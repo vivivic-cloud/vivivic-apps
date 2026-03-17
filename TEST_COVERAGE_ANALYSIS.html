@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Test Coverage Analysis — VIVIVIC Apps</title>
+<style>
+  body { font-family: 'Inter', -apple-system, sans-serif; color: #37352f; max-width: 900px; margin: 0 auto; padding: 24px; line-height: 1.6; }
+  h1 { font-size: 1.8rem; border-bottom: 2px solid #37352f; padding-bottom: 8px; }
+  h2 { font-size: 1.3rem; margin-top: 2rem; color: #37352f; }
+  h3 { font-size: 1.1rem; margin-top: 1.5rem; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.9rem; }
+  th, td { border: 1px solid #ededeb; padding: 8px 12px; text-align: left; }
+  th { background: #f7f6f3; font-weight: 600; }
+  code { background: #f1f1ef; padding: 2px 6px; border-radius: 3px; font-size: 0.85em; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 700; }
+  .p1 { background: #fde2e2; color: #c0392b; }
+  .p2 { background: #fef3cd; color: #856404; }
+  .p3 { background: #d4edda; color: #155724; }
+  .p4 { background: #e2e3e5; color: #383d41; }
+  ul { padding-left: 20px; }
+  li { margin: 4px 0; }
+  .section { background: #fbfbfa; border: 1px solid #ededeb; border-radius: 8px; padding: 16px; margin: 12px 0; }
+</style>
+</head>
+<body>
+
+<h1>Test Coverage Analysis</h1>
+<p><strong>Date:</strong> 2026-03-17 &nbsp;|&nbsp; <strong>Scope:</strong> All applications in vivivic-apps</p>
+
+<h2>Current State: 0% Test Coverage</h2>
+<p>The codebase currently has <strong>no automated tests</strong>, no test framework, no CI/CD pipelines, and no <code>package.json</code>. All three applications are single-file HTML apps with inline React JSX loaded via CDN.</p>
+
+<table>
+  <tr><th>Application</th><th>File</th><th>Lines</th><th>Description</th></tr>
+  <tr><td>반품스캔</td><td>반품스캔_v1.1_20260314_0159.html</td><td>868</td><td>QR/barcode scanning, CS management, Firebase sync</td></tr>
+  <tr><td>에이엠티</td><td>에이엠티.html</td><td>8,415</td><td>Excel-based ordering, timeline, process management</td></tr>
+  <tr><td>조혼가구</td><td>조혼가구.html</td><td>3,829</td><td>Furniture ordering, category browsing, order confirmation</td></tr>
+</table>
+
+<h2>Recommended Testing Strategy</h2>
+<p>Extract pure business logic functions into separate <code>.js</code> modules and test with a lightweight runner (Vitest or Jest). UI flows can later be covered with Playwright E2E tests.</p>
+
+<hr>
+
+<h2>Priority Areas for Test Coverage</h2>
+
+<!-- ============ PRIORITY 1 ============ -->
+<h2><span class="tag p1">P1</span> Critical Business Logic — High Impact, Easy to Extract</h2>
+
+<h3>1.1 Date &amp; Delivery Validation</h3>
+<p><em>Files: 에이엠티.html, 조혼가구.html</em></p>
+<div class="section">
+  <strong>Functions to test:</strong>
+  <ul>
+    <li><code>isWeekendOrHoliday(date)</code> — Checks weekends + Korean holiday list</li>
+    <li><code>getInitialDeliveryDate()</code> — Default delivery date (today + 4 business days)</li>
+    <li><code>validateDeliveryDate(el)</code> — Adjusts user-selected dates to valid business days</li>
+    <li><code>_workDayOffset(dateStr, n)</code> — Offsets a date by N work days</li>
+    <li><code>getKSTDateStr(offsetDays)</code> — KST-aware date string generation</li>
+  </ul>
+  <strong>Why:</strong> Date logic bugs silently cause incorrect delivery promises.<br>
+  <strong>Suggested tests (~15-20 cases):</strong>
+  <ul>
+    <li>Weekend dates get pushed to Monday</li>
+    <li>Korean holidays are skipped correctly</li>
+    <li>Year-end boundary cases (Dec 31 → Jan holidays)</li>
+    <li>Leap year handling</li>
+    <li>Timezone edge cases (KST offset)</li>
+  </ul>
+</div>
+
+<h3>1.2 Data Normalization &amp; Product Identity</h3>
+<p><em>Files: 에이엠티.html, 조혼가구.html</em></p>
+<div class="section">
+  <strong>Functions to test:</strong>
+  <ul>
+    <li><code>normalizeValue(val)</code> — Normalizes null/undefined/empty/"선택없음" values</li>
+    <li><code>buildDisplayName(v1, v2, v3, v4)</code> — Constructs product display names from 4 variant fields</li>
+    <li><code>buildProductIdentities()</code> — Builds unique product identity lookup structures</li>
+  </ul>
+  <strong>Why:</strong> Incorrect normalization leads to duplicate products, wrong orders, or display errors.<br>
+  <strong>Suggested tests (~10-15 cases):</strong>
+  <ul>
+    <li><code>null</code>, <code>undefined</code>, <code>""</code>, <code>" "</code>, <code>"선택없음"</code> all normalize to <code>"선택없음"</code></li>
+    <li>Display names concatenate correctly with missing variants</li>
+    <li>Product identity uniqueness is maintained</li>
+  </ul>
+</div>
+
+<h3>1.3 Process Time Calculation</h3>
+<p><em>File: 조혼가구.html</em></p>
+<div class="section">
+  <strong>Function:</strong> <code>calcProcessTime(row, qty, difficulties, h)</code> — Calculates manufacturing process time based on product attributes, quantity, difficulty factors, and hours.<br>
+  <strong>Why:</strong> Incorrect process time directly impacts production scheduling and delivery promises.<br>
+  <strong>Suggested tests (~5-10 cases):</strong>
+  <ul>
+    <li>Base case calculations with known inputs</li>
+    <li>Edge cases: quantity = 0, missing difficulty values</li>
+    <li>Rounding behavior</li>
+  </ul>
+</div>
+
+<!-- ============ PRIORITY 2 ============ -->
+<h2><span class="tag p2">P2</span> Data Processing — Medium Impact, Moderate Effort</h2>
+
+<h3>2.1 Excel File Parsing</h3>
+<p><em>Files: 에이엠티.html, 조혼가구.html</em></p>
+<div class="section">
+  <strong>Function:</strong> <code>handleFileUpload(input)</code> — Parses uploaded Excel files via SheetJS and builds internal data structures.<br>
+  <strong>Why:</strong> Primary data ingestion path. Malformed Excel files could crash the app or corrupt data silently.<br>
+  <strong>Suggested tests (~10-15 cases):</strong>
+  <ul>
+    <li>Valid Excel file parses correctly</li>
+    <li>Missing columns handled gracefully</li>
+    <li>Empty sheets don't crash</li>
+    <li>Large files (1000+ rows) process correctly</li>
+  </ul>
+</div>
+
+<h3>2.2 Order Management</h3>
+<p><em>File: 에이엠티.html</em></p>
+<div class="section">
+  <strong>Functions to test:</strong>
+  <ul>
+    <li><code>addOrderedProduct()</code> — Adds products with validation</li>
+    <li><code>confirmSelectedToTimeline()</code> — Moves checked orders to confirmed timeline</li>
+    <li><code>moveToRegistered(docId)</code> — Transitions order status in Firestore</li>
+    <li><code>_buildPriorityMap(items)</code> — Builds priority ordering for cutting/production</li>
+  </ul>
+  <strong>Why:</strong> Order state transitions are the core business workflow. Wrong transitions can cause lost or duplicate orders.<br>
+  <strong>Suggested tests (~15-20 cases):</strong>
+  <ul>
+    <li>Cannot add order with missing required fields</li>
+    <li>Quantity validation (positive integers only)</li>
+    <li>State transitions follow valid paths</li>
+    <li>Priority map ordering is deterministic</li>
+  </ul>
+</div>
+
+<h3>2.3 Search &amp; Filtering</h3>
+<p><em>Files: 에이엠티.html, 조혼가구.html</em></p>
+<div class="section">
+  <strong>Functions to test:</strong>
+  <ul>
+    <li><code>handleSearch(query)</code> — Fuzzy product search across multiple fields</li>
+    <li>Category cascade: <code>onSupplierChange()</code> → <code>onCodeChange()</code> → <code>onL1Change()</code> → ... → <code>onL4Change()</code></li>
+  </ul>
+  <strong>Why:</strong> Search bugs prevent users from finding products, directly impacting order volume.<br>
+  <strong>Suggested tests (~10-15 cases):</strong>
+  <ul>
+    <li>Search matches partial strings</li>
+    <li>Empty search returns all results</li>
+    <li>Category filters cascade correctly (selecting L1 resets L2-L4)</li>
+  </ul>
+</div>
+
+<!-- ============ PRIORITY 3 ============ -->
+<h2><span class="tag p3">P3</span> Firebase Integration — High Impact, Higher Effort</h2>
+
+<h3>3.1 Real-time Sync (all apps)</h3>
+<div class="section">
+  <strong>Functions:</strong>
+  <ul>
+    <li><code>initCloudDataSync()</code> — Sets up Firestore real-time listeners</li>
+    <li><code>initConfirmedOrdersSync()</code> — Syncs confirmed orders across devices</li>
+    <li><code>loadCloudExcelData(url, fileName)</code> — Downloads and parses Excel from Firebase Storage</li>
+  </ul>
+  <strong>Why:</strong> Sync failures can cause data loss or stale data without user awareness.<br>
+  <strong>Approach:</strong> Use Firebase Local Emulator Suite for integration tests.
+</div>
+
+<h3>3.2 Notification System (에이엠티)</h3>
+<div class="section">
+  <strong>Functions:</strong>
+  <ul>
+    <li><code>addNotification(type, item)</code> — Creates in-app notifications</li>
+    <li><code>handleNotificationAction(docId, type, notificationId)</code> — Processes notification actions</li>
+    <li><code>clearAllNotifications()</code></li>
+  </ul>
+  <strong>Why:</strong> Missed notifications mean missed order changes or approvals.
+</div>
+
+<!-- ============ PRIORITY 4 ============ -->
+<h2><span class="tag p4">P4</span> UI Component Behavior — E2E Tests</h2>
+
+<div class="section">
+  <ul>
+    <li><strong>Cutting Board:</strong> <code>renderID0508()</code>, <code>setCuttingSort(type)</code></li>
+    <li><strong>Timeline:</strong> <code>renderTimelineConfirmedList()</code>, <code>toggleTlConfDetails(idNum)</code></li>
+    <li><strong>QR Scanning:</strong> Camera initialization, barcode parsing (반품스캔)</li>
+  </ul>
+  <strong>Approach:</strong> Better suited for Playwright/Cypress E2E tests rather than unit tests, since they depend heavily on DOM state.
+</div>
+
+<hr>
+
+<h2>Recommended Implementation Plan</h2>
+<div class="section">
+  <ol>
+    <li><strong>Set up test infrastructure:</strong> <code>npm init -y</code>, install Vitest + jsdom</li>
+    <li><strong>Extract pure functions:</strong> Create <code>src/utils/dates.js</code>, <code>products.js</code>, <code>process.js</code>, <code>search.js</code></li>
+    <li><strong>Write P1 unit tests (~30-45 cases):</strong> Date validation, normalization, process time</li>
+    <li><strong>Add Firebase Emulator tests (P3):</strong> Firestore sync, auth flows, storage</li>
+    <li><strong>Add Playwright E2E tests (P4):</strong> Critical user flows end-to-end</li>
+  </ol>
+</div>
+
+<h2>Summary</h2>
+<table>
+  <tr><th>Priority</th><th>Area</th><th>Est. Test Cases</th><th>Risk if Untested</th></tr>
+  <tr><td><span class="tag p1">P1</span></td><td>Date/delivery validation</td><td>15-20</td><td>Wrong delivery dates promised</td></tr>
+  <tr><td><span class="tag p1">P1</span></td><td>Data normalization</td><td>10-15</td><td>Duplicate/missing products</td></tr>
+  <tr><td><span class="tag p1">P1</span></td><td>Process time calculation</td><td>5-10</td><td>Incorrect schedules</td></tr>
+  <tr><td><span class="tag p2">P2</span></td><td>Excel parsing</td><td>10-15</td><td>Data corruption on import</td></tr>
+  <tr><td><span class="tag p2">P2</span></td><td>Order management</td><td>15-20</td><td>Lost or duplicate orders</td></tr>
+  <tr><td><span class="tag p2">P2</span></td><td>Search &amp; filtering</td><td>10-15</td><td>Users can't find products</td></tr>
+  <tr><td><span class="tag p3">P3</span></td><td>Firebase sync</td><td>10-15</td><td>Silent data loss</td></tr>
+  <tr><td><span class="tag p4">P4</span></td><td>UI components (E2E)</td><td>5-10</td><td>Visual/interaction bugs</td></tr>
+</table>
+<p><strong>Total recommended: ~80-120 test cases</strong>, starting with the ~30-45 pure function tests in P1 for immediate, high-value coverage.</p>
+
+</body>
+</html>
