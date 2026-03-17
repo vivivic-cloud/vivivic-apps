@@ -72,6 +72,7 @@
             padding-bottom: 20px;
             will-change: transform;
             transition: none;
+            min-width: max-content; /* 카드 전체 너비 확보 필수 */
         }
         #tl-infinite-track.momentum {
             transition: transform 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94);
@@ -1388,13 +1389,13 @@
             const pendingContainer = document.getElementById('pending-order-container');
             if (pendingContainer) pendingContainer.style.display = (mode === 'order') ? 'block' : 'none';
 
-            // ✅ 공정 일정 타임라인: 발주서 + 공정관리 탭에서 표시
+            // 공정 일정 타임라인: 발주서 + 공정관리 탭에서 표시
             const timelineSection = document.getElementById('order-timeline-section');
-            if (timelineSection && mode !== 'order' && mode !== 'process') timelineSection.style.display = 'none';
+            if (timelineSection) timelineSection.style.display = (mode === 'order' || mode === 'process') ? 'block' : 'none';
 
-            // ✅ 발주확정목록: 발주서 + 공정관리 탭에서 표시
+            // 발주확정목록: 발주서 탭에서만 표시 (공정관리 탭은 타임라인을 맨 위에 바로 보여야 함)
             const tlConfirmedSection = document.getElementById('timeline-confirmed-section');
-            if (tlConfirmedSection && mode !== 'order' && mode !== 'process') tlConfirmedSection.style.display = 'none';
+            if (tlConfirmedSection) tlConfirmedSection.style.display = (mode === 'order') ? 'block' : 'none';
 
             // 재단발주 전용 섹션: 재단발주 탭에서만 표시
             ['product-name-container', 'confirmed-cutting-section'].forEach(id => {
@@ -1419,8 +1420,12 @@
                 renderConfirmedCuttingList();
             } else if (mode === 'process') {
                 renderProcessTimeline();
-                renderTimelineConfirmedList();
                 initProcessSearch();
+                // 공정관리 탭: 타임라인 섹션을 맨 위로 스크롤
+                setTimeout(() => {
+                    const tl = document.getElementById('order-timeline-section');
+                    if (tl) tl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 50);
             }
         }
 
