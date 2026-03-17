@@ -276,14 +276,8 @@ const App = () => {
     const [status, setStatus] = useState('연결 중…');
     const [activeTab, setActiveTab]               = useState('table');
     const [searchTerm, setSearchTerm]             = useState('');
-    const getDefault3Months = () => {
-        const to = new Date();
-        const from = new Date();
-        from.setMonth(from.getMonth() - 3);
-        return { from: from.toISOString().slice(0,10), to: to.toISOString().slice(0,10) };
-    };
-    const [dateFrom, setDateFrom] = useState(() => getDefault3Months().from);
-    const [dateTo,   setDateTo]   = useState(() => getDefault3Months().to);
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo,   setDateTo]   = useState('');
     const [activeSubHeader, setActiveSubHeader]   = useState('상품명');
     const [currentPage, setCurrentPage]           = useState(1);
     const [fieldInvoiceInput, setFieldInvoiceInput] = useState('');
@@ -323,28 +317,34 @@ const App = () => {
 
     // Firebase
     useEffect(() => {
-        const sdk = window.FirebaseSDK;
-        const app = sdk.initializeApp(firebaseConfig);
-        const auth = sdk.getAuth(app);
-        const fs   = sdk.getFirestore(app);
-        const stor = sdk.getStorage(app);
-        setDb(fs); setStorage(stor);
-        sdk.signInAnonymously(auth);
-        sdk.onAuthStateChanged(auth, u => {
-            if (!u) return;
-            sdk.onSnapshot(sdk.collection(fs,'artifacts',appId,'public','data','cs_records'), snap => {
-                let rows = [];
-                snap.forEach(d => {
-                    try { JSON.parse(d.data().items.replace(/\bNaN\b/g,"null")).forEach((item,idx) => rows.push({ data:[...item], docId:d.id, innerIndex:idx })); } catch{}
+        const initFB = () => {
+            const sdk = window.FirebaseSDK;
+            if (!sdk) { setStatus('SDK 로드 실패'); return; }
+            const app = sdk.initializeApp(firebaseConfig);
+            const auth = sdk.getAuth(app);
+            const fs   = sdk.getFirestore(app);
+            const stor = sdk.getStorage(app);
+            setDb(fs); setStorage(stor);
+            sdk.signInAnonymously(auth).catch(e => setStatus('인증 오류: ' + e.code));
+            sdk.onAuthStateChanged(auth, u => {
+                if (!u) return;
+                sdk.onSnapshot(sdk.collection(fs,'artifacts',appId,'public','data','cs_records'), snap => {
+                    let rows = [];
+                    snap.forEach(d => {
+                        try { JSON.parse(d.data().items.replace(/\bNaN\b/g,"null")).forEach((item,idx) => rows.push({ data:[...item], docId:d.id, innerIndex:idx })); } catch{}
+                    });
+                    setAllRawData(rows); setStatus(`${rows.length.toLocaleString()}건`);
+                }, e => setStatus('읽기 오류: ' + e.code));
+                sdk.onSnapshot(sdk.collection(fs,'artifacts',appId,'public','data','product_records'), snap => {
+                    let list = [];
+                    snap.forEach(d => { try { list=[...list,...JSON.parse(d.data().items.replace(/\bNaN\b/g,"null"))]; } catch{} });
+                    setAllProductRecords(list);
                 });
-                setAllRawData(rows); setStatus(`${rows.length.toLocaleString()}건`);
             });
-            sdk.onSnapshot(sdk.collection(fs,'artifacts',appId,'public','data','product_records'), snap => {
-                let list = [];
-                snap.forEach(d => { try { list=[...list,...JSON.parse(d.data().items.replace(/\bNaN\b/g,"null"))]; } catch{} });
-                setAllProductRecords(list);
-            });
-        });
+        };
+        // ESM 모듈 로드 완료 대기
+        if (window.FirebaseSDK) initFB();
+        else window.addEventListener('firebase-ready', initFB, { once: true });
     }, []);
 
     // 2차보상 auto-string
