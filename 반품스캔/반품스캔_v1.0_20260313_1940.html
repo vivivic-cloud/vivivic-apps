@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>VIVIVIC SYNC — CS Management</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/html5-qrcode"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+    --c-text:   #37352f;
+    --c-text-2: #787774;
+    --c-text-3: #b0aeaa;
+    --c-border:  #ededeb;
+    --c-border-2:#d3d1cb;
+    --c-bg:   #ffffff;
+    --c-bg-2: #f7f6f3;
+    --c-bg-3: #f1f1ef;
+    --c-bg-4: #fbfbfa;
+    --fluid-small: clamp(0.7rem, 1.8vw, 0.8rem);
+    --fluid-mini:  clamp(0.6rem, 1.4vw, 0.7rem);
+}
+* { box-sizing: border-box; }
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    color: var(--c-text); background: var(--c-bg);
+    -webkit-font-smoothing: antialiased; margin: 0;
+    font-size: clamp(0.8rem, 2vw, 0.9rem);
+}
+
+/* ── Scrollbar ── */
+.custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: var(--c-border-2); border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: var(--c-text-3); }
+
+/* ── Toast ── */
+#toast {
+    position: fixed; top: 16px; left: 50%; transform: translateX(-50%);
+    background: var(--c-text); color: #fff; padding: 8px 18px;
+    border-radius: 6px; font-size: 12px; font-weight: 600;
+    opacity: 0; transition: opacity 0.2s ease; z-index: 9999;
+    pointer-events: none; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    white-space: nowrap;
+}
+#toast.show { opacity: 1; }
+
+/* ── Page tabs ── */
+.page-tab {
+    padding: 5px 14px; border-radius: 6px; font-weight: 700;
+    font-size: 12px; color: var(--c-text-2); transition: all 0.15s;
+    cursor: pointer; white-space: nowrap; border: none; background: transparent;
+    user-select: none;
+}
+.page-tab:hover { background: var(--c-bg-3); color: var(--c-text); }
+.page-tab.active {
+    background: var(--c-bg); color: var(--c-text);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08), inset 0 0 0 1px var(--c-border);
+}
+
+/* ── Month pills ── */
+.month-pill {
+    padding: 4px 12px; border-radius: 20px; font-size: 11px; font-weight: 600;
+    color: var(--c-text-2); border: 1px solid var(--c-border); background: var(--c-bg);
+    cursor: pointer; white-space: nowrap; transition: all 0.15s; user-select: none;
+}
+.month-pill:hover { background: var(--c-bg-3); color: var(--c-text); }
+.month-pill.active { background: var(--c-text); color: #fff; border-color: var(--c-text); }
+
+/* ── Notion card ── */
+.notion-card { background: var(--c-bg); border: 1px solid var(--c-border); border-radius: 10px; }
+
+/* ── Inputs / Selects ── */
+.notion-input, .notion-select {
+    appearance: none; background: var(--c-bg); border: 1px solid var(--c-border);
+    border-radius: 6px; padding: 7px 11px; font-size: 12px; color: var(--c-text);
+    font-family: inherit; width: 100%; transition: all 0.15s; font-weight: 500;
+}
+.notion-input:focus, .notion-select:focus { outline: none; border-color: var(--c-text); background: var(--c-bg-4); }
+.notion-input::placeholder { color: var(--c-text-3); }
+
+/* ── Buttons ── */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 5px; border-radius: 7px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all 0.15s; white-space: nowrap; font-family: inherit; }
+.btn-primary { padding: 7px 15px; color: #fff; background: var(--c-text); border: 1px solid var(--c-text); }
+.btn-primary:hover { background: #555250; border-color: #555250; }
+.btn-secondary { padding: 7px 14px; color: var(--c-text-2); background: var(--c-bg-3); border: 1px solid var(--c-border); }
+.btn-secondary:hover { background: #e8e7e4; color: var(--c-text); }
+.btn-icon { padding: 6px; color: var(--c-text-2); background: var(--c-bg); border: 1px solid var(--c-border); border-radius: 7px; }
+.btn-icon:hover { background: var(--c-bg-3); color: var(--c-text); }
+.btn-danger { padding: 7px 14px; color: #c0392b; background: #fdf2f2; border: 1px solid #f5c6c6; }
+.btn-danger:hover { background: #fae0e0; }
+
+/* ── Upload labels ── */
+.upload-label {
+    display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+    padding: 7px 13px; border-radius: 7px; font-size: 12px; font-weight: 700;
+    cursor: pointer; transition: all 0.15s; white-space: nowrap; border: 1px solid var(--c-border);
+    font-family: inherit; user-select: none;
+}
+.upload-cs { background: var(--c-text); color: #fff; border-color: var(--c-text); }
+.upload-cs:hover { background: #555250; }
+.upload-prod { background: var(--c-bg-3); color: var(--c-text-2); }
+.upload-prod:hover { background: #e8e7e4; color: var(--c-text); }
+
+/* ── Table ── */
+.cs-table { border-collapse: separate; border-spacing: 0; width: 100%; }
+.cs-table * { user-select: none; -webkit-user-select: none; }
+.cs-table thead th {
+    position: sticky; top: 0; z-index: 100;
+    padding: 9px 13px; background: var(--c-bg-2);
+    border-bottom: 1px solid var(--c-border); border-right: 1px solid var(--c-border);
+    font-size: 10px; font-weight: 700; color: var(--c-text-2);
+    text-align: left; white-space: nowrap; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.cs-table thead th:last-child { border-right: none; }
+.cs-table thead th.sticky-1 { position: sticky; top: 0; left: 0;      z-index: 130; width: 52px;  min-width: 52px;  max-width: 52px; }
+.cs-table thead th.sticky-2 { position: sticky; top: 0; left: 52px;   z-index: 130; width: 72px;  min-width: 72px;  max-width: 72px; }
+.cs-table thead th.sticky-3 { position: sticky; top: 0; left: 124px;  z-index: 130; width: 140px; min-width: 140px; max-width: 140px; }
+.cs-table tbody tr:hover td { background: var(--c-bg-4); }
+.cs-table tbody td {
+    padding: 8px 13px; border-bottom: 1px solid var(--c-border); border-right: 1px solid var(--c-border);
+    font-size: 11px; font-weight: 400; color: var(--c-text); white-space: nowrap; background: var(--c-bg);
+}
+.cs-table tbody td:last-child { border-right: none; }
+.cs-table tbody td.sticky-1 { position: sticky; left: 0;     z-index: 80; font-weight: 700; font-family: ui-monospace, monospace; font-size: 10px; width:52px;  max-width:52px;  overflow:hidden; text-overflow:ellipsis; }
+.cs-table tbody td.sticky-2 { position: sticky; left: 52px;  z-index: 80; font-weight: 400; color: var(--c-text-2); font-size: 11px; width:72px;  max-width:72px;  overflow:hidden; text-overflow:ellipsis; }
+.cs-table tbody td.sticky-3 { position: sticky; left: 124px; z-index: 80; font-weight: 400; font-size: 11px; width:140px; max-width:140px; overflow:hidden; text-overflow:ellipsis; cursor:default; }
+.cs-table tbody tr:hover td.sticky-1,
+.cs-table tbody tr:hover td.sticky-2,
+.cs-table tbody tr:hover td.sticky-3 { background: var(--c-bg-4); }
+.cs-table tbody td.col-action { color: var(--c-text-2); cursor: pointer; }
+.cs-table tbody td.col-action:hover { color: var(--c-text); text-decoration: underline; }
+
+/* ── Status badge ── */
+.status-badge {
+    display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 4px;
+    font-size: 10px; font-weight: 700; white-space: nowrap;
+}
+.badge-pending { background: #fff3cd; color: #856404; border: 1px solid #ffc107; }
+.badge-done    { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+.badge-wip     { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+.badge-discard { background: var(--c-bg-3); color: var(--c-text-3); border: 1px solid var(--c-border); }
+
+/* ── Popover ── */
+.notion-popover {
+    position: fixed; z-index: 9999;
+    background: var(--c-bg); border: 1px solid var(--c-border); border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.05);
+    padding: 14px 16px; min-width: 200px; max-width: 360px;
+    animation: popIn 0.15s ease-out;
+}
+@keyframes popIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:translateY(0); } }
+.popover-header {
+    font-size: 10px; font-weight: 700; color: var(--c-text-3);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    border-bottom: 1px solid var(--c-border); padding-bottom: 8px; margin-bottom: 10px;
+}
+
+/* ── Part chip ── */
+.part-chip {
+    display: inline-flex; align-items: center; padding: 3px 9px; border-radius: 5px;
+    font-size: 10px; font-weight: 700; border: 1px solid var(--c-border);
+    cursor: pointer; transition: all 0.12s; color: var(--c-text-2); background: var(--c-bg);
+    font-family: inherit;
+}
+.part-chip:hover { background: var(--c-bg-3); color: var(--c-text); }
+.part-chip.on { background: var(--c-text); color: #fff; border-color: var(--c-text); }
+
+/* ── Copy badge ── */
+.copy-badge {
+    display: inline-flex; align-items: center;
+    background: var(--c-bg-3); color: var(--c-text); font-size: 10px;
+    padding: 2px 5px; border-radius: 3px; cursor: pointer; user-select: none;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, monospace;
+    font-weight: 600; border: 1px solid var(--c-border); transition: background 0.1s;
+}
+.copy-badge:hover { background: #e3e2e0; }
+
+/* ── Field section ── */
+.field-section {
+    background: var(--c-bg-2); border: 1px solid var(--c-border);
+    border-radius: 12px; padding: 28px 32px;
+}
+.scan-area {
+    background: var(--c-bg); border: 2px dashed var(--c-border-2);
+    border-radius: 12px; padding: 40px 24px;
+    display: flex; flex-direction: column; align-items: center; gap: 16px;
+}
+#qr-reader-target { width: 100%; max-width: 260px; border-radius: 8px; overflow: hidden; border: 1px solid var(--c-border); }
+.field-label { font-size: 9px; font-weight: 700; color: var(--c-text-3); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 3px; }
+.field-value { font-size: 13px; font-weight: 600; color: var(--c-text); }
+
+/* ── Modal ── */
+.modal-overlay {
+    position: fixed; inset: 0; z-index: 500;
+    background: rgba(0,0,0,0.3); display: flex;
+    align-items: center; justify-content: center; padding: 16px;
+}
+.modal-card {
+    background: var(--c-bg); border: 1px solid var(--c-border);
+    border-radius: 12px; padding: 28px; max-width: 340px; width: 100%;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.12); text-align: center;
+}
+</style>
+</head>
+<body>
+<div id="toast"></div>
+<div id="root"></div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getFirestore, collection, onSnapshot, doc, getDoc, updateDoc, writeBatch, query, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getStorage, ref, uploadBytesResumable, listAll, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
+window.FirebaseSDK = { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, getFirestore, collection, onSnapshot, doc, getDoc, updateDoc, writeBatch, query, getDocs, getStorage, ref, uploadBytesResumable, listAll, deleteObject };
+window.dispatchEvent(new Event('firebase-ready'));
+</script>
+
+<script type="text/babel">
+const { useState, useEffect, useMemo, useRef, Fragment } = React;
+
+const firebaseConfig = {
+    apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
+    authDomain: "vivivic-4b7ef.firebaseapp.com",
+    projectId: "vivivic-4b7ef",
+    storageBucket: "vivivic-4b7ef.firebasestorage.app",
+    appId: "1:830175660542:web:9054030480c8280af8d8af"
+};
+
+const STANDARD_HEADERS = ['CS','생산처','수취인','상품명','옵션값','주소','배송사','주문등록일','입고확인','원주문 제품 (반품제품)','반품사유','회수날짜(물류사)','책임','2차보상 (입고상태)','처리내용','보상항목','판매가','보상비용','요율','처리상태','날짜','기타'];
+const TOGGLEABLE_HEADERS = ['생산처','수취인','상품명','옵션값','주소','배송사','주문등록일','입고확인','원주문 제품 (반품제품)'];
+const PAGE_SIZE = 100;
+
+const showToast = (msg) => {
+    const el = document.getElementById('toast');
+    if (!el) return;
+    el.textContent = msg; el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 2200);
+};
+
+const Icon = ({ name, size = 14 }) => {
+    const paths = {
+        Upload:  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>,
+        Trash:   <><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></>,
+        Box:     <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>,
+        Search:  <><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></>,
+        Camera:  <><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></>,
+        ChevLeft:<polyline points="15 18 9 12 15 6"/>,
+        ChevRight:<polyline points="9 18 15 12 9 6"/>,
+        X:       <path d="M18 6L6 18M6 6l12 12"/>,
+        Check:   <polyline points="20 6 9 17 4 12"/>,
+    };
+    return (
+        <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            {paths[name]}
+        </svg>
+    );
+};
+
+const StatusBadge = ({ val }) => {
+    if (!val || val === '-') return <span style={{color:'var(--c-text-3)'}}>—</span>;
+    const cls = val==='처리완료'?'badge-done': val==='입고완료'?'badge-wip': val==='폐기'?'badge-discard':'badge-pending';
+    return <span className={`status-badge ${cls}`}>{val}</span>;
+};
+
+const App = () => {
+    const [allRawData, setAllRawData]               = useState([]);
+    const [allProductRecords, setAllProductRecords] = useState([]);
+    const [db, setDb]         = useState(null);
+    const [storage, setStorage] = useState(null);
+    const [status, setStatus] = useState('연결 중…');
+    const [activeTab, setActiveTab]               = useState('table');
+    const [searchTerm, setSearchTerm]             = useState('');
+    const getDefault3Months = () => {
+        const to = new Date();
+        const from = new Date();
+        from.setMonth(from.getMonth() - 3);
+        return { from: from.toISOString().slice(0,10), to: to.toISOString().slice(0,10) };
+    };
+    const [dateFrom, setDateFrom] = useState(() => getDefault3Months().from);
+    const [dateTo,   setDateTo]   = useState(() => getDefault3Months().to);
+    const [activeSubHeader, setActiveSubHeader]   = useState('상품명');
+    const [currentPage, setCurrentPage]           = useState(1);
+    const [fieldInvoiceInput, setFieldInvoiceInput] = useState('');
+    const [fieldFoundRow, setFieldFoundRow]         = useState(null);
+    const [fieldCategory, setFieldCategory]         = useState('');
+    const [fieldSelectedParts, setFieldSelectedParts] = useState([]);
+    const [fieldInputs, setFieldInputs] = useState({ recallDate:'', secondComp:'', compItem:'', status:'확인중', detail:'', etc:'' });
+    const [isScanning, setIsScanning]   = useState(false);
+    const [popover, setPopover]         = useState({ show:false, x:0, y:0, row:null, mode:'', text:'' });
+    const [sideTip, setSideTip]         = useState({ show:false, x:0, y:0, text:'' });
+    const [showCSDelete, setShowCSDelete]     = useState(false);
+    const [showProdDelete, setShowProdDelete] = useState(false);
+    const scannerRef  = useRef(null);
+    const tipTimer    = useRef(null);
+    const tableScrollRef = useRef(null);
+    const dragRef = useRef({ dragging:false, startX:0, startY:0, scrollLeft:0, scrollTop:0 });
+    const appId = "vivivic-4b7ef";
+
+    const onTableMouseDown = (e) => {
+        if (e.button !== 0) return;
+        const el = tableScrollRef.current;
+        dragRef.current = { dragging:true, startX:e.clientX, startY:e.clientY, scrollLeft:el.scrollLeft, scrollTop:el.scrollTop };
+        el.style.cursor = 'grabbing';
+        el.style.userSelect = 'none';
+    };
+    const onTableMouseMove = (e) => {
+        if (!dragRef.current.dragging) return;
+        const el = tableScrollRef.current;
+        el.scrollLeft = dragRef.current.scrollLeft - (e.clientX - dragRef.current.startX);
+        el.scrollTop  = dragRef.current.scrollTop  - (e.clientY - dragRef.current.startY);
+    };
+    const onTableMouseUp = () => {
+        dragRef.current.dragging = false;
+        const el = tableScrollRef.current;
+        if (el) { el.style.cursor = 'grab'; el.style.userSelect = ''; }
+    };
+
+    // Firebase
+    useEffect(() => {
+        const sdk = window.FirebaseSDK;
+        const app = sdk.initializeApp(firebaseConfig);
+        const auth = sdk.getAuth(app);
+        const fs   = sdk.getFirestore(app);
+        const stor = sdk.getStorage(app);
+        setDb(fs); setStorage(stor);
+        sdk.signInAnonymously(auth);
+        sdk.onAuthStateChanged(auth, u => {
+            if (!u) return;
+            sdk.onSnapshot(sdk.collection(fs,'artifacts',appId,'public','data','cs_records'), snap => {
+                let rows = [];
+                snap.forEach(d => {
+                    try { JSON.parse(d.data().items.replace(/\bNaN\b/g,"null")).forEach((item,idx) => rows.push({ data:[...item], docId:d.id, innerIndex:idx })); } catch{}
+                });
+                setAllRawData(rows); setStatus(`${rows.length.toLocaleString()}건`);
+            });
+            sdk.onSnapshot(sdk.collection(fs,'artifacts',appId,'public','data','product_records'), snap => {
+                let list = [];
+                snap.forEach(d => { try { list=[...list,...JSON.parse(d.data().items.replace(/\bNaN\b/g,"null"))]; } catch{} });
+                setAllProductRecords(list);
+            });
+        });
+    }, []);
+
+    // 2차보상 auto-string
+    useEffect(() => {
+        if (fieldCategory === '이상없음') { setFieldInputs(p=>({...p,secondComp:'이상없음'})); return; }
+        if ((fieldCategory==='파손'||fieldCategory==='생산불량') && fieldSelectedParts.length>0) {
+            const sfx = fieldCategory==='파손' ? ' 파손' : ' 불량';
+            setFieldInputs(p=>({...p, secondComp:fieldSelectedParts.map(x=>x+sfx).join(', ')}));
+        }
+    }, [fieldCategory, fieldSelectedParts]);
+
+    const getPartsForProduct = name => {
+        if (!name || !allProductRecords.length) return [];
+        const t = String(name).trim();
+        const m = allProductRecords.filter(p => { const n=String(p[0]||'').trim(); return n && t.includes(n); });
+        return [...new Set(m.map(p=>String(p[5]||'').trim()).filter(n=>n&&n!=='-'))];
+    };
+
+    const parseRowDate = (str) => {
+        const s = String(str||'').trim();
+        // YYYY.MM.DD / YYYY-MM-DD / YYYY/MM/DD
+        let m = s.match(/(\d{4})[.\-\/](\d{1,2})[.\-\/](\d{1,2})/);
+        if (m) return new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3]));
+        // YYYY.MM / YYYY-MM (일 없는 경우)
+        m = s.match(/(\d{4})[.\-\/](\d{1,2})/);
+        if (m) return new Date(parseInt(m[1]), parseInt(m[2])-1, 1);
+        return null;
+    };
+
+    const filteredData = useMemo(() => {
+        let r = allRawData.filter(m =>
+            String(m.data[0]||'').trim() !== '' &&
+            !['기사방문AS','선불정산용','비용보상'].includes(String(m.data[3]||'').replace(/\s+/g,''))
+        );
+        const from = dateFrom ? new Date(dateFrom) : null;
+        const to   = dateTo   ? new Date(dateTo + 'T23:59:59') : null;
+        if (from || to) {
+            r = r.filter(m => {
+                const d = parseRowDate(m.data[7]);
+                if (!d) return true; // 날짜 파싱 불가 → 숨기지 않고 표시
+                if (from && d < from) return false;
+                if (to   && d > to)   return false;
+                return true;
+            });
+        }
+        if (searchTerm) { const lo=searchTerm.toLowerCase(); r=r.filter(m=>m.data.some(c=>String(c).toLowerCase().includes(lo))); }
+        return r;
+    }, [allRawData, dateFrom, dateTo, searchTerm]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredData.length/PAGE_SIZE));
+    const pagedData  = useMemo(()=>filteredData.slice((currentPage-1)*PAGE_SIZE, currentPage*PAGE_SIZE),[filteredData,currentPage]);
+    useEffect(()=>setCurrentPage(1),[dateFrom,dateTo,searchTerm]);
+
+    const handleSearch = inv => {
+        const cl = String(inv).trim(); if(!cl) return;
+        const found = allRawData.find(m=>String(m.data[22]||'')===cl||String(m.data[12]||'').includes(cl));
+        if (found) {
+            setFieldFoundRow(found);
+            setFieldInputs({ recallDate:found.data[11]||'', secondComp:found.data[13]||'', compItem:found.data[15]||'', status:found.data[19]||'확인중', detail:found.data[14]||'', etc:found.data[21]||'' });
+            setFieldCategory(''); setFieldSelectedParts([]);
+        } else showToast('조회 결과 없음');
+    };
+
+    const startScanner = async () => {
+        const qr = new window.Html5Qrcode("qr-reader-target");
+        scannerRef.current = qr; setIsScanning(true);
+        try { await qr.start({facingMode:"environment"},{fps:15,qrbox:220},text=>{handleSearch(text);stopScanner();}); }
+        catch { setIsScanning(false); }
+    };
+    const stopScanner = async () => { if(scannerRef.current){await scannerRef.current.stop();scannerRef.current=null;} setIsScanning(false); };
+
+    const openPopover = (e, mode, row, text='') => {
+        const r = e.currentTarget.getBoundingClientRect();
+        const x = Math.min(r.left, window.innerWidth - 380);
+        const y = r.bottom + 6 + 300 > window.innerHeight ? r.top - 10 : r.bottom + 6;
+        setPopover({show:true, x: Math.max(8, x), y, row, mode, text});
+    };
+    const closePopover = () => { setPopover(p=>({...p,show:false})); setFieldCategory(''); setFieldSelectedParts([]); };
+
+    const updateRow = async (rowObj, colIdx, val) => {
+        const docRef = window.FirebaseSDK.doc(db,'artifacts',appId,'public','data','cs_records',rowObj.docId);
+        const snap = await window.FirebaseSDK.getDoc(docRef);
+        const items = JSON.parse(snap.data().items);
+        items[rowObj.innerIndex][colIdx] = val;
+        await window.FirebaseSDK.updateDoc(docRef,{items:JSON.stringify(items),updatedAt:new Date()});
+        showToast('저장됨');
+    };
+
+    const handleFieldSubmit = async () => {
+        if(!fieldFoundRow||!db) return;
+        const docRef = window.FirebaseSDK.doc(db,'artifacts',appId,'public','data','cs_records',fieldFoundRow.docId);
+        const snap=await window.FirebaseSDK.getDoc(docRef); const items=JSON.parse(snap.data().items); const i=fieldFoundRow.innerIndex;
+        items[i][11]=fieldInputs.recallDate; items[i][13]=fieldInputs.secondComp; items[i][14]=fieldInputs.detail;
+        items[i][15]=fieldInputs.compItem;  items[i][19]=fieldInputs.status;     items[i][21]=fieldInputs.etc;
+        await window.FirebaseSDK.updateDoc(docRef,{items:JSON.stringify(items),updatedAt:new Date()});
+        showToast('전송 완료'); setFieldFoundRow(null); setFieldInvoiceInput('');
+    };
+
+    const handleDeleteCS = async () => {
+        const snap=await window.FirebaseSDK.getDocs(window.FirebaseSDK.query(window.FirebaseSDK.collection(db,'artifacts',appId,'public','data','cs_records')));
+        const batch=window.FirebaseSDK.writeBatch(db); snap.forEach(d=>batch.delete(d.ref)); await batch.commit();
+        setShowCSDelete(false); setAllRawData([]); showToast('CS 초기화 완료');
+    };
+    const handleDeleteProd = async () => {
+        const snap=await window.FirebaseSDK.getDocs(window.FirebaseSDK.query(window.FirebaseSDK.collection(db,'artifacts',appId,'public','data','product_records')));
+        const batch=window.FirebaseSDK.writeBatch(db); snap.forEach(d=>batch.delete(d.ref)); await batch.commit();
+        try { const list=await window.FirebaseSDK.listAll(window.FirebaseSDK.ref(storage,'product_info_uploads')); await Promise.all(list.items.map(f=>window.FirebaseSDK.deleteObject(f))); } catch{}
+        setShowProdDelete(false); setAllProductRecords([]); showToast('제품 초기화 완료');
+    };
+    const uploadFile = (path, file) => {
+        if(!file||!storage) return;
+        const r=window.FirebaseSDK.ref(storage,`${path}/${Date.now()}_${file.name}`);
+        window.FirebaseSDK.uploadBytesResumable(r,file).on('state_changed',null,null,()=>showToast('업로드 완료'));
+    };
+
+    return (
+        <div style={{minHeight:'100vh',display:'flex',flexDirection:'column'}}>
+
+            {/* 인플레이스 확장 툴팁 (수취인 / 상품명 / 반품사유 공통) */}
+            {sideTip.show && sideTip.text && (
+                <div style={{
+                    position:'fixed', zIndex:9997, pointerEvents:'none',
+                    left: sideTip.x - 1,
+                    top: sideTip.y - 1,
+                    minHeight: sideTip.h + 2,
+                    display:'flex', alignItems:'center',
+                    padding:'0 13px',
+                    background:'#ffffff',
+                    border:'1px solid var(--c-border-2)',
+                    borderRadius:7,
+                    boxShadow:'2px 0 12px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04)',
+                    whiteSpace:'nowrap',
+                    fontSize:11, fontWeight:500, color:'var(--c-text)',
+                    letterSpacing:'0.01em',
+                    transition:'opacity 0.1s',
+                }}>
+                    {sideTip.text}
+                </div>
+            )}
+
+            {/* Popover */}
+            {popover.show && (
+                <Fragment>
+                    <div style={{position:'fixed',inset:0,zIndex:9990,pointerEvents:popover.mode==='info'?'none':'auto'}} onClick={closePopover}/>
+                    <div className="notion-popover" style={{left:popover.x,top:popover.y}}>
+                        <div className="popover-header">
+                            {popover.mode==='resp'?'책임 배정':popover.mode==='comp'?'2차보상 입력':'반품사유'}
+                        </div>
+                        {popover.mode==='resp' && (
+                            <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                                {['물류','수입','자재','생산','자사'].map(v=>(
+                                    <button key={v} className="btn btn-secondary" style={{justifyContent:'flex-start'}}
+                                        onClick={()=>{updateRow(popover.row,12,v);closePopover();}}>
+                                        {v}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        {popover.mode==='comp' && (
+                            <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                                <div style={{fontSize:11,fontWeight:600,color:'var(--c-text-2)',background:'var(--c-bg-2)',padding:'6px 10px',borderRadius:6,border:'1px solid var(--c-border)'}}>
+                                    {popover.row.data[9]}
+                                </div>
+                                <select className="notion-select" value={fieldCategory} onChange={e=>{setFieldCategory(e.target.value);setFieldSelectedParts([]);}}>
+                                    <option value="">분류 선택…</option>
+                                    <option>이상없음</option><option>파손</option><option>생산불량</option>
+                                </select>
+                                {fieldCategory&&fieldCategory!=='이상없음'&&(
+                                    <div style={{display:'flex',flexWrap:'wrap',gap:5,maxHeight:110,overflowY:'auto'}}>
+                                        {getPartsForProduct(popover.row.data[9]).map(p=>(
+                                            <button key={p} className={`part-chip ${fieldSelectedParts.includes(p)?'on':''}`}
+                                                onClick={()=>setFieldSelectedParts(prev=>prev.includes(p)?prev.filter(x=>x!==p):[...prev,p])}>
+                                                {p}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                                {fieldInputs.secondComp&&<div style={{fontSize:11,color:'var(--c-text-2)',fontWeight:600,background:'var(--c-bg-2)',padding:'4px 8px',borderRadius:5,border:'1px solid var(--c-border)'}}>→ {fieldInputs.secondComp}</div>}
+                                <button className="btn btn-primary" onClick={()=>{updateRow(popover.row,13,fieldInputs.secondComp);closePopover();}}>
+                                    <Icon name="Check"/> 저장
+                                </button>
+                            </div>
+                        )}
+                        {popover.mode==='info' && <p style={{fontSize:12,lineHeight:1.6}}>{popover.text||'—'}</p>}
+                        {popover.mode!=='info'&&<button onClick={closePopover} style={{marginTop:10,fontSize:10,color:'var(--c-text-3)',background:'none',border:'none',cursor:'pointer',width:'100%'}}>닫기</button>}
+                    </div>
+                </Fragment>
+            )}
+
+            {/* Header */}
+            <header style={{padding:'0 24px',height:52,display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid var(--c-border)',background:'var(--c-bg)',position:'sticky',top:0,zIndex:200}}>
+                <div style={{display:'flex',alignItems:'center',gap:18}}>
+                    <div style={{fontSize:15,fontWeight:800,letterSpacing:'-0.02em'}}>
+                        VIVIVIC <span style={{color:'var(--c-text-3)',fontWeight:500}}>Sync</span>
+                    </div>
+                    <div style={{display:'flex',gap:3,background:'var(--c-bg-3)',borderRadius:8,padding:3}}>
+                        <button className={`page-tab ${activeTab==='table'?'active':''}`} onClick={()=>setActiveTab('table')}>CS 목록</button>
+                        <button className={`page-tab ${activeTab==='field'?'active':''}`} onClick={()=>setActiveTab('field')}>Field 관리</button>
+                    </div>
+                    <span style={{fontSize:11,color:'var(--c-text-3)',fontWeight:500}}>{status}</span>
+                </div>
+                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                    <select className="notion-select" style={{width:'auto',minWidth:96,padding:'5px 9px',fontSize:11}}
+                        value={activeSubHeader} onChange={e=>setActiveSubHeader(e.target.value)}>
+                        {TOGGLEABLE_HEADERS.map(h=><option key={h}>{h}</option>)}
+                    </select>
+                    <label className="upload-label upload-prod">
+                        <Icon name="Box"/> 제품DB
+                        <input type="file" style={{display:'none'}} onChange={e=>{uploadFile('product_info_uploads',e.target.files[0]);e.target.value='';}}/>
+                    </label>
+                    <button className="btn btn-icon" title="제품 초기화" onClick={()=>setShowProdDelete(true)} style={{color:'#1e40af'}}><Icon name="Trash"/></button>
+                    <label className="upload-label upload-cs">
+                        <Icon name="Upload"/> CS 업로드
+                        <input type="file" style={{display:'none'}} onChange={e=>{uploadFile('raw_uploads',e.target.files[0]);e.target.value='';}}/>
+                    </label>
+                    <button className="btn btn-icon" title="CS 초기화" onClick={()=>setShowCSDelete(true)} style={{color:'#c0392b'}}><Icon name="Trash"/></button>
+                </div>
+            </header>
+
+            {/* Main */}
+            <main style={{flex:1,padding:'24px 28px',maxWidth:1800,margin:'0 auto',width:'100%',display:'flex',flexDirection:'column',gap:20}}>
+
+                {/* CS TABLE */}
+                {activeTab==='table' && (
+                    <Fragment>
+                        {/* Filters */}
+                        <div style={{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}}>
+                            {/* 검색 */}
+                            <div style={{position:'relative',flex:'0 0 220px'}}>
+                                <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',color:'var(--c-text-3)',pointerEvents:'none'}}><Icon name="Search" size={13}/></span>
+                                <input className="notion-input" style={{paddingLeft:30,fontSize:11}} placeholder="검색…" value={searchTerm} onChange={e=>setSearchTerm(e.target.value)}/>
+                            </div>
+                            {/* 날짜 범위 */}
+                            <div style={{display:'flex',alignItems:'center',gap:6}}>
+                                <input type="date" className="notion-input" style={{fontSize:11,width:130}}
+                                    value={dateFrom} onChange={e=>setDateFrom(e.target.value)}/>
+                                <span style={{fontSize:11,color:'var(--c-text-3)'}}>~</span>
+                                <input type="date" className="notion-input" style={{fontSize:11,width:130}}
+                                    value={dateTo} onChange={e=>setDateTo(e.target.value)}/>
+                            </div>
+                            {/* 빠른 선택 */}
+                            <div style={{display:'flex',gap:4}}>
+                                {[
+                                    { label:'1개월', months:1 },
+                                    { label:'3개월', months:3 },
+                                    { label:'6개월', months:6 },
+                                    { label:'1년',   months:12 },
+                                ].map(({label, months}) => {
+                                    const to = new Date();
+                                    const from = new Date();
+                                    from.setMonth(from.getMonth() - months);
+                                    const fStr = from.toISOString().slice(0,10);
+                                    const tStr = to.toISOString().slice(0,10);
+                                    const isActive = dateFrom===fStr && dateTo===tStr;
+                                    return (
+                                        <button key={label}
+                                            className={`month-pill ${isActive?'active':''}`}
+                                            onClick={()=>{ setDateFrom(fStr); setDateTo(tStr); }}>
+                                            {label}
+                                        </button>
+                                    );
+                                })}
+                                <button className="month-pill" style={{color:'var(--c-text-3)'}}
+                                    onClick={()=>{ setDateFrom(''); setDateTo(''); }}>
+                                    전체
+                                </button>
+                            </div>
+                            {/* 결과 건수 */}
+                            <span style={{fontSize:11,color:'var(--c-text-3)',marginLeft:'auto'}}>
+                                {filteredData.length.toLocaleString()}건
+                            </span>
+                        </div>
+
+                        {/* Table */}
+                        <div className="notion-card" style={{overflow:'hidden'}}>
+                            <div ref={tableScrollRef} className="custom-scrollbar"
+                                style={{overflowX:'auto',overflowY:'auto',maxHeight:560,cursor:'grab'}}
+                                onMouseDown={onTableMouseDown}
+                                onMouseMove={onTableMouseMove}
+                                onMouseUp={onTableMouseUp}
+                                onMouseLeave={onTableMouseUp}>
+                                <table className="cs-table">
+                                    <thead>
+                                        <tr>
+                                            <th className="sticky-1">CS</th>
+                                            <th className="sticky-2">수취인</th>
+                                            <th className="sticky-3" style={{fontStyle:'italic',color:'var(--c-text)'}}>{activeSubHeader}</th>
+                                            {STANDARD_HEADERS.slice(10,22).map(h=><th key={h}>{h}</th>)}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {pagedData.length===0?(
+                                            <tr><td colSpan={15} style={{textAlign:'center',padding:48,color:'var(--c-text-3)',fontSize:13}}>데이터 없음</td></tr>
+                                        ):pagedData.map((m,i)=>(
+                                            <tr key={i}>
+                                                <td className="sticky-1">{m.data[0]||'—'}</td>
+                                                <td className="sticky-2"
+                                                    onMouseEnter={e=>{const r=e.currentTarget.getBoundingClientRect();setSideTip({show:true,x:r.left,y:r.top,h:r.height,text:m.data[2]||''}); }}
+                                                    onMouseLeave={()=>setSideTip(p=>({...p,show:false}))}>
+                                                    {m.data[2]||'—'}
+                                                </td>
+                                                <td className="sticky-3"
+                                                    onMouseEnter={e=>{const r=e.currentTarget.getBoundingClientRect();setSideTip({show:true,x:r.left,y:r.top,h:r.height,text:m.data[STANDARD_HEADERS.indexOf(activeSubHeader)]||''}); }}
+                                                    onMouseLeave={()=>setSideTip(p=>({...p,show:false}))}>
+                                                    {m.data[STANDARD_HEADERS.indexOf(activeSubHeader)]||'—'}
+                                                </td>
+                                                {STANDARD_HEADERS.slice(10,22).map((_,idx)=>{
+                                                    const ri=idx+10;
+                                                    if(ri===19) return <td key={ri}><StatusBadge val={m.data[ri]}/></td>;
+                                                    if(ri===12||ri===13) return <td key={ri} className="col-action" onClick={e=>openPopover(e,ri===12?'resp':'comp',m)}>{m.data[ri]||<span style={{color:'var(--c-text-3)'}}>—</span>}</td>;
+                                                    if(ri===10) return (
+                                                        <td key={ri} style={{maxWidth:140,overflow:'hidden',textOverflow:'ellipsis',cursor:'default'}}
+                                                            onMouseEnter={e=>{
+                                                                const r=e.currentTarget.getBoundingClientRect();
+                                                                setSideTip({show:true, x:r.left, y:r.top, h:r.height, text:m.data[ri]||''});
+                                                            }}
+                                                            onMouseLeave={()=>setSideTip(p=>({...p,show:false}))}>
+                                                            {m.data[ri]||'—'}
+                                                        </td>
+                                                    );
+                                                    return <td key={ri}>{m.data[ri]||'—'}</td>;
+                                                })}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            {/* Pagination */}
+                            {totalPages>1&&(
+                                <div style={{padding:'10px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',borderTop:'1px solid var(--c-border)',background:'var(--c-bg-2)'}}>
+                                    <span style={{fontSize:11,color:'var(--c-text-3)'}}>
+                                        {(currentPage-1)*PAGE_SIZE+1}–{Math.min(currentPage*PAGE_SIZE,filteredData.length)} / {filteredData.length.toLocaleString()}건
+                                    </span>
+                                    <div style={{display:'flex',alignItems:'center',gap:6}}>
+                                        <button className="btn btn-icon" onClick={()=>setCurrentPage(p=>Math.max(1,p-1))} style={{opacity:currentPage===1?0.35:1}}>
+                                            <Icon name="ChevLeft"/>
+                                        </button>
+                                        <span style={{fontSize:11,fontWeight:600,color:'var(--c-text-2)',minWidth:60,textAlign:'center'}}>{currentPage} / {totalPages}</span>
+                                        <button className="btn btn-icon" onClick={()=>setCurrentPage(p=>Math.min(totalPages,p+1))} style={{opacity:currentPage===totalPages?0.35:1}}>
+                                            <Icon name="ChevRight"/>
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </Fragment>
+                )}
+
+                {/* FIELD */}
+                {activeTab==='field' && (
+                    <div className="field-section">
+                        {/* Section header + search */}
+                        <div style={{marginBottom:24,display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12}}>
+                            <div>
+                                <div style={{fontSize:13,fontWeight:800,letterSpacing:'-0.01em'}}>Field Management</div>
+                                <div style={{fontSize:11,color:'var(--c-text-3)',marginTop:2}}>송장번호 스캔 또는 직접 입력</div>
+                            </div>
+                            <div style={{display:'flex',gap:6,flex:'1 1 260px',maxWidth:380}}>
+                                <input className="notion-input" style={{flex:1}} placeholder="송장번호 입력 후 Enter"
+                                    value={fieldInvoiceInput} onChange={e=>setFieldInvoiceInput(e.target.value)}
+                                    onKeyDown={e=>e.key==='Enter'&&handleSearch(fieldInvoiceInput)}/>
+                                <button className="btn btn-primary" onClick={()=>handleSearch(fieldInvoiceInput)}><Icon name="Search"/></button>
+                            </div>
+                        </div>
+
+                        {/* Scanner */}
+                        {!fieldFoundRow&&(
+                            <div className="scan-area">
+                                <div id="qr-reader-target"/>
+                                {!isScanning?(
+                                    <button className="btn btn-primary" style={{fontSize:13,padding:'10px 28px'}} onClick={startScanner}>
+                                        <Icon name="Camera" size={15}/> 카메라 스캔 시작
+                                    </button>
+                                ):(
+                                    <button className="btn btn-secondary" onClick={stopScanner}><Icon name="X"/> 중지</button>
+                                )}
+                                <p style={{fontSize:11,color:'var(--c-text-3)',margin:0}}>QR 코드 또는 바코드를 카메라 앞에 위치시키세요</p>
+                            </div>
+                        )}
+
+                        {/* Entry form */}
+                        {fieldFoundRow&&(
+                            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+                                {/* Info card */}
+                                <div className="notion-card" style={{padding:20}}>
+                                    <div style={{fontSize:10,fontWeight:700,color:'var(--c-text-3)',textTransform:'uppercase',letterSpacing:'0.07em',borderBottom:'1px solid var(--c-border)',paddingBottom:8,marginBottom:14}}>조회 결과</div>
+                                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+                                        <div><div className="field-label">수취인</div><div className="field-value">{fieldFoundRow.data[2]||'—'}</div></div>
+                                        <div><div className="field-label">CS 번호</div><span className="copy-badge">{fieldFoundRow.data[0]||'—'}</span></div>
+                                        <div style={{gridColumn:'1/-1'}}><div className="field-label">상품명</div><div style={{fontSize:12,fontWeight:600,marginTop:2,lineHeight:1.5}}>{fieldFoundRow.data[3]||'—'}</div></div>
+                                        <div style={{gridColumn:'1/-1'}}><div className="field-label">반품제품</div><div style={{fontSize:11,color:'var(--c-text-2)',marginTop:2}}>{fieldFoundRow.data[9]||'—'}</div></div>
+                                    </div>
+                                    <button className="btn btn-secondary" style={{marginTop:18,width:'100%',fontSize:11}}
+                                        onClick={()=>{setFieldFoundRow(null);setFieldInvoiceInput('');setFieldCategory('');setFieldSelectedParts([]);}}>
+                                        <Icon name="X" size={13}/> 초기화
+                                    </button>
+                                </div>
+
+                                {/* Edit form */}
+                                <div style={{display:'flex',flexDirection:'column',gap:12}}>
+                                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                                        <div>
+                                            <div className="field-label" style={{marginBottom:4}}>회수날짜</div>
+                                            <input className="notion-input" placeholder="YY.MM.DD" value={fieldInputs.recallDate} onChange={e=>setFieldInputs(p=>({...p,recallDate:e.target.value}))}/>
+                                        </div>
+                                        <div>
+                                            <div className="field-label" style={{marginBottom:4}}>처리상태</div>
+                                            <select className="notion-select" value={fieldInputs.status} onChange={e=>setFieldInputs(p=>({...p,status:e.target.value}))}>
+                                                <option>확인중</option><option>입고완료</option><option>처리완료</option><option>폐기</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {/* 2차보상 */}
+                                    <div className="notion-card" style={{padding:14}}>
+                                        <div className="field-label" style={{marginBottom:8}}>2차보상 (입고상태)</div>
+                                        <select className="notion-select" style={{marginBottom:8}} value={fieldCategory}
+                                            onChange={e=>{setFieldCategory(e.target.value);setFieldSelectedParts([]);}}>
+                                            <option value="">분류 선택…</option>
+                                            <option>이상없음</option><option>파손</option><option>생산불량</option>
+                                        </select>
+                                        {fieldCategory&&fieldCategory!=='이상없음'&&(
+                                            <div style={{display:'flex',flexWrap:'wrap',gap:5,maxHeight:100,overflowY:'auto',marginBottom:8}}>
+                                                {getPartsForProduct(fieldFoundRow.data[9]).length===0
+                                                    ? <span style={{fontSize:11,color:'var(--c-text-3)'}}>부속 데이터 없음</span>
+                                                    : getPartsForProduct(fieldFoundRow.data[9]).map(p=>(
+                                                        <button key={p} className={`part-chip ${fieldSelectedParts.includes(p)?'on':''}`}
+                                                            onClick={()=>setFieldSelectedParts(prev=>prev.includes(p)?prev.filter(x=>x!==p):[...prev,p])}>
+                                                            {p}
+                                                        </button>
+                                                    ))}
+                                            </div>
+                                        )}
+                                        {fieldInputs.secondComp&&(
+                                            <div style={{fontSize:11,fontWeight:600,color:'var(--c-text-2)',background:'var(--c-bg-2)',padding:'5px 10px',borderRadius:5,border:'1px solid var(--c-border)'}}>
+                                                → {fieldInputs.secondComp}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:10}}>
+                                        <div>
+                                            <div className="field-label" style={{marginBottom:4}}>처리내용</div>
+                                            <input className="notion-input" placeholder="처리내용" value={fieldInputs.detail} onChange={e=>setFieldInputs(p=>({...p,detail:e.target.value}))}/>
+                                        </div>
+                                        <div>
+                                            <div className="field-label" style={{marginBottom:4}}>보상항목</div>
+                                            <input className="notion-input" placeholder="항목" value={fieldInputs.compItem} onChange={e=>setFieldInputs(p=>({...p,compItem:e.target.value}))}/>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="field-label" style={{marginBottom:4}}>기타</div>
+                                        <input className="notion-input" placeholder="기타 메모" value={fieldInputs.etc} onChange={e=>setFieldInputs(p=>({...p,etc:e.target.value}))}/>
+                                    </div>
+                                    <button className="btn btn-primary" style={{width:'100%',padding:'11px',fontSize:13,marginTop:4}} onClick={handleFieldSubmit}>
+                                        <Icon name="Check" size={15}/> 저장 완료
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </main>
+
+            {/* CS Delete Modal */}
+            {showCSDelete&&(
+                <div className="modal-overlay">
+                    <div className="modal-card">
+                        <div style={{fontSize:13,fontWeight:800,color:'#c0392b',marginBottom:8}}>CS 데이터 초기화</div>
+                        <p style={{fontSize:12,color:'var(--c-text-2)',marginBottom:20,lineHeight:1.6}}>전체 CS 레코드가 영구 삭제됩니다.<br/>이 작업은 되돌릴 수 없습니다.</p>
+                        <div style={{display:'flex',gap:8}}>
+                            <button className="btn btn-secondary" style={{flex:1}} onClick={()=>setShowCSDelete(false)}>취소</button>
+                            <button className="btn btn-danger" style={{flex:1}} onClick={handleDeleteCS}>초기화</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Prod Delete Modal */}
+            {showProdDelete&&(
+                <div className="modal-overlay">
+                    <div className="modal-card">
+                        <div style={{fontSize:13,fontWeight:800,color:'#1e40af',marginBottom:8}}>제품 데이터 초기화</div>
+                        <p style={{fontSize:12,color:'var(--c-text-2)',marginBottom:20,lineHeight:1.6}}>제품 DB 및 업로드 파일이 삭제됩니다.<br/>이 작업은 되돌릴 수 없습니다.</p>
+                        <div style={{display:'flex',gap:8}}>
+                            <button className="btn btn-secondary" style={{flex:1}} onClick={()=>setShowProdDelete(false)}>취소</button>
+                            <button className="btn" style={{flex:1,background:'#1e40af',color:'#fff',border:'1px solid #1e40af',padding:'7px 14px'}} onClick={handleDeleteProd}>초기화</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
