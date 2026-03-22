@@ -523,43 +523,55 @@
         }
         #tl-datecard-expand.active .tl-dc-panel { transform: scale(1) translateY(0); }
 
-        /* ── 공정별 타임라인 오버레이 ── */
-        #tl-process-view {
-            position: fixed; inset: 0; z-index: 9000;
-            background: rgba(15,15,15,0.45);
-            opacity: 0; pointer-events: none;
-            transition: opacity 0.2s;
-            display: flex; align-items: flex-end;
-        }
-        #tl-process-view.active { opacity: 1; pointer-events: auto; }
-        #tl-process-view .tl-pv-panel {
-            background: #fff; border-radius: 16px 16px 0 0;
-            width: 100%; max-height: 80vh;
+        /* ── 공정별 타임라인 페이지 ── */
+        #tl-process-page {
+            position: fixed; inset: 0;
+            background: #fff;
+            z-index: 9100;
+            transform: translateX(100%);
+            transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
             display: flex; flex-direction: column;
-            transform: translateY(100%);
-            transition: transform 0.25s cubic-bezier(.4,0,.2,1);
+            overflow: hidden;
         }
-        #tl-process-view.active .tl-pv-panel { transform: translateY(0); }
-        .tl-pv-header {
+        #tl-process-page.active { transform: translateX(0); }
+        #tl-pp-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid #ededeb;
+            background: #fff;
+            flex-shrink: 0;
+            display: flex; align-items: center; gap: 12px;
+        }
+        #tl-pp-back {
+            display: flex; align-items: center; justify-content: center;
+            width: 34px; height: 34px;
+            background: #f5f5f4; border: none; border-radius: 50%;
+            cursor: pointer; font-size: 16px; color: #37352f;
+            flex-shrink: 0;
+        }
+        #tl-pp-body {
+            flex: 1; overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 12px 14px;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .tl-pp-date-group { border: 1px solid #ededeb; border-radius: 12px; overflow: hidden; }
+        .tl-pp-date-hdr {
             display: flex; align-items: center; gap: 10px;
-            padding: 14px 16px 10px; border-bottom: 1px solid #ededeb; flex-shrink: 0;
+            padding: 10px 14px; border-bottom: 1px solid #ededeb;
         }
-        .tl-pv-close {
-            width: 28px; height: 28px; border-radius: 50%;
-            background: #f1f0ef; border: none; cursor: pointer;
-            font-size: 13px; color: #787774;
-        }
-        .tl-pv-body { flex: 1; overflow-y: auto; padding: 12px 16px; }
-        .tl-pv-date-group { margin-bottom: 10px; border: 1px solid #ededeb; border-radius: 10px; overflow: hidden; }
-        .tl-pv-item {
+        .tl-pp-item {
             display: flex; align-items: center; gap: 8px;
-            padding: 8px 12px; border-bottom: 1px solid #f5f5f4;
+            padding: 10px 14px; border-bottom: 1px solid #f5f5f4;
         }
-        .tl-pv-item:last-child { border-bottom: none; }
-        .tl-pv-item-name { font-size: 12px; font-weight: 700; color: #37352f; flex: 1; }
-        .tl-pv-item-qty {
-            font-size: 11px; font-weight: 700; color: #787774;
-            background: #f1f0ef; padding: 1px 7px; border-radius: 4px;
+        .tl-pp-item:last-child { border-bottom: none; }
+        .tl-pp-item-name { font-size: 13px; font-weight: 700; color: #37352f; flex: 1; }
+        .tl-pp-item-qty {
+            font-size: 12px; font-weight: 800; color: #37352f;
+            background: #f1f0ef; padding: 2px 8px; border-radius: 5px;
+        }
+        .tl-pp-empty {
+            padding: 48px; text-align: center;
+            font-size: 13px; color: #c8c6c2; font-weight: 600;
         }
         .tl-dc-close {
             position: absolute; top: 10px; right: 12px;
@@ -1204,6 +1216,14 @@
             <div id="tl-dp-title"></div>
         </div>
         <div id="tl-dp-body"></div>
+    </div>
+
+    <div id="tl-process-page">
+        <div id="tl-pp-header">
+            <button id="tl-pp-back" onclick="tlCloseProcessPage()">←</button>
+            <div id="tl-pp-title" style="flex:1;min-width:0;"></div>
+        </div>
+        <div id="tl-pp-body"></div>
     </div>
 
     <div id="main-container" class="w-full max-w-6xl mx-auto px-4 mt-8 space-y-12">
@@ -5119,7 +5139,7 @@
             if (overlay) overlay.classList.remove('active');
         };
 
-        // ── 공정별 타임라인 오버레이 ──────────────────────────────────────────
+        // ── 공정별 타임라인 페이지 ──────────────────────────────────────────
         window.tlOpenProcessView = function(procKey) {
             const _PC = { '보링':'#227C9D', '엣지':'#17C3B2', 'NC':'#FF9C75', '재단':'#90BBC6', '납기':'#b0aeaa' };
             const color = _PC[procKey] || '#787774';
@@ -5131,54 +5151,48 @@
                 if (sec && sec.items.length > 0) groups.push({ dateStr, items: sec.items });
             });
 
-            let overlay = document.getElementById('tl-process-view');
-            if (!overlay) {
-                overlay = document.createElement('div');
-                overlay.id = 'tl-process-view';
-                overlay.innerHTML = '<div class="tl-pv-panel"></div>';
-                document.body.appendChild(overlay);
-                overlay.addEventListener('click', ev => { if (ev.target === overlay) tlCloseProcessView(); });
-            }
+            // 헤더
+            document.getElementById('tl-pp-title').innerHTML = `
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <div style="width:12px;height:12px;border-radius:3px;background:${color};flex-shrink:0;"></div>
+                    <span style="font-size:16px;font-weight:800;color:#37352f;">${procKey} 공정 타임라인</span>
+                    <span style="font-size:11px;color:#b0aeaa;margin-left:4px;">${groups.length}일 · ${groups.reduce((s,g)=>s+g.items.length,0)}건</span>
+                </div>`;
 
-            const panel = overlay.querySelector('.tl-pv-panel');
-            const groupsHtml = groups.length === 0
-                ? `<div style="text-align:center;padding:32px;color:#b0aeaa;font-size:13px;font-weight:600;">등록된 항목이 없습니다</div>`
-                : groups.map(({ dateStr, items }) => {
+            // 바디
+            const bodyEl = document.getElementById('tl-pp-body');
+            if (groups.length === 0) {
+                bodyEl.innerHTML = `<div class="tl-pp-empty">등록된 항목이 없습니다</div>`;
+            } else {
+                bodyEl.innerHTML = groups.map(({ dateStr, items }) => {
                     const info = parseDateCard(dateStr);
                     const itemsHtml = items.map(item =>
-                        `<div class="tl-pv-item">
-                            <span class="tl-pv-item-name">${item.displayName||''}</span>
-                            <span class="tl-pv-item-qty">${item.orderQty||0}EA</span>
+                        `<div class="tl-pp-item">
+                            <span class="tl-pp-item-name">${item.displayName||''}</span>
+                            <span class="tl-pp-item-qty">${item.orderQty||0}EA</span>
                         </div>`
                     ).join('');
-                    return `<div class="tl-pv-date-group">
-                        <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:${color}22;border-bottom:1px solid #ededeb;">
-                            <span style="font-size:22px;font-weight:900;color:${color};line-height:1;">${info.day}</span>
-                            <div style="display:flex;flex-direction:column;">
-                                <span style="font-size:11px;font-weight:700;color:#787774;">${info.month}월 ${info.weekday}요일</span>
+                    return `<div class="tl-pp-date-group">
+                        <div class="tl-pp-date-hdr" style="background:${color}18;">
+                            <span style="font-size:24px;font-weight:900;color:${color};line-height:1;">${info.day}</span>
+                            <div style="display:flex;flex-direction:column;gap:1px;">
+                                <span style="font-size:12px;font-weight:700;color:#787774;">${info.month}월 ${info.weekday}요일</span>
                                 <span style="font-size:10px;color:#b0aeaa;">${dateStr}</span>
                             </div>
-                            <span style="margin-left:auto;font-size:11px;font-weight:700;background:${color};color:#fff;padding:1px 8px;border-radius:10px;">${items.length}건</span>
+                            <span style="margin-left:auto;font-size:11px;font-weight:700;background:${color};color:#fff;padding:2px 9px;border-radius:10px;">${items.length}건</span>
                         </div>
                         ${itemsHtml}
                     </div>`;
                 }).join('');
+            }
 
-            panel.innerHTML = `
-                <div class="tl-pv-header">
-                    <div style="width:12px;height:12px;border-radius:3px;background:${color};flex-shrink:0;"></div>
-                    <span style="font-size:16px;font-weight:800;color:#37352f;flex:1;">${procKey} 공정 타임라인</span>
-                    <span style="font-size:11px;color:#b0aeaa;margin-right:8px;">${groups.length}일 · ${groups.reduce((s,g)=>s+g.items.length,0)}건</span>
-                    <button class="tl-pv-close" onclick="tlCloseProcessView()">✕</button>
-                </div>
-                <div class="tl-pv-body">${groupsHtml}</div>`;
-
-            overlay.classList.add('active');
+            document.getElementById('tl-process-page').classList.add('active');
+            document.body.style.overflow = 'hidden';
         };
 
-        window.tlCloseProcessView = function() {
-            const overlay = document.getElementById('tl-process-view');
-            if (overlay) overlay.classList.remove('active');
+        window.tlCloseProcessPage = function() {
+            document.getElementById('tl-process-page').classList.remove('active');
+            document.body.style.overflow = '';
         };
 
         // ── 공정작업지시서 헬퍼 함수들 ──────────────────────────────────
