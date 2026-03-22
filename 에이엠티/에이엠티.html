@@ -983,6 +983,91 @@
             #process-timeline-container { overflow-x: auto; -webkit-overflow-scrolling: touch; }
         }
 
+        /* ── 날짜 상세 페이지 (모바일 페이지 전환) ── */
+        #tl-detail-page {
+            position: fixed; inset: 0;
+            background: #fff;
+            z-index: 9000;
+            transform: translateX(100%);
+            transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+            display: flex; flex-direction: column;
+            overflow: hidden;
+        }
+        #tl-detail-page.active { transform: translateX(0); }
+        #tl-dp-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid #ededeb;
+            background: #fff;
+            flex-shrink: 0;
+            display: flex; align-items: center; gap: 12px;
+        }
+        #tl-dp-back {
+            display: flex; align-items: center; justify-content: center;
+            width: 34px; height: 34px;
+            background: #f5f5f4; border: none; border-radius: 50%;
+            cursor: pointer; font-size: 16px; color: #37352f;
+            flex-shrink: 0;
+        }
+        #tl-dp-title { flex: 1; min-width: 0; }
+        #tl-dp-body {
+            flex: 1; overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            padding: 12px 14px;
+            display: flex; flex-direction: column; gap: 10px;
+        }
+        .tl-dp-section {
+            border: 1px solid #ededeb;
+            border-radius: 12px; overflow: hidden;
+        }
+        .tl-dp-section-hdr {
+            padding: 13px 16px;
+            display: flex; align-items: center; gap: 8px;
+            cursor: pointer; user-select: none;
+        }
+        .tl-dp-section-hdr-label {
+            font-size: 13px; font-weight: 900; letter-spacing: 0.3px;
+        }
+        .tl-dp-section-hdr-count {
+            font-size: 11px; font-weight: 800;
+            background: rgba(0,0,0,0.08); padding: 1px 7px; border-radius: 4px;
+        }
+        .tl-dp-section-chevron {
+            margin-left: auto; font-size: 12px; opacity: 0.6;
+            transition: transform 0.18s;
+        }
+        .tl-dp-section.open .tl-dp-section-chevron { transform: rotate(180deg); }
+        .tl-dp-section-body {
+            display: none;
+            flex-direction: column; gap: 8px;
+            padding: 0 12px 12px;
+            border-top: 1px solid #f1f1ef;
+        }
+        .tl-dp-section.open .tl-dp-section-body { display: flex; }
+        .tl-dp-item-card {
+            border: 1px solid #e8e6e3; border-radius: 10px;
+            padding: 10px 12px;
+            display: flex; flex-direction: column; gap: 4px;
+        }
+        .tl-dp-item-top {
+            display: flex; align-items: center; justify-content: space-between; gap: 8px;
+        }
+        .tl-dp-item-name {
+            font-size: 13px; font-weight: 700; color: #37352f;
+            line-height: 1.35; word-break: break-word;
+        }
+        .tl-dp-item-qty {
+            font-size: 12px; font-weight: 900; color: #37352f;
+            white-space: nowrap; flex-shrink: 0;
+        }
+        .tl-dp-item-meta {
+            font-size: 11px; color: #b0aeaa; font-weight: 600;
+            display: flex; gap: 8px; flex-wrap: wrap;
+        }
+        .tl-dp-empty {
+            padding: 20px; text-align: center;
+            font-size: 12px; color: #c8c6c2; font-weight: 600;
+        }
+
         /* Search Mode Styles */
         .search-mode-btn {
             background: #f1f1ef;
@@ -1072,6 +1157,15 @@
             </div>
         </div>
     </header>
+
+    <!-- 모바일 날짜 상세 페이지 -->
+    <div id="tl-detail-page">
+        <div id="tl-dp-header">
+            <button id="tl-dp-back" onclick="tlCloseDetailPage()">←</button>
+            <div id="tl-dp-title"></div>
+        </div>
+        <div id="tl-dp-body"></div>
+    </div>
 
     <div id="main-container" class="w-full max-w-6xl mx-auto px-4 mt-8 space-y-12">
         <div class="relative space-y-6 pt-4">
@@ -4864,7 +4958,81 @@
             return `<div class="tl-dc-5col-grid">${cols}</div>`;
         };
 
+        // ── 모바일 날짜 상세 페이지 ──────────────────────────────
+        window.tlOpenDetailPage = function(dateStr) {
+            window._tlDcDate = dateStr;
+            const info = parseDateCard(dateStr);
+            if (!info) return;
+            const today = toLocalDateStr(new Date());
+            const isToday     = dateStr === today;
+            const isActivated = TL.activatedWeekendDates.has(dateStr);
+            const dayColor = isActivated?(info.isSat?'#787774':'#37352f'):(isToday?'#787774':'#37352f');
+            const wdColor  = isActivated?(info.isSat?'#787774':'#37352f'):'#787774';
+
+            const titleEl = document.getElementById('tl-dp-title');
+            titleEl.innerHTML = `
+                <div style="display:flex;align-items:baseline;gap:8px;">
+                    <span style="font-size:32px;font-weight:900;line-height:1;color:${dayColor};">${info.day}</span>
+                    <div style="display:flex;flex-direction:column;gap:1px;">
+                        <span style="font-size:10px;font-weight:700;color:#b0aeaa;">${info.month}월</span>
+                        <span style="font-size:13px;font-weight:800;color:${wdColor};">${info.weekday}요일</span>
+                    </div>
+                    ${isToday?'<span style="font-size:10px;font-weight:800;background:#37352f;color:#fff;padding:2px 7px;border-radius:4px;align-self:center;">TODAY</span>':''}
+                </div>
+                <span style="font-size:10px;font-weight:700;color:#b0aeaa;">${dateStr}</span>`;
+
+            const sMap = window._tlDcGetItems(dateStr);
+            const KEYS = ['납기','보링','엣지','NC','재단'];
+            const _PC  = { '보링':'#227C9D','엣지':'#17C3B2','NC':'#FF9C75','재단':'#90BBC6','납기':'#b0aeaa' };
+            const _TC  = { '보링':'#fff','엣지':'#fff','NC':'#fff','재단':'#37352f','납기':'#37352f' };
+
+            const bodyEl = document.getElementById('tl-dp-body');
+            bodyEl.innerHTML = KEYS.map(key => {
+                const sec   = sMap[key];
+                const items = sec.items;
+                const color = _PC[key] || '#b0aeaa';
+                const tc    = _TC[key] || '#37352f';
+                const cards = items.length === 0
+                    ? `<div class="tl-dp-empty">해당 없음</div>`
+                    : items.map(item => {
+                        const pd = key==='납기' ? item.deliveryDate : (item.procOverrides?.[key]||null);
+                        return `<div class="tl-dp-item-card">
+                            <div class="tl-dp-item-top">
+                                <span class="tl-dp-item-name">${item.displayName}</span>
+                                <span class="tl-dp-item-qty">${item.orderQty}EA</span>
+                            </div>
+                            <div class="tl-dp-item-meta">
+                                ${item.orderCode?`<span>${item.orderCode}</span>`:''}
+                                <span>${key}: ${pd?pd.slice(5):'-'}</span>
+                                ${item.supplier?`<span>${item.supplier}</span>`:''}
+                            </div>
+                        </div>`;
+                    }).join('');
+                return `<div class="tl-dp-section${items.length>0?' open':''}">
+                    <div class="tl-dp-section-hdr" style="background:${color};" onclick="this.closest('.tl-dp-section').classList.toggle('open')">
+                        <span class="tl-dp-section-hdr-label" style="color:${tc};">${key}</span>
+                        <span class="tl-dp-section-hdr-count" style="color:${tc};">${items.length}건</span>
+                        <span class="tl-dp-section-chevron" style="color:${tc};">▼</span>
+                    </div>
+                    <div class="tl-dp-section-body">${cards}</div>
+                </div>`;
+            }).join('');
+
+            document.getElementById('tl-detail-page').classList.add('active');
+            document.body.style.overflow = 'hidden';
+        };
+
+        window.tlCloseDetailPage = function() {
+            document.getElementById('tl-detail-page').classList.remove('active');
+            document.body.style.overflow = '';
+        };
+
         window.tlExpandDateCard = function(dateStr) {
+            // 모바일에서는 페이지 전환
+            if (window.innerWidth <= 767) {
+                window.tlOpenDetailPage(dateStr);
+                return;
+            }
             window._tlDcDate = dateStr;
             const info = parseDateCard(dateStr);
             if (!info) return;
