@@ -1186,6 +1186,11 @@
                 </nav>
             </div>
             <div class="flex items-center gap-3 ml-4">
+                <!-- ⚠️ 테스트 모드 버튼 (배포시 삭제) -->
+                <button id="test-mode-btn" onclick="toggleTestMode()"
+                    style="font-size:10px;font-weight:800;padding:4px 10px;border-radius:6px;border:1.5px dashed #d1d5db;background:#f9fafb;color:#6b7280;cursor:pointer;letter-spacing:0.02em;transition:all 0.2s;white-space:nowrap;">
+                    🧪 테스트 모드
+                </button>
                 <!-- 알림 아이콘 -->
                 <div class="relative">
                     <button id="notification-bell" onclick="toggleNotifications()" class="relative flex items-center justify-center w-10 h-10 rounded-lg border border-[#ededeb] bg-white hover:bg-[#f7f6f3] transition-all">
@@ -1294,7 +1299,13 @@
                         발주확정목록
                         <span id="timeline-confirmed-count" class="px-2 py-0.5 bg-[#b0aeaa] text-white rounded font-black text-[10px]">0</span>
                     </div>
-                    <svg id="timeline-confirmed-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="transition:transform 0.2s;"><polyline points="6 9 12 15 18 9"/></svg>
+                    <div class="flex items-center gap-2">
+                        <button onclick="event.stopPropagation(); downloadConfirmedOrdersExcel()" class="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-lg text-[11px] font-bold hover:bg-green-100 transition-all shadow-sm active:scale-95">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            엑셀 다운로드
+                        </button>
+                        <svg id="timeline-confirmed-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="transition:transform 0.2s;"><polyline points="6 9 12 15 18 9"/></svg>
+                    </div>
                 </div>
                 <div id="timeline-confirmed-list-body" style="display:none;">
                     <div id="timeline-confirmed-list" class="min-h-[60px] flex flex-col p-4">
@@ -2460,6 +2471,68 @@
             }
         }
 
+        // ⚠️ 테스트 모드 (배포시 삭제) ─────────────────────────────────────
+        let _testModeActive = false;
+        let _testModeSnapshot = []; // 원본 날짜 백업
+
+        function _shiftDate(dateStr, days) {
+            if (!dateStr) return dateStr;
+            const d = new Date(dateStr);
+            if (isNaN(d)) return dateStr;
+            d.setDate(d.getDate() + days);
+            return d.toISOString().split('T')[0];
+        }
+
+        function toggleTestMode() {
+            const btn = document.getElementById('test-mode-btn');
+            if (!_testModeActive) {
+                // ── 테스트 ON: 원본 백업 후 모든 날짜를 -7일 ──
+                _testModeSnapshot = confirmedOrders.map(o => ({
+                    idNum: o.idNum,
+                    deliveryDate: o.deliveryDate,
+                    procOverrides: o.procOverrides ? { ...o.procOverrides } : {}
+                }));
+                confirmedOrders.forEach(o => {
+                    o.deliveryDate = _shiftDate(o.deliveryDate, -7);
+                    if (o.procOverrides) {
+                        Object.keys(o.procOverrides).forEach(k => {
+                            o.procOverrides[k] = _shiftDate(o.procOverrides[k], -7);
+                        });
+                    }
+                });
+                _testModeActive = true;
+                if (btn) {
+                    btn.textContent = '🧪 테스트 해제';
+                    btn.style.background = '#fef2f2';
+                    btn.style.color = '#dc2626';
+                    btn.style.borderColor = '#fca5a5';
+                }
+                showToastMessage('⚠️ 테스트 모드 ON — 모든 일정 -7일 이동');
+            } else {
+                // ── 테스트 OFF: 원본 복원 ──
+                _testModeSnapshot.forEach(snap => {
+                    const o = confirmedOrders.find(x => x.idNum === snap.idNum);
+                    if (!o) return;
+                    o.deliveryDate = snap.deliveryDate;
+                    o.procOverrides = { ...snap.procOverrides };
+                });
+                _testModeSnapshot = [];
+                _testModeActive = false;
+                if (btn) {
+                    btn.textContent = '🧪 테스트 모드';
+                    btn.style.background = '#f9fafb';
+                    btn.style.color = '#6b7280';
+                    btn.style.borderColor = '#d1d5db';
+                }
+                showToastMessage('테스트 모드 OFF — 일정 원복 완료');
+            }
+            // 타임라인 + 목록 재렌더
+            renderProcessTimeline();
+            renderTimelineConfirmedList();
+            renderPendingOrders();
+        }
+        // ────────────────────────────────────────────────────────────────────
+
         // 발주확정목록 토글
         function toggleTimelineConfirmedList() {
             const body = document.getElementById('timeline-confirmed-list-body');
@@ -2862,12 +2935,13 @@
         }
 
         function downloadConfirmedOrdersExcel() {
-            const relevantOrders = confirmedOrders;
-            if (relevantOrders.length === 0) return;
-            const prefix = '';
+            // 발주확정목록 화면과 동일한 필터: amtTimeline === true, 미등록·미취소
+            const currentSupplier = pageToSupplierMap[appMode];
+            const relevantOrders = confirmedOrders.filter(o => o.amtTimeline === true && o.amtRegistered !== true && !o.amtConfirmedCancel);
+            if (relevantOrders.length === 0) { showToastMessage("다운로드할 데이터가 없습니다."); return; }
             const h = currentFullData[0];
             const exportData = [];
-            relevantOrders.sort((a, b) => a.orderCode.localeCompare(b.orderCode)).forEach(item => {
+            relevantOrders.sort((a, b) => (a.orderCode || '').localeCompare(b.orderCode || '')).forEach(item => {
                 const matchingRow = currentFullData.slice(1).find(r => normalizeValue(r[0]) === item.code);
                 const codeIdx = h.indexOf("ing단품코드");
                 const itemCodeValue = (matchingRow && codeIdx !== -1) ? matchingRow[codeIdx] : "";
@@ -2877,40 +2951,21 @@
                     const rowIndex = parseInt(key.split('-').pop());
                     const row = currentFullData[rowIndex];
                     exportData.push({
-                        "PO#": prefix + item.orderCode,
+                        "PO#": item.orderCode,
                         "품목코드": itemCodeValue,
                         "제품명": item.code,
                         "완성품수량": item.orderQty,
-                        "원장 총 사용수": "",
                         "원장종류": row[h.indexOf("원장명")],
-                        "마감종류": row[h.indexOf("마감")],
-                        "원장색상": row[h.indexOf("마감색상")],
-                        "소요량": "",
-                        "재단사이즈": `${row[h.indexOf("재단W")]}\tX\t${row[h.indexOf("재단D")]}`,
                         "부속명": row[h.indexOf("부속명")],
                         "수량": pInfo.qty,
-                        "납기일": item.deliveryDate,
-                        "remark": ""
+                        "납기일": item.deliveryDate
                     });
                 }
             });
             const ws = XLSX.utils.json_to_sheet(exportData);
-            ws['!merges'] = [];
-            const mergeKeys = [{c:0, k:"PO#"}, {c:1, k:"품목코드"}, {c:2, k:"제품명"}, {c:3, k:"완성품수량"}, {c:12, k:"납기일"}];
-            mergeKeys.forEach(m => {
-                let startRow = 0;
-                for (let i = 1; i <= exportData.length; i++) {
-                    const currentVal = (i < exportData.length) ? exportData[i][m.k] : null;
-                    const startVal = exportData[startRow][m.k];
-                    if (currentVal !== startVal) {
-                        if (i - 1 > startRow) ws['!merges'].push({ s: { r: startRow + 1, c: m.c }, e: { r: i, c: m.c } });
-                        startRow = i;
-                    }
-                }
-            });
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Orders");
-            XLSX.writeFile(wb, `발주상세_${curSupplier}_${new Date().toISOString().slice(0,10)}.xlsx`);
+            XLSX.writeFile(wb, `발주확정목록_${currentSupplier}_${new Date().toISOString().slice(0,10)}.xlsx`);
             showToastMessage("엑셀 파일이 다운로드되었습니다.");
         }
 
@@ -5321,7 +5376,14 @@
                     return [];
                 };
                 if (!window._woBoring[sk]) {
-                    window._woBoring[sk] = { '1호기': [], '2호기': [], '멀티보링': [], pool: boringParts.map(p => p.cKey) };
+                    // 작업시간 균형 자동배치 (LPT + 최소분리 보정), 멀티보링 기본배정 제외
+                    const _bBal = _woAutoBalance(boringParts, ['1호기','2호기']);
+                    window._woBoring[sk] = {
+                        '1호기':   _bBal['1호기']?.keys   || [],
+                        '2호기':   _bBal['2호기']?.keys   || [],
+                        '멀티보링': [],
+                        pool: [],
+                    };
                 } else {
                     // 이전 구조(딕셔너리/객체 슬롯) → [cKey] 배열로 마이그레이션
                     _MAC3.forEach(mac => {
@@ -5419,7 +5481,16 @@
                     return [];
                 };
                 if (!window._woBoring[sk]) {
-                    window._woBoring[sk] = { '1호기':[], '2호기':[], '3호기':[], '4호기':[], '5호기':[], pool: edgeParts.map(p => p.cKey) };
+                    // 작업시간 균형 자동배치 (LPT + 최소분리 보정), 5호기 기본배정 제외
+                    const _eBal = _woAutoBalance(edgeParts, ['1호기','2호기','3호기','4호기']);
+                    window._woBoring[sk] = {
+                        '1호기': _eBal['1호기']?.keys || [],
+                        '2호기': _eBal['2호기']?.keys || [],
+                        '3호기': _eBal['3호기']?.keys || [],
+                        '4호기': _eBal['4호기']?.keys || [],
+                        '5호기': [],
+                        pool: [],
+                    };
                 } else {
                     _MAC5.forEach(mac => {
                         const m = window._woBoring[sk][mac];
@@ -5512,7 +5583,8 @@
                     return [];
                 };
                 if (!window._woBoring[sk]) {
-                    window._woBoring[sk] = { 'AMT': [], pool: cuttingParts.map(p => p.cKey) };
+                    // 최초 진입 시 AMT 기계에 순서대로 기본 배정 (미배정 풀 비움)
+                    window._woBoring[sk] = { 'AMT': cuttingParts.map(p => p.cKey), pool: [] };
                 } else {
                     _MAC_CUT.forEach(mac => {
                         const m = window._woBoring[sk][mac];
@@ -5885,6 +5957,97 @@
         window._woBDragKey    = null;
 
         // pool용 카드 HTML (border-left 색상은 부모 요소의 --wo-proc-color CSS 변수로 자동 적용)
+        // 오더번호별 색상 팔레트 — 뮤트 내추럴톤 (배경 극저채도 / 테두리 중간채도)
+        const _ORDER_BG_PAL = [
+            '#eef3ee', // sage
+            '#eeedf5', // lavender
+            '#f3eeea', // warm sand
+            '#e9f3f4', // soft teal
+            '#f4ecea', // dusty rose
+            '#eaeff5', // steel blue
+            '#eaf1eb', // fern
+            '#f1eaf0', // mauve
+            '#f3f0e7', // wheat
+            '#eaecf3', // slate
+        ];
+        const _ORDER_BD_PAL = [
+            '#89a88b', // sage
+            '#8d8cb4', // lavender
+            '#a8907e', // sand
+            '#76a8b0', // teal
+            '#b08680', // rose
+            '#7896b0', // steel blue
+            '#789c82', // fern
+            '#a678a4', // mauve
+            '#ae9e78', // wheat
+            '#8696a8', // slate
+        ];
+        function _woGetOrderColorMap(sk) {
+            const parts = window._woBoringParts[sk] || [];
+            const keys = [...new Set(parts.map(p => p.orderKey || p.orderCode || '').filter(Boolean))];
+            const map = {};
+            keys.forEach((ok, i) => { map[ok] = { bg: _ORDER_BG_PAL[i % _ORDER_BG_PAL.length], bd: _ORDER_BD_PAL[i % _ORDER_BD_PAL.length] }; });
+            return map;
+        }
+
+        /**
+         * 기기별 작업시간 균형 자동배치
+         * Phase 1: LPT(오래 걸리는 오더부터) 그리디 — 오더 단위로 최소부하 기기에 배정
+         * Phase 2: 불균형(평균의 15% 초과) 시 단일 부속 이동으로 최소분리 보정 (최대 parts수만큼 반복)
+         * @param {Array} parts   - 부속 배열 [{cKey, pm, orderKey, orderCode}]
+         * @param {Array} macs    - 배정 대상 기기명 배열
+         * @returns {Object}      - { 기기명: [cKey,...], ... }
+         */
+        function _woAutoBalance(parts, macs) {
+            if (!macs.length) return {};
+            const bins = {};
+            macs.forEach(m => { bins[m] = { keys: [], pm: 0 }; });
+
+            if (macs.length === 1) {
+                bins[macs[0]].keys = parts.map(p => p.cKey);
+                bins[macs[0]].pm  = parts.reduce((s, p) => s + (p.pm || 0), 0);
+                return bins;
+            }
+
+            // ── Phase 1: LPT 그리디 (오더 단위)
+            const orderMap = new Map();
+            parts.forEach(p => {
+                const ok = p.orderKey || p.orderCode || '_';
+                if (!orderMap.has(ok)) orderMap.set(ok, { keys: [], pm: 0 });
+                orderMap.get(ok).keys.push(p.cKey);
+                orderMap.get(ok).pm += p.pm || 0;
+            });
+            const orders = [...orderMap.entries()].sort((a, b) => b[1].pm - a[1].pm);
+            orders.forEach(([, od]) => {
+                const minM = macs.reduce((a, b) => bins[a].pm <= bins[b].pm ? a : b);
+                bins[minM].keys.push(...od.keys);
+                bins[minM].pm += od.pm;
+            });
+
+            // ── Phase 2: 최소 부속 이동으로 불균형 보정
+            const avg = macs.reduce((s, m) => s + bins[m].pm, 0) / macs.length;
+            for (let iter = 0; iter < parts.length; iter++) {
+                const maxM = macs.reduce((a, b) => bins[a].pm >= bins[b].pm ? a : b);
+                const minM = macs.reduce((a, b) => bins[a].pm <= bins[b].pm ? a : b);
+                if (bins[maxM].pm - bins[minM].pm <= avg * 0.15) break;  // 15% 이내 → 충분히 균형
+                const target = (bins[maxM].pm - bins[minM].pm) / 2;
+                let bestKey = null, bestDiff = Infinity;
+                bins[maxM].keys.forEach(k => {
+                    const p = parts.find(pp => pp.cKey === k);
+                    if (!p) return;
+                    const d = Math.abs((p.pm || 0) - target);
+                    if (d < bestDiff) { bestDiff = d; bestKey = k; }
+                });
+                if (!bestKey) break;
+                const bp = parts.find(pp => pp.cKey === bestKey);
+                bins[maxM].keys = bins[maxM].keys.filter(k => k !== bestKey);
+                bins[maxM].pm  -= bp?.pm || 0;
+                bins[minM].keys.push(bestKey);
+                bins[minM].pm  += bp?.pm || 0;
+            }
+            return bins;
+        }
+
         function _woCardHtml(p, stateKey) {
             let innerHtml = '';
             if (p.isCuttingCard) {
@@ -5907,10 +6070,18 @@
                     `<span style="font-size:11px;font-weight:800;color:#37352f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3;">${p.nm}</span>` +
                     `<span style="font-size:9px;font-weight:700;color:#37352f;background:#f5f5f4;padding:0 4px;border-radius:3px;flex-shrink:0;white-space:nowrap;line-height:1.6;">${p.dq} EA</span>` +
                     `</div>`;
-                innerHtml = _cOn + _cNm;
+                const _pmPool = p.pm || 0;
+                const _pmPoolStr = _pmPool >= 1 ? `${_pmPool.toFixed(1)}분` : `${Math.round(_pmPool * 60)}초`;
+                const _cTimePool = `<div style="font-size:8px;font-weight:600;color:#aaa8a4;margin-top:2px;white-space:nowrap;">⏱ ${_pmPoolStr}</div>`;
+                innerHtml = _cOn + _cNm + _cTimePool;
             }
+            const _pcm = _woGetOrderColorMap(stateKey);
+            const _pok = p.orderKey || p.orderCode || '';
+            const _pcc = _pcm[_pok] || {};
+            const _pcs = _pcc.bg ? `background:${_pcc.bg};border-left:3px solid ${_pcc.bd};` : '';
             return `<div class="wo-boring-part-card" draggable="true"
                 data-ck="${p.cKey}" data-sk="${stateKey}"
+                style="${_pcs}"
                 onmouseenter="woBoardCardTipShow(event)"
                 onmouseleave="woBoardCardTipHide()"
                 ondragstart="woBoardDragStart(event,'${p.cKey}','${stateKey}')"
@@ -6008,7 +6179,7 @@
                 `<div class="wo-boring-board-hdr">` +
                 `<div class="wo-boring-time-hdr">시간</div>` +
                 machines.map(m =>
-                    `<div class="wo-boring-machine-hdr" style="color:${procMeta.color};background:${procMeta.colorAlpha};">${m}</div>`
+                    `<div class="wo-boring-machine-hdr" style="color:#1a1a1a;background:${procMeta.colorAlpha};">${m}</div>`
                 ).join('') +
                 `</div>`;
 
@@ -6061,6 +6232,9 @@
                     `</div>`;
             });
             html += `</div>`; // end time-col
+
+            // 오더별 색상맵 (배치 카드용)
+            const _boardColorMap = _woGetOrderColorMap(sk);
 
             // 기계 컬럼
             machines.forEach((mac, mi) => {
@@ -6146,12 +6320,21 @@
                             `<span style="font-size:11px;font-weight:800;color:#37352f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3;">${p.nm}</span>` +
                             `<span style="font-size:9px;font-weight:700;color:#37352f;background:#f5f5f4;padding:0 4px;border-radius:3px;white-space:nowrap;flex-shrink:0;">${p.dq} EA</span>` +
                             `</div>`;
-                        _placedInner = _cOn2 + _cNm2;
+                        // 공정시간 표시 — 카드 높이가 충분할 때 하단에 표기
+                        const _pmVal = p.pm || 0;
+                        const _pmStr2 = _pmVal >= 1 ? `${_pmVal.toFixed(1)}분` : `${Math.round(_pmVal * 60)}초`;
+                        const _cTime2 = cardH >= 42
+                            ? `<div style="font-size:8px;font-weight:600;color:#aaa8a4;margin-top:auto;padding-top:3px;white-space:nowrap;">⏱ ${_pmStr2}</div>`
+                            : '';
+                        _placedInner = `<div style="display:flex;flex-direction:column;height:100%;overflow:hidden;">` + _cOn2 + _cNm2 + _cTime2 + `</div>`;
                     }
 
+                    const _bok = p.orderKey || p.orderCode || '';
+                    const _bcc = _boardColorMap[_bok] || {};
+                    const _bcs = _bcc.bg ? `background:${_bcc.bg};border-left:3px solid ${_bcc.bd};` : '';
                     html +=
                         `<div class="wo-boring-placed-card" draggable="true"` +
-                        ` style="top:${topPx+1}px;height:${cardH}px;"` +
+                        ` style="top:${topPx+1}px;height:${cardH}px;${_bcs}"` +
                         ` data-ck="${cKey}" data-sk="${sk}"` +
                         ` onmouseenter="woBoardCardTipShow(event)"` +
                         ` onmouseleave="woBoardCardTipHide()"` +
@@ -6225,6 +6408,9 @@
             // 긴급 그룹을 최상단으로 정렬
             groupList.sort((a, b) => (b.isUrgent ? 1 : 0) - (a.isUrgent ? 1 : 0));
 
+            // 오더별 색상맵 (pool 그룹용)
+            const _poolColorMap = _woGetOrderColorMap(sk);
+
             let html = '';
             groupList.forEach((grp) => {
                 const total    = grp.parts.length;
@@ -6250,7 +6436,9 @@
                     : '';
 
                 // 긴급 알림 (당일 다른 공정 존재 + 미배정)
-                const accentColor = grp.isUrgent ? '#37352f' : '#b0aeaa';
+                const _grpColor = _poolColorMap[grp.orderKey] || {};
+                const accentColor = grp.isUrgent ? '#37352f' : (_grpColor.bd || '#b0aeaa');
+                const groupBgStyle = _grpColor.bg ? `background:${_grpColor.bg};border-left:3px solid ${_grpColor.bd};` : '';
                 const urgentAlertHtml = grp.isUrgent
                     ? `<div style="padding:4px 9px 3px;border-bottom:1px solid #e3e2e0;">` +
                       `<span class="wo-urgent-alert">⚠ 금일 &ldquo;${grp.orderName}&rdquo;의 ${grp.urgentProcs.join('·')} 일정이 있습니다.</span>` +
@@ -6258,7 +6446,7 @@
                     : '';
 
                 html +=
-                    `<div class="wo-boring-order-group${grp.isUrgent ? ' urgent' : ''}">` +
+                    `<div class="wo-boring-order-group${grp.isUrgent ? ' urgent' : ''}" style="${groupBgStyle}">` +
                         `<div class="wo-boring-order-group-hdr" style="flex-wrap:wrap;row-gap:3px;">` +
                             `<span style="display:inline-block;width:3px;height:16px;background:${accentColor};border-radius:2px;flex-shrink:0;"></span>` +
                             `<span style="font-size:10px;font-weight:800;color:#37352f;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:60px;">${grp.orderName}</span>` +
