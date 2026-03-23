@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ING-AMT 이카운트 입력 - VIVIVICS</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    
+    <!-- Firebase SDK (Compat Version) -->
+    <script src="https://www.gstatic.com/firebasejs/11.2.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #fcfcfc; }
+        
+        .sticky-header th { 
+            position: sticky; 
+            top: 0; 
+            z-index: 50; 
+            background-color: white !important; 
+            box-shadow: inset 0 -2px 0 0 #e2e8f0; 
+            white-space: nowrap;
+        }
+        .sticky-header.dark th { background-color: #18181b !important; }
+        
+        .custom-scroll::-webkit-scrollbar { width: 12px; height: 12px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #f8fafc; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 6px; border: 3px solid #f8fafc; }
+
+        .nav-tab {
+            position: relative;
+            transition: all 0.2s;
+        }
+        .nav-tab.active {
+            color: #217346;
+        }
+        .nav-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background-color: #217346;
+            border-radius: 3px;
+        }
+        
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .animate-modal { animation: fadeIn 0.2s ease-out forwards; }
+
+        .batch-card {
+            background: white;
+            border: 1px solid #ededeb;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .sync-indicator { font-size: 10px; font-weight: 900; padding: 2px 8px; border-radius: 4px; }
+        .sync-idle { background: #f1f1ef; color: #787774; }
+        .sync-active { background: #ebf5ff; color: #0077d4; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo, useEffect, useRef } = React;
+        const EXCEL_GREEN = "#217346";
+
+        // --- 1. Firebase 구성 및 초기화 ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
+            authDomain: "vivivic-4b7ef.firebaseapp.com",
+            projectId: "vivivic-4b7ef",
+            storageBucket: "vivivic-4b7ef.firebasestorage.app",
+            messagingSenderId: "830175660542",
+            appId: "1:830175660542:web:9054030480c8280af8d8af",
+            measurementId: "G-MCPHWSQBQR"
+        };
+
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.firestore();
+        const appId = "vivivic-4b7ef";
+        const COLLECTION_ORDERS = 'confirmed_orders';
+
+        const Icon = ({ name, size = 20, className = "" }) => {
+            const iconRef = useRef(null);
+            useEffect(() => {
+                if (window.lucide) {
+                    window.lucide.createIcons({ attrs: { size, class: className }, nameAttr: 'data-lucide' });
+                }
+            }, [name, size, className]);
+            return <i data-lucide={name} ref={iconRef}></i>;
+        };
+
+        const App = () => {
+            const [processedData, setProcessedData] = useState([]);
+            const [registrationData, setRegistrationData] = useState([]);
+            const [rawOriginalData, setRawOriginalData] = useState([]);
+            const [originalHeaders, setOriginalHeaders] = useState([]);
+            const [activeFormat, setActiveFormat] = useState(null);
+            const [uploadStatus, setUploadStatus] = useState(null);
+            const [uploadProgress, setUploadProgress] = useState(0);
+            const [activeTab, setActiveTab] = useState('ORIGINAL'); 
+            const [cloudSyncStatus, setCloudSyncStatus] = useState('IDLE');
+            
+            const [origSelected, setOrigSelected] = useState([]);
+            const [regSelected, setRegSelected] = useState([]);
+            const [bomSelected, setBomSelected] = useState([]);
+
+            const [dlModal, setDlModal] = useState({ show: false, type: null });
+            const [dlProgress, setDlProgress] = useState(0);
+            const [isDlRunning, setIsDlRunning] = useState(false);
+            const [dlMessage, setDlMessage] = useState("");
+
+            const [confirmedOrders, setConfirmedOrders] = useState([]);
+            const [pendingWorkOrders, setPendingWorkOrders] = useState([]);
+            const [woSearchQuery, setWoSearchQuery] = useState("");
+            const [isWoSearchOpen, setIsWoSearchOpen] = useState(false);
+            const [expandedWeekBox, setExpandedWeekBox] = useState(null);
+            const [expandedOrderCard, setExpandedOrderCard] = useState(null);
+
+            const BOM_HEADERS = ['생성일자', '제품명', '생산품목코드', '생산품목명', '생산품BOM버전', '기본BOM여부', '생산수량', '소모품목코드', '소모품목명', '소모품BOM버전', '소모수량', '위치', '적요'];
+            const REG_HEADERS = ['생성일자', '제품명', '품목코드', '적요', '생산공정', '구매처', '품목명', 'Product name', 'Factory Product name', 'Color', '검색창내용', '품목그룹1', '규격구분', '규격', 'Weight', '단위', '품목구분', '세트여부', '달러(A)', '달러(A)VAT포함여부', '달러(B)', '달러(B)VAT포함여부', 'RMB(A)', 'RMB(A)VAT포함여부', 'RMB(D)', 'RMB(D)VAT포함여부', '입고단가', '입고단가VAT포함여부', '출고단가', '출고단가VAT포함여부', '재고수량관리'];
+
+            // 전역 가공 로직 통합 함수 (원본데이터 처리)
+            const processExcelRows = (rows) => {
+                const todayDate = new Date().toISOString().split('T')[0];
+                const headerRow = rows[0];
+                const dataRows = rows.slice(1).map(r => {
+                    const obj = {};
+                    headerRow.forEach((h, i) => obj[h] = r[i]);
+                    return obj;
+                });
+
+                const filteredJson = dataRows.filter(row => String(row['ing단품명'] || "").trim() !== "");
+                if (filteredJson.length === 0) return;
+
+                setRawOriginalData(dataRows);
+                setOriginalHeaders(headerRow);
+
+                const groupMap = new Map();
+                const groups = [];
+                filteredJson.forEach(row => {
+                    const code = String(row['ing단품코드'] || "").trim();
+                    const name = String(row['ing단품명'] || "").trim();
+                    const key = `${code}_${name}`;
+                    if (!groupMap.has(key)) { groupMap.set(key, []); groups.push(key); }
+                    groupMap.get(key).push(row);
+                });
+
+                const finalBOM = [];
+                const finalReg = [];
+                const processPriority = { "조립": 1, "재단": 2, "엣지": 3, "보링": 4, "NC": 5 };
+
+                groups.forEach(key => {
+                    const rowsInGroup = groupMap.get(key);
+                    const gName = rowsInGroup[0]['ing단품명'] || "";
+                    const gCode = rowsInGroup[0]['ing단품코드'] || "";
+                    const gVendor = rowsInGroup[0]['ing발주처'] || "";
+                    const groupRegData = [];
+
+                    // 1. 조립 행 생성
+                    const masterRow = {};
+                    REG_HEADERS.forEach(h => masterRow[h] = "");
+                    masterRow['생성일자'] = todayDate;
+                    masterRow['제품명'] = gName;
+                    masterRow['품목코드'] = gCode;
+                    masterRow['품목명'] = gName;
+                    masterRow['생산공정'] = "조립";
+                    masterRow['구매처'] = gVendor;
+                    masterRow['품목구분'] = "1";
+                    groupRegData.push(masterRow);
+
+                    // 2. 부속 행 생성
+                    rowsInGroup.forEach(row => {
+                        const subParts = [
+                            { code: '재단부속코드', name: '재단부속명' },
+                            { code: '엣지부속코드', name: '엣지부속명' },
+                            { code: '보링부속코드', name: '보링부속명' },
+                            { code: 'NC부속코드', name: 'NC부속명' }
+                        ];
+                        subParts.forEach(col => {
+                            const cCode = String(row[col.code] || "").trim();
+                            const cName = String(row[col.name] || "").trim();
+                            if (cCode) {
+                                const rRow = {};
+                                REG_HEADERS.forEach(h => rRow[h] = "");
+                                rRow['생성일자'] = todayDate;
+                                rRow['제품명'] = gName;
+                                rRow['품목코드'] = cCode;
+                                rRow['품목명'] = cName;
+                                const process = (cName.match(/\(([^)]+)\)/) || [])[1] || "";
+                                rRow['생산공정'] = process;
+                                let vendor = (process === "재단" || process === "NC") ? "AMT" : (process === "보링" ? "로앤" : (process === "엣지" ? "이룸산업" : ""));
+                                rRow['구매처'] = vendor;
+                                rRow['규격'] = row['마감사이즈'] || "";
+                                rRow['품목구분'] = "2";
+                                groupRegData.push(rRow);
+                            }
+                        });
+                    });
+
+                    groupRegData.sort((a, b) => (processPriority[a['생산공정']] || 99) - (processPriority[b['생산공정']] || 99));
+                    finalReg.push(...groupRegData);
+
+                    rowsInGroup.forEach(row => {
+                        const steps = [];
+                        if (row['NC부속명']) steps.push({ priority: 1, name: row['NC부속명'], code: row['NC부속코드'] });
+                        if (row['보링부속명']) steps.push({ priority: 2, name: row['보링부속명'], code: row['보링부속코드'] });
+                        if (row['엣지부속명']) steps.push({ priority: 3, name: row['엣지부속명'], code: row['엣지부속코드'] });
+                        if (row['재단부속명']) steps.push({ priority: 4, name: row['재단부속명'], code: row['재단부속코드'] });
+                        const s = steps.sort((a, b) => a.priority - b.priority);
+                        const fTask = s.length ? s[0] : { name: "", code: "" };
+                        finalBOM.push({
+                            '생성일자': todayDate, '제품명': gName, '생산품목코드': row['ing단품코드'] || "", '생산품목명': row['ing단품명'] || "",
+                            '소모품목코드': fTask.code, '소모품목명': fTask.name, '소모수량': row['세트별소모량'] || "", '_type': 'original'
+                        });
+                    });
+                });
+                setProcessedData(finalBOM);
+                setRegistrationData(finalReg);
+            };
+
+            // --- 섹션 B: 엑셀 파일 다운로드 및 JSON 변환 ---
+            const loadCloudExcelData = async (url, fileName) => {
+                setCloudSyncStatus('SYNCING');
+                try {
+                    const response = await fetch(url);
+                    const arrayBuffer = await response.arrayBuffer();
+                    const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+                    const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
+                    if (jsonData.length > 0) {
+                        processExcelRows(jsonData);
+                        setCloudSyncStatus('SUCCESS');
+                    }
+                } catch (err) { 
+                    console.error("Cloud Load Error:", err); 
+                    setCloudSyncStatus('IDLE');
+                }
+            };
+
+            // --- 섹션 A: 클라우드 메타데이터 감시 ---
+            useEffect(() => {
+                const colRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('excel_metadata');
+                const unsubscribeMeta = colRef.onSnapshot(async (snapshot) => {
+                    const docs = snapshot.docs.map(d => d.data());
+                    if (docs.length > 0) {
+                        const latest = docs.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0))[0];
+                        if (latest && latest.downloadURL) { 
+                            loadCloudExcelData(latest.downloadURL, latest.fileName); 
+                        }
+                    }
+                });
+
+                const orderRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection(COLLECTION_ORDERS);
+                const unsubscribeOrders = orderRef.onSnapshot((snapshot) => {
+                    const orders = snapshot.docs.map(doc => ({ ...doc.data(), docId: doc.id }));
+                    setConfirmedOrders(orders);
+                }, (err) => console.error("Sync Error:", err));
+
+                return () => { unsubscribeMeta(); unsubscribeOrders(); };
+            }, []);
+
+            const uniqueItemNames = useMemo(() => {
+                if (!rawOriginalData.length || !originalHeaders.length) return [];
+                const firstHeader = originalHeaders[0];
+                return [...new Set(rawOriginalData.map(row => String(row[firstHeader] || "").trim()).filter(Boolean))].sort();
+            }, [rawOriginalData, originalHeaders]);
+
+            const filteredOriginalData = useMemo(() => !origSelected.length ? rawOriginalData : rawOriginalData.filter(row => origSelected.includes(String(row[originalHeaders[0]]).trim())), [rawOriginalData, origSelected, originalHeaders]);
+            const filteredRegData = useMemo(() => !regSelected.length ? [] : registrationData.filter(row => regSelected.includes(row['제품명'])), [registrationData, regSelected]);
+            const filteredBOMData = useMemo(() => !bomSelected.length ? [] : processedData.filter(row => bomSelected.includes(row['제품명'])), [processedData, bomSelected]);
+
+            function calculateSpans(data) {
+                if (!data.length) return [];
+                const spans = new Array(data.length).fill(0);
+                let i = 0;
+                while (i < data.length) {
+                    let count = 1;
+                    const name = data[i]['제품명'];
+                    while (i + count < data.length && data[i + count]['제품명'] === name) count++;
+                    spans[i] = count; i += count;
+                }
+                return spans;
+            }
+
+            const rowSpansReg = useMemo(() => calculateSpans(filteredRegData), [filteredRegData]);
+            const rowSpansBOM = useMemo(() => calculateSpans(filteredBOMData), [filteredBOMData]);
+
+            const handleFileUploadHandler = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                setUploadStatus('uploading'); setUploadProgress(10);
+                const reader = new FileReader();
+                let progressTimer = setInterval(() => setUploadProgress(p => p >= 90 ? 90 : p + 5), 100);
+                reader.onload = (event) => {
+                    const wb = XLSX.read(event.target.result, { type: 'binary' });
+                    const rawJson = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+                    processExcelRows(rawJson);
+                    clearInterval(progressTimer); setUploadProgress(100); setUploadStatus('completed');
+                };
+                reader.readAsBinaryString(file);
+            };
+
+            const runExcelDownload = async (isFull, type) => {
+                setDlModal({ show: false, type: null }); setIsDlRunning(true); setDlProgress(10); setDlMessage("데이터 구성 중...");
+                await new Promise(r => setTimeout(r, 500));
+                let data = (type === 'REGISTRATION') ? (isFull ? registrationData : filteredRegData) : (isFull ? processedData : filteredBOMData);
+                let headers = (type === 'REGISTRATION') ? REG_HEADERS : BOM_HEADERS;
+                if (!data.length) { setIsDlRunning(false); setDlMessage("데이터 없음"); return; }
+                setDlProgress(60); setDlMessage("변환 중...");
+                const ws = XLSX.utils.json_to_sheet(data.map(row => { const obj = {}; headers.forEach(h => obj[h] = row[h] || ""); return obj; }));
+                const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Result");
+                XLSX.writeFile(wb, `${type}_${new Date().toISOString().slice(0,10)}.xlsx`);
+                setDlProgress(100); setDlMessage("성공!");
+                setTimeout(() => setIsDlRunning(false), 2000);
+            };
+
+            const FilterUI = ({ selected, setSelected, items }) => {
+                const [q, setQ] = useState(""); const [open, setOpen] = useState(false);
+                const list = useMemo(() => q ? items.filter(n => n.toLowerCase().includes(q.toLowerCase())) : items, [q, items]);
+                const menuRef = useRef(null);
+                useEffect(() => {
+                    const ck = (e) => { if (menuRef.current && !menuRef.current.contains(e.target)) setOpen(false); };
+                    document.addEventListener("mousedown", ck); return () => document.removeEventListener("mousedown", ck);
+                }, []);
+                return (
+                    <div className="relative mb-6 w-full max-w-[500px]" ref={menuRef}>
+                        <div className="bg-white border-2 border-zinc-200 rounded-xl px-3 py-2 flex flex-wrap gap-2 items-center min-h-[50px] cursor-text shadow-sm focus-within:border-[#217346]" onClick={() => setOpen(true)}>
+                            {selected.map(s => <span key={s} className="bg-emerald-50 text-[#217346] text-[11px] font-bold px-2 py-1 rounded-lg flex items-center gap-1 border border-emerald-100 whitespace-nowrap">{s}<button onClick={(e) => { e.stopPropagation(); setSelected(selected.filter(i => i !== s)); }}><Icon name="x" size={12} /></button></span>)}
+                            <input type="text" className="flex-1 outline-none text-sm font-medium" placeholder={!selected.length ? "상품명 검색..." : "추가 검색..."} value={q} onChange={e => setQ(e.target.value)} />
+                        </div>
+                        {open && (
+                            <div className="absolute top-full left-0 w-full bg-white border rounded-xl shadow-2xl z-[100] max-h-[250px] overflow-y-auto mt-2 p-1">
+                                <div onClick={() => list.every(n => selected.includes(n)) ? setSelected(selected.filter(n => !list.includes(n))) : setSelected([...new Set([...selected, ...list])])} className="p-3 hover:bg-zinc-50 cursor-pointer font-black text-sm border-b">전체 선택/해제</div>
+                                {list.map(n => <div key={n} onClick={() => { if(selected.includes(n)) setSelected(selected.filter(i => i !== n)); else { setSelected([...selected, n]); setQ(""); } }} className="p-3 hover:bg-zinc-50 cursor-pointer text-sm flex justify-between">{n} {selected.includes(n) && "✓"}</div>)}
+                            </div>
+                        )}
+                    </div>
+                );
+            };
+
+            const addPendingWorkOrder = (name) => {
+                const idNum = 1400 + confirmedOrders.length + pendingWorkOrders.length + 1;
+                setPendingWorkOrders([...pendingWorkOrders, { idNum, displayName: name, orderQty: 1, deliveryDate: new Date(Date.now() + 86400000 * 4).toISOString().split('T')[0] }]);
+                setWoSearchQuery(""); setIsWoSearchOpen(false);
+            };
+
+            const confirmWorkOrderBatch = async () => {
+                if (pendingWorkOrders.length === 0) return;
+                setIsDlRunning(true); setDlMessage("저장 중...");
+                const batchId = Date.now();
+                try {
+                    for (const item of pendingWorkOrders) {
+                        await db.collection('artifacts').doc(appId).collection('public').doc('data').collection(COLLECTION_ORDERS).add({ ...item, batchId, orderCode: `WO-${batchId.toString().slice(-6)}`, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+                    }
+                    setPendingWorkOrders([]); setDlMessage("저장 완료!");
+                } catch (err) { setDlMessage("실패"); } finally { setTimeout(() => setIsDlRunning(false), 2000); }
+            };
+
+            // 주차 계산 함수
+            const getWeekOfMonth = (dateStr) => {
+                if (!dateStr) return null;
+                const date = new Date(dateStr);
+                const year = date.getFullYear();
+                const month = date.getMonth() + 1;
+                const day = date.getDate();
+                const weekNum = Math.ceil(day / 7);
+                return { year, month, week: weekNum, label: `${month}월 ${weekNum}주차` };
+            };
+
+            // 주차별 그룹화
+            const weeklyGroupedOrders = useMemo(() => {
+                // 1월1주차~12월5주차 박스 생성
+                const weeks = [];
+                for (let month = 1; month <= 12; month++) {
+                    for (let week = 1; week <= 5; week++) {
+                        weeks.push({
+                            month,
+                            week,
+                            label: `${month}월 ${week}주차`,
+                            orders: []
+                        });
+                    }
+                }
+
+                // 발주확정일 기준으로 주차에 배치
+                confirmedOrders.forEach(order => {
+                    // 여러 날짜 필드를 시도 (confirmedDate, confirmDate, createdAt 등)
+                    let dateStr = order.confirmedDate || order.confirmDate;
+
+                    // Firebase Timestamp 객체인 경우 처리
+                    if (!dateStr && order.createdAt) {
+                        if (order.createdAt.toDate) {
+                            dateStr = order.createdAt.toDate().toISOString();
+                        } else if (order.createdAt.seconds) {
+                            dateStr = new Date(order.createdAt.seconds * 1000).toISOString();
+                        }
+                    }
+
+                    if (dateStr) {
+                        const weekInfo = getWeekOfMonth(dateStr);
+                        if (weekInfo) {
+                            const targetWeek = weeks.find(w => w.month === weekInfo.month && w.week === weekInfo.week);
+                            if (targetWeek) {
+                                targetWeek.orders.push(order);
+                            }
+                        }
+                    }
+                });
+
+                return weeks;
+            }, [confirmedOrders]);
+
+            // 현재 주차로 스크롤
+            useEffect(() => {
+                if (activeTab === 'WORK_ORDER' && weeklyGroupedOrders.length > 0) {
+                    const today = new Date();
+                    const currentWeekInfo = getWeekOfMonth(today.toISOString());
+
+                    if (currentWeekInfo) {
+                        setTimeout(() => {
+                            const currentWeekBox = document.querySelector(`[data-week="${currentWeekInfo.month}-${currentWeekInfo.week}"]`);
+                            if (currentWeekBox) {
+                                currentWeekBox.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+                            }
+                        }, 300);
+                    }
+                }
+            }, [activeTab, weeklyGroupedOrders]);
+
+            const groupedWorkOrders = useMemo(() => {
+                const batches = {};
+                confirmedOrders.forEach(order => {
+                    if (!batches[order.batchId]) batches[order.batchId] = [];
+                    batches[order.batchId].push(order);
+                });
+                return Object.keys(batches).sort((a, b) => b - a).map(batchId => ({ batchId, orders: batches[batchId] }));
+            }, [confirmedOrders]);
+
+            return (
+                <div className="min-h-screen p-4 md:p-8 max-w-[1600px] mx-auto">
+                    <header className="mb-8 flex justify-between items-center bg-white p-10 rounded-2xl shadow-sm border border-zinc-100">
+                        <div className="flex flex-col">
+                            <span className="text-[11px] font-black tracking-[0.4em] text-zinc-400 mb-2 uppercase">VIVIVICS</span>
+                            <h1 className="text-3xl font-bold tracking-tight text-zinc-900 leading-none">ING-AMT 이카운트 입력</h1>
+                        </div>
+                        <div className="flex items-center gap-4">
+                            {cloudSyncStatus !== 'IDLE' && (
+                                <div className={`sync-indicator ${cloudSyncStatus === 'SYNCING' ? 'sync-active' : 'sync-idle bg-emerald-50 text-emerald-600'}`}>
+                                    {cloudSyncStatus === 'SYNCING' ? 'SYNCING...' : 'CLOUD SYNCED'}
+                                </div>
+                            )}
+                            {(uploadStatus || isDlRunning) && (
+                                <div className="text-sm font-bold px-5 py-2.5 bg-zinc-50 rounded-xl border border-zinc-100 flex items-center gap-3">
+                                    <span className="animate-pulse">{isDlRunning ? dlMessage : (uploadStatus === 'uploading' ? `처리 중... ${uploadProgress}%` : '업로드 완료')}</span>
+                                    {isDlRunning && (<div className="w-24 h-2 bg-zinc-200 rounded-full overflow-hidden"><div className="h-full bg-[#217346] transition-all duration-300" style={{ width: `${dlProgress}%` }}></div></div>)}
+                                </div>
+                            )}
+                            <label className="relative w-14 h-14 bg-white rounded-2xl shadow-md border border-zinc-100 flex items-center justify-center overflow-hidden transition-transform active:scale-95 cursor-pointer hover:bg-zinc-50">
+                                <Icon name="file-spreadsheet" className="text-[#217346]" size={28} />
+                                <input type="file" className="hidden" accept=".xlsx,.xls" onChange={handleFileUploadHandler} />
+                            </label>
+                        </div>
+                    </header>
+
+                    <div className="flex gap-8 mb-12 px-2 border-b-2 border-zinc-100">
+                        {['REGISTRATION', 'WORK_ORDER'].map((tab) => (
+                            <button key={tab} onClick={() => setActiveTab(tab)} className={`nav-tab pb-4 text-sm font-black uppercase tracking-wider ${activeTab === tab ? 'active' : 'text-zinc-400 hover:text-zinc-600'}`}>
+                                {tab === 'REGISTRATION' ? '등록' : '작업지시'}
+                            </button>
+                        ))}
+                    </div>
+
+                    <div className="space-y-12">
+                        {activeTab === 'ORIGINAL' && (
+                            <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
+                                <button onClick={() => setActiveFormat(activeFormat === 'ORIG' ? null : 'ORIG')} className="w-full p-6 flex justify-between font-bold text-xl items-center hover:bg-zinc-50 transition-colors"><div className="flex gap-4"><Icon name="database" /> <span>원본데이터</span></div><Icon name={activeFormat === 'ORIG' ? "chevron-up" : "chevron-down"} /></button>
+                                {activeFormat === 'ORIG' && (
+                                    <div className="p-6 border-t bg-zinc-50/50">
+                                        <div className="flex flex-col md:flex-row justify-between items-end gap-4 mb-6">
+                                            <FilterUI selected={origSelected} setSelected={setOrigSelected} items={uniqueItemNames} />
+                                            <button onClick={() => runExcelDownload(false, 'ORIGINAL')} className="px-6 py-3 bg-zinc-900 text-white rounded-xl font-bold flex gap-2 shadow-md hover:bg-black transition-all active:scale-95"><Icon name="download" size={18} /> 엑셀</button>
+                                        </div>
+                                        <div className="overflow-auto custom-scroll border border-zinc-200 rounded-xl bg-white max-h-[450px]">
+                                            <table className="w-full text-xs text-center border-separate border-spacing-0">
+                                                <thead className="sticky-header dark"><tr className="bg-zinc-900 text-white">{originalHeaders.map(h => <th key={h} className="p-3 border-r border-zinc-800 font-bold">{h}</th>)}</tr></thead>
+                                                <tbody>{filteredOriginalData.map((row, i) => <tr key={i} className="hover:bg-zinc-50">{originalHeaders.map(h => <td key={h} className="p-2 border-b border-r text-zinc-600">{row[h]}</td>)}</tr>)}</tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {activeTab === 'REGISTRATION' && (
+                            <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <div className="space-y-8">
+                                    <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
+                                        <button onClick={() => setActiveFormat('REGISTRATION')} className="w-full p-6 flex justify-between font-bold text-xl items-center transition-colors bg-[#217346] text-white hover:bg-[#1a5c38]"><div className="flex gap-4"><Icon name="clipboard-list" className="text-white" /> <span>품목등록</span></div><Icon name="chevron-down" /></button>
+                                        {activeFormat === 'REGISTRATION' && (
+                                            <div className="p-6 border-t bg-white">
+                                                <div className="flex flex-col md:flex-row justify-between items-end gap-4 mb-6">
+                                                    <FilterUI selected={regSelected} setSelected={setRegSelected} items={uniqueItemNames} />
+                                                    <button onClick={() => setDlModal({show:true, type:'REGISTRATION'})} className="px-6 py-3 bg-[#217346] text-white rounded-xl font-bold flex gap-2 shadow-md hover:bg-[#1a5c38] transition-all"><Icon name="download" size={18} /> 엑셀</button>
+                                                </div>
+                                                {filteredRegData.length > 0 ? (
+                                                    <div className="overflow-auto custom-scroll border border-zinc-200 rounded-xl max-h-[450px]">
+                                                        <table className="w-full text-left border-collapse table-auto text-xs border-separate border-spacing-0">
+                                                            <thead className="sticky-header"><tr className="bg-zinc-100">{REG_HEADERS.map(h => <th key={h} className="p-4 border-b border-r border-zinc-200 font-bold text-zinc-700">{h}</th>)}</tr></thead>
+                                                            <tbody className="divide-y divide-zinc-200 font-medium text-zinc-700">
+                                                                {filteredRegData.map((row, i) => <tr key={i} className="hover:bg-zinc-50">
+                                                                    {REG_HEADERS.map(h => {
+                                                                        const span = (h==='생성일자'||h==='제품명') ? rowSpansReg[i] : 0;
+                                                                        if (span === 0 && (h==='생성일자'||h==='제품명')) return null;
+                                                                        return <td key={h} rowSpan={span > 0 ? span : 1} className={`p-3 border-b border-r last:border-r-0 border-zinc-100 whitespace-nowrap ${span > 0 ? 'bg-white font-bold' : ''}`}>{row[h]}</td>;
+                                                                    })}
+                                                                </tr>)}
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                ) : (<div className="py-10 text-center text-zinc-400 font-bold">검색된 데이터가 없습니다.</div>)}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
+                                        <button onClick={() => setActiveFormat('BOM')} className="w-full p-6 flex justify-between font-bold text-xl items-center transition-colors bg-[#217346] text-white hover:bg-[#1a5c38]"><div className="flex gap-4"><Icon name="layers" className="text-white" /> <span>BOM</span></div><Icon name="chevron-down" /></button>
+                                        {activeFormat === 'BOM' && (
+                                            <div className="p-6 border-t bg-white">
+                                                <div className="flex flex-col md:flex-row justify-between items-end gap-4 mb-6">
+                                                    <FilterUI selected={bomSelected} setSelected={setBomSelected} items={uniqueItemNames} />
+                                                    <button onClick={() => setDlModal({show:true, type:'BOM'})} className="px-6 py-3 bg-[#217346] text-white rounded-xl font-bold flex gap-2 shadow-md hover:bg-[#1a5c38] transition-all"><Icon name="download" size={18} /> 엑셀</button>
+                                                </div>
+                                                {filteredBOMData.length > 0 ? (
+                                                    <div className="overflow-auto custom-scroll border border-zinc-200 rounded-xl max-h-[550px]">
+                                                        <table className="w-full text-xs text-center border-separate border-spacing-0">
+                                                            <thead className="sticky-header"><tr className="bg-zinc-100">{BOM_HEADERS.map(h => <th key={h} className="p-4 border-b border-r border-zinc-200 whitespace-nowrap font-bold text-zinc-700">{h}</th>)}</tr></thead>
+                                                            <tbody>{filteredBOMData.map((row, i) => <tr key={i} className="hover:bg-zinc-50">{BOM_HEADERS.map((h, ci) => { const span = (h==='생성일자'||h==='제품명') ? rowSpansBOM[i] : 0; if (span === 0 && (h==='생성일자'||h==='제품명')) return null; let bg = ""; if ([2,3,7,8].includes(ci)) { if (row._type === 'original') bg = "bg-white font-black"; } return <td key={h} rowSpan={span > 0 ? span : 1} className={`p-3 border-b border-r last:border-r-0 border-zinc-100 whitespace-nowrap ${span > 0 ? 'bg-white font-black' : bg}`}>{row[h]}</td>; })}</tr>)}</tbody>
+                                                        </table>
+                                                    </div>
+                                                ) : (<div className="py-10 text-center text-zinc-400 font-bold">검색된 데이터가 없습니다.</div>)}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'WORK_ORDER' && (
+                            <div className="space-y-10 animate-in fade-in duration-500">
+                                <div className="space-y-6">
+                                    <div className="flex items-center justify-between px-2"><h2 className="text-xl font-black text-zinc-900 tracking-tight uppercase italic">주차별 제품발주 현황</h2><span className="text-[10px] font-black px-3 py-1 bg-blue-50 text-blue-600 rounded-full animate-pulse border border-blue-100">REALTIME SYNCED</span></div>
+                                    <div className="overflow-x-auto custom-scroll pb-4">
+                                        <div className="flex gap-4" style={{minWidth: 'max-content'}}>
+                                            {weeklyGroupedOrders.map((weekBox, boxIdx) => (
+                                                boxIdx % 5 === 0 ? (
+                                                    <div key={`group-${boxIdx}`} className="flex gap-4">
+                                                        {weeklyGroupedOrders.slice(boxIdx, boxIdx + 5).map(week => {
+                                                            const today = new Date();
+                                                            const currentWeekInfo = getWeekOfMonth(today.toISOString());
+                                                            const isCurrentWeek = currentWeekInfo && week.month === currentWeekInfo.month && week.week === currentWeekInfo.week;
+
+                                                            return (
+                                                            <div key={`${week.month}-${week.week}`} data-week={`${week.month}-${week.week}`} className={`flex-shrink-0 w-72 bg-white border-2 ${isCurrentWeek ? 'border-orange-400 ring-2 ring-orange-200' : 'border-zinc-200'} rounded-2xl overflow-hidden shadow-sm`}>
+                                                                <div className={`${isCurrentWeek ? 'bg-gradient-to-r from-orange-600 to-orange-500' : 'bg-gradient-to-r from-blue-600 to-blue-500'} text-white p-3 font-black text-xs flex items-center justify-between`}>
+                                                                    <span>{week.label} {isCurrentWeek ? '(현재)' : ''}</span>
+                                                                    <span className="bg-white/20 px-2 py-0.5 rounded text-[9px]">총 {week.orders.length}건</span>
+                                                                </div>
+                                                                <div className="p-3 space-y-2">
+                                                                    {week.orders.length > 0 && (
+                                                                        <div className="border border-blue-200 rounded-lg overflow-hidden bg-blue-50/30">
+                                                                            <div
+                                                                                className="bg-blue-100 px-3 py-2 cursor-pointer hover:bg-blue-200 transition-all flex items-center justify-between"
+                                                                                onClick={() => setExpandedWeekBox(`${week.month}-${week.week}-product`)}
+                                                                            >
+                                                                                <span className="text-[11px] font-black text-blue-900">제품발주</span>
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <span className="text-[9px] font-bold text-blue-700">{week.orders.length}건</span>
+                                                                                    <button onClick={(e) => { e.stopPropagation(); }} className="text-[9px] px-2 py-0.5 bg-blue-600 text-white rounded font-bold hover:bg-blue-700">엑셀↓</button>
+                                                                                </div>
+                                                                            </div>
+                                                                            <div className="p-2 max-h-[200px] overflow-y-auto custom-scroll space-y-1 bg-white">
+                                                                                {week.orders.map((order, idx) => {
+                                                                                    const cardKey = `${week.month}-${week.week}-${idx}`;
+                                                                                    const isExpanded = expandedOrderCard === cardKey;
+
+                                                                                    return (
+                                                                                    <div key={idx}>
+                                                                                        <div
+                                                                                            className="border border-zinc-200 rounded p-1 hover:border-blue-400 transition-all cursor-pointer bg-zinc-50/50"
+                                                                                            onClick={() => {
+                                                                                                console.log('=== 상품카드 클릭 ===');
+                                                                                                console.log('order 전체:', order);
+                                                                                                console.log('partInfoMap:', order.partInfoMap);
+                                                                                                console.log('partInfoMap 존재:', !!order.partInfoMap);
+                                                                                                if (order.partInfoMap) {
+                                                                                                    console.log('partInfoMap keys:', Object.keys(order.partInfoMap));
+                                                                                                    console.log('partInfoMap entries:', Object.entries(order.partInfoMap));
+                                                                                                    const firstEntry = Object.entries(order.partInfoMap)[0];
+                                                                                                    if (firstEntry) {
+                                                                                                        console.log('첫번째 part key:', firstEntry[0]);
+                                                                                                        console.log('첫번째 part 데이터:', firstEntry[1]);
+                                                                                                        console.log('첫번째 part 필드명들:', Object.keys(firstEntry[1]));
+                                                                                                    }
+                                                                                                    const amtParts = Object.entries(order.partInfoMap).filter(([key, part]) => !part.isDeleted && part.partSupplier === 'AMT');
+                                                                                                    console.log('AMT 부속 필터링 결과:', amtParts.length, '개');
+                                                                                                    console.log('AMT 부속 데이터:', amtParts);
+                                                                                                }
+                                                                                                setExpandedOrderCard(isExpanded ? null : cardKey);
+                                                                                            }}
+                                                                                        >
+                                                                                            <div className="flex items-center justify-between gap-1">
+                                                                                                <div className="flex items-center gap-1 flex-1 min-w-0">
+                                                                                                    <div className="text-[9px] font-black text-blue-600">[{order.supplier}]</div>
+                                                                                                    <div className="text-[8px] text-zinc-400 font-bold">납기: {order.deliveryDate || '-'}</div>
+                                                                                                </div>
+                                                                                                <span className="text-[9px] font-black text-zinc-900 bg-zinc-100 px-1.5 py-0.5 rounded whitespace-nowrap">{order.orderQty}</span>
+                                                                                            </div>
+                                                                                            <div className="text-[10px] font-bold text-zinc-800 truncate mt-0.5">{order.displayName}</div>
+                                                                                        </div>
+                                                                                        {isExpanded && order.partInfoMap && (
+                                                                                            <div className="mt-1 p-2 bg-white border border-zinc-200 rounded">
+                                                                                                {/* 기본 발주 부속 (AMT) */}
+                                                                                                <div className="space-y-2">
+                                                                                                    <div className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider">기본 발주 부속</div>
+                                                                                                    <div className="grid grid-cols-2 gap-2">
+                                                                                                        {Object.entries(order.partInfoMap).filter(([key, part]) => !part.isDeleted && part.partSupplier === 'AMT').map(([key, part]) => (
+                                                                                                            <div key={key} className="bg-white p-2 rounded-lg border border-zinc-200 shadow-sm flex flex-col gap-1">
+                                                                                                                <div className="flex justify-between items-start">
+                                                                                                                    <div className="flex flex-col truncate flex-1">
+                                                                                                                        <span className="text-[10px] font-bold text-zinc-800 truncate">{part.partName || '-'}</span>
+                                                                                                                        <span className="text-[8px] text-gray-400 truncate">{part.plateName || '-'} / {part.finish || '-'}</span>
+                                                                                                                    </div>
+                                                                                                                    <div className="flex flex-col items-end gap-1">
+                                                                                                                        <span className="text-[9px] font-black text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded whitespace-nowrap">{part.qty || 0} EA</span>
+                                                                                                                    </div>
+                                                                                                                </div>
+                                                                                                                <div className="text-[9px] text-zinc-600 font-medium">{part.w || 0} X {part.d || 0}</div>
+                                                                                                            </div>
+                                                                                                        ))}
+                                                                                                    </div>
+                                                                                                </div>
+
+                                                                                                {/* AMT 외 공급처 부속 */}
+                                                                                                {Object.entries(order.partInfoMap).some(([key, part]) => part.isDeleted && part.partSupplier !== 'AMT') && (
+                                                                                                    <div className="space-y-2 pt-3 mt-3 border-t border-dashed border-zinc-200">
+                                                                                                        <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">AMT 외 공급처 부속</div>
+                                                                                                        <div className="grid grid-cols-2 gap-2">
+                                                                                                            {Object.entries(order.partInfoMap).filter(([key, part]) => part.isDeleted && part.partSupplier !== 'AMT').map(([key, part]) => (
+                                                                                                                <div key={key} className="bg-blue-50/30 p-2 rounded-lg border border-dashed border-blue-200 flex flex-col gap-1">
+                                                                                                                    <div className="flex justify-between items-start">
+                                                                                                                        <div className="flex flex-col truncate flex-1">
+                                                                                                                            <span className="text-[10px] font-bold text-blue-800 truncate">{part.partName || '-'}</span>
+                                                                                                                            <span className="text-[8px] text-blue-300 truncate">{part.plateName || '-'} / {part.finish || '-'}</span>
+                                                                                                                        </div>
+                                                                                                                    </div>
+                                                                                                                    <div className="text-[9px] text-blue-400 font-medium">{part.w || 0} X {part.d || 0}</div>
+                                                                                                                </div>
+                                                                                                            ))}
+                                                                                                        </div>
+                                                                                                    </div>
+                                                                                                )}
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                    {week.orders.length > 0 && (
+                                                                        <div className="space-y-1 text-[10px] font-bold text-zinc-400">
+                                                                            <div className="px-2 py-1.5 bg-zinc-50 rounded border border-zinc-200">재단발주</div>
+                                                                            <div className="px-2 py-1.5 bg-zinc-50 rounded border border-zinc-200">엣지발주</div>
+                                                                            <div className="px-2 py-1.5 bg-zinc-50 rounded border border-zinc-200">NC발주</div>
+                                                                            <div className="px-2 py-1.5 bg-zinc-50 rounded border border-zinc-200">곡면엣지발주</div>
+                                                                        </div>
+                                                                    )}
+                                                                    {week.orders.length === 0 && (
+                                                                        <div className="py-8 text-center text-zinc-300 text-xs font-bold">발주 없음</div>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                ) : null
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {expandedWeekBox && (
+                        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4" onClick={() => setExpandedWeekBox(null)}>
+                            <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden animate-modal" onClick={(e) => e.stopPropagation()}>
+                                <div className="bg-gradient-to-r from-blue-600 to-blue-500 text-white p-6 flex items-center justify-between">
+                                    <h2 className="text-xl font-black">제품발주 상세 내역</h2>
+                                    <button onClick={() => setExpandedWeekBox(null)} className="text-white hover:bg-white/20 rounded-lg p-2 transition-all">
+                                        <Icon name="x" size={24} />
+                                    </button>
+                                </div>
+                                <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)] custom-scroll">
+                                    {(() => {
+                                        const [month, week] = expandedWeekBox.split('-').slice(0, 2).map(Number);
+                                        const weekData = weeklyGroupedOrders.find(w => w.month === month && w.week === week);
+                                        if (!weekData) return null;
+
+                                        return (
+                                            <div className="space-y-4">
+                                                {weekData.orders.map((order, idx) => (
+                                                    <div key={idx} className="border border-zinc-200 rounded-lg p-4 hover:border-blue-400 transition-all bg-zinc-50/50">
+                                                        <div className="flex items-start justify-between mb-3">
+                                                            <div className="flex-1">
+                                                                <div className="text-sm font-black text-blue-600 mb-1">[{order.supplier}]</div>
+                                                                <div className="text-base font-bold text-zinc-800">{order.displayName}</div>
+                                                            </div>
+                                                            <span className="text-sm font-black text-zinc-900 bg-zinc-100 px-3 py-1 rounded">{order.orderQty} EA</span>
+                                                        </div>
+                                                        <div className="grid grid-cols-2 gap-2 text-xs text-zinc-600">
+                                                            <div><span className="font-bold">납기:</span> {order.deliveryDate || '-'}</div>
+                                                            <div><span className="font-bold">ID:</span> {order.idNum || '-'}</div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {dlModal.show && (
+                        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"><div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-2xl animate-modal"><div className="p-8"><div className="flex justify-between items-start mb-6"><div><h3 className="text-2xl font-black text-zinc-900 leading-tight">엑셀 다운로드</h3><p className="text-zinc-500 text-sm mt-1">범위를 선택하세요.</p></div><button onClick={() => setDlModal({ show: false, type: null })}><Icon name="x" size={24} /></button></div><div className="space-y-4"><button onClick={() => runExcelDownload(true, dlModal.type)} className="w-full p-5 bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 rounded-2xl flex items-center justify-between group transition-all"><div><span className="block text-sm font-bold text-zinc-900 text-left">전체 결과 다운로드</span><span className="text-xs text-zinc-500">모든 데이터를 출력합니다.</span></div><Icon name="chevron-right" size={18} /></button><button onClick={() => runExcelDownload(false, dlModal.type)} className="w-full p-5 bg-[#ecfdf5] hover:bg-[#d1fae5] border border-[#d1fae5] rounded-2xl flex items-center justify-between group transition-all"><div><span className="block text-sm font-bold text-[#217346] text-left">결과값만 다운로드</span><span className="text-xs text-[#217346]/60">현재 화면 검색 데이터만 출력합니다.</span></div><Icon name="chevron-right" size={18} /></button></div></div></div></div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
