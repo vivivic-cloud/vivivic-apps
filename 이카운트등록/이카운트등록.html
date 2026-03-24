@@ -903,63 +903,64 @@
                                     </div>
                                 </div>
 
-                                {/* ── 주차 타임라인 뷰어 ── */}
+                                {/* ── 주차 타임라인 뷰어 (AMT 동일 스타일) ── */}
                                 {tlViewWeek && (() => {
-                                    const { dateMap, weekDates, PROC_DEF, PROC_COLOR } = buildTimelineForWeek(tlViewWeek);
-                                    const DOW = ['일','월','화','수','목','금','토'];
+                                    const { dateMap, weekDates, PROC_DEF } = buildTimelineForWeek(tlViewWeek);
+                                    const WD = ['일','월','화','수','목','금','토'];
+                                    const PROC_HDR = {'납기':'#b0aeaa','보링':'#227C9D','엣지':'#17C3B2','NC':'#FF9C75','재단':'#90BBC6'};
+                                    const SECTIONS = ['납기','보링','엣지','NC','재단']; // AMT와 동일 순서
+                                    const today = new Date().toISOString().slice(0,10);
                                     return (
-                                        <div style={{border:'2px solid #37352f',borderRadius:10,overflow:'hidden',background:'white'}}>
-                                            <div style={{background:'#37352f',color:'white',padding:'10px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                                                <div style={{display:'flex',alignItems:'center',gap:8}}>
-                                                    <span style={{fontSize:13,fontWeight:900}}>{tlViewWeek.label} 타임라인</span>
-                                                    <span style={{fontSize:9,fontWeight:700,background:'rgba(255,255,255,0.15)',padding:'2px 7px',borderRadius:4}}>읽기전용 · 실시간</span>
-                                                </div>
-                                                <button onClick={() => setTlViewWeek(null)} style={{background:'transparent',border:'none',color:'rgba(255,255,255,0.7)',cursor:'pointer',fontSize:16,lineHeight:1,padding:'2px 4px'}}>✕</button>
+                                        <div style={{border:'1px solid #e8e8e5',borderRadius:12,overflow:'hidden',background:'#f7f6f3'}}>
+                                            <div style={{padding:'8px 14px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid #e8e8e5'}}>
+                                                <span style={{fontSize:12,fontWeight:900,color:'#37352f'}}>{tlViewWeek.label} 공정 타임라인</span>
+                                                <button onClick={() => setTlViewWeek(null)} style={{background:'transparent',border:'none',cursor:'pointer',color:'#787774',fontSize:14,padding:'1px 4px'}}>✕</button>
                                             </div>
-                                            <div style={{overflowX:'auto'}} className="custom-scroll">
-                                                <div style={{display:'flex',minWidth:'max-content',borderTop:'1px solid #e8e8e5'}}>
+                                            <div className="overflow-x-auto custom-scroll" style={{padding:'10px 10px 14px'}}>
+                                                <div style={{display:'flex',gap:6,minWidth:'max-content',alignItems:'flex-start'}}>
                                                     {weekDates.map(date => {
-                                                        const dow = DOW[new Date(date + 'T12:00:00').getDay()];
-                                                        const isWeekend = dow === '토' || dow === '일';
-                                                        const totalCards = PROC_DEF.reduce((s, pk) => s + (dateMap[date][pk]?.length || 0), 0);
+                                                        const d = new Date(date + 'T12:00:00');
+                                                        const dow = WD[d.getDay()];
+                                                        const isSat = dow==='토', isSun = dow==='일';
+                                                        const isWeekend = isSat||isSun;
+                                                        const isToday = date===today;
                                                         return (
-                                                            <div key={date} style={{width:180,flexShrink:0,borderRight:'1px solid #e8e8e5',background: isWeekend ? '#fafafa' : 'white'}}>
-                                                                <div style={{padding:'6px 10px',background: isWeekend ? '#f7f6f3' : '#f9f9f8',borderBottom:'1px solid #e8e8e5',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0}}>
-                                                                    <div>
-                                                                        <span style={{fontSize:11,fontWeight:900,color: isWeekend ? '#b0aeaa' : '#37352f'}}>{date.slice(5).replace('-','/')} </span>
-                                                                        <span style={{fontSize:10,fontWeight:700,color: isWeekend ? '#d3d1cb' : '#787774'}}>({dow})</span>
-                                                                    </div>
-                                                                    {totalCards > 0 && <span style={{fontSize:9,fontWeight:800,color:'#37352f',background:'#ededeb',padding:'1px 5px',borderRadius:3}}>{totalCards}</span>}
+                                                            <div key={date} className="flex flex-col rounded-xl border bg-white shadow-sm overflow-hidden" style={{width:130,flexShrink:0,border:`1px solid ${isToday?'#37352f':'#ededeb'}`,boxShadow:isToday?'0 0 0 2px rgba(55,53,47,0.1)':'0 1px 2px rgba(0,0,0,0.05)',opacity:isWeekend?0.6:1}}>
+                                                                {/* 날짜 헤더 */}
+                                                                <div style={{padding:'10px 8px 8px',display:'flex',flexDirection:'column',alignItems:'center',background:isWeekend?'#fafafa':'white'}}>
+                                                                    <span style={{fontSize:10,fontWeight:700,color:'#b0aeaa'}}>{d.getMonth()+1}월</span>
+                                                                    <span style={{fontSize:28,fontWeight:900,lineHeight:1,color:isWeekend?'#c8c6c2':isToday?'#787774':'#37352f'}}>{d.getDate()}</span>
+                                                                    <span style={{fontSize:11,fontWeight:900,color:isWeekend?'#c8c6c2':'#787774',marginTop:2}}>{dow}요일</span>
+                                                                    {isToday && <span style={{fontSize:8,fontWeight:900,color:'white',background:'#37352f',padding:'1px 6px',borderRadius:3,marginTop:3}}>TODAY</span>}
                                                                 </div>
-                                                                <div style={{padding:6,display:'flex',flexDirection:'column',gap:4,minHeight:60}}>
-                                                                    {PROC_DEF.map(procKey => {
-                                                                        const cards = dateMap[date][procKey] || [];
-                                                                        if (!cards.length) return null;
-                                                                        const pc = PROC_COLOR[procKey];
-                                                                        return (
-                                                                            <div key={procKey} style={{borderRadius:5,overflow:'hidden',border:`1px solid ${pc}22`}}>
-                                                                                <div style={{background:pc+'18',padding:'2px 6px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:`1px solid ${pc}22`}}>
-                                                                                    <span style={{fontSize:8,fontWeight:900,color:pc}}>{procKey}</span>
-                                                                                    <span style={{fontSize:8,fontWeight:700,color:pc+'aa'}}>{cards.length}건</span>
-                                                                                </div>
-                                                                                <div style={{padding:'3px 4px',display:'flex',flexDirection:'column',gap:2}}>
-                                                                                    {cards.map((card, ci) => (
-                                                                                        <div key={ci} style={{padding:'3px 5px',background: card.isDone ? '#f0fdf4' : 'white',border:'1px solid '+(card.isDone ? '#d1fae5' : '#e8e8e5'),borderRadius:4,opacity: card.isDone ? 0.8 : 1}}>
-                                                                                            <div style={{display:'flex',alignItems:'center',gap:3,marginBottom:1}}>
-                                                                                                {card.orderCode && <span style={{fontSize:7,fontWeight:900,color:'#787774',fontFamily:'ui-monospace,monospace',background:'#f7f6f3',padding:'0 3px',borderRadius:2,flexShrink:0}}>{card.orderCode}</span>}
-                                                                                                <span style={{fontSize:8,fontWeight:800,color: card.isDone ? '#22c55e' : '#37352f',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{card.qty}EA</span>
+                                                                {/* 공정 섹션 – AMT 동일 순서 */}
+                                                                {SECTIONS.map(pk => {
+                                                                    const cards = dateMap[date]?.[pk] || [];
+                                                                    const bg = PROC_HDR[pk];
+                                                                    return (
+                                                                        <div key={pk} style={{borderTop:'1px solid #f1f1ef'}}>
+                                                                            <div style={{background:bg,padding:'2px 6px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                                                                                <span style={{fontSize:8,fontWeight:900,color:'white',textTransform:'uppercase',letterSpacing:'0.05em'}}>{pk}</span>
+                                                                                {cards.length>0 && <span style={{fontSize:8,fontWeight:800,color:'white',background:'rgba(0,0,0,0.18)',padding:'0 4px',borderRadius:3}}>{cards.length}</span>}
+                                                                            </div>
+                                                                            {cards.length>0 && (
+                                                                                <div style={{padding:'2px 4px',display:'flex',flexDirection:'column',gap:1}}>
+                                                                                    {cards.map((card,ci) => (
+                                                                                        <div key={ci} style={{cursor:'default',padding:'3px 4px',borderRadius:5,background:card.isDone?'rgba(34,197,94,0.06)':'transparent',opacity:card.isDone?0.7:1}}>
+                                                                                            <div style={{display:'flex',alignItems:'center',gap:3}}>
+                                                                                                <span style={{flex:1,fontSize:9,fontWeight:700,color:card.isDone?'#b0aeaa':'#37352f',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textDecoration:card.isDone?'line-through':'none'}}>
+                                                                                                    <span style={{color:card.isDone?'#d3d1cb':'#787774',fontSize:8}}>[{card.partName||'-'}]</span> {card.displayName}
+                                                                                                </span>
+                                                                                                <span style={{fontSize:8,fontWeight:800,color:card.isDone?'#b0aeaa':'#37352f',whiteSpace:'nowrap',flexShrink:0}}>{card.qty}EA</span>
                                                                                                 {card.isDone && <span style={{fontSize:9,fontWeight:900,color:'#22c55e',flexShrink:0}}>✓</span>}
                                                                                             </div>
-                                                                                            {card.partName && <div style={{fontSize:8,color:'#787774',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>[{card.partName}]</div>}
-                                                                                            <div style={{fontSize:8,color:'#b0aeaa',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{card.displayName}</div>
                                                                                         </div>
                                                                                     ))}
                                                                                 </div>
-                                                                            </div>
-                                                                        );
-                                                                    })}
-                                                                    {totalCards === 0 && <div style={{textAlign:'center',padding:'10px 0',color:'#d3d1cb',fontSize:9,fontWeight:700}}>—</div>}
-                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                })}
                                                             </div>
                                                         );
                                                     })}
