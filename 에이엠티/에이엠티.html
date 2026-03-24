@@ -4545,6 +4545,16 @@
 
                             // ── 독립 카드 생성 (카드 자체가 드래그 대상) ──
                             const isDone = !!(item.partCompletions?.[cardKey]?.[procKey]);
+                            // 완료됐지만 partName 없는 경우 자동 수정
+                            if (isDone && item.docId && partName) {
+                                const _tlVal = item.partCompletions?.[cardKey]?.[procKey];
+                                if (_tlVal && typeof _tlVal === 'object' && !_tlVal.partName) {
+                                    const { doc: _tlDoc, updateDoc: _tlUpd } = window.fbFirestore;
+                                    _tlUpd(_tlDoc(window.db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'confirmed_orders', item.docId), {
+                                        [`partCompletions.${cardKey}.${procKey}.partName`]: partName
+                                    }).catch(() => {});
+                                }
+                            }
                             const el = document.createElement('div');
                             el.className = 'tl-delivery-item';
                             el.dataset.idnum     = String(item.idNum);
@@ -6394,6 +6404,16 @@
                     const _bck   = _bdid ? cKey.substring(_bdid.length + 1) : cKey;
                     const _bobj  = confirmedOrders.find(o => (o.docId || String(o.idNum)) === _bdid);
                     const _bDone = !!(_bobj?.partCompletions?.[_bck]?.[_bpk]);
+                    // 완료됐지만 partName 없는 경우 자동 수정
+                    if (_bDone && _bobj?.docId && p.nm) {
+                        const _bVal = _bobj?.partCompletions?.[_bck]?.[_bpk];
+                        if (_bVal && typeof _bVal === 'object' && !_bVal.partName) {
+                            const { doc: _bDoc, updateDoc: _bUpd } = window.fbFirestore;
+                            _bUpd(_bDoc(window.db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'confirmed_orders', _bobj.docId), {
+                                [`partCompletions.${_bck}.${_bpk}.partName`]: p.nm
+                            }).catch(() => {});
+                        }
+                    }
                     const _bSafeDocId = _bdid.replace(/'/g, "\\'");
                     const _bSafeCK    = _bck.replace(/'/g, "\\'");
                     const _bDate     = sk.substring(0, 10);
