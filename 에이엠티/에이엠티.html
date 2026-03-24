@@ -4483,6 +4483,24 @@
                 // ── (procKey × batchDate) 단위로 수량 합산 후 카드 1개 렌더 ──
                 // 배치 분할 시 동일 procKey·날짜가 여러 배치에 걸쳐 중복될 수 있으므로
                 // (cardKey, procKey, batchDate) 기준으로 그룹핑하여 카드를 1개만 생성
+                // partNameMap 일괄 저장 (cardKey → 부속명, 이카운트등록 연동용)
+                pendingOrders.forEach(item => {
+                    if (!item.partMoveLog || !item.docId) return;
+                    const nameUpdates = {};
+                    Object.entries(item.partMoveLog).forEach(([ck, batches]) => {
+                        if (!Array.isArray(batches) || !batches.length) return;
+                        const ri = parseInt(ck.split('-')[2]);
+                        const r  = currentFullData[ri];
+                        if (!r) return;
+                        const pn = r[h.indexOf("부속명")] || '';
+                        if (pn && !item.partNameMap?.[ck]) nameUpdates[`partNameMap.${ck}`] = pn;
+                    });
+                    if (Object.keys(nameUpdates).length) {
+                        const { doc: _pnDoc, updateDoc: _pnUpd } = window.fbFirestore;
+                        _pnUpd(_pnDoc(window.db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'confirmed_orders', item.docId), nameUpdates).catch(() => {});
+                    }
+                });
+
                 pendingOrders.forEach(item => {
                     if (!item.partMoveLog) return;
                     Object.entries(item.partMoveLog).forEach(([cardKey, batches]) => {
