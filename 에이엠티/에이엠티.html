@@ -4613,6 +4613,17 @@
                 await updateDoc(docRef, {
                     [`partCompletions.${cardKey}.${procKey}`]: true
                 });
+                // DOM 즉시 업데이트 (onSnapshot 수신 전 시각적 피드백)
+                const card = btn?.closest('.wo-boring-placed-card, .wo-boring-part-card, .tl-delivery-item');
+                if (card) {
+                    card.style.opacity = '0.6';
+                    card.setAttribute('draggable', 'false');
+                    card.dataset.done = '1';
+                    card.removeAttribute('ondragstart');
+                    card.removeAttribute('ondragend');
+                    const btnWrap = btn.parentElement;
+                    if (btnWrap) btnWrap.innerHTML = `<span style="font-size:9px;font-weight:900;color:#22c55e;">✓ 완료</span>`;
+                }
                 showToastMessage(`[${procKey}] 작업 완료 처리됐습니다.`);
             } catch (err) {
                 console.error('완료 처리 실패:', err);
@@ -6078,9 +6089,20 @@
         }
 
         function _woCardHtml(p, stateKey) {
+            // 완료 상태 확인
+            const _wpk  = stateKey.replace(/^\d{4}-\d{2}-\d{2}-/, '');
+            const _wdid = p.orderKey || '';
+            const _wck  = _wdid ? p.cKey.substring(_wdid.length + 1) : p.cKey;
+            const _wobj = confirmedOrders.find(o => (o.docId || String(o.idNum)) === _wdid);
+            const _wDone = !!(_wobj?.partCompletions?.[_wck]?.[_wpk]);
+            const _wSafeDocId = _wdid.replace(/'/g, "\\'");
+            const _wSafeCK   = _wck.replace(/'/g, "\\'");
+            const _wDoneHtml = _wDone
+                ? `<div style="margin-top:5px;text-align:right;"><span style="font-size:9px;font-weight:900;color:#22c55e;">✓ 완료</span></div>`
+                : `<div style="margin-top:5px;text-align:right;"><button onclick="event.stopPropagation();tlMarkPartDone('${_wSafeDocId}','${_wSafeCK}','${_wpk}',this)" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;line-height:1.4;">완료</button></div>`;
+
             let innerHtml = '';
             if (p.isCuttingCard) {
-                // 재단카드: 오더코드 · 원장명 · 마감 · 치수 · 장수 · 수량 상세 표기
                 const dimStr    = (p.rw && p.rd) ? `${p.rw}×${p.rd}` : '';
                 const sheetsStr = p.sheets       ? `${p.sheets}장`    : '';
                 innerHtml =
@@ -6091,7 +6113,7 @@
                     (dimStr    ? `<span style="font-size:9px;font-weight:700;color:#787774;background:#f0efed;padding:1px 4px;border-radius:3px;">${dimStr}</span>` : '') +
                     (sheetsStr ? `<span style="font-size:9px;font-weight:700;color:#37352f;background:#e8e7e4;padding:1px 4px;border-radius:3px;">${sheetsStr}</span>` : '') +
                     `<span style="font-size:9px;font-weight:700;color:#37352f;background:#f5f5f4;padding:1px 4px;border-radius:3px;">${p.dq} EA</span>` +
-                    `</div>`;
+                    `</div>` + _wDoneHtml;
             } else {
                 const _cOn = p.orderName
                     ? `<div style="font-size:9px;font-weight:600;color:#a8a6a2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3;">${p.orderName}</div>` : '';
@@ -6102,19 +6124,18 @@
                 const _pmPool = p.pm || 0;
                 const _pmPoolStr = _pmPool >= 1 ? `${_pmPool.toFixed(1)}분` : `${Math.round(_pmPool * 60)}초`;
                 const _cTimePool = `<div style="font-size:8px;font-weight:600;color:#aaa8a4;margin-top:2px;white-space:nowrap;">⏱ ${_pmPoolStr}</div>`;
-                innerHtml = _cOn + _cNm + _cTimePool;
+                innerHtml = _cOn + _cNm + _cTimePool + _wDoneHtml;
             }
             const _pcm = _woGetOrderColorMap(stateKey);
             const _pok = p.orderKey || p.orderCode || '';
             const _pcc = _pcm[_pok] || {};
             const _pcs = _pcc.bg ? `background:${_pcc.bg};border-left:3px solid ${_pcc.bd};` : '';
-            return `<div class="wo-boring-part-card" draggable="true"
-                data-ck="${p.cKey}" data-sk="${stateKey}"
-                style="${_pcs}"
+            return `<div class="wo-boring-part-card" draggable="${_wDone ? 'false' : 'true'}"
+                data-ck="${p.cKey}" data-sk="${stateKey}" data-done="${_wDone ? '1' : '0'}"
+                style="${_pcs}${_wDone ? 'opacity:0.6;' : ''}"
                 onmouseenter="woBoardCardTipShow(event)"
                 onmouseleave="woBoardCardTipHide()"
-                ondragstart="woBoardDragStart(event,'${p.cKey}','${stateKey}')"
-                ondragend="woBoardDragEnd(event)">${innerHtml}</div>`;
+                ${_wDone ? '' : `ondragstart="woBoardDragStart(event,'${p.cKey}','${stateKey}')" ondragend="woBoardDragEnd(event)"`}>${innerHtml}</div>`;
         }
 
         // ── 보링 보드 재렌더 (절대위치 Gantt)
@@ -6132,7 +6153,7 @@
             const procMeta   = _woGetProcMeta(sk);
             // 공정색을 CSS 변수로 주입 → placed 카드 border + drag-over 강조에 자동 적용
             grid.style.setProperty('--wo-proc-color', procMeta.color);
-            const MIN_CARD_H = 28;   // 카드 최소 높이 (px) — 컴팩트: 상품명+부속명+수량 2행
+            const MIN_CARD_H = 48;   // 카드 최소 높이 (px) — 완료버튼 공간 포함
             const GAP_PX     = 2;    // 카드 사이 간격
 
             // 기계별 순서 배열 정규화
@@ -6361,15 +6382,28 @@
                     const _bok = p.orderKey || p.orderCode || '';
                     const _bcc = _boardColorMap[_bok] || {};
                     const _bcs = _bcc.bg ? `background:${_bcc.bg};border-left:3px solid ${_bcc.bd};` : '';
+
+                    // 완료 상태 확인
+                    const _bpk   = sk.replace(/^\d{4}-\d{2}-\d{2}-/, '');
+                    const _bdid  = p.orderKey || '';
+                    const _bck   = _bdid ? cKey.substring(_bdid.length + 1) : cKey;
+                    const _bobj  = confirmedOrders.find(o => (o.docId || String(o.idNum)) === _bdid);
+                    const _bDone = !!(_bobj?.partCompletions?.[_bck]?.[_bpk]);
+                    const _bSafeDocId = _bdid.replace(/'/g, "\\'");
+                    const _bSafeCK    = _bck.replace(/'/g, "\\'");
+                    const _bDoneHtml  = _bDone
+                        ? `<div style="text-align:right;padding-top:3px;"><span style="font-size:9px;font-weight:900;color:#22c55e;">✓ 완료</span></div>`
+                        : `<div style="text-align:right;padding-top:3px;"><button onclick="event.stopPropagation();tlMarkPartDone('${_bSafeDocId}','${_bSafeCK}','${_bpk}',this)" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;line-height:1.4;">완료</button></div>`;
+
                     html +=
-                        `<div class="wo-boring-placed-card" draggable="true"` +
-                        ` style="top:${topPx+1}px;height:${cardH}px;${_bcs}"` +
-                        ` data-ck="${cKey}" data-sk="${sk}"` +
+                        `<div class="wo-boring-placed-card" draggable="${_bDone ? 'false' : 'true'}"` +
+                        ` style="top:${topPx+1}px;height:${cardH}px;${_bcs}${_bDone ? 'opacity:0.6;' : ''}"` +
+                        ` data-ck="${cKey}" data-sk="${sk}" data-done="${_bDone ? '1' : '0'}"` +
                         ` onmouseenter="woBoardCardTipShow(event)"` +
                         ` onmouseleave="woBoardCardTipHide()"` +
-                        ` ondragstart="woBoardDragStart(event,'${cKey}','${sk}')"` +
-                        ` ondragend="woBoardDragEnd(event)">` +
-                        _placedInner +
+                        (_bDone ? '' : ` ondragstart="woBoardDragStart(event,'${cKey}','${sk}')" ondragend="woBoardDragEnd(event)"`) +
+                        `>` +
+                        _placedInner + _bDoneHtml +
                         `</div>`;
                 });
 
