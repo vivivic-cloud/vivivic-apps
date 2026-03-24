@@ -135,6 +135,7 @@
             const [expandedWeekBox, setExpandedWeekBox] = useState(null);
             const [expandedOrderCard, setExpandedOrderCard] = useState(null);
             const [tlViewWeek, setTlViewWeek] = useState(null); // { month, week, label, year }
+            const [expandedCompletions, setExpandedCompletions] = useState({}); // { 'date|proc|oc': true }
 
             // 주차 스크롤 드래그
             const weekScrollRef = useRef(null);
@@ -433,7 +434,27 @@
                         });
                     });
                 });
-                return { dateMap, weekDates, PROC_DEF, PROC_COLOR };
+                // ── 완료 맵: completionDate → procKey → orderCode → [{ partName, displayName }]
+                const completionMap = {};
+                weekDates.forEach(d => { completionMap[d] = {}; });
+                amtC.forEach(order => {
+                    if (!order.partCompletions) return;
+                    Object.entries(order.partCompletions).forEach(([cardKey, procs]) => {
+                        if (!procs || typeof procs !== 'object') return;
+                        const partName = order.partNameMap?.[cardKey] || '';
+                        Object.entries(procs).forEach(([procKey, val]) => {
+                            const isDone = val === true || (val && val.done);
+                            if (!isDone) return;
+                            const doneDate = val?.date || null;
+                            if (!doneDate || !dateSet.has(doneDate)) return;
+                            if (!completionMap[doneDate][procKey]) completionMap[doneDate][procKey] = {};
+                            const oc = order.orderCode || '—';
+                            if (!completionMap[doneDate][procKey][oc]) completionMap[doneDate][procKey][oc] = { orderCode: oc, displayName: order.displayName || '', parts: [] };
+                            completionMap[doneDate][procKey][oc].parts.push({ partName: partName || (val?.partName || '') });
+                        });
+                    });
+                });
+                return { dateMap, weekDates, PROC_DEF, PROC_COLOR, completionMap };
             };
 
             // AMT 발주엑셀과 동일 양식 다운로드 (주차별 제품발주현황)
@@ -905,10 +926,10 @@
 
                                 {/* ── 주차 타임라인 뷰어 (AMT 동일 스타일) ── */}
                                 {tlViewWeek && (() => {
-                                    const { dateMap, weekDates, PROC_DEF } = buildTimelineForWeek(tlViewWeek);
+                                    const { dateMap, weekDates, PROC_DEF, completionMap } = buildTimelineForWeek(tlViewWeek);
                                     const WD = ['일','월','화','수','목','금','토'];
                                     const PROC_HDR = {'납기':'#b0aeaa','보링':'#227C9D','엣지':'#17C3B2','NC':'#FF9C75','재단':'#90BBC6'};
-                                    const SECTIONS = ['납기','보링','엣지','NC','재단']; // AMT와 동일 순서
+                                    const SECTIONS = ['납기','보링','엣지','NC','재단'];
                                     const today = new Date().toISOString().slice(0,10);
                                     return (
                                         <div style={{border:'1px solid #e8e8e5',borderRadius:12,overflow:'hidden',background:'#f7f6f3'}}>
@@ -921,11 +942,10 @@
                                                     {weekDates.map(date => {
                                                         const d = new Date(date + 'T12:00:00');
                                                         const dow = WD[d.getDay()];
-                                                        const isSat = dow==='토', isSun = dow==='일';
-                                                        const isWeekend = isSat||isSun;
+                                                        const isWeekend = dow==='토'||dow==='일';
                                                         const isToday = date===today;
                                                         return (
-                                                            <div key={date} className="flex flex-col rounded-xl border bg-white shadow-sm overflow-hidden" style={{width:130,flexShrink:0,border:`1px solid ${isToday?'#37352f':'#ededeb'}`,boxShadow:isToday?'0 0 0 2px rgba(55,53,47,0.1)':'0 1px 2px rgba(0,0,0,0.05)',opacity:isWeekend?0.6:1}}>
+                                                            <div key={date} style={{width:150,flexShrink:0,display:'flex',flexDirection:'column',borderRadius:12,overflow:'hidden',border:`1px solid ${isToday?'#37352f':'#ededeb'}`,boxShadow:isToday?'0 0 0 2px rgba(55,53,47,0.1)':'0 1px 2px rgba(0,0,0,0.05)',background:'white',opacity:isWeekend?0.65:1}}>
                                                                 {/* 날짜 헤더 */}
                                                                 <div style={{padding:'10px 8px 8px',display:'flex',flexDirection:'column',alignItems:'center',background:isWeekend?'#fafafa':'white'}}>
                                                                     <span style={{fontSize:10,fontWeight:700,color:'#b0aeaa'}}>{d.getMonth()+1}월</span>
@@ -936,28 +956,65 @@
                                                                 {/* 공정 섹션 – AMT 동일 순서 */}
                                                                 {SECTIONS.map(pk => {
                                                                     const cards = dateMap[date]?.[pk] || [];
+                                                                    const compByOc = completionMap[date]?.[pk] || {};
+                                                                    const compEntries = Object.values(compByOc);
                                                                     const bg = PROC_HDR[pk];
+                                                                    const total = cards.length + compEntries.length;
+                                                                    if (total === 0) return (
+                                                                        <div key={pk} style={{borderTop:'1px solid #f1f1ef'}}>
+                                                                            <div style={{background:bg,padding:'2px 6px'}}>
+                                                                                <span style={{fontSize:8,fontWeight:900,color:'white',textTransform:'uppercase',letterSpacing:'0.05em'}}>{pk}</span>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
                                                                     return (
                                                                         <div key={pk} style={{borderTop:'1px solid #f1f1ef'}}>
                                                                             <div style={{background:bg,padding:'2px 6px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
                                                                                 <span style={{fontSize:8,fontWeight:900,color:'white',textTransform:'uppercase',letterSpacing:'0.05em'}}>{pk}</span>
-                                                                                {cards.length>0 && <span style={{fontSize:8,fontWeight:800,color:'white',background:'rgba(0,0,0,0.18)',padding:'0 4px',borderRadius:3}}>{cards.length}</span>}
-                                                                            </div>
-                                                                            {cards.length>0 && (
-                                                                                <div style={{padding:'2px 4px',display:'flex',flexDirection:'column',gap:1}}>
-                                                                                    {cards.map((card,ci) => (
-                                                                                        <div key={ci} style={{cursor:'default',padding:'3px 4px',borderRadius:5,background:card.isDone?'rgba(34,197,94,0.06)':'transparent',opacity:card.isDone?0.7:1}}>
-                                                                                            <div style={{display:'flex',alignItems:'center',gap:3}}>
-                                                                                                <span style={{flex:1,fontSize:9,fontWeight:700,color:card.isDone?'#b0aeaa':'#37352f',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textDecoration:card.isDone?'line-through':'none'}}>
-                                                                                                    <span style={{color:card.isDone?'#d3d1cb':'#787774',fontSize:8}}>[{card.partName||'-'}]</span> {card.displayName}
-                                                                                                </span>
-                                                                                                <span style={{fontSize:8,fontWeight:800,color:card.isDone?'#b0aeaa':'#37352f',whiteSpace:'nowrap',flexShrink:0}}>{card.qty}EA</span>
-                                                                                                {card.isDone && <span style={{fontSize:9,fontWeight:900,color:'#22c55e',flexShrink:0}}>✓</span>}
-                                                                                            </div>
-                                                                                        </div>
-                                                                                    ))}
+                                                                                <div style={{display:'flex',gap:3,alignItems:'center'}}>
+                                                                                    {cards.length>0 && <span style={{fontSize:8,fontWeight:800,color:'white',background:'rgba(0,0,0,0.18)',padding:'0 4px',borderRadius:3}}>{cards.length}</span>}
+                                                                                    {compEntries.length>0 && <span style={{fontSize:8,fontWeight:900,color:'#22c55e',background:'rgba(0,0,0,0.25)',padding:'0 4px',borderRadius:3}}>✓{compEntries.length}</span>}
                                                                                 </div>
-                                                                            )}
+                                                                            </div>
+                                                                            <div style={{padding:'2px 4px',display:'flex',flexDirection:'column',gap:1}}>
+                                                                                {/* 일반 배치 카드 */}
+                                                                                {cards.map((card,ci) => (
+                                                                                    <div key={ci} style={{cursor:'default',padding:'3px 4px',borderRadius:5,opacity:card.isDone?0.55:1,textDecoration:card.isDone?'line-through':'none'}}>
+                                                                                        <div style={{display:'flex',alignItems:'center',gap:3}}>
+                                                                                            <span style={{flex:1,fontSize:9,fontWeight:700,color:card.isDone?'#b0aeaa':'#37352f',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                                                                                                <span style={{color:'#b0aeaa',fontSize:8}}>[{card.partName||'-'}]</span> {card.displayName}
+                                                                                            </span>
+                                                                                            <span style={{fontSize:8,fontWeight:800,color:'#787774',whiteSpace:'nowrap',flexShrink:0}}>{card.qty}EA</span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                ))}
+                                                                                {/* 완료 카드: 오더코드 토글 */}
+                                                                                {compEntries.map((oc, oi) => {
+                                                                                    const toggleKey = `${date}|${pk}|${oc.orderCode}`;
+                                                                                    const isOpen = !!expandedCompletions[toggleKey];
+                                                                                    return (
+                                                                                        <div key={oi} style={{borderRadius:5,overflow:'hidden',border:'1px solid #d1fae5',marginTop:1}}>
+                                                                                            <div
+                                                                                                onClick={() => setExpandedCompletions(prev => ({...prev,[toggleKey]:!prev[toggleKey]}))}
+                                                                                                style={{display:'flex',alignItems:'center',gap:3,padding:'3px 5px',background:'#f0fdf4',cursor:'pointer'}}
+                                                                                            >
+                                                                                                <span style={{fontSize:9,fontWeight:900,color:'#22c55e',flexShrink:0}}>✓</span>
+                                                                                                <span style={{flex:1,fontSize:9,fontWeight:900,color:'#059669',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontFamily:'ui-monospace,monospace'}}>{oc.orderCode}</span>
+                                                                                                <span style={{fontSize:9,color:'#6ee7b7',flexShrink:0}}>{isOpen?'▲':'▼'}</span>
+                                                                                            </div>
+                                                                                            {isOpen && (
+                                                                                                <div style={{padding:'3px 6px 4px',background:'white',display:'flex',flexDirection:'column',gap:2}}>
+                                                                                                    {oc.parts.map((p, pi) => (
+                                                                                                        <div key={pi} style={{fontSize:9,fontWeight:700,color:'#37352f',padding:'2px 4px',background:'#f9fafb',borderRadius:3,borderLeft:'2px solid #22c55e'}}>
+                                                                                                            {p.partName || '(부속명 없음)'}
+                                                                                                        </div>
+                                                                                                    ))}
+                                                                                                </div>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
                                                                         </div>
                                                                     );
                                                                 })}
