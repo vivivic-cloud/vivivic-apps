@@ -361,6 +361,48 @@
                 setTimeout(() => setIsDlRunning(false), 2000);
             };
 
+            // AMT 발주엑셀과 동일 양식 다운로드 (주차별 제품발주현황)
+            const downloadWeekOrdersExcel = (weekOrders, weekLabel) => {
+                if (!weekOrders || !weekOrders.length) return;
+                const exportData = [];
+                weekOrders
+                    .slice()
+                    .sort((a, b) => (a.orderCode || '').localeCompare(b.orderCode || ''))
+                    .forEach(order => {
+                        // 품목코드: rawOriginalData에서 ing단품코드 조회
+                        const matchRow = rawOriginalData.find(r => {
+                            const firstVal = r[originalHeaders[0]];
+                            return String(firstVal || '').trim() === String(order.code || '').trim();
+                        });
+                        const itemCode = matchRow ? (matchRow['ing단품코드'] || '') : '';
+
+                        Object.entries(order.partInfoMap || {}).forEach(([key, pInfo]) => {
+                            if (pInfo.isDeleted) return;
+                            const partName = (order.partNameMap && order.partNameMap[key]) || '';
+                            // 원장종류: rawOriginalData에서 부속명 매칭 후 원장명 조회
+                            const partRow = partName
+                                ? rawOriginalData.find(r => String(r['부속명'] || '').trim() === partName.trim())
+                                : null;
+                            const plateName = partRow ? (partRow['원장명'] || '') : '';
+                            exportData.push({
+                                'PO#': order.orderCode || '',
+                                '품목코드': itemCode,
+                                '제품명': order.code || '',
+                                '완성품수량': order.orderQty || '',
+                                '원장종류': plateName,
+                                '부속명': partName,
+                                '수량': pInfo.qty || '',
+                                '납기일': order.deliveryDate || '',
+                            });
+                        });
+                    });
+                if (!exportData.length) return;
+                const ws = XLSX.utils.json_to_sheet(exportData);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Orders');
+                XLSX.writeFile(wb, `발주확정목록_${weekLabel}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+            };
+
             const FilterUI = ({ selected, setSelected, items }) => {
                 const [q, setQ] = useState(""); const [open, setOpen] = useState(false);
                 const list = useMemo(() => q ? items.filter(n => n.toLowerCase().includes(q.toLowerCase())) : items, [q, items]);
@@ -636,7 +678,7 @@
                                                                                 <span style={{fontSize:11,fontWeight:800,color:'#37352f'}}>제품발주</span>
                                                                                 <div className="flex items-center gap-2">
                                                                                     <span style={{fontSize:9,fontWeight:700,color:'#787774'}}>{week.orders.length}건</span>
-                                                                                    <button onClick={(e) => { e.stopPropagation(); }} style={{fontSize:9,padding:'1px 6px',background:'#37352f',color:'white',borderRadius:4,fontWeight:700,border:'none',cursor:'pointer'}}>엑셀↓</button>
+                                                                                    <button onClick={(e) => { e.stopPropagation(); downloadWeekOrdersExcel(week.orders, week.label); }} style={{fontSize:9,padding:'1px 6px',background:'#37352f',color:'white',borderRadius:4,fontWeight:700,border:'none',cursor:'pointer'}}>엑셀↓</button>
                                                                                 </div>
                                                                             </div>
                                                                             <div className="p-2 max-h-[200px] overflow-y-auto custom-scroll space-y-1 bg-white">
