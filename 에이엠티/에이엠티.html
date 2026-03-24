@@ -4544,6 +4544,7 @@
                                 : '';
 
                             // ── 독립 카드 생성 (카드 자체가 드래그 대상) ──
+                            const isDone = !!(item.partCompletions?.[cardKey]?.[procKey]);
                             const el = document.createElement('div');
                             el.className = 'tl-delivery-item';
                             el.dataset.idnum     = String(item.idNum);
@@ -4555,13 +4556,22 @@
                             el.dataset.batchdate = batchDate;
                             el.dataset.totalqty  = String(totalQty);
                             el.dataset.partname  = partName.replace(/"/g, '&quot;');
+                            el.dataset.done      = isDone ? '1' : '0';
                             el.setAttribute('ondblclick', 'tlSelectRelated(this)');
-                            el.setAttribute('onmousedown', 'tlPartDragStart(event,this)');
+                            if (!isDone) el.setAttribute('onmousedown', 'tlPartDragStart(event,this)');
+                            if (isDone) el.style.opacity = '0.55';
+                            const safeDocId  = (item.docId || '').replace(/'/g, "\\'");
+                            const safeCK     = cardKey.replace(/'/g, "\\'");
+                            const safePK     = procKey.replace(/'/g, "\\'");
                             el.innerHTML = `
-                                <div style="display:flex;align-items:center;gap:3px;cursor:grab;">
-                                    <span style="flex:1;font-size:9px;font-weight:700;color:#37352f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><span style="color:#787774;font-size:8px;">[${partName}]</span> ${item.displayName}</span>
-                                    ${spot}${timeStr}
-                                    <span style="font-size:8px;font-weight:800;color:#37352f;white-space:nowrap;flex-shrink:0;">${movedQty}EA</span>
+                                <div style="display:flex;align-items:center;gap:3px;cursor:${isDone ? 'default' : 'grab'};">
+                                    <span style="flex:1;font-size:9px;font-weight:700;color:${isDone ? '#b0aeaa' : '#37352f'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${isDone ? 'text-decoration:line-through;' : ''}"><span style="color:${isDone ? '#d3d1cb' : '#787774'};font-size:8px;">[${partName}]</span> ${item.displayName}</span>
+                                    ${isDone ? '' : spot + timeStr}
+                                    <span style="font-size:8px;font-weight:800;color:${isDone ? '#b0aeaa' : '#37352f'};white-space:nowrap;flex-shrink:0;">${movedQty}EA</span>
+                                    ${isDone
+                                        ? `<span style="font-size:9px;font-weight:900;color:#22c55e;flex-shrink:0;padding:0 2px;">✓</span>`
+                                        : `<button onclick="event.stopPropagation();tlMarkPartDone('${safeDocId}','${safeCK}','${safePK}',this)" onmousedown="event.stopPropagation()" style="flex-shrink:0;font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 5px;cursor:pointer;white-space:nowrap;line-height:1.4;">완료</button>`
+                                    }
                                 </div>`;
                             section.appendChild(el);
 
@@ -4590,6 +4600,25 @@
             },
 
             // SortableJS 초기화 (카드 내 공정 섹션)
+        };
+
+        // ── 부속 공정 완료 처리 ──────────────────────────────────────────────────
+        window.tlMarkPartDone = async function(docId, cardKey, procKey, btn) {
+            if (!docId) return;
+            const { doc, updateDoc } = window.fbFirestore;
+            const appId = "vivivic-4b7ef";
+            try {
+                if (btn) { btn.disabled = true; btn.textContent = '...'; }
+                const docRef = doc(window.db, 'artifacts', appId, 'public', 'data', 'confirmed_orders', docId);
+                await updateDoc(docRef, {
+                    [`partCompletions.${cardKey}.${procKey}`]: true
+                });
+                showToastMessage(`[${procKey}] 작업 완료 처리됐습니다.`);
+            } catch (err) {
+                console.error('완료 처리 실패:', err);
+                showToastMessage('완료 처리 실패');
+                if (btn) { btn.disabled = false; btn.textContent = '완료'; }
+            }
         };
 
         // 오늘로 이동 버튼
@@ -7573,6 +7602,7 @@
             // 부속 행 드래그 시작
             window.tlPartDragStart = function(e, partEl) {
                 if (e.type !== 'touchstart' && e.button !== 0) return;
+                if (partEl.dataset.done === '1') return;
 
                 // 이동모드 체크: 패널이 열린 ORDER card가 tl-item-selected 여야 함
                 const openOrderItem = document.querySelector('.tl-delivery-item[data-tl-open="1"]');
