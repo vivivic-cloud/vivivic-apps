@@ -479,9 +479,10 @@
                 const weekDates = [...allDates].sort();
                 const dateSet = new Set(weekDates);
                 const dateMap = {};
-                weekDates.forEach(d => { dateMap[d] = {}; PROC_DEF.forEach(pk => dateMap[d][pk] = []); });
+                weekDates.forEach(d => { dateMap[d] = { '발주': [] }; PROC_DEF.forEach(pk => dateMap[d][pk] = []); });
                 amtC.forEach(order => {
                     if (!order.partMoveLog) return;
+                    const datesForOrder = new Set(); // 이 오더가 배치된 날짜들
                     Object.entries(order.partMoveLog).forEach(([cardKey, batches]) => {
                         if (!Array.isArray(batches) || !batches.length) return;
                         const partName = order.partNameMap?.[cardKey] || '';
@@ -492,6 +493,7 @@
                                 if (!bd || !dateSet.has(bd)) return;
                                 const gKey = `${procKey}|${bd}`;
                                 grouped[gKey] = (grouped[gKey] || 0) + (batch.qty || 0);
+                                datesForOrder.add(bd);
                             });
                         });
                         Object.entries(grouped).forEach(([gKey, qty]) => {
@@ -501,6 +503,14 @@
                             const isDone = compVal === true || (compVal && compVal.done);
                             dateMap[batchDate][procKey].push({ orderCode: order.orderCode || '', displayName: order.displayName || '', partName, qty, isDone: !!isDone });
                         });
+                    });
+                    // 발주 섹션: 이 오더가 배치된 날짜마다 1회 등록 (중복 방지)
+                    datesForOrder.forEach(d => {
+                        if (!dateMap[d]) return;
+                        const alreadyAdded = dateMap[d]['발주'].some(o => o.orderCode === (order.orderCode || ''));
+                        if (!alreadyAdded) {
+                            dateMap[d]['발주'].push({ orderCode: order.orderCode || '', displayName: order.displayName || '', deliveryDate: order.deliveryDate || '', orderQty: order.orderQty || '' });
+                        }
                     });
                 });
                 const completionMap = {};
@@ -812,7 +822,7 @@
                             const WD = ['일','월','화','수','목','금','토'];
                             const PROC_COLOR_ON  = {'납기':'#b0aeaa','보링':'#227C9D','엣지':'#17C3B2','NC':'#FF9C75','재단':'#90BBC6'};
                             const PROC_COLOR_OFF = '#d3d1cb';
-                            const SECTIONS = ['납기','보링','엣지','NC','재단'];
+                            const SECTIONS = ['발주','재단','NC','엣지','보링','납기'];
                             const today = new Date().toISOString().slice(0,10);
                             return (
                                 <div className="space-y-4">
@@ -840,6 +850,33 @@
                                                                 {isToday && <span style={{fontSize:8,fontWeight:900,color:'white',background:'#37352f',padding:'1px 6px',borderRadius:3,marginTop:3}}>TODAY</span>}
                                                             </div>
                                                             {SECTIONS.map(pk => {
+                                                                // ── 발주 섹션 별도 렌더 ──
+                                                                if (pk === '발주') {
+                                                                    const orders = dateMap[date]?.['발주'] || [];
+                                                                    return (
+                                                                        <div key="발주" style={{borderTop:'1px solid #f1f1ef'}}>
+                                                                            <div style={{background:'#37352f',padding:'2px 6px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                                                                                <span style={{fontSize:8,fontWeight:900,color:'white',textTransform:'uppercase',letterSpacing:'0.05em'}}>발주</span>
+                                                                                {orders.length>0 && <span style={{fontSize:8,fontWeight:800,color:'white',background:'rgba(255,255,255,0.2)',padding:'0 4px',borderRadius:3}}>{orders.length}</span>}
+                                                                            </div>
+                                                                            {orders.length>0 && (
+                                                                                <div style={{padding:'2px 4px',display:'flex',flexDirection:'column',gap:1}}>
+                                                                                    {orders.map((o, oi) => (
+                                                                                        <div key={oi} style={{padding:'3px 4px',borderRadius:5}}>
+                                                                                            <div style={{display:'flex',alignItems:'center',gap:3}}>
+                                                                                                {o.orderCode && <span style={{fontSize:8,fontWeight:900,color:'#787774',fontFamily:'ui-monospace,monospace',background:'#f7f6f3',padding:'0 3px',borderRadius:2,flexShrink:0}}>{o.orderCode}</span>}
+                                                                                                <span style={{flex:1,fontSize:9,fontWeight:700,color:'#37352f',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.displayName}</span>
+                                                                                                {o.orderQty && <span style={{fontSize:8,fontWeight:800,color:'#787774',whiteSpace:'nowrap',flexShrink:0}}>{o.orderQty}EA</span>}
+                                                                                            </div>
+                                                                                            {o.deliveryDate && <div style={{fontSize:7,color:'#b0aeaa',paddingLeft:2}}>납기 {o.deliveryDate}</div>}
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    );
+                                                                }
+                                                                // ── 공정 섹션 ──
                                                                 const cards = dateMap[date]?.[pk] || [];
                                                                 const compByOc = completionMap[date]?.[pk] || {};
                                                                 const compEntries = Object.values(compByOc);
