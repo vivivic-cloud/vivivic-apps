@@ -4570,7 +4570,7 @@
                                     <span style="font-size:8px;font-weight:800;color:${isDone ? '#b0aeaa' : '#37352f'};white-space:nowrap;flex-shrink:0;">${movedQty}EA</span>
                                     ${isDone
                                         ? `<span style="font-size:9px;font-weight:900;color:#22c55e;flex-shrink:0;padding:0 2px;">✓</span>`
-                                        : `<button onclick="event.stopPropagation();tlMarkPartDone('${safeDocId}','${safeCK}','${safePK}',this)" onmousedown="event.stopPropagation()" style="flex-shrink:0;font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 5px;cursor:pointer;white-space:nowrap;line-height:1.4;">완료</button>`
+                                        : `<button onclick="event.stopPropagation();tlMarkPartDone('${safeDocId}','${safeCK}','${safePK}','${batchDate}',this)" onmousedown="event.stopPropagation()" style="flex-shrink:0;font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 5px;cursor:pointer;white-space:nowrap;line-height:1.4;">완료</button>`
                                     }
                                 </div>`;
                             section.appendChild(el);
@@ -4603,7 +4603,7 @@
         };
 
         // ── 부속 공정 완료 처리 ──────────────────────────────────────────────────
-        window.tlMarkPartDone = async function(docId, cardKey, procKey, btn) {
+        window.tlMarkPartDone = async function(docId, cardKey, procKey, doneDate, btn) {
             if (!docId) return;
             const { doc, updateDoc } = window.fbFirestore;
             const appId = "vivivic-4b7ef";
@@ -4611,7 +4611,10 @@
                 if (btn) { btn.disabled = true; btn.textContent = '...'; }
                 const docRef = doc(window.db, 'artifacts', appId, 'public', 'data', 'confirmed_orders', docId);
                 await updateDoc(docRef, {
-                    [`partCompletions.${cardKey}.${procKey}`]: true
+                    [`partCompletions.${cardKey}.${procKey}`]: {
+                        done: true,
+                        date: doneDate || new Date().toISOString().slice(0, 10)
+                    }
                 });
                 // DOM 즉시 업데이트 (onSnapshot 수신 전 시각적 피드백)
                 const card = btn?.closest('.wo-boring-placed-card, .wo-boring-part-card, .tl-delivery-item');
@@ -6097,9 +6100,10 @@
             const _wDone = !!(_wobj?.partCompletions?.[_wck]?.[_wpk]);
             const _wSafeDocId = _wdid.replace(/'/g, "\\'");
             const _wSafeCK   = _wck.replace(/'/g, "\\'");
+            const _wDate    = stateKey.substring(0, 10);
             const _wDoneHtml = _wDone
                 ? `<div style="margin-top:5px;text-align:right;"><span style="font-size:9px;font-weight:900;color:#22c55e;">✓ 완료</span></div>`
-                : `<div style="margin-top:5px;text-align:right;"><button onclick="event.stopPropagation();tlMarkPartDone('${_wSafeDocId}','${_wSafeCK}','${_wpk}',this)" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;line-height:1.4;">완료</button></div>`;
+                : `<div style="margin-top:5px;text-align:right;"><button onclick="event.stopPropagation();tlMarkPartDone('${_wSafeDocId}','${_wSafeCK}','${_wpk}','${_wDate}',this)" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;line-height:1.4;">완료</button></div>`;
 
             let innerHtml = '';
             if (p.isCuttingCard) {
@@ -6391,9 +6395,10 @@
                     const _bDone = !!(_bobj?.partCompletions?.[_bck]?.[_bpk]);
                     const _bSafeDocId = _bdid.replace(/'/g, "\\'");
                     const _bSafeCK    = _bck.replace(/'/g, "\\'");
+                    const _bDate     = sk.substring(0, 10);
                     const _bDoneHtml  = _bDone
                         ? `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><span style="font-size:9px;font-weight:900;color:#22c55e;">✓완료</span></div>`
-                        : `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><button onclick="event.stopPropagation();tlMarkPartDone('${_bSafeDocId}','${_bSafeCK}','${_bpk}',this)" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 6px;cursor:pointer;line-height:1.5;">완료</button></div>`;
+                        : `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><button onclick="event.stopPropagation();tlMarkPartDone('${_bSafeDocId}','${_bSafeCK}','${_bpk}','${_bDate}',this)" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 6px;cursor:pointer;line-height:1.5;">완료</button></div>`;
 
                     html +=
                         `<div class="wo-boring-placed-card" draggable="${_bDone ? 'false' : 'true'}"` +
