@@ -134,6 +134,7 @@
             const [isWoSearchOpen, setIsWoSearchOpen] = useState(false);
             const [expandedWeekBox, setExpandedWeekBox] = useState(null);
             const [expandedOrderCard, setExpandedOrderCard] = useState(null);
+            const [tlViewWeek, setTlViewWeek] = useState(null); // { month, week, label, year }
 
             // 주차 스크롤 드래그
             const weekScrollRef = useRef(null);
@@ -359,6 +360,80 @@
                 XLSX.writeFile(wb, `${type}_${new Date().toISOString().slice(0,10)}.xlsx`);
                 setDlProgress(100); setDlMessage("성공!");
                 setTimeout(() => setIsDlRunning(false), 2000);
+            };
+
+            // 주차 날짜 배열 반환: { month, week } → ['YYYY-MM-DD', ...]
+            const getWeekDates = (year, month, weekNum) => {
+                const startDay = (weekNum - 1) * 7 + 1;
+                const dates = [];
+                for (let d = startDay; d < startDay + 7; d++) {
+                    const dt = new Date(year, month - 1, d);
+                    if (dt.getMonth() + 1 === month) dates.push(dt.toISOString().slice(0, 10));
+                }
+                return dates;
+            };
+
+            // partMoveLog 기반으로 해당 주차 날짜별/공정별 카드 구성
+            const buildTimelineForWeek = (week) => {
+                const PROC_DEF   = ['재단','엣지','NC','보링','납기'];
+                const PROC_COLOR = {'재단':'#90BBC6','엣지':'#17C3B2','NC':'#FF9C75','보링':'#227C9D','납기':'#b0aeaa'};
+                // 연도: 오더 날짜에서 추론, 없으면 현재 연도
+                let year = week.year || new Date().getFullYear();
+                if (!week.year) {
+                    const amtC = confirmedOrders.filter(o => o.amtTimeline && !o.amtConfirmedCancel);
+                    outer: for (const o of amtC) {
+                        if (o.partMoveLog) {
+                            for (const batches of Object.values(o.partMoveLog)) {
+                                if (!Array.isArray(batches)) continue;
+                                for (const b of batches) {
+                                    for (const pk of PROC_DEF) {
+                                        const d = b[pk];
+                                        if (d && d.length >= 7) {
+                                            const m = parseInt(d.slice(5,7));
+                                            const wk = Math.ceil(parseInt(d.slice(8,10))/7);
+                                            if (m === week.month && wk === week.week) { year = parseInt(d.slice(0,4)); break outer; }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                const weekDates = getWeekDates(year, week.month, week.week);
+                const dateSet = new Set(weekDates);
+                const dateMap = {};
+                weekDates.forEach(d => { dateMap[d] = {}; PROC_DEF.forEach(pk => dateMap[d][pk] = []); });
+                const amtC = confirmedOrders.filter(o => o.amtTimeline === true && !o.amtConfirmedCancel);
+                amtC.forEach(order => {
+                    if (!order.partMoveLog) return;
+                    Object.entries(order.partMoveLog).forEach(([cardKey, batches]) => {
+                        if (!Array.isArray(batches) || !batches.length) return;
+                        const partName = order.partNameMap?.[cardKey] || '';
+                        const grouped = {};
+                        batches.forEach(batch => {
+                            PROC_DEF.forEach(procKey => {
+                                const bd = batch[procKey];
+                                if (!bd || !dateSet.has(bd)) return;
+                                const gKey = `${procKey}|${bd}`;
+                                grouped[gKey] = (grouped[gKey] || 0) + (batch.qty || 0);
+                            });
+                        });
+                        Object.entries(grouped).forEach(([gKey, qty]) => {
+                            const [procKey, batchDate] = gKey.split('|');
+                            if (!dateMap[batchDate]?.[procKey]) return;
+                            const compVal = order.partCompletions?.[cardKey]?.[procKey];
+                            const isDone = compVal === true || (compVal && compVal.done);
+                            dateMap[batchDate][procKey].push({
+                                orderCode: order.orderCode || '',
+                                displayName: order.displayName || '',
+                                partName,
+                                qty,
+                                isDone: !!isDone,
+                            });
+                        });
+                    });
+                });
+                return { dateMap, weekDates, PROC_DEF, PROC_COLOR };
             };
 
             // AMT 발주엑셀과 동일 양식 다운로드 (주차별 제품발주현황)
@@ -664,9 +739,16 @@
 
                                                             return (
                                                             <div key={`${week.month}-${week.week}`} data-week={`${week.month}-${week.week}`} style={{flexShrink:0,width:260,background:'white',border:`1px solid ${isCurrentWeek?'#37352f':'#e8e8e5'}`,borderRadius:10,overflow:'hidden',boxShadow:isCurrentWeek?'0 0 0 2px rgba(55,53,47,0.1)':'0 1px 3px rgba(0,0,0,0.04)'}}>
-                                                                <div style={{background:isCurrentWeek?'#37352f':'#f7f6f3',color:isCurrentWeek?'white':'#37352f',padding:'8px 12px',fontWeight:800,fontSize:11,display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid '+(isCurrentWeek?'rgba(255,255,255,0.1)':'#e8e8e5')}}>
+                                                                <div
+                                                                    style={{background:isCurrentWeek?'#37352f':'#f7f6f3',color:isCurrentWeek?'white':'#37352f',padding:'8px 12px',fontWeight:800,fontSize:11,display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid '+(isCurrentWeek?'rgba(255,255,255,0.1)':'#e8e8e5'),cursor:'pointer'}}
+                                                                    onClick={() => setTlViewWeek(tlViewWeek && tlViewWeek.month===week.month && tlViewWeek.week===week.week ? null : week)}
+                                                                    title="클릭하여 타임라인 보기"
+                                                                >
                                                                     <span>{week.label} {isCurrentWeek ? '(현재)' : ''}</span>
-                                                                    <span style={{background:isCurrentWeek?'rgba(255,255,255,0.15)':'#ededeb',padding:'1px 6px',borderRadius:4,fontSize:9}}>총 {week.orders.length}건</span>
+                                                                    <div style={{display:'flex',alignItems:'center',gap:4}}>
+                                                                        <span style={{background:isCurrentWeek?'rgba(255,255,255,0.15)':'#ededeb',padding:'1px 6px',borderRadius:4,fontSize:9}}>총 {week.orders.length}건</span>
+                                                                        <span style={{fontSize:9,opacity:0.6}}>{tlViewWeek && tlViewWeek.month===week.month && tlViewWeek.week===week.week ? '▲' : '▼'}</span>
+                                                                    </div>
                                                                 </div>
                                                                 <div className="p-3 space-y-2">
                                                                     {week.orders.length > 0 && (
@@ -820,6 +902,72 @@
                                         </div>
                                     </div>
                                 </div>
+
+                                {/* ── 주차 타임라인 뷰어 ── */}
+                                {tlViewWeek && (() => {
+                                    const { dateMap, weekDates, PROC_DEF, PROC_COLOR } = buildTimelineForWeek(tlViewWeek);
+                                    const DOW = ['일','월','화','수','목','금','토'];
+                                    return (
+                                        <div style={{border:'2px solid #37352f',borderRadius:10,overflow:'hidden',background:'white'}}>
+                                            <div style={{background:'#37352f',color:'white',padding:'10px 16px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                                                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                                                    <span style={{fontSize:13,fontWeight:900}}>{tlViewWeek.label} 타임라인</span>
+                                                    <span style={{fontSize:9,fontWeight:700,background:'rgba(255,255,255,0.15)',padding:'2px 7px',borderRadius:4}}>읽기전용 · 실시간</span>
+                                                </div>
+                                                <button onClick={() => setTlViewWeek(null)} style={{background:'transparent',border:'none',color:'rgba(255,255,255,0.7)',cursor:'pointer',fontSize:16,lineHeight:1,padding:'2px 4px'}}>✕</button>
+                                            </div>
+                                            <div style={{overflowX:'auto'}} className="custom-scroll">
+                                                <div style={{display:'flex',minWidth:'max-content',borderTop:'1px solid #e8e8e5'}}>
+                                                    {weekDates.map(date => {
+                                                        const dow = DOW[new Date(date + 'T12:00:00').getDay()];
+                                                        const isWeekend = dow === '토' || dow === '일';
+                                                        const totalCards = PROC_DEF.reduce((s, pk) => s + (dateMap[date][pk]?.length || 0), 0);
+                                                        return (
+                                                            <div key={date} style={{width:180,flexShrink:0,borderRight:'1px solid #e8e8e5',background: isWeekend ? '#fafafa' : 'white'}}>
+                                                                <div style={{padding:'6px 10px',background: isWeekend ? '#f7f6f3' : '#f9f9f8',borderBottom:'1px solid #e8e8e5',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0}}>
+                                                                    <div>
+                                                                        <span style={{fontSize:11,fontWeight:900,color: isWeekend ? '#b0aeaa' : '#37352f'}}>{date.slice(5).replace('-','/')} </span>
+                                                                        <span style={{fontSize:10,fontWeight:700,color: isWeekend ? '#d3d1cb' : '#787774'}}>({dow})</span>
+                                                                    </div>
+                                                                    {totalCards > 0 && <span style={{fontSize:9,fontWeight:800,color:'#37352f',background:'#ededeb',padding:'1px 5px',borderRadius:3}}>{totalCards}</span>}
+                                                                </div>
+                                                                <div style={{padding:6,display:'flex',flexDirection:'column',gap:4,minHeight:60}}>
+                                                                    {PROC_DEF.map(procKey => {
+                                                                        const cards = dateMap[date][procKey] || [];
+                                                                        if (!cards.length) return null;
+                                                                        const pc = PROC_COLOR[procKey];
+                                                                        return (
+                                                                            <div key={procKey} style={{borderRadius:5,overflow:'hidden',border:`1px solid ${pc}22`}}>
+                                                                                <div style={{background:pc+'18',padding:'2px 6px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:`1px solid ${pc}22`}}>
+                                                                                    <span style={{fontSize:8,fontWeight:900,color:pc}}>{procKey}</span>
+                                                                                    <span style={{fontSize:8,fontWeight:700,color:pc+'aa'}}>{cards.length}건</span>
+                                                                                </div>
+                                                                                <div style={{padding:'3px 4px',display:'flex',flexDirection:'column',gap:2}}>
+                                                                                    {cards.map((card, ci) => (
+                                                                                        <div key={ci} style={{padding:'3px 5px',background: card.isDone ? '#f0fdf4' : 'white',border:'1px solid '+(card.isDone ? '#d1fae5' : '#e8e8e5'),borderRadius:4,opacity: card.isDone ? 0.8 : 1}}>
+                                                                                            <div style={{display:'flex',alignItems:'center',gap:3,marginBottom:1}}>
+                                                                                                {card.orderCode && <span style={{fontSize:7,fontWeight:900,color:'#787774',fontFamily:'ui-monospace,monospace',background:'#f7f6f3',padding:'0 3px',borderRadius:2,flexShrink:0}}>{card.orderCode}</span>}
+                                                                                                <span style={{fontSize:8,fontWeight:800,color: card.isDone ? '#22c55e' : '#37352f',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{card.qty}EA</span>
+                                                                                                {card.isDone && <span style={{fontSize:9,fontWeight:900,color:'#22c55e',flexShrink:0}}>✓</span>}
+                                                                                            </div>
+                                                                                            {card.partName && <div style={{fontSize:8,color:'#787774',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>[{card.partName}]</div>}
+                                                                                            <div style={{fontSize:8,color:'#b0aeaa',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{card.displayName}</div>
+                                                                                        </div>
+                                                                                    ))}
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                    {totalCards === 0 && <div style={{textAlign:'center',padding:'10px 0',color:'#d3d1cb',fontSize:9,fontWeight:700}}>—</div>}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         )}
                     </div>
