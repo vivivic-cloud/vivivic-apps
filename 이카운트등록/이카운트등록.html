@@ -772,54 +772,38 @@
                                                                             </div>
                                                                         </div>
                                                                     )}
-                                                                    {week.orders.length > 0 && (
-                                                                        <div className="space-y-1" style={{fontSize:10,fontWeight:700,color:'#b0aeaa'}}>
-                                                                            <div style={{padding:'5px 8px',background:'#f7f6f3',borderRadius:6,border:'1px solid #e8e8e5'}}>재단발주</div>
-                                                                            <div style={{padding:'5px 8px',background:'#f7f6f3',borderRadius:6,border:'1px solid #e8e8e5'}}>엣지발주</div>
-                                                                            <div style={{padding:'5px 8px',background:'#f7f6f3',borderRadius:6,border:'1px solid #e8e8e5'}}>NC발주</div>
-                                                                            <div style={{padding:'5px 8px',background:'#f7f6f3',borderRadius:6,border:'1px solid #e8e8e5'}}>곡면엣지발주</div>
-                                                                        </div>
-                                                                    )}
-                                                                    {/* 공정 완료 섹션 */}
-                                                                    {week.completions.length > 0 && (() => {
-                                                                        const PROC_COLOR = {'재단':'#90BBC6','엣지':'#17C3B2','NC':'#FF9C75','보링':'#227C9D','납기':'#b0aeaa'};
-                                                                        // 날짜+공정별 그룹
-                                                                        const groups = {};
-                                                                        week.completions.forEach(c => {
-                                                                            const k = `${c.date}||${c.procKey}`;
-                                                                            if (!groups[k]) groups[k] = { date: c.date, procKey: c.procKey, items: [] };
-                                                                            groups[k].items.push(c);
-                                                                        });
-                                                                        const sortedGroups = Object.values(groups).sort((a,b) => a.date.localeCompare(b.date) || a.procKey.localeCompare(b.procKey));
+                                                                    {(() => {
+                                                                        const PROC_SECTIONS = [
+                                                                            { label: '재단발주', procKey: '재단', color: '#90BBC6' },
+                                                                            { label: '엣지발주', procKey: '엣지', color: '#17C3B2' },
+                                                                            { label: 'NC발주', procKey: 'NC', color: '#FF9C75' },
+                                                                            { label: '보링발주', procKey: '보링', color: '#227C9D' },
+                                                                            { label: '곡면엣지발주', procKey: '곡면엣지', color: '#b0aeaa' },
+                                                                        ];
                                                                         return (
-                                                                            <div style={{border:'1px solid #d1fae5',borderRadius:8,overflow:'hidden'}}>
-                                                                                <div style={{background:'#ecfdf5',padding:'6px 10px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid #d1fae5'}}>
-                                                                                    <span style={{fontSize:11,fontWeight:800,color:'#059669'}}>✓ 공정완료</span>
-                                                                                    <span style={{fontSize:9,fontWeight:700,color:'#059669',background:'#d1fae5',padding:'1px 6px',borderRadius:4}}>{week.completions.length}건</span>
-                                                                                </div>
-                                                                                <div className="p-2 space-y-1 max-h-[200px] overflow-y-auto custom-scroll bg-white">
-                                                                                    {sortedGroups.map((g, gi) => {
-                                                                                        const pc = PROC_COLOR[g.procKey] || '#787774';
-                                                                                        const [,md] = g.date.split('-');
-                                                                                        const dateLabel = g.date.slice(5).replace('-', '/');
-                                                                                        return (
-                                                                                            <div key={gi} style={{borderRadius:6,border:'1px solid #e8e8e5',padding:'5px 8px',background:'#fafafa'}}>
-                                                                                                <div style={{display:'flex',alignItems:'center',gap:5,marginBottom:4}}>
-                                                                                                    <span style={{fontSize:9,fontWeight:800,color:'#787774'}}>{dateLabel}</span>
-                                                                                                    <span style={{fontSize:9,fontWeight:900,color:'white',background:pc,padding:'0 5px',borderRadius:3}}>{g.procKey}</span>
-                                                                                                </div>
-                                                                                                <div style={{display:'flex',flexWrap:'wrap',gap:3}}>
-                                                                                                    {g.items.map((item, ii) => (
-                                                                                                        <span key={ii} style={{fontSize:9,fontWeight:700,color:'#37352f',background:'#f0fdf4',border:'1px solid #d1fae5',padding:'1px 5px',borderRadius:4,fontFamily:'ui-monospace,monospace'}}>
-                                                                                                            {item.orderCode || '—'}
-                                                                                                            {item.partName ? <span style={{fontWeight:500,color:'#787774',marginLeft:3}}>{item.partName}</span> : null}
-                                                                                                        </span>
+                                                                            <div className="space-y-1">
+                                                                                {PROC_SECTIONS.map(sec => {
+                                                                                    const done = week.completions.filter(c => c.procKey === sec.procKey);
+                                                                                    return (
+                                                                                        <div key={sec.procKey} style={{borderRadius:6,border:'1px solid #e8e8e5',overflow:'hidden'}}>
+                                                                                            <div style={{padding:'5px 8px',background:'#f7f6f3',fontSize:10,fontWeight:700,color: done.length > 0 ? '#37352f' : '#b0aeaa',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom: done.length > 0 ? '1px solid #e8e8e5' : 'none'}}>
+                                                                                                <span>{sec.label}</span>
+                                                                                                {done.length > 0 && <span style={{fontSize:9,fontWeight:900,color:'#059669',background:'#d1fae5',padding:'1px 6px',borderRadius:3}}>✓ {done.length}완료</span>}
+                                                                                            </div>
+                                                                                            {done.length > 0 && (
+                                                                                                <div style={{padding:'4px 6px',background:'white',display:'flex',flexDirection:'column',gap:2}}>
+                                                                                                    {done.map((item, ii) => (
+                                                                                                        <div key={ii} style={{display:'flex',alignItems:'center',gap:4,padding:'3px 5px',background:'#f0fdf4',border:'1px solid #d1fae5',borderRadius:4}}>
+                                                                                                            <span style={{fontSize:8,fontWeight:800,color:'#787774',fontFamily:'ui-monospace,monospace',flexShrink:0}}>{item.orderCode || '—'}</span>
+                                                                                                            {item.partName && <span style={{fontSize:9,fontWeight:700,color:'#37352f',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{item.partName}</span>}
+                                                                                                            <span style={{fontSize:8,color:'#b0aeaa',fontWeight:600,flexShrink:0}}>{item.date?.slice(5).replace('-','/')}</span>
+                                                                                                        </div>
                                                                                                     ))}
                                                                                                 </div>
-                                                                                            </div>
-                                                                                        );
-                                                                                    })}
-                                                                                </div>
+                                                                                            )}
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
                                                                             </div>
                                                                         );
                                                                     })()}
