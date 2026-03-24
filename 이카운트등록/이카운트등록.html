@@ -457,6 +457,74 @@
                 return { dateMap, weekDates, PROC_DEF, PROC_COLOR, completionMap };
             };
 
+            // 전체 날짜 타임라인 빌드 (모든 활성 오더의 partMoveLog + partCompletions)
+            const buildFullTimeline = () => {
+                const PROC_DEF = ['재단','엣지','NC','보링','납기'];
+                const amtC = confirmedOrders.filter(o => o.amtTimeline === true && !o.amtConfirmedCancel);
+                const allDates = new Set();
+                amtC.forEach(order => {
+                    if (order.partMoveLog) {
+                        Object.values(order.partMoveLog).forEach(batches => {
+                            if (!Array.isArray(batches)) return;
+                            batches.forEach(b => { PROC_DEF.forEach(pk => { if (b[pk]) allDates.add(b[pk]); }); });
+                        });
+                    }
+                    if (order.partCompletions) {
+                        Object.values(order.partCompletions).forEach(procs => {
+                            if (!procs || typeof procs !== 'object') return;
+                            Object.values(procs).forEach(val => { if (val?.date) allDates.add(val.date); });
+                        });
+                    }
+                });
+                const weekDates = [...allDates].sort();
+                const dateSet = new Set(weekDates);
+                const dateMap = {};
+                weekDates.forEach(d => { dateMap[d] = {}; PROC_DEF.forEach(pk => dateMap[d][pk] = []); });
+                amtC.forEach(order => {
+                    if (!order.partMoveLog) return;
+                    Object.entries(order.partMoveLog).forEach(([cardKey, batches]) => {
+                        if (!Array.isArray(batches) || !batches.length) return;
+                        const partName = order.partNameMap?.[cardKey] || '';
+                        const grouped = {};
+                        batches.forEach(batch => {
+                            PROC_DEF.forEach(procKey => {
+                                const bd = batch[procKey];
+                                if (!bd || !dateSet.has(bd)) return;
+                                const gKey = `${procKey}|${bd}`;
+                                grouped[gKey] = (grouped[gKey] || 0) + (batch.qty || 0);
+                            });
+                        });
+                        Object.entries(grouped).forEach(([gKey, qty]) => {
+                            const [procKey, batchDate] = gKey.split('|');
+                            if (!dateMap[batchDate]?.[procKey]) return;
+                            const compVal = order.partCompletions?.[cardKey]?.[procKey];
+                            const isDone = compVal === true || (compVal && compVal.done);
+                            dateMap[batchDate][procKey].push({ orderCode: order.orderCode || '', displayName: order.displayName || '', partName, qty, isDone: !!isDone });
+                        });
+                    });
+                });
+                const completionMap = {};
+                weekDates.forEach(d => { completionMap[d] = {}; });
+                amtC.forEach(order => {
+                    if (!order.partCompletions) return;
+                    Object.entries(order.partCompletions).forEach(([cardKey, procs]) => {
+                        if (!procs || typeof procs !== 'object') return;
+                        const partName = order.partNameMap?.[cardKey] || '';
+                        Object.entries(procs).forEach(([procKey, val]) => {
+                            const isDone = val === true || (val && val.done);
+                            if (!isDone) return;
+                            const doneDate = val?.date || null;
+                            if (!doneDate || !dateSet.has(doneDate)) return;
+                            if (!completionMap[doneDate][procKey]) completionMap[doneDate][procKey] = {};
+                            const oc = order.orderCode || '—';
+                            if (!completionMap[doneDate][procKey][oc]) completionMap[doneDate][procKey][oc] = { orderCode: oc, displayName: order.displayName || '', parts: [] };
+                            completionMap[doneDate][procKey][oc].parts.push({ partName: partName || (val?.partName || '') });
+                        });
+                    });
+                });
+                return { dateMap, weekDates, PROC_DEF, completionMap };
+            };
+
             // AMT 발주엑셀과 동일 양식 다운로드 (주차별 제품발주현황)
             const downloadWeekOrdersExcel = (weekOrders, weekLabel) => {
                 if (!weekOrders || !weekOrders.length) return;
@@ -739,266 +807,71 @@
                             </div>
                         )}
 
-                        {activeTab === 'WORK_ORDER' && (
-                            <div className="space-y-10">
-                                <div className="space-y-6">
-                                    <div className="flex items-center justify-between px-2"><h2 style={{fontSize:14,fontWeight:900,color:'#37352f',letterSpacing:'-0.02em',textTransform:'uppercase'}}>주차별 제품발주 현황</h2><span style={{fontSize:10,fontWeight:800,padding:'2px 10px',background:'#f1f0ef',color:'#787774',borderRadius:99,border:'1px solid #e8e8e5'}}>REALTIME SYNCED</span></div>
-                                    <div ref={weekScrollRef} className="overflow-x-auto custom-scroll pb-4"
-                                        style={{cursor:'grab'}}
-                                        onMouseDown={onWeekMouseDown}
-                                        onMouseMove={onWeekMouseMove}
-                                        onMouseUp={onWeekMouseUp}
-                                        onMouseLeave={onWeekMouseUp}>
-                                        <div className="flex gap-3" style={{minWidth: 'max-content', pointerEvents: weekDrag.current?.active ? 'none' : 'auto'}}>
-                                            {weeklyGroupedOrders.map((weekBox, boxIdx) => (
-                                                boxIdx % 5 === 0 ? (
-                                                    <div key={`group-${boxIdx}`} className="flex gap-3">
-                                                        {weeklyGroupedOrders.slice(boxIdx, boxIdx + 5).map(week => {
-                                                            const today = new Date();
-                                                            const currentWeekInfo = getWeekOfMonth(today.toISOString());
-                                                            const isCurrentWeek = currentWeekInfo && week.month === currentWeekInfo.month && week.week === currentWeekInfo.week;
-
-                                                            return (
-                                                            <div key={`${week.month}-${week.week}`} data-week={`${week.month}-${week.week}`} style={{flexShrink:0,width:260,background:'white',border:`1px solid ${isCurrentWeek?'#37352f':'#e8e8e5'}`,borderRadius:10,overflow:'hidden',boxShadow:isCurrentWeek?'0 0 0 2px rgba(55,53,47,0.1)':'0 1px 3px rgba(0,0,0,0.04)'}}>
-                                                                <div
-                                                                    style={{background:isCurrentWeek?'#37352f':'#f7f6f3',color:isCurrentWeek?'white':'#37352f',padding:'8px 12px',fontWeight:800,fontSize:11,display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid '+(isCurrentWeek?'rgba(255,255,255,0.1)':'#e8e8e5'),cursor:'pointer'}}
-                                                                    onClick={() => setTlViewWeek(tlViewWeek && tlViewWeek.month===week.month && tlViewWeek.week===week.week ? null : week)}
-                                                                    title="클릭하여 타임라인 보기"
-                                                                >
-                                                                    <span>{week.label} {isCurrentWeek ? '(현재)' : ''}</span>
-                                                                    <div style={{display:'flex',alignItems:'center',gap:4}}>
-                                                                        <span style={{background:isCurrentWeek?'rgba(255,255,255,0.15)':'#ededeb',padding:'1px 6px',borderRadius:4,fontSize:9}}>총 {week.orders.length}건</span>
-                                                                        <span style={{fontSize:9,opacity:0.6}}>{tlViewWeek && tlViewWeek.month===week.month && tlViewWeek.week===week.week ? '▲' : '▼'}</span>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="p-3 space-y-2">
-                                                                    {week.orders.length > 0 && (
-                                                                        <div style={{border:'1px solid #e8e8e5',borderRadius:8,overflow:'hidden',background:'#fafafa'}}>
-                                                                            <div
-                                                                                style={{background:'#f7f6f3',padding:'6px 10px',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid #e8e8e5'}}
-                                                                                onClick={() => setExpandedWeekBox(`${week.month}-${week.week}-product`)}
-                                                                            >
-                                                                                <span style={{fontSize:11,fontWeight:800,color:'#37352f'}}>제품발주</span>
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <span style={{fontSize:9,fontWeight:700,color:'#787774'}}>{week.orders.length}건</span>
-                                                                                    <button onClick={(e) => { e.stopPropagation(); downloadWeekOrdersExcel(week.orders, week.label); }} style={{fontSize:9,padding:'1px 6px',background:'#37352f',color:'white',borderRadius:4,fontWeight:700,border:'none',cursor:'pointer'}}>엑셀↓</button>
-                                                                                </div>
-                                                                            </div>
-                                                                            <div className="p-2 max-h-[200px] overflow-y-auto custom-scroll space-y-1 bg-white">
-                                                                                {week.orders.map((order, idx) => {
-                                                                                    const cardKey = `${week.month}-${week.week}-${idx}`;
-                                                                                    const isExpanded = expandedOrderCard === cardKey;
-
-                                                                                    return (
-                                                                                    <div key={idx}>
-                                                                                        <div
-                                                                                            style={{border:'1px solid #e8e8e5',borderRadius:6,padding:6,cursor:'pointer',background:'white',transition:'border-color 0.15s'}}
-                                                                                            onMouseEnter={e=>e.currentTarget.style.borderColor='#37352f'}
-                                                                                            onMouseLeave={e=>e.currentTarget.style.borderColor='#e8e8e5'}
-                                                                                            onClick={() => {
-                                                                                                console.log('=== 상품카드 클릭 ===');
-                                                                                                console.log('order 전체:', order);
-                                                                                                console.log('partInfoMap:', order.partInfoMap);
-                                                                                                console.log('partInfoMap 존재:', !!order.partInfoMap);
-                                                                                                if (order.partInfoMap) {
-                                                                                                    console.log('partInfoMap keys:', Object.keys(order.partInfoMap));
-                                                                                                    console.log('partInfoMap entries:', Object.entries(order.partInfoMap));
-                                                                                                    const firstEntry = Object.entries(order.partInfoMap)[0];
-                                                                                                    if (firstEntry) {
-                                                                                                        console.log('첫번째 part key:', firstEntry[0]);
-                                                                                                        console.log('첫번째 part 데이터:', firstEntry[1]);
-                                                                                                        console.log('첫번째 part 필드명들:', Object.keys(firstEntry[1]));
-                                                                                                    }
-                                                                                                    const amtParts = Object.entries(order.partInfoMap).filter(([key, part]) => !part.isDeleted && part.partSupplier === 'AMT');
-                                                                                                    console.log('AMT 부속 필터링 결과:', amtParts.length, '개');
-                                                                                                    console.log('AMT 부속 데이터:', amtParts);
-                                                                                                }
-                                                                                                setExpandedOrderCard(isExpanded ? null : cardKey);
-                                                                                            }}
-                                                                                        >
-                                                                                            <div className="flex items-center justify-between gap-1">
-                                                                                                <div className="flex items-center gap-1 flex-1 min-w-0">
-                                                                                                    {order.orderCode && <span style={{fontSize:9,fontWeight:900,color:'#787774',fontFamily:'ui-monospace,monospace',background:'#f7f6f3',padding:'1px 5px',borderRadius:4,whiteSpace:'nowrap',flexShrink:0}}>{order.orderCode}</span>}
-                                                                                                    <div style={{fontSize:8,color:'#b0aeaa',fontWeight:700,whiteSpace:'nowrap'}}>납기: {order.deliveryDate || '-'} · 발주: {order.createdAt?.toDate ? order.createdAt.toDate().toISOString().slice(0,10) : order.createdAt?.seconds ? new Date(order.createdAt.seconds*1000).toISOString().slice(0,10) : '-'}</div>
-                                                                                                </div>
-                                                                                                <span style={{fontSize:9,fontWeight:800,color:'#37352f',background:'#f7f6f3',padding:'1px 5px',borderRadius:4,whiteSpace:'nowrap'}}>{order.orderQty} EA</span>
-                                                                                            </div>
-                                                                                            <div style={{fontSize:10,fontWeight:700,color:'#37352f',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',marginTop:2}}>{order.displayName}</div>
-                                                                                        </div>
-                                                                                        {isExpanded && order.partInfoMap && (
-                                                                                            <div style={{marginTop:4,padding:8,background:'white',border:'1px solid #e8e8e5',borderRadius:6}}>
-                                                                                                {/* 기본 발주 부속 (AMT) */}
-                                                                                                <div className="space-y-2">
-                                                                                                    <div style={{fontSize:10,fontWeight:700,color:'#787774',textTransform:'uppercase',letterSpacing:'0.05em'}}>기본 발주 부속</div>
-                                                                                                    <div className="grid grid-cols-2 gap-2">
-                                                                                                        {Object.entries(order.partInfoMap).filter(([key, part]) => !part.isDeleted && part.partSupplier === 'AMT').map(([key, part]) => (
-                                                                                                            <div key={key} style={{background:'white',padding:8,borderRadius:6,border:'1px solid #e8e8e5',display:'flex',flexDirection:'column',gap:4}}>
-                                                                                                                <div className="flex justify-between items-start">
-                                                                                                                    <div className="flex flex-col truncate flex-1">
-                                                                                                                        <span style={{fontSize:10,fontWeight:700,color:'#37352f',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{part.partName || '-'}</span>
-                                                                                                                        <span style={{fontSize:8,color:'#b0aeaa',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{part.plateName || '-'} / {part.finish || '-'}</span>
-                                                                                                                    </div>
-                                                                                                                    <div className="flex flex-col items-end gap-1">
-                                                                                                                        <span style={{fontSize:9,fontWeight:800,color:'#37352f',background:'#f7f6f3',padding:'1px 5px',borderRadius:4,whiteSpace:'nowrap'}}>{part.qty || 0} EA</span>
-                                                                                                                    </div>
-                                                                                                                </div>
-                                                                                                                <div style={{fontSize:9,color:'#787774',fontWeight:500}}>{part.w || 0} X {part.d || 0}</div>
-                                                                                                            </div>
-                                                                                                        ))}
-                                                                                                    </div>
-                                                                                                </div>
-
-                                                                                                {/* AMT 외 공급처 부속 */}
-                                                                                                {Object.entries(order.partInfoMap).some(([key, part]) => part.isDeleted && part.partSupplier !== 'AMT') && (
-                                                                                                    <div style={{paddingTop:12,marginTop:12,borderTop:'1px dashed #e8e8e5'}} className="space-y-2">
-                                                                                                        <div style={{fontSize:10,fontWeight:700,color:'#787774',textTransform:'uppercase',letterSpacing:'0.05em'}}>AMT 외 공급처 부속</div>
-                                                                                                        <div className="grid grid-cols-2 gap-2">
-                                                                                                            {Object.entries(order.partInfoMap).filter(([key, part]) => part.isDeleted && part.partSupplier !== 'AMT').map(([key, part]) => (
-                                                                                                                <div key={key} style={{background:'#f7f6f3',padding:8,borderRadius:6,border:'1px dashed #e8e8e5',display:'flex',flexDirection:'column',gap:4}}>
-                                                                                                                    <div className="flex justify-between items-start">
-                                                                                                                        <div className="flex flex-col truncate flex-1">
-                                                                                                                            <span style={{fontSize:10,fontWeight:700,color:'#37352f',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{part.partName || '-'}</span>
-                                                                                                                            <span style={{fontSize:8,color:'#b0aeaa',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{part.plateName || '-'} / {part.finish || '-'}</span>
-                                                                                                                        </div>
-                                                                                                                    </div>
-                                                                                                                    <div style={{fontSize:9,color:'#787774',fontWeight:500}}>{part.w || 0} X {part.d || 0}</div>
-                                                                                                                </div>
-                                                                                                            ))}
-                                                                                                        </div>
-                                                                                                    </div>
-                                                                                                )}
-                                                                                            </div>
-                                                                                        )}
-                                                                                    </div>
-                                                                                    );
-                                                                                })}
-                                                                            </div>
-                                                                        </div>
-                                                                    )}
-                                                                    {(() => {
-                                                                        const PROC_SECTIONS = [
-                                                                            { label: '재단발주', procKey: '재단', color: '#90BBC6' },
-                                                                            { label: '엣지발주', procKey: '엣지', color: '#17C3B2' },
-                                                                            { label: 'NC발주', procKey: 'NC', color: '#FF9C75' },
-                                                                            { label: '보링발주', procKey: '보링', color: '#227C9D' },
-                                                                            { label: '곡면엣지발주', procKey: '곡면엣지', color: '#b0aeaa' },
-                                                                        ];
-                                                                        return (
-                                                                            <div className="space-y-1">
-                                                                                {PROC_SECTIONS.map(sec => {
-                                                                                    const done = week.completions.filter(c => c.procKey === sec.procKey);
-                                                                                    return (
-                                                                                        <div key={sec.procKey} style={{borderRadius:6,border:'1px solid #e8e8e5',overflow:'hidden'}}>
-                                                                                            <div style={{padding:'5px 8px',background:'#f7f6f3',fontSize:10,fontWeight:700,color: done.length > 0 ? '#37352f' : '#b0aeaa',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom: done.length > 0 ? '1px solid #e8e8e5' : 'none'}}>
-                                                                                                <span>{sec.label}</span>
-                                                                                                {done.length > 0 && <span style={{fontSize:9,fontWeight:900,color:'#787774',background:'#ededeb',padding:'1px 6px',borderRadius:3}}>✓ {done.length}완료</span>}
-                                                                                            </div>
-                                                                                            {done.length > 0 && (
-                                                                                                <div style={{padding:'4px 6px',background:'white',display:'flex',flexDirection:'column',gap:2}}>
-                                                                                                    {done.map((item, ii) => (
-                                                                                                        <div key={ii} style={{display:'flex',alignItems:'center',gap:4,padding:'3px 5px',background:'#fafafa',border:'1px solid #e8e8e5',borderRadius:4}}>
-                                                                                                            <span style={{fontSize:8,fontWeight:800,color:'#787774',fontFamily:'ui-monospace,monospace',flexShrink:0}}>{item.orderCode || '—'}</span>
-                                                                                                            {item.partName && <span style={{fontSize:9,fontWeight:700,color:'#37352f',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{item.partName}</span>}
-                                                                                                            <span style={{fontSize:8,color:'#b0aeaa',fontWeight:600,flexShrink:0}}>{item.date?.slice(5).replace('-','/')}</span>
-                                                                                                        </div>
-                                                                                                    ))}
-                                                                                                </div>
-                                                                                            )}
-                                                                                        </div>
-                                                                                    );
-                                                                                })}
-                                                                            </div>
-                                                                        );
-                                                                    })()}
-                                                                    {week.orders.length === 0 && week.completions.length === 0 && (
-                                                                        <div style={{padding:'28px 0',textAlign:'center',color:'#d3d1cb',fontSize:11,fontWeight:700}}>발주 없음</div>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                ) : null
-                                            ))}
-                                        </div>
+                        {activeTab === 'WORK_ORDER' && (() => {
+                            const { dateMap, weekDates, completionMap } = buildFullTimeline();
+                            const WD = ['일','월','화','수','목','금','토'];
+                            const PROC_COLOR_ON  = {'납기':'#b0aeaa','보링':'#227C9D','엣지':'#17C3B2','NC':'#FF9C75','재단':'#90BBC6'};
+                            const PROC_COLOR_OFF = '#d3d1cb';
+                            const SECTIONS = ['납기','보링','엣지','NC','재단'];
+                            const today = new Date().toISOString().slice(0,10);
+                            return (
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between px-2">
+                                        <h2 style={{fontSize:14,fontWeight:900,color:'#37352f',letterSpacing:'-0.02em',textTransform:'uppercase'}}>공정 타임라인</h2>
+                                        <span style={{fontSize:10,fontWeight:800,padding:'2px 10px',background:'#f1f0ef',color:'#787774',borderRadius:99,border:'1px solid #e8e8e5'}}>REALTIME SYNCED</span>
                                     </div>
-                                </div>
-
-                                {/* ── 주차 타임라인 뷰어 (AMT 동일 스타일) ── */}
-                                {tlViewWeek && (() => {
-                                    const { dateMap, weekDates, PROC_DEF, completionMap } = buildTimelineForWeek(tlViewWeek);
-                                    const WD = ['일','월','화','수','목','금','토'];
-                                    const PROC_COLOR_ON  = {'납기':'#b0aeaa','보링':'#227C9D','엣지':'#17C3B2','NC':'#FF9C75','재단':'#90BBC6'};
-                                    const PROC_COLOR_OFF = '#d3d1cb'; // 완료 없을 때 무채색
-                                    const SECTIONS = ['납기','보링','엣지','NC','재단'];
-                                    const today = new Date().toISOString().slice(0,10);
-                                    return (
-                                        <div style={{border:'1px solid #e8e8e5',borderRadius:12,overflow:'hidden',background:'#f7f6f3'}}>
-                                            <div style={{padding:'8px 14px',display:'flex',alignItems:'center',justifyContent:'space-between',borderBottom:'1px solid #e8e8e5'}}>
-                                                <span style={{fontSize:12,fontWeight:900,color:'#37352f'}}>{tlViewWeek.label} 공정 타임라인</span>
-                                                <button onClick={() => setTlViewWeek(null)} style={{background:'transparent',border:'none',cursor:'pointer',color:'#787774',fontSize:14,padding:'1px 4px'}}>✕</button>
-                                            </div>
-                                            <div className="overflow-x-auto custom-scroll" style={{padding:'10px 10px 14px'}}>
-                                                <div style={{display:'flex',gap:6,minWidth:'max-content',alignItems:'flex-start'}}>
-                                                    {weekDates.map(date => {
-                                                        const d = new Date(date + 'T12:00:00');
-                                                        const dow = WD[d.getDay()];
-                                                        const isWeekend = dow==='토'||dow==='일';
-                                                        const isToday = date===today;
-                                                        return (
-                                                            <div key={date} style={{width:150,flexShrink:0,display:'flex',flexDirection:'column',borderRadius:12,overflow:'hidden',border:`1px solid ${isToday?'#37352f':'#ededeb'}`,boxShadow:isToday?'0 0 0 2px rgba(55,53,47,0.1)':'0 1px 2px rgba(0,0,0,0.05)',background:'white',opacity:isWeekend?0.65:1}}>
-                                                                {/* 날짜 헤더 */}
-                                                                <div style={{padding:'10px 8px 8px',display:'flex',flexDirection:'column',alignItems:'center',background:isWeekend?'#fafafa':'white'}}>
-                                                                    <span style={{fontSize:10,fontWeight:700,color:'#b0aeaa'}}>{d.getMonth()+1}월</span>
-                                                                    <span style={{fontSize:28,fontWeight:900,lineHeight:1,color:isWeekend?'#c8c6c2':isToday?'#787774':'#37352f'}}>{d.getDate()}</span>
-                                                                    <span style={{fontSize:11,fontWeight:900,color:isWeekend?'#c8c6c2':'#787774',marginTop:2}}>{dow}요일</span>
-                                                                    {isToday && <span style={{fontSize:8,fontWeight:900,color:'white',background:'#37352f',padding:'1px 6px',borderRadius:3,marginTop:3}}>TODAY</span>}
-                                                                </div>
-                                                                {/* 공정 섹션 – AMT 동일 순서 */}
-                                                                {SECTIONS.map(pk => {
-                                                                    const cards = dateMap[date]?.[pk] || [];
-                                                                    const compByOc = completionMap[date]?.[pk] || {};
-                                                                    const compEntries = Object.values(compByOc);
-                                                                    const bg = compEntries.length > 0 ? PROC_COLOR_ON[pk] : PROC_COLOR_OFF;
-                                                                    const total = cards.length + compEntries.length;
-                                                                    if (total === 0) return (
-                                                                        <div key={pk} style={{borderTop:'1px solid #f1f1ef'}}>
-                                                                            <div style={{background:bg,padding:'2px 6px'}}>
-                                                                                <span style={{fontSize:8,fontWeight:900,color:'white',textTransform:'uppercase',letterSpacing:'0.05em'}}>{pk}</span>
-                                                                            </div>
+                                    {weekDates.length === 0 ? (
+                                        <div style={{padding:'60px 0',textAlign:'center',color:'#d3d1cb',fontSize:12,fontWeight:700}}>배치된 공정 일정이 없습니다</div>
+                                    ) : (
+                                        <div className="overflow-x-auto custom-scroll pb-4" ref={weekScrollRef}
+                                            style={{cursor:'grab'}} onMouseDown={onWeekMouseDown} onMouseMove={onWeekMouseMove} onMouseUp={onWeekMouseUp} onMouseLeave={onWeekMouseUp}>
+                                            <div style={{display:'flex',gap:6,minWidth:'max-content',alignItems:'flex-start',padding:'4px 2px 2px'}}>
+                                                {weekDates.map(date => {
+                                                    const d = new Date(date + 'T12:00:00');
+                                                    const dow = WD[d.getDay()];
+                                                    const isWeekend = dow==='토'||dow==='일';
+                                                    const isToday = date===today;
+                                                    return (
+                                                        <div key={date} style={{width:150,flexShrink:0,display:'flex',flexDirection:'column',borderRadius:12,overflow:'hidden',border:`1px solid ${isToday?'#37352f':'#ededeb'}`,boxShadow:isToday?'0 0 0 2px rgba(55,53,47,0.1)':'0 1px 2px rgba(0,0,0,0.05)',background:'white',opacity:isWeekend?0.65:1}}>
+                                                            <div style={{padding:'10px 8px 8px',display:'flex',flexDirection:'column',alignItems:'center',background:isWeekend?'#fafafa':'white'}}>
+                                                                <span style={{fontSize:10,fontWeight:700,color:'#b0aeaa'}}>{d.getMonth()+1}월</span>
+                                                                <span style={{fontSize:28,fontWeight:900,lineHeight:1,color:isWeekend?'#c8c6c2':isToday?'#787774':'#37352f'}}>{d.getDate()}</span>
+                                                                <span style={{fontSize:11,fontWeight:900,color:isWeekend?'#c8c6c2':'#787774',marginTop:2}}>{dow}요일</span>
+                                                                {isToday && <span style={{fontSize:8,fontWeight:900,color:'white',background:'#37352f',padding:'1px 6px',borderRadius:3,marginTop:3}}>TODAY</span>}
+                                                            </div>
+                                                            {SECTIONS.map(pk => {
+                                                                const cards = dateMap[date]?.[pk] || [];
+                                                                const compByOc = completionMap[date]?.[pk] || {};
+                                                                const compEntries = Object.values(compByOc);
+                                                                const bg = compEntries.length > 0 ? PROC_COLOR_ON[pk] : PROC_COLOR_OFF;
+                                                                const total = cards.length + compEntries.length;
+                                                                return (
+                                                                    <div key={pk} style={{borderTop:'1px solid #f1f1ef'}}>
+                                                                        <div style={{background:bg,padding:'2px 6px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                                                                            <span style={{fontSize:8,fontWeight:900,color:'white',textTransform:'uppercase',letterSpacing:'0.05em'}}>{pk}</span>
+                                                                            {total>0 && <div style={{display:'flex',gap:3,alignItems:'center'}}>
+                                                                                {cards.length>0 && <span style={{fontSize:8,fontWeight:800,color:'white',background:'rgba(0,0,0,0.18)',padding:'0 4px',borderRadius:3}}>{cards.length}</span>}
+                                                                                {compEntries.length>0 && <span style={{fontSize:8,fontWeight:900,color:'white',background:'rgba(0,0,0,0.25)',padding:'0 4px',borderRadius:3}}>✓{compEntries.length}</span>}
+                                                                            </div>}
                                                                         </div>
-                                                                    );
-                                                                    return (
-                                                                        <div key={pk} style={{borderTop:'1px solid #f1f1ef'}}>
-                                                                            <div style={{background:bg,padding:'2px 6px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-                                                                                <span style={{fontSize:8,fontWeight:900,color:'white',textTransform:'uppercase',letterSpacing:'0.05em'}}>{pk}</span>
-                                                                                <div style={{display:'flex',gap:3,alignItems:'center'}}>
-                                                                                    {cards.length>0 && <span style={{fontSize:8,fontWeight:800,color:'white',background:'rgba(0,0,0,0.18)',padding:'0 4px',borderRadius:3}}>{cards.length}</span>}
-                                                                                    {compEntries.length>0 && <span style={{fontSize:8,fontWeight:900,color:'white',background:'rgba(0,0,0,0.25)',padding:'0 4px',borderRadius:3}}>✓{compEntries.length}</span>}
-                                                                                </div>
-                                                                            </div>
+                                                                        {total>0 && (
                                                                             <div style={{padding:'2px 4px',display:'flex',flexDirection:'column',gap:1}}>
-                                                                                {/* 일반 배치 카드 */}
                                                                                 {cards.map((card,ci) => (
-                                                                                    <div key={ci} style={{cursor:'default',padding:'3px 4px',borderRadius:5,opacity:card.isDone?0.55:1,textDecoration:card.isDone?'line-through':'none'}}>
+                                                                                    <div key={ci} style={{cursor:'default',padding:'3px 4px',borderRadius:5,opacity:card.isDone?0.55:1}}>
                                                                                         <div style={{display:'flex',alignItems:'center',gap:3}}>
-                                                                                            <span style={{flex:1,fontSize:9,fontWeight:700,color:card.isDone?'#b0aeaa':'#37352f',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                                                                                            <span style={{flex:1,fontSize:9,fontWeight:700,color:card.isDone?'#b0aeaa':'#37352f',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',textDecoration:card.isDone?'line-through':'none'}}>
                                                                                                 <span style={{color:'#b0aeaa',fontSize:8}}>[{card.partName||'-'}]</span> {card.displayName}
                                                                                             </span>
                                                                                             <span style={{fontSize:8,fontWeight:800,color:'#787774',whiteSpace:'nowrap',flexShrink:0}}>{card.qty}EA</span>
                                                                                         </div>
                                                                                     </div>
                                                                                 ))}
-                                                                                {/* 완료 카드: 오더코드 토글 */}
                                                                                 {compEntries.map((oc, oi) => {
                                                                                     const toggleKey = `${date}|${pk}|${oc.orderCode}`;
                                                                                     const isOpen = !!expandedCompletions[toggleKey];
                                                                                     return (
                                                                                         <div key={oi} style={{borderRadius:5,overflow:'hidden',border:'1px solid #e8e8e5',marginTop:1}}>
-                                                                                            <div
-                                                                                                onClick={() => setExpandedCompletions(prev => ({...prev,[toggleKey]:!prev[toggleKey]}))}
-                                                                                                style={{display:'flex',alignItems:'center',gap:3,padding:'3px 5px',background:'#f7f6f3',cursor:'pointer'}}
-                                                                                            >
+                                                                                            <div onClick={() => setExpandedCompletions(prev => ({...prev,[toggleKey]:!prev[toggleKey]}))} style={{display:'flex',alignItems:'center',gap:3,padding:'3px 5px',background:'#f7f6f3',cursor:'pointer'}}>
                                                                                                 <span style={{fontSize:9,fontWeight:900,color:'#787774',flexShrink:0}}>✓</span>
                                                                                                 <span style={{flex:1,fontSize:9,fontWeight:900,color:'#37352f',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontFamily:'ui-monospace,monospace'}}>{oc.orderCode}</span>
                                                                                                 <span style={{fontSize:9,color:'#b0aeaa',flexShrink:0}}>{isOpen?'▲':'▼'}</span>
@@ -1006,9 +879,7 @@
                                                                                             {isOpen && (
                                                                                                 <div style={{padding:'3px 6px 4px',background:'white',display:'flex',flexDirection:'column',gap:2}}>
                                                                                                     {oc.parts.map((p, pi) => (
-                                                                                                        <div key={pi} style={{fontSize:9,fontWeight:700,color:'#37352f',padding:'2px 4px',background:'#fafafa',borderRadius:3,borderLeft:'2px solid #e8e8e5'}}>
-                                                                                                            {p.partName || '(부속명 없음)'}
-                                                                                                        </div>
+                                                                                                        <div key={pi} style={{fontSize:9,fontWeight:700,color:'#37352f',padding:'2px 4px',background:'#fafafa',borderRadius:3,borderLeft:'2px solid #e8e8e5'}}>{p.partName || '(부속명 없음)'}</div>
                                                                                                     ))}
                                                                                                 </div>
                                                                                             )}
@@ -1016,19 +887,19 @@
                                                                                     );
                                                                                 })}
                                                                             </div>
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         </div>
-                                    );
-                                })()}
-                            </div>
-                        )}
+                                    )}
+                                </div>
+                            );
+                        })()}
                     </div>
                     </div>
 
