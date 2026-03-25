@@ -450,7 +450,7 @@
                             if (!completionMap[doneDate][procKey]) completionMap[doneDate][procKey] = {};
                             const oc = order.orderCode || '—';
                             if (!completionMap[doneDate][procKey][oc]) completionMap[doneDate][procKey][oc] = { orderCode: oc, displayName: order.displayName || '', parts: [] };
-                            completionMap[doneDate][procKey][oc].parts.push({ partName: partName || (val?.partName || '') });
+                            completionMap[doneDate][procKey][oc].parts.push({ partName: partName || (val?.partName || ''), qty: order.partInfoMap?.[cardKey]?.qty || 0 });
                         });
                     });
                 });
@@ -461,14 +461,33 @@
             const buildFullTimeline = () => {
                 const PROC_DEF = ['재단','엣지','NC','보링','납기'];
                 const amtC = confirmedOrders.filter(o => o.amtTimeline === true && !o.amtConfirmedCancel);
+
+                // AMT batchDateStr 동일 로직: batchId(ms) → KST 날짜, fallback = orderCode 앞 8자리
+                const getBatchDate = (order) => {
+                    if (order.batchId) {
+                        const kst = new Date(Number(order.batchId) + 9 * 60 * 60 * 1000);
+                        return `${kst.getUTCFullYear()}-${String(kst.getUTCMonth()+1).padStart(2,'0')}-${String(kst.getUTCDate()).padStart(2,'0')}`;
+                    }
+                    if (order.orderCode) {
+                        const s = order.orderCode.replace(/-/g,'').slice(0,8);
+                        if (/^\d{8}$/.test(s)) return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`;
+                    }
+                    return null;
+                };
+
                 const allDates = new Set();
                 amtC.forEach(order => {
+                    // 발주일
+                    const od = getBatchDate(order);
+                    if (od) allDates.add(od);
+                    // partMoveLog 배치 날짜
                     if (order.partMoveLog) {
                         Object.values(order.partMoveLog).forEach(batches => {
                             if (!Array.isArray(batches)) return;
                             batches.forEach(b => { PROC_DEF.forEach(pk => { if (b[pk]) allDates.add(b[pk]); }); });
                         });
                     }
+                    // 완료 날짜
                     if (order.partCompletions) {
                         Object.values(order.partCompletions).forEach(procs => {
                             if (!procs || typeof procs !== 'object') return;
@@ -480,9 +499,27 @@
                 const dateSet = new Set(weekDates);
                 const dateMap = {};
                 weekDates.forEach(d => { dateMap[d] = { '발주': [] }; PROC_DEF.forEach(pk => dateMap[d][pk] = []); });
+
+                // 발주 섹션: 발주일에 오더코드 + 부속 목록
+                amtC.forEach(order => {
+                    const orderDate = getBatchDate(order);
+                    if (!orderDate || !dateMap[orderDate]) return;
+                    const parts = Object.entries(order.partInfoMap || {})
+                        .filter(([, p]) => !p.isDeleted)
+                        .map(([k, p]) => ({ partName: order.partNameMap?.[k] || p.partName || '', qty: p.qty || 0 }))
+                        .filter(p => p.partName);
+                    dateMap[orderDate]['발주'].push({
+                        orderCode: order.orderCode || '',
+                        displayName: order.displayName || '',
+                        deliveryDate: order.deliveryDate || '',
+                        orderQty: order.orderQty || '',
+                        parts,
+                    });
+                });
+
+                // 공정 섹션: partMoveLog
                 amtC.forEach(order => {
                     if (!order.partMoveLog) return;
-                    const datesForOrder = new Set(); // 이 오더가 배치된 날짜들
                     Object.entries(order.partMoveLog).forEach(([cardKey, batches]) => {
                         if (!Array.isArray(batches) || !batches.length) return;
                         const partName = order.partNameMap?.[cardKey] || '';
@@ -493,7 +530,6 @@
                                 if (!bd || !dateSet.has(bd)) return;
                                 const gKey = `${procKey}|${bd}`;
                                 grouped[gKey] = (grouped[gKey] || 0) + (batch.qty || 0);
-                                datesForOrder.add(bd);
                             });
                         });
                         Object.entries(grouped).forEach(([gKey, qty]) => {
@@ -503,14 +539,6 @@
                             const isDone = compVal === true || (compVal && compVal.done);
                             dateMap[batchDate][procKey].push({ orderCode: order.orderCode || '', displayName: order.displayName || '', partName, qty, isDone: !!isDone });
                         });
-                    });
-                    // 발주 섹션: 이 오더가 배치된 날짜마다 1회 등록 (중복 방지)
-                    datesForOrder.forEach(d => {
-                        if (!dateMap[d]) return;
-                        const alreadyAdded = dateMap[d]['발주'].some(o => o.orderCode === (order.orderCode || ''));
-                        if (!alreadyAdded) {
-                            dateMap[d]['발주'].push({ orderCode: order.orderCode || '', displayName: order.displayName || '', deliveryDate: order.deliveryDate || '', orderQty: order.orderQty || '' });
-                        }
                     });
                 });
                 const completionMap = {};
@@ -528,7 +556,7 @@
                             if (!completionMap[doneDate][procKey]) completionMap[doneDate][procKey] = {};
                             const oc = order.orderCode || '—';
                             if (!completionMap[doneDate][procKey][oc]) completionMap[doneDate][procKey][oc] = { orderCode: oc, displayName: order.displayName || '', parts: [] };
-                            completionMap[doneDate][procKey][oc].parts.push({ partName: partName || (val?.partName || '') });
+                            completionMap[doneDate][procKey][oc].parts.push({ partName: partName || (val?.partName || ''), qty: order.partInfoMap?.[cardKey]?.qty || 0 });
                         });
                     });
                 });
@@ -842,35 +870,55 @@
                                                     const isWeekend = dow==='토'||dow==='일';
                                                     const isToday = date===today;
                                                     return (
-                                                        <div key={date} style={{width:150,flexShrink:0,display:'flex',flexDirection:'column',borderRadius:12,overflow:'hidden',border:`1px solid ${isToday?'#37352f':'#ededeb'}`,boxShadow:isToday?'0 0 0 2px rgba(55,53,47,0.1)':'0 1px 2px rgba(0,0,0,0.05)',background:'white',opacity:isWeekend?0.65:1}}>
-                                                            <div style={{padding:'10px 8px 8px',display:'flex',flexDirection:'column',alignItems:'center',background:isWeekend?'#fafafa':'white'}}>
+                                                        <div key={date} style={{width:150,flexShrink:0,display:'flex',flexDirection:'column',borderRadius:12,overflow:'hidden',border:isToday?'2px solid #37352f':'1px solid #ededeb',boxShadow:isToday?'0 0 0 3px rgba(55,53,47,0.12)':'0 1px 2px rgba(0,0,0,0.05)',background:'white',opacity:isWeekend?0.65:1}}>
+                                                            <div style={{height:70,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',background:isWeekend?'#fafafa':'white'}}>
                                                                 <span style={{fontSize:10,fontWeight:700,color:'#b0aeaa'}}>{d.getMonth()+1}월</span>
-                                                                <span style={{fontSize:28,fontWeight:900,lineHeight:1,color:isWeekend?'#c8c6c2':isToday?'#787774':'#37352f'}}>{d.getDate()}</span>
+                                                                <span style={{fontSize:28,fontWeight:900,lineHeight:1,color:isWeekend?'#c8c6c2':'#37352f'}}>{d.getDate()}</span>
                                                                 <span style={{fontSize:11,fontWeight:900,color:isWeekend?'#c8c6c2':'#787774',marginTop:2}}>{dow}요일</span>
-                                                                {isToday && <span style={{fontSize:8,fontWeight:900,color:'white',background:'#37352f',padding:'1px 6px',borderRadius:3,marginTop:3}}>TODAY</span>}
                                                             </div>
                                                             {SECTIONS.map(pk => {
                                                                 // ── 발주 섹션 별도 렌더 ──
                                                                 if (pk === '발주') {
                                                                     const orders = dateMap[date]?.['발주'] || [];
+                                                                    const sectionToggleKey = `section|발주|${date}`;
+                                                                    const isSectionOpen = !!expandedCompletions[sectionToggleKey];
+                                                                    const hdrBg = orders.length > 0 ? '#5a5047' : '#37352f';
                                                                     return (
                                                                         <div key="발주" style={{borderTop:'1px solid #f1f1ef'}}>
-                                                                            <div style={{background:'#37352f',padding:'2px 6px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                                                                            <div onClick={() => orders.length > 0 && setExpandedCompletions(prev => ({...prev,[sectionToggleKey]:!prev[sectionToggleKey]}))}
+                                                                                style={{background:hdrBg,padding:'2px 6px',display:'flex',alignItems:'center',justifyContent:'space-between',cursor:orders.length>0?'pointer':'default'}}>
                                                                                 <span style={{fontSize:8,fontWeight:900,color:'white',textTransform:'uppercase',letterSpacing:'0.05em'}}>발주</span>
-                                                                                {orders.length>0 && <span style={{fontSize:8,fontWeight:800,color:'white',background:'rgba(255,255,255,0.2)',padding:'0 4px',borderRadius:3}}>{orders.length}</span>}
+                                                                                <div style={{display:'flex',gap:4,alignItems:'center'}}>
+                                                                                    {orders.length>0 && <span style={{fontSize:8,fontWeight:800,color:'white',background:'rgba(255,255,255,0.2)',padding:'0 4px',borderRadius:3}}>{orders.length}</span>}
+                                                                                    {orders.length>0 && <span style={{fontSize:9,color:'rgba(255,255,255,0.5)'}}>{isSectionOpen?'▲':'▼'}</span>}
+                                                                                </div>
                                                                             </div>
-                                                                            {orders.length>0 && (
+                                                                            {isSectionOpen && orders.length>0 && (
                                                                                 <div style={{padding:'2px 4px',display:'flex',flexDirection:'column',gap:1}}>
-                                                                                    {orders.map((o, oi) => (
-                                                                                        <div key={oi} style={{padding:'3px 4px',borderRadius:5}}>
-                                                                                            <div style={{display:'flex',alignItems:'center',gap:3}}>
-                                                                                                {o.orderCode && <span style={{fontSize:8,fontWeight:900,color:'#787774',fontFamily:'ui-monospace,monospace',background:'#f7f6f3',padding:'0 3px',borderRadius:2,flexShrink:0}}>{o.orderCode}</span>}
-                                                                                                <span style={{flex:1,fontSize:9,fontWeight:700,color:'#37352f',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.displayName}</span>
-                                                                                                {o.orderQty && <span style={{fontSize:8,fontWeight:800,color:'#787774',whiteSpace:'nowrap',flexShrink:0}}>{o.orderQty}EA</span>}
+                                                                                    {orders.map((o, oi) => {
+                                                                                        const toggleKey = `order|${date}|${o.orderCode||oi}`;
+                                                                                        const isOpen = !!expandedCompletions[toggleKey];
+                                                                                        return (
+                                                                                            <div key={oi} style={{borderRadius:5,overflow:'hidden',border:'1px solid #4a4845',marginTop:1}}>
+                                                                                                <div onClick={() => setExpandedCompletions(prev => ({...prev,[toggleKey]:!prev[toggleKey]}))}
+                                                                                                    style={{display:'flex',alignItems:'center',gap:3,padding:'3px 5px',background:'#37352f',cursor:'pointer'}}>
+                                                                                                    <span style={{flex:1,fontSize:9,fontWeight:900,color:'white',fontFamily:'ui-monospace,monospace',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.orderCode || '(코드없음)'}</span>
+                                                                                                    {o.orderQty && <span style={{fontSize:8,fontWeight:800,color:'rgba(255,255,255,0.55)',whiteSpace:'nowrap',flexShrink:0}}>{o.orderQty}EA</span>}
+                                                                                                    <span style={{fontSize:9,color:'rgba(255,255,255,0.4)',flexShrink:0}}>{isOpen?'▲':'▼'}</span>
+                                                                                                </div>
+                                                                                                {isOpen && (
+                                                                                                    <div style={{padding:'3px 6px 4px',background:'#fafafa',display:'flex',flexDirection:'column',gap:2}}>
+                                                                                                        {o.displayName && <div style={{fontSize:8,fontWeight:700,color:'#787774',padding:'1px 0 2px'}}>{o.displayName}</div>}
+                                                                                                        {(o.parts||[]).map((p, pi) => (
+                                                                                                            <div key={pi} style={{fontSize:9,fontWeight:700,color:'#37352f',padding:'2px 4px',background:'white',borderRadius:3,borderLeft:'2px solid #e8e8e5'}}>
+                                                                                                                {p.partName || '(부속명 없음)'}{p.qty ? ` ×${p.qty}` : ''}
+                                                                                                            </div>
+                                                                                                        ))}
+                                                                                                    </div>
+                                                                                                )}
                                                                                             </div>
-                                                                                            {o.deliveryDate && <div style={{fontSize:7,color:'#b0aeaa',paddingLeft:2}}>납기 {o.deliveryDate}</div>}
-                                                                                        </div>
-                                                                                    ))}
+                                                                                        );
+                                                                                    })}
                                                                                 </div>
                                                                             )}
                                                                         </div>
@@ -882,16 +930,22 @@
                                                                 const compEntries = Object.values(compByOc);
                                                                 const bg = compEntries.length > 0 ? PROC_COLOR_ON[pk] : PROC_COLOR_OFF;
                                                                 const total = cards.length + compEntries.length;
+                                                                const procSectionKey = `section|${pk}|${date}`;
+                                                                const isProcOpen = !!expandedCompletions[procSectionKey];
                                                                 return (
                                                                     <div key={pk} style={{borderTop:'1px solid #f1f1ef'}}>
-                                                                        <div style={{background:bg,padding:'2px 6px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                                                                        <div onClick={() => total>0 && setExpandedCompletions(prev => ({...prev,[procSectionKey]:!prev[procSectionKey]}))}
+                                                                            style={{background:bg,padding:'2px 6px',display:'flex',alignItems:'center',justifyContent:'space-between',cursor:total>0?'pointer':'default'}}>
                                                                             <span style={{fontSize:8,fontWeight:900,color:'white',textTransform:'uppercase',letterSpacing:'0.05em'}}>{pk}</span>
-                                                                            {total>0 && <div style={{display:'flex',gap:3,alignItems:'center'}}>
-                                                                                {cards.length>0 && <span style={{fontSize:8,fontWeight:800,color:'white',background:'rgba(0,0,0,0.18)',padding:'0 4px',borderRadius:3}}>{cards.length}</span>}
-                                                                                {compEntries.length>0 && <span style={{fontSize:8,fontWeight:900,color:'white',background:'rgba(0,0,0,0.25)',padding:'0 4px',borderRadius:3}}>✓{compEntries.length}</span>}
-                                                                            </div>}
+                                                                            <div style={{display:'flex',gap:3,alignItems:'center'}}>
+                                                                                {total>0 && <>
+                                                                                    {cards.length>0 && <span style={{fontSize:8,fontWeight:800,color:'white',background:'rgba(0,0,0,0.18)',padding:'0 4px',borderRadius:3}}>{cards.length}</span>}
+                                                                                    {compEntries.length>0 && <span style={{fontSize:8,fontWeight:900,color:'white',background:'rgba(0,0,0,0.25)',padding:'0 4px',borderRadius:3}}>✓{compEntries.length}</span>}
+                                                                                    <span style={{fontSize:9,color:'rgba(255,255,255,0.5)'}}>{isProcOpen?'▲':'▼'}</span>
+                                                                                </>}
+                                                                            </div>
                                                                         </div>
-                                                                        {total>0 && (
+                                                                        {isProcOpen && total>0 && (
                                                                             <div style={{padding:'2px 4px',display:'flex',flexDirection:'column',gap:1}}>
                                                                                 {cards.map((card,ci) => (
                                                                                     <div key={ci} style={{cursor:'default',padding:'3px 4px',borderRadius:5,opacity:card.isDone?0.55:1}}>
@@ -916,7 +970,7 @@
                                                                                             {isOpen && (
                                                                                                 <div style={{padding:'3px 6px 4px',background:'white',display:'flex',flexDirection:'column',gap:2}}>
                                                                                                     {oc.parts.map((p, pi) => (
-                                                                                                        <div key={pi} style={{fontSize:9,fontWeight:700,color:'#37352f',padding:'2px 4px',background:'#fafafa',borderRadius:3,borderLeft:'2px solid #e8e8e5'}}>{p.partName || '(부속명 없음)'}</div>
+                                                                                                        <div key={pi} style={{fontSize:9,fontWeight:700,color:'#37352f',padding:'2px 4px',background:'#fafafa',borderRadius:3,borderLeft:'2px solid #e8e8e5'}}>{p.partName || '(부속명 없음)'}{p.qty ? ` ×${p.qty}` : ''}</div>
                                                                                                     ))}
                                                                                                 </div>
                                                                                             )}
