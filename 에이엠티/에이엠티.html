@@ -4562,7 +4562,8 @@
                                 : '';
 
                             // ── 독립 카드 생성 (카드 자체가 드래그 대상) ──
-                            const isDone = !!(item.partCompletions?.[cardKey]?.[procKey]);
+                            const isDone    = !!(item.partCompletions?.[cardKey]?.[procKey]);
+                            const isStarted = !!(item.partStarted?.[cardKey]?.[procKey]);
                             // 완료됐지만 partName 없는 경우 자동 수정
                             if (isDone && item.docId && partName) {
                                 const _tlVal = item.partCompletions?.[cardKey]?.[procKey];
@@ -4599,7 +4600,9 @@
                                     ${isDone
                                         ? `<span style="font-size:9px;font-weight:900;color:#22c55e;flex-shrink:0;padding:0 2px;">✓</span>`
                                         : procKey === '재단'
-                                            ? `<button onclick="event.stopPropagation();tlMarkPartDone('${safeDocId}','${safeCK}','${safePK}','${batchDate}',this,'${partName.replace(/'/g,"\\'")}')" onmousedown="event.stopPropagation()" style="flex-shrink:0;font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 5px;cursor:pointer;white-space:nowrap;line-height:1.4;">완료</button>`
+                                            ? isStarted
+                                                ? `<button onclick="event.stopPropagation();tlMarkPartDone('${safeDocId}','${safeCK}','${safePK}','${batchDate}',this,'${partName.replace(/'/g,"\\'")}')" onmousedown="event.stopPropagation()" style="flex-shrink:0;font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 5px;cursor:pointer;white-space:nowrap;line-height:1.4;">완료</button>`
+                                                : `<button onclick="event.stopPropagation();tlMarkPartStarted('${safeDocId}','${safeCK}','${safePK}','${batchDate}',this,'${partName.replace(/'/g,"\\'")}')" onmousedown="event.stopPropagation()" style="flex-shrink:0;font-size:8px;font-weight:900;color:#fff;background:#3b82f6;border:none;border-radius:3px;padding:1px 5px;cursor:pointer;white-space:nowrap;line-height:1.4;">▶ 시작</button>`
                                             : ''
                                     }
                                 </div>`;
@@ -4630,6 +4633,39 @@
             },
 
             // SortableJS 초기화 (카드 내 공정 섹션)
+        };
+
+        // ── 부속 공정 시작 처리 ──────────────────────────────────────────────────
+        window.tlMarkPartStarted = async function(docId, cardKey, procKey, startDate, btn, partName) {
+            if (!docId) return;
+            const { doc, updateDoc } = window.fbFirestore;
+            const appId = "vivivic-4b7ef";
+            try {
+                if (btn) { btn.disabled = true; btn.textContent = '...'; }
+                const docRef = doc(window.db, 'artifacts', appId, 'public', 'data', 'confirmed_orders', docId);
+                await updateDoc(docRef, {
+                    [`partStarted.${cardKey}.${procKey}`]: {
+                        started: true,
+                        date: startDate || new Date().toISOString().slice(0, 10),
+                        partName: partName || ''
+                    }
+                });
+                // DOM 즉시 업데이트
+                const btnWrap = btn?.parentElement;
+                if (btnWrap) {
+                    const safeDocId = docId.replace(/'/g, "\\'");
+                    const safeCK    = cardKey.replace(/'/g, "\\'");
+                    const safePK    = procKey.replace(/'/g, "\\'");
+                    const safeDate  = startDate || new Date().toISOString().slice(0, 10);
+                    const safeName  = (partName || '').replace(/'/g, "\\'");
+                    btnWrap.innerHTML = `<button onclick="event.stopPropagation();tlMarkPartDone('${safeDocId}','${safeCK}','${safePK}','${safeDate}',this,'${safeName}')" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 6px;cursor:pointer;white-space:nowrap;line-height:1.4;">완료</button>`;
+                }
+                showToastMessage(`[${procKey}] 작업 시작 처리됐습니다.`);
+            } catch (err) {
+                console.error('시작 처리 실패:', err);
+                showToastMessage('시작 처리 실패');
+                if (btn) { btn.disabled = false; btn.textContent = '▶ 시작'; }
+            }
         };
 
         // ── 부속 공정 완료 처리 ──────────────────────────────────────────────────
@@ -6128,14 +6164,17 @@
             const _wdid = p.orderKey || '';
             const _wck  = _wdid ? p.cKey.substring(_wdid.length + 1) : p.cKey;
             const _wobj = confirmedOrders.find(o => (o.docId || String(o.idNum)) === _wdid);
-            const _wDone = !!(_wobj?.partCompletions?.[_wck]?.[_wpk]);
+            const _wDone    = !!(_wobj?.partCompletions?.[_wck]?.[_wpk]);
+            const _wStarted = !!(_wobj?.partStarted?.[_wck]?.[_wpk]);
             const _wSafeDocId = _wdid.replace(/'/g, "\\'");
             const _wSafeCK   = _wck.replace(/'/g, "\\'");
             const _wDate    = stateKey.substring(0, 10);
             const _wDoneHtml = _wDone
                 ? `<div style="margin-top:5px;text-align:right;"><span style="font-size:9px;font-weight:900;color:#22c55e;">✓ 완료</span></div>`
                 : _wpk === '재단'
-                    ? `<div style="margin-top:5px;text-align:right;"><button onclick="event.stopPropagation();tlMarkPartDone('${_wSafeDocId}','${_wSafeCK}','${_wpk}','${_wDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}')" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;line-height:1.4;">완료</button></div>`
+                    ? _wStarted
+                        ? `<div style="margin-top:5px;text-align:right;"><button onclick="event.stopPropagation();tlMarkPartDone('${_wSafeDocId}','${_wSafeCK}','${_wpk}','${_wDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}')" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;line-height:1.4;">완료</button></div>`
+                        : `<div style="margin-top:5px;text-align:right;"><button onclick="event.stopPropagation();tlMarkPartStarted('${_wSafeDocId}','${_wSafeCK}','${_wpk}','${_wDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}')" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#3b82f6;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;line-height:1.4;">▶ 시작</button></div>`
                     : '';
 
             let innerHtml = '';
@@ -6425,7 +6464,8 @@
                     const _bdid  = p.orderKey || '';
                     const _bck   = _bdid ? cKey.substring(_bdid.length + 1) : cKey;
                     const _bobj  = confirmedOrders.find(o => (o.docId || String(o.idNum)) === _bdid);
-                    const _bDone = !!(_bobj?.partCompletions?.[_bck]?.[_bpk]);
+                    const _bDone    = !!(_bobj?.partCompletions?.[_bck]?.[_bpk]);
+                    const _bStarted = !!(_bobj?.partStarted?.[_bck]?.[_bpk]);
                     // 완료됐지만 partName 없는 경우 자동 수정
                     if (_bDone && _bobj?.docId && p.nm) {
                         const _bVal = _bobj?.partCompletions?.[_bck]?.[_bpk];
@@ -6442,7 +6482,9 @@
                     const _bDoneHtml  = _bDone
                         ? `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><span style="font-size:9px;font-weight:900;color:#22c55e;">✓완료</span></div>`
                         : _bpk === '재단'
-                            ? `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><button onclick="event.stopPropagation();tlMarkPartDone('${_bSafeDocId}','${_bSafeCK}','${_bpk}','${_bDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}')" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 6px;cursor:pointer;line-height:1.5;">완료</button></div>`
+                            ? _bStarted
+                                ? `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><button onclick="event.stopPropagation();tlMarkPartDone('${_bSafeDocId}','${_bSafeCK}','${_bpk}','${_bDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}')" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 6px;cursor:pointer;line-height:1.5;">완료</button></div>`
+                                : `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><button onclick="event.stopPropagation();tlMarkPartStarted('${_bSafeDocId}','${_bSafeCK}','${_bpk}','${_bDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}')" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#3b82f6;border:none;border-radius:3px;padding:1px 6px;cursor:pointer;line-height:1.5;">▶ 시작</button></div>`
                             : '';
 
                     html +=
