@@ -4646,6 +4646,7 @@
                 await updateDoc(docRef, {
                     [`partStarted.${cardKey}.${procKey}`]: {
                         started: true,
+                        startMs: Date.now(),
                         date: startDate || new Date().toISOString().slice(0, 10),
                         partName: partName || ''
                     }
@@ -4675,12 +4676,17 @@
             const appId = "vivivic-4b7ef";
             try {
                 if (btn) { btn.disabled = true; btn.textContent = '...'; }
+                // ── 실제 작업 시간 계산 ──
+                const _ord = confirmedOrders.find(o => (o.docId || String(o.idNum)) === docId);
+                const _startMs = _ord?.partStarted?.[cardKey]?.[procKey]?.startMs;
+                const actualMinutes = _startMs ? Math.round((Date.now() - _startMs) / 6000) / 10 : null;
                 const docRef = doc(window.db, 'artifacts', appId, 'public', 'data', 'confirmed_orders', docId);
                 await updateDoc(docRef, {
                     [`partCompletions.${cardKey}.${procKey}`]: {
                         done: true,
                         date: doneDate || new Date().toISOString().slice(0, 10),
-                        partName: partName || ''
+                        partName: partName || '',
+                        ...(actualMinutes != null ? { actualMinutes } : {})
                     }
                 });
                 // DOM 즉시 업데이트 (onSnapshot 수신 전 시각적 피드백)
@@ -4692,9 +4698,18 @@
                     card.removeAttribute('ondragstart');
                     card.removeAttribute('ondragend');
                     const btnWrap = btn.parentElement;
-                    if (btnWrap) btnWrap.innerHTML = `<span style="font-size:9px;font-weight:900;color:#22c55e;">✓ 완료</span>`;
+                    const _diffTxt = actualMinutes != null
+                        ? ` <span style="font-size:8px;color:#60a5fa;">(실${actualMinutes.toFixed(1)}분)</span>` : '';
+                    if (btnWrap) btnWrap.innerHTML = `<span style="font-size:9px;font-weight:900;color:#22c55e;">✓ 완료</span>${_diffTxt}`;
                 }
-                showToastMessage(`[${procKey}] 작업 완료 처리됐습니다.`);
+                // ── 보드 즉시 재렌더 (스케줄 당기기) ──
+                const _sk = (doneDate || new Date().toISOString().slice(0, 10)) + '-' + procKey;
+                requestAnimationFrame(() => {
+                    if (typeof _woRenderBoard === 'function') _woRenderBoard(_sk);
+                    if (typeof _woRenderPool  === 'function') _woRenderPool(_sk);
+                });
+                const _diffMsg = actualMinutes != null ? ` (실제 ${actualMinutes.toFixed(1)}분)` : '';
+                showToastMessage(`[${procKey}] 완료 처리됐습니다.${_diffMsg}`);
             } catch (err) {
                 console.error('완료 처리 실패:', err);
                 showToastMessage('완료 처리 실패');
@@ -6268,8 +6283,13 @@
                 let visualY   = ms * PX_PER_MIN;
                 const tl = [];
                 macKeys[mac].forEach(k => {
-                    const p      = parts.find(pp => pp.cKey === k);
-                    const pm     = p ? p.pm : 0;
+                    const p        = parts.find(pp => pp.cKey === k);
+                    // ── 실제 작업시간이 기록된 경우 actualMinutes 우선 사용 (스케줄 자동 조정)
+                    const _procKey = sk.replace(/^\d{4}-\d{2}-\d{2}-/, '');
+                    const _ordAct  = p ? confirmedOrders.find(o => (o.docId || String(o.idNum)) === p.orderKey) : null;
+                    const _ckAct   = p ? p.cKey.substring((p.orderKey || '').length + 1) : '';
+                    const _actPm   = _ordAct?.partCompletions?.[_ckAct]?.[_procKey]?.actualMinutes;
+                    const pm       = p ? (_actPm ?? p.pm) : 0;
                     const cStart = actualCur;
                     const cEnd   = _woCalcEffectiveEnd(cStart, pm, exclZones);
                     const effDur = cEnd - cStart;
