@@ -4607,7 +4607,7 @@
                                         ? `<span style="font-size:9px;font-weight:900;color:#22c55e;flex-shrink:0;padding:0 2px;">✓</span>${actualMin != null ? `<span style="font-size:8px;font-weight:700;color:#60a5fa;flex-shrink:0;white-space:nowrap;">${actualMin.toFixed(1)}분</span>` : ''}`
                                         : _partPrereqDone(cardKey, procKey, item.partCompletions?.[cardKey] || {})
                                             ? isStarted
-                                                ? `<button onclick="event.stopPropagation();tlMarkPartDone('${safeDocId}','${safeCK}','${safePK}','${batchDate}',this,'${partName.replace(/'/g,"\\'")}')" onmousedown="event.stopPropagation()" style="flex-shrink:0;font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 5px;cursor:pointer;white-space:nowrap;line-height:1.4;">완료</button>`
+                                                ? `<button onclick="event.stopPropagation();tlShowPartDoneConfirm('${safeDocId}','${safeCK}','${safePK}','${batchDate}',this,'${partName.replace(/'/g,"\\'")}',${movedQty})" onmousedown="event.stopPropagation()" style="flex-shrink:0;font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 5px;cursor:pointer;white-space:nowrap;line-height:1.4;">완료</button>`
                                                 : `<button onclick="event.stopPropagation();tlMarkPartStarted('${safeDocId}','${safeCK}','${safePK}','${batchDate}',this,'${partName.replace(/'/g,"\\'")}')" onmousedown="event.stopPropagation()" style="flex-shrink:0;font-size:8px;font-weight:900;color:#fff;background:#3b82f6;border:none;border-radius:3px;padding:1px 5px;cursor:pointer;white-space:nowrap;line-height:1.4;">▶ 시작</button>`
                                             : ''
                                     }
@@ -4721,7 +4721,59 @@
             }
         };
 
-        window.tlMarkPartDone = async function(docId, cardKey, procKey, doneDate, btn, partName) {
+        // ── 공정 완료 수량 확인 모달 ───────────────────────────────────────
+        window.tlShowPartDoneConfirm = function(docId, cardKey, procKey, date, btn, partName, expectedQty) {
+            document.getElementById('_partDoneModal')?.remove();
+            window._pdConfirmData = { docId, cardKey, procKey, date, btn, partName, expectedQty: parseInt(expectedQty || 0) };
+            const modal = document.createElement('div');
+            modal.id = '_partDoneModal';
+            modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:9999;display:flex;align-items:center;justify-content:center;';
+            modal.innerHTML = `
+                <div onclick="event.stopPropagation()" style="background:#fff;border-radius:12px;padding:20px 22px;width:290px;box-shadow:0 8px 32px rgba(0,0,0,0.18);font-family:inherit;">
+                    <div style="font-size:13px;font-weight:900;color:#37352f;margin-bottom:2px;">공정 완료 확인</div>
+                    <div style="font-size:11px;color:#787774;margin-bottom:14px;font-weight:600;">${procKey} · ${partName}</div>
+                    <label style="font-size:10px;font-weight:700;color:#37352f;display:block;margin-bottom:4px;">완료 수량 <span style="color:#b0aeaa;font-weight:500;">(예정: ${expectedQty}EA)</span></label>
+                    <input id="_pdQty" type="number" value="${expectedQty}" min="0"
+                        style="width:100%;padding:8px 10px;border:1.5px solid #dddbd8;border-radius:6px;font-size:20px;font-weight:900;box-sizing:border-box;text-align:center;outline:none;"
+                        oninput="document.getElementById('_pdReasonWrap').style.display=parseInt(this.value||0)!==${parseInt(expectedQty||0)}?'block':'none'">
+                    <div id="_pdReasonWrap" style="display:none;margin-top:12px;padding:10px;background:#fff5f5;border-radius:8px;border:1px solid #fca5a5;">
+                        <div style="font-size:10px;font-weight:700;color:#ef4444;margin-bottom:8px;">⚠ 수량 변경 사유 선택 (필수)</div>
+                        <div style="display:flex;flex-direction:column;gap:5px;">
+                            <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;cursor:pointer;padding:5px 8px;border:1px solid #dddbd8;border-radius:5px;background:#fff;"><input type="radio" name="_pdReason" value="생산불량" style="accent-color:#22c55e;"> 생산불량</label>
+                            <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;cursor:pointer;padding:5px 8px;border:1px solid #dddbd8;border-radius:5px;background:#fff;"><input type="radio" name="_pdReason" value="원장분량" style="accent-color:#22c55e;"> 원장분량</label>
+                            <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;cursor:pointer;padding:5px 8px;border:1px solid #dddbd8;border-radius:5px;background:#fff;"><input type="radio" name="_pdReason" value="자재여분발생" style="accent-color:#22c55e;"> 자재여분발생</label>
+                        </div>
+                    </div>
+                    <div style="display:flex;gap:8px;margin-top:16px;">
+                        <button onclick="document.getElementById('_partDoneModal').remove();window._pdConfirmData=null;"
+                            style="flex:1;padding:9px;background:#f7f6f3;border:1.5px solid #dddbd8;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;">취소</button>
+                        <button onclick="_tlPartDoneSubmit()"
+                            style="flex:2;padding:9px;background:#22c55e;color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:900;cursor:pointer;">✓ 완료 확인</button>
+                    </div>
+                </div>`;
+            document.body.appendChild(modal);
+            modal.addEventListener('click', e => { if (e.target === modal) { modal.remove(); window._pdConfirmData = null; } });
+            setTimeout(() => { const q = document.getElementById('_pdQty'); if (q) { q.focus(); q.select(); } }, 50);
+        };
+
+        window._tlPartDoneSubmit = function() {
+            const d = window._pdConfirmData;
+            if (!d) return;
+            const actualQty = parseInt(document.getElementById('_pdQty')?.value ?? d.expectedQty);
+            const isChanged = actualQty !== d.expectedQty;
+            if (isChanged) {
+                const reason = document.querySelector('input[name="_pdReason"]:checked')?.value;
+                if (!reason) { showToastMessage('수량 변경 사유를 선택해주세요.'); return; }
+                document.getElementById('_partDoneModal').remove();
+                tlMarkPartDone(d.docId, d.cardKey, d.procKey, d.date, d.btn, d.partName, actualQty, reason);
+            } else {
+                document.getElementById('_partDoneModal').remove();
+                tlMarkPartDone(d.docId, d.cardKey, d.procKey, d.date, d.btn, d.partName, actualQty, null);
+            }
+            window._pdConfirmData = null;
+        };
+
+        window.tlMarkPartDone = async function(docId, cardKey, procKey, doneDate, btn, partName, actualQty, reason) {
             if (!docId) return;
             const { doc, updateDoc } = window.fbFirestore;
             const appId = "vivivic-4b7ef";
@@ -4742,7 +4794,9 @@
                         done: true,
                         date: doneDate || new Date().toISOString().slice(0, 10),
                         partName: partName || '',
-                        ...(actualMinutes != null ? { actualMinutes } : {})
+                        ...(actualMinutes != null ? { actualMinutes } : {}),
+                        ...(actualQty    != null ? { actualQty }    : {}),
+                        ...(reason               ? { reason }       : {})
                     }
                 });
                 // DOM 즉시 업데이트 (onSnapshot 수신 전 시각적 피드백)
@@ -6293,7 +6347,7 @@
                 ? `<div style="margin-top:5px;text-align:right;"><span style="font-size:9px;font-weight:900;color:#22c55e;">✓ 완료</span>${_wActMin != null ? `<span style="font-size:8px;font-weight:700;color:#60a5fa;margin-left:3px;">${_wActMin.toFixed(1)}분</span>` : ''}</div>`
                 : _wPrereq
                     ? _wStarted
-                        ? `<div style="margin-top:5px;text-align:right;"><button onclick="event.stopPropagation();tlMarkPartDone('${_wSafeDocId}','${_wSafeCK}','${_wpk}','${_wDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}')" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;line-height:1.4;">완료</button></div>`
+                        ? `<div style="margin-top:5px;text-align:right;"><button onclick="event.stopPropagation();tlShowPartDoneConfirm('${_wSafeDocId}','${_wSafeCK}','${_wpk}','${_wDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}',${p.dq||0})" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;line-height:1.4;">완료</button></div>`
                         : `<div style="margin-top:5px;text-align:right;"><button onclick="event.stopPropagation();tlMarkPartStarted('${_wSafeDocId}','${_wSafeCK}','${_wpk}','${_wDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}')" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#3b82f6;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;line-height:1.4;">▶ 시작</button></div>`
                     : '';
 
@@ -6610,7 +6664,7 @@
                         ? `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><span style="font-size:9px;font-weight:900;color:#22c55e;">✓완료</span>${_bActMin != null ? `<span style="font-size:8px;font-weight:700;color:#60a5fa;margin-left:3px;">${_bActMin.toFixed(1)}분</span>` : ''}</div>`
                         : _bPrereq
                             ? _bStarted
-                                ? `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><button onclick="event.stopPropagation();tlMarkPartDone('${_bSafeDocId}','${_bSafeCK}','${_bpk}','${_bDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}')" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 6px;cursor:pointer;line-height:1.5;">완료</button></div>`
+                                ? `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><button onclick="event.stopPropagation();tlShowPartDoneConfirm('${_bSafeDocId}','${_bSafeCK}','${_bpk}','${_bDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}',${p.dq||0})" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 6px;cursor:pointer;line-height:1.5;">완료</button></div>`
                                 : `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><button onclick="event.stopPropagation();tlMarkPartStarted('${_bSafeDocId}','${_bSafeCK}','${_bpk}','${_bDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}')" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#3b82f6;border:none;border-radius:3px;padding:1px 6px;cursor:pointer;line-height:1.5;">▶ 시작</button></div>`
                             : '';
 
