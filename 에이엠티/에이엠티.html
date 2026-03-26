@@ -1323,9 +1323,14 @@
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
                             공정 일정 타임라인
                         </div>
-                        <button onclick="tlScrollToToday()" class="flex items-center gap-1 text-[10px] px-2 py-1 border border-[#ededeb] text-[#37352f] bg-[#f7f6f3] rounded hover:bg-[#f1f1ef] font-bold transition-all active:scale-95">
-                            오늘로
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <button onclick="tlResetAllWorkData()" class="flex items-center gap-1 text-[10px] px-2 py-1 border border-[#fca5a5] text-[#ef4444] bg-[#fff5f5] rounded hover:bg-[#fee2e2] font-bold transition-all active:scale-95">
+                                🗑 작업데이터 초기화
+                            </button>
+                            <button onclick="tlScrollToToday()" class="flex items-center gap-1 text-[10px] px-2 py-1 border border-[#ededeb] text-[#37352f] bg-[#f7f6f3] rounded hover:bg-[#f1f1ef] font-bold transition-all active:scale-95">
+                                오늘로
+                            </button>
+                        </div>
                     </div>
                     <!-- 헤더 2행: 공정 필터 버튼 (멀티선택) -->
                     <div class="flex items-center gap-1.5 flex-wrap">
@@ -4671,6 +4676,32 @@
         };
 
         // ── 부속 공정 완료 처리 ──────────────────────────────────────────────────
+        window.tlResetAllWorkData = async function() {
+            if (!confirm('모든 작업 시작/완료 데이터를 삭제합니다.\n발주 정보는 유지됩니다.\n계속하시겠습니까?')) return;
+            const { collection, getDocs, doc, updateDoc, deleteField } = window.fbFirestore;
+            const appId = "vivivic-4b7ef";
+            try {
+                showToastMessage('초기화 중...');
+                const colRef = collection(window.db, 'artifacts', appId, 'public', 'data', 'confirmed_orders');
+                const snap = await getDocs(colRef);
+                let count = 0;
+                for (const d of snap.docs) {
+                    const data = d.data();
+                    const updates = {};
+                    if (data.partCompletions) updates.partCompletions = deleteField();
+                    if (data.partStarted)     updates.partStarted     = deleteField();
+                    if (Object.keys(updates).length) {
+                        await updateDoc(doc(window.db, 'artifacts', appId, 'public', 'data', 'confirmed_orders', d.id), updates);
+                        count++;
+                    }
+                }
+                showToastMessage(`✓ 작업데이터 초기화 완료 (${count}건)`);
+            } catch(e) {
+                console.error(e);
+                showToastMessage('초기화 실패: ' + e.message);
+            }
+        };
+
         window.tlMarkPartDone = async function(docId, cardKey, procKey, doneDate, btn, partName) {
             if (!docId) return;
             const { doc, updateDoc } = window.fbFirestore;
