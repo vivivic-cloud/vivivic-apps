@@ -4603,7 +4603,7 @@
                                 <div style="display:flex;align-items:center;gap:3px;cursor:${isDone ? 'default' : 'grab'};">
                                     <span style="flex:1;font-size:9px;font-weight:700;color:${isDone ? '#b0aeaa' : '#37352f'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${isDone ? 'text-decoration:line-through;' : ''}"><span style="color:${isDone ? '#d3d1cb' : '#787774'};font-size:8px;">[${partName}]</span> ${item.displayName}</span>
                                     ${isDone ? '' : spot + timeStr}
-                                    <span style="font-size:8px;font-weight:800;color:${isDone ? '#b0aeaa' : '#37352f'};white-space:nowrap;flex-shrink:0;">${_tlQI.label}EA</span>
+                                    <span style="font-size:8px;font-weight:800;color:${isDone ? '#b0aeaa' : _tlQI.color};background:${isDone ? 'transparent' : _tlQI.bg};padding:0 3px;border-radius:3px;white-space:nowrap;flex-shrink:0;">${_tlQI.label}EA</span>
                                     ${isDone
                                         ? `<span style="font-size:9px;font-weight:900;color:#22c55e;flex-shrink:0;padding:0 2px;">✓</span>${actualMin != null ? `<span style="font-size:8px;font-weight:700;color:#60a5fa;flex-shrink:0;white-space:nowrap;">${actualMin.toFixed(1)}분</span>` : ''}`
                                         : _partPrereqDone(cardKey, procKey, item.partCompletions?.[cardKey] || {})
@@ -4667,6 +4667,7 @@
         // 반환: { qty: 실효수량, label: '43(-1, 재단)' 형식 또는 '43' }
         window._partQtyInfo = function(completions, defaultQty) {
             const procs = ['재단', '엣지', 'NC', '보링'];
+            const PC = { '재단':'#90BBC6', '엣지':'#17C3B2', 'NC':'#FF9C75', '보링':'#227C9D' };
             let effectiveQty = defaultQty;
             let changedBy    = null;
             for (const p of procs) {
@@ -4674,10 +4675,12 @@
                 if (aq != null) { effectiveQty = aq; changedBy = p; }
             }
             if (changedBy != null && effectiveQty !== defaultQty) {
-                const diff = effectiveQty - defaultQty;
-                return { qty: effectiveQty, label: `${effectiveQty}(${diff > 0 ? '+' : ''}${diff}, ${changedBy})` };
+                const diff  = effectiveQty - defaultQty;
+                const color = PC[changedBy] || '#ef4444';
+                return { qty: effectiveQty, changedBy, color, bg: color + '22',
+                         label: `${effectiveQty}(${diff > 0 ? '+' : ''}${diff}, ${changedBy})` };
             }
-            return { qty: defaultQty, label: String(defaultQty) };
+            return { qty: defaultQty, changedBy: null, color: '#37352f', bg: '#f5f5f4', label: String(defaultQty) };
         };
 
         window.tlMarkPartStarted = async function(docId, cardKey, procKey, startDate, btn, partName) {
@@ -6053,7 +6056,7 @@
                             ${doneBadge}
                         </div>
                         <div class="flex flex-col items-end gap-0.5 flex-shrink-0">
-                            <div class="text-[9px] font-black ${_dcQI.qty!==displayQty?'text-[#ef4444]':'text-[#37352f]'} bg-[#f7f6f3] px-1 rounded">${_dcQI.label}EA</div>
+                            <div class="text-[9px] font-black px-1 rounded" style="color:${_dcQI.color};background:${_dcQI.bg};">${_dcQI.label}EA</div>
                             ${movedBadge}
                         </div>
                     </div>
@@ -6384,14 +6387,14 @@
                     `<div style="display:flex;gap:3px;align-items:center;flex-wrap:wrap;margin-top:3px;">` +
                     (dimStr    ? `<span style="font-size:9px;font-weight:700;color:#787774;background:#f0efed;padding:1px 4px;border-radius:3px;">${dimStr}</span>` : '') +
                     (sheetsStr ? `<span style="font-size:9px;font-weight:700;color:#37352f;background:#e8e7e4;padding:1px 4px;border-radius:3px;">${sheetsStr}</span>` : '') +
-                    `<span style="font-size:9px;font-weight:700;color:${_wQI.qty!==p.dq?'#ef4444':'#37352f'};background:#f5f5f4;padding:1px 4px;border-radius:3px;">${_wQI.label} EA</span>` +
+                    `<span style="font-size:9px;font-weight:700;color:${_wQI.color};background:${_wQI.bg};padding:1px 4px;border-radius:3px;">${_wQI.label} EA</span>` +
                     `</div>` + _wDoneHtml;
             } else {
                 const _cOn = p.orderName
                     ? `<div style="font-size:9px;font-weight:600;color:#a8a6a2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3;">${p.orderName}</div>` : '';
                 const _cNm = `<div style="display:flex;align-items:center;justify-content:space-between;gap:3px;overflow:hidden;">` +
                     `<span style="font-size:11px;font-weight:800;color:#37352f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3;">${p.nm}</span>` +
-                    `<span style="font-size:9px;font-weight:700;color:${_wQI.qty!==p.dq?'#ef4444':'#37352f'};background:#f5f5f4;padding:0 4px;border-radius:3px;flex-shrink:0;white-space:nowrap;line-height:1.6;">${_wQI.label} EA</span>` +
+                    `<span style="font-size:9px;font-weight:700;color:${_wQI.color};background:${_wQI.bg};padding:0 4px;border-radius:3px;flex-shrink:0;white-space:nowrap;line-height:1.6;">${_wQI.label} EA</span>` +
                     `</div>`;
                 const _pmPool = p.pm || 0;
                 const _pmPoolStr = _pmPool >= 1 ? `${_pmPool.toFixed(1)}분` : `${Math.round(_pmPool * 60)}초`;
@@ -6644,7 +6647,7 @@
                             `<div style="display:flex;gap:3px;align-items:center;flex-wrap:wrap;margin-top:3px;">` +
                             (_dimStr2    ? `<span style="font-size:9px;font-weight:700;color:#787774;background:#f0efed;padding:1px 4px;border-radius:3px;">${_dimStr2}</span>` : '') +
                             (_sheetsStr2 ? `<span style="font-size:9px;font-weight:700;color:#37352f;background:#e8e7e4;padding:1px 4px;border-radius:3px;">${_sheetsStr2}</span>` : '') +
-                            `<span style="font-size:9px;font-weight:700;color:${_bQI.qty!==p.dq?'#ef4444':'#37352f'};background:#f5f5f4;padding:1px 4px;border-radius:3px;">${_bQI.label} EA</span>` +
+                            `<span style="font-size:9px;font-weight:700;color:${_bQI.color};background:${_bQI.bg};padding:1px 4px;border-radius:3px;">${_bQI.label} EA</span>` +
                             `</div>`;
                     } else {
                         const _cOn2 = p.orderName
@@ -6652,7 +6655,7 @@
                             : '';
                         const _cNm2 = `<div style="display:flex;align-items:center;justify-content:space-between;gap:3px;overflow:hidden;">` +
                             `<span style="font-size:11px;font-weight:800;color:#37352f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3;">${p.nm}</span>` +
-                            `<span style="font-size:9px;font-weight:700;color:${_bQI.qty!==p.dq?'#ef4444':'#37352f'};background:#f5f5f4;padding:0 4px;border-radius:3px;white-space:nowrap;flex-shrink:0;">${_bQI.label} EA</span>` +
+                            `<span style="font-size:9px;font-weight:700;color:${_bQI.color};background:${_bQI.bg};padding:0 4px;border-radius:3px;white-space:nowrap;flex-shrink:0;">${_bQI.label} EA</span>` +
                             `</div>`;
                         // 공정시간 표시 — 카드 높이가 충분할 때만 표기
                         const _pmVal = p.pm || 0;
