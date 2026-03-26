@@ -5462,9 +5462,34 @@
             const cardsHtml = sec.items.map(item => {
                 const pd     = procKey==='납기' ? item.deliveryDate : (item.procOverrides?.[procKey]||null);
                 const procLabel = procKey==='납기' ? '납기일' : procKey+' 작업일';
-                const actBtn = sec.isDlv
-                    ? `<button class="tl-dc-btn-delivery" onclick="event.stopPropagation();tlDcStartDelivery(${item.idNum},this)">🚚 배송시작</button>`
-                    : `<button class="tl-dc-btn-workorder" onclick="event.stopPropagation();tlDcIssueWorkOrder('${item.docId||''}','${procKey}',this)">📋 작업지시서 발행</button>`;
+                let actBtn;
+                if (sec.isDlv) {
+                    // ── 모든 부속의 마지막 공정 완료 여부 확인 ──────────────
+                    const _docId = item.docId || String(item.idNum);
+                    let _partCount = 0, _doneCount = 0;
+                    Object.entries(item.partInfoMap || {}).forEach(([_ck, _pd]) => {
+                        if (!_pd || _pd.isDeleted) return;
+                        if (!_fh) return;
+                        const _ri  = parseInt(_ck.split('-')[2]);
+                        const _row = currentFullData[_ri];
+                        if (!_row || normalizeValue(_row[_fh.indexOf('공급처')]) !== 'AMT') return;
+                        const _pt      = calcProcessTime(_row, 1, {}, _fh);
+                        const _cardKey = _ck.substring(_docId.length + 1);
+                        const _comps   = item.partCompletions?.[_cardKey] || {};
+                        let _lastDone  = false;
+                        if ((_pt['보링'] || 0) > 0)                              _lastDone = !!_comps['보링'];
+                        else if ((_pt['엣지'] || 0) > 0 || (_pt['NC'] || 0) > 0) _lastDone = !!(_comps['엣지'] || _comps['NC']);
+                        else                                                       _lastDone = !!_comps['재단'];
+                        _partCount++;
+                        if (_lastDone) _doneCount++;
+                    });
+                    const _allDone = _partCount > 0 && _doneCount === _partCount;
+                    actBtn = _allDone
+                        ? `<button class="tl-dc-btn-delivery" onclick="event.stopPropagation();tlDcStartDelivery(${item.idNum},this)">🚚 배송출발</button>`
+                        : `<span style="font-size:9px;font-weight:700;color:#b0aeaa;">⏳ 공정 ${_doneCount}/${_partCount} 완료</span>`;
+                } else {
+                    actBtn = `<button class="tl-dc-btn-workorder" onclick="event.stopPropagation();tlDcIssueWorkOrder('${item.docId||''}','${procKey}',this)">📋 작업지시서 발행</button>`;
+                }
 
                 // 상품카드 총 공정작업시간 계산
                 let _totalMin = 0;
@@ -5975,7 +6000,7 @@
             if (!area) return;
             if (area.hasChildNodes()) {
                 area.innerHTML = '';
-                btnEl.textContent = '🚚 배송시작';
+                btnEl.textContent = '🚚 배송출발';
                 return;
             }
             const item = confirmedOrders.find(o => o.idNum === idNum);
@@ -6013,7 +6038,7 @@
                 ${partsRows?`<div><div class="tl-dc-delivery-parts-title">📦 부속 목록</div>${partsRows}</div>`:''}
                 <textarea class="tl-dc-delivery-memo" placeholder="배송 메모 (선택사항)..." rows="2"></textarea>
                 <div class="tl-dc-delivery-btn-row">
-                    <button class="tl-dc-btn-cancel" onclick="(function(el){el.closest('.tl-dc-delivery-area').innerHTML='';var c=el.closest('.tl-dc-full-card')||el.closest('.tl-dc-order-card');if(c){var b=c.querySelector('.tl-dc-btn-delivery');if(b)b.textContent='🚚 배송시작';}})(this)">취소</button>
+                    <button class="tl-dc-btn-cancel" onclick="(function(el){el.closest('.tl-dc-delivery-area').innerHTML='';var c=el.closest('.tl-dc-full-card')||el.closest('.tl-dc-order-card');if(c){var b=c.querySelector('.tl-dc-btn-delivery');if(b)b.textContent='🚚 배송출발';}})(this)">취소</button>
                     <button class="tl-dc-btn-confirm" onclick="tlDcConfirmDelivery(${escId},this)">✅ 배송 확정</button>
                 </div>
             </div>`;
