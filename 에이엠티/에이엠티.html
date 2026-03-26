@@ -4605,7 +4605,7 @@
                                     <span style="font-size:8px;font-weight:800;color:${isDone ? '#b0aeaa' : '#37352f'};white-space:nowrap;flex-shrink:0;">${movedQty}EA</span>
                                     ${isDone
                                         ? `<span style="font-size:9px;font-weight:900;color:#22c55e;flex-shrink:0;padding:0 2px;">✓</span>${actualMin != null ? `<span style="font-size:8px;font-weight:700;color:#60a5fa;flex-shrink:0;white-space:nowrap;">${actualMin.toFixed(1)}분</span>` : ''}`
-                                        : procKey === '재단'
+                                        : _partPrereqDone(cardKey, procKey, item.partCompletions?.[cardKey] || {})
                                             ? isStarted
                                                 ? `<button onclick="event.stopPropagation();tlMarkPartDone('${safeDocId}','${safeCK}','${safePK}','${batchDate}',this,'${partName.replace(/'/g,"\\'")}')" onmousedown="event.stopPropagation()" style="flex-shrink:0;font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 5px;cursor:pointer;white-space:nowrap;line-height:1.4;">완료</button>`
                                                 : `<button onclick="event.stopPropagation();tlMarkPartStarted('${safeDocId}','${safeCK}','${safePK}','${batchDate}',this,'${partName.replace(/'/g,"\\'")}')" onmousedown="event.stopPropagation()" style="flex-shrink:0;font-size:8px;font-weight:900;color:#fff;background:#3b82f6;border:none;border-radius:3px;padding:1px 5px;cursor:pointer;white-space:nowrap;line-height:1.4;">▶ 시작</button>`
@@ -4642,6 +4642,25 @@
         };
 
         // ── 부속 공정 시작 처리 ──────────────────────────────────────────────────
+        // ── 공정 선행 조건 충족 여부 판단 ──────────────────────────────
+        window._partPrereqDone = function(cardKey, procKey, completions) {
+            if (procKey === '재단') return true;
+            if (procKey === '엣지' || procKey === 'NC') return !!completions['재단'];
+            if (procKey === '보링') {
+                let hasEdgeNC = false;
+                try {
+                    const _ri = parseInt(cardKey.split('-').pop());
+                    const _pr = currentFullData?.[_ri];
+                    if (_pr && currentFullData?.[0]) {
+                        const _t = calcProcessTime(_pr, 1, {}, currentFullData[0]);
+                        hasEdgeNC = (_t['엣지'] || 0) > 0 || (_t['NC'] || 0) > 0;
+                    }
+                } catch(_e) {}
+                return hasEdgeNC ? !!(completions['엣지'] || completions['NC']) : !!completions['재단'];
+            }
+            return true;
+        };
+
         window.tlMarkPartStarted = async function(docId, cardKey, procKey, startDate, btn, partName) {
             if (!docId) return;
             const { doc, updateDoc } = window.fbFirestore;
@@ -6222,9 +6241,10 @@
             const _wSafeDocId = _wdid.replace(/'/g, "\\'");
             const _wSafeCK   = _wck.replace(/'/g, "\\'");
             const _wDate    = stateKey.substring(0, 10);
+            const _wPrereq = _partPrereqDone(_wck, _wpk, _wobj?.partCompletions?.[_wck] || {});
             const _wDoneHtml = _wDone
                 ? `<div style="margin-top:5px;text-align:right;"><span style="font-size:9px;font-weight:900;color:#22c55e;">✓ 완료</span>${_wActMin != null ? `<span style="font-size:8px;font-weight:700;color:#60a5fa;margin-left:3px;">${_wActMin.toFixed(1)}분</span>` : ''}</div>`
-                : _wpk === '재단'
+                : _wPrereq
                     ? _wStarted
                         ? `<div style="margin-top:5px;text-align:right;"><button onclick="event.stopPropagation();tlMarkPartDone('${_wSafeDocId}','${_wSafeCK}','${_wpk}','${_wDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}')" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;line-height:1.4;">완료</button></div>`
                         : `<div style="margin-top:5px;text-align:right;"><button onclick="event.stopPropagation();tlMarkPartStarted('${_wSafeDocId}','${_wSafeCK}','${_wpk}','${_wDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}')" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#3b82f6;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;line-height:1.4;">▶ 시작</button></div>`
@@ -6538,9 +6558,10 @@
                     const _bSafeDocId = _bdid.replace(/'/g, "\\'");
                     const _bSafeCK    = _bck.replace(/'/g, "\\'");
                     const _bDate     = sk.substring(0, 10);
+                    const _bPrereq = _partPrereqDone(_bck, _bpk, _bobj?.partCompletions?.[_bck] || {});
                     const _bDoneHtml  = _bDone
                         ? `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><span style="font-size:9px;font-weight:900;color:#22c55e;">✓완료</span>${_bActMin != null ? `<span style="font-size:8px;font-weight:700;color:#60a5fa;margin-left:3px;">${_bActMin.toFixed(1)}분</span>` : ''}</div>`
-                        : _bpk === '재단'
+                        : _bPrereq
                             ? _bStarted
                                 ? `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><button onclick="event.stopPropagation();tlMarkPartDone('${_bSafeDocId}','${_bSafeCK}','${_bpk}','${_bDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}')" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 6px;cursor:pointer;line-height:1.5;">완료</button></div>`
                                 : `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><button onclick="event.stopPropagation();tlMarkPartStarted('${_bSafeDocId}','${_bSafeCK}','${_bpk}','${_bDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}')" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#3b82f6;border:none;border-radius:3px;padding:1px 6px;cursor:pointer;line-height:1.5;">▶ 시작</button></div>`
