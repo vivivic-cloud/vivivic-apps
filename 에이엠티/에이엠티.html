@@ -6625,6 +6625,13 @@
                     const p = parts.find(pp => pp.cKey === cKey);
                     if (!p) return;
 
+                    // _bQI 먼저 계산 (수량 표기에 _placedInner 생성 전 필요)
+                    const _bpk   = sk.replace(/^\d{4}-\d{2}-\d{2}-/, '');
+                    const _bdid  = p.orderKey || '';
+                    const _bck   = _bdid ? cKey.substring(_bdid.length + 1) : cKey;
+                    const _bobj  = confirmedOrders.find(o => (o.docId || String(o.idNum)) === _bdid);
+                    const _bQI   = _partQtyInfo(_bobj?.partCompletions?.[_bck], p.dq || 0);
+
                     // ─── 배치 카드 (재단카드: 상세 4행 / 일반카드: 컴팩트 2행) ───
                     let _placedInner = '';
                     if (p.isCuttingCard) {
@@ -6660,11 +6667,7 @@
                     const _bcc = _boardColorMap[_bok] || {};
                     const _bcs = _bcc.bg ? `background:${_bcc.bg};border-left:3px solid ${_bcc.bd};` : '';
 
-                    // 완료 상태 확인
-                    const _bpk   = sk.replace(/^\d{4}-\d{2}-\d{2}-/, '');
-                    const _bdid  = p.orderKey || '';
-                    const _bck   = _bdid ? cKey.substring(_bdid.length + 1) : cKey;
-                    const _bobj  = confirmedOrders.find(o => (o.docId || String(o.idNum)) === _bdid);
+                    // 완료 상태 확인 (_bpk, _bdid, _bck, _bobj, _bQI 는 위에서 이미 선언됨)
                     const _bDone    = !!(_bobj?.partCompletions?.[_bck]?.[_bpk]);
                     const _bStarted = !!(_bobj?.partStarted?.[_bck]?.[_bpk]);
                     // 완료됐지만 partName 없는 경우 자동 수정
@@ -6682,7 +6685,6 @@
                     const _bSafeCK    = _bck.replace(/'/g, "\\'");
                     const _bDate     = sk.substring(0, 10);
                     const _bPrereq = _partPrereqDone(_bck, _bpk, _bobj?.partCompletions?.[_bck] || {});
-                    const _bQI     = _partQtyInfo(_bobj?.partCompletions?.[_bck], p.dq || 0);
                     const _bDoneHtml  = _bDone
                         ? `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><span style="font-size:9px;font-weight:900;color:#22c55e;">✓완료</span>${_bActMin != null ? `<span style="font-size:8px;font-weight:700;color:#60a5fa;margin-left:3px;">${_bActMin.toFixed(1)}분</span>` : ''}</div>`
                         : _bPrereq
