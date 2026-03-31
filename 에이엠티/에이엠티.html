@@ -6514,9 +6514,22 @@
             let html =
                 `<div class="wo-boring-board-hdr">` +
                 `<div class="wo-boring-time-hdr">시간</div>` +
-                machines.map(m =>
-                    `<div class="wo-boring-machine-hdr" style="color:#1a1a1a;background:${procMeta.colorAlpha};">${m}</div>`
-                ).join('') +
+                machines.map(m => {
+                    const _ms  = _woGetMacStart(sk, m) ?? 60;
+                    const _hh  = String(7 + Math.floor(_ms / 60)).padStart(2,'0');
+                    const _mm  = String(_ms % 60).padStart(2,'0');
+                    const _opts = Array.from({length: 24}, (_, i) => i * 30)
+                        .map(mins => {
+                            const oh = String(7 + Math.floor(mins / 60)).padStart(2,'0');
+                            const om = String(mins % 60).padStart(2,'0');
+                            return `<option value="${mins}"${mins === _ms ? ' selected' : ''}>${oh}:${om}</option>`;
+                        }).join('');
+                    return `<div class="wo-boring-machine-hdr" style="color:#1a1a1a;background:${procMeta.colorAlpha};flex-direction:column;gap:1px;">` +
+                        `<span>${m}</span>` +
+                        `<select onchange="_woSetMacStart('${sk}','${m}',parseInt(this.value))" onclick="event.stopPropagation()" ` +
+                        `style="font-size:10px;font-weight:700;color:#37352f;background:#fff;border:1px solid #dddbd8;border-radius:4px;padding:1px 3px;cursor:pointer;text-align:center;">` +
+                        _opts + `</select></div>`;
+                }).join('') +
                 `</div>`;
 
             // ── 내부 콘텐츠 (절대위치 영역)
