@@ -6171,6 +6171,33 @@
 
         function _woSetMacStart(sk, mac, clockMin) {
             if (!window._woMacStartMin[sk]) window._woMacStartMin[sk] = {};
+
+            // ── 카드가 이미 배치된 경우: 미고정 카드의 현재 위치를 startMin으로 pin
+            // → 시작시간 변경 후에도 기존 카드는 제자리 유지
+            const _state = window._woBoring[sk];
+            if (_state && _state[mac] && _state[mac].length > 0) {
+                const _oldStart  = window._woMacStartMin[sk][mac] ?? 480;
+                const _exclZones = _woGetExclZones(sk);
+                const _parts     = window._woBoringParts[sk] || [];
+                let   _cur       = _oldStart;
+
+                _state[mac] = _state[mac].map(x => {
+                    // 이미 pinned — 구형(7시 기준) 변환만 보정
+                    if (typeof x === 'object' && x !== null && x.startMin != null) {
+                        const sm = x.startMin < 420 ? x.startMin + 420 : x.startMin;
+                        return { cKey: x.cKey, startMin: sm };
+                    }
+                    // 미고정: 현재 누적 위치를 startMin으로 확정
+                    const _cKey = typeof x === 'string' ? x : x?.cKey;
+                    if (!_cKey) return x;
+                    const _p  = _parts.find(pp => pp.cKey === _cKey);
+                    const _pm = _p ? _p.pm : 0;
+                    const _thisStart = _cur;
+                    _cur = _woCalcEffectiveEnd(_thisStart, _pm, _exclZones);
+                    return { cKey: _cKey, startMin: _thisStart };
+                });
+            }
+
             window._woMacStartMin[sk][mac] = clockMin;
             _woRenderBoard(sk);
         }
