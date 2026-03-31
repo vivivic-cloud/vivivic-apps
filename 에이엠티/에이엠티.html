@@ -6259,8 +6259,8 @@
             return { procKey:'보링', color:'#227C9D', colorAlpha:'rgba(34,124,157,0.08)', label:'보링' };
         }
 
-        window._WO_SLOTS = Array.from({length:32}, (_, i) => {
-            const h = String(7 + Math.floor(i / 2)).padStart(2, '0');
+        window._WO_SLOTS = Array.from({length:48}, (_, i) => {
+            const h = String(Math.floor(i / 2)).padStart(2, '0');
             return `${h}:${i % 2 === 0 ? '00' : '30'}`;
         });
         window._WO_PX_PER_MIN = 44 / 30; // 30분 = 44px 기준 (1분 ≈ 1.47px)
@@ -6445,12 +6445,12 @@
 
             // ── 기본 배제 구간 초기화 (sk 최초 진입시 1회)
             if (!window._woExclusions[sk]) {
-                // 10:00~10:20 휴식(m=180,190), 12:00~13:00 점심(m=300~350), 15:00~15:20 휴식(m=480,490)
-                window._woExclusions[sk] = new Set([180,190, 300,310,320,330,340,350, 480,490]);
+                // 10:00~10:20 휴식(m=600,610), 12:00~13:00 점심(m=720~770), 15:00~15:20 휴식(m=900,910)
+                window._woExclusions[sk] = new Set([600,610, 720,730,740,750,760,770, 900,910]);
                 window._woExclusionReasons[sk] = {
-                    180: {reason:'휴식', custom:''},
-                    300: {reason:'점심', custom:''},
-                    480: {reason:'휴식', custom:''}
+                    600: {reason:'휴식', custom:''},
+                    720: {reason:'점심', custom:''},
+                    900: {reason:'휴식', custom:''}
                 };
             }
 
@@ -6467,13 +6467,17 @@
             // ── 기계별 타임라인: 기본 순서 누적 + 이동 카드 절대 시간 + 겹침 자동 밀어냄
             const macTimelines = {};
             machines.forEach(mac => {
-                const ms      = _woGetMacStart(sk, mac) ?? 60;
+                const ms      = _woGetMacStart(sk, mac) ?? 480;
                 let actualCur = ms;
                 let visualY   = ms * PX_PER_MIN;
                 const rawArr  = state[mac] || [];
                 const entries = rawArr.map(x => {
                     if (typeof x === 'string') return { cKey: x, startMin: null };
-                    if (x.startMin != null)    return { cKey: x.cKey, startMin: x.startMin };
+                    if (x.startMin != null) {
+                        // 구형 7시 기준 데이터(0~360 범위)는 자정 기준으로 변환
+                        const sm = x.startMin < 420 ? x.startMin + 420 : x.startMin;
+                        return { cKey: x.cKey, startMin: sm };
+                    }
                     return { cKey: x.cKey, startMin: null };
                 });
                 const tl = [];
@@ -6526,10 +6530,10 @@
             });
 
             // 보드 높이: 시각 최대 Y 기준 (시계보다 클 수 있음)
-            let maxClockMin = 180;
-            let maxVisY     = 180 * PX_PER_MIN;
+            let maxClockMin = 600;
+            let maxVisY     = 600 * PX_PER_MIN;
             machines.forEach(mac => {
-                const ms = _woGetMacStart(sk, mac) ?? 60;
+                const ms = _woGetMacStart(sk, mac) ?? 480;
                 maxClockMin = Math.max(maxClockMin, ms + 30);
                 const tl = macTimelines[mac];
                 if (tl.length) {
@@ -6547,9 +6551,9 @@
                     const _ms  = _woGetMacStart(sk, m) ?? 60;
                     const _hh  = String(7 + Math.floor(_ms / 60)).padStart(2,'0');
                     const _mm  = String(_ms % 60).padStart(2,'0');
-                    const _opts = Array.from({length: 24}, (_, i) => i * 30)
+                    const _opts = Array.from({length: 48}, (_, i) => i * 30)
                         .map(mins => {
-                            const oh = String(7 + Math.floor(mins / 60)).padStart(2,'0');
+                            const oh = String(Math.floor(mins / 60)).padStart(2,'0');
                             const om = String(mins % 60).padStart(2,'0');
                             return `<option value="${mins}"${mins === _ms ? ' selected' : ''}>${oh}:${om}</option>`;
                         }).join('');
@@ -6572,7 +6576,7 @@
                 const h10  = Math.round(10 * PX_PER_MIN);
                 if (yPx >= BOARD_H) break;
                 const isOn = exclBlocks.has(m);
-                const cH   = String(7 + Math.floor(m / 60)).padStart(2,'0');
+                const cH   = String(Math.floor(m / 60)).padStart(2,'0');
                 const cM   = String(m % 60).padStart(2,'0');
                 html += `<div class="wo-excl-block${isOn?' on':''}" style="top:${yPx}px;height:${h10}px;"` +
                     ` title="${cH}:${cM} 배제 토글" onclick="_woToggleExclBlock('${sk}',${m})"></div>`;
@@ -6581,7 +6585,7 @@
             for (let m = 0; m <= maxClockMin + 30; m += 30) {
                 const yPx = Math.round(m * PX_PER_MIN);
                 if (yPx > BOARD_H + 5) break;
-                const h   = String(7 + Math.floor(m / 60)).padStart(2, '0');
+                const h   = String(Math.floor(m / 60)).padStart(2, '0');
                 const min = String(m % 60).padStart(2, '0');
                 const isHalf = (m % 60 === 30);
                 html += `<div class="wo-boring-tick" style="top:${yPx}px;pointer-events:none;` +
@@ -6652,7 +6656,7 @@
                         if (yPx >= BOARD_H) break;
                         const isEx = exclZones.some(z => m >= z.start && m < z.end);
                         if (isEx) continue;
-                        const cH    = String(7 + Math.floor(m / 60)).padStart(2,'0');
+                        const cH    = String(Math.floor(m / 60)).padStart(2,'0');
                         const cM    = String(m % 60).padStart(2,'0');
                         const isSel = (curStart === m);
                         const bgNormal  = isSel ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.03)';
@@ -7097,8 +7101,8 @@
             const _MIN_VH        = 28;
             const exclZones      = _woGetExclZones(sk);
             const existingStart  = _woGetMacStart(sk, mac);
-            let   actualCur      = existingStart ?? 60;
-            let   visY           = (existingStart ?? 60) * PX;
+            let   actualCur      = existingStart ?? 480;
+            let   visY           = (existingStart ?? 480) * PX;
             let   ghostTopPx, ghostActualStart;
 
             // 절대 위치 방식: dropY → 30분 스냅 시간으로 ghost 표시
@@ -7113,7 +7117,7 @@
             const ghostEnd  = _woCalcEffectiveEnd(ghostActualStart, dragPm, exclZones);
             const ghostEff  = ghostEnd - ghostActualStart;
             const heightPx  = Math.max(_MIN_VH, Math.round(ghostEff * PX));
-            const hh = String(7 + Math.floor(ghostActualStart / 60)).padStart(2,'0');
+            const hh = String(Math.floor(ghostActualStart / 60)).padStart(2,'0');
             const mm = String(ghostActualStart % 60).padStart(2,'0');
             _woUpdateDropGhost(col, ghostTopPx, heightPx, `${hh}:${mm}`);
         };
