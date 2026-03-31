@@ -7116,45 +7116,36 @@
             const toKey  = x => typeof x === 'string' ? x : x?.cKey;
             const getKeys = mac => (state[mac] || []).map(toKey).filter(Boolean);
 
-            // 모든 기계 + pool 에서 카드 제거
-            machines.forEach(mac => { state[mac] = getKeys(mac).filter(k => k !== cardKey); });
+            // 모든 기계+pool에서 해당 카드 제거 — {cKey,startMin} 형식 유지
+            machines.forEach(mac => {
+                state[mac] = (state[mac] || [])
+                    .map(x => typeof x === 'string' ? { cKey: x, startMin: null } : { cKey: x.cKey, startMin: x.startMin ?? null })
+                    .filter(x => x.cKey !== cardKey);
+            });
             state.pool = (state.pool || []).filter(k => k !== cardKey);
 
             if (targetMachine === 'pool') {
-                state.pool.push(cardKey); // pool 복귀 시 startMin 없음(string)
+                state.pool.push(cardKey); // pool 복귀 시 startMin 없음 → 순서 누적 배치
             } else {
                 if (!state[targetMachine]) state[targetMachine] = [];
-                // 기존 entries에서 해당 카드 제거 (startMin 유지)
-                const keys = (state[targetMachine] || [])
-                    .map(x => typeof x === 'string' ? x : x?.cKey)
-                    .filter(Boolean).filter(k => k !== cardKey);
-
-                // Y 좌표로 삽입 위치 계산 (clock 기준 — 배제 구간 반영)
-                // e.currentTarget이 슬롯 자식일 수 있으므로 반드시 기계 컬럼 기준으로 rect 계산
-                const _colEl = document.querySelector(`.wo-boring-mac-col[data-mac="${targetMachine}"][data-sk="${stateKey}"]`);
-                const rect   = _colEl ? _colEl.getBoundingClientRect() : e.currentTarget.getBoundingClientRect();
-                const dropY  = e.clientY - rect.top; // 컬럼 상단 기준
-                // 렌더 함수와 동일한 방식으로 PX_PER_MIN 재계산 (엣지 상한 포함)
-                // ── 시각 누적 방식으로 삽입 인덱스 결정
-                const PX          = _woDragCalcPX(state, parts, cardKey, stateKey); // = 3.0
-                const _MIN_VH     = 28;
+                const _colEl     = document.querySelector(`.wo-boring-mac-col[data-mac="${targetMachine}"][data-sk="${stateKey}"]`);
+                const rect       = _colEl ? _colEl.getBoundingClientRect() : e.currentTarget.getBoundingClientRect();
+                const dropY      = e.clientY - rect.top;
+                const PX         = _woDragCalcPX(state, parts, cardKey, stateKey);
                 const _dExclZones = _woGetExclZones(stateKey);
+
                 // dropY → 30분 스냅 startMin 계산
                 let dropMin = Math.round((dropY / PX) / 30) * 30;
                 while (_dExclZones.some(z => dropMin >= z.start && dropMin < z.end)) dropMin += 30;
                 dropMin = Math.max(0, dropMin);
 
-                // 기존 배열에서 순서 유지하며 해당 카드에만 startMin 갱신
-                const prevEntries = (state[targetMachine] || [])
-                    .map(x => typeof x === 'string' ? { cKey: x, startMin: null } : { cKey: x.cKey, startMin: x.startMin ?? null });
-                const alreadyIn = prevEntries.some(x => x.cKey === cardKey);
-                const newEntries = prevEntries.map(x =>
+                // 기존 배열 순서 유지 + 해당 카드 startMin만 갱신
+                const prevEntries = state[targetMachine]; // 이미 {cKey,startMin} 형식
+                const alreadyIn   = prevEntries.some(x => x.cKey === cardKey);
+                const newEntries  = prevEntries.map(x =>
                     x.cKey === cardKey ? { cKey: x.cKey, startMin: dropMin } : x
                 );
-                if (!alreadyIn) {
-                    // 다른 기계/pool에서 온 경우: 순서상 마지막에 추가
-                    newEntries.push({ cKey: cardKey, startMin: dropMin });
-                }
+                if (!alreadyIn) newEntries.push({ cKey: cardKey, startMin: dropMin });
                 state[targetMachine] = newEntries;
             }
 
