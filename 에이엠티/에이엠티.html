@@ -6464,39 +6464,42 @@
             // 긴 카드: 실제 소요분 × PX 비례 → 합리적 높이
             const PX_PER_MIN = 0.7;
 
-            // ── 기계별 절대시간 타임라인 (각 카드 startMin 기준 절대 배치)
+            // ── 기계별 타임라인: 기본 순서 누적, startMin 지정 카드만 절대 시간 고정
             const macTimelines = {};
             machines.forEach(mac => {
-                const ms      = _woGetMacStart(sk, mac) ?? 60;
+                const ms     = _woGetMacStart(sk, mac) ?? 60;
+                let actualCur = ms;
+                let visualY   = ms * PX_PER_MIN;
                 const rawArr  = state[mac] || [];
-                // {cKey, startMin} 정규화 — 구형 string/startSlot 데이터 호환
+                // 정규화: string → {cKey, startMin:null}, {cKey,startSlot} → startMin:null(구형 무시)
                 const entries = rawArr.map(x => {
-                    if (typeof x === 'string') return { cKey: x, startMin: ms };
-                    if (x.startMin != null)    return x;
-                    if (x.startSlot != null)   return { cKey: x.cKey, startMin: x.startSlot * 30 };
-                    return { cKey: x.cKey, startMin: ms };
+                    if (typeof x === 'string') return { cKey: x, startMin: null };
+                    if (x.startMin != null)    return { cKey: x.cKey, startMin: x.startMin };
+                    return { cKey: x.cKey, startMin: null };
                 });
                 const tl = [];
                 entries.forEach(entry => {
-                    const p = parts.find(pp => pp.cKey === entry.cKey);
-                    // ── 실제 작업시간이 기록된 경우 actualMinutes 우선 사용
+                    const p        = parts.find(pp => pp.cKey === entry.cKey);
                     const _procKey = sk.replace(/^\d{4}-\d{2}-\d{2}-/, '');
                     const _ordAct  = p ? confirmedOrders.find(o => (o.docId || String(o.idNum)) === p.orderKey) : null;
                     const _ckAct   = p ? p.cKey.substring((p.orderKey || '').length + 1) : '';
                     const _actPm   = _ordAct?.partCompletions?.[_ckAct]?.[_procKey]?.actualMinutes;
                     const pm       = p ? (_actPm ?? p.pm) : 0;
-                    const cStart   = entry.startMin ?? ms;
+                    // startMin 지정 → 절대 시간, 미지정 → 누적 배치
+                    const cStart   = entry.startMin != null ? entry.startMin : actualCur;
                     const cEnd     = _woCalcEffectiveEnd(cStart, pm, exclZones);
                     const effDur   = cEnd - cStart;
                     const cardMinH = (p && p.isCuttingCard) ? 80 : MIN_CARD_H;
                     const visH     = Math.max(cardMinH, Math.round(effDur * PX_PER_MIN));
                     tl.push({ cKey: entry.cKey, pm, clockStart: cStart, clockEnd: cEnd,
                                topPx: Math.round(cStart * PX_PER_MIN), cardH: visH - GAP_PX });
+                    // 누적 기준 갱신 (고정 카드도 이후 순서 카드의 기준이 됨)
+                    actualCur = Math.max(actualCur, cEnd);
+                    visualY   = actualCur * PX_PER_MIN;
                 });
                 macTimelines[mac] = tl;
-                const lastEntry = tl[tl.length - 1];
-                macTimelines[mac]._actEnd = lastEntry ? lastEntry.clockEnd : ms;
-                macTimelines[mac]._visEnd = lastEntry ? (lastEntry.topPx + lastEntry.cardH) : ms * PX_PER_MIN;
+                macTimelines[mac]._actEnd = actualCur;
+                macTimelines[mac]._visEnd = visualY;
             });
 
             // 보드 높이: 시각 최대 Y 기준 (시계보다 클 수 있음)
@@ -7118,10 +7121,13 @@
             state.pool = (state.pool || []).filter(k => k !== cardKey);
 
             if (targetMachine === 'pool') {
-                state.pool.push(cardKey);
+                state.pool.push(cardKey); // pool 복귀 시 startMin 없음(string)
             } else {
                 if (!state[targetMachine]) state[targetMachine] = [];
-                const keys = getKeys(targetMachine).filter(k => k !== cardKey);
+                // 기존 entries에서 해당 카드 제거 (startMin 유지)
+                const keys = (state[targetMachine] || [])
+                    .map(x => typeof x === 'string' ? x : x?.cKey)
+                    .filter(Boolean).filter(k => k !== cardKey);
 
                 // Y 좌표로 삽입 위치 계산 (clock 기준 — 배제 구간 반영)
                 // e.currentTarget이 슬롯 자식일 수 있으므로 반드시 기계 컬럼 기준으로 rect 계산
@@ -7133,20 +7139,23 @@
                 const PX          = _woDragCalcPX(state, parts, cardKey, stateKey); // = 3.0
                 const _MIN_VH     = 28;
                 const _dExclZones = _woGetExclZones(stateKey);
-                // dropY → 30분 스냅 startMin 계산 후 절대 위치로 저장
+                // dropY → 30분 스냅 startMin 계산
                 let dropMin = Math.round((dropY / PX) / 30) * 30;
                 while (_dExclZones.some(z => dropMin >= z.start && dropMin < z.end)) dropMin += 30;
                 dropMin = Math.max(0, dropMin);
 
-                // 기존 {cKey, startMin} 배열 유지하며 해당 카드만 추가/갱신
-                const _dMacStart = _woGetMacStart(stateKey, targetMachine) ?? 60;
-                const existingEntries = (state[targetMachine] || [])
-                    .map(x => typeof x === 'string' ? { cKey: x, startMin: _dMacStart } : x)
-                    .filter(x => x.cKey !== cardKey);
-                existingEntries.push({ cKey: cardKey, startMin: dropMin });
-                // startMin 순 정렬
-                existingEntries.sort((a, b) => (a.startMin || 0) - (b.startMin || 0));
-                state[targetMachine] = existingEntries;
+                // 기존 배열에서 순서 유지하며 해당 카드에만 startMin 갱신
+                const prevEntries = (state[targetMachine] || [])
+                    .map(x => typeof x === 'string' ? { cKey: x, startMin: null } : { cKey: x.cKey, startMin: x.startMin ?? null });
+                const alreadyIn = prevEntries.some(x => x.cKey === cardKey);
+                const newEntries = prevEntries.map(x =>
+                    x.cKey === cardKey ? { cKey: x.cKey, startMin: dropMin } : x
+                );
+                if (!alreadyIn) {
+                    // 다른 기계/pool에서 온 경우: 순서상 마지막에 추가
+                    newEntries.push({ cKey: cardKey, startMin: dropMin });
+                }
+                state[targetMachine] = newEntries;
             }
 
             _woRenderBoard(stateKey);
