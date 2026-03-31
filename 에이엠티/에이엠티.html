@@ -7140,13 +7140,16 @@
             let   visY           = (existingStart ?? 480) * PX;
             let   ghostTopPx, ghostActualStart;
 
-            // 절대 위치 방식: dropY → 30분 스냅 시간으로 ghost 표시
+            // 절대 위치 방식: dropY(보드오프셋 이후 상대Y) → 30분 스냅 절대시계분
             {
-                let snap = Math.round((dropY / PX) / 30) * 30;
+                const _machines   = _woGetMachines(sk);
+                const _bsMin      = Math.min(..._machines.map(m => _woGetMacStart(sk, m) ?? 480));
+                const _bOffPx     = Math.round(_bsMin * PX);
+                let snap = _bsMin + Math.round((dropY / PX) / 30) * 30;
                 while (exclZones.some(z => snap >= z.start && snap < z.end)) snap += 30;
-                snap = Math.max(0, snap);
-                ghostTopPx = snap * PX;
+                snap = Math.max(_bsMin, snap);
                 ghostActualStart = snap;
+                ghostTopPx = Math.round(snap * PX) - _bOffPx;
             }
 
             const ghostEnd  = _woCalcEffectiveEnd(ghostActualStart, dragPm, exclZones);
@@ -7196,10 +7199,11 @@
                 const PX         = _woDragCalcPX(state, parts, cardKey, stateKey);
                 const _dExclZones = _woGetExclZones(stateKey);
 
-                // dropY → 30분 스냅 startMin 계산
-                let dropMin = Math.round((dropY / PX) / 30) * 30;
+                // dropY(보드오프셋 이후 상대Y) → 30분 스냅 절대시계분
+                const _bsMin2  = Math.min(...machines.map(m => _woGetMacStart(stateKey, m) ?? 480));
+                let dropMin = _bsMin2 + Math.round((dropY / PX) / 30) * 30;
                 while (_dExclZones.some(z => dropMin >= z.start && dropMin < z.end)) dropMin += 30;
-                dropMin = Math.max(0, dropMin);
+                dropMin = Math.max(_bsMin2, dropMin);
 
                 // 기존 배열 순서 유지 + 해당 카드 startMin만 갱신
                 const prevEntries = state[targetMachine]; // 이미 {cKey,startMin} 형식
