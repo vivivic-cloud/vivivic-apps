@@ -6464,14 +6464,13 @@
             // 긴 카드: 실제 소요분 × PX 비례 → 합리적 높이
             const PX_PER_MIN = 0.7;
 
-            // ── 기계별 타임라인: 기본 순서 누적, startMin 지정 카드만 절대 시간 고정
+            // ── 기계별 타임라인: 기본은 원래 순서 누적, startMin 지정 카드만 절대 시간 고정
             const macTimelines = {};
             machines.forEach(mac => {
-                const ms     = _woGetMacStart(sk, mac) ?? 60;
+                const ms      = _woGetMacStart(sk, mac) ?? 60;
                 let actualCur = ms;
                 let visualY   = ms * PX_PER_MIN;
                 const rawArr  = state[mac] || [];
-                // 정규화: string → {cKey, startMin:null}, {cKey,startSlot} → startMin:null(구형 무시)
                 const entries = rawArr.map(x => {
                     if (typeof x === 'string') return { cKey: x, startMin: null };
                     if (x.startMin != null)    return { cKey: x.cKey, startMin: x.startMin };
@@ -6485,17 +6484,30 @@
                     const _ckAct   = p ? p.cKey.substring((p.orderKey || '').length + 1) : '';
                     const _actPm   = _ordAct?.partCompletions?.[_ckAct]?.[_procKey]?.actualMinutes;
                     const pm       = p ? (_actPm ?? p.pm) : 0;
-                    // startMin 지정 → 절대 시간, 미지정 → 누적 배치
-                    const cStart   = entry.startMin != null ? entry.startMin : actualCur;
-                    const cEnd     = _woCalcEffectiveEnd(cStart, pm, exclZones);
-                    const effDur   = cEnd - cStart;
                     const cardMinH = (p && p.isCuttingCard) ? 80 : MIN_CARD_H;
-                    const visH     = Math.max(cardMinH, Math.round(effDur * PX_PER_MIN));
+
+                    let cStart, topPx;
+                    if (entry.startMin != null) {
+                        // ── 절대 시간 고정 (사용자가 직접 이동한 카드)
+                        cStart = entry.startMin;
+                        topPx  = Math.round(cStart * PX_PER_MIN);
+                    } else {
+                        // ── 순서 누적 배치 (기본 — 원래 방식)
+                        cStart = actualCur;
+                        topPx  = Math.round(visualY);
+                    }
+
+                    const cEnd   = _woCalcEffectiveEnd(cStart, pm, exclZones);
+                    const effDur = cEnd - cStart;
+                    const visH   = Math.max(cardMinH, Math.round(effDur * PX_PER_MIN));
                     tl.push({ cKey: entry.cKey, pm, clockStart: cStart, clockEnd: cEnd,
-                               topPx: Math.round(cStart * PX_PER_MIN), cardH: visH - GAP_PX });
-                    // 누적 기준 갱신 (고정 카드도 이후 순서 카드의 기준이 됨)
-                    actualCur = Math.max(actualCur, cEnd);
-                    visualY   = actualCur * PX_PER_MIN;
+                               topPx, cardH: visH - GAP_PX });
+
+                    if (entry.startMin == null) {
+                        // 누적 카드만 actualCur/visualY 갱신
+                        actualCur = cEnd;
+                        visualY  += visH;
+                    }
                 });
                 macTimelines[mac] = tl;
                 macTimelines[mac]._actEnd = actualCur;
