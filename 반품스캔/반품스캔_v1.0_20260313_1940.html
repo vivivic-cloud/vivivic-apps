@@ -476,11 +476,21 @@ const App = () => {
             const CHUNK = 500;
             const sdk = window.FirebaseSDK;
             const colRef = sdk.collection(db,'artifacts',appId,'public','data','cs_records');
-            for (let i = 0; i < dataRows.length; i += CHUNK) {
-                const chunk = dataRows.slice(i, i + CHUNK);
+            // 기존 CS번호 수집
+            const existingSnap = await sdk.getDocs(sdk.query(colRef));
+            const existingKeys = new Set();
+            existingSnap.forEach(d => {
+                try { JSON.parse(d.data().items.replace(/\bNaN\b/g,'null')).forEach(item => { if(item[0]) existingKeys.add(String(item[0]).trim()); }); } catch{}
+            });
+            // 중복 제외
+            const newRows = dataRows.filter(r => !existingKeys.has(String(r[0]||'').trim()) && String(r[0]||'').trim() !== '');
+            if (newRows.length === 0) { showToast('중복 없이 추가할 데이터가 없습니다'); return; }
+            for (let i = 0; i < newRows.length; i += CHUNK) {
+                const chunk = newRows.slice(i, i + CHUNK);
                 await sdk.addDoc(colRef, { items: JSON.stringify(chunk), updatedAt: new Date() });
             }
-            showToast(`${dataRows.length.toLocaleString()}건 저장 완료`);
+            const skipped = dataRows.length - newRows.length;
+            showToast(`${newRows.length.toLocaleString()}건 저장${skipped > 0 ? ` (중복 ${skipped}건 제외)` : ''}`);
         } catch(e) {
             console.error(e);
             showToast('파싱 오류: ' + e.message);
