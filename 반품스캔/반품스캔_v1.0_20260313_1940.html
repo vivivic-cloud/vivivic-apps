@@ -472,18 +472,24 @@ const App = () => {
             const ws = wb.Sheets[wb.SheetNames[0]];
             const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
             if (rows.length < 2) { showToast('데이터가 없습니다'); return; }
+            const headerRow = rows[0].map(h => String(h).trim());
+            const invoiceIdx = headerRow.findIndex(h => h === '송장번호');
+            if (invoiceIdx === -1) { showToast('송장번호 컬럼을 찾을 수 없습니다'); return; }
             const dataRows = rows.slice(1).filter(r => r.some(c => String(c).trim() !== ''));
             const CHUNK = 500;
             const sdk = window.FirebaseSDK;
             const colRef = sdk.collection(db,'artifacts',appId,'public','data','cs_records');
-            // 기존 CS번호 수집
+            // 기존 송장번호 수집
             const existingSnap = await sdk.getDocs(sdk.query(colRef));
             const existingKeys = new Set();
             existingSnap.forEach(d => {
-                try { JSON.parse(d.data().items.replace(/\bNaN\b/g,'null')).forEach(item => { if(item[0]) existingKeys.add(String(item[0]).trim()); }); } catch{}
+                try { JSON.parse(d.data().items.replace(/\bNaN\b/g,'null')).forEach(item => { if(item[invoiceIdx]) existingKeys.add(String(item[invoiceIdx]).trim()); }); } catch{}
             });
             // 중복 제외
-            const newRows = dataRows.filter(r => !existingKeys.has(String(r[0]||'').trim()) && String(r[0]||'').trim() !== '');
+            const newRows = dataRows.filter(r => {
+                const key = String(r[invoiceIdx]||'').trim();
+                return key !== '' && !existingKeys.has(key);
+            });
             if (newRows.length === 0) { showToast('중복 없이 추가할 데이터가 없습니다'); return; }
             for (let i = 0; i < newRows.length; i += CHUNK) {
                 const chunk = newRows.slice(i, i + CHUNK);
