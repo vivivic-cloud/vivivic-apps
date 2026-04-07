@@ -234,8 +234,13 @@ const firebaseConfig = {
     appId: "1:830175660542:web:9054030480c8280af8d8af"
 };
 
-const STANDARD_HEADERS = ['CS','생산처','수취인','상품명','옵션값','주소','배송사','주문등록일','입고확인','원주문 제품 (반품제품)','반품사유','회수날짜(물류사)','책임','2차보상 (입고상태)','처리내용','보상항목','판매가','보상비용','요율','처리상태','날짜','기타'];
-const TOGGLEABLE_HEADERS = ['생산처','수취인','상품명','옵션값','주소','배송사','주문등록일','입고확인','원주문 제품 (반품제품)'];
+const STANDARD_HEADERS = [
+  'CS','매출처','생산처','몰','수취인','전화','휴대전화','주문자','주문자휴대폰','주문번호',
+  '고유번호','배송번호','송장번호','배송상태','상품명','옵션값','수량','박스','권역','주소',
+  '배송사','선불비','착불비','제품비','주문등록일','입고확인','지정일','지사출발','지사도착','지방상태',
+  '지방일자','배송출발','배송완료일','회수','배송메세지','기사메모','메모','본사메모'
+];
+const TOGGLEABLE_HEADERS = ['매출처','생산처','상품명','옵션값','주소','배송사','주문등록일','입고확인','송장번호'];
 const PAGE_SIZE = 100;
 
 let _toastTimer = null;
@@ -382,13 +387,13 @@ const App = () => {
     const filteredData = useMemo(() => {
         let r = allRawData.filter(m =>
             String(m.data[0]||'').trim() !== '' &&
-            !['기사방문AS','선불정산용','비용보상'].includes(String(m.data[3]||'').replace(/\s+/g,''))
+            !['기사방문AS','선불정산용','비용보상'].includes(String(m.data[14]||'').replace(/\s+/g,''))
         );
         const from = dateFrom ? new Date(dateFrom) : null;
         const to   = dateTo   ? new Date(dateTo + 'T23:59:59') : null;
         if (from || to) {
             r = r.filter(m => {
-                const d = parseRowDate(m.data[7]);
+                const d = parseRowDate(m.data[24]);
                 if (!d) return true; // 날짜 파싱 불가 → 숨기지 않고 표시
                 if (from && d < from) return false;
                 if (to   && d > to)   return false;
@@ -405,10 +410,10 @@ const App = () => {
 
     const handleSearch = inv => {
         const cl = String(inv).trim(); if(!cl) return;
-        const found = allRawData.find(m=>String(m.data[22]||'')===cl||String(m.data[12]||'').includes(cl));
+        const found = allRawData.find(m=>String(m.data[12]||'').includes(cl));
         if (found) {
             setFieldFoundRow(found);
-            setFieldInputs({ recallDate:found.data[11]||'', secondComp:found.data[13]||'', compItem:found.data[15]||'', status:found.data[19]||'확인중', detail:found.data[14]||'', etc:found.data[21]||'' });
+            setFieldInputs({ recallDate:found.data[40]||'', secondComp:found.data[42]||'', compItem:found.data[44]||'', status:found.data[48]||'확인중', detail:found.data[43]||'', etc:found.data[49]||'' });
             setFieldCategory(''); setFieldSelectedParts([]);
         } else showToast('조회 결과 없음');
     };
@@ -442,8 +447,8 @@ const App = () => {
         if(!fieldFoundRow||!db) return;
         const docRef = window.FirebaseSDK.doc(db,'artifacts',appId,'public','data','cs_records',fieldFoundRow.docId);
         const snap=await window.FirebaseSDK.getDoc(docRef); const items=JSON.parse(snap.data().items); const i=fieldFoundRow.innerIndex;
-        items[i][11]=fieldInputs.recallDate; items[i][13]=fieldInputs.secondComp; items[i][14]=fieldInputs.detail;
-        items[i][15]=fieldInputs.compItem;  items[i][19]=fieldInputs.status;     items[i][21]=fieldInputs.etc;
+        items[i][40]=fieldInputs.recallDate; items[i][42]=fieldInputs.secondComp; items[i][43]=fieldInputs.detail;
+        items[i][44]=fieldInputs.compItem;  items[i][48]=fieldInputs.status;     items[i][49]=fieldInputs.etc;
         await window.FirebaseSDK.updateDoc(docRef,{items:JSON.stringify(items),updatedAt:new Date()});
         showToast('전송 완료'); setFieldFoundRow(null); setFieldInvoiceInput('');
     };
@@ -588,7 +593,7 @@ const App = () => {
                 <div style={{display:'flex',alignItems:'center',gap:18}}>
                     <div style={{fontSize:15,fontWeight:800,letterSpacing:'-0.02em'}}>
                         VIVIVIC <span style={{color:'var(--c-text-3)',fontWeight:500}}>Sync</span>
-                        <span style={{fontSize:9,color:'var(--c-text-3)',fontWeight:400,marginLeft:4}}>v1.0.8</span>
+                        <span style={{fontSize:9,color:'var(--c-text-3)',fontWeight:400,marginLeft:4}}>v1.0.9</span>
                     </div>
                     <div style={{display:'flex',gap:3,background:'var(--c-bg-3)',borderRadius:8,padding:3}}>
                         <button className={`page-tab ${activeTab==='table'?'active':''}`} onClick={()=>setActiveTab('table')}>CS 목록</button>
@@ -679,44 +684,19 @@ const App = () => {
                                 <table className="cs-table">
                                     <thead>
                                         <tr>
-                                            <th className="sticky-1">CS</th>
-                                            <th className="sticky-2">수취인</th>
-                                            <th className="sticky-3" style={{fontStyle:'italic',color:'var(--c-text)'}}>{activeSubHeader}</th>
-                                            {STANDARD_HEADERS.slice(10,22).map(h=><th key={h}>{h}</th>)}
+                                            {STANDARD_HEADERS.map((h,i)=>(
+                                                <th key={i}>{h}</th>
+                                            ))}
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {pagedData.length===0?(
-                                            <tr><td colSpan={15} style={{textAlign:'center',padding:48,color:'var(--c-text-3)',fontSize:13}}>데이터 없음</td></tr>
+                                            <tr><td colSpan={STANDARD_HEADERS.length} style={{textAlign:'center',padding:48,color:'var(--c-text-3)',fontSize:13}}>데이터 없음</td></tr>
                                         ):pagedData.map((m,i)=>(
                                             <tr key={i}>
-                                                <td className="sticky-1">{m.data[0]||'—'}</td>
-                                                <td className="sticky-2"
-                                                    onMouseEnter={e=>{const r=e.currentTarget.getBoundingClientRect();setSideTip({show:true,x:r.left,y:r.top,h:r.height,text:m.data[2]||''}); }}
-                                                    onMouseLeave={()=>setSideTip(p=>({...p,show:false}))}>
-                                                    {m.data[2]||'—'}
-                                                </td>
-                                                <td className="sticky-3"
-                                                    onMouseEnter={e=>{const r=e.currentTarget.getBoundingClientRect();setSideTip({show:true,x:r.left,y:r.top,h:r.height,text:m.data[STANDARD_HEADERS.indexOf(activeSubHeader)]||''}); }}
-                                                    onMouseLeave={()=>setSideTip(p=>({...p,show:false}))}>
-                                                    {m.data[STANDARD_HEADERS.indexOf(activeSubHeader)]||'—'}
-                                                </td>
-                                                {STANDARD_HEADERS.slice(10,22).map((_,idx)=>{
-                                                    const ri=idx+10;
-                                                    if(ri===19) return <td key={ri}><StatusBadge val={m.data[ri]}/></td>;
-                                                    if(ri===12||ri===13) return <td key={ri} className="col-action" onClick={e=>openPopover(e,ri===12?'resp':'comp',m)}>{m.data[ri]||<span style={{color:'var(--c-text-3)'}}>—</span>}</td>;
-                                                    if(ri===10) return (
-                                                        <td key={ri} style={{maxWidth:140,overflow:'hidden',textOverflow:'ellipsis',cursor:'default'}}
-                                                            onMouseEnter={e=>{
-                                                                const r=e.currentTarget.getBoundingClientRect();
-                                                                setSideTip({show:true, x:r.left, y:r.top, h:r.height, text:m.data[ri]||''});
-                                                            }}
-                                                            onMouseLeave={()=>setSideTip(p=>({...p,show:false}))}>
-                                                            {m.data[ri]||'—'}
-                                                        </td>
-                                                    );
-                                                    return <td key={ri}>{m.data[ri]||'—'}</td>;
-                                                })}
+                                                {STANDARD_HEADERS.map((_,ri)=>(
+                                                    <td key={ri}>{m.data[ri]||'—'}</td>
+                                                ))}
                                             </tr>
                                         ))}
                                     </tbody>
