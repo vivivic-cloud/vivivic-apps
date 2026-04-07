@@ -238,11 +238,11 @@ const STANDARD_HEADERS = ['CS','생산처','수취인','상품명','옵션값','
 const TOGGLEABLE_HEADERS = ['생산처','수취인','상품명','옵션값','주소','배송사','주문등록일','입고확인','원주문 제품 (반품제품)'];
 const PAGE_SIZE = 100;
 
-const showToast = (msg) => {
+const showToast = (msg, duration = 2200) => {
     const el = document.getElementById('toast');
     if (!el) return;
     el.textContent = msg; el.classList.add('show');
-    setTimeout(() => el.classList.remove('show'), 2200);
+    setTimeout(() => el.classList.remove('show'), duration);
 };
 
 const Icon = ({ name, size = 14 }) => {
@@ -496,7 +496,10 @@ const App = () => {
                 await sdk.addDoc(colRef, { items: JSON.stringify(chunk), updatedAt: new Date() });
             }
             const skipped = dataRows.length - newRows.length;
-            showToast(`${newRows.length.toLocaleString()}건 저장${skipped > 0 ? ` (중복 ${skipped}건 제외)` : ''}`);
+            const msg = skipped > 0
+                ? `${newRows.length.toLocaleString()}건 저장 / 중복 ${skipped.toLocaleString()}건은 업로드하지 않았습니다`
+                : `${newRows.length.toLocaleString()}건 저장 완료`;
+            showToast(msg, skipped > 0 ? 5000 : 2200);
         } catch(e) {
             console.error(e);
             showToast('파싱 오류: ' + e.message);
