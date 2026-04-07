@@ -10,6 +10,7 @@
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://unpkg.com/html5-qrcode"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
@@ -216,9 +217,9 @@ body {
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
 import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-import { getFirestore, collection, onSnapshot, doc, getDoc, updateDoc, writeBatch, query, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+import { getFirestore, collection, onSnapshot, doc, getDoc, updateDoc, writeBatch, query, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { getStorage, ref, uploadBytesResumable, listAll, deleteObject } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js";
-window.FirebaseSDK = { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, getFirestore, collection, onSnapshot, doc, getDoc, updateDoc, writeBatch, query, getDocs, getStorage, ref, uploadBytesResumable, listAll, deleteObject };
+window.FirebaseSDK = { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, getFirestore, collection, onSnapshot, doc, getDoc, updateDoc, writeBatch, query, getDocs, addDoc, getStorage, ref, uploadBytesResumable, listAll, deleteObject };
 window.dispatchEvent(new Event('firebase-ready'));
 </script>
 
@@ -462,6 +463,34 @@ const App = () => {
         window.FirebaseSDK.uploadBytesResumable(r,file).on('state_changed',null,null,()=>showToast('업로드 완료'));
     };
 
+    const uploadCSFile = async (file) => {
+        if (!file || !db) { showToast('연결 대기 중입니다'); return; }
+        showToast('파일 읽는 중…');
+        try {
+            const buf = await file.arrayBuffer();
+            const wb = XLSX.read(buf, { type:'array', cellDates:true });
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(ws, { header:1, defval:'' });
+            if (rows.length < 2) { showToast('데이터가 없습니다'); return; }
+            const dataRows = rows.slice(1).filter(r => r.some(c => String(c).trim() !== ''));
+            const CHUNK = 500;
+            const sdk = window.FirebaseSDK;
+            const existing = await sdk.getDocs(sdk.query(sdk.collection(db,'artifacts',appId,'public','data','cs_records')));
+            const delBatch = sdk.writeBatch(db);
+            existing.forEach(d => delBatch.delete(d.ref));
+            await delBatch.commit();
+            const colRef = sdk.collection(db,'artifacts',appId,'public','data','cs_records');
+            for (let i = 0; i < dataRows.length; i += CHUNK) {
+                const chunk = dataRows.slice(i, i + CHUNK);
+                await sdk.addDoc(colRef, { items: JSON.stringify(chunk), updatedAt: new Date() });
+            }
+            showToast(`${dataRows.length.toLocaleString()}건 저장 완료`);
+        } catch(e) {
+            console.error(e);
+            showToast('파싱 오류: ' + e.message);
+        }
+    };
+
     return (
         <div style={{minHeight:'100vh',display:'flex',flexDirection:'column'}}>
 
@@ -560,7 +589,7 @@ const App = () => {
                     <button className="btn btn-icon" title="제품 초기화" onClick={()=>setShowProdDelete(true)} style={{color:'#1e40af'}}><Icon name="Trash"/></button>
                     <label className="upload-label upload-cs">
                         <Icon name="Upload"/> CS 업로드
-                        <input type="file" style={{display:'none'}} onChange={e=>{uploadFile('raw_uploads',e.target.files[0]);e.target.value='';}}/>
+                        <input type="file" accept=".xlsx,.xls,.csv" style={{display:'none'}} onChange={e=>{uploadCSFile(e.target.files[0]);e.target.value='';}}/>
                     </label>
                     <button className="btn btn-icon" title="CS 초기화" onClick={()=>setShowCSDelete(true)} style={{color:'#c0392b'}}><Icon name="Trash"/></button>
                 </div>
