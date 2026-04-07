@@ -296,6 +296,12 @@ const App = () => {
     const [dateTo,   setDateTo]   = useState(() => getDefault3Months().to);
     const [activeSubHeader, setActiveSubHeader]   = useState('상품명');
     const [currentPage, setCurrentPage]           = useState(1);
+    const [sortCol, setSortCol] = useState(null);
+    const [sortDir, setSortDir] = useState('asc');
+    const handleSortCol = (idx) => {
+        if (sortCol === idx) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+        else { setSortCol(idx); setSortDir('asc'); }
+    };
     const [fieldInvoiceInput, setFieldInvoiceInput] = useState('');
     const [fieldFoundRow, setFieldFoundRow]         = useState(null);
     const [fieldCategory, setFieldCategory]         = useState('');
@@ -401,8 +407,17 @@ const App = () => {
             });
         }
         if (searchTerm) { const lo=searchTerm.toLowerCase(); r=r.filter(m=>m.data.some(c=>String(c).toLowerCase().includes(lo))); }
+        if (sortCol !== null) {
+            r = [...r].sort((a, b) => {
+                const av = String(a.data[sortCol]||'');
+                const bv = String(b.data[sortCol]||'');
+                const an = parseFloat(av), bn = parseFloat(bv);
+                const cmp = (!isNaN(an) && !isNaN(bn)) ? an - bn : av.localeCompare(bv, 'ko');
+                return sortDir === 'asc' ? cmp : -cmp;
+            });
+        }
         return r;
-    }, [allRawData, dateFrom, dateTo, searchTerm]);
+    }, [allRawData, dateFrom, dateTo, searchTerm, sortCol, sortDir]);
 
     const totalPages = Math.max(1, Math.ceil(filteredData.length/PAGE_SIZE));
     const pagedData  = useMemo(()=>filteredData.slice((currentPage-1)*PAGE_SIZE, currentPage*PAGE_SIZE),[filteredData,currentPage]);
@@ -593,7 +608,7 @@ const App = () => {
                 <div style={{display:'flex',alignItems:'center',gap:18}}>
                     <div style={{fontSize:15,fontWeight:800,letterSpacing:'-0.02em'}}>
                         VIVIVIC <span style={{color:'var(--c-text-3)',fontWeight:500}}>Sync</span>
-                        <span style={{fontSize:9,color:'var(--c-text-3)',fontWeight:400,marginLeft:4}}>v1.0.9</span>
+                        <span style={{fontSize:9,color:'var(--c-text-3)',fontWeight:400,marginLeft:4}}>v1.0.10</span>
                     </div>
                     <div style={{display:'flex',gap:3,background:'var(--c-bg-3)',borderRadius:8,padding:3}}>
                         <button className={`page-tab ${activeTab==='table'?'active':''}`} onClick={()=>setActiveTab('table')}>CS 목록</button>
@@ -685,7 +700,15 @@ const App = () => {
                                     <thead>
                                         <tr>
                                             {STANDARD_HEADERS.map((h,i)=>(
-                                                <th key={i}>{h}</th>
+                                                <th key={i}
+                                                    onClick={()=>handleSortCol(i)}
+                                                    style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap',
+                                                        background: sortCol===i ? 'var(--c-bg-3)' : undefined}}>
+                                                    {h}
+                                                    {sortCol===i
+                                                        ? <span style={{marginLeft:4,fontSize:10}}>{sortDir==='asc'?'▲':'▼'}</span>
+                                                        : <span style={{marginLeft:4,fontSize:10,color:'var(--c-text-3)',opacity:0.4}}>⇅</span>}
+                                                </th>
                                             ))}
                                         </tr>
                                     </thead>
