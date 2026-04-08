@@ -620,11 +620,12 @@ const App = () => {
                 <div style={{display:'flex',alignItems:'center',gap:18}}>
                     <div style={{fontSize:15,fontWeight:800,letterSpacing:'-0.02em'}}>
                         VIVIVIC <span style={{color:'var(--c-text-3)',fontWeight:500}}>Sync</span>
-                        <span style={{fontSize:9,color:'var(--c-text-3)',fontWeight:400,marginLeft:4}}>v1.0.13</span>
+                        <span style={{fontSize:9,color:'var(--c-text-3)',fontWeight:400,marginLeft:4}}>v1.0.14</span>
                     </div>
                     <div style={{display:'flex',gap:3,background:'var(--c-bg-3)',borderRadius:8,padding:3}}>
                         <button className={`page-tab ${activeTab==='table'?'active':''}`} onClick={()=>setActiveTab('table')}>CS 목록</button>
                         <button className={`page-tab ${activeTab==='field'?'active':''}`} onClick={()=>setActiveTab('field')}>Field 관리</button>
+                        <button className={`page-tab ${activeTab==='done'?'active':''}`} onClick={()=>setActiveTab('done')}>처리 완료</button>
                     </div>
                     <span style={{fontSize:11,color:'var(--c-text-3)',fontWeight:500}}>{status}</span>
                 </div>
@@ -759,6 +760,57 @@ const App = () => {
                 )}
 
                 {/* FIELD */}
+                {activeTab==='done' && (
+                    <Fragment>
+                        {(() => {
+                            const MGMT_COLS = [
+                                {idx:40, label:'회수날짜'},
+                                {idx:42, label:'2차보상'},
+                                {idx:43, label:'처리내용'},
+                                {idx:44, label:'보상항목'},
+                                {idx:48, label:'처리상태'},
+                                {idx:49, label:'기타'},
+                            ];
+                            const doneData = allRawData.filter(m =>
+                                MGMT_COLS.some(c => String(m.data[c.idx]||'').trim() !== '')
+                            );
+                            return (
+                                <div className="notion-card" style={{overflow:'hidden'}}>
+                                    <div style={{padding:'12px 16px',borderBottom:'1px solid var(--c-border)',fontSize:11,color:'var(--c-text-3)',fontWeight:600}}>
+                                        처리 완료 {doneData.length.toLocaleString()}건
+                                    </div>
+                                    <div className="custom-scrollbar" style={{overflowX:'auto',overflowY:'auto',maxHeight:620}}>
+                                        <table className="cs-table">
+                                            <thead>
+                                                <tr>
+                                                    {STANDARD_HEADERS.map((h,i)=><th key={i}>{h}</th>)}
+                                                    {MGMT_COLS.map(c=><th key={c.idx} style={{background:'#f0f4ff',color:'#1e40af'}}>{c.label}</th>)}
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {doneData.length===0?(
+                                                    <tr><td colSpan={STANDARD_HEADERS.length+MGMT_COLS.length} style={{textAlign:'center',padding:48,color:'var(--c-text-3)',fontSize:13}}>처리 완료된 데이터 없음</td></tr>
+                                                ):doneData.map((m,i)=>(
+                                                    <tr key={i}>
+                                                        {DISPLAY_IDX.map(ri=><td key={ri}>{m.data[ri]||'—'}</td>)}
+                                                        {MGMT_COLS.map(c=>(
+                                                            <td key={c.idx} style={{background:'#f8faff'}}>
+                                                                {c.idx===48
+                                                                    ? <StatusBadge val={m.data[c.idx]}/>
+                                                                    : m.data[c.idx]||'—'}
+                                                            </td>
+                                                        ))}
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                    </Fragment>
+                )}
+
                 {activeTab==='field' && (
                     <div className="field-section">
                         {/* Section header + search */}
