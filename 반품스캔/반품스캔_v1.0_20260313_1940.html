@@ -442,10 +442,24 @@ const App = () => {
     const startScanner = async () => {
         const qr = new window.Html5Qrcode("qr-reader-target");
         scannerRef.current = qr; setIsScanning(true);
-        try { await qr.start({facingMode:"environment"},{fps:15,qrbox:220},text=>{handleSearch(text);stopScanner();}); }
-        catch { setIsScanning(false); }
+        const config = { fps:10, qrbox:{width:280, height:120}, aspectRatio:2.0 };
+        const onScan = text => { handleSearch(text); stopScanner(); };
+        try {
+            await qr.start({ facingMode: { exact: "environment" } }, config, onScan);
+        } catch {
+            try {
+                await qr.start({ facingMode: "environment" }, config, onScan);
+            } catch {
+                try {
+                    await qr.start({ facingMode: "user" }, config, onScan);
+                } catch(e) {
+                    setIsScanning(false);
+                    showToast('카메라를 시작할 수 없습니다.\n브라우저 카메라 권한을 확인하세요.', 5000);
+                }
+            }
+        }
     };
-    const stopScanner = async () => { if(scannerRef.current){await scannerRef.current.stop();scannerRef.current=null;} setIsScanning(false); };
+    const stopScanner = async () => { if(scannerRef.current){try{await scannerRef.current.stop();}catch{}scannerRef.current=null;} setIsScanning(false); };
 
     const openPopover = (e, mode, row, text='') => {
         const r = e.currentTarget.getBoundingClientRect();
@@ -620,7 +634,7 @@ const App = () => {
                 <div style={{display:'flex',alignItems:'center',gap:18}}>
                     <div style={{fontSize:15,fontWeight:800,letterSpacing:'-0.02em'}}>
                         VIVIVIC <span style={{color:'var(--c-text-3)',fontWeight:500}}>Sync</span>
-                        <span style={{fontSize:9,color:'var(--c-text-3)',fontWeight:400,marginLeft:4}}>v1.0.14</span>
+                        <span style={{fontSize:9,color:'var(--c-text-3)',fontWeight:400,marginLeft:4}}>v1.0.15</span>
                     </div>
                     <div style={{display:'flex',gap:3,background:'var(--c-bg-3)',borderRadius:8,padding:3}}>
                         <button className={`page-tab ${activeTab==='table'?'active':''}`} onClick={()=>setActiveTab('table')}>CS 목록</button>
