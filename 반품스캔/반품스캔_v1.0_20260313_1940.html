@@ -440,24 +440,67 @@ const App = () => {
     };
 
     const [scanError, setScanError] = useState('');
+    const [scanEngine, setScanEngine] = useState('');
+    const rafRef = useRef(null);
+    const videoRef = useRef(null);
+
+    const stopScanner = async () => {
+        if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+        if (videoRef.current) { videoRef.current.srcObject?.getTracks().forEach(t=>t.stop()); videoRef.current = null; }
+        if (scannerRef.current) { try { await scannerRef.current.stop(); } catch{} scannerRef.current = null; }
+        setIsScanning(false); setScanEngine('');
+        const el = document.getElementById('qr-reader-target');
+        if (el) el.innerHTML = '';
+    };
+
     const startScanner = async () => {
-        setScanError('');
-        setIsScanning(true);
-        const config = { fps:15, qrbox:{width:240, height:100} };
-        const onScan = text => { handleSearch(text); stopScanner(); };
+        setScanError(''); setIsScanning(true);
+        const onFound = text => { handleSearch(text); stopScanner(); };
+
+        // ── 방법 A: BarcodeDetector API (네이티브, 빠름) ──
+        if ('BarcodeDetector' in window) {
+            try {
+                const formats = ['code_128','code_39','ean_13','ean_8','qr_code','data_matrix','itf','codabar'];
+                const supported = await window.BarcodeDetector.getSupportedFormats().catch(()=>formats);
+                const detector = new window.BarcodeDetector({ formats: supported.filter(f=>formats.includes(f)) });
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+                });
+                const container = document.getElementById('qr-reader-target');
+                const video = document.createElement('video');
+                video.srcObject = stream; video.setAttribute('playsinline',''); video.setAttribute('autoplay','');
+                video.style.cssText = 'width:100%;border-radius:6px;';
+                container.appendChild(video);
+                videoRef.current = video;
+                await video.play();
+                setScanEngine('네이티브');
+                const scan = async () => {
+                    if (!videoRef.current) return;
+                    try {
+                        const results = await detector.detect(video);
+                        if (results.length > 0) { onFound(results[0].rawValue); return; }
+                    } catch {}
+                    rafRef.current = requestAnimationFrame(scan);
+                };
+                rafRef.current = requestAnimationFrame(scan);
+                return;
+            } catch(e) { /* fallback */ }
+        }
+
+        // ── 방법 B: html5-qrcode (범용 fallback) ──
         try {
             const devices = await window.Html5Qrcode.getCameras();
             if (!devices || devices.length === 0) throw new Error('카메라를 찾을 수 없습니다');
-            const rear = devices.find(d => /back|rear|environ/i.test(d.label)) || devices[devices.length - 1];
+            const rear = devices.find(d => /back|rear|environ/i.test(d.label)) || devices[devices.length-1];
             const qr = new window.Html5Qrcode("qr-reader-target");
             scannerRef.current = qr;
-            await qr.start(rear.id, config, onScan, ()=>{});
+            await qr.start(rear.id, { fps:15, qrbox:{width:240,height:100} }, onFound, ()=>{});
+            setScanEngine('범용');
         } catch(e) {
             setIsScanning(false);
             setScanError(e?.message || '카메라 오류');
         }
     };
-    const stopScanner = async () => { if(scannerRef.current){try{await scannerRef.current.stop();}catch{}scannerRef.current=null;} setIsScanning(false); };
 
     const openPopover = (e, mode, row, text='') => {
         const r = e.currentTarget.getBoundingClientRect();
@@ -633,7 +676,7 @@ const App = () => {
                 <div style={{display:'flex',alignItems:'center',gap:18}}>
                     <div style={{fontSize:15,fontWeight:800,letterSpacing:'-0.02em'}}>
                         VIVIVIC <span style={{color:'var(--c-text-3)',fontWeight:500}}>Sync</span>
-                        <span style={{fontSize:9,color:'var(--c-text-3)',fontWeight:400,marginLeft:4}}>v1.0.17</span>
+                        <span style={{fontSize:9,color:'var(--c-text-3)',fontWeight:400,marginLeft:4}}>v1.0.18</span>
                     </div>
                     <div style={{display:'flex',gap:3,background:'var(--c-bg-3)',borderRadius:8,padding:3}}>
                         <button className={`page-tab ${activeTab==='table'?'active':''}`} onClick={()=>setActiveTab('table')}>CS 목록</button>
@@ -847,7 +890,10 @@ const App = () => {
                                         <Icon name="Camera" size={15}/> 카메라 스캔 시작
                                     </button>
                                 ):(
-                                    <button className="btn btn-secondary" onClick={stopScanner}><Icon name="X"/> 중지</button>
+                                    <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:6}}>
+                                        {scanEngine&&<span style={{fontSize:10,fontWeight:600,color:'#27ae60',background:'#eafaf1',borderRadius:4,padding:'2px 8px'}}>● {scanEngine} 엔진 활성</span>}
+                                        <button className="btn btn-secondary" onClick={stopScanner}><Icon name="X"/> 중지</button>
+                                    </div>
                                 )}
                                 <p style={{fontSize:11,color:'var(--c-text-3)',margin:0}}>QR 코드 또는 바코드를 카메라 앞에 위치시키세요</p>
                                 {scanError&&<p style={{fontSize:11,color:'#c0392b',margin:0,fontWeight:600,textAlign:'center'}}>⚠️ {scanError}</p>}
