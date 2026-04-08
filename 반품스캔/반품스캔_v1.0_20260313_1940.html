@@ -234,16 +234,18 @@ const firebaseConfig = {
     appId: "1:830175660542:web:9054030480c8280af8d8af"
 };
 
-// 개인정보 컬럼(매출처1,전화5,휴대전화6,주문자휴대폰8,배송번호11)은 표시/저장 제외
-const PRIVATE_COL_IDX = new Set([1,5,6,8,11]);
+// 제외 컬럼 (저장/표시 모두 제외)
+// 개인정보: 매출처1,전화5,휴대전화6,주문자휴대폰8,배송번호11
+// 불필요: 고유번호10,제품비23,지정일26,지방상태29,지방일자30,기사메모35,본사메모37
+const PRIVATE_COL_IDX = new Set([1,5,6,8,10,11,23,26,29,30,35,37]);
 const STANDARD_HEADERS = [
   'CS','매출처','생산처','몰','수취인','전화','휴대전화','주문자','주문자휴대폰','주문번호',
   '고유번호','배송번호','송장번호','배송상태','상품명','옵션값','수량','박스','권역','주소',
   '배송사','선불비','착불비','제품비','주문등록일','입고확인','지정일','지사출발','지사도착','지방상태',
   '지방일자','배송출발','배송완료일','회수','배송메세지','기사메모','메모','본사메모'
 ].filter((_,i) => !PRIVATE_COL_IDX.has(i));
-// 표시용 인덱스 매핑 (원본 인덱스 → 저장 배열 내 위치 동일, 빈값으로 저장됨)
-const DISPLAY_IDX = [0,2,3,4,7,9,10,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37];
+// 표시용 원본 인덱스 목록
+const DISPLAY_IDX = [0,2,3,4,7,9,12,13,14,15,16,17,18,19,20,21,22,24,25,27,28,31,32,33,34,36];
 const TOGGLEABLE_HEADERS = ['매출처','생산처','상품명','옵션값','주소','배송사','주문등록일','입고확인','송장번호'];
 const PAGE_SIZE = 100;
 
@@ -511,8 +513,8 @@ const App = () => {
             existingSnap.forEach(d => {
                 try { JSON.parse(d.data().items.replace(/\bNaN\b/g,'null')).forEach(item => { if(item[invoiceIdx]) existingKeys.add(String(item[invoiceIdx]).trim()); }); } catch{}
             });
-            // 개인정보 컬럼 제거 (저장 전 완전 삭제)
-            const PRIVATE_COLS = [1,5,6,8,11]; // 매출처,전화,휴대전화,주문자휴대폰,배송번호
+            // 제외 컬럼 저장 전 완전 삭제 (개인정보 + 불필요 컬럼)
+            const PRIVATE_COLS = [1,5,6,8,10,11,23,26,29,30,35,37];
             // 중복 제외
             const newRows = dataRows.filter(r => {
                 const key = String(r[invoiceIdx]||'').trim();
@@ -618,7 +620,7 @@ const App = () => {
                 <div style={{display:'flex',alignItems:'center',gap:18}}>
                     <div style={{fontSize:15,fontWeight:800,letterSpacing:'-0.02em'}}>
                         VIVIVIC <span style={{color:'var(--c-text-3)',fontWeight:500}}>Sync</span>
-                        <span style={{fontSize:9,color:'var(--c-text-3)',fontWeight:400,marginLeft:4}}>v1.0.12</span>
+                        <span style={{fontSize:9,color:'var(--c-text-3)',fontWeight:400,marginLeft:4}}>v1.0.13</span>
                     </div>
                     <div style={{display:'flex',gap:3,background:'var(--c-bg-3)',borderRadius:8,padding:3}}>
                         <button className={`page-tab ${activeTab==='table'?'active':''}`} onClick={()=>setActiveTab('table')}>CS 목록</button>
