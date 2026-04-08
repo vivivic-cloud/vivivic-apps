@@ -566,6 +566,14 @@ const App = () => {
             });
             // 제외 컬럼 저장 전 완전 삭제 (개인정보 + 불필요 컬럼)
             const PRIVATE_COLS = [1,5,6,8,10,11,23,26,29,30,35,37];
+            // 주소(index 19) → 읍/면/동 단위까지만 저장
+            const truncateAddr = (addr) => {
+                if (!addr) return addr;
+                const tokens = String(addr).trim().split(/\s+/);
+                let lastIdx = -1;
+                tokens.forEach((t, i) => { if (/[읍면동]$/.test(t)) lastIdx = i; });
+                return lastIdx >= 0 ? tokens.slice(0, lastIdx + 1).join(' ') : addr;
+            };
             // 중복 제외
             const newRows = dataRows.filter(r => {
                 const key = String(r[invoiceIdx]||'').trim();
@@ -573,6 +581,7 @@ const App = () => {
             }).map(r => {
                 const row = [...r];
                 PRIVATE_COLS.forEach(i => { row[i] = ''; });
+                row[19] = truncateAddr(row[19]); // 주소: 읍/면/동까지만
                 return row;
             });
             if (newRows.length === 0) { showToast(`총 ${dataRows.length.toLocaleString()}건 중 ${dataRows.length.toLocaleString()}건이 중복으로 업로드되지 않았습니다`, 8000); return; }
@@ -671,7 +680,7 @@ const App = () => {
                 <div style={{display:'flex',alignItems:'center',gap:18}}>
                     <div style={{fontSize:15,fontWeight:800,letterSpacing:'-0.02em'}}>
                         VIVIVIC <span style={{color:'var(--c-text-3)',fontWeight:500}}>Sync</span>
-                        <span style={{fontSize:9,color:'var(--c-text-3)',fontWeight:400,marginLeft:4}}>v1.0.19</span>
+                        <span style={{fontSize:9,color:'var(--c-text-3)',fontWeight:400,marginLeft:4}}>v1.0.20</span>
                     </div>
                     <div style={{display:'flex',gap:3,background:'var(--c-bg-3)',borderRadius:8,padding:3}}>
                         <button className={`page-tab ${activeTab==='table'?'active':''}`} onClick={()=>setActiveTab('table')}>CS 목록</button>
