@@ -193,7 +193,7 @@ body {
     border-radius: 12px; padding: 40px 24px;
     display: flex; flex-direction: column; align-items: center; gap: 16px;
 }
-#qr-reader-target { width: 100%; max-width: 260px; border-radius: 8px; overflow: hidden; border: 1px solid var(--c-border); }
+#qr-reader-target { width: 100%; max-width: 360px; border-radius: 8px; overflow: hidden; border: 1px solid var(--c-border); }
 .field-label { font-size: 9px; font-weight: 700; color: var(--c-text-3); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 3px; }
 .field-value { font-size: 13px; font-weight: 600; color: var(--c-text); }
 
@@ -439,24 +439,22 @@ const App = () => {
         } else showToast('조회 결과 없음');
     };
 
+    const [scanError, setScanError] = useState('');
     const startScanner = async () => {
-        const qr = new window.Html5Qrcode("qr-reader-target");
-        scannerRef.current = qr; setIsScanning(true);
-        const config = { fps:10, qrbox:{width:280, height:120}, aspectRatio:2.0 };
+        setScanError('');
+        setIsScanning(true);
+        const config = { fps:15, qrbox:{width:240, height:100} };
         const onScan = text => { handleSearch(text); stopScanner(); };
         try {
-            await qr.start({ facingMode: { exact: "environment" } }, config, onScan);
-        } catch {
-            try {
-                await qr.start({ facingMode: "environment" }, config, onScan);
-            } catch {
-                try {
-                    await qr.start({ facingMode: "user" }, config, onScan);
-                } catch(e) {
-                    setIsScanning(false);
-                    showToast('카메라를 시작할 수 없습니다.\n브라우저 카메라 권한을 확인하세요.', 5000);
-                }
-            }
+            const devices = await window.Html5Qrcode.getCameras();
+            if (!devices || devices.length === 0) throw new Error('카메라를 찾을 수 없습니다');
+            const rear = devices.find(d => /back|rear|environ/i.test(d.label)) || devices[devices.length - 1];
+            const qr = new window.Html5Qrcode("qr-reader-target");
+            scannerRef.current = qr;
+            await qr.start(rear.id, config, onScan, ()=>{});
+        } catch(e) {
+            setIsScanning(false);
+            setScanError(e?.message || '카메라 오류');
         }
     };
     const stopScanner = async () => { if(scannerRef.current){try{await scannerRef.current.stop();}catch{}scannerRef.current=null;} setIsScanning(false); };
@@ -635,7 +633,7 @@ const App = () => {
                 <div style={{display:'flex',alignItems:'center',gap:18}}>
                     <div style={{fontSize:15,fontWeight:800,letterSpacing:'-0.02em'}}>
                         VIVIVIC <span style={{color:'var(--c-text-3)',fontWeight:500}}>Sync</span>
-                        <span style={{fontSize:9,color:'var(--c-text-3)',fontWeight:400,marginLeft:4}}>v1.0.16</span>
+                        <span style={{fontSize:9,color:'var(--c-text-3)',fontWeight:400,marginLeft:4}}>v1.0.17</span>
                     </div>
                     <div style={{display:'flex',gap:3,background:'var(--c-bg-3)',borderRadius:8,padding:3}}>
                         <button className={`page-tab ${activeTab==='table'?'active':''}`} onClick={()=>setActiveTab('table')}>CS 목록</button>
@@ -852,6 +850,7 @@ const App = () => {
                                     <button className="btn btn-secondary" onClick={stopScanner}><Icon name="X"/> 중지</button>
                                 )}
                                 <p style={{fontSize:11,color:'var(--c-text-3)',margin:0}}>QR 코드 또는 바코드를 카메라 앞에 위치시키세요</p>
+                                {scanError&&<p style={{fontSize:11,color:'#c0392b',margin:0,fontWeight:600,textAlign:'center'}}>⚠️ {scanError}</p>}
                             </div>
                         )}
 
