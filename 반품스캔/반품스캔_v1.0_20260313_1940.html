@@ -484,6 +484,7 @@ const App = () => {
         const snap=await window.FirebaseSDK.getDoc(docRef); const items=JSON.parse(snap.data().items); const i=fieldFoundRow.innerIndex;
         items[i][40]=fieldInputs.recallDate; items[i][42]=fieldInputs.secondComp; items[i][43]=fieldInputs.detail;
         items[i][44]=fieldInputs.compItem;  items[i][48]=fieldInputs.status;     items[i][49]=fieldInputs.etc;
+        items[i][50]='저장완료'; // 처리 완료 탭 필터 마커
         await window.FirebaseSDK.updateDoc(docRef,{items:JSON.stringify(items),updatedAt:new Date()});
         showToast('전송 완료'); setFieldFoundRow(null); setFieldInvoiceInput('');
     };
@@ -517,7 +518,7 @@ const App = () => {
             const headerRow = rows[0].map(h => String(h).trim());
             const invoiceIdx = headerRow.findIndex(h => h === '송장번호');
             if (invoiceIdx === -1) { showToast('송장번호 컬럼을 찾을 수 없습니다'); return; }
-            const dataRows = rows.slice(1).filter(r => r.some(c => String(c).trim() !== ''));
+            const dataRows = rows.slice(1).filter(r => r.some(c => String(c).trim() !== '')).map(r => r.slice(0, 38));
             const CHUNK = 500;
             const sdk = window.FirebaseSDK;
             const colRef = sdk.collection(db,'artifacts',appId,'public','data','cs_records');
@@ -634,7 +635,7 @@ const App = () => {
                 <div style={{display:'flex',alignItems:'center',gap:18}}>
                     <div style={{fontSize:15,fontWeight:800,letterSpacing:'-0.02em'}}>
                         VIVIVIC <span style={{color:'var(--c-text-3)',fontWeight:500}}>Sync</span>
-                        <span style={{fontSize:9,color:'var(--c-text-3)',fontWeight:400,marginLeft:4}}>v1.0.15</span>
+                        <span style={{fontSize:9,color:'var(--c-text-3)',fontWeight:400,marginLeft:4}}>v1.0.16</span>
                     </div>
                     <div style={{display:'flex',gap:3,background:'var(--c-bg-3)',borderRadius:8,padding:3}}>
                         <button className={`page-tab ${activeTab==='table'?'active':''}`} onClick={()=>setActiveTab('table')}>CS 목록</button>
@@ -785,9 +786,7 @@ const App = () => {
                                 {idx:48, label:'처리상태'},
                                 {idx:49, label:'기타'},
                             ];
-                            const doneData = allRawData.filter(m =>
-                                MGMT_COLS.some(c => String(m.data[c.idx]||'').trim() !== '')
-                            );
+                            const doneData = allRawData.filter(m => m.data[50] === '저장완료');
                             return (
                                 <div className="notion-card" style={{overflow:'hidden'}}>
                                     <div style={{padding:'12px 16px',borderBottom:'1px solid var(--c-border)',fontSize:11,color:'var(--c-text-3)',fontWeight:600}}>
