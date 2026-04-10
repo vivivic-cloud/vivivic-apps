@@ -303,6 +303,12 @@ const App = () => {
         if (sortCol === idx) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
         else { setSortCol(idx); setSortDir('asc'); }
     };
+    const [sunboSortCol, setSunboSortCol] = useState(null);
+    const [sunboSortDir, setSunboSortDir] = useState('asc');
+    const handleSunboSortCol = (idx) => {
+        if (sunboSortCol === idx) setSunboSortDir(d => d === 'asc' ? 'desc' : 'asc');
+        else { setSunboSortCol(idx); setSunboSortDir('asc'); }
+    };
     const [fieldInvoiceInput, setFieldInvoiceInput] = useState('');
     const [fieldFoundRow, setFieldFoundRow]         = useState(null);
     const [fieldCategory, setFieldCategory]         = useState('');
@@ -688,7 +694,7 @@ const App = () => {
                 <div style={{display:'flex',alignItems:'center',gap:18}}>
                     <div style={{fontSize:15,fontWeight:800,letterSpacing:'-0.02em'}}>
                         VIVIVIC <span style={{color:'var(--c-text-3)',fontWeight:500}}>Sync</span>
-                        <span style={{fontSize:9,color:'var(--c-text-3)',fontWeight:400,marginLeft:4}}>v1.0.24</span>
+                        <span style={{fontSize:9,color:'var(--c-text-3)',fontWeight:400,marginLeft:4}}>v1.0.25</span>
                     </div>
                     <div style={{display:'flex',gap:3,background:'var(--c-bg-3)',borderRadius:8,padding:3}}>
                         <button className={`page-tab ${activeTab==='table'?'active':''}`} onClick={()=>setActiveTab('table')}>CS 목록</button>
@@ -882,20 +888,39 @@ const App = () => {
                 {activeTab==='sunbo' && (
                     <Fragment>
                         {(() => {
-                            const sunboData = allRawData.filter(m => /\([^)]*물류[^)]*\)/.test(String(m.data[15]||'')));
+                            let sunboData = allRawData.filter(m => /\([^)]*물류[^)]*\)/.test(String(m.data[15]||'')));
+                            if (sunboSortCol !== null) {
+                                sunboData = [...sunboData].sort((a,b) => {
+                                    const av = String(a.data[sunboSortCol]||'');
+                                    const bv = String(b.data[sunboSortCol]||'');
+                                    const an = parseFloat(av), bn = parseFloat(bv);
+                                    const cmp = (!isNaN(an)&&!isNaN(bn)) ? an-bn : av.localeCompare(bv,'ko');
+                                    return sunboSortDir==='asc' ? cmp : -cmp;
+                                });
+                            }
                             return (
-                                <div className="notion-card" style={{overflow:'hidden'}}>
+                                <div style={{border:'1px solid var(--c-border)',borderRadius:10,background:'var(--c-bg)',overflow:'hidden'}}>
                                     <div style={{padding:'12px 16px',borderBottom:'1px solid var(--c-border)',display:'flex',alignItems:'center',gap:10}}>
                                         <span style={{fontSize:11,color:'#b45309',fontWeight:700}}>선보상</span>
                                         <span style={{fontSize:11,color:'var(--c-text-3)',fontWeight:500}}>옵션값 괄호 내 "물류" 포함 건</span>
                                         <span style={{marginLeft:'auto',fontSize:11,color:'var(--c-text-3)',fontWeight:600}}>{sunboData.length.toLocaleString()}건</span>
                                     </div>
-                                    <div className="custom-scrollbar" style={{overflowX:'auto',overflowY:'auto',maxHeight:620,cursor:'grab',WebkitOverflowScrolling:'touch'}}>
-                                        <table className="cs-table" style={{minWidth:'max-content',width:'100%'}}>
+                                    <div className="custom-scrollbar"
+                                        style={{overflowX:'scroll',overflowY:'auto',maxHeight:620,
+                                                WebkitOverflowScrolling:'touch',width:'100%',display:'block'}}>
+                                        <table className="cs-table" style={{tableLayout:'auto',minWidth:'900px'}}>
                                             <thead>
                                                 <tr>
                                                     {STANDARD_HEADERS.map((h,i)=>(
-                                                        <th key={i} style={{whiteSpace:'nowrap'}}>{h}</th>
+                                                        <th key={i}
+                                                            onClick={()=>handleSunboSortCol(DISPLAY_IDX[i])}
+                                                            style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap',
+                                                                background: sunboSortCol===DISPLAY_IDX[i] ? 'var(--c-bg-3)' : undefined}}>
+                                                            {h}
+                                                            {sunboSortCol===DISPLAY_IDX[i]
+                                                                ? <span style={{marginLeft:4,fontSize:10}}>{sunboSortDir==='asc'?'▲':'▼'}</span>
+                                                                : <span style={{marginLeft:4,fontSize:10,color:'var(--c-text-3)',opacity:0.4}}>⇅</span>}
+                                                        </th>
                                                     ))}
                                                 </tr>
                                             </thead>
