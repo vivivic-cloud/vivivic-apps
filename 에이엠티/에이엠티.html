@@ -6660,7 +6660,8 @@
                 const opts   = ['휴식','점심','기타'].map(o =>
                     `<option${r.reason===o?' selected':''}>${o}</option>`).join('');
                 const _titleCls = r.reason === '점심' ? 'wo-excl-zone-title lunch' : 'wo-excl-zone-title';
-                const _titleTxt = r.reason === '기타' ? (r.custom || '기타') : r.reason;
+                const _zoneDur  = z.end - z.start;
+                const _titleTxt = (r.reason === '기타' ? (r.custom || '기타') : r.reason) + ` ${_zoneDur}분`;
                 html += `<div class="wo-excl-zone-label" style="top:${top}px;height:${height}px;">` +
                     `<span class="${_titleCls}">${_titleTxt}</span>` +
                     `<button onclick="_woClearExclZone('${sk}',${z.start},${z.end})" title="이 구간 배제 취소"` +
@@ -6707,8 +6708,9 @@
                     const _r     = exclReasons[z.start] || {reason:'휴식', custom:''};
                     const _cls   = _r.reason === '점심' ? 'wo-excl-overlay lunch' : 'wo-excl-overlay';
                     const _lbl   = _r.reason === '기타' ? (_r.custom || '기타') : _r.reason;
+                    const _dur = z.end - z.start;
                     html += `<div class="${_cls}" style="top:${top}px;height:${height}px;">` +
-                        `<span class="wo-excl-overlay-text">${_lbl}</span></div>`;
+                        `<span class="wo-excl-overlay-text">${_lbl} ${_dur}분</span></div>`;
                 });
 
                 // ── 빈 컬럼: 시작시간 선택 슬롯 (drag 이벤트도 처리)
@@ -6740,7 +6742,8 @@
                 }
 
                 // 배치 카드 (절대위치) — 시각 누적 기반 (topPx/cardH 미리 계산)
-                tl.forEach(({cKey, topPx, cardH}) => {
+                const _fmtClk = m => `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+                tl.forEach(({cKey, topPx, cardH, clockStart, clockEnd}) => {
                     const p = parts.find(pp => pp.cKey === cKey);
                     if (!p) return;
 
@@ -6756,6 +6759,9 @@
                     if (p.isCuttingCard) {
                         const _dimStr2    = (p.rw && p.rd) ? `${p.rw}×${p.rd}` : '';
                         const _sheetsStr2 = p.sheets       ? `${p.sheets}장`    : '';
+                        const _cutTimeStr = (clockStart != null && clockEnd != null)
+                            ? `${_fmtClk(clockStart)} ~ ${_fmtClk(clockEnd)}`
+                            : '';
                         _placedInner =
                             `<div style="font-size:9px;font-weight:700;color:#a8a6a2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${p.orderCode||''}</div>` +
                             `<div style="font-size:12px;font-weight:800;color:#37352f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35;margin-top:1px;">${p.plateName||p.nm||'-'}</div>` +
@@ -6764,7 +6770,8 @@
                             (_dimStr2    ? `<span style="font-size:9px;font-weight:700;color:#787774;background:#f0efed;padding:1px 4px;border-radius:3px;">${_dimStr2}</span>` : '') +
                             (_sheetsStr2 ? `<span style="font-size:9px;font-weight:700;color:#37352f;background:#e8e7e4;padding:1px 4px;border-radius:3px;">${_sheetsStr2}</span>` : '') +
                             `<span style="font-size:9px;font-weight:700;color:${_bQI.color};background:${_bQI.bg};padding:1px 4px;border-radius:3px;">${_bQI.label} EA</span>` +
-                            `</div>`;
+                            `</div>` +
+                            (_cutTimeStr ? `<div style="font-size:8px;font-weight:700;color:#a0a09c;margin-top:3px;white-space:nowrap;">⏱ ${_cutTimeStr}</div>` : '');
                     } else {
                         const _cOn2 = p.orderName
                             ? `<div style="font-size:9px;font-weight:600;color:#a8a6a2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.25;">${p.orderName}</div>`
@@ -6773,12 +6780,17 @@
                             `<span style="font-size:11px;font-weight:800;color:#37352f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3;">${p.nm}</span>` +
                             `<span style="font-size:9px;font-weight:700;color:${_bQI.color};background:${_bQI.bg};padding:0 4px;border-radius:3px;white-space:nowrap;flex-shrink:0;">${_bQI.label} EA</span>` +
                             `</div>`;
-                        // 공정시간 표시 — 카드 높이가 충분할 때만 표기
+                        // 공정시간 표시
                         const _pmVal = p.pm || 0;
                         const _pmStr2 = _pmVal >= 1 ? `${_pmVal.toFixed(1)}분` : `${Math.round(_pmVal * 60)}초`;
-                        const _cTime2 = cardH >= 72
-                            ? `<div style="font-size:8px;font-weight:600;color:#aaa8a4;padding-top:2px;white-space:nowrap;">⏱ ${_pmStr2}</div>`
+                        const _timeRange2 = (clockStart != null && clockEnd != null)
+                            ? `${_fmtClk(clockStart)} ~ ${_fmtClk(clockEnd)}`
                             : '';
+                        const _cTime2 = `<div style="font-size:8px;font-weight:700;color:#a0a09c;padding-top:3px;white-space:nowrap;display:flex;align-items:center;gap:3px;">` +
+                            `<span>⏱</span>` +
+                            (_timeRange2 ? `<span style="color:#787774;">${_timeRange2}</span>` : '') +
+                            `<span style="color:#c0bebb;">(${_pmStr2})</span>` +
+                            `</div>`;
                         _placedInner = `<div style="display:flex;flex-direction:column;overflow:hidden;">` + _cOn2 + _cNm2 + _cTime2 + `</div>`;
                     }
 
