@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.3.0 (2026-04-24)
+     버전: v1.4.0 (2026-04-24) — 휴식구간 겹침 완전 차단
      ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
@@ -1199,7 +1199,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.3.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.4.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -6568,17 +6568,21 @@
                         topPx  = Math.round(visualY);
                         let _cEnd = _woCalcEffectiveEnd(cStart, pm, exclZones);
                         let _visH = Math.max(cardMinH, Math.round((_cEnd - cStart) * PX_PER_MIN));
-                        // 카드 높이가 다음 구간을 가로지르면 구간 이후로 이동
-                        for (const z of exclZones) {
-                            const zStartPx = Math.round(z.start * PX_PER_MIN);
-                            if (topPx < zStartPx && topPx + _visH > zStartPx && _cEnd > z.start) {
-                                actualCur = z.end;
-                                cStart    = z.end;
-                                topPx     = Math.round(z.end * PX_PER_MIN);
-                                visualY   = topPx;
-                                _cEnd     = _woCalcEffectiveEnd(cStart, pm, exclZones);
-                                _visH     = Math.max(cardMinH, Math.round((_cEnd - cStart) * PX_PER_MIN));
-                                break;
+                        // 카드 높이(MIN_CARD_H 포함)가 다음 구간에 걸리면 구간 이후로 이동
+                        let _visOk = false;
+                        while (!_visOk) {
+                            _visOk = true;
+                            for (const z of exclZones) {
+                                const zStartPx = Math.round(z.start * PX_PER_MIN);
+                                if (topPx < zStartPx && topPx + _visH > zStartPx) {
+                                    actualCur = z.end;
+                                    cStart    = z.end;
+                                    topPx     = Math.round(z.end * PX_PER_MIN);
+                                    visualY   = topPx;
+                                    _cEnd     = _woCalcEffectiveEnd(cStart, pm, exclZones);
+                                    _visH     = Math.max(cardMinH, Math.round((_cEnd - cStart) * PX_PER_MIN));
+                                    _visOk = false; break;
+                                }
                             }
                         }
                         actualCur = _cEnd;
@@ -6610,19 +6614,14 @@
                             const zStartPx = Math.round(z.start * PX_PER_MIN);
                             const zEndPx   = Math.round(z.end   * PX_PER_MIN);
                             if (card.topPx >= zEndPx || card.topPx + card.cardH <= zStartPx) continue;
-                            if (card.clockEnd > z.start) {
-                                // 실제 작업이 구간을 가로지름 → 구간 이후로 밀어냄
-                                card.clockStart = z.end;
-                                card.topPx      = zEndPx;
-                                card.clockEnd   = _woCalcEffectiveEnd(card.clockStart, card.pm, exclZones);
-                                const effDur    = card.clockEnd - card.clockStart;
-                                const _mh       = card._minH ?? MIN_CARD_H;
-                                card.cardH      = Math.max(_mh, Math.round(effDur * PX_PER_MIN)) - GAP_PX;
-                                _pushOk = false; break;
-                            } else {
-                                // MIN_CARD_H 팽창만으로 겹침 → 높이를 구간 직전에서 클립
-                                card.cardH = Math.max(24, zStartPx - card.topPx - GAP_PX);
-                            }
+                            // 시각 겹침 → 원인 무관하게 구간 이후로 밀어냄
+                            card.clockStart = z.end;
+                            card.topPx      = zEndPx;
+                            card.clockEnd   = _woCalcEffectiveEnd(card.clockStart, card.pm, exclZones);
+                            const effDur    = card.clockEnd - card.clockStart;
+                            const _mh       = card._minH ?? MIN_CARD_H;
+                            card.cardH      = Math.max(_mh, Math.round(effDur * PX_PER_MIN)) - GAP_PX;
+                            _pushOk = false; break;
                         }
                     }
                     prevBottomPx = card.topPx + card.cardH + GAP_PX;
