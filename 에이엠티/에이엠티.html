@@ -6576,15 +6576,19 @@
                         card.clockStart = card.topPx / PX_PER_MIN;
                         card.clockEnd   = _woCalcEffectiveEnd(card.clockStart, card.pm, exclZones);
                     }
-                    // 휴식/점심 구간 안에 시작점이 걸리면 해당 구간 이후로 밀어냄
+                    // 시작점이 구간 안에 있거나 카드가 구간을 시각적으로 가리면 구간 이후로 밀어냄
                     let _pushOk = false;
                     while (!_pushOk) {
                         _pushOk = true;
                         for (const z of exclZones) {
-                            if (card.clockStart >= z.start && card.clockStart < z.end) {
+                            const inZone  = card.clockStart >= z.start && card.clockStart < z.end;
+                            const spanIn  = card.clockStart < z.start && card.clockEnd > z.start;
+                            if (inZone || spanIn) {
                                 card.clockStart = z.end;
                                 card.topPx      = Math.round(card.clockStart * PX_PER_MIN);
                                 card.clockEnd   = _woCalcEffectiveEnd(card.clockStart, card.pm, exclZones);
+                                const effDur    = card.clockEnd - card.clockStart;
+                                card.cardH      = Math.max(MIN_CARD_H, Math.round(effDur * PX_PER_MIN)) - GAP_PX;
                                 _pushOk = false; break;
                             }
                         }
