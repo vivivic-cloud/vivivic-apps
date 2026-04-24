@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.5.0 (2026-04-24) — 휴식구간 세그먼트 분할 렌더링
+     버전: v1.6.0 (2026-04-24) — PX/분 동적 스케일
      ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
@@ -1199,7 +1199,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.5.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.6.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -6520,10 +6520,31 @@
             const exclBlocks  = _woGetExclBlocks(sk);
             const exclReasons = (window._woExclusionReasons[sk]) || {};
 
-            // ── 고정 PX/분 스케일 — 최단카드 기준 자동확장 폐기, 시각 누적 방식으로 전환
-            // 짧은 카드: MIN_CARD_H 보장 & 다음 카드는 시각 바닥부터 → 겹침 없음
-            // 긴 카드: 실제 소요분 × PX 비례 → 합리적 높이
-            const PX_PER_MIN = 1.5;
+            // ── PX/분 스케일 동적 계산: 배치 카드 중 최단 작업시간 기준으로 MIN_CARD_H 보장
+            const _BASE_PX   = 1.0;   // 최소 스케일 (px/min)
+            const _MAX_PX    = 8.0;   // 최대 스케일 (480px/hr)
+            const _procKey0  = sk.replace(/^\d{4}-\d{2}-\d{2}-/, '');
+            let   _minPmReg  = Infinity, _minPmCut = Infinity;
+            machines.forEach(mac => {
+                (state[mac] || []).forEach(entry => {
+                    const ek  = typeof entry === 'string' ? entry : entry?.cKey;
+                    if (!ek) return;
+                    const ep  = parts.find(p => p.cKey === ek);
+                    if (!ep) return;
+                    const _eo  = confirmedOrders.find(o => (o.docId || String(o.idNum)) === (ep.orderKey || ''));
+                    const _eck = ep.orderKey ? ek.substring(ep.orderKey.length + 1) : ek;
+                    const _epm = _eo?.partCompletions?.[_eck]?.[_procKey0]?.actualMinutes ?? ep.pm ?? 0;
+                    if (_epm > 0) {
+                        if (ep.isCuttingCard) _minPmCut = Math.min(_minPmCut, _epm);
+                        else                  _minPmReg = Math.min(_minPmReg, _epm);
+                    }
+                });
+            });
+            const _reqR      = isFinite(_minPmReg) ? MIN_CARD_H / _minPmReg : _BASE_PX;
+            const _reqC      = isFinite(_minPmCut) ? 80          / _minPmCut : _BASE_PX;
+            const PX_PER_MIN = Math.min(_MAX_PX, Math.max(_BASE_PX, _reqR, _reqC));
+            window._woPxPerMin = window._woPxPerMin || {};
+            window._woPxPerMin[sk] = PX_PER_MIN;
 
             // ── 보드 표시 기준: 가장 이른 macStart → 타임라인 시작점
             const boardStartMin  = Math.min(...machines.map(mac => _woGetMacStart(sk, mac) ?? 480));
@@ -7195,7 +7216,7 @@
         // PX_PER_MIN 반환 헬퍼 (dragover/drop/render 공용)
         // 시각 누적 방식으로 전환 후 고정 스케일 사용
         function _woDragCalcPX(state, parts, extraKey, sk) {
-            return 1.5;
+            return window._woPxPerMin?.[sk] ?? 1.5;
         }
 
         window.woBoardDragOver = function(e) {
