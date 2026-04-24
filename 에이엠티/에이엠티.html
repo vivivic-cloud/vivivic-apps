@@ -6552,26 +6552,44 @@
                         cStart = entry.startMin;
                         topPx  = Math.round(cStart * PX_PER_MIN);
                     } else {
-                        // 기본 배치: actualCur가 휴식/점심 구간 안에 걸리면 구간 이후로 밀어냄
-                        for (const z of exclZones) {
-                            if (actualCur >= z.start && actualCur < z.end) {
-                                visualY  += (z.end - actualCur) * PX_PER_MIN;
-                                actualCur = z.end;
-                                break;
+                        // 기본 배치: actualCur가 구간 안에 걸리면 구간 이후로 밀어냄
+                        let _acSkip = true;
+                        while (_acSkip) {
+                            _acSkip = false;
+                            for (const z of exclZones) {
+                                if (actualCur >= z.start && actualCur < z.end) {
+                                    visualY  += (z.end - actualCur) * PX_PER_MIN;
+                                    actualCur = z.end;
+                                    _acSkip = true; break;
+                                }
                             }
                         }
                         cStart = actualCur;
                         topPx  = Math.round(visualY);
-                        const _cEnd = _woCalcEffectiveEnd(cStart, pm, exclZones);
-                        const _visH = Math.max(cardMinH, Math.round((_cEnd - cStart) * PX_PER_MIN));
-                        actualCur   = _cEnd;
-                        visualY    += _visH;
+                        let _cEnd = _woCalcEffectiveEnd(cStart, pm, exclZones);
+                        let _visH = Math.max(cardMinH, Math.round((_cEnd - cStart) * PX_PER_MIN));
+                        // 카드 높이가 다음 구간을 가로지르면 구간 이후로 이동
+                        for (const z of exclZones) {
+                            const zStartPx = Math.round(z.start * PX_PER_MIN);
+                            if (topPx < zStartPx && topPx + _visH > zStartPx && _cEnd > z.start) {
+                                actualCur = z.end;
+                                cStart    = z.end;
+                                topPx     = Math.round(z.end * PX_PER_MIN);
+                                visualY   = topPx;
+                                _cEnd     = _woCalcEffectiveEnd(cStart, pm, exclZones);
+                                _visH     = Math.max(cardMinH, Math.round((_cEnd - cStart) * PX_PER_MIN));
+                                break;
+                            }
+                        }
+                        actualCur = _cEnd;
+                        visualY   = topPx + _visH;
                     }
                     const cEnd   = _woCalcEffectiveEnd(cStart, pm, exclZones);
                     const effDur = cEnd - cStart;
                     const visH   = Math.max(cardMinH, Math.round(effDur * PX_PER_MIN));
                     tl.push({ cKey: entry.cKey, pm, clockStart: cStart, clockEnd: cEnd,
-                               topPx, cardH: visH - GAP_PX, _pinned: entry.startMin != null });
+                               topPx, cardH: visH - GAP_PX, _pinned: entry.startMin != null,
+                               _minH: cardMinH });
                 });
 
                 // ── 2단계: topPx 순 정렬 후 겹치는 카드 자동 밀어냄
@@ -6598,7 +6616,8 @@
                                 card.topPx      = zEndPx;
                                 card.clockEnd   = _woCalcEffectiveEnd(card.clockStart, card.pm, exclZones);
                                 const effDur    = card.clockEnd - card.clockStart;
-                                card.cardH      = Math.max(MIN_CARD_H, Math.round(effDur * PX_PER_MIN)) - GAP_PX;
+                                const _mh       = card._minH ?? MIN_CARD_H;
+                                card.cardH      = Math.max(_mh, Math.round(effDur * PX_PER_MIN)) - GAP_PX;
                                 _pushOk = false; break;
                             } else {
                                 // MIN_CARD_H 팽창만으로 겹침 → 높이를 구간 직전에서 클립
