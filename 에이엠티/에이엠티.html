@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.2.0 (2026-03-18)
+     버전: v1.3.0 (2026-04-24)
      ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
@@ -1199,7 +1199,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.2.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.3.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -6552,6 +6552,14 @@
                         cStart = entry.startMin;
                         topPx  = Math.round(cStart * PX_PER_MIN);
                     } else {
+                        // 기본 배치: actualCur가 휴식/점심 구간 안에 걸리면 구간 이후로 밀어냄
+                        for (const z of exclZones) {
+                            if (actualCur >= z.start && actualCur < z.end) {
+                                visualY  += (z.end - actualCur) * PX_PER_MIN;
+                                actualCur = z.end;
+                                break;
+                            }
+                        }
                         cStart = actualCur;
                         topPx  = Math.round(visualY);
                         const _cEnd = _woCalcEffectiveEnd(cStart, pm, exclZones);
@@ -6576,20 +6584,25 @@
                         card.clockStart = card.topPx / PX_PER_MIN;
                         card.clockEnd   = _woCalcEffectiveEnd(card.clockStart, card.pm, exclZones);
                     }
-                    // 시작점이 구간 안에 있거나 카드가 구간을 시각적으로 가리면 구간 이후로 밀어냄
+                    // 픽셀 기준 시각 겹침 검사: MIN_CARD_H 팽창까지 포함
                     let _pushOk = false;
                     while (!_pushOk) {
                         _pushOk = true;
                         for (const z of exclZones) {
-                            const inZone  = card.clockStart >= z.start && card.clockStart < z.end;
-                            const spanIn  = card.clockStart < z.start && card.clockEnd > z.start;
-                            if (inZone || spanIn) {
+                            const zStartPx = Math.round(z.start * PX_PER_MIN);
+                            const zEndPx   = Math.round(z.end   * PX_PER_MIN);
+                            if (card.topPx >= zEndPx || card.topPx + card.cardH <= zStartPx) continue;
+                            if (card.clockEnd > z.start) {
+                                // 실제 작업이 구간을 가로지름 → 구간 이후로 밀어냄
                                 card.clockStart = z.end;
-                                card.topPx      = Math.round(card.clockStart * PX_PER_MIN);
+                                card.topPx      = zEndPx;
                                 card.clockEnd   = _woCalcEffectiveEnd(card.clockStart, card.pm, exclZones);
                                 const effDur    = card.clockEnd - card.clockStart;
                                 card.cardH      = Math.max(MIN_CARD_H, Math.round(effDur * PX_PER_MIN)) - GAP_PX;
                                 _pushOk = false; break;
+                            } else {
+                                // MIN_CARD_H 팽창만으로 겹침 → 높이를 구간 직전에서 클립
+                                card.cardH = Math.max(24, zStartPx - card.topPx - GAP_PX);
                             }
                         }
                     }
