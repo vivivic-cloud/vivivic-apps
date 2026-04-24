@@ -6572,9 +6572,22 @@
                 let prevBottomPx = 0;
                 tl.forEach(card => {
                     if (card.topPx < prevBottomPx) {
-                        card.topPx       = prevBottomPx;
-                        card.clockStart  = card.topPx / PX_PER_MIN;
-                        card.clockEnd    = _woCalcEffectiveEnd(card.clockStart, card.pm, exclZones);
+                        card.topPx      = prevBottomPx;
+                        card.clockStart = card.topPx / PX_PER_MIN;
+                        card.clockEnd   = _woCalcEffectiveEnd(card.clockStart, card.pm, exclZones);
+                    }
+                    // 휴식/점심 구간 안에 시작점이 걸리면 해당 구간 이후로 밀어냄
+                    let _pushOk = false;
+                    while (!_pushOk) {
+                        _pushOk = true;
+                        for (const z of exclZones) {
+                            if (card.clockStart >= z.start && card.clockStart < z.end) {
+                                card.clockStart = z.end;
+                                card.topPx      = Math.round(card.clockStart * PX_PER_MIN);
+                                card.clockEnd   = _woCalcEffectiveEnd(card.clockStart, card.pm, exclZones);
+                                _pushOk = false; break;
+                            }
+                        }
                     }
                     prevBottomPx = card.topPx + card.cardH + GAP_PX;
                 });
@@ -7186,6 +7199,16 @@
                 const _bOffPx     = Math.round(_bsMin * PX);
                 let snap = _bsMin + Math.round((dropY / PX) / 30) * 30;
                 while (exclZones.some(z => snap >= z.start && snap < z.end)) snap += 30;
+                // 카드가 휴식/점심 구간을 시각적으로 가리지 않도록 구간 이후로 밀어냄
+                let _goOk = false;
+                while (!_goOk) {
+                    _goOk = true;
+                    for (const z of exclZones) {
+                        if (snap < z.start && _woCalcEffectiveEnd(snap, dragPm, exclZones) > z.start) {
+                            snap = z.end; _goOk = false; break;
+                        }
+                    }
+                }
                 snap = Math.max(_bsMin, snap);
                 ghostActualStart = snap;
                 ghostTopPx = Math.round(snap * PX) - _bOffPx;
@@ -7242,6 +7265,17 @@
                 const _bsMin2  = Math.min(...machines.map(m => _woGetMacStart(stateKey, m) ?? 480));
                 let dropMin = _bsMin2 + Math.round((dropY / PX) / 30) * 30;
                 while (_dExclZones.some(z => dropMin >= z.start && dropMin < z.end)) dropMin += 30;
+                // 카드가 휴식/점심 구간을 시각적으로 가리지 않도록 구간 이후로 밀어냄
+                const _dropPm = parts.find(p => p.cKey === cardKey)?.pm ?? 30;
+                let _dpOk = false;
+                while (!_dpOk) {
+                    _dpOk = true;
+                    for (const z of _dExclZones) {
+                        if (dropMin < z.start && _woCalcEffectiveEnd(dropMin, _dropPm, _dExclZones) > z.start) {
+                            dropMin = z.end; _dpOk = false; break;
+                        }
+                    }
+                }
                 dropMin = Math.max(_bsMin2, dropMin);
 
                 // 기존 배열 순서 유지 + 해당 카드 startMin만 갱신
