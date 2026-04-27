@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.6.9 (2026-04-27) — _fillProcessSections 상세 진단 로그 추가
+     버전: v1.7.0 (2026-04-27) — Excel URL 만료 시 자동 재발급 + cachedWorkTime Firebase 저장으로 공정카드 영속성 확보
      ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
@@ -1199,7 +1199,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.6.9</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.7.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -1679,7 +1679,9 @@
                 const docs = snapshot.docs.map(d => d.data());
                 if (docs.length > 0) {
                     const latest = docs.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0))[0];
-                    if (latest && latest.downloadURL) { loadCloudExcelData(latest.downloadURL, latest.fileName); }
+                    if (latest && latest.downloadURL) {
+                        loadCloudExcelData(latest.downloadURL, latest.fileName, latest.storagePath);
+                    }
                 }
             });
         }
@@ -1906,12 +1908,19 @@
             });
         }
 
-        async function loadCloudExcelData(url, fileName) {
+        async function loadCloudExcelData(url, fileName, storagePath) {
             const indicator = document.getElementById('cloud-sync-status');
             indicator.className = "sync-indicator sync-active";
             indicator.textContent = "SYNCING...";
             try {
-                const response = await fetch(url);
+                let response = await fetch(url);
+                // 412(토큰 만료) 등 실패 시 storagePath로 fresh URL 재발급 후 재시도
+                if (!response.ok && storagePath && window.fbStorage && window.storage) {
+                    console.log('[Excel] URL 만료('+response.status+'), storagePath로 fresh URL 재발급:', storagePath);
+                    const { ref, getDownloadURL } = window.fbStorage;
+                    const freshURL = await getDownloadURL(ref(window.storage, storagePath));
+                    response = await fetch(freshURL);
+                }
                 if (!response.ok) throw new Error("CORS/Network Error");
                 const arrayBuffer = await response.arrayBuffer();
                 const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
@@ -2322,6 +2331,19 @@
                     // matchingRows가 실제로 존재할 때만 덮어쓰기 (빈 결과로 기존 캐시를 0으로 오염시키지 않음)
                     if (Object.values(calcWt).some(v => v > 0)) {
                         item.cachedWorkTime = calcWt;
+                        // ✅ 타임라인 항목의 cachedWorkTime을 Firebase에 저장
+                        // → 다음 로드 시 Excel 파일 없이도 공정 카드 표시 가능
+                        if (item.amtTimeline && item.docId) {
+                            const _prevSaved = JSON.stringify(item._fbSavedCachedWorkTime || null);
+                            const _newVal    = JSON.stringify(calcWt);
+                            if (_prevSaved !== _newVal) {
+                                item._fbSavedCachedWorkTime = calcWt;
+                                const { doc: _doc, updateDoc: _upd } = window.fbFirestore;
+                                const _appId = "vivivic-4b7ef";
+                                const _ref = _doc(window.db, 'artifacts', _appId, 'public', 'data', 'confirmed_orders', item.docId);
+                                _upd(_ref, { cachedWorkTime: calcWt }).catch(e => console.error('[cachedWorkTime FB저장 실패]', e));
+                            }
+                        }
                     }
                 });
             }
