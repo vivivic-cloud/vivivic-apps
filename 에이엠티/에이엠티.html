@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.6.4 (2026-04-27) — 동적 스케일 상한 30px/분으로 확장, 배치 연속성 복원
+     버전: v1.6.5 (2026-04-27) — 스케일 상한 12px/분, 공정 사라짐 수정
      ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
@@ -1199,7 +1199,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.6.4</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.6.5</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -6522,7 +6522,7 @@
 
             // ── PX/분 스케일 동적 계산: 배치 카드 중 최단 작업시간 기준으로 MIN_CARD_H 보장
             const _BASE_PX   = 1.0;   // 최소 스케일 (px/min)
-            const _MAX_PX    = 30.0;  // 최대 스케일 (1800px/hr) — 짧은 카드도 MIN_CARD_H 보장
+            const _MAX_PX    = 12.0;  // 최대 스케일 (720px/hr) — 최단 7분 카드도 MIN_CARD_H 보장
             const _procKey0  = sk.replace(/^\d{4}-\d{2}-\d{2}-/, '');
             let   _minPmReg  = Infinity, _minPmCut = Infinity;
             machines.forEach(mac => {
@@ -6631,7 +6631,7 @@
                         const sp = Math.round((card.clockEnd - card.clockStart) * PX_PER_MIN);
                         card.cardH = Math.max(card._minH ?? MIN_CARD_H, sp) - GAP_PX;
                     }
-                    // prevEndPx: clockEnd 절대px (_MAX_PX 상향으로 MIN_CARD_H 확장 불필요)
+                    // prevEndPx: clockEnd 절대px (_MAX_PX=12 → 7분+ 카드는 MIN_CARD_H 팽창 없음)
                     prevClockEnd = card.clockEnd;
                     prevEndPx    = Math.round(card.clockEnd * PX_PER_MIN);
                 });
@@ -6645,7 +6645,7 @@
                 macTimelines[mac]._visEnd = last ? (last.topPx + last.cardH) : ms * PX_PER_MIN;
             });
 
-            // 보드 높이: 시각 최대 Y 기준 (시계보다 클 수 있음)
+            // 보드 높이: 카드 시각 하단(MIN_CARD_H 팽창 포함) 기준
             let maxClockMin = boardStartMin + 120;
             let maxVisY     = 120 * PX_PER_MIN;
             machines.forEach(mac => {
@@ -6654,7 +6654,9 @@
                 const tl = macTimelines[mac];
                 if (tl.length) {
                     maxClockMin = Math.max(maxClockMin, macTimelines[mac]._actEnd);
-                    maxVisY     = Math.max(maxVisY, toPx(macTimelines[mac]._actEnd));
+                    // 시각 하단 = topPx(이미 offset 적용) + cardH
+                    const last = tl[tl.length - 1];
+                    maxVisY = Math.max(maxVisY, last.topPx + last.cardH);
                 }
             });
             const BOARD_H = Math.max(200, Math.ceil(maxVisY) + 80);
