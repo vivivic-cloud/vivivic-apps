@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.6.5 (2026-04-27) — 스케일 상한 12px/분, 공정 사라짐 수정
+     버전: v1.6.6 (2026-04-27) — 납기 외 공정카드 배치 누락 수정 (cachedWorkTime 전체 적용)
      ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
@@ -1199,7 +1199,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.6.5</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.6.6</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2303,10 +2303,12 @@
             // ✅ 상품 수 배지 업데이트
             updatePendingCountBadge(pendingOrders.length);
 
-            // ✅ 모든 항목 cachedWorkTime 계산 (renderPendingOrderParts와 동일 로직, UI 없이)
+            // ✅ 모든 항목 cachedWorkTime 계산 — 타임라인 등록 항목(amtTimeline=true) 포함
+            // (기존: pendingOrders만 계산 → 타임라인 항목은 cachedWorkTime 미갱신 → 공정섹션 공백 버그)
             if (currentFullData.length >= 2) {
                 const h = currentFullData[0];
-                pendingOrders.forEach(item => {
+                const allActiveOrders = confirmedOrders.filter(o => !o.amtConfirmedCancel);
+                allActiveOrders.forEach(item => {
                     const matchingRows = currentFullData.slice(1).filter(r =>
                         r && normalizeValue(r[h.indexOf("ing발주처")]) === item.supplier &&
                         IDENTITY_HEADERS.every((col, i) => normalizeValue(r[h.indexOf(col)]) === item.criteria[i])
@@ -4094,7 +4096,12 @@
                 };
 
                 // ── 헬퍼: 해당 공정이 포함된 부속 존재 여부 확인 ──────────
+                // cachedWorkTime 우선 사용 (renderPendingOrders에서 전체 항목 계산됨)
+                // 없으면 currentFullData 직접 조회 (fallback)
                 const hasProcInItem = (item, procKey) => {
+                    if (item.cachedWorkTime) {
+                        return (item.cachedWorkTime[procKey] ?? 0) > 0;
+                    }
                     if (!h || currentFullData.length < 2) return false;
                     const matchingRows = currentFullData.slice(1).filter(r =>
                         r && normalizeValue(r[h.indexOf("ing발주처")]) === item.supplier &&
