@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.7.0 (2026-04-27) — Excel URL 만료 시 자동 재발급 + cachedWorkTime Firebase 저장으로 공정카드 영속성 확보
+     버전: v1.3.0 (2026-04-24)
      ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
@@ -1199,7 +1199,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.7.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.3.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -1679,9 +1679,7 @@
                 const docs = snapshot.docs.map(d => d.data());
                 if (docs.length > 0) {
                     const latest = docs.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0))[0];
-                    if (latest && latest.downloadURL) {
-                        loadCloudExcelData(latest.downloadURL, latest.fileName, latest.storagePath);
-                    }
+                    if (latest && latest.downloadURL) { loadCloudExcelData(latest.downloadURL, latest.fileName); }
                 }
             });
         }
@@ -1908,19 +1906,12 @@
             });
         }
 
-        async function loadCloudExcelData(url, fileName, storagePath) {
+        async function loadCloudExcelData(url, fileName) {
             const indicator = document.getElementById('cloud-sync-status');
             indicator.className = "sync-indicator sync-active";
             indicator.textContent = "SYNCING...";
             try {
-                let response = await fetch(url);
-                // 412(토큰 만료) 등 실패 시 storagePath로 fresh URL 재발급 후 재시도
-                if (!response.ok && storagePath && window.fbStorage && window.storage) {
-                    console.log('[Excel] URL 만료('+response.status+'), storagePath로 fresh URL 재발급:', storagePath);
-                    const { ref, getDownloadURL } = window.fbStorage;
-                    const freshURL = await getDownloadURL(ref(window.storage, storagePath));
-                    response = await fetch(freshURL);
-                }
+                const response = await fetch(url);
                 if (!response.ok) throw new Error("CORS/Network Error");
                 const arrayBuffer = await response.arrayBuffer();
                 const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
@@ -2312,12 +2303,10 @@
             // ✅ 상품 수 배지 업데이트
             updatePendingCountBadge(pendingOrders.length);
 
-            // ✅ 모든 항목 cachedWorkTime 계산 — 타임라인 등록 항목(amtTimeline=true) 포함
-            // (기존: pendingOrders만 계산 → 타임라인 항목은 cachedWorkTime 미갱신 → 공정섹션 공백 버그)
+            // ✅ 모든 항목 cachedWorkTime 계산 (renderPendingOrderParts와 동일 로직, UI 없이)
             if (currentFullData.length >= 2) {
                 const h = currentFullData[0];
-                const allActiveOrders = confirmedOrders.filter(o => !o.amtConfirmedCancel);
-                allActiveOrders.forEach(item => {
+                pendingOrders.forEach(item => {
                     const matchingRows = currentFullData.slice(1).filter(r =>
                         r && normalizeValue(r[h.indexOf("ing발주처")]) === item.supplier &&
                         IDENTITY_HEADERS.every((col, i) => normalizeValue(r[h.indexOf(col)]) === item.criteria[i])
@@ -2328,23 +2317,7 @@
                         const t = calcProcessTime(row, unitCons * (item.orderQty || 1), {}, h);
                         calcWt.재단 += t.재단; calcWt.엣지 += t.엣지; calcWt.보링 += t.보링; calcWt.NC += t.NC;
                     });
-                    // matchingRows가 실제로 존재할 때만 덮어쓰기 (빈 결과로 기존 캐시를 0으로 오염시키지 않음)
-                    if (Object.values(calcWt).some(v => v > 0)) {
-                        item.cachedWorkTime = calcWt;
-                        // ✅ 타임라인 항목의 cachedWorkTime을 Firebase에 저장
-                        // → 다음 로드 시 Excel 파일 없이도 공정 카드 표시 가능
-                        if (item.amtTimeline && item.docId) {
-                            const _prevSaved = JSON.stringify(item._fbSavedCachedWorkTime || null);
-                            const _newVal    = JSON.stringify(calcWt);
-                            if (_prevSaved !== _newVal) {
-                                item._fbSavedCachedWorkTime = calcWt;
-                                const { doc: _doc, updateDoc: _upd } = window.fbFirestore;
-                                const _appId = "vivivic-4b7ef";
-                                const _ref = _doc(window.db, 'artifacts', _appId, 'public', 'data', 'confirmed_orders', item.docId);
-                                _upd(_ref, { cachedWorkTime: calcWt }).catch(e => console.error('[cachedWorkTime FB저장 실패]', e));
-                            }
-                        }
-                    }
+                    item.cachedWorkTime = calcWt;
                 });
             }
 
@@ -4108,11 +4081,6 @@
                 const pendingOrders = confirmedOrders.filter(o => o.amtTimeline === true && o.amtRegistered !== true && !o.amtConfirmedCancel);
                 const h = currentFullData[0];
 
-                console.log('[_fillProcessSections] 호출됨. 타임라인 항목수:', pendingOrders.length, '| currentFullData rows:', currentFullData.length, '| h defined:', !!h);
-                pendingOrders.forEach(item => {
-                    console.log('  item:', item.displayName, '| supplier:', item.supplier, '| criteria:', JSON.stringify(item.criteria), '| cachedWorkTime:', JSON.stringify(item.cachedWorkTime));
-                });
-
                 // ── 헬퍼: 비활성(토·일) → 다음 월요일 (활성화된 주말은 그대로 유지) ──
                 // 뒤로 밀면(금요일) lowerBound(토요일)에 의해 토요일로 재클램핑되어
                 // 공정 섹션이 없는 비활성 토·일에 배치 → 카드 사라짐 버그 발생
@@ -4126,30 +4094,17 @@
                 };
 
                 // ── 헬퍼: 해당 공정이 포함된 부속 존재 여부 확인 ──────────
-                // cachedWorkTime 양수값 → 빠른 긍정 확인 (캐시가 없거나 0이면 currentFullData fallback)
                 const hasProcInItem = (item, procKey) => {
-                    // 캐시에 양수값이 있으면 즉시 true (확실한 긍정)
-                    if (item.cachedWorkTime && (item.cachedWorkTime[procKey] ?? 0) > 0) return true;
-                    // currentFullData fallback — 캐시가 없거나 0일 때 직접 조회
-                    if (!h || currentFullData.length < 2) {
-                        console.log('[hasProcInItem] currentFullData 미로드 → false', item.displayName, procKey);
-                        return false;
-                    }
+                    if (!h || currentFullData.length < 2) return false;
                     const matchingRows = currentFullData.slice(1).filter(r =>
                         r && normalizeValue(r[h.indexOf("ing발주처")]) === item.supplier &&
                         IDENTITY_HEADERS.every((col, i) => normalizeValue(r[h.indexOf(col)]) === item.criteria[i])
                     );
-                    if (matchingRows.length === 0) {
-                        console.log('[hasProcInItem] 매칭 행 없음 → false', item.displayName, procKey, 'supplier:', item.supplier, 'criteria:', item.criteria);
-                    }
                     for (const row of matchingRows) {
                         if (normalizeValue(row[h.indexOf("공급처")]) !== "AMT") continue;
                         const unitCons = parseFloat(row[h.indexOf("세트별소모량")]) || 1;
                         const partT = calcProcessTime(row, unitCons * (item.orderQty || 1), {}, h);
                         if ((partT[procKey] ?? 0) > 0) return true;
-                    }
-                    if (matchingRows.length > 0) {
-                        console.log('[hasProcInItem] 매칭 있으나 공정시간 0 → false', item.displayName, procKey);
                     }
                     return false;
                 };
@@ -4255,14 +4210,10 @@
                 });
 
                 // ── STEP 4: DOM 렌더 ──────────────────────────────────────
-                console.log('[_fillProcessSections] byProc 결과:', JSON.stringify(Object.fromEntries(Object.entries(byProc).map(([k,v])=>[k,Object.keys(v)]))));
                 PROC_DEF.forEach(proc => {
                     Object.entries(byProc[proc.key]).forEach(([targetDate, items]) => {
                         const section = document.querySelector(`.tl-process-section[data-date="${targetDate}"][data-process="${proc.key}"]`);
-                        if (!section) {
-                            console.log('[_fillProcessSections] DOM 섹션 없음 →', proc.key, targetDate);
-                            return;
-                        }
+                        if (!section) return;
 
                         let sectionTotalMin = 0;
 
@@ -6336,18 +6287,6 @@
             }
             return cur + workLeft;
         }
-        // 시계 구간 [clockStart, clockEnd]에서 배제 구간을 제외한 실제 작업 세그먼트 반환
-        function _woGetSegments(clockStart, clockEnd, exclZones) {
-            const segs = [];
-            let cur = clockStart;
-            for (const z of exclZones) {
-                if (z.end <= cur || z.start >= clockEnd) continue;
-                if (cur < z.start) segs.push({ s: cur, e: Math.min(z.start, clockEnd) });
-                cur = Math.max(cur, z.end);
-            }
-            if (cur < clockEnd) segs.push({ s: cur, e: clockEnd });
-            return segs.length ? segs : [{ s: clockStart, e: clockEnd }];
-        }
         // 빈 컬럼 시작시간 슬롯 드롭 — macStart 미설정시 해당 슬롯 시간으로 자동 설정 후 드롭 처리
         window._woDropOnEmptyCol = function(e, sk, mac, m) {
             if (_woGetMacStart(sk, mac) == null) {
@@ -6544,7 +6483,7 @@
             const procMeta   = _woGetProcMeta(sk);
             // 공정색을 CSS 변수로 주입 → placed 카드 border + drag-over 강조에 자동 적용
             grid.style.setProperty('--wo-proc-color', procMeta.color);
-            const MIN_CARD_H = 80;   // 카드 최소 높이 (px) — 내용+완료버튼 공간 포함
+            const MIN_CARD_H = 58;   // 카드 최소 높이 (px) — 내용+완료버튼 공간 포함
             const GAP_PX     = 2;    // 카드 사이 간격
 
             // 기계별 순서 배열 정규화
@@ -6569,31 +6508,10 @@
             const exclBlocks  = _woGetExclBlocks(sk);
             const exclReasons = (window._woExclusionReasons[sk]) || {};
 
-            // ── PX/분 스케일 동적 계산: 배치 카드 중 최단 작업시간 기준으로 MIN_CARD_H 보장
-            const _BASE_PX   = 1.0;   // 최소 스케일 (px/min)
-            const _MAX_PX    = 12.0;  // 최대 스케일 (720px/hr) — 최단 7분 카드도 MIN_CARD_H 보장
-            const _procKey0  = sk.replace(/^\d{4}-\d{2}-\d{2}-/, '');
-            let   _minPmReg  = Infinity, _minPmCut = Infinity;
-            machines.forEach(mac => {
-                (state[mac] || []).forEach(entry => {
-                    const ek  = typeof entry === 'string' ? entry : entry?.cKey;
-                    if (!ek) return;
-                    const ep  = parts.find(p => p.cKey === ek);
-                    if (!ep) return;
-                    const _eo  = confirmedOrders.find(o => (o.docId || String(o.idNum)) === (ep.orderKey || ''));
-                    const _eck = ep.orderKey ? ek.substring(ep.orderKey.length + 1) : ek;
-                    const _epm = _eo?.partCompletions?.[_eck]?.[_procKey0]?.actualMinutes ?? ep.pm ?? 0;
-                    if (_epm > 0) {
-                        if (ep.isCuttingCard) _minPmCut = Math.min(_minPmCut, _epm);
-                        else                  _minPmReg = Math.min(_minPmReg, _epm);
-                    }
-                });
-            });
-            const _reqR      = isFinite(_minPmReg) ? MIN_CARD_H / _minPmReg : _BASE_PX;
-            const _reqC      = isFinite(_minPmCut) ? 80          / _minPmCut : _BASE_PX;
-            const PX_PER_MIN = Math.min(_MAX_PX, Math.max(_BASE_PX, _reqR, _reqC));
-            window._woPxPerMin = window._woPxPerMin || {};
-            window._woPxPerMin[sk] = PX_PER_MIN;
+            // ── 고정 PX/분 스케일 — 최단카드 기준 자동확장 폐기, 시각 누적 방식으로 전환
+            // 짧은 카드: MIN_CARD_H 보장 & 다음 카드는 시각 바닥부터 → 겹침 없음
+            // 긴 카드: 실제 소요분 × PX 비례 → 합리적 높이
+            const PX_PER_MIN = 1.5;
 
             // ── 보드 표시 기준: 가장 이른 macStart → 타임라인 시작점
             const boardStartMin  = Math.min(...machines.map(mac => _woGetMacStart(sk, mac) ?? 480));
@@ -6633,56 +6551,81 @@
                     if (entry.startMin != null) {
                         cStart = entry.startMin;
                         topPx  = Math.round(cStart * PX_PER_MIN);
-                        // 핀 카드도 actualCur에 반영 (다음 누적 카드의 기준이 됨)
-                        const _pinnedEnd = _woCalcEffectiveEnd(cStart, pm, exclZones);
-                        if (_pinnedEnd > actualCur) actualCur = _pinnedEnd;
                     } else {
-                        // 기본 배치: actualCur가 구간 안에 있으면 구간 이후로 밀어냄
-                        // (구간을 가로지르는 경우는 세그먼트 분할로 처리)
-                        for (const z of exclZones) {
-                            if (actualCur >= z.start && actualCur < z.end) {
-                                actualCur = z.end; break;
+                        // 기본 배치: actualCur가 구간 안에 걸리면 구간 이후로 밀어냄
+                        let _acSkip = true;
+                        while (_acSkip) {
+                            _acSkip = false;
+                            for (const z of exclZones) {
+                                if (actualCur >= z.start && actualCur < z.end) {
+                                    visualY  += (z.end - actualCur) * PX_PER_MIN;
+                                    actualCur = z.end;
+                                    _acSkip = true; break;
+                                }
                             }
                         }
                         cStart = actualCur;
-                        topPx  = Math.round(cStart * PX_PER_MIN);
-                        const _cEnd = _woCalcEffectiveEnd(cStart, pm, exclZones);
-                        actualCur   = _cEnd;
-                        // visualY: 다음 카드 시작 기준 — 마지막 세그먼트 끝
-                        visualY     = _cEnd * PX_PER_MIN;
-                    }
-                    const cEnd   = _woCalcEffectiveEnd(cStart, pm, exclZones);
-                    // topPx = clockStart 절대px, cardH = 전체 시계 span (세그먼트 포함 break gap)
-                    const spanPx = Math.round((cEnd - cStart) * PX_PER_MIN);
-                    tl.push({ cKey: entry.cKey, pm, clockStart: cStart, clockEnd: cEnd,
-                               topPx, cardH: Math.max(cardMinH, spanPx) - GAP_PX,
-                               _pinned: entry.startMin != null, _minH: cardMinH });
-                });
-
-                // ── 2단계: topPx 순 정렬 후 카드 간 겹침만 밀어냄 (구간 처리는 세그먼트 렌더로)
-                tl.sort((a, b) => a.topPx - b.topPx);
-                let prevEndPx    = 0;   // 이전 카드 clockEnd의 절대 px (GAP 미포함 — 정확한 시각 연속성)
-                let prevClockEnd = 0;   // 이전 카드의 정확한 clockEnd (분)
-                tl.forEach(card => {
-                    // 이전 카드가 끝난 px 이전에 카드가 시작하면 → 이전 카드 끝 시각부터 배치
-                    if (card.topPx < prevEndPx) {
-                        // clockStart = 이전 카드가 끝난 정확한 시각 (px→분 역변환 오차 없음)
-                        card.clockStart = prevClockEnd;
-                        // clockStart가 구간 안이면 구간 이후로
+                        topPx  = Math.round(visualY);
+                        let _cEnd = _woCalcEffectiveEnd(cStart, pm, exclZones);
+                        let _visH = Math.max(cardMinH, Math.round((_cEnd - cStart) * PX_PER_MIN));
+                        // 카드 높이가 다음 구간을 가로지르면 구간 이후로 이동
                         for (const z of exclZones) {
-                            if (card.clockStart >= z.start && card.clockStart < z.end) {
-                                card.clockStart = z.end;
+                            const zStartPx = Math.round(z.start * PX_PER_MIN);
+                            if (topPx < zStartPx && topPx + _visH > zStartPx && _cEnd > z.start) {
+                                actualCur = z.end;
+                                cStart    = z.end;
+                                topPx     = Math.round(z.end * PX_PER_MIN);
+                                visualY   = topPx;
+                                _cEnd     = _woCalcEffectiveEnd(cStart, pm, exclZones);
+                                _visH     = Math.max(cardMinH, Math.round((_cEnd - cStart) * PX_PER_MIN));
                                 break;
                             }
                         }
-                        card.topPx    = Math.round(card.clockStart * PX_PER_MIN);
-                        card.clockEnd = _woCalcEffectiveEnd(card.clockStart, card.pm, exclZones);
-                        const sp = Math.round((card.clockEnd - card.clockStart) * PX_PER_MIN);
-                        card.cardH = Math.max(card._minH ?? MIN_CARD_H, sp) - GAP_PX;
+                        actualCur = _cEnd;
+                        visualY   = topPx + _visH;
                     }
-                    // prevEndPx: clockEnd 절대px (_MAX_PX=12 → 7분+ 카드는 MIN_CARD_H 팽창 없음)
-                    prevClockEnd = card.clockEnd;
-                    prevEndPx    = Math.round(card.clockEnd * PX_PER_MIN);
+                    const cEnd   = _woCalcEffectiveEnd(cStart, pm, exclZones);
+                    const effDur = cEnd - cStart;
+                    const visH   = Math.max(cardMinH, Math.round(effDur * PX_PER_MIN));
+                    tl.push({ cKey: entry.cKey, pm, clockStart: cStart, clockEnd: cEnd,
+                               topPx, cardH: visH - GAP_PX, _pinned: entry.startMin != null,
+                               _minH: cardMinH });
+                });
+
+                // ── 2단계: topPx 순 정렬 후 겹치는 카드 자동 밀어냄
+                // (이 시점에서 topPx는 절대 시계분 기준 — boardStartMin 오프셋은 아직 미적용)
+                tl.sort((a, b) => a.topPx - b.topPx);
+                let prevBottomPx = 0;
+                tl.forEach(card => {
+                    if (card.topPx < prevBottomPx) {
+                        card.topPx      = prevBottomPx;
+                        card.clockStart = card.topPx / PX_PER_MIN;
+                        card.clockEnd   = _woCalcEffectiveEnd(card.clockStart, card.pm, exclZones);
+                    }
+                    // 픽셀 기준 시각 겹침 검사: MIN_CARD_H 팽창까지 포함
+                    let _pushOk = false;
+                    while (!_pushOk) {
+                        _pushOk = true;
+                        for (const z of exclZones) {
+                            const zStartPx = Math.round(z.start * PX_PER_MIN);
+                            const zEndPx   = Math.round(z.end   * PX_PER_MIN);
+                            if (card.topPx >= zEndPx || card.topPx + card.cardH <= zStartPx) continue;
+                            if (card.clockEnd > z.start) {
+                                // 실제 작업이 구간을 가로지름 → 구간 이후로 밀어냄
+                                card.clockStart = z.end;
+                                card.topPx      = zEndPx;
+                                card.clockEnd   = _woCalcEffectiveEnd(card.clockStart, card.pm, exclZones);
+                                const effDur    = card.clockEnd - card.clockStart;
+                                const _mh       = card._minH ?? MIN_CARD_H;
+                                card.cardH      = Math.max(_mh, Math.round(effDur * PX_PER_MIN)) - GAP_PX;
+                                _pushOk = false; break;
+                            } else {
+                                // MIN_CARD_H 팽창만으로 겹침 → 높이를 구간 직전에서 클립
+                                card.cardH = Math.max(24, zStartPx - card.topPx - GAP_PX);
+                            }
+                        }
+                    }
+                    prevBottomPx = card.topPx + card.cardH + GAP_PX;
                 });
                 // ── boardStartMin 오프셋 적용 (2단계의 절대px에서 boardOffsetPx만 빼기)
                 // toPx(clockStart) 재계산 금지 — MIN_CARD_H 팽창으로 보장된 간격이 무너짐
@@ -6694,7 +6637,7 @@
                 macTimelines[mac]._visEnd = last ? (last.topPx + last.cardH) : ms * PX_PER_MIN;
             });
 
-            // 보드 높이: 카드 시각 하단(MIN_CARD_H 팽창 포함) 기준
+            // 보드 높이: 시각 최대 Y 기준 (시계보다 클 수 있음)
             let maxClockMin = boardStartMin + 120;
             let maxVisY     = 120 * PX_PER_MIN;
             machines.forEach(mac => {
@@ -6703,9 +6646,7 @@
                 const tl = macTimelines[mac];
                 if (tl.length) {
                     maxClockMin = Math.max(maxClockMin, macTimelines[mac]._actEnd);
-                    // 시각 하단 = topPx(이미 offset 적용) + cardH
-                    const last = tl[tl.length - 1];
-                    maxVisY = Math.max(maxVisY, last.topPx + last.cardH);
+                    maxVisY     = Math.max(maxVisY, toPx(macTimelines[mac]._actEnd));
                 }
             });
             const BOARD_H = Math.max(200, Math.ceil(maxVisY) + 80);
@@ -6851,7 +6792,7 @@
 
                 // 배치 카드 (절대위치) — 시각 누적 기반 (topPx/cardH 미리 계산)
                 const _fmtClk = m => { const mi = Math.round(m); return `${String(Math.floor(mi/60)).padStart(2,'0')}:${String(mi%60).padStart(2,'0')}`; };
-                tl.forEach(({cKey, topPx, cardH, clockStart, clockEnd, _minH}) => {
+                tl.forEach(({cKey, topPx, cardH, clockStart, clockEnd}) => {
                     const p = parts.find(pp => pp.cKey === cKey);
                     if (!p) return;
 
@@ -6862,11 +6803,6 @@
                     const _bobj  = confirmedOrders.find(o => (o.docId || String(o.idNum)) === _bdid);
                     const _bQI   = _partQtyInfo(_bobj?.partCompletions?.[_bck], p.dq || 0);
 
-                    // 첫 세그먼트 높이 사전 계산 (내용 표시 조건 판단용)
-                    const _firstSeg  = _woGetSegments(clockStart, clockEnd, exclZones)[0];
-                    const _firstSegH = Math.max(_minH ?? MIN_CARD_H,
-                        Math.round((_firstSeg.e - _firstSeg.s) * PX_PER_MIN));
-
                     // ─── 배치 카드 (재단카드: 상세 4행 / 일반카드: 컴팩트 2행) ───
                     let _placedInner = '';
                     if (p.isCuttingCard) {
@@ -6876,31 +6812,33 @@
                             ? `${_fmtClk(clockStart)} ~ ${_fmtClk(clockEnd)}`
                             : '';
                         _placedInner =
-                            `<div style="font-size:11px;font-weight:700;color:#a8a6a2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${p.orderCode||''}</div>` +
-                            `<div style="font-size:14px;font-weight:800;color:#37352f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35;margin-top:2px;">${p.plateName||p.nm||'-'}</div>` +
-                            `<div style="font-size:12px;font-weight:600;color:#6b6966;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${p.finish||''}</div>` +
-                            `<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:4px;">` +
-                            (_dimStr2    ? `<span style="font-size:11px;font-weight:700;color:#787774;background:#f0efed;padding:2px 5px;border-radius:3px;">${_dimStr2}</span>` : '') +
-                            (_sheetsStr2 ? `<span style="font-size:11px;font-weight:700;color:#37352f;background:#e8e7e4;padding:2px 5px;border-radius:3px;">${_sheetsStr2}</span>` : '') +
-                            `<span style="font-size:11px;font-weight:700;color:${_bQI.color};background:${_bQI.bg};padding:2px 5px;border-radius:3px;">${_bQI.label} EA</span>` +
+                            `<div style="font-size:9px;font-weight:700;color:#a8a6a2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${p.orderCode||''}</div>` +
+                            `<div style="font-size:12px;font-weight:800;color:#37352f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35;margin-top:1px;">${p.plateName||p.nm||'-'}</div>` +
+                            `<div style="font-size:10px;font-weight:600;color:#6b6966;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${p.finish||''}</div>` +
+                            `<div style="display:flex;gap:3px;align-items:center;flex-wrap:wrap;margin-top:3px;">` +
+                            (_dimStr2    ? `<span style="font-size:9px;font-weight:700;color:#787774;background:#f0efed;padding:1px 4px;border-radius:3px;">${_dimStr2}</span>` : '') +
+                            (_sheetsStr2 ? `<span style="font-size:9px;font-weight:700;color:#37352f;background:#e8e7e4;padding:1px 4px;border-radius:3px;">${_sheetsStr2}</span>` : '') +
+                            `<span style="font-size:9px;font-weight:700;color:${_bQI.color};background:${_bQI.bg};padding:1px 4px;border-radius:3px;">${_bQI.label} EA</span>` +
                             `</div>` +
-                            (_cutTimeStr ? `<div style="font-size:11px;font-weight:700;color:#a0a09c;margin-top:4px;white-space:nowrap;">⏱ ${_cutTimeStr}</div>` : '');
+                            (_cutTimeStr ? `<div style="font-size:8px;font-weight:700;color:#a0a09c;margin-top:3px;white-space:nowrap;">⏱ ${_cutTimeStr}</div>` : '');
                     } else {
                         const _cOn2 = p.orderName
-                            ? `<div style="font-size:11px;font-weight:600;color:#a8a6a2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3;">${p.orderName}</div>`
+                            ? `<div style="font-size:9px;font-weight:600;color:#a8a6a2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.25;">${p.orderName}</div>`
                             : '';
-                        const _cNm2 = `<div style="display:flex;align-items:center;justify-content:space-between;gap:4px;overflow:hidden;margin-top:1px;">` +
-                            `<span style="font-size:13px;font-weight:800;color:#37352f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3;">${p.nm}</span>` +
-                            `<span style="font-size:11px;font-weight:700;color:${_bQI.color};background:${_bQI.bg};padding:1px 5px;border-radius:3px;white-space:nowrap;flex-shrink:0;">${_bQI.label} EA</span>` +
+                        const _cNm2 = `<div style="display:flex;align-items:center;justify-content:space-between;gap:3px;overflow:hidden;">` +
+                            `<span style="font-size:11px;font-weight:800;color:#37352f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3;">${p.nm}</span>` +
+                            `<span style="font-size:9px;font-weight:700;color:${_bQI.color};background:${_bQI.bg};padding:0 4px;border-radius:3px;white-space:nowrap;flex-shrink:0;">${_bQI.label} EA</span>` +
                             `</div>`;
-                        const _pmMin = Math.round(p.pm || 0);
+                        // 공정시간 표시 — 카드 높이 충분할 때만
+                        const _pmVal = p.pm || 0;
+                        const _pmMin = Math.round(_pmVal);
                         const _timeRange2 = (clockStart != null && clockEnd != null)
-                            ? `${_fmtClk(clockStart)} ~ ${_fmtClk(clockEnd)}`
+                            ? `${_fmtClk(clockStart)}~${_fmtClk(clockEnd)}`
                             : '';
-                        const _cTime2 = _timeRange2
-                            ? `<div style="font-size:11px;font-weight:600;color:#a0a09c;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">⏱ ${_timeRange2}${_pmMin ? ` (${_pmMin}분)` : ''}</div>`
+                        const _cTime2 = cardH >= 56 && _timeRange2
+                            ? `<div style="font-size:8px;font-weight:600;color:#a0a09c;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">⏱ ${_timeRange2}${_pmMin ? ` (${_pmMin}분)` : ''}</div>`
                             : '';
-                        _placedInner = `<div style="flex:1;min-height:0;display:flex;flex-direction:column;">` + _cOn2 + _cNm2 + _cTime2 + `</div>`;
+                        _placedInner = `<div style="display:flex;flex-direction:column;overflow:hidden;">` + _cOn2 + _cNm2 + _cTime2 + `</div>`;
                     }
 
                     const _bok = p.orderKey || p.orderCode || '';
@@ -6933,27 +6871,16 @@
                                 : `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><button onclick="event.stopPropagation();tlMarkPartStarted('${_bSafeDocId}','${_bSafeCK}','${_bpk}','${_bDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}',${p.dq||0})" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#3b82f6;border:none;border-radius:3px;padding:1px 6px;cursor:pointer;line-height:1.5;">▶ 시작</button></div>`
                             : '';
 
-                    // 휴식/점심 구간을 경계로 세그먼트 분할 렌더링
-                    const _segs = _woGetSegments(clockStart, clockEnd, exclZones);
-                    _segs.forEach((seg, si) => {
-                        const _isFirst = si === 0;
-                        const _segTop  = Math.round(seg.s * PX_PER_MIN) - boardOffsetPx;
-                        const _segRawH = Math.round((seg.e - seg.s) * PX_PER_MIN);
-                        const _segMinH = _isFirst ? (_minH ?? MIN_CARD_H) : 22;
-                        const _segH    = Math.max(_segMinH, _segRawH);
-                        const _segDur  = Math.round(seg.e - seg.s);
-                        const _segInner = _isFirst
-                            ? _placedInner + _bDoneHtml
-                            : `<div style="font-size:8px;font-weight:800;color:${_bcc.bd||'#888'};padding:2px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">↪ ${_segDur}분</div>`;
-                        const _segBorder = _isFirst ? '' : 'border-top:2px dashed rgba(0,0,0,0.18);';
-                        html +=
-                            `<div class="wo-boring-placed-card" draggable="${_bDone || !_isFirst ? 'false' : 'true'}"` +
-                            ` style="top:${_segTop+1}px;height:${_segH}px;${_bcs}${_segBorder}${_bDone ? 'opacity:0.6;' : ''}"` +
-                            ` data-ck="${cKey}" data-sk="${sk}" data-done="${_bDone ? '1' : '0'}"` +
-                            (_isFirst ? ` onmouseenter="woBoardCardTipShow(event)" onmouseleave="woBoardCardTipHide()"` : '') +
-                            (_isFirst && !_bDone ? ` ondragstart="woBoardDragStart(event,'${cKey}','${sk}')" ondragend="woBoardDragEnd(event)"` : '') +
-                            `>${_segInner}</div>`;
-                    });
+                    html +=
+                        `<div class="wo-boring-placed-card" draggable="${_bDone ? 'false' : 'true'}"` +
+                        ` style="top:${topPx+1}px;height:${cardH}px;${_bcs}${_bDone ? 'opacity:0.6;' : ''}"` +
+                        ` data-ck="${cKey}" data-sk="${sk}" data-done="${_bDone ? '1' : '0'}"` +
+                        ` onmouseenter="woBoardCardTipShow(event)"` +
+                        ` onmouseleave="woBoardCardTipHide()"` +
+                        (_bDone ? '' : ` ondragstart="woBoardDragStart(event,'${cKey}','${sk}')" ondragend="woBoardDragEnd(event)"`) +
+                        `>` +
+                        _placedInner + _bDoneHtml +
+                        `</div>`;
                 });
 
                 html += `</div>`; // end mac-col
@@ -7269,7 +7196,7 @@
         // PX_PER_MIN 반환 헬퍼 (dragover/drop/render 공용)
         // 시각 누적 방식으로 전환 후 고정 스케일 사용
         function _woDragCalcPX(state, parts, extraKey, sk) {
-            return window._woPxPerMin?.[sk] ?? 1.5;
+            return 1.5;
         }
 
         window.woBoardDragOver = function(e) {
