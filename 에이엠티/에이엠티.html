@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.6.1 (2026-04-24) — PX/분 동적 스케일
+     버전: v1.6.2 (2026-04-27) — 카드 시간 연속성 수정 (종료 즉시 다음 시작)
      ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
@@ -1199,7 +1199,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.6.1</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.6.2</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -6584,6 +6584,9 @@
                     if (entry.startMin != null) {
                         cStart = entry.startMin;
                         topPx  = Math.round(cStart * PX_PER_MIN);
+                        // 핀 카드도 actualCur에 반영 (다음 누적 카드의 기준이 됨)
+                        const _pinnedEnd = _woCalcEffectiveEnd(cStart, pm, exclZones);
+                        if (_pinnedEnd > actualCur) actualCur = _pinnedEnd;
                     } else {
                         // 기본 배치: actualCur가 구간 안에 있으면 구간 이후로 밀어냄
                         // (구간을 가로지르는 경우는 세그먼트 분할로 처리)
@@ -6609,27 +6612,28 @@
 
                 // ── 2단계: topPx 순 정렬 후 카드 간 겹침만 밀어냄 (구간 처리는 세그먼트 렌더로)
                 tl.sort((a, b) => a.topPx - b.topPx);
-                let prevEndPx = 0;
+                let prevEndPx    = 0;   // 이전 카드 clockEnd의 절대 px (GAP 미포함 — 정확한 시각 연속성)
+                let prevClockEnd = 0;   // 이전 카드의 정확한 clockEnd (분)
                 tl.forEach(card => {
-                    // 이전 카드의 마지막 세그먼트 끝보다 앞에 시작하면 그 이후로 밀어냄
+                    // 이전 카드가 끝난 px 이전에 카드가 시작하면 → 이전 카드 끝 시각부터 배치
                     if (card.topPx < prevEndPx) {
-                        card.topPx      = prevEndPx;
-                        card.clockStart = card.topPx / PX_PER_MIN;
-                        card.clockEnd   = _woCalcEffectiveEnd(card.clockStart, card.pm, exclZones);
+                        // clockStart = 이전 카드가 끝난 정확한 시각 (px→분 역변환 오차 없음)
+                        card.clockStart = prevClockEnd;
                         // clockStart가 구간 안이면 구간 이후로
                         for (const z of exclZones) {
                             if (card.clockStart >= z.start && card.clockStart < z.end) {
                                 card.clockStart = z.end;
-                                card.topPx      = Math.round(card.clockStart * PX_PER_MIN);
-                                card.clockEnd   = _woCalcEffectiveEnd(card.clockStart, card.pm, exclZones);
                                 break;
                             }
                         }
+                        card.topPx    = Math.round(card.clockStart * PX_PER_MIN);
+                        card.clockEnd = _woCalcEffectiveEnd(card.clockStart, card.pm, exclZones);
                         const sp = Math.round((card.clockEnd - card.clockStart) * PX_PER_MIN);
                         card.cardH = Math.max(card._minH ?? MIN_CARD_H, sp) - GAP_PX;
                     }
-                    // prevEndPx = 마지막 세그먼트 끝 (clockEnd 절대px)
-                    prevEndPx = Math.round(card.clockEnd * PX_PER_MIN) + GAP_PX;
+                    prevClockEnd = card.clockEnd;
+                    // prevEndPx: GAP_PX 미포함 — 다음 카드의 clockStart 기준은 시각이지 px갭이 아님
+                    prevEndPx = Math.round(card.clockEnd * PX_PER_MIN);
                 });
                 // ── boardStartMin 오프셋 적용 (2단계의 절대px에서 boardOffsetPx만 빼기)
                 // toPx(clockStart) 재계산 금지 — MIN_CARD_H 팽창으로 보장된 간격이 무너짐
