@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.6.2 (2026-04-27) — 카드 시간 연속성 수정 (종료 즉시 다음 시작)
+     버전: v1.6.3 (2026-04-27) — 짧은 카드 MIN_CARD_H 확장 시 다음 카드 겹침 방지
      ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
@@ -1199,7 +1199,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.6.2</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.6.3</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -6631,9 +6631,12 @@
                         const sp = Math.round((card.clockEnd - card.clockStart) * PX_PER_MIN);
                         card.cardH = Math.max(card._minH ?? MIN_CARD_H, sp) - GAP_PX;
                     }
-                    prevClockEnd = card.clockEnd;
-                    // prevEndPx: GAP_PX 미포함 — 다음 카드의 clockStart 기준은 시각이지 px갭이 아님
-                    prevEndPx = Math.round(card.clockEnd * PX_PER_MIN);
+                    // prevEndPx: clockEnd px vs 카드 시각 하단(MIN_CARD_H 확장 포함) 중 더 큰 값
+                    // → 짧은 카드가 MIN_CARD_H로 부풀어도 다음 카드가 시각 하단 이후에 배치됨
+                    const _cardVisBottom = card.topPx + card.cardH + GAP_PX;
+                    const _clockEndPx    = Math.round(card.clockEnd * PX_PER_MIN);
+                    prevEndPx    = Math.max(_clockEndPx, _cardVisBottom);
+                    prevClockEnd = prevEndPx / PX_PER_MIN;
                 });
                 // ── boardStartMin 오프셋 적용 (2단계의 절대px에서 boardOffsetPx만 빼기)
                 // toPx(clockStart) 재계산 금지 — MIN_CARD_H 팽창으로 보장된 간격이 무너짐
