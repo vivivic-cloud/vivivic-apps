@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.6.6 (2026-04-27) — 납기 외 공정카드 배치 누락 수정 (cachedWorkTime 전체 적용)
+     버전: v1.6.7 (2026-04-27) — hasProcInItem 회귀 수정 (캐시 0값으로 공정섹션 공백 방지)
      ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
@@ -1199,7 +1199,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.6.6</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.6.7</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2319,7 +2319,10 @@
                         const t = calcProcessTime(row, unitCons * (item.orderQty || 1), {}, h);
                         calcWt.재단 += t.재단; calcWt.엣지 += t.엣지; calcWt.보링 += t.보링; calcWt.NC += t.NC;
                     });
-                    item.cachedWorkTime = calcWt;
+                    // matchingRows가 실제로 존재할 때만 덮어쓰기 (빈 결과로 기존 캐시를 0으로 오염시키지 않음)
+                    if (Object.values(calcWt).some(v => v > 0)) {
+                        item.cachedWorkTime = calcWt;
+                    }
                 });
             }
 
@@ -4096,12 +4099,11 @@
                 };
 
                 // ── 헬퍼: 해당 공정이 포함된 부속 존재 여부 확인 ──────────
-                // cachedWorkTime 우선 사용 (renderPendingOrders에서 전체 항목 계산됨)
-                // 없으면 currentFullData 직접 조회 (fallback)
+                // cachedWorkTime 양수값 → 빠른 긍정 확인 (캐시가 없거나 0이면 currentFullData fallback)
                 const hasProcInItem = (item, procKey) => {
-                    if (item.cachedWorkTime) {
-                        return (item.cachedWorkTime[procKey] ?? 0) > 0;
-                    }
+                    // 캐시에 양수값이 있으면 즉시 true (확실한 긍정)
+                    if (item.cachedWorkTime && (item.cachedWorkTime[procKey] ?? 0) > 0) return true;
+                    // currentFullData fallback — 캐시가 없거나 0일 때 직접 조회
                     if (!h || currentFullData.length < 2) return false;
                     const matchingRows = currentFullData.slice(1).filter(r =>
                         r && normalizeValue(r[h.indexOf("ing발주처")]) === item.supplier &&
