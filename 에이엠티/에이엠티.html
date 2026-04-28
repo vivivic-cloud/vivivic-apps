@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.7.1 (2026-04-27) — Excel storagePath 없을 때 fileName으로 경로 유도하여 URL 재발급 보완
+     버전: v1.7.2 (2026-04-27) — Firebase Storage getBytes 3단계 fallback (다운로드 토큰 취소 대응)
      ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
@@ -18,7 +18,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";    
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, getDoc, setDoc, getDocs, deleteField } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
-        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL, getBytes } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
@@ -38,7 +38,7 @@
         window.db = db;
         window.storage = storage;
         window.fbFirestore = { collection, addDoc, query, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, getDoc, setDoc, getDocs, deleteField };
-        window.fbStorage = { ref, uploadBytes, getDownloadURL };
+        window.fbStorage = { ref, uploadBytes, getDownloadURL, getBytes };
 
         signInAnonymously(auth);
 
@@ -1199,7 +1199,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.7.1</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.7.2</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -1914,17 +1914,8 @@
             const indicator = document.getElementById('cloud-sync-status');
             indicator.className = "sync-indicator sync-active";
             indicator.textContent = "SYNCING...";
-            try {
-                let response = await fetch(url);
-                // 412(토큰 만료) 등 실패 시 storagePath로 fresh URL 재발급 후 재시도
-                if (!response.ok && storagePath && window.fbStorage && window.storage) {
-                    console.log('[Excel] URL 만료('+response.status+'), storagePath로 fresh URL 재발급:', storagePath);
-                    const { ref, getDownloadURL } = window.fbStorage;
-                    const freshURL = await getDownloadURL(ref(window.storage, storagePath));
-                    response = await fetch(freshURL);
-                }
-                if (!response.ok) throw new Error("CORS/Network Error");
-                const arrayBuffer = await response.arrayBuffer();
+
+            const processArrayBuffer = (arrayBuffer) => {
                 const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
                 const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
                 if (jsonData.length > 0) {
@@ -1932,12 +1923,50 @@
                     buildProductIdentities();
                     onSupplierChange();
                     renderID0508();
-                    renderPendingOrders(); // 클라우드 데이터 로드 완료 후 cachedWorkTime 재계산 + 타임라인 동기화
+                    renderPendingOrders();
                     indicator.className = "sync-indicator sync-idle";
                     indicator.textContent = "CLOUD SYNCED";
                     const toast = document.getElementById('toast');
                     toast.textContent = `[${fileName}] 데이터 로드됨`;
                     toast.style.opacity = '1'; setTimeout(() => toast.style.opacity = '0', 2000);
+                }
+            };
+
+            try {
+                // 1차: 저장된 URL로 직접 fetch
+                let arrayBuffer = null;
+                let fetchOk = false;
+                try {
+                    const response = await fetch(url);
+                    if (response.ok) { arrayBuffer = await response.arrayBuffer(); fetchOk = true; }
+                    else { console.log('[Excel] 저장 URL 실패(' + response.status + '), 대체 방법 시도...'); }
+                } catch (e) { console.log('[Excel] 저장 URL fetch 오류:', e.message); }
+
+                // 2차: getDownloadURL로 fresh URL 재발급
+                if (!fetchOk && storagePath && window.fbStorage && window.storage) {
+                    try {
+                        const { ref, getDownloadURL } = window.fbStorage;
+                        console.log('[Excel] getDownloadURL 시도:', storagePath);
+                        const freshURL = await getDownloadURL(ref(window.storage, storagePath));
+                        const response2 = await fetch(freshURL);
+                        if (response2.ok) { arrayBuffer = await response2.arrayBuffer(); fetchOk = true; }
+                    } catch (e) { console.log('[Excel] getDownloadURL 실패:', e.message); }
+                }
+
+                // 3차: getBytes로 Firebase Auth 토큰 방식 직접 다운로드 (다운로드 토큰 불필요)
+                if (!fetchOk && storagePath && window.fbStorage && window.storage) {
+                    console.log('[Excel] getBytes 시도 (토큰 없이 직접 다운):', storagePath);
+                    const { ref, getBytes } = window.fbStorage;
+                    const bytesResult = await getBytes(ref(window.storage, storagePath));
+                    arrayBuffer = bytesResult.buffer;
+                    fetchOk = true;
+                    console.log('[Excel] getBytes 성공');
+                }
+
+                if (fetchOk && arrayBuffer) {
+                    processArrayBuffer(arrayBuffer);
+                } else {
+                    throw new Error("모든 다운로드 방법 실패");
                 }
             } catch (err) { console.error("Cloud Load Error:", err); indicator.textContent = "SYNC FAIL"; }
         }
