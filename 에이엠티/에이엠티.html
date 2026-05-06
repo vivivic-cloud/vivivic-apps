@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.7.4 (2026-05-06) — 카드 이동 후 선택 상태 자동 해제 + ESC/빈영역 클릭 해제
+     버전: v1.7.5 (2026-05-06) — 이동 후 선택 유지 복원 + ESC/빈영역 클릭으로 선택 해제
      ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
@@ -1199,7 +1199,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.7.4</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.7.5</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -8016,11 +8016,14 @@
                 // 타임라인 재렌더
                 TL.refreshCards();
 
-                // 이동 완료 후 선택 상태 자동 해제
-                _tlFlowActive = false;
-                _tlFlowIdNum  = null;
-                document.querySelectorAll('.tl-item-selected').forEach(c => c.classList.remove('tl-item-selected'));
-                _tlRestoreCollapsed();
+                // 이동 후 선택 상태 유지 (docId로 재선택) — _tlFlowActive 체크로 해제 시 재선택 방지
+                const newDocId = item.docId;
+                setTimeout(() => {
+                    if (_tlFlowActive && _tlFlowIdNum === newDocId) {
+                        document.querySelectorAll(`.tl-delivery-item[data-docid="${newDocId}"]`)
+                            .forEach(c => c.classList.add('tl-item-selected'));
+                    }
+                }, 30);
             }
 
         // ══════════════════════════════════════════════════════════════
@@ -8456,11 +8459,14 @@
                     });
 
                     TL.refreshCards();
-                    // 부속 이동 완료 후 선택 상태 자동 해제
-                    _tlFlowActive = false;
-                    _tlFlowIdNum  = null;
-                    document.querySelectorAll('.tl-item-selected').forEach(c => c.classList.remove('tl-item-selected'));
-                    _tlRestoreCollapsed();
+                    // 이동 후 선택 상태 유지 (docId로 재선택) — _tlFlowActive 체크로 해제 시 재선택 방지
+                    const _keepDocId = _tlFlowIdNum;
+                    setTimeout(() => {
+                        if (_tlFlowActive && _tlFlowIdNum === _keepDocId) {
+                            document.querySelectorAll(`.tl-delivery-item[data-docid="${_keepDocId}"]`)
+                                .forEach(c => c.classList.add('tl-item-selected'));
+                        }
+                    }, 30);
                 });
             }
 
