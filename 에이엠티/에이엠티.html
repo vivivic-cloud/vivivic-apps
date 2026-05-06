@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.7.9 (2026-05-06) — 드롭 시 카드 끝 스냅 적용 → 다른 공정 아래 이동 시 gap 제거
+     버전: v1.8.0 (2026-05-06) — 드롭 위치 이전 카드에 무조건 붙이기로 gap 완전 제거
      ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
@@ -1199,7 +1199,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.7.9</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.8.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -7549,24 +7549,27 @@
                 }
                 dropMin = Math.max(_bsMin2, dropMin);
 
-                // ── 카드 끝 스냅 (dragover와 동일 로직): 커서 위치에 배치된 카드가 있으면 그 끝으로 스냅
-                // → 다른 카드 아래로 이동 시 gap 없이 붙음
+                // ── 카드 끝 스냅: 드롭 위치(dropMin) 이전에 끝나는 카드가 있으면 그 카드 끝에 붙임
+                // → 다른 공정 아래 드롭 시 gap 없이 바로 이어붙음
                 const _dropTl = window._woMacTimelines?.[stateKey]?.[targetMachine];
                 if (_dropTl && _dropTl.length > 0) {
-                    const SNAP_PX = 40;
+                    // dropMin 이전(또는 같은 시각)에 끝나는 카드 중 가장 늦게 끝나는 카드 찾기
+                    let bestCard = null;
                     for (const cardData of _dropTl) {
-                        if (cardData.cKey === cardKey) continue;
-                        const cardBottomY = cardData.topPx + cardData.cardH;
-                        const inCardRange = dropY >= cardData.topPx && dropY <= cardData.topPx + cardData.cardH;
-                        const nearBottom  = Math.abs(dropY - cardBottomY) <= SNAP_PX;
-                        if (inCardRange || nearBottom) {
-                            let snapEnd = cardData.clockEnd;
-                            for (const z of _dExclZones) {
-                                if (snapEnd >= z.start && snapEnd < z.end) { snapEnd = z.end; break; }
+                        if (cardData.cKey === cardKey) continue; // 자기 자신 제외
+                        if (cardData.clockEnd <= dropMin) {
+                            if (!bestCard || cardData.clockEnd > bestCard.clockEnd) {
+                                bestCard = cardData;
                             }
-                            dropMin = snapEnd;
-                            break;
                         }
+                    }
+                    if (bestCard) {
+                        // 가장 늦게 끝나는 카드 바로 다음에 붙임 (gap 없음)
+                        let snapEnd = bestCard.clockEnd;
+                        for (const z of _dExclZones) {
+                            if (snapEnd >= z.start && snapEnd < z.end) { snapEnd = z.end; break; }
+                        }
+                        dropMin = snapEnd;
                     }
                 }
 
