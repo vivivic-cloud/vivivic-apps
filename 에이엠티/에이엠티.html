@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.7.8 (2026-05-06) — 공정작업지시서 카드 이동 시 빈칸 없이 뒷 카드 자동 당겨오기
+     버전: v1.7.9 (2026-05-06) — 드롭 시 카드 끝 스냅 적용 → 다른 공정 아래 이동 시 gap 제거
      ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
@@ -1199,7 +1199,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.7.8</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.7.9</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -7548,6 +7548,27 @@
                     }
                 }
                 dropMin = Math.max(_bsMin2, dropMin);
+
+                // ── 카드 끝 스냅 (dragover와 동일 로직): 커서 위치에 배치된 카드가 있으면 그 끝으로 스냅
+                // → 다른 카드 아래로 이동 시 gap 없이 붙음
+                const _dropTl = window._woMacTimelines?.[stateKey]?.[targetMachine];
+                if (_dropTl && _dropTl.length > 0) {
+                    const SNAP_PX = 40;
+                    for (const cardData of _dropTl) {
+                        if (cardData.cKey === cardKey) continue;
+                        const cardBottomY = cardData.topPx + cardData.cardH;
+                        const inCardRange = dropY >= cardData.topPx && dropY <= cardData.topPx + cardData.cardH;
+                        const nearBottom  = Math.abs(dropY - cardBottomY) <= SNAP_PX;
+                        if (inCardRange || nearBottom) {
+                            let snapEnd = cardData.clockEnd;
+                            for (const z of _dExclZones) {
+                                if (snapEnd >= z.start && snapEnd < z.end) { snapEnd = z.end; break; }
+                            }
+                            dropMin = snapEnd;
+                            break;
+                        }
+                    }
+                }
 
                 // 기존 배열 순서 유지 + 해당 카드 startMin만 갱신
                 const prevEntries = state[targetMachine]; // 이미 {cKey,startMin} 형식
