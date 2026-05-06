@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.9.0 (2026-05-06) — 기계 전용 작업 뷰 (모바일/태블릿 최적화, 실시간 공유)
+     버전: v1.9.1 (2026-05-06) — 기계 전용 뷰: 양방향 실시간 sync + 시작/완료 편집
      ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
@@ -1228,7 +1228,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.1</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -9902,258 +9902,318 @@
         //  URL: ?mv=1&sk={stateKey}&mac={machineName}
         //  ex)  ?mv=1&sk=2026-05-06-엣지&mac=1호기
         // ══════════════════════════════════════════════════════════════════════
-        window.initMachineView = async function(sk, mac) {
+        window.initMachineView = function(sk, mac) {
             if (!sk || !mac) {
                 document.body.innerHTML = '<div style="padding:40px;font-size:16px;color:#888;">잘못된 링크입니다. (sk, mac 파라미터 필요)</div>';
                 return;
             }
 
-            // ── 뷰포트 설정 (모바일 최적화)
+            // ── 뷰포트/타이틀
             document.title = `${mac} 작업화면`;
             const vp = document.querySelector('meta[name=viewport]');
             if (vp) vp.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
 
-            // ── 전체 body 교체
-            document.body.style.cssText = 'margin:0;padding:0;background:#111827;font-family:Inter,sans-serif;color:#fff;overflow-x:hidden;';
+            // ── body 교체
+            document.body.style.cssText = 'margin:0;padding:0;background:#0f172a;font-family:Inter,sans-serif;color:#fff;overflow-x:hidden;-webkit-tap-highlight-color:transparent;';
             document.body.innerHTML = `
-              <div id="mv-root" style="min-height:100vh;display:flex;flex-direction:column;">
-                <div id="mv-header" style="background:#1f2937;padding:16px 20px 12px;border-bottom:2px solid #374151;flex-shrink:0;">
-                  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
-                    <div>
-                      <div id="mv-proc-label" style="font-size:13px;font-weight:700;color:#9ca3af;letter-spacing:0.05em;"></div>
-                      <div id="mv-mac-label" style="font-size:28px;font-weight:900;color:#fff;line-height:1.1;margin-top:2px;"></div>
+              <div id="mv-root" style="min-height:100dvh;display:flex;flex-direction:column;">
+                <div id="mv-header" style="background:#1e293b;padding:14px 18px 10px;border-bottom:2px solid #334155;flex-shrink:0;position:sticky;top:0;z-index:100;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                    <div style="min-width:0;">
+                      <div id="mv-proc-label" style="font-size:11px;font-weight:700;color:#64748b;letter-spacing:0.08em;text-transform:uppercase;"></div>
+                      <div id="mv-mac-label" style="font-size:26px;font-weight:900;line-height:1.1;margin-top:1px;"></div>
                     </div>
-                    <div style="text-align:right;">
-                      <div id="mv-clock" style="font-size:32px;font-weight:900;color:#f59e0b;letter-spacing:-0.5px;font-variant-numeric:tabular-nums;font-family:ui-monospace,monospace;"></div>
-                      <div id="mv-date-label" style="font-size:12px;font-weight:600;color:#6b7280;margin-top:2px;"></div>
+                    <div style="text-align:right;flex-shrink:0;">
+                      <div id="mv-clock" style="font-size:28px;font-weight:900;color:#f59e0b;font-family:ui-monospace,monospace;letter-spacing:-0.5px;"></div>
+                      <div id="mv-date-label" style="font-size:11px;font-weight:600;color:#64748b;margin-top:1px;"></div>
                     </div>
                   </div>
-                  <div id="mv-summary" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;"></div>
+                  <div id="mv-summary" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;"></div>
                 </div>
-                <div id="mv-list" style="flex:1;padding:12px 16px 40px;overflow-y:auto;"></div>
-                <div id="mv-footer" style="padding:10px 20px;font-size:11px;color:#4b5563;background:#1f2937;border-top:1px solid #374151;text-align:center;flex-shrink:0;"></div>
+                <div id="mv-list" style="flex:1;padding:14px 14px 60px;overflow-y:auto;"></div>
+                <div id="mv-footer" style="padding:8px 16px;font-size:10px;color:#334155;background:#1e293b;border-top:1px solid #1e293b;text-align:center;flex-shrink:0;"></div>
               </div>
-              <div id="mv-loading" style="position:fixed;inset:0;background:#111827;display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:12px;">
-                <div style="font-size:24px;">⏳</div>
-                <div style="font-size:14px;color:#9ca3af;">스케줄 로딩 중...</div>
-              </div>`;
+              <div id="mv-loading" style="position:fixed;inset:0;background:#0f172a;display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:16px;">
+                <div style="width:36px;height:36px;border:4px solid #334155;border-top-color:#f59e0b;border-radius:50%;animation:mv-spin 0.8s linear infinite;"></div>
+                <div style="font-size:14px;color:#64748b;">스케줄 불러오는 중...</div>
+              </div>
+              <style>
+                @keyframes mv-spin { to { transform:rotate(360deg); } }
+                @keyframes mv-pulse-in { 0%{opacity:.4;transform:scale(.97)} 100%{opacity:1;transform:scale(1)} }
+                .mv-card { animation: mv-pulse-in 0.25s ease; }
+                .mv-btn { border:none;border-radius:10px;font-weight:800;cursor:pointer;transition:opacity .15s;touch-action:manipulation;-webkit-tap-highlight-color:transparent; }
+                .mv-btn:active { opacity:0.7; }
+              </style>`;
 
-            // ── 시계 업데이트
-            function _mvTick() {
-                const now = new Date();
-                const hh = String(now.getHours()).padStart(2,'0');
-                const mm = String(now.getMinutes()).padStart(2,'0');
-                const ss = String(now.getSeconds()).padStart(2,'0');
-                const el = document.getElementById('mv-clock');
-                if (el) el.textContent = `${hh}:${mm}:${ss}`;
-            }
-            _mvTick();
-            setInterval(_mvTick, 1000);
+            // ── 상태
+            let _mvSchedData = null;
+            let _mvOrders    = [];
+            let _mvReady     = false;
 
-            // ── proc 이름/색상 매핑
-            const _procName = sk.replace(/^\d{4}-\d{2}-\d{2}-/, '');
-            const _procColors = { 보링:'#7c3aed', 엣지:'#0ea5e9', 재단:'#f59e0b', NC:'#10b981' };
+            // ── 공통 유틸
+            const _procName  = sk.replace(/^\d{4}-\d{2}-\d{2}-/, '');
+            const _procColors = { 보링:'#8b5cf6', 엣지:'#0ea5e9', 재단:'#f59e0b', NC:'#10b981' };
             const _procColor  = _procColors[_procName] || '#6b7280';
+            const dateStr     = sk.substring(0, 10);
+            const _dow        = ['일','월','화','수','목','금','토'][new Date(dateStr).getDay()];
+            const _esc        = s => String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'");
 
-            // ── 날짜 표시
-            const dateStr = sk.substring(0, 10);
-            const _dow = ['일','월','화','수','목','금','토'][new Date(dateStr).getDay()];
             document.getElementById('mv-proc-label').textContent = `${_procName} 공정`;
             document.getElementById('mv-mac-label').textContent  = mac;
-            document.getElementById('mv-date-label').textContent = `${dateStr} (${_dow})`;
             document.getElementById('mv-mac-label').style.color  = _procColor;
+            document.getElementById('mv-date-label').textContent = `${dateStr} (${_dow})`;
 
-            // ── 시간(분) → "HH:MM" 포맷
-            const _fmtMin = m => {
-                const h = String(Math.floor(m / 60)).padStart(2,'0');
-                const n = String(Math.round(m) % 60).padStart(2,'0');
-                return `${h}:${n}`;
-            };
+            // ── 시계
+            function _mvTick() {
+                const now = new Date();
+                const el = document.getElementById('mv-clock');
+                if (el) el.textContent =
+                    String(now.getHours()).padStart(2,'0') + ':' +
+                    String(now.getMinutes()).padStart(2,'0') + ':' +
+                    String(now.getSeconds()).padStart(2,'0');
+            }
+            _mvTick(); setInterval(_mvTick, 1000);
 
-            // ── 유효 종료 시각 계산 (배제구간 고려)
+            // ── 시간 포맷
+            const _fmtMin = m => String(Math.floor(m/60)).padStart(2,'0') + ':' + String(Math.round(m)%60).padStart(2,'0');
+
+            // ── 배제구간 고려 종료시각
             function _mvCalcEnd(startMin, pm, exclZones) {
-                let cur = startMin, rem = pm;
-                let guard = 0;
+                let cur = startMin, rem = pm, guard = 0;
                 while (rem > 0 && guard++ < 200) {
                     const excl = exclZones.find(z => cur >= z.start && cur < z.end);
                     if (excl) { cur = excl.end; continue; }
-                    const nextExcl = exclZones.find(z => z.start > cur && z.start < cur + rem);
-                    if (nextExcl) {
-                        rem -= nextExcl.start - cur;
-                        cur = nextExcl.end;
-                    } else {
-                        cur += rem; rem = 0;
-                    }
+                    const nxt = exclZones.find(z => z.start > cur && z.start < cur + rem);
+                    if (nxt) { rem -= nxt.start - cur; cur = nxt.end; }
+                    else { cur += rem; rem = 0; }
                 }
                 return cur;
             }
 
-            // ── 완료 상태 라이브 렌더 함수 (Firestore confirmed_orders 기반)
-            let _mvSchedData = null;
-            let _mvOrders    = [];
+            // ── Firestore 편집: 시작 처리
+            window._mvMarkStarted = async function(orderKey, cKey, procKey) {
+                const ord = _mvOrders.find(o => (o.docId || String(o.idNum)) === orderKey);
+                if (!ord?.docId) return;
+                const ck = orderKey ? cKey.substring(orderKey.length + 1) : cKey;
+                try {
+                    const { doc, updateDoc } = window.fbFirestore;
+                    await updateDoc(doc(window.db,'artifacts','vivivic-4b7ef','public','data','confirmed_orders',ord.docId),
+                        { [`partStarted.${ck}.${procKey}`]: true });
+                } catch(e) { _mvToast('시작 처리 실패: ' + e.message, '#ef4444'); }
+            };
 
+            // ── Firestore 편집: 완료 모달
+            window._mvShowDoneModal = function(orderKey, cKey, procKey, nm, dq) {
+                const existing = document.getElementById('mv-done-modal');
+                if (existing) existing.remove();
+                const modal = document.createElement('div');
+                modal.id = 'mv-done-modal';
+                modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:99999;display:flex;align-items:flex-end;justify-content:center;';
+                modal.innerHTML = `
+                  <div style="background:#1e293b;border-radius:20px 20px 0 0;padding:28px 24px 40px;width:100%;max-width:480px;border-top:2px solid #334155;">
+                    <div style="width:40px;height:4px;background:#334155;border-radius:2px;margin:0 auto 20px;"></div>
+                    <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px;letter-spacing:0.05em;">완료 처리</div>
+                    <div style="font-size:20px;font-weight:900;color:#f9fafb;margin-bottom:2px;">${nm}</div>
+                    <div style="font-size:13px;color:#64748b;margin-bottom:22px;">${dq} EA</div>
+                    <div style="font-size:12px;font-weight:700;color:#94a3b8;margin-bottom:8px;">실제 소요시간 (분)</div>
+                    <input id="mv-done-min" type="number" inputmode="decimal" min="0" step="0.5" placeholder="예: 25.5"
+                      style="width:100%;font-size:28px;font-weight:900;color:#f9fafb;background:#0f172a;border:2px solid #475569;
+                             border-radius:12px;padding:14px 16px;box-sizing:border-box;text-align:center;outline:none;">
+                    <div style="display:flex;gap:10px;margin-top:20px;">
+                      <button class="mv-btn" onclick="document.getElementById('mv-done-modal').remove()"
+                        style="flex:1;font-size:15px;color:#94a3b8;background:#334155;padding:15px;">취소</button>
+                      <button class="mv-btn" onclick="window._mvConfirmDone('${_esc(orderKey)}','${_esc(cKey)}','${_esc(procKey)}','${_esc(nm)}',${dq})"
+                        style="flex:2;font-size:15px;color:#fff;background:#10b981;padding:15px;">✓ 완료 처리</button>
+                    </div>
+                  </div>`;
+                modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+                document.body.appendChild(modal);
+                setTimeout(() => document.getElementById('mv-done-min')?.focus(), 150);
+            };
+
+            window._mvConfirmDone = async function(orderKey, cKey, procKey, nm, dq) {
+                const inputEl = document.getElementById('mv-done-min');
+                const actualMin = inputEl ? parseFloat(inputEl.value) : null;
+                document.getElementById('mv-done-modal')?.remove();
+                const ord = _mvOrders.find(o => (o.docId || String(o.idNum)) === orderKey);
+                if (!ord?.docId) return;
+                const ck = orderKey ? cKey.substring(orderKey.length + 1) : cKey;
+                try {
+                    const { doc, updateDoc } = window.fbFirestore;
+                    const updates = {
+                        [`partCompletions.${ck}.${procKey}`]: {
+                            doneAt: new Date().toISOString(), partName: nm, dq: Number(dq),
+                            ...(actualMin != null && !isNaN(actualMin) ? { actualMinutes: actualMin } : {})
+                        }
+                    };
+                    await updateDoc(doc(window.db,'artifacts','vivivic-4b7ef','public','data','confirmed_orders',ord.docId), updates);
+                    _mvToast('✓ 완료 처리되었습니다.', '#10b981');
+                } catch(e) { _mvToast('완료 처리 실패: ' + e.message, '#ef4444'); }
+            };
+
+            // ── 완료 취소
+            window._mvCancelDone = async function(orderKey, cKey, procKey) {
+                const ord = _mvOrders.find(o => (o.docId || String(o.idNum)) === orderKey);
+                if (!ord?.docId) return;
+                const ck = orderKey ? cKey.substring(orderKey.length + 1) : cKey;
+                if (!confirm('완료를 취소하시겠습니까?')) return;
+                try {
+                    const { doc, updateDoc, deleteField } = window.fbFirestore;
+                    await updateDoc(doc(window.db,'artifacts','vivivic-4b7ef','public','data','confirmed_orders',ord.docId),
+                        { [`partCompletions.${ck}.${procKey}`]: deleteField() });
+                    _mvToast('완료가 취소되었습니다.', '#f59e0b');
+                } catch(e) { _mvToast('취소 실패: ' + e.message, '#ef4444'); }
+            };
+
+            // ── 토스트
+            function _mvToast(msg, color) {
+                const t = document.createElement('div');
+                t.style.cssText = `position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:${color||'#334155'};
+                    color:#fff;font-size:13px;font-weight:700;padding:10px 20px;border-radius:24px;z-index:99999;
+                    pointer-events:none;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,0.4);`;
+                t.textContent = msg;
+                document.body.appendChild(t);
+                setTimeout(() => t.remove(), 2800);
+            }
+
+            // ── 렌더
             function _mvRender() {
                 if (!_mvSchedData) return;
-                const { schedule, parts, exclZones, machines } = _mvSchedData;
+                const { schedule, parts, exclZones = [] } = _mvSchedData;
                 const macArr = schedule[mac] || [];
                 const listEl = document.getElementById('mv-list');
                 if (!listEl) return;
 
-                const macStart = 480; // 기본 8:00 AM (저장된 시작시간 없으면)
-                let cur = macStart;
-                let totalDone = 0, totalInProg = 0, totalPending = 0;
-                let cardsHtml = '';
+                let cur = 480, totalDone = 0, totalInProg = 0, totalPending = 0;
+                const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
 
-                macArr.forEach((entry, idx) => {
+                const cards = macArr.map((entry, idx) => {
                     const cKey = entry.cKey;
                     const p = parts.find(pp => pp.cKey === cKey);
-                    if (!p) return;
+                    if (!p) return '';
 
-                    // 시작시간 결정
                     if (entry.startMin != null && entry.startMin > cur) cur = entry.startMin;
                     exclZones.forEach(z => { if (cur >= z.start && cur < z.end) cur = z.end; });
                     const startMin = cur;
                     const endMin   = _mvCalcEnd(startMin, p.pm || 30, exclZones);
                     cur = endMin;
 
-                    // 완료 상태 조회
-                    const procKey = _procName;
+                    const procKey  = _procName;
                     const orderKey = p.orderKey || '';
-                    const ck = orderKey ? cKey.substring(orderKey.length + 1) : cKey;
-                    const _ord = _mvOrders.find(o => (o.docId || String(o.idNum)) === orderKey);
+                    const ck       = orderKey ? cKey.substring(orderKey.length + 1) : cKey;
+                    const _ord     = _mvOrders.find(o => (o.docId || String(o.idNum)) === orderKey);
                     const isDone    = !!(_ord?.partCompletions?.[ck]?.[procKey]);
                     const isStarted = !!(_ord?.partStarted?.[ck]?.[procKey]);
                     const actMin    = _ord?.partCompletions?.[ck]?.[procKey]?.actualMinutes ?? null;
+                    const isActive  = !isDone && (isStarted || (nowMin >= startMin && nowMin < endMin));
 
-                    // 현재 시간 기준 상태
-                    const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
-                    let statusLabel, statusColor, statusBg, statusIcon;
+                    isDone ? totalDone++ : isActive ? totalInProg++ : totalPending++;
+
+                    const cardBg    = isDone ? '#0d2018' : isActive ? '#1c1505' : '#1e293b';
+                    const borderCol = isDone ? '#10b981' : isActive ? '#f59e0b' : '#334155';
+                    const statusCol = isDone ? '#10b981' : isActive ? '#f59e0b' : '#64748b';
+                    const statusLbl = isDone ? '✓ 완료'  : isActive ? '▶ 진행중' : '○ 대기';
+                    const partNm    = p.isCuttingCard ? (p.plateName||p.nm) : p.nm;
+                    const dimStr    = (p.rw && p.rd) ? `${p.rw}×${p.rd}` : '';
+                    const pmStr     = p.pm >= 1 ? `${p.pm.toFixed(1)}분` : `${Math.round(p.pm*60)}초`;
+                    const eo = _esc(orderKey), ec = _esc(cKey), ep = _esc(procKey), en = _esc(partNm);
+
+                    // 편집 버튼
+                    let actionBtn = '';
                     if (isDone) {
-                        statusLabel = '완료'; statusIcon = '✓';
-                        statusColor = '#10b981'; statusBg = 'rgba(16,185,129,0.12)';
-                        totalDone++;
-                    } else if (isStarted || (nowMin >= startMin && nowMin < endMin)) {
-                        statusLabel = '진행중'; statusIcon = '▶';
-                        statusColor = '#f59e0b'; statusBg = 'rgba(245,158,11,0.12)';
-                        totalInProg++;
+                        actionBtn = `<button class="mv-btn" onclick="window._mvCancelDone('${eo}','${ec}','${ep}')"
+                            style="padding:10px 16px;font-size:12px;color:#64748b;background:#1e293b;border:1px solid #334155;margin-top:12px;width:100%;">
+                            ↩ 완료 취소</button>`;
+                    } else if (isStarted) {
+                        actionBtn = `<button class="mv-btn" onclick="window._mvShowDoneModal('${eo}','${ec}','${ep}','${en}',${p.dq||0})"
+                            style="padding:14px 16px;font-size:16px;color:#fff;background:#10b981;margin-top:12px;width:100%;">
+                            ✓ 완료 처리</button>`;
                     } else {
-                        statusLabel = '대기'; statusIcon = '○';
-                        statusColor = '#6b7280'; statusBg = 'rgba(107,114,128,0.08)';
-                        totalPending++;
+                        actionBtn = `<button class="mv-btn" onclick="window._mvMarkStarted('${eo}','${ec}','${ep}')"
+                            style="padding:14px 16px;font-size:16px;color:#fff;background:#3b82f6;margin-top:12px;width:100%;">
+                            ▶ 작업 시작</button>`;
                     }
 
-                    const dimStr = (p.rw && p.rd) ? `${p.rw}×${p.rd}` : '';
-                    const pmStr  = p.pm >= 1 ? `${p.pm.toFixed(1)}분` : `${Math.round(p.pm*60)}초`;
-
-                    cardsHtml += `
-                      <div style="background:${isDone?'#1a2a1e':statusBg==='rgba(245,158,11,0.12)'?'#1f1a0a':'#1f2937'};border:1.5px solid ${isDone?'#10b981':statusColor==='#f59e0b'?'#f59e0b33':'#374151'};
-                                  border-left:4px solid ${statusColor};border-radius:12px;margin-bottom:12px;padding:16px 18px;
-                                  ${isDone?'opacity:0.65;':''}position:relative;overflow:hidden;">
+                    return `
+                      <div class="mv-card" style="background:${cardBg};border:1.5px solid ${borderCol};border-left:5px solid ${borderCol};
+                           border-radius:14px;margin-bottom:12px;padding:16px 16px 14px;${isDone?'opacity:0.6;':''}">
                         <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
                           <div style="flex:1;min-width:0;">
-                            <div style="font-size:11px;font-weight:700;color:#9ca3af;margin-bottom:3px;letter-spacing:0.03em;">
-                              ${String(idx+1).padStart(2,'0')} · ${p.orderName || p.orderCode || ''}
+                            <div style="font-size:10px;font-weight:700;color:#64748b;margin-bottom:3px;">
+                              ${String(idx+1).padStart(2,'0')} &nbsp;·&nbsp; ${p.orderName||p.orderCode||''}
                             </div>
-                            <div style="font-size:22px;font-weight:900;color:#f9fafb;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-                              ${p.isCuttingCard ? (p.plateName||p.nm) : p.nm}
-                            </div>
-                            ${dimStr ? `<div style="font-size:12px;color:#6b7280;margin-top:2px;">${dimStr}</div>` : ''}
+                            <div style="font-size:21px;font-weight:900;color:#f1f5f9;line-height:1.2;word-break:break-all;">${partNm}</div>
+                            ${dimStr?`<div style="font-size:12px;color:#64748b;margin-top:2px;">${dimStr}</div>`:''}
                           </div>
-                          <div style="text-align:right;flex-shrink:0;">
-                            <div style="font-size:13px;font-weight:900;color:${statusColor};background:${statusBg};border-radius:8px;padding:4px 10px;border:1px solid ${statusColor}40;">
-                              ${statusIcon} ${statusLabel}
-                            </div>
-                            ${actMin != null ? `<div style="font-size:11px;color:#60a5fa;margin-top:4px;font-weight:700;">${actMin.toFixed(1)}분 소요</div>` : ''}
+                          <div style="flex-shrink:0;text-align:right;">
+                            <span style="font-size:12px;font-weight:800;color:${statusCol};background:${statusCol}20;
+                                border:1px solid ${statusCol}50;border-radius:8px;padding:5px 10px;display:inline-block;">${statusLbl}</span>
+                            ${actMin!=null?`<div style="font-size:11px;color:#60a5fa;margin-top:4px;font-weight:700;">${actMin.toFixed(1)}분 소요</div>`:''}
                           </div>
                         </div>
-                        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                          <span style="font-size:14px;font-weight:800;color:#f9fafb;background:#374151;padding:4px 10px;border-radius:6px;">
-                            ${p.dq} EA
-                          </span>
-                          <span style="font-size:13px;font-weight:700;color:#9ca3af;">⏱ ${pmStr}</span>
-                          <span style="font-size:13px;font-weight:700;color:${statusColor};">
-                            ${_fmtMin(startMin)} → ${_fmtMin(endMin)}
-                          </span>
-                          ${p.finish ? `<span style="font-size:11px;color:#6b7280;">${p.finish}</span>` : ''}
+                        <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+                          <span style="font-size:15px;font-weight:900;color:#f1f5f9;background:#334155;padding:5px 12px;border-radius:8px;">${p.dq} EA</span>
+                          <span style="font-size:13px;font-weight:600;color:#94a3b8;">⏱ ${pmStr}</span>
+                          <span style="font-size:13px;font-weight:700;color:${statusCol};">${_fmtMin(startMin)} → ${_fmtMin(endMin)}</span>
+                          ${p.finish?`<span style="font-size:11px;color:#64748b;">${p.finish}</span>`:''}
                         </div>
+                        ${actionBtn}
                       </div>`;
-                });
+                }).join('');
 
-                if (macArr.length === 0) {
-                    cardsHtml = `<div style="padding:60px 20px;text-align:center;color:#4b5563;font-size:15px;">이 기계에 배정된 작업이 없습니다.</div>`;
-                }
+                listEl.innerHTML = cards || `<div style="padding:80px 20px;text-align:center;color:#334155;font-size:15px;">이 기계에 배정된 작업이 없습니다.</div>`;
 
-                listEl.innerHTML = cardsHtml;
-
-                // 요약 바
+                // 요약
                 const sumEl = document.getElementById('mv-summary');
                 if (sumEl) {
-                    const total = macArr.length;
-                    const badge = (label, count, color) =>
-                        count > 0 ? `<span style="font-size:12px;font-weight:700;color:${color};background:${color}20;padding:4px 10px;border-radius:20px;border:1px solid ${color}40;">${label} ${count}</span>` : '';
-                    sumEl.innerHTML = `
-                      ${badge('✓ 완료', totalDone, '#10b981')}
-                      ${badge('▶ 진행중', totalInProg, '#f59e0b')}
-                      ${badge('○ 대기', totalPending, '#6b7280')}
-                      <span style="font-size:12px;color:#4b5563;margin-left:4px;">총 ${total}건</span>`;
+                    const badge = (lbl, n, c) => n>0?`<span style="font-size:11px;font-weight:700;color:${c};background:${c}1a;padding:4px 9px;border-radius:16px;border:1px solid ${c}40;">${lbl} ${n}</span>`:'';
+                    sumEl.innerHTML = badge('✓',totalDone,'#10b981')+badge('▶',totalInProg,'#f59e0b')+badge('○',totalPending,'#64748b')+
+                        `<span style="font-size:11px;color:#475569;margin-left:2px;">총 ${macArr.length}건</span>`;
                 }
 
-                // 푸터 업데이트
                 const ftEl = document.getElementById('mv-footer');
-                if (ftEl) ftEl.textContent = `마지막 업데이트: ${new Date().toLocaleTimeString('ko-KR')} · 30초마다 자동 갱신`;
+                if (ftEl) ftEl.textContent = `실시간 연동 · 마지막 갱신 ${new Date().toLocaleTimeString('ko-KR')}`;
             }
 
-            // ── Firestore 로드
-            async function _mvLoad() {
-                try {
-                    const { doc, getDoc, collection, onSnapshot } = window.fbFirestore;
+            // ── 실시간 Firestore 구독 (양방향)
+            const { doc, collection, onSnapshot } = window.fbFirestore;
 
-                    // proc_schedules 문서 로드
-                    const schedRef = doc(window.db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'proc_schedules', sk);
-                    const snap = await getDoc(schedRef);
+            // 1) 스케줄 실시간 구독 (주 앱이 저장하면 즉시 반영)
+            onSnapshot(
+                doc(window.db, 'artifacts','vivivic-4b7ef','public','data','proc_schedules', sk),
+                snap => {
                     if (snap.exists()) {
                         _mvSchedData = snap.data();
-                    } else {
-                        document.getElementById('mv-loading').innerHTML =
-                            `<div style="text-align:center;padding:40px;"><div style="font-size:24px;margin-bottom:12px;">⚠️</div>
-                            <div style="font-size:14px;color:#9ca3af;">스케줄 데이터가 없습니다.<br>공정작업지시서에서 카드를 배치한 후<br>공유 버튼을 다시 눌러주세요.</div></div>`;
-                        return;
-                    }
-
-                    // confirmed_orders 실시간 구독
-                    const ordersRef = collection(window.db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'confirmed_orders');
-                    onSnapshot(ordersRef, snap2 => {
-                        _mvOrders = snap2.docs.map(d => ({ ...d.data(), docId: d.id }));
+                        if (!_mvReady) {
+                            _mvReady = true;
+                            document.getElementById('mv-loading')?.remove();
+                        }
                         _mvRender();
-                    });
-
-                    // 로딩 화면 숨김
+                    } else if (!_mvReady) {
+                        const ld = document.getElementById('mv-loading');
+                        if (ld) ld.innerHTML = `<div style="text-align:center;padding:40px;">
+                            <div style="font-size:32px;margin-bottom:16px;">⚠️</div>
+                            <div style="font-size:14px;color:#64748b;line-height:1.7;">스케줄 데이터가 없습니다.<br>
+                            공정작업지시서에서 카드를 기계에 배치하면<br>자동으로 이 화면에 표시됩니다.</div></div>`;
+                    }
+                },
+                err => {
+                    console.error('[mv sched]', err);
                     const ld = document.getElementById('mv-loading');
-                    if (ld) ld.remove();
-
-                } catch(e) {
-                    console.error('[mv load]', e);
-                    const ld = document.getElementById('mv-loading');
-                    if (ld) ld.innerHTML = `<div style="text-align:center;padding:40px;color:#ef4444;">로드 오류: ${e.message}</div>`;
+                    if (ld) ld.innerHTML = `<div style="padding:40px;color:#ef4444;">로드 오류: ${err.message}</div>`;
                 }
-            }
+            );
 
-            // ── proc_schedules 실시간 구독 (30초 주기 갱신 대신 실시간)
-            async function _mvStartRealtimeSync() {
-                const { doc, onSnapshot } = window.fbFirestore;
-                const schedRef = doc(window.db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'proc_schedules', sk);
-                onSnapshot(schedRef, snap => {
-                    if (snap.exists()) {
-                        _mvSchedData = snap.data();
-                        _mvRender();
-                    }
-                });
-            }
+            // 2) 완료 상태 실시간 구독 (편집 결과가 주 앱에도 즉시 반영됨)
+            onSnapshot(
+                collection(window.db,'artifacts','vivivic-4b7ef','public','data','confirmed_orders'),
+                snap => {
+                    _mvOrders = snap.docs.map(d => ({ ...d.data(), docId: d.id }));
+                    _mvRender();
+                }
+            );
 
-            await _mvLoad();
-            _mvStartRealtimeSync();
-
-            // ── 1분마다 상태(시간 기준) 재계산 (시작/종료 시간 지남에 따라 상태 변경)
+            // 1분마다 시간 기준 상태(진행중/대기) 재계산
             setInterval(_mvRender, 60000);
         };
     </script>
