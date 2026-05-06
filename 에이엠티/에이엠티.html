@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.8.1 (2026-05-06) — state 직접 시뮬레이션으로 gap 완전 제거 (stale 캐시 문제 해결)
+     버전: v1.8.2 (2026-05-06) — 동일 제품 부속 자동배치 시 오더 단위 유지 (분리 방지)
      ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
@@ -1199,7 +1199,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.8.1</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.8.2</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -6545,26 +6545,28 @@
                 bins[minM].pm += od.pm;
             });
 
-            // ── Phase 2: 최소 부속 이동으로 불균형 보정
+            // ── Phase 2: 오더 단위 이동으로 불균형 보정 (동일 제품 부속은 반드시 같은 기계에 유지)
             const avg = macs.reduce((s, m) => s + bins[m].pm, 0) / macs.length;
-            for (let iter = 0; iter < parts.length; iter++) {
+            for (let iter = 0; iter < orders.length; iter++) {
                 const maxM = macs.reduce((a, b) => bins[a].pm >= bins[b].pm ? a : b);
                 const minM = macs.reduce((a, b) => bins[a].pm <= bins[b].pm ? a : b);
-                if (bins[maxM].pm - bins[minM].pm <= avg * 0.15) break;  // 15% 이내 → 충분히 균형
+                if (bins[maxM].pm - bins[minM].pm <= avg * 0.15) break; // 15% 이내 → 충분히 균형
                 const target = (bins[maxM].pm - bins[minM].pm) / 2;
-                let bestKey = null, bestDiff = Infinity;
-                bins[maxM].keys.forEach(k => {
-                    const p = parts.find(pp => pp.cKey === k);
-                    if (!p) return;
-                    const d = Math.abs((p.pm || 0) - target);
-                    if (d < bestDiff) { bestDiff = d; bestKey = k; }
+                // maxM에 있는 오더 중 이동 시 불균형이 가장 줄어드는 오더 선택
+                let bestOk = null, bestDiff = Infinity;
+                orders.forEach(([ok, od]) => {
+                    // maxM에 이 오더의 부속이 있는지 확인
+                    if (!od.keys.some(k => bins[maxM].keys.includes(k))) return;
+                    const d = Math.abs(od.pm - target);
+                    if (d < bestDiff) { bestDiff = d; bestOk = ok; }
                 });
-                if (!bestKey) break;
-                const bp = parts.find(pp => pp.cKey === bestKey);
-                bins[maxM].keys = bins[maxM].keys.filter(k => k !== bestKey);
-                bins[maxM].pm  -= bp?.pm || 0;
-                bins[minM].keys.push(bestKey);
-                bins[minM].pm  += bp?.pm || 0;
+                if (!bestOk) break;
+                const od = orderMap.get(bestOk);
+                // 오더 전체를 maxM → minM으로 이동 (부속 분리 없음)
+                bins[maxM].keys = bins[maxM].keys.filter(k => !od.keys.includes(k));
+                bins[maxM].pm  -= od.pm;
+                bins[minM].keys.push(...od.keys);
+                bins[minM].pm  += od.pm;
             }
             return bins;
         }
