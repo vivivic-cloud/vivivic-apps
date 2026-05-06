@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.7.6 (2026-05-06) — 공정작업지시서 카드 겹침 수정 (MIN_CARD_H 팽창 시 시각적 하단 기준 배치)
+     버전: v1.7.7 (2026-05-06) — 공정작업지시서 카드 끝에 스냅 이동 + 뒷 카드 자동 밀어내기
      ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
@@ -1199,7 +1199,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.7.6</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.7.7</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -6797,6 +6797,10 @@
                 macTimelines[mac]._visEnd = last ? (last.topPx + last.cardH) : ms * PX_PER_MIN;
             });
 
+            // 전역에 타임라인 데이터 노출 — dragover 에서 카드 끝 스냅에 사용
+            window._woMacTimelines = window._woMacTimelines || {};
+            window._woMacTimelines[sk] = macTimelines;
+
             // 보드 높이: 카드 시각 하단(MIN_CARD_H 팽창 포함) 기준
             let maxClockMin = boardStartMin + 120;
             let maxVisY     = 120 * PX_PER_MIN;
@@ -7426,6 +7430,32 @@
                 ghostTopPx = Math.round(snap * PX) - _bOffPx;
             }
 
+            // ── 배치된 카드 끝에 스냅: 카드 하단 40px 이내 또는 카드 위에 커서가 있으면 그 카드 clockEnd로 스냅
+            const _macTl = window._woMacTimelines?.[sk]?.[mac];
+            if (_macTl && _macTl.length > 0) {
+                const _bOffPx2 = Math.round(Math.min(..._woGetMachines(sk).map(m => _woGetMacStart(sk, m) ?? 480)) * PX);
+                const SNAP_PX = 40;
+                for (const cardData of _macTl) {
+                    if (cardData.cKey === window._woBDragKey) continue; // 자기 자신 제외
+                    // 카드 하단 절대 px (콜 기준 상대좌표)
+                    const cardBottomY = cardData.topPx + cardData.cardH; // 이미 offset 적용됨
+                    const curRelY = e.clientY - col.getBoundingClientRect().top;
+                    // 카드 하단 40px 이내 OR 카드 범위 내 커서
+                    const inCardRange = curRelY >= cardData.topPx && curRelY <= cardData.topPx + cardData.cardH;
+                    const nearBottom  = Math.abs(curRelY - cardBottomY) <= SNAP_PX;
+                    if (inCardRange || nearBottom) {
+                        let snapEnd = cardData.clockEnd;
+                        // 배제구간 안이면 이후로
+                        for (const z of exclZones) {
+                            if (snapEnd >= z.start && snapEnd < z.end) { snapEnd = z.end; break; }
+                        }
+                        ghostActualStart = snapEnd;
+                        ghostTopPx = Math.round(snapEnd * PX) - _bOffPx2;
+                        break;
+                    }
+                }
+            }
+
             const ghostEnd  = _woCalcEffectiveEnd(ghostActualStart, dragPm, exclZones);
             const ghostEff  = ghostEnd - ghostActualStart;
             const heightPx  = Math.max(_MIN_VH, Math.round(ghostEff * PX));
@@ -7497,6 +7527,21 @@
                     x.cKey === cardKey ? { cKey: x.cKey, startMin: dropMin } : x
                 );
                 if (!alreadyIn) newEntries.push({ cKey: cardKey, startMin: dropMin });
+
+                // 드롭된 카드의 종료 시각 계산 → 겹치는 뒷 카드 자동 밀어냄
+                const dropEndMin = _woCalcEffectiveEnd(dropMin, _dropPm, _dExclZones);
+                newEntries.forEach(entry => {
+                    if (entry.cKey === cardKey) return; // 방금 배치한 카드 제외
+                    if (entry.startMin == null) return;  // 미고정 카드는 누적 배치로 자동 처리
+                    if (entry.startMin >= dropMin && entry.startMin < dropEndMin) {
+                        // 겹치는 카드: 드롭된 카드 종료 시각 이후로 밀어냄
+                        let shifted = dropEndMin;
+                        for (const z of _dExclZones) {
+                            if (shifted >= z.start && shifted < z.end) { shifted = z.end; break; }
+                        }
+                        entry.startMin = shifted;
+                    }
+                });
                 state[targetMachine] = newEntries;
             }
 
