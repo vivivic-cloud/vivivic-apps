@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.7.7 (2026-05-06) — 공정작업지시서 카드 끝에 스냅 이동 + 뒷 카드 자동 밀어내기
+     버전: v1.7.8 (2026-05-06) — 공정작업지시서 카드 이동 시 빈칸 없이 뒷 카드 자동 당겨오기
      ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
@@ -1199,7 +1199,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.7.7</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.7.8</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -7485,11 +7485,40 @@
             const toKey  = x => typeof x === 'string' ? x : x?.cKey;
             const getKeys = mac => (state[mac] || []).map(toKey).filter(Boolean);
 
-            // 모든 기계+pool에서 해당 카드 제거 — {cKey,startMin} 형식 유지
+            // 모든 기계+pool에서 해당 카드 제거 — 카드가 있던 기계는 뒷 카드 당겨서 gap 제거
             machines.forEach(mac => {
-                state[mac] = (state[mac] || [])
-                    .map(x => typeof x === 'string' ? { cKey: x, startMin: null } : { cKey: x.cKey, startMin: x.startMin ?? null })
-                    .filter(x => x.cKey !== cardKey);
+                const rawArr = (state[mac] || []).map(x =>
+                    typeof x === 'string' ? { cKey: x, startMin: null } : { cKey: x.cKey, startMin: x.startMin ?? null }
+                );
+                const hasCard = rawArr.some(x => x.cKey === cardKey);
+                if (!hasCard) { state[mac] = rawArr; return; }
+
+                // 제거된 카드의 타임라인 데이터 (clockStart/clockEnd) 조회
+                const _rmTl = window._woMacTimelines?.[stateKey]?.[mac];
+                const _rmCard = _rmTl ? _rmTl.find(c => c.cKey === cardKey) : null;
+
+                if (_rmCard) {
+                    const rmStart = _rmCard.clockStart;
+                    const rmEnd   = _rmCard.clockEnd;
+                    const rmDur   = rmEnd - rmStart; // 제거된 카드의 지속 시간
+                    // 제거 후 남은 카드: rmEnd 이후에 핀된 카드들은 rmDur만큼 당김 (gap 제거)
+                    state[mac] = rawArr
+                        .filter(x => x.cKey !== cardKey)
+                        .map(x => {
+                            if (x.startMin == null) return x; // 미고정은 누적 배치로 자동 처리
+                            if (x.startMin >= rmEnd) {
+                                // 카드 이후: rmDur만큼 당겨서 gap 메움
+                                return { cKey: x.cKey, startMin: Math.max(rmStart, x.startMin - rmDur) };
+                            }
+                            if (x.startMin >= rmStart && x.startMin < rmEnd) {
+                                // 카드 범위 안: rmStart로 당김
+                                return { cKey: x.cKey, startMin: rmStart };
+                            }
+                            return x;
+                        });
+                } else {
+                    state[mac] = rawArr.filter(x => x.cKey !== cardKey);
+                }
             });
             state.pool = (state.pool || []).filter(k => k !== cardKey);
 
