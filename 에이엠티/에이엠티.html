@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.7.3 (2026-04-28) — 파일 업로드 시 로컬 파싱 즉시 반영 (Firebase Storage 우회)
+     버전: v1.7.4 (2026-05-06) — 카드 이동 후 선택 상태 자동 해제 + ESC/빈영역 클릭 해제
      ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
@@ -1199,7 +1199,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.7.3</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.7.4</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -5068,6 +5068,38 @@
         let _tlFlowIdNum  = null;    // 현재 선택된 docId (Firebase 문서 ID)
         let _tlCollapsed  = [];      // 접힌 [{ wrapEl, dateStr, dayCount }] 목록
 
+        // 더블클릭 선택 상태 전역 해제 함수
+        function tlClearSelection() {
+            if (!_tlFlowActive) return;
+            document.querySelectorAll('.tl-item-selected').forEach(c => c.classList.remove('tl-item-selected'));
+            document.querySelectorAll('.tl-delivery-item[data-tl-open="1"]').forEach(el => {
+                el.dataset.tlOpen = '0';
+                const a = el.querySelector('.tl-arrow');
+                if (a) a.textContent = '▶';
+            });
+            const _panel = document.getElementById('tl-parts-panel');
+            if (_panel) { _panel.style.display = 'none'; _panel.innerHTML = ''; }
+            _tlRestoreCollapsed();
+            _tlFlowActive = false;
+            _tlFlowIdNum  = null;
+            if (window._tlFlushPendingRender) window._tlFlushPendingRender();
+        }
+
+        // ESC 키로 선택 해제
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && _tlFlowActive) { e.preventDefault(); tlClearSelection(); }
+        });
+
+        // 타임라인 빈 영역 클릭 시 선택 해제
+        document.addEventListener('click', e => {
+            if (!_tlFlowActive) return;
+            const wrap = document.getElementById('tl-infinite-wrap');
+            if (!wrap || !wrap.contains(e.target)) return;
+            // 카드 또는 버튼 클릭은 무시
+            if (e.target.closest('.tl-delivery-item') || e.target.closest('button') || e.target.closest('.tl-dc-btn-area')) return;
+            tlClearSelection();
+        });
+
         function _tlRestoreCollapsed() {
             _tlCollapsed.forEach(({ wrapEl, placeholder }) => {
                 // placeholder 제거
@@ -7984,12 +8016,11 @@
                 // 타임라인 재렌더
                 TL.refreshCards();
 
-                // 더블클릭 선택 상태 유지 (docId로 재선택)
-                const newDocId = item.docId;
-                setTimeout(() => {
-                    document.querySelectorAll(`.tl-delivery-item[data-docid="${newDocId}"]`)
-                        .forEach(c => c.classList.add('tl-item-selected'));
-                }, 30);
+                // 이동 완료 후 선택 상태 자동 해제
+                _tlFlowActive = false;
+                _tlFlowIdNum  = null;
+                document.querySelectorAll('.tl-item-selected').forEach(c => c.classList.remove('tl-item-selected'));
+                _tlRestoreCollapsed();
             }
 
         // ══════════════════════════════════════════════════════════════
@@ -8425,12 +8456,11 @@
                     });
 
                     TL.refreshCards();
-                    // 이동 후에도 이동모드 유지 — refreshCards 후 선택 클래스 재적용 (docId 기준)
-                    const _keepDocId = _tlFlowIdNum;   // _tlFlowIdNum에는 docId가 저장됨
-                    setTimeout(() => {
-                        document.querySelectorAll(`.tl-delivery-item[data-docid="${_keepDocId}"]`)
-                            .forEach(c => c.classList.add('tl-item-selected'));
-                    }, 30);
+                    // 부속 이동 완료 후 선택 상태 자동 해제
+                    _tlFlowActive = false;
+                    _tlFlowIdNum  = null;
+                    document.querySelectorAll('.tl-item-selected').forEach(c => c.classList.remove('tl-item-selected'));
+                    _tlRestoreCollapsed();
                 });
             }
 
