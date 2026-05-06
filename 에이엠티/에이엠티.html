@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.8.2 (2026-05-06) — 동일 제품 부속 자동배치 시 오더 단위 유지 (분리 방지)
+     버전: v1.8.3 (2026-05-04) — 기기변경 모드: 더블클릭 → 동일 오더 부속 하이라이트 + 일괄 기계 이동
      ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
@@ -831,6 +831,27 @@
         }
         .wo-boring-placed-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.09); z-index: 3; }
         .wo-boring-placed-card.dragging { opacity: 0.35; cursor: grabbing; }
+        /* ── 기기변경 모드: 하이라이트 */
+        .wo-boring-placed-card.wo-mac-highlight {
+            outline: 2px solid #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,0.25);
+            z-index: 4; animation: wo-pulse 1.4s ease-in-out infinite;
+        }
+        .wo-boring-part-card.wo-mac-highlight {
+            outline: 2px solid #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,0.25);
+            animation: wo-pulse 1.4s ease-in-out infinite;
+        }
+        @keyframes wo-pulse {
+            0%,100% { box-shadow: 0 0 0 3px rgba(245,158,11,0.25); }
+            50%      { box-shadow: 0 0 0 6px rgba(245,158,11,0.10); }
+        }
+        /* 기기변경 모드 배너 */
+        #wo-mac-change-banner {
+            display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 9800;
+            background: #fef3c7; border-bottom: 2px solid #f59e0b;
+            padding: 7px 16px; font-size: 12px; font-weight: 700; color: #92400e;
+            align-items: center; gap: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+        }
+        #wo-mac-change-banner.on { display: flex; }
         /* ── 카드 호버 툴팁 (fixed 레이어, overflow:hidden 컬럼 밖) */
         .wo-card-tip {
             position: fixed; z-index: 9999; pointer-events: none;
@@ -1199,7 +1220,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.8.2</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.8.3</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -6622,8 +6643,9 @@
             const _pok = p.orderKey || p.orderCode || '';
             const _pcc = _pcm[_pok] || {};
             const _pcs = _pcc.bg ? `background:${_pcc.bg};border-left:3px solid ${_pcc.bd};` : '';
+            const _pOkPool = (p.orderKey || p.orderCode || '').replace(/'/g, "\\'");
             return `<div class="wo-boring-part-card" draggable="${_wDone ? 'false' : 'true'}"
-                data-ck="${p.cKey}" data-sk="${stateKey}" data-done="${_wDone ? '1' : '0'}"
+                data-ck="${p.cKey}" data-sk="${stateKey}" data-ok="${_pOkPool}" data-done="${_wDone ? '1' : '0'}"
                 style="${_pcs}${_wDone ? 'opacity:0.6;' : ''}"
                 onmouseenter="woBoardCardTipShow(event)"
                 onmouseleave="woBoardCardTipHide()"
@@ -7055,12 +7077,13 @@
                             ? _placedInner + _bDoneHtml
                             : `<div style="font-size:8px;font-weight:800;color:${_bcc.bd||'#888'};padding:2px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">↪ ${_segDur}분</div>`;
                         const _segBorder = _isFirst ? '' : 'border-top:2px dashed rgba(0,0,0,0.18);';
+                        const _pOk = (p.orderKey || p.orderCode || '').replace(/'/g, "\\'");
                         html +=
                             `<div class="wo-boring-placed-card" draggable="${_bDone || !_isFirst ? 'false' : 'true'}"` +
                             ` style="top:${_segTop+1}px;height:${_segH}px;${_bcs}${_segBorder}${_bDone ? 'opacity:0.6;' : ''}"` +
-                            ` data-ck="${cKey}" data-sk="${sk}" data-done="${_bDone ? '1' : '0'}"` +
+                            ` data-ck="${cKey}" data-sk="${sk}" data-ok="${_pOk}" data-done="${_bDone ? '1' : '0'}"` +
                             (_isFirst ? ` onmouseenter="woBoardCardTipShow(event)" onmouseleave="woBoardCardTipHide()"` : '') +
-                            (_isFirst && !_bDone ? ` ondragstart="woBoardDragStart(event,'${cKey}','${sk}')" ondragend="woBoardDragEnd(event)"` : '') +
+                            (_isFirst && !_bDone ? ` ondblclick="woBoardDblClick('${cKey}','${sk}')" ondragstart="woBoardDragStart(event,'${cKey}','${sk}')" ondragend="woBoardDragEnd(event)"` : '') +
                             `>${_segInner}</div>`;
                     });
                 });
@@ -7070,6 +7093,10 @@
 
             html += `</div>`; // end inner
             grid.innerHTML = html;
+            // 기기변경 모드 하이라이트 재적용
+            if (window._woMacChangeMode && window._woMacChangeMode.stateKey === sk) {
+                requestAnimationFrame(() => _woApplyMacHighlight(window._woMacChangeMode.orderKey, sk));
+            }
         }
 
         // pool 섹션 재렌더 (상품명별 그룹화 + 배정 현황 표시)
@@ -7179,7 +7206,13 @@
             });
 
             el.innerHTML = html || '<span style="font-size:9px;color:#b0aeaa;padding:4px 0;">모두 배정됨 ✓</span>';
-            requestAnimationFrame(() => _woEqualCardWidths(sk));
+            requestAnimationFrame(() => {
+                _woEqualCardWidths(sk);
+                // 기기변경 모드 하이라이트 재적용
+                if (window._woMacChangeMode && window._woMacChangeMode.stateKey === sk) {
+                    _woApplyMacHighlight(window._woMacChangeMode.orderKey, sk);
+                }
+            });
         }
 
         function _woEqualCardWidths(sk) {
@@ -7270,6 +7303,76 @@
             document.querySelectorAll('[id^="wo-drop-ghost-"]').forEach(el => el.style.display = 'none');
             window._woBDragKey = null;
         };
+
+        // ── 기기변경 모드 (더블클릭 → 동일 제품 부속 하이라이트 + 일괄 이동) ──────────────
+        window._woMacChangeMode = null; // { orderKey, stateKey }
+
+        function _woEnsureMacChangeBanner() {
+            let banner = document.getElementById('wo-mac-change-banner');
+            if (!banner) {
+                banner = document.createElement('div');
+                banner.id = 'wo-mac-change-banner';
+                document.body.appendChild(banner);
+            }
+            return banner;
+        }
+
+        window._woExitMacChangeMode = function() {
+            window._woMacChangeMode = null;
+            document.querySelectorAll('.wo-mac-highlight').forEach(el => el.classList.remove('wo-mac-highlight'));
+            const banner = document.getElementById('wo-mac-change-banner');
+            if (banner) banner.classList.remove('on');
+        };
+
+        function _woApplyMacHighlight(orderKey, stateKey) {
+            // 기존 하이라이트 제거
+            document.querySelectorAll('.wo-mac-highlight').forEach(el => el.classList.remove('wo-mac-highlight'));
+            // 배치된 카드 하이라이트
+            document.querySelectorAll(`.wo-boring-placed-card[data-sk="${stateKey}"]`).forEach(el => {
+                if ((el.dataset.ok || '') === orderKey) el.classList.add('wo-mac-highlight');
+            });
+            // 풀 카드 하이라이트
+            document.querySelectorAll(`.wo-boring-part-card[data-sk="${stateKey}"]`).forEach(el => {
+                if ((el.dataset.ok || '') === orderKey) el.classList.add('wo-mac-highlight');
+            });
+        }
+
+        window.woBoardDblClick = function(cardKey, stateKey) {
+            const parts = window._woBoringParts[stateKey] || [];
+            const p = parts.find(pp => pp.cKey === cardKey);
+            if (!p) return;
+            const orderKey = p.orderKey || p.orderCode || '';
+
+            // 같은 오더가 이미 활성화된 경우 → 모드 해제
+            const cur = window._woMacChangeMode;
+            if (cur && cur.orderKey === orderKey && cur.stateKey === stateKey) {
+                window._woExitMacChangeMode();
+                return;
+            }
+
+            // 기존 모드 해제 후 새 모드 진입
+            window._woMacChangeMode = { orderKey, stateKey };
+            _woApplyMacHighlight(orderKey, stateKey);
+
+            // 배너 표시
+            const banner = _woEnsureMacChangeBanner();
+            const orderName = p.orderName || orderKey;
+            banner.innerHTML =
+                `<span>🔄 기기 변경 모드</span>` +
+                `<strong style="font-size:13px;">${orderName}</strong>` +
+                `<span style="font-weight:500;color:#a8580c;">— 카드를 드래그해 기계를 변경하세요. 관련 부속이 모두 함께 이동됩니다.</span>` +
+                `<button onclick="window._woExitMacChangeMode()" style="margin-left:auto;font-size:11px;font-weight:700;color:#92400e;background:#fde68a;border:1.5px solid #f59e0b;border-radius:5px;padding:3px 10px;cursor:pointer;">✕ 취소 (ESC)</button>`;
+            banner.classList.add('on');
+        };
+
+        // ESC → 기기변경 모드 해제
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && window._woMacChangeMode) {
+                e.preventDefault();
+                window._woExitMacChangeMode();
+            }
+        });
+
         // ── 배치 카드 호버 툴팁 (fixed 레이어 — overflow:hidden 컬럼 밖에 표시)
         function _woEnsureCardTip() {
             if (document.getElementById('wo-card-tip')) return;
@@ -7481,6 +7584,70 @@
             const state = window._woBoring[stateKey];
             if (!state) return;
             const parts    = window._woBoringParts[stateKey] || [];
+
+            // ── 기기변경 모드: 드래그된 카드가 하이라이트된 경우 동일 오더 전체 이동
+            const _mcm = window._woMacChangeMode;
+            if (_mcm && _mcm.stateKey === stateKey) {
+                const _dragP = parts.find(pp => pp.cKey === cardKey);
+                const _dragOk = _dragP ? (_dragP.orderKey || _dragP.orderCode || '') : '';
+                if (_dragOk === _mcm.orderKey) {
+                    // 동일 오더의 모든 부속 키 수집 (풀 포함)
+                    const _batchKeys = parts
+                        .filter(pp => (pp.orderKey || pp.orderCode || '') === _mcm.orderKey)
+                        .map(pp => pp.cKey);
+                    const machines = _woGetMachines(stateKey);
+                    const _dExclZones = _woGetExclZones(stateKey);
+                    const _macStartMin = _woGetMacStart(stateKey, targetMachine) ?? 480;
+
+                    // 모든 기계+풀에서 해당 오더 카드 제거
+                    machines.forEach(mac => {
+                        state[mac] = (state[mac] || [])
+                            .map(x => typeof x === 'string' ? { cKey: x, startMin: null } : { cKey: x.cKey, startMin: x.startMin ?? null })
+                            .filter(x => !_batchKeys.includes(x.cKey));
+                    });
+                    state.pool = (state.pool || []).filter(k => !_batchKeys.includes(k));
+
+                    if (targetMachine === 'pool') {
+                        // 풀로 복귀 — 순서만 유지
+                        _batchKeys.forEach(k => state.pool.push(k));
+                    } else {
+                        if (!state[targetMachine]) state[targetMachine] = [];
+                        // 드롭 Y위치 기준 시작 시간 산출 (이미 배치된 카드 뒤에 이어 붙임)
+                        const _colEl = document.querySelector(`.wo-boring-mac-col[data-mac="${targetMachine}"][data-sk="${stateKey}"]`);
+                        const rect   = _colEl ? _colEl.getBoundingClientRect() : e.currentTarget.getBoundingClientRect();
+                        const dropY  = e.clientY - rect.top;
+                        const PX     = _woDragCalcPX(state, parts, cardKey, stateKey);
+                        let batchStart = Math.max(_macStartMin, _macStartMin + Math.round((dropY / PX) / 30) * 30);
+                        while (_dExclZones.some(z => batchStart >= z.start && batchStart < z.end)) batchStart += 30;
+                        // 이미 배치된(다른 오더) 카드 시뮬레이션 → 가장 늦은 끝 시간 뒤에 붙임
+                        let _simCur = _macStartMin;
+                        for (const entry of (state[targetMachine] || [])) {
+                            const _eCKey = typeof entry === 'string' ? entry : entry.cKey;
+                            const _eSMin = typeof entry === 'object' && entry.startMin != null ? entry.startMin : null;
+                            const _ePm   = (parts.find(p => p.cKey === _eCKey)?.pm) ?? 30;
+                            if (_eSMin != null && _eSMin > _simCur) _simCur = _eSMin;
+                            for (const z of _dExclZones) { if (_simCur >= z.start && _simCur < z.end) { _simCur = z.end; break; } }
+                            const _eEnd = _woCalcEffectiveEnd(_simCur, _ePm, _dExclZones);
+                            if (_eEnd <= batchStart) batchStart = _eEnd;
+                            _simCur = _eEnd;
+                        }
+                        // 배치 순서 유지하며 순차 배치
+                        let _cur = batchStart;
+                        _batchKeys.forEach(k => {
+                            for (const z of _dExclZones) { if (_cur >= z.start && _cur < z.end) { _cur = z.end; break; } }
+                            const _pm = parts.find(p => p.cKey === k)?.pm ?? 30;
+                            state[targetMachine].push({ cKey: k, startMin: _cur });
+                            _cur = _woCalcEffectiveEnd(_cur, _pm, _dExclZones);
+                        });
+                    }
+
+                    _woRenderBoard(stateKey);
+                    _woRenderPool(stateKey);
+                    window._woBDragKey = null;
+                    requestAnimationFrame(() => _woApplyMacHighlight(_mcm.orderKey, stateKey));
+                    return; // 일반 단일 카드 드롭 로직 건너뜀
+                }
+            }
             const machines = _woGetMachines(stateKey);
 
             // 정규화 헬퍼
@@ -7620,6 +7787,11 @@
             _woRenderBoard(stateKey);
             _woRenderPool(stateKey);
             window._woBDragKey = null;
+
+            // ── 기기변경 모드: 드롭 후 하이라이트 재적용
+            if (window._woMacChangeMode && window._woMacChangeMode.stateKey === stateKey) {
+                requestAnimationFrame(() => _woApplyMacHighlight(window._woMacChangeMode.orderKey, stateKey));
+            }
         };
 
         // 작업지시서 발행 모달
