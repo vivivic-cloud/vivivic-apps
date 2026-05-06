@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.8.5 (2026-05-06) — 기기변경 모드: 관련 카드 외 클릭 시 즉시 해제
+     버전: v1.9.0 (2026-05-06) — 기계 전용 작업 뷰 (모바일/태블릿 최적화, 실시간 공유)
      ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
@@ -44,9 +44,17 @@
 
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                console.log("Firebase Auth Success:", user.uid);
-                initCloudDataSync();
-                initConfirmedOrdersSync();
+                const _mvP = new URLSearchParams(location.search);
+                if (_mvP.get('mv') === '1') {
+                    // ── 기계 전용 뷰 모드
+                    if (typeof window.initMachineView === 'function') {
+                        window.initMachineView(_mvP.get('sk'), _mvP.get('mac'));
+                    }
+                } else {
+                    console.log("Firebase Auth Success:", user.uid);
+                    initCloudDataSync();
+                    initConfirmedOrdersSync();
+                }
             }
         });
     </script>
@@ -1220,7 +1228,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.8.5</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -6853,8 +6861,15 @@
                             const om = String(mins % 60).padStart(2,'0');
                             return `<option value="${mins}"${mins === _ms ? ' selected' : ''}>${oh}:${om}</option>`;
                         }).join('');
+                    const _skEnc = encodeURIComponent(sk);
+                    const _macEnc = encodeURIComponent(m);
+                    const _shareUrl = `${location.origin}${location.pathname}?mv=1&sk=${_skEnc}&mac=${_macEnc}`;
                     return `<div class="wo-boring-machine-hdr" style="color:#1a1a1a;background:${procMeta.colorAlpha};flex-direction:column;gap:1px;">` +
+                        `<div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:4px;">` +
                         `<span>${m}</span>` +
+                        `<button onclick="event.stopPropagation();_woShareMachineView('${_shareUrl.replace(/'/g,"\\'")}')" title="작업화면 공유 링크 복사" ` +
+                        `style="font-size:9px;font-weight:700;color:#fff;background:${procMeta.color};border:none;border-radius:4px;padding:2px 6px;cursor:pointer;flex-shrink:0;">📺 공유</button>` +
+                        `</div>` +
                         `<select onchange="_woSetMacStart('${sk}','${m}',parseInt(this.value))" onclick="event.stopPropagation()" ` +
                         `style="font-size:10px;font-weight:700;color:#37352f;background:#fff;border:1px solid #dddbd8;border-radius:4px;padding:1px 3px;cursor:pointer;text-align:center;">` +
                         _opts + `</select></div>`;
@@ -7738,7 +7753,64 @@
             if (window._woMacChangeMode && window._woMacChangeMode.stateKey === stateKey) {
                 requestAnimationFrame(() => _woApplyMacHighlight(window._woMacChangeMode.orderKey, stateKey));
             }
+            // ── 스케줄 Firestore 자동 저장 (기계 전용 뷰용)
+            _woSaveSchedule(stateKey);
         };
+
+        // ── 스케줄 Firestore 저장 (기계 전용 뷰 공유용) ─────────────────────────────
+        async function _woSaveSchedule(sk) {
+            if (!window.db || !window._woBoring?.[sk] || !window._woBoringParts?.[sk]) return;
+            try {
+                const { doc, setDoc, serverTimestamp } = window.fbFirestore;
+                const machines = _woGetMachines(sk);
+                const schedule = {};
+                machines.forEach(mac => {
+                    schedule[mac] = (window._woBoring[sk][mac] || []).map(x =>
+                        typeof x === 'string' ? { cKey: x, startMin: null } : { cKey: x.cKey, startMin: x.startMin ?? null }
+                    );
+                });
+                schedule.pool = (window._woBoring[sk].pool || []).map(k => ({ cKey: k, startMin: null }));
+
+                const parts = (window._woBoringParts[sk] || []).map(p => ({
+                    cKey: p.cKey || '', nm: p.nm || '', orderName: p.orderName || '',
+                    orderKey: p.orderKey || '', orderCode: p.orderCode || '',
+                    dq: p.dq || 0, pm: p.pm || 0, rw: p.rw || 0, rd: p.rd || 0,
+                    isCuttingCard: p.isCuttingCard || false,
+                    plateName: p.plateName || '', finish: p.finish || '',
+                    deliveryDate: p.deliveryDate || ''
+                }));
+
+                // 배제 구간도 저장
+                const exclZones = _woGetExclZones(sk).map(z => ({ start: z.start, end: z.end }));
+
+                const docRef = doc(window.db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'proc_schedules', sk);
+                await setDoc(docRef, { schedule, parts, exclZones, machines, updatedAt: serverTimestamp() });
+            } catch(e) { console.warn('[_woSaveSchedule]', e); }
+        }
+
+        // ── 공유 링크 복사 / 팝업 ────────────────────────────────────────────────────
+        window._woShareMachineView = function(url) {
+            // 클립보드 복사 시도
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(url).then(() => {
+                    showToastMessage('📺 기계 전용 뷰 링크가 복사되었습니다. 새 탭에서 열어 태블릿/모바일로 공유하세요.');
+                }).catch(() => _woShareFallback(url));
+            } else {
+                _woShareFallback(url);
+            }
+        };
+        function _woShareFallback(url) {
+            // 팝업으로 URL 표시
+            const d = document.createElement('div');
+            d.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;';
+            d.innerHTML = `<div style="background:#fff;border-radius:12px;padding:24px;max-width:500px;width:90%;font-family:Inter,sans-serif;">
+                <div style="font-size:15px;font-weight:800;color:#37352f;margin-bottom:12px;">📺 기계 전용 뷰 링크</div>
+                <input value="${url}" readonly style="width:100%;font-size:11px;padding:8px;border:1px solid #ddd;border-radius:6px;color:#37352f;box-sizing:border-box;" onclick="this.select()">
+                <div style="margin-top:10px;font-size:11px;color:#787774;">위 링크를 복사해 태블릿 또는 모바일 브라우저로 공유하세요.</div>
+                <button onclick="this.closest('div[style*=fixed]').remove()" style="margin-top:12px;font-size:12px;font-weight:700;color:#fff;background:#37352f;border:none;border-radius:6px;padding:6px 18px;cursor:pointer;">닫기</button>
+            </div>`;
+            document.body.appendChild(d);
+        }
 
         // 작업지시서 발행 모달
         window.tlDcIssueWorkOrder = function(docId, procKey, btnEl) {
@@ -9824,6 +9896,266 @@
                 showToastMessage('전송 실패');
             }
         }
+
+        // ══════════════════════════════════════════════════════════════════════
+        //  기계 전용 작업 뷰 (Machine View)
+        //  URL: ?mv=1&sk={stateKey}&mac={machineName}
+        //  ex)  ?mv=1&sk=2026-05-06-엣지&mac=1호기
+        // ══════════════════════════════════════════════════════════════════════
+        window.initMachineView = async function(sk, mac) {
+            if (!sk || !mac) {
+                document.body.innerHTML = '<div style="padding:40px;font-size:16px;color:#888;">잘못된 링크입니다. (sk, mac 파라미터 필요)</div>';
+                return;
+            }
+
+            // ── 뷰포트 설정 (모바일 최적화)
+            document.title = `${mac} 작업화면`;
+            const vp = document.querySelector('meta[name=viewport]');
+            if (vp) vp.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+
+            // ── 전체 body 교체
+            document.body.style.cssText = 'margin:0;padding:0;background:#111827;font-family:Inter,sans-serif;color:#fff;overflow-x:hidden;';
+            document.body.innerHTML = `
+              <div id="mv-root" style="min-height:100vh;display:flex;flex-direction:column;">
+                <div id="mv-header" style="background:#1f2937;padding:16px 20px 12px;border-bottom:2px solid #374151;flex-shrink:0;">
+                  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">
+                    <div>
+                      <div id="mv-proc-label" style="font-size:13px;font-weight:700;color:#9ca3af;letter-spacing:0.05em;"></div>
+                      <div id="mv-mac-label" style="font-size:28px;font-weight:900;color:#fff;line-height:1.1;margin-top:2px;"></div>
+                    </div>
+                    <div style="text-align:right;">
+                      <div id="mv-clock" style="font-size:32px;font-weight:900;color:#f59e0b;letter-spacing:-0.5px;font-variant-numeric:tabular-nums;font-family:ui-monospace,monospace;"></div>
+                      <div id="mv-date-label" style="font-size:12px;font-weight:600;color:#6b7280;margin-top:2px;"></div>
+                    </div>
+                  </div>
+                  <div id="mv-summary" style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;"></div>
+                </div>
+                <div id="mv-list" style="flex:1;padding:12px 16px 40px;overflow-y:auto;"></div>
+                <div id="mv-footer" style="padding:10px 20px;font-size:11px;color:#4b5563;background:#1f2937;border-top:1px solid #374151;text-align:center;flex-shrink:0;"></div>
+              </div>
+              <div id="mv-loading" style="position:fixed;inset:0;background:#111827;display:flex;align-items:center;justify-content:center;z-index:9999;flex-direction:column;gap:12px;">
+                <div style="font-size:24px;">⏳</div>
+                <div style="font-size:14px;color:#9ca3af;">스케줄 로딩 중...</div>
+              </div>`;
+
+            // ── 시계 업데이트
+            function _mvTick() {
+                const now = new Date();
+                const hh = String(now.getHours()).padStart(2,'0');
+                const mm = String(now.getMinutes()).padStart(2,'0');
+                const ss = String(now.getSeconds()).padStart(2,'0');
+                const el = document.getElementById('mv-clock');
+                if (el) el.textContent = `${hh}:${mm}:${ss}`;
+            }
+            _mvTick();
+            setInterval(_mvTick, 1000);
+
+            // ── proc 이름/색상 매핑
+            const _procName = sk.replace(/^\d{4}-\d{2}-\d{2}-/, '');
+            const _procColors = { 보링:'#7c3aed', 엣지:'#0ea5e9', 재단:'#f59e0b', NC:'#10b981' };
+            const _procColor  = _procColors[_procName] || '#6b7280';
+
+            // ── 날짜 표시
+            const dateStr = sk.substring(0, 10);
+            const _dow = ['일','월','화','수','목','금','토'][new Date(dateStr).getDay()];
+            document.getElementById('mv-proc-label').textContent = `${_procName} 공정`;
+            document.getElementById('mv-mac-label').textContent  = mac;
+            document.getElementById('mv-date-label').textContent = `${dateStr} (${_dow})`;
+            document.getElementById('mv-mac-label').style.color  = _procColor;
+
+            // ── 시간(분) → "HH:MM" 포맷
+            const _fmtMin = m => {
+                const h = String(Math.floor(m / 60)).padStart(2,'0');
+                const n = String(Math.round(m) % 60).padStart(2,'0');
+                return `${h}:${n}`;
+            };
+
+            // ── 유효 종료 시각 계산 (배제구간 고려)
+            function _mvCalcEnd(startMin, pm, exclZones) {
+                let cur = startMin, rem = pm;
+                let guard = 0;
+                while (rem > 0 && guard++ < 200) {
+                    const excl = exclZones.find(z => cur >= z.start && cur < z.end);
+                    if (excl) { cur = excl.end; continue; }
+                    const nextExcl = exclZones.find(z => z.start > cur && z.start < cur + rem);
+                    if (nextExcl) {
+                        rem -= nextExcl.start - cur;
+                        cur = nextExcl.end;
+                    } else {
+                        cur += rem; rem = 0;
+                    }
+                }
+                return cur;
+            }
+
+            // ── 완료 상태 라이브 렌더 함수 (Firestore confirmed_orders 기반)
+            let _mvSchedData = null;
+            let _mvOrders    = [];
+
+            function _mvRender() {
+                if (!_mvSchedData) return;
+                const { schedule, parts, exclZones, machines } = _mvSchedData;
+                const macArr = schedule[mac] || [];
+                const listEl = document.getElementById('mv-list');
+                if (!listEl) return;
+
+                const macStart = 480; // 기본 8:00 AM (저장된 시작시간 없으면)
+                let cur = macStart;
+                let totalDone = 0, totalInProg = 0, totalPending = 0;
+                let cardsHtml = '';
+
+                macArr.forEach((entry, idx) => {
+                    const cKey = entry.cKey;
+                    const p = parts.find(pp => pp.cKey === cKey);
+                    if (!p) return;
+
+                    // 시작시간 결정
+                    if (entry.startMin != null && entry.startMin > cur) cur = entry.startMin;
+                    exclZones.forEach(z => { if (cur >= z.start && cur < z.end) cur = z.end; });
+                    const startMin = cur;
+                    const endMin   = _mvCalcEnd(startMin, p.pm || 30, exclZones);
+                    cur = endMin;
+
+                    // 완료 상태 조회
+                    const procKey = _procName;
+                    const orderKey = p.orderKey || '';
+                    const ck = orderKey ? cKey.substring(orderKey.length + 1) : cKey;
+                    const _ord = _mvOrders.find(o => (o.docId || String(o.idNum)) === orderKey);
+                    const isDone    = !!(_ord?.partCompletions?.[ck]?.[procKey]);
+                    const isStarted = !!(_ord?.partStarted?.[ck]?.[procKey]);
+                    const actMin    = _ord?.partCompletions?.[ck]?.[procKey]?.actualMinutes ?? null;
+
+                    // 현재 시간 기준 상태
+                    const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+                    let statusLabel, statusColor, statusBg, statusIcon;
+                    if (isDone) {
+                        statusLabel = '완료'; statusIcon = '✓';
+                        statusColor = '#10b981'; statusBg = 'rgba(16,185,129,0.12)';
+                        totalDone++;
+                    } else if (isStarted || (nowMin >= startMin && nowMin < endMin)) {
+                        statusLabel = '진행중'; statusIcon = '▶';
+                        statusColor = '#f59e0b'; statusBg = 'rgba(245,158,11,0.12)';
+                        totalInProg++;
+                    } else {
+                        statusLabel = '대기'; statusIcon = '○';
+                        statusColor = '#6b7280'; statusBg = 'rgba(107,114,128,0.08)';
+                        totalPending++;
+                    }
+
+                    const dimStr = (p.rw && p.rd) ? `${p.rw}×${p.rd}` : '';
+                    const pmStr  = p.pm >= 1 ? `${p.pm.toFixed(1)}분` : `${Math.round(p.pm*60)}초`;
+
+                    cardsHtml += `
+                      <div style="background:${isDone?'#1a2a1e':statusBg==='rgba(245,158,11,0.12)'?'#1f1a0a':'#1f2937'};border:1.5px solid ${isDone?'#10b981':statusColor==='#f59e0b'?'#f59e0b33':'#374151'};
+                                  border-left:4px solid ${statusColor};border-radius:12px;margin-bottom:12px;padding:16px 18px;
+                                  ${isDone?'opacity:0.65;':''}position:relative;overflow:hidden;">
+                        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+                          <div style="flex:1;min-width:0;">
+                            <div style="font-size:11px;font-weight:700;color:#9ca3af;margin-bottom:3px;letter-spacing:0.03em;">
+                              ${String(idx+1).padStart(2,'0')} · ${p.orderName || p.orderCode || ''}
+                            </div>
+                            <div style="font-size:22px;font-weight:900;color:#f9fafb;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                              ${p.isCuttingCard ? (p.plateName||p.nm) : p.nm}
+                            </div>
+                            ${dimStr ? `<div style="font-size:12px;color:#6b7280;margin-top:2px;">${dimStr}</div>` : ''}
+                          </div>
+                          <div style="text-align:right;flex-shrink:0;">
+                            <div style="font-size:13px;font-weight:900;color:${statusColor};background:${statusBg};border-radius:8px;padding:4px 10px;border:1px solid ${statusColor}40;">
+                              ${statusIcon} ${statusLabel}
+                            </div>
+                            ${actMin != null ? `<div style="font-size:11px;color:#60a5fa;margin-top:4px;font-weight:700;">${actMin.toFixed(1)}분 소요</div>` : ''}
+                          </div>
+                        </div>
+                        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                          <span style="font-size:14px;font-weight:800;color:#f9fafb;background:#374151;padding:4px 10px;border-radius:6px;">
+                            ${p.dq} EA
+                          </span>
+                          <span style="font-size:13px;font-weight:700;color:#9ca3af;">⏱ ${pmStr}</span>
+                          <span style="font-size:13px;font-weight:700;color:${statusColor};">
+                            ${_fmtMin(startMin)} → ${_fmtMin(endMin)}
+                          </span>
+                          ${p.finish ? `<span style="font-size:11px;color:#6b7280;">${p.finish}</span>` : ''}
+                        </div>
+                      </div>`;
+                });
+
+                if (macArr.length === 0) {
+                    cardsHtml = `<div style="padding:60px 20px;text-align:center;color:#4b5563;font-size:15px;">이 기계에 배정된 작업이 없습니다.</div>`;
+                }
+
+                listEl.innerHTML = cardsHtml;
+
+                // 요약 바
+                const sumEl = document.getElementById('mv-summary');
+                if (sumEl) {
+                    const total = macArr.length;
+                    const badge = (label, count, color) =>
+                        count > 0 ? `<span style="font-size:12px;font-weight:700;color:${color};background:${color}20;padding:4px 10px;border-radius:20px;border:1px solid ${color}40;">${label} ${count}</span>` : '';
+                    sumEl.innerHTML = `
+                      ${badge('✓ 완료', totalDone, '#10b981')}
+                      ${badge('▶ 진행중', totalInProg, '#f59e0b')}
+                      ${badge('○ 대기', totalPending, '#6b7280')}
+                      <span style="font-size:12px;color:#4b5563;margin-left:4px;">총 ${total}건</span>`;
+                }
+
+                // 푸터 업데이트
+                const ftEl = document.getElementById('mv-footer');
+                if (ftEl) ftEl.textContent = `마지막 업데이트: ${new Date().toLocaleTimeString('ko-KR')} · 30초마다 자동 갱신`;
+            }
+
+            // ── Firestore 로드
+            async function _mvLoad() {
+                try {
+                    const { doc, getDoc, collection, onSnapshot } = window.fbFirestore;
+
+                    // proc_schedules 문서 로드
+                    const schedRef = doc(window.db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'proc_schedules', sk);
+                    const snap = await getDoc(schedRef);
+                    if (snap.exists()) {
+                        _mvSchedData = snap.data();
+                    } else {
+                        document.getElementById('mv-loading').innerHTML =
+                            `<div style="text-align:center;padding:40px;"><div style="font-size:24px;margin-bottom:12px;">⚠️</div>
+                            <div style="font-size:14px;color:#9ca3af;">스케줄 데이터가 없습니다.<br>공정작업지시서에서 카드를 배치한 후<br>공유 버튼을 다시 눌러주세요.</div></div>`;
+                        return;
+                    }
+
+                    // confirmed_orders 실시간 구독
+                    const ordersRef = collection(window.db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'confirmed_orders');
+                    onSnapshot(ordersRef, snap2 => {
+                        _mvOrders = snap2.docs.map(d => ({ ...d.data(), docId: d.id }));
+                        _mvRender();
+                    });
+
+                    // 로딩 화면 숨김
+                    const ld = document.getElementById('mv-loading');
+                    if (ld) ld.remove();
+
+                } catch(e) {
+                    console.error('[mv load]', e);
+                    const ld = document.getElementById('mv-loading');
+                    if (ld) ld.innerHTML = `<div style="text-align:center;padding:40px;color:#ef4444;">로드 오류: ${e.message}</div>`;
+                }
+            }
+
+            // ── proc_schedules 실시간 구독 (30초 주기 갱신 대신 실시간)
+            async function _mvStartRealtimeSync() {
+                const { doc, onSnapshot } = window.fbFirestore;
+                const schedRef = doc(window.db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'proc_schedules', sk);
+                onSnapshot(schedRef, snap => {
+                    if (snap.exists()) {
+                        _mvSchedData = snap.data();
+                        _mvRender();
+                    }
+                });
+            }
+
+            await _mvLoad();
+            _mvStartRealtimeSync();
+
+            // ── 1분마다 상태(시간 기준) 재계산 (시작/종료 시간 지남에 따라 상태 변경)
+            setInterval(_mvRender, 60000);
+        };
     </script>
 </body>
 </html>
