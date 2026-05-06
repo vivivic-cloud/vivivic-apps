@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.8.0 (2026-05-06) — 드롭 위치 이전 카드에 무조건 붙이기로 gap 완전 제거
+     버전: v1.8.1 (2026-05-06) — state 직접 시뮬레이션으로 gap 완전 제거 (stale 캐시 문제 해결)
      ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
@@ -1199,7 +1199,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.8.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.8.1</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -7549,27 +7549,44 @@
                 }
                 dropMin = Math.max(_bsMin2, dropMin);
 
-                // ── 카드 끝 스냅: 드롭 위치(dropMin) 이전에 끝나는 카드가 있으면 그 카드 끝에 붙임
-                // → 다른 공정 아래 드롭 시 gap 없이 바로 이어붙음
-                const _dropTl = window._woMacTimelines?.[stateKey]?.[targetMachine];
-                if (_dropTl && _dropTl.length > 0) {
-                    // dropMin 이전(또는 같은 시각)에 끝나는 카드 중 가장 늦게 끝나는 카드 찾기
-                    let bestCard = null;
-                    for (const cardData of _dropTl) {
-                        if (cardData.cKey === cardKey) continue; // 자기 자신 제외
-                        if (cardData.clockEnd <= dropMin) {
-                            if (!bestCard || cardData.clockEnd > bestCard.clockEnd) {
-                                bestCard = cardData;
-                            }
-                        }
-                    }
-                    if (bestCard) {
-                        // 가장 늦게 끝나는 카드 바로 다음에 붙임 (gap 없음)
-                        let snapEnd = bestCard.clockEnd;
+                // ── 카드 끝 스냅: 현재 state[targetMachine]을 직접 시뮬레이션해 실제 끝 시각 계산
+                // (_woMacTimelines는 제거 전 오래된 데이터 → 동일 기계 내 이동 시 오차 발생)
+                // → 드롭 위치 이전에 끝나는 카드 중 가장 늦은 끝 시각에 gap 없이 붙임
+                {
+                    const _simEntries = (state[targetMachine] || [])
+                        .filter(x => (typeof x === 'string' ? x : x.cKey) !== cardKey); // 자기 자신 제외
+                    const _macStartMin = _woGetMacStart(stateKey, targetMachine) ?? 480;
+                    let _simCur = _macStartMin;
+                    let _latestEndBeforeDrop = null;
+
+                    for (const entry of _simEntries) {
+                        const _eCKey = typeof entry === 'string' ? entry : entry.cKey;
+                        const _eSMin = typeof entry === 'object' && entry.startMin != null ? entry.startMin : null;
+                        const _ePart = parts.find(p => p.cKey === _eCKey);
+                        const _ePm   = _ePart ? _ePart.pm : 30;
+
+                        // 핀된 카드면 해당 시각으로 이동, 없으면 현재 누적 위치
+                        if (_eSMin != null && _eSMin > _simCur) _simCur = _eSMin;
+                        // 배제구간 건너뜀
                         for (const z of _dExclZones) {
-                            if (snapEnd >= z.start && snapEnd < z.end) { snapEnd = z.end; break; }
+                            if (_simCur >= z.start && _simCur < z.end) { _simCur = z.end; break; }
                         }
-                        dropMin = snapEnd;
+                        const _eEnd = _woCalcEffectiveEnd(_simCur, _ePm, _dExclZones);
+
+                        // dropMin 이전에 끝나는 카드 중 가장 늦은 끝 시각 추적
+                        if (_eEnd <= dropMin) {
+                            _latestEndBeforeDrop = _eEnd;
+                        }
+                        _simCur = _eEnd;
+                    }
+
+                    if (_latestEndBeforeDrop !== null) {
+                        // 가장 늦게 끝나는 카드 바로 다음에 붙임 (gap 없음)
+                        let _snapEnd = _latestEndBeforeDrop;
+                        for (const z of _dExclZones) {
+                            if (_snapEnd >= z.start && _snapEnd < z.end) { _snapEnd = z.end; break; }
+                        }
+                        dropMin = _snapEnd;
                     }
                 }
 
