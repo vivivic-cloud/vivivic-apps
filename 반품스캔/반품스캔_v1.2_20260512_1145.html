@@ -570,8 +570,16 @@ const App = () => {
             existingSnap.forEach(d => {
                 try { JSON.parse(d.data().items.replace(/\bNaN\b/g,'null')).forEach(item => { if(item[invoiceIdx]) existingKeys.add(String(item[invoiceIdx]).trim()); }); } catch{}
             });
-            // 제외 컬럼 저장 전 완전 삭제 (개인정보 + 불필요 컬럼)
-            const PRIVATE_COLS = [1,5,6,8,10,11,23,26,29,30,35,37];
+            // 전화번호 뒷 4자리 → SHA-256 해시 (매칭용, 원본 복원 불가)
+            const hashPhone4 = async (phone) => {
+                const digits = String(phone||'').replace(/\D/g,'');
+                if (digits.length < 4) return '';
+                const last4 = digits.slice(-4);
+                const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('vivivic2026' + last4));
+                return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,8);
+            };
+            // 제외 컬럼 저장 전 완전 삭제 (개인정보 + 불필요 컬럼) — [5]는 해시 저장용으로 별도 처리
+            const PRIVATE_COLS = [1,6,8,10,11,23,26,29,30,35,37];
             // 주소(index 19) → 구/동/읍/면 단위까지만 저장 (없으면 도로명 fallback)
             const truncateAddr = (addr) => {
                 if (!addr) return addr;
@@ -588,16 +596,22 @@ const App = () => {
                 if (lastIdx >= 0) return tokens.slice(0, lastIdx + 1).join(' ');
                 return addr;
             };
-            // 중복 제외
-            const newRows = dataRows.filter(r => {
-                const key = String(r[invoiceIdx]||'').trim();
-                return key !== '' && !existingKeys.has(key);
-            }).map(r => {
-                const row = [...r];
-                PRIVATE_COLS.forEach(i => { row[i] = ''; });
-                row[19] = truncateAddr(row[19]); // 주소: 읍/면/동까지만
-                return row;
-            });
+            // 중복 제외 + 해시 처리 (async)
+            const newRows = await Promise.all(
+                dataRows.filter(r => {
+                    const key = String(r[invoiceIdx]||'').trim();
+                    return key !== '' && !existingKeys.has(key);
+                }).map(async r => {
+                    const row = [...r];
+                    // 전화번호 뒷 4자리 해시 → [5]에 저장 (휴대폰[6] > 전화[5] > 주문자폰[8] 우선순위)
+                    const rawPhone = String(row[6]||row[5]||row[8]||'');
+                    row[5] = await hashPhone4(rawPhone);
+                    // 나머지 개인정보 삭제
+                    PRIVATE_COLS.forEach(i => { row[i] = ''; });
+                    row[19] = truncateAddr(row[19]); // 주소: 읍/면/동까지만
+                    return row;
+                })
+            );
             if (newRows.length === 0) { showToast(`총 ${dataRows.length.toLocaleString()}건 중 ${dataRows.length.toLocaleString()}건이 중복으로 업로드되지 않았습니다`, 8000); return; }
             for (let i = 0; i < newRows.length; i += CHUNK) {
                 const chunk = newRows.slice(i, i + CHUNK);
