@@ -532,15 +532,30 @@ const App = () => {
     };
 
     const handleDeleteCS = async () => {
-        const snap=await window.FirebaseSDK.getDocs(window.FirebaseSDK.query(window.FirebaseSDK.collection(db,'artifacts',appId,'public','data','cs_records')));
-        const batch=window.FirebaseSDK.writeBatch(db); snap.forEach(d=>batch.delete(d.ref)); await batch.commit();
-        setShowCSDelete(false); setAllRawData([]); showToast('CS 초기화 완료');
+        try {
+            const snap = await window.FirebaseSDK.getDocs(window.FirebaseSDK.collection(db,'artifacts',appId,'public','data','cs_records'));
+            // writeBatch 500개 제한 대응 — 청크 단위로 분할 삭제
+            const docs = []; snap.forEach(d => docs.push(d));
+            for (let i = 0; i < docs.length; i += 490) {
+                const batch = window.FirebaseSDK.writeBatch(db);
+                docs.slice(i, i + 490).forEach(d => batch.delete(d.ref));
+                await batch.commit();
+            }
+            setShowCSDelete(false); setAllRawData([]); showToast('CS 초기화 완료');
+        } catch(e) { showToast('초기화 실패: ' + e.message); }
     };
     const handleDeleteProd = async () => {
-        const snap=await window.FirebaseSDK.getDocs(window.FirebaseSDK.query(window.FirebaseSDK.collection(db,'artifacts',appId,'public','data','product_records')));
-        const batch=window.FirebaseSDK.writeBatch(db); snap.forEach(d=>batch.delete(d.ref)); await batch.commit();
-        try { const list=await window.FirebaseSDK.listAll(window.FirebaseSDK.ref(storage,'product_info_uploads')); await Promise.all(list.items.map(f=>window.FirebaseSDK.deleteObject(f))); } catch{}
-        setShowProdDelete(false); setAllProductRecords([]); showToast('제품 초기화 완료');
+        try {
+            const snap = await window.FirebaseSDK.getDocs(window.FirebaseSDK.collection(db,'artifacts',appId,'public','data','product_records'));
+            const docs = []; snap.forEach(d => docs.push(d));
+            for (let i = 0; i < docs.length; i += 490) {
+                const batch = window.FirebaseSDK.writeBatch(db);
+                docs.slice(i, i + 490).forEach(d => batch.delete(d.ref));
+                await batch.commit();
+            }
+            try { const list=await window.FirebaseSDK.listAll(window.FirebaseSDK.ref(storage,'product_info_uploads')); await Promise.all(list.items.map(f=>window.FirebaseSDK.deleteObject(f))); } catch{}
+            setShowProdDelete(false); setAllProductRecords([]); showToast('제품 초기화 완료');
+        } catch(e) { showToast('초기화 실패: ' + e.message); }
     };
     const uploadFile = (path, file) => {
         if(!file||!storage) return;
