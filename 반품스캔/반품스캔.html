@@ -612,22 +612,25 @@ const App = () => {
                 if (lastIdx >= 0) return tokens.slice(0, lastIdx + 1).join(' ');
                 return addr;
             };
-            // 중복 제외 + 해시 처리 (async)
-            const newRows = await Promise.all(
-                dataRows.filter(r => {
-                    const key = String(r[invoiceIdx]||'').trim();
-                    return key !== '' && !existingKeys.has(key);
-                }).map(async r => {
+            // 중복 제외
+            const filteredRows = dataRows.filter(r => {
+                const key = String(r[invoiceIdx]||'').trim();
+                return key !== '' && !existingKeys.has(key);
+            });
+            // 해시 처리 — 1000개씩 나눠서 처리 (브라우저 부하 방지)
+            const newRows = [];
+            for (let i = 0; i < filteredRows.length; i += 1000) {
+                const chunk = await Promise.all(filteredRows.slice(i, i + 1000).map(async r => {
                     const row = [...r];
-                    // 전화번호 뒷 4자리 해시 → [5]에 저장 (휴대폰[6] > 전화[5] > 주문자폰[8] 우선순위)
                     const rawPhone = String(row[6]||row[5]||row[8]||'');
                     row[5] = await hashPhone4(rawPhone);
-                    // 나머지 개인정보 삭제
                     PRIVATE_COLS.forEach(i => { row[i] = ''; });
-                    row[19] = truncateAddr(row[19]); // 주소: 읍/면/동까지만
+                    row[19] = truncateAddr(row[19]);
                     return row;
-                })
-            );
+                }));
+                newRows.push(...chunk);
+                showToast(`처리 중… ${Math.min(i+1000, filteredRows.length).toLocaleString()} / ${filteredRows.length.toLocaleString()}건`);
+            }
             if (newRows.length === 0) { showToast(`총 ${dataRows.length.toLocaleString()}건 중 ${dataRows.length.toLocaleString()}건이 중복으로 업로드되지 않았습니다`, 8000); return; }
             for (let i = 0; i < newRows.length; i += CHUNK) {
                 const chunk = newRows.slice(i, i + CHUNK);
