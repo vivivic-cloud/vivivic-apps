@@ -309,6 +309,27 @@ const App = () => {
         if (sunboSortCol === idx) setSunboSortDir(d => d === 'asc' ? 'desc' : 'asc');
         else { setSunboSortCol(idx); setSunboSortDir('asc'); }
     };
+    const [linkDropdownRow, setLinkDropdownRow] = useState(null);
+    const [linkedMap, setLinkedMap] = useState({});
+
+    // 관련 원주문 후보 탐색 (우선순위: 전화해시 > 고유번호 > 수취인+주소 > 수취인)
+    const findRelatedOrders = (csRow) => {
+        const hidden = allRawData.filter(r => !String(r.data[0]||'').trim());
+        const hash05 = String(csRow.data[5]||'').trim();
+        const key09  = String(csRow.data[9]||'').trim();
+        const key07  = String(csRow.data[7]||'').trim();
+        const key19  = String(csRow.data[19]||'').trim();
+        const scored = hidden.map(h => {
+            let score = 0;
+            if (hash05 && hash05 === String(h.data[5]||'').trim()) score += 40;
+            if (key09  && key09  === String(h.data[9]||'').trim())  score += 30;
+            if (key07  && key07  === String(h.data[7]||'').trim())  score += 20;
+            if (key19  && key19  === String(h.data[19]||'').trim()) score += 10;
+            return { h, score };
+        }).filter(x => x.score > 0).sort((a,b) => b.score - a.score);
+        return scored.slice(0, 15).map(x => x.h);
+    };
+
     const [fieldInvoiceInput, setFieldInvoiceInput] = useState('');
     const [fieldFoundRow, setFieldFoundRow]         = useState(null);
     const [fieldCategory, setFieldCategory]         = useState('');
@@ -823,28 +844,66 @@ const App = () => {
                                     <thead>
                                         <tr>
                                             {STANDARD_HEADERS.map((h,i)=>(
-                                                <th key={i}
-                                                    onClick={()=>handleSortCol(DISPLAY_IDX[i])}
-                                                    style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap',
-                                                        background: sortCol===DISPLAY_IDX[i] ? 'var(--c-bg-3)' : undefined}}>
-                                                    {h}
-                                                    {sortCol===DISPLAY_IDX[i]
-                                                        ? <span style={{marginLeft:4,fontSize:10}}>{sortDir==='asc'?'▲':'▼'}</span>
-                                                        : <span style={{marginLeft:4,fontSize:10,color:'var(--c-text-3)',opacity:0.4}}>⇅</span>}
-                                                </th>
+                                                <Fragment key={i}>
+                                                    <th onClick={()=>handleSortCol(DISPLAY_IDX[i])}
+                                                        style={{cursor:'pointer',userSelect:'none',whiteSpace:'nowrap',
+                                                            background: sortCol===DISPLAY_IDX[i] ? 'var(--c-bg-3)' : undefined}}>
+                                                        {h}
+                                                        {sortCol===DISPLAY_IDX[i]
+                                                            ? <span style={{marginLeft:4,fontSize:10}}>{sortDir==='asc'?'▲':'▼'}</span>
+                                                            : <span style={{marginLeft:4,fontSize:10,color:'var(--c-text-3)',opacity:0.4}}>⇅</span>}
+                                                    </th>
+                                                    {i===4&&<th style={{background:'#eff6ff',color:'#1e40af',whiteSpace:'nowrap',fontWeight:700}}>원주문연결</th>}
+                                                </Fragment>
                                             ))}
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {pagedData.length===0?(
-                                            <tr><td colSpan={STANDARD_HEADERS.length} style={{textAlign:'center',padding:48,color:'var(--c-text-3)',fontSize:13}}>데이터 없음</td></tr>
-                                        ):pagedData.map((m,i)=>(
+                                            <tr><td colSpan={STANDARD_HEADERS.length+1} style={{textAlign:'center',padding:48,color:'var(--c-text-3)',fontSize:13}}>데이터 없음</td></tr>
+                                        ):pagedData.map((m,i)=>{
+                                            const rowKey = `${m.docId}-${m.innerIndex}`;
+                                            const linked = linkedMap[rowKey];
+                                            const isOpen = linkDropdownRow === rowKey;
+                                            return (
                                             <tr key={i}>
                                                 {DISPLAY_IDX.map(ri=>(
-                                                    <td key={ri}>{ri===19&&m.data[ri]?<a href={`https://map.naver.com/v5/search/${encodeURIComponent(m.data[ri])}`} target="_blank" rel="noopener noreferrer" style={{color:'#0077d4',textDecoration:'underline',fontWeight:600}}>{m.data[ri]}</a>:m.data[ri]||'—'}</td>
+                                                    <Fragment key={ri}>
+                                                        <td>{ri===19&&m.data[ri]?<a href={`https://map.naver.com/v5/search/${encodeURIComponent(m.data[ri])}`} target="_blank" rel="noopener noreferrer" style={{color:'#0077d4',textDecoration:'underline',fontWeight:600}}>{m.data[ri]}</a>:m.data[ri]||'—'}</td>
+                                                        {ri===15&&(
+                                                            <td style={{position:'relative',minWidth:130,background:'#f8fbff'}}>
+                                                                <button onClick={()=>setLinkDropdownRow(isOpen?null:rowKey)}
+                                                                    style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:4,border:'1px solid #93c5fd',background: linked?'#dbeafe':'#eff6ff',color:'#1e40af',cursor:'pointer',whiteSpace:'nowrap',maxWidth:120,overflow:'hidden',textOverflow:'ellipsis'}}>
+                                                                    {linked ? String(linked.data[15]||'').slice(0,18)||'연결됨' : '+ 연결'}
+                                                                </button>
+                                                                {isOpen&&(
+                                                                    <div style={{position:'fixed',zIndex:9999,background:'#fff',border:'1px solid var(--c-border)',borderRadius:10,boxShadow:'0 8px 24px rgba(0,0,0,0.12)',padding:8,minWidth:320,maxHeight:280,overflowY:'auto'}}
+                                                                        onClick={e=>e.stopPropagation()}>
+                                                                        <div style={{fontSize:9,fontWeight:700,color:'var(--c-text-3)',textTransform:'uppercase',letterSpacing:'0.06em',padding:'4px 8px 8px'}}>원주문 후보</div>
+                                                                        {(()=>{
+                                                                            const candidates = findRelatedOrders(m);
+                                                                            if(candidates.length===0) return <div style={{fontSize:11,color:'var(--c-text-3)',padding:'8px'}}>관련 원주문 없음</div>;
+                                                                            return candidates.map((c,idx)=>(
+                                                                                <div key={idx} onClick={()=>{setLinkedMap(p=>({...p,[rowKey]:c}));setLinkDropdownRow(null);}}
+                                                                                    style={{padding:'6px 10px',borderRadius:6,cursor:'pointer',fontSize:11,borderBottom:'1px solid var(--c-border)'}}
+                                                                                    onMouseEnter={e=>e.currentTarget.style.background='#f1f5ff'}
+                                                                                    onMouseLeave={e=>e.currentTarget.style.background=''}>
+                                                                                    <div style={{fontWeight:700,color:'#1e40af',marginBottom:2}}>{c.data[7]||'—'} · {c.data[19]||'—'}</div>
+                                                                                    <div style={{color:'var(--c-text-2)',fontSize:10}}>{String(c.data[15]||c.data[14]||'—').slice(0,50)}</div>
+                                                                                    <div style={{color:'var(--c-text-3)',fontSize:9,marginTop:2}}>{c.data[24]||''}</div>
+                                                                                </div>
+                                                                            ));
+                                                                        })()}
+                                                                        <button onClick={()=>setLinkDropdownRow(null)} style={{marginTop:6,width:'100%',fontSize:10,color:'var(--c-text-3)',background:'none',border:'none',cursor:'pointer'}}>닫기</button>
+                                                                    </div>
+                                                                )}
+                                                            </td>
+                                                        )}
+                                                    </Fragment>
                                                 ))}
                                             </tr>
-                                        ))}
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             </div>
