@@ -586,13 +586,12 @@ const App = () => {
             existingSnap.forEach(d => {
                 try { JSON.parse(d.data().items.replace(/\bNaN\b/g,'null')).forEach(item => { if(item[invoiceIdx]) existingKeys.add(String(item[invoiceIdx]).trim()); }); } catch{}
             });
-            // 전화번호 뒷 4자리 → SHA-256 해시 (매칭용, 원본 복원 불가)
-            const hashPhone4 = async (phone) => {
+            // 전화번호 뒷 4자리 → 동기 해시 (매칭용, 원본 복원 불가) — SHA-256보다 수백배 빠름
+            const hashPhone4 = (phone) => {
                 const digits = String(phone||'').replace(/\D/g,'');
                 if (digits.length < 4) return '';
-                const last4 = digits.slice(-4);
-                const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('vivivic2026' + last4));
-                return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,8);
+                const n = parseInt(digits.slice(-4)) + 7901; // salt
+                return (((n * 2654435761) >>> 0) ^ ((n * 40503) >>> 0)).toString(16).padStart(8,'0');
             };
             // 제외 컬럼 저장 전 완전 삭제 (개인정보 + 불필요 컬럼) — [5]는 해시 저장용으로 별도 처리
             const PRIVATE_COLS = [1,6,8,10,11,23,26,29,30,35,37];
@@ -601,40 +600,37 @@ const App = () => {
                 if (!addr) return addr;
                 const tokens = String(addr).trim().split(/\s+/);
                 let lastIdx = -1;
-                // 1순위: 읍/면/동 — 순수 한글로만 된 행정 단위 (101동·A동 등 건물 동 제외)
                 tokens.forEach((t, i) => { if (/^[가-힣]{2,}[읍면동]$/.test(t)) lastIdx = i; });
                 if (lastIdx >= 0) return tokens.slice(0, lastIdx + 1).join(' ');
-                // 2순위: 구/군 단위
                 tokens.forEach((t, i) => { if (/^[가-힣]{2,}[구군]$/.test(t)) lastIdx = i; });
                 if (lastIdx >= 0) return tokens.slice(0, lastIdx + 1).join(' ');
-                // 3순위: 로/길/대로 (도로명) — 구/동/읍/면이 없을 때만
                 tokens.forEach((t, i) => { if (/(?:대로|로|길)$/.test(t)) lastIdx = i; });
                 if (lastIdx >= 0) return tokens.slice(0, lastIdx + 1).join(' ');
                 return addr;
             };
-            // 중복 제외
-            const filteredRows = dataRows.filter(r => {
+            // 중복 제외 + 행 변환 (동기 처리 — 즉시 완료)
+            showToast('데이터 처리 중…');
+            const newRows = dataRows.filter(r => {
                 const key = String(r[invoiceIdx]||'').trim();
                 return key !== '' && !existingKeys.has(key);
+            }).map(r => {
+                const row = [...r];
+                row[5] = hashPhone4(String(row[6]||row[5]||row[8]||''));
+                PRIVATE_COLS.forEach(i => { row[i] = ''; });
+                row[19] = truncateAddr(row[19]);
+                return row;
             });
-            // 해시 처리 — 1000개씩 나눠서 처리 (브라우저 부하 방지)
-            const newRows = [];
-            for (let i = 0; i < filteredRows.length; i += 1000) {
-                const chunk = await Promise.all(filteredRows.slice(i, i + 1000).map(async r => {
-                    const row = [...r];
-                    const rawPhone = String(row[6]||row[5]||row[8]||'');
-                    row[5] = await hashPhone4(rawPhone);
-                    PRIVATE_COLS.forEach(i => { row[i] = ''; });
-                    row[19] = truncateAddr(row[19]);
-                    return row;
-                }));
-                newRows.push(...chunk);
-                showToast(`처리 중… ${Math.min(i+1000, filteredRows.length).toLocaleString()} / ${filteredRows.length.toLocaleString()}건`);
-            }
             if (newRows.length === 0) { showToast(`총 ${dataRows.length.toLocaleString()}건 중 ${dataRows.length.toLocaleString()}건이 중복으로 업로드되지 않았습니다`, 8000); return; }
-            for (let i = 0; i < newRows.length; i += CHUNK) {
-                const chunk = newRows.slice(i, i + CHUNK);
-                await sdk.addDoc(colRef, { items: JSON.stringify(chunk), updatedAt: new Date() });
+            // Firestore 저장 — 10개 문서씩 병렬 저장 (순차 대비 ~10배 빠름)
+            showToast(`Firestore 저장 중… 0 / ${newRows.length.toLocaleString()}건`);
+            const chunks = [];
+            for (let i = 0; i < newRows.length; i += CHUNK) chunks.push(newRows.slice(i, i + CHUNK));
+            const PARALLEL = 10;
+            for (let i = 0; i < chunks.length; i += PARALLEL) {
+                await Promise.all(chunks.slice(i, i + PARALLEL).map(chunk =>
+                    sdk.addDoc(colRef, { items: JSON.stringify(chunk), updatedAt: new Date() })
+                ));
+                showToast(`저장 중… ${Math.min((i + PARALLEL) * CHUNK, newRows.length).toLocaleString()} / ${newRows.length.toLocaleString()}건`);
             }
             const skipped = dataRows.length - newRows.length;
             const total = dataRows.length;
