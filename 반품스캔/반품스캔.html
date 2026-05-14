@@ -312,16 +312,18 @@ const App = () => {
     const [linkDropdownRow, setLinkDropdownRow] = useState(null);
     const [linkedMap, setLinkedMap] = useState({});
 
-    // 관련 원주문 후보 탐색 (우선순위: 전화해시 > 고유번호 > 수취인+주소 > 수취인)
+    // 관련 원주문 후보 탐색 (우선순위: 주문번호 > 전화해시 > 고유번호 > 수취인 > 주소)
     const findRelatedOrders = (csRow) => {
         const hidden = allRawData.filter(r => !String(r.data[0]||'').trim());
+        const key38  = String(csRow.data[38]||'').trim(); // 주문번호 (최우선)
         const hash05 = String(csRow.data[5]||'').trim();
         const key09  = String(csRow.data[9]||'').trim();
         const key07  = String(csRow.data[7]||'').trim();
         const key19  = String(csRow.data[19]||'').trim();
         const scored = hidden.map(h => {
             let score = 0;
-            if (hash05 && hash05 === String(h.data[5]||'').trim()) score += 40;
+            if (key38  && key38  === String(h.data[38]||'').trim()) score += 100;
+            if (hash05 && hash05 === String(h.data[5]||'').trim())  score += 40;
             if (key09  && key09  === String(h.data[9]||'').trim())  score += 30;
             if (key07  && key07  === String(h.data[7]||'').trim())  score += 20;
             if (key19  && key19  === String(h.data[19]||'').trim()) score += 10;
@@ -604,7 +606,6 @@ const App = () => {
             const invoiceIdx = headerRow.findIndex(h => h === '송장번호');
             if (invoiceIdx === -1) { showToast('송장번호 컬럼을 찾을 수 없습니다'); return; }
             const orderNumIdx = headerRow.findIndex(h => h === '주문번호');
-            showToast(`헤더 확인:\n송장번호=[${invoiceIdx}]\n주문번호=[${orderNumIdx === -1 ? '없음' : orderNumIdx}]\n총 컬럼 수=${headerRow.length}`, 8000);
             const dataRows = rows.slice(1).filter(r => r.some(c => String(c).trim() !== '')).map(r => r.slice(0, 38));
             const CHUNK = 500;
             const sdk = window.FirebaseSDK;
@@ -647,6 +648,8 @@ const App = () => {
                 row[5] = hashPhone4(String(row[6]||row[5]||row[8]||''));
                 PRIVATE_COLS.forEach(i => { row[i] = ''; });
                 row[19] = truncateAddr(row[19]);
+                // 주문번호를 [38]번 고정 위치에 저장 (원본 컬럼 위치 무관)
+                row[38] = orderNumIdx >= 0 ? String(r[orderNumIdx]||'').trim() : '';
                 return row;
             });
             if (newRows.length === 0) { showToast(`총 ${dataRows.length.toLocaleString()}건 중 ${dataRows.length.toLocaleString()}건이 중복으로 업로드되지 않았습니다`, 8000); return; }
