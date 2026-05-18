@@ -312,24 +312,37 @@ const App = () => {
     const [linkDropdownRow, setLinkDropdownRow] = useState(null);
     const [linkedMap, setLinkedMap] = useState({});
 
-    // 관련 원주문 후보 탐색 (우선순위: 주문번호 > 전화해시 > 고유번호 > 수취인 > 주소)
+    // 원주문 빠른 조회용 Set (데이터 로드 시 1회 생성)
+    const { origOrderNumSet, origPhoneAddrSet } = React.useMemo(() => {
+        const origRows = allRawData.filter(r => !String(r.data[0]||'').trim());
+        const origOrderNumSet = new Set(origRows.map(r => String(r.data[9]||'').trim()).filter(Boolean));
+        const origPhoneAddrSet = new Set(origRows.map(r => {
+            const h = String(r.data[5]||'').trim();
+            const a = String(r.data[19]||'').trim();
+            return (h && a) ? `${h}|${a}` : '';
+        }).filter(Boolean));
+        return { origOrderNumSet, origPhoneAddrSet };
+    }, [allRawData]);
+
+    // 관련 원주문 후보 탐색: 1순위 주문번호, 2순위 전화해시+주소 동시일치
     const findRelatedOrders = (csRow) => {
         const hidden = allRawData.filter(r => !String(r.data[0]||'').trim());
-        const key38  = String(csRow.data[38]||'').trim(); // 주문번호 (최우선)
-        const hash05 = String(csRow.data[5]||'').trim();
         const key09  = String(csRow.data[9]||'').trim();
-        const key07  = String(csRow.data[7]||'').trim();
+        const hash05 = String(csRow.data[5]||'').trim();
         const key19  = String(csRow.data[19]||'').trim();
-        const scored = hidden.map(h => {
-            let score = 0;
-            if (key38  && key38  === String(h.data[38]||'').trim()) score += 100;
-            if (hash05 && hash05 === String(h.data[5]||'').trim())  score += 40;
-            if (key09  && key09  === String(h.data[9]||'').trim())  score += 30;
-            if (key07  && key07  === String(h.data[7]||'').trim())  score += 20;
-            if (key19  && key19  === String(h.data[19]||'').trim()) score += 10;
-            return { h, score };
-        }).filter(x => x.score > 0).sort((a,b) => b.score - a.score);
-        return scored.slice(0, 15).map(x => x.h);
+        // 1순위: 주문번호 일치
+        if (key09) {
+            const byOrder = hidden.filter(h => String(h.data[9]||'').trim() === key09);
+            if (byOrder.length > 0) return byOrder.slice(0, 15);
+        }
+        // 2순위: 전화해시 + 주소 둘 다 일치
+        if (hash05 && key19) {
+            return hidden.filter(h =>
+                String(h.data[5]||'').trim() === hash05 &&
+                String(h.data[19]||'').trim() === key19
+            ).slice(0, 15);
+        }
+        return [];
     };
 
     const [fieldInvoiceInput, setFieldInvoiceInput] = useState('');
@@ -873,17 +886,27 @@ const App = () => {
                                             const rowKey = `${m.docId}-${m.innerIndex}`;
                                             const linked = linkedMap[rowKey];
                                             const isOpen = linkDropdownRow === rowKey;
+                                            const key09 = String(m.data[9]||'').trim();
+                                            const hash05 = String(m.data[5]||'').trim();
+                                            const key19 = String(m.data[19]||'').trim();
+                                            const isNoMatch = !linked &&
+                                                !origOrderNumSet.has(key09) &&
+                                                !(hash05 && key19 && origPhoneAddrSet.has(`${hash05}|${key19}`));
                                             return (
-                                            <tr key={i}>
+                                            <tr key={i} style={isNoMatch?{background:'#fff1f2'}:undefined}>
                                                 {DISPLAY_IDX.map(ri=>(
                                                     <Fragment key={ri}>
                                                         <td>{ri===19&&m.data[ri]?<a href={`https://map.naver.com/v5/search/${encodeURIComponent(m.data[ri])}`} target="_blank" rel="noopener noreferrer" style={{color:'#0077d4',textDecoration:'underline',fontWeight:600}}>{m.data[ri]}</a>:m.data[ri]||'—'}</td>
                                                         {ri===15&&(
-                                                            <td style={{position:'relative',minWidth:130,background:'#f8fbff'}}>
+                                                            <td style={{position:'relative',minWidth:130,background:isNoMatch?'#fff1f2':'#f8fbff'}}>
+                                                                {isNoMatch && !linked ? (
+                                                                    <span style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:4,border:'1px solid #fca5a5',background:'#fee2e2',color:'#b91c1c',whiteSpace:'nowrap',display:'inline-block'}}>연결건없음</span>
+                                                                ) : (
                                                                 <button onClick={()=>setLinkDropdownRow(isOpen?null:rowKey)}
                                                                     style={{fontSize:10,fontWeight:700,padding:'2px 8px',borderRadius:4,border:'1px solid #93c5fd',background: linked?'#dbeafe':'#eff6ff',color:'#1e40af',cursor:'pointer',whiteSpace:'nowrap',maxWidth:120,overflow:'hidden',textOverflow:'ellipsis'}}>
                                                                     {linked ? String(linked.data[15]||'').slice(0,18)||'연결됨' : '+ 연결'}
                                                                 </button>
+                                                                )}
                                                                 {isOpen&&(
                                                                     <div style={{position:'fixed',zIndex:9999,background:'#fff',border:'1px solid var(--c-border)',borderRadius:10,boxShadow:'0 8px 24px rgba(0,0,0,0.12)',padding:8,minWidth:320,maxHeight:280,overflowY:'auto'}}
                                                                         onClick={e=>e.stopPropagation()}>
