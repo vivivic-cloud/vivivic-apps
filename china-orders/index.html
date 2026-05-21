@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>중국 업체 관리</title>
+<style>
+:root {
+  --primary:#2563eb; --primary-dark:#1d4ed8;
+  --danger:#dc2626; --warning:#d97706; --success:#16a34a;
+  --gray-50:#f9fafb; --gray-100:#f3f4f6; --gray-200:#e5e7eb;
+  --gray-600:#4b5563; --gray-700:#374151; --gray-800:#1f2937;
+  --radius:8px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--gray-50);color:var(--gray-800);font-size:14px}
+a{text-decoration:none;color:inherit}
+.layout{display:flex;min-height:100vh}
+.sidebar{width:200px;background:var(--gray-800);color:#fff;flex-shrink:0;position:fixed;height:100vh;overflow-y:auto}
+.sidebar-logo{padding:20px 16px 16px;font-size:15px;font-weight:700;border-bottom:1px solid rgba(255,255,255,.1);line-height:1.5}
+.sidebar-logo small{font-size:11px;font-weight:400;opacity:.6;display:block}
+.sidebar nav{padding:8px 0}
+.nav-btn{display:block;width:100%;text-align:left;padding:10px 16px;color:rgba(255,255,255,.75);font-size:13px;background:none;border:none;border-left:3px solid transparent;cursor:pointer;transition:all .15s}
+.nav-btn:hover,.nav-btn.active{background:rgba(255,255,255,.08);color:#fff;border-left-color:var(--primary)}
+.section-label{padding:12px 16px 4px;font-size:11px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.05em}
+.main{margin-left:200px;flex:1;padding:24px;max-width:1100px}
+.card{background:#fff;border-radius:var(--radius);border:1px solid var(--gray-200);padding:20px;margin-bottom:20px}
+.page-title{font-size:22px;font-weight:700;margin-bottom:20px}
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px;margin-bottom:20px}
+.stat-card{background:#fff;border-radius:var(--radius);border:1px solid var(--gray-200);padding:16px;text-align:center;cursor:pointer;transition:box-shadow .15s}
+.stat-card:hover{box-shadow:0 4px 12px rgba(0,0,0,.08)}
+.stat-num{font-size:28px;font-weight:700;color:var(--primary)}
+.stat-label{font-size:12px;color:var(--gray-600);margin-top:4px}
+.stat-sub{font-size:11px;color:#9ca3af;margin-top:2px}
+.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600}
+.badge-blue{background:#dbeafe;color:#1d4ed8}
+.badge-yellow{background:#fef3c7;color:#92400e}
+.badge-green{background:#dcfce7;color:#15803d}
+.badge-red{background:#fee2e2;color:#991b1b}
+.badge-gray{background:var(--gray-100);color:var(--gray-600)}
+.badge-purple{background:#ede9fe;color:#6d28d9}
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{background:var(--gray-100);padding:8px 12px;text-align:left;font-size:12px;color:var(--gray-600);border-bottom:1px solid var(--gray-200)}
+.tbl td{padding:8px 12px;border-bottom:1px solid var(--gray-100);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--gray-50)}
+.btn{display:inline-flex;align-items:center;gap:4px;padding:6px 14px;border-radius:6px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all .15s}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{background:var(--primary-dark)}
+.btn-outline{background:#fff;color:var(--gray-700);border:1px solid var(--gray-200)}
+.btn-outline:hover{background:var(--gray-50)}
+.btn-sm{padding:3px 10px;font-size:12px}
+.btn-danger-sm{padding:3px 10px;font-size:12px;color:#dc2626;border:1px solid #fca5a5;background:#fff;border-radius:6px;cursor:pointer}
+.page{display:none}
+.page.active{display:block}
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;overflow-y:auto;align-items:flex-start;justify-content:center;padding:40px 20px}
+.modal-bg.open{display:flex}
+.modal{background:#fff;border-radius:12px;width:100%;max-width:680px;padding:24px;position:relative}
+.modal-title{font-size:18px;font-weight:700;margin-bottom:20px}
+.modal-close{position:absolute;top:16px;right:16px;font-size:20px;cursor:pointer;color:var(--gray-600);background:none;border:none}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-group{display:flex;flex-direction:column;gap:4px}
+.form-group.full{grid-column:1/-1}
+.form-group label{font-size:12px;font-weight:600;color:var(--gray-600)}
+.form-group input,.form-group select,.form-group textarea{padding:7px 10px;border:1px solid var(--gray-200);border-radius:6px;font-size:13px;width:100%}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 2px rgba(37,99,235,.1)}
+.form-section{margin-top:16px;padding-top:12px;border-top:1px solid var(--gray-100);font-size:12px;font-weight:700;color:var(--gray-600);margin-bottom:8px}
+.tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:2px solid var(--gray-200)}
+.tab{padding:8px 16px;font-size:13px;font-weight:500;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;color:var(--gray-600);background:none;border-left:none;border-right:none;border-top:none}
+.tab.active{border-bottom-color:var(--primary);color:var(--primary);font-weight:700}
+.tab-pane{display:none}
+.tab-pane.active{display:block}
+.sched-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:6px;margin-top:10px}
+.sched-item{padding:8px 10px;border-radius:6px;border:1px solid var(--gray-200);background:var(--gray-50)}
+.sched-item.done{background:#f0fdf4;border-color:#bbf7d0}
+.sched-item.urgent{background:#fef2f2;border-color:#fecaca}
+.sched-item.soon{background:#fff7ed;border-color:#fed7aa}
+.sched-label{font-size:10px;color:#6b7280;margin-bottom:3px}
+.sched-val{font-size:12px;font-weight:500}
+.dday-red{color:#dc2626;font-weight:700}
+.dday-orange{color:#d97706;font-weight:600}
+.dday-green{color:#16a34a}
+</style>
+</head>
+<body>
+<div class="layout">
+<div class="sidebar">
+  <div class="sidebar-logo">🏭 업체 관리<small>중국 발주 · 납품</small></div>
+  <nav>
+    <button class="nav-btn active" onclick="showPage('dashboard',this)">📊 대시보드</button>
+    <div class="section-label">업체</div>
+    <button class="nav-btn" onclick="showPage('제헤우드',this)">🏢 제헤우드</button>
+    <button class="nav-btn" onclick="showPage('베이지아',this)">🏢 베이지아</button>
+    <button class="nav-btn" onclick="showPage('천진세라믹',this)">🏢 천진세라믹</button>
+  </nav>
+</div>
+<div class="main">
+
+<!-- 대시보드 -->
+<div class="page active" id="page-dashboard">
+  <div class="page-title">📊 대시보드</div>
+  <div class="stat-grid" id="statGrid"></div>
+  <div id="alertBox"></div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:16px;font-weight:600">📦 전체 발주 현황</div>
+      <button class="btn btn-primary btn-sm" onclick="openModal()">+ 발주 추가</button>
+    </div>
+    <table class="tbl"><thead><tr>
+      <th>업체</th><th>발주번호</th><th>발주일</th><th>품목</th><th>금액</th><th>상태</th><th>납품처</th><th></th>
+    </tr></thead><tbody id="allOrdersTbl"></tbody></table>
+  </div>
+</div>
+
+<!-- 업체별 페이지 -->
+<div class="page" id="page-제헤우드"></div>
+<div class="page" id="page-베이지아"></div>
+<div class="page" id="page-천진세라믹"></div>
+
+</div><!-- /main -->
+</div><!-- /layout -->
+
+<!-- 발주 모달 -->
+<div class="modal-bg" id="orderModal">
+<div class="modal">
+  <button class="modal-close" onclick="closeModal()">✕</button>
+  <div class="modal-title" id="modalTitle">발주 추가</div>
+  <form id="orderForm" onsubmit="saveOrder(event)">
+    <input type="hidden" id="fId">
+    <div class="form-grid">
+      <div class="form-group"><label>업체</label>
+        <select id="fSupplier">
+          <option>제헤우드</option><option>베이지아</option><option>천진세라믹</option>
+        </select></div>
+      <div class="form-group"><label>발주번호 (차수)</label><input type="text" id="fOrderNo" placeholder="예) 26-10차"></div>
+      <div class="form-group"><label>발주일</label><input type="date" id="fOrderDate"></div>
+      <div class="form-group"><label>납기일</label><input type="date" id="fDeadline"></div>
+      <div class="form-group"><label>총 금액</label><input type="number" id="fAmount" placeholder="0"></div>
+      <div class="form-group"><label>통화</label>
+        <select id="fCurrency"><option>USD</option><option>CNY</option><option>KRW</option></select></div>
+      <div class="form-group full"><label>품목 (쉼표로 구분)</label><input type="text" id="fItems" placeholder="예) 토리책장 100개, 그로잉핏 50개"></div>
+    </div>
+    <div class="form-section">💳 입금 일정</div>
+    <div class="form-grid">
+      <div class="form-group"><label>30% 입금 예정일</label><input type="date" id="fPay30Due"></div>
+      <div class="form-group"><label>30% 입금 완료일</label><input type="date" id="fPay30Done"></div>
+      <div class="form-group"><label>70% 입금 예정일</label><input type="date" id="fPay70Due"></div>
+      <div class="form-group"><label>70% 입금 완료일</label><input type="date" id="fPay70Done"></div>
+    </div>
+    <div class="form-section">🚢 선적 · 통관</div>
+    <div class="form-grid">
+      <div class="form-group"><label>선적일</label><input type="date" id="fShipping"></div>
+      <div class="form-group"><label>도착 예정일</label><input type="date" id="fArrival"></div>
+      <div class="form-group"><label>통관 완료일</label><input type="date" id="fCustoms"></div>
+      <div class="form-group"><label>납품 예정일</label><input type="date" id="fDelivery"></div>
+      <div class="form-group"><label>납품 거래처</label><input type="text" id="fClient" placeholder="예) 조혼가구"></div>
+      <div class="form-group"><label>진행 상태</label>
+        <select id="fStatus">
+          <option>발주중</option><option>입금대기</option><option>생산중</option>
+          <option>선적준비</option><option>선적중</option><option>통관중</option><option>납품완료</option>
+        </select></div>
+    </div>
+    <div class="form-section">📝 메모</div>
+    <div class="form-group"><textarea id="fMemo" rows="3" placeholder="특이사항, 요청사항 등"></textarea></div>
+    <div style="display:flex;gap:8px;margin-top:20px;justify-content:flex-end">
+      <button type="button" class="btn btn-outline" onclick="closeModal()">취소</button>
+      <button type="submit" class="btn btn-primary">저장</button>
+    </div>
+  </form>
+</div>
+</div>
+
+<script>
+// ── 데이터 ────────────────────────────────────────────────
+const SUPPLIERS = ['제헤우드','베이지아','천진세라믹'];
+const KEY = 'chinaOrders_v1';
+
+function load(){ return JSON.parse(localStorage.getItem(KEY)||'[]'); }
+function save(orders){ localStorage.setItem(KEY, JSON.stringify(orders)); }
+function nextId(orders){ return orders.length ? Math.max(...orders.map(o=>o.id))+1 : 1; }
+
+// ── 날짜 유틸 ──────────────────────────────────────────────
+function daysLeft(ds){
+  if(!ds) return null;
+  const diff = Math.round((new Date(ds) - new Date(new Date().toDateString()))/86400000);
+  return diff;
+}
+function ddayHtml(ds, doneDt){
+  if(doneDt) return `<span class="dday-green">✅ ${doneDt}</span>`;
+  if(!ds) return '<span style="color:#9ca3af">-</span>';
+  const n = daysLeft(ds);
+  const cls = n<0?'dday-red':n<=3?'dday-red':n<=7?'dday-orange':'dday-green';
+  const txt = n<0?`D+${Math.abs(n)}`:n===0?'D-day':`D-${n}`;
+  return `<span class="${cls}">${txt}</span> <small style="color:#9ca3af">${ds}</small>`;
+}
+function schedClass(ds, doneDt){
+  if(doneDt) return 'done';
+  if(!ds) return '';
+  const n=daysLeft(ds);
+  if(n<0||n<=3) return 'urgent';
+  if(n<=7) return 'soon';
+  return '';
+}
+
+// ── 배지 ──────────────────────────────────────────────────
+function statusBadge(s){
+  const map={
+    '발주중':'badge-blue','입금대기':'badge-yellow','생산중':'badge-purple',
+    '선적준비':'badge-yellow','선적중':'badge-blue','통관중':'badge-yellow','납품완료':'badge-green'
+  };
+  return `<span class="badge ${map[s]||'badge-gray'}">${s}</span>`;
+}
+
+// ── 페이지 전환 ────────────────────────────────────────────
+function showPage(id, btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(btn) btn.classList.add('active');
+  if(id==='dashboard') renderDashboard();
+  else if(SUPPLIERS.includes(id)) renderSupplier(id);
+}
+
+// ── 대시보드 ──────────────────────────────────────────────
+function renderDashboard(){
+  const orders = load();
+  // 통계
+  const sg = document.getElementById('statGrid');
+  let html = '';
+  SUPPLIERS.forEach(s=>{
+    const total = orders.filter(o=>o.supplier===s).length;
+    const active = orders.filter(o=>o.supplier===s&&o.status!=='납품완료').length;
+    html+=`<div class="stat-card" onclick="showPage('${s}',document.querySelector('.nav-btn:nth-child(${SUPPLIERS.indexOf(s)+3})'))">
+      <div class="stat-num">${active}</div>
+      <div class="stat-label">${s} 진행중</div>
+      <div class="stat-sub">전체 ${total}건</div>
+    </div>`;
+  });
+  // D-day 이벤트 수집
+  const events=[];
+  orders.forEach(o=>{
+    if(o.status==='납품완료') return;
+    [
+      ['30% 입금',o.pay30Due,o.pay30Done],
+      ['70% 입금',o.pay70Due,o.pay70Done],
+      ['선적일',o.shippingDate,null],
+      ['도착예정',o.arrivalDate,null],
+      ['통관',o.customsDate,null],
+      ['납품일',o.deliveryDate,null],
+    ].forEach(([label,dt,done])=>{
+      if(dt&&!done){
+        const n=daysLeft(dt);
+        if(n!==null&&n<=14) events.push({supplier:o.supplier,orderNo:o.orderNo||'-',label,date:dt,n,id:o.id});
+      }
+    });
+  });
+  events.sort((a,b)=>a.n-b.n);
+  const alertCount = events.length;
+  html+=`<div class="stat-card">
+    <div class="stat-num" style="color:${alertCount?'#dc2626':'#16a34a'}">${alertCount}</div>
+    <div class="stat-label">14일 내 마감</div>
+  </div>`;
+  sg.innerHTML = html;
+
+  // 알림박스
+  const ab = document.getElementById('alertBox');
+  if(events.length){
+    let rows = events.map(e=>{
+      const cls=e.n<0?'dday-red':e.n<=3?'dday-red':e.n<=7?'dday-orange':'dday-green';
+      const txt=e.n<0?`D+${Math.abs(e.n)}`:e.n===0?'D-day':`D-${e.n}`;
+      return `<tr>
+        <td><strong>${e.supplier}</strong></td>
+        <td>${e.orderNo}</td>
+        <td>${e.label}</td>
+        <td>${e.date}</td>
+        <td><span class="${cls}">${txt}</span></td>
+        <td><button class="btn btn-outline btn-sm" onclick="openModal(${e.id})">수정</button></td>
+      </tr>`;
+    }).join('');
+    ab.innerHTML=`<div class="card"><div style="font-size:16px;font-weight:600;margin-bottom:16px">⚠️ 임박한 일정 (14일 이내)</div>
+      <table class="tbl"><thead><tr><th>업체</th><th>발주번호</th><th>항목</th><th>날짜</th><th>D-day</th><th></th></tr></thead>
+      <tbody>${rows}</tbody></table></div>`;
+  } else {
+    ab.innerHTML=`<div class="card" style="text-align:center;color:#9ca3af;padding:32px">✅ 14일 내 임박한 일정이 없습니다</div>`;
+  }
+
+  // 전체 발주
+  const tbody = document.getElementById('allOrdersTbl');
+  if(!orders.length){
+    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:#9ca3af;padding:32px">발주 데이터가 없습니다</td></tr>';
+    return;
+  }
+  tbody.innerHTML = orders.map(o=>`<tr>
+    <td><strong style="color:var(--primary);cursor:pointer" onclick="showPage('${o.supplier}')">${o.supplier}</strong></td>
+    <td>${o.orderNo||'-'}</td>
+    <td>${o.orderDate||'-'}</td>
+    <td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${(o.items||[]).join(', ')||'-'}</td>
+    <td>${o.amount?Number(o.amount).toLocaleString()+' '+o.currency:'-'}</td>
+    <td>${statusBadge(o.status||'발주중')}</td>
+    <td>${o.deliveryClient||'-'}</td>
+    <td style="white-space:nowrap">
+      <button class="btn btn-outline btn-sm" onclick="openModal(${o.id})">수정</button>
+      <button class="btn-danger-sm" onclick="deleteOrder(${o.id})">삭제</button>
+    </td>
+  </tr>`).join('');
+}
+
+// ── 업체별 페이지 ──────────────────────────────────────────
+function renderSupplier(name){
+  const orders = load().filter(o=>o.supplier===name);
+  const container = document.getElementById('page-'+name);
+
+  let cardsHtml = '';
+  if(!orders.length){
+    cardsHtml=`<div style="text-align:center;color:#9ca3af;padding:60px">
+      아직 발주 데이터가 없습니다.<br>
+      <button class="btn btn-primary" style="margin-top:16px" onclick="openModal(null,'${name}')">+ 첫 발주 추가</button>
+    </div>`;
+  } else {
+    cardsHtml = orders.map(o=>{
+      const scheds = [
+        ['30% 입금', o.pay30Due, o.pay30Done],
+        ['70% 입금', o.pay70Due, o.pay70Done],
+        ['선적일',   o.shippingDate, null],
+        ['도착예정', o.arrivalDate, null],
+        ['통관완료', o.customsDate, null],
+        ['납품일',   o.deliveryDate, null],
+      ];
+      const schedHtml = scheds.map(([label,dt,done])=>`
+        <div class="sched-item ${schedClass(dt,done)}">
+          <div class="sched-label">${label}</div>
+          <div class="sched-val">${ddayHtml(dt,done)}</div>
+        </div>`).join('');
+
+      return `<div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+          <div>
+            <span style="font-size:16px;font-weight:700">${o.orderNo||'(번호없음)'}</span>
+            ${statusBadge(o.status||'발주중')}
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-outline btn-sm" onclick="openModal(${o.id})">✏️ 수정</button>
+            <button class="btn-danger-sm" onclick="deleteOrder(${o.id})">🗑️</button>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-top:12px">
+          <div><div style="font-size:11px;color:#6b7280">발주일</div><div>${o.orderDate||'-'}</div></div>
+          <div><div style="font-size:11px;color:#6b7280">납기일</div><div>${o.deadline||'-'}</div></div>
+          <div><div style="font-size:11px;color:#6b7280">금액</div><div>${o.amount?Number(o.amount).toLocaleString()+' '+o.currency:'-'}</div></div>
+          <div><div style="font-size:11px;color:#6b7280">납품처</div><div>${o.deliveryClient||'-'}</div></div>
+        </div>
+        ${o.items&&o.items.length?`<div style="margin-top:8px;font-size:12px"><span style="color:#6b7280">품목: </span>${o.items.join(', ')}</div>`:''}
+        <div style="margin-top:14px;border-top:1px solid #f3f4f6;padding-top:12px">
+          <div style="font-size:11px;font-weight:700;color:#6b7280;margin-bottom:6px">📅 스케줄</div>
+          <div class="sched-grid">${schedHtml}</div>
+        </div>
+        ${o.memo?`<div style="margin-top:10px;font-size:12px;background:#fffbeb;border:1px solid #fef3c7;border-radius:6px;padding:8px 10px;color:#92400e">📝 ${o.memo}</div>`:''}
+      </div>`;
+    }).join('');
+  }
+
+  container.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+      <div>
+        <div class="page-title" style="margin:0">🏢 ${name}</div>
+        <div style="font-size:13px;color:#6b7280;margin-top:4px">발주 ${orders.length}건</div>
+      </div>
+      <button class="btn btn-primary" onclick="openModal(null,'${name}')">+ 발주 추가</button>
+    </div>
+    ${cardsHtml}`;
+}
+
+// ── 모달 ──────────────────────────────────────────────────
+function openModal(id, supplier){
+  document.getElementById('modalTitle').textContent = id?'발주 수정':'발주 추가';
+  document.getElementById('orderForm').reset();
+  document.getElementById('fId').value='';
+  if(supplier) document.getElementById('fSupplier').value=supplier;
+  if(id){
+    const o = load().find(x=>x.id===id);
+    if(!o) return;
+    document.getElementById('fId').value=o.id;
+    document.getElementById('fSupplier').value=o.supplier||'제헤우드';
+    document.getElementById('fOrderNo').value=o.orderNo||'';
+    document.getElementById('fOrderDate').value=o.orderDate||'';
+    document.getElementById('fDeadline').value=o.deadline||'';
+    document.getElementById('fAmount').value=o.amount||'';
+    document.getElementById('fCurrency').value=o.currency||'USD';
+    document.getElementById('fItems').value=(o.items||[]).join(', ');
+    document.getElementById('fPay30Due').value=o.pay30Due||'';
+    document.getElementById('fPay30Done').value=o.pay30Done||'';
+    document.getElementById('fPay70Due').value=o.pay70Due||'';
+    document.getElementById('fPay70Done').value=o.pay70Done||'';
+    document.getElementById('fShipping').value=o.shippingDate||'';
+    document.getElementById('fArrival').value=o.arrivalDate||'';
+    document.getElementById('fCustoms').value=o.customsDate||'';
+    document.getElementById('fDelivery').value=o.deliveryDate||'';
+    document.getElementById('fClient').value=o.deliveryClient||'';
+    document.getElementById('fStatus').value=o.status||'발주중';
+    document.getElementById('fMemo').value=o.memo||'';
+  }
+  document.getElementById('orderModal').classList.add('open');
+}
+function closeModal(){ document.getElementById('orderModal').classList.remove('open'); }
+
+function saveOrder(e){
+  e.preventDefault();
+  const orders = load();
+  const idVal = document.getElementById('fId').value;
+  const itemsRaw = document.getElementById('fItems').value;
+  const obj = {
+    supplier:       document.getElementById('fSupplier').value,
+    orderNo:        document.getElementById('fOrderNo').value,
+    orderDate:      document.getElementById('fOrderDate').value,
+    deadline:       document.getElementById('fDeadline').value,
+    amount:         document.getElementById('fAmount').value,
+    currency:       document.getElementById('fCurrency').value,
+    items:          itemsRaw?itemsRaw.split(',').map(s=>s.trim()).filter(Boolean):[],
+    pay30Due:       document.getElementById('fPay30Due').value,
+    pay30Done:      document.getElementById('fPay30Done').value,
+    pay70Due:       document.getElementById('fPay70Due').value,
+    pay70Done:      document.getElementById('fPay70Done').value,
+    shippingDate:   document.getElementById('fShipping').value,
+    arrivalDate:    document.getElementById('fArrival').value,
+    customsDate:    document.getElementById('fCustoms').value,
+    deliveryDate:   document.getElementById('fDelivery').value,
+    deliveryClient: document.getElementById('fClient').value,
+    status:         document.getElementById('fStatus').value,
+    memo:           document.getElementById('fMemo').value,
+  };
+  if(idVal){
+    const idx=orders.findIndex(o=>o.id===parseInt(idVal));
+    if(idx>-1){ obj.id=parseInt(idVal); orders[idx]=obj; }
+  } else {
+    obj.id=nextId(orders);
+    orders.push(obj);
+  }
+  save(orders);
+  closeModal();
+  // 현재 활성 페이지 다시 렌더
+  const activePage = document.querySelector('.page.active');
+  if(activePage.id==='page-dashboard') renderDashboard();
+  else renderSupplier(activePage.id.replace('page-',''));
+}
+
+function deleteOrder(id){
+  if(!confirm('이 발주를 삭제할까요?')) return;
+  save(load().filter(o=>o.id!==id));
+  const activePage = document.querySelector('.page.active');
+  if(activePage.id==='page-dashboard') renderDashboard();
+  else renderSupplier(activePage.id.replace('page-',''));
+}
+
+// ── 초기 렌더 ─────────────────────────────────────────────
+renderDashboard();
+</script>
+</body>
+</html>
