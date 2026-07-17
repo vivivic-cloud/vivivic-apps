@@ -1842,7 +1842,7 @@
                 if (n.type === 'cancel') {
                     typeInfo = { color: 'red', label: '취소요청', btn: `<button onclick="handleNotificationAction('${n.docId}', 'cancel', ${n.id})" class="px-1.5 py-0.5 bg-red-600 text-white text-[9px] font-bold rounded hover:bg-red-700 whitespace-nowrap">취소확인</button>` };
                 } else if (n.type === 'edit') {
-                    typeInfo = { color: 'amber', label: '수정요청', btn: `<button onclick="handleNotificationAction('${n.docId}', 'edit', ${n.id})" class="px-1.5 py-0.5 bg-[#37352f] text-white text-[9px] font-bold rounded hover:bg-[#37352f] whitespace-nowrap">수정승인</button>` };
+                    typeInfo = { color: 'amber', label: '수정요청', btn: `<button onclick="handleNotificationAction('${n.docId}', 'edit', ${n.id})" class="px-1.5 py-0.5 bg-white border border-blue-200 text-blue-500 text-[9px] font-bold rounded hover:bg-blue-50 whitespace-nowrap">수정승인</button>` };
                 } else if (n.type === 'editing') {
                     typeInfo = { color: 'red', label: '수정중', btn: '' };
                 } else if (n.type === 'editCompleted') {
@@ -1904,6 +1904,7 @@
                 // docChanges()로 변경분만 처리 — 전체 순회/깊은복사 없음
                 snapshot.docChanges().forEach(change => {
                     const newOrder = { ...change.doc.data(), docId: change.doc.id };
+                    let prevOrder = null;
 
                     if (change.type === 'added') {
                         // 초기 로드 시 이미 있으면 skip (중복 방지)
@@ -1913,9 +1914,11 @@
                     } else if (change.type === 'modified') {
                         const idx = confirmedOrders.findIndex(o => o.docId === newOrder.docId);
                         if (idx !== -1) {
+                            // 배열을 덮어쓰기 전에 변경 전 상태를 보존 — 알림 비교(신규요청 감지)에 사용
+                            prevOrder = confirmedOrders[idx];
                             // checked는 로컬 상태 보존
                             // procOverrides는 Firebase 값이 정본 (이동 확정 시 Firebase에 저장됨)
-                            newOrder.checked = confirmedOrders[idx].checked;
+                            newOrder.checked = prevOrder.checked;
                             confirmedOrders[idx] = newOrder;
                         }
                     } else if (change.type === 'removed') {
@@ -1925,10 +1928,6 @@
 
                     // 알림 감지 (added·modified 대상만)
                     if (change.type === 'added' || change.type === 'modified') {
-                        const prev = change.type === 'modified' ? change.oldIndex : null;
-                        const prevDoc = prev !== null ? change.doc : null;
-                        // 이전 데이터는 Firestore SDK가 제공하지 않으므로
-                        // confirmedOrders 병합 전 스냅샷 대신 change.type으로 구분
                         if (newOrder.amtRegistered !== true && !newOrder.amtConfirmedCancel) {
                             if (change.type === 'added') {
                                 // 신규 문서: 각 상태 알림
@@ -1937,14 +1936,14 @@
                                 if (newOrder.isEditMode && newOrder.amtApprovedEdit)       addNotification('editing', newOrder);
                                 if (newOrder.editCompleted)                                addNotification('editCompleted', newOrder);
                             } else {
-                                // 수정 문서: 이전값은 confirmedOrders에서 찾아 비교
-                                const prevOrder = confirmedOrders.find(o => o.docId === newOrder.docId) || {};
-                                if (newOrder.isCancelRequested && !prevOrder.isCancelRequested)           addNotification('cancel', newOrder);
-                                else if (!newOrder.isCancelRequested && prevOrder.isCancelRequested)      removeNotificationByDocId(newOrder.docId);
-                                if (newOrder.editInfo && !prevOrder.editInfo && !newOrder.amtApprovedEdit) addNotification('edit', newOrder);
-                                else if (!newOrder.editInfo && prevOrder.editInfo)                        removeNotificationByDocId(newOrder.docId);
-                                if (newOrder.isEditMode && newOrder.amtApprovedEdit && !prevOrder.isEditMode) addNotification('editing', newOrder);
-                                if (newOrder.editCompleted && !prevOrder.editCompleted)                   addNotification('editCompleted', newOrder);
+                                // 수정 문서: 배열 덮어쓰기 전에 보존해둔 prevOrder와 비교
+                                const prev = prevOrder || {};
+                                if (newOrder.isCancelRequested && !prev.isCancelRequested)           addNotification('cancel', newOrder);
+                                else if (!newOrder.isCancelRequested && prev.isCancelRequested)      removeNotificationByDocId(newOrder.docId);
+                                if (newOrder.editInfo && !prev.editInfo && !newOrder.amtApprovedEdit) addNotification('edit', newOrder);
+                                else if (!newOrder.editInfo && prev.editInfo)                        removeNotificationByDocId(newOrder.docId);
+                                if (newOrder.isEditMode && newOrder.amtApprovedEdit && !prev.isEditMode) addNotification('editing', newOrder);
+                                if (newOrder.editCompleted && !prev.editCompleted)                   addNotification('editCompleted', newOrder);
                             }
                         }
                     }
@@ -2465,7 +2464,7 @@
                 // 수정 진행 상황 배지 (최종 완료되지 않았을 때만 표시)
                 const editBadge = !isEditCompleted && isEdited ? `<span class="px-2 py-0.5 bg-[#37352f] text-white rounded font-black text-[10px] uppercase ml-2">수정요청됨</span>` : '';
                 const cancelBadge = isCancelRequested ? `<span class="px-2 py-0.5 bg-red-600 text-white rounded font-black text-[10px] uppercase ml-2 animate-pulse">취소요청됨</span>` : '';
-                const editApproveBtn = (isEdited && !item.amtApprovedEdit && !isEditCompleted) ? `<button onclick="approveEditRequest('${item.docId}')" class="px-2 py-0.5 bg-[#37352f] text-white text-[10px] font-bold rounded hover:bg-[#37352f] transition-all animate-pulse">수정승인</button>` : '';
+                const editApproveBtn = (isEdited && !item.amtApprovedEdit && !isEditCompleted) ? `<button onclick="approveEditRequest('${item.docId}')" class="px-2 py-0.5 bg-white border border-blue-200 text-blue-500 text-[10px] font-bold rounded hover:bg-blue-50 transition-all animate-pulse">수정승인</button>` : '';
                 const cancelConfirmBtn = isCancelRequested ? `<button onclick="confirmCancelReceived('${item.docId}')" class="px-2 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded hover:bg-red-700 transition-all animate-pulse">취소확인</button>` : '';
                 const editApprovedBadge = !isEditCompleted && item.amtApprovedEdit ? `<span class="px-2 py-0.5 bg-[#37352f] text-white rounded font-black text-[10px] uppercase ml-2">수정승인완료</span>` : '';
 
@@ -2938,7 +2937,7 @@
                 // 수정 진행 상황 배지 (최종 완료되지 않았을 때만 표시)
                 const editBadge = !isEditCompleted && isEdited ? `<span class="px-2 py-0.5 bg-[#37352f] text-white rounded font-black text-[10px] uppercase ml-2">수정요청됨</span>` : '';
                 const cancelBadge = isCancelRequested ? `<span class="px-2 py-0.5 bg-red-600 text-white rounded font-black text-[10px] uppercase ml-2 animate-pulse">취소요청됨</span>` : '';
-                const editApproveBtn = (isEdited && !item.amtApprovedEdit && !isEditCompleted) ? `<button onclick="approveEditRequest('${item.docId}')" class="px-2 py-0.5 bg-[#37352f] text-white text-[10px] font-bold rounded hover:bg-[#37352f] transition-all animate-pulse">수정승인</button>` : '';
+                const editApproveBtn = (isEdited && !item.amtApprovedEdit && !isEditCompleted) ? `<button onclick="approveEditRequest('${item.docId}')" class="px-2 py-0.5 bg-white border border-blue-200 text-blue-500 text-[10px] font-bold rounded hover:bg-blue-50 transition-all animate-pulse">수정승인</button>` : '';
                 const cancelConfirmBtn = isCancelRequested ? `<button onclick="confirmCancelReceived('${item.docId}')" class="px-2 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded hover:bg-red-700 transition-all animate-pulse">취소확인</button>` : '';
                 const editApprovedBadge = !isEditCompleted && item.amtApprovedEdit ? `<span class="px-2 py-0.5 bg-[#37352f] text-white rounded font-black text-[10px] uppercase ml-2">수정승인완료</span>` : '';
 
