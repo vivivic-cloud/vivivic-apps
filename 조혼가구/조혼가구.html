@@ -10,8 +10,8 @@
     <!-- Firebase SDK (Modular) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";    
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
-        import { getFirestore, collection, addDoc, query, onSnapshot, serverTimestamp, getDocs, deleteDoc, doc, updateDoc, writeBatch } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+        import { getFirestore, collection, addDoc, query, where, onSnapshot, serverTimestamp, getDoc, getDocs, deleteDoc, doc, updateDoc, writeBatch } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
 
         const firebaseConfig = {
@@ -31,25 +31,77 @@
 
         window.db = db;
         window.storage = storage;
-        window.fbFirestore = { collection, addDoc, query, onSnapshot, serverTimestamp, getDocs, deleteDoc, doc, updateDoc, writeBatch };
+        window.fbFirestore = { collection, addDoc, query, where, onSnapshot, serverTimestamp, getDoc, getDocs, deleteDoc, doc, updateDoc, writeBatch };
         window.fbStorage = { ref, uploadBytes, getDownloadURL };
+        window.fbAuth = { auth, signInWithEmailAndPassword, signOut };
 
-        const initAuth = async () => {
-            try {
-                await signInAnonymously(auth);
-            } catch (err) {
-                console.error("Auth Fail:", err);
+        onAuthStateChanged(auth, async (user) => {
+            if (!user || user.isAnonymous) {
+                window.showAuthLoginScreen();
+                return;
             }
-        };
-        initAuth();
 
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                console.log("Firebase Auth Success:", user.uid);
+            try {
+                const accSnap = await getDoc(doc(db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'user_accounts', user.uid));
+                if (!accSnap.exists()) {
+                    window.showAuthLoginScreen('이 계정에 연결된 권한 정보가 없습니다. 관리자에게 문의하세요.');
+                    await signOut(auth);
+                    return;
+                }
+                const acc = accSnap.data();
+                window._myAccount = { uid: user.uid, email: user.email, role: acc.role, company: acc.company || null };
+                window.hideAuthLoginScreen();
+                const emailEl = document.getElementById('auth-account-email');
+                if (emailEl) emailEl.textContent = user.email;
+                console.log("Firebase Auth Success:", user.uid, window._myAccount);
+                if (typeof window.applyAccountRestrictions === 'function') window.applyAccountRestrictions();
                 initCloudDataSync();
                 initConfirmedOrdersSync();
+            } catch (err) {
+                console.error('계정 정보 조회 실패:', err);
+                window.showAuthLoginScreen('계정 정보를 불러오지 못했습니다. 다시 시도해주세요.');
             }
         });
+
+        window.showAuthLoginScreen = function(errorMsg) {
+            const overlay = document.getElementById('auth-login-overlay');
+            if (!overlay) return;
+            overlay.classList.remove('hidden');
+            const errEl = document.getElementById('auth-login-error');
+            if (errorMsg) { errEl.textContent = errorMsg; errEl.classList.remove('hidden'); }
+            else { errEl.classList.add('hidden'); }
+            const btn = document.getElementById('auth-login-submit');
+            if (btn) { btn.disabled = false; btn.textContent = '로그인'; }
+        };
+        window.hideAuthLoginScreen = function() {
+            const overlay = document.getElementById('auth-login-overlay');
+            if (overlay) overlay.classList.add('hidden');
+        };
+        window.handleAuthLoginSubmit = async function(e) {
+            e.preventDefault();
+            const email = document.getElementById('auth-login-email').value.trim();
+            const password = document.getElementById('auth-login-password').value;
+            const btn = document.getElementById('auth-login-submit');
+            btn.disabled = true; btn.textContent = '로그인 중...';
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+            } catch (err) {
+                console.error('로그인 실패:', err);
+                let msg = '로그인에 실패했습니다.';
+                if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+                    msg = '이메일 또는 비밀번호가 올바르지 않습니다.';
+                } else if (err.code === 'auth/too-many-requests') {
+                    msg = '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.';
+                }
+                window.showAuthLoginScreen(msg);
+            }
+            return false;
+        };
+        window.handleAuthLogout = async function() {
+            window._myAccount = null;
+            await signOut(auth);
+            location.reload();
+        };
     </script>
 
     <style>
@@ -1002,7 +1054,7 @@
     <!-- Custom Confirm Modal -->
     <div id="custom-confirm-modal">
         <div class="modal-content">
-            <h3 class="font-bold text-lg mb-4">발주 추가 확인</h3>
+            <h3 id="modal-title" class="font-bold text-lg mb-4">발주 추가 확인</h3>
             <p id="modal-message" class="text-gray-600 mb-6 text-sm leading-relaxed"></p>
             <div class="flex gap-3 justify-center">
                 <button id="modal-cancel-btn" class="px-5 py-2 rounded-lg bg-gray-100 text-gray-700 font-bold hover:bg-gray-200 transition-all text-sm">취소</button>
@@ -1015,6 +1067,22 @@
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#37352f] mb-4"></div>
         <span class="copy-badge mb-2">LOADING</span>
         <span id="loading-status-text" class="font-bold text-[#37352f] fluid-text-body">데이터를 처리 중입니다...</span>
+    </div>
+
+    <!-- 로그인 화면 -->
+    <div id="auth-login-overlay" class="fixed inset-0 bg-[#fbfbfa] flex items-center justify-center z-[10000]">
+        <form id="auth-login-form" onsubmit="return window.handleAuthLoginSubmit(event)" class="w-full max-w-[340px] p-8 bg-white border border-[#ededeb] rounded-2xl shadow-sm">
+            <div class="font-black text-2xl tracking-tighter text-[#37352f] mb-1">VIVIVIC</div>
+            <div class="text-[13px] text-[#787774] font-bold mb-6">거래처 발주 시스템 로그인</div>
+            <label class="block text-[11px] font-bold text-[#787774] mb-1">이메일</label>
+            <input id="auth-login-email" type="email" required autocomplete="username"
+                class="w-full mb-3 px-3 py-2.5 border border-[#ededeb] rounded-lg text-[13px] focus:outline-none focus:border-[#37352f]" placeholder="you@company.com">
+            <label class="block text-[11px] font-bold text-[#787774] mb-1">비밀번호</label>
+            <input id="auth-login-password" type="password" required autocomplete="current-password"
+                class="w-full mb-4 px-3 py-2.5 border border-[#ededeb] rounded-lg text-[13px] focus:outline-none focus:border-[#37352f]" placeholder="••••••••">
+            <div id="auth-login-error" class="hidden mb-3 px-3 py-2 bg-red-50 border border-red-200 text-red-600 text-[11px] font-bold rounded-lg"></div>
+            <button id="auth-login-submit" type="submit" class="w-full py-2.5 bg-[#37352f] text-white font-bold text-[13px] rounded-lg hover:bg-black transition-all active:scale-95">로그인</button>
+        </form>
     </div>
 
     <header class="w-full bg-white border-b border-[#ededeb] sticky top-0 z-[100]">
@@ -1037,7 +1105,11 @@
                 </nav>
             </div>
             <div class="flex items-center gap-3 ml-4">
-                <div class="flex items-center gap-1 border border-[#ededeb] rounded-lg bg-white p-1">
+                <div id="auth-account-badge" class="flex items-center gap-2 px-2 py-1 rounded-lg bg-[#f7f6f3] border border-[#ededeb]" style="font-size:11px;">
+                    <span id="auth-account-email" class="font-bold text-[#37352f]"></span>
+                    <button onclick="window.handleAuthLogout()" class="text-[#787774] hover:text-[#37352f] font-bold underline">로그아웃</button>
+                </div>
+                <div id="excel-upload-wrap" class="flex items-center gap-1 border border-[#ededeb] rounded-lg bg-white p-1">
                     <input type="file" id="excel-upload" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleFileUpload(this)" />
                     <label for="excel-upload" class="flex items-center gap-2 px-2 py-1.5 hover:bg-[#f7f6f3] cursor-pointer rounded-md">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="text-green-600"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg>
@@ -1223,9 +1295,9 @@
             <div class="pt-20 border-t border-red-100 flex flex-col items-center gap-4">
                 <div class="text-[11px] text-red-400 font-bold uppercase tracking-widest">System Maintenance</div>
                 <button onclick="bulkDeleteTestData()" class="px-6 py-2 border-2 border-red-200 text-red-500 rounded-xl font-black text-[12px] hover:bg-red-50 transition-all active:scale-95 shadow-sm">
-                    테스트 데이터 일괄 삭제
+                    ⚠️ 발주기록삭제 (전체, 복구불가)
                 </button>
-                <div class="text-[9px] text-gray-400 italic">이 버튼은 'Firestore 저장' 기능을 통해 생성된 테스트 데이터만 삭제합니다.</div>
+                <div class="text-[9px] text-red-400 font-bold">테스트 데이터만이 아니라 지금까지 등록된 모든 발주 기록이 전부 삭제됩니다. 실사용 전 이 버튼은 반드시 제거하세요.</div>
             </div>
         </div>
 
@@ -1424,10 +1496,15 @@
         }
 
         function initConfirmedOrdersSync() {
-            const { collection, query, onSnapshot } = window.fbFirestore;
+            const { collection, query, where, onSnapshot } = window.fbFirestore;
             const colRef = collection(window.db, 'artifacts', appId, 'public', 'data', COLLECTION_ORDERS);
+            // client(거래처) 계정은 자기 회사 데이터만 조회 (Firestore 보안 규칙도 이 조건을 요구함)
+            const acc = window._myAccount;
+            const target = (acc && acc.role === 'client' && acc.company)
+                ? query(colRef, where('supplier', '==', acc.company))
+                : colRef;
 
-            onSnapshot(colRef, (snapshot) => {
+            onSnapshot(target, (snapshot) => {
                 confirmedOrders = snapshot.docs.map(doc => ({
                     ...doc.data(),
                     docId: doc.id
@@ -1472,6 +1549,26 @@
         function getCurrentSupplier() {
             return pageToSupplierMap[appMode];
         }
+
+        // company(=supplier 값) → 탭 appMode 키 역매핑
+        const supplierToPageMode = { '조혼가구':'조혼가구', '아인가구':'아인가구', '본사':'ing', '럭스디자인':'럭스디자인', '유한가구':'유한가구' };
+
+        // 로그인한 계정이 client(거래처)면 자기 회사 탭만 보이게 제한, amt(내부)면 전체 유지
+        window.applyAccountRestrictions = function() {
+            const acc = window._myAccount;
+            if (!acc) return;
+            if (acc.role === 'amt') return; // 내부 계정은 전체 탭 유지
+
+            const myMode = supplierToPageMode[acc.company] || null;
+            document.querySelectorAll('nav .nav-link').forEach(el => {
+                const navMode = el.id.replace('nav-', '');
+                if (myMode && navMode !== myMode) el.style.display = 'none';
+            });
+            // 엑셀 업로드는 AMT 내부 전용
+            const uploadWrap = document.getElementById('excel-upload-wrap');
+            if (uploadWrap) uploadWrap.style.display = 'none';
+            if (myMode) switchSupplier(myMode);
+        };
 
         /* ── 페이지 탭 전환: 발주하기 / 작업중 ── */
         let _currentPageTab = '발주하기';
@@ -3540,7 +3637,10 @@
         }
 
         async function bulkDeleteTestData() {
-            const result = await showConfirmModal("테스트로 생성된 모든 클라우드 발주 데이터를 삭제하시겠습니까? (이 작업은 되돌릴 수 없습니다.)");
+            const result = await showConfirmModal(
+                "지금까지 등록된 모든 발주 기록(진짜 발주 포함)을 영구 삭제합니다. 테스트로 만든 것인지 여부와 상관없이 confirmed_orders에 있는 모든 문서가 삭제됩니다. (이 작업은 되돌릴 수 없습니다.)",
+                { title: '⚠️ 발주기록삭제 확인', confirmLabel: '전체 삭제' }
+            );
             if (!result) return;
 
             const overlay = document.getElementById('loading-overlay');
@@ -3800,14 +3900,24 @@
             }
         }
 
-        function showConfirmModal(message) {
+        function showConfirmModal(message, opts) {
+            opts = opts || {};
+            const title        = opts.title        || '발주 추가 확인';
+            const confirmLabel = opts.confirmLabel  || 'AMT 발주 추가';
             return new Promise((resolve) => {
                 const modal = document.getElementById('custom-confirm-modal');
+                const titleEl = document.getElementById('modal-title');
                 const msgEl = document.getElementById('modal-message');
                 const cancelBtn = document.getElementById('modal-cancel-btn');
                 const confirmBtn = document.getElementById('modal-confirm-btn');
-                msgEl.textContent = message; modal.classList.add('active');
-                const cleanup = (val) => { modal.classList.remove('active'); resolve(val); };
+                if (titleEl) titleEl.textContent = title;
+                msgEl.textContent = message; confirmBtn.textContent = confirmLabel; modal.classList.add('active');
+                const cleanup = (val) => {
+                    modal.classList.remove('active');
+                    if (titleEl) titleEl.textContent = '발주 추가 확인';
+                    confirmBtn.textContent = 'AMT 발주 추가';
+                    resolve(val);
+                };
                 cancelBtn.onclick = () => cleanup(false); confirmBtn.onclick = () => cleanup(true);
             });
         }

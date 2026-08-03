@@ -15,8 +15,8 @@
     
     <!-- Firebase SDK (Modular) -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";    
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+        import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";    
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, getDoc, setDoc, getDocs, deleteField } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL, getBytes } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
 
@@ -39,25 +39,168 @@
         window.storage = storage;
         window.fbFirestore = { collection, addDoc, query, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, getDoc, setDoc, getDocs, deleteField };
         window.fbStorage = { ref, uploadBytes, getDownloadURL, getBytes };
+        window.fbAuth = { auth, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword };
 
-        signInAnonymously(auth);
+        const _mvParams = new URLSearchParams(location.search);
+        const _isMachineView = _mvParams.get('mv') === '1';
 
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                const _mvP = new URLSearchParams(location.search);
-                if (_mvP.get('mv') === '1') {
-                    // ── 기계 전용 뷰 모드
-                    if (typeof window.initMachineView === 'function') {
-                        window.initMachineView(_mvP.get('sk'), _mvP.get('mac'));
-                    }
-                } else {
-                    console.log("Firebase Auth Success:", user.uid);
-                    initCloudDataSync();
-                    initConfirmedOrdersSync();
-                    initCuttingPlansSync();
+        if (_isMachineView) {
+            // 기계 전용 뷰(공유 링크, 태블릿용)는 기존과 동일하게 익명 인증으로 동작
+            signInAnonymously(auth);
+        }
+
+        onAuthStateChanged(auth, async (user) => {
+            if (!user) {
+                if (!_isMachineView) window.showAuthLoginScreen();
+                return;
+            }
+
+            if (_isMachineView) {
+                if (typeof window.initMachineView === 'function') {
+                    window.initMachineView(_mvParams.get('sk'), _mvParams.get('mac'));
                 }
+                return;
+            }
+
+            if (user.isAnonymous) {
+                // 일반 화면인데 익명 세션만 있는 경우(이전 버전 잔여 세션 등) — 로그인 화면 표시
+                window.showAuthLoginScreen();
+                return;
+            }
+
+            // 실제 계정 로그인 완료 — user_accounts에서 role/company 조회
+            try {
+                const accSnap = await getDoc(doc(db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'user_accounts', user.uid));
+                if (!accSnap.exists()) {
+                    window.showAuthLoginScreen('이 계정에 연결된 권한 정보가 없습니다. 관리자에게 문의하세요.');
+                    await signOut(auth);
+                    return;
+                }
+                const acc = accSnap.data();
+                if (acc.role !== 'amt') {
+                    window.showAuthLoginScreen('에이엠티 화면은 내부(AMT) 계정만 접근할 수 있습니다.');
+                    await signOut(auth);
+                    return;
+                }
+                window._myAccount = { uid: user.uid, email: user.email, role: acc.role, company: acc.company || null };
+                window.hideAuthLoginScreen();
+                const emailEl = document.getElementById('auth-account-email');
+                if (emailEl) emailEl.textContent = user.email;
+                console.log("Firebase Auth Success:", user.uid, window._myAccount);
+                initCloudDataSync();
+                initConfirmedOrdersSync();
+                initCuttingPlansSync();
+            } catch (err) {
+                console.error('계정 정보 조회 실패:', err);
+                window.showAuthLoginScreen('계정 정보를 불러오지 못했습니다. 다시 시도해주세요.');
             }
         });
+
+        // ── 로그인 화면 표시/숨김 ─────────────────────────────────────
+        window.showAuthLoginScreen = function(errorMsg) {
+            const overlay = document.getElementById('auth-login-overlay');
+            overlay.classList.remove('hidden');
+            const errEl = document.getElementById('auth-login-error');
+            if (errorMsg) { errEl.textContent = errorMsg; errEl.classList.remove('hidden'); }
+            else { errEl.classList.add('hidden'); }
+            const btn = document.getElementById('auth-login-submit');
+            btn.disabled = false; btn.textContent = '로그인';
+        };
+        window.hideAuthLoginScreen = function() {
+            document.getElementById('auth-login-overlay').classList.add('hidden');
+        };
+
+        window.handleAuthLoginSubmit = async function(e) {
+            e.preventDefault();
+            const email = document.getElementById('auth-login-email').value.trim();
+            const password = document.getElementById('auth-login-password').value;
+            const btn = document.getElementById('auth-login-submit');
+            btn.disabled = true; btn.textContent = '로그인 중...';
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                // 이후 처리는 onAuthStateChanged가 담당
+            } catch (err) {
+                console.error('로그인 실패:', err);
+                let msg = '로그인에 실패했습니다.';
+                if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+                    msg = '이메일 또는 비밀번호가 올바르지 않습니다.';
+                } else if (err.code === 'auth/too-many-requests') {
+                    msg = '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.';
+                }
+                window.showAuthLoginScreen(msg);
+            }
+            return false;
+        };
+
+        window.handleAuthLogout = async function() {
+            window._myAccount = null;
+            await signOut(auth);
+            location.reload();
+        };
+
+        // ── 계정 생성 (관리자 세션 유지를 위해 별도 보조 앱 인스턴스로 계정만 생성) ──────
+        window.handleCreateAccountSubmit = async function(e) {
+            e.preventDefault();
+            const email = document.getElementById('ca-email').value.trim();
+            const password = document.getElementById('ca-password').value;
+            const role = document.getElementById('ca-role').value;
+            const company = role === 'client' ? document.getElementById('ca-company').value : null;
+            const errEl = document.getElementById('ca-error');
+            const okEl = document.getElementById('ca-success');
+            errEl.classList.add('hidden'); okEl.classList.add('hidden');
+
+            const secondaryApp = initializeApp(firebaseConfig, 'account-creation-' + Date.now());
+            const secondaryAuth = getAuth(secondaryApp);
+            try {
+                const cred = await createUserWithEmailAndPassword(secondaryAuth, email, password);
+                const newUid = cred.user.uid;
+                await setDoc(doc(db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'user_accounts', newUid), {
+                    email, role, company: company || null, createdAt: serverTimestamp(), createdBy: window._myAccount?.email || null
+                });
+                await signOut(secondaryAuth);
+                okEl.textContent = `계정이 생성되었습니다: ${email} (${role}${company ? ' · ' + company : ''})`;
+                okEl.classList.remove('hidden');
+                document.getElementById('create-account-form').reset();
+                renderAccountsPage();
+            } catch (err) {
+                console.error('계정 생성 실패:', err);
+                let msg = '계정 생성에 실패했습니다.';
+                if (err.code === 'auth/email-already-in-use') msg = '이미 사용 중인 이메일입니다.';
+                else if (err.code === 'auth/weak-password') msg = '비밀번호는 6자 이상이어야 합니다.';
+                errEl.textContent = msg;
+                errEl.classList.remove('hidden');
+            } finally {
+                await deleteApp(secondaryApp);
+            }
+            return false;
+        };
+
+        window.renderAccountsPage = async function() {
+            const listEl = document.getElementById('accounts-list');
+            if (!listEl) return;
+            listEl.innerHTML = '<div class="p-6 text-center text-[12px] text-[#787774] italic">불러오는 중...</div>';
+            try {
+                const snap = await getDocs(collection(db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'user_accounts'));
+                if (snap.empty) {
+                    listEl.innerHTML = '<div class="p-6 text-center text-[12px] text-[#787774] italic">발급된 계정이 없습니다.</div>';
+                    return;
+                }
+                const rows = [];
+                snap.forEach(d => rows.push(d.data()));
+                rows.sort((a, b) => (a.email || '').localeCompare(b.email || ''));
+                listEl.innerHTML = rows.map(a => `
+                    <div class="p-4 flex items-center justify-between">
+                        <div>
+                            <div class="font-bold text-[13px] text-[#37352f]">${a.email || '(이메일 없음)'}</div>
+                            <div class="text-[11px] text-[#787774]">${a.role === 'amt' ? '내부(AMT) 관리자' : ('거래처 · ' + (a.company || '-'))}</div>
+                        </div>
+                        <span class="px-2 py-0.5 rounded font-black text-[10px] uppercase ${a.role === 'amt' ? 'bg-[#37352f] text-white' : 'bg-[#e8e7e4] text-[#37352f]'}">${a.role}</span>
+                    </div>`).join('');
+            } catch (err) {
+                console.error('계정 목록 조회 실패:', err);
+                listEl.innerHTML = '<div class="p-6 text-center text-[12px] text-red-500 italic">목록을 불러오지 못했습니다.</div>';
+            }
+        };
     </script>
 
     <style>
@@ -1224,6 +1367,22 @@
         <span id="loading-status-text" class="font-bold text-[#37352f] fluid-text-body">데이터를 처리 중입니다...</span>
     </div>
 
+    <!-- 로그인 화면 -->
+    <div id="auth-login-overlay" class="fixed inset-0 bg-[#fbfbfa] flex items-center justify-center z-[10000]">
+        <form id="auth-login-form" onsubmit="return window.handleAuthLoginSubmit(event)" class="w-full max-w-[340px] p-8 bg-white border border-[#ededeb] rounded-2xl shadow-sm">
+            <div class="font-black text-2xl tracking-tighter text-[#37352f] mb-1">VIVIVIC</div>
+            <div class="text-[13px] text-[#787774] font-bold mb-6">에이엠티 · 내부 관리자 로그인</div>
+            <label class="block text-[11px] font-bold text-[#787774] mb-1">이메일</label>
+            <input id="auth-login-email" type="email" required autocomplete="username"
+                class="w-full mb-3 px-3 py-2.5 border border-[#ededeb] rounded-lg text-[13px] focus:outline-none focus:border-[#37352f]" placeholder="you@vivivic.com">
+            <label class="block text-[11px] font-bold text-[#787774] mb-1">비밀번호</label>
+            <input id="auth-login-password" type="password" required autocomplete="current-password"
+                class="w-full mb-4 px-3 py-2.5 border border-[#ededeb] rounded-lg text-[13px] focus:outline-none focus:border-[#37352f]" placeholder="••••••••">
+            <div id="auth-login-error" class="hidden mb-3 px-3 py-2 bg-red-50 border border-red-200 text-red-600 text-[11px] font-bold rounded-lg"></div>
+            <button id="auth-login-submit" type="submit" class="w-full py-2.5 bg-[#37352f] text-white font-bold text-[13px] rounded-lg hover:bg-black transition-all active:scale-95">로그인</button>
+        </form>
+    </div>
+
     <header class="w-full bg-white border-b border-[#ededeb] sticky top-0 z-[100]">
         <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between overflow-x-auto custom-scrollbar">
             <div class="flex items-center gap-4">
@@ -1235,9 +1394,14 @@
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
                     <div id="nav-cutting" class="nav-link active" onclick="switchPage('cutting')">재단발주</div>
                     <div id="nav-process" class="nav-link" onclick="switchPage('process')">공정관리</div>
+                    <div id="nav-accounts" class="nav-link" onclick="switchPage('accounts')">계정관리</div>
                 </nav>
             </div>
             <div class="flex items-center gap-3 ml-4">
+                <div id="auth-account-badge" class="flex items-center gap-2 px-2 py-1 rounded-lg bg-[#f7f6f3] border border-[#ededeb]" style="font-size:11px;">
+                    <span id="auth-account-email" class="font-bold text-[#37352f]"></span>
+                    <button onclick="window.handleAuthLogout()" class="text-[#787774] hover:text-[#37352f] font-bold underline">로그아웃</button>
+                </div>
                 <!-- ⚠️ 테스트 모드 버튼 (배포시 삭제) -->
                 <button id="test-mode-btn" onclick="toggleTestMode()"
                     style="font-size:10px;font-weight:800;padding:4px 10px;border-radius:6px;border:1.5px dashed #d1d5db;background:#f9fafb;color:#6b7280;cursor:pointer;letter-spacing:0.02em;transition:all 0.2s;white-space:nowrap;">
@@ -1290,6 +1454,51 @@
             <div id="tl-pp-title" style="flex:1;min-width:0;"></div>
         </div>
         <div id="tl-pp-body"></div>
+    </div>
+
+    <!-- 계정관리 (AMT 전용) -->
+    <div id="page-accounts" class="w-full max-w-3xl mx-auto px-4 mt-8 space-y-6" style="display:none;">
+        <div class="notion-card p-6 bg-[#fbfbfa] space-y-4">
+            <div class="font-black text-[15px] text-[#37352f]">새 계정 발급</div>
+            <p class="text-[11px] text-[#787774]">거래처(조혼가구·아인가구·ING·럭스디자인·유한가구) 계정은 role을 <b>client</b>로, 내부 AMT 직원 계정은 <b>amt</b>로 만드세요. client 계정은 해당 거래처 화면만 볼 수 있습니다.</p>
+            <form id="create-account-form" onsubmit="return window.handleCreateAccountSubmit(event)" class="grid grid-cols-2 gap-3">
+                <div class="col-span-2 sm:col-span-1">
+                    <label class="block text-[10px] font-bold text-[#787774] mb-1">이메일</label>
+                    <input id="ca-email" type="email" required class="w-full px-3 py-2 border border-[#ededeb] rounded-lg text-[13px]">
+                </div>
+                <div class="col-span-2 sm:col-span-1">
+                    <label class="block text-[10px] font-bold text-[#787774] mb-1">초기 비밀번호</label>
+                    <input id="ca-password" type="text" required minlength="6" class="w-full px-3 py-2 border border-[#ededeb] rounded-lg text-[13px]">
+                </div>
+                <div class="col-span-2 sm:col-span-1">
+                    <label class="block text-[10px] font-bold text-[#787774] mb-1">권한(role)</label>
+                    <select id="ca-role" onchange="document.getElementById('ca-company-wrap').style.display = this.value==='client' ? 'block' : 'none'" class="w-full px-3 py-2 border border-[#ededeb] rounded-lg text-[13px]">
+                        <option value="client">client (거래처)</option>
+                        <option value="amt">amt (내부 관리자)</option>
+                    </select>
+                </div>
+                <div id="ca-company-wrap" class="col-span-2 sm:col-span-1">
+                    <label class="block text-[10px] font-bold text-[#787774] mb-1">거래처명</label>
+                    <select id="ca-company" class="w-full px-3 py-2 border border-[#ededeb] rounded-lg text-[13px]">
+                        <option value="조혼가구">조혼가구</option>
+                        <option value="아인가구">아인가구</option>
+                        <option value="본사">ING (본사)</option>
+                        <option value="럭스디자인">럭스디자인</option>
+                        <option value="유한가구">유한가구</option>
+                    </select>
+                </div>
+                <button type="submit" class="col-span-2 py-2.5 bg-[#37352f] text-white font-bold text-[13px] rounded-lg hover:bg-black transition-all active:scale-95">계정 생성</button>
+                <div id="ca-error" class="hidden col-span-2 px-3 py-2 bg-red-50 border border-red-200 text-red-600 text-[11px] font-bold rounded-lg"></div>
+                <div id="ca-success" class="hidden col-span-2 px-3 py-2 bg-green-50 border border-green-200 text-green-700 text-[11px] font-bold rounded-lg"></div>
+            </form>
+        </div>
+
+        <div class="notion-card overflow-hidden">
+            <div class="p-4 border-b border-[#f1f1ef] bg-[#fbfbfa] font-black text-[13px] text-[#37352f]">발급된 계정 목록</div>
+            <div id="accounts-list" class="divide-y divide-[#f1f1ef]">
+                <div class="p-6 text-center text-[12px] text-[#787774] italic">불러오는 중...</div>
+            </div>
+        </div>
     </div>
 
     <div id="main-container" class="w-full max-w-6xl mx-auto px-4 mt-8 space-y-12">
@@ -1609,11 +1818,24 @@
         let currentModalResolve = null;
 
         function switchPage(mode) {
-            appMode = mode;
-            document.body.className = `min-h-screen pb-20 mode-${mode}`;
             document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
             const currentNav = document.getElementById(`nav-${mode}`);
             if (currentNav) currentNav.classList.add('active');
+
+            // 계정관리는 appMode 기반 렌더링과 무관한 별도 화면
+            const accountsPage = document.getElementById('page-accounts');
+            const mainContainer = document.getElementById('main-container');
+            if (mode === 'accounts') {
+                if (mainContainer) mainContainer.style.display = 'none';
+                if (accountsPage) accountsPage.style.display = 'block';
+                if (typeof renderAccountsPage === 'function') renderAccountsPage();
+                return;
+            }
+            if (mainContainer) mainContainer.style.display = '';
+            if (accountsPage) accountsPage.style.display = 'none';
+
+            appMode = mode;
+            document.body.className = `min-h-screen pb-20 mode-${mode}`;
 
             // 발주상품목록: 발주서 탭에서만 표시
             const pendingContainer = document.getElementById('pending-order-container');
