@@ -2812,6 +2812,26 @@
             return false;
         }
 
+        // 미해결 취소/수정요청 상태에 대한 안내 메시지
+        function unresolvedRequestMessage(item) {
+            if (!item) return '';
+            if (item.isCancelRequested) {
+                return `이 발주건은 현재 [취소요청] 상태입니다.\n\n"취소확인" 처리를 완료하면 타임라인등록/재단편집을 진행할 수 있습니다.`;
+            }
+            return `이 발주건은 현재 [수정요청] 처리 중입니다.\n\n"수정완료" 처리가 끝나면 타임라인등록/재단편집을 진행할 수 있습니다.`;
+        }
+
+        // 취소요청/수정요청 미해결 상품의 체크박스 클릭을 막고 안내 팝업 표시
+        function handlePendingOrderCheckClick(e, docId) {
+            const item = confirmedOrders.find(o => o.docId === docId);
+            if (hasUnresolvedRequest(item)) {
+                e.preventDefault();
+                alert(unresolvedRequestMessage(item));
+                return false;
+            }
+            return true;
+        }
+
         // 발주상품목록 렌더링 (amtRegistered !== true만 표시)
 
         function renderPendingOrders() {
@@ -2918,7 +2938,7 @@
                     </div>
                     <div class="flex justify-between items-start cursor-pointer group" onclick="togglePendingOrderDetails(${item.idNum})">
                         <div class="flex items-center gap-2 flex-1 mr-4" onclick="event.stopPropagation()">
-                            <input type="checkbox" class="w-4 h-4 flex-shrink-0 accent-[#37352f] cursor-pointer pending-order-check" data-docid="${item.docId}" onchange="updatePendingBatchButton()" ${hasUnresolvedRequest(item) ? `disabled title="${item.isCancelRequested ? '취소확인 처리 전에는 타임라인등록/재단편집을 할 수 없습니다.' : '수정완료 처리 전에는 타임라인등록/재단편집을 할 수 없습니다.'}"` : ''}>
+                            <input type="checkbox" class="w-4 h-4 flex-shrink-0 accent-[#37352f] cursor-pointer pending-order-check" data-docid="${item.docId}" onclick="return handlePendingOrderCheckClick(event, '${item.docId}')" onchange="updatePendingBatchButton()">
                             <span class="font-bold text-[14px] text-[#37352f] leading-tight group-hover:text-[#37352f] transition-colors cursor-pointer" onclick="togglePendingOrderDetails(${item.idNum})">${item.displayName}</span>
                         </div>
                         <span class="font-black text-[#37352f] text-[14px] whitespace-nowrap">${item.orderQty} EA</span>
@@ -2942,7 +2962,7 @@
             if (!docId) return;
             const target = confirmedOrders.find(o => o.docId === docId);
             if (hasUnresolvedRequest(target)) {
-                showToastMessage(target.isCancelRequested ? "취소확인 처리 전에는 재단편집을 할 수 없습니다." : "수정완료 처리 전에는 재단편집을 할 수 없습니다.");
+                alert(unresolvedRequestMessage(target));
                 return;
             }
             const { doc, updateDoc } = window.fbFirestore;
@@ -3411,7 +3431,7 @@
                     </div>
                     <div class="flex justify-between items-start cursor-pointer group" onclick="togglePendingOrderDetails(${item.idNum})">
                         <div class="flex items-center gap-2 flex-1 mr-4" onclick="event.stopPropagation()">
-                            <input type="checkbox" class="w-4 h-4 flex-shrink-0 accent-[#37352f] cursor-pointer pending-order-check" data-docid="${item.docId}" onchange="updatePendingBatchButton()" ${hasUnresolvedRequest(item) ? `disabled title="${item.isCancelRequested ? '취소확인 처리 전에는 타임라인등록/재단편집을 할 수 없습니다.' : '수정완료 처리 전에는 타임라인등록/재단편집을 할 수 없습니다.'}"` : ''}>
+                            <input type="checkbox" class="w-4 h-4 flex-shrink-0 accent-[#37352f] cursor-pointer pending-order-check" data-docid="${item.docId}" onclick="return handlePendingOrderCheckClick(event, '${item.docId}')" onchange="updatePendingBatchButton()">
                             <span class="font-bold text-[14px] text-[#37352f] leading-tight group-hover:text-[#37352f] transition-colors cursor-pointer" onclick="togglePendingOrderDetails(${item.idNum})">${item.displayName}</span>
                         </div>
                         <span class="font-black text-[#37352f] text-[14px] whitespace-nowrap">${item.orderQty} EA</span>
@@ -3444,9 +3464,7 @@
                     ${orderCodeHtml}
                     <div class="font-bold text-[13px]">[${item.supplier}] ${item.displayName}</div>
                     <div class="text-[11px] text-[#787774] mt-1">입고요청일: ${item.deliveryDate}</div>
-                    ${hasUnresolvedRequest(item)
-                        ? `<button disabled title="${item.isCancelRequested ? '취소확인 처리 전에는 재단편집을 할 수 없습니다.' : '수정완료 처리 전에는 재단편집을 할 수 없습니다.'}" class="mt-2 px-3 py-1 bg-[#d3d1cb] text-white text-[11px] rounded cursor-not-allowed">재단편집</button>`
-                        : `<button onclick="moveToRegistered('${item.docId}'); closePopup();" class="mt-2 px-3 py-1 bg-[#37352f] text-white text-[11px] rounded hover:bg-[#37352f]">재단편집</button>`}
+                    <button onclick="moveToRegistered('${item.docId}'); closePopup();" class="mt-2 px-3 py-1 bg-[#37352f] text-white text-[11px] rounded hover:bg-[#37352f]">재단편집</button>
                 </div>`;
             }).join('');
 
