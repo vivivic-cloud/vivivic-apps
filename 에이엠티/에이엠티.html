@@ -503,6 +503,30 @@
             pointer-events: none; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
         }
 
+        /* ── 처리 유도 안내 배너 (toast와 같은 톤, 상태 사유 + 강조선) ── */
+        #guide-toast {
+            position: fixed; top: 16px; left: 50%; transform: translateX(-50%) translateY(-6px);
+            background: #37352f; color: #ffffff; padding: 12px 18px 12px 14px; border-radius: 10px;
+            border-left: 4px solid #dc2626; max-width: min(380px, calc(100vw - 32px));
+            opacity: 0; transition: all 0.25s ease; z-index: 10000; pointer-events: none;
+            box-shadow: 0 10px 24px -6px rgba(0, 0, 0, 0.3);
+        }
+        #guide-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        #guide-toast .guide-toast-title { font-weight: 800; font-size: 12px; letter-spacing: 0.02em; margin-bottom: 4px; }
+        #guide-toast .guide-toast-body { font-weight: 500; font-size: var(--fluid-small); line-height: 1.5; opacity: 0.92; }
+
+        /* ── 처리해야 할 대상(카드/버튼) 하이라이트 유도 ── */
+        @keyframes guide-pulse-red {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.45); }
+            50% { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); }
+        }
+        @keyframes guide-pulse-blue {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.45); }
+            50% { box-shadow: 0 0 0 6px rgba(37, 99, 235, 0); }
+        }
+        .guide-highlight-red { outline: 2px solid #dc2626; outline-offset: 2px; border-radius: 8px; animation: guide-pulse-red 0.9s ease-in-out 3; }
+        .guide-highlight-blue { outline: 2px solid #2563eb; outline-offset: 2px; border-radius: 8px; animation: guide-pulse-blue 0.9s ease-in-out 3; }
+
         .nav-link {
             padding: 8px 12px; border-radius: 8px; font-weight: 600; font-size: 13px;
             color: #787774; transition: all 0.2s; cursor: pointer; white-space: nowrap;
@@ -2812,31 +2836,82 @@
             return false;
         }
 
-        // 미해결 취소/수정요청 상태에 대한 안내 메시지
-        function unresolvedRequestMessage(item) {
-            if (!item) return '';
+        // 미해결 취소/수정요청 상태별 안내 정보 (제목/설명/강조색/유도할 버튼 id)
+        function unresolvedRequestInfo(item) {
+            if (!item) return null;
             if (item.isCancelRequested) {
-                return `이 발주건은 현재 [취소요청] 상태입니다.\n\n거래처가 취소를 요청했습니다. "취소확인" 처리를 완료하면 타임라인등록/재단편집을 진행할 수 있습니다.`;
+                return {
+                    title: '취소요청', accent: '#dc2626',
+                    body: '거래처가 취소를 요청했습니다. 아래 "취소확인" 버튼을 눌러 처리해주세요.',
+                    targetId: `cancel-confirm-btn-${item.docId}`
+                };
             }
             // 수정요청 계열 — 세부 진행 단계별 사유
             if (item.editCompleted === true) {
-                return `이 발주건은 현재 [수정완료확인 대기] 상태입니다.\n\n거래처가 수정을 마치고 확인을 기다리고 있습니다. "수정완료확인" 처리를 완료하면 타임라인등록/재단편집을 진행할 수 있습니다.`;
+                return {
+                    title: '수정완료확인 대기', accent: '#37352f',
+                    body: '거래처가 수정을 마쳤습니다. 아래 "수정완료확인" 버튼을 눌러 처리해주세요.',
+                    targetId: `edit-complete-btn-${item.docId}`
+                };
             }
             if (item.isEditMode && item.amtApprovedEdit) {
-                return `이 발주건은 현재 [수정중] 상태입니다.\n\n거래처가 발주 내용을 수정하고 있는 중입니다. 거래처가 수정을 완료하고 AMT가 "수정완료확인" 처리를 해야 타임라인등록/재단편집을 진행할 수 있습니다.`;
+                return {
+                    title: '수정중', accent: '#2563eb',
+                    body: '거래처가 지금 발주 내용을 수정하고 있습니다. 수정이 끝날 때까지 잠시 기다려주세요.',
+                    targetId: null
+                };
             }
             if (item.amtApprovedEdit) {
-                return `이 발주건은 현재 [수정승인완료] 상태입니다.\n\n수정승인은 됐지만 거래처가 아직 수정 작업을 시작하지 않았습니다. 거래처의 수정 완료 및 AMT의 "수정완료확인" 처리가 끝나야 타임라인등록/재단편집을 진행할 수 있습니다.`;
+                return {
+                    title: '수정승인완료', accent: '#2563eb',
+                    body: '수정은 승인됐지만 거래처가 아직 수정을 시작하지 않았습니다. 거래처의 수정 완료를 기다려주세요.',
+                    targetId: null
+                };
             }
-            return `이 발주건은 현재 [수정요청됨] 상태입니다.\n\n거래처가 수정을 요청했고 AMT의 승인을 기다리고 있습니다. "수정승인" 후 거래처의 수정 완료 및 "수정완료확인" 처리까지 끝나야 타임라인등록/재단편집을 진행할 수 있습니다.`;
+            return {
+                title: '수정요청됨', accent: '#2563eb',
+                body: '거래처가 수정을 요청했습니다. 아래 "수정승인" 버튼을 눌러 승인해주세요.',
+                targetId: `edit-approve-btn-${item.docId}`
+            };
         }
 
-        // 취소요청/수정요청 미해결 상품의 체크박스 클릭을 막고 안내 팝업 표시
+        // 사이트 톤에 맞춘 안내 배너 표시 (상단 중앙, 다크 필 스타일 + 상태색 좌측 강조선)
+        function showGuideToast(title, body, accent) {
+            let el = document.getElementById('guide-toast');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'guide-toast';
+                document.body.appendChild(el);
+            }
+            el.style.borderLeftColor = accent;
+            el.innerHTML = `<div class="guide-toast-title">⚠ ${title} · 처리 후 진행 가능</div><div class="guide-toast-body">${body}</div>`;
+            el.classList.add('show');
+            clearTimeout(el._hideTimer);
+            el._hideTimer = setTimeout(() => el.classList.remove('show'), 4500);
+        }
+
+        // 미해결 상태의 발주건 클릭 시: 안내 배너 + 처리해야 할 버튼(있다면)으로 스크롤·하이라이트
+        function guideToUnresolvedAction(item) {
+            const info = unresolvedRequestInfo(item);
+            if (!info) return;
+            showGuideToast(info.title, info.body, info.accent);
+
+            const cardEl = document.getElementById(`pending-card-${item.docId}`);
+            const target = (info.targetId && document.getElementById(info.targetId)) || cardEl;
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                const cls = info.accent === '#dc2626' ? 'guide-highlight-red' : 'guide-highlight-blue';
+                target.classList.add(cls);
+                setTimeout(() => target.classList.remove(cls), 2800);
+            }
+        }
+
+        // 취소요청/수정요청 미해결 상품의 체크박스 클릭을 막고 안내 표시
         function handlePendingOrderCheckClick(e, docId) {
             const item = confirmedOrders.find(o => o.docId === docId);
             if (hasUnresolvedRequest(item)) {
                 e.preventDefault();
-                alert(unresolvedRequestMessage(item));
+                guideToUnresolvedAction(item);
                 return false;
             }
             return true;
@@ -2911,15 +2986,15 @@
                 // 수정 진행 상황 배지 (최종 완료되지 않았을 때만 표시)
                 const editBadge = !isEditCompleted && isEdited ? `<span class="px-2 py-0.5 bg-[#37352f] text-white rounded font-black text-[10px] uppercase ml-2">수정요청됨</span>` : '';
                 const cancelBadge = isCancelRequested ? `<span class="px-2 py-0.5 bg-red-600 text-white rounded font-black text-[10px] uppercase ml-2 animate-pulse">취소요청됨</span>` : '';
-                const editApproveBtn = (isEdited && !item.amtApprovedEdit && !isEditCompleted) ? `<button onclick="approveEditRequest('${item.docId}')" class="px-2 py-0.5 bg-white border border-blue-200 text-blue-500 text-[10px] font-bold rounded hover:bg-blue-50 transition-all animate-pulse">수정승인</button>` : '';
-                const cancelConfirmBtn = isCancelRequested ? `<button onclick="confirmCancelReceived('${item.docId}')" class="px-2 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded hover:bg-red-700 transition-all animate-pulse">취소확인</button>` : '';
+                const editApproveBtn = (isEdited && !item.amtApprovedEdit && !isEditCompleted) ? `<button id="edit-approve-btn-${item.docId}" onclick="approveEditRequest('${item.docId}')" class="px-2 py-0.5 bg-white border border-blue-200 text-blue-500 text-[10px] font-bold rounded hover:bg-blue-50 transition-all animate-pulse">수정승인</button>` : '';
+                const cancelConfirmBtn = isCancelRequested ? `<button id="cancel-confirm-btn-${item.docId}" onclick="confirmCancelReceived('${item.docId}')" class="px-2 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded hover:bg-red-700 transition-all animate-pulse">취소확인</button>` : '';
                 const editApprovedBadge = !isEditCompleted && item.amtApprovedEdit ? `<span class="px-2 py-0.5 bg-[#37352f] text-white rounded font-black text-[10px] uppercase ml-2">수정승인완료</span>` : '';
 
                 // 최종 상태 표기
                 // - editCompleted = true: 수정완료확인 버튼 표시
                 // - editCompleted = false: "수정완료됨" 배지만 표시 (최종상황, 이전 배지 모두 제거)
                 const editCompleteBadge = isEditCompleted ? `<span class="px-2 py-0.5 bg-[#37352f] text-white rounded font-black text-[10px] uppercase ml-2">수정완료됨</span>` : '';
-                const editCompleteBtn = item.editCompleted === true ? `<button onclick="confirmEditComplete('${item.docId}')" class="px-2 py-0.5 bg-[#37352f] text-white text-[10px] font-bold rounded hover:bg-[#37352f] transition-all animate-pulse">수정완료확인</button>` : '';
+                const editCompleteBtn = item.editCompleted === true ? `<button id="edit-complete-btn-${item.docId}" onclick="confirmEditComplete('${item.docId}')" class="px-2 py-0.5 bg-[#37352f] text-white text-[10px] font-bold rounded hover:bg-[#37352f] transition-all animate-pulse">수정완료확인</button>` : '';
 
 
                 // 작업시간 뱃지 — 값이 0인 공정은 표시 안 함
@@ -2936,7 +3011,7 @@
                 const isEditingInProgress = item.isEditMode && item.amtApprovedEdit;
                 const editingBadge = isEditingInProgress && !isEditCompleted ? `<span class="px-2 py-0.5 bg-red-600 text-white rounded font-black text-[10px] uppercase ml-2 animate-pulse">수정중</span>` : '';
 
-                return `<div class="flex flex-col gap-1 py-3 px-4 border-b border-[#f1f1ef] last:border-none relative group/item ${isCancelRequested ? 'bg-red-50' : (isEditingInProgress ? 'bg-red-50 animate-pulse' : (isEdited && !item.amtApprovedEdit ? 'bg-[#f7f6f3]' : ''))}">
+                return `<div id="pending-card-${item.docId}" class="flex flex-col gap-1 py-3 px-4 border-b border-[#f1f1ef] last:border-none relative group/item ${isCancelRequested ? 'bg-red-50' : (isEditingInProgress ? 'bg-red-50 animate-pulse' : (isEdited && !item.amtApprovedEdit ? 'bg-[#f7f6f3]' : ''))}">
                     <div class="flex justify-between items-center mb-1">
                         <div class="flex items-center gap-1 flex-wrap">
                             ${orderCodeHtml}
@@ -2972,7 +3047,7 @@
             if (!docId) return;
             const target = confirmedOrders.find(o => o.docId === docId);
             if (hasUnresolvedRequest(target)) {
-                alert(unresolvedRequestMessage(target));
+                guideToUnresolvedAction(target);
                 return;
             }
             const { doc, updateDoc } = window.fbFirestore;
@@ -3404,15 +3479,15 @@
                 // 수정 진행 상황 배지 (최종 완료되지 않았을 때만 표시)
                 const editBadge = !isEditCompleted && isEdited ? `<span class="px-2 py-0.5 bg-[#37352f] text-white rounded font-black text-[10px] uppercase ml-2">수정요청됨</span>` : '';
                 const cancelBadge = isCancelRequested ? `<span class="px-2 py-0.5 bg-red-600 text-white rounded font-black text-[10px] uppercase ml-2 animate-pulse">취소요청됨</span>` : '';
-                const editApproveBtn = (isEdited && !item.amtApprovedEdit && !isEditCompleted) ? `<button onclick="approveEditRequest('${item.docId}')" class="px-2 py-0.5 bg-white border border-blue-200 text-blue-500 text-[10px] font-bold rounded hover:bg-blue-50 transition-all animate-pulse">수정승인</button>` : '';
-                const cancelConfirmBtn = isCancelRequested ? `<button onclick="confirmCancelReceived('${item.docId}')" class="px-2 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded hover:bg-red-700 transition-all animate-pulse">취소확인</button>` : '';
+                const editApproveBtn = (isEdited && !item.amtApprovedEdit && !isEditCompleted) ? `<button id="edit-approve-btn-${item.docId}" onclick="approveEditRequest('${item.docId}')" class="px-2 py-0.5 bg-white border border-blue-200 text-blue-500 text-[10px] font-bold rounded hover:bg-blue-50 transition-all animate-pulse">수정승인</button>` : '';
+                const cancelConfirmBtn = isCancelRequested ? `<button id="cancel-confirm-btn-${item.docId}" onclick="confirmCancelReceived('${item.docId}')" class="px-2 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded hover:bg-red-700 transition-all animate-pulse">취소확인</button>` : '';
                 const editApprovedBadge = !isEditCompleted && item.amtApprovedEdit ? `<span class="px-2 py-0.5 bg-[#37352f] text-white rounded font-black text-[10px] uppercase ml-2">수정승인완료</span>` : '';
 
                 // 최종 상태 표기
                 // - editCompleted = true: 수정완료확인 버튼 표시
                 // - editCompleted = false: "수정완료됨" 배지만 표시 (최종상황, 이전 배지 모두 제거)
                 const editCompleteBadge = isEditCompleted ? `<span class="px-2 py-0.5 bg-[#37352f] text-white rounded font-black text-[10px] uppercase ml-2">수정완료됨</span>` : '';
-                const editCompleteBtn = item.editCompleted === true ? `<button onclick="confirmEditComplete('${item.docId}')" class="px-2 py-0.5 bg-[#37352f] text-white text-[10px] font-bold rounded hover:bg-[#37352f] transition-all animate-pulse">수정완료확인</button>` : '';
+                const editCompleteBtn = item.editCompleted === true ? `<button id="edit-complete-btn-${item.docId}" onclick="confirmEditComplete('${item.docId}')" class="px-2 py-0.5 bg-[#37352f] text-white text-[10px] font-bold rounded hover:bg-[#37352f] transition-all animate-pulse">수정완료확인</button>` : '';
 
 
                 // 작업시간 뱃지 — 값이 0인 공정은 표시 안 함
@@ -3429,7 +3504,7 @@
                 const isEditingInProgress = item.isEditMode && item.amtApprovedEdit;
                 const editingBadge = isEditingInProgress && !isEditCompleted ? `<span class="px-2 py-0.5 bg-red-600 text-white rounded font-black text-[10px] uppercase ml-2 animate-pulse">수정중</span>` : '';
 
-                return `<div class="flex flex-col gap-1 py-3 px-4 border-b border-[#f1f1ef] last:border-none relative group/item ${isCancelRequested ? 'bg-red-50' : (isEditingInProgress ? 'bg-red-50 animate-pulse' : (isEdited && !item.amtApprovedEdit ? 'bg-[#f7f6f3]' : ''))}">
+                return `<div id="pending-card-${item.docId}" class="flex flex-col gap-1 py-3 px-4 border-b border-[#f1f1ef] last:border-none relative group/item ${isCancelRequested ? 'bg-red-50' : (isEditingInProgress ? 'bg-red-50 animate-pulse' : (isEdited && !item.amtApprovedEdit ? 'bg-[#f7f6f3]' : ''))}">
                     <div class="flex justify-between items-center mb-1">
                         <div class="flex items-center gap-1 flex-wrap">
                             ${orderCodeHtml}
