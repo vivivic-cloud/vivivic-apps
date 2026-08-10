@@ -2843,7 +2843,8 @@
                 return {
                     title: '취소요청', accent: '#dc2626',
                     body: '거래처가 취소를 요청했습니다. 아래 "취소확인" 버튼을 눌러 처리해주세요.',
-                    targetId: `cancel-confirm-btn-${item.docId}`
+                    targetId: `cancel-confirm-btn-${item.docId}`,
+                    cardClass: 'bg-red-50 ring-2 ring-red-300 animate-pulse'
                 };
             }
             // 수정요청 계열 — 세부 진행 단계별 사유
@@ -2851,27 +2852,25 @@
                 return {
                     title: '수정완료확인 대기', accent: '#37352f',
                     body: '거래처가 수정을 마쳤습니다. 아래 "수정완료확인" 버튼을 눌러 처리해주세요.',
-                    targetId: `edit-complete-btn-${item.docId}`
-                };
-            }
-            if (item.isEditMode && item.amtApprovedEdit) {
-                return {
-                    title: '수정중', accent: '#2563eb',
-                    body: '거래처가 지금 발주 내용을 수정하고 있습니다. 수정이 끝날 때까지 잠시 기다려주세요.',
-                    targetId: null
+                    targetId: `edit-complete-btn-${item.docId}`,
+                    cardClass: 'bg-blue-50 ring-2 ring-blue-300 animate-pulse'
                 };
             }
             if (item.amtApprovedEdit) {
+                // 수정승인 후 ~ 거래처가 "수정완료" 요청을 보내기 전까지는 거래처가 아직
+                // 편집화면에 들어가지 않았어도 전부 "수정중"으로 표기 (일반 발주와 구분되어야 함)
                 return {
-                    title: '수정승인완료', accent: '#2563eb',
-                    body: '수정은 승인됐지만 거래처가 아직 수정을 시작하지 않았습니다. 거래처의 수정 완료를 기다려주세요.',
-                    targetId: null
+                    title: '수정중', accent: '#dc2626',
+                    body: '거래처가 발주 내용을 수정하고 있는 중입니다. 거래처의 수정완료 요청을 기다려주세요.',
+                    targetId: null,
+                    cardClass: 'bg-red-50 ring-2 ring-red-300 animate-pulse'
                 };
             }
             return {
                 title: '수정요청됨', accent: '#2563eb',
                 body: '거래처가 수정을 요청했습니다. 아래 "수정승인" 버튼을 눌러 승인해주세요.',
-                targetId: `edit-approve-btn-${item.docId}`
+                targetId: `edit-approve-btn-${item.docId}`,
+                cardClass: 'bg-blue-50 ring-2 ring-blue-300 animate-pulse'
             };
         }
 
@@ -2984,11 +2983,11 @@
                 const isEditCompleted = item.editCompleted === false;
 
                 // 수정 진행 상황 배지 (최종 완료되지 않았을 때만 표시)
-                const editBadge = !isEditCompleted && isEdited ? `<span class="px-2 py-0.5 bg-[#37352f] text-white rounded font-black text-[10px] uppercase ml-2">수정요청됨</span>` : '';
+                const editBadge = !isEditCompleted && isEdited && !item.amtApprovedEdit ? `<span class="px-2 py-0.5 bg-[#37352f] text-white rounded font-black text-[10px] uppercase ml-2">수정요청됨</span>` : '';
                 const cancelBadge = isCancelRequested ? `<span class="px-2 py-0.5 bg-red-600 text-white rounded font-black text-[10px] uppercase ml-2 animate-pulse">취소요청됨</span>` : '';
                 const editApproveBtn = (isEdited && !item.amtApprovedEdit && !isEditCompleted) ? `<button id="edit-approve-btn-${item.docId}" onclick="approveEditRequest('${item.docId}')" class="px-2 py-0.5 bg-white border border-blue-200 text-blue-500 text-[10px] font-bold rounded hover:bg-blue-50 transition-all animate-pulse">수정승인</button>` : '';
                 const cancelConfirmBtn = isCancelRequested ? `<button id="cancel-confirm-btn-${item.docId}" onclick="confirmCancelReceived('${item.docId}')" class="px-2 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded hover:bg-red-700 transition-all animate-pulse">취소확인</button>` : '';
-                const editApprovedBadge = !isEditCompleted && item.amtApprovedEdit ? `<span class="px-2 py-0.5 bg-[#37352f] text-white rounded font-black text-[10px] uppercase ml-2">수정승인완료</span>` : '';
+                const editApprovedBadge = ''; // "수정중" 배지(editingBadge)가 승인~완료요청 구간을 통째로 표기하므로 중복 배지는 표시하지 않음
 
                 // 최종 상태 표기
                 // - editCompleted = true: 수정완료확인 버튼 표시
@@ -3008,16 +3007,14 @@
                  .map(p => `<span style="background:${p.bg};color:#fff;" class="px-1.5 py-0.5 rounded text-[9px] font-bold">${p.key} ${Math.round(wt[p.key])}분</span>`)
                  .join('');
                 const wtRow = wtBadges ? `<div class="flex items-center gap-1 flex-wrap mt-1">${wtBadges}</div>` : '';
-                const isEditingInProgress = item.isEditMode && item.amtApprovedEdit;
-                const editingBadge = isEditingInProgress && !isEditCompleted ? `<span class="px-2 py-0.5 bg-red-600 text-white rounded font-black text-[10px] uppercase ml-2 animate-pulse">수정중</span>` : '';
+                // 수정승인 후 ~ 거래처 수정완료 요청 전까지는 편집화면 진입 여부와 무관하게 "수정중"으로 취급
+                const isEditingInProgress = item.amtApprovedEdit && !isEditCompleted;
+                const editingBadge = isEditingInProgress ? `<span class="px-2 py-0.5 bg-red-600 text-white rounded font-black text-[10px] uppercase ml-2 animate-pulse">수정중</span>` : '';
 
-                // AMT가 지금 클릭해서 처리해야 하는 상태(취소확인/수정승인/수정완료확인 대기)는
-                // 카드 전체를 색상 구분해서 반짝이게 하여 놓치지 않도록 유도
+                // 미해결 상태(취소요청/수정요청/수정중/수정완료확인 대기)는 전부 카드 전체를
+                // 색상 구분해서 반짝이게 하여 목록을 훑어볼 때도 놓치지 않도록 유도
                 const reqInfo = hasUnresolvedRequest(item) ? unresolvedRequestInfo(item) : null;
-                const needsAmtAction = !!(reqInfo && reqInfo.targetId);
-                const cardStateClass = needsAmtAction
-                    ? (reqInfo.accent === '#dc2626' ? 'bg-red-50 ring-2 ring-red-300 animate-pulse' : 'bg-blue-50 ring-2 ring-blue-300 animate-pulse')
-                    : (isEditingInProgress ? 'bg-red-50 animate-pulse' : (isEdited && !item.amtApprovedEdit ? 'bg-[#f7f6f3]' : ''));
+                const cardStateClass = reqInfo ? reqInfo.cardClass : '';
 
                 return `<div id="pending-card-${item.docId}" class="flex flex-col gap-1 py-3 px-4 border-b border-[#f1f1ef] last:border-none relative group/item ${cardStateClass}">
                     <div class="flex justify-between items-center mb-1">
@@ -3485,11 +3482,11 @@
                 const isEditCompleted = item.editCompleted === false;
 
                 // 수정 진행 상황 배지 (최종 완료되지 않았을 때만 표시)
-                const editBadge = !isEditCompleted && isEdited ? `<span class="px-2 py-0.5 bg-[#37352f] text-white rounded font-black text-[10px] uppercase ml-2">수정요청됨</span>` : '';
+                const editBadge = !isEditCompleted && isEdited && !item.amtApprovedEdit ? `<span class="px-2 py-0.5 bg-[#37352f] text-white rounded font-black text-[10px] uppercase ml-2">수정요청됨</span>` : '';
                 const cancelBadge = isCancelRequested ? `<span class="px-2 py-0.5 bg-red-600 text-white rounded font-black text-[10px] uppercase ml-2 animate-pulse">취소요청됨</span>` : '';
                 const editApproveBtn = (isEdited && !item.amtApprovedEdit && !isEditCompleted) ? `<button id="edit-approve-btn-${item.docId}" onclick="approveEditRequest('${item.docId}')" class="px-2 py-0.5 bg-white border border-blue-200 text-blue-500 text-[10px] font-bold rounded hover:bg-blue-50 transition-all animate-pulse">수정승인</button>` : '';
                 const cancelConfirmBtn = isCancelRequested ? `<button id="cancel-confirm-btn-${item.docId}" onclick="confirmCancelReceived('${item.docId}')" class="px-2 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded hover:bg-red-700 transition-all animate-pulse">취소확인</button>` : '';
-                const editApprovedBadge = !isEditCompleted && item.amtApprovedEdit ? `<span class="px-2 py-0.5 bg-[#37352f] text-white rounded font-black text-[10px] uppercase ml-2">수정승인완료</span>` : '';
+                const editApprovedBadge = ''; // "수정중" 배지(editingBadge)가 승인~완료요청 구간을 통째로 표기하므로 중복 배지는 표시하지 않음
 
                 // 최종 상태 표기
                 // - editCompleted = true: 수정완료확인 버튼 표시
@@ -3509,16 +3506,14 @@
                  .map(p => `<span style="background:${p.bg};color:#fff;" class="px-1.5 py-0.5 rounded text-[9px] font-bold">${p.key} ${Math.round(wt[p.key])}분</span>`)
                  .join('');
                 const wtRow = wtBadges ? `<div class="flex items-center gap-1 flex-wrap mt-1">${wtBadges}</div>` : '';
-                const isEditingInProgress = item.isEditMode && item.amtApprovedEdit;
-                const editingBadge = isEditingInProgress && !isEditCompleted ? `<span class="px-2 py-0.5 bg-red-600 text-white rounded font-black text-[10px] uppercase ml-2 animate-pulse">수정중</span>` : '';
+                // 수정승인 후 ~ 거래처 수정완료 요청 전까지는 편집화면 진입 여부와 무관하게 "수정중"으로 취급
+                const isEditingInProgress = item.amtApprovedEdit && !isEditCompleted;
+                const editingBadge = isEditingInProgress ? `<span class="px-2 py-0.5 bg-red-600 text-white rounded font-black text-[10px] uppercase ml-2 animate-pulse">수정중</span>` : '';
 
-                // AMT가 지금 클릭해서 처리해야 하는 상태(취소확인/수정승인/수정완료확인 대기)는
-                // 카드 전체를 색상 구분해서 반짝이게 하여 놓치지 않도록 유도
+                // 미해결 상태(취소요청/수정요청/수정중/수정완료확인 대기)는 전부 카드 전체를
+                // 색상 구분해서 반짝이게 하여 목록을 훑어볼 때도 놓치지 않도록 유도
                 const reqInfo = hasUnresolvedRequest(item) ? unresolvedRequestInfo(item) : null;
-                const needsAmtAction = !!(reqInfo && reqInfo.targetId);
-                const cardStateClass = needsAmtAction
-                    ? (reqInfo.accent === '#dc2626' ? 'bg-red-50 ring-2 ring-red-300 animate-pulse' : 'bg-blue-50 ring-2 ring-blue-300 animate-pulse')
-                    : (isEditingInProgress ? 'bg-red-50 animate-pulse' : (isEdited && !item.amtApprovedEdit ? 'bg-[#f7f6f3]' : ''));
+                const cardStateClass = reqInfo ? reqInfo.cardClass : '';
 
                 return `<div id="pending-card-${item.docId}" class="flex flex-col gap-1 py-3 px-4 border-b border-[#f1f1ef] last:border-none relative group/item ${cardStateClass}">
                     <div class="flex justify-between items-center mb-1">
