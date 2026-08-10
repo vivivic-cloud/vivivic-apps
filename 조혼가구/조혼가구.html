@@ -3353,13 +3353,20 @@
                             time: now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
                             requester: '조혼가구(수정요청)'
                         },
+                        // 이전 수정완료(editCompleted:true) 상태에서 재수정 요청하는 경우를 대비해
+                        // 완료 플래그를 초기화 — 에이엠티 쪽에 "수정완료확인 대기"로 남아있지 않고
+                        // (이미 승인된 건이면) 즉시 "수정중"으로 반영되도록 함
+                        editCompleted: null,
                         backup: JSON.parse(JSON.stringify({
                             partInfoMap: item.partInfoMap,
                             orderQty: item.orderQty,
                             deliveryDate: item.deliveryDate
                         }))
                     });
-                    showToastMessage("수정 요청이 전송되었습니다. 에이엠티 승인 대기 중입니다.");
+                    // 이미 승인된 건에 대한 재수정이면 재승인 절차 없이 바로 진행되므로 안내 문구도 다르게
+                    showToastMessage(item.amtApprovedEdit
+                        ? "재수정 요청이 전송되었습니다. 에이엠티 화면에 '수정중'으로 표시됩니다."
+                        : "수정 요청이 전송되었습니다. 에이엠티 승인 대기 중입니다.");
                 } catch (err) { console.error("Edit Request Fail:", err); }
             }
         }
