@@ -2073,7 +2073,12 @@
         // 같은 docId 알림이 자동으로 최신 상태로 업데이트됨 — 별도 상태전이 추적 불필요.
         function addNotification(item) {
             const info = unresolvedRequestInfo(item);
-            if (!info) return;
+            // 지금 당장 AMT가 누를 버튼이 없는 상태(예: 거래처가 수정중이라 그냥 기다려야 하는 경우)는
+            // 알림을 띄우지 않음 — 알림은 "AMT가 조치해야 할 때"만 필요
+            if (!info || !info.actionType) {
+                removeNotificationByDocId(item.docId);
+                return;
+            }
 
             const existingIndex = notifications.findIndex(n => n.docId === item.docId);
             const notification = {
