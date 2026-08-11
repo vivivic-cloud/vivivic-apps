@@ -527,6 +527,13 @@
         .guide-highlight-red { outline: 2px solid #dc2626; outline-offset: 2px; border-radius: 8px; animation: guide-pulse-red 0.9s ease-in-out 3; }
         .guide-highlight-blue { outline: 2px solid #2563eb; outline-offset: 2px; border-radius: 8px; animation: guide-pulse-blue 0.9s ease-in-out 3; }
 
+        /* ── 알림 "상세보기"로 찾아온 발주건 하이라이트 (액션 유도색과 구분되는 보라색) ── */
+        @keyframes notif-pulse-violet {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(124, 58, 237, 0.5); }
+            50% { box-shadow: 0 0 0 7px rgba(124, 58, 237, 0); }
+        }
+        .notif-highlight { outline: 2px solid #7c3aed; outline-offset: 2px; border-radius: 8px; animation: notif-pulse-violet 1s ease-in-out 4; }
+
         .nav-link {
             padding: 8px 12px; border-radius: 8px; font-weight: 600; font-size: 13px;
             color: #787774; transition: all 0.2s; cursor: pointer; white-space: nowrap;
@@ -2107,18 +2114,22 @@
             }
         }
 
-        function scrollToPendingOrder(idNum) {
+        function scrollToPendingOrder(docId) {
             const dropdown = document.getElementById('notification-dropdown');
             dropdown.classList.add('hidden');
 
-            const card = document.querySelector(`#pending-details-container-${idNum}`);
-            if (card) {
+            // 발주상품목록은 "발주서" 탭에서만 보이므로, 다른 탭에 있었다면 먼저 이동
+            if (appMode !== 'order') switchPage('order');
+
+            // 탭 전환으로 인한 렌더링이 끝난 다음 스크롤하도록 다음 틱에 실행
+            // (requestAnimationFrame은 비활성/백그라운드 탭에서 안 돌 수 있어 setTimeout 사용)
+            setTimeout(() => {
+                const card = document.getElementById(`pending-card-${docId}`);
+                if (!card) return;
                 card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                card.parentElement.parentElement.classList.add('ring-2', 'ring-[#ededeb]');
-                setTimeout(() => {
-                    card.parentElement.parentElement.classList.remove('ring-2', 'ring-[#ededeb]');
-                }, 2000);
-            }
+                card.classList.add('notif-highlight');
+                setTimeout(() => card.classList.remove('notif-highlight'), 4200);
+            }, 0);
         }
 
         function renderNotifications() {
@@ -2154,7 +2165,7 @@
                         </div>
                         <div class="flex items-center gap-1">
                             ${btn}
-                            <button onclick="scrollToPendingOrder(${n.idNum})" class="px-1.5 py-0.5 bg-[#f7f6f3] border border-[#ededeb] text-[#37352f] text-[9px] font-bold rounded hover:bg-[#f1f1ef] whitespace-nowrap">상세보기</button>
+                            <button onclick="scrollToPendingOrder('${n.docId}')" class="px-1.5 py-0.5 bg-[#f7f6f3] border border-[#ededeb] text-[#37352f] text-[9px] font-bold rounded hover:bg-[#f1f1ef] whitespace-nowrap">상세보기</button>
                         </div>
                     </div>
                     <div class="text-[10px] font-bold text-[#37352f] truncate">
