@@ -715,56 +715,6 @@
             #tl-datecard-expand.active .tl-dc-panel { transform: translateY(0) scale(1); }
         }
 
-        /* ── 공정별 타임라인 페이지 ── */
-        #tl-process-page {
-            position: fixed; inset: 0;
-            background: #fff;
-            z-index: 9100;
-            transform: translateX(100%);
-            transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
-            display: flex; flex-direction: column;
-            overflow: hidden;
-        }
-        #tl-process-page.active { transform: translateX(0); }
-        #tl-pp-header {
-            padding: 12px 16px;
-            border-bottom: 1px solid #ededeb;
-            background: #fff;
-            flex-shrink: 0;
-            display: flex; align-items: center; gap: 12px;
-        }
-        #tl-pp-back {
-            display: flex; align-items: center; justify-content: center;
-            width: 34px; height: 34px;
-            background: #f5f5f4; border: none; border-radius: 50%;
-            cursor: pointer; font-size: 16px; color: #37352f;
-            flex-shrink: 0;
-        }
-        #tl-pp-body {
-            flex: 1; overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
-            padding: 12px 14px;
-            display: flex; flex-direction: column; gap: 10px;
-        }
-        .tl-pp-date-group { border: 1px solid #ededeb; border-radius: 12px; overflow: hidden; }
-        .tl-pp-date-hdr {
-            display: flex; align-items: center; gap: 10px;
-            padding: 10px 14px; border-bottom: 1px solid #ededeb;
-        }
-        .tl-pp-item {
-            display: flex; align-items: center; gap: 8px;
-            padding: 10px 14px; border-bottom: 1px solid #f5f5f4;
-        }
-        .tl-pp-item:last-child { border-bottom: none; }
-        .tl-pp-item-name { font-size: 13px; font-weight: 700; color: #37352f; flex: 1; }
-        .tl-pp-item-qty {
-            font-size: 12px; font-weight: 800; color: #37352f;
-            background: #f1f0ef; padding: 2px 8px; border-radius: 5px;
-        }
-        .tl-pp-empty {
-            padding: 48px; text-align: center;
-            font-size: 13px; color: #c8c6c2; font-weight: 600;
-        }
         .tl-dc-close {
             position: absolute; top: 10px; right: 12px;
             width: 26px; height: 26px;
@@ -1523,13 +1473,6 @@
         <div id="tl-dp-body"></div>
     </div>
 
-    <div id="tl-process-page">
-        <div id="tl-pp-header">
-            <button id="tl-pp-back" onclick="tlCloseProcessPage()">←</button>
-            <div id="tl-pp-title" style="flex:1;min-width:0;"></div>
-        </div>
-        <div id="tl-pp-body"></div>
-    </div>
 
     <!-- 계정관리 (AMT 전용) -->
     <div id="page-accounts" class="w-full max-w-3xl mx-auto px-4 mt-8 space-y-6" style="display:none;">
@@ -4565,7 +4508,7 @@
 
                 const makeSection = (label, headerCls, labelCls, processKey) => {
                     return `<div class="border-t border-[#f1f1ef]">
-                        <div class="px-2 py-0.5 ${headerCls} flex items-center justify-between gap-1" onclick="tlOpenProcessView('${processKey}')" style="cursor:pointer;">
+                        <div class="px-2 py-0.5 ${headerCls} flex items-center justify-between gap-1">
                             <span class="text-[8px] font-black ${labelCls} uppercase tracking-wider">${label}</span>
                             <span class="tl-proc-stat" data-date="${dateStr}" data-process="${processKey}" style="display:none;font-size:8px;font-weight:800;color:#fff;background:rgba(0,0,0,0.18);padding:0 4px;border-radius:3px;white-space:nowrap;"></span>
                         </div>
@@ -4575,7 +4518,7 @@
 
                 // 납기 섹션 — 헤더에 수량 뱃지 슬롯 포함
                 const deliverySection = `<div class="border-t border-[#f1f1ef]">
-                    <div class="px-2 py-0.5 tl-proc-header-납기 flex items-center justify-between gap-1" onclick="tlOpenProcessView('납기')" style="cursor:pointer;">
+                    <div class="px-2 py-0.5 tl-proc-header-납기 flex items-center justify-between gap-1">
                         <span class="text-[8px] font-black tl-proc-label-납기 uppercase tracking-wider">납기</span>
                         <span class="tl-delivery-count" data-date="${dateStr}" style="font-size:8px;font-weight:800;color:#fff;background:rgba(0,0,0,0.18);padding:0 4px;border-radius:3px;display:none;"></span>
                     </div>
@@ -6159,7 +6102,7 @@
                         </div>`;
                     }).join('');
                 return `<div class="tl-dp-section${items.length>0?' open':''}">
-                    <div class="tl-dp-section-hdr" style="background:${color};cursor:pointer;" onclick="tlOpenProcessView('${key}')">
+                    <div class="tl-dp-section-hdr" style="background:${color};">
                         <span class="tl-dp-section-hdr-label" style="color:${tc};">${key}</span>
                         <span class="tl-dp-section-hdr-count" style="color:${tc};">${items.length}건</span>
                         <span class="tl-dp-section-chevron" style="color:${tc};">›</span>
@@ -6225,61 +6168,6 @@
             if (overlay) overlay.classList.remove('active');
         };
 
-        // ── 공정별 타임라인 페이지 ──────────────────────────────────────────
-        window.tlOpenProcessView = function(procKey) {
-            const _PC = { '보링':'#227C9D', '엣지':'#17C3B2', 'NC':'#FF9C75', '재단':'#90BBC6', '납기':'#b0aeaa' };
-            const color = _PC[procKey] || '#787774';
-            const dates = TL.renderedDates || [];
-            const groups = [];
-            dates.forEach(dateStr => {
-                const sMap = window._tlDcGetItems(dateStr);
-                const sec  = sMap[procKey];
-                if (sec && sec.items.length > 0) groups.push({ dateStr, items: sec.items });
-            });
-
-            // 헤더
-            document.getElementById('tl-pp-title').innerHTML = `
-                <div style="display:flex;align-items:center;gap:8px;">
-                    <div style="width:12px;height:12px;border-radius:3px;background:${color};flex-shrink:0;"></div>
-                    <span style="font-size:16px;font-weight:800;color:#37352f;">${procKey} 공정 타임라인</span>
-                    <span style="font-size:11px;color:#b0aeaa;margin-left:4px;">${groups.length}일 · ${groups.reduce((s,g)=>s+g.items.length,0)}건</span>
-                </div>`;
-
-            // 바디
-            const bodyEl = document.getElementById('tl-pp-body');
-            if (groups.length === 0) {
-                bodyEl.innerHTML = `<div class="tl-pp-empty">등록된 항목이 없습니다</div>`;
-            } else {
-                bodyEl.innerHTML = groups.map(({ dateStr, items }) => {
-                    const info = parseDateCard(dateStr);
-                    const itemsHtml = items.map(item =>
-                        `<div class="tl-pp-item">
-                            <span class="tl-pp-item-name">${item.displayName||''}</span>
-                            <span class="tl-pp-item-qty">${item.orderQty||0}EA</span>
-                        </div>`
-                    ).join('');
-                    return `<div class="tl-pp-date-group">
-                        <div class="tl-pp-date-hdr" style="background:${color}18;">
-                            <span style="font-size:24px;font-weight:900;color:${color};line-height:1;">${info.day}</span>
-                            <div style="display:flex;flex-direction:column;gap:1px;">
-                                <span style="font-size:12px;font-weight:700;color:#787774;">${info.month}월 ${info.weekday}요일</span>
-                                <span style="font-size:10px;color:#b0aeaa;">${dateStr}</span>
-                            </div>
-                            <span style="margin-left:auto;font-size:11px;font-weight:700;background:${color};color:#fff;padding:2px 9px;border-radius:10px;">${items.length}건</span>
-                        </div>
-                        ${itemsHtml}
-                    </div>`;
-                }).join('');
-            }
-
-            document.getElementById('tl-process-page').classList.add('active');
-            document.body.style.overflow = 'hidden';
-        };
-
-        window.tlCloseProcessPage = function() {
-            document.getElementById('tl-process-page').classList.remove('active');
-            document.body.style.overflow = '';
-        };
 
         // ── 공정작업지시서 헬퍼 함수들 ──────────────────────────────────
 
