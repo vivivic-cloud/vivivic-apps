@@ -8294,7 +8294,10 @@
                     dq: p.dq || 0, pm: p.pm || 0, rw: p.rw || 0, rd: p.rd || 0,
                     isCuttingCard: p.isCuttingCard || false,
                     plateName: p.plateName || '', finish: p.finish || '',
-                    deliveryDate: p.deliveryDate || ''
+                    deliveryDate: p.deliveryDate || '',
+                    // 기계 전용 뷰(현장 작업자)에서 재단 도면을 보여주기 위해 배치 데이터도 함께 저장
+                    sheets: p.sheets || 0,
+                    boardParts: (p.boardParts || []).map(pt => ({ lp: pt.lp, tp: pt.tp, wp: pt.wp, hp: pt.hp, bg: pt.bg || '' }))
                 }));
 
                 // 배제 구간도 저장
@@ -10597,8 +10600,14 @@
                     const statusLbl = isDone ? '✓ 완료'  : isActive ? '▶ 진행중' : '○ 대기';
                     const partNm    = p.isCuttingCard ? (p.plateName||p.nm) : p.nm;
                     const dimStr    = (p.rw && p.rd) ? `${p.rw}×${p.rd}` : '';
+                    const sheetsStr = p.sheets ? `${p.sheets}장` : '';
                     const pmStr     = p.pm >= 1 ? `${p.pm.toFixed(1)}분` : `${Math.round(p.pm*60)}초`;
                     const eo = _esc(orderKey), ec = _esc(cKey), ep = _esc(procKey), en = _esc(partNm);
+                    // 재단 도면: 커서 호버 없이 카드 안에 바로 크게 표시 (터치 기기에서 계속 참고해야 함)
+                    const diagramSvg = p.isCuttingCard ? _woCuttingDiagramSvg(p, 320, 170) : '';
+                    const diagramHtml = diagramSvg
+                        ? `<div style="margin-top:10px;">${diagramSvg}</div>`
+                        : '';
 
                     // 편집 버튼
                     let actionBtn = '';
@@ -10633,8 +10642,10 @@
                             ${actMin!=null?`<div style="font-size:11px;color:#60a5fa;margin-top:4px;font-weight:700;">${actMin.toFixed(1)}분 소요</div>`:''}
                           </div>
                         </div>
+                        ${diagramHtml}
                         <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
                           <span style="font-size:15px;font-weight:900;color:#f1f5f9;background:#334155;padding:5px 12px;border-radius:8px;">${p.dq} EA</span>
+                          ${sheetsStr?`<span style="font-size:13px;font-weight:700;color:#f1f5f9;background:#334155;padding:5px 10px;border-radius:8px;">${sheetsStr}</span>`:''}
                           <span style="font-size:13px;font-weight:600;color:#94a3b8;">⏱ ${pmStr}</span>
                           <span style="font-size:13px;font-weight:700;color:${statusCol};">${_fmtMin(startMin)} → ${_fmtMin(endMin)}</span>
                           ${p.finish?`<span style="font-size:11px;color:#64748b;">${p.finish}</span>`:''}
