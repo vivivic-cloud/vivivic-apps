@@ -6208,6 +6208,19 @@
             const _pcColor = _PC[procKey] || '#787774';
             const _fh = currentFullData[0];
 
+            // 같은 날짜의 다른 공정으로 바로 이동하는 상단 스위처
+            const _PC_ALL = { '재단':'#90BBC6', '엣지':'#17C3B2', 'NC':'#FF9C75', '보링':'#227C9D', '납기':'#b0aeaa' };
+            const _procSwitcherHtml = `<div style="display:flex;align-items:center;gap:5px;padding:7px 16px;border-bottom:1px solid #f0eeec;flex-shrink:0;background:#fff;overflow-x:auto;">
+                <span style="font-size:9px;font-weight:700;color:#b0aeaa;letter-spacing:0.3px;flex-shrink:0;margin-right:2px;">다른 공정</span>
+                ${Object.keys(_PC_ALL).map(k => {
+                    const isCur = k === procKey;
+                    const c = _PC_ALL[k];
+                    return `<button ${isCur ? 'disabled' : `onclick="tlDcExpandSection('${k}')"`}
+                        style="font-size:11px;font-weight:800;padding:4px 10px;border-radius:6px;border:1.5px solid ${c};flex-shrink:0;
+                        cursor:${isCur ? 'default' : 'pointer'};background:${isCur ? c : '#fff'};color:${isCur ? '#fff' : c};white-space:nowrap;">${k}</button>`;
+                }).join('')}
+            </div>`;
+
             const cardsHtml = sec.items.map(item => {
                 const pd     = procKey==='납기' ? item.deliveryDate : (item.procOverrides?.[procKey]||null);
                 const procLabel = procKey==='납기' ? '납기일' : procKey+' 작업일';
@@ -6280,6 +6293,11 @@
 
             const grid = panel.querySelector('.tl-dc-5col-grid');
             if (grid) grid.remove();
+            // 스위처로 다른 공정으로 직접 전환할 때, 이전에 열려있던 단일 공정 화면이
+            // 제거되지 않고 그대로 쌓이는 문제 방지 (예전엔 항상 전체보기를 거쳐야만 해서
+            // 문제가 안 됐지만, 스위처로 바로 넘어가는 경로가 생기면서 드러난 버그)
+            const oldSingle = panel.querySelector('.tl-dc-single-sec');
+            if (oldSingle) oldSingle.remove();
             const div = document.createElement('div');
             div.className = 'tl-dc-single-sec';
 
@@ -6376,6 +6394,7 @@
                         <span style="font-size:11px;font-weight:700;color:${_pcColor};">기계 배정 · ${sec.items.length}건</span>
                         <span style="margin-left:auto;font-size:10px;font-weight:700;color:#787774;">⏱ 총 ${totalMin.toFixed(1)}분</span>
                     </div>
+                    ${_procSwitcherHtml}
                     <div style="display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">
                         <div id="wo-boring-scroller-${sk}" style="flex:1;min-height:0;overflow-y:auto;overflow-x:auto;padding:0 16px 12px;overscroll-behavior:contain;">
                         <div class="wo-boring-board" id="wo-boring-grid-${sk}"></div>
@@ -6480,6 +6499,7 @@
                         <span style="font-size:11px;font-weight:700;color:${_pcColor};">기계 배정 · ${sec.items.length}건</span>
                         <span style="margin-left:auto;font-size:10px;font-weight:700;color:#787774;">⏱ 총 ${totalMin.toFixed(1)}분</span>
                     </div>
+                    ${_procSwitcherHtml}
                     <div style="display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">
                         <div id="wo-boring-scroller-${sk}" style="flex:1;min-height:0;overflow-y:auto;overflow-x:auto;padding:0 16px 12px;overscroll-behavior:contain;">
                         <div class="wo-boring-board" id="wo-boring-grid-${sk}"></div>
@@ -6579,6 +6599,7 @@
                         <span style="font-size:11px;font-weight:700;color:${_pcColor};">기계 배정 · ${sec.items.length}건</span>
                         <span style="margin-left:auto;font-size:10px;font-weight:700;color:#787774;">⏱ 총 ${totalMin.toFixed(1)}분</span>
                     </div>
+                    ${_procSwitcherHtml}
                     <div style="display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">
                         <div id="wo-boring-scroller-${sk}" style="flex:1;min-height:0;overflow-y:auto;overflow-x:auto;padding:0 16px 12px;overscroll-behavior:contain;">
                         <div class="wo-boring-board" id="wo-boring-grid-${sk}"></div>
@@ -6601,6 +6622,7 @@
                         <span style="font-size:17px;font-weight:900;color:#37352f;letter-spacing:-0.3px;">${procKey}</span>
                         <span style="font-size:11px;font-weight:700;color:${_pcColor};">${sec.items.length}건</span>
                     </div>
+                    ${_procSwitcherHtml}
                     <div class="tl-dc-single-body">
                         ${cardsHtml||'<div style="padding:20px;text-align:center;color:#c8c6c2;font-size:12px;">해당일 없음</div>'}
                     </div>`;
