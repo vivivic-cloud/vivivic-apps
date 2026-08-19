@@ -4343,7 +4343,9 @@
             if (!item || !item.docId) return;
 
             // 납기일 역산: 공정별 offset 만큼 더한 날짜를 deliveryDate로
-            const offsetMap = { '재단': 3, 'NC': 3, '엣지': 2, '보링': 1, '납기': 0 };
+            // NC는 엣지와 같은 병렬 공정(D-2)인데 재단 값(3)이 잘못 들어가 있던 걸 수정
+            // (기본 배치 로직 _fillProcessSections의 PROC_DEF와 일치시킴: 재단→엣지·NC(D-2)→보링(D-1)→납기)
+            const offsetMap = { '재단': 3, 'NC': 2, '엣지': 2, '보링': 1, '납기': 0 };
             const offset = offsetMap[processKey] ?? 0;
             const d = new Date(targetDateStr + 'T00:00:00');
             d.setDate(d.getDate() + offset);
