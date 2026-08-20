@@ -6519,7 +6519,7 @@
             } else if (procKey === '재단') {
                 // ── 재단 전용: 기계 배정 보드 (AMT / 경기재단) ─────────────
                 const sk = dateStr + '-재단';
-                const cuttingParts = [];
+                let cuttingParts = [];
                 let totalMin = 0;
                 if (_fh && currentFullData.length >= 2) {
                     sec.items.forEach(item => {
@@ -6545,10 +6545,43 @@
                             const finish    = row[_fh.indexOf('마감')]   || '';
                             const rw        = parseFloat(row[_fh.indexOf('재단W')]) || 0;
                             const rd        = parseFloat(row[_fh.indexOf('재단D')]) || 0;
-                            cuttingParts.push({ nm, pm, dq, cKey: uid, orderCode: item.orderCode || '', orderKey, orderName: item.displayName || item.orderCode || '', plateName, finish, rw, rd, deliveryDate: item.deliveryDate || '' });
+
+                            // 카드에 재단 도면이 보이도록, _autoGenerateCuttingPlansForOrder와 동일한
+                            // 방식(4X8 원장, 전단컷 5mm, 톱날두께 4.5mm)으로 간단 배치도를 즉석 계산
+                            let boardParts = [], sheets = 0;
+                            if (rw > 0 && rd > 0) {
+                                const BW = 2440, BD = 1220, fCut = 5, bT = 4.5;
+                                const maxCols = Math.floor((BW - fCut + bT) / (rw + bT));
+                                const maxRows = Math.floor((BD - fCut + bT) / (rd + bT));
+                                const perSheet = maxCols * maxRows;
+                                if (perSheet > 0) {
+                                    sheets = Math.ceil(dq / perSheet);
+                                    for (let c = 0; c < maxCols; c++) {
+                                        for (let r = 0; r < maxRows; r++) {
+                                            boardParts.push({
+                                                lp: (fCut + c * (rw + bT)) / BW, tp: (fCut + r * (rd + bT)) / BD,
+                                                wp: rw / BW, hp: rd / BD, bg: '#b0aeaa'
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                            cuttingParts.push({ nm, pm, dq, cKey: uid, orderCode: item.orderCode || '', orderKey, orderName: item.displayName || item.orderCode || '', plateName, finish, rw, rd, deliveryDate: item.deliveryDate || '', isCuttingCard: boardParts.length > 0, boardParts, sheets });
                         });
                     });
                 }
+                // Firebase에 저장된 재단 도면(확정된 것) 먼저 복원 — 날짜 무관하게 전부 확인 후 해당 sk에 자동 배정됨
+                // 아래 cuttingParts와 중복 제거하려면 이 복원을 기계배정보다 먼저 해야 함
+                Object.values(window._cuttingPlans || {}).forEach(plan => _ensureCuttingPlanInTimeline(plan));
+
+                // 위 복원 + assignCuttingToMachine으로 추가된 재단카드(isCuttingCard, 도면 있음) 보존.
+                // cKey 형식이 서로 달라(cut_확정ID vs 오더_부속카드) cKey만으로는 같은 부속을
+                // 구분 못 해 중복 카드가 생기므로, 오더+규격+마감으로 한 번 더 식별해 중복 제외
+                const prevCutParts = (window._woBoringParts[sk] || []).filter(p => p.isCuttingCard);
+                const _cutSig = p => `${p.orderKey}|${p.rw}|${p.rd}|${p.plateName}|${p.finish}`;
+                const prevCutSigs = new Set(prevCutParts.map(_cutSig));
+                cuttingParts = cuttingParts.filter(p => !prevCutSigs.has(_cutSig(p)));
+
                 const _MAC_CUT = ['AMT'];
                 const _normKeysC = arr => {
                     if (!arr || !Array.isArray(arr)) return [];
@@ -6587,10 +6620,7 @@
                     if (!window._woBoring[sk]['AMT']) window._woBoring[sk]['AMT'] = [];
                     cuttingParts.forEach(p => { if (!existingC.has(p.cKey)) window._woBoring[sk]['AMT'].push(p.cKey); });
                 }
-                // Firebase에 저장된 재단 도면 복원 (새로고침·다른 세션에서도 유지) — 날짜 무관하게 전부 확인 후 해당 sk에 자동 배정됨
-                Object.values(window._cuttingPlans || {}).forEach(plan => _ensureCuttingPlanInTimeline(plan));
-                // 위 복원 + assignCuttingToMachine으로 추가된 재단카드(isCuttingCard) 보존 후 병합
-                const prevCutParts = (window._woBoringParts[sk] || []).filter(p => p.isCuttingCard);
+
                 const mergedCutParts = [...prevCutParts];
                 cuttingParts.forEach(p => { if (!mergedCutParts.find(pp => pp.cKey === p.cKey)) mergedCutParts.push(p); });
                 window._woBoringParts[sk] = mergedCutParts;
