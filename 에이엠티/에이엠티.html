@@ -7221,16 +7221,22 @@
 
             let innerHtml = '';
             if (p.isCuttingCard) {
+                // 원장 몇 장을 잘라야 하는지, 그 장수로 최종 몇 개가 나오는지를
+                // 작업자가 한눈에 알 수 있도록 원장명 옆(장수)·사이즈 옆(총 생산개수)에 표기
+                const _perSheet  = (p.boardParts || []).length;
+                const _yield     = _perSheet * (p.sheets || 0);
                 const dimStr    = (p.rw && p.rd) ? `${p.rw}×${p.rd}` : '';
                 const sheetsStr = p.sheets       ? `${p.sheets}장`    : '';
                 innerHtml =
                     `<div style="font-size:9px;font-weight:700;color:#a8a6a2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${p.orderCode||''}</div>` +
-                    `<div style="font-size:12px;font-weight:800;color:#37352f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35;margin-top:1px;">${p.plateName||p.nm||'-'}</div>` +
+                    `<div style="display:flex;align-items:baseline;gap:4px;overflow:hidden;">` +
+                    `<span style="font-size:12px;font-weight:800;color:#37352f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.35;margin-top:1px;">${p.plateName||p.nm||'-'}</span>` +
+                    (sheetsStr ? `<span style="font-size:10px;font-weight:900;color:#fff;background:#37352f;padding:1px 5px;border-radius:3px;flex-shrink:0;white-space:nowrap;">${sheetsStr} 재단</span>` : '') +
+                    `</div>` +
                     `<div style="display:flex;align-items:center;font-size:10px;font-weight:600;color:#6b6966;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${_woColorSwatchHtml(p.finish)}${p.finish||''}</div>` +
                     `<div style="display:flex;gap:3px;align-items:center;flex-wrap:wrap;margin-top:3px;">` +
-                    (dimStr    ? `<span style="font-size:9px;font-weight:700;color:#787774;background:#f0efed;padding:1px 4px;border-radius:3px;">${dimStr}</span>` : '') +
-                    (sheetsStr ? `<span style="font-size:9px;font-weight:700;color:#37352f;background:#e8e7e4;padding:1px 4px;border-radius:3px;">${sheetsStr}</span>` : '') +
-                    `<span style="font-size:9px;font-weight:700;color:${_wQI.color};background:${_wQI.bg};padding:1px 4px;border-radius:3px;">${_wQI.label} EA</span>` +
+                    (dimStr    ? `<span style="font-size:9px;font-weight:700;color:#787774;background:#f0efed;padding:1px 4px;border-radius:3px;">${dimStr}${_yield>0?` → ${_yield}개`:''}</span>` : '') +
+                    `<span style="font-size:9px;font-weight:700;color:${_wQI.color};background:${_wQI.bg};padding:1px 4px;border-radius:3px;">필요 ${_wQI.label} EA</span>` +
                     `</div>` +
                     `<div onclick="event.stopPropagation();woShowCuttingDiagramModal('${p.cKey.replace(/'/g,"\\'")}','${stateKey.replace(/'/g,"\\'")}')" style="cursor:pointer;" title="도면 크게 보기">` +
                     _woCuttingDiagramSvg(p) +
@@ -7622,6 +7628,10 @@
                     // ─── 배치 카드 (재단카드: 상세 4행 / 일반카드: 컴팩트 2행) ───
                     let _placedInner = '';
                     if (p.isCuttingCard) {
+                        // 원장 몇 장을 잘라야 하는지(원장명 옆), 그 장수로 총 몇 개가
+                        // 나오는지(사이즈 옆)를 작업자가 한눈에 알 수 있도록 표기
+                        const _perSheet2 = (p.boardParts || []).length;
+                        const _yield2    = _perSheet2 * (p.sheets || 0);
                         const _dimStr2    = (p.rw && p.rd) ? `${p.rw}×${p.rd}` : '';
                         const _sheetsStr2 = p.sheets       ? `${p.sheets}장`    : '';
                         const _cutTimeStr = (clockStart != null && clockEnd != null)
@@ -7636,12 +7646,14 @@
                         const _placedDiagram = _woCuttingDiagramSvg(p, 260, 150, true);
                         const _textCol =
                             `<div style="font-size:11px;font-weight:700;color:#a8a6a2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${p.orderCode||''}</div>` +
-                            `<div style="font-size:14px;font-weight:800;color:#37352f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35;margin-top:2px;">${p.plateName||p.nm||'-'}</div>` +
+                            `<div style="display:flex;align-items:baseline;gap:5px;overflow:hidden;">` +
+                            `<span style="font-size:14px;font-weight:800;color:#37352f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.35;margin-top:2px;">${p.plateName||p.nm||'-'}</span>` +
+                            (_sheetsStr2 ? `<span style="font-size:11px;font-weight:900;color:#fff;background:#37352f;padding:1px 6px;border-radius:3px;flex-shrink:0;white-space:nowrap;">${_sheetsStr2} 재단</span>` : '') +
+                            `</div>` +
                             `<div style="display:flex;align-items:center;font-size:12px;font-weight:600;color:#6b6966;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${_woColorSwatchHtml(p.finish)}${p.finish||''}</div>` +
                             `<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:4px;">` +
-                            (_dimStr2    ? `<span style="font-size:11px;font-weight:700;color:#787774;background:#f0efed;padding:2px 5px;border-radius:3px;">${_dimStr2}</span>` : '') +
-                            (_sheetsStr2 ? `<span style="font-size:11px;font-weight:700;color:#37352f;background:#e8e7e4;padding:2px 5px;border-radius:3px;">${_sheetsStr2}</span>` : '') +
-                            `<span style="font-size:11px;font-weight:700;color:${_bQI.color};background:${_bQI.bg};padding:2px 5px;border-radius:3px;">${_bQI.label} EA</span>` +
+                            (_dimStr2    ? `<span style="font-size:11px;font-weight:700;color:#787774;background:#f0efed;padding:2px 5px;border-radius:3px;">${_dimStr2}${_yield2>0?` → ${_yield2}개`:''}</span>` : '') +
+                            `<span style="font-size:11px;font-weight:700;color:${_bQI.color};background:${_bQI.bg};padding:2px 5px;border-radius:3px;">필요 ${_bQI.label} EA</span>` +
                             `</div>` +
                             (_cutTimeStr ? `<div style="font-size:11px;font-weight:700;color:#a0a09c;margin-top:4px;white-space:nowrap;">⏱ ${_cutTimeStr}</div>` : '');
                         _placedInner = _placedDiagram
