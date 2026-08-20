@@ -6580,7 +6580,12 @@
                     const existingC = new Set();
                     _MAC_CUT.forEach(mac => (window._woBoring[sk][mac] || []).forEach(k => existingC.add(k)));
                     (window._woBoring[sk].pool || []).forEach(k => existingC.add(k));
-                    cuttingParts.forEach(p => { if (!existingC.has(p.cKey)) window._woBoring[sk].pool.push(p.cKey); });
+                    // 재단은 기계가 AMT 하나뿐이라 미배정 풀에 쌓아둘 이유가 없음 —
+                    // 최초 진입 때처럼 새로 나타난 재단 작업도 바로 AMT에 자동 배정
+                    // (이전엔 여기서 pool로만 들어가서, 두 번째 진입부터는 새 작업이
+                    //  기계에 안 올라오고 계속 미배정으로만 쌓이던 문제였음)
+                    if (!window._woBoring[sk]['AMT']) window._woBoring[sk]['AMT'] = [];
+                    cuttingParts.forEach(p => { if (!existingC.has(p.cKey)) window._woBoring[sk]['AMT'].push(p.cKey); });
                 }
                 // Firebase에 저장된 재단 도면 복원 (새로고침·다른 세션에서도 유지) — 날짜 무관하게 전부 확인 후 해당 sk에 자동 배정됨
                 Object.values(window._cuttingPlans || {}).forEach(plan => _ensureCuttingPlanInTimeline(plan));
