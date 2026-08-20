@@ -2333,6 +2333,12 @@
                 if (perSheet <= 0) return; // 부속이 원장보다 커서 자동 배치 불가 — 수동(재단편집)으로 처리 필요
 
                 const sheets = Math.ceil(qty / perSheet);
+                const plateName  = row[h.indexOf('원장명')] || '';
+                const finishName = row[h.indexOf('마감')] || '';
+                const colorName  = normalizeValue(row[h.indexOf('마감색상')]);
+                const partName   = row[h.indexOf('부속명')] || '-';
+                const _fillHex   = _colorNameToHex(colorName) || '#b0aeaa'; // 원장 실제 색상으로 도면 표시
+
                 const boardParts = [];
                 for (let c = 0; c < maxCols; c++) {
                     for (let r = 0; r < maxRows; r++) {
@@ -2341,16 +2347,11 @@
                             tp: (fCut + r * (rd + bT)) / BD,
                             wp: rw / BW,
                             hp: rd / BD,
-                            bg: '#b0aeaa',
+                            bg: _fillHex,
                             oids: String(order.idNum)
                         });
                     }
                 }
-
-                const plateName  = row[h.indexOf('원장명')] || '';
-                const finishName = row[h.indexOf('마감')] || '';
-                const colorName  = normalizeValue(row[h.indexOf('마감색상')]);
-                const partName   = row[h.indexOf('부속명')] || '-';
 
                 const cuttingData = {
                     confirmId: `auto_${Date.now()}_${order.idNum}_${ri}`,
@@ -6541,10 +6542,15 @@
                             totalMin += pm * (dq / (tq || 1));
                             const uid       = (item.docId || String(item.idNum)) + '_' + cKey;
                             const orderKey  = item.docId || String(item.idNum);
-                            const plateName = row[_fh.indexOf('원장명')] || '';
-                            const finish    = row[_fh.indexOf('마감')]   || '';
+                            // 확정 도면(_ensureCuttingPlanInTimeline) 쪽과 필드 의미를 맞춤:
+                            // plateName = 원장명+마감(재질/질감), finish = 마감색상(실제 색상 이름) —
+                            // 예전엔 여기서 finish에 "마감"(질감)을 넣고 있어서 색상 정보 자체가
+                            // 카드에 안 뜨고 있었음 (도면 rect 색도 항상 고정 회색이었음)
+                            const plateName = (row[_fh.indexOf('원장명')] || '') + (row[_fh.indexOf('마감')] || '');
+                            const finish    = normalizeValue(row[_fh.indexOf('마감색상')]) || '';
                             const rw        = parseFloat(row[_fh.indexOf('재단W')]) || 0;
                             const rd        = parseFloat(row[_fh.indexOf('재단D')]) || 0;
+                            const _fillHex  = _colorNameToHex(finish) || '#b0aeaa';
 
                             // 카드에 재단 도면이 보이도록, _autoGenerateCuttingPlansForOrder와 동일한
                             // 방식(4X8 원장, 전단컷 5mm, 톱날두께 4.5mm)으로 간단 배치도를 즉석 계산
@@ -6560,7 +6566,7 @@
                                         for (let r = 0; r < maxRows; r++) {
                                             boardParts.push({
                                                 lp: (fCut + c * (rw + bT)) / BW, tp: (fCut + r * (rd + bT)) / BD,
-                                                wp: rw / BW, hp: rd / BD, bg: '#b0aeaa'
+                                                wp: rw / BW, hp: rd / BD, bg: _fillHex
                                             });
                                         }
                                     }
@@ -7128,6 +7134,31 @@
             return bins;
         }
 
+        // 마감색상(엑셀 "마감색상" 컬럼 텍스트) → 실제 색상 hex 매핑
+        // 현장에서 원장 색상을 한눈에 구분하기 위한 용도라 정확한 팬톤 매칭이 아니라 근사값
+        const _COLOR_NAME_MAP = {
+            '화이트':'#f5f5f4', '백색':'#f5f5f4', '아이보리':'#f0e9d8', '베이지':'#e6dcc8',
+            '블랙':'#2b2b2b', '흑색':'#2b2b2b', '차콜':'#3a3a3a', '그레이':'#9a9a97', '그레이지':'#a8a196',
+            '오크':'#c9a876', '내추럴오크':'#d4b686', '월넛':'#5c4433', '체리':'#8b4a3a', '메이플':'#dcc190',
+            '브라운':'#6b4a34', '다크브라운':'#4a3527', '민트':'#a8d8c8', '그린':'#4a7a5c', '올리브':'#6b7a4a',
+            '블루':'#3a6b9a', '네이비':'#1f3a5c', '스카이블루':'#8fc4e0', '레드':'#a13a3a', '와인':'#5c2430',
+            '옐로우':'#d8c04a', '핑크':'#e0a8b8', '퍼플':'#7a5c8f', '실버':'#c0c0c0', '골드':'#c4a556',
+            '무광화이트':'#f5f5f4', '유광화이트':'#fbfbfa', '무광블랙':'#2b2b2b', '유광블랙':'#1a1a1a',
+        };
+        function _colorNameToHex(name) {
+            const n = String(name || '').replace(/\s+/g, '');
+            if (!n) return null;
+            if (_COLOR_NAME_MAP[n]) return _COLOR_NAME_MAP[n];
+            const hit = Object.keys(_COLOR_NAME_MAP).find(k => n.includes(k));
+            return hit ? _COLOR_NAME_MAP[hit] : null;
+        }
+        // 원장 마감색상 이름 옆에 붙일 작은 색상 동그라미 — 매핑되는 색이 없으면 표시 안 함
+        function _woColorSwatchHtml(colorName) {
+            const hex = _colorNameToHex(colorName);
+            if (!hex) return '';
+            return `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${hex};border:1px solid rgba(0,0,0,0.18);flex-shrink:0;margin-right:4px;"></span>`;
+        }
+
         // 재단 도면 boardParts(lp/tp/wp/hp 비율) → 작은 SVG 배치도. 카드 인라인 표시와 호버 툴팁이 공용으로 사용.
         // fitHeight=true면 폭 기준(width:100%) 대신 높이 기준(height:100%)으로 맞춤 —
         // 옆에 나란히 놓인 텍스트 칸의 높이를 넘지 않게 해야 할 때 사용
@@ -7208,7 +7239,7 @@
                 innerHtml =
                     `<div style="font-size:9px;font-weight:700;color:#a8a6a2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${p.orderCode||''}</div>` +
                     `<div style="font-size:12px;font-weight:800;color:#37352f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35;margin-top:1px;">${p.plateName||p.nm||'-'}</div>` +
-                    `<div style="font-size:10px;font-weight:600;color:#6b6966;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${p.finish||''}</div>` +
+                    `<div style="display:flex;align-items:center;font-size:10px;font-weight:600;color:#6b6966;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${_woColorSwatchHtml(p.finish)}${p.finish||''}</div>` +
                     `<div style="display:flex;gap:3px;align-items:center;flex-wrap:wrap;margin-top:3px;">` +
                     (dimStr    ? `<span style="font-size:9px;font-weight:700;color:#787774;background:#f0efed;padding:1px 4px;border-radius:3px;">${dimStr}</span>` : '') +
                     (sheetsStr ? `<span style="font-size:9px;font-weight:700;color:#37352f;background:#e8e7e4;padding:1px 4px;border-radius:3px;">${sheetsStr}</span>` : '') +
@@ -7619,7 +7650,7 @@
                         const _textCol =
                             `<div style="font-size:11px;font-weight:700;color:#a8a6a2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${p.orderCode||''}</div>` +
                             `<div style="font-size:14px;font-weight:800;color:#37352f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35;margin-top:2px;">${p.plateName||p.nm||'-'}</div>` +
-                            `<div style="font-size:12px;font-weight:600;color:#6b6966;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${p.finish||''}</div>` +
+                            `<div style="display:flex;align-items:center;font-size:12px;font-weight:600;color:#6b6966;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${_woColorSwatchHtml(p.finish)}${p.finish||''}</div>` +
                             `<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-top:4px;">` +
                             (_dimStr2    ? `<span style="font-size:11px;font-weight:700;color:#787774;background:#f0efed;padding:2px 5px;border-radius:3px;">${_dimStr2}</span>` : '') +
                             (_sheetsStr2 ? `<span style="font-size:11px;font-weight:700;color:#37352f;background:#e8e7e4;padding:2px 5px;border-radius:3px;">${_sheetsStr2}</span>` : '') +
