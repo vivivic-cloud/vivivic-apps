@@ -3120,10 +3120,29 @@
                 const h = currentFullData[0];
                 const byProc = {};
                 PROC_DEF.forEach(p => { byProc[p.key] = {}; });
+
+                // 해당 공정이 포함된 부속이 실제로 있는지 확인 — 없으면 그 공정 섹션에
+                // 아예 배치하지 않음 (에이엠티엔 없는 공정에 조혼가구 쪽만 기본 배치되던 문제 수정)
+                const hasProcInItem = (item, procKey) => {
+                    if (!h || currentFullData.length < 2) return false;
+                    const matchingRows = currentFullData.slice(1).filter(r =>
+                        r && normalizeValue(r[h.indexOf("ing발주처")]) === item.supplier &&
+                        IDENTITY_HEADERS.every((col, i) => normalizeValue(r[h.indexOf(col)]) === item.criteria[i])
+                    );
+                    for (const row of matchingRows) {
+                        if (normalizeValue(row[h.indexOf("공급처")]) !== "AMT") continue;
+                        const unitCons = parseFloat(row[h.indexOf("세트별소모량")]) || 1;
+                        const partT = calcProcessTime(row, unitCons * (item.orderQty || 1), {}, h);
+                        if ((partT[procKey] ?? 0) > 0) return true;
+                    }
+                    return false;
+                };
+
                 this._getPendingOrders().forEach(item => {
                     const d = item.deliveryDate; if (!d) return;
                     const po = item.procOverrides || {};
                     PROC_DEF.forEach(proc => {
+                        if (!hasProcInItem(item, proc.key)) return;
                         const td = po[proc.key] || this._toValidDate(this._dateOffset(d, -proc.offset));
                         if (!byProc[proc.key][td]) byProc[proc.key][td] = [];
                         byProc[proc.key][td].push(item);
