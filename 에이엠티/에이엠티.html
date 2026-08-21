@@ -2276,7 +2276,11 @@
                 pm: 0,
                 dq: plan.sheets || 1,
                 orderCode, orderName,
-                orderKey: String(allOrderIds[0] || ''),
+                // orderKey는 앱 전역에서 (o.docId || String(o.idNum)) 규칙을 쓰는데
+                // 여기만 항상 idNum 문자열만 써서, 주문에 docId가 있는 경우 인라인
+                // 계산 경로(Path B, tlDcExpandSection)의 orderKey와 값이 어긋나
+                // 같은 부속이 중복 카드로 배치되는 원인이었음(_cutSig 매칭 실패)
+                orderKey: order?.docId || String(allOrderIds[0] || ''),
                 plateName: plan.baseMaterial || '',
                 finish: plan.materialColor || '',
                 rw: plan.cutW || 0,
@@ -6614,8 +6618,32 @@
                     cuttingParts.forEach(p => { if (!existingC.has(p.cKey)) window._woBoring[sk]['AMT'].push(p.cKey); });
                 }
 
-                const mergedCutParts = [...prevCutParts];
+                let mergedCutParts = [...prevCutParts];
                 cuttingParts.forEach(p => { if (!mergedCutParts.find(pp => pp.cKey === p.cKey)) mergedCutParts.push(p); });
+
+                // 과거에 orderKey 계산 방식이 서로 달라(Path A는 항상 idNum, Path B는
+                // docId 우선) _cutSig 매칭이 실패해 같은 부속이 두 번 쌓인 경우 정리.
+                // 서명(주문+규격+원장+색상)이 같은 카드가 여럿이면 공식 재단계획
+                // (cKey가 'cut_'로 시작) 쪽을 남기고 나머지는 보드/풀에서 제거
+                {
+                    const sigToKeep = new Map();
+                    const dropKeys  = new Set();
+                    mergedCutParts.forEach(p => {
+                        const sig = _cutSig(p);
+                        const keptKey = sigToKeep.get(sig);
+                        if (!keptKey) { sigToKeep.set(sig, p.cKey); return; }
+                        const keptIsPlan = keptKey.startsWith('cut_');
+                        const curIsPlan  = p.cKey.startsWith('cut_');
+                        if (curIsPlan && !keptIsPlan) { dropKeys.add(keptKey); sigToKeep.set(sig, p.cKey); }
+                        else dropKeys.add(p.cKey);
+                    });
+                    if (dropKeys.size > 0) {
+                        mergedCutParts = mergedCutParts.filter(p => !dropKeys.has(p.cKey));
+                        _MAC_CUT.forEach(mac => { window._woBoring[sk][mac] = (window._woBoring[sk][mac] || []).filter(k => !dropKeys.has(k)); });
+                        window._woBoring[sk].pool = (window._woBoring[sk].pool || []).filter(k => !dropKeys.has(k));
+                    }
+                }
+
                 window._woBoringParts[sk] = mergedCutParts;
                 const poolInitC = (window._woBoring[sk].pool || []).map(k => {
                     const p = mergedCutParts.find(pp => pp.cKey === k);
