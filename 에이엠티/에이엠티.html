@@ -2369,11 +2369,23 @@
             });
         }
 
-        // 특정 주문의 특정 행(부속)이 이미 재단계획(자동/수동 확정)으로 커버됐는지 확인
-        function _cuttingPlanCoversRow(plan, orderId, ri) {
-            if ((plan.pOrderIds || []).includes(orderId) && plan.pRowIndex === ri) return true;
-            if ((plan.sOrderIds || []).includes(orderId) && plan.sRowIndex === ri) return true;
-            if ((plan.tOrderIds || []).includes(orderId) && plan.tRowIndex === ri) return true;
+        // 특정 주문의 특정 행(부속)이 이미 재단계획(자동/수동 확정)으로 커버됐는지 확인.
+        // pRowIndex가 없는(이번 수정 이전에 생성된) 과거 재단계획도 인식할 수 있도록,
+        // 행 인덱스가 없는 슬롯은 규격(재단W/D)으로 한 번 더 대조
+        function _cuttingPlanCoversRow(plan, orderId, ri, rw, rd) {
+            const _dimMatch = (w, d) => Math.abs((w||0) - rw) < 0.5 && Math.abs((d||0) - rd) < 0.5;
+            if ((plan.pOrderIds || []).includes(orderId)) {
+                if (plan.pRowIndex != null) { if (plan.pRowIndex === ri) return true; }
+                else if (_dimMatch(plan.cutW, plan.cutD)) return true;
+            }
+            if ((plan.sOrderIds || []).includes(orderId)) {
+                if (plan.sRowIndex != null) { if (plan.sRowIndex === ri) return true; }
+                else if (_dimMatch(plan.sCutW, plan.sCutD)) return true;
+            }
+            if ((plan.tOrderIds || []).includes(orderId)) {
+                if (plan.tRowIndex != null) { if (plan.tRowIndex === ri) return true; }
+                else if (_dimMatch(plan.tCutW, plan.tCutD)) return true;
+            }
             return false;
         }
 
@@ -2394,7 +2406,7 @@
                 const rd = parseFloat(row[h.indexOf('재단D')]) || 0;
                 if (rw <= 0 || rd <= 0) return; // 재단 대상 부속이 아님
                 hasAmtCutPart = true;
-                const covered = Object.values(window._cuttingPlans || {}).some(plan => _cuttingPlanCoversRow(plan, order.idNum, ri));
+                const covered = Object.values(window._cuttingPlans || {}).some(plan => _cuttingPlanCoversRow(plan, order.idNum, ri, rw, rd));
                 if (!covered) allHandled = false;
             });
             return hasAmtCutPart && allHandled;
