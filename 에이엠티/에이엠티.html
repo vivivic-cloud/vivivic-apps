@@ -3251,15 +3251,18 @@
             const countEl = document.getElementById('timeline-confirmed-count');
             if (!section || !listEl) return;
 
-            // 재단이 필요한 부속이 전부 이미 도면과 함께 자동/수동 확정되어 타임라인
-            // 보드에 배치된 주문은 더 이상 재단편집을 기다릴 필요가 없으므로 목록에서 제외
-            const items = confirmedOrders.filter(o => o.amtTimeline === true && o.amtRegistered !== true && !o.amtConfirmedCancel && !_orderCuttingFullyHandled(o));
-
-            if (items.length === 0) {
+            // 타임라인에 등록된 전체 발주건 — 이 자체가 0건이면 섹션을 숨김(기존 동작 유지)
+            const allTl = confirmedOrders.filter(o => o.amtTimeline === true && o.amtRegistered !== true && !o.amtConfirmedCancel);
+            if (allTl.length === 0) {
                 section.style.display = 'none';
                 return;
             }
             section.style.display = 'block';
+
+            // 그 중 재단이 필요한 부속이 전부 이미 도면과 함께 자동/수동 확정되어 타임라인
+            // 보드에 배치된 주문은 더 이상 재단편집을 기다릴 필요가 없으므로 목록에서만 제외
+            // (섹션 자체는 "타임라인에 등록된 발주건"이 있는 한 계속 노출)
+            const items = allTl.filter(o => !_orderCuttingFullyHandled(o));
             if (countEl) countEl.textContent = items.length;
 
             // 리스트 본문 자동 열기 (처음 표시 시)
@@ -3268,6 +3271,11 @@
             if (listBody && listBody.style.display === 'none') {
                 listBody.style.display = 'block';
                 if (chevron) chevron.style.transform = 'rotate(180deg)';
+            }
+
+            if (items.length === 0) {
+                listEl.innerHTML = `<div class="p-8 text-center font-bold tracking-tight fluid-text-body italic text-[#787774]">✓ 재단 도면이 모두 자동 확정되어 재단편집 대기 중인 항목이 없습니다. (총 ${allTl.length}건 타임라인 등록됨)</div>`;
+                return;
             }
 
             // renderPendingOrders 카드 구조와 동일하게 렌더 (부속카드 토글 포함)
