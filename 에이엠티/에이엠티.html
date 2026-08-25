@@ -2264,6 +2264,12 @@
             if (h && order && plan.pRowIndex != null) {
                 const row = currentFullData[plan.pRowIndex];
                 if (row) {
+                    // 담당자가 수량을 수동으로 조정했을 수 있어(partInfoMap[cKey].qty)
+                    // 세트별소모량 재계산보다 그 값을 우선 신뢰
+                    const pKey = Object.keys(order.partInfoMap || {})
+                        .find(ck => parseInt(ck.split('-')[2]) === plan.pRowIndex);
+                    const pData = pKey ? order.partInfoMap[pKey] : null;
+                    if (pData?.qty) return pData.qty;
                     const uc = parseFloat(row[h.indexOf('세트별소모량')]) || 1;
                     return Math.round(uc * (order.orderQty || 1));
                 }
@@ -2346,7 +2352,10 @@
                 if (rw <= 0 || rd <= 0) return; // 재단 대상 부속이 아님
 
                 const uc  = parseFloat(row[h.indexOf('세트별소모량')]) || 1;
-                const qty = Math.round(uc * (order.orderQty || 1));
+                // 필요수량은 발주 단계에서 이미 정해져 있음(partInfoMap[cKey].qty) —
+                // 담당자가 수동으로 수량을 조정했을 수도 있어(isManual) 세트별소모량으로
+                // 다시 계산한 값보다 pData.qty를 우선 신뢰해야 함
+                const qty = pData.qty || Math.round(uc * (order.orderQty || 1));
                 if (qty <= 0) return;
 
                 const maxCols = Math.floor((BW - fCut + bT) / (rw + bT));
@@ -6599,8 +6608,10 @@
                             if (!row || normalizeValue(row[_fh.indexOf('공급처')]) !== 'AMT') return;
                             const nm  = row[_fh.indexOf('부속명')] || '-';
                             const uc  = parseFloat(row[_fh.indexOf('세트별소모량')]) || 1;
-                            const tq  = Math.round(uc * (item.orderQty || 1));
-                            const pt  = calcProcessTime(row, uc * (item.orderQty || 1), {}, _fh);
+                            // 필요수량은 발주 단계에서 이미 정해져 있음(partInfoMap[cKey].qty) —
+                            // 담당자가 수동으로 조정했을 수 있어 세트별소모량 재계산보다 우선
+                            const tq  = pData.qty || Math.round(uc * (item.orderQty || 1));
+                            const pt  = calcProcessTime(row, tq, {}, _fh);
                             const pm  = pt['재단'] ?? 0;
                             if (pm <= 0) return;
                             const batches = item.partMoveLog?.[cKey] || [];
