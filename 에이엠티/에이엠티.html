@@ -2254,6 +2254,23 @@
 
         // 재단 도면 1건을 재단 공정 타임라인(미배정 풀)에 반영 — 이미 반영돼 있으면 무시(idempotent)
         // 반환값: 해당 도면이 배정된 stateKey (날짜-재단)
+        // 재단계획의 실제 필요수량(필요 EA)을 구함. 발주 단계에서 이미 이 부속의
+        // 발주 수량(세트별소모량 × 주문수량)이 정해져 있으므로, plan에 reqQty가
+        // 기록되어 있지 않은 과거 재단계획도 원본 발주 데이터로 즉석 재계산해
+        // 정확한 필요수량을 구할 수 있음 — sheets(원장 장수)로 잘못 대체하지 않음
+        function _cuttingReqQtyFor(plan, order) {
+            if (plan.reqQty != null) return plan.reqQty;
+            const h = currentFullData[0];
+            if (h && order && plan.pRowIndex != null) {
+                const row = currentFullData[plan.pRowIndex];
+                if (row) {
+                    const uc = parseFloat(row[h.indexOf('세트별소모량')]) || 1;
+                    return Math.round(uc * (order.orderQty || 1));
+                }
+            }
+            return plan.sheets || 1; // 재계산도 불가능한 경우의 최후 폴백
+        }
+
         function _ensureCuttingPlanInTimeline(plan) {
             const allOrderIds = [...new Set([...(plan.pOrderIds||[]), ...(plan.sOrderIds||[]), ...(plan.tOrderIds||[])])];
             const order = confirmedOrders.find(o => allOrderIds.includes(o.idNum));
@@ -2275,10 +2292,8 @@
                 nm: `${plan.baseMaterial} · ${plan.materialColor}`,
                 pm: 0,
                 // dq(필요 수량)는 잘라야 할 원장 "장수"(plan.sheets)가 아니라 실제
-                // 필요한 부속 EA 수량이어야 함 — 카드에 "필요 N EA"로 표시되는 값.
-                // reqQty가 없는(이번 수정 이전에 생성된) 과거 재단계획은 대안이 없어
-                // 부득이 sheets로 폴백(기존 동작 유지)
-                dq: (plan.reqQty != null ? plan.reqQty : plan.sheets) || 1,
+                // 필요한 부속 EA 수량이어야 함 — 카드에 "필요 N EA"로 표시되는 값
+                dq: _cuttingReqQtyFor(plan, order),
                 orderCode, orderName,
                 // orderKey는 앱 전역에서 (o.docId || String(o.idNum)) 규칙을 쓰는데
                 // 여기만 항상 idNum 문자열만 써서, 주문에 docId가 있는 경우 인라인
