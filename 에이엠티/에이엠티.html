@@ -2283,11 +2283,10 @@
 
             const allAssigned = new Set([...(window._woBoring[sk]['AMT']||[]), ...(window._woBoring[sk].pool||[])]);
             if (!allAssigned.has(cKey)) window._woBoring[sk]['AMT'].push(cKey);
-            if (window._woBoringParts[sk].some(p => p.cKey === cKey)) return sk;
 
             const orderCode = allOrderIds.map(id => confirmedOrders.find(o => o.idNum === id)?.orderCode).filter(Boolean).join('/');
             const orderName = allOrderIds.map(id => confirmedOrders.find(o => o.idNum === id)?.displayName).filter(Boolean).join(' / ');
-            window._woBoringParts[sk].push({
+            const partObj = {
                 cKey,
                 nm: `${plan.baseMaterial} · ${plan.materialColor}`,
                 pm: 0,
@@ -2300,6 +2299,11 @@
                 // 계산 경로(Path B, tlDcExpandSection)의 orderKey와 값이 어긋나
                 // 같은 부속이 중복 카드로 배치되는 원인이었음(_cutSig 매칭 실패)
                 orderKey: order?.docId || String(allOrderIds[0] || ''),
+                // coveredOrderIds: 이 재단계획 1건이 실제로 커버하는 모든 발주(idNum) 목록.
+                // 자동생성 시 여러 발주가 하나의 재단계획으로 합쳐질 수 있어(같은 원장·사이즈
+                // 그룹 병합), orderKey 하나만으로는 Path B(인라인 계산)의 중복 제거가 그
+                // 합쳐진 다른 발주분까지는 못 잡아냄 — 이 목록으로 발주별 커버 여부를 확인
+                coveredOrderIds: allOrderIds,
                 plateName: plan.baseMaterial || '',
                 coating: plan.coating || '',
                 finish: plan.materialColor || '',
@@ -2310,13 +2314,20 @@
                 sheets: plan.sheets || 1,
                 isCuttingCard: true,
                 planId: String(plan.confirmId)
-            });
+            };
+            // 같은 cKey(같은 재단계획)가 이미 있으면 새로 추가하지 않고 내용을 갱신 —
+            // 여러 발주를 하나의 재단계획으로 합쳐(reqQty/sheets 재계산) 갱신할 때 필요
+            const existingIdx = window._woBoringParts[sk].findIndex(p => p.cKey === cKey);
+            if (existingIdx >= 0) window._woBoringParts[sk][existingIdx] = partObj;
+            else window._woBoringParts[sk].push(partObj);
             return sk;
         }
 
-        // ── 타임라인 등록 시 재단 도면 자동 생성 (1건씩 독립 배치, 완전자동확정) ──────
-        // 발주 1건에 포함된 AMT 재단 부속마다 개별적으로 원장 배치를 계산해 자동 확정.
-        // 서로 다른 부속/발주를 한 장에 합판하는 최적화는 하지 않음 — 각 부속당 1건의 도면.
+        // ── 타임라인 등록 시 재단 도면 자동 생성 (같은 재단 날짜에 같은 원장·마감·색상·
+        // 사이즈를 쓰는 다른 발주가 이미 있으면 새로 만들지 않고 합쳐서 재계산) ──────
+        // 발주서 1건이 아무리 소량(예: 한 조)이어도 무조건 원장 1장을 새로 잡던 문제를
+        // 막기 위해, 그룹 서명(재단날짜+원장명+마감+색상+사이즈)이 같은 기존 자동생성
+        // 재단계획을 찾아 수량을 합산하고 그 합산 수량으로 원장 장수를 다시 계산한다.
         function _autoGenerateCuttingPlansForOrder(order) {
             const h = currentFullData[0];
             if (!h || currentFullData.length < 2 || !order || !order.partInfoMap) return;
@@ -2343,7 +2354,6 @@
                 const perSheet = maxCols * maxRows;
                 if (perSheet <= 0) return; // 부속이 원장보다 커서 자동 배치 불가 — 수동(재단편집)으로 처리 필요
 
-                const sheets = Math.ceil(qty / perSheet);
                 // plateName = 원장명(코드) 그 자체, coating = 마감(양면/편면 등 가공형태) —
                 // 서로 다른 정보라 카드에서도 별도 항목으로 표기 (붙여쓰지 않음)
                 const plateName  = row[h.indexOf('원장명')] || '';
@@ -2351,26 +2361,59 @@
                 const colorName  = normalizeValue(row[h.indexOf('마감색상')]);
                 const partName   = row[h.indexOf('부속명')] || '-';
                 const _fillHex   = _colorNameToHex(colorName) || '#b0aeaa'; // 원장 실제 색상으로 도면 표시
+                const cuttingDate = order.procOverrides?.['재단'] || order.deliveryDate || '미정';
+                const groupSig = [cuttingDate, plateName, coating, colorName, rw, rd].join('|');
 
-                const boardParts = [];
-                for (let c = 0; c < maxCols; c++) {
-                    for (let r = 0; r < maxRows; r++) {
-                        boardParts.push({
-                            lp: (fCut + c * (rw + bT)) / BW,
-                            tp: (fCut + r * (rd + bT)) / BD,
-                            wp: rw / BW,
-                            hp: rd / BD,
-                            bg: _fillHex,
-                            oids: String(order.idNum)
-                        });
+                const buildBoardParts = (oidsStr) => {
+                    const bp = [];
+                    for (let c = 0; c < maxCols; c++) {
+                        for (let r = 0; r < maxRows; r++) {
+                            bp.push({
+                                lp: (fCut + c * (rw + bT)) / BW,
+                                tp: (fCut + r * (rd + bT)) / BD,
+                                wp: rw / BW,
+                                hp: rd / BD,
+                                bg: _fillHex,
+                                oids: oidsStr
+                            });
+                        }
                     }
+                    return bp;
+                };
+
+                // 같은 그룹(같은 재단 날짜+원장+마감+색상+사이즈)의 기존 자동생성 계획이
+                // 있으면 새로 만들지 않고 이 발주 수량을 더해 원장 장수를 재계산
+                const existingPlan = Object.values(window._cuttingPlans || {})
+                    .find(p => p.autoGenerated && p.groupSig === groupSig && !(p.pOrderIds || []).includes(order.idNum));
+
+                if (existingPlan) {
+                    const mergedOrderIds = [...new Set([...(existingPlan.pOrderIds || []), order.idNum])];
+                    const mergedQty = (existingPlan.reqQty || 0) + qty;
+                    const mergedSheets = Math.ceil(mergedQty / perSheet);
+                    const updated = {
+                        ...existingPlan,
+                        pOrderIds: mergedOrderIds,
+                        reqQty: mergedQty,
+                        sheets: mergedSheets,
+                        boardParts: buildBoardParts(mergedOrderIds.join(',')),
+                        pInfoText: `${rw} X ${rd} - ${partName} - ${mergedQty} EA (발주 ${mergedOrderIds.length}건 통합)`
+                    };
+                    // Firestore 반영은 비동기라 같은 배치에서 연달아 처리되는 다음 발주가
+                    // 이 병합 결과를 못 보고 지나칠 수 있음 — window._cuttingPlans를 먼저
+                    // 즉시 갱신해 같은 그룹의 다음 발주도 바로 이어서 합쳐지도록 함
+                    window._cuttingPlans[String(updated.confirmId)] = updated;
+                    _persistCuttingPlan(updated);
+                    _ensureCuttingPlanInTimeline(updated);
+                    return;
                 }
 
+                const sheets = Math.ceil(qty / perSheet);
                 const cuttingData = {
                     confirmId: `auto_${Date.now()}_${order.idNum}_${ri}`,
                     checked: false,
                     targetPage: 'cutting',
                     autoGenerated: true,
+                    groupSig,
                     pOrderIds: [order.idNum],
                     // pRowIndex: 이 부속이 어느 행(cKey)에서 왔는지 기록 — 발주확정목록에서
                     // "이 주문의 이 부속은 이미 재단계획이 확정됐는지" 판별하는 데 사용
@@ -2385,11 +2428,12 @@
                     // 혼동해서 카드의 "필요 수량"에 sheets를 잘못 쓰던 버그가 있었음
                     reqQty: qty,
                     sheets,
-                    boardParts,
+                    boardParts: buildBoardParts(String(order.idNum)),
                     boardW: BW, boardH: BD,
                     cutW: rw, cutD: rd
                 };
 
+                window._cuttingPlans[String(cuttingData.confirmId)] = cuttingData;
                 _persistCuttingPlan(cuttingData);
                 _ensureCuttingPlanInTimeline(cuttingData);
             });
@@ -6596,7 +6640,7 @@
                                     }
                                 }
                             }
-                            cuttingParts.push({ nm, pm, dq, cKey: uid, orderCode: item.orderCode || '', orderKey, orderName: item.displayName || item.orderCode || '', plateName, coating, finish, rw, rd, deliveryDate: item.deliveryDate || '', isCuttingCard: boardParts.length > 0, boardParts, sheets });
+                            cuttingParts.push({ nm, pm, dq, cKey: uid, orderCode: item.orderCode || '', orderKey, orderIdNum: item.idNum, orderName: item.displayName || item.orderCode || '', plateName, coating, finish, rw, rd, deliveryDate: item.deliveryDate || '', isCuttingCard: boardParts.length > 0, boardParts, sheets });
                         });
                     });
                 }
@@ -6606,11 +6650,20 @@
 
                 // 위 복원 + assignCuttingToMachine으로 추가된 재단카드(isCuttingCard, 도면 있음) 보존.
                 // cKey 형식이 서로 달라(cut_확정ID vs 오더_부속카드) cKey만으로는 같은 부속을
-                // 구분 못 해 중복 카드가 생기므로, 오더+규격+마감으로 한 번 더 식별해 중복 제외
+                // 구분 못 해 중복 카드가 생기므로, 오더+규격+마감으로 한 번 더 식별해 중복 제외.
+                // 자동생성 재단계획은 같은 그룹의 여러 발주를 하나로 합칠 수 있어(coveredOrderIds),
+                // orderKey 하나가 아니라 "이 발주 idNum이 그 재단계획에 포함돼 있는지"로 확인
                 const prevCutParts = (window._woBoringParts[sk] || []).filter(p => p.isCuttingCard);
                 const _cutSig = p => `${p.orderKey}|${p.rw}|${p.rd}|${p.plateName}|${p.finish}`;
+                const _dimSig = p => `${p.rw}|${p.rd}|${p.plateName}|${p.finish}`;
                 const prevCutSigs = new Set(prevCutParts.map(_cutSig));
-                cuttingParts = cuttingParts.filter(p => !prevCutSigs.has(_cutSig(p)));
+                const coveredByOrderId = new Set(); // `${orderIdNum}|${dimSig}`
+                prevCutParts.forEach(p => {
+                    (p.coveredOrderIds || []).forEach(oid => coveredByOrderId.add(`${oid}|${_dimSig(p)}`));
+                });
+                cuttingParts = cuttingParts.filter(p =>
+                    !prevCutSigs.has(_cutSig(p)) && !coveredByOrderId.has(`${p.orderIdNum}|${_dimSig(p)}`)
+                );
 
                 const _MAC_CUT = ['AMT'];
                 const _normKeysC = arr => {
