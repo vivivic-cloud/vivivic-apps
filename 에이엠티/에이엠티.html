@@ -7291,6 +7291,21 @@
             return `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${hex};border:1px solid rgba(0,0,0,0.18);flex-shrink:0;margin-right:4px;"></span>`;
         }
 
+        // 재단 카드의 수치 정보(원장 매수·총작업수량 등)를 라벨+값의 작은 타일로 표시 —
+        // 텍스트를 그냥 줄줄이 쌓는 대신 대시보드형 스탯 타일로 묶어 시각적으로 정리
+        function _woStatTile(label, value, opts) {
+            opts = opts || {};
+            const bg    = opts.accent ? '#eef3ee' : '#f7f6f3';
+            const lc    = opts.accent ? '#6e9573' : '#a8a6a2';
+            const lSize = opts.small ? '8px' : '9px';
+            const vSize = opts.small ? '11px' : '13px';
+            const pad   = opts.small ? '3px 6px' : '4px 8px';
+            return `<div style="background:${bg};border-radius:6px;padding:${pad};min-width:0;">` +
+                   `<div style="font-size:${lSize};font-weight:700;color:${lc};letter-spacing:0.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${label}</div>` +
+                   `<div style="font-size:${vSize};font-weight:800;color:#37352f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${value}</div>` +
+                   `</div>`;
+        }
+
         // 재단 도면 boardParts(lp/tp/wp/hp 비율) → 작은 SVG 배치도. 카드 인라인 표시와 호버 툴팁이 공용으로 사용.
         // fitHeight=true면 폭 기준(width:100%) 대신 높이 기준(height:100%)으로 맞춤 —
         // 옆에 나란히 놓인 텍스트 칸의 높이를 넘지 않게 해야 할 때 사용
@@ -7377,15 +7392,17 @@
                 const sizeQtyLine = [dimStr, p.dq ? `(${p.dq}EA)` : ''].filter(Boolean).join(' ');
                 const plateLine = [p.plateName, p.finish].filter(Boolean).join('-');
                 innerHtml =
-                    `<div style="font-size:9px;font-weight:700;color:#a8a6a2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${p.orderCode||''}</div>` +
-                    `<div style="display:flex;align-items:flex-start;gap:4px;">` +
+                    `<div style="font-size:8px;font-weight:700;color:#a8a6a2;font-family:ui-monospace,monospace;letter-spacing:0.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${p.orderCode||''}</div>` +
+                    `<div style="display:flex;align-items:flex-start;gap:4px;margin-top:1px;">` +
                     `<span style="display:inline-block;line-height:0;flex-shrink:0;margin-top:4px;">${_woColorSwatchHtml(p.finish)}</span>` +
                     `<span style="font-size:12px;font-weight:800;color:#37352f;line-height:1.35;word-break:break-word;">${plateLine||p.nm||'-'}</span>` +
                     `</div>` +
-                    (p.coating ? `<div style="font-size:10px;font-weight:600;color:#6b6966;line-height:1.3;">${p.coating}</div>` : '') +
-                    (sizeQtyLine ? `<div style="font-size:9px;font-weight:700;color:#787774;margin-top:2px;">${sizeQtyLine}</div>` : '') +
-                    (p.sheets ? `<div style="font-size:9px;font-weight:700;color:#787774;">원장 (${p.sheets}매)</div>` : '') +
-                    (_yield>0 ? `<div style="font-size:9px;font-weight:800;color:#37352f;">총작업수량 (${_yield}개)</div>` : '') +
+                    (p.coating ? `<span style="display:inline-block;font-size:8px;font-weight:700;color:#8a8783;background:#f0efed;padding:1px 6px;border-radius:8px;margin-top:3px;">${p.coating}</span>` : '') +
+                    (sizeQtyLine ? `<div style="font-size:9px;font-weight:700;color:#787774;margin-top:4px;">${sizeQtyLine}</div>` : '') +
+                    ((p.sheets || _yield > 0) ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:3px;">` +
+                        (p.sheets  ? _woStatTile('원장',      `${p.sheets}매`, {small:true})              : '') +
+                        (_yield>0  ? _woStatTile('총작업수량', `${_yield}개`,  {small:true, accent:true}) : '') +
+                        `</div>` : '') +
                     // 미배정 부속은 아직 기계에 배치되기 전 단계라 도면까지 보여줄 필요가
                     // 없다는 요청으로 삭제 — 기계에 배치된 카드에는 그대로 도면이 보임
                     _wDoneHtml;
@@ -7799,16 +7816,18 @@
                         // 폭이 아니라 "왼쪽 텍스트 칸 높이"에 맞춰(fitHeight) 도면 크기를 결정
                         const _placedDiagram = _woCuttingDiagramSvg(p, 260, 150, true);
                         const _textCol =
-                            `<div style="font-size:11px;font-weight:700;color:#a8a6a2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${p.orderCode||''}</div>` +
-                            `<div style="display:flex;align-items:flex-start;gap:5px;">` +
+                            `<div style="font-size:10px;font-weight:700;color:#a8a6a2;font-family:ui-monospace,monospace;letter-spacing:0.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${p.orderCode||''}</div>` +
+                            `<div style="display:flex;align-items:flex-start;gap:5px;margin-top:1px;">` +
                             `<span style="display:inline-block;line-height:0;flex-shrink:0;margin-top:5px;">${_woColorSwatchHtml(p.finish)}</span>` +
                             `<span style="font-size:14px;font-weight:800;color:#37352f;line-height:1.35;word-break:break-word;">${_plateLine2||p.nm||'-'}</span>` +
                             `</div>` +
-                            (p.coating ? `<div style="font-size:12px;font-weight:600;color:#6b6966;line-height:1.3;">${p.coating}</div>` : '') +
-                            (_sizeQtyLine2 ? `<div style="font-size:11px;font-weight:700;color:#787774;margin-top:3px;">${_sizeQtyLine2}</div>` : '') +
-                            (p.sheets ? `<div style="font-size:11px;font-weight:700;color:#787774;">원장 (${p.sheets}매)</div>` : '') +
-                            (_yield2>0 ? `<div style="font-size:11px;font-weight:800;color:#37352f;">총작업수량 (${_yield2}개)</div>` : '') +
-                            (_cutTimeStr ? `<div style="font-size:11px;font-weight:700;color:#a0a09c;margin-top:4px;white-space:nowrap;">⏱ ${_cutTimeStr}</div>` : '');
+                            (p.coating ? `<span style="display:inline-block;font-size:9px;font-weight:700;color:#8a8783;background:#f0efed;padding:1px 7px;border-radius:9px;margin-top:4px;">${p.coating}</span>` : '') +
+                            (_sizeQtyLine2 ? `<div style="font-size:11px;font-weight:700;color:#787774;margin-top:5px;">${_sizeQtyLine2}</div>` : '') +
+                            ((p.sheets || _yield2 > 0) ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:4px;">` +
+                                (p.sheets  ? _woStatTile('원장',      `${p.sheets}매`)              : '') +
+                                (_yield2>0 ? _woStatTile('총작업수량', `${_yield2}개`, {accent:true}) : '') +
+                                `</div>` : '') +
+                            (_cutTimeStr ? `<div style="font-size:11px;font-weight:700;color:#a0a09c;margin-top:5px;white-space:nowrap;">⏱ ${_cutTimeStr}</div>` : '');
                         _placedInner = _placedDiagram
                             ? `<div style="display:flex;gap:10px;align-items:stretch;height:100%;">` +
                               // 원장명(원장정보)이 "..."으로 잘리지 않도록 텍스트 칸 폭을
