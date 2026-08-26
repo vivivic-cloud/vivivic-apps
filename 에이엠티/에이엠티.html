@@ -7295,14 +7295,19 @@
         // 텍스트를 그냥 줄줄이 쌓는 대신 대시보드형 스탯 타일로 묶어 시각적으로 정리
         function _woStatTile(label, value, opts) {
             opts = opts || {};
-            const bg    = opts.accent ? '#eef3ee' : '#f7f6f3';
-            const lc    = opts.accent ? '#6e9573' : '#a8a6a2';
+            // tone: 'primary'(발주수량 — 작업자가 맞춰야 할 목표값, 가장 눈에 띄어야 함) /
+            // 'accent'(총작업수량 — 결과값, 은은하게 구분) / 기본(원장 등 보조 정보)
+            const tone = opts.tone || (opts.accent ? 'accent' : 'neutral');
+            const bg = tone === 'primary' ? '#e7f0f7' : tone === 'accent' ? '#eef3ee' : '#f7f6f3';
+            const lc = tone === 'primary' ? '#3f7bab' : tone === 'accent' ? '#6e9573' : '#a8a6a2';
+            const vc = tone === 'primary' ? '#1c4d73' : '#37352f';
+            const bd = tone === 'primary' ? 'border:1px solid #cfe1ee;' : '';
             const lSize = opts.small ? '8px' : '9px';
             const vSize = opts.small ? '11px' : '13px';
             const pad   = opts.small ? '3px 6px' : '4px 8px';
-            return `<div style="background:${bg};border-radius:6px;padding:${pad};min-width:0;">` +
+            return `<div style="background:${bg};${bd}border-radius:6px;padding:${pad};min-width:0;">` +
                    `<div style="font-size:${lSize};font-weight:700;color:${lc};letter-spacing:0.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${label}</div>` +
-                   `<div style="font-size:${vSize};font-weight:800;color:#37352f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${value}</div>` +
+                   `<div style="font-size:${vSize};font-weight:800;color:${vc};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${value}</div>` +
                    `</div>`;
         }
 
@@ -7390,10 +7395,6 @@
                 const _excess   = Math.max(0, _yield - (p.dq || 0));
                 const _yieldVal = `${_yield}개` + (_excess > 0 ? `<span style="font-size:9px;font-weight:700;color:#c2793a;margin-left:3px;">(+${_excess})</span>` : '');
                 const dimStr    = (p.rw && p.rd) ? `${p.rw}×${p.rd}` : '';
-                // 작업사이즈(dimStr)와 발주수량(dq)은 서로 다른 데이터라 사이즈가 없어도
-                // 발주수량은 반드시 보여야 함 — 이전엔 한 줄로 묶여있어 사이즈가 비면
-                // 발주수량까지 통째로 안 보이던 문제가 있었음
-                const sizeQtyLine = [dimStr, p.dq ? `(${p.dq}EA)` : ''].filter(Boolean).join(' ');
                 const plateLine = [p.plateName, p.finish].filter(Boolean).join('-');
                 innerHtml =
                     `<div style="font-size:8px;font-weight:700;color:#a8a6a2;font-family:ui-monospace,monospace;letter-spacing:0.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${p.orderCode||''}</div>` +
@@ -7402,7 +7403,10 @@
                     `<span style="font-size:12px;font-weight:800;color:#37352f;line-height:1.35;word-break:break-word;">${plateLine||p.nm||'-'}</span>` +
                     `</div>` +
                     (p.coating ? `<span style="display:inline-block;font-size:8px;font-weight:700;color:#8a8783;background:#f0efed;padding:1px 6px;border-radius:8px;margin-top:3px;">${p.coating}</span>` : '') +
-                    (sizeQtyLine ? `<div style="font-size:9px;font-weight:700;color:#787774;margin-top:4px;">${sizeQtyLine}</div>` : '') +
+                    (dimStr ? `<div style="font-size:9px;font-weight:700;color:#787774;margin-top:4px;">${dimStr}</div>` : '') +
+                    // 발주수량(필요수량)은 작업자가 반드시 맞춰야 할 목표값이라 별도 타일로
+                    // 한 줄 전체를 차지하게 해서 가장 눈에 띄도록 강조
+                    (p.dq ? `<div style="margin-top:3px;">${_woStatTile('발주수량', `${p.dq} EA`, {small:true, tone:'primary'})}</div>` : '') +
                     ((p.sheets || _yield > 0) ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:3px;margin-top:3px;">` +
                         (p.sheets  ? _woStatTile('원장',      `${p.sheets}매`, {small:true})              : '') +
                         (_yield>0  ? _woStatTile('총작업수량', _yieldVal, {small:true, accent:true}) : '') +
@@ -7537,11 +7541,10 @@
                     const pm       = p ? (_actPm ?? p.pm) : 0;
                     // 도면이 텍스트 칸 높이에 맞춰(fitHeight) 그려지므로 카드 높이는 텍스트
                     // 기준으로만 결정 — 도면 때문에 카드가 더 커지지 않도록 함.
-                    // 재단 카드 표기 항목이 6개(발주번호/원장명/마감/사이즈·수량/원장매수/
-                    // 총작업수량)+완료버튼으로 늘어났고, 원장명이 "..."으로 잘리지 않고
-                    // 줄바꿈되도록 바꾸면서 긴 원장명은 2줄이 될 수 있어 180px로 상향
-                    // (실측: 오더코드 여러개+긴 원장명 2줄+마감+작업시간+버튼 = 약 176px)
-                    const cardMinH = (p && p.isCuttingCard) ? 180 : MIN_CARD_H;
+                    // 발주수량을 별도 강조 타일로 분리하며 한 줄이 늘어나 230px로 상향
+                    // (실측: 오더코드 여러개+긴 원장명 2줄+마감+발주수량 타일+원장/총작업수량
+                    // 타일+작업시간+시작버튼까지 다 있는 최악의 경우 = 약 224px, 안 잘림 확인)
+                    const cardMinH = (p && p.isCuttingCard) ? 230 : MIN_CARD_H;
 
                     let cStart, topPx;
                     if (entry.startMin != null) {
@@ -7808,10 +7811,6 @@
                         const _excess2   = Math.max(0, _yield2 - (p.dq || 0));
                         const _yieldVal2 = `${_yield2}개` + (_excess2 > 0 ? `<span style="font-size:10px;font-weight:700;color:#c2793a;margin-left:3px;">(+${_excess2})</span>` : '');
                         const _dimStr2    = (p.rw && p.rd) ? `${p.rw}×${p.rd}` : '';
-                        // 작업사이즈(_dimStr2)와 발주수량(dq)은 서로 다른 데이터라 사이즈가
-                        // 없어도 발주수량은 반드시 보여야 함 — 한 줄로 묶여있으면 사이즈가
-                        // 비었을 때 발주수량까지 통째로 안 보이는 문제가 생김
-                        const _sizeQtyLine2 = [_dimStr2, p.dq ? `(${p.dq}EA)` : ''].filter(Boolean).join(' ');
                         const _plateLine2 = [p.plateName, p.finish].filter(Boolean).join('-');
                         const _cutTimeStr = (clockStart != null && clockEnd != null)
                             ? `${_fmtClk(clockStart)} ~ ${_fmtClk(clockEnd)}`
@@ -7830,7 +7829,10 @@
                             `<span style="font-size:14px;font-weight:800;color:#37352f;line-height:1.35;word-break:break-word;">${_plateLine2||p.nm||'-'}</span>` +
                             `</div>` +
                             (p.coating ? `<span style="display:inline-block;font-size:9px;font-weight:700;color:#8a8783;background:#f0efed;padding:1px 7px;border-radius:9px;margin-top:4px;">${p.coating}</span>` : '') +
-                            (_sizeQtyLine2 ? `<div style="font-size:11px;font-weight:700;color:#787774;margin-top:5px;">${_sizeQtyLine2}</div>` : '') +
+                            (_dimStr2 ? `<div style="font-size:11px;font-weight:700;color:#787774;margin-top:5px;">${_dimStr2}</div>` : '') +
+                            // 발주수량(필요수량)은 작업자가 반드시 맞춰야 할 목표값이라 별도
+                            // 타일로 한 줄 전체를 차지하게 해서 가장 눈에 띄도록 강조
+                            (p.dq ? `<div style="margin-top:4px;">${_woStatTile('발주수량', `${p.dq} EA`, {tone:'primary'})}</div>` : '') +
                             ((p.sheets || _yield2 > 0) ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:4px;">` +
                                 (p.sheets  ? _woStatTile('원장',      `${p.sheets}매`)              : '') +
                                 (_yield2>0 ? _woStatTile('총작업수량', _yieldVal2, {accent:true}) : '') +
