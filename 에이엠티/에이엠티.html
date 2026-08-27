@@ -2330,8 +2330,31 @@
                 _partNameForPlan = currentFullData[plan.pRowIndex][_h0ForPlan.indexOf('부속명')] || '';
             }
             if (!_partNameForPlan && _h0ForPlan) {
-                // pRowIndex가 없는(예전에 만들어진) 재단계획은 원장명·마감색상·사이즈로
-                // 원본 데이터 행을 재탐색해 부속명을 찾음 (woEditCuttingPlan과 동일한 폴백)
+                // 1순위 폴백: 이 재단계획이 커버하는 발주들의 partInfoMap에서 사이즈가
+                // 일치하는 행을 찾음 — 실제로 그 발주가 담고 있는 부속만 후보라 가장 정확함.
+                // (원장명/마감색상 문자열을 직접 비교하면 표기 방식 차이로 매칭이 실패할
+                // 수 있어 사용하지 않음 — 사이즈+공급처만으로 비교)
+                const _candOrders = allOrderIds.map(id => confirmedOrders.find(o => o.idNum === id)).filter(Boolean);
+                outer:
+                for (const ord of _candOrders) {
+                    for (const ck of Object.keys(ord.partInfoMap || {})) {
+                        const pd = ord.partInfoMap[ck];
+                        if (!pd || pd.isDeleted) continue;
+                        const ri = parseInt(ck.split('-')[2]);
+                        const row = currentFullData[ri];
+                        if (!row) continue;
+                        if (normalizeValue(row[_h0ForPlan.indexOf('공급처')]) !== 'AMT') continue;
+                        const rw2 = parseFloat(row[_h0ForPlan.indexOf('재단W')]) || 0;
+                        const rd2 = parseFloat(row[_h0ForPlan.indexOf('재단D')]) || 0;
+                        if (Math.abs(rw2 - (plan.cutW || 0)) >= 0.5 || Math.abs(rd2 - (plan.cutD || 0)) >= 0.5) continue;
+                        const _found = row[_h0ForPlan.indexOf('부속명')] || '';
+                        if (_found) { _partNameForPlan = _found; break outer; }
+                    }
+                }
+            }
+            if (!_partNameForPlan && _h0ForPlan) {
+                // 2순위 폴백: 발주의 partInfoMap에서도 못 찾으면 시트 전체를 공급처+사이즈로
+                // 재탐색 (woEditCuttingPlan의 폴백과 동일한 방식)
                 for (let ri = 1; ri < currentFullData.length; ri++) {
                     const row = currentFullData[ri];
                     if (!row) continue;
@@ -2339,8 +2362,6 @@
                     const rw2 = parseFloat(row[_h0ForPlan.indexOf('재단W')]) || 0;
                     const rd2 = parseFloat(row[_h0ForPlan.indexOf('재단D')]) || 0;
                     if (Math.abs(rw2 - (plan.cutW || 0)) >= 0.5 || Math.abs(rd2 - (plan.cutD || 0)) >= 0.5) continue;
-                    if (plan.baseMaterial && (row[_h0ForPlan.indexOf('원장명')] || '') !== plan.baseMaterial) continue;
-                    if (plan.materialColor && normalizeValue(row[_h0ForPlan.indexOf('마감색상')]) !== normalizeValue(plan.materialColor)) continue;
                     const _found = row[_h0ForPlan.indexOf('부속명')] || '';
                     if (_found) { _partNameForPlan = _found; break; }
                 }
