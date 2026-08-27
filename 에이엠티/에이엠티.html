@@ -2329,6 +2329,22 @@
             if (plan.pRowIndex != null && _h0ForPlan && currentFullData[plan.pRowIndex]) {
                 _partNameForPlan = currentFullData[plan.pRowIndex][_h0ForPlan.indexOf('부속명')] || '';
             }
+            if (!_partNameForPlan && _h0ForPlan) {
+                // pRowIndex가 없는(예전에 만들어진) 재단계획은 원장명·마감색상·사이즈로
+                // 원본 데이터 행을 재탐색해 부속명을 찾음 (woEditCuttingPlan과 동일한 폴백)
+                for (let ri = 1; ri < currentFullData.length; ri++) {
+                    const row = currentFullData[ri];
+                    if (!row) continue;
+                    if (normalizeValue(row[_h0ForPlan.indexOf('공급처')]) !== 'AMT') continue;
+                    const rw2 = parseFloat(row[_h0ForPlan.indexOf('재단W')]) || 0;
+                    const rd2 = parseFloat(row[_h0ForPlan.indexOf('재단D')]) || 0;
+                    if (Math.abs(rw2 - (plan.cutW || 0)) >= 0.5 || Math.abs(rd2 - (plan.cutD || 0)) >= 0.5) continue;
+                    if (plan.baseMaterial && (row[_h0ForPlan.indexOf('원장명')] || '') !== plan.baseMaterial) continue;
+                    if (plan.materialColor && normalizeValue(row[_h0ForPlan.indexOf('마감색상')]) !== normalizeValue(plan.materialColor)) continue;
+                    const _found = row[_h0ForPlan.indexOf('부속명')] || '';
+                    if (_found) { _partNameForPlan = _found; break; }
+                }
+            }
             if (!_partNameForPlan) _partNameForPlan = `${plan.baseMaterial} · ${plan.materialColor}`;
             const partObj = {
                 cKey,
