@@ -1822,6 +1822,10 @@
         let pendingOrdersMap = {};
         let confirmedOrders = [];
         let confirmedCuttingData = [];
+        // 타임라인-재단 보드의 카드에서 "재편집" 클릭 시 재단편집 화면으로 넘어와
+        // 편집 중인 재단계획 정보 — { planId, oldCKey, oldSk }. confirmCutting()이
+        // 이 값이 있으면 새 계획을 만드는 대신 같은 planId로 덮어써서 갱신한다.
+        window._editingCuttingPlan = null;
         let orderCount = 0;
         let amtLocalOrders = {}; // 로컬 수정 데이터 (재단확정 전까지만 유지)
         let primarySelectedCardId = null;
@@ -2330,6 +2334,10 @@
                 // 그룹 병합), orderKey 하나만으로는 Path B(인라인 계산)의 중복 제거가 그
                 // 합쳐진 다른 발주분까지는 못 잡아냄 — 이 목록으로 발주별 커버 여부를 확인
                 coveredOrderIds: allOrderIds,
+                // 재편집(woEditCuttingPlan) 시 재단편집 화면에서 같은 행의 부속 카드를
+                // 정확히 찾아 자동 선택하는 데 사용 (사이즈만으로는 동일 규격의 다른
+                // 부속과 혼동될 수 있음)
+                pRowIndex: plan.pRowIndex != null ? plan.pRowIndex : null,
                 plateName: plan.baseMaterial || '',
                 coating: plan.coating || '',
                 finish: plan.materialColor || '',
@@ -7358,8 +7366,52 @@
                         ${sheetsStr ? `<span style="font-size:11.5px;font-weight:700;background:#e8e7e4;color:#37352f;padding:3px 9px;border-radius:5px;">${sheetsStr}</span>` : ''}
                         <span style="font-size:11.5px;font-weight:700;background:#e8e7e4;color:#37352f;padding:3px 9px;border-radius:5px;">${p.dq || 0} EA</span>
                     </div>
+                    ${p.planId ? `<button onclick="woEditCuttingPlan('${cKey.replace(/'/g,"\\'")}','${sk.replace(/'/g,"\\'")}')" style="margin-top:14px;width:100%;padding:10px;background:#37352f;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;">✏️ 재단편집에서 다시 배치하기</button>` : ''}
                 </div>`;
             document.body.appendChild(modal);
+        };
+
+        // 타임라인-재단 보드의 카드(자동생성이든 수동확정이든)를 "재단편집" 화면으로
+        // 불러와 다시 배치할 수 있게 함 — 재단편집 탭으로 이동해 해당 원장·부속을
+        // 선택된 상태로 미리 채워두고, 확정(confirmCutting)하면 새 계획을 만드는
+        // 대신 같은 planId로 덮어써서 보드의 같은 카드가 그대로 갱신되도록 함.
+        window.woEditCuttingPlan = function(cKey, sk) {
+            const p = (window._woBoringParts[sk] || []).find(pp => pp.cKey === cKey);
+            if (!p || !p.isCuttingCard || !p.planId) { showToastMessage('편집할 수 있는 재단계획이 아닙니다.'); return; }
+
+            document.getElementById('_cutDiagramModal')?.remove();
+
+            const orderIds = p.coveredOrderIds && p.coveredOrderIds.length ? p.coveredOrderIds : [];
+            const orders = orderIds.map(id => confirmedOrders.find(o => o.idNum === id)).filter(Boolean);
+            if (orders.length === 0) { showToastMessage('연결된 발주 정보를 찾을 수 없어 편집할 수 없습니다.'); return; }
+
+            // showSubParts 내부의 행 매칭 규칙(원장명+마감 붙여쓰고 -마감색상)에 맞춰
+            // plateInfo 문자열을 재구성 — 카드에는 원장명/마감을 분리해 표시하지만
+            // 재단편집 화면의 원장 매칭 로직은 이 합쳐진 형식을 기준으로 함
+            const plateInfo = `${p.plateName || ''}${p.coating || ''}-${p.finish || ''}`;
+
+            window._editingCuttingPlan = { planId: p.planId, oldCKey: cKey, oldSk: sk };
+
+            switchPage('cutting');
+            // showSubParts는 동기적으로 innerHTML을 새로 그려 .inner-part-card를 만들어내므로
+            // 프레임을 기다릴 필요 없이 바로 이어서 카드를 찾아 선택할 수 있음
+            showSubParts(plateInfo, orders);
+
+            // 사이즈(+가능하면 행 번호)가 일치하는 부속 카드를 찾아 자동 선택
+            const cards = Array.from(document.querySelectorAll('.inner-part-card'));
+            const target = cards.find(c =>
+                p.pRowIndex != null && parseInt(c.dataset.rowIndex) === p.pRowIndex
+            ) || cards.find(c =>
+                Math.abs(parseFloat(c.dataset.w) - (p.rw||0)) < 0.5 && Math.abs(parseFloat(c.dataset.d) - (p.rd||0)) < 0.5
+            );
+            if (target) {
+                handleCardClick(target);
+                // 기존 계획에 저장된 원장 장수를 그대로 반영해서 보여줌(사용자가 이후 +/-로 조정 가능)
+                if (p.sheets) { suggestedSheets = p.sheets; isSheetsManual = true; updateBoardVisual(true); }
+            } else {
+                showToastMessage('해당 부속 카드를 찾지 못해 원장 목록에서 직접 선택해주세요.');
+            }
+            document.getElementById('cutting-edit-box')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         };
 
         function _woCardHtml(p, stateKey) {
@@ -7435,9 +7487,12 @@
             const _pcc = _pcm[_pok] || {};
             const _pcs = _pcc.bg ? `background:${_pcc.bg};border-left:3px solid ${_pcc.bd};` : '';
             const _pOkPool = (p.orderKey || p.orderCode || '').replace(/'/g, "\\'");
+            // 재단 카드는 클릭 시 도면 확대 팝업(→ 재편집 진입점)이 열리도록
+            const _cutClick = p.isCuttingCard ? `onclick="woShowCuttingDiagramModal('${p.cKey}','${stateKey}')"` : '';
             return `<div class="wo-boring-part-card" draggable="${_wDone ? 'false' : 'true'}"
                 data-ck="${p.cKey}" data-sk="${stateKey}" data-ok="${_pOkPool}" data-done="${_wDone ? '1' : '0'}"
-                style="${_pcs}${_wDone ? 'opacity:0.6;' : ''}"
+                style="${_pcs}${_wDone ? 'opacity:0.6;' : ''}${p.isCuttingCard ? 'cursor:pointer;' : ''}"
+                ${_cutClick}
                 ${_wDone ? '' : `ondragstart="woBoardDragStart(event,'${p.cKey}','${stateKey}')" ondragend="woBoardDragEnd(event)"`}>${innerHtml}</div>`;
         }
 
@@ -7913,10 +7968,12 @@
                             : `<div style="font-size:8px;font-weight:800;color:${_bcc.bd||'#888'};padding:2px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">↪ ${_segDur}분</div>`;
                         const _segBorder = _isFirst ? '' : 'border-top:2px dashed rgba(0,0,0,0.18);';
                         const _pOk = (p.orderKey || p.orderCode || '').replace(/'/g, "\\'");
+                        // 재단 카드는 클릭 시 도면 확대 팝업(→ 재편집 진입점)이 열리도록
+                        const _cutClick = (_isFirst && p.isCuttingCard) ? ` onclick="woShowCuttingDiagramModal('${cKey}','${sk}')"` : '';
                         html +=
                             `<div class="wo-boring-placed-card" draggable="${_bDone || !_isFirst ? 'false' : 'true'}"` +
-                            ` style="top:${_segTop+1}px;height:${_segH}px;${_bcs}${_segBorder}${_bDone ? 'opacity:0.6;' : ''}"` +
-                            ` data-ck="${cKey}" data-sk="${sk}" data-ok="${_pOk}" data-done="${_bDone ? '1' : '0'}"` +
+                            ` style="top:${_segTop+1}px;height:${_segH}px;${_bcs}${_segBorder}${_bDone ? 'opacity:0.6;' : ''}${p.isCuttingCard ? 'cursor:pointer;' : ''}"` +
+                            ` data-ck="${cKey}" data-sk="${sk}" data-ok="${_pOk}" data-done="${_bDone ? '1' : '0'}"${_cutClick}` +
                             (_isFirst && !_bDone ? ` ondblclick="woBoardDblClick('${cKey}','${sk}')" ondragstart="woBoardDragStart(event,'${cKey}','${sk}')" ondragend="woBoardDragEnd(event)"` : '') +
                             `>${_segInner}</div>`;
                     });
@@ -10549,7 +10606,79 @@
 
         function toggleGroupCuttingCheck(groupIdsStr) { const ids = groupIdsStr.split(',').filter(Boolean).map(Number); const allChecked = ids.every(id => confirmedCuttingData.find(d => d.confirmId === id)?.checked); ids.forEach(id => { const data = confirmedCuttingData.find(d => d.confirmId === id); if (data) data.checked = !allChecked; }); renderConfirmedCuttingList(); }
 
-        function confirmCutting() { if (!primarySelectedCardId) return; const pAgg = document.getElementById(primarySelectedCardId), sAgg = secondarySelectedCardId ? document.getElementById(secondarySelectedCardId) : null, tAgg = tertiarySelectedCardId ? document.getElementById(tertiarySelectedCardId) : null; const board = document.getElementById('board-rect'), confirmId = Date.now(), lastDash = selectedMaterialInfoText.lastIndexOf('-'), base = selectedMaterialInfoText.substring(0, lastDash), color = selectedMaterialInfoText.substring(lastDash + 1); const cuttingData = { confirmId, checked: false, targetPage: 'cutting', pId: primarySelectedCardId, pRowIndex: parseInt(pAgg.dataset.rowIndex), pProducedQty: currentProducedQtyPrimary, reqQty: parseFloat(pAgg.dataset.qty) || 0, pDisplayName: pAgg.dataset.displayName, pInfoText: document.getElementById('part-production-detail-text').textContent, pOrderIds: pAgg.dataset.orderIds ? pAgg.dataset.orderIds.split(',').map(id => parseInt(id)) : [], sId: secondarySelectedCardId || null, sRowIndex: sAgg ? parseInt(sAgg.dataset.rowIndex) : null, sProducedQty: currentProducedQtySecondary, sDisplayName: sAgg ? sAgg.dataset.displayName : '', sInfoText: sAgg ? document.getElementById('residue-production-detail-text').textContent : '', sOrderIds: sAgg && sAgg.dataset.orderIds ? sAgg.dataset.orderIds.split(',').map(id => parseInt(id)) : [], tId: tertiarySelectedCardId || null, tRowIndex: tAgg ? parseInt(tAgg.dataset.rowIndex) : null, tProducedQty: currentProducedQtyTertiary, tDisplayName: tAgg ? tAgg.dataset.displayName : '', tInfoText: tAgg ? document.getElementById('tertiary-production-detail-text').textContent : '', tOrderIds: tAgg && tAgg.dataset.orderIds ? tAgg.dataset.orderIds.split(',').map(id => parseInt(id)) : [], baseMaterial: base, materialColor: color, sheets: suggestedSheets, boardParts: Array.from(board.querySelectorAll('.placed-part')).map(el => ({ lp: parseFloat(el.style.left) / parseFloat(board.style.width), tp: parseFloat(el.style.top) / parseFloat(board.style.height), wp: parseFloat(el.style.width) / parseFloat(board.style.width), hp: parseFloat(el.style.height) / parseFloat(board.style.height), bg: el.style.backgroundColor || '', oids: el.dataset.orderIds || '', dw: el.querySelector('.dim-w-label')?.textContent || '', dh: el.querySelector('.dim-d-label')?.textContent || '' })), boardW: parseFloat(board.style.width), boardH: parseFloat(board.style.height), cutW: (currentFullData[0] && currentFullData[parseInt(pAgg.dataset.rowIndex)]) ? (parseFloat(currentFullData[parseInt(pAgg.dataset.rowIndex)][currentFullData[0].indexOf('재단W')]) || 0) : 0, cutD: (currentFullData[0] && currentFullData[parseInt(pAgg.dataset.rowIndex)]) ? (parseFloat(currentFullData[parseInt(pAgg.dataset.rowIndex)][currentFullData[0].indexOf('재단D')]) || 0) : 0 }; console.log('[confirmCutting] cuttingData:', { pOrderIds: cuttingData.pOrderIds, sOrderIds: cuttingData.sOrderIds, tOrderIds: cuttingData.tOrderIds }); confirmedCuttingData.unshift(cuttingData); _persistCuttingPlan(cuttingData); _ensureCuttingPlanInTimeline(cuttingData); renderProcessTimeline(); if (pAgg.dataset.isCommon !== "true") pAgg.dataset.qty = parseFloat(pAgg.dataset.qty) - currentProducedQtyPrimary; if (sAgg && sAgg.dataset.isCommon !== "true") sAgg.dataset.qty = parseFloat(sAgg.dataset.qty) - currentProducedQtySecondary; if (tAgg && tAgg.dataset.isCommon !== "true") tAgg.dataset.qty = parseFloat(tAgg.dataset.qty) - currentProducedQtyTertiary; primarySelectedCardId = null; secondarySelectedCardId = null; tertiarySelectedCardId = null; document.querySelectorAll('.inner-part-card').forEach(c => { c.classList.remove('active', 'suggested-card'); if (parseFloat(c.dataset.qty) <= 0.001 && c.dataset.isCommon !== "true") c.style.display = 'none'; }); isSheetsManual = false; updateBoardVisual(); renderConfirmedCuttingList(); refreshConsolidatedMaterials(); }
+        function confirmCutting() {
+            if (!primarySelectedCardId) return;
+            const pAgg = document.getElementById(primarySelectedCardId),
+                  sAgg = secondarySelectedCardId ? document.getElementById(secondarySelectedCardId) : null,
+                  tAgg = tertiarySelectedCardId ? document.getElementById(tertiarySelectedCardId) : null;
+            const board = document.getElementById('board-rect');
+            // 타임라인-재단 카드에서 "재편집"으로 들어온 경우, 새 계획을 만들지 않고
+            // 같은 planId(confirmId)로 덮어써서 보드의 같은 카드가 갱신되도록 함
+            const _editing  = window._editingCuttingPlan;
+            const confirmId = _editing ? _editing.planId : Date.now();
+            const lastDash = selectedMaterialInfoText.lastIndexOf('-'),
+                  base = selectedMaterialInfoText.substring(0, lastDash),
+                  color = selectedMaterialInfoText.substring(lastDash + 1);
+            const cuttingData = {
+                confirmId, checked: false, targetPage: 'cutting',
+                // 재편집을 거친 계획은 더 이상 자동 병합 대상이 아님(사용자가 직접
+                // 조정한 배치를 다른 발주 자동생성이 임의로 재계산/합치지 않도록)
+                autoGenerated: false,
+                pId: primarySelectedCardId, pRowIndex: parseInt(pAgg.dataset.rowIndex),
+                pProducedQty: currentProducedQtyPrimary, reqQty: parseFloat(pAgg.dataset.qty) || 0,
+                pDisplayName: pAgg.dataset.displayName,
+                pInfoText: document.getElementById('part-production-detail-text').textContent,
+                pOrderIds: pAgg.dataset.orderIds ? pAgg.dataset.orderIds.split(',').map(id => parseInt(id)) : [],
+                sId: secondarySelectedCardId || null, sRowIndex: sAgg ? parseInt(sAgg.dataset.rowIndex) : null,
+                sProducedQty: currentProducedQtySecondary, sDisplayName: sAgg ? sAgg.dataset.displayName : '',
+                sInfoText: sAgg ? document.getElementById('residue-production-detail-text').textContent : '',
+                sOrderIds: sAgg && sAgg.dataset.orderIds ? sAgg.dataset.orderIds.split(',').map(id => parseInt(id)) : [],
+                tId: tertiarySelectedCardId || null, tRowIndex: tAgg ? parseInt(tAgg.dataset.rowIndex) : null,
+                tProducedQty: currentProducedQtyTertiary, tDisplayName: tAgg ? tAgg.dataset.displayName : '',
+                tInfoText: tAgg ? document.getElementById('tertiary-production-detail-text').textContent : '',
+                tOrderIds: tAgg && tAgg.dataset.orderIds ? tAgg.dataset.orderIds.split(',').map(id => parseInt(id)) : [],
+                baseMaterial: base, materialColor: color, sheets: suggestedSheets,
+                boardParts: Array.from(board.querySelectorAll('.placed-part')).map(el => ({
+                    lp: parseFloat(el.style.left) / parseFloat(board.style.width),
+                    tp: parseFloat(el.style.top) / parseFloat(board.style.height),
+                    wp: parseFloat(el.style.width) / parseFloat(board.style.width),
+                    hp: parseFloat(el.style.height) / parseFloat(board.style.height),
+                    bg: el.style.backgroundColor || '', oids: el.dataset.orderIds || '',
+                    dw: el.querySelector('.dim-w-label')?.textContent || '',
+                    dh: el.querySelector('.dim-d-label')?.textContent || ''
+                })),
+                boardW: parseFloat(board.style.width), boardH: parseFloat(board.style.height),
+                cutW: (currentFullData[0] && currentFullData[parseInt(pAgg.dataset.rowIndex)]) ? (parseFloat(currentFullData[parseInt(pAgg.dataset.rowIndex)][currentFullData[0].indexOf('재단W')]) || 0) : 0,
+                cutD: (currentFullData[0] && currentFullData[parseInt(pAgg.dataset.rowIndex)]) ? (parseFloat(currentFullData[parseInt(pAgg.dataset.rowIndex)][currentFullData[0].indexOf('재단D')]) || 0) : 0
+            };
+            console.log('[confirmCutting] cuttingData:', { pOrderIds: cuttingData.pOrderIds, sOrderIds: cuttingData.sOrderIds, tOrderIds: cuttingData.tOrderIds });
+            const _existingIdx = confirmedCuttingData.findIndex(d => d.confirmId === confirmId);
+            if (_existingIdx >= 0) confirmedCuttingData[_existingIdx] = cuttingData;
+            else confirmedCuttingData.unshift(cuttingData);
+            // Firestore 반영(onSnapshot)은 비동기라 그 전에 재단 보드가 다시 렌더되면
+            // window._cuttingPlans의 예전 값으로 방금 한 수정이 되돌아갈 수 있음 —
+            // 즉시 로컬에도 반영해 그 사이 공백을 없앰
+            window._cuttingPlans[String(confirmId)] = cuttingData;
+            _persistCuttingPlan(cuttingData);
+            _ensureCuttingPlanInTimeline(cuttingData);
+            renderProcessTimeline();
+            if (pAgg.dataset.isCommon !== "true") pAgg.dataset.qty = parseFloat(pAgg.dataset.qty) - currentProducedQtyPrimary;
+            if (sAgg && sAgg.dataset.isCommon !== "true") sAgg.dataset.qty = parseFloat(sAgg.dataset.qty) - currentProducedQtySecondary;
+            if (tAgg && tAgg.dataset.isCommon !== "true") tAgg.dataset.qty = parseFloat(tAgg.dataset.qty) - currentProducedQtyTertiary;
+            primarySelectedCardId = null; secondarySelectedCardId = null; tertiarySelectedCardId = null;
+            document.querySelectorAll('.inner-part-card').forEach(c => {
+                c.classList.remove('active', 'suggested-card');
+                if (parseFloat(c.dataset.qty) <= 0.001 && c.dataset.isCommon !== "true") c.style.display = 'none';
+            });
+            isSheetsManual = false;
+            updateBoardVisual();
+            renderConfirmedCuttingList();
+            refreshConsolidatedMaterials();
+            if (_editing) {
+                window._editingCuttingPlan = null;
+                showToastMessage('재단계획이 수정되었습니다. 타임라인 보드에 반영됐습니다.');
+            }
+        }
 
         function cancelConfirmedCutting(confirmId) { const idx = confirmedCuttingData.findIndex(d => d.confirmId == confirmId); if (idx === -1) return; confirmedCuttingData.splice(idx, 1); showSubParts(selectedMaterialInfoText, confirmedOrders.filter(o => o.checked)); renderConfirmedCuttingList(); updateBoardVisual(); refreshConsolidatedMaterials(); }
 
