@@ -7340,19 +7340,28 @@
         }
 
         // 재단 카드의 "도면 보기" 클릭 시 확대 팝업으로 표시
+        // 도면 팝업에서 원장 장수를 조정 중인 대상 — { cKey, sk, sheets }
+        window._woCutModalState = null;
+
         window.woShowCuttingDiagramModal = function(cKey, sk) {
             const p = (window._woBoringParts[sk] || []).find(pp => pp.cKey === cKey);
             if (!p) return;
             document.getElementById('_cutDiagramModal')?.remove();
 
-            const svgHtml   = _woCuttingDiagramSvg(p, 560, 280) || '<div style="font-size:12px;color:#b0aeaa;padding:20px;text-align:center;">도면 데이터가 없습니다.</div>';
-            const dimStr    = (p.rw && p.rd) ? `${p.rw} × ${p.rd}` : '';
-            const sheetsStr = p.sheets ? `${p.sheets}장` : '';
+            window._woCutModalState = { cKey, sk, sheets: p.sheets || 1 };
 
+            const svgHtml = _woCuttingDiagramSvg(p, 560, 280) || '<div style="font-size:12px;color:#b0aeaa;padding:20px;text-align:center;">도면 데이터가 없습니다.</div>';
+            const dimStr  = (p.rw && p.rd) ? `${p.rw} × ${p.rd}` : '';
+
+            // 재단발주 탭으로 이동하지 않고, 이 팝업 안에서 바로 원장 장수를
+            // 조정하고 저장할 수 있도록 함(같은 재단계획을 덮어써서 카드가
+            // 그대로 갱신됨). 부속 배치 자체(도면 그리드)는 그대로 두고,
+            // "원장을 몇 장 쓸지"만 조정하는 게 가장 자주 필요한 조정이라 이걸
+            // 팝업 안에서 즉시 처리할 수 있게 함.
             const modal = document.createElement('div');
             modal.id = '_cutDiagramModal';
             modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
-            modal.onclick = () => modal.remove();
+            modal.onclick = () => { modal.remove(); window._woCutModalState = null; };
             modal.innerHTML = `
                 <div onclick="event.stopPropagation()" style="background:#fff;border-radius:14px;padding:20px 22px 22px;width:min(94vw,600px);box-shadow:0 12px 40px rgba(0,0,0,0.25);">
                     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:2px;">
@@ -7360,61 +7369,93 @@
                             <div style="font-size:14px;font-weight:900;color:#37352f;">재단 도면</div>
                             <div style="font-size:11px;color:#787774;font-weight:600;margin-top:2px;">${p.orderCode || ''} ${p.orderName ? '· ' + p.orderName : ''}</div>
                         </div>
-                        <button onclick="document.getElementById('_cutDiagramModal').remove()" style="border:none;background:#f5f5f4;width:28px;height:28px;border-radius:7px;cursor:pointer;font-size:14px;color:#787774;flex-shrink:0;">✕</button>
+                        <button onclick="document.getElementById('_cutDiagramModal').remove();window._woCutModalState=null;" style="border:none;background:#f5f5f4;width:28px;height:28px;border-radius:7px;cursor:pointer;font-size:14px;color:#787774;flex-shrink:0;">✕</button>
                     </div>
                     <div style="margin-top:12px;">${svgHtml}</div>
                     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;">
                         <span style="font-size:11.5px;font-weight:700;background:#f0efed;color:#37352f;padding:3px 9px;border-radius:5px;">${p.plateName || ''} ${p.finish || ''}</span>
-                        ${dimStr    ? `<span style="font-size:11.5px;font-weight:700;background:#f0efed;color:#37352f;padding:3px 9px;border-radius:5px;">${dimStr}</span>` : ''}
-                        ${sheetsStr ? `<span style="font-size:11.5px;font-weight:700;background:#e8e7e4;color:#37352f;padding:3px 9px;border-radius:5px;">${sheetsStr}</span>` : ''}
-                        <span style="font-size:11.5px;font-weight:700;background:#e8e7e4;color:#37352f;padding:3px 9px;border-radius:5px;">${p.dq || 0} EA</span>
+                        ${dimStr ? `<span style="font-size:11.5px;font-weight:700;background:#f0efed;color:#37352f;padding:3px 9px;border-radius:5px;">${dimStr}</span>` : ''}
                     </div>
-                    ${p.planId ? `<button onclick="woEditCuttingPlan('${cKey.replace(/'/g,"\\'")}','${sk.replace(/'/g,"\\'")}')" style="margin-top:14px;width:100%;padding:10px;background:#37352f;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;">✏️ 재단편집에서 다시 배치하기</button>` : ''}
+                    ${p.planId ? `
+                    <div style="margin-top:16px;padding-top:14px;border-top:1px solid #f0eeec;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+                            <span style="font-size:12px;font-weight:800;color:#37352f;">원장 장수</span>
+                            <div style="display:flex;align-items:center;gap:2px;background:#f7f6f3;border:1px solid #ededeb;border-radius:8px;overflow:hidden;">
+                                <button onclick="_woCutModalChangeSheets(-1)" style="width:32px;height:32px;border:none;background:transparent;cursor:pointer;font-size:16px;font-weight:900;color:#37352f;">−</button>
+                                <span id="_cutModalSheetsVal" style="min-width:28px;text-align:center;font-size:14px;font-weight:900;color:#37352f;">${p.sheets || 1}</span>
+                                <button onclick="_woCutModalChangeSheets(1)" style="width:32px;height:32px;border:none;background:transparent;cursor:pointer;font-size:16px;font-weight:900;color:#37352f;">+</button>
+                            </div>
+                        </div>
+                        <div id="_cutModalSummary" style="margin-top:8px;font-size:11px;font-weight:700;color:#787774;"></div>
+                        <button onclick="_woCutModalSave()" style="margin-top:12px;width:100%;padding:10px;background:#37352f;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;">저장</button>
+                    </div>` : ''}
                 </div>`;
             document.body.appendChild(modal);
+            _woCutModalRenderSummary();
         };
 
-        // 타임라인-재단 보드의 카드(자동생성이든 수동확정이든)를 "재단편집" 화면으로
-        // 불러와 다시 배치할 수 있게 함 — 재단편집 탭으로 이동해 해당 원장·부속을
-        // 선택된 상태로 미리 채워두고, 확정(confirmCutting)하면 새 계획을 만드는
-        // 대신 같은 planId로 덮어써서 보드의 같은 카드가 그대로 갱신되도록 함.
-        window.woEditCuttingPlan = function(cKey, sk) {
-            const p = (window._woBoringParts[sk] || []).find(pp => pp.cKey === cKey);
-            if (!p || !p.isCuttingCard || !p.planId) { showToastMessage('편집할 수 있는 재단계획이 아닙니다.'); return; }
+        // 팝업 안의 "필요/작업수량" 요약 갱신 — 원장 장수를 바꿀 때마다 호출
+        function _woCutModalRenderSummary() {
+            const st = window._woCutModalState;
+            if (!st) return;
+            const p = (window._woBoringParts[st.sk] || []).find(pp => pp.cKey === st.cKey);
+            if (!p) return;
+            const perSheet = (p.boardParts || []).length;
+            const yieldQty = perSheet * st.sheets;
+            const excess   = Math.max(0, yieldQty - (p.dq || 0));
+            const summaryEl = document.getElementById('_cutModalSummary');
+            if (summaryEl) {
+                summaryEl.innerHTML = `필요 ${p.dq || 0} EA · 작업수량 ${yieldQty}개` +
+                    (excess > 0 ? ` <span style="color:#c2793a;">(+${excess} 초과)</span>` : '');
+            }
+            const valEl = document.getElementById('_cutModalSheetsVal');
+            if (valEl) valEl.textContent = st.sheets;
+        }
+
+        window._woCutModalChangeSheets = function(delta) {
+            const st = window._woCutModalState;
+            if (!st) return;
+            st.sheets = Math.max(1, st.sheets + delta);
+            _woCutModalRenderSummary();
+        };
+
+        // 팝업에서 조정한 원장 장수를 저장 — 같은 재단계획(planId)을 그대로 덮어써서
+        // 카드가 새로 생기지 않고 그 자리에서 갱신됨. 배치(boardParts) 자체는
+        // 손대지 않고 "몇 장 쓸지"만 반영
+        window._woCutModalSave = function() {
+            const st = window._woCutModalState;
+            if (!st) return;
+            const p = (window._woBoringParts[st.sk] || []).find(pp => pp.cKey === st.cKey);
+            if (!p || !p.planId) { showToastMessage('저장할 수 있는 재단계획이 아닙니다.'); return; }
+
+            const existingPlan = window._cuttingPlans[p.planId] || {};
+            const updated = {
+                ...existingPlan,
+                confirmId: p.planId,
+                sheets: st.sheets,
+                // 사용자가 직접 조정한 계획은 다른 발주 자동생성이 임의로
+                // 재계산/병합하지 않도록 자동생성 표시를 내림
+                autoGenerated: false,
+                boardParts: p.boardParts || existingPlan.boardParts || [],
+                baseMaterial: p.plateName || existingPlan.baseMaterial || '',
+                coating: p.coating || existingPlan.coating || '',
+                materialColor: p.finish || existingPlan.materialColor || '',
+                cutW: p.rw || existingPlan.cutW || 0,
+                cutD: p.rd || existingPlan.cutD || 0,
+                reqQty: p.dq || existingPlan.reqQty || 0,
+                pOrderIds: (p.coveredOrderIds && p.coveredOrderIds.length) ? p.coveredOrderIds : (existingPlan.pOrderIds || [])
+            };
+            delete updated.groupSig;
+
+            window._cuttingPlans[String(p.planId)] = updated;
+            _persistCuttingPlan(updated);
+            _ensureCuttingPlanInTimeline(updated);
+            if (typeof _woRenderBoard === 'function') _woRenderBoard(st.sk);
+            if (typeof _woRenderPool  === 'function') _woRenderPool(st.sk);
 
             document.getElementById('_cutDiagramModal')?.remove();
-
-            const orderIds = p.coveredOrderIds && p.coveredOrderIds.length ? p.coveredOrderIds : [];
-            const orders = orderIds.map(id => confirmedOrders.find(o => o.idNum === id)).filter(Boolean);
-            if (orders.length === 0) { showToastMessage('연결된 발주 정보를 찾을 수 없어 편집할 수 없습니다.'); return; }
-
-            // showSubParts 내부의 행 매칭 규칙(원장명+마감 붙여쓰고 -마감색상)에 맞춰
-            // plateInfo 문자열을 재구성 — 카드에는 원장명/마감을 분리해 표시하지만
-            // 재단편집 화면의 원장 매칭 로직은 이 합쳐진 형식을 기준으로 함
-            const plateInfo = `${p.plateName || ''}${p.coating || ''}-${p.finish || ''}`;
-
-            window._editingCuttingPlan = { planId: p.planId, oldCKey: cKey, oldSk: sk };
-
-            switchPage('cutting');
-            // showSubParts는 동기적으로 innerHTML을 새로 그려 .inner-part-card를 만들어내므로
-            // 프레임을 기다릴 필요 없이 바로 이어서 카드를 찾아 선택할 수 있음
-            showSubParts(plateInfo, orders);
-
-            // 사이즈(+가능하면 행 번호)가 일치하는 부속 카드를 찾아 자동 선택
-            const cards = Array.from(document.querySelectorAll('.inner-part-card'));
-            const target = cards.find(c =>
-                p.pRowIndex != null && parseInt(c.dataset.rowIndex) === p.pRowIndex
-            ) || cards.find(c =>
-                Math.abs(parseFloat(c.dataset.w) - (p.rw||0)) < 0.5 && Math.abs(parseFloat(c.dataset.d) - (p.rd||0)) < 0.5
-            );
-            if (target) {
-                handleCardClick(target);
-                // 기존 계획에 저장된 원장 장수를 그대로 반영해서 보여줌(사용자가 이후 +/-로 조정 가능)
-                if (p.sheets) { suggestedSheets = p.sheets; isSheetsManual = true; updateBoardVisual(true); }
-            } else {
-                showToastMessage('해당 부속 카드를 찾지 못해 원장 목록에서 직접 선택해주세요.');
-            }
-            document.getElementById('cutting-edit-box')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            window._woCutModalState = null;
+            showToastMessage('재단계획이 수정되었습니다.');
         };
 
         function _woCardHtml(p, stateKey) {
