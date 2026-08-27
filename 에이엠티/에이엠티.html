@@ -7371,8 +7371,11 @@
         }
 
         // 재단 도면 boardParts(lp/tp/wp/hp 비율) → 작은 SVG 배치도. 카드 인라인 표시와 호버 툴팁이 공용으로 사용.
-        // fitHeight=true면 폭 기준(width:100%) 대신 높이 기준(height:100%)으로 맞춤 —
-        // 옆에 나란히 놓인 텍스트 칸의 높이를 넘지 않게 해야 할 때 사용
+        // fitHeight=true였을 때 height:100%+max-width:100%를 같이 쓰면, 폭이
+        // max-width에 눌리는 순간 높이가 그에 맞춰 재계산되지 않고 100% 높이 그대로
+        // 남아 위아래로 빈 여백(레터박싱)이 생기는 문제가 있었음 — 폭 기준
+        // (width:100%) + max-height로 통일해서 이 문제를 피함 (호출부는 그대로 두되
+        // 실제 크기계산은 항상 폭 기준으로 동작)
         // 재단은 원장의 좌측·상단(전단컷 기준선)에서 시작해 우측·하단으로 채워나가므로
         // "진짜 남는 자투리"는 우측·하단에만 존재함(=기존 "잔여 공간: 우측/하단" 표기와
         // 동일한 기준). 좌측·상단은 재단이 시작되는 기준선이라 여백이 있으면 안 되고,
@@ -7395,11 +7398,19 @@
                 const rw = Math.max(2, pt.wp * BW).toFixed(1), rh = Math.max(2, pt.hp * BD).toFixed(1);
                 return `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="${pt.bg||'#fff'}" stroke="#37352f" stroke-width="1.2" vector-effect="non-scaling-stroke"/>`;
             }).join('');
-            const ratio = (cropW / cropH).toFixed(4);
+            // CSS aspect-ratio 속성을 height:100%+max-width:100%와 함께 쓰면(특히 크롭
+            // 비율이 넓어진 뒤) 폭이 max-width에 눌릴 때 높이가 그에 맞춰 다시
+            // 계산되지 않고 원래 100% 높이 그대로 남아, 상하로 빈 여백(레터박싱)이
+            // 생기는 문제가 있었음 — viewBox 자체가 이미 SVG의 고유 비율을 제공하므로
+            // 중복되는 aspect-ratio 선언을 빼고 표준 교체요소 크기계산에 맡김.
+            // fitHeight 여부와 무관하게 폭(width:100%) 기준으로 통일 — 폭은 flex
+            // 레이아웃에서 항상 확정값을 가지므로 안정적이고, 높이는 max-height로
+            // 상한만 두어 카드 높이를 넘지 않게 함(교체요소 표준 축소 규칙에 따라
+            // 폭·높이가 함께 비례 축소되어 레터박싱이 생기지 않음)
             const sizeStyle = fitHeight
-                ? `height:100%;width:auto;max-width:100%;`
+                ? `width:100%;height:auto;max-height:100%;`
                 : `width:100%;height:auto;`;
-            return `<svg viewBox="0 0 ${cropW.toFixed(1)} ${cropH.toFixed(1)}" style="display:block;${sizeStyle}aspect-ratio:${ratio};border:1px solid #e3e2e0;border-radius:3px;margin-top:4px;flex-shrink:0;background:#f9f9f8;">${rects}</svg>`;
+            return `<svg viewBox="0 0 ${cropW.toFixed(1)} ${cropH.toFixed(1)}" style="display:block;${sizeStyle}border:1px solid #e3e2e0;border-radius:3px;margin-top:4px;flex-shrink:0;background:#f9f9f8;">${rects}</svg>`;
         }
 
         // 재단 카드의 "도면 보기" 클릭 시 확대 팝업으로 표시
@@ -8146,11 +8157,16 @@
                             (_statTiles2.length ? `<div style="display:grid;grid-template-columns:repeat(${_statTiles2.length},1fr);gap:5px;margin-top:6px;padding-top:6px;border-top:1px solid #f0efed;">${_statTiles2.join('')}</div>` : '') +
                             (_cutTimeStr ? `<div style="font-size:11px;font-weight:700;color:#a0a09c;margin-top:5px;white-space:nowrap;">⏱ ${_cutTimeStr}</div>` : '');
                         _placedInner = _placedDiagram
-                            ? `<div style="display:flex;gap:10px;align-items:stretch;height:100%;">` +
+                            // align-items:stretch로 도면 칸을 카드 높이 전체에 강제로 늘리면,
+                            // 도면의 실제 가로세로 비율과 그 칸의 모양(좁고 김)이 어긋나면서
+                            // 도면 안쪽 위아래로 빈 여백(레터박싱)이 생기는 문제가 있었음 —
+                            // stretch 대신 center로 바꿔 도면이 자기 비율대로(폭 기준) 자연스러운
+                            // 크기를 갖게 하고, 남는 카드 공간은 도면 칸 바깥에서만 생기게 함
+                            ? `<div style="display:flex;gap:10px;align-items:center;height:100%;">` +
                               // 원장명(원장정보)이 "..."으로 잘리지 않도록 텍스트 칸 폭을
                               // 넉넉히 주고, 그래도 넘치면 줄바꿈되도록(overflow:hidden 제거)
-                              `<div style="flex:0 1 210px;min-width:0;">${_textCol}</div>` +
-                              `<div style="flex:1;min-width:0;max-width:220px;height:100%;display:flex;align-items:center;justify-content:center;">${_placedDiagram}</div>` +
+                              `<div style="flex:0 1 210px;min-width:0;align-self:stretch;">${_textCol}</div>` +
+                              `<div style="flex:1;min-width:0;max-width:220px;max-height:100%;">${_placedDiagram}</div>` +
                               `</div>`
                             : _textCol;
                     } else {
@@ -8561,8 +8577,12 @@
             const tip = document.getElementById('wo-card-tip');
             tip.style.border = `1.5px solid ${c}`;
             // 재단카드: SVG 도면 호버 시 확대 표시 (카드에 이미 작게 보이는 것과 같은 도면)
+            // 도면은 이제 실제 크롭 비율에 따라 aspect-ratio가 동적으로 계산되므로
+            // (예전처럼 220/110 고정 문자열이 아님) 폭만 220px로 고정하고 높이는
+            // 도면 자체의 비율(width:100%;height:auto)을 그대로 따르게 함 —
+            // 문자열 치환 방식은 새 동적 비율과 더 이상 일치하지 않아 무효화됐었음
             const svgHtml = _woCuttingDiagramSvg(p, 220, 110);
-            tip.innerHTML = rows + (svgHtml ? svgHtml.replace('width:100%;height:auto;aspect-ratio:220/110;', 'width:220px;height:110px;') : '');
+            tip.innerHTML = rows + (svgHtml ? `<div style="width:220px;">${svgHtml}</div>` : '');
             tip.classList.add('on');
             // 위치: 카드 우측 우선, 공간 없으면 좌측
             const r   = card.getBoundingClientRect();
