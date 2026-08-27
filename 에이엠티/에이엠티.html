@@ -7427,22 +7427,28 @@
             // 선택되도록 하기 위함(이게 안 돼서 "편집화면은 뜨는데 아무것도 선택 안 된
             // 빈 상태"로 보이는 문제가 있었음)
             let rowIndex = p.pRowIndex;
+            let grain = '';
+            const _h0 = currentFullData[0];
             if (rowIndex == null) {
                 // 과거에 만들어진 카드라 행 번호가 없는 경우, 사이즈+공급처로 원본 행을 재탐색
-                const h = currentFullData[0];
-                if (h) {
+                if (_h0) {
                     for (let ri = 1; ri < currentFullData.length; ri++) {
                         const row = currentFullData[ri];
                         if (!row) continue;
-                        const rw2 = parseFloat(row[h.indexOf('재단W')]) || 0;
-                        const rd2 = parseFloat(row[h.indexOf('재단D')]) || 0;
-                        if (normalizeValue(row[h.indexOf('공급처')]) === 'AMT' &&
+                        const rw2 = parseFloat(row[_h0.indexOf('재단W')]) || 0;
+                        const rd2 = parseFloat(row[_h0.indexOf('재단D')]) || 0;
+                        if (normalizeValue(row[_h0.indexOf('공급처')]) === 'AMT' &&
                             Math.abs(rw2 - (p.rw || 0)) < 0.5 && Math.abs(rd2 - (p.rd || 0)) < 0.5) {
                             rowIndex = ri;
                             break;
                         }
                     }
                 }
+            }
+            // 결보호(그레인) 값을 원본 행에서 가져와야 회전 버튼이 정상적으로 뜸 —
+            // 비워두면 무조건 회전 불가로 표시되던 문제가 있었음
+            if (rowIndex != null && _h0 && currentFullData[rowIndex]) {
+                grain = currentFullData[rowIndex][_h0.indexOf('결보호')] || '';
             }
 
             let normalArea = document.getElementById('id302-normal-section');
@@ -7463,7 +7469,7 @@
                     id: '_woEditTargetCard',
                     w: p.rw || 0, d: p.rd || 0, qty: p.dq || 0,
                     name: p.nm || p.plateName || '-', displayName: plateInfo,
-                    grain: '', rowIndex: rowIndex != null ? rowIndex : -1,
+                    grain, rowIndex: rowIndex != null ? rowIndex : -1,
                     isCommon: false, orderIds
                 }, normalArea);
                 const target = document.getElementById('_woEditTargetCard');
@@ -7496,6 +7502,7 @@
             const boardH = parseFloat(rect.style.height);
             if (!boardW || !boardH) return;
             rect.querySelectorAll('.placed-part').forEach(el => el.remove());
+            let maxRightFrac = 0, maxBottomFrac = 0;
             p.boardParts.forEach(pt => {
                 const div = document.createElement('div');
                 div.className = 'placed-part';
@@ -7509,7 +7516,18 @@
                 const dh = pt.dh || (p.rd ? String(p.rd) : '');
                 div.innerHTML = `<span class="dim-w-label">${dw}</span><span class="dim-d-label">${dh}</span>`;
                 rect.appendChild(div);
+                maxRightFrac  = Math.max(maxRightFrac,  pt.lp + pt.wp);
+                maxBottomFrac = Math.max(maxBottomFrac, pt.tp + pt.hp);
             });
+            // "다음 배치 추천"(suggested-card 강조)이 표준 그리드 계산 기준 점유
+            // 영역(updateBoardVisual이 직전에 계산한 actOX/actOY)으로 이미 표시된
+            // 상태인데, 실제 저장된 배치가 표준 그리드와 다르면(회전·부분배치 등)
+            // 실제로는 안 들어가는 부속이 추천으로 잘못 남아있을 수 있음 — 방금 그린
+            // 실제 배치의 점유 영역(mm)으로 추천을 다시 계산해 덮어씀
+            if (typeof suggestNextCards === 'function') {
+                const BW = 2440, BD = 1220; // woEditCuttingPlan이 편집 시작 시 4X8로 고정함
+                suggestNextCards(maxRightFrac * BW, maxBottomFrac * BD, 'right');
+            }
         }
 
         // 팝업 안 "재단확정" 버튼이 호출하는 래퍼 — 실제 확정 로직(confirmCutting)을
