@@ -7418,10 +7418,42 @@
                 handleCardClick(target);
                 // 기존 계획에 저장된 원장 장수를 그대로 반영해서 보여줌(이후 +/-로 조정 가능)
                 if (p.sheets) { suggestedSheets = p.sheets; isSheetsManual = true; updateBoardVisual(true); }
+                // updateBoardVisual()은 부속 크기 기준으로 그리드를 "새로" 계산해 그리므로,
+                // 회전·2/3순위 조합 등으로 실제 저장된 배치가 표준 그리드와 다르면
+                // 편집 시작 화면이 실제 도면과 어긋나 보일 수 있음 — 팝업을 열 때는
+                // 저장된 boardParts 그대로를 기본으로 보여주도록 덮어 그림(이후 사용자가
+                // 원장 장수를 바꾸거나 다른 부속을 선택하면 그때부터는 정상적으로
+                // 새로 계산됨 — 그건 "편집 중"이므로 맞는 동작)
+                _woRenderActualBoardParts(p);
             } else {
                 showToastMessage('해당 부속 카드를 찾지 못해 목록에서 직접 선택해주세요.');
             }
         };
+
+        // 팝업을 처음 열 때, board-rect에 "이미 저장된" 배치(p.boardParts)를 그대로
+        // 그려서 편집 시작점이 실제 도면과 항상 일치하도록 함
+        function _woRenderActualBoardParts(p) {
+            const rect = document.getElementById('board-rect');
+            if (!rect || !p.boardParts || !p.boardParts.length) return;
+            const boardW = parseFloat(rect.style.width);
+            const boardH = parseFloat(rect.style.height);
+            if (!boardW || !boardH) return;
+            rect.querySelectorAll('.placed-part').forEach(el => el.remove());
+            p.boardParts.forEach(pt => {
+                const div = document.createElement('div');
+                div.className = 'placed-part';
+                div.style.left = (pt.lp * boardW) + 'px';
+                div.style.top = (pt.tp * boardH) + 'px';
+                div.style.width = (pt.wp * boardW) + 'px';
+                div.style.height = (pt.hp * boardH) + 'px';
+                if (pt.bg) div.style.backgroundColor = pt.bg;
+                if (pt.oids) div.dataset.orderIds = pt.oids;
+                const dw = pt.dw || (p.rw ? String(p.rw) : '');
+                const dh = pt.dh || (p.rd ? String(p.rd) : '');
+                div.innerHTML = `<span class="dim-w-label">${dw}</span><span class="dim-d-label">${dh}</span>`;
+                rect.appendChild(div);
+            });
+        }
 
         // 팝업 안 "재단확정" 버튼이 호출하는 래퍼 — 실제 확정 로직(confirmCutting)을
         // 그대로 실행한 뒤, 임시(Path B) 카드였다면 옛 카드를 정리하고 보드를
