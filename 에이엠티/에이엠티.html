@@ -2322,9 +2322,17 @@
             const orderCode = allOrderIds.map(id => confirmedOrders.find(o => o.idNum === id)?.orderCode).filter(Boolean).join('/');
             const orderName = allOrderIds.map(id => confirmedOrders.find(o => o.idNum === id)?.displayName).filter(Boolean).join(' / ');
             const _dqForPlan = _cuttingReqQtyFor(plan, order);
+            // 카드에 실제 부속명(예: "상판")을 보여줘야 하므로 원본 데이터 행에서 조회 —
+            // 조회 실패 시에만 자재·색상 설명으로 대체(완전히 빈 상태보다는 낫기 때문)
+            let _partNameForPlan = '';
+            const _h0ForPlan = currentFullData[0];
+            if (plan.pRowIndex != null && _h0ForPlan && currentFullData[plan.pRowIndex]) {
+                _partNameForPlan = currentFullData[plan.pRowIndex][_h0ForPlan.indexOf('부속명')] || '';
+            }
+            if (!_partNameForPlan) _partNameForPlan = `${plan.baseMaterial} · ${plan.materialColor}`;
             const partObj = {
                 cKey,
-                nm: `${plan.baseMaterial} · ${plan.materialColor}`,
+                nm: _partNameForPlan,
                 pm: 0,
                 // dq(필요 수량)는 잘라야 할 원장 "장수"(plan.sheets)가 아니라 실제
                 // 필요한 부속 EA 수량이어야 함 — 카드에 "필요 N EA"로 표시되는 값
@@ -7618,9 +7626,12 @@
                 const plateLine = [p.plateName, p.finish].filter(Boolean).join('-');
                 innerHtml =
                     `<div style="font-size:8px;font-weight:700;color:#a8a6a2;font-family:ui-monospace,monospace;letter-spacing:0.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${p.orderCode||''}</div>` +
-                    `<div style="display:flex;align-items:flex-start;gap:4px;margin-top:1px;">` +
-                    `<span style="display:inline-block;line-height:0;flex-shrink:0;margin-top:4px;">${_woColorSwatchHtml(p.finish)}</span>` +
-                    `<span style="font-size:12px;font-weight:800;color:#37352f;line-height:1.35;word-break:break-word;">${plateLine||p.nm||'-'}</span>` +
+                    // 부속명(예: "상판")을 가장 눈에 띄게 — 원장 자재정보(plateLine)는 그 아래
+                    // 보조 정보로 작게 표기 (부속명이 카드에서 안 보인다는 피드백으로 추가)
+                    (p.nm ? `<div style="font-size:12px;font-weight:800;color:#37352f;line-height:1.35;word-break:break-word;margin-top:1px;">${p.nm}</div>` : '') +
+                    `<div style="display:flex;align-items:center;gap:4px;margin-top:2px;">` +
+                    `<span style="display:inline-block;line-height:0;flex-shrink:0;">${_woColorSwatchHtml(p.finish)}</span>` +
+                    `<span style="font-size:9px;font-weight:600;color:#a8a6a2;line-height:1.3;word-break:break-word;">${plateLine||'-'}</span>` +
                     `</div>` +
                     (p.coating ? `<span style="display:inline-block;font-size:8px;font-weight:700;color:#8a8783;background:#f0efed;padding:1px 6px;border-radius:8px;margin-top:3px;">${p.coating}</span>` : '') +
                     (dimStr ? `<div style="font-size:9px;font-weight:700;color:#787774;margin-top:4px;">${dimStr}</div>` : '') +
@@ -8047,9 +8058,12 @@
                         const _placedDiagram = _woCuttingDiagramSvg(p, 260, 150, true);
                         const _textCol =
                             `<div style="font-size:10px;font-weight:700;color:#a8a6a2;font-family:ui-monospace,monospace;letter-spacing:0.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;">${p.orderCode||''}</div>` +
-                            `<div style="display:flex;align-items:flex-start;gap:5px;margin-top:1px;">` +
-                            `<span style="display:inline-block;line-height:0;flex-shrink:0;margin-top:5px;">${_woColorSwatchHtml(p.finish)}</span>` +
-                            `<span style="font-size:14px;font-weight:800;color:#37352f;line-height:1.35;word-break:break-word;">${_plateLine2||p.nm||'-'}</span>` +
+                            // 부속명(예: "상판")을 가장 눈에 띄게 — 원장 자재정보(_plateLine2)는
+                            // 그 아래 보조 정보로 작게 표기 (부속명 미표기 피드백으로 추가)
+                            (p.nm ? `<div style="font-size:14px;font-weight:800;color:#37352f;line-height:1.35;word-break:break-word;margin-top:1px;">${p.nm}</div>` : '') +
+                            `<div style="display:flex;align-items:center;gap:5px;margin-top:2px;">` +
+                            `<span style="display:inline-block;line-height:0;flex-shrink:0;">${_woColorSwatchHtml(p.finish)}</span>` +
+                            `<span style="font-size:10px;font-weight:600;color:#a8a6a2;line-height:1.3;word-break:break-word;">${_plateLine2||'-'}</span>` +
                             `</div>` +
                             (p.coating ? `<span style="display:inline-block;font-size:9px;font-weight:700;color:#8a8783;background:#f0efed;padding:1px 7px;border-radius:9px;margin-top:4px;">${p.coating}</span>` : '') +
                             (_dimStr2 ? `<div style="font-size:11px;font-weight:700;color:#787774;margin-top:5px;">${_dimStr2}</div>` : '') +
