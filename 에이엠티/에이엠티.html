@@ -7340,143 +7340,131 @@
         }
 
         // 재단 카드의 "도면 보기" 클릭 시 확대 팝업으로 표시
-        // 도면 팝업에서 원장 장수를 조정 중인 대상 — { cKey, sk, sheets }
-        window._woCutModalState = null;
+        // 카드에서 "재단편집" 팝업을 열 때, 실제 재단편집 도구(#cutting-edit-box)를
+        // 그 팝업 안으로 옮겨와서 진짜 편집 기능(회전·부속 조합·원장 장수·잔여공간
+        // 표시 등)을 그대로 쓸 수 있게 함 — 재단발주 탭으로 이동시키지 않음.
+        // 팝업을 닫을 때 원래 있던 자리로 되돌려놓는다.
+        window._woInlineEditState = null;
 
-        window.woShowCuttingDiagramModal = function(cKey, sk) {
+        window.woEditCuttingPlan = function(cKey, sk) {
             const p = (window._woBoringParts[sk] || []).find(pp => pp.cKey === cKey);
-            if (!p) return;
-            document.getElementById('_cutDiagramModal')?.remove();
+            if (!p || !p.isCuttingCard) { showToastMessage('편집할 수 있는 카드가 아닙니다.'); return; }
 
-            window._woCutModalState = { cKey, sk, sheets: p.sheets || 1 };
+            const orderIds = (p.coveredOrderIds && p.coveredOrderIds.length) ? p.coveredOrderIds
+                : (p.orderIdNum != null ? [p.orderIdNum] : []);
+            const orders = orderIds.map(id => confirmedOrders.find(o => o.idNum === id)).filter(Boolean);
+            if (orders.length === 0) { showToastMessage('연결된 발주 정보를 찾을 수 없어 편집할 수 없습니다.'); return; }
 
-            const svgHtml = _woCuttingDiagramSvg(p, 560, 280) || '<div style="font-size:12px;color:#b0aeaa;padding:20px;text-align:center;">도면 데이터가 없습니다.</div>';
-            const dimStr  = (p.rw && p.rd) ? `${p.rw} × ${p.rd}` : '';
+            const box = document.getElementById('cutting-edit-box');
+            if (!box) { showToastMessage('재단편집 도구를 찾을 수 없습니다.'); return; }
 
-            // 재단발주 탭으로 이동하지 않고, 이 팝업 안에서 바로 원장 장수를
-            // 조정하고 저장할 수 있도록 함(같은 재단계획을 덮어써서 카드가
-            // 그대로 갱신됨). 부속 배치 자체(도면 그리드)는 그대로 두고,
-            // "원장을 몇 장 쓸지"만 조정하는 게 가장 자주 필요한 조정이라 이걸
-            // 팝업 안에서 즉시 처리할 수 있게 함.
-            const modal = document.createElement('div');
-            modal.id = '_cutDiagramModal';
-            modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;';
-            modal.onclick = () => { modal.remove(); window._woCutModalState = null; };
-            modal.innerHTML = `
-                <div onclick="event.stopPropagation()" style="background:#fff;border-radius:14px;padding:20px 22px 22px;width:min(94vw,600px);box-shadow:0 12px 40px rgba(0,0,0,0.25);">
-                    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:2px;">
-                        <div>
-                            <div style="font-size:14px;font-weight:900;color:#37352f;">재단 도면</div>
-                            <div style="font-size:11px;color:#787774;font-weight:600;margin-top:2px;">${p.orderCode || ''} ${p.orderName ? '· ' + p.orderName : ''}</div>
-                        </div>
-                        <button onclick="document.getElementById('_cutDiagramModal').remove();window._woCutModalState=null;" style="border:none;background:#f5f5f4;width:28px;height:28px;border-radius:7px;cursor:pointer;font-size:14px;color:#787774;flex-shrink:0;">✕</button>
-                    </div>
-                    <div style="margin-top:12px;">${svgHtml}</div>
-                    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;">
-                        <span style="font-size:11.5px;font-weight:700;background:#f0efed;color:#37352f;padding:3px 9px;border-radius:5px;">${p.plateName || ''} ${p.finish || ''}</span>
-                        ${dimStr ? `<span style="font-size:11.5px;font-weight:700;background:#f0efed;color:#37352f;padding:3px 9px;border-radius:5px;">${dimStr}</span>` : ''}
-                    </div>
-                    ${(p.boardParts && p.boardParts.length > 0) ? `
-                    <div style="margin-top:16px;padding-top:14px;border-top:1px solid #f0eeec;">
-                        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
-                            <span style="font-size:12px;font-weight:800;color:#37352f;">원장 장수</span>
-                            <div style="display:flex;align-items:center;gap:2px;background:#f7f6f3;border:1px solid #ededeb;border-radius:8px;overflow:hidden;">
-                                <button onclick="_woCutModalChangeSheets(-1)" style="width:32px;height:32px;border:none;background:transparent;cursor:pointer;font-size:16px;font-weight:900;color:#37352f;">−</button>
-                                <span id="_cutModalSheetsVal" style="min-width:28px;text-align:center;font-size:14px;font-weight:900;color:#37352f;">${p.sheets || 1}</span>
-                                <button onclick="_woCutModalChangeSheets(1)" style="width:32px;height:32px;border:none;background:transparent;cursor:pointer;font-size:16px;font-weight:900;color:#37352f;">+</button>
-                            </div>
-                        </div>
-                        <div id="_cutModalSummary" style="margin-top:8px;font-size:11px;font-weight:700;color:#787774;"></div>
-                        <button onclick="_woCutModalSave()" style="margin-top:12px;width:100%;padding:10px;background:#37352f;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;">저장</button>
-                    </div>` : `
-                    <div style="margin-top:14px;padding:10px 12px;background:#fff5f5;border:1px solid #fca5a5;border-radius:8px;font-size:11px;font-weight:700;color:#b91c1c;">
-                        이 부속은 원장 규격을 넘어서(또는 그 밖의 사유로) 자동 배치가 되지 않았습니다. 재단발주 탭의 재단편집 도구에서 직접 배치해 주세요.
-                    </div>`}
-                </div>`;
-            document.body.appendChild(modal);
-            _woCutModalRenderSummary();
-        };
+            document.getElementById('_woInlineEditOverlay')?.remove();
 
-        // 팝업 안의 "필요/작업수량" 요약 갱신 — 원장 장수를 바꿀 때마다 호출
-        function _woCutModalRenderSummary() {
-            const st = window._woCutModalState;
-            if (!st) return;
-            const p = (window._woBoringParts[st.sk] || []).find(pp => pp.cKey === st.cKey);
-            if (!p) return;
-            const perSheet = (p.boardParts || []).length;
-            const yieldQty = perSheet * st.sheets;
-            const excess   = Math.max(0, yieldQty - (p.dq || 0));
-            const summaryEl = document.getElementById('_cutModalSummary');
-            if (summaryEl) {
-                summaryEl.innerHTML = `필요 ${p.dq || 0} EA · 작업수량 ${yieldQty}개` +
-                    (excess > 0 ? ` <span style="color:#c2793a;">(+${excess} 초과)</span>` : '');
-            }
-            const valEl = document.getElementById('_cutModalSheetsVal');
-            if (valEl) valEl.textContent = st.sheets;
-        }
+            const overlay = document.createElement('div');
+            overlay.id = '_woInlineEditOverlay';
+            overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:24px 16px;overflow-y:auto;';
+            overlay.onclick = (e) => { if (e.target === overlay) _woCloseInlineEdit(); };
 
-        window._woCutModalChangeSheets = function(delta) {
-            const st = window._woCutModalState;
-            if (!st) return;
-            st.sheets = Math.max(1, st.sheets + delta);
-            _woCutModalRenderSummary();
-        };
+            const panel = document.createElement('div');
+            panel.id = '_woInlineEditPanel';
+            panel.style.cssText = 'background:#fff;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,0.3);width:min(96vw,1100px);max-height:calc(100vh - 48px);overflow-y:auto;';
+            panel.onclick = (e) => e.stopPropagation();
 
-        // 팝업에서 조정한 원장 장수를 저장 — 같은 재단계획(planId)을 그대로 덮어써서
-        // 카드가 새로 생기지 않고 그 자리에서 갱신됨. 배치(boardParts) 자체는
-        // 손대지 않고 "몇 장 쓸지"만 반영
-        window._woCutModalSave = function() {
-            const st = window._woCutModalState;
-            if (!st) return;
-            const p = (window._woBoringParts[st.sk] || []).find(pp => pp.cKey === st.cKey);
-            if (!p || !p.boardParts || !p.boardParts.length) { showToastMessage('저장할 수 있는 카드가 아닙니다.'); return; }
+            const header = document.createElement('div');
+            header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 18px;border-bottom:1px solid #f0eeec;position:sticky;top:0;background:#fff;z-index:1;';
+            header.innerHTML =
+                `<div style="font-size:14px;font-weight:900;color:#37352f;">재단 도면 편집 <span style="font-weight:700;color:#787774;font-size:12px;">— ${p.orderCode || ''}${p.orderName ? ' · ' + p.orderName : ''}</span></div>` +
+                `<button onclick="_woCloseInlineEdit()" style="border:none;background:#f5f5f4;width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:15px;color:#787774;flex-shrink:0;">✕</button>`;
+            panel.appendChild(header);
+            overlay.appendChild(panel);
+            document.body.appendChild(overlay);
 
-            // Path B(인라인 계산) 카드는 아직 정식 재단계획(planId)이 없어서, 저장 시
-            // 새 재단계획을 만들어 확정함 — 이전엔 planId 없는 카드는 팝업에 편집
-            // UI 자체가 안 떠서 "편집이 안 된다"는 문제가 있었음
-            const isNewPlan = !p.planId;
-            const confirmId = p.planId || `manual_${Date.now()}`;
-            const existingPlan = p.planId ? (window._cuttingPlans[p.planId] || {}) : {};
-            const updated = {
-                ...existingPlan,
-                confirmId,
-                sheets: st.sheets,
-                // 사용자가 직접 조정한 계획은 다른 발주 자동생성이 임의로
-                // 재계산/병합하지 않도록 자동생성 표시를 내림
-                autoGenerated: false,
-                pRowIndex: p.pRowIndex != null ? p.pRowIndex : (existingPlan.pRowIndex ?? null),
-                boardParts: p.boardParts || existingPlan.boardParts || [],
-                baseMaterial: p.plateName || existingPlan.baseMaterial || '',
-                coating: p.coating || existingPlan.coating || '',
-                materialColor: p.finish || existingPlan.materialColor || '',
-                cutW: p.rw || existingPlan.cutW || 0,
-                cutD: p.rd || existingPlan.cutD || 0,
-                reqQty: p.dq || existingPlan.reqQty || 0,
-                pOrderIds: (p.coveredOrderIds && p.coveredOrderIds.length) ? p.coveredOrderIds
-                    : (p.orderIdNum != null ? [p.orderIdNum] : (existingPlan.pOrderIds || []))
+            // 실제 재단편집 박스(#cutting-edit-box)를 원래 자리에서 팝업 안으로 이동.
+            // id 기반으로 동작하는 기존 함수들(showSubParts/updateBoardVisual/
+            // confirmCutting 등)은 DOM 위치와 무관하게 그대로 작동함
+            window._woInlineEditState = {
+                sk, oldCKey: cKey, isNewPlan: !p.planId,
+                originalParent: box.parentNode,
+                originalNextSibling: box.nextSibling,
+                originalDisplay: box.style.display
             };
-            delete updated.groupSig;
+            box.style.display = 'block';
+            panel.appendChild(box);
 
-            if (isNewPlan) {
-                // Path B 카드(cKey 형식이 다름)를 정식 계획 카드로 교체 —
-                // 옛 카드는 보드/부속목록에서 지우고 새 cKey('cut_'+confirmId)로 대체
+            // "재단확정" 버튼을 팝업 전용 확정 처리로 임시 교체 — 저장 후 옛(임시)
+            // 카드 정리 + 팝업 닫기 + 원래 위치 복원까지 이어서 처리하기 위함
+            const confirmBtn = document.getElementById('btn-confirm-cutting');
+            if (confirmBtn) {
+                window._woInlineEditState.originalConfirmOnclick = confirmBtn.getAttribute('onclick');
+                confirmBtn.setAttribute('onclick', '_woInlineConfirmCutting()');
+            }
+
+            window._editingCuttingPlan = p.planId ? { planId: p.planId, oldCKey: cKey, oldSk: sk } : null;
+
+            // showSubParts 내부의 행 매칭 규칙(원장명+마감 붙여쓰고 -마감색상)에 맞춰
+            // plateInfo 문자열을 재구성 — 카드에는 원장명/마감을 분리해 표시하지만
+            // 재단편집 화면의 원장 매칭 로직은 이 합쳐진 형식을 기준으로 함
+            const plateInfo = `${p.plateName || ''}${p.coating || ''}-${p.finish || ''}`;
+            showSubParts(plateInfo, orders);
+
+            // 사이즈(+가능하면 행 번호)가 일치하는 부속 카드를 찾아 자동 선택
+            const cards = Array.from(document.querySelectorAll('.inner-part-card'));
+            const target = cards.find(c =>
+                p.pRowIndex != null && parseInt(c.dataset.rowIndex) === p.pRowIndex
+            ) || cards.find(c =>
+                Math.abs(parseFloat(c.dataset.w) - (p.rw || 0)) < 0.5 && Math.abs(parseFloat(c.dataset.d) - (p.rd || 0)) < 0.5
+            );
+            if (target) {
+                handleCardClick(target);
+                // 기존 계획에 저장된 원장 장수를 그대로 반영해서 보여줌(이후 +/-로 조정 가능)
+                if (p.sheets) { suggestedSheets = p.sheets; isSheetsManual = true; updateBoardVisual(true); }
+            } else {
+                showToastMessage('해당 부속 카드를 찾지 못해 목록에서 직접 선택해주세요.');
+            }
+        };
+
+        // 팝업 안 "재단확정" 버튼이 호출하는 래퍼 — 실제 확정 로직(confirmCutting)을
+        // 그대로 실행한 뒤, 임시(Path B) 카드였다면 옛 카드를 정리하고 보드를
+        // 다시 그린 다음 팝업을 닫고 재단편집 박스를 원래 자리로 되돌림
+        window._woInlineConfirmCutting = function() {
+            if (!primarySelectedCardId) { showToastMessage('원장에 배치할 부속을 먼저 선택해주세요.'); return; }
+            const st = window._woInlineEditState;
+
+            confirmCutting();
+
+            if (st && st.isNewPlan && st.oldCKey && st.sk) {
+                // Path B(인라인 계산) 카드였던 옛 항목은 cKey 형식이 달라 confirmCutting이
+                // 못 지우므로 여기서 직접 제거(중복 방지)
                 Object.keys(window._woBoring[st.sk] || {}).forEach(mac => {
                     if (Array.isArray(window._woBoring[st.sk][mac])) {
-                        window._woBoring[st.sk][mac] = window._woBoring[st.sk][mac].filter(k => k !== st.cKey);
+                        window._woBoring[st.sk][mac] = window._woBoring[st.sk][mac].filter(k => k !== st.oldCKey);
                     }
                 });
-                window._woBoringParts[st.sk] = (window._woBoringParts[st.sk] || []).filter(pp => pp.cKey !== st.cKey);
+                window._woBoringParts[st.sk] = (window._woBoringParts[st.sk] || []).filter(pp => pp.cKey !== st.oldCKey);
             }
-
-            window._cuttingPlans[String(confirmId)] = updated;
-            _persistCuttingPlan(updated);
-            _ensureCuttingPlanInTimeline(updated);
-            if (typeof _woRenderBoard === 'function') _woRenderBoard(st.sk);
-            if (typeof _woRenderPool  === 'function') _woRenderPool(st.sk);
-
-            document.getElementById('_cutDiagramModal')?.remove();
-            window._woCutModalState = null;
+            if (st && st.sk) {
+                if (typeof _woRenderBoard === 'function') _woRenderBoard(st.sk);
+                if (typeof _woRenderPool  === 'function') _woRenderPool(st.sk);
+            }
             showToastMessage('재단계획이 수정되었습니다.');
+            _woCloseInlineEdit();
+        };
+
+        // 팝업을 닫고(저장 여부와 무관) 재단편집 박스를 원래 있던 자리·표시상태로 복원
+        window._woCloseInlineEdit = function() {
+            const st = window._woInlineEditState;
+            const box = document.getElementById('cutting-edit-box');
+            if (st && box && st.originalParent) {
+                if (st.originalNextSibling) st.originalParent.insertBefore(box, st.originalNextSibling);
+                else st.originalParent.appendChild(box);
+                box.style.display = st.originalDisplay || '';
+                const confirmBtn = document.getElementById('btn-confirm-cutting');
+                if (confirmBtn && st.originalConfirmOnclick != null) confirmBtn.setAttribute('onclick', st.originalConfirmOnclick);
+            }
+            document.getElementById('_woInlineEditOverlay')?.remove();
+            window._woInlineEditState = null;
+            window._editingCuttingPlan = null;
+            primarySelectedCardId = null; secondarySelectedCardId = null; tertiarySelectedCardId = null;
         };
 
         function _woCardHtml(p, stateKey) {
@@ -7552,8 +7540,8 @@
             const _pcc = _pcm[_pok] || {};
             const _pcs = _pcc.bg ? `background:${_pcc.bg};border-left:3px solid ${_pcc.bd};` : '';
             const _pOkPool = (p.orderKey || p.orderCode || '').replace(/'/g, "\\'");
-            // 재단 카드는 클릭 시 도면 확대 팝업(→ 재편집 진입점)이 열리도록
-            const _cutClick = p.isCuttingCard ? `onclick="woShowCuttingDiagramModal('${p.cKey}','${stateKey}')"` : '';
+            // 재단 카드는 클릭 시 실제 재단편집 도구가 팝업으로 뜨며 바로 편집 가능
+            const _cutClick = p.isCuttingCard ? `onclick="woEditCuttingPlan('${p.cKey}','${stateKey}')"` : '';
             return `<div class="wo-boring-part-card" draggable="${_wDone ? 'false' : 'true'}"
                 data-ck="${p.cKey}" data-sk="${stateKey}" data-ok="${_pOkPool}" data-done="${_wDone ? '1' : '0'}"
                 style="${_pcs}${_wDone ? 'opacity:0.6;' : ''}${p.isCuttingCard ? 'cursor:pointer;' : ''}"
@@ -8033,8 +8021,8 @@
                             : `<div style="font-size:8px;font-weight:800;color:${_bcc.bd||'#888'};padding:2px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">↪ ${_segDur}분</div>`;
                         const _segBorder = _isFirst ? '' : 'border-top:2px dashed rgba(0,0,0,0.18);';
                         const _pOk = (p.orderKey || p.orderCode || '').replace(/'/g, "\\'");
-                        // 재단 카드는 클릭 시 도면 확대 팝업(→ 재편집 진입점)이 열리도록
-                        const _cutClick = (_isFirst && p.isCuttingCard) ? ` onclick="woShowCuttingDiagramModal('${cKey}','${sk}')"` : '';
+                        // 재단 카드는 클릭 시 실제 재단편집 도구가 팝업으로 뜨며 바로 편집 가능
+                        const _cutClick = (_isFirst && p.isCuttingCard) ? ` onclick="woEditCuttingPlan('${cKey}','${sk}')"` : '';
                         html +=
                             `<div class="wo-boring-placed-card" draggable="${_bDone || !_isFirst ? 'false' : 'true'}"` +
                             ` style="top:${_segTop+1}px;height:${_segH}px;${_bcs}${_segBorder}${_bDone ? 'opacity:0.6;' : ''}${p.isCuttingCard ? 'cursor:pointer;' : ''}"` +
