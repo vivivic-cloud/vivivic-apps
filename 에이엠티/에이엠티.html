@@ -2457,7 +2457,12 @@
                 // 서로 다른 정보라 카드에서도 별도 항목으로 표기 (붙여쓰지 않음)
                 const plateName  = row[h.indexOf('원장명')] || '';
                 const coating    = row[h.indexOf('마감')] || '';
-                const colorName  = normalizeValue(row[h.indexOf('마감색상')]);
+                // 마감색상은 원본 데이터를 다시 조회하기보다, 조혼가구에서 발주를
+                // 확정할 때 이미 결정된 값(pData.finishColor)을 우선 신뢰해야 함 —
+                // 그 사이 엑셀이 재업로드되어 값이 바뀌었어도 실제 발주 시점 기준으로
+                // 재단계획이 만들어져야 정합성이 맞음. 그 필드가 없는(예전) 발주만
+                // 원본 행에서 다시 조회
+                const colorName  = normalizeValue(pData.finishColor || row[h.indexOf('마감색상')]);
                 const partName   = row[h.indexOf('부속명')] || '-';
                 const _fillHex   = _colorNameToHex(colorName) || '#b0aeaa'; // 원장 실제 색상으로 도면 표시
                 const cuttingDate = order.procOverrides?.['재단'] || order.deliveryDate || '미정';
@@ -6732,7 +6737,10 @@
                             // 각각 별도 항목으로 표기 (원장명을 마감과 붙여쓰지 않음)
                             const plateName = row[_fh.indexOf('원장명')] || '';
                             const coating   = row[_fh.indexOf('마감')] || '';
-                            const finish    = normalizeValue(row[_fh.indexOf('마감색상')]) || '';
+                            // 마감색상은 원본 행을 다시 조회하기보다, 조혼가구에서 발주
+                            // 확정 시 이미 결정된 값(pData.finishColor)을 우선 신뢰 —
+                            // 그 필드가 없는(예전) 발주만 원본 행에서 다시 조회
+                            const finish    = normalizeValue(pData.finishColor || row[_fh.indexOf('마감색상')]) || '';
                             const rw        = parseFloat(row[_fh.indexOf('재단W')]) || 0;
                             const rd        = parseFloat(row[_fh.indexOf('재단D')]) || 0;
                             const _fillHex  = _colorNameToHex(finish) || '#b0aeaa';
