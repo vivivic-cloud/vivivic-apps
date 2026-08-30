@@ -4294,6 +4294,16 @@
                 const partRows = card.rows.map(ri => currentFullData[ri]).filter(Boolean);
                 const amtRows = partRows.filter(r => normalizeValue(r[h.indexOf("공급처")]) === "AMT");
                 const isOpen = card.isOpen || false;
+                // 이 제품에 실제로 쓰이는 원장색상 목록 — 부속마다 색상이 다를 수 있어
+                // 카드를 펼치지 않고도 한눈에 볼 수 있도록 헤더에 요약 표시
+                // ("이 제품의 원장색상이 어떤 것들이 있는지 알고 싶다"는 요청으로 추가)
+                const usedColors = [...new Set(amtRows.map(r => r[h.indexOf("마감색상")]).filter(Boolean))];
+                const colorSummary = usedColors.length
+                    ? `<div class="flex items-center gap-1 flex-wrap mt-1">
+                        <span class="text-[9px] text-[#b0aeaa] font-bold">원장색상</span>
+                        ${usedColors.map(c => `<span class="inline-flex items-center gap-1 text-[9px] font-bold text-[#5f5d59] bg-[#f7f6f3] border border-[#ededeb] rounded-full px-1.5 py-0.5">${_woColorSwatchHtml(c)}${c}</span>`).join('')}
+                       </div>`
+                    : '';
 
                 // 총 작업시간 계산
                 const totalTime = amtRows.reduce((sum, row) => {
@@ -4339,8 +4349,11 @@
                     const partQty = unitCons * orderQty;
 
                     const times = calcProcessTime(row, partQty, diffs, h);
-                    const partName  = row[h.indexOf("부속명")] || '-';
-                    const plateName = row[h.indexOf("원장명")] || '';
+                    const partName   = row[h.indexOf("부속명")] || '-';
+                    const plateName  = row[h.indexOf("원장명")] || '';
+                    // 원장 색상(마감색상)도 부속별로 다를 수 있어 별도로 표시 —
+                    // "이 제품에 어떤 원장색상들이 쓰이는지" 한눈에 보기 위해 추가
+                    const finishColor = row[h.indexOf("마감색상")] || '';
                     const W = row[h.indexOf("재단W")] || 0;
                     const D = row[h.indexOf("재단D")] || 0;
                     const totalEdge = String(row[h.indexOf("총엣지면")] || '').toLowerCase();
@@ -4392,7 +4405,9 @@
                         <div class="flex items-start gap-2 pb-1.5 mb-1 border-b border-[#f1f1ef]">
                             <div class="flex flex-col min-w-0 flex-1">
                                 <span class="text-[11px] font-bold text-[#37352f]">${partName}</span>
-                                <span class="text-[9px] text-[#787774]">${plateName} · ${W}×${D}</span>
+                                <span class="text-[9px] text-[#787774] flex items-center gap-1">
+                                    ${_woColorSwatchHtml(finishColor)}${plateName}${finishColor ? ` · <span class="font-bold text-[#5f5d59]">${finishColor}</span>` : ''} · ${W}×${D}
+                                </span>
                                 <div class="flex gap-1 mt-1 flex-wrap">${processBadges}</div>
                             </div>
                             <!-- 세트수량 표시: unitCons × orderQty -->
@@ -4418,6 +4433,7 @@
                                     <span class="font-bold text-[13px] text-[#37352f] truncate">${card.displayName}</span>
                                     <span class="text-[10px] text-[#787774]">${card.supplier || ''} · ${card.code || ''}</span>
                                     ${sourceBadge}
+                                    ${colorSummary}
                                 </div>
                             </div>
                             <!-- 수량 입력 + 총시간 + 버튼 -->
