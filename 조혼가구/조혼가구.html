@@ -2547,6 +2547,10 @@
                 const partName = row[h.indexOf("부속명")] || "";
                 const plateName = row[h.indexOf("원장명")] || "";
                 const finish = row[h.indexOf("마감")] || "";
+                // 마감색상(원장 색상)은 그동안 이 카드 데이터에 전혀 담기지 않아서
+                // 부속카드에 표시가 안 되고 있었음 — "마감"(양면/편면 등 가공형태)과는
+                // 다른 컬럼이라 별도로 조회해서 함께 저장
+                const finishColor = row[h.indexOf("마감색상")] || "";
                 const w = parseFloat(row[h.indexOf("재단W")]) || 0;
                 const d = parseFloat(row[h.indexOf("재단D")]) || 0;
                 // 부속발주로 특정 부속 선택 시 → 공급처 무관 기본 발주 포함
@@ -2555,7 +2559,7 @@
                 partInfoMap[key] = {
                     unitCons: unitCons, qty: initialQty, isDeleted: targetPartName ? false : !isAmt, isManual: false,
                     partSupplier: partSupplier, partName: partName, plateName: plateName,
-                    finish: finish, w: w, d: d
+                    finish: finish, finishColor: finishColor, w: w, d: d
                 };
             });
 
@@ -3547,13 +3551,15 @@
                 const w = parseFloat(row[h.indexOf("재단W")]), d = parseFloat(row[h.indexOf("재단D")]);
                 const plateName = row[h.indexOf("원장명")] || "원장정보없음";
                 const finish = row[h.indexOf("마감")] || "마감정보없음";
+                // 마감색상(원장 색상) — "마감"(가공형태)과는 다른 컬럼이라 별도로 조회해서 표시
+                const finishColor = pData.finishColor || row[h.indexOf("마감색상")] || "";
 
                 const cardHtml = `
                     <div class="bg-white p-2 rounded-lg border border-[#ededeb] shadow-sm flex flex-col gap-1">
                         <div class="flex justify-between items-start gap-1">
                             <div class="flex flex-col min-w-0 flex-1" style="word-break:break-all;overflow-wrap:anywhere">
                                 <span class="text-[10px] font-bold text-[#37352f]">${row[h.indexOf("부속명")]}</span>
-                                <span class="text-[9px] text-gray-400">${plateName}</span>
+                                <span class="text-[9px] text-gray-400">${plateName}${finishColor ? ` · ${finishColor}` : ''}</span>
                                 <span class="text-[9px] text-gray-400">${finish}</span>
                                 <span class="text-[9px] text-[#787774] font-medium">${w} X ${d}</span>
                             </div>
@@ -3566,7 +3572,7 @@
                 if (isAmt) { if (!pData.isDeleted) basicHtml += cardHtml; }
                 else {
                     if (pData.isDeleted) {
-                        specialHtml += `<div class="bg-blue-50/30 p-2 rounded-lg border border-dashed border-blue-200 flex flex-col gap-1"><div class="flex flex-col min-w-0" style="word-break:break-all;overflow-wrap:anywhere"><span class="text-[10px] font-bold text-blue-800">${row[h.indexOf("부속명")]}</span><span class="text-[9px] text-blue-300">${plateName}</span><span class="text-[9px] text-blue-300">${finish}</span><span class="text-[9px] text-blue-400 font-medium">${w} X ${d}</span></div></div>`;
+                        specialHtml += `<div class="bg-blue-50/30 p-2 rounded-lg border border-dashed border-blue-200 flex flex-col gap-1"><div class="flex flex-col min-w-0" style="word-break:break-all;overflow-wrap:anywhere"><span class="text-[10px] font-bold text-blue-800">${row[h.indexOf("부속명")]}</span><span class="text-[9px] text-blue-300">${plateName}${finishColor ? ` · ${finishColor}` : ''}</span><span class="text-[9px] text-blue-300">${finish}</span><span class="text-[9px] text-blue-400 font-medium">${w} X ${d}</span></div></div>`;
                     } else { basicHtml += cardHtml; }
                 }
             });
@@ -3743,6 +3749,7 @@
                         "제품명": item.code,
                         "완성품수량": item.orderQty,
                         "원장종류": row[h.indexOf("원장명")],
+                        "마감색상": row[h.indexOf("마감색상")],
                         "부속명": row[h.indexOf("부속명")],
                         "수량": pInfo.qty,
                         "납기일": item.deliveryDate
@@ -3876,6 +3883,8 @@
                 const w = parseFloat(row[h.indexOf("재단W")]), d = parseFloat(row[h.indexOf("재단D")]);
                 const plateName = row[h.indexOf("원장명")] || "원장정보없음";
                 const finish = row[h.indexOf("마감")] || "마감정보없음";
+                // 마감색상(원장 색상) — "마감"(가공형태)과는 다른 컬럼이라 별도로 조회해서 표시
+                const finishColor = pData.finishColor || row[h.indexOf("마감색상")] || "";
 
                 let actionsHtml = "";
                 if (isEditMode) {
@@ -3898,7 +3907,7 @@
                         <div class="flex justify-between items-start gap-1">
                             <div class="flex flex-col min-w-0 flex-1" style="word-break:break-all;overflow-wrap:anywhere">
                                 <span class="text-[10px] font-bold ${cardTextClass}">${row[h.indexOf("부속명")]}</span>
-                                <span class="text-[9px] ${!isAmt ? 'text-amber-400' : 'text-gray-400'}">${plateName}</span>
+                                <span class="text-[9px] ${!isAmt ? 'text-amber-400' : 'text-gray-400'}">${plateName}${finishColor ? ` · ${finishColor}` : ''}</span>
                                 <span class="text-[9px] ${!isAmt ? 'text-amber-400' : 'text-gray-400'}">${finish}</span>
                                 <span class="text-[9px] ${!isAmt ? 'text-amber-600' : 'text-[#787774]'} font-medium">${w} X ${d}</span>
                             </div>
@@ -3922,7 +3931,7 @@
                 } else if (showInSpecial) {
                     // AMT 외 공급처 부속 섹션에 표시
                     const specialBtn = isEditMode ? `<button onclick="addSpecialPart(${idNum}, '${cardKey}')" class="px-3 py-1 bg-white border border-blue-300 text-blue-600 rounded text-[10px] font-black hover:bg-blue-50 shadow-sm transition-all active:scale-95">AMT 발주 추가</button>` : '';
-                    specialHtml += `<div class="bg-blue-50/30 p-2 rounded-lg border border-dashed border-blue-200 flex flex-col gap-1 relative group/special"><div class="flex flex-col min-w-0" style="word-break:break-all;overflow-wrap:anywhere"><span class="text-[10px] font-bold text-blue-800">${row[h.indexOf("부속명")]}</span><span class="text-[9px] text-blue-300">${plateName}</span><span class="text-[9px] text-blue-300">${finish}</span><span class="text-[9px] text-blue-400 font-medium">${w} X ${d}</span></div>${!isConfirmed ? `<button onclick="addSpecialPart(${idNum}, '${cardKey}')" class="mt-0.5 px-1 py-px bg-white border border-blue-300 text-blue-600 rounded text-[8px] font-black hover:bg-blue-50 shadow-sm transition-all active:scale-95 leading-none">AMT추가</button>` : specialBtn}</div>`;
+                    specialHtml += `<div class="bg-blue-50/30 p-2 rounded-lg border border-dashed border-blue-200 flex flex-col gap-1 relative group/special"><div class="flex flex-col min-w-0" style="word-break:break-all;overflow-wrap:anywhere"><span class="text-[10px] font-bold text-blue-800">${row[h.indexOf("부속명")]}</span><span class="text-[9px] text-blue-300">${plateName}${finishColor ? ` · ${finishColor}` : ''}</span><span class="text-[9px] text-blue-300">${finish}</span><span class="text-[9px] text-blue-400 font-medium">${w} X ${d}</span></div>${!isConfirmed ? `<button onclick="addSpecialPart(${idNum}, '${cardKey}')" class="mt-0.5 px-1 py-px bg-white border border-blue-300 text-blue-600 rounded text-[8px] font-black hover:bg-blue-50 shadow-sm transition-all active:scale-95 leading-none">AMT추가</button>` : specialBtn}</div>`;
                 }
             });
             el.innerHTML = `<div class="space-y-2"><div class="text-[10px] font-bold text-[#787774] px-1 uppercase tracking-wider">기본 발주 부속</div><div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">${basicHtml || '<div class="col-span-full py-4 text-center text-gray-400 italic text-[11px]">발주할 부속이 없습니다.</div>'}</div></div>${specialHtml ? `<div class="space-y-2 pt-4 border-t border-dashed border-[#ededeb]"><div class="text-[10px] font-bold text-blue-500 px-1 uppercase tracking-wider flex items-center gap-2">AMT 외 공급처 부속</div><div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">${specialHtml}</div></div>` : ''}`;
