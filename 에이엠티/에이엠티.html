@@ -2323,11 +2323,15 @@
             const orderName = allOrderIds.map(id => confirmedOrders.find(o => o.idNum === id)?.displayName).filter(Boolean).join(' / ');
             const _dqForPlan = _cuttingReqQtyFor(plan, order);
             // 카드에 실제 부속명(예: "상판")을 보여줘야 하므로 원본 데이터 행에서 조회 —
-            // 조회 실패 시에만 자재·색상 설명으로 대체(완전히 빈 상태보다는 낫기 때문)
+            // 조회 실패 시에만 자재·색상 설명으로 대체(완전히 빈 상태보다는 낫기 때문).
+            // 같은 행을 찾은 김에 작업시간(pm) 계산에도 재사용(_resolvedRowForPlan)
             let _partNameForPlan = '';
+            let _resolvedRowForPlan = null;
             const _h0ForPlan = currentFullData[0];
             if (plan.pRowIndex != null && _h0ForPlan && currentFullData[plan.pRowIndex]) {
-                _partNameForPlan = currentFullData[plan.pRowIndex][_h0ForPlan.indexOf('부속명')] || '';
+                const _row0 = currentFullData[plan.pRowIndex];
+                _partNameForPlan = _row0[_h0ForPlan.indexOf('부속명')] || '';
+                _resolvedRowForPlan = _row0;
             }
             if (!_partNameForPlan && _h0ForPlan) {
                 // 1순위 폴백: 이 재단계획이 커버하는 발주들의 partInfoMap에서 사이즈가
@@ -2348,7 +2352,7 @@
                         const rd2 = parseFloat(row[_h0ForPlan.indexOf('재단D')]) || 0;
                         if (Math.abs(rw2 - (plan.cutW || 0)) >= 0.5 || Math.abs(rd2 - (plan.cutD || 0)) >= 0.5) continue;
                         const _found = row[_h0ForPlan.indexOf('부속명')] || '';
-                        if (_found) { _partNameForPlan = _found; break outer; }
+                        if (_found) { _partNameForPlan = _found; _resolvedRowForPlan = row; break outer; }
                     }
                 }
             }
@@ -2363,14 +2367,21 @@
                     const rd2 = parseFloat(row[_h0ForPlan.indexOf('재단D')]) || 0;
                     if (Math.abs(rw2 - (plan.cutW || 0)) >= 0.5 || Math.abs(rd2 - (plan.cutD || 0)) >= 0.5) continue;
                     const _found = row[_h0ForPlan.indexOf('부속명')] || '';
-                    if (_found) { _partNameForPlan = _found; break; }
+                    if (_found) { _partNameForPlan = _found; _resolvedRowForPlan = row; break; }
                 }
             }
             if (!_partNameForPlan) _partNameForPlan = `${plan.baseMaterial} · ${plan.materialColor}`;
+            // 작업시간(pm)이 항상 0으로 고정돼 있어 배치카드에 "08:00~08:00"처럼
+            // 시작·종료 시간이 같게 표시되던 문제 — 원본 데이터 행을 찾았으면
+            // calcProcessTime()으로 실제 재단 작업시간을 계산(Path B 인라인 계산과
+            // 동일한 방식), 행을 못 찾은 경우에만 0으로 폴백
+            const _pmForPlan = (_resolvedRowForPlan && _h0ForPlan)
+                ? (calcProcessTime(_resolvedRowForPlan, _dqForPlan, {}, _h0ForPlan)['재단'] || 0)
+                : 0;
             const partObj = {
                 cKey,
                 nm: _partNameForPlan,
-                pm: 0,
+                pm: _pmForPlan,
                 // dq(필요 수량)는 잘라야 할 원장 "장수"(plan.sheets)가 아니라 실제
                 // 필요한 부속 EA 수량이어야 함 — 카드에 "필요 N EA"로 표시되는 값
                 dq: _dqForPlan,
