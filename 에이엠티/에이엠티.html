@@ -7480,7 +7480,7 @@
         // 팝업을 닫을 때 원래 있던 자리로 되돌려놓는다.
         window._woInlineEditState = null;
 
-        window.woEditCuttingPlan = function(cKey, sk) {
+        window.woEditCuttingPlan = function(cKey, sk, clockStart, clockEnd) {
             const p = (window._woBoringParts[sk] || []).find(pp => pp.cKey === cKey);
             if (!p || !p.isCuttingCard) { showToastMessage('편집할 수 있는 카드가 아닙니다.'); return; }
 
@@ -7505,9 +7505,26 @@
             panel.onclick = (e) => e.stopPropagation();
 
             const header = document.createElement('div');
-            header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 18px;border-bottom:1px solid #f0eeec;position:sticky;top:0;background:#fff;z-index:1;';
+            header.style.cssText = 'display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:14px 18px;border-bottom:1px solid #f0eeec;position:sticky;top:0;background:#fff;z-index:1;';
+            // 카드를 6개 핵심 정보만 남기고 작게 줄이면서 뺀 나머지 정보(발주번호·
+            // 사이즈·마감·작업시간)를 여기 팝업 헤더에서 보여줌 — 카드에서 빠진
+            // 정보가 사라지는 게 아니라 팝업으로 옮겨진 것
+            const _dimStrHdr = (p.rw && p.rd) ? `${p.rw}×${p.rd}` : '';
+            const _cutTimeStrHdr = (clockStart != null && clockEnd != null)
+                ? (m => `${String(Math.floor(m/60)).padStart(2,'0')}:${String(Math.round(m)%60).padStart(2,'0')}`)
+                : null;
+            const _timeRangeHdr = _cutTimeStrHdr ? `${_cutTimeStrHdr(clockStart)} ~ ${_cutTimeStrHdr(clockEnd)}` : '';
+            const _hdrMeta = [
+                p.orderCode || '',
+                _dimStrHdr,
+                p.coating || '',
+                _timeRangeHdr ? `⏱ ${_timeRangeHdr}` : ''
+            ].filter(Boolean).join(' · ');
             header.innerHTML =
-                `<div style="font-size:14px;font-weight:900;color:#37352f;">재단 도면 편집 <span style="font-weight:700;color:#787774;font-size:12px;">— ${p.orderCode || ''}${p.orderName ? ' · ' + p.orderName : ''}</span></div>` +
+                `<div style="min-width:0;">` +
+                `<div style="font-size:14px;font-weight:900;color:#37352f;">재단 도면 편집${p.orderName ? ` <span style="font-weight:700;color:#787774;font-size:12px;">— ${p.orderName}</span>` : ''}</div>` +
+                (_hdrMeta ? `<div style="font-size:11px;font-weight:600;color:#a8a6a2;margin-top:3px;font-family:ui-monospace,monospace;">${_hdrMeta}</div>` : '') +
+                `</div>` +
                 `<button onclick="_woCloseInlineEdit()" style="border:none;background:#f5f5f4;width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:15px;color:#787774;flex-shrink:0;">✕</button>`;
             panel.appendChild(header);
             overlay.appendChild(panel);
@@ -7919,13 +7936,15 @@
                     const pm       = p ? (_actPm ?? p.pm) : 0;
                     // 도면이 텍스트 칸 높이에 맞춰(fitHeight) 그려지므로 카드 높이는 텍스트
                     // 기준으로만 결정 — 도면 때문에 카드가 더 커지지 않도록 함.
-                    // 기계가 1대뿐이라 컬럼 폭이 넉넉하게 남는 걸 활용해, 세로로 쌓던
-                    // 정보를 ①오더·제품명 ②원장명-매수/부속명-사이즈 ③발주·예상수량
-                    // ④도면 순으로 가로 4구역에 넓게 펼쳐 배치 — 세로로 쌓을 내용이
-                    // 줄어든 만큼 최소높이도 270px → 145px로 하향
-                    // (실측: 긴 발주코드 2건+긴 제품명 2줄 래핑+긴 원장명까지 다 있는
-                    // 경우도 폭 860px에서 약 118px, 145px에서 안 잘림 확인)
-                    const cardMinH = (p && p.isCuttingCard) ? 145 : MIN_CARD_H;
+                    // 카드에는 6가지 핵심 정보(제품명/원장정보/원장매수/부속명/발주수량/
+                    // 작업수량)만 작게 표시하고, 나머지(발주번호·사이즈·도면·작업시간)는
+                    // 클릭 시 뜨는 재단편집 팝업으로 옮기면서 필요 높이가 크게 줄어
+                    // 최소높이도 145px → 120px로 하향
+                    // (실측: 긴 발주코드 2건+긴 제품명+긴 원장명까지 다 있는 경우, 카드
+                    // 폭 320~600px 범위에서 약 109px, 120px에서 안 잘림 확인. 폭이
+                    // 260px 이하로 아주 좁아지면 144px까지 필요할 수 있어 그 경우는
+                    // cardH 계산이 spanPx로 자연스럽게 더 늘어나지 않는 한 잘릴 수 있음)
+                    const cardMinH = (p && p.isCuttingCard) ? 120 : MIN_CARD_H;
 
                     let cStart, topPx;
                     if (entry.startMin != null) {
@@ -8190,67 +8209,33 @@
                     // ─── 배치 카드 (재단카드: 상세 4행 / 일반카드: 컴팩트 2행) ───
                     let _placedInner = '';
                     if (p.isCuttingCard) {
-                        // 카드 표기 항목(고정 순서): 발주번호 / 원장명-마감색상 / 마감(양면·편면 등) /
-                        // 작업사이즈(발주수량) / 원장(매수) / 총작업수량(계산된 실제 생산개수)
+                        // 카드는 6가지 핵심 정보만 작게 표시하고, 나머지(발주번호·사이즈·
+                        // 작업시간·도면 등)는 카드 클릭 시 뜨는 재단편집 팝업에서 확인 —
+                        // "카드를 작게, 나머지는 클릭 시 팝업으로"라는 요청에 따라 카드를
+                        // 대폭 축소. 팝업 헤더에도 발주번호·사이즈·작업시간을 보강해서
+                        // 카드에서 뺀 정보가 팝업에서 그대로 확인되게 함(아래 woEditCuttingPlan 참고)
                         const _perSheet2 = (p.boardParts || []).length;
                         const _yield2    = _perSheet2 * (p.sheets || 0);
-                        // 원장을 통짜로 재단하다 보니 발주수량보다 더 나올 수 있는 초과분을
-                        // 총작업수량 옆에 별도로 표기(작을수록 좋은 정보라 경고색으로 구분)
                         const _excess2   = Math.max(0, _yield2 - (p.dq || 0));
-                        const _yieldVal2 = `${_yield2}개` + (_excess2 > 0 ? `<span style="font-size:10px;font-weight:700;color:#c2793a;margin-left:3px;">(+${_excess2})</span>` : '');
-                        const _dimStr2    = (p.rw && p.rd) ? `${p.rw}×${p.rd}` : '';
-                        // 원장 매수(N매)는 원장명과 한 세트로 붙여 "원장명-N매" 형태로 표기
-                        // (원장명과 매수를 따로 떨어뜨려 두면 세트로 안 보인다는 피드백)
-                        const _plateLine2 = [p.plateName, p.finish].filter(Boolean).join('-') + (p.sheets ? `-${p.sheets}매` : '');
-                        const _cutTimeStr = (clockStart != null && clockEnd != null)
-                            ? `${_fmtClk(clockStart)} ~ ${_fmtClk(clockEnd)}`
-                            : '';
-                        // 현장 작업자가 이 카드로 "무엇을 할지"를 바로 알아야 하므로,
-                        // 실제로 해야 할 작업(원장정보-매수 + 도면)을 맨 앞에 크게 배치하고,
-                        // 발주번호·제품명·작업시간 같은 참고/확인용 정보는 맨 뒤로 보냄:
-                        // ①원장정보-매수/부속명-사이즈(가장 크게) ②편집도면(바로 옆)
-                        // ③발주수량·예상수량 ④맨 끝에 오더번호/제품명/작업시간(확인사항)
-                        const _placedDiagram = _woCuttingDiagramSvg(p, 260, 150, true);
+                        const _yieldVal2 = `${_yield2}개` + (_excess2 > 0 ? `<span style="font-size:9px;font-weight:700;color:#c2793a;margin-left:2px;">(+${_excess2})</span>` : '');
+                        const _plateLine2 = [p.plateName, p.finish].filter(Boolean).join('-');
                         const _pills2 = [];
-                        if (p.dq) _pills2.push(_woStatPill('발주', `${p.dq} EA`, 'primary'));
-                        if (_yield2 > 0) _pills2.push(_woStatPill('예상', _yieldVal2, 'accent'));
-
-                        // ① 지금 무엇을 잘라야 하는지: 원장정보-매수 / 부속명-사이즈.
-                        // 작업자가 카드를 보자마자 가장 먼저, 가장 크게 확인해야 하는 정보.
-                        // 주방 주문 티켓·보딩패스처럼 "가장 중요한 한 줄"과 "그다음 정보"
-                        // 사이의 크기·색 대비를 뚜렷하게 벌려서(3단 위계) 시선이 자연스럽게
-                        // 위→아래로 흐르도록 정리 — 예전엔 둘 다 같은 크기·색이라 위계가
-                        // 안 느껴진다는 피드백
-                        const _zoneWork =
-                            `<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">` +
-                            `<span style="display:inline-block;line-height:0;flex-shrink:0;">${_woColorSwatchHtml(p.finish)}</span>` +
-                            `<span style="font-size:20px;font-weight:900;color:#1c1a17;line-height:1.25;letter-spacing:-0.2px;word-break:break-word;">${_plateLine2||'-'}</span>` +
-                            (p.coating ? `<span style="flex-shrink:0;font-size:9px;font-weight:700;color:#8a8783;background:#f0efed;padding:2px 7px;border-radius:8px;">${p.coating}</span>` : '') +
-                            `</div>` +
-                            `<div style="display:flex;align-items:baseline;gap:8px;margin-top:6px;flex-wrap:wrap;">` +
-                            (p.nm ? `<span style="font-size:13px;font-weight:700;color:#5f5d59;line-height:1.3;word-break:break-word;">${p.nm}</span>` : '') +
-                            (_dimStr2 ? `<span style="font-size:13px;font-weight:700;color:#5f5d59;flex-shrink:0;">${_dimStr2}</span>` : '') +
-                            `</div>`;
-
-                        // ③ 발주수량 · 예상수량(작업 후 나올 실제 수량)
-                        const _zoneQty = _pills2.length
-                            ? `<div style="display:flex;flex-direction:column;align-items:flex-start;gap:6px;">${_pills2.join('')}</div>` : '';
-
-                        // ④ 확인용 참고정보(발주번호/제품명/작업시간) — 작업 자체엔 필요 없고
-                        // 나중에 확인·대조할 때만 보면 되는 정보라, ①과 대비되도록 한층 더
-                        // 작고 흐리게(3단 위계의 가장 마지막 단) 배치
-                        const _zoneOrder =
-                            (p.orderCode ? `<div style="font-size:9px;font-weight:600;color:#c2c0bb;font-family:ui-monospace,monospace;letter-spacing:0.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.orderCode}</div>` : '') +
-                            (p.orderName ? `<div style="font-size:10px;font-weight:600;color:#a8a6a2;line-height:1.35;word-break:break-word;margin-top:2px;">${p.orderName}</div>` : '') +
-                            (_cutTimeStr ? `<div style="font-size:9px;font-weight:600;color:#c2c0bb;margin-top:5px;white-space:nowrap;">⏱ ${_cutTimeStr}</div>` : '');
+                        if (p.dq) _pills2.push(_woStatPill('발주', `${p.dq} EA`, 'primary', true));
+                        if (_yield2 > 0) _pills2.push(_woStatPill('작업', _yieldVal2, 'accent', true));
 
                         _placedInner =
-                            `<div style="display:flex;align-items:stretch;height:100%;">` +
-                            `<div style="flex:1 1 220px;min-width:0;padding-right:16px;border-right:1px solid #ededeb;display:flex;flex-direction:column;justify-content:center;">${_zoneWork}</div>` +
-                            (_placedDiagram ? `<div style="flex:0 0 auto;max-width:260px;padding:0 16px;border-right:1px solid #ededeb;height:100%;display:flex;align-items:center;">${_placedDiagram}</div>` : '') +
-                            (_zoneQty ? `<div style="flex:0 0 130px;min-width:0;padding:0 16px;border-right:1px solid #ededeb;display:flex;flex-direction:column;justify-content:center;">${_zoneQty}</div>` : '') +
-                            `<div style="flex:0 0 170px;min-width:0;padding-left:16px;display:flex;flex-direction:column;justify-content:center;overflow:hidden;">${_zoneOrder}</div>` +
-                            `</div>`;
+                            // ① 제품명
+                            (p.orderName ? `<div style="font-size:12px;font-weight:800;color:#37352f;line-height:1.3;word-break:break-word;">${p.orderName}</div>` : '') +
+                            // ② 원장정보 · ③ 원장 매수
+                            `<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:3px;">` +
+                            `<span style="display:inline-block;line-height:0;flex-shrink:0;">${_woColorSwatchHtml(p.finish)}</span>` +
+                            `<span style="font-size:11px;font-weight:700;color:#5f5d59;line-height:1.3;word-break:break-word;">${_plateLine2||'-'}</span>` +
+                            (p.sheets ? `<span style="flex-shrink:0;font-size:9px;font-weight:700;color:#8a8783;background:#f0efed;padding:1px 6px;border-radius:8px;">${p.sheets}매</span>` : '') +
+                            `</div>` +
+                            // ④ 부속명
+                            (p.nm ? `<div style="font-size:13px;font-weight:800;color:#37352f;line-height:1.3;word-break:break-word;margin-top:4px;">${p.nm}</div>` : '') +
+                            // ⑤ 발주수량 · ⑥ 작업수량
+                            (_pills2.length ? `<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:5px;">${_pills2.join('')}</div>` : '');
                     } else {
                         const _codePlaced = p.orderCode
                             ? `<div style="font-size:10px;font-weight:700;color:#a8a6a2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;font-family:ui-monospace,monospace;">${p.orderCode}</div>`
@@ -8321,7 +8306,10 @@
                         const _segBorder = _isFirst ? '' : 'border-top:2px dashed rgba(0,0,0,0.18);';
                         const _pOk = (p.orderKey || p.orderCode || '').replace(/'/g, "\\'");
                         // 재단 카드는 클릭 시 실제 재단편집 도구가 팝업으로 뜨며 바로 편집 가능
-                        const _cutClick = (_isFirst && p.isCuttingCard) ? ` onclick="woEditCuttingPlan('${cKey}','${sk}')"` : '';
+                        // 작업시간(clockStart/clockEnd)은 p 객체가 아니라 이 렌더 루프의
+                        // 지역 변수라, 카드에서 뺀 시간 정보를 팝업 헤더에서 보여주려면
+                        // 여기서 함께 넘겨줘야 함
+                        const _cutClick = (_isFirst && p.isCuttingCard) ? ` onclick="woEditCuttingPlan('${cKey}','${sk}',${clockStart ?? 'null'},${clockEnd ?? 'null'})"` : '';
                         html +=
                             `<div class="wo-boring-placed-card" draggable="${_bDone || !_isFirst ? 'false' : 'true'}"` +
                             ` style="top:${_segTop+1}px;height:${_segH}px;${_bcs}${_segBorder}${_bDone ? 'opacity:0.6;' : ''}${p.isCuttingCard ? 'cursor:pointer;' : ''}"` +
