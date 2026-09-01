@@ -7727,11 +7727,19 @@
             const _wDate    = stateKey.substring(0, 10);
             const _wPrereq  = _partPrereqDone(_wck, _wpk, _wobj?.partCompletions?.[_wck] || {});
             const _wQI      = _partQtyInfo(_wobj?.partCompletions?.[_wck], p.dq || 0);
+            // 완료 등록 시 "사유 없이 등록 가능한 기준 수량" — 재단은 원장을 통짜로
+            // 잘라 발주수량보다 더 나오는 게 정상(예: 발주 17개인데 원장 배치상
+            // 18개가 나옴)이라, 발주수량 기준으로 맞추면 실제 작업현장과 달라 매번
+            // 사유를 입력해야 하는 문제가 있었음 — 재단은 실제 예상 생산량(총작업수량)을
+            // 기준으로 삼음
+            const _wDoneQtyBasis = p.isCuttingCard
+                ? ((p.boardParts || []).length * (p.sheets || 0)) || (p.dq || 0)
+                : (p.dq || 0);
             const _wDoneHtml = _wDone
                 ? `<div style="margin-top:5px;text-align:right;"><span style="font-size:9px;font-weight:900;color:#22c55e;">✓ 완료</span>${_wActMin != null ? `<span style="font-size:8px;font-weight:700;color:#60a5fa;margin-left:3px;">${_wActMin.toFixed(1)}분</span>` : ''}</div>`
                 : _wPrereq
                     ? _wStarted
-                        ? `<div style="margin-top:5px;text-align:right;"><button onclick="event.stopPropagation();tlShowPartDoneConfirm('${_wSafeDocId}','${_wSafeCK}','${_wpk}','${_wDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}',${p.dq||0})" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;line-height:1.4;">완료</button></div>`
+                        ? `<div style="margin-top:5px;text-align:right;"><button onclick="event.stopPropagation();tlShowPartDoneConfirm('${_wSafeDocId}','${_wSafeCK}','${_wpk}','${_wDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}',${_wDoneQtyBasis})" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;line-height:1.4;">완료</button></div>`
                         : `<div style="margin-top:5px;text-align:right;"><button onclick="event.stopPropagation();tlMarkPartStarted('${_wSafeDocId}','${_wSafeCK}','${_wpk}','${_wDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}',${p.dq||0})" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#3b82f6;border:none;border-radius:3px;padding:2px 7px;cursor:pointer;line-height:1.4;">▶ 시작</button></div>`
                     : '';
 
@@ -8166,6 +8174,13 @@
                     const _bck   = _bdid ? cKey.substring(_bdid.length + 1) : cKey;
                     const _bobj  = confirmedOrders.find(o => (o.docId || String(o.idNum)) === _bdid);
                     const _bQI   = _partQtyInfo(_bobj?.partCompletions?.[_bck], p.dq || 0);
+                    // 완료 등록 시 "사유 없이 등록 가능한 기준 수량" — 재단은 원장을
+                    // 통짜로 잘라 발주수량보다 더 나오는 게 정상이라, 발주수량 대신
+                    // 실제 예상 생산량(총작업수량)을 기준으로 삼음 (실제 작업현장과
+                    // 맞지 않다는 피드백)
+                    const _bDoneQtyBasis = p.isCuttingCard
+                        ? ((p.boardParts || []).length * (p.sheets || 0)) || (p.dq || 0)
+                        : (p.dq || 0);
 
                     // 첫 세그먼트 높이 사전 계산 (내용 표시 조건 판단용)
                     const _firstSeg  = _woGetSegments(clockStart, clockEnd, exclZones)[0];
@@ -8282,7 +8297,7 @@
                         ? `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><span style="font-size:9px;font-weight:900;color:#22c55e;">✓완료</span>${_bActMin != null ? `<span style="font-size:8px;font-weight:700;color:#60a5fa;margin-left:3px;">${_bActMin.toFixed(1)}분</span>` : ''}</div>`
                         : _bPrereq
                             ? _bStarted
-                                ? `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><button onclick="event.stopPropagation();tlShowPartDoneConfirm('${_bSafeDocId}','${_bSafeCK}','${_bpk}','${_bDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}',${p.dq||0})" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 6px;cursor:pointer;line-height:1.5;">완료</button></div>`
+                                ? `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><button onclick="event.stopPropagation();tlShowPartDoneConfirm('${_bSafeDocId}','${_bSafeCK}','${_bpk}','${_bDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}',${_bDoneQtyBasis})" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 6px;cursor:pointer;line-height:1.5;">완료</button></div>`
                                 : `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><button onclick="event.stopPropagation();tlMarkPartStarted('${_bSafeDocId}','${_bSafeCK}','${_bpk}','${_bDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}',${p.dq||0})" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#3b82f6;border:none;border-radius:3px;padding:1px 6px;cursor:pointer;line-height:1.5;">▶ 시작</button></div>`
                             : '';
 
