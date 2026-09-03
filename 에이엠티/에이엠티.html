@@ -907,7 +907,7 @@
         .tl-wo-table th { padding: 6px 8px; font-size: 10px; font-weight: 800; text-align: left; }
         .tl-wo-table td { padding: 5px 8px; font-size: 11px; border-top: 1px solid #f0eeec; }
         .tl-wo-table tfoot td { background: #f5f5f4; font-weight: 800; }
-        /* ── 보링 기계배정 보드 (절대위치 Gantt) ──────────────────── */
+        /* ── 재단/엣지/보링 기계배정 보드 (순서 있는 카드 목록) ──────────────────── */
         .tl-workorder-panel.boring-mode {
             width: min(860px, 95vw);
             max-height: 95vh;
@@ -918,7 +918,6 @@
         .wo-boring-board {
             border: 1px solid #e3e2e0; border-radius: 10px;
             min-width: 520px; flex-shrink: 0;
-            /* overflow:hidden 제거 — sticky 헤더가 작동하려면 부모에 overflow 없어야 함 */
         }
         /* 헤더 행 */
         .wo-boring-board-hdr {
@@ -928,34 +927,21 @@
             border-radius: 10px 10px 0 0;
             overflow: hidden; /* 헤더 자체만 클리핑 — rounded corner 유지 */
         }
-        .wo-boring-time-hdr {
-            width: 68px; flex-shrink: 0; background: #f8f7f6;
-            border-right: 2px solid #e3e2e0;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 10px; font-weight: 800; color: #b0aeaa; letter-spacing: 0.5px;
-        }
         .wo-boring-machine-hdr {
             flex: 1; border-left: 1px solid #e3e2e0; min-width: 80px;
-            display: flex; align-items: center; justify-content: center;
+            display: flex; align-items: center; justify-content: space-between; gap: 6px;
+            padding: 0 8px;
             font-size: 11px; font-weight: 900; color: #787774; background: #f5f5f4;
         }
-        /* 콘텐츠 행 (flex, 절대위치 컬럼들) */
-        .wo-boring-inner { display: flex; flex-direction: row; position: relative; }
-        .wo-boring-time-col {
-            width: 68px; flex-shrink: 0; position: relative;
-            background: #f8f7f6; border-right: 2px solid #e3e2e0; overflow: hidden;
-        }
+        /* 콘텐츠 행 (기계별 세로 카드 목록) */
+        .wo-boring-inner { display: flex; flex-direction: row; }
         .wo-boring-mac-col {
-            flex: 1; position: relative; border-left: 1px solid #e3e2e0; min-width: 80px;
-            overflow: hidden; /* 배제 구간 오버레이가 컬럼 밖(풀 영역)으로 넘치지 않도록 */
+            flex: 1; min-width: 80px; border-left: 1px solid #e3e2e0;
+            display: flex; flex-direction: column; gap: 6px;
+            padding: 6px; box-sizing: border-box;
         }
-        /* drag-over 컬럼 전체 강조는 제거됨 — 드롭 위치는 고스트 박스(#wo-drop-ghost-*)
-           한 곳으로만 표시 (컬럼 전체 강조와 겹쳐 보여 헷갈린다는 피드백) */
-        /* 시간 눈금선 */
-        .wo-boring-tick {
-            position: absolute; left: 0; right: 0; pointer-events: none;
-            border-top-style: solid; box-sizing: border-box;
-        }
+        /* drag-over 컬럼 전체 강조/드롭 위치 고스트 모두 표시하지 않음 — 두
+           하일라이트가 겹쳐 보여 헷갈린다는 피드백으로 제거됨 */
         .wo-boring-part-card {
             background: #fff; border: 1.5px solid #e3e2e0;
             border-left: 3px solid var(--wo-proc-color, #b0aeaa); border-radius: 5px;
@@ -966,15 +952,14 @@
         }
         .wo-boring-part-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
         .wo-boring-part-card.dragging { opacity: 0.35; cursor: grabbing; }
-        /* ── 타임라인 배치 카드 (절대위치, pm비례 높이) */
+        /* ── 큐 배치 카드 (일반 흐름, 순서대로 쌓임) */
         .wo-boring-placed-card {
-            position: absolute; left: 3px; right: 3px;
             background: #fff; border: 1.5px solid #dddbd8;
             border-left: 3px solid var(--wo-proc-color, #b0aeaa); border-radius: 4px;
-            padding: 3px 5px; box-sizing: border-box;
+            padding: 4px 6px; box-sizing: border-box; min-height: 40px;
             cursor: grab; user-select: none;
             display: flex; flex-direction: column; justify-content: flex-start;
-            overflow: hidden; z-index: 2;
+            overflow: hidden;
             transition: box-shadow 0.1s, opacity 0.1s;
         }
         .wo-boring-placed-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.09); z-index: 3; }
@@ -1035,79 +1020,44 @@
             display: none;
         }
         .wo-card-tip.on { display: block; }
-        /* ── 배제 시간 블록 (10분 단위 토글) */
-        .wo-excl-block {
-            position: absolute; left: 0; right: 0;
-            cursor: pointer; border-radius: 2px;
-            transition: background 0.12s;
-            box-sizing: border-box;
+        /* ── 휴식 마커 (큐 안 카드 사이에 꽂히는 고정 행, 드래그 불가) */
+        .wo-boring-break-marker {
+            display: flex; align-items: center; gap: 5px;
+            background: #fff7ed; border: 1px dashed #fb923c; border-radius: 5px;
+            padding: 3px 6px; box-sizing: border-box;
         }
-        .wo-excl-block:hover { background: rgba(0,0,0,0.05); }
-        .wo-excl-block.on { background: rgba(251,146,60,0.18); border-top: 1px dashed #fb923c; }
-        .wo-excl-block.on:first-of-type { border-top: none; }
-        /* ── 배제 구간 라벨 (시간축 컬럼) */
-        .wo-excl-zone-label {
-            position: absolute; left: 0; right: 0; z-index: 5;
-            display: flex; flex-direction: column; align-items: center;
-            justify-content: center; gap: 2px; padding: 2px 2px;
-            pointer-events: none;
+        .wo-boring-break-icon { font-size: 11px; flex-shrink: 0; }
+        .wo-boring-break-marker select {
+            font-size: 10px; font-weight: 700; color: #ea8030;
+            border: 1px solid #fdba74; border-radius: 3px;
+            background: #fff; padding: 1px 3px; cursor: pointer;
         }
-        .wo-excl-zone-label > * { pointer-events: auto; }
-        .wo-excl-zone-title {
-            font-size: 8px; font-weight: 900; letter-spacing: 0.04em;
-            color: #ea8030; pointer-events: none; white-space: nowrap;
-        }
-        .wo-excl-zone-title.lunch { color: #227C9D; }
-        .wo-excl-zone-select {
-            font-size: 7.5px; border: 1px solid #d0cec9; border-radius: 3px;
-            background: #f5f5f4; color: #787774; padding: 1px 2px;
-            cursor: pointer; width: 100%; max-width: 48px; text-align: center;
-        }
-        .wo-excl-custom-input {
-            font-size: 7px; border: 1px solid #d0cec9; border-radius: 3px;
-            padding: 1px 3px; width: 100%; max-width: 48px;
+        .wo-boring-break-marker input {
+            font-size: 10px; border: 1px solid #fdba74; border-radius: 3px;
+            padding: 1px 4px; flex: 1; min-width: 0;
             color: #37352f; background: #fff; box-sizing: border-box;
         }
-        /* ── 배제 구간 오버레이 (기계 컬럼) */
-        .wo-excl-overlay-text {
-            position: absolute; top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 9px; font-weight: 900; letter-spacing: 0.06em;
-            color: rgba(234,128,48,0.55); white-space: nowrap; pointer-events: none;
-            text-transform: uppercase;
+        .wo-boring-break-marker button {
+            font-size: 10px; font-weight: 900; color: #ea8030;
+            background: none; border: none; cursor: pointer;
+            padding: 0 2px; flex-shrink: 0; line-height: 1;
         }
-        .wo-excl-overlay.lunch .wo-excl-overlay-text { color: rgba(34,124,157,0.55); }
-        /* 작업 시작시간 선택 슬롯 */
-        .wo-start-slot {
-            position: absolute; z-index: 3; cursor: pointer;
-            display: flex; align-items: center; justify-content: center; gap: 4px;
-            border-radius: 5px; box-sizing: border-box;
-            transition: background 0.12s, border-color 0.12s;
+        .wo-boring-break-marker button:hover { color: #c2410c; }
+        /* 카드 사이 "+ 휴식" 삽입 스트립 — 평소엔 얇게, 호버 시에만 커짐 */
+        .wo-boring-break-insert-btn {
+            display: block; width: 100%; height: 6px; margin: -3px 0;
+            font-size: 0; color: transparent; line-height: 6px; text-align: center;
+            border: none; background: none; cursor: pointer;
+            border-radius: 3px; position: relative; z-index: 1;
+            transition: height 0.12s, font-size 0.12s, color 0.12s, background 0.12s;
         }
-        .wo-start-slot:hover {
-            background: rgba(0,0,0,0.07) !important;
-            border-color: #b0aeaa !important;
-            border-style: solid !important;
+        .wo-boring-break-insert-btn:hover {
+            height: 18px; margin: 0; font-size: 9px; color: #ea8030;
+            background: rgba(251,146,60,0.10);
         }
-        .wo-excl-overlay {
-            position: absolute; left: 0; right: 0; z-index: 1;
-            pointer-events: none; overflow: hidden;
-            background: repeating-linear-gradient(
-                135deg,
-                rgba(251,146,60,0.10) 0px, rgba(251,146,60,0.10) 5px,
-                rgba(251,146,60,0.24) 5px, rgba(251,146,60,0.24) 10px
-            );
-            border-top: 2px solid rgba(251,146,60,0.55);
-            border-bottom: 2px solid rgba(251,146,60,0.55);
-        }
-        .wo-excl-overlay.lunch {
-            background: repeating-linear-gradient(
-                135deg,
-                rgba(34,124,157,0.10) 0px, rgba(34,124,157,0.10) 5px,
-                rgba(34,124,157,0.22) 5px, rgba(34,124,157,0.22) 10px
-            );
-            border-top: 2px solid rgba(34,124,157,0.45);
-            border-bottom: 2px solid rgba(34,124,157,0.45);
+        .wo-boring-empty-col-hint {
+            font-size: 10px; font-weight: 700; color: #c2c0bb;
+            text-align: center; padding: 14px 4px;
         }
         .wo-boring-pool {
             background: #f5f4f2; border: 1.5px dashed #ccc9c5;
@@ -7160,131 +7110,58 @@
                 </div>`;
         };
 
-        // ── 보링 기계배정 드래그앤드롭 ─────────────────────────────────────
-        // 07:00 ~ 22:30, 30분 단위 32슬롯 전역 상수
-        // ── 배제 시간 관리
-        window._woExclusions      = {};  // sk → Set<blockStart(분)>
-        window._woExclusionReasons = {}; // sk → { zoneStart: {reason, custom} }
-        window._woMacStartMin     = {};  // sk → { mac → clockMin }
+        // ── 재단/엣지/보링 기계배정: 순서 있는 목록(큐) ──────────────────────
+        // 예전엔 시간축+절대픽셀 위치의 간트차트였는데, 재단은 기계가 1대뿐이고
+        // 카드 높이가 거의 항상 최소값으로 고정돼 시간축이 실질 정보를 못 주면서
+        // 화면만 복잡해진다는 피드백으로 구조를 전면 개편 — 이제 각 기계는 그냥
+        // "순서가 있는 카드 목록"이고, 휴식/점심은 고정 시각이 아니라 카드 사이에
+        // 꽂히는 마커로 표현한다 (NC/납기 처리, _woRenderPool과 같은 패턴)
+        window._woBoring      = {};   // { stateKey: { mac: [cKey|breakMarker, ...], pool:[] } }
+        window._woBoringParts = {};   // { stateKey: [ {nm,pm,dq,cKey} ] }
+        window._woBDragKey    = null;
 
-        function _woSetMacStart(sk, mac, clockMin) {
-            if (!window._woMacStartMin[sk]) window._woMacStartMin[sk] = {};
-
-            // ── 카드가 이미 배치된 경우: 미고정 카드의 현재 위치를 startMin으로 pin
-            // → 시작시간 변경 후에도 기존 카드는 제자리 유지
-            const _state = window._woBoring[sk];
-            if (_state && _state[mac] && _state[mac].length > 0) {
-                const _oldStart  = window._woMacStartMin[sk][mac] ?? 480;
-                const _exclZones = _woGetExclZones(sk);
-                const _parts     = window._woBoringParts[sk] || [];
-                let   _cur       = _oldStart;
-
-                _state[mac] = _state[mac].map(x => {
-                    // 이미 pinned — 구형(7시 기준) 변환만 보정
-                    if (typeof x === 'object' && x !== null && x.startMin != null) {
-                        const sm = x.startMin < 420 ? x.startMin + 420 : x.startMin;
-                        return { cKey: x.cKey, startMin: sm };
-                    }
-                    // 미고정: 현재 누적 위치를 startMin으로 확정
-                    const _cKey = typeof x === 'string' ? x : x?.cKey;
-                    if (!_cKey) return x;
-                    const _p  = _parts.find(pp => pp.cKey === _cKey);
-                    const _pm = _p ? _p.pm : 0;
-                    const _thisStart = _cur;
-                    _cur = _woCalcEffectiveEnd(_thisStart, _pm, _exclZones);
-                    return { cKey: _cKey, startMin: _thisStart };
-                });
-            }
-
-            window._woMacStartMin[sk][mac] = clockMin;
+        // 문자열(cKey) / 레거시 {cKey,startMin} 객체 / 새 휴식마커({type:'break',...})를
+        // 모두 허용하는 통합 정규화 — 카드는 순수 문자열로, 마커는 그대로 통과시킴
+        function _woNormEntries(arr) {
+            if (!Array.isArray(arr) || !arr.length) return [];
+            return arr.map(x => {
+                if (typeof x === 'string') return x;
+                if (x && x.type === 'break') return x;
+                if (x && x.cKey) return x.cKey; // 레거시 {cKey,startMin} → startMin 버리고 순수 문자열로
+                return null;
+            }).filter(v => v !== null);
+        }
+        // 특정 기계의 원본 배열(카드+마커) 그대로 반환 — 렌더링/인덱스 계산의 단일 소스
+        function _woGetEntries(sk, mac) {
+            return _woNormEntries((window._woBoring[sk] || {})[mac] || []);
+        }
+        function _woGenId() {
+            return 'brk_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        }
+        // ── 휴식 마커 CRUD (기계별 독립 — 큐 안의 카드 N과 N+1 사이에 꽂히는 마커) ──
+        function _woInsertBreakMarker(sk, mac, atIndex) {
+            const entries = _woGetEntries(sk, mac);
+            entries.splice(atIndex, 0, { type: 'break', id: _woGenId(), reason: '휴식', custom: '' });
+            if (!window._woBoring[sk]) window._woBoring[sk] = {};
+            window._woBoring[sk][mac] = entries;
             _woRenderBoard(sk);
         }
-        function _woGetMacStart(sk, mac) {
-            return (window._woMacStartMin[sk] && window._woMacStartMin[sk][mac] != null)
-                ? window._woMacStartMin[sk][mac] : null;
-        }
-
-        function _woGetExclBlocks(sk) {
-            return window._woExclusions[sk] || (window._woExclusions[sk] = new Set());
-        }
-        function _woGetExclZones(sk) {
-            const blocks = Array.from(_woGetExclBlocks(sk)).sort((a,b)=>a-b);
-            if (!blocks.length) return [];
-            const zones = [];
-            let zS = blocks[0], zE = blocks[0] + 10;
-            for (let i = 1; i < blocks.length; i++) {
-                if (blocks[i] === zE) { zE += 10; }
-                else { zones.push({start:zS, end:zE}); zS = blocks[i]; zE = blocks[i]+10; }
-            }
-            zones.push({start:zS, end:zE});
-            return zones;
-        }
-        function _woToggleExclBlock(sk, blockStart) {
-            const s = _woGetExclBlocks(sk);
-            if (s.has(blockStart)) s.delete(blockStart); else s.add(blockStart);
+        function _woRemoveBreakMarker(sk, mac, id) {
+            window._woBoring[sk][mac] = _woGetEntries(sk, mac).filter(x => !(x && x.type === 'break' && x.id === id));
             _woRenderBoard(sk);
         }
-        // 특정 구간 전체 취소
-        function _woClearExclZone(sk, zoneStart, zoneEnd) {
-            const s = _woGetExclBlocks(sk);
-            for (let m = zoneStart; m < zoneEnd; m += 10) s.delete(m);
-            if (window._woExclusionReasons[sk]) delete window._woExclusionReasons[sk][zoneStart];
-            _woRenderBoard(sk);
-        }
-        // 전체 배제 초기화
-        function _woClearAllExcl(sk) {
-            window._woExclusions[sk]      = new Set();
-            window._woExclusionReasons[sk] = {};
-            _woRenderBoard(sk);
-        }
-        function _woSetExclReason(sk, zoneStart, reason) {
-            if (!window._woExclusionReasons[sk]) window._woExclusionReasons[sk] = {};
-            const prev = window._woExclusionReasons[sk][zoneStart] || {};
-            window._woExclusionReasons[sk][zoneStart] = {reason, custom: prev.custom || ''};
-            // 기타 선택시 입력창 표시/숨김 (재렌더 없이)
-            const inp = document.getElementById(`wo-excl-inp-${sk}-${zoneStart}`);
+        function _woSetBreakReason(sk, mac, id, reason) {
+            const m = _woGetEntries(sk, mac).find(x => x && x.type === 'break' && x.id === id);
+            if (m) m.reason = reason;
+            const inp = document.getElementById(`wo-break-inp-${id}`);
             if (inp) inp.style.display = reason === '기타' ? 'block' : 'none';
         }
-        function _woSetExclCustom(sk, zoneStart, val) {
-            if (!window._woExclusionReasons[sk]) window._woExclusionReasons[sk] = {};
-            const prev = window._woExclusionReasons[sk][zoneStart] || {};
-            window._woExclusionReasons[sk][zoneStart] = {reason: prev.reason || '기타', custom: val};
+        function _woSetBreakCustom(sk, mac, id, val) {
+            const m = _woGetEntries(sk, mac).find(x => x && x.type === 'break' && x.id === id);
+            if (m) m.custom = val;
         }
-        // 카드의 실제 종료 시간(분) 계산 — 배제 구간을 건너뜀
-        function _woCalcEffectiveEnd(startMin, pm, zones) {
-            let workLeft = pm, cur = startMin;
-            for (const z of zones) {
-                if (z.end <= cur) continue;
-                if (z.start >= cur + workLeft) break;
-                const workBefore = Math.max(0, z.start - cur);
-                workLeft -= workBefore; cur = z.start;
-                if (workLeft <= 0) break;
-                cur = z.end; // 배제 구간 건너뜀
-            }
-            return cur + workLeft;
-        }
-        // 시계 구간 [clockStart, clockEnd]에서 배제 구간을 제외한 실제 작업 세그먼트 반환
-        function _woGetSegments(clockStart, clockEnd, exclZones) {
-            const segs = [];
-            let cur = clockStart;
-            for (const z of exclZones) {
-                if (z.end <= cur || z.start >= clockEnd) continue;
-                if (cur < z.start) segs.push({ s: cur, e: Math.min(z.start, clockEnd) });
-                cur = Math.max(cur, z.end);
-            }
-            if (cur < clockEnd) segs.push({ s: cur, e: clockEnd });
-            return segs.length ? segs : [{ s: clockStart, e: clockEnd }];
-        }
-        // 빈 컬럼 시작시간 슬롯 드롭 — macStart 미설정시 해당 슬롯 시간으로 자동 설정 후 드롭 처리
-        window._woDropOnEmptyCol = function(e, sk, mac, m) {
-            if (_woGetMacStart(sk, mac) == null) {
-                if (!window._woMacStartMin[sk]) window._woMacStartMin[sk] = {};
-                window._woMacStartMin[sk][mac] = m;
-            }
-            woBoardDrop(e, mac, null, sk);
-        };
 
-        // ── 타임라인 공통 헬퍼 (보링/엣지 공용) ──────────────────────────
+        // ── 타임라인 공통 헬퍼 (재단/보링/엣지 공용) ──────────────────────
         function _woGetMachines(sk) {
             if (sk.endsWith('-엣지')) return ['1호기','2호기','3호기','4호기','5호기'];
             if (sk.endsWith('-재단')) return ['AMT'];
@@ -7295,15 +7172,6 @@
             if (sk.endsWith('-재단')) return { procKey:'재단', color:'#90BBC6', colorAlpha:'rgba(144,187,198,0.08)', label:'재단' };
             return { procKey:'보링', color:'#227C9D', colorAlpha:'rgba(34,124,157,0.08)', label:'보링' };
         }
-
-        window._WO_SLOTS = Array.from({length:48}, (_, i) => {
-            const h = String(Math.floor(i / 2)).padStart(2, '0');
-            return `${h}:${i % 2 === 0 ? '00' : '30'}`;
-        });
-        window._WO_PX_PER_MIN = 44 / 30; // 30분 = 44px 기준 (1분 ≈ 1.47px)
-        window._woBoring      = {};   // { stateKey: { '1호기':{'07:00':[],...}, pool:[] } }
-        window._woBoringParts = {};   // { stateKey: [ {nm,pm,dq,cKey} ] }
-        window._woBDragKey    = null;
 
         // pool용 카드 HTML (border-left 색상은 부모 요소의 --wo-proc-color CSS 변수로 자동 적용)
         // 오더번호별 색상 팔레트 — 뮤트 내추럴톤 (배경 극저채도 / 테두리 중간채도)
@@ -7504,7 +7372,7 @@
         // 팝업을 닫을 때 원래 있던 자리로 되돌려놓는다.
         window._woInlineEditState = null;
 
-        window.woEditCuttingPlan = function(cKey, sk, clockStart, clockEnd) {
+        window.woEditCuttingPlan = function(cKey, sk) {
             const p = (window._woBoringParts[sk] || []).find(pp => pp.cKey === cKey);
             if (!p || !p.isCuttingCard) { showToastMessage('편집할 수 있는 카드가 아닙니다.'); return; }
 
@@ -7534,15 +7402,14 @@
             // 사이즈·마감·작업시간)를 여기 팝업 헤더에서 보여줌 — 카드에서 빠진
             // 정보가 사라지는 게 아니라 팝업으로 옮겨진 것
             const _dimStrHdr = (p.rw && p.rd) ? `${p.rw}×${p.rd}` : '';
-            const _cutTimeStrHdr = (clockStart != null && clockEnd != null)
-                ? (m => `${String(Math.floor(m/60)).padStart(2,'0')}:${String(Math.round(m)%60).padStart(2,'0')}`)
-                : null;
-            const _timeRangeHdr = _cutTimeStrHdr ? `${_cutTimeStrHdr(clockStart)} ~ ${_cutTimeStrHdr(clockEnd)}` : '';
+            // 시간축이 없어져 clockStart~clockEnd 범위 대신 소요시간 텍스트만 표시
+            const _pmValHdr = p.pm || 0;
+            const _durHdr = _pmValHdr >= 1 ? `${_pmValHdr.toFixed(1)}분` : (_pmValHdr > 0 ? `${Math.round(_pmValHdr * 60)}초` : '');
             const _hdrMeta = [
                 p.orderCode || '',
                 _dimStrHdr,
                 p.coating || '',
-                _timeRangeHdr ? `⏱ ${_timeRangeHdr}` : ''
+                _durHdr ? `⏱ ${_durHdr}` : ''
             ].filter(Boolean).join(' · ');
             header.innerHTML =
                 `<div style="min-width:0;">` +
@@ -7865,482 +7732,184 @@
         //   ① 어떤 카드도 MIN_CARD_H 이하로 그려지지 않는다 (상한 없음, 타임라인 확장)
         //   ② 확장된 스케일은 세 기계 모두에 동일하게 적용 → 시간 비례 유지
         //   PX_PER_MIN = max(BASE, MIN_CARD_H / min_pm_per_machine)  – 기계별 계산 후 전역 max
+        // 큐 카드 하나(카드 문자열 entry)의 HTML — 예전 절대위치 카드와 내용은 동일하고,
+        // 시계 range 표시만 소요시간 텍스트로 바뀌었고 일반 흐름(normal flow)으로 렌더링됨
+        function _woPlacedCardHtml(p, cKey, sk, mac, _boardColorMap) {
+            const _bpk   = sk.replace(/^\d{4}-\d{2}-\d{2}-/, '');
+            const _bdid  = p.orderKey || '';
+            const _bck   = _bdid ? cKey.substring(_bdid.length + 1) : cKey;
+            const _bobj  = confirmedOrders.find(o => (o.docId || String(o.idNum)) === _bdid);
+            const _bQI   = _partQtyInfo(_bobj?.partCompletions?.[_bck], p.dq || 0);
+            // 완료 등록 시 "사유 없이 등록 가능한 기준 수량" — 재단은 원장을
+            // 통짜로 잘라 발주수량보다 더 나오는 게 정상이라, 발주수량 대신
+            // 실제 예상 생산량(총작업수량)을 기준으로 삼음 (실제 작업현장과
+            // 맞지 않다는 피드백)
+            const _bDoneQtyBasis = p.isCuttingCard
+                ? ((p.boardParts || []).length * (p.sheets || 0)) || (p.dq || 0)
+                : (p.dq || 0);
+
+            // ─── 배치 카드 (재단카드: 6개 핵심정보 / 일반카드: 컴팩트 2행) ───
+            let _placedInner = '';
+            if (p.isCuttingCard) {
+                // 카드는 6가지 핵심 정보만 작게 표시하고, 나머지(발주번호·사이즈·
+                // 작업시간·도면 등)는 카드 클릭 시 뜨는 재단편집 팝업에서 확인
+                const _perSheet2 = (p.boardParts || []).length;
+                const _yield2    = _perSheet2 * (p.sheets || 0);
+                const _excess2   = Math.max(0, _yield2 - (p.dq || 0));
+                const _yieldVal2 = `${_yield2}개` + (_excess2 > 0 ? `<span style="font-size:9px;font-weight:700;color:#c2793a;margin-left:2px;">(+${_excess2})</span>` : '');
+                const _plateLine2 = [p.plateName, p.finish].filter(Boolean).join('-');
+                const _pills2 = [];
+                if (p.dq) _pills2.push(_woStatPill('발주', `${p.dq} EA`, 'primary', true));
+                if (_yield2 > 0) _pills2.push(_woStatPill('작업', _yieldVal2, 'accent', true));
+
+                // 제품명 - 부속명을 한 줄로 붙여 표기, 줄바뀜 없이 넘치면 말줄임표
+                const _titleLine2 = [p.orderName, p.nm].filter(Boolean).join(' - ');
+                _placedInner =
+                    (_titleLine2 ? `<div style="font-size:12px;font-weight:800;color:#37352f;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${_titleLine2}</div>` : '') +
+                    `<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:3px;">` +
+                    `<span style="display:inline-block;line-height:0;flex-shrink:0;">${_woColorSwatchHtml(p.finish)}</span>` +
+                    `<span style="font-size:11px;font-weight:700;color:#5f5d59;line-height:1.3;word-break:break-word;">${_plateLine2||'-'}</span>` +
+                    (p.sheets ? `<span style="flex-shrink:0;font-size:9px;font-weight:700;color:#8a8783;background:#f0efed;padding:1px 6px;border-radius:8px;">${p.sheets}매</span>` : '') +
+                    `</div>` +
+                    (_pills2.length ? `<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:5px;">${_pills2.join('')}</div>` : '');
+            } else {
+                const _codePlaced = p.orderCode
+                    ? `<div style="font-size:10px;font-weight:700;color:#a8a6a2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;font-family:ui-monospace,monospace;">${p.orderCode}</div>`
+                    : '';
+                const _cOn2 = p.orderName
+                    ? `<div style="font-size:11px;font-weight:600;color:#a8a6a2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3;">${p.orderName}</div>`
+                    : '';
+                const _cNm2 = `<div style="display:flex;align-items:center;justify-content:space-between;gap:4px;overflow:hidden;margin-top:1px;">` +
+                    `<span style="font-size:13px;font-weight:800;color:#37352f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3;">${p.nm}</span>` +
+                    `<span style="font-size:11px;font-weight:700;color:${_bQI.color};background:${_bQI.bg};padding:1px 5px;border-radius:3px;white-space:nowrap;flex-shrink:0;">${_bQI.label} EA</span>` +
+                    `</div>`;
+                const _dimPlaced = (p.rw && p.rd)
+                    ? `<span style="font-size:10px;font-weight:700;color:#787774;background:#f0efed;padding:1px 5px;border-radius:3px;margin-right:4px;">${p.rw}×${p.rd}</span>` : '';
+                // 시간축이 없어져 clockStart~clockEnd 범위 대신, 풀 카드와 같은
+                // 방식으로 소요시간 텍스트만 표시 (예: "⏱ 12.4분" / "⏱ 45초")
+                const _pmVal  = p.pm || 0;
+                const _pmStr  = _pmVal >= 1 ? `${_pmVal.toFixed(1)}분` : (_pmVal > 0 ? `${Math.round(_pmVal * 60)}초` : '');
+                const _cTime2 = (_dimPlaced || _pmStr)
+                    ? `<div style="margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${_dimPlaced}${_pmStr ? `<span style="font-size:11px;font-weight:600;color:#a0a09c;">⏱ ${_pmStr}</span>` : ''}</div>`
+                    : '';
+                _placedInner = `<div style="flex:1;min-height:0;display:flex;flex-direction:column;">` + _codePlaced + _cOn2 + _cNm2 + _cTime2 + `</div>`;
+            }
+
+            const _bok = p.orderKey || p.orderCode || '';
+            const _bcc = _boardColorMap[_bok] || {};
+            // 재단 카드는 흰 배경 기본 스타일을 유지하고 색은 배지에만 남김
+            // ("배경색·라인색 때문에 카드가 없어 보인다"는 피드백)
+            const _bcs = (p.isCuttingCard || !_bcc.bg) ? '' : `background:${_bcc.bg};border-left:3px solid ${_bcc.bd};`;
+
+            const _bDone    = !!(_bobj?.partCompletions?.[_bck]?.[_bpk]);
+            const _bStarted = !!(_bobj?.partStarted?.[_bck]?.[_bpk]);
+            // 완료됐지만 partName 없는 경우 자동 수정
+            if (_bDone && _bobj?.docId && p.nm) {
+                const _bVal = _bobj?.partCompletions?.[_bck]?.[_bpk];
+                if (_bVal && typeof _bVal === 'object' && !_bVal.partName) {
+                    const { doc: _bDoc, updateDoc: _bUpd } = window.fbFirestore;
+                    _bUpd(_bDoc(window.db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'confirmed_orders', _bobj.docId), {
+                        [`partCompletions.${_bck}.${_bpk}.partName`]: p.nm
+                    }).catch(() => {});
+                }
+            }
+            const _bActMin   = _bobj?.partCompletions?.[_bck]?.[_bpk]?.actualMinutes ?? null;
+            const _bSafeDocId = _bdid.replace(/'/g, "\\'");
+            const _bSafeCK    = _bck.replace(/'/g, "\\'");
+            const _bDate     = sk.substring(0, 10);
+            const _bPrereq = _partPrereqDone(_bck, _bpk, _bobj?.partCompletions?.[_bck] || {});
+            const _bDoneHtml  = _bDone
+                ? `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><span style="font-size:9px;font-weight:900;color:#22c55e;">✓완료</span>${_bActMin != null ? `<span style="font-size:8px;font-weight:700;color:#60a5fa;margin-left:3px;">${_bActMin.toFixed(1)}분</span>` : ''}</div>`
+                : _bPrereq
+                    ? _bStarted
+                        ? `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><button onclick="event.stopPropagation();tlShowPartDoneConfirm('${_bSafeDocId}','${_bSafeCK}','${_bpk}','${_bDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}',${_bDoneQtyBasis})" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 6px;cursor:pointer;line-height:1.5;">완료</button></div>`
+                        : `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><button onclick="event.stopPropagation();tlMarkPartStarted('${_bSafeDocId}','${_bSafeCK}','${_bpk}','${_bDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}',${p.dq||0})" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#3b82f6;border:none;border-radius:3px;padding:1px 6px;cursor:pointer;line-height:1.5;">▶ 시작</button></div>`
+                    : '';
+
+            const _pOk = (p.orderKey || p.orderCode || '').replace(/'/g, "\\'");
+            // 재단 카드는 클릭 시 실제 재단편집 도구가 팝업으로 뜨며 바로 편집 가능
+            const _cutClick = p.isCuttingCard ? ` onclick="woEditCuttingPlan('${cKey}','${sk}')"` : '';
+            const _cardCls = 'wo-boring-placed-card' + (p.isCuttingCard ? ' cutting-card' : '');
+            return `<div class="${_cardCls}" draggable="${_bDone ? 'false' : 'true'}"` +
+                ` style="${_bcs}${_bDone ? 'opacity:0.6;' : ''}${p.isCuttingCard ? 'cursor:pointer;' : ''}"` +
+                ` data-ck="${cKey}" data-sk="${sk}" data-mac="${mac}" data-ok="${_pOk}" data-done="${_bDone ? '1' : '0'}"${_cutClick}` +
+                (!_bDone ? ` ondblclick="woBoardDblClick('${cKey}','${sk}')" ondragstart="woBoardDragStart(event,'${cKey}','${sk}')" ondragend="woBoardDragEnd(event)"` : '') +
+                `>${_placedInner}${_bDoneHtml}</div>`;
+        }
+
+        // 휴식 마커 한 줄 — 카드 N과 N+1 사이에 꽂히는 고정 항목(드래그 불가)
+        function _woBreakMarkerHtml(sk, mac, m) {
+            const r = m.reason || '휴식';
+            const opts = ['휴식','점심','기타'].map(o => `<option${r===o?' selected':''}>${o}</option>`).join('');
+            return `<div class="wo-boring-break-marker" data-brk-id="${m.id}">` +
+                `<span class="wo-boring-break-icon">☕</span>` +
+                `<select onchange="_woSetBreakReason('${sk}','${mac}','${m.id}',this.value)">${opts}</select>` +
+                `<input id="wo-break-inp-${m.id}" type="text" placeholder="사유입력" value="${(m.custom||'').replace(/"/g,'&quot;')}"` +
+                ` style="display:${r==='기타'?'block':'none'};"` +
+                ` onblur="_woSetBreakCustom('${sk}','${mac}','${m.id}',this.value)">` +
+                `<button onclick="_woRemoveBreakMarker('${sk}','${mac}','${m.id}')" title="휴식 삭제">✕</button>` +
+                `</div>`;
+        }
+
+        // 카드 사이 "+ 휴식 추가" 삽입 스트립
+        function _woBreakInsertStripHtml(sk, mac, atIndex) {
+            return `<button type="button" class="wo-boring-break-insert-btn" ` +
+                `onclick="_woInsertBreakMarker('${sk}','${mac}',${atIndex})" title="여기에 휴식 추가">+ 휴식</button>`;
+        }
+
         function _woRenderBoard(sk) {
             const grid = document.getElementById('wo-boring-grid-' + sk);
             if (!grid) return;
-            const parts    = window._woBoringParts[sk] || [];
-            const state    = window._woBoring[sk];
+            const parts  = window._woBoringParts[sk] || [];
+            const state  = window._woBoring[sk];
             if (!state) return;
-            const machines   = _woGetMachines(sk);
-            const procMeta   = _woGetProcMeta(sk);
+            const machines = _woGetMachines(sk);
+            const procMeta  = _woGetProcMeta(sk);
             // 공정색을 CSS 변수로 주입 → placed 카드 border + drag-over 강조에 자동 적용
             grid.style.setProperty('--wo-proc-color', procMeta.color);
-            const MIN_CARD_H = 96;   // 카드 최소 높이 (px) — 내용+완료버튼 공간 포함 (오더코드 줄 추가로 상향)
-            const GAP_PX     = 2;    // 카드 사이 간격
 
-            // 기계별 순서 배열 정규화
-            const macKeys = {};
-            machines.forEach(mac => {
-                macKeys[mac] = (state[mac] || []).map(x => typeof x === 'string' ? x : x?.cKey).filter(Boolean);
-            });
+            const _boardColorMap = _woGetOrderColorMap(sk);
 
-            // ── 기본 배제 구간 초기화 (sk 최초 진입시 1회)
-            if (!window._woExclusions[sk]) {
-                // 10:00~10:20 휴식(m=600,610), 12:00~13:00 점심(m=720~770), 15:00~15:20 휴식(m=900,910)
-                window._woExclusions[sk] = new Set([600,610, 720,730,740,750,760,770, 900,910]);
-                window._woExclusionReasons[sk] = {
-                    600: {reason:'휴식', custom:''},
-                    720: {reason:'점심', custom:''},
-                    900: {reason:'휴식', custom:''}
-                };
-            }
-
-            // ── 배제 구간 정보 (타임라인 계산보다 먼저)
-            const exclZones   = _woGetExclZones(sk);
-            const exclBlocks  = _woGetExclBlocks(sk);
-            const exclReasons = (window._woExclusionReasons[sk]) || {};
-
-            // ── PX/분 스케일 동적 계산: 배치 카드 중 최단 작업시간 기준으로 MIN_CARD_H 보장
-            const _BASE_PX   = 1.0;   // 최소 스케일 (px/min)
-            const _MAX_PX    = 14.5;  // 최대 스케일 — 최단 7분 카드도 MIN_CARD_H(96px) 보장
-            const _procKey0  = sk.replace(/^\d{4}-\d{2}-\d{2}-/, '');
-            let   _minPmReg  = Infinity, _minPmCut = Infinity;
-            machines.forEach(mac => {
-                (state[mac] || []).forEach(entry => {
-                    const ek  = typeof entry === 'string' ? entry : entry?.cKey;
-                    if (!ek) return;
-                    const ep  = parts.find(p => p.cKey === ek);
-                    if (!ep) return;
-                    const _eo  = confirmedOrders.find(o => (o.docId || String(o.idNum)) === (ep.orderKey || ''));
-                    const _eck = ep.orderKey ? ek.substring(ep.orderKey.length + 1) : ek;
-                    const _epm = _eo?.partCompletions?.[_eck]?.[_procKey0]?.actualMinutes ?? ep.pm ?? 0;
-                    if (_epm > 0) {
-                        if (ep.isCuttingCard) _minPmCut = Math.min(_minPmCut, _epm);
-                        else                  _minPmReg = Math.min(_minPmReg, _epm);
-                    }
-                });
-            });
-            const _reqR      = isFinite(_minPmReg) ? MIN_CARD_H / _minPmReg : _BASE_PX;
-            const _reqC      = isFinite(_minPmCut) ? 80          / _minPmCut : _BASE_PX;
-            const PX_PER_MIN = Math.min(_MAX_PX, Math.max(_BASE_PX, _reqR, _reqC));
-            window._woPxPerMin = window._woPxPerMin || {};
-            window._woPxPerMin[sk] = PX_PER_MIN;
-
-            // ── 보드 표시 기준: 가장 이른 macStart → 타임라인 시작점
-            const boardStartMin  = Math.min(...machines.map(mac => _woGetMacStart(sk, mac) ?? 480));
-            const boardOffsetPx  = Math.round(boardStartMin * PX_PER_MIN);
-            // toPx: 시계분 → 렌더링 Y (눈금/배제구간 전용 — 카드는 별도 변환)
-            const toPx = min => Math.round(min * PX_PER_MIN) - boardOffsetPx;
-
-            // ── 기계별 타임라인: 기본 순서 누적 + 이동 카드 절대 시간 + 겹침 자동 밀어냄
-            const macTimelines = {};
-            machines.forEach(mac => {
-                const ms      = _woGetMacStart(sk, mac) ?? 480;
-                let actualCur = ms;
-                let visualY   = ms * PX_PER_MIN;
-                const rawArr  = state[mac] || [];
-                const entries = rawArr.map(x => {
-                    if (typeof x === 'string') return { cKey: x, startMin: null };
-                    if (x.startMin != null) {
-                        // 구형 7시 기준 데이터(0~360 범위)는 자정 기준으로 변환
-                        const sm = x.startMin < 420 ? x.startMin + 420 : x.startMin;
-                        return { cKey: x.cKey, startMin: sm };
-                    }
-                    return { cKey: x.cKey, startMin: null };
-                });
-                const tl = [];
-
-                // ── 1단계: 초기 위치 계산 (startMin 있으면 절대, 없으면 누적)
-                entries.forEach(entry => {
-                    const p        = parts.find(pp => pp.cKey === entry.cKey);
-                    const _procKey = sk.replace(/^\d{4}-\d{2}-\d{2}-/, '');
-                    const _ordAct  = p ? confirmedOrders.find(o => (o.docId || String(o.idNum)) === p.orderKey) : null;
-                    const _ckAct   = p ? p.cKey.substring((p.orderKey || '').length + 1) : '';
-                    const _actPm   = _ordAct?.partCompletions?.[_ckAct]?.[_procKey]?.actualMinutes;
-                    const pm       = p ? (_actPm ?? p.pm) : 0;
-                    // 도면이 텍스트 칸 높이에 맞춰(fitHeight) 그려지므로 카드 높이는 텍스트
-                    // 기준으로만 결정 — 도면 때문에 카드가 더 커지지 않도록 함.
-                    // 카드에는 6가지 핵심 정보(제품명/원장정보/원장매수/부속명/발주수량/
-                    // 작업수량)만 작게 표시하고, 나머지(발주번호·사이즈·도면·작업시간)는
-                    // 클릭 시 뜨는 재단편집 팝업으로 옮기면서 필요 높이가 크게 줄어
-                    // 최소높이도 145px → 120px로 하향
-                    // (실측: 긴 발주코드 2건+긴 제품명+긴 원장명까지 다 있는 경우, 카드
-                    // 폭 320~600px 범위에서 약 109px, 120px에서 안 잘림 확인. 폭이
-                    // 260px 이하로 아주 좁아지면 144px까지 필요할 수 있어 그 경우는
-                    // cardH 계산이 spanPx로 자연스럽게 더 늘어나지 않는 한 잘릴 수 있음)
-                    const cardMinH = (p && p.isCuttingCard) ? 120 : MIN_CARD_H;
-
-                    let cStart, topPx;
-                    if (entry.startMin != null) {
-                        cStart = entry.startMin;
-                        topPx  = Math.round(cStart * PX_PER_MIN);
-                        // 핀 카드도 actualCur에 반영 (다음 누적 카드의 기준이 됨)
-                        const _pinnedEnd = _woCalcEffectiveEnd(cStart, pm, exclZones);
-                        if (_pinnedEnd > actualCur) actualCur = _pinnedEnd;
-                    } else {
-                        // 기본 배치: actualCur가 구간 안에 있으면 구간 이후로 밀어냄
-                        // (구간을 가로지르는 경우는 세그먼트 분할로 처리)
-                        for (const z of exclZones) {
-                            if (actualCur >= z.start && actualCur < z.end) {
-                                actualCur = z.end; break;
-                            }
-                        }
-                        cStart = actualCur;
-                        topPx  = Math.round(cStart * PX_PER_MIN);
-                        const _cEnd = _woCalcEffectiveEnd(cStart, pm, exclZones);
-                        actualCur   = _cEnd;
-                        // visualY: 다음 카드 시작 기준 — 마지막 세그먼트 끝
-                        visualY     = _cEnd * PX_PER_MIN;
-                    }
-                    const cEnd   = _woCalcEffectiveEnd(cStart, pm, exclZones);
-                    // topPx = clockStart 절대px, cardH = 전체 시계 span (세그먼트 포함 break gap)
-                    const spanPx = Math.round((cEnd - cStart) * PX_PER_MIN);
-                    tl.push({ cKey: entry.cKey, pm, clockStart: cStart, clockEnd: cEnd,
-                               topPx, cardH: Math.max(cardMinH, spanPx) - GAP_PX,
-                               _pinned: entry.startMin != null, _minH: cardMinH });
-                });
-
-                // ── 2단계: topPx 순 정렬 후 카드 간 겹침만 밀어냄 (구간 처리는 세그먼트 렌더로)
-                tl.sort((a, b) => a.topPx - b.topPx);
-                let prevEndPx       = 0;   // 이전 카드의 시각적 하단 px (MIN_CARD_H 팽창 포함)
-                let prevClockEnd    = 0;   // 이전 카드의 정확한 clockEnd (분)
-                let prevVisualEndMin = 0;  // 시각적 하단을 분으로 환산 — 다음 카드 clockStart 기준
-                tl.forEach(card => {
-                    // 이전 카드 시각적 하단 이전에 카드가 시작하면 → 시각적 하단부터 배치
-                    if (card.topPx < prevEndPx) {
-                        // clockStart = 시각적 하단 시각 (MIN_CARD_H 팽창 반영)
-                        card.clockStart = prevVisualEndMin;
-                        // clockStart가 배제구간 안이면 구간 이후로
-                        for (const z of exclZones) {
-                            if (card.clockStart >= z.start && card.clockStart < z.end) {
-                                card.clockStart = z.end;
-                                break;
-                            }
-                        }
-                        card.topPx    = Math.round(card.clockStart * PX_PER_MIN);
-                        card.clockEnd = _woCalcEffectiveEnd(card.clockStart, card.pm, exclZones);
-                        const sp = Math.round((card.clockEnd - card.clockStart) * PX_PER_MIN);
-                        card.cardH = Math.max(card._minH ?? MIN_CARD_H, sp) - GAP_PX;
-                    }
-                    // 시각적 하단 = topPx + cardH + GAP_PX (MIN_CARD_H 팽창 포함)
-                    prevClockEnd     = card.clockEnd;
-                    const _clockEndPx    = Math.round(card.clockEnd * PX_PER_MIN);
-                    const _visualBottom  = card.topPx + card.cardH + GAP_PX;
-                    prevEndPx        = Math.max(_clockEndPx, _visualBottom);
-                    prevVisualEndMin = prevEndPx / PX_PER_MIN;
-                });
-                // ── boardStartMin 오프셋 적용 (2단계의 절대px에서 boardOffsetPx만 빼기)
-                // toPx(clockStart) 재계산 금지 — MIN_CARD_H 팽창으로 보장된 간격이 무너짐
-                tl.forEach(card => { card.topPx = card.topPx - boardOffsetPx; });
-
-                macTimelines[mac] = tl;
-                const last = tl[tl.length - 1];
-                macTimelines[mac]._actEnd = last ? last.clockEnd   : ms;
-                macTimelines[mac]._visEnd = last ? (last.topPx + last.cardH) : ms * PX_PER_MIN;
-            });
-
-            // 전역에 타임라인 데이터 노출 — dragover 에서 카드 끝 스냅에 사용
-            window._woMacTimelines = window._woMacTimelines || {};
-            window._woMacTimelines[sk] = macTimelines;
-
-            // 보드 높이: 카드 시각 하단(MIN_CARD_H 팽창 포함) 기준
-            let maxClockMin = boardStartMin + 120;
-            let maxVisY     = 120 * PX_PER_MIN;
-            machines.forEach(mac => {
-                const ms = _woGetMacStart(sk, mac) ?? 480;
-                maxClockMin = Math.max(maxClockMin, ms + 30);
-                const tl = macTimelines[mac];
-                if (tl.length) {
-                    maxClockMin = Math.max(maxClockMin, macTimelines[mac]._actEnd);
-                    // 시각 하단 = topPx(이미 offset 적용) + cardH
-                    const last = tl[tl.length - 1];
-                    maxVisY = Math.max(maxVisY, last.topPx + last.cardH);
-                }
-            });
-            const BOARD_H = Math.max(200, Math.ceil(maxVisY) + 80);
-
-            // ── 헤더 HTML (기계 목록 동적)
-            let html =
-                `<div class="wo-boring-board-hdr">` +
-                `<div class="wo-boring-time-hdr">시간</div>` +
+            // ── 헤더 HTML (기계 목록 동적) — 시작시간 선택은 제거(시간축 없음),
+            // 기계명 + 공유링크 버튼만 유지
+            let html = `<div class="wo-boring-board-hdr">` +
                 machines.map(m => {
-                    const _ms  = _woGetMacStart(sk, m) ?? 480;
-                    const _opts = Array.from({length: 48}, (_, i) => i * 30)
-                        .map(mins => {
-                            const oh = String(Math.floor(mins / 60)).padStart(2,'0');
-                            const om = String(mins % 60).padStart(2,'0');
-                            return `<option value="${mins}"${mins === _ms ? ' selected' : ''}>${oh}:${om}</option>`;
-                        }).join('');
                     const _skEnc = encodeURIComponent(sk);
                     const _macEnc = encodeURIComponent(m);
                     const _shareUrl = `${location.origin}${location.pathname}?mv=1&sk=${_skEnc}&mac=${_macEnc}`;
-                    return `<div class="wo-boring-machine-hdr" style="color:#1a1a1a;background:${procMeta.colorAlpha};flex-direction:column;gap:1px;">` +
-                        `<div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:4px;">` +
+                    return `<div class="wo-boring-machine-hdr" style="color:#1a1a1a;background:${procMeta.colorAlpha};">` +
                         `<span>${m}</span>` +
                         `<button onclick="event.stopPropagation();_woShareMachineView('${_shareUrl.replace(/'/g,"\\'")}')" title="작업화면 공유 링크 복사" ` +
                         `style="font-size:9px;font-weight:700;color:#fff;background:${procMeta.color};border:none;border-radius:4px;padding:2px 6px;cursor:pointer;flex-shrink:0;">📺 공유</button>` +
-                        `</div>` +
-                        `<select onchange="_woSetMacStart('${sk}','${m}',parseInt(this.value))" onclick="event.stopPropagation()" ` +
-                        `style="font-size:10px;font-weight:700;color:#37352f;background:#fff;border:1px solid #dddbd8;border-radius:4px;padding:1px 3px;cursor:pointer;text-align:center;">` +
-                        _opts + `</select></div>`;
+                        `</div>`;
                 }).join('') +
                 `</div>`;
 
-            // ── 내부 콘텐츠 (절대위치 영역)
-            html += `<div class="wo-boring-inner" style="height:${BOARD_H}px;">`;
+            html += `<div class="wo-boring-inner">`;
 
-            // 시간축 컬럼 — 10분 토글 블록 + 30분 눈금 + 배제 구간 라벨
-            html += `<div class="wo-boring-time-col" style="height:${BOARD_H}px;position:relative;">`;
-            // 10분 단위 토글 버튼
-            for (let m = boardStartMin; m < maxClockMin + 30; m += 10) {
-                const yPx  = toPx(m);
-                const h10  = Math.round(10 * PX_PER_MIN);
-                if (yPx >= BOARD_H) break;
-                const isOn = exclBlocks.has(m);
-                const cH   = String(Math.floor(m / 60)).padStart(2,'0');
-                const cM   = String(m % 60).padStart(2,'0');
-                html += `<div class="wo-excl-block${isOn?' on':''}" style="top:${yPx}px;height:${h10}px;"` +
-                    ` title="${cH}:${cM} 배제 토글" onclick="_woToggleExclBlock('${sk}',${m})"></div>`;
-            }
-            // 30분 눈금 + 시간 표기
-            for (let m = boardStartMin; m <= maxClockMin + 30; m += 30) {
-                const yPx = toPx(m);
-                if (yPx > BOARD_H + 5) break;
-                const h   = String(Math.floor(m / 60)).padStart(2, '0');
-                const min = String(m % 60).padStart(2, '0');
-                const isHalf = (m % 60 === 30);
-                html += `<div class="wo-boring-tick" style="top:${yPx}px;pointer-events:none;` +
-                    `border-top-width:1px;border-top-color:${isHalf?'#e3e1de':'#d0ceca'};` +
-                    `border-top-style:${isHalf?'dashed':'solid'};height:1px;"></div>` +
-                    `<div style="position:absolute;top:${yPx+3}px;left:0;right:0;text-align:center;pointer-events:none;` +
-                    `font-size:${isHalf?8:10}px;font-weight:${isHalf?500:800};` +
-                    `color:${isHalf?'#c0bebb':'#8a8884'};line-height:1;">${h}:${min}</div>`;
-            }
-            // 배제 구간 라벨 (사유 선택 + 구간 취소 버튼)
-            exclZones.forEach(z => {
-                const top    = toPx(z.start);
-                const height = Math.round((z.end - z.start) * PX_PER_MIN);
-                const r      = exclReasons[z.start] || {reason:'휴식', custom:''};
-                const opts   = ['휴식','점심','기타'].map(o =>
-                    `<option${r.reason===o?' selected':''}>${o}</option>`).join('');
-                const _titleCls = r.reason === '점심' ? 'wo-excl-zone-title lunch' : 'wo-excl-zone-title';
-                const _zoneDur  = z.end - z.start;
-                const _titleTxt = (r.reason === '기타' ? (r.custom || '기타') : r.reason) + ` ${_zoneDur}분`;
-                html += `<div class="wo-excl-zone-label" style="top:${top}px;height:${height}px;">` +
-                    `<span class="${_titleCls}">${_titleTxt}</span>` +
-                    `<button onclick="_woClearExclZone('${sk}',${z.start},${z.end})" title="이 구간 배제 취소"` +
-                    ` style="font-size:9px;line-height:1;padding:1px 4px;border:1px solid #d0cec9;border-radius:3px;` +
-                    `background:#fff;color:#b0aeaa;cursor:pointer;width:100%;max-width:48px;">✕ 취소</button>` +
-                    `<select class="wo-excl-zone-select" onchange="_woSetExclReason('${sk}',${z.start},this.value)">${opts}</select>` +
-                    `<input id="wo-excl-inp-${sk}-${z.start}" class="wo-excl-custom-input" type="text"` +
-                    ` placeholder="사유입력" value="${r.custom||''}"` +
-                    ` style="display:${r.reason==='기타'?'block':'none'};"` +
-                    ` onblur="_woSetExclCustom('${sk}',${z.start},this.value)">` +
-                    `</div>`;
-            });
-            html += `</div>`; // end time-col
-
-            // 오더별 색상맵 (배치 카드용)
-            const _boardColorMap = _woGetOrderColorMap(sk);
-
-            // 기계 컬럼
             machines.forEach((mac, mi) => {
-                const tl   = macTimelines[mac];
-                const keys = macKeys[mac];
+                const entries = _woGetEntries(sk, mac);
 
-                html +=
-                    `<div class="wo-boring-mac-col" id="mac-col-${mi}-${sk}"` +
-                    ` style="height:${BOARD_H}px;"` +
+                html += `<div class="wo-boring-mac-col" id="mac-col-${mi}-${sk}"` +
                     ` ondragover="woBoardDragOver(event)"` +
                     ` ondrop="woBoardDrop(event,'${mac}',null,'${sk}')"` +
                     ` ondragleave="woBoardDragLeave(event)"` +
                     ` data-mac="${mac}" data-sk="${sk}">`;
 
-                // 30분 눈금선 (배경)
-                for (let m = boardStartMin; m <= maxClockMin + 30; m += 30) {
-                    const yPx = toPx(m);
-                    if (yPx > BOARD_H) break;
-                    const isHalf = (m % 60 === 30);
-                    html += `<div style="position:absolute;left:0;right:0;top:${yPx}px;height:1px;` +
-                        `border-top:1px ${isHalf?'dashed':'solid'} ${isHalf?'#edeceb':'#e3e2e0'};pointer-events:none;"></div>`;
+                html += _woBreakInsertStripHtml(sk, mac, 0);
+
+                if (entries.length === 0) {
+                    html += `<div class="wo-boring-empty-col-hint">여기로 카드를 드래그하세요</div>`;
                 }
 
-                // 배제 구간 오버레이
-                exclZones.forEach(z => {
-                    const top    = toPx(z.start);
-                    const height = Math.round((z.end - z.start) * PX_PER_MIN);
-                    const _r     = exclReasons[z.start] || {reason:'휴식', custom:''};
-                    const _cls   = _r.reason === '점심' ? 'wo-excl-overlay lunch' : 'wo-excl-overlay';
-                    const _lbl   = _r.reason === '기타' ? (_r.custom || '기타') : _r.reason;
-                    const _dur = z.end - z.start;
-                    html += `<div class="${_cls}" style="top:${top}px;height:${height}px;">` +
-                        `<span class="wo-excl-overlay-text">${_lbl} ${_dur}분</span></div>`;
-                });
-
-                // ── 빈 컬럼: 시작시간 선택 슬롯 (drag 이벤트도 처리)
-                if (tl.length === 0) {
-                    const curStart = _woGetMacStart(sk, mac);
-                    for (let m = boardStartMin; m <= maxClockMin + 60; m += 30) {
-                        const yPx  = toPx(m);
-                        const h30  = Math.round(30 * PX_PER_MIN);
-                        if (yPx >= BOARD_H) break;
-                        const isEx = exclZones.some(z => m >= z.start && m < z.end);
-                        if (isEx) continue;
-                        const cH    = String(Math.floor(m / 60)).padStart(2,'0');
-                        const cM    = String(m % 60).padStart(2,'0');
-                        const isSel = (curStart === m);
-                        const bgNormal  = isSel ? 'rgba(0,0,0,0.08)' : 'rgba(0,0,0,0.03)';
-                        const borderClr = isSel ? '#d0cec9' : '#eeeeec';
-                        html += `<div class="wo-start-slot"` +
-                            ` style="left:4px;right:4px;top:${yPx+2}px;height:${h30-4}px;` +
-                            `background:${bgNormal};border:1px ${isSel?'solid':'dashed'} ${borderClr};"` +
-                            ` onclick="_woSetMacStart('${sk}','${mac}',${m})"` +
-                            ` ondragover="event.preventDefault();event.dataTransfer.dropEffect='move';"` +
-                            ` ondragleave=""` +
-                            ` ondrop="_woDropOnEmptyCol(event,'${sk}','${mac}',${m})">` +
-                            `${isSel?`<span style="font-size:11px;color:#b0aeaa;pointer-events:none;line-height:1;">▶</span>`:''}` +
-                            `<span style="font-size:${isSel?11:10}px;font-weight:${isSel?800:600};` +
-                            `color:${isSel?'#555250':'#b0aeaa'};letter-spacing:0.3px;pointer-events:none;">${cH}:${cM}</span>` +
-                            `</div>`;
-                    }
-                }
-
-                // 배치 카드 (절대위치) — 시각 누적 기반 (topPx/cardH 미리 계산)
-                const _fmtClk = m => { const mi = Math.round(m); return `${String(Math.floor(mi/60)).padStart(2,'0')}:${String(mi%60).padStart(2,'0')}`; };
-                tl.forEach(({cKey, topPx, cardH, clockStart, clockEnd, _minH}) => {
-                    const p = parts.find(pp => pp.cKey === cKey);
-                    if (!p) return;
-
-                    // _bQI 먼저 계산 (수량 표기에 _placedInner 생성 전 필요)
-                    const _bpk   = sk.replace(/^\d{4}-\d{2}-\d{2}-/, '');
-                    const _bdid  = p.orderKey || '';
-                    const _bck   = _bdid ? cKey.substring(_bdid.length + 1) : cKey;
-                    const _bobj  = confirmedOrders.find(o => (o.docId || String(o.idNum)) === _bdid);
-                    const _bQI   = _partQtyInfo(_bobj?.partCompletions?.[_bck], p.dq || 0);
-                    // 완료 등록 시 "사유 없이 등록 가능한 기준 수량" — 재단은 원장을
-                    // 통짜로 잘라 발주수량보다 더 나오는 게 정상이라, 발주수량 대신
-                    // 실제 예상 생산량(총작업수량)을 기준으로 삼음 (실제 작업현장과
-                    // 맞지 않다는 피드백)
-                    const _bDoneQtyBasis = p.isCuttingCard
-                        ? ((p.boardParts || []).length * (p.sheets || 0)) || (p.dq || 0)
-                        : (p.dq || 0);
-
-                    // 첫 세그먼트 높이 사전 계산 (내용 표시 조건 판단용)
-                    const _firstSeg  = _woGetSegments(clockStart, clockEnd, exclZones)[0];
-                    const _firstSegH = Math.max(_minH ?? MIN_CARD_H,
-                        Math.round((_firstSeg.e - _firstSeg.s) * PX_PER_MIN));
-
-                    // ─── 배치 카드 (재단카드: 상세 4행 / 일반카드: 컴팩트 2행) ───
-                    let _placedInner = '';
-                    if (p.isCuttingCard) {
-                        // 카드는 6가지 핵심 정보만 작게 표시하고, 나머지(발주번호·사이즈·
-                        // 작업시간·도면 등)는 카드 클릭 시 뜨는 재단편집 팝업에서 확인 —
-                        // "카드를 작게, 나머지는 클릭 시 팝업으로"라는 요청에 따라 카드를
-                        // 대폭 축소. 팝업 헤더에도 발주번호·사이즈·작업시간을 보강해서
-                        // 카드에서 뺀 정보가 팝업에서 그대로 확인되게 함(아래 woEditCuttingPlan 참고)
-                        const _perSheet2 = (p.boardParts || []).length;
-                        const _yield2    = _perSheet2 * (p.sheets || 0);
-                        const _excess2   = Math.max(0, _yield2 - (p.dq || 0));
-                        const _yieldVal2 = `${_yield2}개` + (_excess2 > 0 ? `<span style="font-size:9px;font-weight:700;color:#c2793a;margin-left:2px;">(+${_excess2})</span>` : '');
-                        const _plateLine2 = [p.plateName, p.finish].filter(Boolean).join('-');
-                        const _pills2 = [];
-                        if (p.dq) _pills2.push(_woStatPill('발주', `${p.dq} EA`, 'primary', true));
-                        if (_yield2 > 0) _pills2.push(_woStatPill('작업', _yieldVal2, 'accent', true));
-
-                        // ① 제품명 · ④ 부속명을 "제품명 - 부속명" 한 줄로 붙여 표기하고
-                        // 줄바뀜 없이 넘치면 말줄임표로 자름 (요청에 따라 결합)
-                        const _titleLine2 = [p.orderName, p.nm].filter(Boolean).join(' - ');
-                        _placedInner =
-                            (_titleLine2 ? `<div style="font-size:12px;font-weight:800;color:#37352f;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${_titleLine2}</div>` : '') +
-                            // ② 원장정보 · ③ 원장 매수
-                            `<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:3px;">` +
-                            `<span style="display:inline-block;line-height:0;flex-shrink:0;">${_woColorSwatchHtml(p.finish)}</span>` +
-                            `<span style="font-size:11px;font-weight:700;color:#5f5d59;line-height:1.3;word-break:break-word;">${_plateLine2||'-'}</span>` +
-                            (p.sheets ? `<span style="flex-shrink:0;font-size:9px;font-weight:700;color:#8a8783;background:#f0efed;padding:1px 6px;border-radius:8px;">${p.sheets}매</span>` : '') +
-                            `</div>` +
-                            // ⑤ 발주수량 · ⑥ 작업수량
-                            (_pills2.length ? `<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:5px;">${_pills2.join('')}</div>` : '');
+                entries.forEach((entry, idx) => {
+                    if (entry && typeof entry === 'object' && entry.type === 'break') {
+                        html += _woBreakMarkerHtml(sk, mac, entry);
                     } else {
-                        const _codePlaced = p.orderCode
-                            ? `<div style="font-size:10px;font-weight:700;color:#a8a6a2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;font-family:ui-monospace,monospace;">${p.orderCode}</div>`
-                            : '';
-                        const _cOn2 = p.orderName
-                            ? `<div style="font-size:11px;font-weight:600;color:#a8a6a2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3;">${p.orderName}</div>`
-                            : '';
-                        const _cNm2 = `<div style="display:flex;align-items:center;justify-content:space-between;gap:4px;overflow:hidden;margin-top:1px;">` +
-                            `<span style="font-size:13px;font-weight:800;color:#37352f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3;">${p.nm}</span>` +
-                            `<span style="font-size:11px;font-weight:700;color:${_bQI.color};background:${_bQI.bg};padding:1px 5px;border-radius:3px;white-space:nowrap;flex-shrink:0;">${_bQI.label} EA</span>` +
-                            `</div>`;
-                        const _dimPlaced = (p.rw && p.rd)
-                            ? `<span style="font-size:10px;font-weight:700;color:#787774;background:#f0efed;padding:1px 5px;border-radius:3px;margin-right:4px;">${p.rw}×${p.rd}</span>` : '';
-                        const _pmMin = Math.round(p.pm || 0);
-                        const _timeRange2 = (clockStart != null && clockEnd != null)
-                            ? `${_fmtClk(clockStart)} ~ ${_fmtClk(clockEnd)}`
-                            : '';
-                        const _cTime2 = _timeRange2
-                            ? `<div style="margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${_dimPlaced}<span style="font-size:11px;font-weight:600;color:#a0a09c;">⏱ ${_timeRange2}${_pmMin ? ` (${_pmMin}분)` : ''}</span></div>`
-                            : (_dimPlaced ? `<div style="margin-top:3px;">${_dimPlaced}</div>` : '');
-                        _placedInner = `<div style="flex:1;min-height:0;display:flex;flex-direction:column;">` + _codePlaced + _cOn2 + _cNm2 + _cTime2 + `</div>`;
+                        const p = parts.find(pp => pp.cKey === entry);
+                        if (p) html += _woPlacedCardHtml(p, entry, sk, mac, _boardColorMap);
                     }
-
-                    const _bok = p.orderKey || p.orderCode || '';
-                    const _bcc = _boardColorMap[_bok] || {};
-                    // 재단 카드는 흰 배경 기본 스타일을 유지하고 색은 배지에만 남김
-                    // ("배경색·라인색 때문에 카드가 없어 보인다"는 피드백)
-                    const _bcs = (p.isCuttingCard || !_bcc.bg) ? '' : `background:${_bcc.bg};border-left:3px solid ${_bcc.bd};`;
-
-                    // 완료 상태 확인 (_bpk, _bdid, _bck, _bobj, _bQI 는 위에서 이미 선언됨)
-                    const _bDone    = !!(_bobj?.partCompletions?.[_bck]?.[_bpk]);
-                    const _bStarted = !!(_bobj?.partStarted?.[_bck]?.[_bpk]);
-                    // 완료됐지만 partName 없는 경우 자동 수정
-                    if (_bDone && _bobj?.docId && p.nm) {
-                        const _bVal = _bobj?.partCompletions?.[_bck]?.[_bpk];
-                        if (_bVal && typeof _bVal === 'object' && !_bVal.partName) {
-                            const { doc: _bDoc, updateDoc: _bUpd } = window.fbFirestore;
-                            _bUpd(_bDoc(window.db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'confirmed_orders', _bobj.docId), {
-                                [`partCompletions.${_bck}.${_bpk}.partName`]: p.nm
-                            }).catch(() => {});
-                        }
-                    }
-                    const _bActMin   = _bobj?.partCompletions?.[_bck]?.[_bpk]?.actualMinutes ?? null;
-                    const _bSafeDocId = _bdid.replace(/'/g, "\\'");
-                    const _bSafeCK    = _bck.replace(/'/g, "\\'");
-                    const _bDate     = sk.substring(0, 10);
-                    const _bPrereq = _partPrereqDone(_bck, _bpk, _bobj?.partCompletions?.[_bck] || {});
-                    const _bDoneHtml  = _bDone
-                        ? `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><span style="font-size:9px;font-weight:900;color:#22c55e;">✓완료</span>${_bActMin != null ? `<span style="font-size:8px;font-weight:700;color:#60a5fa;margin-left:3px;">${_bActMin.toFixed(1)}분</span>` : ''}</div>`
-                        : _bPrereq
-                            ? _bStarted
-                                ? `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><button onclick="event.stopPropagation();tlShowPartDoneConfirm('${_bSafeDocId}','${_bSafeCK}','${_bpk}','${_bDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}',${_bDoneQtyBasis})" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 6px;cursor:pointer;line-height:1.5;">완료</button></div>`
-                                : `<div style="margin-top:auto;padding-top:2px;text-align:right;flex-shrink:0;"><button onclick="event.stopPropagation();tlMarkPartStarted('${_bSafeDocId}','${_bSafeCK}','${_bpk}','${_bDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}',${p.dq||0})" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#3b82f6;border:none;border-radius:3px;padding:1px 6px;cursor:pointer;line-height:1.5;">▶ 시작</button></div>`
-                            : '';
-
-                    // 휴식/점심 구간을 경계로 세그먼트 분할 렌더링
-                    const _segs = _woGetSegments(clockStart, clockEnd, exclZones);
-                    _segs.forEach((seg, si) => {
-                        const _isFirst = si === 0;
-                        const _segTop  = Math.round(seg.s * PX_PER_MIN) - boardOffsetPx;
-                        const _segRawH = Math.round((seg.e - seg.s) * PX_PER_MIN);
-                        const _segMinH = _isFirst ? (_minH ?? MIN_CARD_H) : 22;
-                        const _segH    = Math.max(_segMinH, _segRawH);
-                        const _segDur  = Math.round(seg.e - seg.s);
-                        const _segInner = _isFirst
-                            ? _placedInner + _bDoneHtml
-                            : `<div style="font-size:8px;font-weight:800;color:${_bcc.bd||'#888'};padding:2px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">↪ ${_segDur}분</div>`;
-                        const _segBorder = _isFirst ? '' : 'border-top:2px dashed rgba(0,0,0,0.18);';
-                        const _pOk = (p.orderKey || p.orderCode || '').replace(/'/g, "\\'");
-                        // 재단 카드는 클릭 시 실제 재단편집 도구가 팝업으로 뜨며 바로 편집 가능
-                        // 작업시간(clockStart/clockEnd)은 p 객체가 아니라 이 렌더 루프의
-                        // 지역 변수라, 카드에서 뺀 시간 정보를 팝업 헤더에서 보여주려면
-                        // 여기서 함께 넘겨줘야 함
-                        const _cutClick = (_isFirst && p.isCuttingCard) ? ` onclick="woEditCuttingPlan('${cKey}','${sk}',${clockStart ?? 'null'},${clockEnd ?? 'null'})"` : '';
-                        html +=
-                            `<div class="wo-boring-placed-card" draggable="${_bDone || !_isFirst ? 'false' : 'true'}"` +
-                            ` style="top:${_segTop+1}px;height:${_segH}px;${_bcs}${_segBorder}${_bDone ? 'opacity:0.6;' : ''}${p.isCuttingCard ? 'cursor:pointer;' : ''}"` +
-                            ` data-ck="${cKey}" data-sk="${sk}" data-ok="${_pOk}" data-done="${_bDone ? '1' : '0'}"${_cutClick}` +
-                            (_isFirst && !_bDone ? ` ondblclick="woBoardDblClick('${cKey}','${sk}')" ondragstart="woBoardDragStart(event,'${cKey}','${sk}')" ondragend="woBoardDragEnd(event)"` : '') +
-                            `>${_segInner}</div>`;
-                    });
+                    html += _woBreakInsertStripHtml(sk, mac, idx + 1);
                 });
 
                 html += `</div>`; // end mac-col
@@ -8697,306 +8266,69 @@
             if (tip) tip.classList.remove('on');
         };
 
-        // ── 드롭 고스트 카드 (놓일 위치·크기를 실제 카드처럼 미리 보여줌)
-        window._woGhostCache = {}; // 위치 캐시 — 동일 위치면 DOM 갱신 생략
-        function _woUpdateDropGhost(col, topPx, heightPx, timeLabel) {
-            const key   = topPx + '|' + heightPx + '|' + timeLabel;
-            const cache = window._woGhostCache[col.id];
-            const ghostId = 'wo-drop-ghost-' + col.id;
-            let ghost = document.getElementById(ghostId);
-            if (!ghost) {
-                ghost = document.createElement('div');
-                ghost.id = ghostId;
-                ghost.style.cssText = [
-                    'position:absolute','left:3px','right:3px',
-                    'background:rgba(114,102,162,0.22)',
-                    'border:2px solid #b0aeaa',
-                    'border-left:4px solid #555250',
-                    'border-radius:7px',
-                    'z-index:20','pointer-events:none',
-                    'display:flex','align-items:center','justify-content:center',
-                    'flex-direction:column','gap:3px',
-                    'box-sizing:border-box',
-                    'box-shadow:0 2px 12px rgba(0,0,0,0.12)'
-                ].join(';');
-                col.appendChild(ghost);
+        // 드래그 중인 카드/마커를 제외한 형제 목록에서, 커서 Y가 어느 형제의
+        // 세로 중간점보다 위인지로 삽입 인덱스를 계산 (시계/픽셀 계산 없음)
+        function _woFindInsertIndex(colEl, clientY, dragKey) {
+            const siblings = Array.from(colEl.children).filter(el =>
+                (el.classList.contains('wo-boring-placed-card') || el.classList.contains('wo-boring-break-marker')) &&
+                el.dataset.ck !== dragKey
+            );
+            for (let i = 0; i < siblings.length; i++) {
+                const r = siblings[i].getBoundingClientRect();
+                if (clientY < r.top + r.height / 2) return i;
             }
-            // 동일 위치·크기면 DOM 재생성 없이 display만 보장
-            if (cache === key) { ghost.style.display = 'flex'; return; }
-            window._woGhostCache[col.id] = key;
-            ghost.style.top    = topPx + 'px';
-            ghost.style.height = Math.max(32, heightPx) + 'px';
-            ghost.innerHTML = timeLabel
-                ? `<span style="font-size:13px;font-weight:900;color:#555250;pointer-events:none;letter-spacing:1px;text-shadow:0 1px 2px rgba(255,255,255,0.8);">▶ ${timeLabel}</span>`
-                : '';
-            ghost.style.display = 'flex';
-        }
-        function _woRemoveDropGhost(col) {
-            if (!col) return;
-            const ghost = document.getElementById('wo-drop-ghost-' + col.id);
-            if (ghost) ghost.style.display = 'none';
-        }
-
-        // PX_PER_MIN 반환 헬퍼 (dragover/drop/render 공용)
-        // 시각 누적 방식으로 전환 후 고정 스케일 사용
-        function _woDragCalcPX(state, parts, extraKey, sk) {
-            return window._woPxPerMin?.[sk] ?? 1.5;
+            return siblings.length;
         }
 
         window.woBoardDragOver = function(e) {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
-            const col = e.currentTarget;
-            // 예전엔 컬럼 전체에 좌측 강조 테두리(.drag-over)까지 같이 표시해서,
-            // 실제 드롭 위치를 보여주는 아래쪽 고스트 박스와 강조가 두 개로
-            // 겹쳐 보여 무슨 표시인지 헷갈린다는 피드백 — 이동하려는 정확한
-            // 위치 한 칸만(고스트 박스) 표시되도록 컬럼 전체 강조는 제거
-
-            const mac = col.dataset.mac;
-            const sk  = col.dataset.sk;
-            if (!mac || !sk || !window._woBDragKey) return;
-            const state    = window._woBoring[sk];
-            const parts    = window._woBoringParts[sk] || [];
-            if (!state) return;
-
-            const dragPart = parts.find(pp=>pp.cKey===window._woBDragKey);
-            const dragPm   = dragPart ? dragPart.pm : 0;
-            const PX       = _woDragCalcPX(state, parts, window._woBDragKey, sk);
-
-            const toKey    = x => typeof x==='string'?x:x?.cKey;
-            const keys     = (state[mac]||[]).map(toKey).filter(Boolean).filter(k=>k!==window._woBDragKey);
-            const rect     = col.getBoundingClientRect();
-            const dropY    = e.clientY - rect.top;
-            // ── 시각 누적 방식: dropY(px) → 삽입 슬롯 탐색
-            const _MIN_VH        = 28;
-            const exclZones      = _woGetExclZones(sk);
-            const existingStart  = _woGetMacStart(sk, mac);
-            let   actualCur      = existingStart ?? 480;
-            let   visY           = (existingStart ?? 480) * PX;
-            let   ghostTopPx, ghostActualStart;
-
-            // 절대 위치 방식: dropY(보드오프셋 이후 상대Y) → 30분 스냅 절대시계분
-            {
-                const _machines   = _woGetMachines(sk);
-                const _bsMin      = Math.min(..._machines.map(m => _woGetMacStart(sk, m) ?? 480));
-                const _bOffPx     = Math.round(_bsMin * PX);
-                let snap = _bsMin + Math.round((dropY / PX) / 30) * 30;
-                while (exclZones.some(z => snap >= z.start && snap < z.end)) snap += 30;
-                // 카드가 휴식/점심 구간을 시각적으로 가리지 않도록 구간 이후로 밀어냄
-                let _goOk = false;
-                while (!_goOk) {
-                    _goOk = true;
-                    for (const z of exclZones) {
-                        if (snap < z.start && _woCalcEffectiveEnd(snap, dragPm, exclZones) > z.start) {
-                            snap = z.end; _goOk = false; break;
-                        }
-                    }
-                }
-                snap = Math.max(_bsMin, snap);
-                ghostActualStart = snap;
-                ghostTopPx = Math.round(snap * PX) - _bOffPx;
-            }
-
-            // ── 배치된 카드 끝에 스냅: 카드 하단 40px 이내 또는 카드 위에 커서가 있으면 그 카드 clockEnd로 스냅
-            const _macTl = window._woMacTimelines?.[sk]?.[mac];
-            if (_macTl && _macTl.length > 0) {
-                const _bOffPx2 = Math.round(Math.min(..._woGetMachines(sk).map(m => _woGetMacStart(sk, m) ?? 480)) * PX);
-                const SNAP_PX = 40;
-                for (const cardData of _macTl) {
-                    if (cardData.cKey === window._woBDragKey) continue; // 자기 자신 제외
-                    // 카드 하단 절대 px (콜 기준 상대좌표)
-                    const cardBottomY = cardData.topPx + cardData.cardH; // 이미 offset 적용됨
-                    const curRelY = e.clientY - col.getBoundingClientRect().top;
-                    // 카드 하단 40px 이내 OR 카드 범위 내 커서
-                    const inCardRange = curRelY >= cardData.topPx && curRelY <= cardData.topPx + cardData.cardH;
-                    const nearBottom  = Math.abs(curRelY - cardBottomY) <= SNAP_PX;
-                    if (inCardRange || nearBottom) {
-                        let snapEnd = cardData.clockEnd;
-                        // 배제구간 안이면 이후로
-                        for (const z of exclZones) {
-                            if (snapEnd >= z.start && snapEnd < z.end) { snapEnd = z.end; break; }
-                        }
-                        ghostActualStart = snapEnd;
-                        ghostTopPx = Math.round(snapEnd * PX) - _bOffPx2;
-                        break;
-                    }
-                }
-            }
-
-            // 이동하려는 위치에 뜨던 고스트 박스(시각 라벨)도 무슨 표시인지
-            // 헷갈린다는 피드백으로 완전히 제거 — 실제 드롭 위치 계산(woBoardDrop)은
-            // 이 미리보기와 무관하게 독립적으로 동작하므로 기능 변화는 없음
+            // 컬럼 강조/드롭 위치 고스트 모두 표시하지 않음 — 두 하일라이트가
+            // 겹쳐 보여 헷갈린다는 피드백으로 제거. 실제 삽입 위치는 드롭
+            // 시점에 커서 좌표로 바로 계산하므로 미리보기가 없어도 동작에는
+            // 영향 없음
         };
         window.woBoardDragLeave = function(e) {
-            // 자식 요소로 이동한 경우는 무시 (깜빡임 방지)
-            if (e.currentTarget.contains(e.relatedTarget)) return;
-            e.currentTarget.classList.remove('drag-over');
-            _woRemoveDropGhost(e.currentTarget);
+            // 하일라이트를 표시하지 않으므로 별도 처리 없음 (호환을 위해 유지)
         };
         // targetMachine: '1호기'|'2호기'|'멀티보링'|'pool'
         window.woBoardDrop = function(e, targetMachine, _unused, stateKey) {
             e.preventDefault();
             e.currentTarget.classList.remove('drag-over');
-            _woRemoveDropGhost(e.currentTarget); // 드롭 즉시 고스트 제거
             const cardKey = window._woBDragKey;
             if (!cardKey) return;
             const state = window._woBoring[stateKey];
             if (!state) return;
-            const parts    = window._woBoringParts[stateKey] || [];
 
             // 드롭으로 다른 카드들이 밀려 위/아래로 이동했을 때 그 방향을 잠깐
             // 보여주기 위해, 재렌더 전(re-render 직전) 화면에 실제 그려져 있던
-            // 카드별 top 위치를 미리 찍어둠 — 재렌더 후 값과 비교해서 방향 판정
+            // 카드별 위치를 미리 찍어둠 — 재렌더 후 값과 비교해서 방향 판정.
+            // 카드가 더 이상 절대위치가 아니라 일반 흐름(normal flow)이라
+            // el.style.top 대신 getBoundingClientRect().top을 사용
             const _woShiftBeforeTop = {};
             document.querySelectorAll(`.wo-boring-placed-card[data-sk="${stateKey}"]`).forEach(el => {
                 if (el.dataset.ck && el.dataset.ck !== cardKey) {
-                    _woShiftBeforeTop[el.dataset.ck] = parseFloat(el.style.top) || 0;
+                    _woShiftBeforeTop[el.dataset.ck] = el.getBoundingClientRect().top;
                 }
             });
 
             const machines = _woGetMachines(stateKey);
 
-            // 정규화 헬퍼
-            const toKey  = x => typeof x === 'string' ? x : x?.cKey;
-            const getKeys = mac => (state[mac] || []).map(toKey).filter(Boolean);
-
-            // 모든 기계+pool에서 해당 카드 제거 — 카드가 있던 기계는 뒷 카드 당겨서 gap 제거
+            // 모든 기계+pool에서 해당 카드 제거 — 마커는 단순 필터라 자동으로
+            // 제자리(상대 순서)를 유지함
             machines.forEach(mac => {
-                const rawArr = (state[mac] || []).map(x =>
-                    typeof x === 'string' ? { cKey: x, startMin: null } : { cKey: x.cKey, startMin: x.startMin ?? null }
-                );
-                const hasCard = rawArr.some(x => x.cKey === cardKey);
-                if (!hasCard) { state[mac] = rawArr; return; }
-
-                // 제거된 카드의 타임라인 데이터 (clockStart/clockEnd) 조회
-                const _rmTl = window._woMacTimelines?.[stateKey]?.[mac];
-                const _rmCard = _rmTl ? _rmTl.find(c => c.cKey === cardKey) : null;
-
-                if (_rmCard) {
-                    const rmStart = _rmCard.clockStart;
-                    const rmEnd   = _rmCard.clockEnd;
-                    const rmDur   = rmEnd - rmStart; // 제거된 카드의 지속 시간
-                    // 제거 후 남은 카드: rmEnd 이후에 핀된 카드들은 rmDur만큼 당김 (gap 제거)
-                    state[mac] = rawArr
-                        .filter(x => x.cKey !== cardKey)
-                        .map(x => {
-                            if (x.startMin == null) return x; // 미고정은 누적 배치로 자동 처리
-                            if (x.startMin >= rmEnd) {
-                                // 카드 이후: rmDur만큼 당겨서 gap 메움
-                                return { cKey: x.cKey, startMin: Math.max(rmStart, x.startMin - rmDur) };
-                            }
-                            if (x.startMin >= rmStart && x.startMin < rmEnd) {
-                                // 카드 범위 안: rmStart로 당김
-                                return { cKey: x.cKey, startMin: rmStart };
-                            }
-                            return x;
-                        });
-                } else {
-                    state[mac] = rawArr.filter(x => x.cKey !== cardKey);
-                }
+                state[mac] = _woGetEntries(stateKey, mac).filter(x => x !== cardKey);
             });
             state.pool = (state.pool || []).filter(k => k !== cardKey);
 
             if (targetMachine === 'pool') {
-                state.pool.push(cardKey); // pool 복귀 시 startMin 없음 → 순서 누적 배치
+                state.pool.push(cardKey);
             } else {
-                if (!state[targetMachine]) state[targetMachine] = [];
-                const _colEl     = document.querySelector(`.wo-boring-mac-col[data-mac="${targetMachine}"][data-sk="${stateKey}"]`);
-                const rect       = _colEl ? _colEl.getBoundingClientRect() : e.currentTarget.getBoundingClientRect();
-                const dropY      = e.clientY - rect.top;
-                const PX         = _woDragCalcPX(state, parts, cardKey, stateKey);
-                const _dExclZones = _woGetExclZones(stateKey);
-
-                // dropY(보드오프셋 이후 상대Y) → 30분 스냅 절대시계분
-                const _bsMin2  = Math.min(...machines.map(m => _woGetMacStart(stateKey, m) ?? 480));
-                let dropMin = _bsMin2 + Math.round((dropY / PX) / 30) * 30;
-                while (_dExclZones.some(z => dropMin >= z.start && dropMin < z.end)) dropMin += 30;
-                // 카드가 휴식/점심 구간을 시각적으로 가리지 않도록 구간 이후로 밀어냄
-                const _dropPm = parts.find(p => p.cKey === cardKey)?.pm ?? 30;
-                let _dpOk = false;
-                while (!_dpOk) {
-                    _dpOk = true;
-                    for (const z of _dExclZones) {
-                        if (dropMin < z.start && _woCalcEffectiveEnd(dropMin, _dropPm, _dExclZones) > z.start) {
-                            dropMin = z.end; _dpOk = false; break;
-                        }
-                    }
-                }
-                dropMin = Math.max(_bsMin2, dropMin);
-
-                // ── 카드 끝 스냅: 현재 state[targetMachine]을 직접 시뮬레이션해 실제 끝 시각 계산
-                // (_woMacTimelines는 제거 전 오래된 데이터 → 동일 기계 내 이동 시 오차 발생)
-                // → 드롭 위치 이전에 끝나는 카드 중 가장 늦은 끝 시각에 gap 없이 붙임.
-                // 이 시뮬레이션에서 "dropMin 이전에 끝나는 마지막 카드의 배열 인덱스"도
-                // 함께 구해서, 아래에서 그 인덱스 바로 다음에 실제로 끼워 넣는다 —
-                // 예전엔 항상 배열 맨 끝에 push했는데, 그러면 시계상으로는 맨 앞에
-                // 두었어도 배열 순서상 맨 뒤에 남아 있어서 _woRenderBoard의 동시각
-                // tie-break(배열 순서 우선)에서 항상 밀려나 "맨 위로 옮길 수 없는" 문제,
-                // 그리고 배열 순서와 실제 시간 순서가 어긋나면서 다음 드래그부터
-                // "이전 순서가 꼬이는" 문제의 근본 원인이었음
-                let _insertAfterIdx = -1; // -1 = 배열 맨 앞에 삽입(= 최상단으로 이동)
-                {
-                    const _simEntries = (state[targetMachine] || [])
-                        .filter(x => (typeof x === 'string' ? x : x.cKey) !== cardKey); // 자기 자신 제외
-                    const _macStartMin = _woGetMacStart(stateKey, targetMachine) ?? 480;
-                    let _simCur = _macStartMin;
-                    let _latestEndBeforeDrop = null;
-
-                    _simEntries.forEach((entry, _simIdx) => {
-                        const _eCKey = typeof entry === 'string' ? entry : entry.cKey;
-                        const _eSMin = typeof entry === 'object' && entry.startMin != null ? entry.startMin : null;
-                        const _ePart = parts.find(p => p.cKey === _eCKey);
-                        const _ePm   = _ePart ? _ePart.pm : 30;
-
-                        // 핀된 카드면 해당 시각으로 이동, 없으면 현재 누적 위치
-                        if (_eSMin != null && _eSMin > _simCur) _simCur = _eSMin;
-                        // 배제구간 건너뜀
-                        for (const z of _dExclZones) {
-                            if (_simCur >= z.start && _simCur < z.end) { _simCur = z.end; break; }
-                        }
-                        const _eEnd = _woCalcEffectiveEnd(_simCur, _ePm, _dExclZones);
-
-                        // dropMin 이전에 끝나는 카드 중 가장 늦은 끝 시각(과 그 배열 인덱스) 추적
-                        if (_eEnd <= dropMin) {
-                            _latestEndBeforeDrop = _eEnd;
-                            _insertAfterIdx = _simIdx;
-                        }
-                        _simCur = _eEnd;
-                    });
-
-                    if (_latestEndBeforeDrop !== null) {
-                        // 가장 늦게 끝나는 카드 바로 다음에 붙임 (gap 없음)
-                        let _snapEnd = _latestEndBeforeDrop;
-                        for (const z of _dExclZones) {
-                            if (_snapEnd >= z.start && _snapEnd < z.end) { _snapEnd = z.end; break; }
-                        }
-                        dropMin = _snapEnd;
-                    }
-                }
-
-                // 드롭된 카드를 시간 순서와 일치하는 배열 위치에 실제로 끼워 넣음
-                // (맨 끝에 append하지 않음 — 위 주석 참고)
-                const prevEntries = state[targetMachine].filter(x => x.cKey !== cardKey);
-                const _insertObj  = { cKey: cardKey, startMin: dropMin };
-                const newEntries  = _insertAfterIdx === -1
-                    ? [_insertObj, ...prevEntries]
-                    : [...prevEntries.slice(0, _insertAfterIdx + 1), _insertObj, ...prevEntries.slice(_insertAfterIdx + 1)];
-
-                // 드롭된 카드의 종료 시각 계산 → 겹치는 뒷 카드 자동 밀어냄
-                const dropEndMin = _woCalcEffectiveEnd(dropMin, _dropPm, _dExclZones);
-                newEntries.forEach(entry => {
-                    if (entry.cKey === cardKey) return; // 방금 배치한 카드 제외
-                    if (entry.startMin == null) return;  // 미고정 카드는 누적 배치로 자동 처리
-                    if (entry.startMin >= dropMin && entry.startMin < dropEndMin) {
-                        // 겹치는 카드: 드롭된 카드 종료 시각 이후로 밀어냄
-                        let shifted = dropEndMin;
-                        for (const z of _dExclZones) {
-                            if (shifted >= z.start && shifted < z.end) { shifted = z.end; break; }
-                        }
-                        entry.startMin = shifted;
-                    }
-                });
-                state[targetMachine] = newEntries;
+                const _colEl = document.querySelector(`.wo-boring-mac-col[data-mac="${targetMachine}"][data-sk="${stateKey}"]`) || e.currentTarget;
+                const idx = _woFindInsertIndex(_colEl, e.clientY, cardKey);
+                const entries = _woGetEntries(stateKey, targetMachine); // 위에서 이미 cardKey 제거됨
+                entries.splice(idx, 0, cardKey);
+                state[targetMachine] = entries;
             }
 
             _woRenderBoard(stateKey);
@@ -9009,7 +8341,7 @@
                 const ck = el.dataset.ck;
                 if (!ck || ck === cardKey || !(ck in _woShiftBeforeTop)) return;
                 const beforeTop = _woShiftBeforeTop[ck];
-                const afterTop  = parseFloat(el.style.top) || 0;
+                const afterTop  = el.getBoundingClientRect().top;
                 if (Math.abs(afterTop - beforeTop) < 1) return; // 위치 변화 없음
                 el.classList.add(afterTop < beforeTop ? 'wo-shift-up' : 'wo-shift-down');
                 el.addEventListener('animationend', () => {
@@ -9032,12 +8364,9 @@
                 const { doc, setDoc, serverTimestamp } = window.fbFirestore;
                 const machines = _woGetMachines(sk);
                 const schedule = {};
-                machines.forEach(mac => {
-                    schedule[mac] = (window._woBoring[sk][mac] || []).map(x =>
-                        typeof x === 'string' ? { cKey: x, startMin: null } : { cKey: x.cKey, startMin: x.startMin ?? null }
-                    );
-                });
-                schedule.pool = (window._woBoring[sk].pool || []).map(k => ({ cKey: k, startMin: null }));
+                // 카드는 순수 문자열, 휴식은 마커 객체 그대로 — 화면과 동일한 모양으로 저장
+                machines.forEach(mac => { schedule[mac] = _woGetEntries(sk, mac); });
+                schedule.pool = _woNormEntries(window._woBoring[sk].pool || []);
 
                 const parts = (window._woBoringParts[sk] || []).map(p => ({
                     cKey: p.cKey || '', nm: p.nm || '', orderName: p.orderName || '',
@@ -9051,11 +8380,8 @@
                     boardParts: (p.boardParts || []).map(pt => ({ lp: pt.lp, tp: pt.tp, wp: pt.wp, hp: pt.hp, bg: pt.bg || '' }))
                 }));
 
-                // 배제 구간도 저장
-                const exclZones = _woGetExclZones(sk).map(z => ({ start: z.start, end: z.end }));
-
                 const docRef = doc(window.db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'proc_schedules', sk);
-                await setDoc(docRef, { schedule, parts, exclZones, machines, updatedAt: serverTimestamp() });
+                await setDoc(docRef, { schedule, parts, machines, updatedAt: serverTimestamp() });
             } catch(e) { console.warn('[_woSaveSchedule]', e); }
         }
 
@@ -11335,22 +10661,6 @@
             }
             _mvTick(); setInterval(_mvTick, 1000);
 
-            // ── 시간 포맷
-            const _fmtMin = m => String(Math.floor(m/60)).padStart(2,'0') + ':' + String(Math.round(m)%60).padStart(2,'0');
-
-            // ── 배제구간 고려 종료시각
-            function _mvCalcEnd(startMin, pm, exclZones) {
-                let cur = startMin, rem = pm, guard = 0;
-                while (rem > 0 && guard++ < 200) {
-                    const excl = exclZones.find(z => cur >= z.start && cur < z.end);
-                    if (excl) { cur = excl.end; continue; }
-                    const nxt = exclZones.find(z => z.start > cur && z.start < cur + rem);
-                    if (nxt) { rem -= nxt.start - cur; cur = nxt.end; }
-                    else { cur += rem; rem = 0; }
-                }
-                return cur;
-            }
-
             // ── Firestore 편집: 시작 처리
             window._mvMarkStarted = async function(orderKey, cKey, procKey) {
                 const ord = _mvOrders.find(o => (o.docId || String(o.idNum)) === orderKey);
@@ -11438,26 +10748,33 @@
             }
 
             // ── 렌더
+            // 시간축이 없어져 카드는 시각을 계산하지 않고 배열 순서 그대로 나열.
+            // "진행중" 시각 자동판단은 포기하고 대기/완료 두 상태만 표시(사용자 확정) —
+            // 시작 버튼(isStarted)은 완료 처리 버튼을 보여줄지 결정하는 용도로만 남김
             function _mvRender() {
                 if (!_mvSchedData) return;
-                const { schedule, parts, exclZones = [] } = _mvSchedData;
-                const macArr = schedule[mac] || [];
+                const { schedule = {}, parts = [] } = _mvSchedData;
+                // 레거시({cKey,startMin})/신규(문자열, 마커) 형태를 모두 허용하는 정규화
+                const entries = _woNormEntries(schedule[mac] || []);
                 const listEl = document.getElementById('mv-list');
                 if (!listEl) return;
 
-                let cur = 480, totalDone = 0, totalInProg = 0, totalPending = 0;
-                const nowMin = new Date().getHours() * 60 + new Date().getMinutes();
+                let totalDone = 0, totalPending = 0, cardIdx = 0;
 
-                const cards = macArr.map((entry, idx) => {
-                    const cKey = entry.cKey;
+                const cards = entries.map(entry => {
+                    if (entry && typeof entry === 'object' && entry.type === 'break') {
+                        const label = (entry.reason === '기타' && entry.custom) ? entry.custom : (entry.reason || '휴식');
+                        return `<div style="display:flex;align-items:center;gap:8px;margin:4px 0 14px;color:#64748b;font-size:12px;font-weight:700;">
+                          <span style="flex:1;height:1px;background:#334155;"></span>
+                          <span>☕ ${_esc(label)}</span>
+                          <span style="flex:1;height:1px;background:#334155;"></span>
+                        </div>`;
+                    }
+                    const cKey = entry;
                     const p = parts.find(pp => pp.cKey === cKey);
                     if (!p) return '';
-
-                    if (entry.startMin != null && entry.startMin > cur) cur = entry.startMin;
-                    exclZones.forEach(z => { if (cur >= z.start && cur < z.end) cur = z.end; });
-                    const startMin = cur;
-                    const endMin   = _mvCalcEnd(startMin, p.pm || 30, exclZones);
-                    cur = endMin;
+                    cardIdx++;
+                    const idx = cardIdx - 1;
 
                     const procKey  = _procName;
                     const orderKey = p.orderKey || '';
@@ -11466,14 +10783,13 @@
                     const isDone    = !!(_ord?.partCompletions?.[ck]?.[procKey]);
                     const isStarted = !!(_ord?.partStarted?.[ck]?.[procKey]);
                     const actMin    = _ord?.partCompletions?.[ck]?.[procKey]?.actualMinutes ?? null;
-                    const isActive  = !isDone && (isStarted || (nowMin >= startMin && nowMin < endMin));
 
-                    isDone ? totalDone++ : isActive ? totalInProg++ : totalPending++;
+                    isDone ? totalDone++ : totalPending++;
 
-                    const cardBg    = isDone ? '#0d2018' : isActive ? '#1c1505' : '#1e293b';
-                    const borderCol = isDone ? '#10b981' : isActive ? '#f59e0b' : '#334155';
-                    const statusCol = isDone ? '#10b981' : isActive ? '#f59e0b' : '#64748b';
-                    const statusLbl = isDone ? '✓ 완료'  : isActive ? '▶ 진행중' : '○ 대기';
+                    const cardBg    = isDone ? '#0d2018' : '#1e293b';
+                    const borderCol = isDone ? '#10b981' : '#334155';
+                    const statusCol = isDone ? '#10b981' : '#64748b';
+                    const statusLbl = isDone ? '✓ 완료'  : '○ 대기';
                     const partNm    = p.isCuttingCard ? (p.plateName||p.nm) : p.nm;
                     const dimStr    = (p.rw && p.rd) ? `${p.rw}×${p.rd}` : '';
                     const sheetsStr = p.sheets ? `${p.sheets}장` : '';
@@ -11523,7 +10839,6 @@
                           <span style="font-size:15px;font-weight:900;color:#f1f5f9;background:#334155;padding:5px 12px;border-radius:8px;">${p.dq} EA</span>
                           ${sheetsStr?`<span style="font-size:13px;font-weight:700;color:#f1f5f9;background:#334155;padding:5px 10px;border-radius:8px;">${sheetsStr}</span>`:''}
                           <span style="font-size:13px;font-weight:600;color:#94a3b8;">⏱ ${pmStr}</span>
-                          <span style="font-size:13px;font-weight:700;color:${statusCol};">${_fmtMin(startMin)} → ${_fmtMin(endMin)}</span>
                           ${p.finish?`<span style="font-size:11px;color:#64748b;">${p.finish}</span>`:''}
                         </div>
                         ${actionBtn}
@@ -11532,12 +10847,12 @@
 
                 listEl.innerHTML = cards || `<div style="padding:80px 20px;text-align:center;color:#334155;font-size:15px;">이 기계에 배정된 작업이 없습니다.</div>`;
 
-                // 요약
+                // 요약 — 진행중 자동판단은 포기(사용자 확정) → 대기/완료 두 상태만 집계
                 const sumEl = document.getElementById('mv-summary');
                 if (sumEl) {
                     const badge = (lbl, n, c) => n>0?`<span style="font-size:11px;font-weight:700;color:${c};background:${c}1a;padding:4px 9px;border-radius:16px;border:1px solid ${c}40;">${lbl} ${n}</span>`:'';
-                    sumEl.innerHTML = badge('✓',totalDone,'#10b981')+badge('▶',totalInProg,'#f59e0b')+badge('○',totalPending,'#64748b')+
-                        `<span style="font-size:11px;color:#475569;margin-left:2px;">총 ${macArr.length}건</span>`;
+                    sumEl.innerHTML = badge('✓',totalDone,'#10b981')+badge('○',totalPending,'#64748b')+
+                        `<span style="font-size:11px;color:#475569;margin-left:2px;">총 ${cardIdx}건</span>`;
                 }
 
                 const ftEl = document.getElementById('mv-footer');
@@ -11582,8 +10897,8 @@
                 }
             );
 
-            // 1분마다 시간 기준 상태(진행중/대기) 재계산
-            setInterval(_mvRender, 60000);
+            // 시각 기반 상태 재계산이 없어져 별도 폴링 타이머는 불필요 —
+            // 스케줄/완료 상태 모두 위 onSnapshot 구독으로 실시간 반영됨
         };
     </script>
 </body>
