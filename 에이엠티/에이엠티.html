@@ -992,6 +992,30 @@
             0%,100% { box-shadow: 0 0 0 3px rgba(245,158,11,0.25); }
             50%      { box-shadow: 0 0 0 6px rgba(245,158,11,0.10); }
         }
+        /* ── 카드 드래그로 다른 카드가 밀려 위/아래로 이동했을 때, 어느 방향으로
+           옮겨갔는지 잠깐 표시(고스트 플래시 + 방향 화살표) — JS에서 이동 전/후
+           위치를 비교해 wo-shift-up/wo-shift-down 클래스를 붙였다가 애니메이션이
+           끝나면 스스로 제거 */
+        .wo-boring-placed-card.wo-shift-up,
+        .wo-boring-placed-card.wo-shift-down {
+            animation: wo-shift-flash 1.1s ease-out;
+        }
+        .wo-boring-placed-card.wo-shift-up::after,
+        .wo-boring-placed-card.wo-shift-down::after {
+            position: absolute; top: 3px; right: 5px; z-index: 5;
+            font-size: 13px; font-weight: 900; color: #7266a2;
+            pointer-events: none; animation: wo-shift-arrow-fade 1.1s ease-out;
+        }
+        .wo-boring-placed-card.wo-shift-up::after   { content: '↑'; }
+        .wo-boring-placed-card.wo-shift-down::after { content: '↓'; }
+        @keyframes wo-shift-flash {
+            0%   { box-shadow: 0 0 0 3px rgba(114,102,162,0.35); background: rgba(114,102,162,0.10); }
+            100% { box-shadow: 0 0 0 0 rgba(114,102,162,0); background: transparent; }
+        }
+        @keyframes wo-shift-arrow-fade {
+            0%   { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-6px); }
+        }
         /* 기기변경 모드 배너 */
         #wo-mac-change-banner {
             display: none; position: fixed; top: 0; left: 0; right: 0; z-index: 9800;
@@ -8820,6 +8844,16 @@
             if (!state) return;
             const parts    = window._woBoringParts[stateKey] || [];
 
+            // 드롭으로 다른 카드들이 밀려 위/아래로 이동했을 때 그 방향을 잠깐
+            // 보여주기 위해, 재렌더 전(re-render 직전) 화면에 실제 그려져 있던
+            // 카드별 top 위치를 미리 찍어둠 — 재렌더 후 값과 비교해서 방향 판정
+            const _woShiftBeforeTop = {};
+            document.querySelectorAll(`.wo-boring-placed-card[data-sk="${stateKey}"]`).forEach(el => {
+                if (el.dataset.ck && el.dataset.ck !== cardKey) {
+                    _woShiftBeforeTop[el.dataset.ck] = parseFloat(el.style.top) || 0;
+                }
+            });
+
             const machines = _woGetMachines(stateKey);
 
             // 정규화 헬퍼
@@ -8968,6 +9002,20 @@
             _woRenderBoard(stateKey);
             _woRenderPool(stateKey);
             window._woBDragKey = null;
+
+            // 재렌더 후, 밀려서 위/아래로 실제 이동한 카드에 방향 표시(고스트 플래시
+            // + 화살표)를 잠깐 붙였다가 애니메이션이 끝나면 스스로 지움
+            document.querySelectorAll(`.wo-boring-placed-card[data-sk="${stateKey}"]`).forEach(el => {
+                const ck = el.dataset.ck;
+                if (!ck || ck === cardKey || !(ck in _woShiftBeforeTop)) return;
+                const beforeTop = _woShiftBeforeTop[ck];
+                const afterTop  = parseFloat(el.style.top) || 0;
+                if (Math.abs(afterTop - beforeTop) < 1) return; // 위치 변화 없음
+                el.classList.add(afterTop < beforeTop ? 'wo-shift-up' : 'wo-shift-down');
+                el.addEventListener('animationend', () => {
+                    el.classList.remove('wo-shift-up', 'wo-shift-down');
+                }, { once: true });
+            });
 
             // ── 기기변경 모드: 드롭 후 하이라이트 재적용
             if (window._woMacChangeMode && window._woMacChangeMode.stateKey === stateKey) {
