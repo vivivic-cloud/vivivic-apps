@@ -949,8 +949,8 @@
             flex: 1; position: relative; border-left: 1px solid #e3e2e0; min-width: 80px;
             overflow: hidden; /* 배제 구간 오버레이가 컬럼 밖(풀 영역)으로 넘치지 않도록 */
         }
-        /* drag-over: 좌측 강조 테두리만 — 배경 없음 */
-        .wo-boring-mac-col.drag-over { box-shadow: inset 3px 0 0 var(--wo-proc-color, #b0aeaa); }
+        /* drag-over 컬럼 전체 강조는 제거됨 — 드롭 위치는 고스트 박스(#wo-drop-ghost-*)
+           한 곳으로만 표시 (컬럼 전체 강조와 겹쳐 보여 헷갈린다는 피드백) */
         /* 시간 눈금선 */
         .wo-boring-tick {
             position: absolute; left: 0; right: 0; pointer-events: none;
@@ -8723,7 +8723,10 @@
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
             const col = e.currentTarget;
-            col.classList.add('drag-over');
+            // 예전엔 컬럼 전체에 좌측 강조 테두리(.drag-over)까지 같이 표시해서,
+            // 실제 드롭 위치를 보여주는 아래쪽 고스트 박스와 강조가 두 개로
+            // 겹쳐 보여 무슨 표시인지 헷갈린다는 피드백 — 이동하려는 정확한
+            // 위치 한 칸만(고스트 박스) 표시되도록 컬럼 전체 강조는 제거
 
             const mac = col.dataset.mac;
             const sk  = col.dataset.sk;
@@ -8799,8 +8802,12 @@
             const ghostEnd  = _woCalcEffectiveEnd(ghostActualStart, dragPm, exclZones);
             const ghostEff  = ghostEnd - ghostActualStart;
             const heightPx  = Math.max(_MIN_VH, Math.round(ghostEff * PX));
-            const hh = String(Math.floor(ghostActualStart / 60)).padStart(2,'0');
-            const mm = String(ghostActualStart % 60).padStart(2,'0');
+            // ghostActualStart가 정수가 아닌 경우(예: 480.24) 그대로 %로 나누면
+            // "08:0.24000..." 같은 깨진 시각 라벨이 뜨는 문제가 있었음 — 분 단위로
+            // 반올림한 뒤 계산
+            const _ghostMin = Math.round(ghostActualStart);
+            const hh = String(Math.floor(_ghostMin / 60)).padStart(2,'0');
+            const mm = String(_ghostMin % 60).padStart(2,'0');
             _woUpdateDropGhost(col, ghostTopPx, heightPx, `${hh}:${mm}`);
         };
         window.woBoardDragLeave = function(e) {
