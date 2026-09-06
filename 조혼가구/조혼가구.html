@@ -1395,7 +1395,8 @@
         function normalizeValue(val) { if (val === null || val === undefined || String(val).trim() === "" || String(val).trim() === "선택없음") return "선택없음"; return String(val).trim(); }
         function buildDisplayName(v1, v2, v3, v4) { let n = (v1 !== '선택없음' ? v1 : '') + (v2 !== '선택없음' ? v2 : '') + (v3 !== '선택없음' ? v3 : ''); let c = (v4 !== '선택없음') ? `-${v4}` : ""; return (n + c) || "상품명 없음"; }
 
-        const KR_HOLIDAYS = ["2025-01-01", "2025-01-28", "2025-01-29", "2025-01-30", "2025-03-01", "2025-05-05", "2025-06-06", "2025-08-15", "2025-10-03", "2025-10-09", "2025-12-25"];
+        const KR_HOLIDAYS = ["2025-01-01", "2025-01-28", "2025-01-29", "2025-01-30", "2025-03-01", "2025-05-05", "2025-06-06", "2025-08-15", "2025-10-03", "2025-10-09", "2025-12-25",
+                                   "2026-01-01", "2026-02-16", "2026-02-17", "2026-02-18", "2026-03-01", "2026-03-02", "2026-05-05", "2026-05-24", "2026-05-25", "2026-06-03", "2026-06-06", "2026-08-15", "2026-08-17", "2026-09-24", "2026-09-25", "2026-09-26", "2026-10-03", "2026-10-05", "2026-10-09", "2026-12-25"];
 
         let currentFullData = [];
         let uniqueProductIdentities = [];
@@ -2944,8 +2945,12 @@
 
             _toValidDate(dateStr) {
                 const day = new Date(dateStr + 'T00:00:00').getDay();
-                if (day === 6) return this._dateOffset(dateStr, -1);
-                if (day === 0) return this._dateOffset(dateStr, -2);
+                // 에이엠티와 같은 방향으로 민다. 뒤로(금요일) 밀면 토요일로 다시 붙잡혀
+
+                // 공정 섹션이 없는 날에 배치되어 카드가 사라진다.
+
+                if (day === 6) return this._dateOffset(dateStr, 2); // 토 → 월
+                if (day === 0) return this._dateOffset(dateStr, 1); // 일 → 월
                 return dateStr;
             },
 
@@ -3078,8 +3083,8 @@
                                 if (!pData || pData.isDeleted) return;
                                 if (normalizeValue(row[h.indexOf("공급처")]) !== "AMT") return;
                                 const unitCons  = parseFloat(row[h.indexOf("세트별소모량")]) || 1;
-                                const partQty   = unitCons * (item.orderQty || 1);
-                                const partT     = calcProcessTime(row, partQty, {}, h);
+                                const partQty   = pData.qty || (unitCons * (item.orderQty || 1));
+                                const partT     = calcProcessTime(row, partQty, (pData && pData.difficulties) || {}, h);
                                 const partTotal = PROC.reduce((s, p) => s + (partT[p.key] ?? 0), 0);
                                 totalMin += partTotal;
                                 const partName  = row[h.indexOf("부속명")] || '-';
@@ -3174,10 +3179,13 @@
                                 );
                                 matchingRows.forEach(row => {
                                     const cardKey     = `card-${item.idNum}-${currentFullData.indexOf(row)}`;
+                                    const pData       = item.partInfoMap ? item.partInfoMap[cardKey] : null;
+                                    // 거래처가 지운 부속은 공정에도 올리지 않는다 (납기 섹션과 같은 규칙)
+                                    if (!pData || pData.isDeleted) return;
                                     if (normalizeValue(row[h.indexOf("공급처")]) !== "AMT") return;
                                     const unitCons    = parseFloat(row[h.indexOf("세트별소모량")]) || 1;
-                                    const partQty     = unitCons * (item.orderQty || 1);
-                                    const partT       = calcProcessTime(row, partQty, {}, h);
+                                    const partQty     = pData.qty || (unitCons * (item.orderQty || 1));
+                                    const partT       = calcProcessTime(row, partQty, (pData && pData.difficulties) || {}, h);
                                     const partProcMin = partT[proc.key] ?? 0;
                                     if (partProcMin <= 0) return;
                                     const partName  = row[h.indexOf("부속명")] || '-';

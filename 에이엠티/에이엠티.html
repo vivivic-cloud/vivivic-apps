@@ -1426,11 +1426,6 @@
                     <span id="auth-account-email" class="font-bold text-[#37352f]"></span>
                     <button onclick="window.handleAuthLogout()" class="text-[#787774] hover:text-[#37352f] font-bold underline">로그아웃</button>
                 </div>
-                <!-- ⚠️ 테스트 모드 버튼 (배포시 삭제) -->
-                <button id="test-mode-btn" onclick="toggleTestMode()"
-                    style="font-size:10px;font-weight:800;padding:4px 10px;border-radius:6px;border:1.5px dashed #d1d5db;background:#f9fafb;color:#6b7280;cursor:pointer;letter-spacing:0.02em;transition:all 0.2s;white-space:nowrap;">
-                    🧪 테스트 모드
-                </button>
                 <!-- 알림 아이콘 -->
                 <div class="relative">
                     <button id="notification-bell" onclick="toggleNotifications()" class="relative flex items-center justify-center w-10 h-10 rounded-lg border border-[#ededeb] bg-white hover:bg-[#f7f6f3] transition-all">
@@ -1802,7 +1797,8 @@
         function normalizeValue(val) { if (val === null || val === undefined || String(val).trim() === "" || String(val).trim() === "선택없음") return "선택없음"; return String(val).trim(); }
         function buildDisplayName(v1, v2, v3, v4) { let n = (v1 !== '선택없음' ? v1 : '') + (v2 !== '선택없음' ? v2 : '') + (v3 !== '선택없음' ? v3 : ''); let c = (v4 !== '선택없음') ? `-${v4}` : ""; return (n + c) || "상품명 없음"; }
 
-        const KR_HOLIDAYS = ["2025-01-01", "2025-01-28", "2025-01-29", "2025-01-30", "2025-03-01", "2025-05-05", "2025-06-06", "2025-08-15", "2025-10-03", "2025-10-09", "2025-12-25"];
+        const KR_HOLIDAYS = ["2025-01-01", "2025-01-28", "2025-01-29", "2025-01-30", "2025-03-01", "2025-05-05", "2025-06-06", "2025-08-15", "2025-10-03", "2025-10-09", "2025-12-25",
+                                   "2026-01-01", "2026-02-16", "2026-02-17", "2026-02-18", "2026-03-01", "2026-03-02", "2026-05-05", "2026-05-24", "2026-05-25", "2026-06-03", "2026-06-06", "2026-08-15", "2026-08-17", "2026-09-24", "2026-09-25", "2026-09-26", "2026-10-03", "2026-10-05", "2026-10-09", "2026-12-25"];
 
         let currentFullData = [];
         let uniqueProductIdentities = [];
@@ -1894,7 +1890,7 @@
 
 
         function copyID(idText, badgeElement) { const tempInput = document.createElement('textarea'); tempInput.value = idText; document.body.appendChild(tempInput); tempInput.select(); document.execCommand('copy'); document.body.removeChild(tempInput); if (badgeElement) { badgeElement.classList.add('copied'); setTimeout(() => badgeElement.classList.remove('copied'), 600); } const toast = document.getElementById('toast'); toast.textContent = `${idText} 복사되었습니다!`; toast.style.opacity = '1'; setTimeout(() => { toast.style.opacity = '0'; }, 1500); }
-        function isWeekendOrHoliday(date) { const day = date.getDay(); const dateStr = date.toISOString().split('T')[0]; return day === 0 || day === 6 || KR_HOLIDAYS.includes(dateStr); }
+        function isWeekendOrHoliday(date) { const day = date.getDay(); const dateStr = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`; return day === 0 || day === 6 || KR_HOLIDAYS.includes(dateStr); }
         function getInitialDeliveryDate() { let d = new Date(); d.setDate(d.getDate() + 4); while (isWeekendOrHoliday(d)) { d.setDate(d.getDate() + 1); } return d.toISOString().split('T')[0]; }
         function validateDeliveryDate(el) { let d = new Date(el.value); if (isWeekendOrHoliday(d)) { const toast = document.getElementById('toast'); toast.textContent = "영업일이 아닙니다. 다음 영업일로 조정됩니다."; toast.style.opacity = '1'; setTimeout(() => toast.style.opacity = '0', 2000); while (isWeekendOrHoliday(d)) { d.setDate(d.getDate() + 1); } el.value = d.toISOString().split('T')[0]; } }
 
@@ -2750,11 +2746,12 @@
             const s = n > 0 ? 1 : -1;
             let rem = Math.abs(n);
             while (rem > 0) { d.setDate(d.getDate() + s); if (d.getDay() !== 0 && d.getDay() !== 6) rem--; }
-            return d.toISOString().slice(0,10);
+            // toISOString() 은 UTC 라 한국 기준 하루 앞선 날짜가 나온다. 로컬 날짜로 뽑는다.
+            return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
         }
         function _buildPriorityMap(items) {
             const today = _kstToday();
-            const tmr = (() => { const d = new Date(today+'T00:00:00'); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10); })();
+            const tmr = (() => { const d = new Date(today+'T00:00:00'); d.setDate(d.getDate()+1); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); })();
             const scored = items.map(item => {
                 const deliv = item.deliveryDate || '9999-12-31';
                 const cut   = (item.procOverrides && item.procOverrides['재단']) || _workDayOffset(deliv, -3) || deliv;
@@ -2882,7 +2879,7 @@
 
             if (_cuttingSort === 'priority') {
                 const today = _kstToday();
-                const tmr = (() => { const d = new Date(today+'T00:00:00'); d.setDate(d.getDate()+1); return d.toISOString().slice(0,10); })();
+                const tmr = (() => { const d = new Date(today+'T00:00:00'); d.setDate(d.getDate()+1); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); })();
                 const getTier = item => {
                     const deliv = item.deliveryDate || '9999-12-31';
                     const cut  = (item.procOverrides && item.procOverrides['재단']) || _workDayOffset(deliv,-3) || deliv;
@@ -3283,65 +3280,6 @@
         }
 
         // ⚠️ 테스트 모드 (배포시 삭제) ─────────────────────────────────────
-        let _testModeActive = false;
-        let _testModeSnapshot = []; // 원본 날짜 백업
-
-        function _shiftDate(dateStr, days) {
-            if (!dateStr) return dateStr;
-            const d = new Date(dateStr);
-            if (isNaN(d)) return dateStr;
-            d.setDate(d.getDate() + days);
-            return d.toISOString().split('T')[0];
-        }
-
-        function toggleTestMode() {
-            const btn = document.getElementById('test-mode-btn');
-            if (!_testModeActive) {
-                // ── 테스트 ON: 원본 백업 후 모든 날짜를 -7일 ──
-                _testModeSnapshot = confirmedOrders.map(o => ({
-                    idNum: o.idNum,
-                    deliveryDate: o.deliveryDate,
-                    procOverrides: o.procOverrides ? { ...o.procOverrides } : {}
-                }));
-                confirmedOrders.forEach(o => {
-                    o.deliveryDate = _shiftDate(o.deliveryDate, -7);
-                    if (o.procOverrides) {
-                        Object.keys(o.procOverrides).forEach(k => {
-                            o.procOverrides[k] = _shiftDate(o.procOverrides[k], -7);
-                        });
-                    }
-                });
-                _testModeActive = true;
-                if (btn) {
-                    btn.textContent = '🧪 테스트 해제';
-                    btn.style.background = '#fef2f2';
-                    btn.style.color = '#dc2626';
-                    btn.style.borderColor = '#fca5a5';
-                }
-                showToastMessage('⚠️ 테스트 모드 ON — 모든 일정 -7일 이동');
-            } else {
-                // ── 테스트 OFF: 원본 복원 ──
-                _testModeSnapshot.forEach(snap => {
-                    const o = confirmedOrders.find(x => x.idNum === snap.idNum);
-                    if (!o) return;
-                    o.deliveryDate = snap.deliveryDate;
-                    o.procOverrides = { ...snap.procOverrides };
-                });
-                _testModeSnapshot = [];
-                _testModeActive = false;
-                if (btn) {
-                    btn.textContent = '🧪 테스트 모드';
-                    btn.style.background = '#f9fafb';
-                    btn.style.color = '#6b7280';
-                    btn.style.borderColor = '#d1d5db';
-                }
-                showToastMessage('테스트 모드 OFF — 일정 원복 완료');
-            }
-            // 타임라인 + 목록 재렌더
-            renderProcessTimeline();
-            renderTimelineConfirmedList();
-            renderPendingOrders();
-        }
         // ────────────────────────────────────────────────────────────────────
 
         // 발주확정목록 토글
