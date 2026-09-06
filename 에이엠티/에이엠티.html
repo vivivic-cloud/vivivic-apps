@@ -16,7 +16,7 @@
     <!-- Firebase SDK (Modular) -->
     <script type="module">
         import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";    
-        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword, setPersistence, indexedDBLocalPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, getDoc, setDoc, getDocs, deleteField } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL, getBytes } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
 
@@ -32,6 +32,13 @@
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
+
+        // 로그인 유지 — 브라우저를 닫아도 남게 한다.
+        // 지정하지 않으면 저장에 실패했을 때 조용히 "이번 창에서만" 으로 떨어져
+        // 다음에 열 때 로그인이 풀린다. indexedDB 가 막히면 localStorage 로 물러선다.
+        setPersistence(auth, indexedDBLocalPersistence)
+            .catch(() => setPersistence(auth, browserLocalPersistence))
+            .catch(err => console.warn('로그인 유지 설정 실패:', err));
         const db = getFirestore(app);
         const storage = getStorage(app);
 
