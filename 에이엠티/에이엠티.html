@@ -1367,6 +1367,50 @@
         .search-mode-content.hidden {
             display: none;
         }
+
+        /* ── 아래 탭바 — 폰이 기준. 넓은 화면에서는 위쪽 메뉴가 대신한다 ── */
+        .bottom-nav {
+            position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+            display: grid; grid-template-columns: repeat(4, 1fr);
+            background: #fff; border-top: 1px solid #ededeb;
+            padding-bottom: env(safe-area-inset-bottom);
+            box-shadow: 0 -6px 18px -14px rgba(0,0,0,.4);
+        }
+        .bottom-nav .bnav {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 3px; min-height: 56px; background: none; border: 0;
+            font-size: 11px; font-weight: 700; color: #b0aeaa; transition: color .15s ease;
+        }
+        .bottom-nav .bnav svg { width: 21px; height: 21px; }
+        .bottom-nav .bnav.on { color: #37352f; }
+        .bottom-nav .bnav:active { background: #f7f6f3; }
+
+        @media (min-width: 768px) { .bottom-nav { display: none; } }
+        @media (max-width: 767px) {
+            /* 위쪽 메뉴는 아래 탭바가 대신하므로 감춘다 */
+            header nav.flex.items-center.gap-1 { display: none; }
+            body { padding-bottom: calc(64px + env(safe-area-inset-bottom)) !important; }
+        }
+
+        /* ── 부속 카드 — 폰에서는 부속명과 사이즈만, 가로세로가 고른 작은 상자로 ── */
+        @media (max-width: 767px) {
+            .parts-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
+
+            .pt-card {
+                min-height: 64px;                 /* 세로로 길쭉하지 않게 아래를 받쳐 준다 */
+                padding: 10px 11px !important;
+                justify-content: center;
+                gap: 3px !important;
+            }
+            .pt-card > .flex.justify-between { align-items: center !important; }
+
+            .pt-name { font-size: 14px !important; line-height: 1.25; }
+            .pt-size { font-size: 12.5px !important; color: #787774 !important; }
+
+            /* 폰에서는 덜 급한 것을 접는다 */
+            .pt-sub, .pt-qty { display: none !important; }
+            .pt-card .proc-dots, .pt-card .flex.flex-col.items-end { display: none !important; }
+        }
     </style>
 </head>
 <body class="min-h-screen pb-20" onload="initializeAppEmpty()">
@@ -1412,7 +1456,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.1</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.2</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -1828,6 +1872,8 @@
             document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
             const currentNav = document.getElementById(`nav-${mode}`);
             if (currentNav) currentNav.classList.add('active');
+            document.querySelectorAll('.bnav').forEach(b =>
+                b.classList.toggle('on', b.dataset.mode === mode));
 
             // 계정관리는 appMode 기반 렌더링과 무관한 별도 화면
             const accountsPage = document.getElementById('page-accounts');
@@ -3410,17 +3456,17 @@
                 const procDotsHtml = procDots ? `<div style="display:flex;gap:3px;align-items:center;flex-wrap:wrap;margin-top:2px;">${procDots}</div>` : '';
 
                 const cardHtml = `
-                    <div class="p-2 rounded-lg shadow-sm flex flex-col gap-1 relative group/card border border-[#ededeb]">
+                    <div class="pt-card p-2 rounded-lg shadow-sm flex flex-col gap-1 relative group/card border border-[#ededeb]">
                         <div class="flex justify-between items-start gap-1">
                             <div class="flex flex-col min-w-0 flex-1" style="word-break:break-all;overflow-wrap:anywhere">
-                                <span class="text-[10px] font-bold text-[#37352f]">${row[h.indexOf("부속명")]}</span>
-                                <span class="text-[9px] text-[#787774]">${plateName}${finishColor ? ` · ${finishColor}` : ''}</span>
-                                <span class="text-[9px] text-[#787774]">${finish}</span>
-                                <span class="text-[9px] text-[#787774] font-medium">${w} X ${d}</span>
+                                <span class="pt-name text-[10px] font-bold text-[#37352f]">${row[h.indexOf("부속명")]}</span>
+                                <span class="pt-sub text-[9px] text-[#787774]">${plateName}${finishColor ? ` · ${finishColor}` : ''}</span>
+                                <span class="pt-sub text-[9px] text-[#787774]">${finish}</span>
+                                <span class="pt-size text-[9px] text-[#787774] font-medium">${w} X ${d}</span>
                                 ${procDotsHtml}
                             </div>
                             <div class="flex flex-col items-end gap-0.5 flex-shrink-0">
-                                <span class="text-[9px] font-black text-[#37352f] bg-[#f7f6f3] px-1 rounded">${pData.qty} EA</span>
+                                <span class="pt-qty text-[9px] font-black text-[#37352f] bg-[#f7f6f3] px-1 rounded">${pData.qty} EA</span>
                             </div>
                         </div>
                     </div>`;
@@ -3428,7 +3474,7 @@
                 if (isAmt) { if (!pData.isDeleted) basicHtml += cardHtml; }
                 else {
                     if (pData.isDeleted) {
-                        specialHtml += `<div class="p-2 rounded-lg border border-dashed border-[#ededeb] bg-[#f7f6f3]/30 flex flex-col gap-1"><div class="flex justify-between items-start gap-1"><div class="flex flex-col min-w-0 flex-1" style="word-break:break-all;overflow-wrap:anywhere"><span class="text-[10px] font-bold text-[#37352f]">${row[h.indexOf("부속명")]}</span><span class="text-[9px] text-[#787774]">${plateName}${finishColor ? ` · ${finishColor}` : ''}</span><span class="text-[9px] text-[#787774] font-medium">${w} X ${d}</span></div></div></div>`;
+                        specialHtml += `<div class="pt-card p-2 rounded-lg border border-dashed border-[#ededeb] bg-[#f7f6f3]/30 flex flex-col gap-1"><div class="flex justify-between items-start gap-1"><div class="flex flex-col min-w-0 flex-1" style="word-break:break-all;overflow-wrap:anywhere"><span class="pt-name text-[10px] font-bold text-[#37352f]">${row[h.indexOf("부속명")]}</span><span class="pt-sub text-[9px] text-[#787774]">${plateName}${finishColor ? ` · ${finishColor}` : ''}</span><span class="pt-size text-[9px] text-[#787774] font-medium">${w} X ${d}</span></div></div></div>`;
                     } else { basicHtml += cardHtml; }
                 }
             });
@@ -3452,7 +3498,7 @@
             }
             item.cachedWorkTime = { 재단: calcWt.재단, 엣지: calcWt.엣지, 보링: calcWt.보링, NC: calcWt.NC };
             renderProcessTimeline();
-            el.innerHTML = `<div class="space-y-2"><div class="text-[10px] font-bold text-[#787774] px-1 uppercase tracking-wider">기본 발주 부속</div><div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">${basicHtml || '<div class="col-span-full py-4 text-center text-[#787774] italic text-[11px]">발주할 부속이 없습니다.</div>'}</div></div>${specialHtml ? `<div class="space-y-2 pt-4 border-t border-dashed border-[#ededeb]"><div class="text-[10px] font-bold text-[#787774] px-1 uppercase tracking-wider flex items-center gap-2">AMT 외 공급처 부속</div><div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">${specialHtml}</div></div>` : ''}`;
+            el.innerHTML = `<div class="space-y-2"><div class="text-[10px] font-bold text-[#787774] px-1 uppercase tracking-wider">기본 발주 부속</div><div class="parts-grid grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">${basicHtml || '<div class="col-span-full py-4 text-center text-[#787774] italic text-[11px]">발주할 부속이 없습니다.</div>'}</div></div>${specialHtml ? `<div class="space-y-2 pt-4 border-t border-dashed border-[#ededeb]"><div class="text-[10px] font-bold text-[#787774] px-1 uppercase tracking-wider flex items-center gap-2">AMT 외 공급처 부속</div><div class="parts-grid grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">${specialHtml}</div></div>` : ''}`;
         }
 
         // 선택된 발주상품들을 재단발주목록으로 일괄 이동
@@ -6951,7 +6997,7 @@
                         <div class="flex flex-col min-w-0 flex-1" style="word-break:break-all;overflow-wrap:anywhere;">
                             <span class="text-[10px] font-bold text-[${_lastDoneDc ? '#16a34a' : '#37352f'}]">${nm}</span>
                             <span class="text-[9px] text-[#787774]">${mat}</span>
-                            <span class="text-[9px] text-[#787774] font-medium">${w} X ${d}</span>
+                            <span class="pt-size text-[9px] text-[#787774] font-medium">${w} X ${d}</span>
                             ${doneBadge}
                         </div>
                         <div class="flex flex-col items-end gap-0.5 flex-shrink-0">
@@ -6976,7 +7022,7 @@
 
             el.innerHTML = `<div class="space-y-2">
                 <div class="text-[10px] font-bold text-[#787774] px-1 uppercase tracking-wider">기본 발주 부속</div>
-                <div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">
+                <div class="parts-grid grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">
                     ${basicHtml || '<div class="col-span-full py-4 text-center text-[#787774] italic text-[11px]">해당 공정 부속 없음</div>'}
                 </div>
                 ${totalHtml}
@@ -9572,17 +9618,17 @@
                 const procDotsHtml = procDots ? `<div style="display:flex;gap:3px;align-items:center;flex-wrap:wrap;margin-top:2px;">${procDots}</div>` : '';
 
                 const cardHtml = `
-                    <div class="p-2 rounded-lg shadow-sm flex flex-col gap-1 relative group/card border border-[#ededeb]">
+                    <div class="pt-card p-2 rounded-lg shadow-sm flex flex-col gap-1 relative group/card border border-[#ededeb]">
                         <div class="flex justify-between items-start gap-1">
                             <div class="flex flex-col min-w-0 flex-1" style="word-break:break-all;overflow-wrap:anywhere">
-                                <span class="text-[10px] font-bold text-[#37352f]">${row[h.indexOf("부속명")]}</span>
-                                <span class="text-[9px] text-[#787774]">${plateName}${finishColor ? ` · ${finishColor}` : ''}</span>
-                                <span class="text-[9px] text-[#787774]">${finish}</span>
-                                <span class="text-[9px] text-[#787774] font-medium">${w} X ${d}</span>
+                                <span class="pt-name text-[10px] font-bold text-[#37352f]">${row[h.indexOf("부속명")]}</span>
+                                <span class="pt-sub text-[9px] text-[#787774]">${plateName}${finishColor ? ` · ${finishColor}` : ''}</span>
+                                <span class="pt-sub text-[9px] text-[#787774]">${finish}</span>
+                                <span class="pt-size text-[9px] text-[#787774] font-medium">${w} X ${d}</span>
                                 ${procDotsHtml}
                             </div>
                             <div class="flex flex-col items-end gap-0.5 flex-shrink-0">
-                                <span class="text-[9px] font-black text-[#37352f] bg-[#f7f6f3] px-1 rounded">${pData.qty} EA</span>
+                                <span class="pt-qty text-[9px] font-black text-[#37352f] bg-[#f7f6f3] px-1 rounded">${pData.qty} EA</span>
                             </div>
                         </div>
                     </div>`;
@@ -9590,7 +9636,7 @@
                 if (isAmt) { if (!pData.isDeleted) basicHtml += cardHtml; }
                 else {
                     if (pData.isDeleted) {
-                        specialHtml += `<div class="p-2 rounded-lg border border-dashed border-[#ededeb] bg-[#f7f6f3]/30 flex flex-col gap-1"><div class="flex justify-between items-start gap-1"><div class="flex flex-col min-w-0 flex-1" style="word-break:break-all;overflow-wrap:anywhere"><span class="text-[10px] font-bold text-[#37352f]">${row[h.indexOf("부속명")]}</span><span class="text-[9px] text-[#787774]">${plateName}${finishColor ? ` · ${finishColor}` : ''}</span><span class="text-[9px] text-[#787774] font-medium">${w} X ${d}</span></div></div></div>`;
+                        specialHtml += `<div class="pt-card p-2 rounded-lg border border-dashed border-[#ededeb] bg-[#f7f6f3]/30 flex flex-col gap-1"><div class="flex justify-between items-start gap-1"><div class="flex flex-col min-w-0 flex-1" style="word-break:break-all;overflow-wrap:anywhere"><span class="pt-name text-[10px] font-bold text-[#37352f]">${row[h.indexOf("부속명")]}</span><span class="pt-sub text-[9px] text-[#787774]">${plateName}${finishColor ? ` · ${finishColor}` : ''}</span><span class="pt-size text-[9px] text-[#787774] font-medium">${w} X ${d}</span></div></div></div>`;
                     } else { basicHtml += cardHtml; }
                 }
             });
@@ -9617,7 +9663,7 @@
             item.cachedWorkTime = { 재단: calcWt.재단, 엣지: calcWt.엣지, 보링: calcWt.보링, NC: calcWt.NC };
             renderProcessTimeline();
             // 작업시간 테이블 제거 — 각 부속카드 내 공정 원형 뱃지로 대체
-            el.innerHTML = `<div class="space-y-2"><div class="text-[10px] font-bold text-[#787774] px-1 uppercase tracking-wider">기본 발주 부속</div><div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">${basicHtml || '<div class="col-span-full py-4 text-center text-[#787774] italic text-[11px]">발주할 부속이 없습니다.</div>'}</div></div>${specialHtml ? `<div class="space-y-2 pt-4 border-t border-dashed border-[#ededeb]"><div class="text-[10px] font-bold text-[#787774] px-1 uppercase tracking-wider flex items-center gap-2">AMT 외 공급처 부속</div><div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">${specialHtml}</div></div>` : ''}`;
+            el.innerHTML = `<div class="space-y-2"><div class="text-[10px] font-bold text-[#787774] px-1 uppercase tracking-wider">기본 발주 부속</div><div class="parts-grid grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">${basicHtml || '<div class="col-span-full py-4 text-center text-[#787774] italic text-[11px]">발주할 부속이 없습니다.</div>'}</div></div>${specialHtml ? `<div class="space-y-2 pt-4 border-t border-dashed border-[#ededeb]"><div class="text-[10px] font-bold text-[#787774] px-1 uppercase tracking-wider flex items-center gap-2">AMT 외 공급처 부속</div><div class="parts-grid grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">${specialHtml}</div></div>` : ''}`;
         }
         function handleSubPartEdit(btn, idNum, cardKey, isID0508 = false) {
             const input = document.getElementById(`input-${cardKey}`);
@@ -9703,7 +9749,7 @@
                 // 수정 가능 여부 확인
                 const canEdit = isID0508 || pendingOrdersMap[appMode];
 
-                const cardHtml = `<div class="p-2 rounded-lg shadow-sm flex flex-col gap-1 relative group/card border border-[#ededeb]">
+                const cardHtml = `<div class="pt-card p-2 rounded-lg shadow-sm flex flex-col gap-1 relative group/card border border-[#ededeb]">
                     ${isAmt && canEdit ? `<button onclick="event.stopPropagation(); deleteSubPart(${idNum}, '${cardKey}')" class="absolute -top-1 -right-1 sub-part-action-btn bg-white border border-[#ededeb] text-[#d3d1cb] hover:text-red-50 opacity-0 group-hover/card:opacity-100 shadow-sm"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>` : ''}
                     <div class="flex justify-between items-start gap-1">
                         <div class="flex flex-col min-w-0 flex-1" style="word-break:break-all;overflow-wrap:anywhere">
@@ -9726,9 +9772,9 @@
                         specialHtml += `<div class="p-2 rounded-lg border border-dashed border-[#ededeb] bg-[#f7f6f3]/30 flex flex-col gap-1 group/special relative">
                             <div class="flex justify-between items-start gap-1">
                                 <div class="flex flex-col min-w-0 flex-1" style="word-break:break-all;overflow-wrap:anywhere">
-                                    <span class="text-[10px] font-bold text-[#37352f]">${row[h.indexOf("부속명")]}</span>
+                                    <span class="pt-name text-[10px] font-bold text-[#37352f]">${row[h.indexOf("부속명")]}</span>
                                     <span class="text-[9px] text-[#787774]">${plateNameWithColor}</span>
-                                    <span class="text-[9px] text-[#787774] font-medium">${w} X ${d}</span>
+                                    <span class="pt-size text-[9px] text-[#787774] font-medium">${w} X ${d}</span>
                                 </div>
                                 <div class="flex flex-col items-end gap-0.5 flex-shrink-0">
                                     <button onclick="addSpecialPart(${idNum}, '${cardKey}')" class="px-1 py-0.5 bg-white border border-[#ededeb] text-[#37352f] rounded text-[9px] font-black hover:bg-[#f7f6f3] shadow-sm transition-all active:scale-95">추가</button>
@@ -9745,7 +9791,7 @@
             el.innerHTML = `
                 <div class="space-y-2">
                     <div class="text-[10px] font-bold text-[#787774] px-1 uppercase tracking-wider">기본 발주 부속</div>
-                    <div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">
+                    <div class="parts-grid grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">
                         ${basicHtml || '<div class="col-span-full py-4 text-center text-[#787774] italic text-[11px]">발주할 부속이 없습니다.</div>'}
                     </div>
                 </div>
@@ -9754,7 +9800,7 @@
                     <div class="text-[10px] font-bold text-[#787774] px-1 uppercase tracking-wider flex items-center gap-2">
                         <span>추가 선택 부속 (AMT 외 공급처)</span>
                     </div>
-                    <div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">
+                    <div class="parts-grid grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">
                         ${specialHtml}
                     </div>
                 </div>` : ''}
@@ -10846,5 +10892,28 @@
             // 스케줄/완료 상태 모두 위 onSnapshot 구독으로 실시간 반영됨
         };
     </script>
+    <!-- 아래 탭바 — 폰에서만 보인다. 엄지가 닿는 자리에 화면 이동을 둔다 -->
+    <nav class="bottom-nav" id="bottom-nav">
+            <button type="button" class="bnav" data-mode="order" onclick="switchPage('order')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+                     stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M8 13h8M8 17h5"/></svg>
+                <span>발주서</span>
+            </button>
+            <button type="button" class="bnav" data-mode="cutting" onclick="switchPage('cutting')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+                     stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.12 15.88M14.47 14.48L20 20M8.12 8.12L12 12"/></svg>
+                <span>재단발주</span>
+            </button>
+            <button type="button" class="bnav" data-mode="process" onclick="switchPage('process')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+                     stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
+                <span>공정관리</span>
+            </button>
+            <button type="button" class="bnav" data-mode="accounts" onclick="switchPage('accounts')">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+                     stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span>계정관리</span>
+            </button>
+    </nav>
 </body>
 </html>
