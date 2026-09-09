@@ -22,7 +22,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, indexedDBLocalPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
     import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, addDoc, onSnapshot, serverTimestamp, writeBatch, query, orderBy } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
-    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
+    import { getStorage, ref, uploadBytes, getDownloadURL, getBytes } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
@@ -45,7 +45,7 @@
     window.db = db;
     window.storage = storage;
     window.fbFirestore = { collection, doc, getDoc, getDocs, setDoc, updateDoc, addDoc, onSnapshot, serverTimestamp, writeBatch, query, orderBy };
-    window.fbStorage = { ref, uploadBytes, getDownloadURL };
+    window.fbStorage = { ref, uploadBytes, getDownloadURL, getBytes };
 
     onAuthStateChanged(auth, async (user) => {
         if (!user) { window.showAuthLoginScreen(); return; }
@@ -212,7 +212,7 @@
                     <tbody id="pm-table-body"></tbody>
                 </table>
             </div>
-            <div id="pm-empty" class="hidden p-16 text-center text-[13px] text-[#a8a6a2] font-bold">등록된 원장 데이터가 없습니다. 상단 "엑셀 가져오기"로 기존 원장을 불러오세요.</div>
+            <div id="pm-empty" class="hidden p-16 text-center text-[13px] text-[#a8a6a2] font-bold">등록된 원장 데이터가 없습니다. <a href="#" onclick="switchTab('import');return false;" class="text-blue-600 underline">엑셀 가져오기</a> 탭에서 지금 쓰고 있는 원장 파일을 그대로 불러올 수 있습니다.</div>
         </div>
         <div id="pm-count-label" class="mt-2 text-[11px] text-[#a8a6a2] font-bold"></div>
     </div>
@@ -236,11 +236,18 @@
     <div id="page-import" class="hidden">
         <div class="mb-4">
             <div class="text-[18px] font-black text-[#37352f]">엑셀 가져오기</div>
-            <div class="text-[12px] text-[#787774] font-medium">기존 원장 엑셀 파일을 올리면 이 화면의 데이터로 반영합니다. 처음 한 번은 지금 실제 운영 중인 원장 파일을 그대로 올려서 초기 이관해주세요.</div>
+            <div class="text-[12px] text-[#787774] font-medium">기존 원장 엑셀 파일을 올리면 이 화면의 데이터로 반영합니다.</div>
+        </div>
+        <div id="fb-fetch-box" class="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-4 flex items-center justify-between gap-4">
+            <div>
+                <div class="text-[13px] font-black text-blue-700">☁️ 지금 에이엠티/조혼가구가 쓰고 있는 원장 파일 그대로 불러오기</div>
+                <div id="fb-fetch-info" class="text-[11px] text-blue-500 font-bold mt-1">확인 중...</div>
+            </div>
+            <button id="btn-fetch-firebase" onclick="fetchFromFirebase()" disabled class="px-4 py-2.5 bg-blue-600 text-white font-bold text-[13px] rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed flex-shrink-0">불러오기</button>
         </div>
         <div class="bg-white border border-2 border-dashed border-[#ededeb] rounded-xl p-10 text-center mb-4">
             <input type="file" id="import-file-input" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleImportFile(this)">
-            <button onclick="document.getElementById('import-file-input').click()" class="px-5 py-2.5 bg-[#f5f5f4] text-[#37352f] font-bold text-[13px] rounded-lg hover:bg-[#ededeb]">📂 엑셀 파일 선택</button>
+            <button onclick="document.getElementById('import-file-input').click()" class="px-5 py-2.5 bg-[#f5f5f4] text-[#37352f] font-bold text-[13px] rounded-lg hover:bg-[#ededeb]">📂 또는 직접 파일 선택해서 올리기</button>
             <div class="text-[11px] text-[#a8a6a2] mt-3">첫 번째 행은 헤더(컬럼명)여야 합니다.</div>
         </div>
         <div id="import-report" class="hidden">
@@ -372,6 +379,68 @@ window.switchTab = function(tab) {
         document.getElementById('nav-' + t).classList.toggle('active', t === tab);
     });
     if (tab === 'publish') renderPublishPage();
+    if (tab === 'import') checkFirebaseFile();
+};
+
+// ── 화이어베이스에 이미 올라가 있는 원장 파일(에이엠티/조혼가구가 지금
+// 쓰고 있는 바로 그 파일) 자동 감지 — excel_metadata는 파일 자체가 아니라
+// 다운로드 URL만 들고 있어서, 목록만 조회하는 건 가볍다 (매번 파일을
+// 통째로 받지 않음. 실제 다운로드는 "불러오기" 버튼을 눌렀을 때만)
+let latestExcelMeta = null;
+async function checkFirebaseFile() {
+    const infoEl = document.getElementById('fb-fetch-info');
+    const btn = document.getElementById('btn-fetch-firebase');
+    infoEl.textContent = '확인 중...'; btn.disabled = true;
+    try {
+        const { collection, getDocs } = window.fbFirestore;
+        const snap = await getDocs(collection(window.db, ...EXCEL_META_COLLECTION));
+        if (snap.empty) {
+            infoEl.textContent = '화이어베이스에 등록된 원장 파일이 아직 없습니다.';
+            latestExcelMeta = null;
+            return;
+        }
+        const docs = snap.docs.map(d => d.data());
+        latestExcelMeta = docs.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0))[0];
+        const when = latestExcelMeta.timestamp?.seconds ? new Date(latestExcelMeta.timestamp.seconds * 1000).toLocaleString('ko-KR') : '시각 미상';
+        infoEl.textContent = `📄 ${latestExcelMeta.fileName || '(이름없음)'} · 업로드: ${when}`;
+        btn.disabled = false;
+    } catch (err) {
+        console.error('[checkFirebaseFile]', err);
+        infoEl.textContent = '확인 실패: ' + err.message;
+    }
+}
+
+window.fetchFromFirebase = async function() {
+    if (!latestExcelMeta) return;
+    const btn = document.getElementById('btn-fetch-firebase');
+    btn.disabled = true; btn.textContent = '불러오는 중...';
+    try {
+        // 에이엠티의 loadCloudExcelData와 동일한 3단계 폴백 — 저장된 URL이
+        // 만료/차단됐을 수 있어 fresh URL 재발급, 그래도 안 되면 Storage에서
+        // 바이트를 직접 받는다
+        const { ref, getDownloadURL, getBytes } = window.fbStorage;
+        let arrayBuffer;
+        try {
+            const resp = await fetch(latestExcelMeta.downloadURL);
+            if (!resp.ok) throw new Error('fetch failed: ' + resp.status);
+            arrayBuffer = await resp.arrayBuffer();
+        } catch (e1) {
+            try {
+                const freshURL = await getDownloadURL(ref(window.storage, latestExcelMeta.storagePath));
+                const resp2 = await fetch(freshURL);
+                arrayBuffer = await resp2.arrayBuffer();
+            } catch (e2) {
+                arrayBuffer = await getBytes(ref(window.storage, latestExcelMeta.storagePath));
+            }
+        }
+        processImportArrayBuffer(arrayBuffer, `☁️ 화이어베이스: ${esc(latestExcelMeta.fileName || '')}`);
+        document.getElementById('import-report').scrollIntoView({ behavior: 'smooth' });
+    } catch (err) {
+        console.error('[fetchFromFirebase]', err);
+        alert('원장 파일을 불러오지 못했습니다: ' + err.message);
+    } finally {
+        btn.disabled = false; btn.textContent = '불러오기';
+    }
 };
 
 function updatePendingBadge() {
@@ -716,47 +785,51 @@ window.doPublish = async function() {
 let importedRows = []; // [{ ing단품명:..., ... }] 헤더매칭된 객체 배열
 let importedHeaders = [];
 
+// 파일 선택이든 화이어베이스 자동 불러오기든, ArrayBuffer만 확보되면 이후
+// 처리(헤더 매칭·미리보기 렌더링)는 완전히 동일하므로 공용 함수로 분리
+function processImportArrayBuffer(arrayBuffer, sourceLabel) {
+    const wb = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+    const jsonData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+    if (!jsonData.length) { alert('빈 파일입니다.'); return; }
+    importedHeaders = jsonData[0].map(h => String(h ?? '').trim());
+    const rows = jsonData.slice(1).filter(r => r && r.some(c => c !== undefined && c !== ''));
+
+    // 헤더 인식 리포트
+    // 0번째 컬럼(ing단품명)은 항상 위치로만 취급하므로, 헤더 텍스트 일치
+    // 개수 집계에서는 빼고 "나머지 27개 중 몇 개를 이름으로 찾았는지"만 센다
+    const matched = HEADER_ORDER.filter(k => k !== 'ing단품명' && importedHeaders.includes(k));
+    const unmatched = HEADER_ORDER.filter(k => !importedHeaders.includes(k));
+    const extra = importedHeaders.filter(h => h && !HEADER_ORDER.includes(h) && h !== importedHeaders[0]);
+    document.getElementById('import-header-report').innerHTML = `
+        ${sourceLabel ? `<div class="mb-2 text-[#37352f]">${sourceLabel}</div>` : ''}
+        <div class="mb-1">✅ 매칭된 컬럼 ${matched.length}/${HEADER_ORDER.length - 1}개 (0번째 컬럼 "${esc(importedHeaders[0]||'')}"은 위치상 ing단품명으로 취급)</div>
+        ${unmatched.length ? `<div class="text-amber-600 mb-1">⚠ 이 스키마에 없는 컬럼(빈 값으로 처리): ${unmatched.filter(u=>u!=='ing단품명').map(esc).join(', ')}</div>` : ''}
+        ${extra.length ? `<div class="text-red-500">⚠ 파일에는 있지만 이 스키마엔 없는 컬럼(무시됨): ${extra.map(esc).join(', ')}</div>` : ''}`;
+
+    importedRows = rows.map((r, i) => {
+        const obj = {};
+        HEADER_ORDER.forEach((k, idx) => {
+            if (idx === 0) { obj[k] = String(r[0] ?? '').trim(); return; } // 0번째=위치 기반
+            const hIdx = importedHeaders.indexOf(k);
+            obj[k] = hIdx >= 0 ? String(r[hIdx] ?? '').trim() : '';
+        });
+        return obj;
+    }).filter(o => o['ing단품명']);
+
+    document.getElementById('import-row-count').textContent = importedRows.length;
+    const previewCols = ['ing단품명','부속명','대분류','중분류','원장명','마감색상','재단W','재단D'];
+    document.getElementById('import-preview-head').innerHTML = '<tr>' + previewCols.map(c => `<th class="px-2 py-1.5 text-left font-bold text-[#787774] border-b border-[#ededeb]">${c}</th>`).join('') + '</tr>';
+    document.getElementById('import-preview-body').innerHTML = importedRows.slice(0, 50).map(o =>
+        '<tr class="border-b border-[#f5f5f4]">' + previewCols.map(c => `<td class="px-2 py-1.5">${esc(o[c])}</td>`).join('') + '</tr>'
+    ).join('') + (importedRows.length > 50 ? `<tr><td colspan="${previewCols.length}" class="px-2 py-2 text-center text-[#a8a6a2]">… 외 ${importedRows.length - 50}행</td></tr>` : '');
+
+    document.getElementById('import-report').classList.remove('hidden');
+}
+
 window.handleImportFile = function(input) {
     const file = input.files[0]; if (!file) return;
     const reader = new FileReader();
-    reader.onload = e => {
-        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-        const jsonData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
-        if (!jsonData.length) { alert('빈 파일입니다.'); return; }
-        importedHeaders = jsonData[0].map(h => String(h ?? '').trim());
-        const rows = jsonData.slice(1).filter(r => r && r.some(c => c !== undefined && c !== ''));
-
-        // 헤더 인식 리포트
-        // 0번째 컬럼(ing단품명)은 항상 위치로만 취급하므로, 헤더 텍스트 일치
-        // 개수 집계에서는 빼고 "나머지 27개 중 몇 개를 이름으로 찾았는지"만 센다
-        const matched = HEADER_ORDER.filter(k => k !== 'ing단품명' && importedHeaders.includes(k));
-        const unmatched = HEADER_ORDER.filter(k => !importedHeaders.includes(k));
-        const extra = importedHeaders.filter(h => h && !HEADER_ORDER.includes(h) && h !== importedHeaders[0]);
-        // 0번째 컬럼은 실제 헤더 텍스트가 뭐든 ing단품명으로 취급(위치 기반 규칙과 동일)
-        document.getElementById('import-header-report').innerHTML = `
-            <div class="mb-1">✅ 매칭된 컬럼 ${matched.length}/${HEADER_ORDER.length - 1}개 (0번째 컬럼 "${esc(importedHeaders[0]||'')}"은 위치상 ing단품명으로 취급)</div>
-            ${unmatched.length ? `<div class="text-amber-600 mb-1">⚠ 이 스키마에 없는 컬럼(빈 값으로 처리): ${unmatched.filter(u=>u!=='ing단품명').map(esc).join(', ')}</div>` : ''}
-            ${extra.length ? `<div class="text-red-500">⚠ 파일에는 있지만 이 스키마엔 없는 컬럼(무시됨): ${extra.map(esc).join(', ')}</div>` : ''}`;
-
-        importedRows = rows.map((r, i) => {
-            const obj = {};
-            HEADER_ORDER.forEach((k, idx) => {
-                if (idx === 0) { obj[k] = String(r[0] ?? '').trim(); return; } // 0번째=위치 기반
-                const hIdx = importedHeaders.indexOf(k);
-                obj[k] = hIdx >= 0 ? String(r[hIdx] ?? '').trim() : '';
-            });
-            return obj;
-        }).filter(o => o['ing단품명']);
-
-        document.getElementById('import-row-count').textContent = importedRows.length;
-        const previewCols = ['ing단품명','부속명','대분류','중분류','원장명','마감색상','재단W','재단D'];
-        document.getElementById('import-preview-head').innerHTML = '<tr>' + previewCols.map(c => `<th class="px-2 py-1.5 text-left font-bold text-[#787774] border-b border-[#ededeb]">${c}</th>`).join('') + '</tr>';
-        document.getElementById('import-preview-body').innerHTML = importedRows.slice(0, 50).map(o =>
-            '<tr class="border-b border-[#f5f5f4]">' + previewCols.map(c => `<td class="px-2 py-1.5">${esc(o[c])}</td>`).join('') + '</tr>'
-        ).join('') + (importedRows.length > 50 ? `<tr><td colspan="${previewCols.length}" class="px-2 py-2 text-center text-[#a8a6a2]">… 외 ${importedRows.length - 50}행</td></tr>` : '');
-
-        document.getElementById('import-report').classList.remove('hidden');
-    };
+    reader.onload = e => processImportArrayBuffer(e.target.result, `📂 로컬 파일: ${esc(file.name)}`);
     reader.readAsArrayBuffer(file);
     input.value = '';
 };
