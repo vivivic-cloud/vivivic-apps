@@ -128,6 +128,13 @@
     .group-title { font-size:12px; font-weight:900; color:#37352f; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
     .pending-dot { width:7px; height:7px; border-radius:50%; background:#f59e0b; display:inline-block; }
     .badge { font-size:9px; font-weight:800; padding:2px 6px; border-radius:5px; }
+    /* 조혼가구의 검색방식 선택 칩과 동일한 패턴 */
+    .method-pick { display:flex; gap:6px; }
+    .method-chip { min-height:34px; padding:0 14px; font-size:12px; border:1px solid #ededeb; border-radius:10px;
+        background:#fff; color:#787774; font-weight:800; cursor:pointer; transition:all .12s; }
+    .method-chip:active { transform:scale(.97); }
+    .method-chip.on { background:#37352f; color:#fff; border-color:#37352f; }
+    select:disabled.field-input { background:#f7f6f3; color:#c2c0bb; cursor:not-allowed; }
     table.pm-table th { position:sticky; top:0; background:#fbfbfa; z-index:5; }
     ::-webkit-scrollbar { width:8px; height:8px; }
     ::-webkit-scrollbar-thumb { background:#e3e2e0; border-radius:4px; }
@@ -160,7 +167,7 @@
             <nav class="flex items-center gap-1 flex-shrink-0">
                 <div id="nav-list" class="nav-link active" onclick="switchTab('list')">원장 목록</div>
                 <div id="nav-publish" class="nav-link" onclick="switchTab('publish')">확정 발행 <span id="pending-count-badge" class="hidden ml-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full text-[10px]">0</span></div>
-                <div id="nav-import" class="nav-link" onclick="switchTab('import')">엑셀 가져오기</div>
+                <div id="nav-import" class="nav-link" onclick="switchTab('import')">원장 다시 불러오기</div>
             </nav>
         </div>
         <div class="flex items-center gap-2 px-2 py-1 rounded-lg bg-[#f7f6f3] border border-[#ededeb] flex-shrink-0" style="font-size:11px;">
@@ -176,25 +183,39 @@
     <div id="page-list">
         <div class="flex items-center justify-between mb-4">
             <div>
-                <div class="text-[18px] font-black text-[#37352f]">원장 목록</div>
-                <div class="text-[12px] text-[#787774] font-medium">에이엠티·조혼가구·이카운트등록이 함께 쓰는 제품/부속 마스터데이터</div>
+                <div class="text-[18px] font-black text-[#37352f]">원장 검색</div>
+                <div class="text-[12px] text-[#787774] font-medium">전체 목록을 나열하지 않고, 조혼가구처럼 검색/카테고리로 필요한 항목만 찾아서 보여줍니다.</div>
             </div>
-            <button onclick="openEditModal(null)" class="px-4 py-2.5 bg-[#37352f] text-white font-bold text-[13px] rounded-lg hover:bg-black transition-all">+ 신규 등록</button>
+            <button onclick="openEditModal(null)" class="px-4 py-2.5 bg-[#37352f] text-white font-bold text-[13px] rounded-lg hover:bg-black transition-all flex-shrink-0">+ 신규 등록</button>
         </div>
 
-        <div class="bg-white border border-[#ededeb] rounded-xl p-4 mb-4 flex flex-wrap gap-2 items-center">
-            <input id="pm-search" type="text" placeholder="검색 (제품명/부속명/코드 등)" oninput="renderList()"
-                class="field-input flex-1 min-w-[200px]">
-            <select id="pm-filter-l1" class="field-input" style="width:130px" onchange="onFilterL1Change()"><option value="">대분류 전체</option></select>
-            <select id="pm-filter-l2" class="field-input" style="width:130px" onchange="onFilterL2Change()"><option value="">중분류 전체</option></select>
-            <select id="pm-filter-l3" class="field-input" style="width:130px" onchange="onFilterL3Change()"><option value="">소분류 전체</option></select>
-            <select id="pm-filter-l4" class="field-input" style="width:130px" onchange="renderList()"><option value="">색상 전체</option></select>
-            <label class="flex items-center gap-1.5 text-[12px] font-bold text-[#787774] px-1">
-                <input type="checkbox" id="pm-filter-pending" onchange="renderList()"> 미확정만
+        <div class="bg-white border border-[#ededeb] rounded-xl p-4 mb-4">
+            <div class="method-pick mb-3">
+                <button type="button" class="method-chip on" data-mode="direct" onclick="selectListSearchMethod('direct')">상품검색</button>
+                <button type="button" class="method-chip" data-mode="category" onclick="selectListSearchMethod('category')">카테고리</button>
+            </div>
+
+            <div id="list-search-direct" class="search-mode-content">
+                <input id="pm-search" type="text" placeholder="제품명 / 부속명 / 코드로 검색..." oninput="renderList()" class="field-input">
+            </div>
+            <div id="list-search-category" class="search-mode-content hidden flex flex-wrap gap-2">
+                <select id="pm-filter-l1" class="field-input" style="width:140px" onchange="onFilterL1Change()"><option value="">① 대분류 선택</option></select>
+                <select id="pm-filter-l2" class="field-input" style="width:140px" onchange="onFilterL2Change()" disabled><option value="">② 중분류 선택</option></select>
+                <select id="pm-filter-l3" class="field-input" style="width:140px" onchange="onFilterL3Change()" disabled><option value="">③ 소분류 선택</option></select>
+                <select id="pm-filter-l4" class="field-input" style="width:140px" onchange="renderList()" disabled><option value="">④ 색상 선택</option></select>
+            </div>
+
+            <label class="flex items-center gap-1.5 text-[12px] font-bold text-[#787774] mt-3">
+                <input type="checkbox" id="pm-filter-pending" onchange="renderList()"> 검색 대신 미확정 변경분만 전체 보기
             </label>
         </div>
 
-        <div class="bg-white border border-[#ededeb] rounded-xl overflow-hidden">
+        <div id="pm-prompt" class="bg-white border border-[#ededeb] rounded-xl p-16 text-center text-[13px] text-[#a8a6a2] font-bold">
+            👆 검색어를 입력하거나 카테고리를 선택하면 결과가 여기 나타납니다.
+        </div>
+        <div id="pm-loading" class="hidden bg-white border border-[#ededeb] rounded-xl p-16 text-center text-[13px] text-[#787774] font-bold">☁️ 원장 데이터를 불러오는 중...</div>
+
+        <div id="pm-results" class="hidden bg-white border border-[#ededeb] rounded-xl overflow-hidden">
             <div class="overflow-x-auto" style="max-height:70vh;">
                 <table class="pm-table w-full text-left border-collapse">
                     <thead>
@@ -212,7 +233,6 @@
                     <tbody id="pm-table-body"></tbody>
                 </table>
             </div>
-            <div id="pm-empty" class="hidden p-16 text-center text-[13px] text-[#a8a6a2] font-bold">등록된 원장 데이터가 없습니다. <a href="#" onclick="switchTab('import');return false;" class="text-blue-600 underline">엑셀 가져오기</a> 탭에서 지금 쓰고 있는 원장 파일을 그대로 불러올 수 있습니다.</div>
         </div>
         <div id="pm-count-label" class="mt-2 text-[11px] text-[#a8a6a2] font-bold"></div>
     </div>
@@ -235,8 +255,8 @@
     <!-- ===== 가져오기 페이지 ===== -->
     <div id="page-import" class="hidden">
         <div class="mb-4">
-            <div class="text-[18px] font-black text-[#37352f]">엑셀 가져오기</div>
-            <div class="text-[12px] text-[#787774] font-medium">기존 원장 엑셀 파일을 올리면 이 화면의 데이터로 반영합니다.</div>
+            <div class="text-[18px] font-black text-[#37352f]">원장 다시 불러오기</div>
+            <div class="text-[12px] text-[#787774] font-medium">평소엔 앱을 열 때 자동으로 최신 원장을 가져오므로 여기 올 일이 없습니다. 화이어베이스 밖에서 원장이 바뀌었거나 다시 동기화가 필요할 때만 쓰세요.</div>
         </div>
         <div id="fb-fetch-box" class="bg-blue-50 border border-blue-200 rounded-xl p-5 mb-4 flex items-center justify-between gap-4">
             <div>
@@ -404,14 +424,44 @@ function fv(row, key) { return (row.fields && row.fields[key]) || ''; }
 window.initApp = function() {
     const { collection, query, orderBy, onSnapshot } = window.fbFirestore;
     const colRef = collection(window.db, ...COLLECTION);
+    let _autoBootstrapTried = false;
     onSnapshot(query(colRef, orderBy('legacyRowIndex', 'asc')), snap => {
         ROWS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         renderList();
         renderFilterOptions();
         renderPublishPage();
         updatePendingBadge();
+        // 에이엠티/조혼가구처럼 — 사용자가 "가져오기" 버튼을 누를 필요 없이,
+        // product_master가 비어있으면(=아직 한 번도 이관 안 한 상태) 화이어
+        // 베이스에 이미 올라가 있는 원장 파일을 앱을 여는 즉시 자동으로
+        // 가져온다. 데이터가 이미 있는 뒤로는(=편집 중인 진짜 데이터베이스가
+        // 됨) 열 때마다 덮어쓰면 안 되므로 한 번만 시도한다.
+        if (ROWS.length === 0 && !_autoBootstrapTried) {
+            _autoBootstrapTried = true;
+            autoBootstrapFromExcel();
+        }
     }, err => console.error('[product_master onSnapshot]', err));
 };
+
+async function autoBootstrapFromExcel() {
+    window._pmBootstrapping = true;
+    document.getElementById('pm-prompt').classList.add('hidden');
+    document.getElementById('pm-loading').classList.remove('hidden');
+    try {
+        await checkFirebaseFile();
+        if (latestExcelMeta) {
+            const buf = await downloadExcelBuffer(latestExcelMeta);
+            processImportArrayBuffer(buf, `☁️ 자동 불러오기: ${esc(latestExcelMeta.fileName || '')}`);
+            await window.doImport('merge'); // product_master가 비어있으니 사실상 전부 신규 추가
+        }
+    } catch (err) {
+        console.error('[autoBootstrapFromExcel]', err);
+    } finally {
+        window._pmBootstrapping = false;
+        document.getElementById('pm-loading').classList.add('hidden');
+        renderList();
+    }
+}
 
 window.switchTab = function(tab) {
     ['list','publish','import'].forEach(t => {
@@ -450,29 +500,32 @@ async function checkFirebaseFile() {
     }
 }
 
+// 에이엠티의 loadCloudExcelData와 동일한 3단계 폴백 — 저장된 URL이
+// 만료/차단됐을 수 있어 fresh URL 재발급, 그래도 안 되면 Storage에서
+// 바이트를 직접 받는다. 수동 "불러오기" 버튼과 자동 부트스트랩이 공유.
+async function downloadExcelBuffer(meta) {
+    const { ref, getDownloadURL, getBytes } = window.fbStorage;
+    try {
+        const resp = await fetch(meta.downloadURL);
+        if (!resp.ok) throw new Error('fetch failed: ' + resp.status);
+        return await resp.arrayBuffer();
+    } catch (e1) {
+        try {
+            const freshURL = await getDownloadURL(ref(window.storage, meta.storagePath));
+            const resp2 = await fetch(freshURL);
+            return await resp2.arrayBuffer();
+        } catch (e2) {
+            return await getBytes(ref(window.storage, meta.storagePath));
+        }
+    }
+}
+
 window.fetchFromFirebase = async function() {
     if (!latestExcelMeta) return;
     const btn = document.getElementById('btn-fetch-firebase');
     btn.disabled = true; btn.textContent = '불러오는 중...';
     try {
-        // 에이엠티의 loadCloudExcelData와 동일한 3단계 폴백 — 저장된 URL이
-        // 만료/차단됐을 수 있어 fresh URL 재발급, 그래도 안 되면 Storage에서
-        // 바이트를 직접 받는다
-        const { ref, getDownloadURL, getBytes } = window.fbStorage;
-        let arrayBuffer;
-        try {
-            const resp = await fetch(latestExcelMeta.downloadURL);
-            if (!resp.ok) throw new Error('fetch failed: ' + resp.status);
-            arrayBuffer = await resp.arrayBuffer();
-        } catch (e1) {
-            try {
-                const freshURL = await getDownloadURL(ref(window.storage, latestExcelMeta.storagePath));
-                const resp2 = await fetch(freshURL);
-                arrayBuffer = await resp2.arrayBuffer();
-            } catch (e2) {
-                arrayBuffer = await getBytes(ref(window.storage, latestExcelMeta.storagePath));
-            }
-        }
+        const arrayBuffer = await downloadExcelBuffer(latestExcelMeta);
         processImportArrayBuffer(arrayBuffer, `☁️ 화이어베이스: ${esc(latestExcelMeta.fileName || '')}`);
         document.getElementById('import-report').scrollIntoView({ behavior: 'smooth' });
     } catch (err) {
@@ -491,58 +544,110 @@ function updatePendingBadge() {
 }
 
 // ════════════════════════════════════════════════════════════════════
-// 목록 페이지
+// 목록 페이지 — 조혼가구의 검색방식(직접검색/카테고리 계층선택)을 그대로
+// 따라감: 전체를 늘어놓지 않고, 검색어를 입력하거나 카테고리를 한 단계씩
+// 선택해 내려가야("① 대분류 → ② 중분류 → ③ 소분류 → ④ 색상", 다음 단계는
+// 이전 단계를 고르기 전까지 비활성) 결과가 나타난다.
 // ════════════════════════════════════════════════════════════════════
+let listSearchMode = 'direct';
+window.selectListSearchMethod = function(mode) {
+    listSearchMode = mode;
+    document.querySelectorAll('#page-list .method-chip').forEach(c => c.classList.toggle('on', c.dataset.mode === mode));
+    document.getElementById('list-search-direct').classList.toggle('hidden', mode !== 'direct');
+    document.getElementById('list-search-category').classList.toggle('hidden', mode !== 'category');
+    document.getElementById('pm-search').value = '';
+    resetListCategorySelects();
+    renderList();
+};
+function resetListCategorySelects() {
+    const l1 = document.getElementById('pm-filter-l1'), l2 = document.getElementById('pm-filter-l2');
+    const l3 = document.getElementById('pm-filter-l3'), l4 = document.getElementById('pm-filter-l4');
+    l1.value = ''; l2.value = ''; l3.value = ''; l4.value = '';
+    l2.disabled = true; l3.disabled = true; l4.disabled = true;
+    l2.innerHTML = '<option value="">② 중분류 선택</option>';
+    l3.innerHTML = '<option value="">③ 소분류 선택</option>';
+    l4.innerHTML = '<option value="">④ 색상 선택</option>';
+}
+// ①대분류 옵션만 항상 채워둠(전체 목록에서 뽑되, 다음 단계 select들은
+// 이전 단계를 실제로 고르기 전까지 비활성 상태로 둬서 "한 단계씩" 좁히게 함
 function renderFilterOptions() {
     const active = ROWS.filter(r => !r.deleted);
     const l1 = document.getElementById('pm-filter-l1'), curL1 = l1.value;
     const opts1 = [...new Set(active.map(r => fv(r,'대분류')).filter(Boolean))].sort();
-    l1.innerHTML = '<option value="">대분류 전체</option>' + opts1.map(v => `<option value="${v}">${v}</option>`).join('');
+    l1.innerHTML = '<option value="">① 대분류 선택</option>' + opts1.map(v => `<option value="${v}">${v}</option>`).join('');
     l1.value = curL1;
-    onFilterL1Change(true);
 }
-window.onFilterL1Change = function(skipL2) {
+window.onFilterL1Change = function() {
     const l1 = document.getElementById('pm-filter-l1').value;
-    const active = ROWS.filter(r => !r.deleted && (!l1 || fv(r,'대분류') === l1));
-    const l2 = document.getElementById('pm-filter-l2'), curL2 = skipL2 ? l2.value : '';
+    const l2 = document.getElementById('pm-filter-l2'), l3 = document.getElementById('pm-filter-l3'), l4 = document.getElementById('pm-filter-l4');
+    l2.value = ''; l3.value = ''; l4.value = '';
+    l3.disabled = true; l4.disabled = true;
+    l3.innerHTML = '<option value="">③ 소분류 선택</option>';
+    l4.innerHTML = '<option value="">④ 색상 선택</option>';
+    if (!l1) { l2.disabled = true; l2.innerHTML = '<option value="">② 중분류 선택</option>'; renderList(); return; }
+    const active = ROWS.filter(r => !r.deleted && fv(r,'대분류') === l1);
     const opts2 = [...new Set(active.map(r => fv(r,'중분류')).filter(Boolean))].sort();
-    l2.innerHTML = '<option value="">중분류 전체</option>' + opts2.map(v => `<option value="${v}">${v}</option>`).join('');
-    l2.value = curL2;
-    onFilterL2Change(true);
+    l2.innerHTML = '<option value="">② 중분류 선택</option>' + opts2.map(v => `<option value="${v}">${v}</option>`).join('');
+    l2.disabled = false;
+    renderList();
 };
-window.onFilterL2Change = function(skipL3) {
+window.onFilterL2Change = function() {
     const l1 = document.getElementById('pm-filter-l1').value, l2 = document.getElementById('pm-filter-l2').value;
-    const active = ROWS.filter(r => !r.deleted && (!l1 || fv(r,'대분류') === l1) && (!l2 || fv(r,'중분류') === l2));
-    const l3 = document.getElementById('pm-filter-l3'), curL3 = skipL3 ? l3.value : '';
+    const l3 = document.getElementById('pm-filter-l3'), l4 = document.getElementById('pm-filter-l4');
+    l3.value = ''; l4.value = ''; l4.disabled = true;
+    l4.innerHTML = '<option value="">④ 색상 선택</option>';
+    if (!l2) { l3.disabled = true; l3.innerHTML = '<option value="">③ 소분류 선택</option>'; renderList(); return; }
+    const active = ROWS.filter(r => !r.deleted && fv(r,'대분류') === l1 && fv(r,'중분류') === l2);
     const opts3 = [...new Set(active.map(r => fv(r,'소분류')).filter(Boolean))].sort();
-    l3.innerHTML = '<option value="">소분류 전체</option>' + opts3.map(v => `<option value="${v}">${v}</option>`).join('');
-    l3.value = curL3;
-    onFilterL3Change(true);
+    l3.innerHTML = '<option value="">③ 소분류 선택</option>' + opts3.map(v => `<option value="${v}">${v}</option>`).join('');
+    l3.disabled = false;
+    renderList();
 };
-window.onFilterL3Change = function(skipL4) {
+window.onFilterL3Change = function() {
     const l1 = document.getElementById('pm-filter-l1').value, l2 = document.getElementById('pm-filter-l2').value, l3 = document.getElementById('pm-filter-l3').value;
-    const active = ROWS.filter(r => !r.deleted && (!l1 || fv(r,'대분류') === l1) && (!l2 || fv(r,'중분류') === l2) && (!l3 || fv(r,'소분류') === l3));
-    const l4 = document.getElementById('pm-filter-l4'), curL4 = skipL4 ? l4.value : '';
+    const l4 = document.getElementById('pm-filter-l4');
+    l4.value = '';
+    if (!l3) { l4.disabled = true; l4.innerHTML = '<option value="">④ 색상 선택</option>'; renderList(); return; }
+    const active = ROWS.filter(r => !r.deleted && fv(r,'대분류') === l1 && fv(r,'중분류') === l2 && fv(r,'소분류') === l3);
     const opts4 = [...new Set(active.map(r => fv(r,'상품색상')).filter(Boolean))].sort();
-    l4.innerHTML = '<option value="">색상 전체</option>' + opts4.map(v => `<option value="${v}">${v}</option>`).join('');
-    l4.value = curL4;
+    l4.innerHTML = '<option value="">④ 색상 선택</option>' + opts4.map(v => `<option value="${v}">${v}</option>`).join('');
+    l4.disabled = false;
     renderList();
 };
 
 window.renderList = function() {
-    const q = (document.getElementById('pm-search').value || '').toLowerCase().trim();
+    const q = listSearchMode === 'direct' ? (document.getElementById('pm-search').value || '').toLowerCase().trim() : '';
     const l1 = document.getElementById('pm-filter-l1').value, l2 = document.getElementById('pm-filter-l2').value;
     const l3 = document.getElementById('pm-filter-l3').value, l4 = document.getElementById('pm-filter-l4').value;
     const pendingOnly = document.getElementById('pm-filter-pending').checked;
 
+    // 검색어도 없고 카테고리도 하나도 안 골랐으면(미확정만 보기도 아니면)
+    // "전체 나열" 대신 안내 문구만 보여줌 — 조혼가구가 항목 하나를 찾을
+    // 때까지 아무것도 안 보여주는 것과 같은 원칙
+    const hasActiveSearch = pendingOnly || (listSearchMode === 'direct' && q) || (listSearchMode === 'category' && l1);
+    const promptEl = document.getElementById('pm-prompt');
+    if (window._pmBootstrapping) {
+        // 자동 불러오기 진행 중이면 pm-loading이 대신 보여주고 있으니 숨김
+        promptEl.classList.add('hidden');
+    } else if (ROWS.length === 0) {
+        promptEl.innerHTML = '등록된 원장 데이터가 없습니다. <a href="#" onclick="switchTab(\'import\');return false;" class="text-blue-600 underline">원장 다시 불러오기</a> 탭에서 지금 쓰고 있는 원장 파일을 가져올 수 있습니다.';
+        promptEl.classList.remove('hidden');
+    } else {
+        promptEl.innerHTML = '👆 검색어를 입력하거나 카테고리를 선택하면 결과가 여기 나타납니다.';
+        promptEl.classList.toggle('hidden', hasActiveSearch);
+    }
+    document.getElementById('pm-results').classList.toggle('hidden', !hasActiveSearch);
+    if (!hasActiveSearch) { document.getElementById('pm-count-label').textContent = ''; return; }
+
     const filtered = ROWS.filter(r => {
         if (r.deleted) return false;
         if (pendingOnly && !r.pendingPublish) return false;
-        if (l1 && fv(r,'대분류') !== l1) return false;
-        if (l2 && fv(r,'중분류') !== l2) return false;
-        if (l3 && fv(r,'소분류') !== l3) return false;
-        if (l4 && fv(r,'상품색상') !== l4) return false;
-        if (q) {
+        if (listSearchMode === 'category') {
+            if (l1 && fv(r,'대분류') !== l1) return false;
+            if (l2 && fv(r,'중분류') !== l2) return false;
+            if (l3 && fv(r,'소분류') !== l3) return false;
+            if (l4 && fv(r,'상품색상') !== l4) return false;
+        } else if (q) {
             const hay = ['ing단품명','ing단품코드','부속명','원장명','대분류','중분류','소분류','상품색상']
                 .map(k => fv(r,k)).join(' ').toLowerCase();
             if (!hay.includes(q)) return false;
@@ -551,9 +656,7 @@ window.renderList = function() {
     });
 
     const body = document.getElementById('pm-table-body');
-    const empty = document.getElementById('pm-empty');
-    empty.classList.toggle('hidden', ROWS.length > 0);
-    document.getElementById('pm-count-label').textContent = `${filtered.length}건 표시 / 전체 ${ROWS.filter(r=>!r.deleted).length}건`;
+    document.getElementById('pm-count-label').textContent = `${filtered.length}건 표시 (전체 ${ROWS.filter(r=>!r.deleted).length}건 중)`;
 
     body.innerHTML = filtered.map(r => {
         const catLine = [fv(r,'대분류'), fv(r,'중분류'), fv(r,'소분류')].filter(Boolean).join(' / ') || '-';
@@ -884,8 +987,8 @@ window.handleImportFile = function(input) {
     input.value = '';
 };
 
-window.doImport = async function() {
-    const mode = document.querySelector('input[name="import-mode"]:checked').value;
+window.doImport = async function(modeOverride) {
+    const mode = modeOverride || document.querySelector('input[name="import-mode"]:checked').value;
     const statusEl = document.getElementById('import-status');
     const btn = document.getElementById('btn-do-import');
     if (mode === 'replace' && !confirm(`정말 기존 원장 ${ROWS.length}건을 전부 지우고 이 파일(${importedRows.length}행)로 완전히 교체하시겠습니까?`)) return;
