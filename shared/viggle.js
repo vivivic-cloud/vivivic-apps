@@ -12,13 +12,11 @@
   const 이름 = 표.get('name') || (document.title || '프로그램');
 
   const css = `
-  .vg-bar{position:fixed;left:0;right:0;bottom:0;z-index:2147483000;display:flex;gap:8px;
-    padding:10px 12px calc(10px + env(safe-area-inset-bottom));background:#111110;color:#fff;
-    font:14px/1.4 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",system-ui,sans-serif}
-  .vg-bar button,.vg-bar a{flex:1;min-height:44px;border:0;border-radius:10px;background:#2b2a27;
-    color:#fff;font:inherit;font-weight:700;text-decoration:none;display:flex;align-items:center;
-    justify-content:center;gap:6px;cursor:pointer}
-  .vg-bar button.on{background:#fff;color:#111110}
+  .vg-hint{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom));
+    z-index:2147483000;background:#111110;color:#fff;border-radius:999px;padding:9px 16px;
+    font:13px/1.4 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",system-ui,sans-serif;
+    opacity:1;transition:opacity .4s;pointer-events:none}
+  .vg-hint.gone{opacity:0}
   .vg-mark{outline:2px solid #FF3B30 !important;outline-offset:1px;
     background:rgba(255,59,48,.07) !important}
   .vg-sheet{position:fixed;inset:0;z-index:2147483001;background:rgba(17,17,16,.4);
@@ -40,16 +38,44 @@
   document.head.insertAdjacentHTML('beforeend', `<style>${css}</style>`);
 
 
-  const bar = document.createElement('div');
-  bar.className = 'vg-bar';
-  bar.innerHTML = `<button id="vg-pick">✋ 짚어서 지시</button>`;
-  document.body.appendChild(bar);
-  document.body.style.paddingBottom = '76px';
+  /* 켜고 끄는 단추는 없다. 바이글에서 열면 언제나 짚을 수 있고,
+     0.5초 길게 누르는 손짓은 바이글 안과 같다. 짧게 누르면 프로그램이 그대로 돌아간다. */
+  const 안내 = document.createElement('div');
+  안내.className = 'vg-hint';
+  안내.textContent = '길게 눌러 짚어서 지시';
+  addEventListener('DOMContentLoaded', () => document.body.appendChild(안내), { once: true });
+  if (document.readyState !== 'loading') document.body.appendChild(안내);
+  setTimeout(() => 안내.classList.add('gone'), 3200);
+  setTimeout(() => 안내.remove(), 3800);
 
-  let 켬 = false, 겨냥 = null;
-  const 단추 = bar.querySelector('#vg-pick');
-  단추.onclick = () => { 켬 = !켬; 단추.classList.toggle('on', 켬);
-                        단추.textContent = 켬 ? '✋ 짚는 중 — 화면을 누르세요' : '✋ 짚어서 지시'; };
+  let 겨냥 = null, 시계 = null, 짚었다 = false, 시작 = null;
+
+  const 그만 = () => { clearTimeout(시계); 시계 = null; };
+  function 눌림(e){
+    const p = e.touches ? e.touches[0] : e;
+    if (e.target.closest('.vg-sheet')) return;
+    시작 = { x: p.clientX, y: p.clientY };
+    시계 = setTimeout(() => {
+      시계 = null; 짚었다 = true;
+      const sel = getSelection && getSelection(); sel && sel.removeAllRanges();
+      겨냥 = e.target;
+      겨냥.classList.add('vg-mark');
+      시트(무엇(겨냥));
+    }, 500);
+  }
+  function 움직임(e){                       // 스크롤이면 짚는 것이 아니다
+    if (!시계 || !시작) return;
+    const p = e.touches ? e.touches[0] : e;
+    if (Math.abs(p.clientX - 시작.x) > 10 || Math.abs(p.clientY - 시작.y) > 10) 그만();
+  }
+  addEventListener('touchstart', 눌림, true);
+  addEventListener('mousedown', 눌림, true);
+  addEventListener('touchmove', 움직임, true);
+  addEventListener('mousemove', 움직임, true);
+  addEventListener('touchend', 그만, true);
+  addEventListener('mouseup', 그만, true);
+  addEventListener('touchcancel', 그만, true);
+  addEventListener('scroll', 그만, true);
 
   /* 짚은 것이 무엇인지 사람이 알아볼 말로 적는다 */
   function 무엇(el) {
@@ -64,11 +90,9 @@
   }
 
   document.addEventListener('click', (e) => {
-    if (!켬 || e.target.closest('.vg-bar, .vg-sheet')) return;
+    if (!짚었다 || e.target.closest('.vg-sheet')) return;
+    짚었다 = false;                        // 짚느라 누른 것이 눌림으로 새지 않게 한 번만 삼킨다
     e.preventDefault(); e.stopPropagation();
-    겨냥 = e.target;
-    겨냥.classList.add('vg-mark');
-    시트(무엇(겨냥));
   }, true);
 
   function 시트(짚은것) {
@@ -84,7 +108,7 @@
     document.body.appendChild(s);
     const ta = s.querySelector('textarea');
     setTimeout(() => ta.focus(), 60);
-    const 닫기 = () => { s.remove(); 겨냥 && 겨냥.classList.remove('vg-mark'); };
+    const 닫기 = () => { s.remove(); 겨냥 && 겨냥.classList.remove('vg-mark'); 짚었다 = false; };
     s.querySelector('.vg-cancel').onclick = 닫기;
     s.onclick = (e) => { if (e.target === s) 닫기(); };
     s.querySelector('.vg-send').onclick = () => {
