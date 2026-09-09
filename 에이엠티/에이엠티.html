@@ -1464,7 +1464,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.14</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.15</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2535,6 +2535,27 @@
         // 발주서 1건이 아무리 소량(예: 한 조)이어도 무조건 원장 1장을 새로 잡던 문제를
         // 막기 위해, 그룹 서명(재단날짜+원장명+마감+색상+사이즈)이 같은 기존 자동생성
         // 재단계획을 찾아 수량을 합산하고 그 합산 수량으로 원장 장수를 다시 계산한다.
+        // 원장 한 장에 몇 개가 앉는지
+        function _한장수량(w, d, BW, BD, fCut, bT) {
+            if (!(w > 0) || !(d > 0)) return 0;
+            return Math.max(0, Math.floor((BW - fCut + bT) / (w + bT)))
+                 * Math.max(0, Math.floor((BD - fCut + bT) / (d + bT)));
+        }
+
+        // 재단편집에서 담당자가 '재단회전'으로 하던 일을 자동생성에서도 한다 —
+        // 눕혀서 더 많이 앉으면 그 방향으로 놓는다. 원장 장수가 줄고 버리는 양도 준다.
+        // 결이 있는 부속(결보호가 'X' 가 아닌 것)은 돌리면 안 되므로 그대로 둔다.
+        // 수량과 무관하게 '한 장에 더 많이 앉는 쪽'으로만 정한다 — 같은 부속을 여러
+        // 발주에 걸쳐 합칠 때 방향이 왔다갔다 하지 않게 하기 위해서다.
+        function _앉힐방향(w, d, grain, BW, BD, fCut, bT) {
+            const 그대로 = _한장수량(w, d, BW, BD, fCut, bT);
+            if (normalizeValue(grain) !== 'X') return { w, d, perSheet: 그대로, 돌림: false };
+            const 돌려서 = _한장수량(d, w, BW, BD, fCut, bT);
+            return 돌려서 > 그대로
+                ? { w: d, d: w, perSheet: 돌려서, 돌림: true }
+                : { w, d, perSheet: 그대로, 돌림: false };
+        }
+
         function _autoGenerateCuttingPlansForOrder(order) {
             const h = currentFullData[0];
             if (!h || currentFullData.length < 2 || !order || !order.partInfoMap) return;
@@ -2559,8 +2580,10 @@
                 const qty = pData.qty || Math.round(uc * (order.orderQty || 1));
                 if (qty <= 0) return;
 
-                const maxCols = Math.floor((BW - fCut + bT) / (rw + bT));
-                const maxRows = Math.floor((BD - fCut + bT) / (rd + bT));
+                const _방향 = _앉힐방향(rw, rd, row[h.indexOf('결보호')], BW, BD, fCut, bT);
+                const pw = _방향.w, pd = _방향.d;          // 실제로 원장에 앉히는 방향
+                const maxCols = Math.floor((BW - fCut + bT) / (pw + bT));
+                const maxRows = Math.floor((BD - fCut + bT) / (pd + bT));
                 const perSheet = maxCols * maxRows;
                 if (perSheet <= 0) return; // 부속이 원장보다 커서 자동 배치 불가 — 수동(재단편집)으로 처리 필요
 
@@ -2584,12 +2607,15 @@
                     for (let c = 0; c < maxCols; c++) {
                         for (let r = 0; r < maxRows; r++) {
                             bp.push({
-                                lp: (fCut + c * (rw + bT)) / BW,
-                                tp: (fCut + r * (rd + bT)) / BD,
-                                wp: rw / BW,
-                                hp: rd / BD,
+                                lp: (fCut + c * (pw + bT)) / BW,
+                                tp: (fCut + r * (pd + bT)) / BD,
+                                wp: pw / BW,
+                                hp: pd / BD,
                                 bg: _fillHex,
-                                oids: oidsStr
+                                oids: oidsStr,
+                                // 이 자리가 어느 부속인지 알아볼 수 있게 치수를 적어 둔다
+                                // (자투리에 다른 부속을 앉혔을 때 내 몫만 세는 데 쓰인다)
+                                dw: String(pw), dh: String(pd)
                             });
                         }
                     }
@@ -2618,7 +2644,9 @@
                         reqQty: mergedQty,
                         sheets: mergedSheets,
                         boardParts: buildBoardParts(mergedOrderIds.join(',')),
-                        pInfoText: `${rw} X ${rd} - ${partName} - ${mergedQty} EA (발주 ${mergedOrderIds.length}건 통합)`
+                        rotated: _방향.돌림,
+                        perSheet,
+                        pInfoText: `${pw} X ${pd} - ${partName} - ${mergedQty} EA (발주 ${mergedOrderIds.length}건 통합)`
                     };
                     // Firestore 반영은 비동기라 같은 배치에서 연달아 처리되는 다음 발주가
                     // 이 병합 결과를 못 보고 지나칠 수 있음 — window._cuttingPlans를 먼저
@@ -2642,7 +2670,7 @@
                     pRowIndex: ri,
                     sOrderIds: [], tOrderIds: [],
                     pDisplayName: order.displayName || order.orderCode || '',
-                    pInfoText: `${rw} X ${rd} - ${partName} - ${qty} EA`,
+                    pInfoText: `${pw} X ${pd} - ${partName} - ${qty} EA`,
                     baseMaterial: plateName,
                     coating,
                     materialColor: colorName,
@@ -2652,7 +2680,11 @@
                     sheets,
                     boardParts: buildBoardParts(String(order.idNum)),
                     boardW: BW, boardH: BD,
-                    cutW: rw, cutD: rd
+                    // cutW·cutD 는 시트에 적힌 부속 본래 치수 그대로 둔다(재단편집과 같은 규칙).
+                    // 실제로 앉힌 방향은 boardParts 와 아래 두 값에 남긴다.
+                    cutW: rw, cutD: rd,
+                    rotated: _방향.돌림,
+                    perSheet
                 };
 
                 window._cuttingPlans[String(cuttingData.confirmId)] = cuttingData;
@@ -6825,8 +6857,11 @@
                             let boardParts = [], sheets = 0, _perSheetInline = 0;
                             if (rw > 0 && rd > 0) {
                                 const BW = 2440, BD = 1220, fCut = 5, bT = 4.5;
-                                const maxCols = Math.floor((BW - fCut + bT) / (rw + bT));
-                                const maxRows = Math.floor((BD - fCut + bT) / (rd + bT));
+                                // 자동생성과 같은 규칙 — 눕혀서 더 많이 앉으면 그 방향으로
+                                const _방향2 = _앉힐방향(rw, rd, row[_fh.indexOf('결보호')], BW, BD, fCut, bT);
+                                const pw2 = _방향2.w, pd2 = _방향2.d;
+                                const maxCols = Math.floor((BW - fCut + bT) / (pw2 + bT));
+                                const maxRows = Math.floor((BD - fCut + bT) / (pd2 + bT));
                                 const perSheet = maxCols * maxRows;
                                 _perSheetInline = perSheet;
                                 if (perSheet > 0) {
@@ -6834,8 +6869,9 @@
                                     for (let c = 0; c < maxCols; c++) {
                                         for (let r = 0; r < maxRows; r++) {
                                             boardParts.push({
-                                                lp: (fCut + c * (rw + bT)) / BW, tp: (fCut + r * (rd + bT)) / BD,
-                                                wp: rw / BW, hp: rd / BD, bg: _fillHex
+                                                lp: (fCut + c * (pw2 + bT)) / BW, tp: (fCut + r * (pd2 + bT)) / BD,
+                                                wp: pw2 / BW, hp: pd2 / BD, bg: _fillHex,
+                                                dw: String(pw2), dh: String(pd2)
                                             });
                                         }
                                     }
