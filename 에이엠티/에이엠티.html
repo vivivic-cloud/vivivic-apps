@@ -1444,7 +1444,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.8</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.9</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2336,6 +2336,30 @@
             });
         }
 
+        // 원장 한 장에 '이 부속'이 몇 개 들어가는지.
+        // boardParts 에는 자투리에 함께 앉힌 2·3순위 부속의 자리까지 들어 있어서,
+        // 그 길이를 그대로 쓰면 남의 몫이 이 부속 작업량으로 잡힌다.
+        // (가와 144개 발주에 작업 232개로 뜨던 원인 — 한 장에 가와 5개 + 다른 부속 3개가
+        //  앉아 있었는데 8개를 전부 가와로 셌다)
+        // 재단편집에서 확정한 계획은 perSheet 를 그대로 적어 두고, 그 값이 없는
+        // 예전 계획은 도면 조각의 치수(dw·dh)가 이 부속과 같은 것만 센다.
+        function _cuttingPerSheet(p) {
+            if (p.perSheet > 0) return p.perSheet;
+            const bps = p.boardParts || [];
+            if (!bps.length) return 0;
+            const w = p.rw || 0, d = p.rd || 0;
+            if (!w || !d) return bps.length;
+            const 같다 = (a, b) => isFinite(a) && Math.abs(a - b) < 0.5;
+            const 내것 = bps.filter(pt => {
+                const dw = parseFloat(pt.dw), dh = parseFloat(pt.dh);
+                // 돌려서 앉혔을 수 있으니 가로·세로를 바꾼 것도 이 부속으로 본다
+                return (같다(dw, w) && 같다(dh, d)) || (같다(dw, d) && 같다(dh, w));
+            });
+            return 내것.length || bps.length;   // 치수가 안 적힌 옛 도면은 예전대로
+        }
+        // 이 재단계획으로 실제로 나오는 개수(총작업수량)
+        function _cuttingYield(p) { return _cuttingPerSheet(p) * (p.sheets || 0); }
+
         function _ensureCuttingPlanInTimeline(plan) {
             const allOrderIds = [...new Set([...(plan.pOrderIds||[]), ...(plan.sOrderIds||[]), ...(plan.tOrderIds||[])])];
             // 실제 발주에 매여 있는 재단계획만 공정 카드가 된다.
@@ -2449,6 +2473,7 @@
                 boardParts: plan.boardParts || [],
                 sheets: _cuttingSheetsFor(plan, _dqForPlan),
                 isCuttingCard: true,
+                perSheet: plan.perSheet || 0,
                 planId: String(plan.confirmId)
             };
             // 같은 cKey(같은 재단계획)가 이미 있으면 새로 추가하지 않고 내용을 갱신 —
@@ -6744,12 +6769,13 @@
 
                             // 카드에 재단 도면이 보이도록, _autoGenerateCuttingPlansForOrder와 동일한
                             // 방식(4X8 원장, 전단컷 5mm, 톱날두께 4.5mm)으로 간단 배치도를 즉석 계산
-                            let boardParts = [], sheets = 0;
+                            let boardParts = [], sheets = 0, _perSheetInline = 0;
                             if (rw > 0 && rd > 0) {
                                 const BW = 2440, BD = 1220, fCut = 5, bT = 4.5;
                                 const maxCols = Math.floor((BW - fCut + bT) / (rw + bT));
                                 const maxRows = Math.floor((BD - fCut + bT) / (rd + bT));
                                 const perSheet = maxCols * maxRows;
+                                _perSheetInline = perSheet;
                                 if (perSheet > 0) {
                                     sheets = Math.ceil(dq / perSheet);
                                     for (let c = 0; c < maxCols; c++) {
@@ -6762,7 +6788,7 @@
                                     }
                                 }
                             }
-                            cuttingParts.push({ nm, pm, dq, cKey: uid, orderCode: item.orderCode || '', orderKey, orderIdNum: item.idNum, orderName: item.displayName || item.orderCode || '', plateName, coating, finish, rw, rd, deliveryDate: item.deliveryDate || '', isCuttingCard: boardParts.length > 0, boardParts, sheets, pRowIndex: ri, coveredOrderIds: [item.idNum] });
+                            cuttingParts.push({ nm, pm, dq, cKey: uid, orderCode: item.orderCode || '', orderKey, orderIdNum: item.idNum, orderName: item.displayName || item.orderCode || '', plateName, coating, finish, rw, rd, deliveryDate: item.deliveryDate || '', isCuttingCard: boardParts.length > 0, boardParts, sheets, perSheet: _perSheetInline, pRowIndex: ri, coveredOrderIds: [item.idNum] });
                         });
                     });
                 }
@@ -7649,7 +7675,7 @@
             // 사유를 입력해야 하는 문제가 있었음 — 재단은 실제 예상 생산량(총작업수량)을
             // 기준으로 삼음
             const _wDoneQtyBasis = p.isCuttingCard
-                ? ((p.boardParts || []).length * (p.sheets || 0)) || (p.dq || 0)
+                ? (_cuttingYield(p) || (p.dq || 0))
                 : (p.dq || 0);
             const _wDoneHtml = _wDone
                 ? `<div style="margin-top:5px;text-align:right;"><span style="font-size:9px;font-weight:900;color:#22c55e;">✓ 완료</span>${_wActMin != null ? `<span style="font-size:8px;font-weight:700;color:#60a5fa;margin-left:3px;">${_wActMin.toFixed(1)}분</span>` : ''}</div>`
@@ -7663,7 +7689,7 @@
             if (p.isCuttingCard) {
                 // 카드 표기 항목(고정 순서): 발주번호 / 원장명-마감색상 / 마감(양면·편면 등) /
                 // 작업사이즈(발주수량) / 원장(매수) / 총작업수량(계산된 실제 생산개수)
-                const _perSheet = (p.boardParts || []).length;
+                const _perSheet = _cuttingPerSheet(p);
                 const _yield    = _perSheet * (p.sheets || 0);
                 // 원장을 통짜로 재단하다 보니 발주수량보다 더 나올 수 있는 초과분을
                 // 총작업수량 옆에 별도로 표기(작을수록 좋은 정보라 경고색으로 구분)
@@ -7755,13 +7781,13 @@
             // 실제 예상 생산량(총작업수량)을 기준으로 삼음 (실제 작업현장과
             // 맞지 않다는 피드백)
             const _bDoneQtyBasis = p.isCuttingCard
-                ? ((p.boardParts || []).length * (p.sheets || 0)) || (p.dq || 0)
+                ? (_cuttingYield(p) || (p.dq || 0))
                 : (p.dq || 0);
 
             // ─── 배치 카드 (재단카드: 6개 핵심정보 / 일반카드: 컴팩트 2행) ───
             let _placedInner = '';
             if (p.isCuttingCard) {
-                const _perSheet2 = (p.boardParts || []).length;
+                const _perSheet2 = _cuttingPerSheet(p);
                 const _yield2    = _perSheet2 * (p.sheets || 0);
                 const _excess2   = Math.max(0, _yield2 - (p.dq || 0));
                 const _yieldVal2 = `${_yield2}개` + (_excess2 > 0 ? `<span style="font-size:9px;font-weight:700;color:#c2793a;margin-left:2px;">(+${_excess2})</span>` : '');
@@ -10446,6 +10472,9 @@
                 tInfoText: tAgg ? document.getElementById('tertiary-production-detail-text').textContent : '',
                 tOrderIds: tAgg && tAgg.dataset.orderIds ? tAgg.dataset.orderIds.split(',').map(id => parseInt(id)) : [],
                 baseMaterial: base, materialColor: color, sheets: suggestedSheets,
+                // 원장 한 장에 이 부속(1순위)이 몇 개 앉는지. boardParts 에는 자투리에
+                // 함께 앉힌 2·3순위 부속도 섞여 있어 그 길이로는 알 수 없다
+                perSheet: suggestedSheets ? Math.round(currentProducedQtyPrimary / suggestedSheets) : 0,
                 boardParts: Array.from(board.querySelectorAll('.placed-part')).map(el => ({
                     lp: parseFloat(el.style.left) / parseFloat(board.style.width),
                     tp: parseFloat(el.style.top) / parseFloat(board.style.height),
@@ -10455,7 +10484,10 @@
                     dw: el.querySelector('.dim-w-label')?.textContent || '',
                     dh: el.querySelector('.dim-d-label')?.textContent || ''
                 })),
-                boardW: parseFloat(board.style.width), boardH: parseFloat(board.style.height),
+                // 원장 크기는 화면 픽셀이 아니라 실제 mm 로 적는다 (예전엔 480×240 같은
+                // 화면 크기가 들어가 자동생성 계획의 2440×1220 과 단위가 달랐다)
+                boardW: (document.getElementById('setting-board-size').value === '3X6' ? 1840 : 2440),
+                boardH: (document.getElementById('setting-board-size').value === '3X6' ?  920 : 1220),
                 cutW: (currentFullData[0] && currentFullData[parseInt(pAgg.dataset.rowIndex)]) ? (parseFloat(currentFullData[parseInt(pAgg.dataset.rowIndex)][currentFullData[0].indexOf('재단W')]) || 0) : 0,
                 cutD: (currentFullData[0] && currentFullData[parseInt(pAgg.dataset.rowIndex)]) ? (parseFloat(currentFullData[parseInt(pAgg.dataset.rowIndex)][currentFullData[0].indexOf('재단D')]) || 0) : 0
             };
