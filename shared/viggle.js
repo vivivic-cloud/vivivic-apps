@@ -39,13 +39,10 @@
   .vg-cancel{background:#fff;color:#6E6E6A;border:1px solid #E2E2DF !important}`;
   document.head.insertAdjacentHTML('beforeend', `<style>${css}</style>`);
 
-  const 순수 = (() => { const u = new URL(location.href);
-    ['viggle','box','vg','name'].forEach(k => u.searchParams.delete(k)); return u.toString(); })();
 
   const bar = document.createElement('div');
   bar.className = 'vg-bar';
-  bar.innerHTML = `<button id="vg-pick">✋ 짚어서 지시</button>
-                   <a href="${순수}">순수 화면</a>`;
+  bar.innerHTML = `<button id="vg-pick">✋ 짚어서 지시</button>`;
   document.body.appendChild(bar);
   document.body.style.paddingBottom = '76px';
 
