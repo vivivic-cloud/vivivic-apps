@@ -1464,7 +1464,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.15</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.16</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2556,6 +2556,48 @@
                 : { w, d, perSheet: 그대로, 돌림: false };
         }
 
+        // 자투리(1순위 부속을 앉히고 남은 오른쪽·아래)에 공통부속을 앉힌다.
+        // 재단편집에서 담당자가 2순위 부속으로 골라 넣던 일과 같다.
+        function _자투리에앉히기(sw, sd, grain, actOX, actOY, BW, BD, fCut, bT) {
+            const 후보 = [{ w: sw, d: sd }];
+            if (normalizeValue(grain) === 'X' && sw !== sd) 후보.push({ w: sd, d: sw });
+            const 자리들 = [
+                { 이름: 'right',  w: BW - actOX - bT, d: BD,                 x: actOX + bT, y: 0 },
+                { 이름: 'bottom', w: BW,              d: BD - actOY - bT,    x: 0,          y: actOY + bT }
+            ];
+            let 최고 = null;
+            자리들.forEach(a => {
+                if (a.w <= 0 || a.d <= 0) return;
+                후보.forEach(c => {
+                    const cols = Math.floor((a.w + bT) / (c.w + bT));
+                    const rows = Math.floor((a.d + bT) / (c.d + bT));
+                    const n = Math.max(0, cols) * Math.max(0, rows);
+                    if (n > 0 && (!최고 || n > 최고.n)) 최고 = { a, w: c.w, d: c.d, cols, rows, n };
+                });
+            });
+            return 최고;
+        }
+
+        // 이 원장에 함께 앉힐 수 있는 전도방지 부속 한 줄을 찾는다.
+        // 마감색상이 'any' 면 어느 색에나 쓰는 부속이라는 뜻이다.
+        function _전도방지행(h, plateName, coating, colorName) {
+            const iN = h.indexOf('부속명'), iS = h.indexOf('공급처'), iP = h.indexOf('원장명'),
+                  iM = h.indexOf('마감'), iC = h.indexOf('마감색상'),
+                  iW = h.indexOf('재단W'), iD = h.indexOf('재단D');
+            for (let i = 1; i < currentFullData.length; i++) {
+                const r = currentFullData[i]; if (!r) continue;
+                if (String(r[iN] || '').trim() !== '전도방지') continue;
+                if (normalizeValue(r[iS]) !== '공통부속') continue;
+                if ((r[iP] || '') !== plateName || (r[iM] || '') !== coating) continue;
+                const c = normalizeValue(r[iC]);
+                if (c && c !== 'any' && c !== colorName) continue;
+                const w = parseFloat(r[iW]) || 0, d = parseFloat(r[iD]) || 0;
+                if (w <= 0 || d <= 0) continue;
+                return { rowIndex: i, w, d, grain: r[h.indexOf('결보호')] };
+            }
+            return null;
+        }
+
         function _autoGenerateCuttingPlansForOrder(order) {
             const h = currentFullData[0];
             if (!h || currentFullData.length < 2 || !order || !order.partInfoMap) return;
@@ -2602,6 +2644,15 @@
                 const cuttingDate = order.procOverrides?.['재단'] || order.deliveryDate || '미정';
                 const groupSig = [cuttingDate, plateName, coating, colorName, rw, rd].join('|');
 
+                // 1순위 부속을 다 앉히고 남는 자리 — 오른쪽 끝과 아래쪽
+                const actOX = fCut + maxCols * (pw + bT);
+                const actOY = fCut + maxRows * (pd + bT);
+                // 남는 자리에 전도방지가 들어가면 기본으로 함께 앉힌다
+                const _전도 = _전도방지행(h, plateName, coating, colorName);
+                const _전도자리 = _전도
+                    ? _자투리에앉히기(_전도.w, _전도.d, _전도.grain, actOX, actOY, BW, BD, fCut, bT)
+                    : null;
+
                 const buildBoardParts = (oidsStr) => {
                     const bp = [];
                     for (let c = 0; c < maxCols; c++) {
@@ -2617,6 +2668,22 @@
                                 // (자투리에 다른 부속을 앉혔을 때 내 몫만 세는 데 쓰인다)
                                 dw: String(pw), dh: String(pd)
                             });
+                        }
+                    }
+                    if (_전도자리) {
+                        const z = _전도자리;
+                        for (let c = 0; c < z.cols; c++) {
+                            for (let r = 0; r < z.rows; r++) {
+                                bp.push({
+                                    lp: (z.a.x + c * (z.w + bT)) / BW,
+                                    tp: (z.a.y + r * (z.d + bT)) / BD,
+                                    wp: z.w / BW,
+                                    hp: z.d / BD,
+                                    bg: '#f5f5f4',            // 재단편집의 2순위 부속과 같은 색
+                                    oids: oidsStr,
+                                    dw: String(z.w), dh: String(z.d)
+                                });
+                            }
                         }
                     }
                     return bp;
@@ -2646,6 +2713,13 @@
                         boardParts: buildBoardParts(mergedOrderIds.join(',')),
                         rotated: _방향.돌림,
                         perSheet,
+                        sRowIndex: _전도자리 ? _전도.rowIndex : null,
+                        sProducedQty: _전도자리 ? _전도자리.n * mergedSheets : 0,
+                        sDisplayName: _전도자리 ? '전도방지' : '',
+                        sInfoText: _전도자리
+                            ? `${_전도자리.w} X ${_전도자리.d} - 전도방지 - ${_전도자리.n * mergedSheets} EA`
+                            : '',
+                        sOrderIds: _전도자리 ? mergedOrderIds : [],
                         pInfoText: `${pw} X ${pd} - ${partName} - ${mergedQty} EA (발주 ${mergedOrderIds.length}건 통합)`
                     };
                     // Firestore 반영은 비동기라 같은 배치에서 연달아 처리되는 다음 발주가
@@ -2668,7 +2742,15 @@
                     // pRowIndex: 이 부속이 어느 행(cKey)에서 왔는지 기록 — 발주확정목록에서
                     // "이 주문의 이 부속은 이미 재단계획이 확정됐는지" 판별하는 데 사용
                     pRowIndex: ri,
-                    sOrderIds: [], tOrderIds: [],
+                    // 자투리에 함께 앉힌 전도방지 — 재단편집이 2순위 부속을 적는 자리와 같다
+                    sId: null,
+                    sRowIndex: _전도자리 ? _전도.rowIndex : null,
+                    sProducedQty: _전도자리 ? _전도자리.n * sheets : 0,
+                    sDisplayName: _전도자리 ? '전도방지' : '',
+                    sInfoText: _전도자리
+                        ? `${_전도자리.w} X ${_전도자리.d} - 전도방지 - ${_전도자리.n * sheets} EA`
+                        : '',
+                    sOrderIds: _전도자리 ? [order.idNum] : [], tOrderIds: [],
                     pDisplayName: order.displayName || order.orderCode || '',
                     pInfoText: `${pw} X ${pd} - ${partName} - ${qty} EA`,
                     baseMaterial: plateName,
