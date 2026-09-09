@@ -1444,7 +1444,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.9</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.10</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -6802,8 +6802,17 @@
                 // 자동생성 재단계획은 같은 그룹의 여러 발주를 하나로 합칠 수 있어(coveredOrderIds),
                 // orderKey 하나가 아니라 "이 발주 idNum이 그 재단계획에 포함돼 있는지"로 확인
                 const prevCutParts = (window._woBoringParts[sk] || []).filter(p => p.isCuttingCard);
-                const _cutSig = p => `${p.orderKey}|${p.rw}|${p.rd}|${p.plateName}|${p.finish}`;
-                const _dimSig = p => `${p.rw}|${p.rd}|${p.plateName}|${p.finish}`;
+                // 같은 부속인지는 원본 시트의 행(pRowIndex)으로 가린다.
+                // 규격+원장명+색상으로 가리던 때는 두 가지가 다 틀렸다:
+                //  · 상판과 지판은 둘 다 420×480, 같은 원장·색상이라 한 부속으로 묶여
+                //    지판 카드가 통째로 사라졌다 (발주에는 있는데 재단에는 없던 이유)
+                //  · 같은 가와인데 원장명이 'PB-18T'와 'PB-18TLPM-양면'으로 달리 적혀
+                //    다른 부속으로 보여 카드가 두 번 나왔다
+                const _partSig = p => p.pRowIndex != null
+                    ? 'r' + p.pRowIndex
+                    : `${p.rw}|${p.rd}|${p.plateName}|${p.finish}`;
+                const _cutSig = p => `${p.orderKey}|${_partSig(p)}`;
+                const _dimSig = p => _partSig(p);
                 const prevCutSigs = new Set(prevCutParts.map(_cutSig));
                 const coveredByOrderId = new Set(); // `${orderIdNum}|${dimSig}`
                 prevCutParts.forEach(p => {
@@ -6860,15 +6869,21 @@
                 // 서명(주문+규격+원장+색상)이 같은 카드가 여럿이면 공식 재단계획
                 // (cKey가 'cut_'로 시작) 쪽을 남기고 나머지는 보드/풀에서 제거
                 {
+                    // 죽은 발주까지 물고 있는 재단계획보다, 살아 있는 발주만 덮는 쪽을 남긴다.
+                    // (합쳐 만든 계획이 발주 취소 뒤에도 그때 수량을 그대로 들고 있어서,
+                    //  같은 부속인데 수량이 다른 카드가 나란히 뜨는 일이 있었다)
+                    const _다살아있나 = p => {
+                        const ids = p.coveredOrderIds || [];
+                        return ids.length > 0 && ids.every(id => confirmedOrders.some(o => o.idNum === id));
+                    };
+                    const _점수 = p => (p.cKey.startsWith('cut_') ? 2 : 0) + (_다살아있나(p) ? 1 : 0);
                     const sigToKeep = new Map();
                     const dropKeys  = new Set();
                     mergedCutParts.forEach(p => {
                         const sig = _cutSig(p);
-                        const keptKey = sigToKeep.get(sig);
-                        if (!keptKey) { sigToKeep.set(sig, p.cKey); return; }
-                        const keptIsPlan = keptKey.startsWith('cut_');
-                        const curIsPlan  = p.cKey.startsWith('cut_');
-                        if (curIsPlan && !keptIsPlan) { dropKeys.add(keptKey); sigToKeep.set(sig, p.cKey); }
+                        const kept = sigToKeep.get(sig);
+                        if (!kept) { sigToKeep.set(sig, p); return; }
+                        if (_점수(p) > _점수(kept)) { dropKeys.add(kept.cKey); sigToKeep.set(sig, p); }
                         else dropKeys.add(p.cKey);
                     });
                     if (dropKeys.size > 0) {
