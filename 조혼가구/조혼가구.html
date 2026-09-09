@@ -42,9 +42,32 @@
         window.fbStorage = { ref, uploadBytes, getDownloadURL };
         window.fbAuth = { auth, signInWithEmailAndPassword, signOut };
 
+        // 로그아웃을 눌렀을 때만 로그인 화면을 띄운다. 그 밖에는 익명으로 바로 들어간다.
+        let _로그인화면요청 = false;
+        try {
+            _로그인화면요청 = sessionStorage.getItem('vv.wantLogin') === '1';
+            sessionStorage.removeItem('vv.wantLogin');
+        } catch (e) {}
+
         onAuthStateChanged(auth, async (user) => {
-            if (!user || user.isAnonymous) {
-                window.showAuthLoginScreen();
+            if (!user) {
+                if (_로그인화면요청) { _로그인화면요청 = false; window.showAuthLoginScreen(); return; }
+                // 로그인 없이 들어와도 그대로 쓸 수 있게 익명으로 들어간다
+                signInAnonymously(auth)
+                    .catch(err => window.showAuthLoginScreen('접속하지 못했습니다: ' + (err.code || err.message)));
+                return;
+            }
+
+            if (user.isAnonymous) {
+                // 로그인 없이 쓰는 사람 — 계정 권한 조회를 건너뛰고 바로 들어간다
+                window._myAccount = { uid: user.uid, email: '', role: null, company: null };
+                window.hideAuthLoginScreen();
+                const emailEl0 = document.getElementById('auth-account-email');
+                if (emailEl0) emailEl0.textContent = '로그인 없이 이용 중';
+                const outBtn = document.getElementById('auth-logout-btn');
+                if (outBtn) { outBtn.textContent = '로그인'; outBtn.onclick = () => window.showAuthLoginScreen(); }
+                initCloudDataSync();
+                initConfirmedOrdersSync();
                 return;
             }
 
@@ -106,6 +129,7 @@
         };
         window.handleAuthLogout = async function() {
             window._myAccount = null;
+            try { sessionStorage.setItem('vv.wantLogin', '1'); } catch (e) {}   // 이번만 로그인 화면
             await signOut(auth);
             location.reload();
         };
@@ -1214,7 +1238,7 @@
             <div class="flex items-center gap-3 ml-4">
                 <div id="auth-account-badge" class="flex items-center gap-2 px-2 py-1 rounded-lg bg-[#f7f6f3] border border-[#ededeb]" style="font-size:11px;">
                     <span id="auth-account-email" class="font-bold text-[#37352f]"></span>
-                    <button onclick="window.handleAuthLogout()" class="text-[#787774] hover:text-[#37352f] font-bold underline">로그아웃</button>
+                    <button id="auth-logout-btn" onclick="window.handleAuthLogout()" class="text-[#787774] hover:text-[#37352f] font-bold underline">로그아웃</button>
                 </div>
                 <div id="excel-upload-wrap" class="flex items-center gap-1 border border-[#ededeb] rounded-lg bg-white p-1">
                     <input type="file" id="excel-upload" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleFileUpload(this)" />
