@@ -1464,7 +1464,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.13</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.14</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -7628,8 +7628,12 @@
             const target = document.getElementById('_woEditTargetCard');
             if (target) {
                 handleCardClick(target);
-                // 기존 계획에 저장된 원장 장수를 그대로 반영해서 보여줌(이후 +/-로 조정 가능)
-                if (p.sheets) { suggestedSheets = p.sheets; isSheetsManual = true; updateBoardVisual(true); }
+                // 기존 계획에 저장된 원장 장수를 그대로 반영해서 보여줌(이후 +/-로 조정 가능).
+                // 여기서 isSheetsManual 을 켜면 안 된다 — 그건 "담당자가 장수를 직접 못박았다"는
+                // 뜻이라, 켜 두면 부속을 돌리거나 바꿔서 한 장당 수량이 달라져도 장수가
+                // 그대로 남아 총작업량이 발주수량과 어긋난다. 한 번만 덮어 보여주고(true),
+                // 그 뒤의 변경은 다시 계산되게 둔다.
+                if (p.sheets) { suggestedSheets = p.sheets; isSheetsManual = false; updateBoardVisual(true); }
                 // updateBoardVisual()은 부속 크기 기준으로 그리드를 "새로" 계산해 그리므로,
                 // 회전·2/3순위 조합 등으로 실제 저장된 배치가 표준 그리드와 다르면
                 // 편집 시작 화면이 실제 도면과 어긋나 보일 수 있음 — 팝업을 열 때는
@@ -10302,7 +10306,10 @@
             container.appendChild(card);
         }
 
-        function toggleRotation(btn) { const card = btn.closest('.inner-part-card'), step = (card.id === primarySelectedCardId) ? 'P' : (card.id === secondarySelectedCardId) ? 'S' : 'T'; const w = card.dataset.w, d = card.dataset.d; card.dataset.w = d; card.dataset.d = w; card.querySelector('.dim-label').textContent = `${d}X${w}`; btn.classList.toggle('rotated');  updateBoardVisual(isSheetsManual); }
+        // 부속을 돌리면 원장 한 장에 들어가는 개수가 달라지므로 원장 장수를 반드시 다시 센다.
+        // 담당자가 +/- 로 못박아 둔 장수가 있어도, 그건 돌리기 전 배치를 보고 정한 값이라
+        // 그대로 두면 총작업량이 발주수량과 어긋난다 — 다시 센 뒤 필요하면 또 +/- 로 조정한다.
+        function toggleRotation(btn) { const card = btn.closest('.inner-part-card'), step = (card.id === primarySelectedCardId) ? 'P' : (card.id === secondarySelectedCardId) ? 'S' : 'T'; const w = card.dataset.w, d = card.dataset.d; card.dataset.w = d; card.dataset.d = w; card.querySelector('.dim-label').textContent = `${d}X${w}`; btn.classList.toggle('rotated'); isSheetsManual = false; updateBoardVisual(); }
 
         function changeSuggestedSheets(delta) { suggestedSheets = Math.max(1, suggestedSheets + delta); isSheetsManual = true; updateBoardVisual(true); }
 
