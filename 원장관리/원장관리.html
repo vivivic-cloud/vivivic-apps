@@ -458,12 +458,40 @@ const GROUPS = [...new Set(SCHEMA.map(s => s.group))];
 const HEADER_ORDER = SCHEMA.map(s => s.key); // 엑셀 재생성 시 컬럼 순서 — 0번=ing단품명 고정
 
 const COLLECTION = ['artifacts','vivivic-4b7ef','public','data','product_master'];
+// 원본(엑셀에서 가져온 값)은 절대 직접 고치지 않는다 — 사람이 실제로
+// 편집·확정한 값은 전부 이 별도 컬렉션에만 쓴다. 문서ID는 대응하는
+// product_master 문서ID를 그대로 재사용(1:1). 이렇게 나눠두면 나중에
+// 원장 엑셀을 다시 가져와도(제품 마스터만 갱신됨) 사람이 확정해둔 값은
+// 전혀 안 건드려져서 안전하게 남는다.
+const OVERRIDES_COLLECTION = ['artifacts','vivivic-4b7ef','public','data','product_overrides'];
 const EXCEL_META_COLLECTION = ['artifacts','vivivic-4b7ef','public','data','excel_metadata'];
 
 // ── 앱 상태 ──────────────────────────────────────────────────────────
-let ROWS = [];              // Firestore product_master 전체 (메모리 캐시)
+let MASTER_ROWS = [];       // product_master 원본 스냅샷(절대 화면에 직접 안 씀)
+let OVERRIDE_ROWS = {};     // { [문서ID]: overrideData } — product_overrides 스냅샷
+let ROWS = [];               // MASTER_ROWS + OVERRIDE_ROWS 병합 결과(화면은 항상 이것만 읽음)
 let currentEditId = null;   // 편집 중인 문서 ID (null = 신규)
 let currentEditFields = {}; // 편집 중인 필드값(로컬 드래프트, 저장 눌러야 반영)
+
+// 원본 위에 확정값을 덧씌운다 — 확정값이 있는 필드만 원본을 가리고,
+// 없는 필드는 원본 그대로 보임. deleted/pendingPublish도 확정값이
+// 있으면 그걸 우선(신규 등록 행처럼 확정값이 없으면 원본 문서 자체의
+// 값을 그대로 씀 — 신규는 애초에 "원본"과 "확정값" 구분이 없으므로).
+function mergeRows() {
+    ROWS = MASTER_ROWS.map(m => {
+        const ov = OVERRIDE_ROWS[m.id];
+        if (!ov) return m;
+        return {
+            ...m,
+            fields: { ...m.fields, ...(ov.fields || {}) },
+            deleted: ov.deleted != null ? ov.deleted : !!m.deleted,
+            pendingPublish: !!ov.pendingPublish,
+            hasOverride: true,
+            overrideConfirmedAt: ov.confirmedAt || null,
+            overrideConfirmedBy: ov.confirmedBy || null,
+        };
+    });
+}
 
 function fv(row, key) { return (row.fields && row.fields[key]) || ''; }
 
@@ -484,26 +512,47 @@ const PRODUCT_LEVEL_KEYS = [
 ];
 
 // ── 초기화 ───────────────────────────────────────────────────────────
+// product_master(원본)와 product_overrides(확정값)를 각각 독립 구독하고,
+// 둘 다 최초 한 번씩 도착하면 병합해서 화면을 그린다. 자동 부트스트랩은
+// "원본이 비어있는지"만 보고 판단(확정값 존재 여부와는 무관).
 window.initApp = function() {
     const { collection, query, orderBy, onSnapshot } = window.fbFirestore;
-    const colRef = collection(window.db, ...COLLECTION);
+    const masterCol = collection(window.db, ...COLLECTION);
+    const overridesCol = collection(window.db, ...OVERRIDES_COLLECTION);
     let _autoBootstrapTried = false;
-    onSnapshot(query(colRef, orderBy('legacyRowIndex', 'asc')), snap => {
-        ROWS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    let _masterLoaded = false, _overridesLoaded = false;
+
+    function onEitherLoaded() {
+        if (!_masterLoaded || !_overridesLoaded) return; // 둘 다 도착해야 정확히 병합됨
+        mergeRows();
         renderList();
         renderFilterOptions();
         renderPublishPage();
         updatePendingBadge();
         // 에이엠티/조혼가구처럼 — 사용자가 "가져오기" 버튼을 누를 필요 없이,
-        // product_master가 비어있으면(=아직 한 번도 이관 안 한 상태) 화이어
-        // 베이스에 이미 올라가 있는 원장 파일을 앱을 여는 즉시 자동으로
-        // 가져온다. 데이터가 이미 있는 뒤로는(=편집 중인 진짜 데이터베이스가
-        // 됨) 열 때마다 덮어쓰면 안 되므로 한 번만 시도한다.
-        if (ROWS.length === 0 && !_autoBootstrapTried) {
+        // product_master(원본)가 비어있으면(=아직 한 번도 이관 안 한 상태)
+        // 화이어베이스에 이미 올라가 있는 원장 파일을 앱을 여는 즉시 자동
+        // 으로 가져온다. 원본이 이미 있으면 열 때마다 덮어쓰면 안 되므로
+        // 한 번만 시도한다.
+        if (MASTER_ROWS.length === 0 && !_autoBootstrapTried) {
             _autoBootstrapTried = true;
             autoBootstrapFromExcel();
         }
+    }
+
+    onSnapshot(query(masterCol, orderBy('legacyRowIndex', 'asc')), snap => {
+        MASTER_ROWS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        _masterLoaded = true;
+        onEitherLoaded();
     }, err => console.error('[product_master onSnapshot]', err));
+
+    onSnapshot(overridesCol, snap => {
+        const map = {};
+        snap.docs.forEach(d => { map[d.id] = d.data(); });
+        OVERRIDE_ROWS = map;
+        _overridesLoaded = true;
+        onEitherLoaded();
+    }, err => console.error('[product_overrides onSnapshot]', err));
 };
 
 async function autoBootstrapFromExcel() {
@@ -956,17 +1005,22 @@ window.saveCurrentRow = async function() {
         alert('ing단품명은 필수입니다 (에이엠티/조혼가구가 이 값을 제품 식별자로 씁니다).');
         return;
     }
-    const { collection, doc, setDoc, updateDoc, serverTimestamp } = window.fbFirestore;
+    const { collection, doc, setDoc, serverTimestamp } = window.fbFirestore;
     const cleanFields = {};
     HEADER_ORDER.forEach(k => { cleanFields[k] = currentEditFields[k] != null ? String(currentEditFields[k]) : ''; });
 
     try {
         if (currentEditId) {
-            await updateDoc(doc(window.db, ...COLLECTION, currentEditId), {
-                fields: cleanFields, pendingPublish: true, updatedAt: serverTimestamp(), updatedBy: window._myAccount?.email || null
-            });
+            // 기존 행 수정 — 원본(product_master)은 절대 안 건드리고, 확정값
+            // 컬렉션(product_overrides)에만 씀. 문서ID는 원본과 동일하게 재사용.
+            await setDoc(doc(window.db, ...OVERRIDES_COLLECTION, currentEditId), {
+                fields: cleanFields, deleted: false, pendingPublish: true,
+                confirmedAt: serverTimestamp(), confirmedBy: window._myAccount?.email || null
+            }, { merge: true });
         } else {
-            const nextIdx = ROWS.length ? Math.max(...ROWS.map(r => r.legacyRowIndex ?? -1)) + 1 : 0;
+            // 완전히 새 행(신규 등록/이 제품에 부속 추가) — 아직 "원본"이라는
+            // 게 없는 데이터이므로 확정값 개념 없이 그냥 product_master에 생성
+            const nextIdx = MASTER_ROWS.length ? Math.max(...MASTER_ROWS.map(r => r.legacyRowIndex ?? -1)) + 1 : 0;
             await setDoc(doc(collection(window.db, ...COLLECTION)), {
                 fields: cleanFields, legacyRowIndex: nextIdx, deleted: false, pendingPublish: true,
                 createdAt: serverTimestamp(), updatedAt: serverTimestamp(), updatedBy: window._myAccount?.email || null
@@ -981,13 +1035,13 @@ window.saveCurrentRow = async function() {
 
 window.deleteCurrentRow = async function() {
     if (!currentEditId) return;
-    if (!confirm('이 항목을 삭제하시겠습니까?\n(실제로는 완전히 지우지 않고 빈 행으로 남깁니다 — 예전에 확정된 발주가 이 행 번호를 참조하고 있을 수 있어, 행 번호 자체를 바꾸면 그 발주 데이터가 어긋날 수 있기 때문입니다.)')) return;
-    const { doc, updateDoc, serverTimestamp } = window.fbFirestore;
-    const blank = {}; HEADER_ORDER.forEach(k => blank[k] = '');
+    if (!confirm('이 항목을 삭제하시겠습니까?\n(원본 데이터는 그대로 두고 "삭제됨" 확정값만 남깁니다 — 나중에 이 확정값만 지우면 원본이 그대로 복원됩니다. 예전에 확정된 발주가 이 행 번호를 참조하고 있을 수 있어, 행 번호 자체는 바꾸지 않습니다.)')) return;
+    const { doc, setDoc, serverTimestamp } = window.fbFirestore;
     try {
-        await updateDoc(doc(window.db, ...COLLECTION, currentEditId), {
-            fields: blank, deleted: true, pendingPublish: true, updatedAt: serverTimestamp(), updatedBy: window._myAccount?.email || null
-        });
+        await setDoc(doc(window.db, ...OVERRIDES_COLLECTION, currentEditId), {
+            deleted: true, pendingPublish: true,
+            confirmedAt: serverTimestamp(), confirmedBy: window._myAccount?.email || null
+        }, { merge: true });
         closeEditModal();
     } catch (err) {
         console.error('삭제 실패', err);
@@ -1039,14 +1093,16 @@ window.saveProductEdit = async function() {
     const rows = ROWS.filter(r => !r.deleted && productKeyOf(r) === currentProductEditKey);
     if (!confirm(`이 제품의 부속 ${rows.length}개 전체에 이 변경사항을 적용하시겠습니까?`)) return;
     try {
+        // 원본(product_master)은 안 건드리고, 확정값 컬렉션에만 반영
         const { doc, writeBatch, serverTimestamp } = window.fbFirestore;
         const batch = writeBatch(window.db);
         rows.forEach(r => {
             const newFields = { ...r.fields };
             PRODUCT_LEVEL_KEYS.forEach(k => newFields[k] = currentProductEditFields[k]);
-            batch.update(doc(window.db, ...COLLECTION, r.id), {
-                fields: newFields, pendingPublish: true, updatedAt: serverTimestamp(), updatedBy: window._myAccount?.email || null
-            });
+            batch.set(doc(window.db, ...OVERRIDES_COLLECTION, r.id), {
+                fields: newFields, deleted: false, pendingPublish: true,
+                confirmedAt: serverTimestamp(), confirmedBy: window._myAccount?.email || null
+            }, { merge: true });
         });
         await batch.commit();
         // 제품명(키)이 바뀌었을 수 있으니 선택 상태를 새 값으로 갱신
@@ -1136,12 +1192,15 @@ window.doPublish = async function() {
             uploadedBy: window._myAccount?.email || '원장관리'
         });
 
-        // 4) 확정 처리 — pendingPublish 플래그 정리
+        // 4) 확정 처리 — pendingPublish 플래그 정리. 기존 행의 pendingPublish는
+        //    확정값(product_overrides) 쪽에 있고, 신규 등록 행만 원본
+        //    (product_master) 자체에 있으므로 각각 맞는 컬렉션에 씀
         statusEl.textContent = '마무리 중...';
-        const { doc, updateDoc, writeBatch } = window.fbFirestore;
+        const { doc, writeBatch } = window.fbFirestore;
         const batch = writeBatch(window.db);
         ROWS.filter(r => r.pendingPublish).forEach(r => {
-            batch.update(doc(window.db, ...COLLECTION, r.id), { pendingPublish: false, publishedAt: serverTimestamp() });
+            const target = r.hasOverride ? OVERRIDES_COLLECTION : COLLECTION;
+            batch.update(doc(window.db, ...target, r.id), { pendingPublish: false, publishedAt: serverTimestamp() });
         });
         await batch.commit();
 
