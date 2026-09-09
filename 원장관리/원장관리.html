@@ -134,6 +134,9 @@
         background:#fff; color:#787774; font-weight:800; cursor:pointer; transition:all .12s; }
     .method-chip:active { transform:scale(.97); }
     .method-chip.on { background:#37352f; color:#fff; border-color:#37352f; }
+    .supplier-chip { padding:4px 10px; font-size:11px; font-weight:800; border:1px solid #ededeb; border-radius:20px;
+        background:#fff; color:#787774; cursor:pointer; transition:all .12s; }
+    .supplier-chip.on { background:#227C9D; color:#fff; border-color:#227C9D; }
     select:disabled.field-input { background:#f7f6f3; color:#c2c0bb; cursor:not-allowed; }
     table.pm-table th { position:sticky; top:0; background:#fbfbfa; z-index:5; }
     ::-webkit-scrollbar { width:8px; height:8px; }
@@ -192,17 +195,29 @@
         <div class="bg-white border border-[#ededeb] rounded-xl p-4 mb-4">
             <div class="method-pick mb-3">
                 <button type="button" class="method-chip on" data-mode="direct" onclick="selectListSearchMethod('direct')">상품검색</button>
+                <button type="button" class="method-chip" data-mode="ing" onclick="selectListSearchMethod('ing')">ING단품명</button>
                 <button type="button" class="method-chip" data-mode="category" onclick="selectListSearchMethod('category')">카테고리</button>
             </div>
 
             <div id="list-search-direct" class="search-mode-content">
                 <input id="pm-search" type="text" placeholder="제품명 / 부속명 / 코드로 검색..." oninput="renderList()" class="field-input">
             </div>
+            <div id="list-search-ing" class="search-mode-content hidden">
+                <select id="pm-filter-ing" class="field-input" onchange="renderList()"><option value="">ing단품명 선택</option></select>
+            </div>
             <div id="list-search-category" class="search-mode-content hidden flex flex-wrap gap-2">
                 <select id="pm-filter-l1" class="field-input" style="width:140px" onchange="onFilterL1Change()"><option value="">① 대분류 선택</option></select>
                 <select id="pm-filter-l2" class="field-input" style="width:140px" onchange="onFilterL2Change()" disabled><option value="">② 중분류 선택</option></select>
                 <select id="pm-filter-l3" class="field-input" style="width:140px" onchange="onFilterL3Change()" disabled><option value="">③ 소분류 선택</option></select>
                 <select id="pm-filter-l4" class="field-input" style="width:140px" onchange="renderList()" disabled><option value="">④ 색상 선택</option></select>
+            </div>
+
+            <!-- 거래처는 검색모드와 별개로 항상 켜져 있는 추가 필터 — 기본은
+                 전체 거래처(조혼가구/유한가구/럭스디자인 등 구분 없이) 다
+                 검색되고, 여기서 원하는 거래처(들)만 골라 더 좁힐 수 있음 -->
+            <div class="mt-3 pt-3 border-t border-[#f1f0ef]">
+                <div class="text-[11px] font-bold text-[#787774] mb-1.5">거래처로 좁히기 (선택 안 하면 전체)</div>
+                <div id="pm-supplier-chips" class="flex items-center gap-1.5 flex-wrap"></div>
             </div>
 
             <label class="flex items-center gap-1.5 text-[12px] font-bold text-[#787774] mt-3">
@@ -554,9 +569,24 @@ window.selectListSearchMethod = function(mode) {
     listSearchMode = mode;
     document.querySelectorAll('#page-list .method-chip').forEach(c => c.classList.toggle('on', c.dataset.mode === mode));
     document.getElementById('list-search-direct').classList.toggle('hidden', mode !== 'direct');
+    document.getElementById('list-search-ing').classList.toggle('hidden', mode !== 'ing');
     document.getElementById('list-search-category').classList.toggle('hidden', mode !== 'category');
     document.getElementById('pm-search').value = '';
+    document.getElementById('pm-filter-ing').value = '';
     resetListCategorySelects();
+    renderList();
+};
+
+// ── 거래처 필터 — 조혼가구는 로그인 계정(거래처)에 따라 상품이 자동으로
+// 걸러지지만, 원장관리는 내부 관리자만 쓰는 화면이라 기본은 거래처 구분
+// 없이 전부 검색되고("조혼가구/유한가구/럭스디자인 등 다 나오면 된다"),
+// 여기 칩에서 원하는 거래처(들)를 골랐을 때만 그 거래처로 좁혀짐. 검색
+// 모드(상품검색/ING단품명/카테고리)와는 독립적으로 항상 추가 적용됨.
+let selectedSuppliers = new Set();
+window.toggleSupplierChip = function(name) {
+    if (selectedSuppliers.has(name)) selectedSuppliers.delete(name);
+    else selectedSuppliers.add(name);
+    document.querySelectorAll('.supplier-chip').forEach(c => c.classList.toggle('on', selectedSuppliers.has(c.dataset.supplier)));
     renderList();
 };
 function resetListCategorySelects() {
@@ -576,6 +606,18 @@ function renderFilterOptions() {
     const opts1 = [...new Set(active.map(r => fv(r,'대분류')).filter(Boolean))].sort();
     l1.innerHTML = '<option value="">① 대분류 선택</option>' + opts1.map(v => `<option value="${v}">${v}</option>`).join('');
     l1.value = curL1;
+
+    const ingSel = document.getElementById('pm-filter-ing'), curIng = ingSel.value;
+    const ingOpts = [...new Set(active.map(r => fv(r,'ing단품명')).filter(Boolean))].sort();
+    ingSel.innerHTML = '<option value="">ing단품명 선택</option>' + ingOpts.map(v => `<option value="${v}">${v}</option>`).join('');
+    ingSel.value = curIng;
+
+    // 거래처(ing발주처) 칩 — 실제 데이터에 있는 값 기준으로 동적 생성(하드코딩 안 함)
+    const chipsEl = document.getElementById('pm-supplier-chips');
+    const suppliers = [...new Set(active.map(r => fv(r,'ing발주처')).filter(Boolean))].sort();
+    chipsEl.innerHTML = suppliers.map(s =>
+        `<button type="button" class="supplier-chip ${selectedSuppliers.has(s)?'on':''}" data-supplier="${esc(s)}" onclick="toggleSupplierChip('${esc(s).replace(/'/g,"\\'")}')">${esc(s)}</button>`
+    ).join('') || '<span class="text-[11px] text-[#c2c0bb]">거래처 정보 없음</span>';
 }
 window.onFilterL1Change = function() {
     const l1 = document.getElementById('pm-filter-l1').value;
@@ -617,14 +659,20 @@ window.onFilterL3Change = function() {
 
 window.renderList = function() {
     const q = listSearchMode === 'direct' ? (document.getElementById('pm-search').value || '').toLowerCase().trim() : '';
+    const ingVal = listSearchMode === 'ing' ? document.getElementById('pm-filter-ing').value : '';
     const l1 = document.getElementById('pm-filter-l1').value, l2 = document.getElementById('pm-filter-l2').value;
     const l3 = document.getElementById('pm-filter-l3').value, l4 = document.getElementById('pm-filter-l4').value;
     const pendingOnly = document.getElementById('pm-filter-pending').checked;
+    const hasSupplierFilter = selectedSuppliers.size > 0;
 
-    // 검색어도 없고 카테고리도 하나도 안 골랐으면(미확정만 보기도 아니면)
-    // "전체 나열" 대신 안내 문구만 보여줌 — 조혼가구가 항목 하나를 찾을
-    // 때까지 아무것도 안 보여주는 것과 같은 원칙
-    const hasActiveSearch = pendingOnly || (listSearchMode === 'direct' && q) || (listSearchMode === 'category' && l1);
+    // 검색어도 없고 카테고리도 하나도 안 골랐으면(미확정만 보기·거래처
+    // 필터도 아니면) "전체 나열" 대신 안내 문구만 보여줌 — 조혼가구가 항목
+    // 하나를 찾을 때까지 아무것도 안 보여주는 것과 같은 원칙. 거래처 칩만
+    // 골라도(카테고리 없이) 그 자체로 유의미한 좁히기라 결과를 보여줌.
+    const hasActiveSearch = pendingOnly || hasSupplierFilter
+        || (listSearchMode === 'direct' && q)
+        || (listSearchMode === 'ing' && ingVal)
+        || (listSearchMode === 'category' && l1);
     const promptEl = document.getElementById('pm-prompt');
     if (window._pmBootstrapping) {
         // 자동 불러오기 진행 중이면 pm-loading이 대신 보여주고 있으니 숨김
@@ -642,11 +690,15 @@ window.renderList = function() {
     const filtered = ROWS.filter(r => {
         if (r.deleted) return false;
         if (pendingOnly && !r.pendingPublish) return false;
+        // 거래처 필터는 검색모드와 무관하게 항상 추가로 적용(선택 안 하면 통과)
+        if (hasSupplierFilter && !selectedSuppliers.has(fv(r,'ing발주처'))) return false;
         if (listSearchMode === 'category') {
             if (l1 && fv(r,'대분류') !== l1) return false;
             if (l2 && fv(r,'중분류') !== l2) return false;
             if (l3 && fv(r,'소분류') !== l3) return false;
             if (l4 && fv(r,'상품색상') !== l4) return false;
+        } else if (listSearchMode === 'ing') {
+            if (ingVal && fv(r,'ing단품명') !== ingVal) return false;
         } else if (q) {
             const hay = ['ing단품명','ing단품코드','부속명','원장명','대분류','중분류','소분류','상품색상']
                 .map(k => fv(r,k)).join(' ').toLowerCase();
