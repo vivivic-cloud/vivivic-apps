@@ -1,0 +1,825 @@
+<!-- ==========================================
+     원장관리.html
+     버전: v0.1.0 (2026-09-09) — 원장(제품/부속 마스터) 데이터 관리 페이지 최초 버전
+     목적: 에이엠티/조혼가구/이카운트등록이 공유하는 "원장" 마스터데이터를
+           엑셀 파일 통째로 주고받는 대신, 화면에서 행 단위로 검색·수정·
+           신규등록하고 "확정 발행" 시점에만 엑셀을 재생성해 기존 파이프라인
+           (excel_metadata → Storage → 각 앱 재다운로드/재파싱)에 얹어준다.
+           즉 에이엠티/조혼가구/이카운트등록 쪽 코드는 한 줄도 바꾸지 않고,
+           "엑셀 열어서 수정" 대신 "이 화면에서 수정 → 확정" 으로 대체한다.
+     ========================================== -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>원장관리 - VIVIVIC</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+
+<!-- Firebase SDK (Modular) — 에이엠티.html과 동일한 프로젝트/설정 재사용 -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, indexedDBLocalPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+    import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, addDoc, onSnapshot, serverTimestamp, writeBatch, query, orderBy } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+    import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
+        authDomain: "vivivic-4b7ef.firebaseapp.com",
+        projectId: "vivivic-4b7ef",
+        storageBucket: "vivivic-4b7ef.firebasestorage.app",
+        messagingSenderId: "830175660542",
+        appId: "1:830175660542:web:9054030480c8280af8d8af",
+        measurementId: "G-MCPHWSQBQR"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    setPersistence(auth, indexedDBLocalPersistence)
+        .catch(() => setPersistence(auth, browserLocalPersistence))
+        .catch(err => console.warn('로그인 유지 설정 실패:', err));
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+
+    window.db = db;
+    window.storage = storage;
+    window.fbFirestore = { collection, doc, getDoc, getDocs, setDoc, updateDoc, addDoc, onSnapshot, serverTimestamp, writeBatch, query, orderBy };
+    window.fbStorage = { ref, uploadBytes, getDownloadURL };
+
+    onAuthStateChanged(auth, async (user) => {
+        if (!user) { window.showAuthLoginScreen(); return; }
+        try {
+            const accSnap = await getDoc(doc(db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'user_accounts', user.uid));
+            if (!accSnap.exists()) {
+                window.showAuthLoginScreen('이 계정에 연결된 권한 정보가 없습니다. 관리자에게 문의하세요.');
+                await signOut(auth);
+                return;
+            }
+            const acc = accSnap.data();
+            // 원장은 두 앱(에이엠티/조혼가구) + 이카운트등록까지 물리는 핵심
+            // 마스터데이터라, 내부(AMT) 계정만 수정 가능하도록 제한한다.
+            if (acc.role !== 'amt') {
+                window.showAuthLoginScreen('원장관리는 내부(AMT) 계정만 접근할 수 있습니다.');
+                await signOut(auth);
+                return;
+            }
+            window._myAccount = { uid: user.uid, email: user.email, role: acc.role };
+            window.hideAuthLoginScreen();
+            document.getElementById('auth-account-email').textContent = user.email;
+            window.initApp();
+        } catch (err) {
+            console.error('계정 정보 조회 실패:', err);
+            window.showAuthLoginScreen('계정 정보를 불러오지 못했습니다. 다시 시도해주세요.');
+        }
+    });
+
+    window.showAuthLoginScreen = function(errorMsg) {
+        const overlay = document.getElementById('auth-login-overlay');
+        overlay.classList.remove('hidden');
+        const errEl = document.getElementById('auth-login-error');
+        if (errorMsg) { errEl.textContent = errorMsg; errEl.classList.remove('hidden'); }
+        else { errEl.classList.add('hidden'); }
+        const btn = document.getElementById('auth-login-submit');
+        btn.disabled = false; btn.textContent = '로그인';
+    };
+    window.hideAuthLoginScreen = function() {
+        document.getElementById('auth-login-overlay').classList.add('hidden');
+    };
+    window.handleAuthLoginSubmit = async function(e) {
+        e.preventDefault();
+        const email = document.getElementById('auth-login-email').value.trim();
+        const password = document.getElementById('auth-login-password').value;
+        const btn = document.getElementById('auth-login-submit');
+        btn.disabled = true; btn.textContent = '로그인 중...';
+        try {
+            await signInWithEmailAndPassword(auth, email, password);
+        } catch (err) {
+            console.error('로그인 실패:', err);
+            let msg = '로그인에 실패했습니다.';
+            if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+                msg = '이메일 또는 비밀번호가 올바르지 않습니다.';
+            } else if (err.code === 'auth/too-many-requests') {
+                msg = '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.';
+            }
+            window.showAuthLoginScreen(msg);
+        }
+        return false;
+    };
+    window.handleAuthLogout = async function() { await signOut(auth); location.reload(); };
+</script>
+
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
+    body { font-family: 'Inter', ui-sans-serif, system-ui, sans-serif; background:#fbfbfa; color:#37352f; }
+    .nav-link { padding:8px 12px; border-radius:8px; font-size:13px; font-weight:700; color:#787774; cursor:pointer; transition:all .12s; }
+    .nav-link:hover { background:#f5f5f4; color:#37352f; }
+    .nav-link.active { background:#37352f; color:#fff; }
+    .field-input { width:100%; padding:8px 10px; border:1px solid #ededeb; border-radius:8px; font-size:13px; color:#37352f; background:#fff; }
+    .field-input:focus { outline:none; border-color:#37352f; }
+    .field-label { font-size:11px; font-weight:700; color:#787774; margin-bottom:4px; display:block; }
+    .field-note { font-size:10px; color:#a8a6a2; margin-top:3px; line-height:1.4; }
+    .seg-btn { flex:1; padding:8px 10px; font-size:12px; font-weight:800; border:1.5px solid #ededeb; background:#fff; color:#a8a6a2; cursor:pointer; transition:all .1s; }
+    .seg-btn:first-child { border-radius:8px 0 0 8px; }
+    .seg-btn:last-child { border-radius:0 8px 8px 0; border-left:none; }
+    .seg-btn.on { background:#37352f; color:#fff; border-color:#37352f; }
+    .group-card { background:#fff; border:1px solid #ededeb; border-radius:12px; padding:16px; margin-bottom:14px; }
+    .group-title { font-size:12px; font-weight:900; color:#37352f; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+    .pending-dot { width:7px; height:7px; border-radius:50%; background:#f59e0b; display:inline-block; }
+    .badge { font-size:9px; font-weight:800; padding:2px 6px; border-radius:5px; }
+    table.pm-table th { position:sticky; top:0; background:#fbfbfa; z-index:5; }
+    ::-webkit-scrollbar { width:8px; height:8px; }
+    ::-webkit-scrollbar-thumb { background:#e3e2e0; border-radius:4px; }
+</style>
+</head>
+<body>
+
+<div id="auth-login-overlay" class="fixed inset-0 bg-[#fbfbfa] flex items-center justify-center z-[10000]">
+    <form id="auth-login-form" onsubmit="return window.handleAuthLoginSubmit(event)" class="w-full max-w-[340px] p-8 bg-white border border-[#ededeb] rounded-2xl shadow-sm">
+        <div class="font-black text-2xl tracking-tighter text-[#37352f] mb-1">VIVIVIC</div>
+        <div class="text-[13px] text-[#787774] font-bold mb-6">원장관리 · 내부 관리자 로그인</div>
+        <label class="block text-[11px] font-bold text-[#787774] mb-1">이메일</label>
+        <input id="auth-login-email" type="email" required autocomplete="username"
+            class="w-full mb-3 px-3 py-2.5 border border-[#ededeb] rounded-lg text-[13px] focus:outline-none focus:border-[#37352f]" placeholder="you@vivivic.com">
+        <label class="block text-[11px] font-bold text-[#787774] mb-1">비밀번호</label>
+        <input id="auth-login-password" type="password" required autocomplete="current-password"
+            class="w-full mb-4 px-3 py-2.5 border border-[#ededeb] rounded-lg text-[13px] focus:outline-none focus:border-[#37352f]" placeholder="••••••••">
+        <div id="auth-login-error" class="hidden mb-3 px-3 py-2 bg-red-50 border border-red-200 text-red-600 text-[11px] font-bold rounded-lg"></div>
+        <button id="auth-login-submit" type="submit" class="w-full py-2.5 bg-[#37352f] text-white font-bold text-[13px] rounded-lg hover:bg-black transition-all active:scale-95">로그인</button>
+    </form>
+</div>
+
+<header class="w-full bg-white border-b border-[#ededeb] sticky top-0 z-[100]">
+    <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2 mr-2">
+                <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
+                <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v0.1.0</span>
+            </div>
+            <nav class="flex items-center gap-1">
+                <div id="nav-list" class="nav-link active" onclick="switchTab('list')">원장 목록</div>
+                <div id="nav-publish" class="nav-link" onclick="switchTab('publish')">확정 발행 <span id="pending-count-badge" class="hidden ml-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full text-[10px]">0</span></div>
+                <div id="nav-import" class="nav-link" onclick="switchTab('import')">엑셀 가져오기</div>
+            </nav>
+        </div>
+        <div class="flex items-center gap-2 px-2 py-1 rounded-lg bg-[#f7f6f3] border border-[#ededeb]" style="font-size:11px;">
+            <span id="auth-account-email" class="font-bold text-[#37352f]"></span>
+            <button onclick="window.handleAuthLogout()" class="text-[#787774] hover:text-[#37352f] font-bold underline">로그아웃</button>
+        </div>
+    </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-4 py-6">
+
+    <!-- ===== 목록 페이지 ===== -->
+    <div id="page-list">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <div class="text-[18px] font-black text-[#37352f]">원장 목록</div>
+                <div class="text-[12px] text-[#787774] font-medium">에이엠티·조혼가구·이카운트등록이 함께 쓰는 제품/부속 마스터데이터</div>
+            </div>
+            <button onclick="openEditModal(null)" class="px-4 py-2.5 bg-[#37352f] text-white font-bold text-[13px] rounded-lg hover:bg-black transition-all">+ 신규 등록</button>
+        </div>
+
+        <div class="bg-white border border-[#ededeb] rounded-xl p-4 mb-4 flex flex-wrap gap-2 items-center">
+            <input id="pm-search" type="text" placeholder="검색 (제품명/부속명/코드 등)" oninput="renderList()"
+                class="field-input flex-1 min-w-[200px]">
+            <select id="pm-filter-l1" class="field-input" style="width:130px" onchange="onFilterL1Change()"><option value="">대분류 전체</option></select>
+            <select id="pm-filter-l2" class="field-input" style="width:130px" onchange="onFilterL2Change()"><option value="">중분류 전체</option></select>
+            <select id="pm-filter-l3" class="field-input" style="width:130px" onchange="onFilterL3Change()"><option value="">소분류 전체</option></select>
+            <select id="pm-filter-l4" class="field-input" style="width:130px" onchange="renderList()"><option value="">색상 전체</option></select>
+            <label class="flex items-center gap-1.5 text-[12px] font-bold text-[#787774] px-1">
+                <input type="checkbox" id="pm-filter-pending" onchange="renderList()"> 미확정만
+            </label>
+        </div>
+
+        <div class="bg-white border border-[#ededeb] rounded-xl overflow-hidden">
+            <div class="overflow-x-auto" style="max-height:70vh;">
+                <table class="pm-table w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-[#ededeb]">
+                            <th class="px-3 py-2 text-[10px] font-black text-[#a8a6a2] uppercase w-6"></th>
+                            <th class="px-3 py-2 text-[10px] font-black text-[#a8a6a2] uppercase">제품 (분류)</th>
+                            <th class="px-3 py-2 text-[10px] font-black text-[#a8a6a2] uppercase">부속명</th>
+                            <th class="px-3 py-2 text-[10px] font-black text-[#a8a6a2] uppercase">원장/마감</th>
+                            <th class="px-3 py-2 text-[10px] font-black text-[#a8a6a2] uppercase">치수(W×D)</th>
+                            <th class="px-3 py-2 text-[10px] font-black text-[#a8a6a2] uppercase text-center">회전</th>
+                            <th class="px-3 py-2 text-[10px] font-black text-[#a8a6a2] uppercase">공급처</th>
+                            <th class="px-3 py-2 text-[10px] font-black text-[#a8a6a2] uppercase"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="pm-table-body"></tbody>
+                </table>
+            </div>
+            <div id="pm-empty" class="hidden p-16 text-center text-[13px] text-[#a8a6a2] font-bold">등록된 원장 데이터가 없습니다. 상단 "엑셀 가져오기"로 기존 원장을 불러오세요.</div>
+        </div>
+        <div id="pm-count-label" class="mt-2 text-[11px] text-[#a8a6a2] font-bold"></div>
+    </div>
+
+    <!-- ===== 확정 발행 페이지 ===== -->
+    <div id="page-publish" class="hidden">
+        <div class="mb-4">
+            <div class="text-[18px] font-black text-[#37352f]">확정 발행</div>
+            <div class="text-[12px] text-[#787774] font-medium">여기서 "확정"을 눌러야 실제로 에이엠티·조혼가구·이카운트등록이 새 데이터를 받아갑니다. 그 전까지 수정한 내용은 이 화면(원장관리)에만 반영된 상태입니다.</div>
+        </div>
+        <div id="publish-summary" class="grid grid-cols-3 gap-3 mb-4"></div>
+        <div class="bg-white border border-[#ededeb] rounded-xl overflow-hidden mb-4">
+            <div id="publish-list" class="divide-y divide-[#f1f0ef]"></div>
+            <div id="publish-empty" class="hidden p-16 text-center text-[13px] text-[#a8a6a2] font-bold">확정 대기 중인 변경사항이 없습니다.</div>
+        </div>
+        <button id="btn-do-publish" onclick="doPublish()" class="w-full py-3.5 bg-[#37352f] text-white font-black text-[14px] rounded-xl hover:bg-black transition-all disabled:opacity-40 disabled:cursor-not-allowed">🚀 이 변경사항 확정하여 반영</button>
+        <div id="publish-status" class="mt-3 text-[12px] font-bold text-center"></div>
+    </div>
+
+    <!-- ===== 가져오기 페이지 ===== -->
+    <div id="page-import" class="hidden">
+        <div class="mb-4">
+            <div class="text-[18px] font-black text-[#37352f]">엑셀 가져오기</div>
+            <div class="text-[12px] text-[#787774] font-medium">기존 원장 엑셀 파일을 올리면 이 화면의 데이터로 반영합니다. 처음 한 번은 지금 실제 운영 중인 원장 파일을 그대로 올려서 초기 이관해주세요.</div>
+        </div>
+        <div class="bg-white border border-2 border-dashed border-[#ededeb] rounded-xl p-10 text-center mb-4">
+            <input type="file" id="import-file-input" accept=".xlsx,.xls,.csv" class="hidden" onchange="handleImportFile(this)">
+            <button onclick="document.getElementById('import-file-input').click()" class="px-5 py-2.5 bg-[#f5f5f4] text-[#37352f] font-bold text-[13px] rounded-lg hover:bg-[#ededeb]">📂 엑셀 파일 선택</button>
+            <div class="text-[11px] text-[#a8a6a2] mt-3">첫 번째 행은 헤더(컬럼명)여야 합니다.</div>
+        </div>
+        <div id="import-report" class="hidden">
+            <div class="group-card">
+                <div class="group-title">헤더 인식 결과</div>
+                <div id="import-header-report" class="text-[12px] leading-relaxed"></div>
+            </div>
+            <div class="group-card">
+                <div class="group-title">미리보기 (<span id="import-row-count">0</span>행) — 병합 방식</div>
+                <div class="flex gap-3 mb-3">
+                    <label class="flex items-center gap-1.5 text-[12px] font-bold"><input type="radio" name="import-mode" value="merge" checked> 병합 (같은 항목은 기존 값 위에 덮어쓰고, 새 항목은 추가)</label>
+                    <label class="flex items-center gap-1.5 text-[12px] font-bold"><input type="radio" name="import-mode" value="replace"> 완전 교체 (기존 데이터 전체를 이 파일로 대체)</label>
+                </div>
+                <div class="overflow-x-auto border border-[#ededeb] rounded-lg" style="max-height:320px;">
+                    <table class="w-full text-[11px]"><thead id="import-preview-head"></thead><tbody id="import-preview-body"></tbody></table>
+                </div>
+            </div>
+            <button id="btn-do-import" onclick="doImport()" class="w-full py-3.5 bg-[#37352f] text-white font-black text-[14px] rounded-xl hover:bg-black transition-all">이 데이터로 가져오기 실행</button>
+            <div id="import-status" class="mt-3 text-[12px] font-bold text-center"></div>
+        </div>
+    </div>
+
+</main>
+
+<!-- ===== 편집 모달 ===== -->
+<div id="edit-modal-overlay" class="hidden fixed inset-0 bg-black/40 z-[500] flex items-start justify-center overflow-y-auto py-8 px-4">
+    <div class="bg-[#fbfbfa] rounded-2xl w-full max-w-[720px] shadow-2xl">
+        <div class="sticky top-0 bg-white border-b border-[#ededeb] rounded-t-2xl px-6 py-4 flex items-center justify-between z-10">
+            <div>
+                <div id="edit-modal-title" class="text-[15px] font-black text-[#37352f]">신규 등록</div>
+                <div id="edit-modal-subtitle" class="text-[11px] text-[#a8a6a2] font-bold"></div>
+            </div>
+            <button onclick="closeEditModal()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#f5f5f4] text-[#787774] font-bold">✕</button>
+        </div>
+        <div id="edit-modal-body" class="p-6"></div>
+        <div class="sticky bottom-0 bg-white border-t border-[#ededeb] rounded-b-2xl px-6 py-4 flex items-center justify-between gap-3">
+            <button id="btn-delete-row" onclick="deleteCurrentRow()" class="hidden px-4 py-2.5 text-red-500 font-bold text-[13px] rounded-lg hover:bg-red-50">삭제</button>
+            <div class="flex-1"></div>
+            <button onclick="closeEditModal()" class="px-4 py-2.5 text-[#787774] font-bold text-[13px] rounded-lg hover:bg-[#f5f5f4]">취소</button>
+            <button onclick="saveCurrentRow()" class="px-5 py-2.5 bg-[#37352f] text-white font-bold text-[13px] rounded-lg hover:bg-black">저장</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════
+// 원장 컬럼 스키마 — 에이엠티/조혼가구/이카운트등록 세 앱을 실제로 조사해서
+// 확인한 컬럼만 정의한다. `key`는 기존 앱이 h.indexOf("...")로 찾는 헤더
+// 텍스트와 정확히 같아야 하며, 배열 순서 = 엑셀 재생성 시 컬럼 순서다.
+//
+// 단 하나 예외: 0번째 컬럼(ing단품명)은 에이엠티/조혼가구가 헤더명이 아니라
+// "무조건 첫 번째 칸"으로 위치 접근한다(row[0]). 그래서 이 배열의 첫 원소는
+// 반드시 ing단품명이어야 하고, 순서를 바꾸면 안 된다. 나머지 컬럼은 전부
+// 헤더 텍스트로 찾으므로 순서가 바뀌어도 안전하다.
+// ════════════════════════════════════════════════════════════════════
+const SCHEMA = [
+    { key:'ing단품명',   label:'ing단품명',        group:'기본정보', type:'text', required:true,
+      note:'제품 식별자. 에이엠티·조혼가구가 "무조건 첫 번째 컬럼"으로 읽으므로 이 값이 비어있으면 안 됩니다.' },
+    { key:'ing단품코드', label:'ing단품코드',      group:'기본정보', type:'text',
+      note:'이카운트등록에서 품목코드/BOM 그룹핑 키로 핵심적으로 쓰입니다.' },
+    { key:'ing발주처',   label:'ing발주처 (거래처)', group:'기본정보', type:'text', datalist:true,
+      note:'이 제품이 어느 거래처 탭(조혼가구/아인가구/…) 소속인지. 아래 "공급처"와는 다른 개념입니다.' },
+
+    { key:'대분류',   label:'대분류',   group:'분류', type:'text', datalist:true, cascade:0 },
+    { key:'중분류',   label:'중분류',   group:'분류', type:'text', datalist:true, cascade:1 },
+    { key:'소분류',   label:'소분류',   group:'분류', type:'text', datalist:true, cascade:2 },
+    { key:'상품색상', label:'상품색상(제품 분류용)', group:'분류', type:'text', datalist:true, cascade:3,
+      note:'제품을 구분하는 색상 분류입니다. 아래 "마감색상"(원장 실제 색)과 다릅니다.' },
+
+    { key:'부속명',   label:'부속명',   group:'부속/원장정보', type:'text' },
+    { key:'원장명',   label:'원장명',   group:'부속/원장정보', type:'text', datalist:true },
+    { key:'마감',     label:'마감(가공형태)', group:'부속/원장정보', type:'text', datalist:true },
+    { key:'마감색상', label:'마감색상(원장 색상)', group:'부속/원장정보', type:'text', datalist:true,
+      note:'"any" 입력 시 색상 무관(모든 상품색상과 매칭)으로 처리됩니다.' },
+
+    { key:'재단W', label:'재단W (mm)', group:'치수 · 공정', type:'number' },
+    { key:'재단D', label:'재단D (mm)', group:'치수 · 공정', type:'number' },
+    { key:'총엣지면', label:'총엣지면', group:'치수 · 공정', type:'edge' },
+    { key:'보링수량', label:'보링 여부/수량', group:'치수 · 공정', type:'boring' },
+    { key:'NC유무',   label:'NC 공정', group:'치수 · 공정', type:'flagO' },
+    { key:'결보호',   label:'재단 회전 가능 여부', group:'치수 · 공정', type:'grain',
+      note:'재단편집 화면에서 "재단회전" 버튼과 자동배치 추천이 이 값을 그대로 사용합니다.' },
+
+    { key:'공급처',       label:'공급처(실제 생산주체)', group:'생산 · 수량', type:'text', datalist:true,
+      note:'"AMT"가 아니면 에이엠티 작업목록에서 자동 제외됩니다. 위 "ing발주처"와 다른 개념입니다.' },
+    { key:'세트별소모량', label:'세트별소모량', group:'생산 · 수량', type:'number',
+      note:'완성품 1세트 발주 시 이 부속이 몇 개 필요한지(발주수량 × 이 값 = 필요수량).' },
+
+    { key:'재단부속코드', label:'재단부속코드', group:'이카운트 연동 전용', type:'text' },
+    { key:'재단부속명',   label:'재단부속명',   group:'이카운트 연동 전용', type:'text' },
+    { key:'엣지부속코드', label:'엣지부속코드', group:'이카운트 연동 전용', type:'text' },
+    { key:'엣지부속명',   label:'엣지부속명',   group:'이카운트 연동 전용', type:'text' },
+    { key:'보링부속코드', label:'보링부속코드', group:'이카운트 연동 전용', type:'text' },
+    { key:'보링부속명',   label:'보링부속명',   group:'이카운트 연동 전용', type:'text' },
+    { key:'NC부속코드',   label:'NC부속코드',   group:'이카운트 연동 전용', type:'text' },
+    { key:'NC부속명',     label:'NC부속명',     group:'이카운트 연동 전용', type:'text' },
+    { key:'마감사이즈',   label:'마감사이즈',   group:'이카운트 연동 전용', type:'text',
+      note:'이카운트등록이 부속 "규격" 칸을 채울 때 씁니다(에이엠티/조혼가구는 재단W/D를 대신 씁니다).' },
+];
+const GROUPS = [...new Set(SCHEMA.map(s => s.group))];
+const HEADER_ORDER = SCHEMA.map(s => s.key); // 엑셀 재생성 시 컬럼 순서 — 0번=ing단품명 고정
+
+const COLLECTION = ['artifacts','vivivic-4b7ef','public','data','product_master'];
+const EXCEL_META_COLLECTION = ['artifacts','vivivic-4b7ef','public','data','excel_metadata'];
+
+// ── 앱 상태 ──────────────────────────────────────────────────────────
+let ROWS = [];              // Firestore product_master 전체 (메모리 캐시)
+let currentEditId = null;   // 편집 중인 문서 ID (null = 신규)
+let currentEditFields = {}; // 편집 중인 필드값(로컬 드래프트, 저장 눌러야 반영)
+
+function fv(row, key) { return (row.fields && row.fields[key]) || ''; }
+
+// ── 초기화 ───────────────────────────────────────────────────────────
+window.initApp = function() {
+    const { collection, query, orderBy, onSnapshot } = window.fbFirestore;
+    const colRef = collection(window.db, ...COLLECTION);
+    onSnapshot(query(colRef, orderBy('legacyRowIndex', 'asc')), snap => {
+        ROWS = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderList();
+        renderFilterOptions();
+        renderPublishPage();
+        updatePendingBadge();
+    }, err => console.error('[product_master onSnapshot]', err));
+};
+
+window.switchTab = function(tab) {
+    ['list','publish','import'].forEach(t => {
+        document.getElementById('page-' + t).classList.toggle('hidden', t !== tab);
+        document.getElementById('nav-' + t).classList.toggle('active', t === tab);
+    });
+    if (tab === 'publish') renderPublishPage();
+};
+
+function updatePendingBadge() {
+    const n = ROWS.filter(r => r.pendingPublish).length;
+    const badge = document.getElementById('pending-count-badge');
+    if (n > 0) { badge.textContent = n; badge.classList.remove('hidden'); }
+    else badge.classList.add('hidden');
+}
+
+// ════════════════════════════════════════════════════════════════════
+// 목록 페이지
+// ════════════════════════════════════════════════════════════════════
+function renderFilterOptions() {
+    const active = ROWS.filter(r => !r.deleted);
+    const l1 = document.getElementById('pm-filter-l1'), curL1 = l1.value;
+    const opts1 = [...new Set(active.map(r => fv(r,'대분류')).filter(Boolean))].sort();
+    l1.innerHTML = '<option value="">대분류 전체</option>' + opts1.map(v => `<option value="${v}">${v}</option>`).join('');
+    l1.value = curL1;
+    onFilterL1Change(true);
+}
+window.onFilterL1Change = function(skipL2) {
+    const l1 = document.getElementById('pm-filter-l1').value;
+    const active = ROWS.filter(r => !r.deleted && (!l1 || fv(r,'대분류') === l1));
+    const l2 = document.getElementById('pm-filter-l2'), curL2 = skipL2 ? l2.value : '';
+    const opts2 = [...new Set(active.map(r => fv(r,'중분류')).filter(Boolean))].sort();
+    l2.innerHTML = '<option value="">중분류 전체</option>' + opts2.map(v => `<option value="${v}">${v}</option>`).join('');
+    l2.value = curL2;
+    onFilterL2Change(true);
+};
+window.onFilterL2Change = function(skipL3) {
+    const l1 = document.getElementById('pm-filter-l1').value, l2 = document.getElementById('pm-filter-l2').value;
+    const active = ROWS.filter(r => !r.deleted && (!l1 || fv(r,'대분류') === l1) && (!l2 || fv(r,'중분류') === l2));
+    const l3 = document.getElementById('pm-filter-l3'), curL3 = skipL3 ? l3.value : '';
+    const opts3 = [...new Set(active.map(r => fv(r,'소분류')).filter(Boolean))].sort();
+    l3.innerHTML = '<option value="">소분류 전체</option>' + opts3.map(v => `<option value="${v}">${v}</option>`).join('');
+    l3.value = curL3;
+    onFilterL3Change(true);
+};
+window.onFilterL3Change = function(skipL4) {
+    const l1 = document.getElementById('pm-filter-l1').value, l2 = document.getElementById('pm-filter-l2').value, l3 = document.getElementById('pm-filter-l3').value;
+    const active = ROWS.filter(r => !r.deleted && (!l1 || fv(r,'대분류') === l1) && (!l2 || fv(r,'중분류') === l2) && (!l3 || fv(r,'소분류') === l3));
+    const l4 = document.getElementById('pm-filter-l4'), curL4 = skipL4 ? l4.value : '';
+    const opts4 = [...new Set(active.map(r => fv(r,'상품색상')).filter(Boolean))].sort();
+    l4.innerHTML = '<option value="">색상 전체</option>' + opts4.map(v => `<option value="${v}">${v}</option>`).join('');
+    l4.value = curL4;
+    renderList();
+};
+
+window.renderList = function() {
+    const q = (document.getElementById('pm-search').value || '').toLowerCase().trim();
+    const l1 = document.getElementById('pm-filter-l1').value, l2 = document.getElementById('pm-filter-l2').value;
+    const l3 = document.getElementById('pm-filter-l3').value, l4 = document.getElementById('pm-filter-l4').value;
+    const pendingOnly = document.getElementById('pm-filter-pending').checked;
+
+    const filtered = ROWS.filter(r => {
+        if (r.deleted) return false;
+        if (pendingOnly && !r.pendingPublish) return false;
+        if (l1 && fv(r,'대분류') !== l1) return false;
+        if (l2 && fv(r,'중분류') !== l2) return false;
+        if (l3 && fv(r,'소분류') !== l3) return false;
+        if (l4 && fv(r,'상품색상') !== l4) return false;
+        if (q) {
+            const hay = ['ing단품명','ing단품코드','부속명','원장명','대분류','중분류','소분류','상품색상']
+                .map(k => fv(r,k)).join(' ').toLowerCase();
+            if (!hay.includes(q)) return false;
+        }
+        return true;
+    });
+
+    const body = document.getElementById('pm-table-body');
+    const empty = document.getElementById('pm-empty');
+    empty.classList.toggle('hidden', ROWS.length > 0);
+    document.getElementById('pm-count-label').textContent = `${filtered.length}건 표시 / 전체 ${ROWS.filter(r=>!r.deleted).length}건`;
+
+    body.innerHTML = filtered.map(r => {
+        const catLine = [fv(r,'대분류'), fv(r,'중분류'), fv(r,'소분류')].filter(Boolean).join(' / ') || '-';
+        const grainOn = fv(r,'결보호') === 'X';
+        return `<tr class="border-b border-[#f5f5f4] hover:bg-[#fbfbfa] cursor-pointer" onclick="openEditModal('${r.id}')">
+            <td class="px-3 py-2.5">${r.pendingPublish ? '<span class="pending-dot" title="확정 대기중"></span>' : ''}</td>
+            <td class="px-3 py-2.5">
+                <div class="font-bold text-[12.5px] text-[#37352f]">${esc(fv(r,'ing단품명')) || '(이름없음)'}</div>
+                <div class="text-[10px] text-[#a8a6a2]">${esc(catLine)}${fv(r,'상품색상') ? ' · ' + esc(fv(r,'상품색상')) : ''}</div>
+            </td>
+            <td class="px-3 py-2.5 text-[12px] font-medium text-[#37352f]">${esc(fv(r,'부속명')) || '-'}</td>
+            <td class="px-3 py-2.5 text-[11px] text-[#787774]">${esc(fv(r,'원장명')) || '-'}${fv(r,'마감색상') ? ' · ' + esc(fv(r,'마감색상')) : ''}</td>
+            <td class="px-3 py-2.5 text-[11px] font-mono text-[#787774]">${fv(r,'재단W')||'-'}×${fv(r,'재단D')||'-'}</td>
+            <td class="px-3 py-2.5 text-center">${grainOn ? '<span class="badge bg-blue-50 text-blue-600">🔄 가능</span>' : '<span class="badge bg-[#f5f5f4] text-[#a8a6a2]">🔒 고정</span>'}</td>
+            <td class="px-3 py-2.5 text-[11px] font-bold ${fv(r,'공급처')==='AMT' ? 'text-[#37352f]' : 'text-[#a8a6a2]'}">${esc(fv(r,'공급처')) || '-'}</td>
+            <td class="px-3 py-2.5 text-right"><span class="text-[11px] text-[#a8a6a2] font-bold">편집 →</span></td>
+        </tr>`;
+    }).join('');
+};
+
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// ════════════════════════════════════════════════════════════════════
+// 편집 모달
+// ════════════════════════════════════════════════════════════════════
+function distinctValues(key) {
+    return [...new Set(ROWS.filter(r=>!r.deleted).map(r => fv(r,key)).filter(Boolean))].sort();
+}
+
+window.openEditModal = function(id) {
+    currentEditId = id;
+    const row = id ? ROWS.find(r => r.id === id) : null;
+    currentEditFields = row ? { ...row.fields } : {};
+    document.getElementById('edit-modal-title').textContent = id ? '원장 수정' : '신규 등록';
+    document.getElementById('edit-modal-subtitle').textContent = id ? `문서ID: ${id} · 행번호(legacyRowIndex): ${row.legacyRowIndex}` : '저장하면 목록 맨 끝에 새 행으로 추가됩니다.';
+    document.getElementById('btn-delete-row').classList.toggle('hidden', !id);
+
+    const body = document.getElementById('edit-modal-body');
+    body.innerHTML = GROUPS.map(g => `
+        <div class="group-card">
+            <div class="group-title">${g}</div>
+            <div class="grid grid-cols-2 gap-3">
+                ${SCHEMA.filter(s => s.group === g).map(fieldHtml).join('')}
+            </div>
+        </div>`).join('');
+
+    document.getElementById('edit-modal-overlay').classList.remove('hidden');
+};
+
+function fieldHtml(s) {
+    const val = currentEditFields[s.key] || '';
+    const wide = (s.type === 'text' && !s.datalist) || s.group === '이카운트 연동 전용' ? '' : '';
+    const note = s.note ? `<div class="field-note">${esc(s.note)}</div>` : '';
+    let control = '';
+
+    if (s.type === 'grain') {
+        const on = val === 'X';
+        control = `<div class="flex">
+            <button type="button" class="seg-btn ${on?'on':''}" onclick="setField('${s.key}','X')">🔄 회전 가능</button>
+            <button type="button" class="seg-btn ${!on?'on':''}" onclick="setField('${s.key}','')">🔒 회전 고정</button>
+        </div>`;
+    } else if (s.type === 'flagO') {
+        const on = val === 'O';
+        control = `<div class="flex">
+            <button type="button" class="seg-btn ${on?'on':''}" onclick="setField('${s.key}','O')">있음</button>
+            <button type="button" class="seg-btn ${!on?'on':''}" onclick="setField('${s.key}','')">없음</button>
+        </div>`;
+    } else if (s.type === 'edge') {
+        const none = !val || val === 'non' || val === 'x';
+        const numDefault = none ? '1' : val; // "직접입력" 클릭 시 넣어줄 값 — 렌더 시점에 미리 확정
+        control = `<div class="flex gap-2">
+            <div class="flex flex-1">
+                <button type="button" class="seg-btn ${none?'on':''}" onclick="setField('${s.key}','')">없음</button>
+                <button type="button" class="seg-btn ${!none?'on':''}" onclick="setField('${s.key}','${esc(numDefault)}')">직접입력</button>
+            </div>
+            ${!none ? `<input type="number" class="field-input" style="width:90px" value="${esc(val)}" oninput="setField('${s.key}', this.value, true)" placeholder="면 수">` : ''}
+        </div>`;
+    } else if (s.type === 'boring') {
+        const mode = !val ? 'none' : (String(val).includes('입력대기') ? 'tbd' : 'num');
+        const numDefault = mode === 'num' ? val : '1'; // 렌더 시점에 미리 확정 (onclick 안에서 변수 참조 금지)
+        control = `<div class="flex gap-2 flex-wrap">
+            <div class="flex flex-1 min-w-[180px]">
+                <button type="button" class="seg-btn ${mode==='none'?'on':''}" onclick="setField('${s.key}','')">없음</button>
+                <button type="button" class="seg-btn ${mode==='tbd'?'on':''}" onclick="setField('${s.key}','입력대기')">입력대기</button>
+                <button type="button" class="seg-btn ${mode==='num'?'on':''}" onclick="setField('${s.key}','${esc(numDefault)}')">수량입력</button>
+            </div>
+            ${mode==='num' ? `<input type="number" class="field-input" style="width:90px" value="${esc(val)}" oninput="setField('${s.key}', this.value, true)" placeholder="수량">` : ''}
+        </div>`;
+    } else if (s.type === 'number') {
+        control = `<input type="number" class="field-input" value="${esc(val)}" oninput="setField('${s.key}', this.value, true)">`;
+    } else if (s.datalist) {
+        const listId = 'dl-' + s.key;
+        control = `<input type="text" class="field-input" list="${listId}" value="${esc(val)}" oninput="setField('${s.key}', this.value, true)">
+            <datalist id="${listId}">${distinctValues(s.key).map(v=>`<option value="${esc(v)}">`).join('')}</datalist>`;
+    } else {
+        control = `<input type="text" class="field-input" value="${esc(val)}" oninput="setField('${s.key}', this.value, true)">`;
+    }
+
+    return `<div class="${s.group==='이카운트 연동 전용' || s.type==='number' ? '' : 'col-span-2'}">
+        <label class="field-label">${esc(s.label)}${s.required?' <span class="text-red-400">*</span>':''}</label>
+        ${control}
+        ${note}
+    </div>`;
+}
+
+window.setField = function(key, val, skipRerender) {
+    currentEditFields[key] = val;
+    if (!skipRerender) {
+        // 세그먼트/선택형 필드는 클릭 즉시 폼을 다시 그려서 조건부 입력칸을 갱신
+        const scrollY = document.getElementById('edit-modal-body').scrollTop;
+        document.getElementById('edit-modal-body').innerHTML = GROUPS.map(g => `
+            <div class="group-card"><div class="group-title">${g}</div>
+            <div class="grid grid-cols-2 gap-3">${SCHEMA.filter(s => s.group === g).map(fieldHtml).join('')}</div></div>`).join('');
+        document.getElementById('edit-modal-body').scrollTop = scrollY;
+    }
+};
+window.field = function(key) { return currentEditFields[key] || ''; };
+
+window.closeEditModal = function() {
+    document.getElementById('edit-modal-overlay').classList.add('hidden');
+    currentEditId = null; currentEditFields = {};
+};
+
+window.saveCurrentRow = async function() {
+    if (!currentEditFields['ing단품명'] || !String(currentEditFields['ing단품명']).trim()) {
+        alert('ing단품명은 필수입니다 (에이엠티/조혼가구가 이 값을 제품 식별자로 씁니다).');
+        return;
+    }
+    const { collection, doc, setDoc, updateDoc, serverTimestamp } = window.fbFirestore;
+    const cleanFields = {};
+    HEADER_ORDER.forEach(k => { cleanFields[k] = currentEditFields[k] != null ? String(currentEditFields[k]) : ''; });
+
+    try {
+        if (currentEditId) {
+            await updateDoc(doc(window.db, ...COLLECTION, currentEditId), {
+                fields: cleanFields, pendingPublish: true, updatedAt: serverTimestamp(), updatedBy: window._myAccount?.email || null
+            });
+        } else {
+            const nextIdx = ROWS.length ? Math.max(...ROWS.map(r => r.legacyRowIndex ?? -1)) + 1 : 0;
+            await setDoc(doc(collection(window.db, ...COLLECTION)), {
+                fields: cleanFields, legacyRowIndex: nextIdx, deleted: false, pendingPublish: true,
+                createdAt: serverTimestamp(), updatedAt: serverTimestamp(), updatedBy: window._myAccount?.email || null
+            });
+        }
+        closeEditModal();
+    } catch (err) {
+        console.error('저장 실패', err);
+        alert('저장에 실패했습니다: ' + err.message);
+    }
+};
+
+window.deleteCurrentRow = async function() {
+    if (!currentEditId) return;
+    if (!confirm('이 항목을 삭제하시겠습니까?\n(실제로는 완전히 지우지 않고 빈 행으로 남깁니다 — 예전에 확정된 발주가 이 행 번호를 참조하고 있을 수 있어, 행 번호 자체를 바꾸면 그 발주 데이터가 어긋날 수 있기 때문입니다.)')) return;
+    const { doc, updateDoc, serverTimestamp } = window.fbFirestore;
+    const blank = {}; HEADER_ORDER.forEach(k => blank[k] = '');
+    try {
+        await updateDoc(doc(window.db, ...COLLECTION, currentEditId), {
+            fields: blank, deleted: true, pendingPublish: true, updatedAt: serverTimestamp(), updatedBy: window._myAccount?.email || null
+        });
+        closeEditModal();
+    } catch (err) {
+        console.error('삭제 실패', err);
+        alert('삭제에 실패했습니다: ' + err.message);
+    }
+};
+
+// ════════════════════════════════════════════════════════════════════
+// 확정 발행 페이지
+// ════════════════════════════════════════════════════════════════════
+function renderPublishPage() {
+    const pending = ROWS.filter(r => r.pendingPublish);
+    const newRows = pending.filter(r => !r.deleted);
+    const delRows = pending.filter(r => r.deleted);
+
+    document.getElementById('publish-summary').innerHTML = `
+        <div class="bg-white border border-[#ededeb] rounded-xl p-4 text-center">
+            <div class="text-[22px] font-black text-[#37352f]">${pending.length}</div>
+            <div class="text-[11px] font-bold text-[#787774]">확정 대기 항목</div>
+        </div>
+        <div class="bg-white border border-[#ededeb] rounded-xl p-4 text-center">
+            <div class="text-[22px] font-black text-emerald-600">${newRows.length}</div>
+            <div class="text-[11px] font-bold text-[#787774]">추가/변경</div>
+        </div>
+        <div class="bg-white border border-[#ededeb] rounded-xl p-4 text-center">
+            <div class="text-[22px] font-black text-red-500">${delRows.length}</div>
+            <div class="text-[11px] font-bold text-[#787774]">삭제</div>
+        </div>`;
+
+    document.getElementById('publish-empty').classList.toggle('hidden', pending.length > 0);
+    document.getElementById('btn-do-publish').disabled = pending.length === 0;
+
+    document.getElementById('publish-list').innerHTML = pending.map(r => `
+        <div class="px-4 py-3 flex items-center justify-between">
+            <div>
+                <div class="font-bold text-[13px] ${r.deleted ? 'text-red-500 line-through' : 'text-[#37352f]'}">${esc(fv(r,'ing단품명')) || '(이름없음)'} ${r.deleted ? '(삭제됨)' : ''}</div>
+                <div class="text-[11px] text-[#a8a6a2]">${esc(fv(r,'부속명')) || '-'} · 행번호 ${r.legacyRowIndex}</div>
+            </div>
+            <span class="badge ${r.deleted ? 'bg-red-50 text-red-500' : 'bg-amber-50 text-amber-600'}">${r.deleted ? '삭제 예정' : '미확정 변경'}</span>
+        </div>`).join('');
+}
+
+window.doPublish = async function() {
+    const btn = document.getElementById('btn-do-publish');
+    const statusEl = document.getElementById('publish-status');
+    btn.disabled = true; statusEl.textContent = '엑셀 생성 중...'; statusEl.className = 'mt-3 text-[12px] font-bold text-center text-[#787774]';
+    try {
+        // 1) legacyRowIndex 순서대로 array-of-arrays 재구성 (삭제된 행은 빈 값으로
+        //    자리만 유지 — 뒤 행들의 인덱스가 밀리면 예전 확정 데이터의 부속키가
+        //    엉뚱한 행을 가리키게 되므로 절대 행을 통째로 없애면 안 됨)
+        const active = ROWS.filter(r => r.legacyRowIndex != null);
+        const maxIdx = active.length ? Math.max(...active.map(r => r.legacyRowIndex)) : -1;
+        const byIdx = new Map(active.map(r => [r.legacyRowIndex, r]));
+        const dataRows = [];
+        for (let i = 0; i <= maxIdx; i++) {
+            const r = byIdx.get(i);
+            if (!r || r.deleted) { dataRows.push(HEADER_ORDER.map(() => '')); continue; }
+            dataRows.push(HEADER_ORDER.map(k => fv(r, k)));
+        }
+        const aoa = [HEADER_ORDER, ...dataRows];
+
+        // 2) xlsx 파일 생성 (SheetJS)
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+        const wbBinary = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([wbBinary], { type: 'application/octet-stream' });
+        const fileName = `원장_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.xlsx`;
+
+        // 3) 기존 파이프라인과 동일한 경로로 Storage 업로드 + excel_metadata 기록
+        //    (에이엠티/조혼가구/이카운트등록은 이 컬렉션을 구독하고 있어서
+        //     코드 변경 없이 새 파일을 자동으로 받아간다)
+        statusEl.textContent = '업로드 중...';
+        const { ref, uploadBytes, getDownloadURL } = window.fbStorage;
+        const { collection, addDoc, serverTimestamp } = window.fbFirestore;
+        const appId = 'vivivic-4b7ef';
+        const storagePath = `artifacts/${appId}/excel_files/${fileName}`;
+        const fileRef = ref(window.storage, storagePath);
+        await uploadBytes(fileRef, blob);
+        const downloadURL = await getDownloadURL(fileRef);
+        await addDoc(collection(window.db, ...EXCEL_META_COLLECTION), {
+            fileName, downloadURL, storagePath, timestamp: serverTimestamp(),
+            uploadedBy: window._myAccount?.email || '원장관리'
+        });
+
+        // 4) 확정 처리 — pendingPublish 플래그 정리
+        statusEl.textContent = '마무리 중...';
+        const { doc, updateDoc, writeBatch } = window.fbFirestore;
+        const batch = writeBatch(window.db);
+        ROWS.filter(r => r.pendingPublish).forEach(r => {
+            batch.update(doc(window.db, ...COLLECTION, r.id), { pendingPublish: false, publishedAt: serverTimestamp() });
+        });
+        await batch.commit();
+
+        statusEl.textContent = `✓ 확정 완료 — ${fileName} 이(가) 에이엠티/조혼가구/이카운트등록에 자동 반영됩니다.`;
+        statusEl.className = 'mt-3 text-[12px] font-bold text-center text-emerald-600';
+    } catch (err) {
+        console.error('발행 실패', err);
+        statusEl.textContent = '발행 실패: ' + err.message;
+        statusEl.className = 'mt-3 text-[12px] font-bold text-center text-red-500';
+    } finally {
+        btn.disabled = false;
+    }
+};
+
+// ════════════════════════════════════════════════════════════════════
+// 엑셀 가져오기 페이지
+// ════════════════════════════════════════════════════════════════════
+let importedRows = []; // [{ ing단품명:..., ... }] 헤더매칭된 객체 배열
+let importedHeaders = [];
+
+window.handleImportFile = function(input) {
+    const file = input.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+        const jsonData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1 });
+        if (!jsonData.length) { alert('빈 파일입니다.'); return; }
+        importedHeaders = jsonData[0].map(h => String(h ?? '').trim());
+        const rows = jsonData.slice(1).filter(r => r && r.some(c => c !== undefined && c !== ''));
+
+        // 헤더 인식 리포트
+        // 0번째 컬럼(ing단품명)은 항상 위치로만 취급하므로, 헤더 텍스트 일치
+        // 개수 집계에서는 빼고 "나머지 27개 중 몇 개를 이름으로 찾았는지"만 센다
+        const matched = HEADER_ORDER.filter(k => k !== 'ing단품명' && importedHeaders.includes(k));
+        const unmatched = HEADER_ORDER.filter(k => !importedHeaders.includes(k));
+        const extra = importedHeaders.filter(h => h && !HEADER_ORDER.includes(h) && h !== importedHeaders[0]);
+        // 0번째 컬럼은 실제 헤더 텍스트가 뭐든 ing단품명으로 취급(위치 기반 규칙과 동일)
+        document.getElementById('import-header-report').innerHTML = `
+            <div class="mb-1">✅ 매칭된 컬럼 ${matched.length}/${HEADER_ORDER.length - 1}개 (0번째 컬럼 "${esc(importedHeaders[0]||'')}"은 위치상 ing단품명으로 취급)</div>
+            ${unmatched.length ? `<div class="text-amber-600 mb-1">⚠ 이 스키마에 없는 컬럼(빈 값으로 처리): ${unmatched.filter(u=>u!=='ing단품명').map(esc).join(', ')}</div>` : ''}
+            ${extra.length ? `<div class="text-red-500">⚠ 파일에는 있지만 이 스키마엔 없는 컬럼(무시됨): ${extra.map(esc).join(', ')}</div>` : ''}`;
+
+        importedRows = rows.map((r, i) => {
+            const obj = {};
+            HEADER_ORDER.forEach((k, idx) => {
+                if (idx === 0) { obj[k] = String(r[0] ?? '').trim(); return; } // 0번째=위치 기반
+                const hIdx = importedHeaders.indexOf(k);
+                obj[k] = hIdx >= 0 ? String(r[hIdx] ?? '').trim() : '';
+            });
+            return obj;
+        }).filter(o => o['ing단품명']);
+
+        document.getElementById('import-row-count').textContent = importedRows.length;
+        const previewCols = ['ing단품명','부속명','대분류','중분류','원장명','마감색상','재단W','재단D'];
+        document.getElementById('import-preview-head').innerHTML = '<tr>' + previewCols.map(c => `<th class="px-2 py-1.5 text-left font-bold text-[#787774] border-b border-[#ededeb]">${c}</th>`).join('') + '</tr>';
+        document.getElementById('import-preview-body').innerHTML = importedRows.slice(0, 50).map(o =>
+            '<tr class="border-b border-[#f5f5f4]">' + previewCols.map(c => `<td class="px-2 py-1.5">${esc(o[c])}</td>`).join('') + '</tr>'
+        ).join('') + (importedRows.length > 50 ? `<tr><td colspan="${previewCols.length}" class="px-2 py-2 text-center text-[#a8a6a2]">… 외 ${importedRows.length - 50}행</td></tr>` : '');
+
+        document.getElementById('import-report').classList.remove('hidden');
+    };
+    reader.readAsArrayBuffer(file);
+    input.value = '';
+};
+
+window.doImport = async function() {
+    const mode = document.querySelector('input[name="import-mode"]:checked').value;
+    const statusEl = document.getElementById('import-status');
+    const btn = document.getElementById('btn-do-import');
+    if (mode === 'replace' && !confirm(`정말 기존 원장 ${ROWS.length}건을 전부 지우고 이 파일(${importedRows.length}행)로 완전히 교체하시겠습니까?`)) return;
+    btn.disabled = true; statusEl.textContent = '가져오는 중...'; statusEl.className = 'mt-3 text-[12px] font-bold text-center text-[#787774]';
+
+    try {
+        const { collection, doc, writeBatch, serverTimestamp } = window.fbFirestore;
+
+        if (mode === 'replace') {
+            // 완전교체: 기존 행은 전부 빈 값으로 비우고(행번호는 보존), 새 데이터는
+            // 처음부터 새 legacyRowIndex(0..N-1)로 다시 채운다.
+            let batch = writeBatch(window.db), opCount = 0;
+            for (const r of ROWS) {
+                batch.update(doc(window.db, ...COLLECTION, r.id), { deleted: true, pendingPublish: true, fields: Object.fromEntries(HEADER_ORDER.map(k=>[k,''])), updatedAt: serverTimestamp() });
+                if (++opCount >= 400) { await batch.commit(); batch = writeBatch(window.db); opCount = 0; }
+            }
+            if (opCount > 0) await batch.commit();
+
+            batch = writeBatch(window.db); opCount = 0;
+            for (let i = 0; i < importedRows.length; i++) {
+                const ref = doc(collection(window.db, ...COLLECTION));
+                batch.set(ref, { fields: importedRows[i], legacyRowIndex: i, deleted: false, pendingPublish: true, createdAt: serverTimestamp(), updatedAt: serverTimestamp(), updatedBy: window._myAccount?.email || null });
+                if (++opCount >= 400) { await batch.commit(); batch = writeBatch(window.db); opCount = 0; }
+            }
+            if (opCount > 0) await batch.commit();
+        } else {
+            // 병합: (ing단품코드+부속명+원장명+마감색상)이 같은 기존 행이 있으면
+            // legacyRowIndex를 보존한 채 값만 덮어쓰고, 없으면 맨 끝에 새로 추가
+            const sig = o => [o['ing단품코드'], o['부속명'], o['원장명'], o['마감색상']].join('|');
+            const existingBySig = new Map(ROWS.filter(r=>!r.deleted).map(r => [sig(r.fields), r]));
+            let nextIdx = ROWS.length ? Math.max(...ROWS.map(r => r.legacyRowIndex ?? -1)) + 1 : 0;
+
+            let batch = writeBatch(window.db), opCount = 0;
+            for (const o of importedRows) {
+                const existing = existingBySig.get(sig(o));
+                if (existing) {
+                    batch.update(doc(window.db, ...COLLECTION, existing.id), { fields: o, pendingPublish: true, updatedAt: serverTimestamp(), updatedBy: window._myAccount?.email || null });
+                } else {
+                    const ref = doc(collection(window.db, ...COLLECTION));
+                    batch.set(ref, { fields: o, legacyRowIndex: nextIdx++, deleted: false, pendingPublish: true, createdAt: serverTimestamp(), updatedAt: serverTimestamp(), updatedBy: window._myAccount?.email || null });
+                }
+                if (++opCount >= 400) { await batch.commit(); batch = writeBatch(window.db); opCount = 0; }
+            }
+            if (opCount > 0) await batch.commit();
+        }
+
+        statusEl.textContent = `✓ 가져오기 완료 (${importedRows.length}행 처리). "확정 발행" 탭에서 검토 후 반영하세요.`;
+        statusEl.className = 'mt-3 text-[12px] font-bold text-center text-emerald-600';
+        importedRows = []; importedHeaders = [];
+        document.getElementById('import-report').classList.add('hidden');
+    } catch (err) {
+        console.error('가져오기 실패', err);
+        statusEl.textContent = '가져오기 실패: ' + err.message;
+        statusEl.className = 'mt-3 text-[12px] font-bold text-center text-red-500';
+    } finally {
+        btn.disabled = false;
+    }
+};
+</script>
+</body>
+</html>
