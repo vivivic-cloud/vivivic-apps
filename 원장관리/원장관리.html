@@ -17,10 +17,15 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 
-<!-- Firebase SDK (Modular) — 에이엠티.html과 동일한 프로젝트/설정 재사용 -->
+<!-- Firebase SDK (Modular) — 에이엠티.html과 동일한 프로젝트/설정 재사용.
+     로그인 화면 없이 조용히 익명 인증만 하고 바로 시작한다(사용자 요청 —
+     user_accounts 조회 실패로 자동 로그아웃되는 문제도 이걸로 근본적으로
+     사라짐). Firestore 규칙이 "로그인한 사용자면 누구나 접근 가능"이라
+     익명 인증만으로도 읽기/쓰기가 그대로 된다. 대신 링크만 있으면 누구나
+     들어와서 보고 고칠 수 있다는 점은 감안해야 함. -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut, setPersistence, indexedDBLocalPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
     import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, addDoc, onSnapshot, serverTimestamp, writeBatch, query, orderBy } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
     import { getStorage, ref, uploadBytes, getDownloadURL, getBytes } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
 
@@ -36,9 +41,6 @@
 
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
-    setPersistence(auth, indexedDBLocalPersistence)
-        .catch(() => setPersistence(auth, browserLocalPersistence))
-        .catch(err => console.warn('로그인 유지 설정 실패:', err));
     const db = getFirestore(app);
     const storage = getStorage(app);
 
@@ -47,66 +49,11 @@
     window.fbFirestore = { collection, doc, getDoc, getDocs, setDoc, updateDoc, addDoc, onSnapshot, serverTimestamp, writeBatch, query, orderBy };
     window.fbStorage = { ref, uploadBytes, getDownloadURL, getBytes };
 
-    onAuthStateChanged(auth, async (user) => {
-        if (!user) { window.showAuthLoginScreen(); return; }
-        try {
-            const accSnap = await getDoc(doc(db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'user_accounts', user.uid));
-            if (!accSnap.exists()) {
-                window.showAuthLoginScreen('이 계정에 연결된 권한 정보가 없습니다. 관리자에게 문의하세요.');
-                await signOut(auth);
-                return;
-            }
-            const acc = accSnap.data();
-            // 원장은 두 앱(에이엠티/조혼가구) + 이카운트등록까지 물리는 핵심
-            // 마스터데이터라, 내부(AMT) 계정만 수정 가능하도록 제한한다.
-            if (acc.role !== 'amt') {
-                window.showAuthLoginScreen('원장관리는 내부(AMT) 계정만 접근할 수 있습니다.');
-                await signOut(auth);
-                return;
-            }
-            window._myAccount = { uid: user.uid, email: user.email, role: acc.role };
-            window.hideAuthLoginScreen();
-            document.getElementById('auth-account-email').textContent = user.email;
-            window.initApp();
-        } catch (err) {
-            console.error('계정 정보 조회 실패:', err);
-            window.showAuthLoginScreen('계정 정보를 불러오지 못했습니다. 다시 시도해주세요.');
-        }
+    onAuthStateChanged(auth, (user) => {
+        if (!user) { signInAnonymously(auth).catch(err => console.error('익명 인증 실패:', err)); return; }
+        window._myAccount = { uid: user.uid, email: null };
+        window.initApp();
     });
-
-    window.showAuthLoginScreen = function(errorMsg) {
-        const overlay = document.getElementById('auth-login-overlay');
-        overlay.classList.remove('hidden');
-        const errEl = document.getElementById('auth-login-error');
-        if (errorMsg) { errEl.textContent = errorMsg; errEl.classList.remove('hidden'); }
-        else { errEl.classList.add('hidden'); }
-        const btn = document.getElementById('auth-login-submit');
-        btn.disabled = false; btn.textContent = '로그인';
-    };
-    window.hideAuthLoginScreen = function() {
-        document.getElementById('auth-login-overlay').classList.add('hidden');
-    };
-    window.handleAuthLoginSubmit = async function(e) {
-        e.preventDefault();
-        const email = document.getElementById('auth-login-email').value.trim();
-        const password = document.getElementById('auth-login-password').value;
-        const btn = document.getElementById('auth-login-submit');
-        btn.disabled = true; btn.textContent = '로그인 중...';
-        try {
-            await signInWithEmailAndPassword(auth, email, password);
-        } catch (err) {
-            console.error('로그인 실패:', err);
-            let msg = '로그인에 실패했습니다.';
-            if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
-                msg = '이메일 또는 비밀번호가 올바르지 않습니다.';
-            } else if (err.code === 'auth/too-many-requests') {
-                msg = '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.';
-            }
-            window.showAuthLoginScreen(msg);
-        }
-        return false;
-    };
-    window.handleAuthLogout = async function() { await signOut(auth); location.reload(); };
 </script>
 
 <style>
@@ -152,21 +99,6 @@
 </head>
 <body>
 
-<div id="auth-login-overlay" class="fixed inset-0 bg-[#fbfbfa] flex items-center justify-center z-[10000]">
-    <form id="auth-login-form" onsubmit="return window.handleAuthLoginSubmit(event)" class="w-full max-w-[340px] p-8 bg-white border border-[#ededeb] rounded-2xl shadow-sm">
-        <div class="font-black text-2xl tracking-tighter text-[#37352f] mb-1">VIVIVIC</div>
-        <div class="text-[13px] text-[#787774] font-bold mb-6">원장관리 · 내부 관리자 로그인</div>
-        <label class="block text-[11px] font-bold text-[#787774] mb-1">이메일</label>
-        <input id="auth-login-email" type="email" required autocomplete="username"
-            class="w-full mb-3 px-3 py-2.5 border border-[#ededeb] rounded-lg text-[13px] focus:outline-none focus:border-[#37352f]" placeholder="you@vivivic.com">
-        <label class="block text-[11px] font-bold text-[#787774] mb-1">비밀번호</label>
-        <input id="auth-login-password" type="password" required autocomplete="current-password"
-            class="w-full mb-4 px-3 py-2.5 border border-[#ededeb] rounded-lg text-[13px] focus:outline-none focus:border-[#37352f]" placeholder="••••••••">
-        <div id="auth-login-error" class="hidden mb-3 px-3 py-2 bg-red-50 border border-red-200 text-red-600 text-[11px] font-bold rounded-lg"></div>
-        <button id="auth-login-submit" type="submit" class="w-full py-2.5 bg-[#37352f] text-white font-bold text-[13px] rounded-lg hover:bg-black transition-all active:scale-95">로그인</button>
-    </form>
-</div>
-
 <header class="w-full bg-white border-b border-[#ededeb] sticky top-0 z-[100]">
     <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between gap-3 overflow-x-auto custom-scrollbar">
         <div class="flex items-center gap-4 flex-shrink-0">
@@ -179,10 +111,6 @@
                 <div id="nav-publish" class="nav-link" onclick="switchTab('publish')">확정 발행 <span id="pending-count-badge" class="hidden ml-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full text-[10px]">0</span></div>
                 <div id="nav-import" class="nav-link" onclick="switchTab('import')">원장 다시 불러오기</div>
             </nav>
-        </div>
-        <div class="flex items-center gap-2 px-2 py-1 rounded-lg bg-[#f7f6f3] border border-[#ededeb] flex-shrink-0" style="font-size:11px;">
-            <span id="auth-account-email" class="font-bold text-[#37352f] whitespace-nowrap"></span>
-            <button onclick="window.handleAuthLogout()" class="text-[#787774] hover:text-[#37352f] font-bold underline whitespace-nowrap">로그아웃</button>
         </div>
     </div>
 </header>
