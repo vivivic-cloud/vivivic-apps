@@ -137,6 +137,13 @@
     .supplier-chip { padding:4px 10px; font-size:11px; font-weight:800; border:1px solid #ededeb; border-radius:20px;
         background:#fff; color:#787774; cursor:pointer; transition:all .12s; }
     .supplier-chip.on { background:#227C9D; color:#fff; border-color:#227C9D; }
+    /* 에이엠티 재단편집 화면의 부속카드(.inner-part-card)와 같은 톤 */
+    .pm-part-card { background:#fff; border:1.5px solid #ededeb; border-radius:8px; padding:8px 9px;
+        cursor:pointer; transition:box-shadow .1s,border-color .1s; display:flex; flex-direction:column; gap:2px; }
+    .pm-part-card:hover { border-color:#c2c0bb; box-shadow:0 2px 8px rgba(0,0,0,0.06); }
+    .pm-product-pick-item { display:flex; align-items:center; justify-content:space-between; gap:8px;
+        padding:9px 10px; border:1px solid #ededeb; border-radius:8px; cursor:pointer; transition:all .1s; }
+    .pm-product-pick-item:hover { background:#f7f6f3; border-color:#c2c0bb; }
     select:disabled.field-input { background:#f7f6f3; color:#c2c0bb; cursor:not-allowed; }
     table.pm-table th { position:sticky; top:0; background:#fbfbfa; z-index:5; }
     ::-webkit-scrollbar { width:8px; height:8px; }
@@ -230,23 +237,20 @@
         </div>
         <div id="pm-loading" class="hidden bg-white border border-[#ededeb] rounded-xl p-16 text-center text-[13px] text-[#787774] font-bold">☁️ 원장 데이터를 불러오는 중...</div>
 
-        <div id="pm-results" class="hidden bg-white border border-[#ededeb] rounded-xl overflow-hidden">
-            <div class="overflow-x-auto" style="max-height:70vh;">
-                <table class="pm-table w-full text-left border-collapse">
-                    <thead>
-                        <tr class="border-b border-[#ededeb]">
-                            <th class="px-3 py-2 text-[10px] font-black text-[#a8a6a2] uppercase w-6"></th>
-                            <th class="px-3 py-2 text-[10px] font-black text-[#a8a6a2] uppercase">제품 (분류)</th>
-                            <th class="px-3 py-2 text-[10px] font-black text-[#a8a6a2] uppercase">부속명</th>
-                            <th class="px-3 py-2 text-[10px] font-black text-[#a8a6a2] uppercase">원장/마감</th>
-                            <th class="px-3 py-2 text-[10px] font-black text-[#a8a6a2] uppercase">치수(W×D)</th>
-                            <th class="px-3 py-2 text-[10px] font-black text-[#a8a6a2] uppercase text-center">회전</th>
-                            <th class="px-3 py-2 text-[10px] font-black text-[#a8a6a2] uppercase">공급처</th>
-                            <th class="px-3 py-2 text-[10px] font-black text-[#a8a6a2] uppercase"></th>
-                        </tr>
-                    </thead>
-                    <tbody id="pm-table-body"></tbody>
-                </table>
+        <!-- 검색 결과 — 여러 제품이 걸리면 먼저 "제품 선택" 목록을 보여주고,
+             제품 하나로 좁혀지면(카테고리 4단 완성/ING단품명 선택/제품 클릭)
+             그 제품의 부속들만 에이엠티 재단편집 화면과 같은 카드로 보여줌 -->
+        <div id="pm-results" class="hidden">
+            <div id="pm-product-picker" class="hidden bg-white border border-[#ededeb] rounded-xl p-4">
+                <div class="text-[11px] font-bold text-[#787774] mb-2">제품을 선택하세요</div>
+                <div id="pm-product-picker-list" class="flex flex-col gap-1"></div>
+            </div>
+            <div id="pm-product-cards" class="hidden">
+                <div class="flex items-center gap-2 mb-3">
+                    <button onclick="clearProductSelection()" class="text-[11px] font-bold text-[#787774] hover:text-[#37352f]">← 다른 제품 선택</button>
+                    <span id="pm-selected-product-name" class="text-[14px] font-black text-[#37352f]"></span>
+                </div>
+                <div id="pm-part-card-grid" class="grid gap-2" style="grid-template-columns:repeat(auto-fill,minmax(140px,1fr));"></div>
             </div>
         </div>
         <div id="pm-count-label" class="mt-2 text-[11px] text-[#a8a6a2] font-bold"></div>
@@ -574,6 +578,7 @@ window.selectListSearchMethod = function(mode) {
     document.getElementById('pm-search').value = '';
     document.getElementById('pm-filter-ing').value = '';
     resetListCategorySelects();
+    selectedProductKey = null; // 검색방식을 바꾸면 제품 선택도 초기화
     renderList();
 };
 
@@ -707,27 +712,70 @@ window.renderList = function() {
         return true;
     });
 
-    const body = document.getElementById('pm-table-body');
     document.getElementById('pm-count-label').textContent = `${filtered.length}건 표시 (전체 ${ROWS.filter(r=>!r.deleted).length}건 중)`;
 
-    body.innerHTML = filtered.map(r => {
-        const catLine = [fv(r,'대분류'), fv(r,'중분류'), fv(r,'소분류')].filter(Boolean).join(' / ') || '-';
-        const grainOn = fv(r,'결보호') === 'X';
-        return `<tr class="border-b border-[#f5f5f4] hover:bg-[#fbfbfa] cursor-pointer" onclick="openEditModal('${r.id}')">
-            <td class="px-3 py-2.5">${r.pendingPublish ? '<span class="pending-dot" title="확정 대기중"></span>' : ''}</td>
-            <td class="px-3 py-2.5">
-                <div class="font-bold text-[12.5px] text-[#37352f]">${esc(fv(r,'ing단품명')) || '(이름없음)'}</div>
-                <div class="text-[10px] text-[#a8a6a2]">${esc(catLine)}${fv(r,'상품색상') ? ' · ' + esc(fv(r,'상품색상')) : ''}</div>
-            </td>
-            <td class="px-3 py-2.5 text-[12px] font-medium text-[#37352f]">${esc(fv(r,'부속명')) || '-'}</td>
-            <td class="px-3 py-2.5 text-[11px] text-[#787774]">${esc(fv(r,'원장명')) || '-'}${fv(r,'마감색상') ? ' · ' + esc(fv(r,'마감색상')) : ''}</td>
-            <td class="px-3 py-2.5 text-[11px] font-mono text-[#787774]">${fv(r,'재단W')||'-'}×${fv(r,'재단D')||'-'}</td>
-            <td class="px-3 py-2.5 text-center">${grainOn ? '<span class="badge bg-blue-50 text-blue-600">🔄 가능</span>' : '<span class="badge bg-[#f5f5f4] text-[#a8a6a2]">🔒 고정</span>'}</td>
-            <td class="px-3 py-2.5 text-[11px] font-bold ${fv(r,'공급처')==='AMT' ? 'text-[#37352f]' : 'text-[#a8a6a2]'}">${esc(fv(r,'공급처')) || '-'}</td>
-            <td class="px-3 py-2.5 text-right"><span class="text-[11px] text-[#a8a6a2] font-bold">편집 →</span></td>
-        </tr>`;
-    }).join('');
+    // 제품 단위로 묶기 — ing단품명("제품명")을 우선 키로 쓰고, 비어있는
+    // 행이면 분류 4단 조합으로 대체. 결과가 제품 1개로 이미 좁혀졌으면
+    // (카테고리 4단 완성, ING단품명 선택 등) 고르는 단계 없이 바로 카드로.
+    const productKeyOf = r => fv(r,'ing단품명') || [fv(r,'대분류'),fv(r,'중분류'),fv(r,'소분류'),fv(r,'상품색상')].join('|');
+    const productMap = new Map();
+    filtered.forEach(r => {
+        const key = productKeyOf(r);
+        if (!productMap.has(key)) productMap.set(key, []);
+        productMap.get(key).push(r);
+    });
+    if (selectedProductKey && !productMap.has(selectedProductKey)) selectedProductKey = null;
+    if (!selectedProductKey && productMap.size === 1) selectedProductKey = [...productMap.keys()][0];
+
+    const pickerEl = document.getElementById('pm-product-picker');
+    const cardsEl = document.getElementById('pm-product-cards');
+
+    if (!selectedProductKey) {
+        pickerEl.classList.remove('hidden');
+        cardsEl.classList.add('hidden');
+        const list = document.getElementById('pm-product-picker-list');
+        list.innerHTML = [...productMap.entries()].map(([key, rows]) => {
+            const first = rows[0];
+            const catLine = [fv(first,'대분류'), fv(first,'중분류'), fv(first,'소분류')].filter(Boolean).join(' / ') || '-';
+            const pendingCount = rows.filter(r => r.pendingPublish).length;
+            return `<div class="pm-product-pick-item" onclick="selectProduct('${esc(key).replace(/'/g,"\\'")}')">
+                <div>
+                    <div class="font-bold text-[13px] text-[#37352f]">${esc(fv(first,'ing단품명')) || '(이름없음)'}${pendingCount ? ' <span class="pending-dot" title="확정 대기중"></span>' : ''}</div>
+                    <div class="text-[10px] text-[#a8a6a2]">${esc(catLine)}${fv(first,'상품색상') ? ' · ' + esc(fv(first,'상품색상')) : ''}</div>
+                </div>
+                <span class="badge bg-[#f5f5f4] text-[#787774] flex-shrink-0">부속 ${rows.length}개</span>
+            </div>`;
+        }).join('');
+    } else {
+        pickerEl.classList.add('hidden');
+        cardsEl.classList.remove('hidden');
+        const rows = productMap.get(selectedProductKey) || [];
+        const first = rows[0];
+        document.getElementById('pm-selected-product-name').textContent =
+            (fv(first,'ing단품명') || selectedProductKey) + ` (부속 ${rows.length}개)`;
+        const grid = document.getElementById('pm-part-card-grid');
+        grid.innerHTML = rows.map(r => {
+            const grainOn = fv(r,'결보호') === 'X';
+            const plateInfo = [fv(r,'원장명'), fv(r,'마감')].filter(Boolean).join('-');
+            return `<div class="pm-part-card" onclick="openEditModal('${r.id}')">
+                <div class="flex items-start justify-between gap-1">
+                    <span class="text-[11px] font-black text-[#37352f] leading-tight">${esc(fv(r,'부속명')) || '(부속명없음)'}</span>
+                    ${r.pendingPublish ? '<span class="pending-dot flex-shrink-0" style="margin-top:3px;" title="확정 대기중"></span>' : ''}
+                </div>
+                <div class="text-[9px] text-[#a8a6a2] font-bold truncate">${esc(plateInfo) || '-'}${fv(r,'마감색상') ? ' · ' + esc(fv(r,'마감색상')) : ''}</div>
+                <div class="text-[10px] font-mono text-[#787774] mt-1">${fv(r,'재단W')||'-'}×${fv(r,'재단D')||'-'}</div>
+                <div class="flex items-center gap-1 mt-1 flex-wrap">
+                    ${grainOn ? '<span class="badge bg-blue-50 text-blue-600">🔄 회전가능</span>' : '<span class="badge bg-[#f5f5f4] text-[#a8a6a2]">🔒 고정</span>'}
+                    <span class="badge ${fv(r,'공급처')==='AMT' ? 'bg-[#37352f] text-white' : 'bg-[#f5f5f4] text-[#a8a6a2]'}">${esc(fv(r,'공급처')) || '-'}</span>
+                </div>
+            </div>`;
+        }).join('');
+    }
 };
+
+let selectedProductKey = null;
+window.selectProduct = function(key) { selectedProductKey = key; renderList(); };
+window.clearProductSelection = function() { selectedProductKey = null; renderList(); };
 
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
