@@ -1444,7 +1444,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.4</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.5</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2317,10 +2317,39 @@
             return perSheet > 0 ? Math.ceil(dq / perSheet) : (plan.sheets || 1);
         }
 
+        // 살아 있는 발주가 없는 재단계획을 타임라인에서 걷어낸다.
+        // cutting_plans 는 Firebase 에 계속 남는데 발주는 취소·삭제될 수 있어,
+        // 한 번 화면에 올라온 카드가 메모리(_woBoring / _woBoringParts)에 그대로
+        // 남아 있는 것까지 지워야 사라진다.
+        function _removeCuttingPlanFromTimeline(plan) {
+            const cKey = 'cut_' + plan.confirmId;
+            Object.keys(window._woBoring || {}).forEach(sk => {
+                const b = window._woBoring[sk]; if (!b) return;
+                Object.keys(b).forEach(mac => {
+                    if (!Array.isArray(b[mac])) return;
+                    b[mac] = b[mac].filter(x => (typeof x === 'string' ? x : x?.cKey) !== cKey);
+                });
+            });
+            Object.keys(window._woBoringParts || {}).forEach(sk => {
+                const arr = window._woBoringParts[sk];
+                if (Array.isArray(arr)) window._woBoringParts[sk] = arr.filter(p => p.cKey !== cKey);
+            });
+        }
+
         function _ensureCuttingPlanInTimeline(plan) {
             const allOrderIds = [...new Set([...(plan.pOrderIds||[]), ...(plan.sOrderIds||[]), ...(plan.tOrderIds||[])])];
-            const order = confirmedOrders.find(o => allOrderIds.includes(o.idNum));
-            const cuttingDate = order?.procOverrides?.['재단'] || order?.deliveryDate || '미정';
+            // 실제 발주에 매여 있는 재단계획만 공정 카드가 된다.
+            // 발주가 취소·삭제됐거나(orderIds 는 있는데 confirmedOrders 에 없음),
+            // 애초에 발주와 이어지지 않은 구형 데이터(orderIds 자체가 없음)는 올리지 않는다.
+            // 예전에는 그런 것들도 order 를 못 찾은 채 '미정-재단' 카드로 떠 있었다.
+            const 살아있는 = allOrderIds.map(id => confirmedOrders.find(o => o.idNum === id)).filter(Boolean);
+            if (!살아있는.length) {
+                // 발주 목록이 아직 안 실렸을 때는 지우지 않는다 — 뒤에 다시 그려진다
+                if (confirmedOrders.length) _removeCuttingPlanFromTimeline(plan);
+                return null;
+            }
+            const order = 살아있는[0];
+            const cuttingDate = order.procOverrides?.['재단'] || order.deliveryDate || '미정';
             const sk = cuttingDate + '-재단';
             const cKey = 'cut_' + plan.confirmId;
 
@@ -10451,16 +10480,21 @@
             const checkedData = confirmedCuttingData.filter(d => d.checked);
             if (checkedData.length === 0) { alert('배치할 재단 도면을 선택해주세요!'); return; }
 
+            let 올림 = 0;
             checkedData.forEach(data => {
                 _persistCuttingPlan(data);
-                _ensureCuttingPlanInTimeline(data);
+                if (_ensureCuttingPlanInTimeline(data)) 올림++;
             });
 
             // 확정 리스트에서 제거
             confirmedCuttingData = confirmedCuttingData.filter(d => !d.checked);
             renderConfirmedCuttingList();
             renderProcessTimeline();
-            showToastMessage(`${checkedData.length}개 재단 도면이 AMT 재단 타임라인 미배정 풀에 등록되었습니다.`);
+            // 살아 있는 발주가 없는 도면은 타임라인에 올라가지 않는다 — 조용히 넘기지 않고 알린다
+            const 못올림 = checkedData.length - 올림;
+            showToastMessage(못올림
+                ? `${올림}개 등록. ${못올림}개는 연결된 발주가 없어 타임라인에 올리지 않았습니다.`
+                : `${올림}개 재단 도면이 AMT 재단 타임라인 미배정 풀에 등록되었습니다.`);
         }
 
         // AMT재단으로 전송 (Firebase - 레거시 보존)
