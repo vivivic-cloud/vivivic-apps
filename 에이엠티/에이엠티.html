@@ -1444,7 +1444,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.10</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.11</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2279,22 +2279,34 @@
         // 발주 수량(세트별소모량 × 주문수량)이 정해져 있으므로, plan에 reqQty가
         // 기록되어 있지 않은 과거 재단계획도 원본 발주 데이터로 즉석 재계산해
         // 정확한 필요수량을 구할 수 있음 — sheets(원장 장수)로 잘못 대체하지 않음
-        function _cuttingReqQtyFor(plan, order) {
-            if (plan.reqQty != null) return plan.reqQty;
+        // 발주 한 건이 이 재단계획에서 차지하는 수량
+        function _발주몫(order, plan, h) {
+            const pKey = Object.keys(order.partInfoMap || {})
+                .find(ck => parseInt(ck.split('-')[2]) === plan.pRowIndex);
+            const pData = pKey ? order.partInfoMap[pKey] : null;
+            if (!pData || pData.isDeleted) return null;          // 이 발주엔 이 부속이 없다
+            // 담당자가 수량을 수동으로 조정했을 수 있어(partInfoMap[cKey].qty)
+            // 세트별소모량 재계산보다 그 값을 우선 신뢰
+            if (pData.qty) return pData.qty;
+            const row = currentFullData[plan.pRowIndex];
+            if (!row) return null;
+            const uc = parseFloat(row[h.indexOf('세트별소모량')]) || 1;
+            return Math.round(uc * (order.orderQty || 1));
+        }
+
+        // 재단계획의 실제 필요수량(필요 EA) — 지금 살아 있는 발주만으로 다시 센다.
+        // plan.reqQty 는 계획을 만들 때 여러 발주를 합쳐 굳혀 둔 값이라,
+        // 그 중 일부가 발주에서 삭제돼도 줄지 않는다. 삭제된 발주는 아무 작용도
+        // 남기면 안 되므로 저장된 값보다 지금의 발주를 믿는다.
+        function _cuttingReqQtyFor(plan, orders) {
+            const 산것 = (Array.isArray(orders) ? orders : [orders]).filter(Boolean);
             const h = currentFullData[0];
-            if (h && order && plan.pRowIndex != null) {
-                const row = currentFullData[plan.pRowIndex];
-                if (row) {
-                    // 담당자가 수량을 수동으로 조정했을 수 있어(partInfoMap[cKey].qty)
-                    // 세트별소모량 재계산보다 그 값을 우선 신뢰
-                    const pKey = Object.keys(order.partInfoMap || {})
-                        .find(ck => parseInt(ck.split('-')[2]) === plan.pRowIndex);
-                    const pData = pKey ? order.partInfoMap[pKey] : null;
-                    if (pData?.qty) return pData.qty;
-                    const uc = parseFloat(row[h.indexOf('세트별소모량')]) || 1;
-                    return Math.round(uc * (order.orderQty || 1));
-                }
+            if (h && plan.pRowIndex != null && 산것.length) {
+                let 합 = 0, 찾음 = false;
+                산것.forEach(o => { const q = _발주몫(o, plan, h); if (q != null) { 합 += q; 찾음 = true; } });
+                if (찾음) return 합;
             }
+            if (plan.reqQty != null) return plan.reqQty;
             return plan.sheets || 1; // 재계산도 불가능한 경우의 최후 폴백
         }
 
@@ -2360,6 +2372,18 @@
         // 이 재단계획으로 실제로 나오는 개수(총작업수량)
         function _cuttingYield(p) { return _cuttingPerSheet(p) * (p.sheets || 0); }
 
+        // 필요수량이 저장해 둔 값과 달라졌으면(=발주가 지워졌거나 바뀌었으면)
+        // 원장 장수도 그 수량으로 다시 센다. 안 달라졌으면 손대지 않는다 —
+        // 재단편집에서 담당자가 직접 정한 장수를 함부로 덮지 않기 위해서다.
+        function _살아있는장수(plan, dq) {
+            if (plan.reqQty != null && dq !== plan.reqQty) {
+                const per = _cuttingPerSheet({ perSheet: plan.perSheet, boardParts: plan.boardParts,
+                                               rw: plan.cutW, rd: plan.cutD });
+                if (per > 0) return Math.max(1, Math.ceil(dq / per));
+            }
+            return _cuttingSheetsFor(plan, dq);
+        }
+
         function _ensureCuttingPlanInTimeline(plan) {
             const allOrderIds = [...new Set([...(plan.pOrderIds||[]), ...(plan.sOrderIds||[]), ...(plan.tOrderIds||[])])];
             // 실제 발주에 매여 있는 재단계획만 공정 카드가 된다.
@@ -2383,9 +2407,9 @@
             const allAssigned = new Set([...(window._woBoring[sk]['AMT']||[]), ...(window._woBoring[sk].pool||[])]);
             if (!allAssigned.has(cKey)) window._woBoring[sk]['AMT'].push(cKey);
 
-            const orderCode = allOrderIds.map(id => confirmedOrders.find(o => o.idNum === id)?.orderCode).filter(Boolean).join('/');
-            const orderName = allOrderIds.map(id => confirmedOrders.find(o => o.idNum === id)?.displayName).filter(Boolean).join(' / ');
-            const _dqForPlan = _cuttingReqQtyFor(plan, order);
+            const orderCode = 살아있는.map(o => o.orderCode).filter(Boolean).join('/');
+            const orderName = 살아있는.map(o => o.displayName).filter(Boolean).join(' / ');
+            const _dqForPlan = _cuttingReqQtyFor(plan, 살아있는);
             // 카드에 실제 부속명(예: "상판")을 보여줘야 하므로 원본 데이터 행에서 조회 —
             // 조회 실패 시에만 자재·색상 설명으로 대체(완전히 빈 상태보다는 낫기 때문).
             // 같은 행을 찾은 김에 작업시간(pm) 계산에도 재사용(_resolvedRowForPlan)
@@ -2459,7 +2483,9 @@
                 // 자동생성 시 여러 발주가 하나의 재단계획으로 합쳐질 수 있어(같은 원장·사이즈
                 // 그룹 병합), orderKey 하나만으로는 Path B(인라인 계산)의 중복 제거가 그
                 // 합쳐진 다른 발주분까지는 못 잡아냄 — 이 목록으로 발주별 커버 여부를 확인
-                coveredOrderIds: allOrderIds,
+                // 삭제된 발주는 여기에도 남기지 않는다 — 남기면 그 발주 몫이
+                // 중복 제거·수량 계산에 계속 끼어든다
+                coveredOrderIds: 살아있는.map(o => o.idNum),
                 // 재편집(woEditCuttingPlan) 시 재단편집 화면에서 같은 행의 부속 카드를
                 // 정확히 찾아 자동 선택하는 데 사용 (사이즈만으로는 동일 규격의 다른
                 // 부속과 혼동될 수 있음)
@@ -2471,7 +2497,7 @@
                 rd: plan.cutD || 0,
                 deliveryDate: order?.deliveryDate || '',
                 boardParts: plan.boardParts || [],
-                sheets: _cuttingSheetsFor(plan, _dqForPlan),
+                sheets: _살아있는장수(plan, _dqForPlan),
                 isCuttingCard: true,
                 perSheet: plan.perSheet || 0,
                 planId: String(plan.confirmId)
@@ -2556,8 +2582,15 @@
                     .find(p => p.autoGenerated && p.groupSig === groupSig && !(p.pOrderIds || []).includes(order.idNum));
 
                 if (existingPlan) {
-                    const mergedOrderIds = [...new Set([...(existingPlan.pOrderIds || []), order.idNum])];
-                    const mergedQty = (existingPlan.reqQty || 0) + qty;
+                    // 합칠 때 삭제된 발주는 떨궈 낸다. 안 그러면 지운 발주 몫이
+                    // reqQty 에 그대로 굳어 계속 따라다닌다.
+                    const mergedOrderIds = [...new Set([...(existingPlan.pOrderIds || []), order.idNum])]
+                        .filter(id => id === order.idNum || confirmedOrders.some(o => o.idNum === id));
+                    const 이전분 = mergedOrderIds
+                        .filter(id => id !== order.idNum)
+                        .map(id => confirmedOrders.find(o => o.idNum === id))
+                        .reduce((n, o) => n + (o ? (_발주몫(o, existingPlan, h) || 0) : 0), 0);
+                    const mergedQty = 이전분 + qty;
                     const mergedSheets = Math.ceil(mergedQty / perSheet);
                     const updated = {
                         ...existingPlan,
