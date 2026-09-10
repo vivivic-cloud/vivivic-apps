@@ -224,8 +224,11 @@ function 그리기(){
     것들.forEach(it => sh.appendChild(만들기(it, n, sh)));
     sh.addEventListener('pointerdown', e => {
       지금장 = n;
-      if (e.target === sh || e.target.classList.contains('zone')){ 고른것 = null; 그리기(); }
-      else 쪽표시();
+      // 빈 자리를 누를 때 통째로 다시 그리면, 짚은 칸이 그 자리에서 사라진다.
+      // 손잡이는 그 다음(mousedown)에 무엇을 짚었는지 읽으므로 자리를 잃는다.
+      // 표시만 지운다.
+      if (e.target === sh || e.target.classList.contains('zone')) 고름지우기();
+      쪽표시();
     });
     const no = document.createElement('div');
     no.className = 'pageno';
@@ -261,6 +264,14 @@ function 칸나누기(sh, 장번호){
 
 function 쪽표시(){
   [...무대.children].forEach((w, n) => w.classList.toggle('now', n === 지금장));
+}
+/* 고른 것을 놓는다 — 무대를 다시 그리지 않고 표시와 손잡이만 뺀다 */
+function 고름지우기(){
+  고른것 = null;
+  무대.querySelectorAll('.it.sel').forEach(el => {
+    el.classList.remove('sel');
+    el.querySelectorAll('.grip,.del').forEach(x => x.remove());
+  });
 }
 
 function 만들기(it, 장번호, sh){
