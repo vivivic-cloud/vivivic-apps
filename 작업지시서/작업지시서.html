@@ -56,6 +56,13 @@ button,input,textarea,select{font:inherit;color:inherit}
 /* touch-action 이 없으면 손가락으로 끌 때 브라우저가 화면 스크롤로 가져간다.
    pointerdown 의 preventDefault 로는 못 막는다 — 아이폰에서 옮기기가 아예 안 됐다 */
 .it{position:absolute;box-sizing:border-box;touch-action:none}
+/* 빈 자리를 칸으로 나눠 둔다. 눈에는 안 보이고, 길게 눌러 짚으면
+   "2장 위 왼쪽" 처럼 어느 자리인지가 지시에 함께 실린다.
+   항목보다 아래(z-index 0)에 있어 항목을 짚는 데는 방해가 안 된다. */
+.zone{position:absolute;z-index:0;background:transparent}
+.sheet.짚기 .zone{outline:1px dashed rgba(17,17,16,.18);outline-offset:-1px}
+.sheet.짚기 .zone::after{content:attr(data-nm);position:absolute;left:2mm;top:1.5mm;
+  font-size:2.6mm;color:rgba(17,17,16,.3)}
 .it.sel{outline:1.5px solid var(--ink);outline-offset:1px}
 .it img{width:100%;height:100%;object-fit:contain;display:block;pointer-events:none}
 .it .tx{width:100%;height:100%;padding:2mm;border:0;background:transparent;resize:none;
@@ -149,6 +156,13 @@ PDF·PPT 를 불러오면 <b>한 장이 한 쪽</b>이 됩니다. 비율은 원�
   <button class="b" id="front">맨 앞으로</button>
   <button class="b" id="back">맨 뒤로</button>
   <button class="b" id="fitw">폭 맞춤</button>
+  <span class="seg" id="nudge">
+    <button data-n="left">◀</button>
+    <button data-n="up">▲</button>
+    <button data-n="down">▼</button>
+    <button data-n="right">▶</button>
+  </span>
+  <button class="b" id="step">1mm</button>
   <button class="b" id="clear">모두 지우기</button>
 </div>
 
@@ -172,6 +186,8 @@ PDF·PPT 를 불러오면 <b>한 장이 한 쪽</b>이 됩니다. 비율은 원�
 const $ = id => document.getElementById(id);
 const 무대 = $('stage');
 const A4 = { p: [210, 297], l: [297, 210] };
+// 작업대에서 손잡이를 달고 연 경우에만 빈 자리 칸을 옅게 보여 준다
+const 짚는중 = new URLSearchParams(location.search).get('viggle') === '1';
 const 여백 = 10;                       // 불러온 쪽을 앉힐 때 두는 가장자리(mm)
 
 let 문서 = 새문서();
@@ -202,12 +218,13 @@ function 그리기(){
     const wrap = document.createElement('div');
     wrap.className = 'wrap' + (n === 지금장 ? ' now' : '');
     const sh = document.createElement('div');
-    sh.className = 'sheet ' + 문서.방향;
+    sh.className = 'sheet ' + 문서.방향 + (짚는중 ? ' 짚기' : '');
     sh.dataset.p = n;
+    칸나누기(sh, n);
     것들.forEach(it => sh.appendChild(만들기(it, n, sh)));
     sh.addEventListener('pointerdown', e => {
       지금장 = n;
-      if (e.target === sh){ 고른것 = null; 그리기(); }
+      if (e.target === sh || e.target.classList.contains('zone')){ 고른것 = null; 그리기(); }
       else 쪽표시();
     });
     const no = document.createElement('div');
@@ -218,6 +235,30 @@ function 그리기(){
   });
   맞추기();
 }
+/* 종이를 세로 넷 × 가로 셋으로 나눠 둔다. 자리 이름과 mm 자리를 함께 적어
+   두어, 짚어서 지시할 때 "2장 위 왼쪽 35,37mm" 처럼 어디인지가 실린다. */
+const 세로이름 = ['위', '중상', '중하', '아래'];
+const 가로이름 = ['왼쪽', '가운데', '오른쪽'];
+function 칸나누기(sh, 장번호){
+  const [W, H] = 지금크기();
+  const 칸W = W / 3, 칸H = H / 4;
+  for (let r = 0; r < 4; r++){
+    for (let c = 0; c < 3; c++){
+      const z = document.createElement('div');
+      z.className = 'zone';
+      z.style.left = mm(c * 칸W); z.style.top = mm(r * 칸H);
+      z.style.width = mm(칸W); z.style.height = mm(칸H);
+      const 이름 = `${장번호 + 1}장 ${세로이름[r]} ${가로이름[c]}`;
+      z.dataset.nm = 이름;
+      // 손잡이(viggle.js)가 짚은 것의 글자를 그대로 읽어 간다
+      z.textContent = `${이름} ${Math.round((c + .5) * 칸W)},${Math.round((r + .5) * 칸H)}mm`;
+      z.style.color = 'transparent';
+      z.style.fontSize = '1px';
+      sh.appendChild(z);
+    }
+  }
+}
+
 function 쪽표시(){
   [...무대.children].forEach((w, n) => w.classList.toggle('now', n === 지금장));
 }
@@ -516,6 +557,23 @@ $('fitw').onclick  = () => { const it = 지금것(); if (!it) return;
   저장(); 그리기(); };
 $('clear').onclick = () => { if (!confirm('이 지시서의 모든 장을 지웁니다.')) return;
   문서.장들 = [[]]; 지금장 = 0; 고른것 = null; 저장(); 그리기(); };
+
+/* 미세 이동 — 화면이 0.44배로 줄어 있어 손가락으로는 1mm 를 맞출 수 없다 */
+let 걸음 = 1;
+$('step').onclick = () => { 걸음 = 걸음 === 1 ? 5 : 걸음 === 5 ? 10 : 1; $('step').textContent = 걸음 + 'mm'; };
+$('nudge').addEventListener('click', e => {
+  const b = e.target.closest('[data-n]'); if (!b) return;
+  const it = 지금것();
+  if (!it){ $('step').textContent = '고르세요'; setTimeout(() => $('step').textContent = 걸음 + 'mm', 1200); return; }
+  const [W, H] = 지금크기();
+  if (b.dataset.n === 'left')  it.x = Math.max(0, it.x - 걸음);
+  if (b.dataset.n === 'right') it.x = Math.min(W - it.w, it.x + 걸음);
+  if (b.dataset.n === 'up')    it.y = Math.max(0, it.y - 걸음);
+  if (b.dataset.n === 'down')  it.y = Math.min(H - it.h, it.y + 걸음);
+  const box = 무대.querySelector('.it[data-id="' + it.id + '"]');
+  if (box){ box.style.left = mm(it.x); box.style.top = mm(it.y); }
+  저장();
+});
 
 document.querySelectorAll('[data-z]').forEach(b => b.onclick = () => {
   자리배율 = Math.max(.3, Math.min(2.5, 자리배율 + (b.dataset.z === '+' ? .15 : -.15)));
