@@ -46,6 +46,9 @@ button,input,textarea,select{font:inherit;color:inherit}
 .wrap.now .sheet{border-color:var(--ink)}
 .pageno{position:absolute;left:0;right:0;bottom:-15px;text-align:center;font-size:11px;
   color:var(--muted);pointer-events:none}
+/* 장마다 지우는 단추 — 불러온 자료가 장을 여럿 만들면 그 장을 바로 지운다 */
+.pagedel{position:absolute;right:0;bottom:-19px;border:1px solid var(--edge);background:#fff;
+  color:var(--soft);border-radius:8px;padding:1px 7px;font:11px/1.7 inherit;cursor:pointer}
 /* 줄여 보여 줄 때 자리가 밀리지 않게 왼쪽 위를 기준으로 줄인다 (가운데 기준이면
    줄인 만큼 오른쪽으로 밀려 종이가 화면 밖으로 나간다) */
 .sheet{position:relative;background:#fff;border:1px solid var(--line);
@@ -110,7 +113,7 @@ button,input,textarea,select{font:inherit;color:inherit}
 @page{size:A4 portrait;margin:0}
 @media print{
   html,body{background:#fff}
-  .top,.tools,.hint,.sheetpad,.grip,.del,.pageno{display:none !important}
+  .top,.tools,.hint,.sheetpad,.grip,.del,.pageno,.pagedel{display:none !important}
   .stage{padding:0;display:block;gap:0}
   .wrap{width:auto !important;height:auto !important;margin:0}
   .sheet{border:0;box-shadow:none;transform:none !important;margin:0;break-after:page}
@@ -147,6 +150,8 @@ button,input,textarea,select{font:inherit;color:inherit}
 <div class="stage" id="stage"></div>
 
 <p class="hint">A4 흰 바탕입니다. 자료를 불러와 끌어 옮기고, 오른쪽 아래 손잡이로 크기를 바꿉니다.<br>
+자료를 골라 <b>다른 장으로 끌면</b> 그 장으로 넘어갑니다. 자료끼리 겹쳐 놓아도 됩니다.
+장은 <b>× 이 장</b> 으로 지웁니다.<br>
 PDF·PPT 를 불러오면 <b>한 장이 한 쪽</b>이 됩니다. 비율은 원본 그대로 지킵니다.<br>
 인쇄 · PDF 를 누른 뒤 대상에서 <b>PDF로 저장</b>을 고르면 전체가 한 파일이 됩니다.</p>
 
@@ -233,7 +238,11 @@ function 그리기(){
     const no = document.createElement('div');
     no.className = 'pageno';
     no.textContent = `${n + 1} / ${문서.장들.length}`;
-    wrap.appendChild(sh); wrap.appendChild(no);
+    const 지움 = document.createElement('button');
+    지움.type = 'button'; 지움.className = 'pagedel';
+    지움.textContent = '× 이 장';
+    지움.addEventListener('click', e => { e.stopPropagation(); 장지우기(n); });
+    wrap.appendChild(sh); wrap.appendChild(no); wrap.appendChild(지움);
     무대.appendChild(wrap);
   });
   맞추기();
@@ -338,37 +347,81 @@ function 손잡이달기(el, it, 장번호, sh){
 }
 
 /* ── 끌어 옮기기 · 크기 바꾸기 ───────────────────────── */
+/* 손가락 밑에 있는 종이 — 자료를 잡고 장을 넘나들 때 어디에 놓을지 가른다 */
+function 밑의종이(x, y){
+  return [...무대.querySelectorAll('.sheet')].find(s => {
+    const r = s.getBoundingClientRect();
+    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+  });
+}
+/* 잡은 자료를 다른 장으로 넘긴다. 그 장의 맨 앞에 놓아, 이미 있던 것 위에 얹힌다 */
+function 장넘기기(it, el, 옛sh, 새sh){
+  const 옛장 = +옛sh.dataset.p, 새장 = +새sh.dataset.p;
+  if (옛장 === 새장) return false;
+  const 옛것들 = 문서.장들[옛장], 새것들 = 문서.장들[새장];
+  if (!옛것들 || !새것들) return false;
+  const i = 옛것들.indexOf(it);
+  if (i < 0) return false;
+  옛것들.splice(i, 1);
+  it.z = 새것들.reduce((n, x) => Math.max(n, x.z || 1), 0) + 1;
+  새것들.push(it);
+  el.style.zIndex = it.z;
+  새sh.appendChild(el);
+  지금장 = 새장; 쪽표시();
+  return true;
+}
+
+/* 손가락 따라가기는 문서에 건다. 요소에만 걸면, 자료를 다른 종이로 옮기는 순간
+   pointer capture 가 풀려 그 뒤 움직임이 오지 않는다 — 장을 하나 넘고 멈췄다. */
 function 끌기(el, it, 무엇, sh){
-  let 시작 = null;
+  let 시작 = null, 현재sh = sh, 잡은틈 = null, 장바뀜 = false;
   el.addEventListener('pointerdown', e => {
     if (무엇 === 'move' && e.target.closest('.grip,.del,.tx')) return;
     if (무엇 === 'move' && 고른것 !== it.id) return;      // 한 번 골라야 옮긴다
     e.preventDefault(); e.stopPropagation();
     el.setPointerCapture(e.pointerId);
-    시작 = { x: e.clientX, y: e.clientY, ix: it.x, iy: it.y, iw: it.w, ih: it.h,
-             비: it.h / it.w };
+    현재sh = el.closest('.sheet') || sh;
+    // 자료 안 어디를 잡았는지 — 장을 넘어가도 잡은 자리가 그대로 따라온다
+    const r = 현재sh.getBoundingClientRect();
+    잡은틈 = { x: (e.clientX - r.left) / 배율 / px1mm - it.x,
+               y: (e.clientY - r.top) / 배율 / px1mm - it.y };
+    시작 = { x: e.clientX, y: e.clientY, iw: it.w, ih: it.h, 비: it.h / it.w };
+    document.addEventListener('pointermove', 움직임);
+    document.addEventListener('pointerup', 끝);
+    document.addEventListener('pointercancel', 끝);
   });
-  el.addEventListener('pointermove', e => {
+  const 움직임 = e => {
     if (!시작) return;
     const [W, H] = 지금크기();
-    const dx = (e.clientX - 시작.x) / 배율 / px1mm;
-    const dy = (e.clientY - 시작.y) / 배율 / px1mm;
     if (무엇 === 'move'){
-      it.x = Math.max(0, Math.min(W - it.w, 시작.ix + dx));
-      it.y = Math.max(0, Math.min(H - it.h, 시작.iy + dy));
+      // 손가락이 다른 종이 위로 가면 그 장으로 넘긴다
+      const 새sh = 밑의종이(e.clientX, e.clientY);
+      if (새sh && 새sh !== 현재sh && 장넘기기(it, el, 현재sh, 새sh)){ 현재sh = 새sh; 장바뀜 = true; }
+      // 넘어간 종이를 기준으로 다시 잰다. 자리를 델타로 쌓으면 장을 넘을 때 튄다
+      const r = 현재sh.getBoundingClientRect();
+      it.x = Math.max(0, Math.min(W - it.w, (e.clientX - r.left) / 배율 / px1mm - 잡은틈.x));
+      it.y = Math.max(0, Math.min(H - it.h, (e.clientY - r.top) / 배율 / px1mm - 잡은틈.y));
     } else {
+      const dx = (e.clientX - 시작.x) / 배율 / px1mm;
+      const dy = (e.clientY - 시작.y) / 배율 / px1mm;
       it.w = Math.max(8, Math.min(W - it.x, 시작.iw + dx));
       // 그림은 비율을 지킨다 — 늘리면 찌그러진다
       it.h = it.종류 === 'img' ? Math.min(H - it.y, it.w * 시작.비)
                                : Math.max(6, Math.min(H - it.y, 시작.ih + dy));
     }
-    const box = sh.querySelector('[data-id="' + it.id + '"]');
+    const box = 현재sh.querySelector('[data-id="' + it.id + '"]');
     if (box){ box.style.left = mm(it.x); box.style.top = mm(it.y);
               box.style.width = mm(it.w); box.style.height = mm(it.h); }
-  });
-  const 끝 = () => { if (시작){ 시작 = null; 저장(); } };
-  el.addEventListener('pointerup', 끝);
-  el.addEventListener('pointercancel', 끝);
+  };
+  // 장을 넘었으면 다시 그린다 — 요소가 쥐고 있던 옛 장 번호를 새것으로 바꾼다
+  function 끝(){
+    document.removeEventListener('pointermove', 움직임);
+    document.removeEventListener('pointerup', 끝);
+    document.removeEventListener('pointercancel', 끝);
+    if (!시작) return;
+    시작 = null; 저장();
+    if (장바뀜){ 장바뀜 = false; 고른것 = it.id; 그리기(); }
+  }
 }
 
 /* ── 화면에 맞춰 줄이기 ─────────────────────────────── */
@@ -528,14 +581,19 @@ $('addline').onclick = () => {
   저장(); 그리기();
 };
 $('addpage').onclick = () => { 문서.장들.push([]); 지금장 = 문서.장들.length - 1; 고른것 = null; 저장(); 그리기(); };
-$('delpage').onclick = () => {
-  // 물음은 두 갈래 모두에 건다. 예전엔 else 안에만 있어서 한 장짜리 문서는
-  // 아무것도 안 묻고 통째로 비워졌다 — 되돌릴 길도 없었다
-  if (이장().length && !confirm(`${지금장 + 1}장을 지웁니다. 되돌릴 수 없습니다.`)) return;
+/* 어느 장이든 지운다. 물음은 두 갈래 모두에 건다 — 예전엔 else 안에만 있어서
+   한 장짜리 문서는 아무것도 안 묻고 통째로 비워졌다 */
+function 장지우기(n){
+  if ((문서.장들[n] || []).length && !confirm(`${n + 1}장을 지웁니다. 되돌릴 수 없습니다.`)) return;
   if (문서.장들.length <= 1) 문서.장들 = [[]];
-  else { 문서.장들.splice(지금장, 1); 지금장 = Math.max(0, 지금장 - 1); }
+  else {
+    문서.장들.splice(n, 1);
+    if (지금장 > n) 지금장--;
+    if (지금장 > 문서.장들.length - 1) 지금장 = 문서.장들.length - 1;
+  }
   고른것 = null; 저장(true); 그리기();
-};
+}
+$('delpage').onclick = () => 장지우기(지금장);
 
 /* ── 자동 정렬 — 이 장만 위에서부터 차곡차곡 ─────────── */
 $('tidy').onclick = () => {
