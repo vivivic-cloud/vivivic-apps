@@ -1218,12 +1218,17 @@ window.doImport = async function(modeOverride) {
     try {
         const { collection, doc, writeBatch, serverTimestamp } = window.fbFirestore;
 
+        // 가져오기(원본 재동기화)는 사람이 만든 "확정 대기중" 변경이 아니라
+        // 그냥 원본 기준선을 최신으로 맞추는 것뿐이라, pendingPublish를
+        // true로 안 켠다 — 켜면 지금 최신 원장 그대로인 행까지 전부
+        // "미확정"으로 표시돼서 확정발행 탭에 엉뚱하게 수천 건이 쌓여 보임
+        // (실제로 사용자가 이 문제를 겪고 "왜 안되냐"고 문의해서 고침).
         if (mode === 'replace') {
             // 완전교체: 기존 행은 전부 빈 값으로 비우고(행번호는 보존), 새 데이터는
             // 처음부터 새 legacyRowIndex(0..N-1)로 다시 채운다.
             let batch = writeBatch(window.db), opCount = 0;
             for (const r of ROWS) {
-                batch.update(doc(window.db, ...COLLECTION, r.id), { deleted: true, pendingPublish: true, fields: Object.fromEntries(HEADER_ORDER.map(k=>[k,''])), updatedAt: serverTimestamp() });
+                batch.update(doc(window.db, ...COLLECTION, r.id), { deleted: true, pendingPublish: false, fields: Object.fromEntries(HEADER_ORDER.map(k=>[k,''])), updatedAt: serverTimestamp() });
                 if (++opCount >= 400) { await batch.commit(); batch = writeBatch(window.db); opCount = 0; }
             }
             if (opCount > 0) await batch.commit();
@@ -1231,7 +1236,7 @@ window.doImport = async function(modeOverride) {
             batch = writeBatch(window.db); opCount = 0;
             for (let i = 0; i < importedRows.length; i++) {
                 const ref = doc(collection(window.db, ...COLLECTION));
-                batch.set(ref, { fields: importedRows[i], legacyRowIndex: i, deleted: false, pendingPublish: true, createdAt: serverTimestamp(), updatedAt: serverTimestamp(), updatedBy: window._myAccount?.email || null });
+                batch.set(ref, { fields: importedRows[i], legacyRowIndex: i, deleted: false, pendingPublish: false, createdAt: serverTimestamp(), updatedAt: serverTimestamp(), updatedBy: window._myAccount?.email || null });
                 if (++opCount >= 400) { await batch.commit(); batch = writeBatch(window.db); opCount = 0; }
             }
             if (opCount > 0) await batch.commit();
@@ -1246,17 +1251,17 @@ window.doImport = async function(modeOverride) {
             for (const o of importedRows) {
                 const existing = existingBySig.get(sig(o));
                 if (existing) {
-                    batch.update(doc(window.db, ...COLLECTION, existing.id), { fields: o, pendingPublish: true, updatedAt: serverTimestamp(), updatedBy: window._myAccount?.email || null });
+                    batch.update(doc(window.db, ...COLLECTION, existing.id), { fields: o, pendingPublish: false, updatedAt: serverTimestamp(), updatedBy: window._myAccount?.email || null });
                 } else {
                     const ref = doc(collection(window.db, ...COLLECTION));
-                    batch.set(ref, { fields: o, legacyRowIndex: nextIdx++, deleted: false, pendingPublish: true, createdAt: serverTimestamp(), updatedAt: serverTimestamp(), updatedBy: window._myAccount?.email || null });
+                    batch.set(ref, { fields: o, legacyRowIndex: nextIdx++, deleted: false, pendingPublish: false, createdAt: serverTimestamp(), updatedAt: serverTimestamp(), updatedBy: window._myAccount?.email || null });
                 }
                 if (++opCount >= 400) { await batch.commit(); batch = writeBatch(window.db); opCount = 0; }
             }
             if (opCount > 0) await batch.commit();
         }
 
-        statusEl.textContent = `✓ 가져오기 완료 (${importedRows.length}행 처리). "확정 발행" 탭에서 검토 후 반영하세요.`;
+        statusEl.textContent = `✓ 가져오기 완료 (${importedRows.length}행 처리). 지금까지 확정해둔 값은 그대로 유지됩니다.`;
         statusEl.className = 'mt-3 text-[12px] font-bold text-center text-emerald-600';
         importedRows = []; importedHeaders = [];
         document.getElementById('import-report').classList.add('hidden');
