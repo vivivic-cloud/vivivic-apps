@@ -38,9 +38,11 @@ button,input,textarea,select{font:inherit;color:inherit}
 /* ── 종이 ─────────────────────────────────────────────── */
 /* 가운데 정렬을 flex 로 하면 종이가 칸보다 넓어지는 순간 왼쪽으로 밀려 잘린다.
    블록 + margin auto 로 두고, 넘칠 때만 가로로 밀어 본다. */
+/* flex 가운데 정렬은 내용이 칸보다 넓어지면 왼쪽 넘침에 스크롤이 안 닿는다.
+   왼쪽 붙이기로 두고 .wrap 의 auto 여백으로 가운데를 맞춘다 */
 .stage{padding:14px 12px 120px;overflow-x:auto;display:flex;flex-direction:column;
-  align-items:center;gap:18px}
-.wrap{position:relative;margin:0 auto}
+  align-items:flex-start;gap:18px}
+.wrap{position:relative;margin-inline:auto}
 .wrap.now .sheet{border-color:var(--ink)}
 .pageno{position:absolute;left:0;right:0;bottom:-15px;text-align:center;font-size:11px;
   color:var(--muted);pointer-events:none}
@@ -51,7 +53,9 @@ button,input,textarea,select{font:inherit;color:inherit}
 .sheet.p{width:210mm;height:297mm}
 .sheet.l{width:297mm;height:210mm}
 
-.it{position:absolute;box-sizing:border-box}
+/* touch-action 이 없으면 손가락으로 끌 때 브라우저가 화면 스크롤로 가져간다.
+   pointerdown 의 preventDefault 로는 못 막는다 — 아이폰에서 옮기기가 아예 안 됐다 */
+.it{position:absolute;box-sizing:border-box;touch-action:none}
 .it.sel{outline:1.5px solid var(--ink);outline-offset:1px}
 .it img{width:100%;height:100%;object-fit:contain;display:block;pointer-events:none}
 .it .tx{width:100%;height:100%;padding:2mm;border:0;background:transparent;resize:none;
@@ -59,10 +63,15 @@ button,input,textarea,select{font:inherit;color:inherit}
 .it .cap{position:absolute;left:0;right:0;bottom:-4.6mm;font-size:2.6mm;color:var(--muted);
   text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .grip{position:absolute;right:-9px;bottom:-9px;width:20px;height:20px;border-radius:50%;
-  background:var(--ink);border:2px solid #fff;cursor:nwse-resize;touch-action:none}
+  background:var(--ink);border:2px solid #fff;cursor:nwse-resize;touch-action:none;
+  transform:scale(var(--되키움,1));transform-origin:center}
 .del{position:absolute;left:-9px;top:-9px;width:20px;height:20px;border-radius:50%;
   background:#fff;border:1.5px solid var(--ink);color:var(--ink);font-size:12px;line-height:1;
-  display:grid;place-items:center;cursor:pointer}
+  display:grid;place-items:center;cursor:pointer;touch-action:none;
+  transform:scale(var(--되키움,1));transform-origin:center}
+/* 종이 가장자리에 붙은 항목의 손잡이가 잘리지 않게 한 칸 물러선다 */
+.it.sel .grip{right:2px;bottom:2px}
+.it.sel .del{left:2px;top:2px}
 
 /* ── 아래 도구 ─────────────────────────────────────────── */
 .tools{position:fixed;left:0;right:0;bottom:0;z-index:50;background:#fff;
@@ -71,6 +80,8 @@ button,input,textarea,select{font:inherit;color:inherit}
 .tools::-webkit-scrollbar{display:none}
 .tools .b{min-height:40px}
 .hint{padding:10px 14px;color:var(--muted);font-size:12.5px;text-align:center}
+.warn{position:sticky;top:0;z-index:45;background:var(--red);color:#fff;font-size:13px;
+  font-weight:700;padding:9px 14px;text-align:center;line-height:1.45}
 
 /* ── 판 ───────────────────────────────────────────────── */
 .sheetpad{position:fixed;inset:0;z-index:60;background:rgba(17,17,16,.35);display:none;
@@ -124,6 +135,7 @@ button,input,textarea,select{font:inherit;color:inherit}
   </div>
 </div>
 
+<div class="warn" id="warn" hidden></div>
 <div class="stage" id="stage"></div>
 
 <p class="hint">A4 흰 바탕입니다. 자료를 불러와 끌어 옮기고, 오른쪽 아래 손잡이로 크기를 바꿉니다.<br>
@@ -171,7 +183,10 @@ function 손질(d){
   if (!d) return 새문서();
   if (!d.장들) d.장들 = [d.것들 || []];
   delete d.것들;
-  if (!d.장들.length) d.장들 = [[]];
+  if (!Array.isArray(d.장들) || !d.장들.length) d.장들 = [[]];
+  d.장들 = d.장들.map(z => Array.isArray(z) ? z : []);
+  if (!A4[d.방향]) d.방향 = 'p';        // 방향이 없으면 지금크기() 가 터진다
+  if (!d.이름) d.이름 = '작업지시서';
   return d;
 }
 
@@ -228,21 +243,42 @@ function 만들기(it, 장번호, sh){
     el.appendChild(t);
   }
 
-  if (고른것 === it.id){
-    const g = document.createElement('div'); g.className = 'grip'; el.appendChild(g);
-    끌기(g, it, 'size', sh);
-    const d = document.createElement('button'); d.className = 'del'; d.textContent = '×';
-    d.onclick = e => { e.stopPropagation();
-      문서.장들[장번호] = 문서.장들[장번호].filter(x => x !== it);
-      고른것 = null; 저장(); 그리기(); };
-    el.appendChild(d);
-  }
+  if (고른것 === it.id) 손잡이달기(el, it, 장번호, sh);
   끌기(el, it, 'move', sh);
   el.addEventListener('pointerdown', () => { 지금장 = 장번호; 고르기(it.id); });
   return el;
 }
 
-function 고르기(id){ if (고른것 === id){ 쪽표시(); return; } 고른것 = id; 그리기(); }
+/* 예전에는 고를 때마다 무대를 통째로 다시 그려서, 방금 만진 요소가 그 자리에서
+   사라졌다. 그래서 글상자는 두 번 눌러야 키보드가 뜨고, 처음 잡은 손가락으로는
+   끌리지 않았다. 이제 표시만 바꾸고 손잡이만 끼웠다 뺀다. */
+function 고르기(id){
+  if (고른것 === id){ 쪽표시(); return; }
+  const 전 = 고른것; 고른것 = id;
+  무대.querySelectorAll('.it.sel').forEach(el => {
+    if (el.dataset.id === id) return;
+    el.classList.remove('sel');
+    el.querySelectorAll('.grip,.del').forEach(x => x.remove());
+  });
+  const el = 무대.querySelector('.it[data-id="' + id + '"]');
+  if (!el){ 그리기(); return; }
+  const 장번호 = +el.closest('.sheet').dataset.p;
+  const it = (문서.장들[장번호] || []).find(x => x.id === id);
+  if (!it){ 그리기(); return; }
+  el.classList.add('sel');
+  if (!el.querySelector('.grip')) 손잡이달기(el, it, 장번호, el.closest('.sheet'));
+  쪽표시();
+}
+
+function 손잡이달기(el, it, 장번호, sh){
+  const g = document.createElement('div'); g.className = 'grip'; el.appendChild(g);
+  끌기(g, it, 'size', sh);
+  const d = document.createElement('button'); d.className = 'del'; d.textContent = '×';
+  d.onclick = e => { e.stopPropagation();
+    문서.장들[장번호] = 문서.장들[장번호].filter(x => x !== it);
+    고른것 = null; 저장(true); 그리기(); };
+  el.appendChild(d);
+}
 
 /* ── 끌어 옮기기 · 크기 바꾸기 ───────────────────────── */
 function 끌기(el, it, 무엇, sh){
@@ -284,6 +320,9 @@ function 맞추기(){
   const 폭px = W * px1mm, 높px = H * px1mm;
   const 쓸수있는 = Math.min(무대.clientWidth - 24, 1100);
   배율 = Math.min(1, 쓸수있는 / 폭px) * 자리배율;
+  // 손잡이·× 는 종이 안에 있어 배율만큼 같이 작아진다(0.44배면 9px).
+  // 그만큼 되키워 손가락이 닿게 한다
+  document.documentElement.style.setProperty('--되키움', (1 / Math.max(배율, .2)).toFixed(2));
   [...무대.children].forEach(wrap => {
     const sh = wrap.querySelector('.sheet');
     sh.style.transform = 'scale(' + 배율 + ')';
@@ -356,9 +395,11 @@ async function pdf쪽(f, 알리기){
       알리기 && 알리기(i, doc.numPages);
       const page = await doc.getPage(i);
       const 재기 = page.getViewport({ scale: 1 });
-      // 긴 변이 2000px 을 넘지 않게 — 쪽이 많으면 자리(저장 공간)가 금방 찬다
-      const 배 = Math.min(2, 2000 / Math.max(재기.width, 재기.height));
-      const vp = page.getViewport({ scale: Math.max(1, 배) });
+      // 긴 변이 2000px 을 넘지 않게 — 쪽이 많으면 자리(저장 공간)가 금방 찬다.
+      // 예전에는 Math.max(1, 배) 로 감싸는 바람에 큰 도면(A0·큰 스캔본)에서만
+      // 제한이 풀려 한 쪽이 몇 MB 씩 나왔다. 줄이는 쪽은 막지 않는다.
+      const 배 = Math.max(0.25, Math.min(2, 2000 / Math.max(재기.width, 재기.height)));
+      const vp = page.getViewport({ scale: 배 });
       const cv = document.createElement('canvas');
       cv.width = vp.width; cv.height = vp.height;
       숨은칸.appendChild(cv);
@@ -428,28 +469,32 @@ $('addline').onclick = () => {
 };
 $('addpage').onclick = () => { 문서.장들.push([]); 지금장 = 문서.장들.length - 1; 고른것 = null; 저장(); 그리기(); };
 $('delpage').onclick = () => {
-  if (문서.장들.length <= 1){ 문서.장들 = [[]]; }
-  else {
-    if (이장().length && !confirm(`${지금장 + 1}장을 지웁니다.`)) return;
-    문서.장들.splice(지금장, 1);
-    지금장 = Math.max(0, 지금장 - 1);
-  }
-  고른것 = null; 저장(); 그리기();
+  // 물음은 두 갈래 모두에 건다. 예전엔 else 안에만 있어서 한 장짜리 문서는
+  // 아무것도 안 묻고 통째로 비워졌다 — 되돌릴 길도 없었다
+  if (이장().length && !confirm(`${지금장 + 1}장을 지웁니다. 되돌릴 수 없습니다.`)) return;
+  if (문서.장들.length <= 1) 문서.장들 = [[]];
+  else { 문서.장들.splice(지금장, 1); 지금장 = Math.max(0, 지금장 - 1); }
+  고른것 = null; 저장(true); 그리기();
 };
 
 /* ── 자동 정렬 — 이 장만 위에서부터 차곡차곡 ─────────── */
 $('tidy').onclick = () => {
-  const [W] = 지금크기();
-  let y = 여백 + 2;
-  이장().slice().sort((a, b) => (a.y - b.y) || (a.x - b.x)).forEach(it => {
+  const [W, H] = 지금크기();
+  const 줄선것 = 이장().slice().sort((a, b) => (a.y - b.y) || (a.x - b.x));
+  let y = 여백 + 2, 담을곳 = [];
+  const 새장들 = [담을곳];
+  줄선것.forEach(it => {
     const 비 = it.h / it.w;
     it.x = 여백;
     it.w = Math.min(it.종류 === 'img' ? it.w : W - 여백 * 2, W - 여백 * 2);
     if (it.종류 === 'img') it.h = it.w * 비;
-    it.y = y;
+    // 종이 밖으로 밀려나면 보이지도 지우지도 못한다 — 새 장으로 넘긴다
+    if (y + it.h > H - 여백 && 담을곳.length){ 담을곳 = []; 새장들.push(담을곳); y = 여백 + 2; }
+    it.y = y; 담을곳.push(it);
     y += it.h + 5;
   });
-  저장(); 그리기();
+  문서.장들.splice(지금장, 1, ...새장들);
+  저장(true); 그리기();
 };
 
 /* ── 앞뒤 · 크기 ────────────────────────────────────── */
@@ -494,24 +539,50 @@ function 적용된인쇄방향(){
 }
 
 $('print').onclick = () => { 고른것 = null; 그리기(); setTimeout(() => window.print(), 80); };
-$('docname').oninput = e => { 문서.이름 = e.target.value; 저장(); };
+/* oninput 으로 저장하면 글자 하나마다 문서 사본이 하나씩 쌓였다.
+   다섯 글자만 고쳐도 사본 다섯 개 — 지울 방법도 없었다. */
+let 옛이름 = null;
+$('docname').onfocus = e => { 옛이름 = e.target.value; };
+$('docname').onchange = e => {
+  const 새 = (e.target.value || '이름없음').trim() || '이름없음';
+  if (옛이름 && 옛이름 !== 새){
+    try { localStorage.removeItem(칸 + '문서.' + 옛이름);
+          const m = 문서목록(); delete m[옛이름];
+          localStorage.setItem(칸 + '목록', JSON.stringify(m)); } catch (err){}
+  }
+  문서.이름 = 새; e.target.value = 새; 옛이름 = 새;
+  저장(true);
+};
 
 /* ── 저장 — 이 기계 안에 남는다 ─────────────────────── */
 const 칸 = 'vv.workorder.';
-function 저장(){
+const 이름칸 = () => 칸 + '문서.' + (문서.이름 || '이름없음');
+
+/* 본문은 한 곳(문서.<이름>)에만 둔다. 예전에는 '지금' 에도 같은 것을 통째로
+   한 벌 더 써서 담을 수 있는 쪽 수가 정확히 절반이었고, 둘 중 하나만
+   성공하면 다음에 열 때 말없이 옛 판으로 되돌아갔다. */
+let 저장미룸 = null;
+function 저장(바로){
+  clearTimeout(저장미룸);
+  if (!바로){ 저장미룸 = setTimeout(() => 저장(true), 600); return; }
   문서.잰때 = Date.now();
   try {
-    localStorage.setItem(칸 + '지금', JSON.stringify(문서));
+    localStorage.setItem(이름칸(), JSON.stringify(문서));
+    localStorage.setItem(칸 + '지금이름', 문서.이름 || '이름없음');
     const 목록 = 문서목록();
     목록[문서.이름 || '이름없음'] = { 잰때: 문서.잰때 };
     localStorage.setItem(칸 + '목록', JSON.stringify(목록));
-    localStorage.setItem(칸 + '문서.' + (문서.이름 || '이름없음'), JSON.stringify(문서));
+    저장못함(false);
   } catch (e){
-    // 그림이 많으면 자리가 모자란다. 화면은 그대로 쓸 수 있으니 조용히 넘어가되
-    // 한 번은 알려 준다 — 모르고 닫으면 사라진다
-    if (!window.__자리없다경고){ window.__자리없다경고 = 1;
-      alert('저장 공간이 모자라 이 지시서는 자동 저장되지 않습니다.\n인쇄 · PDF 로 먼저 내보내 두세요.'); }
+    // 그림이 많으면 자리가 모자란다. 한 번 알리고 마는 게 아니라
+    // 고쳐질 때까지 머리에 띠를 띄워 둔다 — 모르고 닫으면 다 사라진다
+    저장못함(true);
   }
+}
+function 저장못함(켬){
+  const w = $('warn'); if (!w) return;
+  w.hidden = !켬;
+  if (켬) w.textContent = '저장 공간이 모자라 자동 저장이 멈췄습니다 · 인쇄 · PDF 로 먼저 내보내세요';
 }
 function 문서목록(){
   try { return JSON.parse(localStorage.getItem(칸 + '목록') || '{}'); } catch (e){ return {}; }
@@ -534,7 +605,8 @@ $('pad').onclick = e => {
           적용된인쇄방향(); 저장(); 그리기(); $('pad').classList.remove('on'); }
   if (o){
     try { 문서 = 손질(JSON.parse(localStorage.getItem(칸 + '문서.' + o.dataset.open))); } catch (e){ return; }
-    지금장 = 0; 고른것 = null; $('docname').value = 문서.이름;
+    지금장 = 0; 고른것 = null; $('docname').value = 문서.이름; 옛이름 = 문서.이름;
+    저장못함(false);
     document.querySelectorAll('#orient button').forEach(x => x.classList.toggle('on', x.dataset.o === 문서.방향));
     적용된인쇄방향(); 그리기(); $('pad').classList.remove('on');
   }
@@ -545,7 +617,13 @@ function 언제(t){
 }
 
 /* ── 시작 ───────────────────────────────────────────── */
-try { 문서 = 손질(JSON.parse(localStorage.getItem(칸 + '지금') || 'null')); } catch (e){ 문서 = 새문서(); }
+try {
+  const 마지막 = localStorage.getItem(칸 + '지금이름')
+              || (JSON.parse(localStorage.getItem(칸 + '지금') || 'null') || {}).이름;   // 옛 방식
+  문서 = 손질(JSON.parse(localStorage.getItem(칸 + '문서.' + 마지막) || 'null')
+             || JSON.parse(localStorage.getItem(칸 + '지금') || 'null'));
+  localStorage.removeItem(칸 + '지금');                 // 두 벌 쓰던 옛 자리를 비운다
+} catch (e){ 문서 = 새문서(); }
 $('docname').value = 문서.이름 || '작업지시서';
 document.querySelectorAll('#orient button').forEach(x => x.classList.toggle('on', x.dataset.o === 문서.방향));
 적용된인쇄방향();
