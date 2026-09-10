@@ -9,8 +9,7 @@
 
   // 지시를 받는 자리. 예전에는 맥의 /take 였고 지금은 클라우드 작업대다.
   // 주소를 통째로 받으므로 뒤에 /take 를 붙이지 않는다.
-  const 받는곳 = 표.get('vg') ||
-    'https://vivivic-cloud.github.io/vivivic-apps/%EC%9E%91%EC%97%85%EB%8C%80/index.html?take=1';
+  const 받는곳 = 표.get('vg') || 'https://vivivic-cloud.github.io/viggle/?take=1';
   const 박스 = 표.get('box') || '';
   const 이름 = 표.get('name') || (document.title || '프로그램');
 
