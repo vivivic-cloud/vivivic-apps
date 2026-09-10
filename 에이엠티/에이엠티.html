@@ -215,6 +215,7 @@
     </script>
 
     <style>
+        .cut-set-line{display:none}   /* 폰에서만 보인다 (아래 media 에서 켠다) */
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
         /* SortableJS 드래그 스타일 */
@@ -1133,6 +1134,17 @@
             /* 메인 패딩 축소 */
             #main-container { padding: 0 8px; margin-top: 10px; }
 
+            /* ─ 재단편집 설정: 폰에서는 한 줄로 접는다 ─ */
+            #cut-settings{padding:10px 12px !important}
+            .cut-set-line{display:flex !important;align-items:center;gap:8px}
+            .cut-set-sum{flex:1;min-width:0;font-size:12.5px;font-weight:700;color:#37352f;
+                white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+            .cut-set-edit{flex:none;font-size:12px;font-weight:800;color:#37352f;
+                background:#f1f1ef;border:1px solid #ededeb;border-radius:8px;
+                padding:7px 14px;min-height:36px;cursor:pointer}
+            #cut-settings:not(.펼침) .cut-set-full{display:none !important}
+            #cut-settings.펼침 .cut-set-line{margin-bottom:10px}
+
             /* ─ 타임라인 카드 터치 타겟 확대 ─ */
             .tl-sort-item {
                 min-height: 30px;
@@ -1448,7 +1460,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.22</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.23</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -1697,22 +1709,28 @@
                 <div id="id302-material-header" class="p-4 border-b border-[#f1f1ef] bg-[#fbfbfa] hidden">
                     <div class="flex items-center gap-3"><span class="text-[10px] font-bold text-[#787774]">선택 원장</span><span id="id302-material-title" class="font-bold text-[#37352f] fluid-text-small truncate"></span></div>
                 </div>
-                <div class="p-4 border-b border-[#f1f1ef] bg-[#fbfbfa] space-y-4">
-                    <div class="flex items-center gap-2 font-bold text-[#787774] fluid-text-mini">
+                <div class="p-4 border-b border-[#f1f1ef] bg-[#fbfbfa] space-y-4" id="cut-settings">
+                    <!-- 폰에서는 이 세 값이 화면 위쪽을 크게 차지해 도면에 집중할 수 없다.
+                         한 줄로 접어 두고 '편집' 을 눌렀을 때만 펼친다. 넓은 화면은 그대로. -->
+                    <div class="cut-set-line" id="cut-set-line">
+                        <span class="cut-set-sum" id="cut-set-sum">4X8 · 전단컷 5 · 톱날T 4.5</span>
+                        <button type="button" class="cut-set-edit" onclick="cutSettingsToggle()">편집</button>
+                    </div>
+                    <div class="flex items-center gap-2 font-bold text-[#787774] fluid-text-mini cut-set-full">
                         재단편집
                     </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 cut-set-full">
                         <div class="space-y-1">
                             <label class="text-[10px] font-bold text-[#787774] px-1 flex items-center gap-1">원장사이즈</label>
-                            <select id="setting-board-size" class="notion-select" onchange="updateBoardVisual()"><option value="3X6">3X6</option><option value="4X8" selected>4X8</option></select>
+                            <select id="setting-board-size" class="notion-select" onchange="updateBoardVisual();cutSettingsSum()"><option value="3X6">3X6</option><option value="4X8" selected>4X8</option></select>
                         </div>
                         <div class="space-y-1">
                             <label class="text-[10px] font-bold text-[#787774] px-1 flex items-center gap-1">전단컷</label>
-                            <input type="number" id="setting-front-cut" class="notion-input" value="5" oninput="updateBoardVisual();">
+                            <input type="number" id="setting-front-cut" class="notion-input" value="5" oninput="updateBoardVisual();cutSettingsSum();">
                         </div>
                         <div class="space-y-1">
                             <label class="text-[10px] font-bold text-[#787774] px-1 flex items-center gap-1">톱날T</label>
-                            <input type="number" step="0.1" id="setting-blade-t" class="notion-input" value="4.5" oninput="updateBoardVisual();">
+                            <input type="number" step="0.1" id="setting-blade-t" class="notion-input" value="4.5" oninput="updateBoardVisual();cutSettingsSum();">
                         </div>
                     </div>
                 </div>
@@ -10265,6 +10283,22 @@
                 console.log(`  - ✅ 버튼 생성: "${plate}"`);
             });
         }
+
+        /* 재단편집 설정 — 폰에서 한 줄로 접고 펴기 */
+        window.cutSettingsToggle = function(){
+            const box = document.getElementById('cut-settings'); if (!box) return;
+            box.classList.toggle('펼침');
+            document.getElementById('cut-set-line').querySelector('.cut-set-edit').textContent =
+                box.classList.contains('펼침') ? '접기' : '편집';
+        };
+        window.cutSettingsSum = function(){
+            const el = document.getElementById('cut-set-sum'); if (!el) return;
+            const s2 = document.getElementById('setting-board-size'),
+                  f  = document.getElementById('setting-front-cut'),
+                  b  = document.getElementById('setting-blade-t');
+            if (!s2 || !f || !b) return;
+            el.textContent = `${s2.value} · 전단컷 ${f.value} · 톱날T ${b.value}`;
+        };
 
         function getPackingCount(pw, pd, BW, BD, fCut, bT) { let count = 0; if (pw <= 0 || pd <= 0 || pw > BW - fCut || pd > BD - fCut) return 0; let curY = fCut; while (curY + pd <= BD + bT + 0.5) { let curX = fCut; while (curX + pw <= BW + bT + 0.5) { count++; curX += pw + bT; } curY += pd + bT; } return count; }
 
