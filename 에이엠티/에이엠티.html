@@ -5760,7 +5760,14 @@
                     const safeDate  = startDate || new Date().toISOString().slice(0, 10);
                     const safeName  = (partName || '').replace(/'/g, "\\'");
                     const _expQty = parseInt(defaultQty != null ? defaultQty : (btn?.closest('[data-totalqty]')?.dataset?.totalqty || btn?.closest('.tl-delivery-item')?.dataset?.totalqty || 0));
-                    btnWrap.innerHTML = `<button onclick="event.stopPropagation();tlShowPartDoneConfirm('${safeDocId}','${safeCK}','${safePK}','${safeDate}',this,'${safeName}',${_expQty})" onmousedown="event.stopPropagation()" style="font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 6px;cursor:pointer;white-space:nowrap;line-height:1.4;">완료</button>`;
+                    // 완료는 방금 누른 시작 자리를 그대로 물려받는다. 크기를 여기에
+                    // 박아 두면, 카드의 큰 시작(45%·14px)을 눌렀을 때 8px 짜리로
+                    // 쪼그라들었다 — 장갑 낀 손으로는 못 누른다. 색만 바꿔 끼운다.
+                    const _시작꼴 = (btn?.getAttribute('style') || '').replace(/background\s*:[^;]*;?/g, '');
+                    const _완료꼴 = _시작꼴
+                        ? _시작꼴 + (/;\s*$/.test(_시작꼴) ? '' : ';') + 'background:#22c55e;'
+                        : 'font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 6px;cursor:pointer;white-space:nowrap;line-height:1.4;';
+                    btnWrap.innerHTML = `<button onclick="event.stopPropagation();tlShowPartDoneConfirm('${safeDocId}','${safeCK}','${safePK}','${safeDate}',this,'${safeName}',${_expQty})" onmousedown="event.stopPropagation()" style="${_완료꼴}">완료</button>`;
                 }
                 showToastMessage(`[${procKey}] 작업 시작 처리됐습니다.`);
             } catch (err) {
