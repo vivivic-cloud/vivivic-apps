@@ -1464,7 +1464,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.16</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.17</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -8114,19 +8114,12 @@
 
             const _boardColorMap = _woGetOrderColorMap(sk);
 
-            // ── 헤더 HTML (기계 목록 동적) — 시작시간 선택은 제거(시간축 없음),
-            // 기계명 + 공유링크 버튼만 유지
+            // ── 헤더 HTML (기계 목록 동적) — 기계명만 (공유 링크 단추는 걷어냈다)
             let html = `<div class="wo-boring-board-hdr">` +
-                machines.map(m => {
-                    const _skEnc = encodeURIComponent(sk);
-                    const _macEnc = encodeURIComponent(m);
-                    const _shareUrl = `${location.origin}${location.pathname}?mv=1&sk=${_skEnc}&mac=${_macEnc}`;
-                    return `<div class="wo-boring-machine-hdr" style="color:#1a1a1a;background:${procMeta.colorAlpha};">` +
+                machines.map(m =>
+                    `<div class="wo-boring-machine-hdr" style="color:#1a1a1a;background:${procMeta.colorAlpha};">` +
                         `<span>${m}</span>` +
-                        `<button onclick="event.stopPropagation();_woShareMachineView('${_shareUrl.replace(/'/g,"\\'")}')" title="작업화면 공유 링크 복사" ` +
-                        `style="font-size:9px;font-weight:700;color:#fff;background:${procMeta.color};border:none;border-radius:4px;padding:2px 6px;cursor:pointer;flex-shrink:0;">📺 공유</button>` +
-                        `</div>`;
-                }).join('') +
+                    `</div>`).join('') +
                 `</div>`;
 
             html += `<div class="wo-boring-inner">`;
@@ -8627,30 +8620,6 @@
                 const docRef = doc(window.db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'proc_schedules', sk);
                 await setDoc(docRef, { schedule, parts, machines, updatedAt: serverTimestamp() });
             } catch(e) { console.warn('[_woSaveSchedule]', e); }
-        }
-
-        // ── 공유 링크 복사 / 팝업 ────────────────────────────────────────────────────
-        window._woShareMachineView = function(url) {
-            // 클립보드 복사 시도
-            if (navigator.clipboard && navigator.clipboard.writeText) {
-                navigator.clipboard.writeText(url).then(() => {
-                    showToastMessage('📺 기계 전용 뷰 링크가 복사되었습니다. 새 탭에서 열어 태블릿/모바일로 공유하세요.');
-                }).catch(() => _woShareFallback(url));
-            } else {
-                _woShareFallback(url);
-            }
-        };
-        function _woShareFallback(url) {
-            // 팝업으로 URL 표시
-            const d = document.createElement('div');
-            d.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;';
-            d.innerHTML = `<div style="background:#fff;border-radius:12px;padding:24px;max-width:500px;width:90%;font-family:Inter,sans-serif;">
-                <div style="font-size:15px;font-weight:800;color:#37352f;margin-bottom:12px;">📺 기계 전용 뷰 링크</div>
-                <input value="${url}" readonly style="width:100%;font-size:11px;padding:8px;border:1px solid #ddd;border-radius:6px;color:#37352f;box-sizing:border-box;" onclick="this.select()">
-                <div style="margin-top:10px;font-size:11px;color:#787774;">위 링크를 복사해 태블릿 또는 모바일 브라우저로 공유하세요.</div>
-                <button onclick="this.closest('div[style*=fixed]').remove()" style="margin-top:12px;font-size:12px;font-weight:700;color:#fff;background:#37352f;border:none;border-radius:6px;padding:6px 18px;cursor:pointer;">닫기</button>
-            </div>`;
-            document.body.appendChild(d);
         }
 
         // 작업지시서 발행 모달
