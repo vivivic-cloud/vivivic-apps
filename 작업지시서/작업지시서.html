@@ -540,23 +540,29 @@ function 적용된인쇄방향(){
 
 $('print').onclick = () => { 고른것 = null; 그리기(); setTimeout(() => window.print(), 80); };
 /* oninput 으로 저장하면 글자 하나마다 문서 사본이 하나씩 쌓였다.
-   다섯 글자만 고쳐도 사본 다섯 개 — 지울 방법도 없었다. */
-let 옛이름 = null;
-$('docname').onfocus = e => { 옛이름 = e.target.value; };
+   다섯 글자만 고쳐도 사본 다섯 개 — 지울 방법도 없었다.
+   옛 이름은 focus 에 기대지 않는다. 그건 안 뜰 때가 있다 —
+   실제로 저장해 둔 이름(저장된이름)을 기준으로 삼는다. */
 $('docname').onchange = e => {
-  const 새 = (e.target.value || '이름없음').trim() || '이름없음';
-  if (옛이름 && 옛이름 !== 새){
-    try { localStorage.removeItem(칸 + '문서.' + 옛이름);
-          const m = 문서목록(); delete m[옛이름];
-          localStorage.setItem(칸 + '목록', JSON.stringify(m)); } catch (err){}
-  }
-  문서.이름 = 새; e.target.value = 새; 옛이름 = 새;
+  const 새 = (e.target.value || '').trim() || '이름없음';
+  const 옛 = 저장된이름;
+  문서.이름 = 새; e.target.value = 새;
   저장(true);
+  if (옛 && 옛 !== 새) 문서지우기(옛);
 };
+
+function 문서지우기(이름){
+  try {
+    localStorage.removeItem(칸 + '문서.' + 이름);
+    const m = 문서목록(); delete m[이름];
+    localStorage.setItem(칸 + '목록', JSON.stringify(m));
+  } catch (err){}
+}
 
 /* ── 저장 — 이 기계 안에 남는다 ─────────────────────── */
 const 칸 = 'vv.workorder.';
 const 이름칸 = () => 칸 + '문서.' + (문서.이름 || '이름없음');
+let 저장된이름 = null;          // 지금 저장소에 들어 있는 이름
 
 /* 본문은 한 곳(문서.<이름>)에만 둔다. 예전에는 '지금' 에도 같은 것을 통째로
    한 벌 더 써서 담을 수 있는 쪽 수가 정확히 절반이었고, 둘 중 하나만
@@ -569,6 +575,7 @@ function 저장(바로){
   try {
     localStorage.setItem(이름칸(), JSON.stringify(문서));
     localStorage.setItem(칸 + '지금이름', 문서.이름 || '이름없음');
+    저장된이름 = 문서.이름 || '이름없음';
     const 목록 = 문서목록();
     목록[문서.이름 || '이름없음'] = { 잰때: 문서.잰때 };
     localStorage.setItem(칸 + '목록', JSON.stringify(목록));
@@ -594,18 +601,29 @@ $('docs').onclick = () => {
     '<h4>지시서</h4><div class="docs">' +
       '<button data-new="1"><span>+ 새 지시서</span></button>' +
       목록.map(([n, m]) => '<button data-open="' + n.replace(/"/g, '&quot;') + '"><span>' +
-        n.replace(/</g, '&lt;') + '</span><span class="when">' + 언제(m.잰때) + '</span></button>').join('') +
+        n.replace(/</g, '&lt;') + '</span><span class="when">' + 언제(m.잰때) +
+        ' <i data-del="' + n.replace(/"/g, '&quot;') + '" style="font-style:normal;padding:0 6px;color:var(--soft)">×</i></span></button>').join('') +
     '</div>';
   $('pad').classList.add('on');
 };
 $('pad').onclick = e => {
   if (e.target === $('pad')) return $('pad').classList.remove('on');
+  const x = e.target.closest('[data-del]');
+  if (x){
+    e.stopPropagation();
+    if (!confirm(`"${x.dataset.del}" 지시서를 지웁니다. 되돌릴 수 없습니다.`)) return;
+    문서지우기(x.dataset.del);
+    if (문서.이름 === x.dataset.del){ 문서 = 새문서(); 저장된이름 = null; 지금장 = 0;
+                                     $('docname').value = 문서.이름; 그리기(); }
+    $('docs').click();                       // 목록 다시 그리기
+    return;
+  }
   const n = e.target.closest('[data-new]'), o = e.target.closest('[data-open]');
-  if (n){ 문서 = 새문서(); 지금장 = 0; 고른것 = null; $('docname').value = 문서.이름;
+  if (n){ 문서 = 새문서(); 지금장 = 0; 고른것 = null; 저장된이름 = null; $('docname').value = 문서.이름;
           적용된인쇄방향(); 저장(); 그리기(); $('pad').classList.remove('on'); }
   if (o){
     try { 문서 = 손질(JSON.parse(localStorage.getItem(칸 + '문서.' + o.dataset.open))); } catch (e){ return; }
-    지금장 = 0; 고른것 = null; $('docname').value = 문서.이름; 옛이름 = 문서.이름;
+    지금장 = 0; 고른것 = null; $('docname').value = 문서.이름; 저장된이름 = 문서.이름;
     저장못함(false);
     document.querySelectorAll('#orient button').forEach(x => x.classList.toggle('on', x.dataset.o === 문서.방향));
     적용된인쇄방향(); 그리기(); $('pad').classList.remove('on');
@@ -623,6 +641,7 @@ try {
   문서 = 손질(JSON.parse(localStorage.getItem(칸 + '문서.' + 마지막) || 'null')
              || JSON.parse(localStorage.getItem(칸 + '지금') || 'null'));
   localStorage.removeItem(칸 + '지금');                 // 두 벌 쓰던 옛 자리를 비운다
+  저장된이름 = 문서.이름;
 } catch (e){ 문서 = 새문서(); }
 $('docname').value = 문서.이름 || '작업지시서';
 document.querySelectorAll('#orient button').forEach(x => x.classList.toggle('on', x.dataset.o === 문서.방향));
