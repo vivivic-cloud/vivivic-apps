@@ -313,7 +313,10 @@ async function 넣기(f){
     const 단추 = $('load');
     const 쪽들 = await pdf쪽(f, (i, n) => { 단추.textContent = `읽는 중… ${i}/${n}쪽`; });
     if (!쪽들.length) return 알림쪽(f.name + ' — 이 PDF 를 읽지 못했습니다');
-    쪽들.forEach(({ src, 비 }) => 쪽으로넣기(src, f.name, 비));
+    쪽들.forEach(({ src, 비, 못함 }) => {
+      if (못함) 알림쪽(`${f.name} ${못함}쪽 — 그리지 못했습니다`);
+      else 쪽으로넣기(src, f.name, 비);
+    });
     return;
   }
   if (/^image\//.test(f.type)){
@@ -363,10 +366,15 @@ async function pdf쪽(f, 알리기){
       let 늦음 = false;
       await Promise.race([일.promise.catch(() => {}),
                           new Promise(r => setTimeout(() => { 늦음 = true; r(); }, 30000))]);
-      if (늦음){ try { 일.cancel(); } catch (e){} cv.remove();
-                 console.warn('PDF ' + i + '쪽을 그리지 못했습니다'); break; }
+      if (늦음){                                  // 이 쪽만 건너뛴다. 뒤쪽까지 버리지 않는다
+        try { 일.cancel(); } catch (e){}
+        cv.remove();
+        나온것.push({ 못함: i, 비: vp.height / vp.width });
+        continue;
+      }
       나온것.push({ src: cv.toDataURL('image/jpeg', 0.85), 비: vp.height / vp.width });
       cv.remove();
+      await new Promise(r => setTimeout(r, 0));   // 한 숨 돌려 브라우저가 숨 쉬게
     }
   } catch (e){ console.warn('PDF 읽기 실패', e); }
   숨은칸.remove();
@@ -388,8 +396,10 @@ function 쪽으로넣기(src, 이름, 비){
 
 function 알림쪽(글){
   const [W] = 지금크기();
-  더하기({ id: 새id(), 종류: 'text', 글, x: 여백, y: 다음y(), w: W - 여백 * 2,
-           h: 8 + 글.split('\n').length * 7, 크기: 4.2, z: 다음z() });
+  const 빈장 = 문서.장들[지금장] && 문서.장들[지금장].length === 0;
+  if (!빈장){ 문서.장들.push([]); 지금장 = 문서.장들.length - 1; }
+  더하기({ id: 새id(), 종류: 'text', 글, x: 여백, y: 여백 + 10, w: W - 여백 * 2,
+           h: 10 + 글.split('\n').length * 7, 크기: 4.2, z: 1 });
 }
 
 function 더하기(it){
