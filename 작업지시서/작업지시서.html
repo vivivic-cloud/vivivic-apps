@@ -38,8 +38,12 @@ button,input,textarea,select{font:inherit;color:inherit}
 /* ── 종이 ─────────────────────────────────────────────── */
 /* 가운데 정렬을 flex 로 하면 종이가 칸보다 넓어지는 순간 왼쪽으로 밀려 잘린다.
    블록 + margin auto 로 두고, 넘칠 때만 가로로 밀어 본다. */
-.stage{padding:14px 12px 120px;overflow-x:auto}
+.stage{padding:14px 12px 120px;overflow-x:auto;display:flex;flex-direction:column;
+  align-items:center;gap:18px}
 .wrap{position:relative;margin:0 auto}
+.wrap.now .sheet{border-color:var(--ink)}
+.pageno{position:absolute;left:0;right:0;bottom:-15px;text-align:center;font-size:11px;
+  color:var(--muted);pointer-events:none}
 /* 줄여 보여 줄 때 자리가 밀리지 않게 왼쪽 위를 기준으로 줄인다 (가운데 기준이면
    줄인 만큼 오른쪽으로 밀려 종이가 화면 밖으로 나간다) */
 .sheet{position:relative;background:#fff;border:1px solid var(--line);
@@ -88,9 +92,11 @@ button,input,textarea,select{font:inherit;color:inherit}
 @page{size:A4 portrait;margin:0}
 @media print{
   html,body{background:#fff}
-  .top,.tools,.hint,.sheetpad,.grip,.del{display:none !important}
-  .stage{padding:0}
-  .sheet{border:0;box-shadow:none;transform:none !important;margin:0}
+  .top,.tools,.hint,.sheetpad,.grip,.del,.pageno{display:none !important}
+  .stage{padding:0;display:block;gap:0}
+  .wrap{width:auto !important;height:auto !important;margin:0}
+  .sheet{border:0;box-shadow:none;transform:none !important;margin:0;break-after:page}
+  .wrap:last-child .sheet{break-after:auto}
   .it.sel{outline:0}
 }
 </style>
@@ -112,14 +118,17 @@ button,input,textarea,select{font:inherit;color:inherit}
     <button class="b" id="addtext">글상자</button>
     <button class="b" id="addline">구분선</button>
     <button class="b" id="tidy">자동 정렬</button>
+    <button class="b" id="addpage">장 추가</button>
+    <button class="b" id="delpage">이 장 지우기</button>
     <button class="b" id="docs">문서</button>
   </div>
 </div>
 
-<div class="stage"><div class="wrap"><div class="sheet p" id="sheet"></div></div></div>
+<div class="stage" id="stage"></div>
 
 <p class="hint">A4 흰 바탕입니다. 자료를 불러와 끌어 옮기고, 오른쪽 아래 손잡이로 크기를 바꿉니다.<br>
-인쇄 · PDF 를 누른 뒤 대상에서 <b>PDF로 저장</b>을 고르면 PDF가 됩니다.</p>
+PDF·PPT 를 불러오면 <b>한 장이 한 쪽</b>이 됩니다. 비율은 원본 그대로 지킵니다.<br>
+인쇄 · PDF 를 누른 뒤 대상에서 <b>PDF로 저장</b>을 고르면 전체가 한 파일이 됩니다.</p>
 
 <div class="tools">
   <button class="b" data-z="-">축소</button>
@@ -130,38 +139,70 @@ button,input,textarea,select{font:inherit;color:inherit}
   <button class="b" id="clear">모두 지우기</button>
 </div>
 
-<input type="file" id="file" multiple accept="image/*,application/pdf" hidden>
+<input type="file" id="file" multiple accept="image/*,application/pdf,.pdf,.ppt,.pptx" hidden>
 
 <div class="sheetpad" id="pad"><div class="card" id="padbody"></div></div>
 
 <script src="../shared/viggle.js"></script>
 <script>
-/* ══ 작업지시서 — A4 캔버스 ══════════════════════════════
-   자리·크기는 모두 mm 로 둔다. 화면에서는 축소해 보여 주고 인쇄할 때만
-   1:1 이 되므로, px 로 두면 종이에서 어긋난다. */
+/* ══ 작업지시서 — A4 여러 장 ═════════════════════════════
+   자리·크기는 모두 mm 로 둔다. 화면에서는 줄여 보여 주고 인쇄할 때만 1:1 이
+   되므로, px 로 두면 종이에서 어긋난다.
+
+   한 문서는 여러 장이다. 예전에는 A4 한 장뿐이라 PDF·PPT 를 불러오면 그
+   한 장에 모두 쌓였고, 아래로 갈수록 자리가 없어 눌리면서 비율이 깨졌다.
+   이제 불러온 쪽 하나가 종이 한 장이 된다. */
 const $ = id => document.getElementById(id);
-const sheet = $('sheet');
+const 무대 = $('stage');
 const A4 = { p: [210, 297], l: [297, 210] };
+const 여백 = 10;                       // 불러온 쪽을 앉힐 때 두는 가장자리(mm)
 
 let 문서 = 새문서();
-let 고른것 = null;
-let 배율 = 1;
+let 고른것 = null, 지금장 = 0, 자리배율 = 1, 배율 = 1;
 
-function 새문서(){
-  return { 이름: '작업지시서', 방향: 'p', 것들: [], 잰때: Date.now() };
-}
+function 새문서(){ return { 이름: '작업지시서', 방향: 'p', 장들: [[]], 잰때: Date.now() }; }
 function 지금크기(){ return A4[문서.방향]; }
 const mm = v => v + 'mm';
+const 새id = () => 'i' + Math.random().toString(36).slice(2, 9);
+const px1mm = 96 / 25.4;
+
+/* 옛 문서(한 장짜리)를 여러 장 모양으로 맞춘다 */
+function 손질(d){
+  if (!d) return 새문서();
+  if (!d.장들) d.장들 = [d.것들 || []];
+  delete d.것들;
+  if (!d.장들.length) d.장들 = [[]];
+  return d;
+}
 
 /* ── 그리기 ─────────────────────────────────────────── */
 function 그리기(){
-  sheet.className = 'sheet ' + 문서.방향;
-  sheet.innerHTML = '';
-  문서.것들.forEach(it => sheet.appendChild(만들기(it)));
+  무대.innerHTML = '';
+  문서.장들.forEach((것들, n) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'wrap' + (n === 지금장 ? ' now' : '');
+    const sh = document.createElement('div');
+    sh.className = 'sheet ' + 문서.방향;
+    sh.dataset.p = n;
+    것들.forEach(it => sh.appendChild(만들기(it, n, sh)));
+    sh.addEventListener('pointerdown', e => {
+      지금장 = n;
+      if (e.target === sh){ 고른것 = null; 그리기(); }
+      else 쪽표시();
+    });
+    const no = document.createElement('div');
+    no.className = 'pageno';
+    no.textContent = `${n + 1} / ${문서.장들.length}`;
+    wrap.appendChild(sh); wrap.appendChild(no);
+    무대.appendChild(wrap);
+  });
   맞추기();
 }
+function 쪽표시(){
+  [...무대.children].forEach((w, n) => w.classList.toggle('now', n === 지금장));
+}
 
-function 만들기(it){
+function 만들기(it, 장번호, sh){
   const el = document.createElement('div');
   el.className = 'it' + (고른것 === it.id ? ' sel' : '');
   el.dataset.id = it.id;
@@ -172,7 +213,7 @@ function 만들기(it){
   if (it.종류 === 'img'){
     const img = document.createElement('img');
     img.src = it.src; el.appendChild(img);
-    if (it.이름){ const c = document.createElement('span'); c.className='cap'; c.textContent=it.이름; el.appendChild(c); }
+    if (it.이름){ const c = document.createElement('span'); c.className = 'cap'; c.textContent = it.이름; el.appendChild(c); }
   } else if (it.종류 === 'line'){
     el.style.borderTop = '0.4mm solid #111110';
     el.style.height = '0.4mm';
@@ -183,52 +224,52 @@ function 만들기(it){
     t.style.fontWeight = it.굵게 ? '800' : '400';
     t.style.textAlign = it.정렬 || 'left';
     t.addEventListener('input', () => { it.글 = t.innerText; 저장(); });
-    t.addEventListener('focus', () => 고르기(it.id, true));
+    t.addEventListener('focus', () => { 지금장 = 장번호; 고르기(it.id); });
     el.appendChild(t);
   }
 
   if (고른것 === it.id){
     const g = document.createElement('div'); g.className = 'grip'; el.appendChild(g);
-    끌기(g, it, 'size');
+    끌기(g, it, 'size', sh);
     const d = document.createElement('button'); d.className = 'del'; d.textContent = '×';
-    d.onclick = e => { e.stopPropagation(); 문서.것들 = 문서.것들.filter(x => x !== it); 고른것 = null; 저장(); 그리기(); };
+    d.onclick = e => { e.stopPropagation();
+      문서.장들[장번호] = 문서.장들[장번호].filter(x => x !== it);
+      고른것 = null; 저장(); 그리기(); };
     el.appendChild(d);
   }
-  끌기(el, it, 'move');
-  el.addEventListener('pointerdown', () => 고르기(it.id));
+  끌기(el, it, 'move', sh);
+  el.addEventListener('pointerdown', () => { 지금장 = 장번호; 고르기(it.id); });
   return el;
 }
 
-function 고르기(id, 조용히){
-  if (고른것 === id) return;
-  고른것 = id;
-  if (!조용히) 그리기();
-  else 그리기();
-}
+function 고르기(id){ if (고른것 === id){ 쪽표시(); return; } 고른것 = id; 그리기(); }
 
 /* ── 끌어 옮기기 · 크기 바꾸기 ───────────────────────── */
-function 끌기(el, it, 무엇){
+function 끌기(el, it, 무엇, sh){
   let 시작 = null;
   el.addEventListener('pointerdown', e => {
     if (무엇 === 'move' && e.target.closest('.grip,.del,.tx')) return;
     if (무엇 === 'move' && 고른것 !== it.id) return;      // 한 번 골라야 옮긴다
     e.preventDefault(); e.stopPropagation();
     el.setPointerCapture(e.pointerId);
-    시작 = { x: e.clientX, y: e.clientY, ix: it.x, iy: it.y, iw: it.w, ih: it.h };
+    시작 = { x: e.clientX, y: e.clientY, ix: it.x, iy: it.y, iw: it.w, ih: it.h,
+             비: it.h / it.w };
   });
   el.addEventListener('pointermove', e => {
     if (!시작) return;
     const [W, H] = 지금크기();
-    const dx = (e.clientX - 시작.x) / 배율 / (96 / 25.4);   // px → mm
-    const dy = (e.clientY - 시작.y) / 배율 / (96 / 25.4);
+    const dx = (e.clientX - 시작.x) / 배율 / px1mm;
+    const dy = (e.clientY - 시작.y) / 배율 / px1mm;
     if (무엇 === 'move'){
       it.x = Math.max(0, Math.min(W - it.w, 시작.ix + dx));
       it.y = Math.max(0, Math.min(H - it.h, 시작.iy + dy));
     } else {
       it.w = Math.max(8, Math.min(W - it.x, 시작.iw + dx));
-      it.h = Math.max(6, Math.min(H - it.y, 시작.ih + dy));
+      // 그림은 비율을 지킨다 — 늘리면 찌그러진다
+      it.h = it.종류 === 'img' ? Math.min(H - it.y, it.w * 시작.비)
+                               : Math.max(6, Math.min(H - it.y, 시작.ih + dy));
     }
-    const box = sheet.querySelector('[data-id="' + it.id + '"]');
+    const box = sh.querySelector('[data-id="' + it.id + '"]');
     if (box){ box.style.left = mm(it.x); box.style.top = mm(it.y);
               box.style.width = mm(it.w); box.style.height = mm(it.h); }
   });
@@ -237,112 +278,144 @@ function 끌기(el, it, 무엇){
   el.addEventListener('pointercancel', 끝);
 }
 
-/* ── 화면에 맞춰 축소 ───────────────────────────────── */
+/* ── 화면에 맞춰 줄이기 ─────────────────────────────── */
 function 맞추기(){
-  const [W] = 지금크기();
-  const 폭px = W * (96 / 25.4);
-  const 칸 = document.querySelector('.stage');
-  const 쓸수있는 = Math.min((칸 ? 칸.clientWidth : window.innerWidth) - 24, 1100);
+  const [W, H] = 지금크기();
+  const 폭px = W * px1mm, 높px = H * px1mm;
+  const 쓸수있는 = Math.min(무대.clientWidth - 24, 1100);
   배율 = Math.min(1, 쓸수있는 / 폭px) * 자리배율;
-  sheet.style.transform = 'scale(' + 배율 + ')';
-  const [, H] = 지금크기();
-  sheet.parentElement.style.width = (폭px * 배율) + 'px';
-  sheet.parentElement.style.height = (H * (96 / 25.4) * 배율) + 'px';
+  [...무대.children].forEach(wrap => {
+    const sh = wrap.querySelector('.sheet');
+    sh.style.transform = 'scale(' + 배율 + ')';
+    wrap.style.width = (폭px * 배율) + 'px';
+    wrap.style.height = (높px * 배율) + 'px';
+  });
 }
-let 자리배율 = 1;
 addEventListener('resize', 맞추기);
-// 창 크기 말고 칸 크기가 바뀌어도(가로 세로 돌리기 등) 따라가게 한다
-if (window.ResizeObserver) new ResizeObserver(() => 맞추기()).observe(document.querySelector('.stage'));
+if (window.ResizeObserver) new ResizeObserver(() => 맞추기()).observe(무대);
 
 /* ── 자료 불러오기 ──────────────────────────────────── */
 $('load').onclick = () => $('file').click();
 $('file').onchange = async e => {
   const 파일들 = [...e.target.files];
-  for (const f of 파일들) await 넣기(f);
+  const 단추 = $('load'); const 본글 = 단추.textContent;
+  단추.disabled = true;
+  try {
+    for (const f of 파일들){ 단추.textContent = '읽는 중… ' + f.name.slice(0, 14); await 넣기(f); }
+  } finally { 단추.disabled = false; 단추.textContent = 본글; }
   e.target.value = '';
   저장(); 그리기();
 };
 
 async function 넣기(f){
-  if (f.type === 'application/pdf'){
-    const 장들 = await pdf장(f);
-    장들.forEach(src => 그림넣기(src, f.name));
-    if (!장들.length) 글넣기('[' + f.name + '] — 이 PDF는 미리보기를 만들지 못했습니다');
+  const 확장 = (f.name.split('.').pop() || '').toLowerCase();
+  if (f.type === 'application/pdf' || 확장 === 'pdf'){
+    const 쪽들 = await pdf쪽(f);
+    if (!쪽들.length) return 알림쪽(f.name + ' — 이 PDF 를 읽지 못했습니다');
+    쪽들.forEach(({ src, 비 }) => 쪽으로넣기(src, f.name, 비));
     return;
   }
   if (/^image\//.test(f.type)){
     const src = await 읽기(f);
-    return 그림넣기(src, f.name);
+    const 비 = await 그림비(src);
+    return 쪽으로넣기(src, f.name, 비);
   }
-  글넣기('[' + f.name + ']');
+  if (확장 === 'ppt' || 확장 === 'pptx'){
+    // 파워포인트 원본은 브라우저가 그려 낼 수 없다. 감추지 않고 그대로 말한다.
+    return 알림쪽(f.name + ' — 파워포인트는 그대로 읽지 못합니다.\n' +
+                  '파워포인트에서 PDF 로 내보낸 뒤 그 파일을 불러오세요.\n' +
+                  '(아이폰: 공유 → 파일에 저장 대신 "PDF로 내보내기")');
+  }
+  알림쪽('[' + f.name + ']');
 }
 
 const 읽기 = f => new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(f); });
+const 그림비 = src => new Promise(r => { const i = new Image(); i.onload = () => r(i.naturalHeight / i.naturalWidth); i.onerror = () => r(1); i.src = src; });
 
-/* PDF 는 pdf.js 로 장마다 그림을 떠서 넣는다. 라이브러리가 안 실려 있으면 건너뛴다 */
-async function pdf장(f){
+/* PDF 는 pdf.js 로 쪽마다 그림을 떠서 넣는다. 쪽 수는 자르지 않는다 —
+   예전에는 10쪽에서 끊어 뒤가 통째로 사라졌다. */
+async function pdf쪽(f){
   if (!window.pdfjsLib) return [];
-  try{
+  try {
     pdfjsLib.GlobalWorkerOptions.workerSrc =
       'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    const buf = await f.arrayBuffer();
-    const doc = await pdfjsLib.getDocument({ data: buf }).promise;
+    const doc = await pdfjsLib.getDocument({ data: await f.arrayBuffer() }).promise;
     const 나온것 = [];
-    for (let i = 1; i <= Math.min(doc.numPages, 10); i++){
+    for (let i = 1; i <= doc.numPages; i++){
       const page = await doc.getPage(i);
       const vp = page.getViewport({ scale: 2 });
       const cv = document.createElement('canvas');
       cv.width = vp.width; cv.height = vp.height;
       await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
-      나온것.push(cv.toDataURL('image/jpeg', 0.85));
+      나온것.push({ src: cv.toDataURL('image/jpeg', 0.85), 비: vp.height / vp.width });
     }
     return 나온것;
-  } catch(e){ console.warn('PDF 읽기 실패', e); return []; }
+  } catch (e){ console.warn('PDF 읽기 실패', e); return []; }
 }
 
-function 그림넣기(src, 이름){
+/* 불러온 쪽 하나 = 종이 한 장. 비율을 지킨 채 종이 안에 가장 크게 앉힌다 */
+function 쪽으로넣기(src, 이름, 비){
   const [W, H] = 지금크기();
-  const it = { id: 새id(), 종류: 'img', src, 이름: 이름 || '',
-               x: 12, y: 다음y(), w: Math.min(W - 24, 90), h: 60, z: 다음z() };
-  const img = new Image();
-  img.onload = () => {                                  // 비율은 원본 그대로
-    const 비 = img.naturalHeight / img.naturalWidth;
-    it.h = Math.min(H - it.y - 8, it.w * 비);
-    저장(); 그리기();
-  };
-  img.src = src;
-  문서.것들.push(it);
+  const 칸W = W - 여백 * 2, 칸H = H - 여백 * 2;
+  let w = 칸W, h = w * 비;
+  if (h > 칸H){ h = 칸H; w = h / 비; }              // 넘치면 높이에 맞춘다
+  const it = { id: 새id(), 종류: 'img', src, 이름: '',
+               x: (W - w) / 2, y: (H - h) / 2, w, h, z: 1 };
+  const 빈장 = 문서.장들[지금장] && 문서.장들[지금장].length === 0;
+  if (빈장) 문서.장들[지금장] = [it];
+  else { 문서.장들.push([it]); 지금장 = 문서.장들.length - 1; }
 }
 
-function 글넣기(글){
+function 알림쪽(글){
   const [W] = 지금크기();
-  문서.것들.push({ id: 새id(), 종류: 'text', 글: 글 || '내용을 적으세요',
-                   x: 12, y: 다음y(), w: W - 24, h: 16, 크기: 4, z: 다음z() });
+  더하기({ id: 새id(), 종류: 'text', 글, x: 여백, y: 다음y(), w: W - 여백 * 2,
+           h: 8 + 글.split('\n').length * 7, 크기: 4.2, z: 다음z() });
 }
 
+function 더하기(it){
+  if (!문서.장들[지금장]) 문서.장들[지금장] = [];
+  문서.장들[지금장].push(it);
+}
+function 이장(){ return 문서.장들[지금장] || []; }
 function 다음y(){
-  const 아래 = 문서.것들.reduce((n, it) => Math.max(n, it.y + it.h), 8);
+  const 아래 = 이장().reduce((n, it) => Math.max(n, it.y + it.h), 여백 - 5);
   const [, H] = 지금크기();
   return Math.min(H - 20, 아래 + 5);
 }
-function 다음z(){ return 문서.것들.reduce((n, it) => Math.max(n, it.z || 1), 0) + 1; }
-const 새id = () => 'i' + Math.random().toString(36).slice(2, 9);
+function 다음z(){ return 이장().reduce((n, it) => Math.max(n, it.z || 1), 0) + 1; }
+
+function 글넣기(글){
+  const [W] = 지금크기();
+  더하기({ id: 새id(), 종류: 'text', 글: 글 || '내용을 적으세요',
+           x: 여백, y: 다음y(), w: W - 여백 * 2, h: 16, 크기: 4, z: 다음z() });
+}
 
 $('addtext').onclick = () => { 글넣기(); 저장(); 그리기(); };
 $('addline').onclick = () => {
   const [W] = 지금크기();
-  문서.것들.push({ id: 새id(), 종류: 'line', x: 12, y: 다음y(), w: W - 24, h: 0.4, z: 다음z() });
+  더하기({ id: 새id(), 종류: 'line', x: 여백, y: 다음y(), w: W - 여백 * 2, h: 0.4, z: 다음z() });
   저장(); 그리기();
 };
+$('addpage').onclick = () => { 문서.장들.push([]); 지금장 = 문서.장들.length - 1; 고른것 = null; 저장(); 그리기(); };
+$('delpage').onclick = () => {
+  if (문서.장들.length <= 1){ 문서.장들 = [[]]; }
+  else {
+    if (이장().length && !confirm(`${지금장 + 1}장을 지웁니다.`)) return;
+    문서.장들.splice(지금장, 1);
+    지금장 = Math.max(0, 지금장 - 1);
+  }
+  고른것 = null; 저장(); 그리기();
+};
 
-/* ── 자동 정렬 — 위에서부터 차곡차곡 ─────────────────── */
+/* ── 자동 정렬 — 이 장만 위에서부터 차곡차곡 ─────────── */
 $('tidy').onclick = () => {
-  const [W, H] = 지금크기();
-  let y = 12;
-  문서.것들.slice().sort((a, b) => (a.y - b.y) || (a.x - b.x)).forEach(it => {
-    it.x = 12;
-    if (it.종류 !== 'img') it.w = W - 24;
-    else it.w = Math.min(it.w, W - 24);
+  const [W] = 지금크기();
+  let y = 여백 + 2;
+  이장().slice().sort((a, b) => (a.y - b.y) || (a.x - b.x)).forEach(it => {
+    const 비 = it.h / it.w;
+    it.x = 여백;
+    it.w = Math.min(it.종류 === 'img' ? it.w : W - 여백 * 2, W - 여백 * 2);
+    if (it.종류 === 'img') it.h = it.w * 비;
     it.y = y;
     y += it.h + 5;
   });
@@ -350,16 +423,19 @@ $('tidy').onclick = () => {
 };
 
 /* ── 앞뒤 · 크기 ────────────────────────────────────── */
+const 지금것 = () => 이장().find(x => x.id === 고른것);
 $('front').onclick = () => { const it = 지금것(); if (it){ it.z = 다음z(); 저장(); 그리기(); } };
-$('back').onclick  = () => { const it = 지금것(); if (it){ 문서.것들.forEach(x => x.z = (x.z || 1) + 1); it.z = 1; 저장(); 그리기(); } };
-$('fitw').onclick  = () => { const it = 지금것(); if (!it) return; const [W] = 지금크기();
-  const 비 = it.h / it.w; it.x = 12; it.w = W - 24; if (it.종류 === 'img') it.h = it.w * 비; 저장(); 그리기(); };
-$('clear').onclick = () => { if (!confirm('이 지시서의 내용을 모두 지웁니다.')) return;
-  문서.것들 = []; 고른것 = null; 저장(); 그리기(); };
-const 지금것 = () => 문서.것들.find(x => x.id === 고른것);
+$('back').onclick  = () => { const it = 지금것(); if (it){ 이장().forEach(x => x.z = (x.z || 1) + 1); it.z = 1; 저장(); 그리기(); } };
+$('fitw').onclick  = () => { const it = 지금것(); if (!it) return;
+  const [W, H] = 지금크기(); const 비 = it.h / it.w;
+  it.x = 여백; it.w = W - 여백 * 2;
+  if (it.종류 === 'img'){ it.h = Math.min(H - it.y, it.w * 비); it.w = it.h / 비; it.x = (W - it.w) / 2; }
+  저장(); 그리기(); };
+$('clear').onclick = () => { if (!confirm('이 지시서의 모든 장을 지웁니다.')) return;
+  문서.장들 = [[]]; 지금장 = 0; 고른것 = null; 저장(); 그리기(); };
 
 document.querySelectorAll('[data-z]').forEach(b => b.onclick = () => {
-  자리배율 = Math.max(.4, Math.min(2.5, 자리배율 + (b.dataset.z === '+' ? .15 : -.15)));
+  자리배율 = Math.max(.3, Math.min(2.5, 자리배율 + (b.dataset.z === '+' ? .15 : -.15)));
   맞추기();
 });
 
@@ -370,22 +446,24 @@ $('orient').addEventListener('click', e => {
   document.querySelectorAll('#orient button').forEach(x => x.classList.toggle('on', x === b));
   적용된인쇄방향();
   const [W, H] = 지금크기();
-  문서.것들.forEach(it => {                       // 종이 밖으로 나간 것은 끌어들인다
-    it.w = Math.min(it.w, W - 4); it.h = Math.min(it.h, H - 4);
+  문서.장들.forEach(것들 => 것들.forEach(it => {       // 종이 밖으로 나간 것은 끌어들인다
+    const 비 = it.h / it.w;
+    if (it.w > W - 4){ it.w = W - 4; if (it.종류 === 'img') it.h = it.w * 비; }
+    if (it.h > H - 4){ it.h = H - 4; if (it.종류 === 'img') it.w = it.h / 비; }
     it.x = Math.max(0, Math.min(W - it.w, it.x));
     it.y = Math.max(0, Math.min(H - it.h, it.y));
-  });
+  }));
   저장(); 그리기();
 });
 
-/* @page 는 CSS 라 자바스크립트로 바꿔 끼운다 — 인쇄 대화상자의 용지 방향이 맞아야 한다 */
-let 인쇄스타일 = document.createElement('style');
+/* @page 는 CSS 라 자바스크립트로 바꿔 끼운다 — 인쇄 용지 방향이 맞아야 한다 */
+const 인쇄스타일 = document.createElement('style');
 document.head.appendChild(인쇄스타일);
 function 적용된인쇄방향(){
   인쇄스타일.textContent = '@page{size:A4 ' + (문서.방향 === 'l' ? 'landscape' : 'portrait') + ';margin:0}';
 }
 
-$('print').onclick = () => { 고른것 = null; 그리기(); setTimeout(() => window.print(), 60); };
+$('print').onclick = () => { 고른것 = null; 그리기(); setTimeout(() => window.print(), 80); };
 $('docname').oninput = e => { 문서.이름 = e.target.value; 저장(); };
 
 /* ── 저장 — 이 기계 안에 남는다 ─────────────────────── */
@@ -398,30 +476,35 @@ function 저장(){
     목록[문서.이름 || '이름없음'] = { 잰때: 문서.잰때 };
     localStorage.setItem(칸 + '목록', JSON.stringify(목록));
     localStorage.setItem(칸 + '문서.' + (문서.이름 || '이름없음'), JSON.stringify(문서));
-  } catch(e){ /* 자리가 모자라면 조용히 넘어간다 — 화면은 그대로 쓸 수 있다 */ }
+  } catch (e){
+    // 그림이 많으면 자리가 모자란다. 화면은 그대로 쓸 수 있으니 조용히 넘어가되
+    // 한 번은 알려 준다 — 모르고 닫으면 사라진다
+    if (!window.__자리없다경고){ window.__자리없다경고 = 1;
+      alert('저장 공간이 모자라 이 지시서는 자동 저장되지 않습니다.\n인쇄 · PDF 로 먼저 내보내 두세요.'); }
+  }
 }
 function 문서목록(){
-  try { return JSON.parse(localStorage.getItem(칸 + '목록') || '{}'); } catch(e){ return {}; }
+  try { return JSON.parse(localStorage.getItem(칸 + '목록') || '{}'); } catch (e){ return {}; }
 }
 
 $('docs').onclick = () => {
   const 목록 = Object.entries(문서목록()).sort((a, b) => b[1].잰때 - a[1].잰때);
   $('padbody').innerHTML =
-    '<h4>지시서</h4>' +
-    '<div class="docs">' +
+    '<h4>지시서</h4><div class="docs">' +
       '<button data-new="1"><span>+ 새 지시서</span></button>' +
-      목록.map(([n, m]) => '<button data-open="' + n.replace(/"/g,'&quot;') + '"><span>' +
-        n.replace(/</g,'&lt;') + '</span><span class="when">' + 언제(m.잰때) + '</span></button>').join('') +
+      목록.map(([n, m]) => '<button data-open="' + n.replace(/"/g, '&quot;') + '"><span>' +
+        n.replace(/</g, '&lt;') + '</span><span class="when">' + 언제(m.잰때) + '</span></button>').join('') +
     '</div>';
   $('pad').classList.add('on');
 };
 $('pad').onclick = e => {
   if (e.target === $('pad')) return $('pad').classList.remove('on');
   const n = e.target.closest('[data-new]'), o = e.target.closest('[data-open]');
-  if (n){ 문서 = 새문서(); 고른것 = null; $('docname').value = 문서.이름; 적용된인쇄방향(); 저장(); 그리기(); $('pad').classList.remove('on'); }
+  if (n){ 문서 = 새문서(); 지금장 = 0; 고른것 = null; $('docname').value = 문서.이름;
+          적용된인쇄방향(); 저장(); 그리기(); $('pad').classList.remove('on'); }
   if (o){
-    try { 문서 = JSON.parse(localStorage.getItem(칸 + '문서.' + o.dataset.open)); } catch(e){ return; }
-    고른것 = null; $('docname').value = 문서.이름;
+    try { 문서 = 손질(JSON.parse(localStorage.getItem(칸 + '문서.' + o.dataset.open))); } catch (e){ return; }
+    지금장 = 0; 고른것 = null; $('docname').value = 문서.이름;
     document.querySelectorAll('#orient button').forEach(x => x.classList.toggle('on', x.dataset.o === 문서.방향));
     적용된인쇄방향(); 그리기(); $('pad').classList.remove('on');
   }
@@ -432,19 +515,16 @@ function 언제(t){
 }
 
 /* ── 시작 ───────────────────────────────────────────── */
-try {
-  const 있던것 = JSON.parse(localStorage.getItem(칸 + '지금') || 'null');
-  if (있던것 && 있던것.것들) 문서 = 있던것;
-} catch(e){}
+try { 문서 = 손질(JSON.parse(localStorage.getItem(칸 + '지금') || 'null')); } catch (e){ 문서 = 새문서(); }
 $('docname').value = 문서.이름 || '작업지시서';
 document.querySelectorAll('#orient button').forEach(x => x.classList.toggle('on', x.dataset.o === 문서.방향));
 적용된인쇄방향();
-if (!문서.것들.length){
+if (!문서.장들.some(장 => 장.length)){
   글넣기('작업지시서');
-  문서.것들[0].크기 = 8; 문서.것들[0].굵게 = true; 문서.것들[0].정렬 = 'center'; 문서.것들[0].y = 14; 문서.것들[0].h = 14;
+  const t = 문서.장들[0][0];
+  t.크기 = 8; t.굵게 = true; t.정렬 = 'center'; t.y = 14; t.h = 14;
 }
 그리기();
-sheet.addEventListener('pointerdown', e => { if (e.target === sheet){ 고른것 = null; 그리기(); } });
 </script>
 </body>
 </html>
