@@ -7,7 +7,10 @@
   const 표 = new URLSearchParams(location.search);
   if (표.get('viggle') !== '1') return;
 
-  const 바이글 = 표.get('vg') || 'http://macbookpro:5177';
+  // 지시를 받는 자리. 예전에는 맥의 /take 였고 지금은 클라우드 작업대다.
+  // 주소를 통째로 받으므로 뒤에 /take 를 붙이지 않는다.
+  const 받는곳 = 표.get('vg') ||
+    'https://vivivic-cloud.github.io/vivivic-apps/%EC%9E%91%EC%97%85%EB%8C%80/index.html?take=1';
   const 박스 = 표.get('box') || '';
   const 이름 = 표.get('name') || (document.title || '프로그램');
 
@@ -113,7 +116,8 @@
     s.onclick = (e) => { if (e.target === s) 닫기(); };
     s.querySelector('.vg-send').onclick = () => {
       const 글 = ta.value.trim(); if (!글) return;
-      const u = `${바이글}/take?box=${encodeURIComponent(박스)}`
+      const u = 받는곳 + (받는곳.includes('?') ? '&' : '?')
+              + `box=${encodeURIComponent(박스)}`
               + `&where=${encodeURIComponent(어디() + ' · ' + 짚은것)}`
               + `&text=${encodeURIComponent(글)}`;
       닫기();
