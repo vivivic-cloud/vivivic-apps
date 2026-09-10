@@ -125,7 +125,8 @@ button,input,textarea,select{font:inherit;color:inherit}
       <button data-o="p" class="on">세로</button>
       <button data-o="l">가로</button>
     </div>
-    <button class="b" id="load">자료 불러오기</button>
+    <button class="b" id="load">파일</button>
+    <button class="b" id="loadimg">사진</button>
     <button class="b" id="addtext">글상자</button>
     <button class="b" id="addline">구분선</button>
     <button class="b" id="tidy">자동 정렬</button>
@@ -151,7 +152,11 @@ PDF·PPT 를 불러오면 <b>한 장이 한 쪽</b>이 됩니다. 비율은 원�
   <button class="b" id="clear">모두 지우기</button>
 </div>
 
-<input type="file" id="file" multiple accept="image/*,application/pdf,.pdf,.ppt,.pptx" hidden>
+<!-- 아이폰은 accept 에 image/* 가 섞여 있으면 "사진 보관함 / 사진 찍기 / 파일 선택"
+     을 먼저 묻는다. 그 물음을 거치면 파일 앱이 기억하던 폴더도 흐트러진다.
+     그래서 파일과 사진을 갈라 둔다 — 파일은 곧장 파일 앱으로 간다. -->
+<input type="file" id="file" multiple accept="application/pdf,.pdf,.ppt,.pptx" hidden>
+<input type="file" id="fileimg" multiple accept="image/*" hidden>
 
 <div class="sheetpad" id="pad"><div class="card" id="padbody"></div></div>
 
@@ -335,22 +340,25 @@ if (window.ResizeObserver) new ResizeObserver(() => 맞추기()).observe(무대)
 
 /* ── 자료 불러오기 ──────────────────────────────────── */
 $('load').onclick = () => $('file').click();
-$('file').onchange = async e => {
+$('loadimg').onclick = () => $('fileimg').click();
+
+async function 골라온것(e, 단추id){
   const 파일들 = [...e.target.files];
-  const 단추 = $('load'); const 본글 = 단추.textContent;
+  const 단추 = $(단추id), 본글 = 단추.textContent;
   단추.disabled = true;
   try {
-    for (const f of 파일들){ 단추.textContent = '읽는 중… ' + f.name.slice(0, 14); await 넣기(f); }
+    for (const f of 파일들){ 단추.textContent = '읽는 중… ' + f.name.slice(0, 12); await 넣기(f, 단추); }
   } finally { 단추.disabled = false; 단추.textContent = 본글; }
   e.target.value = '';
-  저장(); 그리기();
-};
+  저장(true); 그리기();
+}
+$('file').onchange    = e => 골라온것(e, 'load');
+$('fileimg').onchange = e => 골라온것(e, 'loadimg');
 
-async function 넣기(f){
+async function 넣기(f, 단추){
   const 확장 = (f.name.split('.').pop() || '').toLowerCase();
   if (f.type === 'application/pdf' || 확장 === 'pdf'){
-    const 단추 = $('load');
-    const 쪽들 = await pdf쪽(f, (i, n) => { 단추.textContent = `읽는 중… ${i}/${n}쪽`; });
+    const 쪽들 = await pdf쪽(f, (i, n) => { if (단추) 단추.textContent = `읽는 중… ${i}/${n}쪽`; });
     if (!쪽들.length) return 알림쪽(f.name + ' — 이 PDF 를 읽지 못했습니다');
     쪽들.forEach(({ src, 비, 못함 }) => {
       if (못함) 알림쪽(`${f.name} ${못함}쪽 — 그리지 못했습니다`);
