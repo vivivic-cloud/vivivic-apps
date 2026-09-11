@@ -1487,7 +1487,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.27</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.28</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -5690,16 +5690,24 @@
                                 : '';
 
                             // ── 독립 카드 생성 (카드 자체가 드래그 대상) ──
-                            const isDone    = !!(item.partCompletions?.[cardKey]?.[procKey]);
-                            const isStarted = !!(item.partStarted?.[cardKey]?.[procKey]);
-                            const actualMin = item.partCompletions?.[cardKey]?.[procKey]?.actualMinutes ?? null;
-                            // 완료됐지만 partName 없는 경우 자동 수정
+                            // 재단 보드가 예전 이름으로 남긴 기록도 같은 부속으로 받는다
+                            const _tlComps  = _partRecMap(item.partCompletions, cardKey);
+                            const _tlStarts = _partRecMap(item.partStarted,     cardKey);
+                            // 시작 기록이 예전 이름에 들어 있으면 그 이름을 완료 단계로
+                            // 넘긴다 — 완료는 그래도 기준 이름에만 쓴다
+                            const _tlStartCK = _partRecKey(item.partStarted, cardKey, procKey).replace(/'/g, "\\'");
+                            const isDone    = !!_tlComps[procKey];
+                            const isStarted = !!_tlStarts[procKey];
+                            const actualMin = _tlComps[procKey]?.actualMinutes ?? null;
+                            // 완료됐지만 partName 없는 경우 자동 수정 — 기록이 실제로
+                            // 들어 있는 이름에 덧붙인다(기준 이름에 쓰면 반쪽 기록이 생긴다)
                             if (isDone && item.docId && partName) {
-                                const _tlVal = item.partCompletions?.[cardKey]?.[procKey];
+                                const _tlVal = _tlComps[procKey];
                                 if (_tlVal && typeof _tlVal === 'object' && !_tlVal.partName) {
+                                    const _tlRecCK = _partRecKey(item.partCompletions, cardKey, procKey);
                                     const { doc: _tlDoc, updateDoc: _tlUpd } = window.fbFirestore;
                                     _tlUpd(_tlDoc(window.db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'confirmed_orders', item.docId), {
-                                        [`partCompletions.${cardKey}.${procKey}.partName`]: partName
+                                        [`partCompletions.${_tlRecCK}.${procKey}.partName`]: partName
                                     }).catch(() => {});
                                 }
                             }
@@ -5721,7 +5729,7 @@
                             const safeDocId  = (item.docId || '').replace(/'/g, "\\'");
                             const safeCK     = cardKey.replace(/'/g, "\\'");
                             const safePK     = procKey.replace(/'/g, "\\'");
-                            const _tlQI = _partQtyInfo(item.partCompletions?.[cardKey], movedQty);
+                            const _tlQI = _partQtyInfo(_tlComps, movedQty);
                             el.innerHTML = `
                                 <div style="display:flex;align-items:center;gap:3px;cursor:${isDone ? 'default' : 'grab'};">
                                     <span style="flex:1;font-size:9px;font-weight:700;color:${isDone ? '#b0aeaa' : '#37352f'};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${isDone ? 'text-decoration:line-through;' : ''}"><span style="color:${isDone ? '#d3d1cb' : '#787774'};font-size:8px;">[${partName}]</span> ${item.displayName}</span>
@@ -5729,9 +5737,9 @@
                                     <span style="font-size:8px;font-weight:800;color:${isDone ? '#b0aeaa' : _tlQI.color};background:${isDone ? 'transparent' : _tlQI.bg};padding:0 3px;border-radius:3px;white-space:nowrap;flex-shrink:0;">${_tlQI.label}EA</span>
                                     ${isDone
                                         ? `<span style="font-size:9px;font-weight:900;color:#22c55e;flex-shrink:0;padding:0 2px;">✓</span>${actualMin != null ? `<span style="font-size:8px;font-weight:700;color:#60a5fa;flex-shrink:0;white-space:nowrap;">${actualMin.toFixed(1)}분</span>` : ''}`
-                                        : _partPrereqDone(cardKey, procKey, item.partCompletions?.[cardKey] || {})
+                                        : _partPrereqDone(cardKey, procKey, _tlComps)
                                             ? isStarted
-                                                ? `<button onclick="event.stopPropagation();tlShowPartDoneConfirm('${safeDocId}','${safeCK}','${safePK}','${batchDate}',this,'${partName.replace(/'/g,"\\'")}',${movedQty})" onmousedown="event.stopPropagation()" style="flex-shrink:0;font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 5px;cursor:pointer;white-space:nowrap;line-height:1.4;">완료</button>`
+                                                ? `<button onclick="event.stopPropagation();tlShowPartDoneConfirm('${safeDocId}','${safeCK}','${safePK}','${batchDate}',this,'${partName.replace(/'/g,"\\'")}',${movedQty},'${_tlStartCK}')" onmousedown="event.stopPropagation()" style="flex-shrink:0;font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 5px;cursor:pointer;white-space:nowrap;line-height:1.4;">완료</button>`
                                                 : `<button onclick="event.stopPropagation();tlMarkPartStarted('${safeDocId}','${safeCK}','${safePK}','${batchDate}',this,'${partName.replace(/'/g,"\\'")}',${movedQty})" onmousedown="event.stopPropagation()" style="flex-shrink:0;font-size:8px;font-weight:900;color:#fff;background:#3b82f6;border:none;border-radius:3px;padding:1px 5px;cursor:pointer;white-space:nowrap;line-height:1.4;">▶ 시작</button>`
                                             : ''
                                     }
@@ -5763,6 +5771,68 @@
             },
 
             // SortableJS 초기화 (카드 내 공정 섹션)
+        };
+
+        // ── 부속키는 한 모양으로만 쌓는다 ────────────────────────────────────
+        // 기준 이름은 `card-{발주}-{행}` — partInfoMap 과 발주서 타임라인이 쓰는
+        // 바로 그 이름이다. 재단 보드는 예전에 카드의 cKey 를 발주문서id 길이만큼
+        // 잘라 '1_1402_36' 같은 뜻 없는 이름으로, 수동 재단계획은 'cut_1789…' 로
+        // 남겼다. 이름이 갈라지면 보드에서 찍은 완료가 타임라인에서는 안 보여
+        // "완료했는데 완료가 아닌" 카드가 된다.
+        //   → 쓰기는 늘 기준 이름 하나로. 읽기는 예전 이름도 같이 받아 준다.
+        //     이러면 옛 기록을 옮기거나 지우지 않고도 어긋남이 사라진다.
+
+        // 같은 부속을 가리키는 이름들 — 기준 이름이 먼저, 예전 이름이 뒤.
+        // extraKeys: 카드가 자기 cKey 로 직접 알아낸 예전 이름들(_woPartOldKeys).
+        window._partSameKeys = function(map, cardKey, extraKeys) {
+            if (!map) return [];
+            const out = map[cardKey] ? [cardKey] : [];
+            const m = String(cardKey || '').match(/^card-(\d+)-(\d+)$/);
+            if (m) {
+                // ① 잘려 남은 이름 — '…_{발주}_{행}' 으로 끝난다
+                const tail = `_${m[1]}_${m[2]}`;
+                Object.keys(map).forEach(k => {
+                    if (k !== cardKey && k.endsWith(tail)) out.push(k);
+                });
+                // ② 재단계획 이름 — 'cut_{confirmId}'. 이름만으로는 어느 부속인지
+                //    알 수 없어, 그 재단계획이 들고 있는 발주·행으로 맞춰 본다.
+                Object.keys(map).forEach(k => {
+                    if (!k.startsWith('cut_') || out.includes(k)) return;
+                    const plan = (window._cuttingPlans || {})[k.slice(4)];
+                    if (!plan || plan.pRowIndex == null || String(plan.pRowIndex) !== m[2]) return;
+                    if ((plan.pOrderIds || []).map(String).includes(m[1])) out.push(k);
+                });
+            }
+            // ③ 카드가 직접 건네준 예전 이름 — 위 두 규칙으로 못 잡는 경우
+            //    (여러 발주를 합친 재단계획 등)를 받아 준다
+            (extraKeys || []).forEach(k => {
+                if (k && map[k] && !out.includes(k)) out.push(k);
+            });
+            return out;
+        };
+
+        // 그 공정의 기록이 실제로 들어 있는 이름(없으면 기준 이름). 이미 있는
+        // 기록에 무언가 덧붙일 때는 반드시 이 이름을 써야 한다 — 기준 이름에
+        // 쓰면 done 없는 반쪽 기록이 새로 생겨 완료가 풀린 것처럼 보인다.
+        window._partRecKey = function(map, cardKey, procKey, extraKeys) {
+            if (!map) return cardKey;
+            for (const k of _partSameKeys(map, cardKey, extraKeys)) {
+                if (procKey == null ? map[k] : map[k]?.[procKey]) return k;
+            }
+            return cardKey;
+        };
+
+        // 그 부속의 기록 묶음(예: {재단:{done:true,…}}). 없으면 빈 객체.
+        // 이름이 갈라져 공정별로 다른 이름에 쌓여 있을 수 있으므로(예: 재단은
+        // 예전 이름, 엣지는 기준 이름) 모두 합쳐서 본다 — 기준 이름이 우선.
+        window._partRecMap = function(map, cardKey, extraKeys) {
+            if (!map) return {};
+            const ks = _partSameKeys(map, cardKey, extraKeys);
+            if (!ks.length) return {};
+            if (ks.length === 1) return map[ks[0]] || {};
+            const out = {};
+            for (let i = ks.length - 1; i >= 0; i--) Object.assign(out, map[ks[i]] || {});
+            return out;
         };
 
         // ── 부속 공정 시작 처리 ──────────────────────────────────────────────────
@@ -5893,7 +5963,7 @@
                     const _완료꼴 = _시작꼴
                         ? _시작꼴 + (/;\s*$/.test(_시작꼴) ? '' : ';') + 'background:#22c55e;'
                         : 'font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 6px;cursor:pointer;white-space:nowrap;line-height:1.4;';
-                    btnWrap.innerHTML = `<button onclick="event.stopPropagation();tlShowPartDoneConfirm('${safeDocId}','${safeCK}','${safePK}','${safeDate}',this,'${safeName}',${_expQty})" onmousedown="event.stopPropagation()" style="${_완료꼴}">완료</button>`;
+                    btnWrap.innerHTML = `<button onclick="event.stopPropagation();tlShowPartDoneConfirm('${safeDocId}','${safeCK}','${safePK}','${safeDate}',this,'${safeName}',${_expQty},'${safeCK}')" onmousedown="event.stopPropagation()" style="${_완료꼴}">완료</button>`;
                 }
                 showToastMessage(`[${procKey}] 작업 시작 처리됐습니다.`);
             } catch (err) {
@@ -5942,14 +6012,14 @@
             q.dispatchEvent(new Event('input'));
         };
 
-        window.tlShowPartDoneConfirm = function(docId, cardKey, procKey, date, btn, partName, rawDefaultQty) {
+        window.tlShowPartDoneConfirm = function(docId, cardKey, procKey, date, btn, partName, rawDefaultQty, startKey) {
             document.getElementById('_partDoneModal')?.remove();
             // 이전 공정에서 수량이 변경됐다면 그 값을 기본값으로 사용
             const _ordDc   = (typeof confirmedOrders !== 'undefined' ? confirmedOrders : []).find(o => (o.docId || String(o.idNum)) === docId);
-            const _compsDc = _ordDc?.partCompletions?.[cardKey] || {};
+            const _compsDc = _partRecMap(_ordDc?.partCompletions, cardKey);
             const _qiDc    = (typeof _partQtyInfo === 'function') ? _partQtyInfo(_compsDc, parseInt(rawDefaultQty || 0)) : { qty: parseInt(rawDefaultQty || 0) };
             const expectedQty = _qiDc.qty;  // 이전 공정 actualQty 반영된 현재 유효 수량
-            window._pdConfirmData = { docId, cardKey, procKey, date, btn, partName, expectedQty, rawDefaultQty: parseInt(rawDefaultQty || 0) };
+            window._pdConfirmData = { docId, cardKey, procKey, date, btn, partName, expectedQty, rawDefaultQty: parseInt(rawDefaultQty || 0), startKey: startKey || '' };
             const modal = document.createElement('div');
             modal.id = '_partDoneModal';
             modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.35);z-index:9999;display:flex;align-items:center;justify-content:center;';
@@ -5996,16 +6066,16 @@
                 const reason = document.querySelector('input[name="_pdReason"]:checked')?.value;
                 if (!reason) { showToastMessage('수량 변경 사유를 선택해주세요.'); return; }
                 document.getElementById('_partDoneModal').remove();
-                tlMarkPartDone(d.docId, d.cardKey, d.procKey, d.date, d.btn, d.partName, actualQty, reason);
+                tlMarkPartDone(d.docId, d.cardKey, d.procKey, d.date, d.btn, d.partName, actualQty, reason, d.startKey);
             } else {
                 document.getElementById('_partDoneModal').remove();
                 // 수량 변경 없으면 actualQty 저장 안 함 → 이전 공정 changedBy 유지
-                tlMarkPartDone(d.docId, d.cardKey, d.procKey, d.date, d.btn, d.partName, null, null);
+                tlMarkPartDone(d.docId, d.cardKey, d.procKey, d.date, d.btn, d.partName, null, null, d.startKey);
             }
             window._pdConfirmData = null;
         };
 
-        window.tlMarkPartDone = async function(docId, cardKey, procKey, doneDate, btn, partName, actualQty, reason) {
+        window.tlMarkPartDone = async function(docId, cardKey, procKey, doneDate, btn, partName, actualQty, reason, startKey) {
             if (!docId) return;
             const { doc, updateDoc } = window.fbFirestore;
             const appId = "vivivic-4b7ef";
@@ -6013,12 +6083,18 @@
                 if (btn) { btn.disabled = true; btn.textContent = '...'; }
                 // ── 시작 여부 검증 ──
                 const _ord = confirmedOrders.find(o => (o.docId || String(o.idNum)) === docId);
-                if (!_ord?.partStarted?.[cardKey]?.[procKey]) {
+                // 시작이 예전 이름으로 쌓여 있어도 같은 부속으로 인정한다 —
+                // 그러지 않으면 재단 보드에서 시작한 부속을 완료할 수 없다.
+                // startKey: 카드가 "시작 기록이 실제로 이 이름에 있다"고 알려준 것.
+                // 완료는 그래도 기준 이름(cardKey)에만 쓴다.
+                const _startRec = (startKey && _ord?.partStarted?.[startKey]?.[procKey])
+                    || _partRecMap(_ord?.partStarted, cardKey)[procKey];
+                if (!_startRec) {
                     showToastMessage('▶ 시작 후 완료할 수 있습니다.');
                     if (btn) { btn.disabled = false; btn.textContent = '완료'; }
                     return;
                 }
-                const _startMs = _ord?.partStarted?.[cardKey]?.[procKey]?.startMs;
+                const _startMs = _startRec.startMs;
                 const actualMinutes = _startMs ? Math.round((Date.now() - _startMs) / 6000) / 10 : null;
                 const docRef = doc(window.db, 'artifacts', appId, 'public', 'data', 'confirmed_orders', docId);
                 await updateDoc(docRef, {
@@ -6749,7 +6825,7 @@
                         const _row = currentFullData[_ri];
                         if (!_row || normalizeValue(_row[_fh.indexOf('공급처')]) !== 'AMT') return;
                         const _pt    = calcProcessTime(_row, 1, {}, _fh);
-                        const _comps = item.partCompletions?.[_ck] || {};
+                        const _comps = _partRecMap(item.partCompletions, _ck);
                         let _lastDone  = false;
                         if ((_pt['보링'] || 0) > 0)                              _lastDone = !!_comps['보링'];
                         else if ((_pt['엣지'] || 0) > 0 || (_pt['NC'] || 0) > 0) _lastDone = !!(_comps['엣지'] || _comps['NC']);
@@ -7323,7 +7399,7 @@
                 }
 
                 // ── 완료 여부 확인 + 수량 변경 표기 ──────────────────────
-                const _compsDc = item.partCompletions?.[cardKey] || {};
+                const _compsDc = _partRecMap(item.partCompletions, cardKey);
                 const _dcQI    = _partQtyInfo(_compsDc, displayQty);
                 let _lastDoneDc = false;
                 let _actMinDc   = null;
@@ -8004,33 +8080,70 @@
         // cKey 는 두 갈래로 만들어진다.
         //   ① 인라인 계산 카드 : `${orderKey}_card-{발주}-{행}`  → 앞의 orderKey 를 떼야 부속키
         //   ② 재단계획 카드     : `cut_{confirmId}`               → orderKey 가 애초에 안 붙는다
-        // ②를 ①처럼 orderKey 길이만큼 잘라 오고 있었다. 재단편집으로 방금 저장한
-        // 계획은 confirmId 가 13자리 시각뿐이라 cKey 가 'cut_1789092660914'(17자)인데,
-        // 발주 문서 id 는 20자다 — 잘라 내면 빈 문자열이 된다. 그 빈 값이 그대로
-        // 파이어스토어 필드 경로에 들어가 'partStarted..재단' 이 되고, 쓰기가 통째로
-        // 거부된다(Invalid field path). 이것이 '시작 처리 실패' 의 정체였다.
-        // → 잘라 낸 결과가 비면 자르지 않고 cKey 를 그대로 쓴다. 이미 기록이 쌓인
-        //   카드(잘라도 값이 남는 경우)는 예전 그대로라 지난 시작·완료 기록을 잃지 않는다.
-        window._woPartKey = function(cKey, orderKey) {
-            const _ck = cKey || '';
-            if (!orderKey) return _ck;
-            return _ck.substring(orderKey.length + 1) || _ck;
+        // 예전에는 ②도 ①처럼 orderKey 길이만큼 잘랐다. 자동생성 계획의 cKey 는
+        // 'cut_auto_{13자리시각}_{발주}_{행}' 이고 발주 문서 id 는 20자라,
+        // 잘라 내면 '1_1402_36' 처럼 시각의 끝자리가 붙은 뜻 없는 이름이 남았다.
+        // 재단 보드는 그 이름으로 시작·완료를 쌓고, 발주서 타임라인의 같은 부속은
+        // 'card-1402-36' 을 보니 "완료했는데 완료가 아닌" 카드가 생겼다.
+        // → 이제 잘라 내지 않는다. 어느 갈래든 기준 이름 `card-{발주}-{행}` 하나로
+        //   맞춘다. 예전 이름으로 쌓인 기록은 _partSameKeys 가 읽기에서 함께
+        //   받아 주므로 옛 자료를 옮기지 않아도 된다.
+        window._woPartKey = function(cKey, orderKey, p) {
+            const _ck = String(cKey || '');
+            // ① 인라인 계산 카드 — 길이로 자르지 않고 모양으로 집어낸다
+            //    (orderKey 길이가 어긋나도 안전하다)
+            const m = _ck.match(/card-\d+-\d+$/);
+            if (m) return m[0];
+            // ② 재단계획 카드 — 이름 안에 부속 자리가 없다. 카드가 들고 있는
+            //    발주(idNum)·행(pRowIndex)으로 기준 이름을 만든다.
+            //    발주는 이 카드의 기록이 실제로 들어갈 발주(살아있는 첫 발주)를
+            //    따른다 — 자동생성 이름에 박힌 발주번호는 계획이 합쳐지면서
+            //    어긋날 수 있어 믿지 않는다.
+            //    행은 pRowIndex 가 없는 예전 계획만 이름('auto_{시각}_{발주}_{행}')
+            //    에서 읽는다.
+            const _auto = _ck.match(/^cut_auto_\d+_(\d+)_(\d+)$/);
+            const _id = (p && p.orderIdNum != null) ? p.orderIdNum
+                      : (p && Array.isArray(p.coveredOrderIds) && p.coveredOrderIds.length) ? p.coveredOrderIds[0]
+                      : (_auto ? _auto[1] : null);
+            const _ri = (p && p.pRowIndex != null) ? p.pRowIndex
+                      : (_auto ? _auto[2] : null);
+            if (_id != null && _ri != null) return `card-${_id}-${_ri}`;
+            // ③ 그래도 못 만들면 cKey 를 그대로 쓴다 — 자르면 뜻 없는 이름이 남고,
+            //    빈 값이 되면 'partStarted..재단' 이 되어 쓰기가 통째로 거부된다.
+            return _ck;
+        };
+
+        // 이 카드가 예전에 기록을 남겼을 수 있는 이름들 — 읽을 때만 함께 본다.
+        // 잘라 쓰던 이름과 cKey 그대로. 쓰기는 언제나 _woPartKey 한 모양.
+        window._woPartOldKeys = function(cKey, orderKey) {
+            const _ck = String(cKey || '');
+            const out = [_ck];
+            if (orderKey) {
+                const _cut = _ck.substring(String(orderKey).length + 1);
+                if (_cut) out.push(_cut);
+            }
+            return out;
         };
 
         function _woCardHtml(p, stateKey) {
             // 완료 상태 확인
             const _wpk  = stateKey.replace(/^\d{4}-\d{2}-\d{2}-/, '');
             const _wdid = p.orderKey || '';
-            const _wck  = _woPartKey(p.cKey, _wdid);
+            const _wck  = _woPartKey(p.cKey, _wdid, p);
             const _wobj = confirmedOrders.find(o => (o.docId || String(o.idNum)) === _wdid);
-            const _wDone    = !!(_wobj?.partCompletions?.[_wck]?.[_wpk]);
-            const _wStarted = !!(_wobj?.partStarted?.[_wck]?.[_wpk]);
-            const _wActMin  = _wobj?.partCompletions?.[_wck]?.[_wpk]?.actualMinutes ?? null;
+            // 예전 이름으로 쌓인 기록도 같은 부속으로 받아 준다(쓰기는 _wck 하나)
+            const _wOld     = _woPartOldKeys(p.cKey, _wdid);
+            const _wComps   = _partRecMap(_wobj?.partCompletions, _wck, _wOld);
+            const _wStarts  = _partRecMap(_wobj?.partStarted,     _wck, _wOld);
+            const _wDone    = !!_wComps[_wpk];
+            const _wStarted = !!_wStarts[_wpk];
+            const _wActMin  = _wComps[_wpk]?.actualMinutes ?? null;
             const _wSafeDocId = _wdid.replace(/'/g, "\\'");
             const _wSafeCK   = _wck.replace(/'/g, "\\'");
             const _wDate    = stateKey.substring(0, 10);
-            const _wPrereq  = _partPrereqDone(_wck, _wpk, _wobj?.partCompletions?.[_wck] || {});
-            const _wQI      = _partQtyInfo(_wobj?.partCompletions?.[_wck], p.dq || 0);
+            const _wStartCK = _partRecKey(_wobj?.partStarted, _wck, _wpk, _wOld).replace(/'/g, "\\'");
+            const _wPrereq  = _partPrereqDone(_wck, _wpk, _wComps);
+            const _wQI      = _partQtyInfo(_wComps, p.dq || 0);
             // 완료 등록 시 "사유 없이 등록 가능한 기준 수량" — 재단은 원장을 통짜로
             // 잘라 발주수량보다 더 나오는 게 정상(예: 발주 17개인데 원장 배치상
             // 18개가 나옴)이라, 발주수량 기준으로 맞추면 실제 작업현장과 달라 매번
@@ -8049,7 +8162,7 @@
                 ? `<div style="${_w줄}"><span style="${_w칸}background:#e8f7ee;color:#16a34a;">✓ 완료${_wActMin != null ? ` <span style="font-size:11px;font-weight:700;opacity:.75;">${_wActMin.toFixed(1)}분</span>` : ''}</span></div>`
                 : _wPrereq
                     ? _wStarted
-                        ? `<div style="${_w줄}"><button onclick="event.stopPropagation();tlShowPartDoneConfirm('${_wSafeDocId}','${_wSafeCK}','${_wpk}','${_wDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}',${_wDoneQtyBasis})" onmousedown="event.stopPropagation()" style="${_w칸}background:#22c55e;">완료</button></div>`
+                        ? `<div style="${_w줄}"><button onclick="event.stopPropagation();tlShowPartDoneConfirm('${_wSafeDocId}','${_wSafeCK}','${_wpk}','${_wDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}',${_wDoneQtyBasis},'${_wStartCK}')" onmousedown="event.stopPropagation()" style="${_w칸}background:#22c55e;">완료</button></div>`
                         : `<div style="${_w줄}"><button onclick="event.stopPropagation();tlMarkPartStarted('${_wSafeDocId}','${_wSafeCK}','${_wpk}','${_wDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}',${p.dq||0})" onmousedown="event.stopPropagation()" style="${_w칸}background:#3b82f6;">▶ 시작</button></div>`
                     : '';
 
@@ -8141,9 +8254,13 @@
         function _woPlacedCardHtml(p, cKey, sk, mac, _boardColorMap) {
             const _bpk   = sk.replace(/^\d{4}-\d{2}-\d{2}-/, '');
             const _bdid  = p.orderKey || '';
-            const _bck   = _woPartKey(cKey, _bdid);
+            const _bck   = _woPartKey(cKey, _bdid, p);
             const _bobj  = confirmedOrders.find(o => (o.docId || String(o.idNum)) === _bdid);
-            const _bQI   = _partQtyInfo(_bobj?.partCompletions?.[_bck], p.dq || 0);
+            // 예전 이름으로 쌓인 기록도 같은 부속으로 받아 준다(쓰기는 _bck 하나)
+            const _bOld    = _woPartOldKeys(cKey, _bdid);
+            const _bComps  = _partRecMap(_bobj?.partCompletions, _bck, _bOld);
+            const _bStarts = _partRecMap(_bobj?.partStarted,     _bck, _bOld);
+            const _bQI   = _partQtyInfo(_bComps, p.dq || 0);
             // 완료 등록 시 "사유 없이 등록 가능한 기준 수량" — 재단은 원장을
             // 통짜로 잘라 발주수량보다 더 나오는 게 정상이라, 발주수량 대신
             // 실제 예상 생산량(총작업수량)을 기준으로 삼음 (실제 작업현장과
@@ -8223,23 +8340,26 @@
             // ("배경색·라인색 때문에 카드가 없어 보인다"는 피드백)
             const _bcs = (p.isCuttingCard || !_bcc.bg) ? '' : `background:${_bcc.bg};border-left:3px solid ${_bcc.bd};`;
 
-            const _bDone    = !!(_bobj?.partCompletions?.[_bck]?.[_bpk]);
-            const _bStarted = !!(_bobj?.partStarted?.[_bck]?.[_bpk]);
-            // 완료됐지만 partName 없는 경우 자동 수정
+            const _bDone    = !!_bComps[_bpk];
+            const _bStarted = !!_bStarts[_bpk];
+            // 완료됐지만 partName 없는 경우 자동 수정 — 기록이 실제로 들어 있는
+            // 이름에 덧붙인다. 기준 이름에 쓰면 done 없는 반쪽 기록이 새로 생긴다.
             if (_bDone && _bobj?.docId && p.nm) {
-                const _bVal = _bobj?.partCompletions?.[_bck]?.[_bpk];
+                const _bVal = _bComps[_bpk];
                 if (_bVal && typeof _bVal === 'object' && !_bVal.partName) {
+                    const _bRecCK = _partRecKey(_bobj?.partCompletions, _bck, _bpk, _bOld);
                     const { doc: _bDoc, updateDoc: _bUpd } = window.fbFirestore;
                     _bUpd(_bDoc(window.db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'confirmed_orders', _bobj.docId), {
-                        [`partCompletions.${_bck}.${_bpk}.partName`]: p.nm
+                        [`partCompletions.${_bRecCK}.${_bpk}.partName`]: p.nm
                     }).catch(() => {});
                 }
             }
-            const _bActMin   = _bobj?.partCompletions?.[_bck]?.[_bpk]?.actualMinutes ?? null;
+            const _bActMin   = _bComps[_bpk]?.actualMinutes ?? null;
             const _bSafeDocId = _bdid.replace(/'/g, "\\'");
             const _bSafeCK    = _bck.replace(/'/g, "\\'");
             const _bDate     = sk.substring(0, 10);
-            const _bPrereq = _partPrereqDone(_bck, _bpk, _bobj?.partCompletions?.[_bck] || {});
+            const _bStartCK = _partRecKey(_bobj?.partStarted, _bck, _bpk, _bOld).replace(/'/g, "\\'");
+            const _bPrereq = _partPrereqDone(_bck, _bpk, _bComps);
             // 시작·완료는 현장에서 장갑 낀 손으로 누르는 자리다. 8px 글씨에
             // 1px 여백이면 눌리지 않는다 — 도면과 같은 폭(카드의 45%)으로 키워
             // 도면 아래에 나란히 세운다.
@@ -8251,7 +8371,7 @@
             // 있었다. 그 빈 자리에 몇 개를 끝냈는지 크게 적는다 — 현장에서 멀리서도
             // 읽혀야 하는 값이다. 수량은 이 공정에 적힌 실제 수량을 따르고, 없으면
             // 완료 등록 때 기준으로 삼던 값을 쓴다(재단은 총작업수량).
-            const _bDoneQty = _partQtyInfo(_bobj?.partCompletions?.[_bck], _bDoneQtyBasis).qty;
+            const _bDoneQty = _partQtyInfo(_bComps, _bDoneQtyBasis).qty;
             const _bDoneQtyHtml = Number.isFinite(_bDoneQty) && _bDoneQty > 0
                 ? `<span style="flex:1;min-width:0;text-align:left;font-size:22px;font-weight:900;color:#16a34a;line-height:1.1;letter-spacing:-0.5px;white-space:nowrap;">${Math.round(_bDoneQty)}<span style="font-size:11px;font-weight:800;margin-left:2px;">EA</span></span>`
                 : '<span style="flex:1;"></span>';
@@ -8259,7 +8379,7 @@
                 ? `<div style="${_b줄}display:flex;align-items:center;gap:8px;">${_bDoneQtyHtml}<span style="${_b칸}background:#e8f7ee;color:#16a34a;padding:8px 0;flex:0 0 45%;">✓ 완료${_bActMin != null ? ` <span style="font-size:11px;font-weight:700;opacity:.75;">${_bActMin.toFixed(1)}분</span>` : ''}</span></div>`
                 : _bPrereq
                     ? _bStarted
-                        ? `<div style="${_b줄}"><button onclick="event.stopPropagation();tlShowPartDoneConfirm('${_bSafeDocId}','${_bSafeCK}','${_bpk}','${_bDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}',${_bDoneQtyBasis})" onmousedown="event.stopPropagation()" style="${_b칸}background:#22c55e;">완료</button></div>`
+                        ? `<div style="${_b줄}"><button onclick="event.stopPropagation();tlShowPartDoneConfirm('${_bSafeDocId}','${_bSafeCK}','${_bpk}','${_bDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}',${_bDoneQtyBasis},'${_bStartCK}')" onmousedown="event.stopPropagation()" style="${_b칸}background:#22c55e;">완료</button></div>`
                         : `<div style="${_b줄}"><button onclick="event.stopPropagation();tlMarkPartStarted('${_bSafeDocId}','${_bSafeCK}','${_bpk}','${_bDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}',${p.dq||0})" onmousedown="event.stopPropagation()" style="${_b칸}background:#3b82f6;">▶ 시작</button></div>`
                     : '';
 
