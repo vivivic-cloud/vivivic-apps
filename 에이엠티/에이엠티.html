@@ -974,6 +974,37 @@
             overflow: hidden;
             transition: box-shadow 0.1s, opacity 0.1s;
         }
+        /* ── 재단 보드의 "발주 상품" 줄 — 부속카드 위에 놓인 한 겹.
+              누르면 그 상품의 재단도 카드가 펼쳐진다. 폰에서 두 줄만 쓴다. ── */
+        .wo-cut-grp {
+            display: flex; flex-direction: column; gap: 1px;
+            background: #f7f6f3; border: 1px solid #e3e2e0;
+            border-left: 3px solid var(--wo-proc-color, #90BBC6);
+            border-radius: 6px; padding: 6px 8px; cursor: pointer;
+            user-select: none; min-width: 0;
+        }
+        .wo-cut-grp:active { background: #f0eeec; }
+        .wo-cut-grp.on { background: #fff; border-color: #37352f; }
+        .wo-cut-grp-top { display: flex; align-items: center; gap: 5px; min-width: 0; }
+        .wo-cut-grp-chev { font-size: 12px; color: #37352f; flex-shrink: 0; width: 11px; line-height: 1; }
+        .wo-cut-grp-nm {
+            flex: 1; min-width: 0; font-size: 13px; font-weight: 800; color: #37352f;
+            line-height: 1.25; letter-spacing: -0.2px;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .wo-cut-grp-n {
+            flex-shrink: 0; font-size: 11px; font-weight: 900; color: #fff;
+            background: #37352f; padding: 1px 7px; border-radius: 8px;
+        }
+        .wo-cut-grp-sub {
+            display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+            padding-left: 14px; font-size: 10px; font-weight: 700; color: #a8a6a2;
+        }
+        .wo-cut-grp-code { font-family: ui-monospace, monospace; color: #787774; }
+        .wo-cut-grp-done { color: #16a34a; }
+        /* 접힌 상품의 카드·휴식자리는 감춘다. 지우는 것이 아니다 —
+           컬럼의 바로 밑 자식으로 그대로 있어 자리 계산이 어긋나지 않는다. */
+        [data-grp-open="0"] { display: none !important; }
         .wo-boring-placed-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.09); z-index: 3; }
         .wo-boring-placed-card.dragging { opacity: 0.35; cursor: grabbing; }
         /* ── 기기변경 모드: 하이라이트 */
@@ -1616,7 +1647,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.29</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.30</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -7485,6 +7516,10 @@
                     }
                 }
 
+                // 머리에 적을 셈 — 상품이 몇 개로 묶이는지, 재단도가 몇 장인지.
+                // 예전 "N건" 은 그 날 재단 발주의 건수였다. 겹이 하나 늘었으니
+                // 무엇을 세는 값인지 이름을 붙여 둘 다 적는다.
+                const _cutGrpN = new Set(mergedCutParts.map(p => _woCutGroupKey(p))).size;
                 window._woBoringParts[sk] = mergedCutParts;
                 const poolInitC = (window._woBoring[sk].pool || []).map(k => {
                     const p = mergedCutParts.find(pp => pp.cKey === k);
@@ -7495,7 +7530,7 @@
                         <button class="tl-dc-back-btn" onclick="tlDcBackToGrid()">← 전체보기</button>
                         <span style="display:inline-block;width:6px;height:24px;background:${_pcColor};border-radius:3px;flex-shrink:0;"></span>
                         <span style="font-size:17px;font-weight:900;color:#37352f;letter-spacing:-0.3px;">재단</span>
-                        <span style="font-size:11px;font-weight:700;color:${_pcColor};">기계 배정 · ${sec.items.length}건</span>
+                        <span style="font-size:11px;font-weight:700;color:${_pcColor};">상품 ${_cutGrpN}개 · 재단도 ${mergedCutParts.length}장</span>
                         <span style="margin-left:auto;font-size:10px;font-weight:700;color:#787774;">⏱ 총 ${totalMin.toFixed(1)}분</span>
                     </div>
                     ${_procSwitcherHtml}
@@ -8462,7 +8497,7 @@
         //   PX_PER_MIN = max(BASE, MIN_CARD_H / min_pm_per_machine)  – 기계별 계산 후 전역 max
         // 큐 카드 하나(카드 문자열 entry)의 HTML — 예전 절대위치 카드와 내용은 동일하고,
         // 시계 range 표시만 소요시간 텍스트로 바뀌었고 일반 흐름(normal flow)으로 렌더링됨
-        function _woPlacedCardHtml(p, cKey, sk, mac, _boardColorMap) {
+        function _woPlacedCardHtml(p, cKey, sk, mac, _boardColorMap, _grpAttr) {
             const _bpk   = sk.replace(/^\d{4}-\d{2}-\d{2}-/, '');
             const _bdid  = p.orderKey || '';
             const _bck   = _woPartKey(cKey, _bdid, p);
@@ -8600,7 +8635,7 @@
             const _cardCls = 'wo-boring-placed-card' + (p.isCuttingCard ? ' cutting-card' : '');
             return `<div class="${_cardCls}" draggable="${_bDone ? 'false' : 'true'}"` +
                 ` style="${_bcs}${_bDone ? 'opacity:0.6;' : ''}${p.isCuttingCard ? 'cursor:pointer;' : ''}"` +
-                ` data-ck="${cKey}" data-sk="${sk}" data-mac="${mac}" data-ok="${_pOk}" data-done="${_bDone ? '1' : '0'}"${_cutClick}` +
+                ` data-ck="${cKey}" data-sk="${sk}" data-mac="${mac}" data-ok="${_pOk}" data-done="${_bDone ? '1' : '0'}"${_grpAttr || ''}${_cutClick}` +
                 (!_bDone ? ` ondblclick="woBoardDblClick('${cKey}','${sk}')" ondragstart="woBoardDragStart(event,'${cKey}','${sk}')" ondragend="woBoardDragEnd(event)"` : '') +
                 `>${_placedInner}${_bDoneHtml}</div>`;
         }
@@ -8620,9 +8655,81 @@
         }
 
         // 카드 사이 "+ 휴식 추가" 삽입 스트립
-        function _woBreakInsertStripHtml(sk, mac, atIndex) {
-            return `<button type="button" class="wo-boring-break-insert-btn" ` +
+        function _woBreakInsertStripHtml(sk, mac, atIndex, _grpAttr) {
+            return `<button type="button" class="wo-boring-break-insert-btn"${_grpAttr || ''} ` +
                 `onclick="_woInsertBreakMarker('${sk}','${mac}',${atIndex})" title="여기에 휴식 추가">+ 휴식</button>`;
+        }
+
+        /* ══ 재단 보드의 "발주 상품" 겹 ══════════════════════════════════
+           지금까지는 부속카드 하나하나가 곧 재단도 카드로 깔렸다. 그 위에
+           발주된 상품 줄을 한 겹 둔다 — 오더번호(orderCode)가 곧 묶음이다.
+           상품 줄을 누르면 그 상품의 재단도 카드가 펼쳐진다.
+
+           카드는 그대로 컬럼의 바로 밑 자식으로 남는다. 상품 줄은 끼어드는
+           형제일 뿐이라, 끌어다 놓기의 자리 계산(_woFindInsertIndex)도
+           시작·완료 찍기도 재편집도 지금 그대로 돈다. */
+        function _woCutGroupKey(p) {
+            return String(p.orderCode || p.orderKey || p.orderName || '기타');
+        }
+
+        // 이 재단도 카드가 완료로 찍혔는지 — _woPlacedCardHtml 과 같은 방식으로 읽는다
+        function _woCutCardDone(p, cKey, sk) {
+            try {
+                const _pk   = sk.replace(/^\d{4}-\d{2}-\d{2}-/, '');
+                const _did  = p.orderKey || '';
+                const _ck   = _woPartKey(cKey, _did, p);
+                const _obj  = confirmedOrders.find(o => (o.docId || String(o.idNum)) === _did);
+                const _old  = _woPartOldKeys(cKey, _did);
+                return !!_partRecMap(_obj?.partCompletions, _ck, _old)[_pk];
+            } catch (e) { return false; }
+        }
+
+        // 상품별 셈 — 재단도 몇 장, 몇 장 끝났나, 시간은 얼마나
+        function _woCutGroupStats(sk, parts) {
+            const g = {};
+            (parts || []).forEach(p => {
+                const k = _woCutGroupKey(p);
+                if (!g[k]) g[k] = { n: 0, done: 0, min: 0, name: p.orderName || '', code: p.orderCode || '' };
+                g[k].n++;
+                g[k].min += p.pm || 0;
+                if (!g[k].name && p.orderName) g[k].name = p.orderName;
+                if (_woCutCardDone(p, p.cKey, sk)) g[k].done++;
+            });
+            return g;
+        }
+
+        function _woCutGrpIsOpen(sk, gk) {
+            window._woCutGrpOpen = window._woCutGrpOpen || {};
+            return !!window._woCutGrpOpen[sk + '|' + gk];
+        }
+
+        // 상품 줄을 누르면 그 상품의 재단도 카드가 펼쳐지고 접힌다
+        window._woCutToggleGrp = function(sk, gk) {
+            window._woCutGrpOpen = window._woCutGrpOpen || {};
+            const k = sk + '|' + gk;
+            window._woCutGrpOpen[k] = !window._woCutGrpOpen[k];
+            _woRenderBoard(sk);
+        };
+
+        function _woCutGrpHdrHtml(sk, gk, g, open) {
+            const _e = v => String(v == null ? '' : v)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+            const _j = v => String(v == null ? '' : v).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            const nm   = g.name || gk || '상품';
+            const n    = g.n || 0, done = g.done || 0, min = g.min || 0;
+            const sub  = [];
+            if (g.code) sub.push(`<span class="wo-cut-grp-code">${_e(g.code)}</span>`);
+            if (done > 0) sub.push(`<span class="wo-cut-grp-done">\u2713 ${done}/${n} 완료</span>`);
+            if (min > 0) sub.push(`<span>\u23f1 ${min.toFixed(1)}분</span>`);
+            return `<div class="wo-cut-grp${open ? ' on' : ''}" data-gk="${_e(gk)}"` +
+                ` onclick="_woCutToggleGrp('${_j(sk)}','${_j(gk)}')">` +
+                `<div class="wo-cut-grp-top">` +
+                    `<span class="wo-cut-grp-chev">${open ? '\u25be' : '\u25b8'}</span>` +
+                    `<span class="wo-cut-grp-nm">${_e(nm)}</span>` +
+                    `<span class="wo-cut-grp-n">재단도 ${n}장</span>` +
+                `</div>` +
+                (sub.length ? `<div class="wo-cut-grp-sub">${sub.join('<span>\u00b7</span>')}</div>` : '') +
+                `</div>`;
         }
 
         function _woRenderBoard(sk) {
@@ -8641,6 +8748,10 @@
             grid.style.minWidth = (machines.length * 130) + 'px';
 
             const _boardColorMap = _woGetOrderColorMap(sk);
+
+            // 재단 보드에서만 상품 겹을 둔다 (엣지·보링은 지금 그대로)
+            const _isCut   = /-재단$/.test(sk);
+            const _grpStat = _isCut ? _woCutGroupStats(sk, parts) : null;
 
             // ── 헤더 HTML (기계 목록 동적) — 기계명만 (공유 링크 단추는 걷어냈다)
             let html = `<div class="wo-boring-board-hdr">` +
@@ -8667,14 +8778,30 @@
                     html += `<div class="wo-boring-empty-col-hint">여기로 카드를 드래그하세요</div>`;
                 }
 
+                let _curGrp = null, _curOpen = true;
                 entries.forEach((entry, idx) => {
+                    let _grpAttr = '';
                     if (entry && typeof entry === 'object' && entry.type === 'break') {
                         html += _woBreakMarkerHtml(sk, mac, entry);
+                        _curGrp = null; _curOpen = true;   // 휴식은 묶음을 끊는다
                     } else {
                         const p = parts.find(pp => pp.cKey === entry);
-                        if (p) html += _woPlacedCardHtml(p, entry, sk, mac, _boardColorMap);
+                        if (p) {
+                            if (_isCut) {
+                                const gk = _woCutGroupKey(p);
+                                // 카드 차례는 손대지 않는다. 묶음이 바뀌는 자리에만
+                                // 상품 줄을 끼운다 — 끌어다 섞어 놓아도 차례가 안 바뀐다.
+                                if (gk !== _curGrp) {
+                                    _curGrp  = gk;
+                                    _curOpen = _woCutGrpIsOpen(sk, gk);
+                                    html += _woCutGrpHdrHtml(sk, gk, (_grpStat && _grpStat[gk]) || {}, _curOpen);
+                                }
+                                _grpAttr = ` data-grp-open="${_curOpen ? '1' : '0'}"`;
+                            }
+                            html += _woPlacedCardHtml(p, entry, sk, mac, _boardColorMap, _grpAttr);
+                        }
                     }
-                    html += _woBreakInsertStripHtml(sk, mac, idx + 1);
+                    html += _woBreakInsertStripHtml(sk, mac, idx + 1, _grpAttr);
                 });
 
                 html += `</div>`; // end mac-col
@@ -9039,6 +9166,10 @@
                 el.dataset.ck !== dragKey
             );
             for (let i = 0; i < siblings.length; i++) {
+                // 접혀 있어 화면에 없는 카드는 높이가 0 이라 자리를 가늠할 수 없다.
+                // 건너뛰면 그 뒤 처음 만나는 보이는 카드 앞에 꽂힌다 — 접힌 묶음은
+                // 통째로 위쪽에 남고 순서가 어긋나지 않는다.
+                if (siblings[i].offsetParent === null) continue;
                 const r = siblings[i].getBoundingClientRect();
                 if (clientY < r.top + r.height / 2) return i;
             }
