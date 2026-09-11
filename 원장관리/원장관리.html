@@ -104,12 +104,13 @@
         <div class="flex items-center gap-4 flex-shrink-0">
             <div class="flex items-center gap-2 mr-2 flex-shrink-0">
                 <div class="font-black text-xl tracking-tighter text-[#37352f] whitespace-nowrap">VIVIVIC</div>
-                <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;white-space:nowrap;">v0.1.0</span>
+                <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;white-space:nowrap;">v0.10.0</span>
             </div>
             <nav class="flex items-center gap-1 flex-shrink-0">
                 <div id="nav-list" class="nav-link active" onclick="switchTab('list')">원장 목록</div>
                 <div id="nav-publish" class="nav-link" onclick="switchTab('publish')">확정 발행 <span id="pending-count-badge" class="hidden ml-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full text-[10px]">0</span></div>
                 <div id="nav-import" class="nav-link" onclick="switchTab('import')">원장 다시 불러오기</div>
+                <div id="nav-history" class="nav-link" onclick="switchTab('history')">변경 이력</div>
             </nav>
         </div>
     </div>
@@ -194,6 +195,7 @@
             <div class="text-[18px] font-black text-[#37352f]">확정 발행</div>
             <div class="text-[12px] text-[#787774] font-medium">여기서 "확정"을 눌러야 실제로 에이엠티·조혼가구·이카운트등록이 새 데이터를 받아갑니다. 그 전까지 수정한 내용은 이 화면(원장관리)에만 반영된 상태입니다.</div>
         </div>
+        <div id="last-publish-info" class="text-[11px] text-[#a8a6a2] font-bold mb-4">확인 중...</div>
         <div id="publish-summary" class="grid grid-cols-3 gap-3 mb-4"></div>
         <div class="bg-white border border-[#ededeb] rounded-xl overflow-hidden mb-4">
             <div id="publish-list" class="divide-y divide-[#f1f0ef]"></div>
@@ -238,6 +240,33 @@
             </div>
             <button id="btn-do-import" onclick="doImport()" class="w-full py-3.5 bg-[#37352f] text-white font-black text-[14px] rounded-xl hover:bg-black transition-all">이 데이터로 가져오기 실행</button>
             <div id="import-status" class="mt-3 text-[12px] font-bold text-center"></div>
+        </div>
+    </div>
+
+    <!-- ===== 변경 이력 페이지 =====
+         "저장했는데 진짜 반영됐는지 나도 확인하고 싶다"는 요청으로 추가.
+         매번 나(클로드)한테 화이어베이스를 직접 뒤져봐달라고 안 해도, 이
+         화면에서 스스로 "언제 뭐가 바뀌었고 언제 실제로 발행됐는지" 볼 수
+         있게 한다. -->
+    <div id="page-history" class="hidden">
+        <div class="mb-4">
+            <div class="text-[18px] font-black text-[#37352f]">변경 이력</div>
+            <div class="text-[12px] text-[#787774] font-medium">누가 언제 무엇을 고쳤는지, 그리고 그게 실제로 에이엠티·조혼가구에 발행됐는지까지 여기서 직접 확인할 수 있습니다.</div>
+        </div>
+
+        <div class="group-card">
+            <div class="group-title">🚀 발행 이력 (실제로 파일이 나간 시점)</div>
+            <div id="history-publish-list" class="text-[12px]"></div>
+        </div>
+
+        <div class="group-card">
+            <div class="group-title">✏️ 수정 이력 (어떤 필드가 뭐에서 뭐로 바뀌었는지)</div>
+            <div id="history-edit-list" class="text-[12px]"></div>
+        </div>
+
+        <div class="group-card">
+            <div class="group-title">🆕 신규 등록 이력</div>
+            <div id="history-new-list" class="text-[12px]"></div>
         </div>
     </div>
 
@@ -288,6 +317,15 @@
 </div>
 
 <script>
+// 어디서든 처리 안 된 오류(비동기 실패 등)가 나면 콘솔에만 조용히 남고
+// 화면은 아무 반응이 없어서, 사용자가 "분명히 눌렀는데 안 됐다"는 걸
+// 눈치채기 어려운 사고가 있었다(발행 실패가 작은 글씨로만 표시된 사례).
+// 그래서 앱 전체에 안전망을 깔아 어떤 실패든 반드시 alert로 눈에 띄게 한다.
+window.addEventListener('unhandledrejection', e => {
+    console.error('[처리 안 된 오류]', e.reason);
+    alert('예상치 못한 오류가 발생했습니다: ' + (e.reason?.message || e.reason) + '\n\n다시 시도해보시고, 계속되면 알려주세요.');
+});
+
 // ════════════════════════════════════════════════════════════════════
 // 원장 컬럼 스키마 — 에이엠티/조혼가구/이카운트등록 세 앱을 실제로 조사해서
 // 확인한 컬럼만 정의한다. `key`는 기존 앱이 h.indexOf("...")로 찾는 헤더
@@ -504,13 +542,32 @@ async function autoBootstrapFromExcel() {
 }
 
 window.switchTab = function(tab) {
-    ['list','publish','import'].forEach(t => {
+    ['list','publish','import','history'].forEach(t => {
         document.getElementById('page-' + t).classList.toggle('hidden', t !== tab);
         document.getElementById('nav-' + t).classList.toggle('active', t === tab);
     });
-    if (tab === 'publish') renderPublishPage();
+    if (tab === 'publish') { renderPublishPage(); renderLastPublishInfo(); }
     if (tab === 'import') checkFirebaseFile();
+    if (tab === 'history') renderHistoryPage();
 };
+
+// 발행 버튼 근처에 "마지막으로 실제 발행된 파일/시각"을 항상 보여준다 —
+// "확정 눌렀는데 진짜 반영됐나?"를 화면만 보고 바로 알 수 있게(버튼을
+// 눌렀는데 이 시각이 안 바뀌면 발행이 실패/누락된 것).
+async function renderLastPublishInfo() {
+    const el = document.getElementById('last-publish-info');
+    try {
+        const { collection, getDocs } = window.fbFirestore;
+        const snap = await getDocs(collection(window.db, ...EXCEL_META_COLLECTION));
+        if (snap.empty) { el.textContent = '아직 발행된 파일이 없습니다.'; return; }
+        const docs = snap.docs.map(d => d.data());
+        const latest = docs.sort((a,b) => (b.timestamp?.seconds||0) - (a.timestamp?.seconds||0))[0];
+        const when = latest.timestamp?.seconds ? new Date(latest.timestamp.seconds*1000).toLocaleString('ko-KR') : '시각 미상';
+        el.textContent = `📄 마지막 발행: ${latest.fileName || '(이름없음)'} · ${when}`;
+    } catch (err) {
+        el.textContent = '마지막 발행 정보를 못 불러왔습니다: ' + err.message;
+    }
+}
 
 // ── 화이어베이스에 이미 올라가 있는 원장 파일(에이엠티/조혼가구가 지금
 // 쓰고 있는 바로 그 파일) 자동 감지 — excel_metadata는 파일 자체가 아니라
@@ -951,6 +1008,7 @@ window.saveCurrentRow = async function() {
             const nextIdx = MASTER_ROWS.length ? Math.max(...MASTER_ROWS.map(r => r.legacyRowIndex ?? -1)) + 1 : 0;
             await setDoc(doc(collection(window.db, ...COLLECTION)), {
                 fields: cleanFields, legacyRowIndex: nextIdx, deleted: false, pendingPublish: true,
+                isManualEntry: true, // 변경 이력 화면에서 "가져오기로 생긴 행"과 구분하기 위한 표식
                 createdAt: serverTimestamp(), updatedAt: serverTimestamp(), updatedBy: window._myAccount?.email || null
             });
         }
@@ -1077,6 +1135,84 @@ function renderPublishPage() {
         </div>`).join('');
 }
 
+// ════════════════════════════════════════════════════════════════════
+// 변경 이력 페이지 — 이미 메모리에 있는 MASTER_ROWS/OVERRIDE_ROWS와
+// excel_metadata만 읽어서 그리므로 추가 네트워크 요청이 거의 없다.
+// "수정 이력"은 override 문서가 원본(master)과 실제로 다른 필드만 골라
+// "필드명: 원본값 → 확정값"으로 보여준다 — 이게 있어야 "고쳤다고 생각했는데
+// 실제로는 안 바뀐 값이 저장된" 경우(잠긴 필드를 잘못 건드린 경우 등)를
+// 사용자 본인이 바로 알아챌 수 있다.
+function renderHistoryPage() {
+    // 1) 발행 이력
+    const { collection, getDocs } = window.fbFirestore;
+    getDocs(collection(window.db, ...EXCEL_META_COLLECTION)).then(snap => {
+        const docs = snap.docs.map(d => d.data()).sort((a,b) => (b.timestamp?.seconds||0) - (a.timestamp?.seconds||0));
+        const el = document.getElementById('history-publish-list');
+        if (!docs.length) { el.innerHTML = '<div class="text-[#a8a6a2] font-bold">아직 없음</div>'; return; }
+        el.innerHTML = docs.slice(0, 30).map(m => {
+            const when = m.timestamp?.seconds ? new Date(m.timestamp.seconds*1000).toLocaleString('ko-KR') : '시각 미상';
+            return `<div class="py-2 border-b border-[#f1f0ef] last:border-0 flex items-center justify-between gap-2">
+                <span class="font-bold text-[#37352f]">${esc(m.fileName || '(이름없음)')}</span>
+                <span class="text-[#a8a6a2] flex-shrink-0">${when}${m.uploadedBy ? ' · ' + esc(m.uploadedBy) : ''}</span>
+            </div>`;
+        }).join('');
+    });
+
+    // 2) 수정 이력 — OVERRIDE_ROWS(메모리)를 confirmedAt 내림차순으로
+    const edits = Object.entries(OVERRIDE_ROWS)
+        .map(([id, ov]) => ({ id, ov }))
+        .filter(x => x.ov.confirmedAt)
+        .sort((a,b) => (b.ov.confirmedAt?.seconds||0) - (a.ov.confirmedAt?.seconds||0));
+    const editEl = document.getElementById('history-edit-list');
+    if (!edits.length) {
+        editEl.innerHTML = '<div class="text-[#a8a6a2] font-bold">아직 없음</div>';
+    } else {
+        editEl.innerHTML = edits.slice(0, 50).map(({id, ov}) => {
+            const master = MASTER_ROWS.find(m => m.id === id);
+            const changedFields = [];
+            if (master && ov.fields) {
+                Object.keys(ov.fields).forEach(k => {
+                    const mv = (master.fields && master.fields[k]) || '';
+                    const ovv = ov.fields[k] || '';
+                    if (mv !== ovv) changedFields.push({ k, mv, ovv });
+                });
+            }
+            const when = ov.confirmedAt?.seconds ? new Date(ov.confirmedAt.seconds*1000).toLocaleString('ko-KR') : '시각 미상';
+            const statusBadge = ov.pendingPublish
+                ? '<span class="badge bg-amber-50 text-amber-600">⏳ 발행 대기중</span>'
+                : '<span class="badge bg-emerald-50 text-emerald-600">✓ 발행 완료</span>';
+            return `<div class="py-2.5 border-b border-[#f1f0ef] last:border-0">
+                <div class="flex items-center justify-between gap-2 flex-wrap">
+                    <span class="font-bold text-[#37352f]">${esc(ov.fields?.['ing단품명']||'-')} · ${esc(ov.fields?.['부속명']||'-')}</span>
+                    ${statusBadge}
+                </div>
+                <div class="text-[#a8a6a2] mt-0.5">${when}${ov.confirmedBy ? ' · ' + esc(ov.confirmedBy) : ''}${ov.deleted ? ' · <span class="text-red-500 font-bold">삭제됨</span>' : ''}</div>
+                ${changedFields.length
+                    ? `<div class="mt-1.5 flex flex-col gap-0.5">${changedFields.map(c =>
+                        `<div class="text-[11px]"><span class="font-bold text-[#787774]">${esc(c.k)}</span>: <span class="text-red-400 line-through">${esc(c.mv)||'(공백)'}</span> → <span class="text-emerald-600 font-bold">${esc(c.ovv)||'(공백)'}</span></div>`
+                      ).join('')}</div>`
+                    : '<div class="mt-1.5 text-[11px] text-amber-600 font-bold">⚠ 원본과 값이 완전히 같습니다 — 실제로는 아무것도 안 바뀐 채 저장됐습니다(잠긴 필드를 건드리셨다면 이게 원인일 수 있어요).</div>'}
+            </div>`;
+        }).join('');
+    }
+
+    // 3) 신규 등록 이력 — saveCurrentRow가 새 행을 만들 때만 찍는 isManualEntry로,
+    // "원장 다시 불러오기"로 생긴 행과 구분한다
+    const newRows = MASTER_ROWS.filter(m => m.isManualEntry).sort((a,b) => (b.createdAt?.seconds||0) - (a.createdAt?.seconds||0));
+    const newEl = document.getElementById('history-new-list');
+    if (!newRows.length) {
+        newEl.innerHTML = '<div class="text-[#a8a6a2] font-bold">아직 없음</div>';
+    } else {
+        newEl.innerHTML = newRows.slice(0, 50).map(r => {
+            const when = r.createdAt?.seconds ? new Date(r.createdAt.seconds*1000).toLocaleString('ko-KR') : '시각 미상';
+            return `<div class="py-2 border-b border-[#f1f0ef] last:border-0 flex items-center justify-between gap-2">
+                <span class="font-bold text-[#37352f]">${esc(fv(r,'ing단품명'))||'-'} · ${esc(fv(r,'부속명'))||'-'}</span>
+                <span class="text-[#a8a6a2] flex-shrink-0">${when}${r.updatedBy ? ' · ' + esc(r.updatedBy) : ''}</span>
+            </div>`;
+        }).join('');
+    }
+}
+
 window.doPublish = async function() {
     const btn = document.getElementById('btn-do-publish');
     const statusEl = document.getElementById('publish-status');
@@ -1134,10 +1270,14 @@ window.doPublish = async function() {
 
         statusEl.textContent = `✓ 확정 완료 — ${fileName} 이(가) 에이엠티/조혼가구/이카운트등록에 자동 반영됩니다.`;
         statusEl.className = 'mt-3 text-[12px] font-bold text-center text-emerald-600';
+        renderLastPublishInfo(); // "마지막 발행" 시각을 바로 갱신 — 눈으로 방금 반영됐는지 확인 가능
     } catch (err) {
         console.error('발행 실패', err);
         statusEl.textContent = '발행 실패: ' + err.message;
         statusEl.className = 'mt-3 text-[12px] font-bold text-center text-red-500';
+        // 작은 글씨 상태 문구는 놓치기 쉬워서(실제로 이것 때문에 발행 실패를
+        // 못 알아챈 사례가 있었음) 실패는 무조건 alert로도 눈에 띄게 알린다
+        alert('발행에 실패했습니다: ' + err.message + '\n\n다시 "확정 발행" 탭에서 눌러 재시도해주세요.');
     } finally {
         btn.disabled = false;
     }
