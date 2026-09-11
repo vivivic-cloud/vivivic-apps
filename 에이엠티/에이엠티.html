@@ -983,6 +983,9 @@
             border-left: 3px solid var(--wo-proc-color, #b0aeaa); border-radius: 4px;
             padding: 4px 6px; box-sizing: border-box; min-height: 40px;
             cursor: grab; user-select: none;
+            /* 아이폰 사파리는 -webkit- 짝이 없으면 듣지 않는다. 길게 누를 때
+               글자 선택 돋보기·꾹 누름 차림표가 떠 이동 제스처가 끊긴다. */
+            -webkit-user-select: none; -webkit-touch-callout: none;
             display: flex; flex-direction: column; justify-content: flex-start;
             overflow: hidden;
             transition: box-shadow 0.1s, opacity 0.1s;
@@ -994,7 +997,8 @@
             background: #f7f6f3; border: 1px solid #e3e2e0;
             border-left: 3px solid var(--wo-proc-color, #90BBC6);
             border-radius: 6px; padding: 6px 8px; cursor: pointer;
-            user-select: none; min-width: 0;
+            user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+            min-width: 0;
         }
         .wo-cut-grp:active { background: #f0eeec; }
         .wo-cut-grp.on { background: #fff; border-color: #37352f; }
@@ -1687,7 +1691,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.34</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.35</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -9275,7 +9279,10 @@
             const el = target && target.closest && target.closest('.wo-boring-placed-card');
             if (!el) return null;
             if (!el.dataset.sk || !el.dataset.mac) return null;   // 기계 판의 카드만 (재단·보링·엣지)
-            if (el.dataset.done === '1') return null;
+            // 완료 찍힌 카드도 차례는 바꾼다. 막아 뒀더니 그 카드를 길게 누른 손이
+            // 이동 대신 재단편집을 열어 화면을 덮었고, 그 뒤로는 다른 카드에 손이
+            // 닿지 않아 '눌러서 순서이동 안된다' 가 됐다.
+            // 차례는 일하는 순서일 뿐이라 옮겨도 기록은 그대로다.
             if (target.closest('button, select, input, textarea, a')) return null;
             const col = el.closest('.wo-boring-mac-col');
             if (!col) return null;
