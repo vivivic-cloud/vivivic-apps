@@ -75,6 +75,7 @@
                 initCloudDataSync();
                 initConfirmedOrdersSync();
                 initCuttingPlansSync();
+                initBoardOrderSync();
                 return;
             }
 
@@ -100,6 +101,7 @@
                 initCloudDataSync();
                 initConfirmedOrdersSync();
                 initCuttingPlansSync();
+                initBoardOrderSync();
             } catch (err) {
                 console.error('계정 정보 조회 실패:', err);
                 window.showAuthLoginScreen('계정 정보를 불러오지 못했습니다. 다시 시도해주세요.');
@@ -1006,6 +1008,32 @@
            컬럼의 바로 밑 자식으로 그대로 있어 자리 계산이 어긋나지 않는다. */
         [data-grp-open="0"] { display: none !important; }
         .wo-boring-placed-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.09); z-index: 3; }
+        /* ── 길게 눌러 이동 — 재단 보드에서 카드 차례를 손가락으로 바꾼다 ──
+              폰에서는 HTML5 끌어놓기가 아예 듣지 않아, 한 칸 안에서 차례를
+              바꿀 길이 없었다. 0.4초 길게 누르면 이동이 켜진다. */
+        .wo-boring-placed-card.wo-move-on {
+            position: relative; z-index: 40;
+            box-shadow: 0 10px 26px -8px rgba(0,0,0,.45);
+            border-color: #37352f;
+            transform-origin: center;
+            touch-action: none;
+            cursor: grabbing;
+        }
+        .wo-move-bar {
+            height: 0; border-top: 3px solid #37352f; border-radius: 2px;
+            margin: -1px 0; pointer-events: none;
+        }
+        .wo-move-hint {
+            position: fixed; left: 50%; transform: translateX(-50%);
+            bottom: calc(76px + env(safe-area-inset-bottom));
+            z-index: 9600; background: #37352f; color: #fff;
+            font-size: 12px; font-weight: 800; letter-spacing: -0.2px;
+            padding: 8px 14px; border-radius: 999px;
+            box-shadow: 0 10px 24px -12px rgba(0,0,0,.6);
+            pointer-events: none;
+        }
+        @media (min-width: 768px) { .wo-move-hint { bottom: 20px; } }
+
         .wo-boring-placed-card.dragging { opacity: 0.35; cursor: grabbing; }
         /* ── 기기변경 모드: 하이라이트 */
         .wo-boring-placed-card.wo-mac-highlight {
@@ -1647,7 +1675,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.31</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.32</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -7524,6 +7552,8 @@
                     cuttingParts.forEach(p => { if (!existingC.has(p.cKey)) window._woBoring[sk]['AMT'].push(p.cKey); });
                 }
 
+                _woApplySavedOrder(sk, 'AMT');   // 저장해 둔 카드 차례대로 다시 줄 세운다
+
                 let mergedCutParts = [...prevCutParts];
                 cuttingParts.forEach(p => { if (!mergedCutParts.find(pp => pp.cKey === p.cKey)) mergedCutParts.push(p); });
 
@@ -9214,6 +9244,199 @@
                 if (clientY < r.top + r.height / 2) return i;
             }
             return siblings.length;
+        }
+
+
+        /* ══ 길게 눌러 카드 차례 바꾸기 (재단 보드) ════════════════════════
+           폰에서는 HTML5 끌어놓기(draggable)가 손가락으로 아예 시작되지 않는다.
+           그래서 한 칸 안에서 작업 차례를 바꿀 길이 없었다.
+           0.4초 길게 누르면 이동이 켜지고, 끌어서 차례를 바꾼다.
+
+           작업대(?viggle=1)의 '0.5초 길게 눌러 짚어서 지시' 와 부딪히지 않게,
+           이동이 켜지는 순간 window 에 scroll 을 한 번 흘려 그쪽 시계를 끈다.
+           viggle.js 는 scroll 에 그만() 이 걸려 있다 — 그 파일은 손대지 않았다.
+           0.4초 < 0.5초 라 언제나 이쪽이 먼저 잡는다. */
+        const WO_MOVE_MS = 400;      // 이동이 켜지는 시간. viggle 의 500ms 보다 짧다
+        window._woMove = null;       // { sk, mac, cKey, el, col, startY, dy, idx }
+        let _woMoveTimer = null, _woMoveStart = null, _woMoveCand = null, _woMoveSwallowClick = false;
+
+        function _woMoveCancelTimer() {
+            if (_woMoveTimer) { clearTimeout(_woMoveTimer); _woMoveTimer = null; }
+            _woMoveCand = null; _woMoveStart = null;
+        }
+
+        // 재단 보드의, 아직 완료 안 찍힌 카드만 옮긴다 (완료 카드는 지금도 못 끈다)
+        function _woMoveCardAt(target) {
+            const el = target && target.closest && target.closest('.wo-boring-placed-card');
+            if (!el) return null;
+            if (!/-재단$/.test(el.dataset.sk || '')) return null;   // 재단 판에서만
+            if (el.dataset.done === '1') return null;
+            if (target.closest('button, select, input, textarea, a')) return null;
+            const col = el.closest('.wo-boring-mac-col');
+            if (!col) return null;
+            return { el, col };
+        }
+
+        function _woMoveBegin(cand, y) {
+            const el = cand.el, col = cand.col;
+            window._woMove = {
+                sk: el.dataset.sk, mac: el.dataset.mac, cKey: el.dataset.ck,
+                el, col, startY: y, dy: 0, idx: null,
+                scroller: document.getElementById('wo-boring-scroller-' + el.dataset.sk)
+            };
+            // 작업대의 '짚어서 지시' 시계를 끈다 — viggle.js 를 건드리지 않는 길
+            try { window.dispatchEvent(new Event('scroll')); } catch (e) {}
+            el.classList.add('wo-move-on');
+            // 넓은 화면의 기존 끌어놓기(draggable)와 겹치지 않게 잠깐 꺼 둔다.
+            // 손을 떼면 _woRenderBoard 가 카드를 다시 그리며 원래대로 돌려 놓는다.
+            el.setAttribute('draggable', 'false');
+            if (navigator.vibrate) { try { navigator.vibrate(15); } catch (e) {} }
+            let hint = document.querySelector('.wo-move-hint');
+            if (!hint) {
+                hint = document.createElement('div');
+                hint.className = 'wo-move-hint';
+                document.body.appendChild(hint);
+            }
+            hint.textContent = '이동 — 끌어서 차례 바꾸기';
+            _woMoveDrawBar();
+        }
+
+        // 꽂힐 자리에 줄을 하나 긋는다
+        function _woMoveDrawBar() {
+            const m = window._woMove; if (!m) return;
+            let bar = document.querySelector('.wo-move-bar');
+            if (!bar) { bar = document.createElement('div'); bar.className = 'wo-move-bar'; }
+            const 형제 = Array.from(m.col.children).filter(el =>
+                (el.classList.contains('wo-boring-placed-card') || el.classList.contains('wo-boring-break-marker')) &&
+                el.dataset.ck !== m.cKey);
+            const i = m.idx == null ? 형제.length : m.idx;
+            if (i >= 형제.length) m.col.appendChild(bar);
+            else m.col.insertBefore(bar, 형제[i]);
+        }
+
+        function _woMoveMove(y) {
+            const m = window._woMove; if (!m) return;
+            m.dy = y - m.startY;
+            m.el.style.transform = `translateY(${m.dy}px) scale(1.02)`;
+            m.idx = _woFindInsertIndex(m.col, y, m.cKey);
+            _woMoveDrawBar();
+            // 판 끝에 닿으면 조금씩 밀어 준다
+            const sc = m.scroller;
+            if (sc) {
+                const r = sc.getBoundingClientRect();
+                if (y < r.top + 70)         sc.scrollTop -= 12;
+                else if (y > r.bottom - 70) sc.scrollTop += 12;
+            }
+        }
+
+        function _woMoveEnd() {
+            const m = window._woMove;
+            _woMoveCancelTimer();
+            const bar = document.querySelector('.wo-move-bar'); if (bar) bar.remove();
+            const hint = document.querySelector('.wo-move-hint'); if (hint) hint.remove();
+            if (!m) return;
+            window._woMove = null;
+            m.el.style.transform = '';
+            m.el.classList.remove('wo-move-on');
+            if (m.el.dataset.done !== '1') m.el.setAttribute('draggable', 'true');
+            _woMoveSwallowClick = true;                 // 손을 뗀 뒤 재단편집이 열리지 않게
+            setTimeout(() => { _woMoveSwallowClick = false; }, 350);
+            const state = window._woBoring[m.sk];
+            if (!state || m.idx == null) return;
+            const entries = _woGetEntries(m.sk, m.mac).filter(x =>
+                (typeof x === 'string' ? x : x && x.cKey) !== m.cKey);
+            const 옛자리 = _woGetEntries(m.sk, m.mac).findIndex(x =>
+                (typeof x === 'string' ? x : x && x.cKey) === m.cKey);
+            entries.splice(Math.max(0, Math.min(m.idx, entries.length)), 0, m.cKey);
+            state[m.mac] = entries;
+            _woRenderBoard(m.sk);
+            _woRenderPool(m.sk);
+            const 새자리 = entries.findIndex(x => (typeof x === 'string' ? x : x && x.cKey) === m.cKey);
+            if (옛자리 !== 새자리) _woSaveBoardOrder(m.sk);
+        }
+
+        document.addEventListener('pointerdown', (e) => {
+            if (e.button != null && e.button !== 0) return;
+            const cand = _woMoveCardAt(e.target);
+            if (!cand) return;
+            _woMoveCand = cand;
+            _woMoveStart = { x: e.clientX, y: e.clientY };
+            _woMoveTimer = setTimeout(() => {
+                _woMoveTimer = null;
+                if (_woMoveCand) _woMoveBegin(_woMoveCand, _woMoveStart.y);
+            }, WO_MOVE_MS);
+        }, true);
+
+        document.addEventListener('pointermove', (e) => {
+            if (window._woMove) { _woMoveMove(e.clientY); return; }
+            if (!_woMoveTimer || !_woMoveStart) return;
+            if (Math.abs(e.clientX - _woMoveStart.x) > 10 || Math.abs(e.clientY - _woMoveStart.y) > 10) _woMoveCancelTimer();
+        }, true);
+
+        ['pointerup', 'pointercancel'].forEach(t =>
+            document.addEventListener(t, () => { if (window._woMove) _woMoveEnd(); else _woMoveCancelTimer(); }, true));
+
+        // 이동 중에는 판이 따라 움직이지 않게 막는다 (passive 가 아니어야 듣는다)
+        document.addEventListener('touchmove', (e) => {
+            if (window._woMove) e.preventDefault();
+        }, { passive: false, capture: true });
+
+        // 손을 뗀 직후의 클릭 한 번은 삼킨다 — 재단편집이 딸려 열리지 않게
+        document.addEventListener('click', (e) => {
+            if (!_woMoveSwallowClick) return;
+            if (!e.target.closest('.wo-boring-placed-card')) return;
+            e.stopPropagation(); e.preventDefault();
+            _woMoveSwallowClick = false;
+        }, true);
+
+        /* ── 바꾼 차례를 저장한다 ────────────────────────────────────
+           카드 차례는 지금까지 메모리에만 있어 새로 열면 사라졌다.
+           재단계획과 같은 방식으로 파이어베이스에 둔다 — 판 하나에 문서 하나.
+           발주·재단계획은 건드리지 않는다. 이 문서에는 카드 이름의 차례만 적는다. */
+        window._woBoardOrder = {};
+
+        function initBoardOrderSync() {
+            try {
+                const { collection, onSnapshot } = window.fbFirestore;
+                const colRef = collection(window.db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'wo_board_order');
+                onSnapshot(colRef, (snap) => {
+                    snap.docChanges().forEach(ch => {
+                        if (ch.type === 'removed') delete window._woBoardOrder[ch.doc.id];
+                        else window._woBoardOrder[ch.doc.id] = ch.doc.data() || {};
+                    });
+                    if (typeof renderProcessTimeline === 'function') renderProcessTimeline();
+                }, (err) => console.error('카드 차례 동기화 오류:', err));
+            } catch (err) { console.error('카드 차례 동기화 시작 실패:', err); }
+        }
+
+        async function _woSaveBoardOrder(sk) {
+            try {
+                const state = window._woBoring[sk]; if (!state) return;
+                const order = {};
+                Object.keys(state).forEach(mac => {
+                    if (mac === 'pool') return;
+                    order[mac] = _woGetEntries(sk, mac).filter(x => typeof x === 'string');
+                });
+                const { doc, setDoc } = window.fbFirestore;
+                await setDoc(doc(window.db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'wo_board_order', sk),
+                    { sk, order, at: Date.now() });
+            } catch (err) {
+                console.error('카드 차례 저장 오류:', err);
+                if (typeof showToastMessage === 'function') showToastMessage('차례 저장 실패 — 새로 열면 되돌아갑니다');
+            }
+        }
+
+        // 저장된 차례대로 다시 줄 세운다. 저장에 없는 카드는 뒤에 그대로 붙는다.
+        function _woApplySavedOrder(sk, mac) {
+            const 저장 = (window._woBoardOrder[sk] || {}).order;
+            const 줄 = 저장 && 저장[mac];
+            if (!Array.isArray(줄) || !줄.length) return;
+            const entries = _woGetEntries(sk, mac);
+            const 자리 = new Map(줄.map((k, i) => [k, i]));
+            const 아는것 = entries.filter(x => typeof x === 'string' && 자리.has(x))
+                .sort((a, b) => 자리.get(a) - 자리.get(b));
+            const 남은것 = entries.filter(x => !(typeof x === 'string' && 자리.has(x)));
+            window._woBoring[sk][mac] = [...아는것, ...남은것];
         }
 
         window.woBoardDragOver = function(e) {
