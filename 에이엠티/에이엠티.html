@@ -1150,6 +1150,10 @@
             .tl-dc-hdr .dc-배지{display:none !important}
             .tl-dc-hdr .dc-날짜{display:none !important}
 
+            /* ─ 원장정보(선택 원장): 폰에서는 줄 여백을 줄인다 ─
+               맨 위로 올라온 칸이라 위쪽을 더 잡아먹지 않게 p-4(16px) 를 줄인다. */
+            #id302-material-header{padding:8px 12px !important}
+
             /* ─ 재단편집 설정: 폰에서는 한 줄로 접는다 ─ */
             #cut-settings{padding:10px 12px !important}
             .cut-set-line{display:flex !important;align-items:center;gap:8px}
@@ -7764,11 +7768,16 @@
             // 폰에서는 부속 목록이 도면 아래에 깔려 무엇을 편집하는지 보려면 한참
             // 내려가야 했다. 카드를 이 자리에 그려도 선택·계산 로직은 전부
             // document 전체에서 .inner-part-card 를 찾으므로 그대로 동작한다.
+            //
+            // 지시(09-11 03:18): 원장정보(선택 원장)와 재단편집 설정칸이 페이지 맨
+            // 위로 와야 한다. 그 둘은 #cutting-edit-box 안에 붙어 있어 따로 떼어
+            // 올리면 팝업을 닫을 때 되돌릴 것이 늘어난다. 대신 이 '해당 부속' 자리를
+            // 설정칸 바로 아래로 내려 차례를 바꾼다 — 머리글 · 선택 원장 · 설정칸 ·
+            // 해당 부속 · 도면. 부속 카드는 여전히 도면보다 위다.
             const targetSlot = document.createElement('div');
             targetSlot.id = '_woEditTargetSlot';
             targetSlot.style.cssText = 'padding:10px 14px 0;';
             targetSlot.innerHTML = '<div style="font-size:10px;font-weight:800;color:#787774;margin-bottom:5px;">해당 부속</div>';
-            panel.appendChild(targetSlot);
 
             overlay.appendChild(panel);
             document.body.appendChild(overlay);
@@ -7784,6 +7793,12 @@
             };
             box.style.display = 'block';
             panel.appendChild(box);
+
+            // 설정칸 바로 아래에 '해당 부속' 자리를 끼운다. 설정칸을 못 찾으면
+            // 예전처럼 팝업 맨 위(머리글 아래)에 둔다.
+            const _cutSetBox = document.getElementById('cut-settings');
+            if (_cutSetBox && _cutSetBox.parentNode === box) box.insertBefore(targetSlot, _cutSetBox.nextSibling);
+            else panel.insertBefore(targetSlot, box);
 
             // "재단확정" 버튼을 팝업 전용 확정 처리로 임시 교체 — 저장 후 옛(임시)
             // 카드 정리 + 팝업 닫기 + 원래 위치 복원까지 이어서 처리하기 위함
@@ -7969,6 +7984,9 @@
         window._woCloseInlineEdit = function() {
             const st = window._woInlineEditState;
             const box = document.getElementById('cutting-edit-box');
+            // '해당 부속' 자리는 팝업에서만 쓰는 것이라 박스를 제자리로 돌리기 전에
+            // 떼어낸다(설정칸 아래에 끼워 넣었으므로 박스와 함께 딸려 간다).
+            document.getElementById('_woEditTargetSlot')?.remove();
             if (st && box && st.originalParent) {
                 if (st.originalNextSibling) st.originalParent.insertBefore(box, st.originalNextSibling);
                 else st.originalParent.appendChild(box);
