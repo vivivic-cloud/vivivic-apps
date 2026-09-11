@@ -1029,6 +1029,7 @@
             transform-origin: center;
             touch-action: none;
             cursor: grabbing;
+            pointer-events: none;   /* 손가락 아래의 기계 칸을 가리지 않게 */
         }
         .wo-move-bar {
             height: 0; border-top: 3px solid #37352f; border-radius: 2px;
@@ -1686,7 +1687,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.33</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.34</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2603,7 +2604,7 @@
             }
         }
 
-        // 재단 도면 1건을 재단 공정 타임라인(미배정 풀)에 반영 — 이미 반영돼 있으면 무시(idempotent)
+        // 재단 도면 1건을 재단 공정 타임라인(AMT 기계)에 반영 — 이미 반영돼 있으면 무시(idempotent)
         // 반환값: 해당 도면이 배정된 stateKey (날짜-재단)
         // 재단계획의 실제 필요수량(필요 EA)을 구함. 발주 단계에서 이미 이 부속의
         // 발주 수량(세트별소모량 × 주문수량)이 정해져 있으므로, plan에 reqQty가
@@ -7294,19 +7295,21 @@
                             window._woBoring[sk][mac] = _normKeys(arr);
                         }
                     });
-                    // 신규 부속 pool에 추가
+                    // 새 부속도 바로 기계에 붙인다 — 미배정이라는 자리를 두지 않는다.
+                    // 재단 판이 하던 그대로다(그 판은 기계가 AMT 하나라 거기로 바로 넣었다).
+                    // 기계 목록의 첫 기계에 붙인다. 어느 기계든 눈에 보이는 데 있어야
+                    // 사장님이 보고 옮기실 수 있다 — 사라지는 것보다 낫다.
                     const existing = new Set();
                     _MAC3.forEach(mac => (window._woBoring[sk][mac] || []).forEach(k => existing.add(k)));
                     (window._woBoring[sk].pool || []).forEach(k => existing.add(k));
-                    boringParts.forEach(p => { if (!existing.has(p.cKey)) window._woBoring[sk].pool.push(p.cKey); });
+                    const _b첫기계 = _MAC3[0];
+                    if (!window._woBoring[sk][_b첫기계]) window._woBoring[sk][_b첫기계] = [];
+                    boringParts.forEach(p => { if (!existing.has(p.cKey)) window._woBoring[sk][_b첫기계].push(p.cKey); });
                 }
+                _woDrainPool(sk, _MAC3[0]);      // 미배정 자리를 없앴으니 남은 것도 기계로 올린다
+                _MAC3.forEach(mac => _woApplySavedOrder(sk, mac));   // 저장해 둔 차례대로
                 window._woBoringParts[sk] = boringParts;
 
-                // pool 초기 HTML (grid는 requestAnimationFrame 후 _woRenderBoard로 채움)
-                const poolInit = (window._woBoring[sk].pool || []).map(k => {
-                    const p = boringParts.find(pp => pp.cKey === k);
-                    return p ? _woCardHtml(p, sk) : '';
-                }).join('');
                 div.innerHTML = `
                     <div class="tl-dc-single-hdr" style="border-bottom:2px solid #e3e2e0;flex-shrink:0;">
                         <button class="tl-dc-back-btn" onclick="tlDcBackToGrid()">← 전체보기</button>
@@ -7319,15 +7322,6 @@
                     <div style="display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">
                         <div id="wo-boring-scroller-${sk}" style="flex:1;min-height:0;overflow-y:auto;overflow-x:auto;padding:0 16px 12px;overscroll-behavior:contain;">
                         <div class="wo-boring-board" id="wo-boring-grid-${sk}"></div>
-                        <div style="margin-top:10px;">
-                            <div style="font-size:9px;font-weight:700;color:${_pcColor};margin-bottom:4px;">미배정 부속</div>
-                            <div class="wo-boring-pool" id="zone-pool-${sk}"
-                                ondragover="woBoardDragOver(event)"
-                                ondrop="woBoardDrop(event,'pool',null,'${sk}')"
-                                ondragleave="woBoardDragLeave(event)">
-                                ${poolInit || `<span style="font-size:9px;color:${_pcColor};padding:4px 0;">모두 배정됨 ✓</span>`}
-                            </div>
-                        </div>
                         </div><!-- /scroll-area -->
                     </div>`;
             } else if (procKey === '엣지') {
@@ -7401,16 +7395,17 @@
                             window._woBoring[sk][mac] = _normKeysE(arr2);
                         }
                     });
+                    // 새 부속도 바로 기계에 붙인다 — 보링과 같다
                     const existingE = new Set();
                     _MAC5.forEach(mac => (window._woBoring[sk][mac] || []).forEach(k => existingE.add(k)));
                     (window._woBoring[sk].pool || []).forEach(k => existingE.add(k));
-                    edgeParts.forEach(p => { if (!existingE.has(p.cKey)) window._woBoring[sk].pool.push(p.cKey); });
+                    const _e첫기계 = _MAC5[0];
+                    if (!window._woBoring[sk][_e첫기계]) window._woBoring[sk][_e첫기계] = [];
+                    edgeParts.forEach(p => { if (!existingE.has(p.cKey)) window._woBoring[sk][_e첫기계].push(p.cKey); });
                 }
+                _woDrainPool(sk, _MAC5[0]);
+                _MAC5.forEach(mac => _woApplySavedOrder(sk, mac));
                 window._woBoringParts[sk] = edgeParts;
-                const poolInitE = (window._woBoring[sk].pool || []).map(k => {
-                    const p = edgeParts.find(pp => pp.cKey === k);
-                    return p ? _woCardHtml(p, sk) : '';
-                }).join('');
                 const _eMeta = _woGetProcMeta(sk);
                 div.innerHTML = `
                     <div class="tl-dc-single-hdr" style="border-bottom:2px solid #e3e2e0;flex-shrink:0;">
@@ -7424,15 +7419,6 @@
                     <div style="display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">
                         <div id="wo-boring-scroller-${sk}" style="flex:1;min-height:0;overflow-y:auto;overflow-x:auto;padding:0 16px 12px;overscroll-behavior:contain;">
                         <div class="wo-boring-board" id="wo-boring-grid-${sk}"></div>
-                        <div style="margin-top:10px;">
-                            <div style="font-size:9px;font-weight:700;color:${_pcColor};margin-bottom:4px;">미배정 부속</div>
-                            <div class="wo-boring-pool" id="zone-pool-${sk}"
-                                ondragover="woBoardDragOver(event)"
-                                ondrop="woBoardDrop(event,'pool',null,'${sk}')"
-                                ondragleave="woBoardDragLeave(event)">
-                                ${poolInitE || `<span style="font-size:9px;color:${_pcColor};padding:4px 0;">모두 배정됨 ✓</span>`}
-                            </div>
-                        </div>
                         </div><!-- /scroll-area -->
                     </div>`;
             } else if (procKey === '재단') {
@@ -7573,6 +7559,7 @@
                     cuttingParts.forEach(p => { if (!existingC.has(p.cKey)) window._woBoring[sk]['AMT'].push(p.cKey); });
                 }
 
+                _woDrainPool(sk, 'AMT');
                 _woApplySavedOrder(sk, 'AMT');   // 저장해 둔 카드 차례대로 다시 줄 세운다
 
                 let mergedCutParts = [...prevCutParts];
@@ -7612,10 +7599,6 @@
                 // 무엇을 세는 값인지 이름을 붙여 둘 다 적는다.
                 const _cutGrpN = new Set(mergedCutParts.map(p => _woCutGroupKey(p))).size;
                 window._woBoringParts[sk] = mergedCutParts;
-                const poolInitC = (window._woBoring[sk].pool || []).map(k => {
-                    const p = mergedCutParts.find(pp => pp.cKey === k);
-                    return p ? _woCardHtml(p, sk) : '';
-                }).join('');
                 div.innerHTML = `
                     <div class="tl-dc-single-hdr" style="border-bottom:2px solid #e3e2e0;flex-shrink:0;">
                         <button class="tl-dc-back-btn" onclick="tlDcBackToGrid()">← 전체보기</button>
@@ -7628,15 +7611,6 @@
                     <div style="display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">
                         <div id="wo-boring-scroller-${sk}" style="flex:1;min-height:0;overflow-y:auto;overflow-x:auto;padding:0 16px 12px;overscroll-behavior:contain;">
                         <div class="wo-boring-board" id="wo-boring-grid-${sk}"></div>
-                        <div style="margin-top:10px;">
-                            <div style="font-size:9px;font-weight:700;color:${_pcColor};margin-bottom:4px;">미배정 부속</div>
-                            <div class="wo-boring-pool" id="zone-pool-${sk}"
-                                ondragover="woBoardDragOver(event)"
-                                ondrop="woBoardDrop(event,'pool',null,'${sk}')"
-                                ondragleave="woBoardDragLeave(event)">
-                                ${poolInitC || `<span style="font-size:9px;color:${_pcColor};padding:4px 0;">모두 배정됨 ✓</span>`}
-                            </div>
-                        </div>
                         </div><!-- /scroll-area -->
                     </div>`;
             } else {
@@ -8906,6 +8880,16 @@
             }
         }
 
+        // 미배정 자리에 남아 있는 카드를 기계로 올린다.
+        // 미배정이라는 자리를 없앴으므로 거기 남아 있으면 어디에도 안 보인다.
+        function _woDrainPool(sk, 기계) {
+            const st = window._woBoring[sk];
+            if (!st || !Array.isArray(st.pool) || !st.pool.length) return;
+            if (!Array.isArray(st[기계])) st[기계] = [];
+            st.pool.forEach(k => { if (!st[기계].includes(k)) st[기계].push(k); });
+            st.pool = [];
+        }
+
         // pool 섹션 재렌더 (상품명별 그룹화 + 배정 현황 표시)
         function _woRenderPool(sk) {
             const el = document.getElementById('zone-pool-' + sk);
@@ -9290,7 +9274,7 @@
         function _woMoveCardAt(target) {
             const el = target && target.closest && target.closest('.wo-boring-placed-card');
             if (!el) return null;
-            if (!/-재단$/.test(el.dataset.sk || '')) return null;   // 재단 판에서만
+            if (!el.dataset.sk || !el.dataset.mac) return null;   // 기계 판의 카드만 (재단·보링·엣지)
             if (el.dataset.done === '1') return null;
             if (target.closest('button, select, input, textarea, a')) return null;
             const col = el.closest('.wo-boring-mac-col');
@@ -9302,7 +9286,7 @@
             const el = cand.el, col = cand.col;
             window._woMove = {
                 sk: el.dataset.sk, mac: el.dataset.mac, cKey: el.dataset.ck,
-                el, col, startY: y, dy: 0, idx: null,
+                el, col, startX: 0, startY: y, dx: 0, dy: 0, idx: null,
                 scroller: document.getElementById('wo-boring-scroller-' + el.dataset.sk)
             };
             // 작업대의 '짚어서 지시' 시계를 끈다 — viggle.js 를 건드리지 않는 길
@@ -9318,7 +9302,9 @@
                 hint.className = 'wo-move-hint';
                 document.body.appendChild(hint);
             }
-            hint.textContent = '이동 — 끌어서 차례 바꾸기';
+            hint.textContent = _woGetMachines(el.dataset.sk).length > 1
+                ? `이동 → ${el.dataset.mac} · 끌어서 차례·기계 바꾸기`
+                : '이동 — 끌어서 차례 바꾸기';
             _woMoveDrawBar();
         }
 
@@ -9335,10 +9321,22 @@
             else m.col.insertBefore(bar, 형제[i]);
         }
 
-        function _woMoveMove(y) {
+        function _woMoveMove(x, y) {
             const m = window._woMove; if (!m) return;
-            m.dy = y - m.startY;
-            m.el.style.transform = `translateY(${m.dy}px) scale(1.02)`;
+            if (!m.startX) m.startX = x;
+            m.dx = x - m.startX; m.dy = y - m.startY;
+            m.el.style.transform = `translate(${m.dx}px, ${m.dy}px) scale(1.02)`;
+            // 손가락이 다른 기계 칸 위로 가면 그 칸으로 옮긴다.
+            // 미배정 자리를 없앴으므로 기계를 바꾸는 것이 카드를 빼는 유일한 길이다.
+            const 아래 = document.elementFromPoint(x, y);
+            const 칸 = 아래 && 아래.closest
+                ? 아래.closest(`.wo-boring-mac-col[data-sk="${m.sk}"]`) : null;
+            if (칸 && 칸 !== m.col) {
+                m.col = 칸;
+                m.mac = 칸.dataset.mac || m.mac;
+                const h = document.querySelector('.wo-move-hint');
+                if (h) h.textContent = `이동 → ${m.mac}`;
+            }
             m.idx = _woFindInsertIndex(m.col, y, m.cKey);
             _woMoveDrawBar();
             // 판 끝에 닿으면 조금씩 밀어 준다
@@ -9364,16 +9362,17 @@
             setTimeout(() => { _woMoveSwallowClick = false; }, 350);
             const state = window._woBoring[m.sk];
             if (!state || m.idx == null) return;
-            const entries = _woGetEntries(m.sk, m.mac).filter(x =>
-                (typeof x === 'string' ? x : x && x.cKey) !== m.cKey);
-            const 옛자리 = _woGetEntries(m.sk, m.mac).findIndex(x =>
-                (typeof x === 'string' ? x : x && x.cKey) === m.cKey);
+            const 이름 = x => (typeof x === 'string' ? x : x && x.cKey);
+            // 어느 기계에 있었든 빼고, 지금 손가락이 있는 칸에 꽂는다 (woBoardDrop 과 같다)
+            _woGetMachines(m.sk).forEach(mac => {
+                state[mac] = _woGetEntries(m.sk, mac).filter(x => 이름(x) !== m.cKey);
+            });
+            state.pool = (state.pool || []).filter(k => k !== m.cKey);
+            const entries = _woGetEntries(m.sk, m.mac);
             entries.splice(Math.max(0, Math.min(m.idx, entries.length)), 0, m.cKey);
             state[m.mac] = entries;
             _woRenderBoard(m.sk);
-            _woRenderPool(m.sk);
-            const 새자리 = entries.findIndex(x => (typeof x === 'string' ? x : x && x.cKey) === m.cKey);
-            if (옛자리 !== 새자리) _woSaveBoardOrder(m.sk);
+            _woSaveBoardOrder(m.sk);
         }
 
         document.addEventListener('pointerdown', (e) => {
@@ -9389,7 +9388,7 @@
         }, true);
 
         document.addEventListener('pointermove', (e) => {
-            if (window._woMove) { _woMoveMove(e.clientY); return; }
+            if (window._woMove) { _woMoveMove(e.clientX, e.clientY); return; }
             if (!_woMoveTimer || !_woMoveStart) return;
             if (Math.abs(e.clientX - _woMoveStart.x) > 10 || Math.abs(e.clientY - _woMoveStart.y) > 10) _woMoveCancelTimer();
         }, true);
