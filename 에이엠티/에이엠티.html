@@ -1483,7 +1483,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.26</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.27</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -5802,8 +5802,64 @@
             return { qty: defaultQty, changedBy: null, color: '#37352f', bg: '#f5f5f4', label: String(defaultQty) };
         };
 
+        // ── 실패 사유를 화면에 남긴다 ──────────────────────────────────────
+        // '시작 처리 실패' 한 마디만 띄우던 자리였다. 무엇이 잘못됐는지 알 수 없어
+        // 현장에서 아무 대응도 못 한다. 무슨 일인지(우리말)와 원래 오류(코드·메시지)를
+        // 같이, 읽을 수 있을 만큼 길게 보여준다. 폰 폭에 맞춰 줄바꿈한다.
+        window._작업실패알림 = function(title, why, raw) {
+            const _esc = s => String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            let el = document.getElementById('work-fail-toast');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'work-fail-toast';
+                el.style.cssText = 'position:fixed;top:16px;left:50%;transform:translateX(-50%);'
+                    // left:50% 로 띄운 고정 상자는 폭을 안 정해 주면 화면의 절반(187px)
+                    // 안에서만 줄바꿈한다 — 폰에서 글이 세로로 길게 늘어졌다. 폭을 못박는다.
+                    + 'width:min(400px,calc(100vw - 24px));box-sizing:border-box;'
+                    + 'background:#37352f;color:#fff;border-left:4px solid #dc2626;'
+                    + 'padding:12px 14px;border-radius:10px;z-index:10001;'
+                    + 'box-shadow:0 10px 24px -6px rgba(0,0,0,0.35);'
+                    + 'opacity:0;transition:opacity 0.2s ease;pointer-events:none;';
+                document.body.appendChild(el);
+            }
+            el.innerHTML = `<div style="font-weight:800;font-size:13px;margin-bottom:5px;">⚠ ${_esc(title)}</div>`
+                + `<div style="font-weight:600;font-size:12px;line-height:1.5;">${_esc(why)}</div>`
+                + (raw ? `<div style="margin-top:7px;font-size:10px;line-height:1.45;opacity:0.75;`
+                       + `word-break:break-all;white-space:pre-wrap;font-family:ui-monospace,monospace;">${_esc(raw)}</div>` : '');
+            el.style.opacity = '1';
+            clearTimeout(el._hideTimer);
+            el._hideTimer = setTimeout(() => { el.style.opacity = '0'; }, 9000);
+        };
+
+        // 파이어스토어 오류 코드를 현장에서 알아볼 말로 바꾼다
+        window._작업실패까닭 = function(err) {
+            const code = err?.code || '';
+            const msg  = String(err?.message || err || '');
+            if (code === 'permission-denied')  return '이 발주에 쓸 권한이 없습니다. 로그인이 풀렸는지 확인하세요.';
+            if (code === 'unauthenticated')    return '로그인이 풀렸습니다. 새로고침 후 다시 누르세요.';
+            if (code === 'not-found' || /No document to update/i.test(msg))
+                                               return '발주서 문서가 없습니다. 그 발주가 지워졌거나 발주번호가 어긋났습니다.';
+            if (code === 'invalid-argument')   return '저장할 자리 이름이 잘못돼 기록할 곳을 못 만들었습니다.';
+            if (code === 'unavailable' || code === 'deadline-exceeded')
+                                               return '인터넷이 끊겼습니다. 연결을 확인하고 다시 누르세요.';
+            return '알 수 없는 오류입니다. 아래 내용을 그대로 알려주세요.';
+        };
+
         window.tlMarkPartStarted = async function(docId, cardKey, procKey, startDate, btn, partName, defaultQty) {
-            if (!docId) return;
+            // 쓰기 전에 먼저 짚는다 — 셋 중 하나라도 비면 필드 경로가
+            // 'partStarted..재단' 처럼 깨져 파이어스토어가 쓰기를 통째로 거부한다.
+            // 점(.)이 섞여도 경로가 쪼개져 엉뚱한 자리에 쓰인다.
+            const _빈칸 = !docId ? '발주번호' : (!cardKey ? '부속키' : (!procKey ? '공정이름' : ''));
+            const _자리 = `발주=${docId || '(빈값)'} · 부속키=${cardKey || '(빈값)'} · 공정=${procKey || '(빈값)'}`;
+            if (_빈칸) {
+                _작업실패알림('시작 처리 실패', `${_빈칸} 가 비어 있어 기록할 자리를 못 찾았습니다.`, _자리);
+                return;
+            }
+            if (String(cardKey).includes('.') || String(procKey).includes('.')) {
+                _작업실패알림('시작 처리 실패', '부속키에 점(.)이 들어 있어 기록할 자리를 만들 수 없습니다.', _자리);
+                return;
+            }
             const { doc, updateDoc } = window.fbFirestore;
             const appId = "vivivic-4b7ef";
             try {
@@ -5838,7 +5894,8 @@
                 showToastMessage(`[${procKey}] 작업 시작 처리됐습니다.`);
             } catch (err) {
                 console.error('시작 처리 실패:', err);
-                showToastMessage('시작 처리 실패');
+                _작업실패알림('시작 처리 실패', _작업실패까닭(err),
+                    (err?.code ? `code=${err.code}\n` : '') + `${err?.message || err}\n${_자리}`);
                 if (btn) { btn.disabled = false; btn.textContent = '▶ 시작'; }
             }
         };
@@ -7925,11 +7982,28 @@
             primarySelectedCardId = null; secondarySelectedCardId = null; tertiarySelectedCardId = null;
         };
 
+        // ── 카드의 cKey 에서 부속키를 뽑는다 ────────────────────────────────
+        // cKey 는 두 갈래로 만들어진다.
+        //   ① 인라인 계산 카드 : `${orderKey}_card-{발주}-{행}`  → 앞의 orderKey 를 떼야 부속키
+        //   ② 재단계획 카드     : `cut_{confirmId}`               → orderKey 가 애초에 안 붙는다
+        // ②를 ①처럼 orderKey 길이만큼 잘라 오고 있었다. 재단편집으로 방금 저장한
+        // 계획은 confirmId 가 13자리 시각뿐이라 cKey 가 'cut_1789092660914'(17자)인데,
+        // 발주 문서 id 는 20자다 — 잘라 내면 빈 문자열이 된다. 그 빈 값이 그대로
+        // 파이어스토어 필드 경로에 들어가 'partStarted..재단' 이 되고, 쓰기가 통째로
+        // 거부된다(Invalid field path). 이것이 '시작 처리 실패' 의 정체였다.
+        // → 잘라 낸 결과가 비면 자르지 않고 cKey 를 그대로 쓴다. 이미 기록이 쌓인
+        //   카드(잘라도 값이 남는 경우)는 예전 그대로라 지난 시작·완료 기록을 잃지 않는다.
+        window._woPartKey = function(cKey, orderKey) {
+            const _ck = cKey || '';
+            if (!orderKey) return _ck;
+            return _ck.substring(orderKey.length + 1) || _ck;
+        };
+
         function _woCardHtml(p, stateKey) {
             // 완료 상태 확인
             const _wpk  = stateKey.replace(/^\d{4}-\d{2}-\d{2}-/, '');
             const _wdid = p.orderKey || '';
-            const _wck  = _wdid ? p.cKey.substring(_wdid.length + 1) : p.cKey;
+            const _wck  = _woPartKey(p.cKey, _wdid);
             const _wobj = confirmedOrders.find(o => (o.docId || String(o.idNum)) === _wdid);
             const _wDone    = !!(_wobj?.partCompletions?.[_wck]?.[_wpk]);
             const _wStarted = !!(_wobj?.partStarted?.[_wck]?.[_wpk]);
@@ -8049,7 +8123,7 @@
         function _woPlacedCardHtml(p, cKey, sk, mac, _boardColorMap) {
             const _bpk   = sk.replace(/^\d{4}-\d{2}-\d{2}-/, '');
             const _bdid  = p.orderKey || '';
-            const _bck   = _bdid ? cKey.substring(_bdid.length + 1) : cKey;
+            const _bck   = _woPartKey(cKey, _bdid);
             const _bobj  = confirmedOrders.find(o => (o.docId || String(o.idNum)) === _bdid);
             const _bQI   = _partQtyInfo(_bobj?.partCompletions?.[_bck], p.dq || 0);
             // 완료 등록 시 "사유 없이 등록 가능한 기준 수량" — 재단은 원장을
