@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.9.47 (2026-09-12) — 발주서를 거래처별 박스로 (전체보기 포함)
+     버전: v1.9.48 (2026-09-12) — 거래처 박스는 발주가 없어도 뜬다 (원장 명단)
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1759,7 +1759,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.47</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.48</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -1880,7 +1880,7 @@
 
             </div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.47</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.48</b></p>
         </div>
     </div>
 
@@ -3773,8 +3773,26 @@
             return _amtVendorOf(o) === v;
         }
 
+        // 원장에 적힌 거래처 명단 — 발주가 한 건도 없어도 박스는 있어야 한다
+        function _amtVendorsFromLedger() {
+            try {
+                if (!Array.isArray(currentFullData) || currentFullData.length < 2) return [];
+                const h = currentFullData[0];
+                const i = h.indexOf('ing발주처');
+                if (i < 0) return [];
+                const 모음 = new Set();
+                currentFullData.slice(1).forEach(r => {
+                    const v = (r && r[i] != null) ? String(r[i]).trim() : '';
+                    if (v) 모음.add(v);
+                });
+                return [...모음];
+            } catch (e) { return []; }
+        }
+
         function _amtVendorList() {
             const 셈 = new Map();
+            // 먼저 원장의 거래처를 0건으로 깔아 둔다 — 발주가 없다고 박스가 사라지면 안 된다
+            _amtVendorsFromLedger().forEach(v => 셈.set(v, { 대기: 0, 확정: 0 }));
             (confirmedOrders || []).forEach(o => {
                 if (o.amtConfirmedCancel) return;
                 const v = _amtVendorOf(o);
@@ -3782,7 +3800,13 @@
                 if (o.amtTimeline === true) 셈.get(v).확정++;
                 else if (o.amtRegistered !== true) 셈.get(v).대기++;
             });
-            return [...셈.entries()].sort((a, b) => a[0].localeCompare(b[0], 'ko'));
+            // 일이 있는 곳을 앞에, 그 다음 이름순. '거래처 없음' 은 늘 맨 뒤.
+            return [...셈.entries()].sort((a, b) => {
+                if ((a[0] === '거래처 없음') !== (b[0] === '거래처 없음')) return a[0] === '거래처 없음' ? 1 : -1;
+                const n = (x) => x[1].대기 + x[1].확정;
+                if (n(b) !== n(a)) return n(b) - n(a);
+                return a[0].localeCompare(b[0], 'ko');
+            });
         }
 
         window.amtVendorPick = function(v) {
