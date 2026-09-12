@@ -1314,8 +1314,9 @@
            하면서 익히게 한다. 이끄는 것만 더했다 — 발주 흐름은 그대로다.
            이름은 전부 jhh-/jhs- 로 시작한다.
            번쩍임은 늘 켜져 있지 않다 (johonGuideSync 참고):
-             · 전에 발주한 적이 있으면 꺼진다
-             · 지금 상품을 담고 있으면 꺼진다 (알림줄만 꺼지고 안쪽 단계는 남는다)
+             · 이 기계에서 발주를 한 번 마치면 번쩍임이 멎고 말풍선만 남는다
+             · 세 번 마치면 말풍선도 사라진다
+             · 지금 상품을 담고 있으면 쉰다 (안쪽 세 걸음은 남는다)
              · '그만 보기' 를 누르면 다시 켜지지 않는다 */
 
         /* 박스 판 — 발주하기 타일 위에 뜨는 말풍선 */
@@ -1338,12 +1339,12 @@
             70%  { box-shadow:0 0 0 10px rgba(17,17,16,0); }
             100% { box-shadow:0 0 0 0 rgba(17,17,16,0); }
         }
-        html[data-johoncall="1"] #johon-home .jhh-tile.jhh-call{
+        html[data-johonpulse="1"] #johon-home .jhh-tile.jhh-call{
             animation:jhh-ripple 1.9s ease-out infinite;
         }
         /* 움직임을 꺼 둔 폰에서는 테두리만 남긴다 */
         @media (prefers-reduced-motion: reduce){
-            html[data-johoncall="1"] #johon-home .jhh-tile.jhh-call{
+            html[data-johonpulse="1"] #johon-home .jhh-tile.jhh-call{
                 animation:none; box-shadow:0 0 0 3px rgba(17,17,16,.28);
             }
         }
@@ -1450,7 +1451,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.0.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.0.1</span>
                 </div>
                 <!-- 페이지 탭: 발주하기 / 작업중 -->
                 <div class="flex items-center gap-1 border border-[#ededeb] rounded-lg bg-[#f7f6f3] p-1 mr-2">
@@ -4538,15 +4539,26 @@
         /* ── 처음 쓰는 분 이끌기 ────────────────────────────────────────
            바깥 업체가 쓰는 프로그램이다. 설명서 대신 화면이 다음 걸음을 짚는다.
            업무 자료는 읽기만 한다 — 여기서 발주를 만들거나 지우지 않는다.
-           번쩍임이 늘 켜져 있으면 곧 눈에 안 들어오므로 이렇게 잦아든다.
-             · 전에 발주한 적이 있으면       → 말풍선·번쩍임·단계 도움 모두 꺼진다
-             · 지금 상품을 담고 있으면       → 말풍선·번쩍임만 꺼지고 단계 도움은 남는다
-             · '그만 보기' 를 누르면          → 이 기계에서 다시 켜지지 않는다 */
+
+           잦아드는 기준은 '그 회사가 전에 발주한 적 있는가' 가 아니라
+           '이 사람이 이 기계에서 발주를 끝까지 해 봤는가' 다. 회사로 따지면
+           거래처는 이미 다 발주 기록이 있어 아무에게도 안 뜬다 (v1.0.0 의 잘못).
+             · 이 기계에서 발주를 마친 적 없음 → 말풍선 + 번쩍임 + 세 걸음
+             · 한두 번 해 봤음               → 말풍선만, 번쩍임은 멈춘다
+             · 세 번 넘게 해 봤음            → 전부 꺼진다. 할 줄 아는 사람이다
+             · 지금 상품을 담고 있음         → 말풍선·번쩍임은 쉬고 세 걸음만 남는다
+             · '그만 보기' 를 누름            → 이 기계에서 다시 켜지지 않는다 */
         const JOHON_GUIDE_OFF = 'johon_guide_off';   // 사람이 껐다
-        const JOHON_ORDERED   = 'johon_ordered';     // 이 기계에서 발주한 적이 있다
+        const JOHON_DONE      = 'johon_done';        // 이 기계에서 발주를 마친 횟수
+        const JOHON_DONE_MAX  = 3;                   // 이만큼 해 봤으면 손을 뗀다
 
         function johonLS(k){ try { return localStorage.getItem(k); } catch (e) { return null; } }
-        function johonLSet(k){ try { localStorage.setItem(k, '1'); } catch (e) {} }
+        function johonLSet(k, v){ try { localStorage.setItem(k, v === undefined ? '1' : String(v)); } catch (e) {} }
+
+        function johonDoneCount(){
+            const v = parseInt(johonLS(JOHON_DONE) || '0', 10);
+            return isNaN(v) ? 0 : v;
+        }
 
         function johonGuideStop(){
             johonLSet(JOHON_GUIDE_OFF);
@@ -4557,25 +4569,41 @@
         function johonPendingCount(){
             try { return ((pendingOrdersMap || {})[appMode] || []).length; } catch (e) { return 0; }
         }
-        // 전에 발주한 적이 있는가 — 읽기만 한다
-        function johonEverOrdered(){
-            if (johonLS(JOHON_ORDERED) === '1') return true;
-            try {
-                const sup = getCurrentSupplier();
-                if ((confirmedOrders || []).some(o => o.supplier === sup)) { johonLSet(JOHON_ORDERED); return true; }
-            } catch (e) {}
-            return false;
-        }
+
+        // 발주확정이 끝나면 한 번 센다. 발주 흐름은 건드리지 않는다 —
+        // 원래 함수를 그대로 부르고 끝난 뒤에 옆에서 세기만 한다.
+        (function(){
+            const _origConfirm = window.confirmProductOrderBatch;
+            if (typeof _origConfirm !== 'function') return;
+            window.confirmProductOrderBatch = function(){
+                const r = _origConfirm.apply(this, arguments);
+                try {
+                    Promise.resolve(r).then(() => {
+                        // 보낸 것이 목록에서 비워졌을 때만 — 그게 성공한 자리다
+                        try {
+                            if (johonPendingCount() === 0) {
+                                johonLSet(JOHON_DONE, johonDoneCount() + 1);
+                                johonGuideSync();
+                            }
+                        } catch (e) {}
+                    }, () => {});
+                } catch (e) {}
+                return r;
+            };
+        })();
 
         function johonGuideSync(){
             const de = document.documentElement;
             const off  = johonLS(JOHON_GUIDE_OFF) === '1';
-            const live = !off && !johonEverOrdered();     // 도움을 아직 보여 줄 때
+            const done = johonDoneCount();
+            const live = !off && done < JOHON_DONE_MAX;   // 도움을 아직 보여 줄 때
             const n    = johonPendingCount();
-            const call = live && n === 0;                 // 말풍선·번쩍임
+            const call = live && n === 0;                 // 말풍선
+            const puls = call && done === 0;              // 번쩍임 — 처음 한 번뿐
 
             if (live) de.setAttribute('data-johonguide', '1'); else de.removeAttribute('data-johonguide');
             if (call) de.setAttribute('data-johoncall',  '1'); else de.removeAttribute('data-johoncall');
+            if (puls) de.setAttribute('data-johonpulse', '1'); else de.removeAttribute('data-johonpulse');
             if (!live) return;
 
             // 세 걸음 — 지금 어디인지 짚는다
