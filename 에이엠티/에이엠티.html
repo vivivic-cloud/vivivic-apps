@@ -1,7 +1,7 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.9.41 (2026-09-12) — 화면 속 판 번호와 맞춘다. 여기를 안 고쳐
-     두었더니 파일만 보고는 어느 판인지 알 수 없었다 (자세한 내력은 git 에)
+     버전: v1.9.42 (2026-09-12) — 기계 칸 머리글을 누르면 그 호기만 본다
+     (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
@@ -959,6 +959,22 @@
             padding: 0 8px;
             font-size: 11px; font-weight: 900; color: #787774; background: #f5f5f4;
         }
+        /* 머리글을 누르면 그 호기만 — 손가락이 닿는 자리다 */
+        .wo-boring-board-hdr { height: auto; min-height: 40px; }
+        .wo-boring-machine-hdr { min-height: 40px; }
+        .wo-boring-machine-hdr.tapable { cursor: pointer; }
+        .wo-boring-machine-hdr.tapable:active { filter: brightness(0.94); }
+        .wo-boring-machine-hdr.only { background: #37352f !important; color: #fff !important; }
+        .wo-mac-only-hint {
+            font-size: 9px; font-weight: 800; color: #787774;
+            background: #fff; border: 1px solid #e3e2e0; border-radius: 999px;
+            padding: 2px 6px; white-space: nowrap; flex-shrink: 0;
+        }
+        .wo-mac-only-btn {
+            font-size: 10px; font-weight: 800; color: #37352f;
+            background: #fff; border-radius: 999px;
+            padding: 3px 9px; white-space: nowrap; flex-shrink: 0;
+        }
         /* 콘텐츠 행 (기계별 세로 카드 목록) */
         .wo-boring-inner { display: flex; flex-direction: row; }
         .wo-boring-mac-col {
@@ -1714,7 +1730,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.41</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.42</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -1835,7 +1851,7 @@
 
             </div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.41</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.42</b></p>
         </div>
     </div>
 
@@ -8878,13 +8894,30 @@
                 `</div>`;
         }
 
+        /* 한 호기만 보기 — 기계 칸 머리글을 누르면 그 호기만 남는다.
+           폰에서 기계가 다섯이면 칸 하나가 100px 남짓이라 카드가 눌린다.
+           한 호기만 보면 그 칸이 화면 너비를 다 써서 카드가 넓게 보인다.
+           머리글에는 여태 아무 일도 걸려 있지 않아 부딪힐 것이 없다.
+           옮기기·시작·완료는 그리는 자리만 줄었을 뿐이라 그대로 듣는다. */
+        window._woOnlyMac = {};
+        window._woSetOnlyMac = function(sk, mac) {
+            window._woOnlyMac[sk] = mac || null;
+            _woRenderBoard(sk);
+            const sc = document.getElementById('wo-boring-scroller-' + sk);
+            if (sc) { sc.scrollLeft = 0; sc.scrollTop = 0; }
+        };
+
         function _woRenderBoard(sk) {
             const grid = document.getElementById('wo-boring-grid-' + sk);
             if (!grid) return;
             const parts  = window._woBoringParts[sk] || [];
             const state  = window._woBoring[sk];
             if (!state) return;
-            const machines = _woGetMachines(sk);
+            const _모든기계 = _woGetMachines(sk);
+            const _한호기 = (window._woOnlyMac || {})[sk];
+            // 그리는 칸만 줄인다. 옮기기는 _woGetMachines 로 모든 기계를 훑으므로
+            // 다른 호기에 있던 카드도 그대로 걷힌다.
+            const machines = (_한호기 && _모든기계.includes(_한호기)) ? [_한호기] : _모든기계;
             const procMeta  = _woGetProcMeta(sk);
             // 공정색을 CSS 변수로 주입 → placed 카드 border + drag-over 강조에 자동 적용
             grid.style.setProperty('--wo-proc-color', procMeta.color);
@@ -8899,11 +8932,19 @@
             const _isCut   = !!_woGrpProcOf(sk);   // 상품 겹을 두는 판인가
             const _grpStat = _isCut ? _woCutGroupStats(sk, parts) : null;
 
-            // ── 헤더 HTML (기계 목록 동적) — 기계명만 (공유 링크 단추는 걷어냈다)
+            // ── 헤더 HTML (기계 목록 동적) — 누르면 그 호기만 보인다
+            const _j = v => String(v == null ? '' : v).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
             let html = `<div class="wo-boring-board-hdr">` +
                 machines.map(m =>
-                    `<div class="wo-boring-machine-hdr" style="color:#1a1a1a;background:${procMeta.colorAlpha};">` +
+                    // 기계가 하나뿐인 판(재단)은 누를 일이 없다 — 잠가 둔다
+                    `<div class="wo-boring-machine-hdr${_한호기 ? ' only' : ''}${_모든기계.length > 1 ? ' tapable' : ''}"` +
+                    ` style="color:#1a1a1a;background:${procMeta.colorAlpha};"` +
+                    (_모든기계.length > 1
+                        ? ` onclick="_woSetOnlyMac('${_j(sk)}', ${_한호기 ? 'null' : `'${_j(m)}'`})"` : '') + `>` +
                         `<span>${m}</span>` +
+                        (_한호기
+                            ? `<span class="wo-mac-only-btn">← 전체 호기</span>`
+                            : (_모든기계.length > 1 ? `<span class="wo-mac-only-hint">이 호기만 ▸</span>` : '')) +
                     `</div>`).join('') +
                 `</div>`;
 
