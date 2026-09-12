@@ -1713,7 +1713,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.40</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.41</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -1834,7 +1834,7 @@
 
             </div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.40</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.41</b></p>
         </div>
     </div>
 
@@ -8920,7 +8920,7 @@
                 html += _woBreakInsertStripHtml(sk, mac, 0);
 
                 if (entries.length === 0) {
-                    html += `<div class="wo-boring-empty-col-hint">여기로 카드를 드래그하세요</div>`;
+                    html += `<div class="wo-boring-empty-col-hint">카드를 길게 눌러 여기로 옮기세요</div>`;
                 }
 
                 let _curGrp = null, _curOpen = true;
@@ -9231,7 +9231,7 @@
             banner.innerHTML =
                 `<span>🔄 기기 변경 모드</span>` +
                 `<strong style="font-size:13px;">${orderName}</strong>` +
-                `<span style="font-weight:500;color:#a8580c;">— 카드를 드래그해 기계를 변경하세요. 관련 부속이 모두 함께 이동됩니다.</span>` +
+                `<span style="font-weight:500;color:#a8580c;">— 카드를 길게 눌러 기계를 바꾸세요. 관련 부속이 모두 함께 이동됩니다.</span>` +
                 `<button onclick="window._woExitMacChangeMode()" style="margin-left:auto;font-size:11px;font-weight:700;color:#92400e;background:#fde68a;border:1.5px solid #f59e0b;border-radius:5px;padding:3px 10px;cursor:pointer;">✕ 취소 (ESC)</button>`;
             banner.classList.add('on');
         };
@@ -9386,6 +9386,7 @@
             // 작업대의 '짚어서 지시' 시계를 끈다 — viggle.js 를 건드리지 않는 길
             try { window.dispatchEvent(new Event('scroll')); } catch (e) {}
             el.classList.add('wo-move-on');
+            window._woMove.밀개 = setInterval(_woMoveEdgeScroll, 60);
             // 넓은 화면의 기존 끌어놓기(draggable)와 겹치지 않게 잠깐 꺼 둔다.
             // 손을 떼면 _woRenderBoard 가 카드를 다시 그리며 원래대로 돌려 놓는다.
             el.setAttribute('draggable', 'false');
@@ -9459,17 +9460,44 @@
             if (m.gk != null) m.beforeGk = _woGrpBefore(m.col, y, m.gk);
             else m.idx = _woFindInsertIndex(m.col, y, m.cKey);
             _woMoveDrawBar();
-            // 판 끝에 닿으면 조금씩 밀어 준다
-            const sc = m.scroller;
-            if (sc) {
-                const r = sc.getBoundingClientRect();
-                if (y < r.top + 70)         sc.scrollTop -= 12;
-                else if (y > r.bottom - 70) sc.scrollTop += 12;
+            // 판 끝에 닿으면 조금씩 밀어 준다.
+            // 엣지·보링 판은 기계 칸이 화면보다 넓어 옆으로 굴러간다(375px 에 두 칸 반).
+            // 옆으로도 밀어 주지 않으면 3호기 뒤로는 손가락이 닿지 않는다.
+            m.lastX = x; m.lastY = y;
+            _woMoveEdgeScroll();
+        }
+
+        // 손가락이 판 가장자리에 있으면 판을 민다. 손가락이 멈춰 있어도
+        // 계속 밀리도록 이동이 켜져 있는 동안 되풀이해 부른다.
+        function _woMoveEdgeScroll() {
+            const m = window._woMove; if (!m || !m.scroller) return;
+            const r = m.scroller.getBoundingClientRect();
+            const x = m.lastX, y = m.lastY;
+            if (x == null || y == null) return;
+            let 밀었나 = false;
+            if (y < r.top + 70)         { m.scroller.scrollTop  -= 12; 밀었나 = true; }
+            else if (y > r.bottom - 70) { m.scroller.scrollTop  += 12; 밀었나 = true; }
+            if (x < r.left + 56)        { m.scroller.scrollLeft -= 16; 밀었나 = true; }
+            else if (x > r.right - 56)  { m.scroller.scrollLeft += 16; 밀었나 = true; }
+            // 판이 밀렸으면 손가락 밑의 기계 칸이 달라졌을 수 있다 — 다시 가린다
+            if (밀었나) {
+                const 아래 = document.elementFromPoint(x, y);
+                const 칸 = 아래 && 아래.closest ? 아래.closest(`.wo-boring-mac-col[data-sk="${m.sk}"]`) : null;
+                if (칸 && 칸 !== m.col) {
+                    m.col = 칸;
+                    m.mac = 칸.dataset.mac || m.mac;
+                    const h = document.querySelector('.wo-move-hint');
+                    if (h) h.textContent = m.gk != null ? `상품 이동 → ${m.mac}` : `이동 → ${m.mac}`;
+                }
+                if (m.gk != null) m.beforeGk = _woGrpBefore(m.col, y, m.gk);
+                else m.idx = _woFindInsertIndex(m.col, y, m.cKey);
+                _woMoveDrawBar();
             }
         }
 
         function _woMoveEnd() {
             const m = window._woMove;
+            if (m && m.밀개) { clearInterval(m.밀개); m.밀개 = null; }
             _woMoveCancelTimer();
             const bar = document.querySelector('.wo-move-bar'); if (bar) bar.remove();
             const hint = document.querySelector('.wo-move-hint'); if (hint) hint.remove();
