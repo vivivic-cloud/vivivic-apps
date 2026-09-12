@@ -70,6 +70,17 @@ button,input,textarea,select{font:inherit;color:inherit}
   font-size:2.6mm;color:rgba(17,17,16,.55)}
 .it.sel{outline:1.5px solid var(--ink);outline-offset:1px}
 .it img{width:100%;height:100%;object-fit:contain;display:block;pointer-events:none}
+/* 자른 그림 — 원본은 그대로 두고, 고른 조각만 상자에 꽉 채워 보인다.
+   상자 크기는 건드리지 않는다(사이즈 변동 없이 자르기). 넘치는 만큼만 가린다.
+   그림의 자리·크기는 자바스크립트가 mm 로 박아 넣는다 → 인쇄에도 그대로 간다 */
+.it.잘림{overflow:hidden}
+.it.자르는중{overflow:hidden}
+.it.자르는중 .grip,.it.자르는중 .del{display:none}
+/* 고르는 판 — 손가락으로 끌어 네모를 그린다. draggable 은 손가락으로 안 된다 */
+.croplayer{position:absolute;inset:0;z-index:60;touch-action:none;background:rgba(17,17,16,.34)}
+.croplayer.그림{background:transparent}
+.cropbox{position:absolute;display:none;border:0.5mm dashed #fff;
+  box-shadow:0 0 0 9999px rgba(17,17,16,.45)}
 .it .tx{width:100%;height:100%;padding:2mm;border:0;background:transparent;resize:none;
   outline:none;overflow:hidden;white-space:pre-wrap;word-break:break-word}
 .it .cap{position:absolute;left:0;right:0;bottom:-4.6mm;font-size:2.6mm;color:var(--muted);
@@ -92,6 +103,15 @@ button,input,textarea,select{font:inherit;color:inherit}
 .tools::-webkit-scrollbar{display:none}
 .tools .b{min-height:40px}
 .hint{padding:10px 14px;color:var(--muted);font-size:12.5px;text-align:center}
+/* 자르기·붙이기 띠 — 아래 도구 자리를 그대로 물려받는다.
+   손잡이가 종이 안에 있으면 배율만큼 작아져 손가락이 안 닿는다. 띠는 밖에 둔다 */
+.cropbar{position:fixed;left:0;right:0;bottom:0;z-index:55;background:var(--ink);color:#fff;
+  padding:8px 10px calc(8px + env(safe-area-inset-bottom));
+  display:flex;align-items:center;gap:7px;overflow-x:auto;scrollbar-width:none}
+.cropbar::-webkit-scrollbar{display:none}
+.cropbar[hidden]{display:none}
+.cropbar .cw{flex:1;min-width:96px;font-size:12.5px;font-weight:700;line-height:1.3}
+.cropbar .b{min-height:40px;background:#fff;color:var(--ink);border-color:#fff}
 .warn{position:sticky;top:0;z-index:45;background:var(--red);color:#fff;font-size:13px;
   font-weight:700;padding:9px 14px;text-align:center;line-height:1.45}
 
@@ -123,7 +143,7 @@ button,input,textarea,select{font:inherit;color:inherit}
   /* 작업대에서 손잡이를 달고 연 경우(?viggle=1) 떠 있는 것들. position:fixed 라
      인쇄하면 장마다 '길게 눌러 짚어서 지시' 가 박힌다 — 종이에 나올 것이 아니다.
      짚은 자리 표시(vg-mark)는 본문에 붙으므로 건드리지 않는다 */
-  .vg-hint,.vg-toast,.vg-sheet{display:none !important}
+  .vg-hint,.vg-toast,.vg-sheet,.cropbar,.croplayer{display:none !important}
   /* 무대는 화면에서 가로로 밀어 보는 칸이다. 그대로 두면 웹킷이 인쇄할 때
      보이는 만큼만 남기고 잘라 낸다 — 뒷장이 통째로 빠진다 */
   .stage{padding:0;display:block;gap:0;overflow:visible !important}
@@ -184,7 +204,21 @@ PDF·PPT 를 불러오면 <b>한 장이 한 쪽</b>이 됩니다. 비율은 원�
     <button data-n="right">▶</button>
   </span>
   <button class="b" id="step">1mm</button>
+  <button class="b" id="crop">자르기</button>
+  <button class="b" id="uncrop">자르기 되돌리기</button>
   <button class="b" id="clear">모두 지우기</button>
+</div>
+
+<!-- 자를 자리를 고르는 동안 아래 도구 대신 뜬다 -->
+<div class="cropbar" id="cropbar" hidden>
+  <span class="cw" id="cropmsg">사진 위에서 손가락으로 끌어 네모를 그리세요</span>
+  <button class="b" id="cropdo">이 부분만</button>
+  <button class="b" id="cropcopy">복사</button>
+  <button class="b" id="cropend">그만</button>
+</div>
+<div class="cropbar" id="pastebar" hidden>
+  <span class="cw">복사했습니다 · 붙일 곳을 누르세요</span>
+  <button class="b" id="pasteend">그만</button>
 </div>
 
 <!-- 아이폰은 accept 에 image/* 가 섞여 있으면 "사진 보관함 / 사진 찍기 / 파일 선택"
@@ -249,6 +283,7 @@ function 그리기(){
     칸나누기(sh, n);
     것들.forEach(it => sh.appendChild(만들기(it, n, sh)));
     sh.addEventListener('pointerdown', e => {
+      if (복사함 && !자르는것){ e.preventDefault(); e.stopPropagation(); 붙이기(sh, n, e); return; }
       지금장 = n;
       // 빈 자리를 누를 때 통째로 다시 그리면, 짚은 칸이 그 자리에서 사라진다.
       // 손잡이는 그 다음(mousedown)에 무엇을 짚었는지 읽으므로 자리를 잃는다.
@@ -304,6 +339,41 @@ function 고름지우기(){
   });
 }
 
+/* ── 그림 자르기 ─────────────────────────────────────
+   자르기는 원본을 건드리지 않는다. it.잘라 = {x,y,w,h} (원본 그림에 대한 비,
+   0~1) 만 적어 둔다. 그래서 언제든 되돌릴 수 있고, 사진을 다시 불러올 일이 없다.
+
+   상자 크기(it.w·it.h)는 자를 때 그대로 둔다 — "사이즈 변동 없이".
+   고른 조각이 상자를 덮도록 원본을 키워 앉히고, 넘치는 부분만 가린다.
+   늘리지 않으므로 찌그러지지 않는다. */
+function 그림자리(it, nw, nh){
+  const 비 = (nh || 1) / (nw || 1);
+  const c = it.잘라;
+  if (!c){                                   // 안 자른 그림 — 지금까지처럼 상자 안에 담는다
+    let W = it.w, H = it.w * 비;
+    if (H > it.h){ H = it.h; W = it.h / 비; }
+    return { W, H, left: (it.w - W) / 2, top: (it.h - H) / 2, 비 };
+  }
+  const W = Math.max(it.w / c.w, it.h / (비 * c.h));
+  const H = W * 비;
+  return { W, H, left: it.w / 2 - (c.x + c.w / 2) * W,
+                 top:  it.h / 2 - (c.y + c.h / 2) * H, 비 };
+}
+/* 안 자른 그림은 손대지 않는다 — 지금 나오는 인쇄 결과를 그대로 둔다 */
+function 그림앉히기(el, img, it){
+  if (!it.잘라){ el.classList.remove('잘림'); img.removeAttribute('style'); return; }
+  const 하기 = () => {
+    if (!it.잘라) return;
+    const g = 그림자리(it, img.naturalWidth, img.naturalHeight);
+    el.classList.add('잘림');
+    img.style.cssText = 'position:absolute;object-fit:fill;max-width:none;max-height:none;'
+      + 'width:' + g.W + 'mm;height:' + g.H + 'mm;'
+      + 'left:' + g.left + 'mm;top:' + g.top + 'mm';
+  };
+  if (img.complete && img.naturalWidth) 하기();
+  else img.addEventListener('load', 하기, { once: true });
+}
+
 function 만들기(it, 장번호, sh){
   const el = document.createElement('div');
   el.className = 'it' + (고른것 === it.id ? ' sel' : '');
@@ -315,6 +385,7 @@ function 만들기(it, 장번호, sh){
   if (it.종류 === 'img'){
     const img = document.createElement('img');
     img.src = it.src; el.appendChild(img);
+    그림앉히기(el, img, it);
     if (it.이름){ const c = document.createElement('span'); c.className = 'cap'; c.textContent = it.이름; el.appendChild(c); }
   } else if (it.종류 === 'line'){
     el.style.borderTop = '0.4mm solid #111110';
@@ -669,6 +740,159 @@ document.querySelectorAll('[data-z]').forEach(b => b.onclick = () => {
   자리배율 = Math.max(.3, Math.min(2.5, 자리배율 + (b.dataset.z === '+' ? .15 : -.15)));
   맞추기();
 });
+
+/* ── 그림 안에서 끌어 골라 자르기 · 복사 · 붙이기 ──────
+   고르는 판(.croplayer)을 그림 위에 덮고 pointer 로 네모를 그린다.
+   HTML5 draggable 은 손가락으로 아예 시작되지 않아 쓰지 않는다.
+   네모는 상자에 대한 비(0~1)로 잡았다가, 누를 때 원본 그림의 비로 옮긴다 —
+   이미 잘린 그림을 또 잘라도 셈이 맞는다. */
+let 자르는것 = null, 자르는판 = null, 고른네모 = null, 복사함 = null;
+
+function 튕김(단추, 글){
+  const 본 = 단추.textContent; 단추.textContent = 글;
+  setTimeout(() => { 단추.textContent = 본; }, 1400);
+}
+function 띠(어느){
+  $('cropbar').hidden  = 어느 !== 'crop';
+  $('pastebar').hidden = 어느 !== 'paste';
+  document.querySelector('.tools').style.display = 어느 ? 'none' : '';
+}
+
+function 자르기시작(){
+  const it = 지금것();
+  if (!it || it.종류 !== 'img') return 튕김($('crop'), '사진을 고르세요');
+  const el = 무대.querySelector('.it[data-id="' + it.id + '"]');
+  if (!el) return;
+  자르기끝();
+  자르는것 = it;
+  el.classList.add('자르는중');
+  자르는판 = document.createElement('div');
+  자르는판.className = 'croplayer';
+  const 네모칸 = document.createElement('div');
+  네모칸.className = 'cropbox';
+  자르는판.appendChild(네모칸);
+  el.appendChild(자르는판);
+  고른네모 = null;
+  $('cropmsg').textContent = '사진 위에서 손가락으로 끌어 네모를 그리세요';
+  띠('crop');
+
+  let 시작 = null;
+  const 비율 = (cx, cy) => {
+    const r = 자르는판.getBoundingClientRect();
+    return { x: Math.max(0, Math.min(1, (cx - r.left) / r.width)),
+             y: Math.max(0, Math.min(1, (cy - r.top) / r.height)) };
+  };
+  const 그리기네모 = () => {
+    if (!고른네모){ 네모칸.style.display = 'none'; 자르는판.classList.remove('그림'); return; }
+    네모칸.style.display = 'block';
+    자르는판.classList.add('그림');
+    네모칸.style.left = (고른네모.x * 100) + '%';
+    네모칸.style.top = (고른네모.y * 100) + '%';
+    네모칸.style.width = (고른네모.w * 100) + '%';
+    네모칸.style.height = (고른네모.h * 100) + '%';
+  };
+  const 움직임 = e => {
+    if (!시작) return;
+    const p2 = 비율(e.clientX, e.clientY);
+    고른네모 = { x: Math.min(시작.x, p2.x), y: Math.min(시작.y, p2.y),
+                 w: Math.abs(p2.x - 시작.x), h: Math.abs(p2.y - 시작.y) };
+    그리기네모();
+  };
+  const 끝 = () => {
+    document.removeEventListener('pointermove', 움직임);
+    document.removeEventListener('pointerup', 끝);
+    document.removeEventListener('pointercancel', 끝);
+    시작 = null;
+    if (고른네모 && (고른네모.w < .04 || 고른네모.h < .04)){ 고른네모 = null; 그리기네모(); }
+    $('cropmsg').textContent = 고른네모 ? '고른 부분으로 자르거나 복사합니다'
+                                        : '사진 위에서 손가락으로 끌어 네모를 그리세요';
+  };
+  자르는판.addEventListener('pointerdown', e => {
+    e.preventDefault(); e.stopPropagation();
+    시작 = 비율(e.clientX, e.clientY);
+    고른네모 = null; 그리기네모();
+    document.addEventListener('pointermove', 움직임);
+    document.addEventListener('pointerup', 끝);
+    document.addEventListener('pointercancel', 끝);
+  });
+}
+
+function 자르기끝(){
+  if (자르는판) 자르는판.remove();
+  무대.querySelectorAll('.it.자르는중').forEach(el => el.classList.remove('자르는중'));
+  자르는판 = null; 자르는것 = null; 고른네모 = null;
+  띠(복사함 ? 'paste' : null);
+}
+
+/* 상자에 대한 비 → 원본 그림에 대한 비. 이미 잘린 그림도 셈이 맞는다 */
+function 네모를원본으로(it, 네모, img){
+  const g = 그림자리(it, img.naturalWidth, img.naturalHeight);
+  const 가 = v => Math.max(0, Math.min(1, v));
+  const x1 = 가((네모.x * it.w - g.left) / g.W);
+  const x2 = 가(((네모.x + 네모.w) * it.w - g.left) / g.W);
+  const y1 = 가((네모.y * it.h - g.top) / g.H);
+  const y2 = 가(((네모.y + 네모.h) * it.h - g.top) / g.H);
+  if (x2 - x1 < .02 || y2 - y1 < .02) return null;   // 그림 바깥만 골랐다
+  return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
+}
+function 고른것원본네모(){
+  if (!자르는것 || !고른네모) return null;
+  const img = 무대.querySelector('.it[data-id="' + 자르는것.id + '"] img');
+  if (!img || !img.naturalWidth) return null;
+  return { 네모: 네모를원본으로(자르는것, 고른네모, img), nw: img.naturalWidth, nh: img.naturalHeight };
+}
+
+$('crop').onclick = 자르기시작;
+$('cropend').onclick = () => 자르기끝();
+
+/* 이 부분만 — 상자 크기는 그대로, 고른 조각만 남긴다 */
+$('cropdo').onclick = () => {
+  const r = 고른것원본네모();
+  if (!r || !r.네모) return 튕김($('cropdo'), '네모를 그리세요');
+  자르는것.잘라 = r.네모;
+  const id = 자르는것.id;
+  자르기끝(); 저장(true); 그리기(); 고르기(id);
+};
+
+/* 복사 — 고른 조각을 담아 두고, 다음에 누른 자리에 새 그림으로 붙인다.
+   원본은 그대로 둔다 */
+$('cropcopy').onclick = () => {
+  const r = 고른것원본네모();
+  if (!r || !r.네모) return 튕김($('cropcopy'), '네모를 그리세요');
+  복사함 = { src: 자르는것.src, 잘라: r.네모,
+             비: (r.nh * r.네모.h) / (r.nw * r.네모.w) };
+  자르기끝();
+  띠('paste');
+};
+$('pasteend').onclick = () => { 복사함 = null; 띠(null); };
+
+/* 누른 자리에 붙인다. 그 자리를 가운데로 삼고 종이 안으로 끌어들인다 */
+function 붙이기(sh, 장번호, e){
+  const [W, H] = 지금크기();
+  const r = sh.getBoundingClientRect();
+  const mx = (e.clientX - r.left) / 배율 / px1mm;
+  const my = (e.clientY - r.top) / 배율 / px1mm;
+  let w = Math.min(80, W - 여백 * 2), h = w * 복사함.비;
+  if (h > H - 여백 * 2){ h = H - 여백 * 2; w = h / 복사함.비; }
+  const it = { id: 새id(), 종류: 'img', src: 복사함.src, 이름: '', 잘라: 복사함.잘라,
+               x: Math.max(0, Math.min(W - w, mx - w / 2)),
+               y: Math.max(0, Math.min(H - h, my - h / 2)), w, h,
+               z: (문서.장들[장번호] || []).reduce((n, x) => Math.max(n, x.z || 1), 0) + 1 };
+  if (!문서.장들[장번호]) 문서.장들[장번호] = [];
+  문서.장들[장번호].push(it);
+  복사함 = null; 띠(null);
+  지금장 = 장번호; 고른것 = it.id;
+  저장(true); 그리기();
+}
+
+/* 자르기 되돌리기 — 잘라 둔 표만 뗀다. 원본은 한 번도 건드린 적이 없다 */
+$('uncrop').onclick = () => {
+  const it = 지금것();
+  if (!it || it.종류 !== 'img') return 튕김($('uncrop'), '사진을 고르세요');
+  if (!it.잘라) return 튕김($('uncrop'), '안 잘린 사진입니다');
+  delete it.잘라;
+  저장(true); 그리기(); 고르기(it.id);
+};
 
 /* ── 방향 ───────────────────────────────────────────── */
 $('orient').addEventListener('click', e => {
