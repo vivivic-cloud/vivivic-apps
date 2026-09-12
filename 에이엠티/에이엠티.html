@@ -1713,7 +1713,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.39</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.40</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -1834,7 +1834,7 @@
 
             </div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.39</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.40</b></p>
         </div>
     </div>
 
@@ -9450,11 +9450,11 @@
             const 아래 = document.elementFromPoint(x, y);
             const 칸 = 아래 && 아래.closest
                 ? 아래.closest(`.wo-boring-mac-col[data-sk="${m.sk}"]`) : null;
-            if (칸 && 칸 !== m.col && m.gk == null) {
+            if (칸 && 칸 !== m.col) {
                 m.col = 칸;
                 m.mac = 칸.dataset.mac || m.mac;
                 const h = document.querySelector('.wo-move-hint');
-                if (h) h.textContent = `이동 → ${m.mac}`;
+                if (h) h.textContent = m.gk != null ? `상품 이동 → ${m.mac}` : `이동 → ${m.mac}`;
             }
             if (m.gk != null) m.beforeGk = _woGrpBefore(m.col, y, m.gk);
             else m.idx = _woFindInsertIndex(m.col, y, m.cKey);
@@ -9485,17 +9485,25 @@
             const 이름 = x => (typeof x === 'string' ? x : x && x.cKey);
             // ── 상품 줄을 옮긴 경우: 그 상품의 재단도 카드를 다 데리고 간다 ──
             if (m.gk != null) {
-                const entries0 = _woGetEntries(m.sk, m.mac);
-                const 내것 = entries0.filter(x => typeof x === 'string' && _woGrpOfKey(m.sk, x) === m.gk);
+                const 기계들 = _woGetMachines(m.sk);
+                const 내것인가 = x => typeof x === 'string' && _woGrpOfKey(m.sk, x) === m.gk;
+                // 이 상품의 카드를 어느 기계에 있든 다 걷는다. 놓인 차례는 그대로 둔다.
+                let 내것 = [];
+                기계들.forEach(mac => { 내것 = 내것.concat(_woGetEntries(m.sk, mac).filter(내것인가)); });
                 if (!내것.length) return;
-                const 나머지 = entries0.filter(x => !(typeof x === 'string' && _woGrpOfKey(m.sk, x) === m.gk));
-                let 자리 = 나머지.length;
+                기계들.forEach(mac => {
+                    state[mac] = _woGetEntries(m.sk, mac).filter(x => !내것인가(x));
+                });
+                state.pool = (state.pool || []).filter(k => !내것인가(k));
+                // 손가락이 있는 칸에 통째로 꽂는다. 같은 칸이면 차례만 바뀐다.
+                const 받는칸 = _woGetEntries(m.sk, m.mac);
+                let 자리 = 받는칸.length;
                 if (m.beforeGk != null) {
-                    const i = 나머지.findIndex(x => typeof x === 'string' && _woGrpOfKey(m.sk, x) === m.beforeGk);
+                    const i = 받는칸.findIndex(x => typeof x === 'string' && _woGrpOfKey(m.sk, x) === m.beforeGk);
                     if (i >= 0) 자리 = i;
                 }
-                나머지.splice(자리, 0, ...내것);
-                state[m.mac] = 나머지;
+                받는칸.splice(자리, 0, ...내것);
+                state[m.mac] = 받는칸;
                 _woRenderBoard(m.sk);
                 _woSaveBoardOrder(m.sk);
                 return;
