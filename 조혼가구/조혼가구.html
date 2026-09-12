@@ -262,28 +262,21 @@
         .ordered-item:hover { background-color: #fbfbfa; }
 
         /* ── 카드 힌트 툴팁 ── */
-        .card-hint-wrap { position: relative; display: inline-block; }
+        .card-hint-wrap { position: relative; display: inline-flex;
+                           flex-direction: column; align-items: stretch; min-width: 0; }
+        /* 칸마다 붙는 안내. 마우스를 얹어야 보이는 툴팁이었는데, 폰에는 얹는 것이
+           없어 아무에게도 안 보였다. 늘 보이는 작고 흐린 한 줄로 바꾼다.
+           다섯 자리(검색칸·부속발주·상품명·입고요청일·수량)를 한 모양으로 맞췄다. */
         .card-hint {
-            /* 안 보일 때는 자리도 차지하지 않게 한다(display:none).
-               visibility:hidden 이면 숨은 채로 폭을 차지해, 글이 길어지면
-               화면 오른쪽으로 삐져나가 가로 스크롤이 생긴다. */
-            display: none;
-            position: absolute; bottom: calc(100% + 6px); left: 50%;
-            transform: translateX(-50%);
-            background: #37352f; color: #ffffff;
-            font-size: 11px; font-weight: 600;
-            /* 긴 글은 접어서 보여 준다 — 한 줄로 두면 화면을 벗어난다 */
-            white-space: normal; text-align: center; line-height: 1.35;
-            max-width: min(72vw, 260px); width: max-content;
-            padding: 5px 10px; border-radius: 6px;
-            pointer-events: none; z-index: 999;
+            display: block; position: static; transform: none;
+            margin: 2px 0 0; padding: 0; border-radius: 0;
+            background: none; color: #b0aeaa;
+            font-size: 10px; font-weight: 600; line-height: 1.3; text-align: left;
+            white-space: nowrap; pointer-events: none;
         }
-        .card-hint::after {
-            content: ''; position: absolute; top: 100%; left: 50%;
-            transform: translateX(-50%);
-            border: 5px solid transparent; border-top-color: #37352f;
-        }
-        .card-hint-wrap:hover .card-hint { display: block; }
+        .card-hint::after { display: none; }
+        /* 상품명 칸의 안내가 이름 길이가 아니라 칸 폭을 갖게 한다 */
+        .jh-name-cell .card-hint-wrap { flex:1 1 auto; min-width:0; width:100%; }
         
         .notion-select, .notion-input {
             appearance: none; background-color: #ffffff; border: 1px solid #ededeb; border-radius: 6px;
@@ -1172,8 +1165,10 @@
         /* 자막이동 — 긴 글이 오른쪽에서 왼쪽으로 흐른다.
            CSS 애니메이션이 아니라 자바스크립트가 민다(johonMarqTick).
            아이폰의 '동작 줄이기'·저전력 모드에서 CSS 가 멎어도 글이 사라지지 않게. */
-        .jh-marq{ box-sizing:border-box; display:block; flex:1 1 0%; min-width:0; width:0;
+        .jh-marq{ box-sizing:border-box; display:block; min-width:0;
                    position:relative; height:1.4em; overflow:hidden; }
+        .btn-part-order .jh-marq{ flex:1 1 0%; width:0; }
+        .card-hint.jh-marq{ width:100%; height:1.3em; }
         /* 글을 자리에서 띄워 둔다 — 그래야 흘러도 화면 폭을 넓히지 않는다 */
         .jh-marq > span{ position:absolute; left:0; top:0; white-space:nowrap;
                          will-change:transform; }
@@ -1185,6 +1180,8 @@
         .method-chip.on em { color:#fff; opacity:.7; }
 
         @media (min-width: 768px) {
+          /* 넓은 화면에서는 줄이 한 줄이므로, 안내가 흐르지 않게 칸에 자리를 준다 */
+          .jh-right .jh-cell { min-width: 190px; }
           .method-pick { display:flex; gap:6px; }
           .method-chip { min-height:34px; padding:0 14px; font-size:12px; }
         }
@@ -1209,6 +1206,14 @@
           .jh-pick-box { padding:10px 7px; }
           .jh-pick-box .jh-pick-tip { padding:0 3px; }
           .jh-pick-box .method-chip { padding:0 3px; }
+          /* 발주상품목록 줄 — 칸을 세로로 쌓아야 안내 한 줄이 제 폭을 갖는다.
+             안 그러면 날짜칸 128px · 수량칸 56px 안에서 글이 흘러 읽기 어렵다. */
+          .jh-row { flex-wrap:wrap; }
+          .jh-name-cell { flex:0 0 100%; width:100%; }
+          .jh-right { flex-direction:column; align-items:stretch; width:100%; }
+          .jh-right .jh-cell { width:100%; }
+          .jh-right .jh-cell input { width:100% !important; }
+          .jh-right > button { align-self:flex-end; }
           .page-tab-link { min-height:44px; display:flex; align-items:center;
                            justify-content:center; font-size:15px; }
           .nav-link { min-height:44px; display:flex; align-items:center;
@@ -1434,7 +1439,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.0.7</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.0.8</span>
                 </div>
                 <!-- 페이지 탭: 발주하기 / 작업중 -->
                 <div class="flex items-center gap-1 border border-[#ededeb] rounded-lg bg-[#f7f6f3] p-1 mr-2">
@@ -1560,7 +1565,7 @@
                             <span class="tutorial-emoji">👆</span>상품을 검색하세요
                         </div>
                         <span id="search-method-label" class="hidden"></span>
-                        <p class="jh-pick-tip">찾는 방법 세 가지 · <b>ING단품명</b>이 가장 간단합니다</p>
+                        <p class="jh-pick-tip">터치하여 발주할 제품을 선택하세요</p>
                         <div class="method-pick" onclick="dismissTutorial()">
                             <button type="button" class="method-chip" data-mode="direct"
                                 onclick="selectSearchMethod('direct', '상품검색(직접입력)')">상품검색</button>
@@ -1580,7 +1585,7 @@
                         <div id="wrap-part-direct" class="relative hidden flex-shrink-0 flex items-center gap-2">
                             <button id="btn-part-direct" onclick="handlePartSelectClick('direct')" class="btn-part-order">
                                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                                <span class="jh-marq"><span>해당제품의 일부 부속만 발주 하려면 이곳에서 선택하세요</span></span>
+                                <span class="jh-marq"><span>해당제품의 일주부속만 발주 하려면 이곳에서 선택하세요</span></span>
                             </button>
                             <div id="popover-part-direct" class="part-confirm-popover hidden">
                                 <p class="text-[11px] font-bold text-[#37352f] mb-3">선택된 부속만 발주됩니다.<br>그래도 진행하시겠습니까?</p>
@@ -1609,12 +1614,12 @@
                             <select id="sel-ing-code" class="notion-select" style="width:100%; transition:width 0.2s ease;" onchange="onCodeChange()" disabled>
                                 <option value="">ing단품명 선택</option>
                             </select>
-                            <div id="overlay-ing" class="select-guide-overlay hidden">터치하여 발주할 제품을 선택하세요</div>
+                            <div id="overlay-ing" class="select-guide-overlay hidden"></div>
                         </div>
                         <div id="wrap-part-ing" class="relative hidden flex-shrink-0 flex items-center gap-2">
                             <button id="btn-part-ing" onclick="handlePartSelectClick('ing')" class="btn-part-order">
                                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                                <span class="jh-marq"><span>해당제품의 일부 부속만 발주 하려면 이곳에서 선택하세요</span></span>
+                                <span class="jh-marq"><span>해당제품의 일주부속만 발주 하려면 이곳에서 선택하세요</span></span>
                             </button>
                             <div id="popover-part-ing" class="part-confirm-popover hidden">
                                 <p class="text-[11px] font-bold text-[#37352f] mb-3">선택된 부속만 발주됩니다.<br>그래도 진행하시겠습니까?</p>
@@ -1660,7 +1665,7 @@
                             <div id="wrap-part-category" class="relative hidden flex-shrink-0 flex items-center gap-2">
                                 <button id="btn-part-category" onclick="handlePartSelectClick('category')" class="btn-part-order">
                                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                                    <span class="jh-marq"><span>해당제품의 일부 부속만 발주 하려면 이곳에서 선택하세요</span></span>
+                                    <span class="jh-marq"><span>해당제품의 일주부속만 발주 하려면 이곳에서 선택하세요</span></span>
                                 </button>
                                 <div id="popover-part-category" class="part-confirm-popover hidden">
                                     <p class="text-[11px] font-bold text-[#37352f] mb-3">선택된 부속만 발주됩니다.<br>그래도 진행하시겠습니까?</p>
@@ -2993,22 +2998,22 @@
             if (!dataToRender || dataToRender.length === 0) { listContainer.innerHTML = `<div id="list-placeholder" class="p-8 text-center font-bold tracking-tight fluid-text-body italic text-gray-400">데이터가 없습니다.</div>`; return; } 
             listContainer.innerHTML = dataToRender.map(item => {
                 return `<div id="order-item-${item.idNum}" class="ordered-item border-b border-[#f1f1ef] last:border-none">
-                    <div class="px-4 py-2 flex items-center gap-3">
-                        <div class="flex items-center gap-2 overflow-hidden flex-1 cursor-pointer group" onclick="toggleOrderDetails(${item.idNum})">
+                    <div class="px-4 py-2 flex items-center gap-3 jh-row">
+                        <div class="flex items-center gap-2 overflow-hidden flex-1 cursor-pointer group jh-name-cell" onclick="toggleOrderDetails(${item.idNum})">
                             <span class="card-hint-wrap font-bold text-[12px] truncate text-[#37352f] group-hover:text-blue-600 transition-colors">
                                 ${displayNameHtml(item, 'text-[#37352f]')}
-                                <span class="card-hint">터치하여 부속의 발주수량을 확인해 주세요</span>
+                                <span class="card-hint jh-marq"><span>터치하여 부속의 발주수량을  확인해 주세요</span></span>
                             </span>
                         </div>
-                        <div class="flex items-center gap-2 flex-shrink-0" onclick="event.stopPropagation()">
+                        <div class="flex items-center gap-2 flex-shrink-0 jh-right" onclick="event.stopPropagation()">
                             <span class="text-[11px] font-medium text-[#787774] whitespace-nowrap">입고요청일</span>
-                            <span class="card-hint-wrap">
+                            <span class="card-hint-wrap jh-cell">
                                 <input type="date" class="notion-input !w-32 !py-1 !px-2 !text-[11px] font-bold" value="${item.deliveryDate}" min="${getMinDeliveryDate()}" onchange="validateDeliveryDate(this); updateItemDate(${item.idNum}, this.value)">
-                                <span class="card-hint">희망하는 입고시점을 선택해 주세요.</span>
+                                <span class="card-hint jh-marq"><span>희망하는 입고시점을 선택해 주세요.</span></span>
                             </span>
-                            <span class="card-hint-wrap">
+                            <span class="card-hint-wrap jh-cell">
                                 <input type="number" min="1" value="${item.orderQty}" class="notion-input !w-14 !py-1 !px-2 !text-center font-black" onchange="updateItemQty(${item.idNum}, this.value)">
-                                <span class="card-hint">발주할 제품의 세트수량을 입력해 주세요.</span>
+                                <span class="card-hint jh-marq"><span>발주할 제품의 세트수량을 입력해 주세요.</span></span>
                             </span>
                             <button onclick="event.stopPropagation(); removePendingItem(${item.idNum})" class="p-1.5 hover:bg-red-50 text-red-400 rounded-lg"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
                         </div>
