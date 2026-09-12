@@ -262,21 +262,40 @@
         .ordered-item:hover { background-color: #fbfbfa; }
 
         /* ── 카드 힌트 툴팁 ── */
-        .card-hint-wrap { position: relative; display: inline-flex;
-                           flex-direction: column; align-items: stretch; min-width: 0; }
-        /* 칸마다 붙는 안내. 마우스를 얹어야 보이는 툴팁이었는데, 폰에는 얹는 것이
-           없어 아무에게도 안 보였다. 늘 보이는 작고 흐린 한 줄로 바꾼다.
-           다섯 자리(검색칸·부속발주·상품명·입고요청일·수량)를 한 모양으로 맞췄다. */
+        .card-hint-wrap { position: relative; display: inline-block; }
+        /* v1.0.7 그대로 — 얹으면 뜨는 말풍선. 카드 모양을 건드리지 않는다.
+           숨어 있을 때 자리를 차지하지 않게 display:none 을 쓴다(가로 스크롤 방지). */
         .card-hint {
-            display: block; position: static; transform: none;
+            display: none;
+            position: absolute; bottom: calc(100% + 6px); left: 50%;
+            transform: translateX(-50%);
+            background: #37352f; color: #ffffff;
+            font-size: 11px; font-weight: 600;
+            white-space: normal; text-align: center; line-height: 1.35;
+            max-width: min(72vw, 260px); width: max-content;
+            padding: 5px 10px; border-radius: 6px;
+            pointer-events: none; z-index: 999;
+        }
+        .card-hint::after {
+            content: ''; position: absolute; top: 100%; left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent; border-top-color: #37352f;
+        }
+        .card-hint-wrap:hover .card-hint { display: block; }
+        /* 상품명 아래 한 줄만 늘 보인다. 그 자리는 폭이 270px 라 글이 다 들어간다.
+           날짜칸(141px)·수량칸(78px)은 폭이 모자라 흐르는 글이 되어 되레 어지럽다.
+           카드 모양이 먼저이므로 그 둘은 손대지 않고 v1.0.7 그대로 두었다. */
+        .card-hint.jh-shown {
+            /* static 이면 안쪽 흐르는 글이 감싸개(relative)에 붙어 상품명 위로 겹친다.
+               relative 로 두어야 이 줄이 기준이 된다. */
+            display: block; position: relative; transform: none;
+            left: 0; right: auto; top: auto; bottom: auto;   /* 말풍선 자리잡기를 지운다 */
             margin: 2px 0 0; padding: 0; border-radius: 0;
             background: none; color: #b0aeaa;
             font-size: 10px; font-weight: 600; line-height: 1.3; text-align: left;
             white-space: nowrap; pointer-events: none;
         }
-        .card-hint::after { display: none; }
-        /* 상품명 칸의 안내가 이름 길이가 아니라 칸 폭을 갖게 한다 */
-        .jh-name-cell .card-hint-wrap { flex:1 1 auto; min-width:0; width:100%; }
+        .card-hint.jh-shown::after { display: none; }
         
         .notion-select, .notion-input {
             appearance: none; background-color: #ffffff; border: 1px solid #ededeb; border-radius: 6px;
@@ -1168,7 +1187,10 @@
         .jh-marq{ box-sizing:border-box; display:block; min-width:0;
                    position:relative; height:1.4em; overflow:hidden; }
         .btn-part-order .jh-marq{ flex:1 1 0%; width:0; }
-        .card-hint.jh-marq{ width:100%; height:1.3em; }
+        /* 안내가 칸 폭을 정하지 못하게 한다 — width:0 이라 칸 크기를 늘리지 않고,
+           min-width:100% 로 칸이 정해진 뒤 그 폭을 채운다. 넘치면 흐른다.
+           카드 모양이 먼저다. 안내 때문에 칸이 넓어지거나 쌓이면 안 된다. */
+        .card-hint.jh-marq{ width:0; min-width:100%; height:1.3em; overflow:hidden; }
         /* 글을 자리에서 띄워 둔다 — 그래야 흘러도 화면 폭을 넓히지 않는다 */
         .jh-marq > span{ position:absolute; left:0; top:0; white-space:nowrap;
                          will-change:transform; }
@@ -1180,8 +1202,6 @@
         .method-chip.on em { color:#fff; opacity:.7; }
 
         @media (min-width: 768px) {
-          /* 넓은 화면에서는 줄이 한 줄이므로, 안내가 흐르지 않게 칸에 자리를 준다 */
-          .jh-right .jh-cell { min-width: 190px; }
           .method-pick { display:flex; gap:6px; }
           .method-chip { min-height:34px; padding:0 14px; font-size:12px; }
         }
@@ -1206,14 +1226,6 @@
           .jh-pick-box { padding:10px 7px; }
           .jh-pick-box .jh-pick-tip { padding:0 3px; }
           .jh-pick-box .method-chip { padding:0 3px; }
-          /* 발주상품목록 줄 — 칸을 세로로 쌓아야 안내 한 줄이 제 폭을 갖는다.
-             안 그러면 날짜칸 128px · 수량칸 56px 안에서 글이 흘러 읽기 어렵다. */
-          .jh-row { flex-wrap:wrap; }
-          .jh-name-cell { flex:0 0 100%; width:100%; }
-          .jh-right { flex-direction:column; align-items:stretch; width:100%; }
-          .jh-right .jh-cell { width:100%; }
-          .jh-right .jh-cell input { width:100% !important; }
-          .jh-right > button { align-self:flex-end; }
           .page-tab-link { min-height:44px; display:flex; align-items:center;
                            justify-content:center; font-size:15px; }
           .nav-link { min-height:44px; display:flex; align-items:center;
@@ -1439,7 +1451,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.1.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.1.1</span>
                 </div>
                 <!-- 페이지 탭: 발주하기 / 작업중 -->
                 <div class="flex items-center gap-1 border border-[#ededeb] rounded-lg bg-[#f7f6f3] p-1 mr-2">
@@ -2998,22 +3010,22 @@
             if (!dataToRender || dataToRender.length === 0) { listContainer.innerHTML = `<div id="list-placeholder" class="p-8 text-center font-bold tracking-tight fluid-text-body italic text-gray-400">데이터가 없습니다.</div>`; return; } 
             listContainer.innerHTML = dataToRender.map(item => {
                 return `<div id="order-item-${item.idNum}" class="ordered-item border-b border-[#f1f1ef] last:border-none">
-                    <div class="px-4 py-2 flex items-center gap-3 jh-row">
-                        <div class="flex items-center gap-2 overflow-hidden flex-1 cursor-pointer group jh-name-cell" onclick="toggleOrderDetails(${item.idNum})">
+                    <div class="px-4 py-2 flex items-center gap-3">
+                        <div class="flex items-center gap-2 overflow-hidden flex-1 cursor-pointer group" onclick="toggleOrderDetails(${item.idNum})">
                             <span class="card-hint-wrap font-bold text-[12px] truncate text-[#37352f] group-hover:text-blue-600 transition-colors">
                                 ${displayNameHtml(item, 'text-[#37352f]')}
-                                <span class="card-hint jh-marq"><span>터치하여 부속의 발주수량을  확인해 주세요</span></span>
+                                <span class="card-hint jh-shown jh-marq"><span>터치하여 부속의 발주수량을  확인해 주세요</span></span>
                             </span>
                         </div>
-                        <div class="flex items-center gap-2 flex-shrink-0 jh-right" onclick="event.stopPropagation()">
+                        <div class="flex items-center gap-2 flex-shrink-0" onclick="event.stopPropagation()">
                             <span class="text-[11px] font-medium text-[#787774] whitespace-nowrap">입고요청일</span>
-                            <span class="card-hint-wrap jh-cell">
+                            <span class="card-hint-wrap">
                                 <input type="date" class="notion-input !w-32 !py-1 !px-2 !text-[11px] font-bold" value="${item.deliveryDate}" min="${getMinDeliveryDate()}" onchange="validateDeliveryDate(this); updateItemDate(${item.idNum}, this.value)">
-                                <span class="card-hint jh-marq"><span>희망하는 입고시점을 선택해 주세요.</span></span>
+                                <span class="card-hint">희망하는 입고시점을 선택해 주세요.</span>
                             </span>
-                            <span class="card-hint-wrap jh-cell">
+                            <span class="card-hint-wrap">
                                 <input type="number" min="1" value="${item.orderQty}" class="notion-input !w-14 !py-1 !px-2 !text-center font-black" onchange="updateItemQty(${item.idNum}, this.value)">
-                                <span class="card-hint jh-marq"><span>발주할 제품의 세트수량을 입력해 주세요.</span></span>
+                                <span class="card-hint">발주할 제품의 세트수량을 입력해 주세요.</span>
                             </span>
                             <button onclick="event.stopPropagation(); removePendingItem(${item.idNum})" class="p-1.5 hover:bg-red-50 text-red-400 rounded-lg"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
                         </div>
