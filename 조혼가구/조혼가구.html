@@ -1458,7 +1458,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.1.2</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.1.3</span>
                 </div>
                 <!-- 페이지 탭: 발주하기 / 작업중 -->
                 <div class="flex items-center gap-1 border border-[#ededeb] rounded-lg bg-[#f7f6f3] p-1 mr-2">
@@ -4541,7 +4541,22 @@
              · 세 번 넘게 해 봤음            → 꺼진다. 할 줄 아는 사람이다
              · 지금 상품을 담고 있음         → 쉰다 */
         const JOHON_GUIDE_OFF = 'johon_guide_off';   // 사람이 껐다
-        const JOHON_DONE      = 'johon_done';        // 이 기계에서 발주를 마친 횟수
+        /* ═══ 깜빡임을 끄는 것은 여기 넷뿐이다 ═══════════════════════════
+           다시 죽이지 않으려고 한 군데에 모아 둔다. 깜빡임을 건드릴 일이
+           생기면 이 덩어리만 보면 된다. 다른 곳에 조건을 흩지 마라.
+             1. johon_guide_off  사람이 껐다 (지금은 끄는 단추가 없다)
+             2. johon_done2      이 기계에서 발주를 마친 횟수가 3 이상
+             3. 담은 상품이 있다  (발주하기 깜빡임만. 수정 단추와는 상관없다)
+             4. johon_edit_used  수정을 한 번 썼다 (수정 단추 깜빡임만)
+           v1.1.2 까지 죽었던 까닭 둘 — 둘 다 여기 있었다:
+             · 세는 자리가 틀렸다. 발주상품목록이 빈 채로 발주확정을 눌러도
+               한 번 센다(원래 함수는 빈 목록이면 그냥 돌아간다). 세 번 헛누르면
+               안내가 통째로 꺼졌다. 이제 '있던 것이 비워졌을 때'만 센다.
+             · 깜빡임 조건이 done === 0 이었다. 한 번만 세어져도 영영 안 깜빡였다.
+               이제 안내가 살아 있는 동안(done < 3)은 깜빡인다.
+           셈 이름을 johon_done2 로 새로 지었다. 앞 판이 잘못 올려 둔 수가
+           남아 있어도 깜빡임이 되살아난다. ══════════════════════════════ */
+        const JOHON_DONE      = 'johon_done2';       // 이 기계에서 발주를 마친 횟수
         const JOHON_DONE_MAX  = 3;                   // 이만큼 해 봤으면 손을 뗀다
 
         function johonLS(k){ try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -4563,12 +4578,14 @@
             const _origConfirm = window.confirmProductOrderBatch;
             if (typeof _origConfirm !== 'function') return;
             window.confirmProductOrderBatch = function(){
+                const 보내기전 = johonPendingCount();      // 헛누름을 세지 않으려고 먼저 잰다
                 const r = _origConfirm.apply(this, arguments);
                 try {
                     Promise.resolve(r).then(() => {
-                        // 보낸 것이 목록에서 비워졌을 때만 — 그게 성공한 자리다
+                        // 있던 것이 비워졌을 때만 — 그게 실제로 보내진 자리다.
+                        // 빈 목록에서 눌러도 세던 것이 깜빡임을 죽였다(v1.1.2 까지).
                         try {
-                            if (johonPendingCount() === 0) {
+                            if (보내기전 > 0 && johonPendingCount() === 0) {
                                 johonLSet(JOHON_DONE, johonDoneCount() + 1);
                                 johonGuideSync();
                             }
@@ -4586,7 +4603,7 @@
             const live = !off && done < JOHON_DONE_MAX;   // 도움을 아직 보여 줄 때
             const n    = johonPendingCount();
             const call = live && n === 0;                 // 말풍선
-            const puls = call && done === 0;              // 번쩍임 — 처음 한 번뿐
+            const puls = call;                            // 깜빡임 — 안내가 살아 있는 동안 (2·3번 조건은 위 덩어리 참고)
 
             if (call) de.setAttribute('data-johoncall',  '1'); else de.removeAttribute('data-johoncall');
             if (puls) de.setAttribute('data-johonpulse', '1'); else de.removeAttribute('data-johonpulse');
