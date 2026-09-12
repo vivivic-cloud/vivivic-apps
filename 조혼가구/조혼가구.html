@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- 조혼가구 — 거래처 발주 화면.
-     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.1.8 -->
+     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.1.9 -->
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -1228,6 +1228,14 @@
         .method-chip.on em { color:#fff; opacity:.7; }
 
         @media (min-width: 768px) {
+          /* 넓은 화면에서 부속발주 단추의 자막칸 폭이 0 이었다(폰에서는 단추가
+             width:100% 라 자리가 생겼다). 그래서 글이 안 나오고 단추는 아이콘만
+             남아 41px 로 쪼그라들었다. 글이 다 들어갈 자리를 준다. */
+          .btn-part-order .jh-marq { width:auto; min-width:290px; flex:0 0 auto; }
+          .btn-part-order { min-height:34px; }
+          /* 고르는 칸이 192px 라 그 위 안내(246px)가 잘렸다. 칸을 키운다.
+             넓은 화면은 자리가 남으므로 흐르게 하지 않고 키우는 쪽으로 했다. */
+          #ing-select-wrap { min-width:290px !important; }
           .method-pick { display:flex; gap:6px; }
           .method-chip { min-height:34px; padding:0 14px; font-size:12px; }
         }
@@ -1477,7 +1485,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.1.8</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.1.9</span>
                 </div>
                 <!-- 페이지 탭: 발주하기 / 작업중 -->
                 <div class="flex items-center gap-1 border border-[#ededeb] rounded-lg bg-[#f7f6f3] p-1 mr-2">
@@ -1830,8 +1838,33 @@
         function normalizeValue(val) { if (val === null || val === undefined || String(val).trim() === "" || String(val).trim() === "선택없음") return "선택없음"; return String(val).trim(); }
         function buildDisplayName(v1, v2, v3, v4) { let n = (v1 !== '선택없음' ? v1 : '') + (v2 !== '선택없음' ? v2 : '') + (v3 !== '선택없음' ? v3 : ''); let c = (v4 !== '선택없음') ? `-${v4}` : ""; return (n + c) || "상품명 없음"; }
 
-        const KR_HOLIDAYS = ["2025-01-01", "2025-01-28", "2025-01-29", "2025-01-30", "2025-03-01", "2025-05-05", "2025-06-06", "2025-08-15", "2025-10-03", "2025-10-09", "2025-12-25",
-                                   "2026-01-01", "2026-02-16", "2026-02-17", "2026-02-18", "2026-03-01", "2026-03-02", "2026-05-05", "2026-05-24", "2026-05-25", "2026-06-03", "2026-06-06", "2026-08-15", "2026-08-17", "2026-09-24", "2026-09-25", "2026-09-26", "2026-10-03", "2026-10-05", "2026-10-09", "2026-12-25"];
+        /* ═══ 대한민국 공휴일 표 ═══════════════════════════════════════════
+           설·추석은 음력이라 규칙으로 셀 수 없다. 해마다 손으로 적는다.
+           대체공휴일도 함께 적는다(삼일절·어린이날·부처님오신날·광복절·
+           개천절·한글날·성탄절·설·추석이 주말과 겹칠 때. 신정과 현충일은
+           대체 대상이 아니다).
+           ⚠ 임시공휴일이 생기면 그 해 줄에 날짜 하나만 더 넣으면 된다.
+           ⚠ 표는 2027년까지다. 그 뒤 날짜는 공휴일로 안 걸리고 토·일만 걸린다.
+              2027년이 가기 전에 2028년 줄을 더해야 한다. */
+        const KR_HOLIDAYS_LAST_YEAR = 2027;
+        const KR_HOLIDAYS = [
+            "2025-01-01", "2025-01-28", "2025-01-29", "2025-01-30", "2025-03-01", "2025-05-05", "2025-06-06", "2025-08-15", "2025-10-03", "2025-10-09", "2025-12-25",
+            // 2026
+            "2026-01-01", "2026-02-16", "2026-02-17", "2026-02-18", "2026-03-01", "2026-03-02", "2026-05-05",
+            "2026-05-24", "2026-05-25", "2026-06-03", "2026-06-06", "2026-08-15", "2026-08-17",
+            "2026-09-24", "2026-09-25", "2026-09-26", "2026-09-28",   // 추석(목금토) + 토요일 겹침 대체
+            "2026-10-03", "2026-10-05", "2026-10-09", "2026-12-25",
+            // 2027
+            "2027-01-01",
+            "2027-02-06", "2027-02-07", "2027-02-08", "2027-02-09", "2027-02-10",  // 설(토일월) + 대체 둘
+            "2027-03-01", "2027-05-05", "2027-05-13",                              // 삼일절 · 어린이날 · 부처님오신날
+            "2027-06-06",                                                          // 현충일(일) — 대체 대상 아님
+            "2027-08-15", "2027-08-16",                                            // 광복절(일) + 대체
+            "2027-09-14", "2027-09-15", "2027-09-16",                              // 추석(화수목)
+            "2027-10-03", "2027-10-04",                                            // 개천절(일) + 대체
+            "2027-10-09", "2027-10-11",                                            // 한글날(토) + 대체
+            "2027-12-25", "2027-12-27"                                             // 성탄절(토) + 대체
+        ];
 
         let currentFullData = [];
         let uniqueProductIdentities = [];
@@ -1884,8 +1917,15 @@
         function dateToStr(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
         function getKSTDateStr(offsetDays = 0) { const d = new Date(new Date().getTime() + 9 * 60 * 60 * 1000); d.setUTCDate(d.getUTCDate() + offsetDays); return d.toISOString().split('T')[0]; }
         function getMinDeliveryDate() { return getKSTDateStr(4); }
-        // 기본 입고요청일 — 여는 날로부터 2주 뒤. 주말·공휴일로 밀지 않는다(지시 09-12 05:51).
-        function getInitialDeliveryDate() { return getKSTDateStr(14); }
+        // 기본 입고요청일 — 여는 날로부터 2주 뒤.
+        // 그날이 토·일·공휴일이면 다음 영업일로 민다(지시 09-12 12:07).
+        // 못 고르는 날이 기본값이 되면 안 되고, 당기면 납기가 짧아지므로 뒤로 민다.
+        // 2주라는 셈 자체는 그대로다.
+        function getInitialDeliveryDate() {
+            const d = new Date(getKSTDateStr(14) + 'T00:00:00');
+            while (isWeekendOrHoliday(d)) { d.setDate(d.getDate() + 1); }
+            return dateToStr(d);
+        }
         function validateDeliveryDate(el) { const min = getMinDeliveryDate(); if (el.value < min) { showToastMessage("현재일로부터 4일 이후만 고를 수 있습니다. 기본 입고요청일(2주 뒤)로 되돌립니다."); el.value = getInitialDeliveryDate(); return; } let d = new Date(el.value + 'T00:00:00'); if (isWeekendOrHoliday(d)) { showToastMessage("영업일이 아닙니다. 다음 영업일로 조정됩니다."); while (isWeekendOrHoliday(d)) { d.setDate(d.getDate() + 1); } el.value = dateToStr(d); } }
 
         function handleFileUpload(input) {
