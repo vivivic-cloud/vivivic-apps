@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.9.43 (2026-09-12) — 한 호기 보기에서 좌우로 끌면 옆 호기 고스트 칸
+     버전: v1.9.44 (2026-09-12) — 상품 줄의 셈을 그 칸에 있는 것만 센다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1744,7 +1744,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.43</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.44</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -1865,7 +1865,7 @@
 
             </div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.43</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.44</b></p>
         </div>
     </div>
 
@@ -7390,7 +7390,7 @@
                     boringParts.forEach(p => { if (!existing.has(p.cKey)) window._woBoring[sk][_b첫기계].push(p.cKey); });
                 }
                 _woDrainPool(sk, _MAC3[0]);      // 미배정 자리를 없앴으니 남은 것도 기계로 올린다
-                _MAC3.forEach(mac => _woApplySavedOrder(sk, mac));   // 저장해 둔 차례대로
+                _woApplySavedBoard(sk, _MAC3);   // 저장해 둔 기계·차례대로
                 window._woBoringParts[sk] = boringParts;
 
                 div.innerHTML = `
@@ -7487,7 +7487,7 @@
                     edgeParts.forEach(p => { if (!existingE.has(p.cKey)) window._woBoring[sk][_e첫기계].push(p.cKey); });
                 }
                 _woDrainPool(sk, _MAC5[0]);
-                _MAC5.forEach(mac => _woApplySavedOrder(sk, mac));
+                _woApplySavedBoard(sk, _MAC5);   // 저장해 둔 기계·차례대로
                 window._woBoringParts[sk] = edgeParts;
                 // 머리에 적을 셈 — 상품이 몇 개로 묶이는지, 부속이 몇 개인지.
                 // 예전 "N건" 은 그 날 엣지 발주의 건수였다. 재단 판과 같은 말투로 적는다.
@@ -7646,7 +7646,7 @@
                 }
 
                 _woDrainPool(sk, 'AMT');
-                _woApplySavedOrder(sk, 'AMT');   // 저장해 둔 카드 차례대로 다시 줄 세운다
+                _woApplySavedBoard(sk, ['AMT']);   // 저장해 둔 카드 차례대로 다시 줄 세운다
 
                 let mergedCutParts = [...prevCutParts];
                 cuttingParts.forEach(p => { if (!mergedCutParts.find(pp => pp.cKey === p.cKey)) mergedCutParts.push(p); });
@@ -8873,6 +8873,30 @@
             return g;
         }
 
+        /* 상품 줄에 적는 셈은 그 줄 밑에 실제로 달린 카드만 센다.
+           한 상품의 부속을 두 기계에 나눠 두면 줄도 둘이 생기는데(그것은 맞다),
+           예전에는 둘 다 판 전체의 셈을 적어 같은 숫자가 두 군데에 떴다.
+           현장에서 몇 장 자를지 이 숫자를 보고 정하므로 틀리면 안 된다.
+           휴식으로 줄이 한 번 끊기면 그 아래는 새 줄이므로 셈도 새로 센다. */
+        function _woCutRunStats(sk, parts, entries) {
+            const 결과 = {};          // 줄이 시작되는 자리(idx) → 셈
+            let 시작 = null, 지금 = null, 모음 = [];
+            const 닫기 = () => {
+                if (시작 != null && 지금 != null) 결과[시작] = _woCutGroupStats(sk, 모음)[지금] || {};
+                시작 = null; 지금 = null; 모음 = [];
+            };
+            (entries || []).forEach((entry, idx) => {
+                if (entry && typeof entry === 'object' && entry.type === 'break') { 닫기(); return; }
+                const p = (parts || []).find(pp => pp.cKey === entry);
+                if (!p) return;
+                const gk = _woCutGroupKey(p);
+                if (gk !== 지금) { 닫기(); 시작 = idx; 지금 = gk; 모음 = []; }
+                모음.push(p);
+            });
+            닫기();
+            return 결과;
+        }
+
         function _woCutGrpIsOpen(sk, gk) {
             window._woCutGrpOpen = window._woCutGrpOpen || {};
             return !!window._woCutGrpOpen[sk + '|' + gk];
@@ -8944,7 +8968,6 @@
 
             // 재단 보드에서만 상품 겹을 둔다 (엣지·보링은 지금 그대로)
             const _isCut   = !!_woGrpProcOf(sk);   // 상품 겹을 두는 판인가
-            const _grpStat = _isCut ? _woCutGroupStats(sk, parts) : null;
 
             // ── 헤더 HTML (기계 목록 동적) — 누르면 그 호기만 보인다
             const _j = v => String(v == null ? '' : v).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
@@ -8966,6 +8989,8 @@
 
             machines.forEach((mac, mi) => {
                 const entries = _woGetEntries(sk, mac);
+                // 이 칸의 줄별 셈 — 다른 기계에 가 있는 부속은 세지 않는다
+                const _runStat = _isCut ? _woCutRunStats(sk, parts, entries) : null;
 
                 html += `<div class="wo-boring-mac-col" id="mac-col-${mi}-${sk}"` +
                     ` ondragover="woBoardDragOver(event)"` +
@@ -8995,7 +9020,7 @@
                                 if (gk !== _curGrp) {
                                     _curGrp  = gk;
                                     _curOpen = _woCutGrpIsOpen(sk, gk);
-                                    html += _woCutGrpHdrHtml(sk, gk, (_grpStat && _grpStat[gk]) || {}, _curOpen);
+                                    html += _woCutGrpHdrHtml(sk, gk, (_runStat && _runStat[idx]) || {}, _curOpen);
                                 }
                                 _grpAttr = ` data-grp-open="${_curOpen ? '1' : '0'}"`;
                             }
@@ -9771,6 +9796,37 @@
                 console.error('카드 차례 저장 오류:', err);
                 if (typeof showToastMessage === 'function') showToastMessage('차례 저장 실패 — 새로 열면 되돌아갑니다');
             }
+        }
+
+        /* 저장해 둔 대로 기계까지 되돌린다.
+           차례 저장(wo_board_order)은 기계마다 카드 이름을 적어 두는데, 여태
+           칸 안 차례만 되살리고 기계는 되돌리지 않았다. 그래서 새로 열면
+           자동배치가 이겨, 2호기로 옮겨 둔 카드가 1호기로 돌아가 있었다 —
+           저장된 것과 화면이 어긋났다. 저장에 적힌 기계로 먼저 옮기고,
+           그 다음 칸 안 차례를 맞춘다. 저장에 없는 새 카드는 있던 자리에 둔다. */
+        function _woApplySavedBoard(sk, 기계들) {
+            const 저장 = (window._woBoardOrder[sk] || {}).order;
+            const 상태 = window._woBoring[sk];
+            if (저장 && 상태) {
+                const 갈곳 = new Map();
+                기계들.forEach(mac => (저장[mac] || []).forEach(k => {
+                    if (typeof k === 'string') 갈곳.set(k, mac);
+                }));
+                if (갈곳.size) {
+                    const 새판 = {};
+                    기계들.forEach(mac => 새판[mac] = []);
+                    기계들.forEach(mac => {
+                        _woGetEntries(sk, mac).forEach(x => {
+                            const k = (typeof x === 'string') ? x : null;
+                            // 휴식 표는 제 기계에 그대로 둔다
+                            const 자리 = (k && 갈곳.has(k) && 새판[갈곳.get(k)]) ? 갈곳.get(k) : mac;
+                            새판[자리].push(x);
+                        });
+                    });
+                    기계들.forEach(mac => { 상태[mac] = 새판[mac]; });
+                }
+            }
+            기계들.forEach(mac => _woApplySavedOrder(sk, mac));
         }
 
         // 저장된 차례대로 다시 줄 세운다. 저장에 없는 카드는 뒤에 그대로 붙는다.
