@@ -1002,12 +1002,19 @@
         }
         .wo-cut-grp:active { background: #f0eeec; }
         .wo-cut-grp.on { background: #fff; border-color: #37352f; }
-        .wo-cut-grp-top { display: flex; align-items: center; gap: 5px; min-width: 0; }
+        .wo-cut-grp-top { display: flex; align-items: center; gap: 5px; min-width: 0; flex-wrap: wrap; row-gap: 3px; }
         .wo-cut-grp-chev { font-size: 12px; color: #37352f; flex-shrink: 0; width: 11px; line-height: 1; }
         .wo-cut-grp-nm {
-            flex: 1; min-width: 0; font-size: 13px; font-weight: 800; color: #37352f;
+            /* 좁은 칸에서는 배지가 아랫줄로 내려가고 이름이 자리를 차지하게 한다.
+               min-width 가 없으면 이름이 0 까지 줄어 '(...' 만 남는다. */
+            flex: 1 1 92px; min-width: 92px;
+            font-size: 13px; font-weight: 800; color: #37352f;
             line-height: 1.25; letter-spacing: -0.2px;
-            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            /* 엣지 판은 기계가 다섯이라 칸이 좁다. 한 줄로 자르면 이름이 '(...' 로
+               뭉개져 무슨 상품인지 알 수 없다. 두 줄까지 펴고 거기서 자른다.
+               재단 판(칸 하나)은 한 줄에 다 들어가 예전과 같다. */
+            display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+            white-space: normal; overflow: hidden;
         }
         .wo-cut-grp-n {
             flex-shrink: 0; font-size: 11px; font-weight: 900; color: #fff;
@@ -1706,7 +1713,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.38</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.39</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -1827,7 +1834,7 @@
 
             </div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.38</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.39</b></p>
         </div>
     </div>
 
@@ -7451,13 +7458,16 @@
                 _woDrainPool(sk, _MAC5[0]);
                 _MAC5.forEach(mac => _woApplySavedOrder(sk, mac));
                 window._woBoringParts[sk] = edgeParts;
+                // 머리에 적을 셈 — 상품이 몇 개로 묶이는지, 부속이 몇 개인지.
+                // 예전 "N건" 은 그 날 엣지 발주의 건수였다. 재단 판과 같은 말투로 적는다.
+                const _eGrpN = new Set(edgeParts.map(p => _woCutGroupKey(p))).size;
                 const _eMeta = _woGetProcMeta(sk);
                 div.innerHTML = `
                     <div class="tl-dc-single-hdr" style="border-bottom:2px solid #e3e2e0;flex-shrink:0;">
                         <button class="tl-dc-back-btn" onclick="tlDcBackToGrid()">← 전체보기</button>
                         <span style="display:inline-block;width:6px;height:24px;background:${_pcColor};border-radius:3px;flex-shrink:0;"></span>
                         <span style="font-size:17px;font-weight:900;color:#37352f;letter-spacing:-0.3px;">엣지</span>
-                        <span style="font-size:11px;font-weight:700;color:${_pcColor};">기계 배정 · ${sec.items.length}건</span>
+                        <span style="font-size:11px;font-weight:700;color:${_pcColor};">상품 ${_eGrpN}개 · 부속 ${edgeParts.length}개</span>
                         <span style="margin-left:auto;font-size:10px;font-weight:700;color:#787774;">⏱ 총 ${totalMin.toFixed(1)}분</span>
                     </div>
                     ${_procSwitcherHtml}
@@ -8789,6 +8799,19 @@
            카드는 그대로 컬럼의 바로 밑 자식으로 남는다. 상품 줄은 끼어드는
            형제일 뿐이라, 끌어다 놓기의 자리 계산(_woFindInsertIndex)도
            시작·완료 찍기도 재편집도 지금 그대로 돈다. */
+        // 상품 겹을 두는 판. 재단에서 시작해 엣지까지 왔다.
+        // 보링을 더하려면 여기에 '보링' 한 마디만 보태면 된다.
+        const WO_GRP_PROCS = ['재단', '엣지'];
+        function _woGrpProcOf(sk) {
+            const m = String(sk || '').match(/-([^-]+)$/);
+            return m && WO_GRP_PROCS.includes(m[1]) ? m[1] : null;
+        }
+        // 그 판에서 카드 한 장을 무엇이라 부르는가
+        const WO_GRP_UNIT = { '재단': ['재단도', '장'], '엣지': ['부속', '개'], '보링': ['부속', '개'] };
+        function _woGrpUnit(sk) {
+            return WO_GRP_UNIT[_woGrpProcOf(sk)] || ['카드', '장'];
+        }
+
         function _woCutGroupKey(p) {
             return String(p.orderCode || p.orderKey || p.orderName || '기타');
         }
@@ -8838,6 +8861,7 @@
             const _j = v => String(v == null ? '' : v).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
             const nm   = g.name || gk || '상품';
             const n    = g.n || 0, done = g.done || 0, min = g.min || 0;
+            const _단위 = _woGrpUnit(sk);
             const sub  = [];
             if (g.code) sub.push(`<span class="wo-cut-grp-code">${_e(g.code)}</span>`);
             if (done > 0) sub.push(`<span class="wo-cut-grp-done">\u2713 ${done}/${n} 완료</span>`);
@@ -8847,7 +8871,7 @@
                 `<div class="wo-cut-grp-top">` +
                     `<span class="wo-cut-grp-chev">${open ? '\u25be' : '\u25b8'}</span>` +
                     `<span class="wo-cut-grp-nm">${_e(nm)}</span>` +
-                    `<span class="wo-cut-grp-n">재단도 ${n}장</span>` +
+                    `<span class="wo-cut-grp-n">${_단위[0]} ${n}${_단위[1]}</span>` +
                 `</div>` +
                 (sub.length ? `<div class="wo-cut-grp-sub">${sub.join('<span>\u00b7</span>')}</div>` : '') +
                 `</div>`;
@@ -8871,7 +8895,7 @@
             const _boardColorMap = _woGetOrderColorMap(sk);
 
             // 재단 보드에서만 상품 겹을 둔다 (엣지·보링은 지금 그대로)
-            const _isCut   = /-재단$/.test(sk);
+            const _isCut   = !!_woGrpProcOf(sk);   // 상품 겹을 두는 판인가
             const _grpStat = _isCut ? _woCutGroupStats(sk, parts) : null;
 
             // ── 헤더 HTML (기계 목록 동적) — 기계명만 (공유 링크 단추는 걷어냈다)
@@ -9373,7 +9397,7 @@
                 document.body.appendChild(hint);
             }
             hint.textContent = cand.gk != null
-                ? '상품 이동 — 끌어서 차례 바꾸기 (재단도 같이 갑니다)'
+                ? `상품 이동 — 끌어서 차례 바꾸기 (${_woGrpUnit(sk)[0]} 같이 갑니다)`
                 : (_woGetMachines(el.dataset.sk).length > 1
                     ? `이동 → ${el.dataset.mac} · 끌어서 차례·기계 바꾸기`
                     : '이동 — 끌어서 차례 바꾸기');
