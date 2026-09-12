@@ -825,6 +825,10 @@
         /* 단일 섹션 뷰 */
         .tl-dc-single-sec { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
         .tl-dc-single-hdr { padding: 9px 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #f0eeec; flex-shrink: 0; background: #fafaf9; }
+        /* 순서바꾸기 단추가 들어오며 폰에서 글자가 세로로 눌렸다.
+           줄바꿈을 허락하고 글자는 안 쪼개지게 한다. 셈은 필요하면 둘째 줄로 간다. */
+        .tl-dc-single-hdr { flex-wrap: wrap; row-gap: 6px; }
+        .tl-dc-single-hdr > span { white-space: nowrap; }
         .tl-dc-single-body { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 14px; display: flex; flex-direction: column; gap: 8px; overscroll-behavior: contain; }
         .tl-dc-back-btn { font-size: 10px; font-weight: 700; color: #787774; background: #f5f5f4; border: 1px solid #e3e2e0; border-radius: 5px; padding: 4px 10px; cursor: pointer; white-space: nowrap; transition: background 0.12s; }
         .tl-dc-back-btn:hover { background: #e3e2e0; color: #37352f; }
@@ -1023,6 +1027,29 @@
            컬럼의 바로 밑 자식으로 그대로 있어 자리 계산이 어긋나지 않는다. */
         [data-grp-open="0"] { display: none !important; }
         .wo-boring-placed-card:hover { box-shadow: 0 2px 10px rgba(0,0,0,0.09); z-index: 3; }
+        /* ── 순서바꾸기 — 눌러서 옮기는 길. 손가락 제스처에 기대지 않는다 ── */
+        .wo-sort-btn {
+            font-size: 11px; font-weight: 800; color: #37352f; background: #f5f5f4;
+            border: 1px solid #e3e2e0; border-radius: 6px; padding: 0 10px;
+            min-height: 32px; cursor: pointer; white-space: nowrap; flex-shrink: 0;
+        }
+        .wo-sort-btn.on { background: #37352f; color: #fff; border-color: #37352f; }
+        .wo-sort-row {
+            display: flex; align-items: center; justify-content: space-between; gap: 6px;
+            margin: -2px -4px 4px; padding: 2px 2px 3px;
+            border-bottom: 1px dashed #e3e2e0;
+        }
+        .wo-sort-updown {
+            min-width: 46px; min-height: 40px; font-size: 15px; font-weight: 900;
+            color: #fff; background: #37352f; border: 0; border-radius: 8px;
+            cursor: pointer; line-height: 1; flex-shrink: 0;
+        }
+        .wo-sort-updown:disabled { background: #e3e2e0; color: #b0aeaa; }
+        .wo-sort-updown:active:not(:disabled) { background: #000; }
+        .wo-sort-no { font-size: 11px; font-weight: 800; color: #787774; white-space: nowrap; }
+        .wo-boring-placed-card.wo-sort-moved {
+            box-shadow: 0 0 0 2px #37352f; transition: box-shadow .2s;
+        }
         /* ── 길게 눌러 이동 — 재단 보드에서 카드 차례를 손가락으로 바꾼다 ──
               폰에서는 HTML5 끌어놓기가 아예 듣지 않아, 한 칸 안에서 차례를
               바꿀 길이 없었다. 0.4초 길게 누르면 이동이 켜진다. */
@@ -1691,7 +1718,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.35</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.36</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -1812,7 +1839,7 @@
 
             </div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.</p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.36</b></p>
         </div>
     </div>
 
@@ -7317,6 +7344,7 @@
                 div.innerHTML = `
                     <div class="tl-dc-single-hdr" style="border-bottom:2px solid #e3e2e0;flex-shrink:0;">
                         <button class="tl-dc-back-btn" onclick="tlDcBackToGrid()">← 전체보기</button>
+                        ${_woSortBtnHtml(sk)}
                         <span style="display:inline-block;width:6px;height:24px;background:${_pcColor};border-radius:3px;flex-shrink:0;"></span>
                         <span style="font-size:17px;font-weight:900;color:#37352f;letter-spacing:-0.3px;">보링</span>
                         <span style="font-size:11px;font-weight:700;color:${_pcColor};">기계 배정 · ${sec.items.length}건</span>
@@ -7414,6 +7442,7 @@
                 div.innerHTML = `
                     <div class="tl-dc-single-hdr" style="border-bottom:2px solid #e3e2e0;flex-shrink:0;">
                         <button class="tl-dc-back-btn" onclick="tlDcBackToGrid()">← 전체보기</button>
+                        ${_woSortBtnHtml(sk)}
                         <span style="display:inline-block;width:6px;height:24px;background:${_pcColor};border-radius:3px;flex-shrink:0;"></span>
                         <span style="font-size:17px;font-weight:900;color:#37352f;letter-spacing:-0.3px;">엣지</span>
                         <span style="font-size:11px;font-weight:700;color:${_pcColor};">기계 배정 · ${sec.items.length}건</span>
@@ -7606,6 +7635,7 @@
                 div.innerHTML = `
                     <div class="tl-dc-single-hdr" style="border-bottom:2px solid #e3e2e0;flex-shrink:0;">
                         <button class="tl-dc-back-btn" onclick="tlDcBackToGrid()">← 전체보기</button>
+                        ${_woSortBtnHtml(sk)}
                         <span style="display:inline-block;width:6px;height:24px;background:${_pcColor};border-radius:3px;flex-shrink:0;"></span>
                         <span style="font-size:17px;font-weight:900;color:#37352f;letter-spacing:-0.3px;">재단</span>
                         <span style="font-size:11px;font-weight:700;color:${_pcColor};">상품 ${_cutGrpN}개 · 재단도 ${mergedCutParts.length}장</span>
@@ -8566,6 +8596,80 @@
         //   PX_PER_MIN = max(BASE, MIN_CARD_H / min_pm_per_machine)  – 기계별 계산 후 전역 max
         // 큐 카드 하나(카드 문자열 entry)의 HTML — 예전 절대위치 카드와 내용은 동일하고,
         // 시계 range 표시만 소요시간 텍스트로 바뀌었고 일반 흐름(normal flow)으로 렌더링됨
+
+        /* ══ 순서바꾸기 — 눌러서 옮긴다 ═══════════════════════════════════
+           길게 눌러 끌기는 아이폰에서 끊긴다. 세로로 구르는 목록 위에서
+           사파리가 손가락을 스크롤로 먼저 채 가기 때문이다(카드에
+           touch-action:none 을 걸면 막을 수 있지만, 그러면 카드를 짚고
+           판을 굴릴 수 없게 된다).
+           그래서 제스처에 기대지 않는 길을 따로 둔다. 머리글의 '순서바꾸기'
+           를 누르면 카드마다 ▲▼ 가 붙고, 한 번 톡 눌러 위아래로 옮긴다.
+           다 옮기면 '완료' 로 빠져나온다. 끌기는 그대로 남겨 둔다. */
+        window._woSortMode = null;   // 순서바꾸기 중인 판(sk)
+
+        function _woSortBtnHtml(sk) {
+            const 켬 = window._woSortMode === sk;
+            return `<button class="wo-sort-btn${켬 ? ' on' : ''}" onclick="_woToggleSortMode('${sk}')">` +
+                (켬 ? '완료' : '순서바꾸기') + `</button>`;
+        }
+
+        window._woToggleSortMode = function(sk) {
+            window._woSortMode = (window._woSortMode === sk) ? null : sk;
+            // 재단 판은 상품 줄이 접혀 있으면 옮길 카드가 안 보인다. 켤 때 다 펼친다.
+            if (window._woSortMode === sk && /-재단$/.test(sk)) {
+                window._woCutGrpOpen = window._woCutGrpOpen || {};
+                (window._woBoringParts[sk] || []).forEach(p => {
+                    window._woCutGrpOpen[sk + '|' + _woCutGroupKey(p)] = true;
+                });
+            }
+            const btn = document.querySelector(`.tl-dc-single-hdr .wo-sort-btn`);
+            if (btn) {
+                btn.textContent = window._woSortMode === sk ? '완료' : '순서바꾸기';
+                btn.classList.toggle('on', window._woSortMode === sk);
+            }
+            _woRenderBoard(sk);
+        };
+
+        // 카드 한 칸 위/아래로. dir = -1 위, +1 아래
+        window._woSortStep = function(sk, mac, cKey, dir) {
+            const st = window._woBoring[sk];
+            if (!st) return;
+            const entries = _woGetEntries(sk, mac);
+            const 이름 = x => (typeof x === 'string' ? x : x && x.cKey);
+            const i = entries.findIndex(x => 이름(x) === cKey);
+            const j = i + dir;
+            if (i < 0 || j < 0 || j >= entries.length) return;   // 끝이면 아무 일도 없다
+            const t = entries[i]; entries[i] = entries[j]; entries[j] = t;
+            st[mac] = entries;
+            _woRenderBoard(sk);
+            _woSaveBoardOrder(sk);
+            // 옮긴 카드가 눈에 남게 한다
+            requestAnimationFrame(() => {
+                const el = document.querySelector(`.wo-boring-placed-card[data-ck="${cKey}"][data-sk="${sk}"]`);
+                if (el) {
+                    el.classList.add('wo-sort-moved');
+                    el.scrollIntoView({ block: 'nearest' });
+                    setTimeout(() => el.classList.remove('wo-sort-moved'), 600);
+                }
+            });
+        };
+
+        // 카드 머리에 붙는 ▲▼ 줄 — 순서바꾸기 중일 때만
+        function _woSortRowHtml(p, cKey, sk, mac) {
+            if (window._woSortMode !== sk) return '';
+            const entries = _woGetEntries(sk, mac);
+            const 이름 = x => (typeof x === 'string' ? x : x && x.cKey);
+            const i = entries.findIndex(x => 이름(x) === cKey);
+            const 맨위 = i <= 0, 맨아래 = i < 0 || i >= entries.length - 1;
+            const _e = v => String(v == null ? '' : v).replace(/'/g, "\\'");
+            const 부 = `'${_e(sk)}','${_e(mac)}','${_e(cKey)}'`;
+            return `<div class="wo-sort-row">` +
+                `<button class="wo-sort-updown" ${맨위 ? 'disabled' : ''} onclick="event.stopPropagation();_woSortStep(${부},-1)" onpointerdown="event.stopPropagation()">▲</button>` +
+                `<span class="wo-sort-no">${i >= 0 ? i + 1 : '-'}번째</span>` +
+                `<button class="wo-sort-updown" ${맨아래 ? 'disabled' : ''} onclick="event.stopPropagation();_woSortStep(${부},1)" onpointerdown="event.stopPropagation()">▼</button>` +
+                `</div>`;
+        }
+
         function _woPlacedCardHtml(p, cKey, sk, mac, _boardColorMap, _grpAttr) {
             const _bpk   = sk.replace(/^\d{4}-\d{2}-\d{2}-/, '');
             const _bdid  = p.orderKey || '';
@@ -8699,14 +8803,17 @@
                     : '';
 
             const _pOk = (p.orderKey || p.orderCode || '').replace(/'/g, "\\'");
-            // 재단 카드는 클릭 시 실제 재단편집 도구가 팝업으로 뜨며 바로 편집 가능
-            const _cutClick = p.isCuttingCard ? ` onclick="woEditCuttingPlan('${cKey}','${sk}')"` : '';
+            // 재단 카드는 클릭 시 실제 재단편집 도구가 팝업으로 뜨며 바로 편집 가능.
+            // 순서바꾸기 중에는 열지 않는다 — 옮기려고 누른 손에 편집기가 뜨면 안 된다.
+            const _cutClick = (p.isCuttingCard && window._woSortMode !== sk)
+                ? ` onclick="woEditCuttingPlan('${cKey}','${sk}')"` : '';
+            const _sortRow = _woSortRowHtml(p, cKey, sk, mac);
             const _cardCls = 'wo-boring-placed-card' + (p.isCuttingCard ? ' cutting-card' : '');
-            return `<div class="${_cardCls}" draggable="${_bDone ? 'false' : 'true'}"` +
+            return `<div class="${_cardCls}" draggable="${(_bDone || window._woSortMode === sk) ? 'false' : 'true'}"` +
                 ` style="${_bcs}${_bDone ? 'opacity:0.6;' : ''}${p.isCuttingCard ? 'cursor:pointer;' : ''}"` +
                 ` data-ck="${cKey}" data-sk="${sk}" data-mac="${mac}" data-ok="${_pOk}" data-done="${_bDone ? '1' : '0'}"${_grpAttr || ''}${_cutClick}` +
                 (!_bDone ? ` ondblclick="woBoardDblClick('${cKey}','${sk}')" ondragstart="woBoardDragStart(event,'${cKey}','${sk}')" ondragend="woBoardDragEnd(event)"` : '') +
-                `>${_placedInner}${_bDoneHtml}</div>`;
+                `>${_sortRow}${_placedInner}${_bDoneHtml}</div>`;
         }
 
         // 휴식 마커 한 줄 — 카드 N과 N+1 사이에 꽂히는 고정 항목(드래그 불가)
