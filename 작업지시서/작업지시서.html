@@ -205,6 +205,8 @@ PDF·PPT 를 불러오면 <b>한 장이 한 쪽</b>이 됩니다. 비율은 원�
   </span>
   <button class="b" id="step">1mm</button>
   <button class="b" id="crop">자르기</button>
+  <button class="b" id="bigger">크게</button>
+  <button class="b" id="smaller">작게</button>
   <button class="b" id="uncrop">자르기 되돌리기</button>
   <button class="b" id="clear">모두 지우기</button>
 </div>
@@ -343,9 +345,10 @@ function 고름지우기(){
    자르기는 원본을 건드리지 않는다. it.잘라 = {x,y,w,h} (원본 그림에 대한 비,
    0~1) 만 적어 둔다. 그래서 언제든 되돌릴 수 있고, 사진을 다시 불러올 일이 없다.
 
-   상자 크기(it.w·it.h)는 자를 때 그대로 둔다 — "사이즈 변동 없이".
-   고른 조각이 상자를 덮도록 원본을 키워 앉히고, 넘치는 부분만 가린다.
-   늘리지 않으므로 찌그러지지 않는다. */
+   자를 때 그림의 배율은 건드리지 않는다. 고른 네모 밖을 없앨 뿐이다 —
+   상자가 고른 네모 그대로가 되므로, 남은 조각은 잘리기 전 그 크기 그대로다.
+   (예전에는 조각을 상자에 꽉 채우도록 키웠다. 그래서 자르면 부풀었다.)
+   크게·작게는 사용자가 따로 한다 — 손잡이나 [크게]·[작게] 단추로. */
 function 그림자리(it, nw, nh){
   const 비 = (nh || 1) / (nw || 1);
   const c = it.잘라;
@@ -354,10 +357,9 @@ function 그림자리(it, nw, nh){
     if (H > it.h){ H = it.h; W = it.h / 비; }
     return { W, H, left: (it.w - W) / 2, top: (it.h - H) / 2, 비 };
   }
-  const W = Math.max(it.w / c.w, it.h / (비 * c.h));
-  const H = W * 비;
-  return { W, H, left: it.w / 2 - (c.x + c.w / 2) * W,
-                 top:  it.h / 2 - (c.y + c.h / 2) * H, 비 };
+  // 자른 그림 — 고른 조각이 상자와 꼭 맞는다(상자 비 = 조각 비라 안 찌그러진다)
+  const W = it.w / c.w, H = it.h / c.h;
+  return { W, H, left: -c.x * W, top: -c.y * H, 비 };
 }
 /* 안 자른 그림은 손대지 않는다 — 지금 나오는 인쇄 결과를 그대로 둔다 */
 function 그림앉히기(el, img, it){
@@ -845,22 +847,43 @@ function 고른것원본네모(){
 $('crop').onclick = 자르기시작;
 $('cropend').onclick = () => 자르기끝();
 
-/* 이 부분만 — 상자 크기는 그대로, 고른 조각만 남긴다 */
+/* 이 부분만 — 고른 네모 밖을 없앤다. 그림 배율은 건드리지 않는다.
+   상자를 그 네모가 있던 자리·크기로 옮기면, 남은 조각은 잘리기 전 그대로다. */
 $('cropdo').onclick = () => {
-  const r = 고른것원본네모();
-  if (!r || !r.네모) return 튕김($('cropdo'), '네모를 그리세요');
-  자르는것.잘라 = r.네모;
-  const id = 자르는것.id;
+  const it = 자르는것;
+  if (!it || !고른네모) return 튕김($('cropdo'), '네모를 그리세요');
+  const img = 무대.querySelector('.it[data-id="' + it.id + '"] img');
+  if (!img || !img.naturalWidth) return;
+  const g = 그림자리(it, img.naturalWidth, img.naturalHeight);
+  // 고른 네모를 mm 로 옮기고, 그림 밖으로 나간 부분은 잘라 낸다
+  const 왼 = Math.max(고른네모.x * it.w, g.left);
+  const 위 = Math.max(고른네모.y * it.h, g.top);
+  const 오 = Math.min((고른네모.x + 고른네모.w) * it.w, g.left + g.W);
+  const 아 = Math.min((고른네모.y + 고른네모.h) * it.h, g.top + g.H);
+  if (오 - 왼 < 2 || 아 - 위 < 2) return 튕김($('cropdo'), '그림 위에서 고르세요');
+  it.x += 왼; it.y += 위; it.w = 오 - 왼; it.h = 아 - 위;
+  it.잘라 = { x: (왼 - g.left) / g.W, y: (위 - g.top) / g.H,
+              w: (오 - 왼) / g.W,     h: (아 - 위) / g.H };
+  const id = it.id;
   자르기끝(); 저장(true); 그리기(); 고르기(id);
 };
 
 /* 복사 — 고른 조각을 담아 두고, 다음에 누른 자리에 새 그림으로 붙인다.
    원본은 그대로 둔다 */
 $('cropcopy').onclick = () => {
-  const r = 고른것원본네모();
-  if (!r || !r.네모) return 튕김($('cropcopy'), '네모를 그리세요');
-  복사함 = { src: 자르는것.src, 잘라: r.네모,
-             비: (r.nh * r.네모.h) / (r.nw * r.네모.w) };
+  const it = 자르는것;
+  if (!it || !고른네모) return 튕김($('cropcopy'), '네모를 그리세요');
+  const img = 무대.querySelector('.it[data-id="' + it.id + '"] img');
+  if (!img || !img.naturalWidth) return;
+  const g = 그림자리(it, img.naturalWidth, img.naturalHeight);
+  const 왼 = Math.max(고른네모.x * it.w, g.left), 위 = Math.max(고른네모.y * it.h, g.top);
+  const 오 = Math.min((고른네모.x + 고른네모.w) * it.w, g.left + g.W);
+  const 아 = Math.min((고른네모.y + 고른네모.h) * it.h, g.top + g.H);
+  if (오 - 왼 < 2 || 아 - 위 < 2) return 튕김($('cropcopy'), '그림 위에서 고르세요');
+  // 잰 크기 그대로 담는다 — 붙일 때도 배율이 바뀌지 않는다
+  복사함 = { src: it.src, w: 오 - 왼, h: 아 - 위,
+             잘라: { x: (왼 - g.left) / g.W, y: (위 - g.top) / g.H,
+                     w: (오 - 왼) / g.W,     h: (아 - 위) / g.H } };
   자르기끝();
   띠('paste');
 };
@@ -872,8 +895,10 @@ function 붙이기(sh, 장번호, e){
   const r = sh.getBoundingClientRect();
   const mx = (e.clientX - r.left) / 배율 / px1mm;
   const my = (e.clientY - r.top) / 배율 / px1mm;
-  let w = Math.min(80, W - 여백 * 2), h = w * 복사함.비;
-  if (h > H - 여백 * 2){ h = H - 여백 * 2; w = h / 복사함.비; }
+  const 비 = 복사함.h / 복사함.w;
+  let w = 복사함.w, h = 복사함.h;                 // 잰 크기 그대로
+  if (w > W){ w = W; h = w * 비; }                // 종이보다 크면 그때만 줄인다
+  if (h > H){ h = H; w = h / 비; }
   const it = { id: 새id(), 종류: 'img', src: 복사함.src, 이름: '', 잘라: 복사함.잘라,
                x: Math.max(0, Math.min(W - w, mx - w / 2)),
                y: Math.max(0, Math.min(H - h, my - h / 2)), w, h,
@@ -885,11 +910,41 @@ function 붙이기(sh, 장번호, e){
   저장(true); 그리기();
 }
 
+/* 크게·작게 — 자르기는 배율을 안 건드리므로, 키우고 줄이는 것은 여기서 한다.
+   가운데를 붙잡고 한 번에 10% 씩. 손잡이로 끄는 길도 그대로 있다 */
+function 크기바꾸기(배){
+  const it = 지금것();
+  if (!it) return 튕김($(배 > 1 ? 'bigger' : 'smaller'), '고르세요');
+  if (it.종류 === 'line') return 튕김($(배 > 1 ? 'bigger' : 'smaller'), '구분선은 못 바꿉니다');
+  const [W, H] = 지금크기();
+  const 가x = it.x + it.w / 2, 가y = it.y + it.h / 2, 비 = it.h / it.w;
+  let w = Math.max(8, it.w * 배), h = it.종류 === 'img' ? w * 비 : Math.max(6, it.h * 배);
+  if (w > W){ w = W; if (it.종류 === 'img') h = w * 비; }
+  if (h > H){ h = H; if (it.종류 === 'img') w = h / 비; }
+  it.w = w; it.h = h;
+  it.x = Math.max(0, Math.min(W - w, 가x - w / 2));
+  it.y = Math.max(0, Math.min(H - h, 가y - h / 2));
+  저장(true); 그리기(); 고르기(it.id);
+}
+$('bigger').onclick  = () => 크기바꾸기(1.1);
+$('smaller').onclick = () => 크기바꾸기(1 / 1.1);
+
 /* 자르기 되돌리기 — 잘라 둔 표만 뗀다. 원본은 한 번도 건드린 적이 없다 */
 $('uncrop').onclick = () => {
   const it = 지금것();
   if (!it || it.종류 !== 'img') return 튕김($('uncrop'), '사진을 고르세요');
   if (!it.잘라) return 튕김($('uncrop'), '안 잘린 사진입니다');
+  const img = 무대.querySelector('.it[data-id="' + it.id + '"] img');
+  if (img && img.naturalWidth){
+    // 배율은 그대로 두고 상자만 원본 전체가 들어가게 넓힌다.
+    // 자를 때 배율을 안 건드렸으므로, 이러면 자르기 전 그 상자로 정확히 돌아온다.
+    const g = 그림자리(it, img.naturalWidth, img.naturalHeight);
+    const [W, H] = 지금크기();
+    it.x = Math.max(0, Math.min(W - Math.min(g.W, W), it.x + g.left));
+    it.y = Math.max(0, Math.min(H - Math.min(g.H, H), it.y + g.top));
+    it.w = Math.min(g.W, W); it.h = it.w * g.비;
+    if (it.h > H){ it.h = H; it.w = it.h / g.비; }
+  }
   delete it.잘라;
   저장(true); 그리기(); 고르기(it.id);
 };
