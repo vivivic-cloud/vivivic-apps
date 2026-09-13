@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.9.60 (2026-09-13) — 보링 판에도 상품명 한 겹. 앞 공정은 엣지
+     버전: v1.9.61 (2026-09-13) — 부속초기화가 사람이 더한 부속을 지우지 않는다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1819,7 +1819,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.60</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.61</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -1940,7 +1940,7 @@
 
             </div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.60</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.61</b></p>
         </div>
     </div>
 
@@ -4762,10 +4762,17 @@
                 for (let key in item.partInfoMap) { 
                     const p = item.partInfoMap[key]; 
                     p.qty = p.unitCons * item.orderQty; 
-                    const rowIndex = parseInt(key.split('-').pop());
-                    const partSupplier = normalizeValue(currentFullData[rowIndex][h.indexOf("공급처")]);
-                    p.isDeleted = (partSupplier !== "AMT"); 
                     p.isManual = false; 
+                    const rowIndex = parseInt(key.split('-').pop());
+                    const row = currentFullData[rowIndex];
+                    if (!row) continue;              // 원장에서 사라진 줄 — 표시는 그대로 둔다
+                    const partSupplier = normalizeValue(row[h.indexOf("공급처")]);
+                    const 원장기본 = (partSupplier !== "AMT");
+                    // 되돌리기는 살아 있다 — 손으로 뺐던 AMT 부속은 예전처럼 도로 돌아오고
+                    // 손으로 고친 수량도 원장 값으로 돌아간다. 다만 'AMT 발주 추가' 로
+                    // 사람이 넣은 부속(원장은 AMT 가 아닌데 켜 둔 것)은 지우지 않는다.
+                    // 사람이 넣은 결정이 원장보다 위다.
+                    if (!(원장기본 && p.isDeleted === false)) p.isDeleted = 원장기본;
                 } 
                 renderOrderParts(idNum); refreshConsolidatedMaterials(); 
             } 
