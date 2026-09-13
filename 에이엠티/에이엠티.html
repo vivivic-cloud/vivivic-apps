@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.9.58 (2026-09-13) — 취소·수정 요청을 확정목록에도 곧바로. 알림을 누르면 그 줄로
+     버전: v1.9.59 (2026-09-13) — 재단도를 발주번호가 아니라 원장 행으로 가린다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1819,7 +1819,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.58</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.59</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -1940,7 +1940,7 @@
 
             </div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.58</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.59</b></p>
         </div>
     </div>
 
@@ -2901,10 +2901,49 @@
         // 83장 붙어 있었고, 그 가운데 26장만이 실제로 만들어진 뒤의 것이었다.
         // 재단도는 '만들어질 때 발주확정목록에 있던 그 발주' 의 것이다.
         // 번호가 같은 발주가 여럿이면 그 중 가장 늦게 확정된 쪽이 주인이다.
-        function _cutPlanOwner(idNum, 만든때) {
+        /* 재단도가 덮는 원장 행 — 어느 발주 것인지 가리는 가장 확실한 표다.
+           발주번호(idNum)는 다시 쓰인다. 지금 자료에도 1401·1402·1403 이 저마다
+           두세 발주에 걸쳐 있고 그중에는 취소된 것도 있다. 번호만 보면 취소된
+           발주의 도면이 살아 있는 발주에 붙는다 — 사장님이 겪으신 그것이다.
+           행은 발주마다 다르므로 이것으로 가른다. */
+        function _cutPlanRows(plan) {
+            const rows = new Set();
+            ['pRowIndex', 'sRowIndex', 'tRowIndex'].forEach(k => {
+                const v = plan && plan[k];
+                if (v != null && v !== '') { const n = parseInt(v, 10); if (!isNaN(n)) rows.add(n); }
+            });
+            return rows;
+        }
+
+        // 이 발주가 지금 들고 있는(안 지워진) 부속의 원장 행들
+        function _orderPartRows(order) {
+            const rows = new Set();
+            Object.entries((order && order.partInfoMap) || {}).forEach(([k, v]) => {
+                if (!v || v.isDeleted) return;
+                const n = parseInt(String(k).split('-')[2], 10);
+                if (!isNaN(n)) rows.add(n);
+            });
+            return rows;
+        }
+
+        function _cutPlanOwner(idNum, 만든때, plan) {
             const 확정 = confirmedOrders.filter(o =>
                 o.idNum === idNum && o.amtTimeline === true && !o.amtConfirmedCancel);
             if (!확정.length) return null;                 // 발주확정목록에 없다 → 재단도가 아니다
+            // 행이 적힌 도면은 행으로 가린다. 행이 맞는 발주가 없으면 주인이 없는
+            // 것이다(취소·삭제된 옛 발주의 도면) — 번호가 같다고 남에게 붙이지 않는다.
+            const 행 = _cutPlanRows(plan);
+            if (행.size) {
+                const 행맞음 = 확정.filter(o => {
+                    const r = _orderPartRows(o);
+                    for (const x of 행) if (r.has(x)) return true;
+                    return false;
+                });
+                if (!행맞음.length) return null;
+                // 행이 맞아도 시각 규칙은 그대로 거친다. 같은 상품을 두 번 발주하면
+                // 행이 같아, 행만 보면 옛 발주(취소된 것까지)의 도면이 딸려 온다.
+                확정.length = 0; 확정.push(...행맞음);
+            }
             if (만든때 == null) return 확정[0];             // 시각을 못 읽는 옛 도면은 예전대로
             let 주인 = null;
             확정.forEach(o => {
@@ -2945,7 +2984,7 @@
             // 같고 실은 지워진 옛 발주의 것이면 올리지 않는다. 자세한 까닭은
             // _cutPlanOwner 에 적었다. 지우지는 않는다 — 화면에 안 올릴 뿐이다.
             const _만든때 = _cutPlanMadeAt(plan);
-            const _주인 = allOrderIds.map(id => _cutPlanOwner(id, _만든때)).filter(Boolean);
+            const _주인 = allOrderIds.map(id => _cutPlanOwner(id, _만든때, plan)).filter(Boolean);
             // 주인이 하나라도 있으면 이 재단도의 발주 목록을 믿는다. 나중에 합쳐진
             // 발주는 만든 때보다 늦게 붙기 때문이다 — 여기서 떨구면 합친 몫이
             // 수량에서 빠져 필요한 것보다 적게 자르게 된다(_cuttingReqQtyFor).
@@ -2953,7 +2992,7 @@
             // 만들어질 때의 번호를 그대로 들고 있을 뿐이고, 합치기는 주인이 있는
             // 도면에만 일어난다(_autoGenerateCuttingPlansForOrder).
             const 살아있는 = _주인.length
-                ? allOrderIds.map(id => _cutPlanOwner(id, _만든때) || _cutPlanOwner(id, Infinity)).filter(Boolean)
+                ? allOrderIds.map(id => _cutPlanOwner(id, _만든때, plan) || _cutPlanOwner(id, Infinity, plan)).filter(Boolean)
                 : [];
             if (!살아있는.length) {
                 // 발주 목록이 아직 안 실렸을 때는 지우지 않는다 — 뒤에 다시 그려진다
