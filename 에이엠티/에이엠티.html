@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.9.59 (2026-09-13) — 재단도를 발주번호가 아니라 원장 행으로 가린다
+     버전: v1.9.60 (2026-09-13) — 보링 판에도 상품명 한 겹. 앞 공정은 엣지
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1819,7 +1819,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.59</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.60</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -1940,7 +1940,7 @@
 
             </div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.59</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.60</b></p>
         </div>
     </div>
 
@@ -9077,9 +9077,9 @@
             const _pOk = (p.orderKey || p.orderCode || '').replace(/'/g, "\\'");
             // 재단 카드는 클릭 시 실제 재단편집 도구가 팝업으로 뜨며 바로 편집 가능
             const _cutClick = p.isCuttingCard ? ` onclick="woEditCuttingPlan('${cKey}','${sk}')"` : '';
-            // 엣지 판에서는 그 부속의 재단이 끝나야 또렷해진다. 아직이면 연한 글씨.
+            // 엣지·보링 판에서는 그 부속의 앞 공정이 끝나야 또렷해진다. 아직이면 연한 글씨.
             // 누르는 것은 그대로다 — 보기만 연할 뿐 막지 않는다.
-            const _대기카드 = /-엣지$/.test(sk) && !_bDone && !_woEdgeReady(p, _bck, _bComps);
+            const _대기카드 = !_bDone && !_woPrevReady(p, _bck, _bComps, sk);
             const _cardCls = 'wo-boring-placed-card' + (p.isCuttingCard ? ' cutting-card' : '')
                 + (_대기카드 ? ' wo-앞대기카드' : '');
             return `<div class="${_cardCls}" draggable="${_bDone ? 'false' : 'true'}"` +
@@ -9117,9 +9117,9 @@
            카드는 그대로 컬럼의 바로 밑 자식으로 남는다. 상품 줄은 끼어드는
            형제일 뿐이라, 끌어다 놓기의 자리 계산(_woFindInsertIndex)도
            시작·완료 찍기도 재편집도 지금 그대로 돈다. */
-        // 상품 겹을 두는 판. 재단에서 시작해 엣지까지 왔다.
-        // 보링을 더하려면 여기에 '보링' 한 마디만 보태면 된다.
-        const WO_GRP_PROCS = ['재단', '엣지'];
+        // 상품 겹을 두는 판. 재단에서 시작해 엣지를 거쳐 보링까지 왔다.
+        // 판을 더 늘리려면 여기에 그 공정 한 마디만 보태면 된다.
+        const WO_GRP_PROCS = ['재단', '엣지', '보링'];
         function _woGrpProcOf(sk) {
             const m = String(sk || '').match(/-([^-]+)$/);
             return m && WO_GRP_PROCS.includes(m[1]) ? m[1] : null;
@@ -9134,6 +9134,12 @@
             return String(p.orderCode || p.orderKey || p.orderName || '기타');
         }
 
+        /* 이 판의 앞 공정 — 엣지 앞은 재단, 보링 앞은 엣지다.
+           이 파일의 PROC_ORDER 는 재단→엣지→NC→보링 이지만, 보링 카드의 ▶시작을
+           여닫는 _partPrereqDone 이 이미 엣지(·NC)를 보링의 앞으로 보고 있다.
+           여기서도 같은 뜻으로 잡았다. 재단은 앞이 없어 표에 없다. */
+        const WO_PREV_PROC = { '엣지': '재단', '보링': '엣지' };
+
         /* 재단이 끝나야 엣지가 활성 ──────────────────────────────────────
            공정 차례는 이 파일이 이미 쓰고 있는 PROC_ORDER(재단→엣지→NC→보링→납기)
            그대로다. 사장님 말씀대로 재단→엣지 한 칸만 본다. 다른 공정은 안 엮었다.
@@ -9147,14 +9153,15 @@
             return String(p.orderCode || '') + '|' + String(p.orderKey || '');
         }
 
-        // 재단 판들에서 이 발주의 카드를 모아 다 끝났는지 본다.
-        // 돌려주는 값: true=다 끝남 · false=아직 · null=재단 쪽에 짝이 없음
-        function _woCutAllDoneFor(열쇠) {
+        // 앞 공정 판들에서 이 발주의 카드를 모아 다 끝났는지 본다.
+        // 돌려주는 값: true=다 끝남 · false=아직 · null=앞 공정 쪽에 짝이 없음
+        function _woCutAllDoneFor(열쇠, 앞공정) {
             if (!열쇠) return null;
+            const 앞 = 앞공정 || '재단';
             let 있었나 = false, 다끝 = true;
             const 판들 = window._woBoringParts || {};
             Object.keys(판들).forEach(sk2 => {
-                if (!/-재단$/.test(sk2)) return;
+                if (!sk2.endsWith('-' + 앞)) return;
                 (판들[sk2] || []).forEach(p => {
                     if (_woOrderMatchKey(p) !== 열쇠) return;
                     있었나 = true;
@@ -9219,19 +9226,32 @@
             return st.끝난것.has(행);
         }
 
-        /* 점 하나의 상태 — 0 아무것도 아직 · 1 앞 공정(재단)만 끝 · 2 이 공정까지 끝.
-           앞 공정 판정은 엣지 카드를 켜고 끄는 그 판정(_woEdgeReady)을 그대로 쓴다.
-           두 벌로 만들지 않았다. 재단 판에는 앞 공정이 없어 0 과 2 만 나온다. */
+        /* 카드 한 장 — 지금 손댈 수 있는가(앞 공정이 끝났는가)
+           엣지는 재단 완료가 재단계획 카드(cut_…)에 적히는 일이 있어 위처럼 행으로도
+           맞춰 봐야 한다. 보링의 앞(엣지)은 부속키에 그대로 적히므로, 그 카드의
+           ▶시작 단추를 여닫는 _partPrereqDone 을 그대로 쓴다 — 두 벌로 만들지 않는다.
+           앞이 없는 판(재단)은 언제나 켜 둔다. */
+        function _woPrevReady(p, 부속키, comps, sk) {
+            const 공정 = _woGrpProcOf(sk);
+            if (공정 === '엣지') return _woEdgeReady(p, 부속키, comps);
+            if (공정 === '보링') return _partPrereqDone(부속키, '보링', comps || {});
+            return true;
+        }
+
+        /* 점 하나의 상태 — 0 아무것도 아직 · 1 앞 공정만 끝 · 2 이 공정까지 끝.
+           앞 공정 판정은 카드를 켜고 끄는 그 판정(_woPrevReady)을 그대로 쓴다.
+           두 벌로 만들지 않았다. 앞이 없는 판(재단)은 0 과 2 만 나온다.
+           엣지의 앞은 재단, 보링의 앞은 엣지 — 규칙은 셋 다 같다. */
         function _woCardDotState(p, sk) {
             if (_woCutCardDone(p, p.cKey, sk)) return 2;
-            if (!/-엣지$/.test(sk)) return 0;
+            if (!WO_PREV_PROC[_woGrpProcOf(sk)]) return 0;
             try {
                 const _did = p.orderKey || '';
                 const _ck  = _woPartKey(p.cKey, _did, p);
                 const _obj = confirmedOrders.find(o => (o.docId || String(o.idNum)) === _did);
                 const _old = _woPartOldKeys(p.cKey, _did);
                 const comps = _partRecMap(_obj?.partCompletions, _ck, _old);
-                return _woEdgeReady(p, _ck, comps) ? 1 : 0;
+                return _woPrevReady(p, _ck, comps, sk) ? 1 : 0;
             } catch (e) { return 0; }
         }
 
@@ -9332,16 +9352,17 @@
                     `</div>`;
             }
             const 잘렸나 = 표.length > 0 && 점줄 && 표.length > (표.length > 11 ? 8 : 11);
-            // 엣지 판에서만 앞 공정(재단)을 본다. 재단이 아직이면 연한 글씨로 둔다.
-            // 짝이 없으면(재단 쪽에 이 발주 카드가 없으면) 밝게 둔다 — 못 보는 것을
+            // 앞 공정이 있는 판(엣지·보링)에서만 앞을 본다. 아직이면 연한 글씨로 둔다.
+            // 짝이 없으면(앞 공정 쪽에 이 발주 카드가 없으면) 밝게 둔다 — 못 보는 것을
             // 근거로 일을 막으면 영영 못 쓰시게 된다.
-            const 앞공정 = (_woGrpProcOf(sk) === '엣지') ? _woCutAllDoneFor(g.열쇠) : null;
+            const 앞이름 = WO_PREV_PROC[_woGrpProcOf(sk)] || null;
+            const 앞공정 = 앞이름 ? _woCutAllDoneFor(g.열쇠, 앞이름) : null;
             const 앞대기 = 앞공정 === false;
             const sub  = [];
             if (g.code) sub.push(`<span class="wo-cut-grp-code">${_e(g.code)}</span>`);
-            // 옅은 글씨가 두 뜻으로 쓰인다 — 재단 판은 '다 했다', 엣지 판은 '아직 못 한다'.
-            // 헷갈리지 않게 엣지 쪽에는 까닭을 적어 둔다.
-            if (앞대기) sub.push(`<span class="wo-앞대기-표">재단 대기</span>`);
+            // 옅은 글씨가 두 뜻으로 쓰인다 — '다 했다'와 '아직 못 한다'.
+            // 헷갈리지 않게 기다리는 쪽에는 무엇을 기다리는지 적어 둔다.
+            if (앞대기) sub.push(`<span class="wo-앞대기-표">${앞이름} 대기</span>`);
             if (done > 0) sub.push(`<span class="wo-cut-grp-done">\u2713 ${done}/${n} 완료</span>`);
             // 점이 잘린 줄은 아직 하나도 안 끝났어도 몇 개 중 몇 개인지 적어 준다.
             // 점만으로는 전체 수를 알 수 없기 때문이다.
