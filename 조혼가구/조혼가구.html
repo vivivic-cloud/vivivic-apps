@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- 조혼가구 — 거래처 발주 화면.
-     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.3.3 -->
+     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.3.4 -->
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -1469,9 +1469,16 @@
             cursor:pointer; display:grid; place-items:center; padding:0;
         }
         #johon-home .jhh-row .jhh-set:active{ background:var(--vg-fill2); }
-        #johon-home .jhh-mine-empty{
-            font-size:12.5px; color:var(--vg-muted); padding:2px 4px 0; line-height:1.5;
+        /* 글로 된 「새 박스」 — 작업대의 .newbox · 에이엠티의 .amth-newbox 값 그대로.
+           둥근 ＋ 만 두었더니 사장님이 "새박스가 없네요" 하셨다(지시 09-13 09:52).
+           작업대·에이엠티는 글로 된 것을 따로 둔다. 같은 모양으로 맞춘다. */
+        #johon-home .jhh-newbox{
+            border:1px dashed var(--vg-edge); background:#fff; display:grid; place-items:center;
+            min-height:104px; border-radius:20px; cursor:pointer; color:var(--vg-soft); gap:6px;
+            font:inherit; width:100%; margin-top:9px;
         }
+        #johon-home .jhh-newbox:active{ background:var(--vg-fill); }
+        #johon-home .jhh-newbox span{ font-size:14px; font-weight:700; }
         /* 떠 있는 단추에 마지막 줄이 가리지 않게 */
         html[data-johonhome="1"] #johon-home .jhh-wrap{
             padding-bottom:calc(92px + env(safe-area-inset-bottom));
@@ -1597,7 +1604,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.3.3</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.3.4</span>
                 </div>
                 <!-- 페이지 탭: 발주하기 / 작업중 -->
                 <div class="flex items-center gap-1 border border-[#ededeb] rounded-lg bg-[#f7f6f3] p-1 mr-2">
@@ -1693,9 +1700,9 @@
                  있어 이 목록에 섞이지 않는다. 그래서 지워지지도 옮겨지지도 않는다. -->
             <div class="jhh-sec"><b>내 박스</b><span id="jhh-mine-n">0</span></div>
             <div class="jhh-list" id="jhh-mine"></div>
-            <div class="jhh-mine-empty" id="jhh-mine-empty">
-                오른쪽 아래 ＋ 를 눌러 박스를 만드세요.
-            </div>
+            <button type="button" class="jhh-newbox" id="jhh-newbox" onclick="johonBoxOpen(null)">
+                <span id="jhh-newbox-ico"></span><span>새 박스</span>
+            </button>
 
             <div class="jhh-sec"><b>나머지</b><span>1</span></div>
             <div class="jhh-list">
@@ -1712,8 +1719,8 @@
         </div>
     </div>
 
-    <!-- 박스추가 — 작업대·서류관리와 같은 자리, 같은 모양 -->
-    <button type="button" id="johon-fab" aria-label="박스추가" title="박스추가" onclick="johonBoxOpen(null)">＋</button>
+    <!-- 새 박스 — 작업대·에이엠티·서류관리와 같은 자리, 같은 모양 -->
+    <button type="button" id="johon-fab" aria-label="새 박스" title="새 박스" onclick="johonBoxOpen(null)">＋</button>
     <div id="johon-sheet" onclick="if(event.target===this) johonBoxClose()">
         <div class="jhm-card">
             <div class="jhm-grip"></div>
@@ -5349,10 +5356,10 @@
         function johonBoxRender(){
             const list = document.getElementById('jhh-mine');
             const n    = document.getElementById('jhh-mine-n');
-            const 빔    = document.getElementById('jhh-mine-empty');
             if (!list) return;
             if (n) n.textContent = String(johonMyBoxes.length);
-            if (빔) 빔.style.display = johonMyBoxes.length ? 'none' : 'block';
+            const ico = document.getElementById('jhh-newbox-ico');
+            if (ico && !ico.firstChild) ico.innerHTML = johonIco('plus', 22);
             list.innerHTML = johonMyBoxes.map(b => {
                 const 어둠 = b.tone === 'dark' ? ' jhh-dark' : '';
                 const 바탕 = b.tone === 'light' ? '' : (b.tone === 'dark' ? '' : ' style="background:#fff;border:1px solid var(--vg-edge)"');
