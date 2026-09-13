@@ -202,7 +202,13 @@
     setTimeout(() => ta.focus(), 60);
     const 닫기 = () => { s.remove(); 겨냥 && 겨냥.classList.remove('vg-mark'); 짚었다 = false; };
     s.querySelector('.vg-cancel').onclick = 닫기;
-    s.onclick = (e) => { if (e.target === s) 닫기(); };
+    /* 길게 누른 손가락을 떼면 click 하나가 뒤따라온다. 그 click 이 방금 열린
+       이 판의 뒤판 위에 떨어져 판이 곧바로 닫혔다 — 짚어도 아무 일이 없는
+       것처럼 보였고, 화면 아래쪽(카드가 깔리는 자리)을 짚었을 때만 살아남았다.
+       판이 열리고 잠깐은 뒤판 닫기를 받지 않는다. 손으로 누르는 것은 그대로다. */
+    let 뒤판받기 = false;
+    setTimeout(() => { 뒤판받기 = true; }, 400);
+    s.onclick = (e) => { if (뒤판받기 && e.target === s) 닫기(); };
     const 보냄 = s.querySelector('.vg-send');
     보냄.onclick = async () => {
       const 글 = ta.value.trim(); if (!글) return;
