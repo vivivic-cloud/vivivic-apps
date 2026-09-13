@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.9.63 (2026-09-13) — 함께 앉힌 부속도 이름·치수·수량을 적는다
+     버전: v1.9.64 (2026-09-13) — 원장재고 — 실제 쓰이는 원장·마감·색상 짝과 수량
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1816,6 +1816,79 @@
         .amtb-go.amtb-del{ background:#fff; color:var(--vg-red); border:1px solid var(--vg-edge); margin-top:10px; }
         .amtb-empty{ grid-column:1/-1; font-size:13px; color:var(--vg-muted); margin:6px 0; }
 
+        /* ══ 원장재고 ══════════════════════════════════════════════
+           원장(엑셀)에 실제로 쓰이고 있는 「원장명 + 마감 + 마감색상」 짝을 훑어
+           목록으로 깔고, 짝마다 사장님이 손으로 적는 재고 수량을 둔다.
+           들고 나는 것은 아직 없다 — 저절로 줄거나 늘지 않는다.
+           박스판과 같은 토큰·같은 크기를 쓴다. */
+        #amt-stock{
+            --vg-bg:#fff; --vg-ink:#111110; --vg-body:#1A1A19; --vg-soft:#6E6E6A;
+            --vg-muted:#9C9C98; --vg-line:#EDEDEB; --vg-edge:#E2E2DF;
+            --vg-fill:#F4F4F2; --vg-fill2:#EAEAE7; --vg-red:#FF3B30;
+            position:fixed; left:0; right:0; bottom:0; z-index:8200;
+            top:var(--amth-top, 64px);
+            display:none; background:var(--vg-bg); color:var(--vg-body);
+            font:15px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",system-ui,sans-serif;
+            overflow-y:auto; -webkit-overflow-scrolling:touch;
+        }
+        html[data-amtstock="1"] #amt-stock{ display:block; }
+        #amt-stock *{ box-sizing:border-box; }
+        #amt-stock .ams-wrap{
+            max-width:560px; margin:0 auto;
+            /* 아래를 넉넉히 비운다 — '← 박스판' 이 바닥에 떠 있어 마지막 줄을 가린다 */
+            padding:14px 20px calc(86px + env(safe-area-inset-bottom));
+        }
+        #amt-stock .ams-head{ display:flex; align-items:baseline; gap:9px; margin:0 0 12px; }
+        #amt-stock .ams-head b{ font-size:22px; font-weight:700; letter-spacing:-.6px; color:var(--vg-ink); }
+        #amt-stock .ams-head span{ font-size:12px; color:var(--vg-muted); }
+        #amt-stock .ams-find{
+            width:100%; border:1px solid var(--vg-edge); border-radius:13px; padding:12px 14px;
+            font:inherit; background:#fff; outline:none; margin:0 0 12px;
+        }
+        #amt-stock .ams-find:focus{ border-color:var(--vg-ink); }
+        #amt-stock .ams-list{ display:flex; flex-direction:column; gap:8px; }
+        #amt-stock .ams-row{
+            display:flex; align-items:center; gap:10px; background:var(--vg-fill);
+            border:1px solid transparent; border-radius:14px; padding:10px 12px;
+        }
+        #amt-stock .ams-t{ flex:1; min-width:0; }
+        #amt-stock .ams-nm{
+            display:block; font-size:14px; font-weight:700; color:var(--vg-ink);
+            line-height:1.3; word-break:break-all;
+        }
+        #amt-stock .ams-sub{ display:block; font-size:11px; color:var(--vg-muted); margin-top:2px; }
+        #amt-stock .ams-q{ display:flex; align-items:center; gap:4px; flex:none; }
+        #amt-stock .ams-q button{
+            width:34px; height:34px; min-width:34px; border-radius:50%; flex:none;
+            border:1px solid var(--vg-edge); background:#fff; color:var(--vg-ink);
+            font:inherit; font-size:17px; font-weight:800; line-height:1; cursor:pointer;
+            display:grid; place-items:center;
+        }
+        #amt-stock .ams-q button:active{ background:var(--vg-fill2); }
+        #amt-stock .ams-q input{
+            width:62px; height:34px; border:1px solid var(--vg-edge); border-radius:10px;
+            background:#fff; color:var(--vg-ink); font:inherit; font-weight:800;
+            text-align:center; outline:none; -moz-appearance:textfield;
+        }
+        #amt-stock .ams-q input:focus{ border-color:var(--vg-ink); }
+        #amt-stock .ams-q input::-webkit-outer-spin-button,
+        #amt-stock .ams-q input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+        #amt-stock .ams-q i{ font-style:normal; font-size:11px; color:var(--vg-muted); flex:none; }
+        #amt-stock .ams-foot{ margin:18px 0 0; text-align:center; font-size:11px; color:var(--vg-muted); line-height:1.6; }
+        #amt-stock .ams-empty{ padding:28px 0; text-align:center; color:var(--vg-muted); font-size:13px; }
+        #amt-stock-back{
+            display:none; position:fixed; z-index:8300; left:12px;
+            bottom:calc(16px + env(safe-area-inset-bottom));
+        }
+        html[data-amtstock="1"] #amt-stock-back{ display:block; }
+        #amt-stock-back button{
+            display:inline-flex; align-items:center; gap:7px; background:#fff;
+            border:1px solid #E2E2DF; border-radius:999px; padding:9px 15px;
+            font:inherit; font-size:13px; font-weight:700; color:#6E6E6A; cursor:pointer;
+            box-shadow:0 8px 22px -14px rgba(0,0,0,.55);
+        }
+        #amt-stock-back button:active{ background:#F4F4F2; }
+
         /* 돌아오는 길 — 박스 안에서 첫 화면으로. 엄지가 닿는 자리에 띄운다. */
         #amt-back{
             display:none; position:fixed; z-index:990; left:12px;
@@ -1890,7 +1963,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.63</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.64</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2016,12 +2089,24 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.63</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.64</b></p>
         </div>
     </div>
 
     <!-- 박스 안에서 첫 화면으로 돌아오는 자리 -->
     <div id="amt-back"><button type="button" onclick="amtGoHome()">← 박스판</button></div>
+
+    <!-- 원장재고 — 원장에 실제로 쓰이는 원장·마감·마감색상 짝과 그 재고 -->
+    <div id="amt-stock">
+        <div class="ams-wrap">
+            <div class="ams-head"><b>원장재고</b><span id="ams-sub">—</span></div>
+            <input class="ams-find" id="ams-find" type="text" placeholder="원장·마감·색상 찾기" autocomplete="off">
+            <div class="ams-list" id="ams-list"></div>
+            <p class="ams-foot">원장 자료에서 실제 제품에 쓰이는 짝만 골라 왔습니다. 원장은 읽기만 합니다.<br>
+               수량은 손으로 적는 값입니다 — 발주나 재단으로 저절로 줄지 않습니다.</p>
+        </div>
+    </div>
+    <div id="amt-stock-back"><button type="button" onclick="amtCloseStock()">← 박스판</button></div>
 
     <!-- 박스추가 — 박스가 보이는 화면에서만 뜬다 -->
     <button type="button" id="amtb-fab" aria-label="새 박스" title="새 박스">
@@ -12898,6 +12983,161 @@
                 <span>계정관리</span>
             </button>
     </nav>
+    <script>
+    /* ══ 원장재고 ══════════════════════════════════════════════
+       ① 원본은 원장 엑셀이다. 파이어스토어 excel_metadata 가 가리키는 그 파일을
+          앱이 이미 받아 currentFullData 로 들고 있다. 여기서는 그것을 읽기만 한다.
+          고치지도 지우지도 않는다.
+       ② 실제 제품 줄에 쓰인 「원장명 + 마감 + 마감색상」 짝만 모은다. 셋을 묶는 것은
+          이 앱이 재단에서 원장을 가리는 방식 그대로다(원장명+마감+'-'+마감색상).
+          같은 것을 다르게 적어 놓은 것이 있어도 합치지 않는다 — 적힌 대로 둔다.
+       ③ 짝마다 수량을 둔다. 사장님이 손으로 적는 값이다.
+       ④ 들고 나는 자리는 아직 없다. 발주를 넣어도 재단을 해도 이 수량은 안 바뀐다. */
+    (function(){
+        const 칸이름 = 'amt_plate_stock';
+        const appId  = 'vivivic-4b7ef';
+        let 재고 = {}, 붙었나 = false, 찾는말 = '';
+
+        const $ = id => document.getElementById(id);
+        const _e = v => String(v == null ? '' : v)
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        const _빈 = '(빈칸)';
+
+        // 짝 하나의 이름표 — 창고 열쇠로도 쓴다. '/' 는 파이어스토어 문서 이름에 못 쓴다.
+        function 열쇠(원, 마, 색){
+            return [원 || _빈, 마 || _빈, 색 || _빈]
+                .map(x => String(x).trim().replace(/[\/\.#\$\[\]]/g, '_')).join('__');
+        }
+
+        /* 원장에서 실제로 쓰이는 짝을 훑는다. 제품 줄만 센다(단품명이 있는 줄). */
+        window._amtStockPairs = function(){
+            // currentFullData 는 let 으로 선언돼 window 에 안 붙는다. 이름으로 바로 본다.
+            const L = (typeof currentFullData !== 'undefined' && currentFullData) || [];
+            if (!L.length) return [];
+            const h = L[0];
+            const i원 = h.indexOf('원장명'), i마 = h.indexOf('마감'), i색 = h.indexOf('마감색상');
+            const i단 = h.indexOf('ing단품명');
+            if (i원 < 0) return [];
+            const 모음 = new Map();
+            for (let r = 1; r < L.length; r++){
+                const row = L[r]; if (!row) continue;
+                const 원 = String(row[i원] == null ? '' : row[i원]).trim();
+                if (!원) continue;                                  // 원장이 안 적힌 줄은 짝이 아니다
+                const 단 = i단 >= 0 ? String(row[i단] == null ? '' : row[i단]).trim() : '';
+                if (i단 >= 0 && !단) continue;                       // 제품에 안 쓰이는 줄은 뺀다
+                const 마 = String(row[i마] == null ? '' : row[i마]).trim();
+                const 색 = String(row[i색] == null ? '' : row[i색]).trim();
+                const k = 열쇠(원, 마, 색);
+                let x = 모음.get(k);
+                if (!x){ x = { key: k, 원, 마, 색, 줄: 0, 제품: new Set() }; 모음.set(k, x); }
+                x.줄++; if (단) x.제품.add(단);
+            }
+            return [...모음.values()]
+                .map(x => ({ key: x.key, 원: x.원, 마: x.마, 색: x.색, 줄: x.줄, 제품: x.제품.size }))
+                .sort((a, b) => b.줄 - a.줄 || a.원.localeCompare(b.원));
+        };
+
+        /* ── 창고 ── */
+        function 문서(id){
+            const { doc } = window.fbFirestore;
+            return doc(window.db, 'artifacts', appId, 'public', 'data', 칸이름, id);
+        }
+        window.amtStockSync = function(){
+            if (붙었나 || !window.db || !window.fbFirestore) return;
+            붙었나 = true;
+            const { collection, onSnapshot } = window.fbFirestore;
+            const 칸 = collection(window.db, 'artifacts', appId, 'public', 'data', 칸이름);
+            onSnapshot(칸, s => {
+                if (!s || typeof s.forEach !== 'function') return;   // 남의 소식은 흘려보낸다
+                try {
+                    const 새것 = {};
+                    s.forEach(d => { 새것[d.id] = d.data() || {}; });
+                    재고 = 새것;
+                    if (document.documentElement.dataset.amtstock === '1') 그리기();
+                } catch (e) {}
+            }, () => {});
+        };
+
+        async function 적기(k, 값, x){
+            const { setDoc } = window.fbFirestore || {};
+            재고[k] = Object.assign({}, 재고[k], { 수량: 값 });      // 화면은 바로 따라온다
+            if (!setDoc || !window.db) return;
+            try {
+                await setDoc(문서(k), { 원장명: x.원, 마감: x.마, 마감색상: x.색,
+                                        수량: 값, at: Date.now() }, { merge: true });
+            } catch (e) { alert('재고를 담지 못했습니다: ' + e.message); }
+        }
+
+        /* ── 그리기 ── */
+        function 그리기(){
+            const 자리 = $('ams-list'); if (!자리) return;
+            const 모두 = window._amtStockPairs();
+            const 말 = 찾는말.trim().toLowerCase();
+            const 것들 = !말 ? 모두 : 모두.filter(x =>
+                (x.원 + ' ' + x.마 + ' ' + x.색).toLowerCase().includes(말));
+            const sub = $('ams-sub');
+            if (sub) sub.textContent = 모두.length ? (말 ? `${것들.length} / ${모두.length}짝` : `${모두.length}짝`)
+                                                  : '원장을 아직 못 읽었습니다';
+            if (!모두.length){
+                자리.innerHTML = '<div class="ams-empty">원장 자료를 먼저 불러와 주세요.</div>'; return;
+            }
+            if (!것들.length){ 자리.innerHTML = '<div class="ams-empty">찾는 것이 없습니다.</div>'; return; }
+            자리.innerHTML = 것들.map(x => {
+                const 수 = Number((재고[x.key] || {}).수량 || 0);
+                const 이름 = _e(x.원) + ' · ' + _e(x.마 || _빈) + ' · ' + _e(x.색 || _빈);
+                return '<div class="ams-row" data-k="' + _e(x.key) + '">' +
+                    '<span class="ams-t"><span class="ams-nm">' + 이름 + '</span>' +
+                    '<span class="ams-sub">제품 ' + x.제품 + ' · 원장 줄 ' + x.줄 + '</span></span>' +
+                    '<span class="ams-q">' +
+                        '<button type="button" data-step="-1" aria-label="하나 줄이기">−</button>' +
+                        '<input type="number" inputmode="numeric" step="1" value="' + 수 + '">' +
+                        '<button type="button" data-step="1" aria-label="하나 늘리기">+</button>' +
+                        '<i>장</i>' +
+                    '</span></div>';
+            }).join('');
+        }
+
+        function 짝찾기(k){ return window._amtStockPairs().find(x => x.key === k) || null; }
+
+        /* ── 손가락 ──
+           길게 누르기는 쓰지 않는다. 짚어서 지시하는 손잡이(viggle)가 0.5초 길게
+           누르기를 쓰기 때문이다 — 여기서 또 쓰면 사장님이 이 화면을 짚어 지시를
+           남기실 수 없다. 수량은 한 번 눌러 고친다(− + 와 숫자칸). */
+        document.addEventListener('click', e => {
+            const 단추 = e.target.closest('#amt-stock .ams-q button'); if (!단추) return;
+            const 줄 = 단추.closest('.ams-row'); if (!줄) return;
+            const 칸 = 줄.querySelector('input');
+            const x = 짝찾기(줄.dataset.k); if (!칸 || !x) return;
+            const 값 = Math.max(0, (parseInt(칸.value, 10) || 0) + parseInt(단추.dataset.step, 10));
+            칸.value = 값; 적기(줄.dataset.k, 값, x);
+        });
+        document.addEventListener('change', e => {
+            const 칸 = e.target.closest('#amt-stock .ams-q input'); if (!칸) return;
+            const 줄 = 칸.closest('.ams-row'); if (!줄) return;
+            const x = 짝찾기(줄.dataset.k); if (!x) return;
+            const 값 = Math.max(0, parseInt(칸.value, 10) || 0);
+            칸.value = 값; 적기(줄.dataset.k, 값, x);
+        });
+        document.addEventListener('input', e => {
+            if (e.target.id !== 'ams-find') return;
+            찾는말 = e.target.value || ''; 그리기();
+        });
+
+        window.amtOpenStock = function(){
+            if (typeof amtFitTop === 'function') amtFitTop();
+            document.documentElement.removeAttribute('data-amthome');
+            document.documentElement.setAttribute('data-amtstock', '1');
+            try { window.amtStockSync(); } catch (e) {}
+            그리기();
+            window.scrollTo(0, 0);
+        };
+        window.amtCloseStock = function(){
+            document.documentElement.removeAttribute('data-amtstock');
+            if (typeof amtGoHome === 'function') amtGoHome();
+        };
+    })();
+    </script>
+
     <!-- 아이콘 — 작업대가 쓰는 그 파일이다(같은 집 shared/). CDN 이 아니다. -->
     <script src="../shared/lucide.min.js"></script>
     <script>
@@ -12966,7 +13206,8 @@
         // 이 집 안에서 갈 수 있는 곳 — 일하는 박스를 바로가기로 걸 수 있게
         const 안쪽 = [['pending','발주확정 대기목록'],['confirmed','발주확정목록'],
                       ['timeline','공정 일정 타임라인'],['cutting','재단발주·도면'],
-                      ['process','공정관리'],['accounts','계정관리']];
+                      ['process','공정관리'],['accounts','계정관리'],
+                      ['stock','원장재고']];
 
         /* ── 창고 ── */
         function 칸(){
@@ -12999,7 +13240,14 @@
             return '<button type="button" class="amth-tile ' + 모양 + '" data-amtb-id="' + _e(b.id) + '">' +
                 '<span class="amth-ico">' + 아이콘(b.icon || 'square', 22) + '</span>' +
                 '<span><span class="amth-nm">' + _e(b.name || '새 박스') + '</span>' +
-                '<span class="amth-pct">' + _e(갈곳이름(b.link)) + '</span></span></button>';
+                '<span class="amth-pct">' + _e(갈곳이름(b.link || 이름으로(b))) + '</span></span></button>';
+        }
+        // 갈 곳을 안 고르고 이름만 적으셨는데 그 이름이 이 집 안의 화면과 똑같으면
+        // 거기로 본다. '원장재고' 라 적힌 박스는 원장재고 화면을 연다.
+        function 이름으로(b){
+            if (!b || b.link) return null;
+            const 안 = 안쪽.find(x => x[1] === String(b.name || '').trim());
+            return 안 ? 안[0] : null;
         }
         function 갈곳이름(link){
             if (!link) return '길게 눌러 고치기';
@@ -13100,10 +13348,12 @@
         }
 
         function 열기(b){
-            if (!b || !b.link) return 박스판(b);          // 갈 곳이 없으면 고치기 판
-            const 안 = 안쪽.find(x => x[0] === b.link);
-            if (안) { if (typeof amtOpenBox === 'function') amtOpenBox(b.link); return; }
-            window.open(b.link, '_blank', 'noopener');
+            const 갈곳 = (b && b.link) || 이름으로(b);
+            if (!갈곳) return 박스판(b);                  // 갈 곳이 없으면 고치기 판
+            if (갈곳 === 'stock') { if (typeof amtOpenStock === 'function') amtOpenStock(); return; }
+            const 안 = 안쪽.find(x => x[0] === 갈곳);
+            if (안) { if (typeof amtOpenBox === 'function') amtOpenBox(갈곳); return; }
+            window.open(갈곳, '_blank', 'noopener');
         }
 
         /* ── 손가락 ── */
