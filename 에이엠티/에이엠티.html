@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.9.51 (2026-09-13) — 재단이 끝나야 엣지 줄이 또렷해진다
+     버전: v1.9.52 (2026-09-13) — 엣지 부속 하나하나가 재단을 따라 켜진다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1063,6 +1063,9 @@
         .wo-cut-grp.wo-앞대기 .wo-cut-grp-sub,
         .wo-cut-grp.wo-앞대기 .wo-cut-grp-chev,
         .wo-cut-grp.wo-앞대기 .wo-cut-grp-n { opacity: .42; }
+        /* 재단이 아직인 엣지 부속 카드 — 글씨만 연하다. 테두리·자리·크기는 그대로. */
+        .wo-boring-placed-card.wo-앞대기카드 { color: #a8a6a2; }
+        .wo-boring-placed-card.wo-앞대기카드 > * { opacity: .45; }
         .wo-앞대기-표 {
             font-size: 9px; font-weight: 900; color: #37352f;
             background: #ededeb; border-radius: 999px; padding: 1px 6px;
@@ -1798,7 +1801,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.51</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.52</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -1919,7 +1922,7 @@
 
             </div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.51</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.52</b></p>
         </div>
     </div>
 
@@ -8963,7 +8966,11 @@
             const _pOk = (p.orderKey || p.orderCode || '').replace(/'/g, "\\'");
             // 재단 카드는 클릭 시 실제 재단편집 도구가 팝업으로 뜨며 바로 편집 가능
             const _cutClick = p.isCuttingCard ? ` onclick="woEditCuttingPlan('${cKey}','${sk}')"` : '';
-            const _cardCls = 'wo-boring-placed-card' + (p.isCuttingCard ? ' cutting-card' : '');
+            // 엣지 판에서는 그 부속의 재단이 끝나야 또렷해진다. 아직이면 연한 글씨.
+            // 누르는 것은 그대로다 — 보기만 연할 뿐 막지 않는다.
+            const _대기카드 = /-엣지$/.test(sk) && !_bDone && !_woEdgeReady(p, _bck, _bComps);
+            const _cardCls = 'wo-boring-placed-card' + (p.isCuttingCard ? ' cutting-card' : '')
+                + (_대기카드 ? ' wo-앞대기카드' : '');
             return `<div class="${_cardCls}" draggable="${_bDone ? 'false' : 'true'}"` +
                 ` style="${_bcs}${_bDone ? 'opacity:0.6;' : ''}${p.isCuttingCard ? 'cursor:pointer;' : ''}"` +
                 ` data-ck="${cKey}" data-sk="${sk}" data-mac="${mac}" data-ok="${_pOk}" data-done="${_bDone ? '1' : '0'}"${_grpAttr || ''}${_cutClick}` +
@@ -9044,6 +9051,61 @@
                 });
             });
             return 있었나 ? 다끝 : null;
+        }
+
+        /* 엣지 부속 하나하나가 재단을 따라 켜진다 ────────────────────────
+           짝 맞추는 열쇠를 새로 만들지 않았다. 이미 있는 것 둘을 쓴다.
+             ① 부속키 — 재단과 엣지가 같은 키(partCompletions[부속키])에 공정별로
+                완료를 적는다. ▶시작 단추를 열고 닫는 _partPrereqDone 이 쓰는 그것이다.
+             ② 원장 행 번호 — 재단을 '재단계획 카드'로 자른 경우 완료가 그 계획 키
+                (cut_…)에 적혀 부속키로는 안 잡힌다. 그때는 계획이 덮는 행
+                (pRowIndex·sRowIndex·tRowIndex)과 이 부속의 행을 맞춘다.
+           둘 중 어느 쪽으로도 짝을 못 찾으면 켜 둔다 — 못 보는 것을 근거로 막으면
+           영영 못 쓰시게 된다. */
+        function _woRowOfPartKey(키) {
+            const m = String(키 || '').match(/card-\d+-(\d+)/);
+            return m ? parseInt(m[1], 10) : null;
+        }
+
+        // 이 재단 카드가 덮는 원장 행들
+        function _woCutCardRows(p) {
+            const rows = new Set();
+            if (p && p.pRowIndex != null) rows.add(Number(p.pRowIndex));
+            const r0 = _woRowOfPartKey(p && p.cKey);
+            if (r0 != null) rows.add(r0);
+            const m = String((p && p.cKey) || '').match(/cut_(.+)$/);
+            if (m) {
+                const plan = (window._cuttingPlans || {})[m[1]];
+                if (plan) ['pRowIndex', 'sRowIndex', 'tRowIndex'].forEach(k => {
+                    if (plan[k] != null) rows.add(Number(plan[k]));
+                });
+            }
+            return rows;
+        }
+
+        // 이 발주의 재단 카드들을 훑어, 행마다 끝났는지 모아 둔다
+        function _woCutRowState(열쇠) {
+            const 본것 = new Set(), 끝난것 = new Set();
+            const 판들 = window._woBoringParts || {};
+            Object.keys(판들).forEach(sk2 => {
+                if (!/-재단$/.test(sk2)) return;
+                (판들[sk2] || []).forEach(p2 => {
+                    if (_woOrderMatchKey(p2) !== 열쇠) return;
+                    const 끝 = _woCutCardDone(p2, p2.cKey, sk2);
+                    _woCutCardRows(p2).forEach(r => { 본것.add(r); if (끝) 끝난것.add(r); });
+                });
+            });
+            return { 본것, 끝난것 };
+        }
+
+        // 엣지 부속 카드 하나 — 지금 손댈 수 있는가(재단이 끝났는가)
+        function _woEdgeReady(p, 부속키, comps) {
+            if (comps && comps['재단']) return true;          // 그 부속의 재단 완료가 찍혀 있다
+            const 행 = _woRowOfPartKey(부속키);
+            if (행 == null) return true;                      // 행을 못 읽으면 막지 않는다
+            const st = _woCutRowState(_woOrderMatchKey(p));
+            if (!st.본것.has(행)) return true;                 // 재단 쪽에 짝이 없다 → 켜 둔다
+            return st.끝난것.has(행);
         }
 
         // 이 재단도 카드가 완료로 찍혔는지 — _woPlacedCardHtml 과 같은 방식으로 읽는다
