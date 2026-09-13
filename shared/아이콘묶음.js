@@ -87,6 +87,16 @@
       .toLowerCase();
   }
 
+  // 적어 둔 이름이 lucide 에 그대로 있으면 그것, 없으면 lucide 쪽 표기로 바꿔 본다
+  function 바른이름(n, 본것) {
+    if (본것[n]) return n;
+    var 파스칼 = String(n).split('-').map(function (w) {
+      return w ? w.charAt(0).toUpperCase() + w.slice(1) : w;
+    }).join('');
+    var k = 케밥(파스칼);
+    return 본것[k] ? k : null;
+  }
+
   function 만들기() {
     var L = (global.lucide && global.lucide.icons) || {};
     var 모든이름 = Object.keys(L);
@@ -103,12 +113,14 @@
     var 통 = {}, 놓인것 = {};
     for (var t = 0; t < 차례.length; t++) 통[차례[t]] = [];
 
-    // ① 씨앗 먼저 — 있는 것만, 적어 둔 차례 그대로
+    // ① 씨앗 먼저 — 있는 것만, 적어 둔 차례 그대로.
+    //    손으로 적어 두던 이름과 lucide 가 내놓는 이름이 숫자 앞의 '-' 하나로
+    //    갈릴 때가 있다(table-2 ↔ table2). 그때는 lucide 쪽 이름으로 맞춘다.
     for (var s = 0; s < 차례.length; s++) {
       var 이름 = 차례[s], 씨 = 씨앗[이름] || [];
       for (var j = 0; j < 씨.length; j++) {
-        var c = 씨[j];
-        if (!본것[c] || 놓인것[c]) continue;
+        var c = 바른이름(씨[j], 본것);
+        if (!c || 놓인것[c]) continue;
         통[이름].push(c); 놓인것[c] = 1;
       }
     }
