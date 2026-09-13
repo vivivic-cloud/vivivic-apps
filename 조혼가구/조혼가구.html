@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- 조혼가구 — 거래처 발주 화면.
-     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.1.9 -->
+     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.2.0 -->
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -1204,7 +1204,7 @@
             box-sizing:border-box;
             display:block; width:100%; border:2px solid #37352f; border-radius:14px;
             padding:12px; background:#fbfbfa;
-            transition:border-color .2s, background .2s, opacity .26s ease-in-out;
+            transition:border-color .2s, background .2s;
         }
         html[data-johonpicked="1"] .jh-pick-box{
             border-color:#ededeb; background:transparent;
@@ -1485,7 +1485,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.1.9</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.2.0</span>
                 </div>
                 <!-- 페이지 탭: 발주하기 / 작업중 -->
                 <div class="flex items-center gap-1 border border-[#ededeb] rounded-lg bg-[#f7f6f3] p-1 mr-2">
@@ -4676,6 +4676,7 @@
         // 깜빡임 — 값을 직접 바꾼다. CSS 애니메이션은 아이폰의 '동작 줄이기'·
         // 저전력 모드에 막힐 수 있어 믿지 않는다. 흐림만 오르내리므로 어디서나 돈다.
         var _johonDim = false;
+        var _johonChip = -1;   // 차례로 도는 칩 — 한 칸에 560ms, 셋 한 바퀴 1.68초
         function johonBlinkTick(){
             const de   = document.documentElement;
             const tile = document.querySelector('#johon-home .jhh-call');
@@ -4695,7 +4696,20 @@
             const v = _johonDim ? '0.32' : '1';
             if (tile) tile.style.opacity = on ? v : '';
             if (lead) lead.style.opacity = on ? v : '';
-            if (pick) pick.style.opacity = pk ? v : '';
+            // 검색 방법 — 박스 바탕은 가만히 두고(지시 09-12 23:53),
+            // 글 한 줄만 깜빡이고 칩 테두리가 차례로 돈다.
+            const msg  = document.querySelector('.jh-pick-msg');
+            const chips = document.querySelectorAll('.method-chip');
+            if (pick) pick.style.opacity = '';
+            if (msg)  msg.style.opacity = pk ? v : '';
+            if (pk) _johonChip = (_johonChip + 1) % (chips.length || 1);
+            chips.forEach((c, i) => {
+                // 테두리 둘레에 고리를 씌운다. 테두리 빛깔을 바꾸면 ING단품명 칩은
+                // 원래 먹빛이라 제 차례인지 알 수 없다. 고리는 자리를 안 먹으므로
+                // 칩 크기도 그대로다.
+                c.style.boxShadow = (pk && i === _johonChip)
+                    ? '0 0 0 3px rgba(55,53,47,.45)' : '';
+            });
             de.setAttribute('data-johonedit', ed ? '1' : '0');
             document.querySelectorAll('.jh-blink').forEach(b => { b.style.opacity = ed ? v : ''; });
         }
