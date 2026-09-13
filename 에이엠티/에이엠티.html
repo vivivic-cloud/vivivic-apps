@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.9.54 (2026-09-13) — 보낸 적 없는 발주가 재단발주목록에 앉던 것
+     버전: v1.9.55 (2026-09-13) — 점 셋: 빈 점 · 재단만 끝(반 빨강) · 엣지까지 끝(검정)
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1054,6 +1054,12 @@
             border: 1.5px solid #b0aeaa; background: #fff; flex: none;
         }
         .wo-grp-점 i.on { background: #37352f; border-color: #37352f; }
+        /* 앞 공정(재단)만 끝난 점 — 빨강이면서 '반만 찬' 모양이다. 색이 안 갈리는
+           눈에도 채움 정도(빈 점 0 · 반 50 · 꽉 100)로 갈린다. */
+        .wo-grp-점 i.wo-앞끝 {
+            border-color: #c92a2a;
+            background: linear-gradient(90deg, #c92a2a 0 50%, #fff 50% 100%);
+        }
         .wo-grp-점.wo-잔점 { gap: 2px; }
         .wo-grp-점.wo-잔점 i { width: 5px; height: 5px; border-width: 1px; }
         .wo-grp-점 b { font-size: 9px; font-weight: 800; color: #787774; margin-left: 2px; }
@@ -1801,7 +1807,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.54</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.55</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -1922,7 +1928,7 @@
 
             </div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.54</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.55</b></p>
         </div>
     </div>
 
@@ -9112,6 +9118,22 @@
             return st.끝난것.has(행);
         }
 
+        /* 점 하나의 상태 — 0 아무것도 아직 · 1 앞 공정(재단)만 끝 · 2 이 공정까지 끝.
+           앞 공정 판정은 엣지 카드를 켜고 끄는 그 판정(_woEdgeReady)을 그대로 쓴다.
+           두 벌로 만들지 않았다. 재단 판에는 앞 공정이 없어 0 과 2 만 나온다. */
+        function _woCardDotState(p, sk) {
+            if (_woCutCardDone(p, p.cKey, sk)) return 2;
+            if (!/-엣지$/.test(sk)) return 0;
+            try {
+                const _did = p.orderKey || '';
+                const _ck  = _woPartKey(p.cKey, _did, p);
+                const _obj = confirmedOrders.find(o => (o.docId || String(o.idNum)) === _did);
+                const _old = _woPartOldKeys(p.cKey, _did);
+                const comps = _partRecMap(_obj?.partCompletions, _ck, _old);
+                return _woEdgeReady(p, _ck, comps) ? 1 : 0;
+            } catch (e) { return 0; }
+        }
+
         // 이 재단도 카드가 완료로 찍혔는지 — _woPlacedCardHtml 과 같은 방식으로 읽는다
         function _woCutCardDone(p, cKey, sk) {
             try {
@@ -9134,9 +9156,9 @@
                 g[k].n++;
                 g[k].min += p.pm || 0;
                 if (!g[k].name && p.orderName) g[k].name = p.orderName;
-                const 끝 = _woCutCardDone(p, p.cKey, sk);
-                if (끝) g[k].done++;
-                g[k].표.push(!!끝);          // 카드 차례대로 — 점 하나가 카드 하나다
+                const 상태 = _woCardDotState(p, sk);
+                if (상태 === 2) g[k].done++;
+                g[k].표.push(상태);          // 카드 차례대로 — 점 하나가 카드 하나다
             });
             return g;
         }
@@ -9204,7 +9226,7 @@
                 // 열둘이 넘으면 열둘까지만 찍고 말줄임표를 단다. 몇 개 중 몇 개인지는
                 // 옆의 배지(부속 23개)와 '✓ 13/23 완료' 가 정확히 말해 준다.
                 점줄 = `<div class="wo-grp-점${잘게 ? ' wo-잔점' : ''}">` +
-                    보일것.map(끝 => `<i class="${끝 ? 'on' : ''}"></i>`).join('') +
+                    보일것.map(st => `<i class="${st === 2 ? 'on' : (st === 1 ? 'wo-앞끝' : '')}"></i>`).join('') +
                     (표.length > 한도 ? `<b>\u2026</b>` : '') +
                     `</div>`;
             }
