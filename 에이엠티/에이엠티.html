@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.9.57 (2026-09-13) — 같은 공정 안에서 배치 차례도 바꾼다
+     버전: v1.9.58 (2026-09-13) — 취소·수정 요청을 확정목록에도 곧바로. 알림을 누르면 그 줄로
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1819,7 +1819,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.57</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.58</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -1940,7 +1940,7 @@
 
             </div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.57</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.58</b></p>
         </div>
     </div>
 
@@ -2559,22 +2559,48 @@
             }
         }
 
+        /* 알림에서 그 발주 줄로 데려간다.
+           그 줄은 둘 중 한 곳에 있다 — 아직 확정 전이면 '발주확정 대기목록',
+           확정된 뒤면 '발주확정목록'. 예전에는 대기목록 줄만 찾아, 확정된 발주는
+           눌러도 아무 일이 없었다. 거래처 판(v1.9.47)이 목록을 가리고 있을 수도 있어
+           전체보기로 열어 둔다. 옮겨 가기만 한다 — 누른다고 처리되지 않는다. */
         function scrollToPendingOrder(docId) {
             const dropdown = document.getElementById('notification-dropdown');
-            dropdown.classList.add('hidden');
+            if (dropdown) dropdown.classList.add('hidden');
 
-            // 발주상품목록은 "발주서" 탭에서만 보이므로, 다른 탭에 있었다면 먼저 이동
+            // 발주 목록은 "발주서" 탭에서만 보인다
             if (appMode !== 'order') switchPage('order');
+            // 박스 판을 열어 둔 상태면 발주 목록이 보이는 박스로 (v1.9.29)
+            try {
+                if (typeof amtCurrentBox !== 'undefined' && amtCurrentBox &&
+                    amtCurrentBox !== 'pending' && amtCurrentBox !== 'confirmed') amtOpenBox('pending');
+            } catch (e) {}
+            // 거래처 판이 고르기 전이면 목록이 감춰져 있다 — 전체보기로 연다 (v1.9.47)
+            try { if (window._amtVendor == null && typeof amtVendorPick === 'function') amtVendorPick('*'); } catch (e) {}
 
             // 탭 전환으로 인한 렌더링이 끝난 다음 스크롤하도록 다음 틱에 실행
             // (requestAnimationFrame은 비활성/백그라운드 탭에서 안 돌 수 있어 setTimeout 사용)
-            setTimeout(() => {
-                const card = document.getElementById(`pending-card-${docId}`);
-                if (!card) return;
+            const 짚기 = (남은) => {
+                const card = document.getElementById(`pending-card-${docId}`)
+                          || document.getElementById(`tlconf-card-${docId}`);
+                if (!card) { if (남은 > 0) setTimeout(() => 짚기(남은 - 1), 120); return; }
+                // 확정목록은 접혀 있을 수 있다 — 열어야 줄이 보인다
+                const body = document.getElementById('timeline-confirmed-list-body');
+                if (body && body.style.display === 'none' && card.id.startsWith('tlconf-')) {
+                    try { toggleTimelineConfirmedList(); } catch (e) { body.style.display = 'block'; }
+                }
+                const 대기몸 = document.getElementById('pending-list-body');
+                if (대기몸 && 대기몸.style.display === 'none' && card.id.startsWith('pending-')) {
+                    try { togglePendingList(); } catch (e) { 대기몸.style.display = 'block'; }
+                }
                 card.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 card.classList.add('notif-highlight');
                 setTimeout(() => card.classList.remove('notif-highlight'), 4200);
-            }, 0);
+            };
+            // 목록이 다시 그려지면 줄이 새 것으로 바뀌어 짚어 둔 표가 날아간다.
+            // 잠깐 사이를 두고 몇 번 다시 짚는다.
+            setTimeout(() => 짚기(12), 0);
+            [250, 600, 1100].forEach(ms => setTimeout(() => 짚기(0), ms));
         }
 
         function renderNotifications() {
@@ -2593,16 +2619,17 @@
             list.innerHTML = notifications.map(n => {
                 let btn = '';
                 if (n.actionType === 'cancel') {
-                    btn = `<button onclick="handleNotificationAction('${n.docId}', 'cancel', ${n.id})" class="px-1.5 py-0.5 bg-red-600 text-white text-[9px] font-bold rounded hover:bg-red-700 whitespace-nowrap">취소확인</button>`;
+                    btn = `<button onclick="event.stopPropagation();handleNotificationAction('${n.docId}', 'cancel', ${n.id})" class="px-1.5 py-0.5 bg-red-600 text-white text-[9px] font-bold rounded hover:bg-red-700 whitespace-nowrap">취소확인</button>`;
                 } else if (n.actionType === 'edit') {
-                    btn = `<button onclick="handleNotificationAction('${n.docId}', 'edit', ${n.id})" class="px-1.5 py-0.5 bg-white border border-blue-200 text-blue-500 text-[9px] font-bold rounded hover:bg-blue-50 whitespace-nowrap">수정승인</button>`;
+                    btn = `<button onclick="event.stopPropagation();handleNotificationAction('${n.docId}', 'edit', ${n.id})" class="px-1.5 py-0.5 bg-white border border-blue-200 text-blue-500 text-[9px] font-bold rounded hover:bg-blue-50 whitespace-nowrap">수정승인</button>`;
                 } else if (n.actionType === 'editComplete') {
-                    btn = `<button onclick="handleNotificationAction('${n.docId}', 'editComplete', ${n.id})" class="px-1.5 py-0.5 bg-[#37352f] text-white text-[9px] font-bold rounded hover:bg-[#37352f] animate-pulse whitespace-nowrap">수정완료확인</button>`;
+                    btn = `<button onclick="event.stopPropagation();handleNotificationAction('${n.docId}', 'editComplete', ${n.id})" class="px-1.5 py-0.5 bg-[#37352f] text-white text-[9px] font-bold rounded hover:bg-[#37352f] animate-pulse whitespace-nowrap">수정완료확인</button>`;
                 }
                 // actionType이 null이면(예: 수정중) 지금 당장 누를 버튼 없이 정보성으로만 표시
 
                 return `
-                <div class="p-2 border-b border-[#ededeb] last:border-none hover:bg-[#f7f6f3]">
+                <div onclick="scrollToPendingOrder('${n.docId}')" style="cursor:pointer;min-height:44px;"
+                     class="p-2 border-b border-[#ededeb] last:border-none hover:bg-[#f7f6f3] active:bg-[#f1f1ef]">
                     <div class="flex items-center justify-between gap-2 mb-1.5">
                         <div class="flex items-center gap-2">
                             <span style="background:${n.accent};" class="px-1.5 py-0.5 text-white rounded font-black text-[9px] uppercase">${n.title}</span>
@@ -2610,7 +2637,7 @@
                         </div>
                         <div class="flex items-center gap-1">
                             ${btn}
-                            <button onclick="scrollToPendingOrder('${n.docId}')" class="px-1.5 py-0.5 bg-[#f7f6f3] border border-[#ededeb] text-[#37352f] text-[9px] font-bold rounded hover:bg-[#f1f1ef] whitespace-nowrap">상세보기</button>
+                            <button onclick="event.stopPropagation();scrollToPendingOrder('${n.docId}')" class="px-1.5 py-0.5 bg-[#f7f6f3] border border-[#ededeb] text-[#37352f] text-[9px] font-bold rounded hover:bg-[#f1f1ef] whitespace-nowrap">상세보기</button>
                         </div>
                     </div>
                     <div class="text-[10px] font-bold text-[#37352f] truncate">
@@ -2653,6 +2680,7 @@
             };
 
             onSnapshot(colRef, (snapshot) => {
+                let _요청바뀜 = false;   // 이번 소식에 취소·수정 요청이 걸려 있나
                 // docChanges()로 변경분만 처리 — 전체 순회/깊은복사 없음
                 snapshot.docChanges().forEach(change => {
                     const newOrder = { ...change.doc.data(), docId: change.doc.id };
@@ -2685,6 +2713,7 @@
                     //  이미 승인된 건을 재수정요청하는 경우처럼 그 어떤 조건에도 안 걸려
                     //  알림이 아예 안 뜨는 사각지대가 있었음)
                     if (change.type === 'added' || change.type === 'modified') {
+                        if (hasUnresolvedRequest(newOrder) !== hasUnresolvedRequest(prevOrder)) _요청바뀜 = true;
                         if (newOrder.amtRegistered !== true && !newOrder.amtConfirmedCancel) {
                             if (hasUnresolvedRequest(newOrder)) addNotification(newOrder);
                             else removeNotificationByDocId(newOrder.docId);
@@ -2698,8 +2727,9 @@
                     if (el) { el.setAttribute('stroke', '#b0aeaa'); el.setAttribute('title', 'Firebase 연결됨'); }
                 });
 
-                // 타임라인 편집 중이면 렌더 보류, 아니면 즉시 반영
-                if (_tlFlowActive) {
+                // 타임라인 편집 중이면 렌더 보류 — 다만 거래처의 취소·수정 요청이
+                // 걸린 변경은 보류하지 않는다. 늦게 뜨면 이미 취소된 것을 발주하게 된다.
+                if (_tlFlowActive && !_요청바뀜) {
                     _tlPendingRender = true;
                 } else {
                     renderPendingOrders();
@@ -4226,12 +4256,20 @@
                      .join('');
                     const wtRow = wtBadges ? `<div class="flex items-center gap-1 flex-wrap mt-1">${wtBadges}</div>` : '';
 
+                    // 거래처가 넣은 취소·수정 요청은 확정된 뒤에도 이 줄에 그대로 떠야 한다.
+                    // 여기 표시가 없어서, 확정된 발주는 요청이 들어와도 목록에서 보이지 않았다.
+                    // 판정은 대기목록과 같은 것을 쓴다(unresolvedRequestInfo).
+                    const _req = (typeof unresolvedRequestInfo === 'function') ? unresolvedRequestInfo(item) : null;
+                    const _reqBadge = _req
+                        ? `<span style="background:${_req.accent};color:#fff;" class="px-2 py-0.5 rounded font-black text-[10px] uppercase ml-1 animate-pulse">${_req.title}</span>`
+                        : '';
                     return `
-                    <div class="flex flex-col gap-1 py-3 px-4 border-b border-[#f1f1ef] last:border-none relative group/item">
+                    <div id="tlconf-card-${item.docId}" class="flex flex-col gap-1 py-3 px-4 border-b border-[#f1f1ef] last:border-none relative group/item"${_req ? ' style="background:#fff7f7;"' : ''}>
                         <div class="flex justify-between items-center mb-1">
                             <div class="flex items-center gap-1 flex-wrap">
                                 ${orderCodeHtml}
                                 <span style="background:#b0aeaa;color:#fff;" class="px-2 py-0.5 rounded font-black text-[10px]">확정</span>
+                                ${_reqBadge}
                             </div>
                         </div>
                         <div class="flex justify-between items-start cursor-pointer group" onclick="toggleTlConfDetails(${item.idNum})">
