@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- 조혼가구 — 거래처 발주 화면.
-     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.3.7 -->
+     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.3.8 -->
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -1604,7 +1604,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.3.7</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.3.8</span>
                 </div>
                 <!-- 페이지 탭: 발주하기 / 작업중 -->
                 <div class="flex items-center gap-1 border border-[#ededeb] rounded-lg bg-[#f7f6f3] p-1 mr-2">
@@ -5271,11 +5271,20 @@
             };
             const _reset = window.resetEditToOriginal;
             if (typeof _reset === 'function') window.resetEditToOriginal = function(idNum){
+                // ⚠ 초안은 원래 함수를 부르기 **전에** 놓는다. 뒤에 놓으면 한 줄 늦다 —
+                //    _reset 이 제 안에서 renderConfirmedBatchList() 를 부르고, 그것이
+                //    johonDraftApply() 를 먼저 돌려 원주문으로 되돌려 놓은 것 위에
+                //    손댄 값을 도로 얹었다. 눌러도 아무것도 안 돌아왔다(지시 09-13 20:41).
+                // ⚠ 되돌릴 것이 실제로 있을 때만 놓는다. _reset 은 backup 이 없으면
+                //    맨 앞에서 그냥 돌아나간다. 그때 초안까지 놓아 버리면 되돌린 것은
+                //    없는데 사장님 손댐만 보호가 풀려 다음 갈아끼움에 소리 없이 날아간다.
                 let docId = null;
-                try { const c = (confirmedOrders || []).find(o => o.idNum === idNum); docId = c && c.docId; } catch (e) {}
-                const r = _reset.apply(this, arguments);
-                try { johonDraftDrop(docId); } catch (e) {}
-                return r;
+                try {
+                    const c = (confirmedOrders || []).find(o => o.idNum === idNum);
+                    if (c && c.backup) docId = c.docId;      // backup 이 있을 때만
+                } catch (e) {}
+                try { if (docId) johonDraftDrop(docId); } catch (e) {}
+                return _reset.apply(this, arguments);
             };
         })();
 
