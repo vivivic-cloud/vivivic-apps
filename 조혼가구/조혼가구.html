@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- 조혼가구 — 거래처 발주 화면.
-     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.3.6 -->
+     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.3.7 -->
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -1604,7 +1604,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.3.6</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.3.7</span>
                 </div>
                 <!-- 페이지 탭: 발주하기 / 작업중 -->
                 <div class="flex items-center gap-1 border border-[#ededeb] rounded-lg bg-[#f7f6f3] p-1 mr-2">
@@ -4093,10 +4093,19 @@
             const item = confirmedOrders.find(o => o.idNum === idNum);
             if (!item || !item.isEditMode) return;
             if (!editHistoryMap[idNum]) editHistoryMap[idNum] = [];
+            // 화면 값 옆에 '수정중 지키기' 초안 한 칸도 같이 담는다.
+            // 안 담으면 되돌린 것을 그 초안이 곧바로 도로 덮는다 — 「뒤로가기」가
+            // 알림만 뜨고 부속이 안 돌아왔다(지시 09-13 19:42).
+            // 칸 전체를 놓아 버리면 앞서 해 두신 수량·날짜 손댐까지 보호가 풀린다.
+            // 그래서 그 단계 직전의 초안 모습을 통째로 담아 둔다.
+            let 초안칸;
+            try { 초안칸 = item.docId ? johonDraftRead()[item.docId] : undefined; } catch (e) {}
             editHistoryMap[idNum].push(JSON.parse(JSON.stringify({
                 partInfoMap: item.partInfoMap,
                 orderQty: item.orderQty,
-                deliveryDate: item.deliveryDate
+                deliveryDate: item.deliveryDate,
+                draft: 초안칸 === undefined ? null : 초안칸,
+                hadDraft: 초안칸 !== undefined
             })));
         }
 
@@ -4122,6 +4131,18 @@
             item.partInfoMap = JSON.parse(JSON.stringify(prev.partInfoMap));
             item.orderQty = prev.orderQty;
             item.deliveryDate = prev.deliveryDate;
+            // 담아 둔 초안 칸을 그대로 도로 써 넣는다 — 그리기 전에 해야 한다.
+            // renderConfirmedBatchList 가 johonDraftApply 를 먼저 돌리기 때문이다.
+            // 그 단계 직전 모습으로 돌아가므로 되돌린 것은 다시 안 덮이고,
+            // 앞서 해 두신 손댐은 그 초안 안에 그대로 남아 지켜진다.
+            try {
+                if (item.docId) {
+                    const d = johonDraftRead();
+                    if (prev.hadDraft && prev.draft) d[item.docId] = JSON.parse(JSON.stringify(prev.draft));
+                    else delete d[item.docId];
+                    johonDraftWrite(d);
+                }
+            } catch (e) {}
             renderConfirmedBatchList();
             showToastMessage("한 단계 되돌렸습니다.");
         }
