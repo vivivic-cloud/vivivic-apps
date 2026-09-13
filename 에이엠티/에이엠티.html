@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.9.56 (2026-09-13) — 더한 부속이 다음 단계에서 사라지던 것
+     버전: v1.9.57 (2026-09-13) — 같은 공정 안에서 배치 차례도 바꾼다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -433,6 +433,18 @@
         .tl-proc-label-NC,
         .tl-proc-label-엣지,
         .tl-proc-label-보링   { color: #fff; }
+        /* 같은 공정 안 차례 바꾸기 — 두 번 눌러 고른 카드에만 나온다.
+           평소에는 자리를 차지하지 않아 카드 모양이 그대로다. */
+        .tl-차례 { display: none; gap: 2px; flex: none; }
+        .tl-item-selected .tl-차례 { display: inline-flex; }
+        .tl-차례 button {
+            flex: none; width: 18px; height: 18px; min-width: 18px; min-height: 18px;
+            line-height: 1; padding: 0;
+            font-size: 9px; font-weight: 900; color: #37352f;
+            background: #fff; border: 1px solid #c5c3bf; border-radius: 4px;
+            cursor: pointer; touch-action: manipulation;
+        }
+        .tl-차례 button:active { background: #ededeb; }
         /* 납기 섹션 — 상품 토글 */
         .tl-delivery-item { cursor:pointer; padding:3px 4px; border-radius:5px; transition:background 0.12s; position:relative; }
         .tl-delivery-item:hover { background:#f1f1ef; }
@@ -1807,7 +1819,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.56</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.57</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -1928,7 +1940,7 @@
 
             </div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.56</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.57</b></p>
         </div>
     </div>
 
@@ -5892,6 +5904,14 @@
                     });
                 });
 
+                // 사장님이 정하신 차례가 있으면 그대로 줄 세운다. 저장에 없는 카드는
+                // (새로 들어온 것) 맨 뒤에 붙는다 — 있던 차례가 흐트러지지 않는다.
+                PROC_DEF.forEach(proc => {
+                    Object.keys(byProc[proc.key]).forEach(td => {
+                        byProc[proc.key][td] = _tlProcSortBySaved(td, proc.key, byProc[proc.key][td]);
+                    });
+                });
+
                 // ── STEP 4: DOM 렌더 ──────────────────────────────────────
                 console.log('[_fillProcessSections] byProc 결과:', JSON.stringify(Object.fromEntries(Object.entries(byProc).map(([k,v])=>[k,Object.keys(v)]))));
                 PROC_DEF.forEach(proc => {
@@ -5979,9 +5999,13 @@
                             sectionTotalMin += procMin;
 
                             return `
-                            <div class="tl-delivery-item" data-idnum="${item.idNum}" data-docid="${item.docId || ''}" data-ordercode="${item.orderCode || ''}" data-proc="${proc.key}" ondblclick="tlSelectRelated(this)" onmousedown="tlProcDragStart(event,this)">
+                            <div class="tl-delivery-item" data-idnum="${item.idNum}" data-docid="${item.docId || ''}" data-ordercode="${item.orderCode || ''}" data-proc="${proc.key}" data-tl-date="${targetDate}" ondblclick="tlSelectRelated(this)" onmousedown="tlProcDragStart(event,this)">
                                 <div style="display:flex;align-items:center;gap:3px;">
                                     <span class="tl-arrow" style="font-size:9px;color:#787774;flex-shrink:0;cursor:pointer;padding:0 2px;" onclick="event.stopPropagation();tlToggleDeliveryParts(this.closest('.tl-delivery-item'))">▶</span>
+                                    <span class="tl-차례">
+                                        <button type="button" onclick="event.stopPropagation();tlProcMove(this,-1)" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()" title="앞으로">▲</button>
+                                        <button type="button" onclick="event.stopPropagation();tlProcMove(this,1)" onmousedown="event.stopPropagation()" ontouchstart="event.stopPropagation()" title="뒤로">▼</button>
+                                    </span>
                                     <span style="flex:1;font-size:9px;font-weight:700;color:#37352f;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${item.displayName}</span>
                                     <span style="display:flex;gap:2px;align-items:center;flex-shrink:0;">${spot}</span>
                                     ${procStr ? `<span style="font-size:8px;font-weight:700;color:#787774;white-space:nowrap;flex-shrink:0;">${procStr}</span>` : ''}
@@ -10404,6 +10428,65 @@
             // 관련 카드들이 뷰포트를 초과하면 중간 날짜 접기
             if (totalRelatedWidth > wrapW) {
                 _tlCollapseMiddleDates(relatedDates);
+            }
+        };
+
+        /* ═══ 같은 공정 안에서 차례 바꾸기 ═══════════════════════════════
+           두 번 눌러 고른 카드에 ▲▼ 가 나온다. 누르면 그 날 그 공정 안에서
+           한 칸 앞뒤로 간다. 날짜·공정을 옮기는 지금 길은 그대로 둔다.
+
+           끌어 옮기기로 하지 않았다. 폰에서는 HTML5 끌어놓기가 손가락으로 아예
+           시작되지 않고(이 집에서 이미 겪었다), 타임라인은 옆으로 굴러가는 판이라
+           손가락 끌기가 화면 굴리기와 부딪힌다. 단추는 한 번 누르면 한 칸이라
+           틀릴 일이 없다.
+
+           차례는 이미 쓰고 있는 wo_board_order 칸에 담는다. 새 칸을 만들지 않았다.
+           문서 이름만 'tl|날짜|공정' 으로 갈라 두고, 이미 돌고 있는 onSnapshot 이
+           받아 다른 화면에도 곧바로 같은 차례로 보인다. */
+        function _tlProcOrderKey(date, proc) { return 'tl|' + date + '|' + proc; }
+
+        function _tlProcSavedOrder(date, proc) {
+            const d = (window._woBoardOrder || {})[_tlProcOrderKey(date, proc)];
+            const arr = d && d.order && d.order.tl;
+            return Array.isArray(arr) ? arr : null;
+        }
+
+        function _tlProcSortBySaved(date, proc, items) {
+            const 저장 = _tlProcSavedOrder(date, proc);
+            if (!저장 || !저장.length) return items;
+            const 자리 = new Map(저장.map((k, i) => [k, i]));
+            const 아는것 = items.filter(x => 자리.has(x.docId || ''))
+                .sort((a, b) => 자리.get(a.docId || '') - 자리.get(b.docId || ''));
+            const 새것 = items.filter(x => !자리.has(x.docId || ''));   // 새 카드는 맨 뒤
+            return [...아는것, ...새것];
+        }
+
+        // ▲▼ — 한 칸 앞뒤로. 누르신 그때만 저장한다.
+        window.tlProcMove = async function(btnEl, 방향) {
+            const card = btnEl.closest('.tl-delivery-item');
+            if (!card) return;
+            const date = card.dataset.tlDate || (card.closest('[data-card-date]') || {}).dataset?.cardDate;
+            const proc = card.dataset.proc;
+            const docId = card.dataset.docid;
+            if (!date || !proc || !docId) return;
+            const sec = card.closest('.tl-process-section');
+            if (!sec) return;
+            const 줄 = [...sec.querySelectorAll('.tl-delivery-item')].map(e => e.dataset.docid || '');
+            const i = 줄.indexOf(docId);
+            const j = i + (방향 < 0 ? -1 : 1);
+            if (i < 0 || j < 0 || j >= 줄.length) return;          // 끝에서는 안 움직인다
+            줄.splice(j, 0, 줄.splice(i, 1)[0]);
+            // 화면부터 바로 바꾼다 — 저장을 기다리지 않는다
+            const 카드들 = new Map([...sec.querySelectorAll('.tl-delivery-item')].map(e => [e.dataset.docid || '', e]));
+            줄.forEach(k => { const el = 카드들.get(k); if (el) sec.appendChild(el); });
+            try {
+                const { doc, setDoc } = window.fbFirestore;
+                await setDoc(doc(window.db, 'artifacts', 'vivivic-4b7ef', 'public', 'data',
+                    'wo_board_order', _tlProcOrderKey(date, proc)),
+                    { sk: _tlProcOrderKey(date, proc), order: { tl: 줄 }, at: Date.now() });
+            } catch (err) {
+                console.error('공정 차례 저장 오류:', err);
+                if (typeof showToastMessage === 'function') showToastMessage('차례 저장 실패 — 새로 열면 되돌아갑니다');
             }
         };
 
