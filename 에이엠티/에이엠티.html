@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.9.62 (2026-09-13) — 박스가 있는 화면마다 「새 박스」
+     버전: v1.9.63 (2026-09-13) — 함께 앉힌 부속도 이름·치수·수량을 적는다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1890,7 +1890,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.62</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.63</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2016,7 +2016,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.62</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.63</b></p>
         </div>
     </div>
 
@@ -8785,6 +8785,22 @@
                 rect.appendChild(div);
                 maxRightFrac  = Math.max(maxRightFrac,  pt.lp + pt.wp);
                 maxBottomFrac = Math.max(maxBottomFrac, pt.tp + pt.hp);
+            });
+            /* 자투리에 함께 앉힌 부속(2·3순위) — 도면에는 치수 숫자만 찍혀 있어
+               무슨 판을 몇 장 자르는 것인지 알 수가 없었다. 재단계획이 이미 들고
+               있는 이름·치수·수량(extras)을 원래 있던 그 줄에 그대로 적는다.
+               자리를 새로 만들지 않는다 — 1순위가 쓰던 줄 바로 아래, 여태 비어
+               숨어 있던 줄이다. 편집을 시작하면 updateBoardVisual 이 실제로 고른
+               부속으로 이 줄을 다시 적는다. */
+            const _함께줄 = [['residue-production-info-row', 'residue-production-detail-text'],
+                             ['tertiary-production-info-row', 'tertiary-production-detail-text']];
+            (p.extras || []).slice(0, 2).forEach((x, i) => {
+                const 줄 = document.getElementById(_함께줄[i][0]);
+                const 글 = document.getElementById(_함께줄[i][1]);
+                if (!줄 || !글 || !x || !x.이름) return;
+                글.textContent = (x.w && x.d ? x.w + ' X ' + x.d + ' - ' : '') + x.이름 +
+                    (x.수 > 0 ? ' - ' + x.수 + ' EA' : '');
+                줄.classList.remove('hidden');
             });
             // "다음 배치 추천"(suggested-card 강조)이 표준 그리드 계산 기준 점유
             // 영역(updateBoardVisual이 직전에 계산한 actOX/actOY)으로 이미 표시된
