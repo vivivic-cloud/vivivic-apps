@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- 조혼가구 — 거래처 발주 화면.
-     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.3.4 -->
+     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.3.5 -->
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -1478,7 +1478,7 @@
             font:inherit; width:100%; margin-top:9px;
         }
         #johon-home .jhh-newbox:active{ background:var(--vg-fill); }
-        #johon-home .jhh-newbox span{ font-size:14px; font-weight:700; }
+        #johon-home .jhh-newbox span{ font-size:15px; font-weight:700; }
         /* 떠 있는 단추에 마지막 줄이 가리지 않게 */
         html[data-johonhome="1"] #johon-home .jhh-wrap{
             padding-bottom:calc(92px + env(safe-area-inset-bottom));
@@ -1604,7 +1604,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.3.4</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.3.5</span>
                 </div>
                 <!-- 페이지 탭: 발주하기 / 작업중 -->
                 <div class="flex items-center gap-1 border border-[#ededeb] rounded-lg bg-[#f7f6f3] p-1 mr-2">
@@ -5188,6 +5188,19 @@
             if (typeof _del === 'function') window.deleteSubPart = function(idNum, cardKey){
                 const r = _del.apply(this, arguments);
                 try { johonDraftMark(idNum, cardKey, ['isDeleted']); } catch (e) {}
+                // 빗나가도 아무 말이 없어서 사장님이 세 번을 말씀하셔야 했다(지시 09-13 10:03).
+                // 지워졌는지 한 번 보고, 안 지워졌으면 짧게 알린다. 묻는 창은 넣지 않는다 —
+                // 눌러도 안 지워지는 것이 답답하신 것이지 한 걸음을 더 바라시는 게 아니다.
+                try {
+                    const it = (pendingOrdersMap[appMode] || []).find(d => d.idNum === idNum)
+                            || (confirmedOrders || []).find(d => d.idNum === idNum);
+                    const p = it && it.partInfoMap && it.partInfoMap[cardKey];
+                    if (!p || p.isDeleted !== true) {
+                        showToastMessage('지우지 못했습니다. 화면을 새로 고친 뒤 다시 눌러 주세요.');
+                    }
+                } catch (e) {
+                    showToastMessage('지우지 못했습니다. 화면을 새로 고친 뒤 다시 눌러 주세요.');
+                }
                 return r;
             };
             const _add = window.addSpecialPart;
