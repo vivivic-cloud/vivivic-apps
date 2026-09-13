@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- 조혼가구 — 거래처 발주 화면.
-     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.3.2 -->
+     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.3.3 -->
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -1597,7 +1597,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.3.2</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.3.3</span>
                 </div>
                 <!-- 페이지 탭: 발주하기 / 작업중 -->
                 <div class="flex items-center gap-1 border border-[#ededeb] rounded-lg bg-[#f7f6f3] p-1 mr-2">
@@ -4444,7 +4444,12 @@
             if (btn.textContent === "수정") { input.disabled = false; input.focus(); btn.textContent = "수정완료"; btn.classList.replace('text-[#787774]', 'text-blue-600'); }
             else {
                 const newQty = parseInt(input.value) || 0;
-                const item = confirmedOrders.find(d => d.idNum === idNum) || pendingOrdersMap[appMode].find(d => d.idNum === idNum);
+                // ⚠ 미확정을 먼저 뒤진다. 예전에는 확정 목록을 먼저 뒤졌다 —
+                // idNum 은 거래처마다 1401 부터 새로 세므로 남의 확정 발주와 겹친다.
+                // 그래서 ✕ 를 눌러도 표가 남의 확정 발주에 찍히고, 화면은
+                // renderOrderParts 가 미확정을 그리므로 아무 일도 안 일어났다
+                // (지시 09-13 09:50 · 세 번째 말씀). 그리는 쪽과 같은 순서로 맞춘다.
+                const item = pendingOrdersMap[appMode].find(d => d.idNum === idNum) || confirmedOrders.find(d => d.idNum === idNum);
                 if (item && item.partInfoMap[cardKey]) {
                     pushEditHistory(idNum); // 변경 전 상태 저장
                     item.partInfoMap[cardKey].qty = newQty; item.partInfoMap[cardKey].isManual = true;
@@ -4454,7 +4459,12 @@
         }
 
         function deleteSubPart(idNum, cardKey) {
-            const item = confirmedOrders.find(d => d.idNum === idNum) || pendingOrdersMap[appMode].find(d => d.idNum === idNum);
+            // ⚠ 미확정을 먼저 뒤진다. 예전에는 확정 목록을 먼저 뒤졌다 —
+                // idNum 은 거래처마다 1401 부터 새로 세므로 남의 확정 발주와 겹친다.
+                // 그래서 ✕ 를 눌러도 표가 남의 확정 발주에 찍히고, 화면은
+                // renderOrderParts 가 미확정을 그리므로 아무 일도 안 일어났다
+                // (지시 09-13 09:50 · 세 번째 말씀). 그리는 쪽과 같은 순서로 맞춘다.
+                const item = pendingOrdersMap[appMode].find(d => d.idNum === idNum) || confirmedOrders.find(d => d.idNum === idNum);
             if (item && item.partInfoMap[cardKey]) {
                 pushEditHistory(idNum); // 변경 전 상태 저장
                 item.partInfoMap[cardKey].isDeleted = true;
