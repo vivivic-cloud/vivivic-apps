@@ -138,6 +138,11 @@
 
   const 그만 = () => { clearTimeout(시계); 시계 = null; };
   function 눌림(e){
+    // 손가락이 둘이면 짚는 것이 아니라 확대·축소다. 첫 손가락만 보던 때는
+    // 그 손가락이 제자리에 있어 10px 자에 안 걸렸고, 0.5초 뒤 지시창이 튀어나왔다.
+    // 확대는 대개 한 손가락이 먼저 닿고 둘째가 뒤따른다 — 그때도 touchstart 가
+    // 다시 오므로 여기서 걸린다.
+    if (e.touches && e.touches.length > 1) return 그만();
     const p = e.touches ? e.touches[0] : e;
     if (e.target.closest('.vg-sheet')) return;
     시작 = { x: p.clientX, y: p.clientY };
@@ -151,6 +156,7 @@
   }
   function 움직임(e){                       // 스크롤이면 짚는 것이 아니다
     if (!시계 || !시작) return;
+    if (e.touches && e.touches.length > 1) return 그만();
     const p = e.touches ? e.touches[0] : e;
     if (Math.abs(p.clientX - 시작.x) > 10 || Math.abs(p.clientY - 시작.y) > 10) 그만();
   }
