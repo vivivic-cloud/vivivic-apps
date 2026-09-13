@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- 조혼가구 — 거래처 발주 화면.
-     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.3.0 -->
+     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.3.1 -->
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -1417,6 +1417,21 @@
             border:1px solid #E2E2DF; background:#fff; color:#1A1A19; cursor:pointer;
         }
         #johon-sheet .jhm-chips button.on{ background:#111110; border-color:#111110; color:#fff; }
+        /* 아이콘 고르기 — 에이엠티의 .amtb-icogrid 값 그대로(작업대의 .icogrid) */
+        #johon-sheet .jhm-icogrid{
+            display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin-top:12px;
+            max-height:46vh; overflow-y:auto; padding-right:2px;
+        }
+        #johon-sheet .jhm-icogrid button{
+            aspect-ratio:1; border:1px solid #EDEDEB; background:#fff; border-radius:12px;
+            display:grid; place-items:center; cursor:pointer; color:inherit; padding:0;
+        }
+        #johon-sheet .jhm-icogrid button.on{ border-color:#111110; background:#F4F4F2; }
+        #johon-sheet .jhm-icohead{
+            grid-column:1/-1; margin:10px 0 0; font-size:11.5px; font-weight:800;
+            color:#9C9C98; letter-spacing:.02em;
+        }
+        #johon-sheet .jhm-icohead:first-child{ margin-top:0; }
         #johon-sheet .jhm-go{ display:flex; gap:8px; margin-top:6px; }
         #johon-sheet .jhm-go button{
             flex:1; font:inherit; font-size:15px; font-weight:700; padding:14px;
@@ -1565,7 +1580,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.3.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.3.1</span>
                 </div>
                 <!-- 페이지 탭: 발주하기 / 작업중 -->
                 <div class="flex items-center gap-1 border border-[#ededeb] rounded-lg bg-[#f7f6f3] p-1 mr-2">
@@ -1697,6 +1712,9 @@
             </div>
             <input id="jhm-link" type="text" placeholder="열면 갈 곳 (주소 · 비워도 됨)"
                    autocomplete="off" style="margin-top:12px" />
+            <input id="jhm-q" type="text" placeholder="아이콘 찾기 (영문)"
+                   autocomplete="off" style="margin-top:12px" oninput="johonIcoDraw()" />
+            <div class="jhm-icogrid" id="jhm-ig"></div>
             <p class="jhm-hint" id="jhm-hint"></p>
             <div class="jhm-go">
                 <button type="button" class="jhm-no" onclick="johonBoxClose()">그만두기</button>
@@ -5203,11 +5221,76 @@
            ⚠ 발주 흐름·확정 규칙은 건드리지 않는다. 이 박스는 이름표와 바로가기다.
            ⚠ 폰과 넓은 화면이 같아야 하므로 파이어스토어에 담는다. 못 닿을 때를
               대비해 폰 안(localStorage)에도 같이 둔다 — 화면은 늘 곧바로 뜬다. */
+        // 아이콘 하나 — 작업대의 ico()·에이엠티의 아이콘() 과 같은 방식(lucide 원자료를 svg 로)
+        const johonPascal = n => String(n||'').split('-')
+            .map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
+        function johonIco(name, sz, stroke){
+            const L = (window.lucide && window.lucide.icons) || {};
+            const n = L[johonPascal(name)] || L.Square;
+            if (!n) return '';
+            const a = Object.assign({}, n[1], { width: sz, height: sz, 'stroke-width': stroke || 1.7 });
+            const at = Object.keys(a).map(k => k + '="' + johonEsc(a[k]) + '"').join(' ');
+            const 안 = (n[2] || []).map(c => '<' + c[0] + ' ' +
+                Object.keys(c[1] || {}).map(k => k + '="' + johonEsc(c[1][k]) + '"').join(' ') + '/>').join('');
+            return '<svg ' + at + '>' + 안 + '</svg>';
+        }
+        // 작업대의 아이콘 묶음 그대로. 한 글자도 고치지 않았다.
+        const JOHON_ICONS = [
+          ['자주 쓰는 것', ['square','layout-grid','folder','file-text','message-square','star',
+            'check-check','bell','tag','bookmark','pin','flag']],
+          ['프로그램·화면', ['monitor','smartphone','app-window','panel-left','table-2','list',
+            'kanban','sliders-horizontal','toggle-right','mouse-pointer-click']],
+          ['서류·문서', ['files','folder-open','clipboard-list','receipt','notebook-pen','book-open',
+            'printer','scan-text','file-spreadsheet','file-check','stamp','signature']],
+          ['가구·제조', ['hammer','wrench','ruler','pencil-ruler','scissors','layers','package','boxes',
+            'factory','cog','drill','component']],
+          ['물류·배송', ['truck','ship','plane','warehouse','forklift','route','map-pin','map',
+            'scan-barcode','qr-code','container','package-check']],
+          ['돈·거래', ['banknote','coins','credit-card','calculator','percent','wallet','trending-up',
+            'chart-column','chart-pie','handshake']],
+          ['사람·연락', ['users','user-round','phone','mail','send','headphones','messages-square',
+            'megaphone','id-card','contact']],
+          ['시간·일정', ['calendar','calendar-days','clock','timer','hourglass','alarm-clock',
+            'calendar-check','history']],
+          ['알림·상태', ['circle-alert','triangle-alert','info','circle-check','circle-dot','circle-x',
+            'shield-check','activity','zap','heart']],
+          ['그 밖', ['image','camera','video','mic','globe','key','lock','search','lightbulb','rocket',
+            'database','code-xml','cpu','cloud','link','download','upload','archive','trash-2','wand-sparkles']],
+        ];
+        const johonIcoHas = n => !!((window.lucide && window.lucide.icons) || {})[johonPascal(n)];
+        function johonIcoDraw(){
+            const ig = document.getElementById('jhm-ig'); if (!ig) return;
+            const 한칸 = n => '<button type="button" data-ic="' + n + '" class="' +
+                (n === johonBoxIcon ? 'on' : '') + '">' + johonIco(n, 20) + '</button>';
+            const q = ((document.getElementById('jhm-q') || {}).value || '').trim().toLowerCase();
+            if (q){
+                const L = (window.lucide && window.lucide.icons) || {};
+                const all = Object.keys(L).map(k => k.replace(/([a-z0-9])([A-Z])/g,'$1-$2').toLowerCase())
+                             .filter(n => n.includes(q)).slice(0, 60);
+                ig.innerHTML = all.length ? all.map(한칸).join('')
+                    : '<p class="jhm-icohead">그런 아이콘이 없습니다</p>';
+                return;
+            }
+            ig.innerHTML = JOHON_ICONS.map(([이름, 것들]) => {
+                const 쓸것 = 것들.filter(johonIcoHas);
+                return 쓸것.length ? '<h5 class="jhm-icohead">' + 이름 + '</h5>' + 쓸것.map(한칸).join('') : '';
+            }).join('');
+        }
+        (function(){
+            const ig = document.getElementById('jhm-ig'); if (!ig) return;
+            ig.addEventListener('click', e => {
+                const t = e.target.closest('[data-ic]'); if (!t) return;
+                johonBoxIcon = t.dataset.ic;
+                [...ig.children].forEach(c => c.classList.toggle('on', c === t));
+            });
+        })();
+
         const JOHON_BOXCOL = 'johon_boxes';
         const JOHON_BOXLS  = 'johon_boxes_v1';
         let johonMyBoxes = [];          // [{id, name, tone, link, at}]
         let johonBoxEdit = null;        // 고치는 중인 박스 (null 이면 새것)
         let johonBoxTone = 'white';
+        let johonBoxIcon = 'square';
 
         function johonBoxLoadLS(){
             try {
@@ -5248,7 +5331,7 @@
                 const 바탕 = b.tone === 'light' ? '' : (b.tone === 'dark' ? '' : ' style="background:#fff;border:1px solid var(--vg-edge)"');
                 return `<div class="jhh-row"${바탕}>
                     <span class="jhh-ico${어둠}">
-                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/></svg>
+                        ${johonIco(b.icon || 'square', 17, 2)}
                     </span>
                     <span class="jhh-t" data-go="${johonEsc(b.id)}">${johonEsc(b.name || '새 박스')}${
                         b.link ? `<i>${johonEsc(b.link)}</i>` : '<i>이름표</i>'}</span>
@@ -5278,6 +5361,7 @@
         function johonBoxOpen(b){
             johonBoxEdit = b || null;
             johonBoxTone = (b && b.tone) || 'white';
+            johonBoxIcon = (b && b.icon) || 'square';
             const put = (id, t) => { const el = document.getElementById(id); if (el) el.textContent = t; };
             put('jhm-title', b ? '박스설정' : '새 박스');
             put('jhm-go',    b ? '저장' : '만들기');
@@ -5289,6 +5373,8 @@
             const lk = document.getElementById('jhm-link');
             if (lk) { lk.value = (b && b.link) || ''; }
             johonBoxTones();
+            const q = document.getElementById('jhm-q'); if (q) q.value = '';
+            johonIcoDraw();
             document.documentElement.setAttribute('data-johonmk', '1');
             if (nm) setTimeout(() => { try { nm.focus(); } catch (e) {} }, 60);
         }
@@ -5314,7 +5400,7 @@
             const hint = document.getElementById('jhm-hint');
             const name = nm.trim().slice(0, 60) || '새 박스';
             const link = lk.trim();
-            const 값 = { name: name, tone: johonBoxTone, link: link };
+            const 값 = { name: name, tone: johonBoxTone, icon: johonBoxIcon, link: link };
             const fb = window.fbFirestore || {};
             try {
                 if (johonBoxEdit) {
@@ -5361,6 +5447,8 @@
 
         // 폰 안에 있는 것을 먼저 그려 화면이 비지 않게 하고, 그 뒤 클라우드를 붙인다.
         johonBoxLoadLS(); johonBoxRender();
+        // lucide 는 이 글 아래에서 실린다. 뜨면 한 번 다시 그려 아이콘을 채운다.
+        window.addEventListener('load', () => { try { johonBoxRender(); } catch (e) {} });
         (function(){
             let 남은횟수 = 40;               // 파이어베이스가 늦게 뜰 수 있다
             const t = setInterval(() => {
@@ -5371,6 +5459,8 @@
 
         /* ═══ /박스 첫 화면 ══════════════════════════════════════════════ */
     </script>
+    <!-- 아이콘 — 작업대·에이엠티가 쓰는 그 파일 그대로. 바깥 CDN 이 아니다. -->
+    <script src="../shared/lucide.min.js"></script>
     <!-- 바이글 손잡이 — 주소에 ?viggle=1 이 있을 때만 켜진다 -->
     <script src="../shared/viggle.js"></script>
 </body>
