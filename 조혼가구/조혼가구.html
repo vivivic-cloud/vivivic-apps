@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- 조혼가구 — 거래처 발주 화면.
-     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.2.1 -->
+     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.2.2 -->
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -1488,7 +1488,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.2.1</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.2.2</span>
                 </div>
                 <!-- 페이지 탭: 발주하기 / 작업중 -->
                 <div class="flex items-center gap-1 border border-[#ededeb] rounded-lg bg-[#f7f6f3] p-1 mr-2">
@@ -4898,6 +4898,185 @@
 
         // 담고 지우는 것은 파이어베이스를 거치지 않으므로 짧게 살펴본다. 하는 일은 가볍다.
         setInterval(() => { try { johonGuideSync(); } catch (e) {} }, 1200);
+
+        /* ── 고치는 중인 것은 목록이 새로 읽혀도 남긴다 ──────────────────
+           지시(09-13 06:11 · ㉠). 확정된 발주를 수정모드에서 고칠 때
+           (AMT추가·부속삭제·부속수량·발주수량·입고요청일) 그 손댐은 '수정완료'
+           를 누를 때까지 이 기계 안에만 있었다. 그 사이 다른 발주가 하나라도
+           바뀌면 onSnapshot 이 목록을 통째로 갈아끼워(confirmedOrders =
+           snapshot.docs.map(...)) 더해 놓은 부속이 소리 없이 사라졌다.
+           사장님은 사라진 줄 모르고 그대로 발주를 넣으신다.
+
+           ⚠ 지키는 것은 '사장님이 손댄 칸' 뿐이다. 부속 하나하나, 칸 하나하나를
+              적어 두고 그것만 덮는다. 나머지는 새로 읽은 것을 그대로 따른다 —
+              그래야 그 사이 에이엠티가 바꾼 것을 가리지 않는다.
+           ⚠ 놓는 때는 셋. 수정완료 · 되돌리기/초기화 · 새로 읽은 문서가 더는
+              수정모드가 아님(다른 데서 수정이 끝났다).
+           ⚠ 담는 곳은 localStorage 다. 사파리는 뒤로 돌린 탭을 버리고 되살릴
+              때 새로고침하므로, 화면 기억에만 두면 잠깐 딴 데 보고 오시면 날아간다.
+           파이어스토어에는 한 줄도 쓰지 않는다. 올리는 것은 여전히 '수정완료' 뿐이다. */
+        const JOHON_DRAFT   = 'johon_edit_draft_v1';
+        const JOHON_DRAFT_H = 24;       // 이보다 오래된 손댐은 버린다 (시간)
+
+        function johonDraftWrite(d){
+            try {
+                if (!d || !Object.keys(d).length) localStorage.removeItem(JOHON_DRAFT);
+                else localStorage.setItem(JOHON_DRAFT, JSON.stringify(d));
+            } catch (e) {}
+        }
+        function johonDraftRead(){
+            let raw = null;
+            try { raw = localStorage.getItem(JOHON_DRAFT); } catch (e) {}
+            if (!raw) return {};
+            let d = null;
+            try { d = JSON.parse(raw); } catch (e) { johonDraftWrite(null); return {}; }
+            if (!d || typeof d !== 'object') return {};
+            const 끝 = Date.now() - JOHON_DRAFT_H * 3600 * 1000;
+            let 변함 = false;
+            Object.keys(d).forEach(id => {
+                if (!d[id] || !d[id].at || d[id].at < 끝) { delete d[id]; 변함 = true; }
+            });
+            if (변함) johonDraftWrite(d);
+            return d;
+        }
+        function johonDraftDrop(docId){
+            if (!docId) return;
+            const d = johonDraftRead();
+            if (d[docId]) { delete d[docId]; johonDraftWrite(d); }
+        }
+
+        // 이 idNum 이 '수정모드인 확정 발주' 인가. 미확정 발주는 이 길이 아니다 —
+        // 그쪽은 johon_cart_v1 이 이미 폰 안에 담아 둔다.
+        function johonDraftTarget(idNum){
+            try {
+                if (((pendingOrdersMap || {})[appMode] || []).some(d => d.idNum === idNum)) return null;
+                const c = (confirmedOrders || []).find(o => o.idNum === idNum);
+                if (!c || !c.docId || c.isEditMode !== true) return null;
+                return c;
+            } catch (e) { return null; }
+        }
+
+        // 사장님이 손댄 칸을 적어 둔다. 값은 손댄 뒤의 것을 그대로 베낀다.
+        function johonDraftMark(idNum, cardKey, 칸들){
+            const c = johonDraftTarget(idNum);
+            if (!c) return;
+            const d = johonDraftRead();
+            const r = d[c.docId] || { parts: {}, item: {} };
+            r.at = Date.now();
+            r.parts = r.parts || {}; r.item = r.item || {};
+            if (cardKey) {
+                const p = c.partInfoMap && c.partInfoMap[cardKey];
+                if (!p) return;
+                r.parts[cardKey] = r.parts[cardKey] || {};
+                칸들.forEach(k => { r.parts[cardKey][k] = p[k]; });
+            } else {
+                칸들.forEach(k => { r.item[k] = c[k]; });
+            }
+            d[c.docId] = r;
+            johonDraftWrite(d);
+        }
+
+        // 새로 읽은 목록 위에 사장님이 손댄 칸만 다시 얹는다.
+        function johonDraftApply(){
+            const d = johonDraftRead();
+            const ids = Object.keys(d);
+            if (!ids.length) return;
+            let 변함 = false;
+            ids.forEach(docId => {
+                const o = (confirmedOrders || []).find(x => x.docId === docId);
+                if (!o) return;                  // 아직 안 내려왔다 — 적어 둔 것은 그대로 둔다
+                if (o.isEditMode !== true) {     // 다른 데서 수정이 끝났다 — 놓는다
+                    delete d[docId]; 변함 = true; return;
+                }
+                const r = d[docId] || {};
+                Object.entries(r.parts || {}).forEach(([cardKey, 칸]) => {
+                    const p = o.partInfoMap && o.partInfoMap[cardKey];
+                    if (!p) return;              // 그 부속이 없어졌다 — 새로 만들지 않는다
+                    Object.entries(칸).forEach(([k, v]) => { p[k] = v; });
+                });
+                Object.entries(r.item || {}).forEach(([k, v]) => { o[k] = v; });
+            });
+            if (변함) johonDraftWrite(d);
+        }
+
+        /* 갈아끼운 바로 뒤에 얹는다. onSnapshot 은 목록을 바꾼 다음 곧바로
+           renderConfirmedBatchList() 를 부르므로, 그 앞에 끼우면 화면에는
+           언제나 손댄 것이 실려 그려진다. 여러 번 불려도 같은 값이라 해롭지 않다. */
+        (function(){
+            const _orig = window.renderConfirmedBatchList;
+            if (typeof _orig !== 'function') return;
+            window.renderConfirmedBatchList = function(){
+                try { johonDraftApply(); } catch (e) {}
+                return _orig.apply(this, arguments);
+            };
+        })();
+
+        /* 손댈 때마다 적어 둔다. 원래 함수는 그대로 부르고 끝난 뒤에 옆에서 적는다. */
+        (function(){
+            const _edit = window.handleSubPartEdit;
+            if (typeof _edit === 'function') window.handleSubPartEdit = function(btn, idNum, cardKey){
+                // '수정' 을 눌러 칸을 연 때가 아니라, '수정완료' 를 눌러 값이 들어간 때만 적는다
+                const 넣는가 = !!btn && btn.textContent !== '수정';
+                const r = _edit.apply(this, arguments);
+                if (넣는가) { try { johonDraftMark(idNum, cardKey, ['qty', 'isManual']); } catch (e) {} }
+                return r;
+            };
+            const _del = window.deleteSubPart;
+            if (typeof _del === 'function') window.deleteSubPart = function(idNum, cardKey){
+                const r = _del.apply(this, arguments);
+                try { johonDraftMark(idNum, cardKey, ['isDeleted']); } catch (e) {}
+                return r;
+            };
+            const _add = window.addSpecialPart;
+            if (typeof _add === 'function') window.addSpecialPart = async function(idNum, cardKey){
+                const r = await _add.apply(this, arguments);
+                try { johonDraftMark(idNum, cardKey, ['isDeleted']); } catch (e) {}
+                return r;
+            };
+            const _qty = window.updateItemQty;
+            if (typeof _qty === 'function') window.updateItemQty = function(idNum, val){
+                const r = _qty.apply(this, arguments);
+                try {
+                    johonDraftMark(idNum, null, ['orderQty']);
+                    const c = johonDraftTarget(idNum);      // 딸려 다시 셈해진 부속수량도 같이
+                    if (c) Object.keys(c.partInfoMap || {}).forEach(k => {
+                        if (!c.partInfoMap[k].isManual) johonDraftMark(idNum, k, ['qty']);
+                    });
+                } catch (e) {}
+                return r;
+            };
+            const _date = window.updateItemDate;           // 앞서 얹은 확인창 위에 다시 얹는다
+            if (typeof _date === 'function') window.updateItemDate = async function(idNum, val){
+                const r = await _date.apply(this, arguments);
+                try { johonDraftMark(idNum, null, ['deliveryDate']); } catch (e) {}
+                return r;
+            };
+        })();
+
+        /* 놓는 자리 — 수정완료 · 되돌리기 · 초기화. 여기서 놓지 않으면 옛 것이
+           계속 눌러앉아 다음에 내려온 값을 덮는다. */
+        (function(){
+            const _fin = window.finishEditingOrderFirebase;
+            if (typeof _fin === 'function') window.finishEditingOrderFirebase = async function(docId){
+                const r = await _fin.apply(this, arguments);
+                try { johonDraftDrop(docId); } catch (e) {}
+                return r;
+            };
+            const _rev = window.revertEditingOrder;
+            if (typeof _rev === 'function') window.revertEditingOrder = async function(docId){
+                const r = await _rev.apply(this, arguments);
+                try { johonDraftDrop(docId); } catch (e) {}
+                return r;
+            };
+            const _reset = window.resetEditToOriginal;
+            if (typeof _reset === 'function') window.resetEditToOriginal = function(idNum){
+                let docId = null;
+                try { const c = (confirmedOrders || []).find(o => o.idNum === idNum); docId = c && c.docId; } catch (e) {}
+                const r = _reset.apply(this, arguments);
+                try { johonDraftDrop(docId); } catch (e) {}
+                return r;
+            };
+        })();
 
         /* ═══ /박스 첫 화면 ══════════════════════════════════════════════ */
     </script>
