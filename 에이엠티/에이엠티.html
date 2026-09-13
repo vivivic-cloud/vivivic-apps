@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.9.49 (2026-09-12) — 거래처 박스가 글줄로 보이던 것 (색 토큰)
+     버전: v1.9.50 (2026-09-13) — 상품 줄에 부속 점. 다 끝나면 글씨가 옅어진다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1042,6 +1042,26 @@
             padding-left: 14px; font-size: 10px; font-weight: 700; color: #a8a6a2;
         }
         .wo-cut-grp-code { font-family: ui-monospace, monospace; color: #787774; }
+        /* 부속 점 — 이 줄에 달린 카드 하나에 점 하나. 빈 점은 아직, 검은 점은 끝난 것.
+           한 줄로만 두고 넘치면 잘라, 점 때문에 카드가 밀리지 않게 한다. */
+        .wo-grp-점 {
+            display: flex; align-items: center; gap: 3px;
+            padding-left: 14px; margin-top: 2px;
+            overflow: hidden; white-space: nowrap;
+        }
+        .wo-grp-점 i {
+            width: 7px; height: 7px; border-radius: 50%;
+            border: 1.5px solid #b0aeaa; background: #fff; flex: none;
+        }
+        .wo-grp-점 i.on { background: #37352f; border-color: #37352f; }
+        .wo-grp-점.wo-잔점 { gap: 2px; }
+        .wo-grp-점.wo-잔점 i { width: 5px; height: 5px; border-width: 1px; }
+        .wo-grp-점 b { font-size: 9px; font-weight: 800; color: #787774; margin-left: 2px; }
+        /* 다 끝난 상품 줄 — 글씨만 옅어진다. 누르면 그대로 펴지고 접힌다. */
+        .wo-cut-grp.wo-다끝 .wo-cut-grp-nm,
+        .wo-cut-grp.wo-다끝 .wo-cut-grp-sub,
+        .wo-cut-grp.wo-다끝 .wo-cut-grp-chev { opacity: .42; }
+        .wo-cut-grp.wo-다끝 .wo-cut-grp-n { opacity: .42; }
         .wo-cut-grp-done { color: #16a34a; }
         /* 접힌 상품의 카드·휴식자리는 감춘다. 지우는 것이 아니다 —
            컬럼의 바로 밑 자식으로 그대로 있어 자리 계산이 어긋나지 않는다. */
@@ -1768,7 +1788,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.49</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.50</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -1889,7 +1909,7 @@
 
             </div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.49</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.50</b></p>
         </div>
     </div>
 
@@ -9003,11 +9023,13 @@
             const g = {};
             (parts || []).forEach(p => {
                 const k = _woCutGroupKey(p);
-                if (!g[k]) g[k] = { n: 0, done: 0, min: 0, name: p.orderName || '', code: p.orderCode || '' };
+                if (!g[k]) g[k] = { n: 0, done: 0, min: 0, name: p.orderName || '', code: p.orderCode || '', 표: [] };
                 g[k].n++;
                 g[k].min += p.pm || 0;
                 if (!g[k].name && p.orderName) g[k].name = p.orderName;
-                if (_woCutCardDone(p, p.cKey, sk)) g[k].done++;
+                const 끝 = _woCutCardDone(p, p.cKey, sk);
+                if (끝) g[k].done++;
+                g[k].표.push(!!끝);          // 카드 차례대로 — 점 하나가 카드 하나다
             });
             return g;
         }
@@ -9060,7 +9082,31 @@
             if (g.code) sub.push(`<span class="wo-cut-grp-code">${_e(g.code)}</span>`);
             if (done > 0) sub.push(`<span class="wo-cut-grp-done">\u2713 ${done}/${n} 완료</span>`);
             if (min > 0) sub.push(`<span>\u23f1 ${min.toFixed(1)}분</span>`);
-            return `<div class="wo-cut-grp${open ? ' on' : ''}" data-gk="${_e(gk)}"` +
+            // 점 — 이 줄에 달린 카드 하나에 점 하나. 끝난 것은 검게 찬다.
+            // 칸이 좁으면(기계 다섯이면 130px) 점이 줄을 넘겨 카드를 밀어내므로
+            // 수가 많으면 점을 잘게 하고, 스물이 넘으면 스물까지만 찍고 +N 을 적는다.
+            // 정확한 셈은 옆의 '✓ 3/7 완료' 가 그대로 말해 준다.
+            const 표 = Array.isArray(g.표) ? g.표 : [];
+            let 점줄 = '';
+            if (표.length) {
+                // 가장 좁은 칸은 엣지 다섯 기계일 때로, 점이 놓일 너비가 100px 남짓이다.
+                // 여덟까지는 큰 점(7px·틈3), 열둘까지는 잔 점(5px·틈2), 그보다 많으면
+                // 열둘만 찍고 +N 을 적는다. 어느 경우도 한 줄 안에 다 보인다.
+                // 가장 좁은 칸(엣지 다섯 기계)에서 점이 놓일 너비는 97px 로 쟀다.
+                // 큰 점은 한 개에 13px(7px+틈3), 잔 점은 9px(5px+틈2), 말줄임표는 10px.
+                // 그래서 일곱까지 큰 점, 열하나까지 잔 점, 넘으면 아홉 + 말줄임표.
+                const 잘게 = 표.length > 7;
+                const 한도 = 표.length > 11 ? 8 : 11;
+                const 보일것 = 표.slice(0, 한도);
+                // 열둘이 넘으면 열둘까지만 찍고 말줄임표를 단다. 몇 개 중 몇 개인지는
+                // 옆의 배지(부속 23개)와 '✓ 13/23 완료' 가 정확히 말해 준다.
+                점줄 = `<div class="wo-grp-점${잘게 ? ' wo-잔점' : ''}">` +
+                    보일것.map(끝 => `<i class="${끝 ? 'on' : ''}"></i>`).join('') +
+                    (표.length > 한도 ? `<b>\u2026</b>` : '') +
+                    `</div>`;
+            }
+            const 다끝 = n > 0 && done >= n;
+            return `<div class="wo-cut-grp${open ? ' on' : ''}${다끝 ? ' wo-다끝' : ''}" data-gk="${_e(gk)}"` +
                 ` onclick="_woCutToggleGrp('${_j(sk)}','${_j(gk)}')">` +
                 `<div class="wo-cut-grp-top">` +
                     `<span class="wo-cut-grp-chev">${open ? '\u25be' : '\u25b8'}</span>` +
@@ -9068,6 +9114,7 @@
                     `<span class="wo-cut-grp-n">${_단위[0]} ${n}${_단위[1]}</span>` +
                 `</div>` +
                 (sub.length ? `<div class="wo-cut-grp-sub">${sub.join('<span>\u00b7</span>')}</div>` : '') +
+                점줄 +
                 `</div>`;
         }
 
