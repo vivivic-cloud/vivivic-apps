@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.9.71 (2026-09-14) — 곁가지로 나오는 몫만큼 작업수량을 줄인다
+     버전: v1.9.72 (2026-09-14) — v1.9.71 되돌림 — 사장님 결정 전까지 옛 셈으로
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2016,7 +2016,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.71</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.72</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2142,7 +2142,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.71</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.72</b></p>
         </div>
     </div>
 
@@ -3103,66 +3103,6 @@
         // 이 재단계획으로 실제로 나오는 개수(총작업수량)
         function _cuttingYield(p) { return _cuttingPerSheet(p) * (p.sheets || 0); }
 
-        /* ══ 곁가지로 같이 나오는 몫 ═══════════════════════════════════
-           같은 부속이 원장에 여러 줄로 적혀 있다. 전도방지는 1번(공통 줄) ·
-           208번(러블리/킨포) · 253번(토리) 셋이 전부 같은 판이다. 그래서 도면은
-           1번을 적고 발주는 253번을 가리켜, 행 번호로 맞추면 영영 안 만난다.
-           부속명·원장·마감·색상·치수로 '같은 판인가' 를 본다. */
-        function _부속실체(ri) {
-            const h = currentFullData[0], r = currentFullData[ri];
-            if (!h || !r) return null;
-            const g = n => { const i = h.indexOf(n); return i < 0 ? '' : String(r[i] == null ? '' : r[i]).trim(); };
-            const 색 = normalizeValue(g('마감색상'));
-            return [g('부속명'), g('원장명'), g('마감'), (색 === 'any' ? '' : 색),
-                    parseFloat(g('재단W')) || 0, parseFloat(g('재단D')) || 0].join('|');
-        }
-
-        /* 다른 재단도의 자투리(2·3순위)에서 이 부속이 몇 개나 같이 나오는가.
-
-           ⚠ 반드시 '그 발주 것' 만 센다. 창고에는 지난 도면이 그대로 쌓여 있고
-           (지금 296장), 오더번호(idNum)는 재사용되어 옛 도면이 같은 번호를 달고 있다.
-           번호만 보고 더하면 전도방지 곁가지가 632개로 잡혀 오늘 자를 것이 없다고
-           나온다. 그래서 재단도의 주인을 가리는 그 판정(_cutPlanOwner)을 그대로 쓴다.
-
-           도면을 한 번만 훑어 '부속 실체 → 곁가지 개수' 표를 만든다. 원장이 1,397줄이라
-           줄마다 도면을 다시 훑으면 폰에서 버벅인다. */
-        function _곁가지표(발주들) {
-            const 표 = new Map();
-            if (!발주들 || !발주들.size) return 표;
-            const 실체칸 = new Map();
-            const 실체 = ri => {
-                if (실체칸.has(ri)) return 실체칸.get(ri);
-                const v = _부속실체(ri); 실체칸.set(ri, v); return v;
-            };
-            Object.values(window._cuttingPlans || {}).forEach(pl => {
-                if (!pl) return;
-                if (pl.sRowIndex == null && pl.tRowIndex == null) return;
-                /* 주인은 도면의 '본 부속(p)' 으로 가린다. 자투리 행까지 넣어 가리면
-                   못 만난다 — 자투리의 전도방지는 원장 1번(공통 줄)로 적히는데
-                   발주는 제 제품 줄(208·253)을 가리키기 때문이다. 본 부속의 행은
-                   발주와 그대로 맞으므로 이쪽으로 주인을 가려야 한다. */
-                const _때 = _cutPlanMadeAt(pl);
-                const _본것 = { pRowIndex: pl.pRowIndex };
-                const 임자 = [...new Set([...(pl.pOrderIds || []), ...(pl.sOrderIds || []), ...(pl.tOrderIds || [])])]
-                    .map(id => _cutPlanOwner(id, _때, _본것)).filter(Boolean);
-                if (!임자.some(o => 발주들.has(o.docId || String(o.idNum)))) return;
-                ['s', 't'].forEach(급 => {
-                    const ri = pl[급 + 'RowIndex'];
-                    if (ri == null) return;
-                    const k = 실체(ri);
-                    if (!k) return;
-                    표.set(k, (표.get(k) || 0) + (parseInt(pl[급 + 'ProducedQty'], 10) || 0));
-                });
-            });
-            return 표;
-        }
-        // 그 표에서 이 원장 줄의 몫을 꺼낸다
-        function _곁가지몫(표, rowIndex) {
-            if (!표 || !표.size) return 0;
-            const k = _부속실체(rowIndex);
-            return k ? (표.get(k) || 0) : 0;
-        }
-
         // 필요수량이 저장해 둔 값과 달라졌으면(=발주가 지워졌거나 바뀌었으면)
         // 원장 장수도 그 수량으로 다시 센다. 안 달라졌으면 손대지 않는다 —
         // 재단편집에서 담당자가 직접 정한 장수를 함부로 덮지 않기 위해서다.
@@ -3477,20 +3417,7 @@
             // 수동 재단편집 도구의 기본값과 동일: 4X8 원장, 전단컷 5mm, 톱날두께 4.5mm
             const BW = 2440, BD = 1220, fCut = 5, bT = 4.5;
 
-            /* 자투리에 곁가지로 앉는 부속(전도방지)은 맨 나중에 셈한다 —
-               앞의 재단도들이 만들어져야 곁가지로 몇 개가 나오는지 알 수 있고,
-               그래야 그 부속의 제 도면을 남은 몫에 맞춰 잡을 수 있다. */
-            const _곁가지이름 = '전도방지';
-            // 이 발주의 도면에서 곁가지로 나오는 몫 — 도면을 한 번만 훑어 표로 만든다
-            const _곁표 = _곁가지표(new Set([order.docId || String(order.idNum)]));
-            const _차례 = Object.entries(order.partInfoMap).sort((a, b) => {
-                const 이름 = k => {
-                    const r = currentFullData[parseInt(String(k).split('-')[2])];
-                    return r ? String(r[h.indexOf('부속명')] || '').trim() : '';
-                };
-                return (이름(a[0]) === _곁가지이름 ? 1 : 0) - (이름(b[0]) === _곁가지이름 ? 1 : 0);
-            });
-            _차례.forEach(([cKey, pData]) => {
+            Object.entries(order.partInfoMap).forEach(([cKey, pData]) => {
                 if (!pData || pData.isDeleted) return;
                 const ri  = parseInt(cKey.split('-')[2]);
                 const row = currentFullData[ri];
@@ -3504,13 +3431,7 @@
                 // 필요수량은 발주 단계에서 이미 정해져 있음(partInfoMap[cKey].qty) —
                 // 담당자가 수동으로 수량을 조정했을 수도 있어(isManual) 세트별소모량으로
                 // 다시 계산한 값보다 pData.qty를 우선 신뢰해야 함
-                const _발주몫수 = pData.qty || Math.round(uc * (order.orderQty || 1));
-                if (_발주몫수 <= 0) return;
-                /* 다른 원장의 자투리에서 이 부속이 이미 같이 나온다면 그만큼은 안 잘라도 된다.
-                   조혼가구가 정한 발주수량은 그대로 두고, '이번에 자를 몫' 만 줄인다.
-                   다 채워졌으면(0) 이 부속의 재단도는 만들지 않는다. */
-                const _곁 = _곁가지몫(_곁표, ri);
-                const qty = Math.max(0, _발주몫수 - _곁);
+                const qty = pData.qty || Math.round(uc * (order.orderQty || 1));
                 if (qty <= 0) return;
 
                 const _방향 = _앉힐방향(rw, rd, row[h.indexOf('결보호')], BW, BD, fCut, bT);
@@ -12247,9 +12168,6 @@
                 return;
             }
 
-            // 이 발주들의 도면에서 곁가지로 나오는 몫 — 줄마다 도면을 다시 훑지 않게 한 번만
-            const _곁표버튼 = _곁가지표(new Set(checkedOrders.map(o => o.docId || String(o.idNum))));
-
             if (!currentFullData || currentFullData.length < 2) {
                 box.classList.add('hidden');
                 console.log('  - ❌ currentFullData 없음');
@@ -12335,14 +12253,11 @@
 
                         // 이미 재단 확정된 수량 계산
                         let alreadyProduced = 0;
-                        const _센도면2 = new Set();
                         confirmedCuttingData.forEach(ci => {
-                            _센도면2.add(String(ci.confirmId));
-                            if (ci.pRowIndex === rowIndex) alreadyProduced += parseInt(ci.pProducedQty, 10) || 0;
-                            if (ci.sRowIndex === rowIndex) alreadyProduced += parseInt(ci.sProducedQty, 10) || 0;
-                            if (ci.tRowIndex === rowIndex) alreadyProduced += parseInt(ci.tProducedQty, 10) || 0;
+                            if (ci.pRowIndex === rowIndex) alreadyProduced += parseInt(ci.pProducedQty);
+                            if (ci.sRowIndex === rowIndex) alreadyProduced += parseInt(ci.sProducedQty);
+                            if (ci.tRowIndex === rowIndex) alreadyProduced += parseInt(ci.tProducedQty);
                         });
-                        alreadyProduced += _곁가지몫(_곁표버튼, rowIndex);
 
                         // 남은 수량이 없으면 버튼에서 제외
                         const remaining = totalOrdered - alreadyProduced;
@@ -12413,8 +12328,6 @@
 
         function showSubParts(plateInfo, orders) {
             primarySelectedCardId = null; secondarySelectedCardId = null; tertiarySelectedCardId = null; isSheetsManual = false;
-            // 이 발주들의 도면에서 곁가지로 나오는 몫 — 줄마다 도면을 다시 훑지 않게 한 번만
-            const _곁표부속 = _곁가지표(new Set((orders || []).map(o => o.docId || String(o.idNum))));
             const h = currentFullData[0], inner = document.getElementById('id302-parts-content');
             document.getElementById('id302-material-header').classList.remove('hidden');
             document.getElementById('id302-material-title').textContent = plateInfo;
@@ -12490,17 +12403,11 @@
                     });
                     if (matchedInOrders) {
                         let alreadyProduced = 0;
-                        const _센도면 = new Set();
                         confirmedCuttingData.forEach(ci => {
-                            _센도면.add(String(ci.confirmId));
-                            // 값이 없으면 NaN 이 되어 남은수량이 통째로 NaN 이 된다 — 0 으로 막는다
-                            if (ci.pRowIndex === rowIndex) alreadyProduced += parseInt(ci.pProducedQty, 10) || 0;
-                            if (ci.sRowIndex === rowIndex) alreadyProduced += parseInt(ci.sProducedQty, 10) || 0;
-                            if (ci.tRowIndex === rowIndex) alreadyProduced += parseInt(ci.tProducedQty, 10) || 0;
+                            if (ci.pRowIndex === rowIndex) alreadyProduced += parseInt(ci.pProducedQty);
+                            if (ci.sRowIndex === rowIndex) alreadyProduced += parseInt(ci.sProducedQty);
+                            if (ci.tRowIndex === rowIndex) alreadyProduced += parseInt(ci.tProducedQty);
                         });
-                        // 다른 원장의 자투리에서 같이 나오는 몫도 뺀다. 파이어스토어의
-                        // 도면을 보므로 새로고침해도 남는다.
-                        alreadyProduced += _곁가지몫(_곁표부속, rowIndex);
                         const finalRemainingQty = totalAggregatedQty - alreadyProduced;
                         if (finalRemainingQty > 0.001) {
                             orderedPartsList.push({
