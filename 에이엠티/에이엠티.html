@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.9.75 (2026-09-14) — 함께 앉힌 몫은 빼고, 모자란 몫은 그 자리에서 붙인다
+     버전: v1.9.76 (2026-09-14) — 곁가지로 깎인 것이 화면에 보이게
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1107,6 +1107,27 @@
             padding: 2px 7px; border-radius: 6px; line-height: 1.35;
         }
         .cut-추가-칩 b { font-weight: 900; color: #7a4e12; }
+        /* ── 곁가지로 깎인 셈을 그대로 보여 주는 줄 ──────────────────────
+              수량이 줄었으면 왜 줄었는지 카드에 남아야 한다. 폰(375px)에서
+              카드가 터지지 않게 줄바꿈을 허용하고 글자를 작게 잡는다. */
+        .wo-깎임 {
+            margin-top: 5px; padding: 3px 7px; border-radius: 6px;
+            font-size: 10.5px; font-weight: 700; line-height: 1.45;
+            color: #8a5a1c; background: #fdf3e3; border: 1px solid #f0dfc0;
+            word-break: keep-all; overflow-wrap: anywhere;
+        }
+        /* 「자를 몫 0」 이 '자를 몫' 과 '0' 으로 갈라져 줄이 바뀌면 0을 놓친다 */
+        .wo-깎임 b { font-weight: 900; color: #7a4e12; white-space: nowrap; }
+        .wo-깎임.다참 { color: #1f6f4a; background: #e9f7ef; border-color: #c6e7d5; }
+        .wo-깎임.다참 b { color: #14603d; }
+        .wo-깎임-끝 { display: block; margin-top: 1px; font-weight: 900; }
+        .wo-깎임-요약 {
+            margin: 4px 0 2px; padding: 5px 9px; border-radius: 7px;
+            font-size: 11px; font-weight: 700; line-height: 1.45;
+            color: #8a5a1c; background: #fdf3e3; border: 1px solid #f0dfc0;
+            word-break: keep-all; overflow-wrap: anywhere;
+        }
+        .wo-깎임-요약 b { font-weight: 900; color: #7a4e12; }
         /* ── 길게 눌러 이동 — 재단 보드에서 카드 차례를 손가락으로 바꾼다 ──
               폰에서는 HTML5 끌어놓기가 아예 듣지 않아, 한 칸 안에서 차례를
               바꿀 길이 없었다. 0.4초 길게 누르면 이동이 켜진다. */
@@ -2016,7 +2037,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.75</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.76</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2142,7 +2163,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.75</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.76</b></p>
         </div>
     </div>
 
@@ -3452,8 +3473,11 @@
                 // 잘라야 할 몫이 0이 되면 원장도 0장이다. _살아있는장수 는 최소 1장을
                 // 돌려주므로(빈 도면을 만들지 않으려는 규칙) 그 앞에서 가른다.
                 sheets: _자를몫 <= 0 ? 0 : _살아있는장수(plan, _자를몫),
-                // 다른 도면의 자투리에서 받아 온 몫 — 카드에 배지로 적는다
+                // 다른 도면의 자투리에서 받아 온 몫, 그러고도 남아 실제로 자를 몫 —
+                // 카드에 「발주 N − 곁가지 M = 자를 몫 K」로 그대로 적는다.
+                // 깎인 것이 화면에 안 보이면 부속이 모르는 새 빠져 나간다.
                 받은몫: _받은몫,
+                자를몫: _자를몫,
                 부모계획: plan.부모계획 || null,
                 isCuttingCard: true,
                 perSheet: plan.perSheet || 0,
@@ -8785,6 +8809,31 @@
         // 발주목록의 "재단 1분 / 엣지 5분 / 보링 3분" 스타일 알약 배지 — 박스형 배경/좌측
         // 컬러바 대신 색은 이 작은 배지에만 쓰고 카드 자체는 흰 배경으로 깔끔하게 유지
         // ("배경색·라인색 때문에 없어 보인다"는 피드백으로 도입)
+        /* 곁가지로 깎였으면 그 셈을 카드에 그대로 적는다 — 「발주 24 − 곁가지 24 = 자를 몫 0」.
+           자를 몫이 0이어도 카드를 없애지 않는다. 없어지는 것과 '자를 것 없음' 은 다르다.
+           없어지면 사장님은 그 부속이 도면에 없다는 것을 모르신 채 재단을 내보내신다.
+           곁가지가 0인 부속에는 아무것도 안 붙는다 — 전과 똑같이 보인다. */
+        function _wo깎임줄(p) {
+            const 받은 = p.받은몫 || 0;
+            if (받은 <= 0) return '';
+            const 발주 = p.dq || 0, 자를 = p.자를몫 != null ? p.자를몫 : Math.max(0, 발주 - 받은);
+            const 다참 = 자를 <= 0;
+            return `<div class="wo-깎임${다참 ? ' 다참' : ''}">` +
+                `<b>발주 ${발주}</b> − 곁가지 ${받은} = <b>자를 몫 ${자를}</b>` +
+                (다참 ? `<span class="wo-깎임-끝">곁가지로 다 채움 · 자를 것 없음</span>` : '') +
+                `</div>`;
+        }
+
+        /* 이 판에서 곁가지로 채워진 부속이 몇 개고 몇 EA 인지 한 줄로 — 한눈에 세시라고. */
+        function _wo깎임요약(parts) {
+            const 것 = (parts || []).filter(p => (p.받은몫 || 0) > 0);
+            if (!것.length) return '';
+            const EA = 것.reduce((n, p) => n + (p.받은몫 || 0), 0);
+            const 다참 = 것.filter(p => (p.자를몫 != null ? p.자를몫 : 1) <= 0).length;
+            return `<div class="wo-깎임-요약">곁가지로 채운 부속 <b>${것.length}개</b> · <b>${EA} EA</b>` +
+                (다참 ? ` · 그중 <b>${다참}개</b>는 자를 것 없음` : '') + `</div>`;
+        }
+
         function _woStatPill(label, value, tone, small) {
             const bg = tone === 'primary' ? '#3b82f6' : tone === 'accent' ? '#14b8a6' : '#8a8783';
             // 타임라인에 배치된 카드는 현장 작업자가 원거리에서 바로 읽어야 하는
@@ -9265,6 +9314,8 @@
                 // 이 배지가 없으면 카드가 아무 말 없이 0장이 되어 왜인지 알 수 없다.
                 if (p.받은몫 > 0) _pills.push(_woStatPill('곁가지', `${p.받은몫} EA`, 'muted', true));
                 if (p.부모계획) _pills.push(_woStatPill('모자란 몫', `${p.dq} EA`, 'muted', true));
+                // 깎인 셈을 그대로 적는다. 여기 없으면 사장님은 왜 줄었는지 알 길이 없다.
+                const _깎임 = _wo깎임줄(p);
                 innerHtml =
                     // 헤더: 발주코드 한 줄 + 제품명은 잘리지 않고 끝까지 줄바꿈되도록 별도 줄
                     (p.orderCode ? `<div style="font-size:8px;font-weight:700;color:#a8a6a2;font-family:ui-monospace,monospace;letter-spacing:0.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.orderCode}</div>` : '') +
@@ -9284,6 +9335,7 @@
                     `</div>` +
                     // 배지 행: 발주/원장/작업 수량을 색이 있는 알약 배지로만 강조
                     (_pills.length ? `<div style="display:flex;align-items:center;gap:4px;margin-top:6px;flex-wrap:wrap;">${_pills.join('')}</div>` : '') +
+                    _깎임 +
                     // 미배정 부속은 아직 기계에 배치되기 전 단계라 도면까지 보여줄 필요가
                     // 없다는 요청으로 삭제 — 기계에 배치된 카드에는 그대로 도면이 보임
                     _wDoneHtml;
@@ -9358,6 +9410,7 @@
                 if (_yield2 > 0) _pills2.push(_woStatPill('작업', _yieldVal2, 'accent', true));
                 if (p.받은몫 > 0) _pills2.push(_woStatPill('곁가지', `${p.받은몫} EA`, 'muted', true));
                 if (p.부모계획) _pills2.push(_woStatPill('모자란 몫', `${p.dq} EA`, 'muted', true));
+                const _깎임2 = _wo깎임줄(p);
 
                 // 재단사이즈는 현장에서 가장 먼저 봐야 하는 값이라 제목 바로 아래에
                 // 가장 진한 글씨로 둔다. 예전엔 "클릭하면 팝업에서 보인다"며 카드에서
@@ -9397,7 +9450,8 @@
                     `<span style="font-size:13px;font-weight:800;color:#37352f;line-height:1.3;word-break:break-word;letter-spacing:-0.2px;">${_plateLine2||'-'}</span>` +
                     (p.sheets ? `<span style="flex-shrink:0;font-size:13px;font-weight:900;color:#fff;background:#37352f;padding:2px 9px;border-radius:9px;">${p.sheets}매</span>` : '') +
                     `</div>` +
-                    (_pills2.length ? `<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:5px;">${_pills2.join('')}</div>` : '');
+                    (_pills2.length ? `<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:5px;">${_pills2.join('')}</div>` : '') +
+                    _깎임2;
                 _placedInner = `<div style="display:flex;gap:8px;align-items:stretch;min-width:0;">` +
                     `<div style="flex:1;min-width:0;">${_textCut}</div>${_diagBox}</div>`;
             } else {
@@ -9833,6 +9887,10 @@
                             : (_모든기계.length > 1 ? `<span class="wo-mac-only-hint">이 호기만 ▸</span>` : '')) +
                     `</div>`).join('') +
                 `</div>`;
+
+            // 곁가지로 깎인 것이 이 판에 몇 개인지 한 줄로 — 카드를 하나하나 열지 않아도
+            // 보이게. 깎인 것이 없으면 이 줄 자체가 안 생긴다.
+            html += _wo깎임요약(parts);
 
             html += `<div class="wo-boring-inner">`;
 
