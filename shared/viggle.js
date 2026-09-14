@@ -77,6 +77,25 @@
     if (!w.ok) throw new Error('보내지 못했습니다 (' + w.status + ')');
   }
 
+  /* 지난 지시를 읽어 온다 — 읽기만 한다. 보내기와 같은 자리(wt_dev/<자리>)다 */
+  async function 지난것읽기() {
+    const 자리 = 박스 ? 'box:' + 박스 : '모든박스';
+    const 문서 = encodeURIComponent(자리).replace(/%/g, '~');
+    const tok = await 토큰();
+    const r = await fetch(`${창고}/wt_dev/${문서}`, { headers: { Authorization: 'Bearer ' + tok } });
+    if (r.status === 404) return [];                 // 아직 한 번도 지시가 없던 자리
+    if (!r.ok) throw new Error('읽지 못했습니다 (' + r.status + ')');
+    const d = await r.json();
+    const 것 = Object.fromEntries(Object.entries(d.fields || {}).map(([k, v]) => [k, 풀기(v)]));
+    return Array.isArray(것.msgs) ? 것.msgs : [];
+  }
+  const 때글 = sec => {
+    const d = new Date((sec || 0) * 1000), z = n => String(n).padStart(2, '0');
+    return `${z(d.getMonth() + 1)}.${z(d.getDate())} ${z(d.getHours())}:${z(d.getMinutes())}`;
+  };
+  const 막기 = t => String(t == null ? '' : t)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
   /* 화면 위에 잠깐 떴다 사라지는 알림 — 페이지를 떠나지 않는다 */
   function 알림(글, 나쁨) {
     const t = document.createElement('div');
@@ -120,7 +139,22 @@
   .vg-row button{flex:1;min-height:46px;border:0;border-radius:12px;font:inherit;font-weight:700;
     font-size:15px;cursor:pointer}
   .vg-send{background:#111110;color:#fff}
-  .vg-cancel{background:#fff;color:#6E6E6A;border:1px solid #E2E2DF !important}`;
+  .vg-cancel{background:#fff;color:#6E6E6A;border:1px solid #E2E2DF !important}
+  /* 지난 지시 — 작게 곁들인다. 적는 자리(textarea)는 그대로 둔다 */
+  .vg-row .vg-log{flex:none;padding:0 12px;font-size:14px;background:#fff;color:#6E6E6A;
+    border:1px solid #E2E2DF !important}
+  .vg-head{display:flex;align-items:baseline;gap:8px;margin:0 0 10px}
+  .vg-head b{font-size:15px}
+  .vg-cnt{font-size:12px;color:#9B9B96}
+  .vg-list{max-height:56vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+  .vg-it{border-radius:12px;padding:10px 12px;margin:0 0 8px;font-size:14px;
+    word-break:break-word;white-space:pre-wrap}
+  .vg-it.me{background:#111110;color:#fff}
+  .vg-it.cl{background:#F4F4F2;color:#1A1A19}
+  .vg-it .vg-when{display:block;font-size:11px;opacity:.6;margin:0 0 4px}
+  .vg-it .vg-where{display:block;font-size:11px;opacity:.75;margin:0 0 4px}
+  .vg-empty{color:#9B9B96;font-size:14px;padding:20px 2px;text-align:center}
+  .vg-back{background:#fff;color:#6E6E6A;border:1px solid #E2E2DF !important}`;
   document.head.insertAdjacentHTML('beforeend', `<style>${css}</style>`);
 
 
@@ -191,12 +225,21 @@
     const s = document.createElement('div');
     s.className = 'vg-sheet';
     s.innerHTML = `<div class="vg-card">
-        <div class="vg-what">짚은 것 · ${짚은것.replace(/</g,'&lt;')}</div>
-        <textarea placeholder="여기를 어떻게 고칠까요?"></textarea>
-        <div class="vg-row">
-          <button class="vg-cancel">그만</button>
-          <button class="vg-send">보내기</button>
-        </div></div>`;
+        <div class="vg-write">
+          <div class="vg-what">짚은 것 · ${짚은것.replace(/</g,'&lt;')}</div>
+          <textarea placeholder="여기를 어떻게 고칠까요?"></textarea>
+          <div class="vg-row">
+            <button class="vg-log" type="button">지난 지시</button>
+            <button class="vg-cancel">그만</button>
+            <button class="vg-send">보내기</button>
+          </div>
+        </div>
+        <div class="vg-past" hidden>
+          <div class="vg-head"><b>지난 지시</b><span class="vg-cnt"></span></div>
+          <div class="vg-list"></div>
+          <div class="vg-row"><button class="vg-back" type="button">← 돌아가기</button></div>
+        </div>
+      </div>`;
     document.body.appendChild(s);
     const ta = s.querySelector('textarea');
     setTimeout(() => ta.focus(), 60);
@@ -209,6 +252,38 @@
     let 뒤판받기 = false;
     setTimeout(() => { 뒤판받기 = true; }, 400);
     s.onclick = (e) => { if (뒤판받기 && e.target === s) 닫기(); };
+
+    /* 지난 지시 — 이 자리에 오간 말을 새것부터 보여 준다. 읽기만 한다.
+       적던 글은 그대로 두고 판 안에서만 갈아 끼운다 — 돌아가면 쓰던 글이 남아 있다. */
+    const 적는곳 = s.querySelector('.vg-write'), 지난곳 = s.querySelector('.vg-past');
+    const 목록 = s.querySelector('.vg-list'), 셈 = s.querySelector('.vg-cnt');
+    s.querySelector('.vg-back').onclick = () => {
+      지난곳.hidden = true; 적는곳.hidden = false;
+    };
+    s.querySelector('.vg-log').onclick = async () => {
+      if (ta) ta.blur();                       // 자판을 내려 목록이 다 보이게
+      적는곳.hidden = true; 지난곳.hidden = false;
+      셈.textContent = ''; 목록.innerHTML = '<div class="vg-empty">읽는 중…</div>';
+      let 말들;
+      try { 말들 = await 지난것읽기(); }
+      catch (e) { 목록.innerHTML = '<div class="vg-empty">' + 막기(e.message || '읽지 못했습니다') + '</div>'; return; }
+      if (!말들.length){ 목록.innerHTML = '<div class="vg-empty">아직 이곳에 남긴 지시가 없습니다</div>'; return; }
+      셈.textContent = 말들.length + '건';
+      목록.innerHTML = 말들
+        .slice().sort((a, b) => (b.at || 0) - (a.at || 0))          // 새것이 위로
+        .map(m => {
+          const 나 = m.who === '나';
+          const 글 = String(m.text == null ? '' : m.text);
+          const 쪼갬 = /^\s*\[([^\]]{1,80})\]\s*([\s\S]*)$/.exec(글);   // 짚으셨던 자리
+          const 어디글 = 쪼갬 ? 쪼갬[1] : '';
+          const 본문 = 쪼갬 ? 쪼갬[2] : 글;
+          return '<div class="vg-it ' + (나 ? 'me' : 'cl') + '">'
+               + '<span class="vg-when">' + 때글(m.at) + ' · ' + 막기(나 ? '사장님' : (m.who || '클로드')) + '</span>'
+               + (어디글 ? '<span class="vg-where">' + 막기(어디글) + '</span>' : '')
+               + 막기(본문) + '</div>';
+        }).join('');
+      목록.scrollTop = 0;
+    };
     const 보냄 = s.querySelector('.vg-send');
     보냄.onclick = async () => {
       const 글 = ta.value.trim(); if (!글) return;
