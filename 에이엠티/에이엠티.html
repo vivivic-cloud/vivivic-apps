@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.9.73 (2026-09-14) — 함께 앉힌 몫은 빼고, 모자란 몫은 그 자리에서 붙인다
+     버전: v1.9.74 (2026-09-14) — v1.9.73 되돌림 — 시키지 않은 것이었다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2016,7 +2016,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.73</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.74</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2142,7 +2142,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.73</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.74</b></p>
         </div>
     </div>
 
@@ -3004,16 +3004,6 @@
             }
         }
 
-        async function _deleteCuttingPlan(confirmId) {
-            try {
-                const { doc, deleteDoc } = window.fbFirestore;
-                const appId = "vivivic-4b7ef";
-                await deleteDoc(doc(window.db, 'artifacts', appId, 'public', 'data', 'cutting_plans', String(confirmId)));
-            } catch (err) {
-                console.error('재단 도면 삭제 오류:', err);
-            }
-        }
-
         // 재단 도면 1건을 재단 공정 타임라인(AMT 기계)에 반영 — 이미 반영돼 있으면 무시(idempotent)
         // 반환값: 해당 도면이 배정된 stateKey (날짜-재단)
         // 재단계획의 실제 필요수량(필요 EA)을 구함. 발주 단계에서 이미 이 부속의
@@ -3112,109 +3102,6 @@
         }
         // 이 재단계획으로 실제로 나오는 개수(총작업수량)
         function _cuttingYield(p) { return _cuttingPerSheet(p) * (p.sheets || 0); }
-
-        /* ── 함께 앉힌 몫(곁가지) ────────────────────────────────────────
-           재단편집에서 자투리에 다른 부속을 앉히면 그 부속은 거기서 이미 나온다.
-           그만큼은 그 부속의 제 도면에서 또 자를 일이 없다.
-           어느 부속카드의 몫인지는 도면이 sRowIndex 로 직접 적어 둔다
-           (sId 'agg-card-8' 의 8 = 원장 8번 행). 원장·치수를 견주어 짐작하지
-           않는다 — 짐작하면 같은 규격의 남의 몫이 딸려 온다. */
-        function _곁가지받은(plan, 살아있는) {
-            if (!plan || plan.pRowIndex == null) return 0;
-            const 내행 = parseInt(plan.pRowIndex, 10);
-            if (isNaN(내행)) return 0;
-            const 내키 = new Set((살아있는 || []).map(o => o.docId || String(o.idNum)));
-            if (!내키.size) return 0;
-            const 내번호 = String(plan.confirmId);
-            let 합 = 0;
-            Object.values(window._cuttingPlans || {}).forEach(pl => {
-                if (!pl || String(pl.confirmId) === 내번호) return;
-                // 이 도면에서 갈라져 나온 '모자란 몫' 도면은 제 부모의 몫을 빼지 않는다
-                if (String(pl.부모계획 || '') === 내번호) return;
-                // 서로 상대의 1순위를 자투리로 내주는 두 도면이 맞물리면 둘 다 0이 되어
-                // 아무것도 안 잘린다 — 내가 저쪽 1순위를 내주고 있으면 받지 않는다
-                const 저쪽1 = parseInt(pl.pRowIndex, 10);
-                if (!isNaN(저쪽1) && (parseInt(plan.sRowIndex, 10) === 저쪽1 ||
-                                      parseInt(plan.tRowIndex, 10) === 저쪽1)) return;
-                const 만든때 = _cutPlanMadeAt(pl);
-                ['s', 't'].forEach(급 => {
-                    if (parseInt(pl[급 + 'RowIndex'], 10) !== 내행) return;
-                    const 수 = parseInt(pl[급 + 'ProducedQty'], 10) || 0;
-                    if (수 <= 0) return;
-                    const 임자 = (pl[급 + 'OrderIds'] || [])
-                        .map(id => _cutPlanOwner(id, 만든때, pl)).filter(Boolean);
-                    if (!임자.some(o => 내키.has(o.docId || String(o.idNum)))) return;
-                    합 += 수;
-                });
-            });
-            return 합;
-        }
-
-        // 모자란 몫 도면의 번호 — 부모 도면 하나에 자식 하나. 늘 같은 번호라
-        // 다시 편집할 때마다 새로 쌓이지 않고 그 자리에서 고쳐진다.
-        function _모자란몫아이디(plan) { return '모자란_' + String(plan.confirmId); }
-
-        /* 편집을 마친 도면이 제 발주수량에 못 미치면(자투리 부속을 덜 내려고 원장을
-           줄인 경우 등) 모자란 몫만 자르는 도면을 만들어 붙인다. 다시 편집해서
-           모자람이 없어지면 걷어낸다. 수량이 걸린 자리라 조용히 생기거나 조용히
-           사라지지 않는다 — 카드에 '모자란 몫' 이라 적고 토스트로도 알린다.
-           되돌림: {한일:'붙임'|'걷어냄', 모자람, 장수, sk} / 할 일 없으면 null */
-        function _모자란몫채우기(plan) {
-            if (!plan || plan.부모계획) return null;          // 자식은 또 자식을 낳지 않는다
-            const 아이디 = _모자란몫아이디(plan);
-            const 걷어내기 = () => {
-                const 옛 = window._cuttingPlans[아이디];
-                if (!옛) return null;
-                _removeCuttingPlanFromTimeline(옛);
-                delete window._cuttingPlans[아이디];
-                _deleteCuttingPlan(아이디);
-                return { 한일: '걷어냄', 모자람: 0, 장수: 0, sk: null };
-            };
-            if (plan.pRowIndex == null) return 걷어내기();
-            const 만든때 = _cutPlanMadeAt(plan);
-            const 살아있는 = [...new Set(plan.pOrderIds || [])]
-                .map(id => _cutPlanOwner(id, 만든때, plan) || _cutPlanOwner(id, Infinity, plan))
-                .filter(Boolean);
-            if (!살아있는.length) return 걷어내기();
-            const per = _cuttingPerSheet({ perSheet: plan.perSheet, boardParts: plan.boardParts,
-                                           rw: plan.cutW, rd: plan.cutD });
-            if (per <= 0) return 걷어내기();
-            const 필요 = _cuttingReqQtyFor(plan, 살아있는) - _곁가지받은(plan, 살아있는);
-            const 모자람 = Math.round(필요 - per * (plan.sheets || 0));
-            if (모자람 <= 0) return 걷어내기();
-
-            // 부모 도면에서 이 부속이 앉은 자리만 그대로 물려받는다 — 새로 짜맞추지
-            // 않는다. 치수가 안 적힌 옛 도면은 있는 그대로 쓴다.
-            const 같다 = (a, b) => isFinite(a) && Math.abs(a - b) < 0.5;
-            const 내자리 = (plan.boardParts || []).filter(pt => {
-                const dw = parseFloat(pt.dw), dh = parseFloat(pt.dh);
-                return (같다(dw, plan.cutW) && 같다(dh, plan.cutD)) ||
-                       (같다(dw, plan.cutD) && 같다(dh, plan.cutW));
-            });
-            const 장수 = Math.ceil(모자람 / per);
-            const 자식 = {
-                confirmId: 아이디,
-                부모계획: String(plan.confirmId),
-                checked: false, targetPage: 'cutting', autoGenerated: false,
-                pId: plan.pId || null, pRowIndex: plan.pRowIndex,
-                pProducedQty: per * 장수, reqQty: 모자람,
-                pDisplayName: plan.pDisplayName || '',
-                pInfoText: `${plan.cutW} X ${plan.cutD} - 모자란 몫 - ${per * 장수} EA`,
-                pOrderIds: [...(plan.pOrderIds || [])],
-                sId: null, sRowIndex: null, sProducedQty: 0, sDisplayName: '', sInfoText: '', sOrderIds: [],
-                tId: null, tRowIndex: null, tProducedQty: 0, tDisplayName: '', tInfoText: '', tOrderIds: [],
-                baseMaterial: plan.baseMaterial || '', coating: plan.coating || '',
-                materialColor: plan.materialColor || '',
-                sheets: 장수, perSheet: per,
-                boardParts: 내자리.length ? 내자리 : (plan.boardParts || []),
-                boardW: plan.boardW || 2440, boardH: plan.boardH || 1220,
-                cutW: plan.cutW || 0, cutD: plan.cutD || 0
-            };
-            window._cuttingPlans[아이디] = 자식;
-            _persistCuttingPlan(자식);
-            const sk = _ensureCuttingPlanInTimeline(자식);
-            return { 한일: '붙임', 모자람, 장수, sk };
-        }
 
         // 필요수량이 저장해 둔 값과 달라졌으면(=발주가 지워졌거나 바뀌었으면)
         // 원장 장수도 그 수량으로 다시 센다. 안 달라졌으면 손대지 않는다 —
@@ -3352,16 +3239,7 @@
 
             const orderCode = 살아있는.map(o => o.orderCode).filter(Boolean).join('/');
             const orderName = 살아있는.map(o => o.displayName).filter(Boolean).join(' / ');
-            // '모자란 몫' 도면은 제 부모가 내지 못한 몫만 맡는다. 발주 전체를 다시
-            // 맡으면 부모 몫까지 두 번 잘린다.
-            const _dqForPlan = plan.부모계획 ? (plan.reqQty || 0) : _cuttingReqQtyFor(plan, 살아있는);
-            // 다른 도면의 자투리에서 이미 나오는 몫은 여기서 또 자를 일이 없다.
-            // dq(발주 필요수)는 그대로 둔다 — 카드의 '발주 N EA' 는 발주 그대로여야
-            // 한다. 줄어드는 것은 잘라야 할 몫(원장 장수)이고, 줄어든 까닭은 카드에
-            // '곁가지' 배지로 남긴다. 조용히 사라지지 않게.
-            // ('모자란 몫' 도면은 이미 곁가지를 뺀 값을 reqQty 로 들고 있어 또 빼지 않는다)
-            const _받은몫 = plan.부모계획 ? 0 : _곁가지받은(plan, 살아있는);
-            const _자를몫 = Math.max(0, _dqForPlan - _받은몫);
+            const _dqForPlan = _cuttingReqQtyFor(plan, 살아있는);
             // 카드에 실제 부속명(예: "상판")을 보여줘야 하므로 원본 데이터 행에서 조회 —
             // 조회 실패 시에만 자재·색상 설명으로 대체(완전히 빈 상태보다는 낫기 때문).
             // 같은 행을 찾은 김에 작업시간(pm) 계산에도 재사용(_resolvedRowForPlan)
@@ -3416,7 +3294,7 @@
             // calcProcessTime()으로 실제 재단 작업시간을 계산(Path B 인라인 계산과
             // 동일한 방식), 행을 못 찾은 경우에만 0으로 폴백
             const _pmForPlan = (_resolvedRowForPlan && _h0ForPlan)
-                ? (calcProcessTime(_resolvedRowForPlan, _자를몫, {}, _h0ForPlan)['재단'] || 0)
+                ? (calcProcessTime(_resolvedRowForPlan, _dqForPlan, {}, _h0ForPlan)['재단'] || 0)
                 : 0;
             const partObj = {
                 cKey,
@@ -3449,12 +3327,7 @@
                 rd: plan.cutD || 0,
                 deliveryDate: order?.deliveryDate || '',
                 boardParts: plan.boardParts || [],
-                // 잘라야 할 몫이 0이 되면 원장도 0장이다. _살아있는장수 는 최소 1장을
-                // 돌려주므로(빈 도면을 만들지 않으려는 규칙) 그 앞에서 가른다.
-                sheets: _자를몫 <= 0 ? 0 : _살아있는장수(plan, _자를몫),
-                // 다른 도면의 자투리에서 받아 온 몫 — 카드에 배지로 적는다
-                받은몫: _받은몫,
-                부모계획: plan.부모계획 || null,
+                sheets: _살아있는장수(plan, _dqForPlan),
                 isCuttingCard: true,
                 perSheet: plan.perSheet || 0,
                 // 함께 앉힌 부속(2·3순위) — 카드에 이름과 치수를 적는다
@@ -9104,27 +8977,11 @@
                 });
                 window._woBoringParts[st.sk] = (window._woBoringParts[st.sk] || []).filter(pp => pp.cKey !== st.oldCKey);
             }
-            // ── 편집을 마친 그 자리에서 바로 다시 센다 ──────────────────────
-            // 자투리에 함께 앉힌 부속이 있으면 그 부속의 제 도면은 그만큼 덜 자르면
-            // 되고, 이 도면이 제 발주수량에 못 미치면 모자란 몫을 자를 도면이 새로
-            // 붙는다. 새로고침을 기다리게 하면 방금 생긴 것을 놓친다.
-            const _방금 = window._woLastConfirmedPlan;
-            const _붙임 = _방금 ? _모자란몫채우기(_방금) : null;
-            // 곁가지를 받은 다른 부속의 카드까지 다시 세야 하므로 전체를 다시 올린다
-            // (같은 일을 하는 자리가 이미 있다 — 보드를 처음 그릴 때)
-            Object.values(window._cuttingPlans || {}).forEach(pl => _ensureCuttingPlanInTimeline(pl));
-            const _그릴곳 = new Set([st && st.sk, _붙임 && _붙임.sk].filter(Boolean));
-            _그릴곳.forEach(sk => {
-                if (typeof _woRenderBoard === 'function') _woRenderBoard(sk);
-                if (typeof _woRenderPool  === 'function') _woRenderPool(sk);
-            });
-            showToastMessage(
-                _붙임 && _붙임.한일 === '붙임'
-                    ? `재단계획이 수정되었습니다. 모자란 ${_붙임.모자람}개를 자를 도면(원장 ${_붙임.장수}장)을 붙였습니다.`
-                    : _붙임 && _붙임.한일 === '걷어냄'
-                        ? '재단계획이 수정되었습니다. 모자람이 없어져 덧붙였던 도면을 걷어냈습니다.'
-                        : '재단계획이 수정되었습니다.');
-            window._woLastConfirmedPlan = null;
+            if (st && st.sk) {
+                if (typeof _woRenderBoard === 'function') _woRenderBoard(st.sk);
+                if (typeof _woRenderPool  === 'function') _woRenderPool(st.sk);
+            }
+            showToastMessage('재단계획이 수정되었습니다.');
             _woCloseInlineEdit();
         };
 
@@ -9261,10 +9118,6 @@
                 const _pills = [];
                 if (p.dq) _pills.push(_woStatPill('발주', `${p.dq} EA`, 'primary', true));
                 if (_yield > 0) _pills.push(_woStatPill('작업', _yieldVal, 'accent', true));
-                // 다른 도면 자투리에서 이미 나오는 몫 — 원장이 0장이 된 까닭이 여기 있다.
-                // 이 배지가 없으면 카드가 아무 말 없이 0장이 되어 왜인지 알 수 없다.
-                if (p.받은몫 > 0) _pills.push(_woStatPill('곁가지', `${p.받은몫} EA`, 'muted', true));
-                if (p.부모계획) _pills.push(_woStatPill('모자란 몫', `${p.dq} EA`, 'muted', true));
                 innerHtml =
                     // 헤더: 발주코드 한 줄 + 제품명은 잘리지 않고 끝까지 줄바꿈되도록 별도 줄
                     (p.orderCode ? `<div style="font-size:8px;font-weight:700;color:#a8a6a2;font-family:ui-monospace,monospace;letter-spacing:0.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.orderCode}</div>` : '') +
@@ -9356,8 +9209,6 @@
                 const _pills2 = [];
                 if (p.dq) _pills2.push(_woStatPill('발주', `${p.dq} EA`, 'primary', true));
                 if (_yield2 > 0) _pills2.push(_woStatPill('작업', _yieldVal2, 'accent', true));
-                if (p.받은몫 > 0) _pills2.push(_woStatPill('곁가지', `${p.받은몫} EA`, 'muted', true));
-                if (p.부모계획) _pills2.push(_woStatPill('모자란 몫', `${p.dq} EA`, 'muted', true));
 
                 // 재단사이즈는 현장에서 가장 먼저 봐야 하는 값이라 제목 바로 아래에
                 // 가장 진한 글씨로 둔다. 예전엔 "클릭하면 팝업에서 보인다"며 카드에서
@@ -12622,20 +12473,7 @@
 
         function changeSuggestedSheets(delta) { suggestedSheets = Math.max(1, suggestedSheets + delta); isSheetsManual = true; updateBoardVisual(true); }
 
-        // 원장 장수를 올리고 내릴 때 이 도면에 앉은 부속이 그 부속의 발주를 채우는지
-        // 그 자리에서 보여 준다 — 몇 장으로 할지 보면서 정하라고. 자투리에 함께
-        // 앉힌 부속도 제 발주가 있고, 넘치면 남고 모자라면 따로 또 잘라야 한다.
-        // (카드의 qty 는 이미 다른 도면에서 나오는 몫을 뺀 '남은 발주' 다)
-        function _곁가지안내(조각, 나오는수) {
-            if (!조각 || 조각.isCommon) return '';
-            const 발주 = Math.round(조각.qty || 0);
-            if (발주 <= 0) return '';
-            const 남을몫 = Math.round(발주 - (나오는수 || 0));
-            return ` · 발주 ${발주} → ` +
-                (남을몫 > 0 ? `${남을몫}개 모자람` : 남을몫 < 0 ? `${-남을몫}개 남음` : '딱 맞음');
-        }
-
-        function updateBoardVisual(isManualChangeOverride = false) { const size = document.getElementById('setting-board-size').value, BW = size === '3X6' ? 1840 : 2440, BD = size === '3X6' ? 920 : 1220, fCut = parseFloat(document.getElementById('setting-front-cut').value) || 0, bT = parseFloat(document.getElementById('setting-blade-t').value) || 0, rect = document.getElementById('board-rect'), scale = 480 / 2440; rect.style.width = (BW * scale) + 'px'; rect.style.height = (BD * scale) + 'px'; rect.querySelectorAll('.placed-part').forEach(c => c.remove()); document.querySelectorAll('.inner-part-card').forEach(c => { const b = c.querySelector('.qty-badge'); if (b && c.dataset.isCommon !== "true") { const q = parseFloat(c.dataset.qty); b.textContent = Math.round(q); b.classList.remove('bg-[#37352f]'); b.classList.add('bg-[#37352f]'); if (q <= 0.001) { b.classList.add('bg-[#37352f]'); b.classList.remove('bg-[#37352f]'); b.textContent = "0"; } } }); let pCard = primarySelectedCardId ? document.getElementById(primarySelectedCardId) : null; if (!pCard) { document.getElementById('material-id-label-text').textContent = ""; document.getElementById('part-production-detail-text').textContent = ""; document.getElementById('residue-production-info-row').classList.add('hidden'); document.getElementById('tertiary-production-info-row').classList.add('hidden'); document.getElementById('remaining-area-info-row')?.classList.add('hidden'); _fitBoardToScreen(); return; } let pW = parseFloat(pCard.dataset.w), pD = parseFloat(pCard.dataset.d), pQty = parseFloat(pCard.dataset.qty); const maxColsP = Math.floor((BW - fCut + bT) / (pW + bT)), maxRowsP = Math.floor((BD - fCut + bT) / (pD + bT)), pYld = maxColsP * maxRowsP; if (!isManualChangeOverride && !isSheetsManual) suggestedSheets = pCard.dataset.isCommon === "true" ? 1 : Math.ceil(pQty / (pYld || 1)) || 0; currentProducedQtyPrimary = suggestedSheets * pYld; let actOX = fCut, actOY = fCut; for (let c = 0; c < maxColsP; c++) { for (let r = 0; r < maxRowsP; r++) { const div = document.createElement('div'); div.className = 'placed-part'; div.dataset.orderIds = pCard.dataset.orderIds || ''; const orderIds = (pCard.dataset.orderIds || '').split(',').filter(id => id); const colors = ['#37352f', '#b0aeaa', '#b0aeaa', '#b0aeaa', '#b0aeaa']; if (orderIds.length > 1) { div.style.borderWidth = '3px'; div.style.borderStyle = 'solid'; div.style.borderImage = `linear-gradient(135deg, ${orderIds.map((id, idx) => colors[idx % colors.length]).join(', ')}) 1`; } else if (orderIds.length === 1) { div.style.border = `2px solid ${colors[0]}`; } div.style.left = (fCut + c * (pW + bT)) * scale + 'px'; div.style.top = (fCut + r * (pD + bT)) * scale + 'px'; div.style.width = (pW * scale) + 'px'; div.style.height = (pD * scale) + 'px'; div.innerHTML = `<span class="dim-w-label">${pW}</span><span class="dim-d-label">${pD}</span>`; rect.appendChild(div); actOX = Math.max(actOX, fCut + (c + 1) * (pW + bT)); actOY = Math.max(actOY, fCut + (r + 1) * (pD + bT)); } } { const _rmRightW = Math.max(0, Math.round(BW - actOX - bT)), _rmRightD = Math.round(BD), _rmBottomW = Math.round(BW), _rmBottomD = Math.max(0, Math.round(BD - actOY - bT)); const _rmRow = document.getElementById('remaining-area-info-row'), _rmText = document.getElementById('remaining-area-detail-text'); const _rmParts = []; if (_rmRightW > 0) _rmParts.push(`우측 ${_rmRightW}×${_rmRightD}`); if (_rmBottomD > 0) _rmParts.push(`하단 ${_rmBottomW}×${_rmBottomD}`); if (_rmRow && _rmText) { if (_rmParts.length > 0) { _rmText.textContent = `잔여 공간: ${_rmParts.join(' · ')} (mm)`; _rmRow.classList.remove('hidden'); } else { _rmText.textContent = ''; _rmRow.classList.add('hidden'); } } } let sPiece = null, tPiece = null; let _dir = 'right'; if (secondarySelectedCardId) { const sCard = document.getElementById(secondarySelectedCardId); if (sCard) { let sw = parseFloat(sCard.dataset.w), sd = parseFloat(sCard.dataset.d); sPiece = { id: sCard.id, w: sw, d: sd, qty: parseFloat(sCard.dataset.qty), name: sCard.dataset.name, isCommon: sCard.dataset.isCommon === "true" }; let sArea = { w: 0, d: 0, x: 0, y: 0 }, tArea = { w: 0, d: 0, x: 0, y: 0 }; _dir = getPackingCount(sw, sd, BW - actOX - bT, BD, 0, bT) >= getPackingCount(sw, sd, BW, BD - actOY - bT, 0, bT) ? 'right' : 'bottom'; if (_dir === 'right') { sArea = { w: BW - actOX - bT, d: BD, x: actOX + bT, y: 0 }; tArea = { w: actOX, d: BD - actOY - bT, x: 0, y: actOY + bT }; } else { sArea = { w: BW, d: BD - actOY - bT, x: 0, y: actOY + bT }; tArea = { w: BW - actOX - bT, d: actOY, x: actOX + bT, y: 0 }; } const colsS = Math.floor((sArea.w + bT) / (sw + bT)), rowsS = Math.floor((sArea.d + bT) / (sd + bT)); let sYld = colsS * rowsS; currentProducedQtySecondary = suggestedSheets * sYld; if (sYld > 0) { for (let c = 0; c < colsS; c++) { for (let r = 0; r < rowsS; r++) { const div = document.createElement('div'); div.className = 'placed-part'; div.dataset.orderIds = sCard.dataset.orderIds || ''; div.style.backgroundColor = '#f5f5f4'; const sOrderIds = (sCard.dataset.orderIds || '').split(',').filter(id => id); const sColors = ['#37352f', '#b0aeaa', '#b0aeaa', '#b0aeaa', '#b0aeaa']; if (sOrderIds.length > 1) { div.style.borderWidth = '3px'; div.style.borderStyle = 'solid'; div.style.borderImage = `linear-gradient(135deg, ${sOrderIds.map((id, idx) => sColors[idx % sColors.length]).join(', ')}) 1`; } else if (sOrderIds.length === 1) { div.style.border = `2px solid ${sColors[0]}`; } div.style.left = (sArea.x + c * (sw + bT)) * scale + 'px'; div.style.top = (sArea.y + r * (sd + bT)) * scale + 'px'; div.style.width = (sw * scale) + 'px'; div.style.height = (sd * scale) + 'px'; div.innerHTML = `<span class="dim-w-label">${sw}</span><span class="dim-d-label">${sd}</span>`; rect.appendChild(div); } } } if (tertiarySelectedCardId) { const tCard = document.getElementById(tertiarySelectedCardId); if (tCard) { let tw = parseFloat(tCard.dataset.w), td = parseFloat(tCard.dataset.d); tPiece = { id: tCard.id, w: tw, d: td, qty: parseFloat(tCard.dataset.qty), name: tCard.dataset.name, isCommon: tCard.dataset.isCommon === "true" }; const colsT = Math.floor((tArea.w + bT) / (tw + bT)), rowsT = Math.floor((tArea.d + bT) / (td + bT)); let tYld = colsT * rowsT; currentProducedQtyTertiary = suggestedSheets * tYld; if (tYld > 0) { for (let c = 0; c < colsT; c++) { for (let r = 0; r < rowsT; r++) { const div = document.createElement('div'); div.className = 'placed-part'; div.dataset.orderIds = tCard.dataset.orderIds || ''; div.style.backgroundColor = '#f5f5f4'; const tOrderIds = (tCard.dataset.orderIds || '').split(',').filter(id => id); const tColors = ['#37352f', '#b0aeaa', '#b0aeaa', '#b0aeaa', '#b0aeaa']; if (tOrderIds.length > 1) { div.style.borderWidth = '3px'; div.style.borderStyle = 'solid'; div.style.borderImage = `linear-gradient(135deg, ${tOrderIds.map((id, idx) => tColors[idx % tColors.length]).join(', ')}) 1`; } else if (tOrderIds.length === 1) { div.style.border = `2px solid ${tColors[0]}`; } else { div.style.borderColor = '#37352f'; } div.style.left = (tArea.x + c * (tw + bT)) * scale + 'px'; div.style.top = (tArea.y + r * (td + bT)) * scale + 'px'; div.style.width = (tw * scale) + 'px'; div.style.height = (td * scale) + 'px'; div.innerHTML = `<span class="dim-w-label">${tw}</span><span class="dim-d-label">${td}</span>`; rect.appendChild(div); } } } } } } } const materialLabel = document.getElementById('material-id-label-text'); materialLabel.innerHTML = `${selectedMaterialInfoText} : <div class="inline-flex items-center gap-1 ml-2 bg-white border border-[#ededeb] rounded-md px-1 shadow-sm overflow-hidden" onclick="event.stopPropagation()"><button onclick="changeSuggestedSheets(-1)" class="w-6 h-6 flex items-center justify-center hover:bg-[#f1f1ef] text-[#787774] font-black text-sm">-</button><span class="px-2 font-black text-[#37352f] fluid-text-small">${suggestedSheets}</span><button onclick="changeSuggestedSheets(1)" class="w-6 h-6 flex items-center justify-center hover:bg-[#f1f1ef] text-[#787774] font-black text-sm">+</button></div> 장`; const updatePartBadge = (cardId, prodQty, totalQty, isCommon) => { const card = document.getElementById(cardId); if (!card || isCommon) return; const rem = totalQty - prodQty, badge = card.querySelector('.qty-badge'); if (badge) { badge.textContent = (rem <= 0.001) ? `0 (+${Math.abs(Math.round(rem))})` : Math.round(rem); if (rem <= 0.001) { badge.classList.add('bg-[#37352f]'); badge.classList.remove('bg-[#37352f]'); } else { badge.classList.add('bg-[#37352f]'); badge.classList.remove('bg-[#37352f]'); } } }; if (pCard) updatePartBadge(primarySelectedCardId, currentProducedQtyPrimary, pQty, pCard.dataset.isCommon === "true"); if (secondarySelectedCardId && sPiece) updatePartBadge(secondarySelectedCardId, currentProducedQtySecondary, sPiece.qty, sPiece.isCommon); if (tertiarySelectedCardId && tPiece) updatePartBadge(tertiarySelectedCardId, currentProducedQtyTertiary, tPiece.qty, tPiece.isCommon); document.getElementById('residue-production-info-row').classList.toggle('hidden', !sPiece); document.getElementById('tertiary-production-info-row').classList.toggle('hidden', !tPiece); document.getElementById('part-production-detail-text').textContent = `${pW} X ${pD} - ${pCard.dataset.name} - ${currentProducedQtyPrimary} EA` + (currentProducedQtyPrimary > pQty && pCard.dataset.isCommon !== "true" ? ` (+${Math.round(currentProducedQtyPrimary - pQty)})` : "") + _곁가지안내({ qty: pQty, isCommon: pCard.dataset.isCommon === "true" }, currentProducedQtyPrimary); if (sPiece) document.getElementById('residue-production-detail-text').textContent = `${sPiece.w} X ${sPiece.d} - ${sPiece.name} - ${currentProducedQtySecondary} EA` + (currentProducedQtySecondary > sPiece.qty && !sPiece.isCommon ? ` (+${Math.round(currentProducedQtySecondary - sPiece.qty)})` : "") + _곁가지안내(sPiece, currentProducedQtySecondary); if (tPiece) document.getElementById('tertiary-production-detail-text').textContent = `${tPiece.w} X ${tPiece.d} - ${tPiece.name} - ${currentProducedQtyTertiary} EA` + (currentProducedQtyTertiary > tPiece.qty && !tPiece.isCommon ? ` (+${Math.round(currentProducedQtyTertiary - tPiece.qty)})` : "") + _곁가지안내(tPiece, currentProducedQtyTertiary); suggestNextCards(actOX, actOY, _dir); _fitBoardToScreen(); }
+        function updateBoardVisual(isManualChangeOverride = false) { const size = document.getElementById('setting-board-size').value, BW = size === '3X6' ? 1840 : 2440, BD = size === '3X6' ? 920 : 1220, fCut = parseFloat(document.getElementById('setting-front-cut').value) || 0, bT = parseFloat(document.getElementById('setting-blade-t').value) || 0, rect = document.getElementById('board-rect'), scale = 480 / 2440; rect.style.width = (BW * scale) + 'px'; rect.style.height = (BD * scale) + 'px'; rect.querySelectorAll('.placed-part').forEach(c => c.remove()); document.querySelectorAll('.inner-part-card').forEach(c => { const b = c.querySelector('.qty-badge'); if (b && c.dataset.isCommon !== "true") { const q = parseFloat(c.dataset.qty); b.textContent = Math.round(q); b.classList.remove('bg-[#37352f]'); b.classList.add('bg-[#37352f]'); if (q <= 0.001) { b.classList.add('bg-[#37352f]'); b.classList.remove('bg-[#37352f]'); b.textContent = "0"; } } }); let pCard = primarySelectedCardId ? document.getElementById(primarySelectedCardId) : null; if (!pCard) { document.getElementById('material-id-label-text').textContent = ""; document.getElementById('part-production-detail-text').textContent = ""; document.getElementById('residue-production-info-row').classList.add('hidden'); document.getElementById('tertiary-production-info-row').classList.add('hidden'); document.getElementById('remaining-area-info-row')?.classList.add('hidden'); _fitBoardToScreen(); return; } let pW = parseFloat(pCard.dataset.w), pD = parseFloat(pCard.dataset.d), pQty = parseFloat(pCard.dataset.qty); const maxColsP = Math.floor((BW - fCut + bT) / (pW + bT)), maxRowsP = Math.floor((BD - fCut + bT) / (pD + bT)), pYld = maxColsP * maxRowsP; if (!isManualChangeOverride && !isSheetsManual) suggestedSheets = pCard.dataset.isCommon === "true" ? 1 : Math.ceil(pQty / (pYld || 1)) || 0; currentProducedQtyPrimary = suggestedSheets * pYld; let actOX = fCut, actOY = fCut; for (let c = 0; c < maxColsP; c++) { for (let r = 0; r < maxRowsP; r++) { const div = document.createElement('div'); div.className = 'placed-part'; div.dataset.orderIds = pCard.dataset.orderIds || ''; const orderIds = (pCard.dataset.orderIds || '').split(',').filter(id => id); const colors = ['#37352f', '#b0aeaa', '#b0aeaa', '#b0aeaa', '#b0aeaa']; if (orderIds.length > 1) { div.style.borderWidth = '3px'; div.style.borderStyle = 'solid'; div.style.borderImage = `linear-gradient(135deg, ${orderIds.map((id, idx) => colors[idx % colors.length]).join(', ')}) 1`; } else if (orderIds.length === 1) { div.style.border = `2px solid ${colors[0]}`; } div.style.left = (fCut + c * (pW + bT)) * scale + 'px'; div.style.top = (fCut + r * (pD + bT)) * scale + 'px'; div.style.width = (pW * scale) + 'px'; div.style.height = (pD * scale) + 'px'; div.innerHTML = `<span class="dim-w-label">${pW}</span><span class="dim-d-label">${pD}</span>`; rect.appendChild(div); actOX = Math.max(actOX, fCut + (c + 1) * (pW + bT)); actOY = Math.max(actOY, fCut + (r + 1) * (pD + bT)); } } { const _rmRightW = Math.max(0, Math.round(BW - actOX - bT)), _rmRightD = Math.round(BD), _rmBottomW = Math.round(BW), _rmBottomD = Math.max(0, Math.round(BD - actOY - bT)); const _rmRow = document.getElementById('remaining-area-info-row'), _rmText = document.getElementById('remaining-area-detail-text'); const _rmParts = []; if (_rmRightW > 0) _rmParts.push(`우측 ${_rmRightW}×${_rmRightD}`); if (_rmBottomD > 0) _rmParts.push(`하단 ${_rmBottomW}×${_rmBottomD}`); if (_rmRow && _rmText) { if (_rmParts.length > 0) { _rmText.textContent = `잔여 공간: ${_rmParts.join(' · ')} (mm)`; _rmRow.classList.remove('hidden'); } else { _rmText.textContent = ''; _rmRow.classList.add('hidden'); } } } let sPiece = null, tPiece = null; let _dir = 'right'; if (secondarySelectedCardId) { const sCard = document.getElementById(secondarySelectedCardId); if (sCard) { let sw = parseFloat(sCard.dataset.w), sd = parseFloat(sCard.dataset.d); sPiece = { id: sCard.id, w: sw, d: sd, qty: parseFloat(sCard.dataset.qty), name: sCard.dataset.name, isCommon: sCard.dataset.isCommon === "true" }; let sArea = { w: 0, d: 0, x: 0, y: 0 }, tArea = { w: 0, d: 0, x: 0, y: 0 }; _dir = getPackingCount(sw, sd, BW - actOX - bT, BD, 0, bT) >= getPackingCount(sw, sd, BW, BD - actOY - bT, 0, bT) ? 'right' : 'bottom'; if (_dir === 'right') { sArea = { w: BW - actOX - bT, d: BD, x: actOX + bT, y: 0 }; tArea = { w: actOX, d: BD - actOY - bT, x: 0, y: actOY + bT }; } else { sArea = { w: BW, d: BD - actOY - bT, x: 0, y: actOY + bT }; tArea = { w: BW - actOX - bT, d: actOY, x: actOX + bT, y: 0 }; } const colsS = Math.floor((sArea.w + bT) / (sw + bT)), rowsS = Math.floor((sArea.d + bT) / (sd + bT)); let sYld = colsS * rowsS; currentProducedQtySecondary = suggestedSheets * sYld; if (sYld > 0) { for (let c = 0; c < colsS; c++) { for (let r = 0; r < rowsS; r++) { const div = document.createElement('div'); div.className = 'placed-part'; div.dataset.orderIds = sCard.dataset.orderIds || ''; div.style.backgroundColor = '#f5f5f4'; const sOrderIds = (sCard.dataset.orderIds || '').split(',').filter(id => id); const sColors = ['#37352f', '#b0aeaa', '#b0aeaa', '#b0aeaa', '#b0aeaa']; if (sOrderIds.length > 1) { div.style.borderWidth = '3px'; div.style.borderStyle = 'solid'; div.style.borderImage = `linear-gradient(135deg, ${sOrderIds.map((id, idx) => sColors[idx % sColors.length]).join(', ')}) 1`; } else if (sOrderIds.length === 1) { div.style.border = `2px solid ${sColors[0]}`; } div.style.left = (sArea.x + c * (sw + bT)) * scale + 'px'; div.style.top = (sArea.y + r * (sd + bT)) * scale + 'px'; div.style.width = (sw * scale) + 'px'; div.style.height = (sd * scale) + 'px'; div.innerHTML = `<span class="dim-w-label">${sw}</span><span class="dim-d-label">${sd}</span>`; rect.appendChild(div); } } } if (tertiarySelectedCardId) { const tCard = document.getElementById(tertiarySelectedCardId); if (tCard) { let tw = parseFloat(tCard.dataset.w), td = parseFloat(tCard.dataset.d); tPiece = { id: tCard.id, w: tw, d: td, qty: parseFloat(tCard.dataset.qty), name: tCard.dataset.name, isCommon: tCard.dataset.isCommon === "true" }; const colsT = Math.floor((tArea.w + bT) / (tw + bT)), rowsT = Math.floor((tArea.d + bT) / (td + bT)); let tYld = colsT * rowsT; currentProducedQtyTertiary = suggestedSheets * tYld; if (tYld > 0) { for (let c = 0; c < colsT; c++) { for (let r = 0; r < rowsT; r++) { const div = document.createElement('div'); div.className = 'placed-part'; div.dataset.orderIds = tCard.dataset.orderIds || ''; div.style.backgroundColor = '#f5f5f4'; const tOrderIds = (tCard.dataset.orderIds || '').split(',').filter(id => id); const tColors = ['#37352f', '#b0aeaa', '#b0aeaa', '#b0aeaa', '#b0aeaa']; if (tOrderIds.length > 1) { div.style.borderWidth = '3px'; div.style.borderStyle = 'solid'; div.style.borderImage = `linear-gradient(135deg, ${tOrderIds.map((id, idx) => tColors[idx % tColors.length]).join(', ')}) 1`; } else if (tOrderIds.length === 1) { div.style.border = `2px solid ${tColors[0]}`; } else { div.style.borderColor = '#37352f'; } div.style.left = (tArea.x + c * (tw + bT)) * scale + 'px'; div.style.top = (tArea.y + r * (td + bT)) * scale + 'px'; div.style.width = (tw * scale) + 'px'; div.style.height = (td * scale) + 'px'; div.innerHTML = `<span class="dim-w-label">${tw}</span><span class="dim-d-label">${td}</span>`; rect.appendChild(div); } } } } } } } const materialLabel = document.getElementById('material-id-label-text'); materialLabel.innerHTML = `${selectedMaterialInfoText} : <div class="inline-flex items-center gap-1 ml-2 bg-white border border-[#ededeb] rounded-md px-1 shadow-sm overflow-hidden" onclick="event.stopPropagation()"><button onclick="changeSuggestedSheets(-1)" class="w-6 h-6 flex items-center justify-center hover:bg-[#f1f1ef] text-[#787774] font-black text-sm">-</button><span class="px-2 font-black text-[#37352f] fluid-text-small">${suggestedSheets}</span><button onclick="changeSuggestedSheets(1)" class="w-6 h-6 flex items-center justify-center hover:bg-[#f1f1ef] text-[#787774] font-black text-sm">+</button></div> 장`; const updatePartBadge = (cardId, prodQty, totalQty, isCommon) => { const card = document.getElementById(cardId); if (!card || isCommon) return; const rem = totalQty - prodQty, badge = card.querySelector('.qty-badge'); if (badge) { badge.textContent = (rem <= 0.001) ? `0 (+${Math.abs(Math.round(rem))})` : Math.round(rem); if (rem <= 0.001) { badge.classList.add('bg-[#37352f]'); badge.classList.remove('bg-[#37352f]'); } else { badge.classList.add('bg-[#37352f]'); badge.classList.remove('bg-[#37352f]'); } } }; if (pCard) updatePartBadge(primarySelectedCardId, currentProducedQtyPrimary, pQty, pCard.dataset.isCommon === "true"); if (secondarySelectedCardId && sPiece) updatePartBadge(secondarySelectedCardId, currentProducedQtySecondary, sPiece.qty, sPiece.isCommon); if (tertiarySelectedCardId && tPiece) updatePartBadge(tertiarySelectedCardId, currentProducedQtyTertiary, tPiece.qty, tPiece.isCommon); document.getElementById('residue-production-info-row').classList.toggle('hidden', !sPiece); document.getElementById('tertiary-production-info-row').classList.toggle('hidden', !tPiece); document.getElementById('part-production-detail-text').textContent = `${pW} X ${pD} - ${pCard.dataset.name} - ${currentProducedQtyPrimary} EA` + (currentProducedQtyPrimary > pQty && pCard.dataset.isCommon !== "true" ? ` (+${Math.round(currentProducedQtyPrimary - pQty)})` : ""); if (sPiece) document.getElementById('residue-production-detail-text').textContent = `${sPiece.w} X ${sPiece.d} - ${sPiece.name} - ${currentProducedQtySecondary} EA` + (currentProducedQtySecondary > sPiece.qty && !sPiece.isCommon ? ` (+${Math.round(currentProducedQtySecondary - sPiece.qty)})` : ""); if (tPiece) document.getElementById('tertiary-production-detail-text').textContent = `${tPiece.w} X ${tPiece.d} - ${tPiece.name} - ${currentProducedQtyTertiary} EA` + (currentProducedQtyTertiary > tPiece.qty && !tPiece.isCommon ? ` (+${Math.round(currentProducedQtyTertiary - tPiece.qty)})` : ""); suggestNextCards(actOX, actOY, _dir); _fitBoardToScreen(); }
 
         // 지시(09-11 02:16): 폰에서 도면 가로 양쪽이 잘려 나왔다.
         // board-rect 는 4X8 기준 480px 고정이라 폰(375px) 화면보다 넓다.
@@ -12918,9 +12756,6 @@
             // window._cuttingPlans의 예전 값으로 방금 한 수정이 되돌아갈 수 있음 —
             // 즉시 로컬에도 반영해 그 사이 공백을 없앰
             window._cuttingPlans[String(confirmId)] = cuttingData;
-            // 팝업 편집을 마친 뒤(_woInlineConfirmCutting) 방금 확정한 이 도면을 기준으로
-            // 곁가지 몫·모자란 몫을 그 자리에서 다시 세기 위해 들고 있는다
-            window._woLastConfirmedPlan = cuttingData;
             _persistCuttingPlan(cuttingData);
             _ensureCuttingPlanInTimeline(cuttingData);
             renderProcessTimeline();
