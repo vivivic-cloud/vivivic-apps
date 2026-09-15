@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.9.83 (2026-09-15) — 「다른카드에 편집중」 글을 칸에 맞게 앉힌다
+     버전: v1.9.84 (2026-09-15) — 자료 다 오기 전엔 「비었다」고 그리지 않는다 · 못 받으면 작업을 막는다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -56,6 +56,20 @@
             sessionStorage.removeItem('vv.wantLogin');
         } catch (e) {}
 
+        /* 자료 듣기는 딱 한 번만 건다. onAuthStateChanged 는 한 번 여는 동안에도
+           여러 번 불린다(로그인 없음 → 익명 로그인 → 토큰 갱신). 그때마다 다시 걸면
+           같은 자료를 듣는 귀가 여럿이 되어 서로 덮어쓴다. */
+        window.__자료동기섰나 = false;
+        function _자료동기시작() {
+            if (window.__자료동기섰나) return;
+            window.__자료동기섰나 = true;
+            initCloudDataSync();
+            initConfirmedOrdersSync();
+            initCuttingPlansSync();
+            initBoardOrderSync();
+        }
+        window._자료동기시작 = _자료동기시작;   // 밖에서 상태를 확인할 수 있게
+
         onAuthStateChanged(auth, async (user) => {
             if (!user) {
                 if (_로그인화면요청) { _로그인화면요청 = false; window.showAuthLoginScreen(); return; }
@@ -73,10 +87,7 @@
                 if (emailEl0) emailEl0.textContent = '로그인 없이 이용 중';
                 const outBtn = document.getElementById('auth-logout-btn');
                 if (outBtn) { outBtn.textContent = '로그인'; outBtn.onclick = () => window.showAuthLoginScreen(); }
-                initCloudDataSync();
-                initConfirmedOrdersSync();
-                initCuttingPlansSync();
-                initBoardOrderSync();
+                _자료동기시작();
                 return;
             }
 
@@ -99,10 +110,7 @@
                 const emailEl = document.getElementById('auth-account-email');
                 if (emailEl) emailEl.textContent = user.email;
                 console.log("Firebase Auth Success:", user.uid, window._myAccount);
-                initCloudDataSync();
-                initConfirmedOrdersSync();
-                initCuttingPlansSync();
-                initBoardOrderSync();
+                _자료동기시작();
             } catch (err) {
                 console.error('계정 정보 조회 실패:', err);
                 window.showAuthLoginScreen('계정 정보를 불러오지 못했습니다. 다시 시도해주세요.');
@@ -2016,7 +2024,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.83</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.84</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2142,7 +2150,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.83</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.84</b></p>
         </div>
     </div>
 
@@ -2701,6 +2709,38 @@
             reader.readAsArrayBuffer(file);
         }
 
+        /* ── 자료가 다 왔는가 ───────────────────────────────────────────────
+           자료는 네 군데서 따로 온다 — 원장(엑셀) · 발주확정 · 재단도면 · 카드차례.
+           예전에는 먼저 온 것 하나만으로 화면을 그렸다. 그래서 '아직 안 온 것' 과
+           '정말 없는 것' 이 화면에서 똑같아 보였다. 두 가지가 위험하다.
+             하나 — 한 번 열어 보고 「할 일 없네」 하고 덮으신다.
+             둘  — 일부만 온 채로 다 온 것처럼 보여, 빠진 자료 없이 재단이 나간다.
+           그래서 다 오기 전에는 「불러오는 중」 만 보이고, 하나라도 못 받으면
+           크게 알리고 작업 단추를 막는다. 자료는 읽기만 한다. */
+        window._자료옴 = { 원장: false, 발주: false, 도면: false, 차례: false };
+        window._자료탈 = {};
+        window._자료이름 = { 원장: '원장(엑셀)', 발주: '발주확정', 도면: '재단도면', 차례: '카드 차례' };
+        window._자료다옴  = () => Object.keys(window._자료옴).every(k => window._자료옴[k]);
+        window._자료못옴  = () => Object.keys(window._자료옴).filter(k => !window._자료옴[k]);
+        window._자료늦음  = false;
+        window._자료막힘  = () => !window._자료다옴();     // 작업 단추를 막아야 하는가
+        window._자료왔다 = function (무엇) {
+            if (window._자료옴[무엇]) return;
+            window._자료옴[무엇] = true;
+            delete window._자료탈[무엇];
+            if (typeof renderProcessTimeline === 'function') renderProcessTimeline();
+        };
+        window._자료탈났다 = function (무엇, 까닭) {
+            window._자료탈[무엇] = String((까닭 && (까닭.code ||까닭.message)) || 까닭 || '못 받음');
+            if (typeof renderProcessTimeline === 'function') renderProcessTimeline();
+        };
+        // 언제까지나 '불러오는 중' 이어도 못 쓴다 — 오래 걸리면 못 받은 것으로 본다
+        setTimeout(() => {
+            if (window._자료다옴()) return;
+            window._자료늦음 = true;
+            if (typeof renderProcessTimeline === 'function') renderProcessTimeline();
+        }, 15000);
+
         function initCloudDataSync() {
             const { collection, query, onSnapshot } = window.fbFirestore;
             const appId = "vivivic-4b7ef";
@@ -2713,9 +2753,12 @@
                         // storagePath 없으면 fileName으로 경로 유도
                         const sp = latest.storagePath || (latest.fileName ? `artifacts/vivivic-4b7ef/excel_files/${latest.fileName}` : null);
                         loadCloudExcelData(latest.downloadURL, latest.fileName, sp);
+                        return;
                     }
                 }
-            });
+                // 올려 둔 원장이 아예 없다 — 기다릴 것이 없으니 '왔다' 로 친다
+                window._자료왔다('원장');
+            }, (err) => window._자료탈났다('원장', err));
         }
 
         // 알림 관리
@@ -2962,9 +3005,12 @@
                     renderPendingOrders();
                     renderID0508();
                     refreshConsolidatedMaterials();
+                    window._자료왔다('발주');
                     renderProcessTimeline();
                 }
+                window._자료왔다('발주');       // 비어 있어도 '다 받아 봤다' 는 것이다
             }, (err) => {
+                window._자료탈났다('발주', err);
                 console.error("Orders Sync Error:", err);
                 // Firebase 연결 실패 → 아이콘 비활성 (회색)
                 ['sync-icon-pending', 'sync-icon-ordered'].forEach(id => {
@@ -2990,8 +3036,9 @@
                         window._cuttingPlans[change.doc.id] = { ...change.doc.data(), planId: change.doc.id };
                     }
                 });
+                window._자료왔다('도면');
                 renderProcessTimeline();
-            }, (err) => console.error('Cutting Plans Sync Error:', err));
+            }, (err) => window._자료탈났다('도면', err) || console.error('Cutting Plans Sync Error:', err));
         }
 
         async function _persistCuttingPlan(plan) {
@@ -3713,6 +3760,7 @@
                 const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
                 if (jsonData.length > 0) {
                     currentFullData = jsonData;
+                    window._자료왔다('원장');       // 원장이 실제로 손에 들어온 자리
                     buildProductIdentities();
                     onSupplierChange();
                     renderID0508();
@@ -9183,7 +9231,10 @@
             const _wSafeCK   = _wck.replace(/'/g, "\\'");
             const _wDate    = stateKey.substring(0, 10);
             const _wStartCK = _partRecKey(_wobj?.partStarted, _wck, _wpk, _wOld).replace(/'/g, "\\'");
-            const _wPrereq  = _partPrereqDone(_wck, _wpk, _wComps);
+            // 자료를 다 못 받았으면 작업을 시작·완료하지 못하게 막는다 —
+            // 안 온 자료 없이 작업이 나가면 부속이 빠진 채로 재단이 나간다.
+            const _자료막힘 = (typeof window._자료막힘 === 'function') && window._자료막힘();
+            const _wPrereq  = !_자료막힘 && _partPrereqDone(_wck, _wpk, _wComps);
             const _wQI      = _partQtyInfo(_wComps, p.dq || 0);
             // 완료 등록 시 "사유 없이 등록 가능한 기준 수량" — 재단은 원장을 통짜로
             // 잘라 발주수량보다 더 나오는 게 정상(예: 발주 17개인데 원장 배치상
@@ -9432,7 +9483,9 @@
             const _bSafeCK    = _bck.replace(/'/g, "\\'");
             const _bDate     = sk.substring(0, 10);
             const _bStartCK = _partRecKey(_bobj?.partStarted, _bck, _bpk, _bOld).replace(/'/g, "\\'");
-            const _bPrereq = _partPrereqDone(_bck, _bpk, _bComps);
+            // 배치카드도 같다 — 자료를 다 못 받았으면 못 누른다
+            const _자료막힘2 = (typeof window._자료막힘 === 'function') && window._자료막힘();
+            const _bPrereq = !_자료막힘2 && _partPrereqDone(_bck, _bpk, _bComps);
             // 시작·완료는 현장에서 장갑 낀 손으로 누르는 자리다. 8px 글씨에
             // 1px 여백이면 눌리지 않는다 — 도면과 같은 폭(카드의 45%)으로 키워
             // 도면 아래에 나란히 세운다.
@@ -10617,9 +10670,10 @@
                         if (ch.type === 'removed') delete window._woBoardOrder[ch.doc.id];
                         else window._woBoardOrder[ch.doc.id] = ch.doc.data() || {};
                     });
+                    window._자료왔다('차례');
                     if (typeof renderProcessTimeline === 'function') renderProcessTimeline();
-                }, (err) => console.error('카드 차례 동기화 오류:', err));
-            } catch (err) { console.error('카드 차례 동기화 시작 실패:', err); }
+                }, (err) => window._자료탈났다('차례', err) || console.error('카드 차례 동기화 오류:', err));
+            } catch (err) { window._자료탈났다('차례', err); console.error('카드 차례 동기화 시작 실패:', err); }
         }
 
         async function _woSaveBoardOrder(sk) {
@@ -11947,6 +12001,39 @@
             // 데이터 없으면 빈 상태 안내 표시
             const container = document.getElementById('process-timeline-container');
             if (!container) return;
+            /* 자료가 다 오기 전에는 '비었다' 고 그리지 않는다.
+               예전에는 발주확정이 아직 안 왔을 때도 여기로 떨어져
+               「발주확정 버튼을 눌러주세요」 가 떴다 — 일이 있는데도 없어 보였다. */
+            if (typeof window._자료다옴 === 'function' && !window._자료다옴()) {
+                // 안내문으로 타임라인 자리를 덮으므로, 자료가 다 온 뒤에는 처음부터
+                // 다시 그려야 한다. 안 그러면 TL 이 '이미 그렸다' 고 여겨 안내문만 남는다.
+                try { if (typeof TL !== 'undefined' && Array.isArray(TL.renderedDates)) TL.renderedDates.length = 0; } catch (e) {}
+                const 못온 = window._자료못옴().map(k => window._자료이름[k] || k);
+                const 탈남 = Object.keys(window._자료탈 || {});
+                if (탈남.length || window._자료늦음) {
+                    container.innerHTML =
+                        '<div style="margin:16px;padding:18px 16px;border-radius:12px;background:#fdecea;border:1px solid #f5b5ae;text-align:center;">' +
+                        '<div style="font-size:15px;font-weight:900;color:#b3261e;line-height:1.4;">자료를 다 못 받았습니다</div>' +
+                        '<div style="margin-top:6px;font-size:12px;font-weight:700;color:#8c1d18;line-height:1.5;">못 받은 것 — ' + 못온.join(' · ') + '</div>' +
+                        '<div style="margin-top:6px;font-size:11.5px;font-weight:700;color:#8c1d18;line-height:1.5;">다 받기 전에는 시작·완료를 누를 수 없습니다.<br>안 온 자료 없이 작업이 나가면 안 되기 때문입니다.</div>' +
+                        '<button onclick="location.reload()" style="margin-top:12px;border:none;border-radius:9px;padding:11px 22px;background:#b3261e;color:#fff;font-size:14px;font-weight:900;cursor:pointer;">다시 받기</button>' +
+                        '</div>';
+                } else {
+                    container.innerHTML =
+                        '<div style="padding:40px 16px;text-align:center;font-size:13px;font-weight:800;color:#787774;line-height:1.6;">' +
+                        '자료를 불러오는 중입니다…' +
+                        '<div style="margin-top:6px;font-size:11.5px;font-weight:700;color:#b0aeaa;">기다리는 것 — ' + 못온.join(' · ') + '</div>' +
+                        '</div>';
+                }
+                container.dataset.자료안내 = '1';   // 안내문으로 덮어 둔 표
+                return;
+            }
+            // 자료가 다 왔다 — 덮어 뒀던 안내문을 걷고 처음부터 다시 그린다
+            if (container.dataset.자료안내 === '1') {
+                delete container.dataset.자료안내;
+                container.innerHTML = '';
+                try { if (typeof TL !== 'undefined' && Array.isArray(TL.renderedDates)) TL.renderedDates.length = 0; } catch (e) {}
+            }
             if (cards.length === 0) {
                 container.innerHTML = '<div style="padding:40px 16px;text-align:center;font-size:13px;font-weight:700;color:#b0aeaa;font-style:italic;">발주서 탭에서 항목을 선택 후<br>발주확정 버튼을 눌러주세요.</div>';
                 return;
