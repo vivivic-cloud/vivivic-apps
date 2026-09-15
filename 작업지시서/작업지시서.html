@@ -76,6 +76,9 @@ body.쪽함 .stage{margin-left:92px}
 /* 장마다 지우는 단추 — 불러온 자료가 장을 여럿 만들면 그 장을 바로 지운다 */
 .pagedel{position:absolute;right:0;bottom:-19px;border:1px solid var(--edge);background:#fff;
   color:var(--soft);border-radius:8px;padding:1px 7px;font:11px/1.7 inherit;cursor:pointer}
+/* 장마다 정렬 — 그 장만 가지런히 놓는다. 삭제 × 왼쪽에 둔다 */
+.pagefit{position:absolute;right:46px;bottom:-19px;border:1px solid var(--edge);background:#fff;
+  color:var(--muted);border-radius:8px;padding:1px 7px;font:11px/1.7 inherit;cursor:pointer}
 /* 줄여 보여 줄 때 자리가 밀리지 않게 왼쪽 위를 기준으로 줄인다 (가운데 기준이면
    줄인 만큼 오른쪽으로 밀려 종이가 화면 밖으로 나간다) */
 .sheet{position:relative;background:#fff;border:1px solid var(--line);
@@ -166,7 +169,7 @@ body.쪽함 .stage{margin-left:92px}
 @page{size:A4 portrait;margin:0}
 @media print{
   html,body{background:#fff}
-  .top,.tools,.hint,.sheetpad,.grip,.del,.pageno,.pagedel,.zone,.warn{display:none !important}
+  .top,.tools,.hint,.sheetpad,.grip,.del,.pageno,.pagedel,.pagefit,.zone,.warn{display:none !important}
   /* 작업대에서 손잡이를 달고 연 경우(?viggle=1) 떠 있는 것들. position:fixed 라
      인쇄하면 장마다 '길게 눌러 짚어서 지시' 가 박힌다 — 종이에 나올 것이 아니다.
      짚은 자리 표시(vg-mark)는 본문에 붙으므로 건드리지 않는다 */
@@ -333,7 +336,11 @@ function 그리기(){
     지움.type = 'button'; 지움.className = 'pagedel';
     지움.textContent = '삭제 ×';
     지움.addEventListener('click', e => { e.stopPropagation(); 장지우기(n); });
-    wrap.appendChild(sh); wrap.appendChild(no); wrap.appendChild(지움);
+    const 정렬 = document.createElement('button');
+    정렬.type = 'button'; 정렬.className = 'pagefit';
+    정렬.textContent = '정렬';
+    정렬.addEventListener('click', e => { e.stopPropagation(); 장정렬(n); });
+    wrap.appendChild(sh); wrap.appendChild(no); wrap.appendChild(정렬); wrap.appendChild(지움);
     무대.appendChild(wrap);
   });
   맞추기();
@@ -809,6 +816,46 @@ $('tidy').onclick = () => {
   문서.장들.splice(지금장, 1, ...새장들);
   저장(true); 그리기();
 };
+
+/* ── 장마다 정렬 ─────────────────────────────────────
+   그 장에 있는 것만 가지런히 놓는다. 지금 크기를 지킨다 — 폭이 넘치면
+   다음 줄로 내리고, 그래도 종이를 넘으면 그때만 모두 같은 비로 줄인다.
+   한 가지 비로 줄이므로 그림도 글상자도 모양이 안 깨진다.
+   인쇄를 생각해 가장자리 여백(10mm)은 늘 남긴다. 다른 장으로 넘기지 않는다. */
+function 장정렬(n){
+  const 것들 = (문서.장들[n] || []).slice();
+  if (!것들.length) return;
+  const [W, H] = 지금크기();
+  const 칸W = W - 여백 * 2, 칸H = H - 여백 * 2, 틈 = 4;
+  것들.sort((a, b) => (a.y - b.y) || (a.x - b.x));      // 지금 놓인 차례를 지킨다
+  const 줄들 = []; let 줄 = [], 폭 = 0;
+  것들.forEach(it => {
+    const w = Math.min(it.w, 칸W);
+    if (줄.length && 폭 + 틈 + w > 칸W){ 줄들.push({ 것: 줄, 폭 }); 줄 = []; 폭 = 0; }
+    폭 += (줄.length ? 틈 : 0) + w;
+    줄.push(it);
+  });
+  if (줄.length) 줄들.push({ 것: 줄, 폭 });
+  const 줄높 = 줄들.map(r => r.것.reduce((m, it) => Math.max(m, it.h), 0));
+  const 총높 = 줄높.reduce((a, b) => a + b, 0) + 틈 * (줄들.length - 1);
+  const k = 총높 > 칸H ? 칸H / 총높 : 1;               // 넘칠 때만 줄인다
+  let y = 여백 + (k === 1 ? Math.max(0, (칸H - 총높) / 2) : 0);
+  줄들.forEach((r, i) => {
+    const 이줄폭 = r.것.reduce((a, it) => a + Math.min(it.w, 칸W) * k, 0) + 틈 * k * (r.것.length - 1);
+    let x = 여백 + Math.max(0, (칸W - 이줄폭) / 2);     // 줄을 가운데로
+    const 이줄높 = 줄높[i] * k;
+    r.것.forEach(it => {
+      const w = Math.min(it.w, 칸W) * k, h = it.h * k;
+      it.w = w; it.h = h;
+      it.x = Math.max(0, Math.min(W - w, x));
+      it.y = Math.max(0, Math.min(H - h, y + (이줄높 - h) / 2));   // 줄 안에서 가운데
+      x += w + 틈 * k;
+    });
+    y += 이줄높 + 틈 * k;
+  });
+  지금장 = n; 고른것 = null;
+  저장(true); 그리기();
+}
 
 /* ── 앞뒤 · 크기 ────────────────────────────────────── */
 const 지금것 = () => 이장().find(x => x.id === 고른것);
