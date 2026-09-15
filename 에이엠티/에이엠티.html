@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.9.80 (2026-09-15) — 얹어도 되돌려도 저쪽 카드가 그 자리에서 따라온다
+     버전: v1.9.81 (2026-09-15) — 묶음은 한 발주 안에서만 — 남의 발주는 안 건드린다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2016,7 +2016,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.80</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.81</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2142,7 +2142,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.80</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.81</b></p>
         </div>
     </div>
 
@@ -3165,10 +3165,17 @@
             });
             if (!행.size) return;
             const 내번호 = String((새 && 새.confirmId) || '');
+            // 울타리는 '한 발주 안' 이다. 한 도면에 같이 앉은 것들이 한 묶음이고,
+            // 그 묶음은 같은 발주의 부속들이다. 발주번호(idNum)는 날마다 다시 쓰여
+            // 남의 발주 카드가 번호만 같다고 딸려 오면 안 된다.
+            const 내발주 = new Set([...(옛 ? [...(옛.pOrderIds||[]), ...(옛.sOrderIds||[]), ...(옛.tOrderIds||[])] : []),
+                                    ...(새 ? [...(새.pOrderIds||[]), ...(새.sOrderIds||[]), ...(새.tOrderIds||[])] : [])]);
             Object.values(window._cuttingPlans || {}).forEach(pl => {
                 if (!pl || String(pl.confirmId) === 내번호) return;
                 const n = parseInt(pl.pRowIndex, 10);
-                if (!isNaN(n) && 행.has(n)) _ensureCuttingPlanInTimeline(pl);
+                if (isNaN(n) || !행.has(n)) return;
+                if (내발주.size && !(pl.pOrderIds || []).some(id => 내발주.has(id))) return;
+                _ensureCuttingPlanInTimeline(pl);
             });
         }
 
