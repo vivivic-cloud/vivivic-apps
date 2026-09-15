@@ -200,20 +200,11 @@ body.쪽함 .stage{margin-left:92px}
     <input class="docname" id="docname" placeholder="지시서 이름" value="작업지시서">
     <button class="b go" id="print">인쇄 · PDF</button>
   </div>
+  <!-- 불러오기만 남긴다. 나머지 기능 단추는 뺐다(09-15 04:51 지시).
+       글상자·구분선·방향은 못 만들 뿐, 이미 있는 문서의 것은 그대로 산다. -->
   <div class="row two">
-    <div class="seg" id="orient">
-      <button data-o="p" class="on">세로</button>
-      <button data-o="l">가로</button>
-    </div>
     <button class="b" id="load">파일</button>
     <button class="b" id="loadimg">사진</button>
-    <button class="b" id="addtext">글상자</button>
-    <button class="b" id="addline">구분선</button>
-    <button class="b" id="tidy">자동 정렬</button>
-    <button class="b" id="addpage">장 추가</button>
-    <button class="b" id="delpage">이 장 지우기</button>
-    <button class="b" id="tray">쪽 목록</button>
-    <button class="b" id="docs">문서</button>
   </div>
 </div>
 
@@ -270,7 +261,6 @@ PDF·PPT 를 불러오면 <b>한 장이 한 쪽</b>이 됩니다. 비율은 원�
 <input type="file" id="file" multiple accept="application/pdf,.pdf,.ppt,.pptx" hidden>
 <input type="file" id="fileimg" multiple accept="image/*" hidden>
 
-<div class="sheetpad" id="pad"><div class="card" id="padbody"></div></div>
 
 <script src="../shared/viggle.js"></script>
 <script>
@@ -350,8 +340,9 @@ function 그리기(){
     wrap.appendChild(sh); wrap.appendChild(no); wrap.appendChild(정렬); wrap.appendChild(지움);
     무대.appendChild(wrap);
   });
-  맞추기();
+  // 쪽 목록을 먼저 여닫는다 — 무대 너비가 달라지므로 맞추기() 는 그 뒤여야 한다
   쪽함그리기();
+  맞추기();
 }
 /* 종이를 세로 넷 × 가로 셋으로 나눠 둔다. 자리 이름과 mm 자리를 함께 적어
    두어, 짚어서 지시할 때 "2장 위 왼쪽 35,37mm" 처럼 어디인지가 실린다. */
@@ -814,13 +805,6 @@ function 글넣기(글){
            x: 여백, y: 다음y(), w: W - 여백 * 2, h: 16, 크기: 4, z: 다음z() });
 }
 
-$('addtext').onclick = () => { 글넣기(); 저장(); 그리기(); };
-$('addline').onclick = () => {
-  const [W] = 지금크기();
-  더하기({ id: 새id(), 종류: 'line', x: 여백, y: 다음y(), w: W - 여백 * 2, h: 0.4, z: 다음z() });
-  저장(); 그리기();
-};
-$('addpage').onclick = () => { 문서.장들.push([]); 지금장 = 문서.장들.length - 1; 고른것 = null; 저장(); 그리기(); };
 /* 어느 장이든 지운다. 물음은 두 갈래 모두에 건다 — 예전엔 else 안에만 있어서
    한 장짜리 문서는 아무것도 안 묻고 통째로 비워졌다 */
 function 장지우기(n){
@@ -833,27 +817,6 @@ function 장지우기(n){
   }
   고른것 = null; 저장(true); 그리기();
 }
-$('delpage').onclick = () => 장지우기(지금장);
-
-/* ── 자동 정렬 — 이 장만 위에서부터 차곡차곡 ─────────── */
-$('tidy').onclick = () => {
-  const [W, H] = 지금크기();
-  const 줄선것 = 이장().slice().sort((a, b) => (a.y - b.y) || (a.x - b.x));
-  let y = 여백 + 2, 담을곳 = [];
-  const 새장들 = [담을곳];
-  줄선것.forEach(it => {
-    const 비 = it.h / it.w;
-    it.x = 여백;
-    it.w = Math.min(it.종류 === 'img' ? it.w : W - 여백 * 2, W - 여백 * 2);
-    if (it.종류 === 'img') it.h = it.w * 비;
-    // 종이 밖으로 밀려나면 보이지도 지우지도 못한다 — 새 장으로 넘긴다
-    if (y + it.h > H - 여백 && 담을곳.length){ 담을곳 = []; 새장들.push(담을곳); y = 여백 + 2; }
-    it.y = y; 담을곳.push(it);
-    y += it.h + 5;
-  });
-  문서.장들.splice(지금장, 1, ...새장들);
-  저장(true); 그리기();
-};
 
 /* ── 장마다 정렬 ─────────────────────────────────────
    그 장에 있는 것만 가지런히 놓는다. 지금 크기를 지킨다 — 폭이 넘치면
@@ -1171,12 +1134,12 @@ let 고른쪽 = [];
 function 쪽함그리기(){
   const 함 = $('traybox');
   const 있다 = (문서.쪽함 || []).length > 0;
-  $('tray').classList.toggle('on', document.body.classList.contains('쪽함'));
-  if (!document.body.classList.contains('쪽함')){ 함.innerHTML = ''; return; }
+  // 여닫는 단추를 뺐으므로 스스로 여닫는다 — 쌓인 것이 있으면 펼치고,
+  // 비면 접는다. 접혔을 때 캔버스 너비는 단추가 있던 때와 똑같다.
+  document.body.classList.toggle('쪽함', 있다);
+  if (!있다){ 함.innerHTML = ''; return; }
   함.style.top = (document.querySelector('.top').offsetHeight) + 'px';
   함.style.bottom = '0';
-  if (!있다){ 함.innerHTML = '<div class="tt">쪽 목록</div>'
-    + '<div class="none">파일·사진을<br>불러오면<br>여기에 쌓입니다</div>'; return; }
   함.innerHTML = '<div class="tt">쪽 목록 ' + 문서.쪽함.length + '</div>';
   문서.쪽함.forEach((p2, i) => {
     const d = document.createElement('div');
@@ -1269,27 +1232,8 @@ function 놓기(장번호, 것들){
   저장(true); 그리기();
 }
 
-$('tray').onclick = () => {
-  document.body.classList.toggle('쪽함');
-  쪽함그리기(); 맞추기();
-};
-
-/* ── 방향 ───────────────────────────────────────────── */
-$('orient').addEventListener('click', e => {
-  const b = e.target.closest('[data-o]'); if (!b) return;
-  문서.방향 = b.dataset.o;
-  document.querySelectorAll('#orient button').forEach(x => x.classList.toggle('on', x === b));
-  적용된인쇄방향();
-  const [W, H] = 지금크기();
-  문서.장들.forEach(것들 => 것들.forEach(it => {       // 종이 밖으로 나간 것은 끌어들인다
-    const 비 = it.h / it.w;
-    if (it.w > W - 4){ it.w = W - 4; if (it.종류 === 'img') it.h = it.w * 비; }
-    if (it.h > H - 4){ it.h = H - 4; if (it.종류 === 'img') it.w = it.h / 비; }
-    it.x = Math.max(0, Math.min(W - it.w, it.x));
-    it.y = Math.max(0, Math.min(H - it.h, it.y));
-  }));
-  저장(); 그리기();
-});
+/* 방향(세로·가로) 고르는 단추는 뺐다. 이미 저장된 문서의 방향은 그대로
+   읽어 쓴다 — 적용된인쇄방향() 이 문서.방향 을 보고 인쇄 용지를 맞춘다. */
 
 /* @page 는 CSS 라 자바스크립트로 바꿔 끼운다 — 인쇄 용지 방향이 맞아야 한다 */
 const 인쇄스타일 = document.createElement('style');
@@ -1419,44 +1363,9 @@ function 문서목록(){
   try { return JSON.parse(localStorage.getItem(칸 + '목록') || '{}'); } catch (e){ return {}; }
 }
 
-$('docs').onclick = () => {
-  const 목록 = Object.entries(문서목록()).sort((a, b) => b[1].잰때 - a[1].잰때);
-  $('padbody').innerHTML =
-    '<h4>지시서</h4><div class="docs">' +
-      '<button data-new="1"><span>+ 새 지시서</span></button>' +
-      목록.map(([n, m]) => '<button data-open="' + n.replace(/"/g, '&quot;') + '"><span>' +
-        n.replace(/</g, '&lt;') + '</span><span class="when">' + 언제(m.잰때) +
-        ' <i data-del="' + n.replace(/"/g, '&quot;') + '" style="font-style:normal;padding:0 6px;color:var(--soft)">×</i></span></button>').join('') +
-    '</div>';
-  $('pad').classList.add('on');
-};
-$('pad').onclick = e => {
-  if (e.target === $('pad')) return $('pad').classList.remove('on');
-  const x = e.target.closest('[data-del]');
-  if (x){
-    e.stopPropagation();
-    if (!confirm(`"${x.dataset.del}" 지시서를 지웁니다. 되돌릴 수 없습니다.`)) return;
-    문서지우기(x.dataset.del);
-    if (문서.이름 === x.dataset.del){ 문서 = 새문서(); 저장된이름 = null; 지금장 = 0;
-                                     $('docname').value = 문서.이름; 그리기(); }
-    $('docs').click();                       // 목록 다시 그리기
-    return;
-  }
-  const n = e.target.closest('[data-new]'), o = e.target.closest('[data-open]');
-  if (n){ 문서 = 새문서(); 지금장 = 0; 고른것 = null; 저장된이름 = null; $('docname').value = 문서.이름;
-          적용된인쇄방향(); 저장(); 그리기(); $('pad').classList.remove('on'); }
-  if (o){
-    try { 문서 = 손질(JSON.parse(localStorage.getItem(칸 + '문서.' + o.dataset.open))); } catch (e){ return; }
-    지금장 = 0; 고른것 = null; $('docname').value = 문서.이름; 저장된이름 = 문서.이름;
-    저장못함(false);
-    document.querySelectorAll('#orient button').forEach(x => x.classList.toggle('on', x.dataset.o === 문서.방향));
-    적용된인쇄방향(); 그리기(); $('pad').classList.remove('on');
-  }
-};
-function 언제(t){
-  const d = new Date(t), z = n => String(n).padStart(2, '0');
-  return z(d.getMonth() + 1) + '.' + z(d.getDate()) + ' ' + z(d.getHours()) + ':' + z(d.getMinutes());
-}
+/* 「문서」 판(지시서 목록·새 지시서)은 뺐다. 저장은 그대로 돈다 —
+   저장()·문서목록()·문서지우기() 는 살아 있고, 저장해 둔 지시서도
+   하나도 안 지웠다. 이름칸으로 이름을 바꾸는 길도 그대로다. */
 
 /* ── 시작 ───────────────────────────────────────────── */
 try {
@@ -1468,7 +1377,6 @@ try {
   저장된이름 = 문서.이름;
 } catch (e){ 문서 = 새문서(); }
 $('docname').value = 문서.이름 || '작업지시서';
-document.querySelectorAll('#orient button').forEach(x => x.classList.toggle('on', x.dataset.o === 문서.방향));
 적용된인쇄방향();
 if (!문서.장들.some(장 => 장.length)){
   글넣기('작업지시서');
