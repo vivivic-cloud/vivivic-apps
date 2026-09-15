@@ -68,7 +68,8 @@ body.쪽함 .stage{margin-left:92px}
 .sheet.받는곳{outline:2px dashed var(--ink);outline-offset:-4px}
 /* 크기를 맞출 때 옆 것에 걸리면, 그 자료의 모서리에 잠깐 선을 긋는다.
    걸려 있는 동안만 보이고 손을 떼면 사라진다 */
-.guide{position:absolute;z-index:40;pointer-events:none;background:var(--red)}
+/* 고른 것이 잠깐 z 900 으로 올라가므로, 줄은 그보다 위에 있어야 가린다 */
+.guide{position:absolute;z-index:1000;pointer-events:none;background:var(--red)}
 .wrap{position:relative;margin-inline:auto}
 .wrap.now .sheet{border-color:var(--ink)}
 .pageno{position:absolute;left:0;right:0;bottom:-15px;text-align:center;font-size:11px;
@@ -172,7 +173,8 @@ body.쪽함 .stage{margin-left:92px}
 @page{size:A4 portrait;margin:0}
 @media print{
   html,body{background:#fff}
-  .top,.tools,.hint,.sheetpad,.grip,.del,.pageno,.pagedel,.pagefit,.zone,.warn{display:none !important}
+  .top,.tools,.hint,.sheetpad,.grip,.del,.pageno,.pagedel,.pagefit,.zone,.warn,
+  .guide{display:none !important}
   /* 작업대에서 손잡이를 달고 연 경우(?viggle=1) 떠 있는 것들. position:fixed 라
      인쇄하면 장마다 '길게 눌러 짚어서 지시' 가 박힌다 — 종이에 나올 것이 아니다.
      짚은 자리 표시(vg-mark)는 본문에 붙으므로 건드리지 않는다 */
@@ -643,14 +645,33 @@ function 걸어보기(it, sh, W, H, 비){
     if (ow){ it.w = ow.w; 걸린것.push({ o: ow, 무엇: 'w' }); }
     if (oh){ it.h = oh.h; 걸린것.push({ o: oh, 무엇: 'h' }); }
   }
+  // 줄을 둘 긋는다 — 맞춰진 상대 쪽 하나, 지금 끌고 있는 것 쪽 하나.
+  // 길이가 같아 보이는 것이 핵심이라, 둘 다 제 상자의 같은 모서리에 긋고
+  // 양 끝에 짧은 마감 눈금을 단다. 글자·숫자는 안 쓴다.
   걸린것.forEach(({ o, 무엇 }) => {
+    줄긋기(sh, o, 무엇);
+    줄긋기(sh, it, 무엇);
+  });
+}
+/* 한 자료의 한 모서리에 줄 하나와 양 끝 눈금 둘 */
+const 눈금 = 2, 굵기 = 0.6;
+function 줄긋기(sh, o, 무엇){
+  const 대기 = (l, t, w, h) => {
     const g = document.createElement('div');
     g.className = 'guide';
-    g.style.left = mm(o.x); g.style.top = mm(o.y);
-    if (무엇 === 'w'){ g.style.width = mm(o.w); g.style.height = '0.6mm'; }
-    else { g.style.width = '0.6mm'; g.style.height = mm(o.h); }
+    g.style.left = mm(l); g.style.top = mm(t);
+    g.style.width = mm(w); g.style.height = mm(h);
     sh.appendChild(g);
-  });
+  };
+  if (무엇 === 'w'){                                   // 가로 길이를 맞췄다 — 위 모서리에
+    대기(o.x, o.y, o.w, 굵기);
+    대기(o.x, o.y - 눈금 / 2 + 굵기 / 2, 굵기, 눈금);          // 왼 끝 눈금
+    대기(o.x + o.w - 굵기, o.y - 눈금 / 2 + 굵기 / 2, 굵기, 눈금); // 오른 끝 눈금
+  } else {                                             // 세로 길이를 맞췄다 — 왼 모서리에
+    대기(o.x, o.y, 굵기, o.h);
+    대기(o.x - 눈금 / 2 + 굵기 / 2, o.y, 눈금, 굵기);
+    대기(o.x - 눈금 / 2 + 굵기 / 2, o.y + o.h - 굵기, 눈금, 굵기);
+  }
 }
 
 /* ── 화면에 맞춰 줄이기 ─────────────────────────────── */
