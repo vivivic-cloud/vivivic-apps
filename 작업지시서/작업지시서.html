@@ -66,6 +66,9 @@ body.쪽함 .stage{margin-left:92px}
 .ghost .cnt{position:absolute;right:0;bottom:0;background:var(--ink);color:#fff;font-size:11px;
   font-weight:700;padding:1px 6px;border-radius:8px 0 0 0}
 .sheet.받는곳{outline:2px dashed var(--ink);outline-offset:-4px}
+/* 크기를 맞출 때 옆 것에 걸리면, 그 자료의 모서리에 잠깐 선을 긋는다.
+   걸려 있는 동안만 보이고 손을 떼면 사라진다 */
+.guide{position:absolute;z-index:40;pointer-events:none;background:var(--red)}
 .wrap{position:relative;margin-inline:auto}
 .wrap.now .sheet{border-color:var(--ink)}
 .pageno{position:absolute;left:0;right:0;bottom:-15px;text-align:center;font-size:11px;
@@ -533,6 +536,7 @@ function 끌기(el, it, 무엇, sh){
       // 그림은 비율을 지킨다 — 늘리면 찌그러진다
       it.h = it.종류 === 'img' ? Math.min(H - it.y, it.w * 시작.비)
                                : Math.max(6, Math.min(H - it.y, 시작.ih + dy));
+      걸어보기(it, 현재sh, W, H, 시작.비);
     }
     const box = 현재sh.querySelector('[data-id="' + it.id + '"]');
     if (box){ box.style.left = mm(it.x); box.style.top = mm(it.y);
@@ -543,10 +547,59 @@ function 끌기(el, it, 무엇, sh){
     document.removeEventListener('pointermove', 움직임);
     document.removeEventListener('pointerup', 끝);
     document.removeEventListener('pointercancel', 끝);
+    길잡이지우기();                      // 손을 떼면 선은 반드시 사라진다
     if (!시작) return;
     시작 = null; 저장();
     if (장바뀜){ 장바뀜 = false; 고른것 = it.id; 그리기(); }
   }
+}
+
+/* ── 크기 맞출 때 옆 것에 한 번씩 걸리기 ─────────────────
+   같은 장에 있는 다른 자료의 너비·높이에 걸린다. 자기 자신은 뺀다.
+   걸리는 폭은 화면에서 늘 같아야 한다 — 화면 6px 을 mm 로 바꿔 쓴다.
+   (배율 1.0 이면 1.59mm, 0.44 이면 3.60mm 다. 종이 위 거리는 달라도
+    손가락이 느끼는 거리는 6px 로 같다.) */
+const 걸림px = 6;
+function 길잡이지우기(){
+  무대.querySelectorAll('.guide').forEach(g => g.remove());
+}
+function 걸어보기(it, sh, W, H, 비){
+  길잡이지우기();
+  const 남들 = (문서.장들[+sh.dataset.p] || []).filter(x => x !== it);
+  if (!남들.length) return;
+  const 붙임 = 걸림px / 배율 / px1mm;
+  const 걸린것 = [];
+  if (it.종류 === 'img'){
+    // 비율이 잠겨 있다. 너비로 걸거나, 남의 높이에 맞는 너비를 거꾸로 셈해 건다.
+    let 가깝 = 붙임, 고른 = null;
+    남들.forEach(o => {
+      const 재보기 = (값, 무엇) => {
+        if (!(값 >= 8) || 값 > W - it.x) return;          // 종이를 넘으면 안 건다
+        if (값 * 비 > H - it.y) return;
+        const 차 = Math.abs(it.w - 값);
+        if (차 < 가깝){ 가깝 = 차; 고른 = { o, 무엇, 값 }; }
+      };
+      재보기(o.w, 'w');
+      if (o.h >= 2) 재보기(o.h / 비, 'h');
+    });
+    if (고른){ it.w = 고른.값; it.h = it.w * 비; 걸린것.push(고른); }
+  } else {
+    let 가w = 붙임, 가h = 붙임, ow = null, oh = null;
+    남들.forEach(o => {
+      if (o.w >= 8 && o.w <= W - it.x && Math.abs(it.w - o.w) < 가w){ 가w = Math.abs(it.w - o.w); ow = o; }
+      if (o.h >= 6 && o.h <= H - it.y && Math.abs(it.h - o.h) < 가h){ 가h = Math.abs(it.h - o.h); oh = o; }
+    });
+    if (ow){ it.w = ow.w; 걸린것.push({ o: ow, 무엇: 'w' }); }
+    if (oh){ it.h = oh.h; 걸린것.push({ o: oh, 무엇: 'h' }); }
+  }
+  걸린것.forEach(({ o, 무엇 }) => {
+    const g = document.createElement('div');
+    g.className = 'guide';
+    g.style.left = mm(o.x); g.style.top = mm(o.y);
+    if (무엇 === 'w'){ g.style.width = mm(o.w); g.style.height = '0.6mm'; }
+    else { g.style.width = '0.6mm'; g.style.height = mm(o.h); }
+    sh.appendChild(g);
+  });
 }
 
 /* ── 화면에 맞춰 줄이기 ─────────────────────────────── */
