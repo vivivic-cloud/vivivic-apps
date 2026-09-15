@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.9.79 (2026-09-15) — 자를 것이 없는 카드는 완료로 보이고 잠근다 (기록은 안 쓴다)
+     버전: v1.9.80 (2026-09-15) — 얹어도 되돌려도 저쪽 카드가 그 자리에서 따라온다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2016,7 +2016,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.79</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.80</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2142,7 +2142,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.79</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.80</b></p>
         </div>
     </div>
 
@@ -3146,6 +3146,30 @@
                 });
             });
             return { 수: 합, 곳: 곳들.join('·') };
+        }
+
+        /* 자투리에 얹거나 뺀 부속의 '제 도면' 카드를 그 자리에서 다시 센다.
+           얹기와 되돌리기가 같은 길을 쓰게 하려는 것이다 — 얹을 때만 다시 세면
+           되돌려도 저쪽 카드가 잠긴 채 남는다(새로고침해야 풀렸다).
+           옛 모습과 새 모습의 자투리 자리를 둘 다 본다. 뺀 자리는 새 계획에는
+           이미 없어서, 새 것만 보면 되살릴 카드를 못 찾는다.
+           화면을 통째로 다시 그리지 않는다 — 그 행을 1순위로 쓰는 도면만 다시 센다. */
+        function _곁가지쪽다시(옛, 새) {
+            const 행 = new Set();
+            [옛, 새].forEach(pl => {
+                if (!pl) return;
+                ['sRowIndex', 'tRowIndex'].forEach(k => {
+                    const n = parseInt(pl[k], 10);
+                    if (!isNaN(n)) 행.add(n);
+                });
+            });
+            if (!행.size) return;
+            const 내번호 = String((새 && 새.confirmId) || '');
+            Object.values(window._cuttingPlans || {}).forEach(pl => {
+                if (!pl || String(pl.confirmId) === 내번호) return;
+                const n = parseInt(pl.pRowIndex, 10);
+                if (!isNaN(n) && 행.has(n)) _ensureCuttingPlanInTimeline(pl);
+            });
         }
 
         // 필요수량이 저장해 둔 값과 달라졌으면(=발주가 지워졌거나 바뀌었으면)
@@ -12828,9 +12852,15 @@
             // Firestore 반영(onSnapshot)은 비동기라 그 전에 재단 보드가 다시 렌더되면
             // window._cuttingPlans의 예전 값으로 방금 한 수정이 되돌아갈 수 있음 —
             // 즉시 로컬에도 반영해 그 사이 공백을 없앰
+            const _옛계획 = window._cuttingPlans[String(confirmId)];   // 바꾸기 전 모습 — 뺀 자리를 알기 위해
             window._cuttingPlans[String(confirmId)] = cuttingData;
             _persistCuttingPlan(cuttingData);
             _ensureCuttingPlanInTimeline(cuttingData);
+            // 자투리에 얹거나 뺀 부속의 '제 도면' 카드도 그 자리에서 같이 다시 센다.
+            // 여기서 이 도면 하나만 다시 세면 얹을 때만 맞고 뺄 때는 안 맞는다 —
+            // 되돌려도 저쪽 카드가 잠긴 채 남아, 새로고침해야 풀렸다. 편집 중에
+            // 화면이 사실을 안 보여 주면 잘못 보고 또 편집해 꼬인다.
+            _곁가지쪽다시(_옛계획, cuttingData);
             renderProcessTimeline();
             if (pAgg.dataset.isCommon !== "true") pAgg.dataset.qty = parseFloat(pAgg.dataset.qty) - currentProducedQtyPrimary;
             if (sAgg && sAgg.dataset.isCommon !== "true") sAgg.dataset.qty = parseFloat(sAgg.dataset.qty) - currentProducedQtySecondary;
