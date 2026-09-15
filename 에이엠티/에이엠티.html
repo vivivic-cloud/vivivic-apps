@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.9.81 (2026-09-15) — 묶음은 한 발주 안에서만 — 남의 발주는 안 건드린다
+     버전: v1.9.82 (2026-09-15) — 「다른카드에 편집중」 · 그 도면이 잘리면 같이 완료
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2016,7 +2016,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.81</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.82</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2142,7 +2142,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.81</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.82</b></p>
         </div>
     </div>
 
@@ -3115,7 +3115,7 @@
 
            되돌림: { 수: 개수, 곳: '이동선반L' }  — 근거를 카드에 적기 위함 */
         function _곁가지받은(plan, 살아있는) {
-            const 없음 = { 수: 0, 곳: '' };
+            const 없음 = { 수: 0, 곳: '', 도면: [] };
             if (!plan || plan.pRowIndex == null) return 없음;
             const 내행 = parseInt(plan.pRowIndex, 10);
             if (isNaN(내행)) return 없음;
@@ -3123,7 +3123,7 @@
             if (!내키.size) return 없음;
             const 내번호 = String(plan.confirmId);
             const h = currentFullData[0];
-            let 합 = 0; const 곳들 = [];
+            let 합 = 0; const 곳들 = []; const 도면들 = [];
             Object.values(window._cuttingPlans || {}).forEach(pl => {
                 if (!pl || String(pl.confirmId) === 내번호) return;
                 // 서로 상대의 1순위를 자투리로 내주는 두 도면이 맞물리면 둘 다 0이 되어
@@ -3143,9 +3143,33 @@
                     const 줄 = (h && !isNaN(저쪽1)) ? currentFullData[저쪽1] : null;
                     const 이름 = 줄 ? (줄[h.indexOf('부속명')] || '') : '';
                     if (이름 && 곳들.indexOf(이름) < 0) 곳들.push(이름);
+                    const 번 = String(pl.confirmId);
+                    if (도면들.indexOf(번) < 0) 도면들.push(번);
                 });
             });
-            return { 수: 합, 곳: 곳들.join('·') };
+            return { 수: 합, 곳: 곳들.join('·'), 도면: 도면들 };
+        }
+
+        /* 이 재단도면이 실제로 잘렸는가(재단 완료로 찍혔는가).
+           카드가 그려질 때마다 그때그때 본다 — 미리 적어 두면 저쪽 완료를
+           취소했을 때 이쪽이 완료인 채로 굳는다. 앞에서 겪은 그 탈이다. */
+        function _도면완료됨(confirmId) {
+            const ck = 'cut_' + String(confirmId);
+            let 됨 = false;
+            Object.keys(window._woBoringParts || {}).forEach(sk => {
+                if (됨 || !/-재단$/.test(sk)) return;
+                const p = (window._woBoringParts[sk] || []).find(x => x.cKey === ck);
+                if (p && _woCutCardDone(p, ck, sk)) 됨 = true;
+            });
+            return 됨;
+        }
+
+        /* 나를 내주고 있는 도면들이 다 잘렸는가. 다 잘렸으면 내 몫도 그때 나온 것이니
+           이 카드도 완료다. 하나라도 안 잘렸으면 아직 '다른카드에 편집중' 이다.
+           따로 완료 기록을 쓰지 않는다 — 저쪽을 되돌리면 이쪽도 그 자리에서 풀린다. */
+        function _곁가지도면완료(p) {
+            const 들 = (p && p.받은도면) || [];
+            return 들.length > 0 && 들.every(id => _도면완료됨(id));
         }
 
         /* 자투리에 얹거나 뺀 부속의 '제 도면' 카드를 그 자리에서 다시 센다.
@@ -3415,6 +3439,7 @@
                 sheets: _자를몫 <= 0 ? 0 : _살아있는장수(plan, _자를몫),
                 받은몫: _받은.수,          // 다른 도면에서 이미 나오는 개수
                 받은곳: _받은.곳,          // 어느 부속 도면에서 왔는지 (사장님이 근거를 보시게)
+                받은도면: _받은.도면,      // 그 도면의 번호 — 다 잘렸는지 카드 그릴 때마다 본다
                 isCuttingCard: true,
                 perSheet: plan.perSheet || 0,
                 // 함께 앉힌 부속(2·3순위) — 카드에 이름과 치수를 적는다
@@ -9180,10 +9205,13 @@
                다시 살아나야 하는데 기록을 써 버리면 완료인 채로 굳는다.
                셈에서 나온 상태라 화면에서만 산다. */
             const _곁다참 = p.isCuttingCard && (p.받은몫 > 0) && !(p.sheets > 0) && !_wDone;
-            const _wDoneHtml = _곁다참
-                ? `<div style="${_w줄}"><span style="${_w칸}background:#e8f7ee;color:#16a34a;">✓ 완료 — ${p.받은곳 || '다른'} 도면에서 다 나옴</span></div>`
-                : _wDone
+            // 저쪽 도면이 실제로 잘렸으면 이 몫도 그때 나온 것이다 — 그때는 다른 카드와
+            // 똑같은 모양으로 완료가 된다. 아직이면 완료가 아니라 '다른카드에 편집중' 이다.
+            const _곁잘림 = _곁다참 && _곁가지도면완료(p);
+            const _wDoneHtml = (_wDone || _곁잘림)
                 ? `<div style="${_w줄}"><span style="${_w칸}background:#e8f7ee;color:#16a34a;">✓ 완료${_wActMin != null ? ` <span style="font-size:11px;font-weight:700;opacity:.75;">${_wActMin.toFixed(1)}분</span>` : ''}</span></div>`
+                : _곁다참
+                ? `<div style="${_w줄}"><span style="${_w칸}background:#fdf3e3;color:#8a5a1c;">다른카드에 편집중 — ${p.받은곳 || '다른'} 도면</span></div>`
                 : _wPrereq
                     ? _wStarted
                         ? `<div style="${_w줄}"><button onclick="event.stopPropagation();tlShowPartDoneConfirm('${_wSafeDocId}','${_wSafeCK}','${_wpk}','${_wDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}',${_wDoneQtyBasis},'${_wStartCK}')" onmousedown="event.stopPropagation()" style="${_w칸}background:#22c55e;">완료</button></div>`
@@ -9416,12 +9444,14 @@
             const _bDoneQtyHtml = Number.isFinite(_bDoneQty) && _bDoneQty > 0
                 ? `<span style="flex:1;min-width:0;text-align:left;font-size:22px;font-weight:900;color:#16a34a;line-height:1.1;letter-spacing:-0.5px;white-space:nowrap;">${Math.round(_bDoneQty)}<span style="font-size:11px;font-weight:800;margin-left:2px;">EA</span></span>`
                 : '<span style="flex:1;"></span>';
-            // 배치카드도 같다 — 자를 것이 없으면 완료로 보이고 잠근다. 기록은 안 쓴다.
+            // 배치카드도 같다 — 자를 것이 없으면 잠근다. 기록은 안 쓴다.
+            // 저쪽 도면이 잘리기 전까지는 완료가 아니라 '다른카드에 편집중' 이다.
             const _곁다참2 = p.isCuttingCard && (p.받은몫 > 0) && !(p.sheets > 0) && !_bDone;
-            const _bDoneHtml  = _곁다참2
-                ? `<div style="${_b줄}"><span style="${_b칸}background:#e8f7ee;color:#16a34a;padding:8px 0;">✓ 완료 — ${p.받은곳 || '다른'} 도면에서 다 나옴</span></div>`
-                : _bDone
+            const _곁잘림2 = _곁다참2 && _곁가지도면완료(p);
+            const _bDoneHtml  = (_bDone || _곁잘림2)
                 ? `<div style="${_b줄}display:flex;align-items:center;gap:8px;">${_bDoneQtyHtml}<span style="${_b칸}background:#e8f7ee;color:#16a34a;padding:8px 0;flex:0 0 45%;">✓ 완료${_bActMin != null ? ` <span style="font-size:11px;font-weight:700;opacity:.75;">${_bActMin.toFixed(1)}분</span>` : ''}</span></div>`
+                : _곁다참2
+                ? `<div style="${_b줄}"><span style="${_b칸}background:#fdf3e3;color:#8a5a1c;padding:8px 0;">다른카드에 편집중 — ${p.받은곳 || '다른'} 도면</span></div>`
                 : _bPrereq
                     ? _bStarted
                         ? `<div style="${_b줄}"><button onclick="event.stopPropagation();tlShowPartDoneConfirm('${_bSafeDocId}','${_bSafeCK}','${_bpk}','${_bDate}',this,'${(p.nm||'').replace(/'/g,"\\'")}',${_bDoneQtyBasis},'${_bStartCK}')" onmousedown="event.stopPropagation()" style="${_b칸}background:#22c55e;">완료</button></div>`
