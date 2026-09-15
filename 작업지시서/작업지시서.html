@@ -42,6 +42,30 @@ button,input,textarea,select{font:inherit;color:inherit}
    왼쪽 붙이기로 두고 .wrap 의 auto 여백으로 가운데를 맞춘다 */
 .stage{padding:14px 12px 120px;overflow-x:auto;display:flex;flex-direction:column;
   align-items:flex-start;gap:18px}
+/* ── 쪽 목록 — 불러온 것을 왼쪽에 쌓아 두고 끌어다 캔버스에 놓는다 ──
+   닫으면 무대에 아무 것도 더하지 않는다 — 캔버스 너비가 지금 그대로다 */
+.tray{position:fixed;left:0;z-index:35;width:92px;background:#fff;border-right:1px solid var(--line);
+  overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px 8px 120px;display:none}
+body.쪽함 .tray{display:block}
+body.쪽함 .stage{margin-left:92px}
+.tray .tt{font-size:11px;font-weight:700;color:var(--muted);margin:0 0 6px;text-align:center}
+/* pan-y 로 두면 위아래로는 목록이 스크롤되고, 옆으로 끌면 끌기가 된다.
+   none 으로 막으면 손가락으로 목록을 넘길 수가 없다 */
+.tray .pg{position:relative;width:100%;margin:0 0 8px;border:1px solid var(--edge);border-radius:8px;
+  background:var(--fill);overflow:hidden;touch-action:pan-y;cursor:grab}
+.tray .pg img{width:100%;display:block;pointer-events:none}
+.tray .pg.on{border-color:var(--ink);box-shadow:0 0 0 2px var(--ink)}
+.tray .pg .no{position:absolute;left:3px;top:3px;min-width:16px;height:16px;border-radius:8px;
+  background:rgba(17,17,16,.72);color:#fff;font-size:10px;font-weight:700;line-height:16px;
+  text-align:center;padding:0 4px}
+.tray .none{font-size:11px;color:var(--soft);text-align:center;padding:14px 4px;line-height:1.5}
+/* 끌고 다니는 동안 손가락을 따라다니는 그림자 */
+.ghost{position:fixed;z-index:70;pointer-events:none;opacity:.85;border:1px solid var(--ink);
+  border-radius:8px;overflow:hidden;background:#fff;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+.ghost img{width:100%;display:block}
+.ghost .cnt{position:absolute;right:0;bottom:0;background:var(--ink);color:#fff;font-size:11px;
+  font-weight:700;padding:1px 6px;border-radius:8px 0 0 0}
+.sheet.받는곳{outline:2px dashed var(--ink);outline-offset:-4px}
 .wrap{position:relative;margin-inline:auto}
 .wrap.now .sheet{border-color:var(--ink)}
 .pageno{position:absolute;left:0;right:0;bottom:-15px;text-align:center;font-size:11px;
@@ -143,7 +167,8 @@ button,input,textarea,select{font:inherit;color:inherit}
   /* 작업대에서 손잡이를 달고 연 경우(?viggle=1) 떠 있는 것들. position:fixed 라
      인쇄하면 장마다 '길게 눌러 짚어서 지시' 가 박힌다 — 종이에 나올 것이 아니다.
      짚은 자리 표시(vg-mark)는 본문에 붙으므로 건드리지 않는다 */
-  .vg-hint,.vg-toast,.vg-sheet,.cropbar,.croplayer{display:none !important}
+  .vg-hint,.vg-toast,.vg-sheet,.cropbar,.croplayer,.tray,.ghost{display:none !important}
+  body.쪽함 .stage{margin-left:0 !important}
   /* 무대는 화면에서 가로로 밀어 보는 칸이다. 그대로 두면 웹킷이 인쇄할 때
      보이는 만큼만 남기고 잘라 낸다 — 뒷장이 통째로 빠진다 */
   .stage{padding:0;display:block;gap:0;overflow:visible !important}
@@ -178,9 +203,13 @@ button,input,textarea,select{font:inherit;color:inherit}
     <button class="b" id="tidy">자동 정렬</button>
     <button class="b" id="addpage">장 추가</button>
     <button class="b" id="delpage">이 장 지우기</button>
+    <button class="b" id="tray">쪽 목록</button>
     <button class="b" id="docs">문서</button>
   </div>
 </div>
+
+<!-- 불러온 쪽이 쌓이는 곳. 끌어다 종이에 놓는다 -->
+<aside class="tray" id="traybox"></aside>
 
 <div class="warn" id="warn" hidden></div>
 <div class="stage" id="stage"></div>
@@ -255,7 +284,7 @@ if (아이폰) document.documentElement.classList.add('아이폰');
 let 문서 = 새문서();
 let 고른것 = null, 지금장 = 0, 자리배율 = 1, 배율 = 1;
 
-function 새문서(){ return { 이름: '작업지시서', 방향: 'p', 장들: [[]], 잰때: Date.now() }; }
+function 새문서(){ return { 이름: '작업지시서', 방향: 'p', 장들: [[]], 쪽함: [], 잰때: Date.now() }; }
 function 지금크기(){ return A4[문서.방향]; }
 const mm = v => v + 'mm';
 const 새id = () => 'i' + Math.random().toString(36).slice(2, 9);
@@ -268,6 +297,7 @@ function 손질(d){
   delete d.것들;
   if (!Array.isArray(d.장들) || !d.장들.length) d.장들 = [[]];
   d.장들 = d.장들.map(z => Array.isArray(z) ? z : []);
+  if (!Array.isArray(d.쪽함)) d.쪽함 = [];   // 옛 문서에는 없다. 빈 목록으로 연다
   if (!A4[d.방향]) d.방향 = 'p';        // 방향이 없으면 지금크기() 가 터진다
   if (!d.이름) d.이름 = '작업지시서';
   return d;
@@ -304,6 +334,7 @@ function 그리기(){
     무대.appendChild(wrap);
   });
   맞추기();
+  쪽함그리기();
 }
 /* 종이를 세로 넷 × 가로 셋으로 나눠 둔다. 자리 이름과 mm 자리를 함께 적어
    두어, 짚어서 지시할 때 "2장 위 왼쪽 35,37mm" 처럼 어디인지가 실린다. */
@@ -386,7 +417,7 @@ function 만들기(it, 장번호, sh){
 
   if (it.종류 === 'img'){
     const img = document.createElement('img');
-    img.src = it.src; el.appendChild(img);
+    img.src = 그림주소(it); el.appendChild(img);
     그림앉히기(el, img, it);
     if (it.이름){ const c = document.createElement('span'); c.className = 'cap'; c.textContent = it.이름; el.appendChild(c); }
   } else if (it.종류 === 'line'){
@@ -629,17 +660,19 @@ async function pdf쪽(f, 알리기){
   return 나온것;
 }
 
-/* 불러온 쪽 하나 = 종이 한 장. 비율을 지킨 채 종이 안에 가장 크게 앉힌다 */
+/* 불러온 쪽은 캔버스에 바로 넣지 않는다. 왼쪽 쪽 목록에 쌓아 두었다가
+   손가락으로 끌어다 원하는 종이에 놓는다. 놓아도 목록에는 그대로 남는다 —
+   같은 사진을 여러 장에 쓸 수 있어야 한다. */
 function 쪽으로넣기(src, 이름, 비){
-  const [W, H] = 지금크기();
-  const 칸W = W - 여백 * 2, 칸H = H - 여백 * 2;
-  let w = 칸W, h = w * 비;
-  if (h > 칸H){ h = 칸H; w = h / 비; }              // 넘치면 높이에 맞춘다
-  const it = { id: 새id(), 종류: 'img', src, 이름: '',
-               x: (W - w) / 2, y: (H - h) / 2, w, h, z: 1 };
-  const 빈장 = 문서.장들[지금장] && 문서.장들[지금장].length === 0;
-  if (빈장) 문서.장들[지금장] = [it];
-  else { 문서.장들.push([it]); 지금장 = 문서.장들.length - 1; }
+  문서.쪽함.push({ id: 새id(), src, 이름: 이름 || '', 비: 비 || 1 });
+  document.body.classList.add('쪽함');            // 들어온 것이 있으면 펼쳐 둔다
+}
+/* 종이 위의 것이 쓰는 그림 주소 — 쪽함을 가리키면 거기서 찾는다.
+   같은 그림을 여러 장에 놓아도 자료가 한 벌만 쌓인다(저장 공간). */
+function 그림주소(it){
+  if (it.src) return it.src;                       // 옛 문서는 제 안에 담고 있다
+  const p2 = (문서.쪽함 || []).find(x => x.id === it.쪽);
+  return p2 ? p2.src : '';
 }
 
 function 알림쪽(글){
@@ -881,7 +914,7 @@ $('cropcopy').onclick = () => {
   const 아 = Math.min((고른네모.y + 고른네모.h) * it.h, g.top + g.H);
   if (오 - 왼 < 2 || 아 - 위 < 2) return 튕김($('cropcopy'), '그림 위에서 고르세요');
   // 잰 크기 그대로 담는다 — 붙일 때도 배율이 바뀌지 않는다
-  복사함 = { src: it.src, w: 오 - 왼, h: 아 - 위,
+  복사함 = { src: 그림주소(it), w: 오 - 왼, h: 아 - 위,
              잘라: { x: (왼 - g.left) / g.W, y: (위 - g.top) / g.H,
                      w: (오 - 왼) / g.W,     h: (아 - 위) / g.H } };
   자르기끝();
@@ -947,6 +980,118 @@ $('uncrop').onclick = () => {
   }
   delete it.잘라;
   저장(true); 그리기(); 고르기(it.id);
+};
+
+/* ── 쪽 목록 — 끌어다 종이에 놓기 ─────────────────────
+   HTML5 draggable 은 손가락으로 아예 시작되지 않는다. pointer 로만 만든다.
+   길게 누르기는 쓰지 않는다 — 그건 지시를 보내는 손잡이가 쓰고 있다.
+   톡 누르면 고르기(여럿 고를 수 있다), 끌면 끌기다. 6px 움직이면 끌기로 본다. */
+let 고른쪽 = [];
+
+function 쪽함그리기(){
+  const 함 = $('traybox');
+  const 있다 = (문서.쪽함 || []).length > 0;
+  $('tray').classList.toggle('on', document.body.classList.contains('쪽함'));
+  if (!document.body.classList.contains('쪽함')){ 함.innerHTML = ''; return; }
+  함.style.top = (document.querySelector('.top').offsetHeight) + 'px';
+  함.style.bottom = '0';
+  if (!있다){ 함.innerHTML = '<div class="tt">쪽 목록</div>'
+    + '<div class="none">파일·사진을<br>불러오면<br>여기에 쌓입니다</div>'; return; }
+  함.innerHTML = '<div class="tt">쪽 목록 ' + 문서.쪽함.length + '</div>';
+  문서.쪽함.forEach((p2, i) => {
+    const d = document.createElement('div');
+    d.className = 'pg' + (고른쪽.includes(p2.id) ? ' on' : '');
+    d.dataset.id = p2.id;
+    d.innerHTML = '<img alt=""><span class="no">' + (i + 1) + '</span>';
+    d.querySelector('img').src = p2.src;
+    끌어놓기(d, p2);
+    함.appendChild(d);
+  });
+}
+
+function 끌어놓기(d, p2){
+  d.addEventListener('pointerdown', e => {
+    e.preventDefault(); e.stopPropagation();
+    const 시작 = { x: e.clientX, y: e.clientY };
+    let 끄는중 = false, 유령 = null, 받을곳 = null;
+    const 움직임 = ev => {
+      if (!끄는중){
+        if (Math.abs(ev.clientX - 시작.x) < 6 && Math.abs(ev.clientY - 시작.y) < 6) return;
+        끄는중 = true;
+        if (!고른쪽.includes(p2.id)) 고른쪽 = [p2.id];      // 안 고른 것을 끌면 그것만
+        유령 = 유령만들기();
+      }
+      유령.style.left = (ev.clientX - 30) + 'px';
+      유령.style.top  = (ev.clientY - 30) + 'px';
+      const sh = 밑의종이(ev.clientX, ev.clientY);
+      if (sh !== 받을곳){
+        받을곳 && 받을곳.classList.remove('받는곳');
+        받을곳 = sh; 받을곳 && 받을곳.classList.add('받는곳');
+      }
+    };
+    const 끝 = ev => {
+      document.removeEventListener('pointermove', 움직임);
+      document.removeEventListener('pointerup', 끝);
+      document.removeEventListener('pointercancel', 끝);
+      유령 && 유령.remove();
+      받을곳 && 받을곳.classList.remove('받는곳');
+      if (!끄는중){                                        // 톡 눌렀다 — 고르기
+        const i = 고른쪽.indexOf(p2.id);
+        if (i < 0) 고른쪽.push(p2.id); else 고른쪽.splice(i, 1);
+        쪽함그리기(); return;
+      }
+      const sh = 받을곳;
+      if (sh) 놓기(+sh.dataset.p, 고른쪽.slice());
+      받을곳 = null;
+    };
+    document.addEventListener('pointermove', 움직임);
+    document.addEventListener('pointerup', 끝);
+    document.addEventListener('pointercancel', 끝);
+  });
+}
+
+function 유령만들기(){
+  const g = document.createElement('div');
+  g.className = 'ghost'; g.style.width = '60px';
+  const 첫 = (문서.쪽함 || []).find(x => x.id === 고른쪽[0]);
+  g.innerHTML = '<img alt="">' + (고른쪽.length > 1 ? '<span class="cnt">' + 고른쪽.length + '</span>' : '');
+  if (첫) g.querySelector('img').src = 첫.src;
+  document.body.appendChild(g);
+  return g;
+}
+
+/* 고른 쪽들을 그 장에 놓는다.
+   하나면 종이에 가장 크게(지금까지 불러올 때와 같은 크기),
+   여럿이면 줄·칸으로 나눠 한 장에 나란히 깐다. */
+function 놓기(장번호, 것들){
+  if (!것들.length) return;
+  const 쪽들 = 것들.map(id => (문서.쪽함 || []).find(x => x.id === id)).filter(Boolean);
+  if (!쪽들.length) return;
+  const [W, H] = 지금크기();
+  if (!문서.장들[장번호]) 문서.장들[장번호] = [];
+  let z = 문서.장들[장번호].reduce((n, x) => Math.max(n, x.z || 1), 0);
+  const 칸W = W - 여백 * 2, 칸H = H - 여백 * 2;
+  const 열 = Math.ceil(Math.sqrt(쪽들.length)), 행 = Math.ceil(쪽들.length / 열);
+  const 폭 = 칸W / 열, 높 = 칸H / 행;
+  쪽들.forEach((p2, i) => {
+    const 비 = p2.비 || 1;
+    let w = 쪽들.length === 1 ? 칸W : 폭 - 2, h = w * 비;
+    const 맞출높 = 쪽들.length === 1 ? 칸H : 높 - 2;
+    if (h > 맞출높){ h = 맞출높; w = h / 비; }
+    const c = i % 열, r = Math.floor(i / 열);
+    const x = 쪽들.length === 1 ? (W - w) / 2 : 여백 + c * 폭 + (폭 - w) / 2;
+    const y = 쪽들.length === 1 ? (H - h) / 2 : 여백 + r * 높 + (높 - h) / 2;
+    문서.장들[장번호].push({ id: 새id(), 종류: 'img', 쪽: p2.id, 이름: '',
+                            x: Math.max(0, Math.min(W - w, x)),
+                            y: Math.max(0, Math.min(H - h, y)), w, h, z: ++z });
+  });
+  지금장 = 장번호; 고른쪽 = [];
+  저장(true); 그리기();
+}
+
+$('tray').onclick = () => {
+  document.body.classList.toggle('쪽함');
+  쪽함그리기(); 맞추기();
 };
 
 /* ── 방향 ───────────────────────────────────────────── */
