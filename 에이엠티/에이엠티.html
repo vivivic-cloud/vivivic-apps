@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.9.85 (2026-09-15) — 못 받으면 즉시 알리고 · 겁주는 거짓 경고를 없애고 · 안내 상자를 화면에 맞춘다
+     버전: v1.9.86 (2026-09-15) — 추천 부속 목록에서 이미 다 잘린 것은 빼고, 모자란 것은 남은 수량과 함께
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2031,7 +2031,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.85</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.86</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2157,7 +2157,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.85</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.86</b></p>
         </div>
     </div>
 
@@ -3209,6 +3209,44 @@
                 });
             });
             return { 수: 합, 곳: 곳들.join('·'), 도면: 도면들 };
+        }
+
+        /* 이 부속(원장 행)이 이미 잘린 몫 — 재단편집 추천 목록에서 다 채워진 것을 빼려는 셈.
+           근거는 파이어베이스에 있는 재단도면(window._cuttingPlans)이다.
+           confirmedCuttingData 는 이 브라우저에서 방금 확정한 것만 들어 있어, 앱을 새로 열면
+           비어 있다. 그것만 보면 어제 자른 것도 남이 자른 것도 하나도 안 빠진다.
+           아직 파이어베이스에 안 올라간 것이 있을 수 있어 둘을 합치되, 같은 confirmId 는
+           한 번만 센다 — 두 번 세면 덜 자르게 되고, 덜 자르는 쪽이 훨씬 나쁘다.
+           도면이 적어 둔 행 번호로만 맞춘다. 치수·색상을 견주어 짐작하지 않는다.
+           발주번호는 날마다 다시 쓰이므로 임자를 가려 한 발주 안에서만 센다. */
+        function _이미잘린몫(rowIndex, 발주키들, 뺄번호) {
+            const ri = parseInt(rowIndex, 10);
+            if (isNaN(ri) || !발주키들 || !발주키들.size) return 0;
+            const 본것 = new Set(); const 모음 = [];
+            Object.values(window._cuttingPlans || {}).forEach(pl => {
+                if (!pl) return; const n = String(pl.confirmId);
+                if (본것.has(n)) return; 본것.add(n); 모음.push(pl);
+            });
+            (typeof confirmedCuttingData !== 'undefined' ? confirmedCuttingData : []).forEach(pl => {
+                if (!pl) return; const n = String(pl.confirmId);
+                if (본것.has(n)) return; 본것.add(n); 모음.push(pl);
+            });
+            let 합 = 0;
+            모음.forEach(pl => {
+                // 지금 편집 중인 그 도면이 넣은 몫은 빼지 않는다 — 편집하다 제 카드가 사라진다
+                if (뺄번호 && String(pl.confirmId) === String(뺄번호)) return;
+                const 만든때 = _cutPlanMadeAt(pl);
+                ['p', 's', 't'].forEach(급 => {
+                    if (parseInt(pl[급 + 'RowIndex'], 10) !== ri) return;
+                    const 수 = parseInt(pl[급 + 'ProducedQty'], 10) || 0;
+                    if (수 <= 0) return;
+                    const 임자 = (pl[급 + 'OrderIds'] || [])
+                        .map(id => _cutPlanOwner(id, 만든때, pl)).filter(Boolean);
+                    if (!임자.some(o => 발주키들.has(o.docId || String(o.idNum)))) return;
+                    합 += 수;
+                });
+            });
+            return 합;
         }
 
         /* 이 재단도면이 실제로 잘렸는가(재단 완료로 찍혔는가).
@@ -12601,14 +12639,28 @@
             const targetPlateCleaned = plateInfo.substring(0, lastDashIndex).replace(/\s+/g, '').toLowerCase();
             const targetColor = plateInfo.substring(lastDashIndex + 1).replace(/\s+/g, '').toLowerCase();
 
+            // 이미 다 잘린 부속을 추천 목록에서 빼는 데 쓰는 열쇠 — 한 발주 안에서만 센다
+            const _발주키 = new Set((orders || []).map(o => o.docId || String(o.idNum)));
+            const _편집중도면 = (window._editingCuttingPlan && window._editingCuttingPlan.planId) || null;
+
             allRows.forEach((row, idx) => {
                 const rowIndex = idx + 1, rowL1 = normalizeValue(row[h.indexOf("대분류")]).replace(/\s/g, '').toLowerCase(), rowG = String(row[h.indexOf("원장명")]).replace(/\s/g, '').toLowerCase();
                 if (rowL1 === '공통부속' && rowG === currentSelectedG && currentSelectedG !== "") {
-                    commonPartsFound = true;
-                    // 공통부속은 모든 상품카드에서 사용
-                    const commonOrderIds = orders.map(o => o.idNum);
-                    const p = { id: `agg-common-${rowIndex}`, w: parseFloat(row[h.indexOf("재단W")]), d: parseFloat(row[h.indexOf("재단D")]), qty: 0, name: row[h.indexOf("부속명")], displayName: plateInfo, grain: row[h.indexOf("결보호")], rowIndex: rowIndex, isCommon: true, orderIds: commonOrderIds };
-                    renderPartCard(p, commonArea);
+                    // 공통부속도 일반부속과 같은 셈을 받는다.
+                    // 필요 총량 = 세트별소모량 × 발주수량 (_발주몫 이 쓰는 그 셈이다).
+                    // 예: 원장 1행 전도방지는 세트별소모량 2 → 24세트 발주면 48개.
+                    // 세트별소모량이 없으면 필요량을 모르는 것이니 예전처럼 그냥 보여 준다.
+                    const _uc공통 = parseFloat(row[h.indexOf("세트별소모량")]) || 0;
+                    const _필요공통 = (orders || []).reduce((n, o) => n + Math.round(_uc공통 * (o.orderQty || 0)), 0);
+                    const _남은공통 = _필요공통 - _이미잘린몫(rowIndex, _발주키, _편집중도면);
+                    // 이미 발주수량만큼 다 잘렸으면 추천 목록에 올리지 않는다
+                    if (_필요공통 <= 0 || _남은공통 > 0.001) {
+                        commonPartsFound = true;
+                        // 공통부속은 모든 상품카드에서 사용
+                        const commonOrderIds = orders.map(o => o.idNum);
+                        const p = { id: `agg-common-${rowIndex}`, w: parseFloat(row[h.indexOf("재단W")]), d: parseFloat(row[h.indexOf("재단D")]), qty: _필요공통 > 0 ? _남은공통 : 0, name: row[h.indexOf("부속명")], displayName: plateInfo, grain: row[h.indexOf("결보호")], rowIndex: rowIndex, isCommon: true, orderIds: commonOrderIds };
+                        renderPartCard(p, commonArea);
+                    }
                 }
                 
                 const rowPlateName = (row[h.indexOf("원장명")] || '').trim();
@@ -12654,12 +12706,9 @@
                         }
                     });
                     if (matchedInOrders) {
-                        let alreadyProduced = 0;
-                        confirmedCuttingData.forEach(ci => {
-                            if (ci.pRowIndex === rowIndex) alreadyProduced += parseInt(ci.pProducedQty);
-                            if (ci.sRowIndex === rowIndex) alreadyProduced += parseInt(ci.sProducedQty);
-                            if (ci.tRowIndex === rowIndex) alreadyProduced += parseInt(ci.tProducedQty);
-                        });
+                        // 예전에는 confirmedCuttingData 만 봤다. 그건 이 브라우저에서 방금 확정한
+                        // 것만 들어 있어, 앱을 새로 열면 비어 어제 자른 것이 하나도 안 빠졌다.
+                        const alreadyProduced = _이미잘린몫(rowIndex, _발주키, _편집중도면);
                         const finalRemainingQty = totalAggregatedQty - alreadyProduced;
                         if (finalRemainingQty > 0.001) {
                             orderedPartsList.push({
@@ -12702,7 +12751,8 @@
             card.onclick = () => handleCardClick(card);
 
             let rotateHtml = (p.grain === 'X') ? `<button onclick="event.stopPropagation(); toggleRotation(this)" class="rotate-btn">재단회전</button>` : "";
-            let qtyDisplay = p.isCommon ? "공통" : Math.round(p.qty), qtyClass = p.isCommon ? "!bg-[#f7f6f3]0" : "bg-[#37352f]";
+            // 공통부속도 남은 필요수량을 알면 숫자를 찍는다. 모를 때만 「공통」 이라고 둔다.
+            let qtyDisplay = (p.isCommon && !(p.qty > 0)) ? "공통" : Math.round(p.qty), qtyClass = p.isCommon ? "!bg-[#f7f6f3]0" : "bg-[#37352f]";
 
             // 상품카드 색상 점 (여러 개면 표시)
             const orderIds = p.orderIds || [];
