@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.9.88 (2026-09-15) — 재단회전 단추를 손가락으로 누를 수 있게 키웠다 (44px)
+     버전: v1.9.89 (2026-09-15) — 편집화면에 도면 초기화 단추 (처음 세팅으로 되돌리기)
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2036,7 +2036,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.88</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.89</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2162,7 +2162,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.88</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.89</b></p>
         </div>
     </div>
 
@@ -2462,6 +2462,12 @@
                             </div>
                             <div class="mt-4 flex flex-col items-center gap-1 w-full">
                                 <div class="flex items-center justify-center gap-2">
+                                    <!-- 사장님 지시(09-15 05:27) — 편집화면을 처음 상태로 되돌리는 단추.
+                                         재단편집 도구(#cutting-edit-box)는 하나뿐이고 재단발주 탭과
+                                         보드 카드 '재편집' 팝업이 같은 것을 옮겨 쓰므로, 이 단추 하나가
+                                         두 화면 모두에 따라간다. 폰에서 손가락으로 눌리게 높이 40px.
+                                         저장된 재단계획은 건드리지 않는다 — 화면만 되돌린다. -->
+                                    <button onclick="resetCuttingEdit()" id="btn-reset-cutting" type="button" style="min-height:40px;padding:0 18px;font-size:13px;font-weight:700;border-radius:8px;background:#ffffff;color:#37352f;border:1.5px solid #ededeb;box-sizing:border-box;">초기화</button>
                                     <button onclick="confirmCutting()" id="btn-confirm-cutting" class="px-8 py-2.5 bg-[#37352f] text-white text-[13px] font-bold rounded-lg hover:bg-black transition-all active:scale-95 shadow-md uppercase tracking-wider">재단확정</button>
                                 </div>
                             </div>
@@ -12629,9 +12635,40 @@
             el.textContent = `${s2.value} · 전단컷 ${f.value} · 톱날T ${b.value}`;
         };
 
+        /* 편집화면을 '처음 골라 들어왔을 때' 로 되돌린다 — 화면만 되돌린다.
+           저장된 재단계획(cutting_plans)·확정목록·발주는 건드리지 않고,
+           파이어베이스에는 읽지도 쓰지도 않는다.
+           showSubParts 를 다시 부르면 P/S/T 가 null 이 되고 isSheetsManual 이
+           false 가 되며 부속 카드를 새로 그리므로 돌려 놓은 것(.rotated)도 함께 풀린다. */
+        window.resetCuttingEdit = function () {
+            const 처음 = window._재단편집처음;
+            if (!처음) { showToastMessage('되돌릴 원장이 없습니다. 원장을 먼저 골라주세요.'); return; }
+            if (!confirm('이 도면을 처음 상태로 되돌립니다.\n지금 편집한 것은 사라집니다.\n(이미 저장된 재단계획은 지워지지 않습니다.)')) return;
+            const s2 = document.getElementById('setting-board-size'),
+                  f  = document.getElementById('setting-front-cut'),
+                  b  = document.getElementById('setting-blade-t');
+            if (s2) s2.value = '4X8';
+            if (f)  f.value  = 5;
+            if (b)  b.value  = 4.5;
+            // 손으로 정해 둔 장수를 버린다 — showSubParts 는 isSheetsManual 만 풀고
+            // 장수 자체는 그대로 두므로 여기서 처음 값(0)으로 되돌린다. 부속을 다시
+            // 고르면 updateBoardVisual 이 저절로 세어 채운다.
+            suggestedSheets = 0;
+            showSubParts(처음.plateInfo, 처음.orders);
+            // 보드 카드 '재편집' 팝업에는 목록 밖에 '해당 부속' 카드가 따로 서 있다.
+            // 목록은 새로 그려져 돌림이 저절로 풀리지만 그 카드는 남으므로 같이 푼다
+            // (toggleRotation 을 다시 부르면 w·d 가 원래대로 되돌아간다).
+            document.querySelectorAll('.rotate-btn.rotated').forEach(bt => toggleRotation(bt));
+            if (typeof updateBoardVisual === 'function') updateBoardVisual();
+            cutSettingsSum();
+            showToastMessage('도면을 처음 상태로 되돌렸습니다.');
+        };
+
         function getPackingCount(pw, pd, BW, BD, fCut, bT) { let count = 0; if (pw <= 0 || pd <= 0 || pw > BW - fCut || pd > BD - fCut) return 0; let curY = fCut; while (curY + pd <= BD + bT + 0.5) { let curX = fCut; while (curX + pw <= BW + bT + 0.5) { count++; curX += pw + bT; } curY += pd + bT; } return count; }
 
         function showSubParts(plateInfo, orders) {
+            // 초기화 단추가 되돌아갈 '처음 상태' — 이 원장을 골라 들어왔을 때의 그 인자
+            window._재단편집처음 = { plateInfo, orders };
             primarySelectedCardId = null; secondarySelectedCardId = null; tertiarySelectedCardId = null; isSheetsManual = false;
             const h = currentFullData[0], inner = document.getElementById('id302-parts-content');
             document.getElementById('id302-material-header').classList.remove('hidden');
