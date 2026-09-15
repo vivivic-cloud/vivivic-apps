@@ -98,7 +98,10 @@ body.쪽함 .stage{margin-left:92px}
    인쇄·PDF 에는 아예 나오지 않는다(아래 @media print). */
 .sheet.짚기 .zone.vg-mark::after{content:attr(data-nm);position:absolute;left:2mm;top:1.5mm;
   font-size:2.6mm;color:rgba(17,17,16,.55)}
-.it.sel{outline:1.5px solid var(--ink);outline-offset:1px}
+/* 고른 것은 고른 동안만 맨 앞에 온다 — 겹쳐 있어도 손으로 잡을 수 있게.
+   문서에 적힌 앞뒤 차례(z)는 안 바뀌고, 놓으면 제자리로 돌아간다.
+   인쇄 전에는 고름을 지우므로 종이에는 영향이 없다. */
+.it.sel{outline:1.5px solid var(--ink);outline-offset:1px;z-index:900 !important}
 .it img{width:100%;height:100%;object-fit:contain;display:block;pointer-events:none}
 /* 자른 그림 — 원본은 그대로 두고, 고른 네모 밖만 가린다. 그림 배율은
    자를 때 건드리지 않는다(사이즈 변동 없이 자르기). 크게·작게는 따로 한다.
@@ -251,6 +254,9 @@ PDF·PPT 를 불러오면 <b>한 장이 한 쪽</b>이 됩니다. 비율은 원�
   <span class="cw" id="cropmsg">사진 위에서 손가락으로 끌어 네모를 그리세요</span>
   <button class="b" id="cropdo">이 부분만</button>
   <button class="b" id="cropcopy">복사</button>
+  <button class="b" id="cropdup">복제</button>
+  <button class="b" id="cropcut">잘라내기</button>
+  <button class="b" id="cropdel">삭제</button>
   <button class="b" id="cropend">그만</button>
 </div>
 <div class="cropbar" id="pastebar" hidden>
@@ -320,6 +326,7 @@ function 그리기(){
     sh.dataset.p = n;
     칸나누기(sh, n);
     것들.forEach(it => sh.appendChild(만들기(it, n, sh)));
+    겹친것고르기(sh);
     sh.addEventListener('pointerdown', e => {
       if (복사함 && !자르는것){ e.preventDefault(); e.stopPropagation(); 붙이기(sh, n, e); return; }
       지금장 = n;
@@ -448,6 +455,39 @@ function 만들기(it, 장번호, sh){
   끌기(el, it, 'move', sh);
   el.addEventListener('pointerdown', () => { 지금장 = 장번호; 고르기(it.id); });
   return el;
+}
+
+/* 겹쳐 놓은 것을 하나씩 골라 잡는다. 이미 고른 것을 그 자리에서 한 번 더
+   톡 누르면 그 밑에 있는 것으로 넘어간다(맨 아래까지 가면 다시 맨 위로).
+   끌기와 부딪히지 않게, 6px 안에서 0.4초 안에 뗀 '톡' 일 때만 넘어간다. */
+function 겹친것들(sh, cx, cy){
+  const r = sh.getBoundingClientRect();
+  const mx = (cx - r.left) / 배율 / px1mm, my = (cy - r.top) / 배율 / px1mm;
+  return (문서.장들[+sh.dataset.p] || [])
+    .filter(o => mx >= o.x && mx <= o.x + o.w && my >= o.y && my <= o.y + o.h)
+    .sort((a, b) => (b.z || 1) - (a.z || 1));
+}
+/* 종이에 건다. 요소에 걸면 맨 위 것만 이벤트를 받아 한 겹 아래로 못 내려간다 */
+function 겹친것고르기(sh){
+  let 톡 = null;
+  sh.addEventListener('pointerdown', e => {
+    // 누르기 직전에 무엇이 골라져 있었는지 적어 둔다(고르기보다 먼저 온다)
+    톡 = e.target.closest('.grip,.del,.tx,.croplayer') ? null
+       : { x: e.clientX, y: e.clientY, t: Date.now(), 전: 고른것 };
+  }, true);
+  sh.addEventListener('pointerup', e => {
+    const b = 톡; 톡 = null;
+    if (!b || !고른것) return;
+    if (!b.전) return;                       // 처음 짚은 것이다 — 맨 위 것을 고른 채로 둔다
+    if (Math.abs(e.clientX - b.x) > 6 || Math.abs(e.clientY - b.y) > 6) return;  // 끌었다
+    if (Date.now() - b.t > 400) return;                                          // 길게 눌렀다
+    const 겹친 = 겹친것들(sh, e.clientX, e.clientY);
+    if (겹친.length < 2) return;
+    if (!겹친.some(x => x.id === b.전)) return;   // 다른 자리에서 옮겨 온 첫 짚기
+    const i = 겹친.findIndex(x => x.id === 고른것);
+    if (i < 0) return;
+    고르기(겹친[(i + 1) % 겹친.length].id);
+  }, true);
 }
 
 /* 예전에는 고를 때마다 무대를 통째로 다시 그려서, 방금 만진 요소가 그 자리에서
@@ -974,64 +1014,87 @@ function 자르기끝(){
   띠(복사함 ? 'paste' : null);
 }
 
-/* 상자에 대한 비 → 원본 그림에 대한 비. 이미 잘린 그림도 셈이 맞는다 */
-function 네모를원본으로(it, 네모, img){
-  const g = 그림자리(it, img.naturalWidth, img.naturalHeight);
-  const 가 = v => Math.max(0, Math.min(1, v));
-  const x1 = 가((네모.x * it.w - g.left) / g.W);
-  const x2 = 가(((네모.x + 네모.w) * it.w - g.left) / g.W);
-  const y1 = 가((네모.y * it.h - g.top) / g.H);
-  const y2 = 가(((네모.y + 네모.h) * it.h - g.top) / g.H);
-  if (x2 - x1 < .02 || y2 - y1 < .02) return null;   // 그림 바깥만 골랐다
-  return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
-}
-function 고른것원본네모(){
-  if (!자르는것 || !고른네모) return null;
-  const img = 무대.querySelector('.it[data-id="' + 자르는것.id + '"] img');
-  if (!img || !img.naturalWidth) return null;
-  return { 네모: 네모를원본으로(자르는것, 고른네모, img), nw: img.naturalWidth, nh: img.naturalHeight };
-}
-
 $('crop').onclick = 자르기시작;
 $('cropend').onclick = () => 자르기끝();
 
-/* 이 부분만 — 고른 네모 밖을 없앤다. 그림 배율은 건드리지 않는다.
-   상자를 그 네모가 있던 자리·크기로 옮기면, 남은 조각은 잘리기 전 그대로다. */
-$('cropdo').onclick = () => {
+/* 고른 네모를 한 곳에서 셈한다 — 종이 위 자리(mm)와 원본 그림에 대한 비.
+   이 부분만·복사·복제·잘라내기·삭제가 모두 이것을 쓴다. */
+function 고른조각(단추){
   const it = 자르는것;
-  if (!it || !고른네모) return 튕김($('cropdo'), '네모를 그리세요');
+  if (!it || !고른네모){ 튕김(단추, '네모를 그리세요'); return null; }
   const img = 무대.querySelector('.it[data-id="' + it.id + '"] img');
-  if (!img || !img.naturalWidth) return;
+  if (!img || !img.naturalWidth) return null;
   const g = 그림자리(it, img.naturalWidth, img.naturalHeight);
-  // 고른 네모를 mm 로 옮기고, 그림 밖으로 나간 부분은 잘라 낸다
   const 왼 = Math.max(고른네모.x * it.w, g.left);
   const 위 = Math.max(고른네모.y * it.h, g.top);
   const 오 = Math.min((고른네모.x + 고른네모.w) * it.w, g.left + g.W);
   const 아 = Math.min((고른네모.y + 고른네모.h) * it.h, g.top + g.H);
-  if (오 - 왼 < 2 || 아 - 위 < 2) return 튕김($('cropdo'), '그림 위에서 고르세요');
-  it.x += 왼; it.y += 위; it.w = 오 - 왼; it.h = 아 - 위;
-  it.잘라 = { x: (왼 - g.left) / g.W, y: (위 - g.top) / g.H,
-              w: (오 - 왼) / g.W,     h: (아 - 위) / g.H };
+  if (오 - 왼 < 2 || 아 - 위 < 2){ 튕김(단추, '그림 위에서 고르세요'); return null; }
+  return { it, img, 왼, 위, 오, 아, w: 오 - 왼, h: 아 - 위,
+           잘라: { x: (왼 - g.left) / g.W, y: (위 - g.top) / g.H,
+                   w: (오 - 왼) / g.W,     h: (아 - 위) / g.H } };
+}
+
+/* 이 부분만 — 고른 네모 밖을 없앤다. 그림 배율은 건드리지 않는다.
+   상자를 그 네모가 있던 자리·크기로 옮기면, 남은 조각은 잘리기 전 그대로다. */
+$('cropdo').onclick = () => {
+  const c = 고른조각($('cropdo')); if (!c) return;
+  const it = c.it;
+  it.x += c.왼; it.y += c.위; it.w = c.w; it.h = c.h; it.잘라 = c.잘라;
   const id = it.id;
   자르기끝(); 저장(true); 그리기(); 고르기(id);
+};
+
+/* 복제 — 고른 조각을 그 자리에 한 벌 더 놓는다. 원본은 그대로다 */
+$('cropdup').onclick = () => {
+  const c = 고른조각($('cropdup')); if (!c) return;
+  const it = c.it, [W, H] = 지금크기();
+  const 장 = 문서.장들[지금장] || (문서.장들[지금장] = []);
+  const 새 = { id: 새id(), 종류: 'img', 이름: '', 잘라: c.잘라,
+               x: Math.max(0, Math.min(W - c.w, it.x + c.왼 + 4)),
+               y: Math.max(0, Math.min(H - c.h, it.y + c.위 + 4)),
+               w: c.w, h: c.h, z: 장.reduce((n, x) => Math.max(n, x.z || 1), 0) + 1 };
+  if (it.쪽) 새.쪽 = it.쪽; else 새.src = it.src;
+  장.push(새);
+  자르기끝(); 저장(true); 그리기(); 고르기(새.id);
+};
+
+/* 고른 네모만큼 그림에 구멍을 낸다(그 자리가 비친다).
+   쪽 목록의 원본은 건드리지 않는다 — 이 자료가 제 사본을 갖는다. */
+function 구멍내기(it, img, 네모){
+  const cv = document.createElement('canvas');
+  cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+  const g = cv.getContext('2d');
+  g.drawImage(img, 0, 0, cv.width, cv.height);
+  g.clearRect(네모.x * cv.width, 네모.y * cv.height, 네모.w * cv.width, 네모.h * cv.height);
+  it.src = cv.toDataURL('image/png');
+  delete it.쪽;                                   // 이제 제 것을 쓴다
+}
+
+/* 삭제 — 고른 조각이 캔버스에서 사라진다(그 자리가 빈다) */
+$('cropdel').onclick = () => {
+  const c = 고른조각($('cropdel')); if (!c) return;
+  const id = c.it.id;
+  구멍내기(c.it, c.img, c.잘라);
+  자르기끝(); 저장(true); 그리기(); 고르기(id);
+};
+
+/* 잘라내기 — 고른 조각을 떼어 들고 있는다. 누른 자리에 붙일 수 있다 */
+$('cropcut').onclick = () => {
+  const c = 고른조각($('cropcut')); if (!c) return;
+  const it = c.it, id = it.id;
+  복사함 = { src: 그림주소(it), w: c.w, h: c.h, 잘라: c.잘라 };
+  구멍내기(it, c.img, c.잘라);
+  자르기끝(); 저장(true); 그리기(); 고르기(id);
+  띠('paste');
 };
 
 /* 복사 — 고른 조각을 담아 두고, 다음에 누른 자리에 새 그림으로 붙인다.
    원본은 그대로 둔다 */
 $('cropcopy').onclick = () => {
-  const it = 자르는것;
-  if (!it || !고른네모) return 튕김($('cropcopy'), '네모를 그리세요');
-  const img = 무대.querySelector('.it[data-id="' + it.id + '"] img');
-  if (!img || !img.naturalWidth) return;
-  const g = 그림자리(it, img.naturalWidth, img.naturalHeight);
-  const 왼 = Math.max(고른네모.x * it.w, g.left), 위 = Math.max(고른네모.y * it.h, g.top);
-  const 오 = Math.min((고른네모.x + 고른네모.w) * it.w, g.left + g.W);
-  const 아 = Math.min((고른네모.y + 고른네모.h) * it.h, g.top + g.H);
-  if (오 - 왼 < 2 || 아 - 위 < 2) return 튕김($('cropcopy'), '그림 위에서 고르세요');
+  const c = 고른조각($('cropcopy')); if (!c) return;
   // 잰 크기 그대로 담는다 — 붙일 때도 배율이 바뀌지 않는다
-  복사함 = { src: 그림주소(it), w: 오 - 왼, h: 아 - 위,
-             잘라: { x: (왼 - g.left) / g.W, y: (위 - g.top) / g.H,
-                     w: (오 - 왼) / g.W,     h: (아 - 위) / g.H } };
+  복사함 = { src: 그림주소(c.it), w: c.w, h: c.h, 잘라: c.잘라 };
   자르기끝();
   띠('paste');
 };
