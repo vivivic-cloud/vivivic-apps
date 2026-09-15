@@ -103,8 +103,6 @@ body.쪽함 .stage{margin-left:92px}
    문서에 적힌 앞뒤 차례(z)는 안 바뀌고, 놓으면 제자리로 돌아간다.
    인쇄 전에는 고름을 지우므로 종이에는 영향이 없다. */
 .it.sel{outline:1.5px solid var(--ink);outline-offset:1px;z-index:900 !important}
-/* 덤으로 고른 것 — 으뜸(실선)과 구별되게 점선이다. 손잡이는 안 붙는다 */
-.it.덤{outline:1.5px dashed var(--ink);outline-offset:1px;z-index:899}
 .it img{width:100%;height:100%;object-fit:contain;display:block;pointer-events:none}
 /* 자른 그림 — 원본은 그대로 두고, 고른 네모 밖만 가린다. 그림 배율은
    자를 때 건드리지 않는다(사이즈 변동 없이 자르기). 크게·작게는 따로 한다.
@@ -167,6 +165,8 @@ body.쪽함 .stage{margin-left:92px}
 /* 사진 위에 얹는 그림판. 손가락을 받는 동안만 pointer-events 를 켠다 */
 .그림판{position:absolute;inset:0;z-index:70;touch-action:none}
 .it .얹은그림{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+/* 지운 자리(구멍)를 오려 내는 모양만 담는 자리. 화면에는 아무것도 안 그린다 */
+.구멍자{position:absolute;width:0;height:0;overflow:hidden}
 .warn{position:sticky;top:0;z-index:45;background:var(--red);color:#fff;font-size:13px;
   font-weight:700;padding:9px 14px;text-align:center;line-height:1.45}
 
@@ -241,7 +241,8 @@ body.쪽함 .stage{margin-left:92px}
 <p class="hint">A4 흰 바탕입니다. 자료를 불러와 끌어 옮기고, 오른쪽 아래 손잡이로 크기를 바꿉니다.<br>
 자료를 골라 <b>다른 장으로 끌면</b> 그 장으로 넘어갑니다. 자료끼리 겹쳐 놓아도 됩니다.
 장은 <b>삭제 ×</b> 로 지웁니다.<br>
-여럿 고르기 — <b id="멀티키">Ctrl</b> 키를 누른 채 누릅니다. 고른 것은 함께 옮기고 함께 지웁니다.<br>
+여럿 고르기 — 컴퓨터는 <b>Ctrl</b>(맥은 <b>⌘</b>)을 누른 채, 폰은 <b>여러 개</b> 단추를 켜고 하나씩 누릅니다.
+고른 것은 함께 옮기고 함께 지웁니다.<br>
 PDF·PPT 를 불러오면 <b>한 장이 한 쪽</b>이 됩니다. 비율은 원본 그대로 지킵니다.<br>
 인쇄 · PDF 를 누른 뒤 대상에서 <b>PDF로 저장</b>을 고르면 전체가 한 파일이 됩니다.</p>
 
@@ -258,6 +259,7 @@ PDF·PPT 를 불러오면 <b>한 장이 한 쪽</b>이 됩니다. 비율은 원�
     <button data-n="right">▶</button>
   </span>
   <button class="b" id="step">1mm</button>
+  <button class="b" id="many">여러 개</button>
   <button class="b" id="crop">자르기</button>
   <button class="b" id="draw">표시 도구</button>
   <button class="b" id="bigger">크게</button>
@@ -339,11 +341,13 @@ if (아이폰) document.documentElement.classList.add('아이폰');
 let 문서 = 새문서();
 let 고른것 = null, 지금장 = 0, 자리배율 = 1, 배율 = 1;
 /* 여럿 고르기 — 으뜸 하나(고른것)와 덤으로 고른 것들(더고른).
-   손잡이(크기·자르기·도형)는 늘 으뜸 하나에만 붙는다. 옮기기·지우기·
-   미세이동은 고른 것 모두에 걸린다. */
+   고른 것은 모두 .sel 로 보이고, 크기 손잡이와 ×(지움)는 으뜸 하나에만 단다
+   (모두에 달면 폰에서 화면이 손잡이로 뒤덮인다).
+   옮기기·미세이동·앞뒤·폭 맞춤·크게·작게·지우기는 고른 것 모두에 걸린다.
+   자르기와 자르기 되돌리기는 사진 한 장짜리 일이라 으뜸에만 건다. */
 let 더고른 = [];
-const 맥 = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
-const 더누름 = e => !!(e.ctrlKey || e.metaKey || e.shiftKey);   // 윈도우 Ctrl · 맥 ⌘ · Shift
+let 여럿모드 = false;                    // 폰에는 Ctrl 키가 없다 — 단추로 켠다
+const 더누름 = e => !!(e.ctrlKey || e.metaKey);   // 윈도는 Ctrl, 맥은 Cmd
 const 고른모두 = () => 고른것 ? [고른것, ...더고른] : [];
 /* 글상자는 눌리면 focus 가 따라온다. 그 focus 가 고르기를 한 번 더 부르면
    방금 Ctrl 로 더한 것이 곧바로 도로 빠진다. 눌러서 처리한 것은 다시 안 한다. */
@@ -365,6 +369,8 @@ function 손질(d){
   if (!Array.isArray(d.장들) || !d.장들.length) d.장들 = [[]];
   d.장들 = d.장들.map(z => Array.isArray(z) ? z : []);
   if (!Array.isArray(d.쪽함)) d.쪽함 = [];   // 옛 문서에는 없다. 빈 목록으로 연다
+  // 구멍은 새로 생긴 것이다. 없는 문서는 그냥 그림 그대로 보이면 된다
+  d.장들.forEach(장 => 장.forEach(it => { if (it && it.구멍 && !Array.isArray(it.구멍)) delete it.구멍; }));
   if (!A4[d.방향]) d.방향 = 'p';        // 방향이 없으면 지금크기() 가 터진다
   if (!d.이름) d.이름 = '작업지시서';
   return d;
@@ -438,10 +444,13 @@ function 칸나누기(sh, 장번호){
 function 쪽표시(){
   [...무대.children].forEach((w, n) => w.classList.toggle('now', n === 지금장));
 }
-/* 덤으로 고른 것들의 표시만 다시 칠한다 */
-function 덤표시(){
-  무대.querySelectorAll('.it').forEach(el =>
-    el.classList.toggle('덤', el.dataset.id !== 고른것 && 더고른.includes(el.dataset.id)));
+/* 고른 것 표시를 다시 칠한다 — 고른 것은 모두 .sel, 손잡이는 으뜸에만 */
+function 고름표시(){
+  const 뽑 = 고른모두();
+  무대.querySelectorAll('.it').forEach(el => {
+    el.classList.toggle('sel', 뽑.includes(el.dataset.id));
+    if (el.dataset.id !== 고른것) el.querySelectorAll('.grip,.del').forEach(x => x.remove());
+  });
 }
 /* 고른 것을 놓는다 — 무대를 다시 그리지 않고 표시와 손잡이만 뺀다 */
 function 고름지우기(){
@@ -450,7 +459,6 @@ function 고름지우기(){
     el.classList.remove('sel');
     el.querySelectorAll('.grip,.del').forEach(x => x.remove());
   });
-  덤표시();
 }
 
 /* ── 그림 자르기 ─────────────────────────────────────
@@ -473,6 +481,52 @@ function 그림자리(it, nw, nh){
   const W = it.w / c.w, H = it.h / c.h;
   return { W, H, left: -c.x * W, top: -c.y * H, 비 };
 }
+/* 지운 자리(구멍) — 그림을 다시 굽지 않는다. 어디를 지웠는지만 적어 두고
+   화면에서 오려 낸다. it.구멍 = [{x,y,w,h}…] 는 원본 그림에 대한 비(0~1)로,
+   it.잘라 와 같은 자리 셈을 쓴다.
+   · 파일이 안 커진다(예전 PNG 로 다시 굽던 길은 797KB → 4014KB, 5배였다.
+     저장은 localStorage 라 사파리에서 5MB 를 넘으면 그때부터 저장이 끊긴다)
+   · 쪽 목록의 한 벌 쓰기가 그대로 산다(it.쪽 을 안 지운다)
+   · 밑에 깔린 자료가 진짜로 비친다 · 인쇄는 원본 그림 그대로라 선명하다
+   오려 내기는 SVG clipPath 의 evenodd 를 쓴다. 겉 네모 한 바퀴 뒤에 구멍을
+   같은 방향으로 한 바퀴씩 더 돌면, 그 안쪽이 빠진다. */
+function 구멍적용(el, img, it){
+  const 옛 = el.querySelector(':scope > .구멍자');
+  if (옛) 옛.remove();
+  img.style.clipPath = ''; img.style.webkitClipPath = '';
+  const 구 = it.구멍 || [];
+  if (!구.length) return;
+  const 하기 = () => {
+    if (!(it.구멍 || []).length) return;
+    const g = 그림자리(it, img.naturalWidth, img.naturalHeight);
+    // 그림 안의 비를 img 요소 안의 비로 옮긴다. 안 자른 그림은 상자 안에서
+    // 여백을 두고 담기므로(object-fit:contain) 그 여백만큼 밀어 준다.
+    const 옮 = h => it.잘라 ? h
+      : { x: (g.left + h.x * g.W) / it.w, y: (g.top + h.y * g.H) / it.h,
+          w: h.w * g.W / it.w,            h: h.h * g.H / it.h };
+    const 길 = ['M0,0 H1 V1 H0 Z'].concat((it.구멍 || []).map(h => {
+      const q = 옮(h);
+      return 'M' + q.x + ',' + q.y + ' h' + q.w + ' v' + q.h + ' h' + (-q.w) + ' Z';
+    })).join(' ');
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('class', '구멍자');
+    svg.setAttribute('width', '0'); svg.setAttribute('height', '0');
+    const cp = document.createElementNS(ns, 'clipPath');
+    const id = '구멍_' + it.id;
+    cp.setAttribute('id', id);
+    cp.setAttribute('clipPathUnits', 'objectBoundingBox');
+    const 선 = document.createElementNS(ns, 'path');
+    선.setAttribute('d', 길);
+    선.setAttribute('clip-rule', 'evenodd');
+    cp.appendChild(선); svg.appendChild(cp); el.appendChild(svg);
+    img.style.clipPath = 'url(#' + id + ')';
+    img.style.webkitClipPath = 'url(#' + id + ')';
+  };
+  if (img.complete && img.naturalWidth) 하기();
+  else img.addEventListener('load', 하기, { once: true });
+}
+
 /* 안 자른 그림은 손대지 않는다 — 지금 나오는 인쇄 결과를 그대로 둔다 */
 function 그림앉히기(el, img, it){
   if (!it.잘라){ el.classList.remove('잘림'); img.removeAttribute('style'); return; }
@@ -490,7 +544,7 @@ function 그림앉히기(el, img, it){
 
 function 만들기(it, 장번호, sh){
   const el = document.createElement('div');
-  el.className = 'it' + (고른것 === it.id ? ' sel' : (더고른.includes(it.id) ? ' 덤' : ''));
+  el.className = 'it' + (고른모두().includes(it.id) ? ' sel' : '');
   el.dataset.id = it.id;
   el.style.left = mm(it.x); el.style.top = mm(it.y);
   el.style.width = mm(it.w); el.style.height = mm(it.h);
@@ -500,6 +554,7 @@ function 만들기(it, 장번호, sh){
     const img = document.createElement('img');
     img.src = 그림주소(it); el.appendChild(img);
     그림앉히기(el, img, it);
+    구멍적용(el, img, it);          // 지운 자리를 오려 낸다(그림은 원본 그대로)
     if (it.이름){ const c = document.createElement('span'); c.className = 'cap'; c.textContent = it.이름; el.appendChild(c); }
   } else if (it.종류 === 'line'){
     el.style.borderTop = '0.4mm solid #111110';
@@ -553,7 +608,8 @@ function 겹친것고르기(sh){
   let 톡 = null;
   sh.addEventListener('pointerdown', e => {
     // 누르기 직전에 무엇이 골라져 있었는지 적어 둔다(고르기보다 먼저 온다)
-    톡 = (e.target.closest('.grip,.del,.tx,.croplayer') || 더누름(e)) ? null
+    // 여럿 고르는 중이면 한 겹 내려가지 않는다 — 톡 칠 때마다 더해야 하니까
+    톡 = (e.target.closest('.grip,.del,.tx,.croplayer') || 더누름(e) || 여럿모드) ? null
        : { x: e.clientX, y: e.clientY, t: Date.now(), 전: 고른것 };
   }, true);
   sh.addEventListener('pointerup', e => {
@@ -575,40 +631,39 @@ function 겹친것고르기(sh){
    사라졌다. 그래서 글상자는 두 번 눌러야 키보드가 뜨고, 처음 잡은 손가락으로는
    끌리지 않았다. 이제 표시만 바꾸고 손잡이만 끼웠다 뺀다. */
 function 고르기(id, 더할까){
-  // Ctrl(윈도우)·⌘(맥)·Shift 를 누른 채 누르면 고른 것에 더하고 뺀다
-  if (더할까 && 고른것 && 고른것 !== id){
+  const 더 = 더할까 || 여럿모드;          // Ctrl·Cmd 를 눌렀거나 「여러 개」 가 켜졌다
+  if (더 && 고른것 && 고른것 !== id){
     const i = 더고른.indexOf(id);
-    if (i >= 0) 더고른.splice(i, 1); else 더고른.push(id);
-    덤표시(); 쪽표시(); return;
+    if (i >= 0) 더고른.splice(i, 1); else 더고른.push(id);   // 든 것이면 뺀다
+    고름표시(); 쪽표시(); return;
   }
-  if (더할까 && 고른것 === id){
+  if (더 && 고른것 === id){
     if (!더고른.length){ 쪽표시(); return; }   // 하나뿐이면 그대로 둔다
     const 남 = 더고른.slice(), 새으뜸 = 남.shift();
-    더고른 = []; 고르기(새으뜸);                 // 손잡이를 옆 것으로 옮겨 단다
-    더고른 = 남; 덤표시(); return;
+    더고른 = [];
+    으뜸앉히기(새으뜸);                        // 손잡이를 옆 것으로 옮겨 단다
+    더고른 = 남; 고름표시(); 쪽표시(); return;
   }
   if (고른것 === id){
-    if (더고른.length){ 더고른 = []; 덤표시(); }
+    if (더고른.length){ 더고른 = []; 고름표시(); }
     쪽표시(); return;
   }
   더고른 = [];
   if (그리는것 && 그리는것.id !== id) 그림끝();   // 다른 것을 고르면 도구상자는 닫는다
-  const 전 = 고른것; 고른것 = id;
-  무대.querySelectorAll('.it.sel').forEach(el => {
-    if (el.dataset.id === id) return;
-    el.classList.remove('sel');
-    el.querySelectorAll('.grip,.del').forEach(x => x.remove());
-  });
+  으뜸앉히기(id); 고름표시(); 쪽표시();
+}
+/* 으뜸으로 앉힌다 — 표시를 켜고 크기 손잡이와 ×를 단다 */
+function 으뜸앉히기(id){
+  고른것 = id;
   const el = 무대.querySelector('.it[data-id="' + id + '"]');
   if (!el){ 그리기(); return; }
-  const 장번호 = +el.closest('.sheet').dataset.p;
+  const sh = el.closest('.sheet');
+  const 장번호 = +sh.dataset.p;
   const it = (문서.장들[장번호] || []).find(x => x.id === id);
   if (!it){ 그리기(); return; }
   el.classList.add('sel');
-  if (!el.querySelector('.grip')) 손잡이달기(el, it, 장번호, el.closest('.sheet'));
-  덤표시(); 쪽표시();
+  if (!el.querySelector('.grip')) 손잡이달기(el, it, 장번호, sh);
 }
-
 function 손잡이달기(el, it, 장번호, sh){
   const g = document.createElement('div'); g.className = 'grip'; el.appendChild(g);
   끌기(g, it, 'size', sh);
@@ -723,9 +778,9 @@ function 끌기(el, it, 무엇, sh){
               box.style.width = mm(it.w); box.style.height = mm(it.h);
               // 잘린 그림은 상자만 바뀌면 안에 든 그림이 그대로 있어, 크기를
               // 바꿔도 내용이 안 커졌다. 상자를 따라 같이 키운다.
-              if (it.종류 === 'img' && it.잘라){
+              if (it.종류 === 'img' && (it.잘라 || (it.구멍 || []).length)){
                 const im = box.querySelector('img');
-                if (im) 그림앉히기(box, im, it);
+                if (im){ 그림앉히기(box, im, it); 구멍적용(box, im, it); }
               }
               // 얹은 도형은 비(0~1)로 담겨 있다 — 상자가 바뀌면 그 비로 다시 편다
               if ((it.그림들 || []).length) 얹은그림그리기(box, it); }
@@ -1020,13 +1075,30 @@ function 장정렬(n){
 }
 
 /* ── 앞뒤 · 크기 ────────────────────────────────────── */
-const 지금것 = () => 이장().find(x => x.id === 고른것);
-$('front').onclick = () => { const it = 지금것(); if (it){ it.z = 다음z(); 저장(); 그리기(); } };
-$('back').onclick  = () => { const it = 지금것(); if (it){ 이장().forEach(x => x.z = (x.z || 1) + 1); it.z = 1; 저장(); 그리기(); } };
-$('fitw').onclick  = () => { const it = 지금것(); if (!it) return;
-  const [W, H] = 지금크기(); const 비 = it.h / it.w;
-  it.x = 여백; it.w = W - 여백 * 2;
-  if (it.종류 === 'img'){ it.h = Math.min(H - it.y, it.w * 비); it.w = it.h / 비; it.x = (W - it.w) / 2; }
+const 지금것 = () => 이장().find(x => x.id === 고른것);   // 으뜸 하나
+/* 이 장에서 고른 것 모두 — 아래 연장들은 이것을 쓴다 */
+const 고른것들 = () => { const 뽑 = 고른모두(); return 이장().filter(x => 뽑.includes(x.id)); };
+
+/* 폰에는 Ctrl 키가 없다. 이 단추를 켜면 톡 칠 때마다 고른 것에 더해진다 */
+$('many').onclick = () => {
+  여럿모드 = !여럿모드;
+  $('many').classList.toggle('on', 여럿모드);
+};
+
+$('front').onclick = () => { const 것들 = 고른것들(); if (!것들.length) return;
+  것들.forEach(it => { it.z = 다음z(); });        // 고른 차례대로 앞에 쌓인다
+  저장(); 그리기(); };
+$('back').onclick  = () => { const 것들 = 고른것들(); if (!것들.length) return;
+  이장().forEach(x => x.z = (x.z || 1) + 것들.length);
+  것들.forEach((it, i) => { it.z = i + 1; });
+  저장(); 그리기(); };
+$('fitw').onclick  = () => { const 것들 = 고른것들(); if (!것들.length) return;
+  const [W, H] = 지금크기();
+  것들.forEach(it => {
+    const 비 = it.h / it.w;
+    it.x = 여백; it.w = W - 여백 * 2;
+    if (it.종류 === 'img'){ it.h = Math.min(H - it.y, it.w * 비); it.w = it.h / 비; it.x = (W - it.w) / 2; }
+  });
   저장(); 그리기(); };
 $('clear').onclick = () => { if (!confirm('이 지시서의 모든 장을 지웁니다.')) return;
   문서.장들 = [[]]; 지금장 = 0; 고른것 = null; 저장(); 그리기(); };
@@ -1036,8 +1108,7 @@ let 걸음 = 1;
 $('step').onclick = () => { 걸음 = 걸음 === 1 ? 5 : 걸음 === 5 ? 10 : 1; $('step').textContent = 걸음 + 'mm'; };
 $('nudge').addEventListener('click', e => {
   const b = e.target.closest('[data-n]'); if (!b) return;
-  const 뽑 = 고른모두();
-  const 것들 = 이장().filter(x => 뽑.includes(x.id));
+  const 것들 = 고른것들();
   if (!것들.length){ $('step').textContent = '고르세요'; setTimeout(() => $('step').textContent = 걸음 + 'mm', 1200); return; }
   const [W, H] = 지금크기();
   let dx = 0, dy = 0;
@@ -1189,22 +1260,17 @@ $('cropdup').onclick = () => {
 };
 
 /* 고른 네모만큼 그림에 구멍을 낸다(그 자리가 비친다).
-   쪽 목록의 원본은 건드리지 않는다 — 이 자료가 제 사본을 갖는다. */
-function 구멍내기(it, img, 네모){
-  const cv = document.createElement('canvas');
-  cv.width = img.naturalWidth; cv.height = img.naturalHeight;
-  const g = cv.getContext('2d');
-  g.drawImage(img, 0, 0, cv.width, cv.height);
-  g.clearRect(네모.x * cv.width, 네모.y * cv.height, 네모.w * cv.width, 네모.h * cv.height);
-  it.src = cv.toDataURL('image/png');
-  delete it.쪽;                                   // 이제 제 것을 쓴다
+   그림을 다시 굽지 않는다 — 어디를 지웠는지만 적어 둔다. 파일이 안 커지고,
+   쪽 목록을 가리키던 것(it.쪽)도 그대로 산다. */
+function 구멍적기(it, 네모){
+  (it.구멍 = it.구멍 || []).push(네모);
 }
 
 /* 삭제 — 고른 조각이 캔버스에서 사라진다(그 자리가 빈다) */
 $('cropdel').onclick = () => {
   const c = 고른조각($('cropdel')); if (!c) return;
   const id = c.it.id;
-  구멍내기(c.it, c.img, c.잘라);
+  구멍적기(c.it, c.잘라);
   자르기끝(); 저장(true); 그리기(); 고르기(id);
 };
 
@@ -1213,7 +1279,7 @@ $('cropcut').onclick = () => {
   const c = 고른조각($('cropcut')); if (!c) return;
   const it = c.it, id = it.id;
   복사함 = { src: 그림주소(it), w: c.w, h: c.h, 잘라: c.잘라 };
-  구멍내기(it, c.img, c.잘라);
+  구멍적기(it, c.잘라);
   자르기끝(); 저장(true); 그리기(); 고르기(id);
   띠('paste');
 };
@@ -1253,18 +1319,24 @@ function 붙이기(sh, 장번호, e){
 /* 크게·작게 — 자르기는 배율을 안 건드리므로, 키우고 줄이는 것은 여기서 한다.
    가운데를 붙잡고 한 번에 10% 씩. 손잡이로 끄는 길도 그대로 있다 */
 function 크기바꾸기(배){
-  const it = 지금것();
-  if (!it) return 튕김($(배 > 1 ? 'bigger' : 'smaller'), '고르세요');
-  if (it.종류 === 'line') return 튕김($(배 > 1 ? 'bigger' : 'smaller'), '구분선은 못 바꿉니다');
+  const 단추 = $(배 > 1 ? 'bigger' : 'smaller');
+  const 것들 = 고른것들();
+  if (!것들.length) return 튕김(단추, '고르세요');
   const [W, H] = 지금크기();
-  const 가x = it.x + it.w / 2, 가y = it.y + it.h / 2, 비 = it.h / it.w;
-  let w = Math.max(8, it.w * 배), h = it.종류 === 'img' ? w * 비 : Math.max(6, it.h * 배);
-  if (w > W){ w = W; if (it.종류 === 'img') h = w * 비; }
-  if (h > H){ h = H; if (it.종류 === 'img') w = h / 비; }
-  it.w = w; it.h = h;
-  it.x = Math.max(0, Math.min(W - w, 가x - w / 2));
-  it.y = Math.max(0, Math.min(H - h, 가y - h / 2));
-  저장(true); 그리기(); 고르기(it.id);
+  let 했나 = false;
+  것들.forEach(it => {                      // 저마다 제 가운데를 붙잡고 커지고 작아진다
+    if (it.종류 === 'line') return;
+    const 가x = it.x + it.w / 2, 가y = it.y + it.h / 2, 비 = it.h / it.w;
+    let w = Math.max(8, it.w * 배), h = it.종류 === 'img' ? w * 비 : Math.max(6, it.h * 배);
+    if (w > W){ w = W; if (it.종류 === 'img') h = w * 비; }
+    if (h > H){ h = H; if (it.종류 === 'img') w = h / 비; }
+    it.w = w; it.h = h;
+    it.x = Math.max(0, Math.min(W - w, 가x - w / 2));
+    it.y = Math.max(0, Math.min(H - h, 가y - h / 2));
+    했나 = true;
+  });
+  if (!했나) return 튕김(단추, '구분선은 못 바꿉니다');
+  저장(true); 그리기();
 }
 $('bigger').onclick  = () => 크기바꾸기(1.1);
 $('smaller').onclick = () => 크기바꾸기(1 / 1.1);
@@ -1685,7 +1757,6 @@ try {
   저장된이름 = 문서.이름;
 } catch (e){ 문서 = 새문서(); }
 $('docname').value = 문서.이름 || '작업지시서';
-$('멀티키').textContent = 맥 ? '⌘(커맨드)' : 'Ctrl';   // 쓰는 기계에 맞는 키를 적어 준다
 적용된인쇄방향();
 if (!문서.장들.some(장 => 장.length)){
   글넣기('작업지시서');
