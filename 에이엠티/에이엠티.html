@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.9.91 (2026-09-16) — 작업완료 때 같은 도면에서 같이 나온 작업물의 수량도 보인다
+     버전: v1.9.92 (2026-09-16) — 아무 요청도 없는 확정 발주에 「수정요청됨」 이 뜨던 것을 고침
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2036,7 +2036,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.91</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.92</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2162,7 +2162,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.91</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.9.92</b></p>
         </div>
     </div>
 
@@ -4766,7 +4766,14 @@
                     // 거래처가 넣은 취소·수정 요청은 확정된 뒤에도 이 줄에 그대로 떠야 한다.
                     // 여기 표시가 없어서, 확정된 발주는 요청이 들어와도 목록에서 보이지 않았다.
                     // 판정은 대기목록과 같은 것을 쓴다(unresolvedRequestInfo).
-                    const _req = (typeof unresolvedRequestInfo === 'function') ? unresolvedRequestInfo(item) : null;
+                    // unresolvedRequestInfo() 는 '요청이 있다' 고 이미 판가름난 뒤에 어떤
+                    // 요청인지만 알려 주는 함수다. 아무 요청도 없는 발주에 그냥 부르면
+                    // 마지막 줄까지 내려가 「수정요청됨」 을 돌려준다. 그래서 여기서만
+                    // 거르는 것을 빠뜨려, 깨끗한 확정 발주에도 배지가 붙고 분홍이 깔렸다.
+                    // 대기목록·거른목록과 같게 hasUnresolvedRequest() 로 먼저 거른다.
+                    const _req = (typeof hasUnresolvedRequest === 'function' && hasUnresolvedRequest(item)
+                                  && typeof unresolvedRequestInfo === 'function')
+                        ? unresolvedRequestInfo(item) : null;
                     const _reqBadge = _req
                         ? `<span style="background:${_req.accent};color:#fff;" class="px-2 py-0.5 rounded font-black text-[10px] uppercase ml-1 animate-pulse">${_req.title}</span>`
                         : '';
