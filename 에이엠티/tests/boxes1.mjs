@@ -63,8 +63,62 @@ console.log('박스 누르는 크기: '+JSON.stringify(판판.크기));
    합(판판.색)+' / '+합(판판.두께)+' / '+합(판판.가공));
 판('박스 누르는 높이 44px 이상', Object.values(판판.크기).every(x=>x && x.세로>=44),
    JSON.stringify(판판.크기));
+// 박스와 재고 줄이 한 화면에 같이 보이는 자리로 옮겨 찍는다 (경계가 보여야 뜻이 있다).
+// 이 화면은 창이 아니라 안쪽 칸이 구른다 — 구르는 칸을 찾아 그것을 굴린다.
+await p.evaluate(()=>{
+  const l=document.getElementById('ams-list'); if(!l) return;
+  let e=l.parentElement, 구르는=null;
+  while(e && e!==document.body){
+    const s=getComputedStyle(e);
+    if(/(auto|scroll)/.test(s.overflowY) && e.scrollHeight>e.clientHeight+4){ 구르는=e; break; }
+    e=e.parentElement;
+  }
+  const 목표 = l.getBoundingClientRect().top - 260;
+  if(구르는) 구르는.scrollTop += 목표;
+  else { document.scrollingElement.scrollTop += 목표; window.scrollBy(0, 목표); }
+});
+await p.waitForTimeout(250);
 await p.screenshot({path:그림칸+'/stock-375-박스판.png'});
+await p.evaluate(()=>window.scrollTo(0,0));
 
+
+// ── 박스판에도 재고 적는 줄이 보이는가 (09-17 00:23 지시 — 사장님이 여기에 수량을 적으신다)
+const 판목록 = await p.evaluate(()=>{
+  const 줄=[...document.querySelectorAll('#ams-list .ams-row')];
+  const 첫=줄[0];
+  return {줄수:줄.length,
+          박스판보임:!document.getElementById('ams-boxes').hidden,
+          목록보임:(()=>{const e=document.getElementById('ams-list'); if(!e) return false;
+            const s=getComputedStyle(e); const r=e.getBoundingClientRect();
+            return !e.hidden && s.display!=='none' && r.height>0;})(),
+          수량칸:첫?!!첫.querySelector('input'):false,
+          더하기빼기:첫?[...첫.querySelectorAll('button')].map(b=>b.textContent.trim()).length:0,
+          머리:(document.getElementById('ams-sub')||{}).textContent};
+});
+console.log('■ 박스판의 재고 줄: '+JSON.stringify(판목록));
+판('박스판에 재고 줄이 보인다 (한 겹 뒤로 안 숨는다)', 판목록.목록보임===true && 판목록.줄수>0,
+   '보임 '+판목록.목록보임+' · '+판목록.줄수+'줄');
+판('박스판에 35짝이 다 보인다', 판목록.줄수===35, 판목록.줄수+'줄');
+판('박스판에서도 수량 ± 칸이 그대로다', 판목록.수량칸===true && 판목록.더하기빼기>=2,
+   '숫자칸 '+판목록.수량칸+' · 단추 '+판목록.더하기빼기+'개');
+판('박스판 머리에 전체 짝 수가 뜬다', /35짝/.test(판목록.머리||''), 판목록.머리);
+// 박스와 재고 줄이 한 화면에 같이 보이는 자리로 옮겨 찍는다 (경계가 보여야 뜻이 있다).
+// 이 화면은 창이 아니라 안쪽 칸이 구른다 — 구르는 칸을 찾아 그것을 굴린다.
+await p.evaluate(()=>{
+  const l=document.getElementById('ams-list'); if(!l) return;
+  let e=l.parentElement, 구르는=null;
+  while(e && e!==document.body){
+    const s=getComputedStyle(e);
+    if(/(auto|scroll)/.test(s.overflowY) && e.scrollHeight>e.clientHeight+4){ 구르는=e; break; }
+    e=e.parentElement;
+  }
+  const 목표 = l.getBoundingClientRect().top - 260;
+  if(구르는) 구르는.scrollTop += 목표;
+  else { document.scrollingElement.scrollTop += 목표; window.scrollBy(0, 목표); }
+});
+await p.waitForTimeout(250);
+await p.screenshot({path:그림칸+'/stock-375-박스판.png'});
+await p.evaluate(()=>window.scrollTo(0,0));
 // ── 진짜 손가락으로 박스에 들어간다
 const 들어가기 = async (id, 값) => {
   const h = await p.evaluateHandle(({id,값})=>{
