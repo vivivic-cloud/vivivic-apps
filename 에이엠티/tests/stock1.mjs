@@ -44,53 +44,53 @@ const 손 = await p.evaluate(()=>{
 console.log('■ 원장에서 센 가공: '+손.가짓수+'가지 · 전체 '+손.전체짝+'짝');
 console.log('   '+손.표.map(([k,v])=>k+'('+v+')').join(' · '));
 
-const 박스 = () => p.evaluate(()=>[...(document.getElementById('ams-box-가공')||{children:[]}).children]
-  .map(b=>({이름:(b.querySelector('.amth-nm')||{}).textContent,
-            짝:parseInt(((b.querySelector('.amth-pct')||{}).textContent||'').replace(/[^\d]/g,''),10)||0,
-            값:b.dataset['값']})));
-const 가공박스 = await 박스();
-console.log('■ 화면의 가공 박스: '+가공박스.length+'개');
+const 알약 = (칸) => p.evaluate(id=>[...(document.getElementById(id)||{children:[]}).children]
+  .map(b=>({이름:b.childNodes[0].textContent.trim(),
+            짝:parseInt(((b.querySelector('.ams-수')||{}).textContent||'').replace(/[^\d]/g,''),10)||0,
+            값:b.dataset['값']})), 칸);
+const 가공칩 = await 알약('ams-가공');
+console.log('■ 화면의 가공 알약: '+가공칩.length+'개');
 판('가공이 원장에 적힌 그대로 갈라진다 (합치지 않는다)',
-   가공박스.length===손.가짓수 && 손.표.every(([k,v])=>가공박스.some(x=>x.값===k && x.짝===v)),
-   '화면 '+가공박스.length+'가지 · 원장 '+손.가짓수+'가지');
-판('가공별 짝을 다 더하면 전체와 같다', 가공박스.reduce((a,c)=>a+c.짝,0)===손.전체짝,
-   가공박스.reduce((a,c)=>a+c.짝,0)+' / '+손.전체짝);
+   가공칩.length===손.가짓수 && 손.표.every(([k,v])=>가공칩.some(x=>x.값===k && x.짝===v)),
+   '화면 '+가공칩.length+'가지 · 원장 '+손.가짓수+'가지');
+판('가공별 짝을 다 더하면 전체와 같다', 가공칩.reduce((a,c)=>a+c.짝,0)===손.전체짝,
+   가공칩.reduce((a,c)=>a+c.짝,0)+' / '+손.전체짝);
 
-// ── 진짜 손가락으로 제일 큰 가공 박스에 들어가, 그 안에서 색상·두께로 더 좁힌다
+// ── 진짜 손가락으로 제일 큰 가공 알약을 누르고, 색상·두께로 더 좁힌다
 const 톡 = async (sel, n=0) => {
   const h=await p.evaluateHandle(({s,n})=>document.querySelectorAll(s)[n]||null,{s:sel,n});
   const el=h.asElement(); if(!el) return false;
   await el.scrollIntoViewIfNeeded(); await el.tap(); await p.waitForTimeout(280); return true;
 };
-const 칩톡 = async (칸, 글) => {
+const 칩톡 = async (칸, 값) => {
   const i=await p.evaluate(({s,g})=>[...(document.getElementById(s)||{children:[]}).children]
-      .findIndex(e=>e.textContent.trim()===g), {s:칸,g:글});
+      .findIndex(e=>e.dataset['값']===g), {s:칸,g:값});
   if(i<0) return false; return 톡('#'+칸+' .amtb-chip', i);
 };
 const 셈보기 = () => p.evaluate(()=>({
   머리:(document.getElementById('ams-sub')||{}).textContent,
   줄:document.querySelectorAll('#ams-list .ams-row').length,
-  박스:(document.getElementById('ams-박스이름')||{}).textContent,
+  켠것:['색','두께','가공'].map(g=>[...document.querySelectorAll('#ams-'+g+' .amtb-chip.on')]
+        .map(e=>e.dataset['값'])).flat(),
   푼다:(document.getElementById('ams-푼다')||{classList:{contains:()=>null}}).classList.contains('on')}));
 
-const 큰것 = 가공박스[0];
-await 톡('#ams-box-가공 .amth-tile', 0);
+const 다 = await 셈보기();
+const 큰것 = 가공칩[0];
+await 칩톡('ams-가공', 큰것.값);
 const 안 = await 셈보기();
-console.log('■ 「'+큰것.이름+'」 박스 안: '+JSON.stringify(안));
-판('가공 박스에 들어가면 그 가공 짝만 모인다', 안.줄===큰것.짝 && 안.박스===큰것.이름,
-   큰것.이름+' 표 '+큰것.짝+'짝 · 화면 '+안.줄+'줄');
+console.log('■ 「'+큰것.이름+'」 알약 누른 뒤: '+JSON.stringify(안));
+판('가공 알약을 누르면 그 가공 짝만 목록에 남는다', 안.줄===큰것.짝 && 안.켠것[0]===큰것.값,
+   큰것.이름+' 알약 '+큰것.짝+'짝 · 화면 '+안.줄+'줄');
 
-// 그 안에서 색상 하나를 더 건다
-const 색칩 = await p.evaluate(()=>[...(document.getElementById('ams-색')||{children:[]}).children]
-  .map(b=>b.textContent.trim()).filter(x=>x!=='전체'));
-await 칩톡('ams-색', 색칩[0]);
+// 그 위에 색상 하나를 더 건다
+const 색칩 = await 알약('ams-색');
+await 칩톡('ams-색', 색칩[0].값);
 const 색까지 = await 셈보기();
 // 두께도 하나 더
-const 두칩 = await p.evaluate(()=>[...(document.getElementById('ams-두께')||{children:[]}).children]
-  .map(b=>b.textContent.trim()).filter(x=>x!=='전체'));
-await 칩톡('ams-두께', 두칩[0]);
+const 두칩 = await 알약('ams-두께');
+await 칩톡('ams-두께', 두칩[0].값);
 const 두께까지 = await 셈보기();
-console.log('■ 좁히기: 가공만 '+안.줄+'줄 → +'+색칩[0]+' '+색까지.줄+'줄 → +'+두칩[0]+' '+두께까지.줄+'줄');
+console.log('■ 좁히기: 전체 '+다.줄+'줄 → 가공만 '+안.줄+'줄 → +'+색칩[0].이름+' '+색까지.줄+'줄 → +'+두칩[0].이름+' '+두께까지.줄+'줄');
 판('가공 + 색상 + 두께를 같이 걸면 좁혀진다 (AND 그대로)',
    안.줄 >= 색까지.줄 && 색까지.줄 >= 두께까지.줄,
    안.줄+' ≥ '+색까지.줄+' ≥ '+두께까지.줄);
@@ -99,13 +99,19 @@ console.log('■ 좁히기: 가공만 '+안.줄+'줄 → +'+색칩[0]+' '+색까
 // ── 거르기 풀기가 다 푸는가
 await 톡('#ams-푼다', 0);
 const 푼뒤 = await 셈보기();
-const 켠것 = await p.evaluate(()=>({
-  색:[...(document.getElementById('ams-색')||{children:[]}).children].filter(b=>b.classList.contains('on')).map(b=>b.textContent.trim()),
-  두께:[...(document.getElementById('ams-두께')||{children:[]}).children].filter(b=>b.classList.contains('on')).map(b=>b.textContent.trim())}));
-console.log('■ 거르기 푼 뒤: '+JSON.stringify(푼뒤)+' · 켜진 칩 '+JSON.stringify(켠것));
-판('거르기 풀기가 색상·두께를 다 푼다', 켠것.색[0]==='전체' && 켠것.두께[0]==='전체', JSON.stringify(켠것));
-판('풀면 그 박스의 짝 수로 돌아온다', 푼뒤.줄===큰것.짝, 큰것.짝+' → '+푼뒤.줄);
+console.log('■ 거르기 푼 뒤: '+JSON.stringify(푼뒤));
+판('거르기 풀기가 색상·두께·가공을 다 푼다', 푼뒤.켠것.length===0, JSON.stringify(푼뒤.켠것));
+판('풀면 전체 짝 수로 돌아온다', 푼뒤.줄===손.전체짝, 손.전체짝+' → '+푼뒤.줄);
 판('풀면 「거르기 풀기」 가 꺼진다', 푼뒤.푼다===false, String(푼뒤.푼다));
+
+// ── 같은 알약을 다시 누르면 풀린다 (들어가는 칸이 없으니 되돌리는 길은 이것뿐이다)
+await 칩톡('ams-가공', 큰것.값);
+const 다시1 = await 셈보기();
+await 칩톡('ams-가공', 큰것.값);
+const 다시2 = await 셈보기();
+console.log('■ 같은 알약 두 번: '+다시1.줄+'줄 → '+다시2.줄+'줄');
+판('같은 알약을 다시 누르면 풀린다', 다시1.줄===큰것.짝 && 다시2.줄===손.전체짝,
+   다시1.줄+' → '+다시2.줄);
 
 const 끝 = await p.evaluate(()=>({쓰기:window.__쓰기, 문서가로:document.documentElement.scrollWidth}));
 판('375px 가로 스크롤 없다', 끝.문서가로<=375, 끝.문서가로+'px');

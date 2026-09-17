@@ -45,11 +45,9 @@ console.log('■ 박스 글:', await p.evaluate(()=>{const e=document.querySelec
   return e? e.innerText.replace(/\s*\n+\s*/g,' / ') : '(박스 없음)';}));
 console.log('■ 박스 눌러 열기:', await 탭('#amth-mine [data-amtb-id]'),
   '→ 원장재고 화면?', await p.evaluate(()=>document.documentElement.dataset.amtstock==='1'));
-// 원장재고가 두 칸이 됐다(박스판 → 박스 안). 목록 줄은 박스에 들어가야 나온다.
-// 첫 색상 박스로 진짜 손가락으로 들어간다.
-console.log('■ 첫 색상 박스로 들어가기:', await 탭('#ams-box-색 .amth-tile'),
-  '→ 박스 안?', await p.evaluate(()=>!document.getElementById('ams-inner').hidden),
-  '·', await p.evaluate(()=>(document.getElementById('ams-박스이름')||{}).textContent));
+// 원장재고는 한 칸이다 — 알약 세 줄 바로 아래에 목록이 늘 있다(들어가는 칸이 없다).
+console.log('■ 알약 줄:', await p.evaluate(()=>['색','두께','가공']
+  .map(g=>g+' '+document.querySelectorAll('#ams-'+g+' .amtb-chip').length+'개').join(' · ')));
 const 재기=async(sel)=>p.evaluate(s=>{const e=document.querySelector(s); if(!e) return null;
   const r=e.getBoundingClientRect(), st=getComputedStyle(e);
   return {w:Math.round(r.width),h:Math.round(r.height),글자:st.fontSize};},sel);

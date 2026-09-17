@@ -40,11 +40,8 @@ const 탭=async(sel,n=0)=>{const c=await p.evaluate(({s,n})=>{const e=document.q
 const 칩누르기=async(자리,글)=>{const i=await p.evaluate(({s,g})=>{const es=[...document.querySelectorAll(s+' .amtb-chip')];
   return es.findIndex(e=>e.textContent.trim().startsWith(g));},{s:자리,g:글});
   if(i<0){console.log('   («'+글+'» 칩 없음)'); return false;} return 탭(자리+' .amtb-chip', i);};
-// 원장재고가 두 칸이 됐다 — 칩 줄과 목록은 박스에 들어가야 나온다.
-// 가장 큰 가공 박스(LPM-양면)로 진짜 손가락으로 들어간 뒤 칩을 눌러 본다.
-console.log('■ 가공 박스로 들어가기:', await 탭('#ams-box-가공 .amth-tile', 0),
-  '→', await p.evaluate(()=>(document.getElementById('ams-박스이름')||{}).textContent
-      + ' / ' + (document.getElementById('ams-박스수')||{}).textContent));
+// 알약을 누르면 그 자리에서 목록이 좁혀진다 — 들어가는 칸이 없다.
+console.log('■ 가공 칩:', JSON.stringify(await 칩('#ams-가공')));
 await 칩누르기('#ams-색','화이트');
 console.log('■ 색상 «화이트» 만:', JSON.stringify(await 셈()),
   '\n   보이는 것:', JSON.stringify(await p.evaluate(()=>[...document.querySelectorAll('#ams-list .ams-nm')].map(e=>e.textContent))));

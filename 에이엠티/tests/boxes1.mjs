@@ -1,4 +1,6 @@
-// 원장재고 — 필터가 아니라 박스. 폰 375px, 진짜 손가락으로 눌러 들어간다.
+// 원장재고 — 박스가 아니라 알약 세 줄. 폰 375px, 진짜 손가락으로 누른다.
+// 사장님 지시(09-17 00:37): 「필터링 별 박스 작게 만들어줘 해당 버튼 클릭시
+// 아래로 해당 원장만 나오게해줘 스크롤밑으로 길게 노출시키지말라고」
 import { chromium, devices } from '/opt/node22/lib/node_modules/playwright/index.mjs';
 import { readFileSync } from 'node:fs';
 const HERE='/tmp/claude-0/-home-user-vivivic-apps/17fbe99e-07b2-5ca2-bd6b-e6d2d41ab942/scratchpad';
@@ -31,198 +33,118 @@ await p.evaluate((L)=>{
 }, L);
 await p.waitForTimeout(500);
 
-const 박스읽기 = () => p.evaluate(()=>{
-  const 통=id=>[...(document.getElementById(id)||{children:[]}).children].map(b=>({
-      이름:(b.querySelector('.amth-nm')||{}).textContent,
-      짝:parseInt(((b.querySelector('.amth-pct')||{}).textContent||'').replace(/[^\d]/g,''),10)||0,
-      갈래:b.dataset['갈래'], 값:b.dataset['값']}));
-  const 재=id=>{const e=document.getElementById(id); const b=e&&e.children[0];
+const 읽기 = () => p.evaluate(()=>{
+  const 줄=id=>[...(document.getElementById(id)||{children:[]}).children].map(b=>({
+      이름:b.childNodes[0].textContent.trim(),
+      짝:parseInt(((b.querySelector('.ams-수')||{}).textContent||'').replace(/[^\d]/g,''),10)||0,
+      값:b.dataset['값'], 켬:b.classList.contains('on')}));
+  const 재=id=>{const e=document.getElementById(id), b=e&&e.children[0];
     if(!b) return null; const r=b.getBoundingClientRect(); return {가로:Math.round(r.width), 세로:Math.round(r.height)};};
-  return {색:통('ams-box-색'), 두께:통('ams-box-두께'), 가공:통('ams-box-가공'),
-          박스판보임:!document.getElementById('ams-boxes').hidden,
-          안보임:!document.getElementById('ams-inner').hidden,
+  const 칸=id=>{const e=document.getElementById(id); if(!e) return null; const r=e.getBoundingClientRect();
+    return {세로:Math.round(r.height), 보이는폭:Math.round(e.clientWidth), 담긴폭:Math.round(e.scrollWidth),
+            옆으로밈:e.scrollWidth>e.clientWidth+1, 아래로깔림:e.scrollHeight>e.clientHeight+1};};
+  // 거르기 세 줄이 세로로 먹는 자리 — 이름표 '색상' 꼭대기부터 가공 줄 바닥까지
+  const 첫=document.getElementById('ams-이름-색'), 끝=document.getElementById('ams-가공');
+  const 먹는자리 = (첫&&끝) ? Math.round(끝.getBoundingClientRect().bottom - 첫.getBoundingClientRect().top) : null;
+  return {색:줄('ams-색'), 두께:줄('ams-두께'), 가공:줄('ams-가공'),
+          크기:{색:재('ams-색'), 두께:재('ams-두께'), 가공:재('ams-가공')},
+          줄칸:{색:칸('ams-색'), 두께:칸('ams-두께'), 가공:칸('ams-가공')},
+          먹는자리,
+          목록줄:document.querySelectorAll('#ams-list .ams-row').length,
+          목록보임:(()=>{const e=document.getElementById('ams-list'); if(!e) return false;
+            const s=getComputedStyle(e); return !e.hidden && s.display!=='none' && e.getBoundingClientRect().height>0;})(),
+          목록첫줄y:(()=>{const e=document.querySelector('#ams-list .ams-row');
+            return e?Math.round(e.getBoundingClientRect().top):null;})(),
           sub:(document.getElementById('ams-sub')||{}).textContent,
-          크기:{색:재('ams-box-색'), 두께:재('ams-box-두께'), 가공:재('ams-box-가공')},
-          가공칩있나:!!document.getElementById('ams-가공'),
+          푼다켜짐:(document.getElementById('ams-푼다')||{classList:{contains:()=>null}}).classList.contains('on'),
+          박스판있나:!!document.getElementById('ams-boxes'), 뒤단추있나:!!document.getElementById('ams-뒤'),
           문서가로:document.documentElement.scrollWidth, 쓰기:window.__쓰기};
 });
-const 판판 = await 박스읽기();
+
+const 첫판 = await 읽기();
 const 합 = a => a.reduce((x,c)=>x+c.짝,0);
-console.log('색상 박스 '+판판.색.length+'개: '+판판.색.map(x=>x.이름+'('+x.짝+')').join(' · '));
-console.log('두께 박스 '+판판.두께.length+'개: '+판판.두께.map(x=>x.이름+'('+x.짝+')').join(' · '));
-console.log('가공 박스 '+판판.가공.length+'개: '+판판.가공.map(x=>x.이름+'('+x.짝+')').join(' · '));
-console.log('합계 — 색상 '+합(판판.색)+' · 두께 '+합(판판.두께)+' · 가공 '+합(판판.가공)+' (sub: '+판판.sub+')');
-console.log('박스 누르는 크기: '+JSON.stringify(판판.크기));
-판('들어오면 박스판이 먼저 보인다', 판판.박스판보임===true && 판판.안보임===false,
-   '박스판 '+판판.박스판보임+' · 박스안 '+판판.안보임);
-판('어제 잘못 넣은 가공 칩 줄은 없어졌다', 판판.가공칩있나===false, String(판판.가공칩있나));
-판('색상 박스 10개', 판판.색.length===10, 판판.색.length+'개');
-판('두께 박스 5개', 판판.두께.length===5, 판판.두께.length+'개');
-판('가공 박스 9개', 판판.가공.length===9, 판판.가공.length+'개');
-판('세 묶음 합이 다 35', 합(판판.색)===35 && 합(판판.두께)===35 && 합(판판.가공)===35,
-   합(판판.색)+' / '+합(판판.두께)+' / '+합(판판.가공));
-판('박스 누르는 높이 44px 이상', Object.values(판판.크기).every(x=>x && x.세로>=44),
-   JSON.stringify(판판.크기));
-// 박스와 재고 줄이 한 화면에 같이 보이는 자리로 옮겨 찍는다 (경계가 보여야 뜻이 있다).
-// 이 화면은 창이 아니라 안쪽 칸이 구른다 — 구르는 칸을 찾아 그것을 굴린다.
-await p.evaluate(()=>{
-  const l=document.getElementById('ams-list'); if(!l) return;
-  let e=l.parentElement, 구르는=null;
-  while(e && e!==document.body){
-    const s=getComputedStyle(e);
-    if(/(auto|scroll)/.test(s.overflowY) && e.scrollHeight>e.clientHeight+4){ 구르는=e; break; }
-    e=e.parentElement;
-  }
-  const 목표 = l.getBoundingClientRect().top - 260;
-  if(구르는) 구르는.scrollTop += 목표;
-  else { document.scrollingElement.scrollTop += 목표; window.scrollBy(0, 목표); }
-});
-await p.waitForTimeout(250);
-await p.screenshot({path:그림칸+'/stock-375-박스판.png'});
-await p.evaluate(()=>window.scrollTo(0,0));
+console.log('색상 알약 '+첫판.색.length+'개: '+첫판.색.map(x=>x.이름+'('+x.짝+')').join(' · '));
+console.log('두께 알약 '+첫판.두께.length+'개: '+첫판.두께.map(x=>x.이름+'('+x.짝+')').join(' · '));
+console.log('가공 알약 '+첫판.가공.length+'개: '+첫판.가공.map(x=>x.이름+'('+x.짝+')').join(' · '));
+console.log('합계 — 색상 '+합(첫판.색)+' · 두께 '+합(첫판.두께)+' · 가공 '+합(첫판.가공)+' (sub: '+첫판.sub+')');
+console.log('알약 누르는 크기: '+JSON.stringify(첫판.크기));
+console.log('거르기 세 줄이 먹는 세로 자리: '+첫판.먹는자리+'px · 목록 첫 줄 y '+첫판.목록첫줄y+'px');
+console.log('줄칸: '+JSON.stringify(첫판.줄칸));
 
+판('박스판과 돌아가기 단추가 없어졌다 (들어가는 칸이 없다)',
+   첫판.박스판있나===false && 첫판.뒤단추있나===false,
+   '박스판 '+첫판.박스판있나+' · 뒤단추 '+첫판.뒤단추있나);
+판('색상 알약 10개', 첫판.색.length===10, 첫판.색.length+'개');
+판('두께 알약 5개', 첫판.두께.length===5, 첫판.두께.length+'개');
+판('가공 알약 9개', 첫판.가공.length===9, 첫판.가공.length+'개');
+판('세 묶음 합이 다 35', 합(첫판.색)===35 && 합(첫판.두께)===35 && 합(첫판.가공)===35,
+   합(첫판.색)+' / '+합(첫판.두께)+' / '+합(첫판.가공));
+판('알약 누르는 높이 44px 이상', Object.values(첫판.크기).every(x=>x && x.세로>=44),
+   JSON.stringify(첫판.크기));
+판('갈래마다 딱 한 줄 — 아래로 안 깔린다 (넘치면 옆으로 민다)',
+   Object.values(첫판.줄칸).every(x=>x && !x.아래로깔림),
+   Object.entries(첫판.줄칸).map(([k,v])=>k+' '+v.세로+'px(담긴폭 '+v.담긴폭+')').join(' · '));
+판('들어오자마자 목록 35짝이 알약 바로 아래에 있다',
+   첫판.목록보임===true && 첫판.목록줄===35, '보임 '+첫판.목록보임+' · '+첫판.목록줄+'줄');
+판('세 줄과 목록 첫 줄이 한 화면(812px) 안에 같이 든다',
+   첫판.목록첫줄y!=null && 첫판.목록첫줄y<812, '목록 첫 줄 y '+첫판.목록첫줄y+'px');
 
-// ── 박스판에도 재고 적는 줄이 보이는가 (09-17 00:23 지시 — 사장님이 여기에 수량을 적으신다)
-const 판목록 = await p.evaluate(()=>{
-  const 줄=[...document.querySelectorAll('#ams-list .ams-row')];
-  const 첫=줄[0];
-  return {줄수:줄.length,
-          박스판보임:!document.getElementById('ams-boxes').hidden,
-          목록보임:(()=>{const e=document.getElementById('ams-list'); if(!e) return false;
-            const s=getComputedStyle(e); const r=e.getBoundingClientRect();
-            return !e.hidden && s.display!=='none' && r.height>0;})(),
-          수량칸:첫?!!첫.querySelector('input'):false,
-          더하기빼기:첫?[...첫.querySelectorAll('button')].map(b=>b.textContent.trim()).length:0,
-          머리:(document.getElementById('ams-sub')||{}).textContent};
-});
-console.log('■ 박스판의 재고 줄: '+JSON.stringify(판목록));
-판('박스판에 재고 줄이 보인다 (한 겹 뒤로 안 숨는다)', 판목록.목록보임===true && 판목록.줄수>0,
-   '보임 '+판목록.목록보임+' · '+판목록.줄수+'줄');
-판('박스판에 35짝이 다 보인다', 판목록.줄수===35, 판목록.줄수+'줄');
-판('박스판에서도 수량 ± 칸이 그대로다', 판목록.수량칸===true && 판목록.더하기빼기>=2,
-   '숫자칸 '+판목록.수량칸+' · 단추 '+판목록.더하기빼기+'개');
-판('박스판 머리에 전체 짝 수가 뜬다', /35짝/.test(판목록.머리||''), 판목록.머리);
-// 박스와 재고 줄이 한 화면에 같이 보이는 자리로 옮겨 찍는다 (경계가 보여야 뜻이 있다).
-// 이 화면은 창이 아니라 안쪽 칸이 구른다 — 구르는 칸을 찾아 그것을 굴린다.
-await p.evaluate(()=>{
-  const l=document.getElementById('ams-list'); if(!l) return;
-  let e=l.parentElement, 구르는=null;
-  while(e && e!==document.body){
-    const s=getComputedStyle(e);
-    if(/(auto|scroll)/.test(s.overflowY) && e.scrollHeight>e.clientHeight+4){ 구르는=e; break; }
-    e=e.parentElement;
-  }
-  const 목표 = l.getBoundingClientRect().top - 260;
-  if(구르는) 구르는.scrollTop += 목표;
-  else { document.scrollingElement.scrollTop += 목표; window.scrollBy(0, 목표); }
-});
-await p.waitForTimeout(250);
-await p.screenshot({path:그림칸+'/stock-375-박스판.png'});
-await p.evaluate(()=>window.scrollTo(0,0));
-// ── 진짜 손가락으로 박스에 들어간다
-const 들어가기 = async (id, 값) => {
-  const h = await p.evaluateHandle(({id,값})=>{
-      const 찾 = [...document.getElementById(id).children].find(b=>b.dataset['값']===값);
-      return 찾 || null;
-    }, {id,값});
-  const el=h.asElement();
-  if(!el){ console.log('   !! 못 집음: '+id+' / '+값); return null; }
-  await el.scrollIntoViewIfNeeded(); await el.tap(); await p.waitForTimeout(350);
-  return await p.evaluate(()=>({
-    이름:(document.getElementById('ams-박스이름')||{}).textContent,
-    수:(document.getElementById('ams-박스수')||{}).textContent,
-    줄:document.querySelectorAll('#ams-list .ams-row').length,
-    박스판보임:!document.getElementById('ams-boxes').hidden,
-    안보임:!document.getElementById('ams-inner').hidden,
-    뒤:(()=>{const e=document.getElementById('ams-뒤'); if(!e) return null;
-        const r=e.getBoundingClientRect(); return {가로:Math.round(r.width), 세로:Math.round(r.height)};})(),
-    색칩:!!document.getElementById('ams-색'), 두께칩:!!document.getElementById('ams-두께'),
-    문서가로:document.documentElement.scrollWidth}));
+// ── 진짜 손가락으로 알약을 누른다
+const 칩톡 = async (칸, 값) => {
+  const h=await p.evaluateHandle(({s,g})=>[...(document.getElementById(s)||{children:[]}).children]
+      .find(e=>e.dataset['값']===g)||null, {s:칸,g:값});
+  const el=h.asElement(); if(!el){ console.log('   !! 못 집음: '+칸+' / '+값); return false; }
+  await el.scrollIntoViewIfNeeded(); await el.tap(); await p.waitForTimeout(320); return true;
 };
-const 돌아가기 = async () => {
-  const h=await p.evaluateHandle(()=>document.getElementById('ams-뒤'));
-  await h.asElement().scrollIntoViewIfNeeded(); await h.asElement().tap(); await p.waitForTimeout(300);
-  return await 박스읽기();
-};
+const 표에서 = (줄,값) => (줄.find(x=>x.값===값)||{}).짝;
 
-const _두값 = (판판.두께.find(x=>x.이름==='18T')||{}).값;
-const 쓸것 = [['ams-box-가공','LPM-양면'], ['ams-box-색','화이트'], ['ams-box-두께', _두값]];
-const 본것 = [];
-for (const [id,값] of 쓸것) {
-  const r = await 들어가기(id, 값);
-  const 표 = (id.includes('가공')?판판.가공:id.includes('색')?판판.색:판판.두께).find(x=>x.값===값);
-  if(!r) { console.log('   !! 들어가지 못함: '+id+' / '+값); continue; }
-  본것.push({값, 표:표?표.짝:null, 머리:r.수, 줄:r.줄, 뒤:r.뒤});
-  await 돌아가기();
-}
-console.log('박스에 들어가 본 것:');
-본것.forEach(x=>console.log('   '+x.값.padEnd(10)+' 박스표 '+x.표+'짝 · 머리 '+x.머리+' · 줄 '+x.줄+'개'));
-판('박스에 들어가면 그 묶음 짝만 모여 있다', 본것.every(x=>x.줄===x.표),
-   본것.map(x=>x.값+' '+x.줄+'/'+x.표).join(' · '));
-판('머리에 그 박스 이름과 짝 수가 뜬다', 본것.every(x=>x.머리===x.표+'짝'),
-   본것.map(x=>x.머리).join(' · '));
-판('돌아가기 단추 44px 이상', 본것.every(x=>x.뒤 && x.뒤.세로>=44), JSON.stringify(본것[0].뒤));
-// 줄을 지운 것이 아니라 감춘 것이다 — 되돌리기 쉽게. 그래서 자리 자체는 그대로 있어야 한다.
-판('칩 줄을 지운 것이 아니라 감춘 것이다',
-   (await p.evaluate(()=>({색:!!document.getElementById('ams-색'), 두:!!document.getElementById('ams-두께')}))).색, '자리 그대로 있음');
+// ① 색상 「화이트」
+await 칩톡('ams-색','화이트');
+const 화이트 = await 읽기();
+console.log('■ 「화이트」 누른 뒤: '+화이트.목록줄+'줄 · sub 「'+화이트.sub+'」');
+판('「화이트」 를 누르면 그 자리에서 목록만 좁혀진다',
+   화이트.목록줄===표에서(첫판.색,'화이트'), 표에서(첫판.색,'화이트')+'짝 → '+화이트.목록줄+'줄');
+판('누른 알약이 켜지고 「거르기 풀기」 가 나온다',
+   화이트.색.find(x=>x.값==='화이트').켬===true && 화이트.푼다켜짐===true,
+   '켬 '+화이트.색.find(x=>x.값==='화이트').켬+' · 푼다 '+화이트.푼다켜짐);
+판('머리에 무엇을 걸었는지와 몇 짝인지 뜬다', /화이트/.test(화이트.sub) && /짝/.test(화이트.sub), 화이트.sub);
+판('걸어도 세 줄이 먹는 세로 자리가 그대로다', 화이트.먹는자리===첫판.먹는자리,
+   첫판.먹는자리+'px → '+화이트.먹는자리+'px');
 
+// 판번호를 올린 뒤에 찍는 그림 — 세 줄과 목록 첫 줄이 한 화면에 같이 보이게
+await p.evaluate(()=>window.scrollTo(0,0));
+await p.waitForTimeout(200);
+await p.screenshot({path:그림칸+'/stock-375-알약.png'});
 
-// ── 박스 안에서 쓸모없는 칩줄이 감춰지는가 (13:25 지시)
-const 줄보기 = () => p.evaluate(()=>{
-  const 진짜보임=e=>{ if(!e) return null;
-    if(e.hidden) return false;
-    const s=getComputedStyle(e);
-    if(s.display==='none'||s.visibility==='hidden') return false;
-    const r=e.getBoundingClientRect(); return r.height>0 && r.width>0; };
-  const 줄=(id)=>{ const e=document.getElementById(id), n=document.getElementById('ams-이름-'+id.replace('ams-',''));
-    return {보임:진짜보임(e), 칩:e?[...e.children].map(b=>b.textContent.trim()):[],
-            이름표보임:진짜보임(n)}; };
-  return {색:줄('ams-색'), 두께:줄('ams-두께'),
-          박스:(document.getElementById('ams-박스이름')||{}).textContent,
-          푼다켜짐:(document.getElementById('ams-푼다')||{classList:{contains:()=>null}}).classList.contains('on')};
-});
-const 감춤 = [];
-for (const [id,값,갈래] of [['ams-box-색','화이트','색'], ['ams-box-두께',_두값,'두께'], ['ams-box-가공','LPM-양면','가공']]) {
-  await 들어가기(id, 값);
-  const r = await 줄보기();
-  감춤.push({갈래, 박스:r.박스, 색줄:r.색.보임, 색이름표:r.색.이름표보임, 색칩:r.색.칩.length,
-             두께줄:r.두께.보임, 두께이름표:r.두께.이름표보임, 두께칩:r.두께.칩,  푼다:r.푼다켜짐});
-  if (갈래==='색') await p.screenshot({path:그림칸+'/stock-375-박스안-2.png'});
-  await 돌아가기();
-}
-console.log('박스 안 칩줄:');
-감춤.forEach(x=>console.log('   '+x.갈래.padEnd(3)+' 박스('+x.박스+') → 색상줄 '+(x.색줄?'보임':'감춤')
-  +'(칩 '+x.색칩+') · 두께줄 '+(x.두께줄?'보임':'감춤')+'(칩 '+JSON.stringify(x.두께칩)+')'));
-const 색박스=감춤[0], 두께박스=감춤[1], 가공박스=감춤[2];
-판('색상 박스 안 — 색상 칩줄이 감춰진다', 색박스.색줄===false && 색박스.색이름표===false,
-   '줄 '+색박스.색줄+' · 이름표 '+색박스.색이름표);
-판('색상 박스 안 — 두께 칩줄은 남는다 (더 좁힐 수 있으니)', 색박스.두께줄===true && 색박스.두께칩.length>1,
-   '두께 칩 '+JSON.stringify(색박스.두께칩));
-판('두께 박스 안 — 두께 칩줄이 감춰진다', 두께박스.두께줄===false && 두께박스.두께이름표===false,
-   '줄 '+두께박스.두께줄+' · 이름표 '+두께박스.두께이름표);
-판('두께 박스 안 — 색상 칩줄은 남는다', 두께박스.색줄===true && 두께박스.색칩>1,
-   '색상 칩 '+두께박스.색칩+'개');
-판('가공 박스 안 — 둘 다 남는다', 가공박스.색줄===true && 가공박스.두께줄===true,
-   '색상 '+가공박스.색줄+' · 두께 '+가공박스.두께줄);
-판('감춘 줄 때문에 「거르기 풀기」 가 켜지지 않는다', 감춤.every(x=>x.푼다===false),
-   감춤.map(x=>x.갈래+':'+x.푼다).join(' · '));
-// ── 한 짝이 세 박스에 다 드는가
-const 세곳 = await p.evaluate(()=>{
-  const 짝=window._amtStockPairs();
-  const x=짝.find(z=>z.원==='PB-18T' && z.마==='LPM-양면' && z.색==='화이트') || 짝[0];
-  const 든다=(갈래,값)=>{ const v = 갈래==='색'?(x.색||'(색상 없음)'):갈래==='두께'?(x.두께||'(두께 모름)'):(x.마||'(가공 없음)');
-    return v===값; };
-  return {짝:x.원+' · '+x.마+' · '+(x.색||'(색상 없음)'),
-          색:든다('색', x.색||'(색상 없음)'), 두께:든다('두께', x.두께||'(두께 모름)'), 가공:든다('가공', x.마||'(가공 없음)'),
-          어디:{색:x.색, 두께:x.두께, 가공:x.마}};
-});
-console.log('한 짝이 드는 박스: '+JSON.stringify(세곳));
-판('한 짝이 색상·두께·가공 세 박스에 다 든다', 세곳.색 && 세곳.두께 && 세곳.가공,
-   세곳.짝+' → 색상 '+세곳.어디.색+' · 두께 '+세곳.어디.두께+' · 가공 '+세곳.어디.가공);
+// ② 두께를 더 건다 — AND
+const _두값 = (첫판.두께.find(x=>x.이름==='18T')||첫판.두께[0]).값;
+await 칩톡('ams-두께', _두값);
+const 둘 = await 읽기();
+console.log('■ 「화이트」 + 「'+_두값+'T」: '+둘.목록줄+'줄 · sub 「'+둘.sub+'」');
+판('둘을 같이 걸면 둘 다 맞는 것만 남는다 (AND)',
+   둘.목록줄<=화이트.목록줄 && 둘.목록줄===표에서(둘.두께,_두값) && 둘.목록줄===표에서(둘.색,'화이트'),
+   '화이트만 '+화이트.목록줄+' → 둘 '+둘.목록줄+' (걸린 채 센 수: 두께 '+표에서(둘.두께,_두값)+' · 색 '+표에서(둘.색,'화이트')+')');
+판('걸린 채로도 알약에 적힌 수가 남는 짝 수를 미리 알려 준다',
+   둘.가공.reduce((a,c)=>a+c.짝,0)===둘.목록줄,
+   '가공 줄 합 '+둘.가공.reduce((a,c)=>a+c.짝,0)+' / 목록 '+둘.목록줄);
 
-const 끝 = await 박스읽기();
+// ③ 같은 알약을 다시 누르면 풀린다
+await 칩톡('ams-두께', _두값);
+const 푼하나 = await 읽기();
+판('같은 알약을 다시 누르면 그것만 풀린다',
+   푼하나.목록줄===화이트.목록줄 && 푼하나.색.find(x=>x.값==='화이트').켬===true,
+   둘.목록줄+' → '+푼하나.목록줄+'줄');
+
+// ④ 거르기 풀기
+const h=await p.evaluateHandle(()=>document.getElementById('ams-푼다'));
+await h.asElement().scrollIntoViewIfNeeded(); await h.asElement().tap(); await p.waitForTimeout(320);
+const 끝 = await 읽기();
+console.log('■ 거르기 푼 뒤: '+끝.목록줄+'줄 · sub 「'+끝.sub+'」');
+판('「거르기 풀기」 가 세 갈래를 다 푼다',
+   끝.목록줄===35 && [...끝.색,...끝.두께,...끝.가공].every(x=>!x.켬) && 끝.푼다켜짐===false,
+   끝.목록줄+'줄 · 푼다 '+끝.푼다켜짐);
 판('375px 가로 스크롤 없다', 끝.문서가로<=375, 끝.문서가로+'px');
 판('파이어베이스 쓰기 0', 끝.쓰기===0, 끝.쓰기+'번');
 판('페이지오류 없음', errs.length===0, String(errs.length)+(errs[0]?' :: '+errs[0]:''));
-console.log(실패===0?'box1   OK':'box1   FAIL ('+실패+')');
+console.log(실패===0?'boxes1   OK':'boxes1   FAIL ('+실패+')');
 await b.close(); process.exit(실패===0?0:1);
