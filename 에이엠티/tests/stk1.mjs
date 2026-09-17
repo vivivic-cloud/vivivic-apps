@@ -45,9 +45,15 @@ console.log('■ 박스 글:', await p.evaluate(()=>{const e=document.querySelec
   return e? e.innerText.replace(/\s*\n+\s*/g,' / ') : '(박스 없음)';}));
 console.log('■ 박스 눌러 열기:', await 탭('#amth-mine [data-amtb-id]'),
   '→ 원장재고 화면?', await p.evaluate(()=>document.documentElement.dataset.amtstock==='1'));
-// 원장재고는 한 칸이다 — 알약 세 줄 바로 아래에 목록이 늘 있다(들어가는 칸이 없다).
+// 원장재고는 한 칸이다 — 알약 세 줄 바로 아래가 목록 자리다(들어가는 칸이 없다).
 console.log('■ 알약 줄:', await p.evaluate(()=>['색','두께','가공']
   .map(g=>g+' '+document.querySelectorAll('#ams-'+g+' .amtb-chip').length+'개').join(' · ')));
+// 안 고르면 목록을 안 낸다(09-17 02:00 지시). 재려면 먼저 색상 알약 하나를 눌러야 한다.
+console.log('■ 안 고른 채 목록:', await p.evaluate(()=>({
+  줄:document.querySelectorAll('#ams-list .ams-row').length,
+  안내:(document.querySelector('#ams-list .ams-empty')||{}).textContent})));
+console.log('■ 첫 색상 알약 누르기:', await 탭('#ams-색 .amtb-chip'),
+  '→', await p.evaluate(()=>document.getElementById('ams-sub').textContent));
 const 재기=async(sel)=>p.evaluate(s=>{const e=document.querySelector(s); if(!e) return null;
   const r=e.getBoundingClientRect(), st=getComputedStyle(e);
   return {w:Math.round(r.width),h:Math.round(r.height),글자:st.fontSize};},sel);

@@ -55,6 +55,8 @@ const 읽기 = () => p.evaluate(()=>{
             const s=getComputedStyle(e); return !e.hidden && s.display!=='none' && e.getBoundingClientRect().height>0;})(),
           목록첫줄y:(()=>{const e=document.querySelector('#ams-list .ams-row');
             return e?Math.round(e.getBoundingClientRect().top):null;})(),
+          빈말:(()=>{const e=document.querySelector('#ams-list .ams-empty');
+            return e?e.textContent.trim():null;})(),
           sub:(document.getElementById('ams-sub')||{}).textContent,
           푼다켜짐:(document.getElementById('ams-푼다')||{classList:{contains:()=>null}}).classList.contains('on'),
           박스판있나:!!document.getElementById('ams-boxes'), 뒤단추있나:!!document.getElementById('ams-뒤'),
@@ -84,10 +86,20 @@ console.log('줄칸: '+JSON.stringify(첫판.줄칸));
 판('갈래마다 딱 한 줄 — 아래로 안 깔린다 (넘치면 옆으로 민다)',
    Object.values(첫판.줄칸).every(x=>x && !x.아래로깔림),
    Object.entries(첫판.줄칸).map(([k,v])=>k+' '+v.세로+'px(담긴폭 '+v.담긴폭+')').join(' · '));
-판('들어오자마자 목록 35짝이 알약 바로 아래에 있다',
-   첫판.목록보임===true && 첫판.목록줄===35, '보임 '+첫판.목록보임+' · '+첫판.목록줄+'줄');
-판('세 줄과 목록 첫 줄이 한 화면(812px) 안에 같이 든다',
-   첫판.목록첫줄y!=null && 첫판.목록첫줄y<812, '목록 첫 줄 y '+첫판.목록첫줄y+'px');
+// 09-17 02:00 지시 — 안 고르셨으면 자재를 쭉 늘어놓지 않는다
+판('연 직후에는 목록이 비어 있다 (안 거른 자재를 늘어놓지 않는다)',
+   첫판.목록줄===0, 첫판.목록줄+'줄');
+판('빈 목록 자리에 한 줄 안내가 있다',
+   /고르시면/.test(첫판.빈말||''), 첫판.빈말);
+판('머리의 「35짝」 은 그대로 둔다 (몇 짝인지는 보셔야 한다)',
+   /^35짝$/.test((첫판.sub||'').trim()), 첫판.sub);
+판('목록 칸 자체는 이 화면에 그대로 있다 (한 겹 뒤로 안 숨는다)',
+   첫판.목록보임===true, String(첫판.목록보임));
+
+// 그림 ① — 아무것도 안 고른 첫 화면 (판번호를 올린 뒤에 찍는다)
+await p.evaluate(()=>window.scrollTo(0,0));
+await p.waitForTimeout(200);
+await p.screenshot({path:그림칸+'/stock-375-안고름.png'});
 
 // ── 진짜 손가락으로 알약을 누른다
 const 칩톡 = async (칸, 값) => {
@@ -101,9 +113,11 @@ const 표에서 = (줄,값) => (줄.find(x=>x.값===값)||{}).짝;
 // ① 색상 「화이트」
 await 칩톡('ams-색','화이트');
 const 화이트 = await 읽기();
-console.log('■ 「화이트」 누른 뒤: '+화이트.목록줄+'줄 · sub 「'+화이트.sub+'」');
-판('「화이트」 를 누르면 그 자리에서 목록만 좁혀진다',
+console.log('■ 「화이트」 누른 뒤: '+화이트.목록줄+'줄 · sub 「'+화이트.sub+'」 · 첫 줄 y '+화이트.목록첫줄y);
+판('「화이트」 를 누르면 그때 그 자리에 그 몫만 나온다',
    화이트.목록줄===표에서(첫판.색,'화이트'), 표에서(첫판.색,'화이트')+'짝 → '+화이트.목록줄+'줄');
+판('세 줄과 목록 첫 줄이 한 화면(812px) 안에 같이 든다',
+   화이트.목록첫줄y!=null && 화이트.목록첫줄y<812, '목록 첫 줄 y '+화이트.목록첫줄y+'px');
 판('누른 알약이 켜지고 「거르기 풀기」 가 나온다',
    화이트.색.find(x=>x.값==='화이트').켬===true && 화이트.푼다켜짐===true,
    '켬 '+화이트.색.find(x=>x.값==='화이트').켬+' · 푼다 '+화이트.푼다켜짐);
@@ -111,7 +125,7 @@ console.log('■ 「화이트」 누른 뒤: '+화이트.목록줄+'줄 · sub �
 판('걸어도 세 줄이 먹는 세로 자리가 그대로다', 화이트.먹는자리===첫판.먹는자리,
    첫판.먹는자리+'px → '+화이트.먹는자리+'px');
 
-// 판번호를 올린 뒤에 찍는 그림 — 세 줄과 목록 첫 줄이 한 화면에 같이 보이게
+// 그림 ② — 「화이트」 를 누른 화면. 세 줄과 목록 첫 줄이 한 화면에 같이 보이게
 await p.evaluate(()=>window.scrollTo(0,0));
 await p.waitForTimeout(200);
 await p.screenshot({path:그림칸+'/stock-375-알약.png'});
@@ -135,14 +149,31 @@ const 푼하나 = await 읽기();
    푼하나.목록줄===화이트.목록줄 && 푼하나.색.find(x=>x.값==='화이트').켬===true,
    둘.목록줄+' → '+푼하나.목록줄+'줄');
 
-// ④ 거르기 풀기
+// ④ 마지막 하나까지 끄면 목록이 도로 빈다
+await 칩톡('ams-색','화이트');
+const 다끔 = await 읽기();
+판('마지막 알약까지 끄면 목록이 도로 빈다', 다끔.목록줄===0 && /고르시면/.test(다끔.빈말||''),
+   다끔.목록줄+'줄 · 「'+다끔.빈말+'」');
+
+// ⑤ 찾는 말만 쳐도 나온다 — 그것도 거르는 것이다
+await p.evaluate(()=>{const i=document.getElementById('ams-find'); i.value='아이보리';
+  i.dispatchEvent(new Event('input',{bubbles:true}));});
+await p.waitForTimeout(300);
+const 찾기 = await 읽기();
+console.log('■ 「아이보리」 찾기: '+찾기.목록줄+'줄 · sub 「'+찾기.sub+'」');
+판('알약을 안 눌러도 찾는 말만 치면 나온다', 찾기.목록줄>0 && 찾기.목록줄<35,
+   찾기.목록줄+'줄');
+
+// ⑥ 거르기 풀기 — 아무것도 안 고른 자리로, 곧 빈 목록으로 돌아간다
 const h=await p.evaluateHandle(()=>document.getElementById('ams-푼다'));
 await h.asElement().scrollIntoViewIfNeeded(); await h.asElement().tap(); await p.waitForTimeout(320);
 const 끝 = await 읽기();
 console.log('■ 거르기 푼 뒤: '+끝.목록줄+'줄 · sub 「'+끝.sub+'」');
-판('「거르기 풀기」 가 세 갈래를 다 푼다',
-   끝.목록줄===35 && [...끝.색,...끝.두께,...끝.가공].every(x=>!x.켬) && 끝.푼다켜짐===false,
-   끝.목록줄+'줄 · 푼다 '+끝.푼다켜짐);
+판('「거르기 풀기」 가 세 갈래와 찾는 말을 다 풀고 목록을 비운다',
+   끝.목록줄===0 && /고르시면/.test(끝.빈말||'') &&
+   [...끝.색,...끝.두께,...끝.가공].every(x=>!x.켬) && 끝.푼다켜짐===false,
+   끝.목록줄+'줄 · 「'+끝.빈말+'」 · 푼다 '+끝.푼다켜짐);
+판('풀고 나도 머리는 「35짝」 이다', /^35짝$/.test((끝.sub||'').trim()), 끝.sub);
 판('375px 가로 스크롤 없다', 끝.문서가로<=375, 끝.문서가로+'px');
 판('파이어베이스 쓰기 0', 끝.쓰기===0, 끝.쓰기+'번');
 판('페이지오류 없음', errs.length===0, String(errs.length)+(errs[0]?' :: '+errs[0]:''));
