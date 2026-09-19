@@ -37,11 +37,20 @@ const 탭=async(sel,n=0)=>{const c=await p.evaluate(({s,n})=>{const e=document.q
   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:c.x,y:c.y,radiusX:14,radiusY:14,force:1}]});
   await p.waitForTimeout(50); await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   await p.waitForTimeout(300); return true;};
-const 칩누르기=async(자리,글)=>{const i=await p.evaluate(({s,g})=>{const es=[...document.querySelectorAll(s+' .amtb-chip')];
+// 알약은 그 갈래를 먼저 펼쳐야 눌린다(09-19 지시)
+const 갈래펼치기=async(갈래)=>{const i=await p.evaluate(g=>[...document.querySelectorAll('#ams-갈래 .amtb-chip')]
+  .findIndex(e=>e.dataset['갈래']===g), 갈래);
+  if(i<0) return false; return 탭('#ams-갈래 .amtb-chip', i);};
+const 칩누르기=async(자리,글)=>{
+  const 갈래=자리.replace('#ams-','');
+  const 폈나=await p.evaluate(g=>{const e=document.getElementById('ams-'+g);
+    return !!e && getComputedStyle(e).display!=='none';}, 갈래);
+  if(!폈나) await 갈래펼치기(갈래);
+  const i=await p.evaluate(({s,g})=>{const es=[...document.querySelectorAll(s+' .amtb-chip')];
   return es.findIndex(e=>e.textContent.trim().startsWith(g));},{s:자리,g:글});
   if(i<0){console.log('   («'+글+'» 칩 없음)'); return false;} return 탭(자리+' .amtb-chip', i);};
-// 알약을 누르면 그 자리에서 목록이 좁혀진다 — 들어가는 칸이 없다.
-console.log('■ 가공 칩:', JSON.stringify(await 칩('#ams-가공')));
+// 갈래 단추 한 줄만 늘 보인다. 누르면 그 갈래 알약이 펼쳐지고, 고르면 도로 접힌다.
+console.log('■ 갈래 단추:', JSON.stringify(await 칩('#ams-갈래')));
 await 칩누르기('#ams-색','화이트');
 console.log('■ 색상 «화이트» 만:', JSON.stringify(await 셈()),
   '\n   보이는 것:', JSON.stringify(await p.evaluate(()=>[...document.querySelectorAll('#ams-list .ams-nm')].map(e=>e.textContent))));
@@ -71,12 +80,17 @@ for(const g of ['(색상 없음)','any']){
   await 탭('#ams-푼다');
 }
 // 폭
+// 늘 보이는 것은 갈래 단추 한 줄이다. 알약 줄은 펼쳤을 때만 잴 것이 있으므로 펼쳐 놓고 잰다.
+await 갈래펼치기('색');
 console.log('■ 잰 값(폭 '+폭+'):', JSON.stringify(await p.evaluate(()=>{
-  const c=document.getElementById('ams-색'), t=document.getElementById('ams-두께');
-  return {색줄:{보이는폭:Math.round(c.clientWidth), 담긴폭:Math.round(c.scrollWidth), 옆으로밈:c.scrollWidth>c.clientWidth+1, 높이:Math.round(c.getBoundingClientRect().height)},
-          두께줄:{보이는폭:Math.round(t.clientWidth), 담긴폭:Math.round(t.scrollWidth), 옆으로밈:t.scrollWidth>t.clientWidth+1, 높이:Math.round(t.getBoundingClientRect().height)},
-          칩:(()=>{const e=c.querySelector('.amtb-chip'); const s=getComputedStyle(e); const r=e.getBoundingClientRect();
-            return {크기:Math.round(r.width)+'x'+Math.round(r.height), 모서리:s.borderRadius, 글자:s.fontSize};})()};
+  const g=document.getElementById('ams-갈래'), c=document.getElementById('ams-색');
+  const 재=e=>{const r=e.getBoundingClientRect(); return Math.round(r.width)+'x'+Math.round(r.height);};
+  return {갈래줄:{높이:Math.round(g.getBoundingClientRect().height),
+                  단추:[...g.children].map(재), 틈:getComputedStyle(g).gap},
+          펼친색줄:{보이는폭:Math.round(c.clientWidth), 담긴폭:Math.round(c.scrollWidth),
+                    옆으로밈:c.scrollWidth>c.clientWidth+1, 높이:Math.round(c.getBoundingClientRect().height)},
+          칩:(()=>{const e=c.querySelector('.amtb-chip'); const s=getComputedStyle(e);
+            return {크기:재(e), 모서리:s.borderRadius, 글자:s.fontSize};})()};
 })));
 console.log('■ 문서 가로', await p.evaluate(()=>document.documentElement.scrollWidth),
   '· 오류', errs.length, errs.slice(0,3));

@@ -62,7 +62,17 @@ const 톡 = async (sel, n=0) => {
   const el=h.asElement(); if(!el) return false;
   await el.scrollIntoViewIfNeeded(); await el.tap(); await p.waitForTimeout(280); return true;
 };
+// 알약은 그 갈래를 먼저 펼쳐야 눌린다 — 접혀 있으면 화면에 없다(09-19 지시)
+const 갈래톡 = async (갈래) => {
+  const i=await p.evaluate(g=>[...(document.getElementById('ams-갈래')||{children:[]}).children]
+      .findIndex(e=>e.dataset['갈래']===g), 갈래);
+  if(i<0) return false; return 톡('#ams-갈래 .amtb-chip', i);
+};
 const 칩톡 = async (칸, 값) => {
+  const 갈래 = 칸.replace('ams-','');
+  const 폈나 = await p.evaluate(g=>{const e=document.getElementById('ams-'+g);
+    return !!e && getComputedStyle(e).display!=='none';}, 갈래);
+  if(!폈나) await 갈래톡(갈래);
   const i=await p.evaluate(({s,g})=>[...(document.getElementById(s)||{children:[]}).children]
       .findIndex(e=>e.dataset['값']===g), {s:칸,g:값});
   if(i<0) return false; return 톡('#'+칸+' .amtb-chip', i);
