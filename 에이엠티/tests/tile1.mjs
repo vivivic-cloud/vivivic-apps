@@ -2,7 +2,7 @@
 // 기준은 작업대(viggle/index.html)의 .tile 이다. 다섯 가지를 그대로 잰다:
 //   안여백 17px · 최소높이 150px · 아이콘 54px · 이름 글자 20px · 모서리 26px
 // 집 박스판(#amt-home)과 거래처 박스판(#amt-vendor-home) 둘 다 본다.
-import { chromium, devices, 서버, 자료, 자재, 그림칸 as 그림칸자리 } from './도구/터.mjs';
+import { 브라우저열기, devices, 서버, 자료, 자재, 그림칸 as 그림칸자리 } from './도구/터.mjs';
 await 서버();   // 저장소를 8899 에 내주는 자리 서버 — 없으면 스스로 띄운다
 import { readFileSync } from 'node:fs';
 const HERE = await 자재();   // 막힌 CDN 대신 쓸 것들 — 없으면 스스로 갖춘다
@@ -26,7 +26,7 @@ const 기준 = {
 };
 console.log('■ 작업대 원본(viggle/index.html 에서 그대로 읽음): '+JSON.stringify(기준));
 
-const b=await chromium.launch();
+const b=await 브라우저열기();
 let 실패=0; const 판=(n,t,v)=>{ if(!t) 실패++; console.log((t?'  OK  ':'  FAIL')+'  '+n+'   → '+v); };
 const ctx=await b.newContext({...devices['iPhone 12'],viewport:{width:375,height:812},isMobile:true,hasTouch:true});
 await ctx.route('https://cdn.tailwindcss.com*', r=>r.fulfill({status:200,contentType:'application/javascript',

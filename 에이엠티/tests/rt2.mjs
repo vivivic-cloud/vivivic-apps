@@ -1,14 +1,14 @@
 // 되돌렸을 때 그 자리에서 풀리는가 — 진짜 편집 흐름으로. 새로고침 없이 네 번 이어서.
 // 재단편집 팝업을 열고 → 이동선반S 를 골라 → 재단확정 → 다시 열어 빼고 → 재단확정.
 // 파이어스토어는 가짜로 막고 몇 번 불렸는지 센다.
-import { chromium, devices, 서버, 자료, 자재 } from './도구/터.mjs';
+import { 브라우저열기, devices, 서버, 자료, 자재 } from './도구/터.mjs';
 await 서버();   // 저장소를 8899 에 내주는 자리 서버 — 없으면 스스로 띄운다
 const B='http://127.0.0.1:8899';
 const URL=B+'/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0.html';
 const O=await 자료('confirmed_orders');
 const C=await 자료('cutting_plans');
 const L=await 자료('원장');
-const b=await chromium.launch();
+const b=await 브라우저열기();
 let 실패=0; const 판=(n,t,v)=>{ if(!t) 실패++; console.log((t?'  OK  ':'  FAIL')+'  '+n+'   → '+v); };
 
 for (const [폭,opt] of [[375,{...devices['iPhone 12'],viewport:{width:375,height:812},isMobile:true,hasTouch:true}],

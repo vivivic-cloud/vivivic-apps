@@ -1,14 +1,14 @@
 // 자료 안내 상자(「불러오는 중」 · 「다 못 받았습니다」)가 폰 화면에 맞게 앉는가.
 // ※ 이 시험은 제가 같은 이름으로 다른 시험을 덮어써서 잃었다가 다시 쓴 것입니다.
 //    보던 값(좌우 여백 10px 씩 · 가로 스크롤 없음)을 그대로 잽니다.
-import { chromium, devices, 서버, 자료, 자재 } from './도구/터.mjs';
+import { 브라우저열기, devices, 서버, 자료, 자재 } from './도구/터.mjs';
 await 서버();   // 저장소를 8899 에 내주는 자리 서버 — 없으면 스스로 띄운다
 import { readFileSync } from 'node:fs';
 const HERE = await 자재();   // 막힌 CDN 대신 쓸 것들 — 없으면 스스로 갖춘다
 const CSS=readFileSync(HERE+'/tw-built.css','utf-8');
 const B='http://127.0.0.1:8899';
 const URL=B+'/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0.html';
-const b=await chromium.launch();
+const b=await 브라우저열기();
 let 실패=0; const 판=(n,t,v)=>{ if(!t) 실패++; console.log((t?'  OK  ':'  FAIL')+'  '+n+'   → '+v); };
 for (const [폭, opt] of [[375,{...devices['iPhone 12'],viewport:{width:375,height:812},isMobile:true,hasTouch:true}],
                          [1280,{viewport:{width:1280,height:900}}]]) {

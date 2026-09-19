@@ -1,13 +1,13 @@
 // 추천 부속 목록 — 이미 다 잘린 것은 빠지고, 모자란 것은 남은 수량과 함께 서는가.
 // 업무 자료는 읽기만. 파이어베이스 쓰기는 가짜로 막고 몇 번 불렸는지 센다.
-import { chromium, devices, 서버, 자료, 자재 } from './도구/터.mjs';
+import { 브라우저열기, devices, 서버, 자료, 자재 } from './도구/터.mjs';
 await 서버();   // 저장소를 8899 에 내주는 자리 서버 — 없으면 스스로 띄운다
 const B='http://127.0.0.1:8899';
 const URL=B+'/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0.html';
 const O=await 자료('confirmed_orders');
 const C=await 자료('cutting_plans');
 const L=await 자료('원장');
-const b=await chromium.launch();
+const b=await 브라우저열기();
 let 실패=0; const 판=(n,t,v)=>{ if(!t) 실패++; console.log((t?'  OK  ':'  FAIL')+'  '+n+'   → '+v); };
 
 // 손으로 검산: 공통부속(전도방지) 필요 총량 = 세트별소모량 × 발주수량

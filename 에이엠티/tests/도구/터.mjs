@@ -11,7 +11,6 @@
      자재()      막힌 CDN 을 대신할 것들이 든 칸. 없으면 npm 으로 스스로 갖춘다.
 */
 import { createServer } from 'node:http';
-import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -22,20 +21,59 @@ export const 시험칸 = path.resolve(여기, '..');                      // …
 export const 뿌리 = path.resolve(여기, '../../..');                  // 저장소 뿌리
 const 있나 = p => { try { fs.accessSync(p); return true; } catch { return false; } };
 
-/* ── 플레이라이트 — 이름으로 찾고, 안 되면 아는 자리를 차례로 본다 ────────── */
-const 리콰이어 = createRequire(import.meta.url);
+/* ── 플레이라이트 ────────────────────────────────────────────────────────
+   **상자에 이미 깔린 것을 먼저 쓴다.** npm 으로 새로 받은 판은 저 혼자 새 브라우저
+   번호를 찾는데, 바깥이 막힌 상자에서는 그 브라우저를 받을 길이 없어 반드시 떨어진다.
+   상자에 깔린 판은 상자에 깔린 브라우저와 짝이 맞는다. */
 async function 플레이라이트(){
-    const 길들 = ['playwright',
-                  '/opt/node22/lib/node_modules/playwright/index.mjs',
+    const 길들 = ['/opt/node22/lib/node_modules/playwright/index.mjs',
+                  'playwright',
                   path.join(시험칸, '.자재/node_modules/playwright/index.mjs')];
+    const 못한것 = [];
     for (const g of 길들) {
-        try { return await import(g.startsWith('/') ? ('file://' + g) : g); } catch {}
+        try { return await import(g.startsWith('/') ? ('file://' + g) : g); }
+        catch (e) { 못한것.push(g); }
     }
-    throw new Error('플레이라이트를 못 찾았습니다. `npm i -D playwright && npx playwright install chromium` 하십시오.');
+    throw new Error('플레이라이트를 못 찾았습니다. 찾아본 자리: ' + 못한것.join(' · ') +
+        '\n  → `npm i -D playwright` 로 받으십시오.');
 }
 const pw = await 플레이라이트();
 export const chromium = pw.chromium;
 export const devices = pw.devices;
+
+/* ── 브라우저 열기 ──────────────────────────────────────────────────────
+   플레이라이트가 제 판에 맞는 브라우저를 못 찾으면(바깥이 막혀 새로 못 받는 상자에서
+   흔하다) 상자에 이미 깔린 크로미움으로 떨어진다. 판 번호는 박지 않는다 — 브라우저
+   칸을 훑어 있는 것을 찾는다. 상자가 바뀌면 번호도 바뀌기 때문이다. */
+export function 크로미움찾기(){
+    const 칸 = process.env.PLAYWRIGHT_BROWSERS_PATH || '/opt/pw-browsers';
+    if (!있나(칸)) return null;
+    const 뒤 = ['chrome-linux/chrome', 'chrome-headless-shell-linux64/chrome-headless-shell',
+                'chrome-linux64/chrome', 'chrome-mac/Chromium.app/Contents/MacOS/Chromium'];
+    // 번호가 큰 것부터 본다. 맨 이름(chromium)은 흔히 최신을 가리키는 이음줄이다.
+    const 것들 = fs.readdirSync(칸).filter(n => n.startsWith('chromium'))
+        .sort((a, b) => (parseInt(b.replace(/\D/g, ''), 10) || 0) - (parseInt(a.replace(/\D/g, ''), 10) || 0));
+    for (const 이름 of ['chromium', ...것들]) {
+        const 밑 = path.join(칸, 이름);
+        if (!있나(밑)) continue;
+        try { if (fs.statSync(밑).isFile()) return 밑; } catch { continue; }   // 이음줄이 곧 실행파일
+        for (const t of 뒤) { const p2 = path.join(밑, t); if (있나(p2)) return p2; }
+    }
+    return null;
+}
+export async function 브라우저열기(옵션 = {}){
+    try { return await chromium.launch(옵션); }
+    catch (e) {
+        const 길 = 크로미움찾기();
+        if (!길) throw new Error(
+            '크로미움을 못 열었습니다. 플레이라이트가 찾는 브라우저도, ' +
+            (process.env.PLAYWRIGHT_BROWSERS_PATH || '/opt/pw-browsers') + ' 에 깔린 것도 없습니다.' +
+            '\n  → `npx playwright install chromium` 이 되는 자리면 그것을, 안 되면 상자에 깔린 크로미움을 ' +
+            'PLAYWRIGHT_BROWSERS_PATH 로 가리켜 주십시오.\n  (플레이라이트가 한 말: ' +
+            String(e && e.message || e).split('\n')[0] + ')');
+        return await chromium.launch({ ...옵션, executablePath: 길 });
+    }
+}
 
 /* ── 자리 서버 ───────────────────────────────────────────────────────────
    8899 에 이미 저장소를 내주는 것이 떠 있으면 그것을 쓴다. 없으면 우리가 띄우고

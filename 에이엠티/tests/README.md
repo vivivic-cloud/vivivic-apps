@@ -18,9 +18,21 @@
 `tailwindcss · xlsx · sortablejs · gsap` 를 npm 으로 받고 테일윈드를 뽑습니다(40MB, 1분쯤).
 그다음부터는 그대로 씁니다. `.자재/` 는 저장소에 안 들어갑니다.
 
-플레이라이트만 있으면 됩니다. 없으면:
+**플레이라이트는 상자에 깔린 것을 먼저 씁니다.** `/opt/node22/lib/node_modules/playwright`
+→ 그냥 `playwright` → `tests/.자재/` 차례로 찾습니다.
 
-    npm i -D playwright && npx playwright install chromium
+브라우저도 마찬가지입니다. 플레이라이트가 제 판에 맞는 크로미움을 못 찾으면
+`PLAYWRIGHT_BROWSERS_PATH`(여기서는 `/opt/pw-browsers`)를 훑어 **상자에 깔린 크로미움**으로
+열어 줍니다. 판 번호는 박아 두지 않았습니다 — 상자가 바뀌면 번호도 바뀝니다.
+
+> ⚠ `npm i -D playwright` 로 **새 판을 받지 마십시오.** 새 판은 저에게 맞는 새 브라우저
+> 번호를 찾는데, 바깥이 막힌 상자에서는 `npx playwright install` 이 안 되어 받을 길이
+> 없습니다. 그러면 47개가 다
+> `Executable doesn't exist at …/chromium_headless_shell-1243/…` 로 떨어집니다.
+> 상자에 플레이라이트가 아예 없을 때만 받으시고, 그때는 브라우저도 같이 받으십시오
+> (`npx playwright install chromium`).
+
+크로미움을 어디에서도 못 찾으면 시험이 **무엇이 없는지 한 줄로 말하고 멈춥니다.**
 
 ## 왜 이 세 가지가 필요한가
 

@@ -1,9 +1,9 @@
-import { chromium, devices, 서버, 자료, 자재 } from './도구/터.mjs';
+import { 브라우저열기, devices, 서버, 자료, 자재 } from './도구/터.mjs';
 await 서버();   // 저장소를 8899 에 내주는 자리 서버 — 없으면 스스로 띄운다
 const B='http://127.0.0.1:8899';
 const O=await 자료('confirmed_orders');
 const L=await 자료('원장');
-const b=await chromium.launch();
+const b=await 브라우저열기();
 const ctx=await b.newContext({...devices['iPhone 12'],viewport:{width:375,height:812},isMobile:true,hasTouch:true});
 const p=await ctx.newPage();
 await p.goto(B+'/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0.html',{waitUntil:'load'});

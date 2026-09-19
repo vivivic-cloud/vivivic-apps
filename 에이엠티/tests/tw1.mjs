@@ -3,7 +3,7 @@
 // tailwindcss 3.4.17 로 이 앱 파일을 훑어 CSS 를 뽑아 두고(tw-built.css),
 // CDN 자리에 그 CSS 를 끼워 넣는 쪽지로 바꿔치기한다 — 앱 파일은 안 건드린다.
 // 이렇게 하면 두 칸 격자·배지·글자 크기가 실제와 같은 자리에서 잰다.
-import { chromium, devices, 서버, 자료, 자재 } from './도구/터.mjs';
+import { 브라우저열기, devices, 서버, 자료, 자재 } from './도구/터.mjs';
 await 서버();   // 저장소를 8899 에 내주는 자리 서버 — 없으면 스스로 띄운다
 import { readFileSync } from 'node:fs';
 const HERE = await 자재();   // 막힌 CDN 대신 쓸 것들 — 없으면 스스로 갖춘다
@@ -13,7 +13,7 @@ const URL=B+'/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0/%EC%97%90%EC%9D%B4%EC%97%A0%E
 const O=await 자료('confirmed_orders');
 const C=await 자료('cutting_plans');
 const L=await 자료('원장');
-const b=await chromium.launch();
+const b=await 브라우저열기();
 let 실패=0; const 판=(n,t,v)=>{ if(!t) 실패++; console.log((t?'  OK  ':'  FAIL')+'  '+n+'   → '+v); };
 const ctx=await b.newContext({...devices['iPhone 12'],viewport:{width:375,height:812},isMobile:true,hasTouch:true});
 // CDN 자리를 진짜 테일윈드 CSS 로 바꿔치기 — 문서의 그 자리(앱 <style> 보다 위)에 들어간다

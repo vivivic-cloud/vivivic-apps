@@ -1,6 +1,6 @@
-import { chromium, devices, 서버, 자료, 자재 } from './도구/터.mjs';
+import { 브라우저열기, devices, 서버, 자료, 자재 } from './도구/터.mjs';
 await 서버();   // 저장소를 8899 에 내주는 자리 서버 — 없으면 스스로 띄운다
-const b=await chromium.launch();
+const b=await 브라우저열기();
 const 판정의 = { '재단':['AMT'], '보링':['1호기','2호기','멀티보링'], '엣지':['1호기','2호기','3호기','4호기','5호기'] };
 for (const [공정, 기계들] of Object.entries(판정의)) {
   const ctx=await b.newContext({ ...devices['iPhone 12'], viewport:{width:375,height:812}, isMobile:true, hasTouch:true });

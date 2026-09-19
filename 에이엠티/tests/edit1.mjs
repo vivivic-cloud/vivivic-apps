@@ -1,6 +1,6 @@
 // 아무것도 안 했는데 발주확정목록에 「수정요청됨」 이 뜨는가 — 진짜 손가락으로 재현한다.
 // 발주서 → 공정관리 → 발주서 로 다녀온 뒤 확정목록을 본다.
-import { chromium, devices, 서버, 자료, 자재, 그림칸 as 그림칸자리 } from './도구/터.mjs';
+import { 브라우저열기, devices, 서버, 자료, 자재, 그림칸 as 그림칸자리 } from './도구/터.mjs';
 await 서버();   // 저장소를 8899 에 내주는 자리 서버 — 없으면 스스로 띄운다
 import { readFileSync } from 'node:fs';
 const HERE = await 자재();   // 막힌 CDN 대신 쓸 것들 — 없으면 스스로 갖춘다
@@ -10,7 +10,7 @@ const URL=B+'/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0/%EC%97%90%EC%9D%B4%EC%97%A0%E
 const O=await 자료('confirmed_orders');
 const C=await 자료('cutting_plans');
 const L=await 자료('원장');
-const b=await chromium.launch();
+const b=await 브라우저열기();
 let 실패=0; const 판=(n,t,v)=>{ if(!t) 실패++; console.log((t?'  OK  ':'  FAIL')+'  '+n+'   → '+v); };
 const ctx=await b.newContext({...devices['iPhone 12'],viewport:{width:375,height:812},isMobile:true,hasTouch:true});
 await ctx.route('https://cdn.tailwindcss.com*', r=>r.fulfill({status:200,contentType:'application/javascript',
