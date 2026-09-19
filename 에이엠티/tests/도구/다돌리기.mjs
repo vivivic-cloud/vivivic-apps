@@ -18,10 +18,14 @@ await 자재();                  // 처음 한 번 받는 동안 시험이 헛�
    끝줄만 집으면 「Node.js v22.22.2」 같은 꼬리표가 찍힌다 — 그건 까닭이 아니다. */
 function 까닭뽑기(글){
     const 줄 = 글.split('\n').map(l => l.replace(/\s+$/, ''));
-    const 쓸모없는 = l => !l.trim() || /^Node\.js v/.test(l) || /^\s+at /.test(l) ||
-        /^\s*\^+\s*$/.test(l) || /^node:internal/.test(l) || /^\s*$/.test(l);
-    return (줄.find(l => /\bFAIL\b/.test(l))                       // 시험이 스스로 적은 실패
-         || 줄.find(l => /(Error|error:|오류|Executable doesn't exist|못 찾았습니다|못 열었습니다)/.test(l) && !쓸모없는(l))
+    // 노드는 오류를 낼 때 터진 자리의 **소스 줄**을 먼저 베껴 찍고(`throw new Error(` 같은 것),
+    // 맨 끝에 `Node.js v22…` 를 붙인다. 둘 다 까닭이 아니다.
+    const 쓸모없는 = l => !l.trim() || /^Node\.js v/.test(l) || /^\s+at /.test(l)
+        || /^\s*\^+\s*$/.test(l) || /^node:internal/.test(l)
+        || /throw new /.test(l) || /^\s*[\}\)];?\s*$/.test(l) || /^\/.*:\d+$/.test(l);
+    return (줄.find(l => /\bFAIL\b/.test(l))                          // 시험이 스스로 적은 실패
+         || 줄.find(l => /^[A-Za-z]*Error:/.test(l.trim()))             // 「Error: …」 진짜 첫 줄
+         || 줄.find(l => !쓸모없는(l) && /(Executable doesn't exist|못 찾았습니다|못 열었습니다|오류)/.test(l))
          || 줄.filter(l => !쓸모없는(l)).pop()
          || '까닭 모름').trim();
 }
