@@ -1,12 +1,13 @@
 // 도면 초기화 단추 — 시키신 그대로 해 본다.
 // 부속 셋 고르고 · 하나 돌리고 · 장수 손으로 +2 · 원장 3X6 → 초기화 → 처음 상태인가
 // 그리고 재단계획 장수가 그대로인가(세 번 눌러 본다), 파이어베이스 쓰기 0 인가.
-import { chromium, devices } from '/opt/node22/lib/node_modules/playwright/index.mjs';
-const B='http://localhost:8899';
+import { chromium, devices, 서버, 자료, 자재 } from './도구/터.mjs';
+await 서버();   // 저장소를 8899 에 내주는 자리 서버 — 없으면 스스로 띄운다
+const B='http://127.0.0.1:8899';
 const URL=B+'/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0.html';
-const O=await (await fetch(B+'/confirmed_orders.json')).json();
-const C=await (await fetch(B+'/cutting_plans.json')).json();
-const L=await (await fetch(B+'/원장.json')).json();
+const O=await 자료('confirmed_orders');
+const C=await 자료('cutting_plans');
+const L=await 자료('원장');
 const b=await chromium.launch();
 let 실패=0; const 판=(n,t,v)=>{ if(!t) 실패++; console.log((t?'  OK  ':'  FAIL')+'  '+n+'   → '+v); };
 const ctx=await b.newContext({...devices['iPhone 12'],viewport:{width:375,height:812},isMobile:true,hasTouch:true});

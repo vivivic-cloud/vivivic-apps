@@ -2,13 +2,14 @@
 // 기준은 작업대(viggle/index.html)의 .tile 이다. 다섯 가지를 그대로 잰다:
 //   안여백 17px · 최소높이 150px · 아이콘 54px · 이름 글자 20px · 모서리 26px
 // 집 박스판(#amt-home)과 거래처 박스판(#amt-vendor-home) 둘 다 본다.
-import { chromium, devices } from '/opt/node22/lib/node_modules/playwright/index.mjs';
+import { chromium, devices, 서버, 자료, 자재, 그림칸 as 그림칸자리 } from './도구/터.mjs';
+await 서버();   // 저장소를 8899 에 내주는 자리 서버 — 없으면 스스로 띄운다
 import { readFileSync } from 'node:fs';
-const HERE='/tmp/claude-0/-home-user-vivivic-apps/17fbe99e-07b2-5ca2-bd6b-e6d2d41ab942/scratchpad';
-const 그림칸 = process.env.SHOTS==='1' ? '/home/user/vivivic-apps/에이엠티/shots' : HERE;
+const HERE = await 자재();   // 막힌 CDN 대신 쓸 것들 — 없으면 스스로 갖춘다
+const 그림칸 = 그림칸자리();
 const CSS=readFileSync(HERE+'/tw-built.css','utf-8');
-const B='http://localhost:8899';
-const O=await (await fetch(B+'/confirmed_orders.json')).json();
+const B='http://127.0.0.1:8899';
+const O=await 자료('confirmed_orders');
 // 작업대 원본에서 곧바로 읽어 온 기준값 — 손으로 적지 않는다
 const 작업대글 = readFileSync('/home/user/viggle/index.html','utf-8');
 const 뽑기 = (덩이, 키) => {

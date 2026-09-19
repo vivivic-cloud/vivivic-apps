@@ -1,11 +1,12 @@
 // 자료 안내 상자(「불러오는 중」 · 「다 못 받았습니다」)가 폰 화면에 맞게 앉는가.
 // ※ 이 시험은 제가 같은 이름으로 다른 시험을 덮어써서 잃었다가 다시 쓴 것입니다.
 //    보던 값(좌우 여백 10px 씩 · 가로 스크롤 없음)을 그대로 잽니다.
-import { chromium, devices } from '/opt/node22/lib/node_modules/playwright/index.mjs';
+import { chromium, devices, 서버, 자료, 자재 } from './도구/터.mjs';
+await 서버();   // 저장소를 8899 에 내주는 자리 서버 — 없으면 스스로 띄운다
 import { readFileSync } from 'node:fs';
-const HERE='/tmp/claude-0/-home-user-vivivic-apps/17fbe99e-07b2-5ca2-bd6b-e6d2d41ab942/scratchpad';
+const HERE = await 자재();   // 막힌 CDN 대신 쓸 것들 — 없으면 스스로 갖춘다
 const CSS=readFileSync(HERE+'/tw-built.css','utf-8');
-const B='http://localhost:8899';
+const B='http://127.0.0.1:8899';
 const URL=B+'/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0.html';
 const b=await chromium.launch();
 let 실패=0; const 판=(n,t,v)=>{ if(!t) 실패++; console.log((t?'  OK  ':'  FAIL')+'  '+n+'   → '+v); };

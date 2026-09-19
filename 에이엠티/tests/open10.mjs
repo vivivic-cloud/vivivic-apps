@@ -3,14 +3,16 @@
 //                  ③ 빨강이 떴나 ④ ▶시작이 눌리는 상태였나
 // 이 상자는 파이어베이스에 못 닿으므로, 자료가 오는 것은 네 군데 듣기가 답을 준
 // 것과 똑같이 손으로 넣어 흉내낸다. 망이 정말 끊긴 경우는 net1 에서 따로 쟀다.
-import { chromium, devices } from '/opt/node22/lib/node_modules/playwright/index.mjs';
+import { chromium, devices, 서버, 자료, 자재 } from './도구/터.mjs';
+await 서버();   // 저장소를 8899 에 내주는 자리 서버 — 없으면 스스로 띄운다
 import { readFileSync } from 'node:fs';
-const CSS=readFileSync('/tmp/claude-0/-home-user-vivivic-apps/17fbe99e-07b2-5ca2-bd6b-e6d2d41ab942/scratchpad/tw-built.css','utf-8');
-const B='http://localhost:8899';
+const HERE = await 자재();   // 막힌 CDN 대신 쓸 것들 — 없으면 스스로 갖춘다
+const CSS=readFileSync(HERE+'/tw-built.css','utf-8');
+const B='http://127.0.0.1:8899';
 const URL=B+'/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0.html';
-const O=await (await fetch(B+'/confirmed_orders.json')).json();
-const C=await (await fetch(B+'/cutting_plans.json')).json();
-const L=await (await fetch(B+'/원장.json')).json();
+const O=await 자료('confirmed_orders');
+const C=await 자료('cutting_plans');
+const L=await 자료('원장');
 const b=await chromium.launch();
 const 폰={...devices['iPhone 12'],viewport:{width:375,height:812},isMobile:true,hasTouch:true};
 const 늦기=[300,900,1500,2400,600,1200,2000,400,1800,1000];   // 자료가 오는 데 걸리는 시간을 번마다 다르게

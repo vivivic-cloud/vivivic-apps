@@ -1,11 +1,12 @@
 // 「다른카드에 편집중」 칸이 진짜 완료 칸과 결이 같은가 — 숫자로.
 // 글이 칸을 넘는지 · 글자 크기 · 두 칸 높이 · 제일 긴 부속 이름으로도.
-import { chromium, devices } from '/opt/node22/lib/node_modules/playwright/index.mjs';
-const B='http://localhost:8899';
+import { chromium, devices, 서버, 자료, 자재 } from './도구/터.mjs';
+await 서버();   // 저장소를 8899 에 내주는 자리 서버 — 없으면 스스로 띄운다
+const B='http://127.0.0.1:8899';
 const URL=B+'/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0.html';
-const O=await (await fetch(B+'/confirmed_orders.json')).json();
-const C=await (await fetch(B+'/cutting_plans.json')).json();
-const L=await (await fetch(B+'/원장.json')).json();
+const O=await 자료('confirmed_orders');
+const C=await 자료('cutting_plans');
+const L=await 자료('원장');
 const b=await chromium.launch();
 let 실패=0; const 판=(n,t,v)=>{ if(!t) 실패++; console.log((t?'  OK  ':'  FAIL')+'  '+n+'   → '+v); };
 

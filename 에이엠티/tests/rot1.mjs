@@ -1,12 +1,13 @@
 // 재단회전 단추를 손가락으로 누를 수 있게 키웠는가 — 폰 375px 에서 잰다.
 // 고치기 전(옛 규칙을 되살려)과 고친 뒤를 같은 창에서 잰다.
 // 마지막에 진짜 손가락(CDP 터치)으로 눌러 회전이 되는지, 카드가 안 골라지는지 본다.
-import { chromium, devices } from '/opt/node22/lib/node_modules/playwright/index.mjs';
-const B='http://localhost:8899';
+import { chromium, devices, 서버, 자료, 자재 } from './도구/터.mjs';
+await 서버();   // 저장소를 8899 에 내주는 자리 서버 — 없으면 스스로 띄운다
+const B='http://127.0.0.1:8899';
 const URL=B+'/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0.html';
-const O=await (await fetch(B+'/confirmed_orders.json')).json();
-const C=await (await fetch(B+'/cutting_plans.json')).json();
-const L=await (await fetch(B+'/원장.json')).json();
+const O=await 자료('confirmed_orders');
+const C=await 자료('cutting_plans');
+const L=await 자료('원장');
 const b=await chromium.launch();
 let 실패=0; const 판=(n,t,v)=>{ if(!t) 실패++; console.log((t?'  OK  ':'  FAIL')+'  '+n+'   → '+v); };
 const ctx=await b.newContext({...devices['iPhone 12'],viewport:{width:375,height:812},isMobile:true,hasTouch:true});

@@ -1,8 +1,9 @@
-import { chromium, devices } from '/opt/node22/lib/node_modules/playwright/index.mjs';
-const B='http://localhost:8899'; const 폭=parseInt(process.argv[2]||'375',10);
-const O=await (await fetch(B+'/confirmed_orders.json')).json();
-const C=await (await fetch(B+'/cutting_plans.json')).json();
-const L=await (await fetch(B+'/원장.json')).json();
+import { chromium, devices, 서버, 자료, 자재 } from './도구/터.mjs';
+await 서버();   // 저장소를 8899 에 내주는 자리 서버 — 없으면 스스로 띄운다
+const B='http://127.0.0.1:8899'; const 폭=parseInt(process.argv[2]||'375',10);
+const O=await 자료('confirmed_orders');
+const C=await 자료('cutting_plans');
+const L=await 자료('원장');
 const b=await chromium.launch();
 const ctx=await b.newContext({...devices['iPhone 12'],viewport:{width:폭,height:812},isMobile:폭<500,hasTouch:true});
 const p=await ctx.newPage(); const errs=[]; p.on('pageerror',e=>errs.push(e.message));

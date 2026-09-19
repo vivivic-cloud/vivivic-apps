@@ -1,8 +1,9 @@
 // 로그인이 아예 안 될 때 화면이 영영 「불러오는 중」 에 멈추지 않는가 — 40초 보조 시계.
 // ① 망이 끊긴 채 열면 빨강이 몇 초 만에 뜨는가 (40초 안쪽이어야 한다)
 // ② 자료가 정상으로 다 왔으면 40초가 지나도 거짓 빨강이 안 뜨는가 (창 열 개 한꺼번에)
-import { chromium, devices } from '/opt/node22/lib/node_modules/playwright/index.mjs';
-const B='http://localhost:8899';
+import { chromium, devices, 서버, 자료, 자재 } from './도구/터.mjs';
+await 서버();   // 저장소를 8899 에 내주는 자리 서버 — 없으면 스스로 띄운다
+const B='http://127.0.0.1:8899';
 const URL=B+'/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0.html';
 const b=await chromium.launch();
 let 실패=0; const 판=(n,t,v)=>{ if(!t) 실패++; console.log((t?'  OK  ':'  FAIL')+'  '+n+'   → '+v); };

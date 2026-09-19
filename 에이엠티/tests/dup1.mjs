@@ -1,13 +1,14 @@
 // 작업완료를 찍을 때, 그 도면에서 같이 나온 작업물의 수량도 보이는가.
-import { chromium, devices } from '/opt/node22/lib/node_modules/playwright/index.mjs';
+import { chromium, devices, 서버, 자료, 자재, 그림칸 as 그림칸자리 } from './도구/터.mjs';
+await 서버();   // 저장소를 8899 에 내주는 자리 서버 — 없으면 스스로 띄운다
 import { readFileSync } from 'node:fs';
-const HERE='/tmp/claude-0/-home-user-vivivic-apps/17fbe99e-07b2-5ca2-bd6b-e6d2d41ab942/scratchpad';
+const HERE = await 자재();   // 막힌 CDN 대신 쓸 것들 — 없으면 스스로 갖춘다
 const CSS=readFileSync(HERE+'/tw-built.css','utf-8');
-const B='http://localhost:8899';
+const B='http://127.0.0.1:8899';
 const URL=B+'/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0.html';
-const O=await (await fetch(B+'/confirmed_orders.json')).json();
-const C=await (await fetch(B+'/cutting_plans.json')).json();
-const L=await (await fetch(B+'/원장.json')).json();
+const O=await 자료('confirmed_orders');
+const C=await 자료('cutting_plans');
+const L=await 자료('원장');
 const b=await chromium.launch();
 let 실패=0; const 판=(n,t,v)=>{ if(!t) 실패++; console.log((t?'  OK  ':'  FAIL')+'  '+n+'   → '+v); };
 const ctx=await b.newContext({...devices['iPhone 12'],viewport:{width:375,height:812},isMobile:true,hasTouch:true});
@@ -128,7 +129,7 @@ console.log('팝업: '+JSON.stringify(팝));
    '왼 '+팝.왼+' · 오른 '+팝.오른+' · 문서 '+팝.문서가로);
 판('팝업 글이 안 잘린다', 팝.넘침===false, String(팝.넘침));
 판('여기까지 파이어베이스 쓰기 0', 팝.쓰기===0, 팝.쓰기+'번');
-await p.screenshot({path:HERE+'/완료팝업_375.png'});
+await p.screenshot({path:그림칸자리()+'/완료팝업_375.png'});
 
 // ── 오바 칸 (09-16 02:32 지시)
 const 오바 = await p.evaluate(()=>{
@@ -153,7 +154,7 @@ console.log('오바 칸: '+JSON.stringify(오바));
 await p.evaluate(()=>{ const q=document.getElementById('_pdQty');
   q.value=String((window._pdChk.발주 - window._pdChk.다른) + 30); q.dispatchEvent(new Event('input')); });
 await p.waitForTimeout(300);
-await p.screenshot({path:HERE+'/완료팝업_오바_375.png'});
+await p.screenshot({path:그림칸자리()+'/완료팝업_오바_375.png'});
 판('완료 확인 창에 발주수량 맞춰 보는 칸이 있다', !!(오바.셈 && 오바.셈.잼), JSON.stringify(오바.셈));
 판('발주수량·다른 도면·이번·합계가 다 적힌다', /발주수량/.test(오바.박스) && /다른 도면에서/.test(오바.박스)
    && /이번에 찍는 것/.test(오바.박스) && /합계/.test(오바.박스), 오바.박스);

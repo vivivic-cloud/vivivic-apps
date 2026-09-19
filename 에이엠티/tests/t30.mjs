@@ -1,8 +1,9 @@
 // 빨강으로 바뀌는 시계가 15초가 아니라 30초인가 — 직접 재 본다.
 // ① 듣기를 건 뒤 자료가 안 오면: 15초에는 아직 회색, 30초쯤에 빨강
 // ② 25초 만에 자료가 다 오면 빨강이 안 뜬다 (전에는 15초에 떠 겁을 줬다)
-import { chromium, devices } from '/opt/node22/lib/node_modules/playwright/index.mjs';
-const B='http://localhost:8899';
+import { chromium, devices, 서버, 자료, 자재 } from './도구/터.mjs';
+await 서버();   // 저장소를 8899 에 내주는 자리 서버 — 없으면 스스로 띄운다
+const B='http://127.0.0.1:8899';
 const URL=B+'/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0.html';
 const b=await chromium.launch();
 let 실패=0; const 판=(n,t,v)=>{ if(!t) 실패++; console.log((t?'  OK  ':'  FAIL')+'  '+n+'   → '+v); };
