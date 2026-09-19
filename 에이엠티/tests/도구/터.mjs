@@ -125,9 +125,13 @@ export async function 자재(){
         if (r.status !== 0) throw new Error('자재를 갖추지 못했습니다: ' + 명 + ' ' + 인자.join(' ') +
             '\n  (인터넷이 막힌 자리면 tests/.자재/ 에 직접 넣어 주십시오 — README 를 보십시오)');
     };
-    if (!있나(path.join(자재칸, 'node_modules'))) {
+    if (!있나(path.join(자재칸, 'node_modules/tailwindcss'))) {
+        // package.json 이 없으면 npm 이 위로 거슬러 올라가 엉뚱한 자리를 보고
+        // 「up to date」 라며 아무것도 안 받는다. 그래서 여기에 하나 둔다.
+        fs.writeFileSync(path.join(자재칸, 'package.json'),
+            JSON.stringify({ name: 'amt-시험자재', private: true, version: '0.0.0' }, null, 2) + '\n');
         console.log('· 시험 자재를 받습니다 (처음 한 번만): tailwindcss · xlsx · sortablejs · gsap');
-        돌려('npm', ['install', '--no-save', '--no-audit', '--no-fund',
+        돌려('npm', ['install', '--no-audit', '--no-fund',
                      'tailwindcss@3.4.17', 'xlsx', 'sortablejs', 'gsap']);
     }
     if (!있나(path.join(자재칸, 'tw-built.css'))) {
