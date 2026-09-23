@@ -240,6 +240,29 @@ const 완료값 = await p.evaluate(() => {
 });
 await 톡('#_집중완료');
 const 팝업떴나 = await p.evaluate(() => !!document.getElementById('_partDoneModal'));
+// 완료 창은 v1.11.0 부터 완료를 하는 유일한 길이다 — 누르는 자리를 다 잰다
+const 완료창 = await p.evaluate(() => {
+  const m = document.getElementById('_partDoneModal'); if (!m) return null;
+  const w = document.getElementById('_pdReasonWrap'); if (w) w.style.display = 'block';   // 사유 알약도 드러내 놓고
+  const 속 = m.querySelector('div[onclick]'); const r = 속.getBoundingClientRect();
+  const 잼 = e => { const b = e.getBoundingClientRect();
+    return { 글: (e.innerText || e.value || e.getAttribute('aria-label') || '').trim().replace(/\s+/g, ' ').slice(0, 12),
+             갈래: e.tagName.toLowerCase(), w: Math.round(b.width), h: Math.round(b.height) }; };
+  const 누르는것 = [...m.querySelectorAll('button, label, input[type="number"]')].map(잼)
+    .filter(x => x.w > 0 && x.h > 0 && !/^완료 수량/.test(x.글));   // 글자 딱지는 누르는 자리가 아니다
+  if (w) w.style.display = 'none';
+  return { 창: { w: Math.round(r.width), h: Math.round(r.height), x: Math.round(r.x), y: Math.round(r.y) },
+           넘침: r.x < 0 || r.x + r.width > 375 || r.y < 0 || r.y + r.height > 812,
+           누르는것, 문서가로: document.documentElement.scrollWidth };
+});
+console.log('■ 완료 창: ' + JSON.stringify(완료창));
+await p.screenshot({ path: 그림칸 + '/work-375-완료창.png' });
+판('완료 창의 누르는 자리가 다 44px 이상',
+   완료창 && 완료창.누르는것.every(x => x.h >= 44),
+   (완료창 ? 완료창.누르는것.map(x => x.글 + ' ' + x.w + 'x' + x.h).join(' · ') : '창 없음'));
+판('완료 창이 375px 화면 안에 다 든다 (단추가 안 가린다)',
+   완료창 && 완료창.넘침 === false && 완료창.문서가로 <= 375,
+   완료창 ? JSON.stringify(완료창.창) + ' · 문서가로 ' + 완료창.문서가로 : '창 없음');
 판('⑥ 집중 창 「완료」 를 누르면 쓰던 완료 팝업이 뜬다', 팝업떴나 === true, String(팝업떴나));
 판('⑥ 완료 팝업이 뜨면 집중 창은 닫힌다', (await 판떴나()) === false, String(await 판떴나()));
 // 팝업의 등록 단추를 진짜로 누른다 (btn 없이 부른 길 — 여태 아무도 안 밟은 길이다)
@@ -268,10 +291,7 @@ console.log('■ 완료에 적힌 것: ' + JSON.stringify(적힌것.완료));
 판('⑥ actualMinutes 가 쌓인분 + 이번 분이다',
    적힌것.완료 && Math.abs(적힌것.완료.actualMinutes - 완료값.적힐분) < 0.2,
    완료값.쌓인분 + ' + ' + 완료값.흐른분 + ' = ' + 완료값.적힐분 + '분 · 적힌 값 ' + (적힌것.완료 || {}).actualMinutes + '분');
-// 완료 팝업의 등록 단추는 **이번에 만든 것이 아니라 예전부터 있던 것**이다.
-// 재기만 하고 떨어뜨리지 않는다 — 고치라는 지시가 없었다. 값은 늘 찍어 둔다.
-console.log('■ (재기만 함 · 이번 지시 밖) 완료 팝업 등록 단추 ' + 등록눌림
-  + (parseInt((등록눌림.match(/높이 (\d+)px/) || [0, 0])[1], 10) < 44 ? '  ← 44px 밑이다' : ''));
+console.log('■ 완료 창 등록 단추 ' + 등록눌림);
 
 // ⑦-끝 취소를 두 번 하고 완료해도 다 더해진다 — 이번엔 둘째 카드로 끝까지 몬다
 const 두번뒤 = await p.evaluate(async () => {
