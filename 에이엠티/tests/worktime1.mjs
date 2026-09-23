@@ -232,58 +232,86 @@ console.log('■ 새로고침 흉내: ' + JSON.stringify(되살림));
    '쌓인분 ' + 다시시작.쌓인분 + ' → ' + 되살림.시계);
 await p.screenshot({ path: 그림칸 + '/work-375-집중.png' });
 
-// ⑥-끝 완료 → actualMinutes 가 합쳐진 값
-await p.evaluate(() => { window.tl일완료(); });
-await p.waitForTimeout(500);
-const 완료판 = await p.evaluate(() => {
-  const 칸 = document.querySelector('#part-done-qty, input[type="number"]');
-  const 단 = [...document.querySelectorAll('button')].find(b => /등록|완료 등록|확인/.test(b.textContent));
-  return { 팝업: !!document.querySelector('[id*="done"], .swal2-container, #part-done-popup'), 단추: !!단 };
-});
+// ⑥-끝 완료 → 완료 팝업 → 등록까지 진짜로 몰고, partCompletions 에 적힌 값을 잰다
 const 완료값 = await p.evaluate(() => {
-  // 완료 팝업이 무엇을 적든, 적히는 분은 _일한분 이 낸다 — 그 값을 그대로 잰다
   const o = confirmedOrders.find(x => x.docId === 'd1');
   const rec = o.partStarted['CUT_1']['재단'];
   return { 쌓인분: _쌓인분(rec), 흐른분: _흐른분(rec), 적힐분: _일한분(rec) };
 });
-console.log('■ 완료 때 적힐 분: ' + JSON.stringify(완료값));
-판('⑥ 완료에 적힐 분 = 쌓인분 + 이번 분',
-   Math.abs(완료값.적힐분 - (완료값.쌓인분 + 완료값.흐른분)) < 0.05,
-   완료값.쌓인분 + ' + ' + 완료값.흐른분 + ' = ' + 완료값.적힐분);
-
-// ── 세 군데 다 같은 길로 간다 — 타임라인 줄 · 작업 카드(풀) · 보드에 놓인 카드
-const 세군데 = await (async () => {
-  const 글 = await (await fetch(URL)).text();
-  const 수 = (글.match(/tlMarkPartStarted\(/g) || []).length;
-  const 카드둘 = await p.evaluate(() => {
-    const 있나 = f => typeof f === 'function' && /tlMarkPartStarted/.test(String(f));
-    return { 놓인카드: 있나(_woPlacedCardHtml), 작업카드: 있나(_woCardHtml) };
-  });
-  return Object.assign({ 부르는자리수: 수 }, 카드둘);
+await 톡('#_집중완료');
+const 팝업떴나 = await p.evaluate(() => !!document.getElementById('_partDoneModal'));
+판('⑥ 집중 창 「완료」 를 누르면 쓰던 완료 팝업이 뜬다', 팝업떴나 === true, String(팝업떴나));
+판('⑥ 완료 팝업이 뜨면 집중 창은 닫힌다', (await 판떴나()) === false, String(await 판떴나()));
+// 팝업의 등록 단추를 진짜로 누른다 (btn 없이 부른 길 — 여태 아무도 안 밟은 길이다)
+const 등록눌림 = await (async () => {
+  const i = await p.evaluate(() => [...document.querySelectorAll('#_partDoneModal button')]
+    .findIndex(b => /_tlPartDoneSubmit/.test(b.getAttribute('onclick') || '')));
+  if (i < 0) return '등록 단추 없음';
+  const r = await p.evaluate(i => { const b = [...document.querySelectorAll('#_partDoneModal button')][i];
+    const x = b.getBoundingClientRect();
+    return { x: Math.round(x.x + x.width / 2), y: Math.round(x.y + x.height / 2), h: Math.round(x.height) }; }, i);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: r.x, y: r.y, radiusX: 14, radiusY: 14, force: 1 }] });
+  await p.waitForTimeout(110);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await p.waitForTimeout(700);
+  return '높이 ' + r.h + 'px';
 })();
-console.log('■ ▶ 시작을 그리는 자리: ' + JSON.stringify(세군데));
-판('▶ 시작을 그리는 자리가 셋이고 다 tlMarkPartStarted 를 부른다',
-   세군데.부르는자리수 === 3 && 세군데.놓인카드 && 세군데.작업카드, JSON.stringify(세군데));
-// 풀 카드(아직 기계에 안 놓인 카드)에서도 집중 창이 뜬다
-const 풀에서 = await p.evaluate(async () => {
-  window._집중판닫기();
+console.log('■ 등록 단추: ' + 등록눌림);
+const 적힌것 = await p.evaluate(() => {
+  const o = confirmedOrders.find(x => x.docId === 'd1');
+  return { 완료: (o.partCompletions?.['CUT_1'] || {})['재단'] || null,
+           쓴칸: window.__쓴것.map(x => Object.keys(x.값)[0]) };
+});
+console.log('■ 완료에 적힌 것: ' + JSON.stringify(적힌것.완료));
+판('⑥ 등록을 누르면 partCompletions 에 적힌다',
+   !!(적힌것.완료 && 적힌것.완료.done === true), JSON.stringify(적힌것.완료));
+판('⑥ actualMinutes 가 쌓인분 + 이번 분이다',
+   적힌것.완료 && Math.abs(적힌것.완료.actualMinutes - 완료값.적힐분) < 0.2,
+   완료값.쌓인분 + ' + ' + 완료값.흐른분 + ' = ' + 완료값.적힐분 + '분 · 적힌 값 ' + (적힌것.완료 || {}).actualMinutes + '분');
+// 완료 팝업의 등록 단추는 **이번에 만든 것이 아니라 예전부터 있던 것**이다.
+// 재기만 하고 떨어뜨리지 않는다 — 고치라는 지시가 없었다. 값은 늘 찍어 둔다.
+console.log('■ (재기만 함 · 이번 지시 밖) 완료 팝업 등록 단추 ' + 등록눌림
+  + (parseInt((등록눌림.match(/높이 (\d+)px/) || [0, 0])[1], 10) < 44 ? '  ← 44px 밑이다' : ''));
+
+// ⑦-끝 취소를 두 번 하고 완료해도 다 더해진다 — 이번엔 둘째 카드로 끝까지 몬다
+const 두번뒤 = await p.evaluate(async () => {
   const o = confirmedOrders.find(x => x.docId === 'd2');
   o.partStarted = {}; o.partCompletions = {};
-  const o1 = confirmedOrders.find(x => x.docId === 'd1');
-  o1.partStarted = {}; o1.partCompletions = {};      // 붙잡은 일을 놓는다
-  const 칸 = document.getElementById('__무대');
-  칸.innerHTML = _woCardHtml(window.__한장(2), window.__sk);
-  const bt = 칸.querySelector('button[style*="3b82f6"]');
-  if (!bt) return '시작 단추 없음';
-  bt.click();
+  const 적기 = async 값 => { window._집중일 = { docId: 'd2', cardKey: 'CUT_2', procKey: '재단',
+      rec: 값, order: o };
+    o.partStarted['CUT_2'] = o.partStarted['CUT_2'] || {}; o.partStarted['CUT_2']['재단'] = 값; };
+  // 3분 하고 취소
+  await 적기({ started: true, startMs: Date.now() - 3 * 60000, date: '2026-09-15', partName: '가와2' });
+  await window.tl일취소();
+  const 한번 = o.partStarted['CUT_2']['재단'].쌓인분;
+  // 다시 2분 하고 또 취소
+  await 적기(Object.assign({}, o.partStarted['CUT_2']['재단'], { started: true, startMs: Date.now() - 2 * 60000 }));
+  await window.tl일취소();
+  const 두번 = o.partStarted['CUT_2']['재단'].쌓인분;
+  // 다시 1분 하고 완료 팝업까지
+  await 적기(Object.assign({}, o.partStarted['CUT_2']['재단'], { started: true, startMs: Date.now() - 1 * 60000 }));
+  const 적힐 = _일한분(o.partStarted['CUT_2']['재단']);
+  window.tl일완료();
   await new Promise(r => setTimeout(r, 400));
-  return document.getElementById('_집중판') ? '집중 창 뜸' : '안 뜸';
+  const 단 = [...document.querySelectorAll('#_partDoneModal button')]
+    .find(b => /_tlPartDoneSubmit/.test(b.getAttribute('onclick') || ''));
+  if (단) 단.click();
+  await new Promise(r => setTimeout(r, 600));
+  return { 한번, 두번, 적힐, 적힌: (o.partCompletions?.['CUT_2'] || {})['재단'] || null };
 });
-판('작업 카드(아직 안 놓인 카드)에서 시작해도 집중 창이 뜬다', 풀에서 === '집중 창 뜸', 풀에서);
+console.log('■ 두 번 취소하고 완료: ' + JSON.stringify(두번뒤));
+판('⑦ 두 번 취소하면 3 → 5 분으로 쌓인다',
+   Math.abs(두번뒤.한번 - 3) < 0.2 && Math.abs(두번뒤.두번 - 5) < 0.2, 두번뒤.한번 + ' → ' + 두번뒤.두번);
+판('⑦ 두 번 취소한 뒤 완료해도 다 더해져 적힌다 (5 + 1 = 6)',
+   두번뒤.적힌 && Math.abs(두번뒤.적힌.actualMinutes - 6) < 0.3,
+   '적힐 ' + 두번뒤.적힐 + '분 · 적힌 ' + (두번뒤.적힌 || {}).actualMinutes + '분');
+판('⑦ 완료 기록에 partCompletions 쓰기가 남는다',
+   (await p.evaluate(() => window.__쓴것.some(x => Object.keys(x.값).some(k => /^partCompletions\./.test(k))))) === true,
+   JSON.stringify(await p.evaluate(() => [...new Set(window.__쓴것.map(x => Object.keys(x.값)[0].split('.')[0]))])));
 
-판('파이어스토어에 쓴 것은 partStarted 뿐이다 (발주 내용·재단계획 안 건드림)',
-   (await p.evaluate(() => window.__쓴것.every(x => Object.keys(x.값).every(k => /^partStarted\./.test(k))))) === true,
-   JSON.stringify(await p.evaluate(() => window.__쓴것.map(x => Object.keys(x.값)[0]))));
+판('파이어스토어에 쓴 것은 partStarted·partCompletions 뿐이다 (발주 내용·재단계획 안 건드림)',
+   (await p.evaluate(() => window.__쓴것.every(x => Object.keys(x.값).every(k => /^(partStarted|partCompletions)\./.test(k))))) === true,
+   JSON.stringify(await p.evaluate(() => [...new Set(window.__쓴것.map(x => Object.keys(x.값)[0].split('.')[0]))])));
 판('페이지오류 없음', errs.length === 0, String(errs.length) + (errs[0] ? ' :: ' + errs[0] : ''));
 console.log(실패 === 0 ? 'worktime1   OK' : 'worktime1   FAIL (' + 실패 + ')');
 await b.close(); process.exit(실패 === 0 ? 0 : 1);
