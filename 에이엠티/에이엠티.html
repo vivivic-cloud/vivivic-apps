@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.11.0 (2026-09-23) — 시작한 일에 집중 창(잠시 멈춤·취소·완료)을 붙이고, 취소한 시간을 쌓아 합산한다
+     버전: v1.11.1 (2026-09-23) — 화면 글자를 「취소」 한 가지로 맞추고, 완료 막이도 같은 잣대로 본다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2102,7 +2102,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.11.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.11.1</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2228,7 +2228,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.11.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.11.1</b></p>
         </div>
     </div>
 
@@ -7300,13 +7300,13 @@
             const 일 = window._집중일; if (!일) return;
             const r = 일.rec || {};
             const 쌓을것 = Math.round((_쌓인분(r) + _흐른분(r)) * 10) / 10;
-            if (!confirm(`이 일의 시작을 무릅니다.\n지금까지 ${쌓을것.toFixed(1)}분은 이 카드에 쌓아 두고,\n다시 시작하면 그 시간에 이어서 셉니다.\n\n무를까요?`)) return;
+            if (!confirm(`이 일을 취소합니다.\n지금까지 ${쌓을것.toFixed(1)}분은 이 카드에 쌓아 두고,\n다시 시작하면 그 시간에 이어서 셉니다.\n\n취소할까요?`)) return;
             try {
                 await _집중쓰기({ started: false, startMs: null,
                                   date: r.date || new Date().toISOString().slice(0, 10),
                                   partName: r.partName || '', 쌓인분: 쌓을것, 멈춤: false });
                 window._집중판닫기();
-                showToastMessage(`시작을 무렀습니다. ${쌓을것.toFixed(1)}분을 쌓아 두었습니다.`);
+                showToastMessage(`취소했습니다. ${쌓을것.toFixed(1)}분을 쌓아 두었습니다.`);
                 if (typeof renderProcessTimeline === 'function') renderProcessTimeline();
                 Object.keys(window._woBoringParts || {}).forEach(sk => { try { _woRenderBoard(sk); } catch (e) {} });
             } catch (e) { showToastMessage('취소를 적지 못했습니다: ' + (e.message || e)); }
@@ -7342,7 +7342,7 @@
             // 한 번에 한 가지 일만 붙잡는다 — 지시(09-23): 「현재 작업에 집중할 수 있도록」
             const _붙든것 = _집중찾기();
             if (_붙든것 && !(_붙든것.docId === docId && _붙든것.cardKey === cardKey && _붙든것.procKey === procKey)) {
-                showToastMessage(`먼저 하던 일(${_붙든것.rec?.partName || _붙든것.cardKey} · ${_붙든것.procKey})을 끝내거나 무르고 시작해 주세요.`);
+                showToastMessage(`먼저 하던 일(${_붙든것.rec?.partName || _붙든것.cardKey} · ${_붙든것.procKey})을 끝내거나 취소하고 시작해 주세요.`);
                 window._집중판열기(_붙든것);
                 return;
             }
@@ -7389,7 +7389,7 @@
                         : 'font-size:8px;font-weight:900;color:#fff;background:#22c55e;border:none;border-radius:3px;padding:1px 6px;cursor:pointer;white-space:nowrap;line-height:1.4;';
                     btnWrap.innerHTML = `<button onclick="event.stopPropagation();tlShowPartDoneConfirm('${safeDocId}','${safeCK}','${safePK}','${safeDate}',this,'${safeName}',${_expQty},'${safeCK}')" onmousedown="event.stopPropagation()" style="${_완료꼴}">완료</button>`;
                 }
-                showToastMessage(`[${procKey}] 작업 시작 — 끝내거나 무를 때까지 이 창이 떠 있습니다.`);
+                showToastMessage(`[${procKey}] 작업 시작 — 끝내거나 취소할 때까지 이 창이 떠 있습니다.`);
             } catch (err) {
                 console.error('시작 처리 실패:', err);
                 _작업실패알림('시작 처리 실패', _작업실패까닭(err),
@@ -7598,7 +7598,9 @@
                 // 완료는 그래도 기준 이름(cardKey)에만 쓴다.
                 const _startRec = (startKey && _ord?.partStarted?.[startKey]?.[procKey])
                     || _partRecMap(_ord?.partStarted, cardKey)[procKey];
-                if (!_startRec) {
+                // 취소한 자리는 {started:false} 로 남아 있다 — 있기만 한 것이 아니라
+                // 「시작한 상태인가」 로 물어야 한다. 그리는 자리 넷이 쓰는 그 잣대다.
+                if (!_공정시작됨(_startRec)) {
                     showToastMessage('▶ 시작 후 완료할 수 있습니다.');
                     if (btn) { btn.disabled = false; btn.textContent = '완료'; }
                     return;
