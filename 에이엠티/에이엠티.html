@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.10.3 (2026-09-23) — 저장된 도면을 다시 열어도 자투리에 들어갈 부속이 후보로 뜬다
+     버전: v1.10.4 (2026-09-23) — 1순위 조각을 색이 아니라 치수로 가른다(화이트 원장에서도 후보가 뜬다)
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2067,7 +2067,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.10.3</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.10.4</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2193,7 +2193,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.10.3</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.10.4</b></p>
         </div>
     </div>
 
@@ -9297,12 +9297,30 @@
                다시 열 때 2·3순위는 고른 상태로 되살리지 않으므로(1순위만 고른 상태다),
                후보는 1순위 뒤에 남는 자리를 기준으로 내야 맞다.
                자투리에 앉힌 조각은 그릴 때 잿빛(#f5f5f4)으로 칠해 두었으므로 그것으로 가른다. */
+            /* 무엇이 1순위 조각인가 — **치수로 가른다.**
+               색으로만 가르려 했더니 화이트 원장에서 안 먹었다: 「화이트」 의 색이
+               자투리를 칠하는 잿빛(#f5f5f4)과 똑같고(_COLOR_NAME_MAP), 자동생성
+               도면은 1순위 조각에도 그 색을 칠한다. 그러면 1순위가 하나도 안 잡혀
+               통째로 세던 예전으로 되돌아갔다(진짜 도면 312장 중 5장이 그랬다).
+               집에 이미 쓰는 잣대가 있다 — _cuttingPerSheet 가 dw·dh 를 이 계획의
+               재단W×D 와 대 보고, 돌려 앉힌 것까지 제 몫으로 센다. 그대로 쓴다.
+               치수가 안 적힌 옛 도면이면 그때만 색으로, 색으로도 못 가르면
+               그때만 통째로 센다(없는 것보다 낫다). */
+            const _같다 = (a, bv) => isFinite(a) && Math.abs(a - bv) < 0.5;
+            const _내치수 = pt => {
+                const w = p.rw || 0, d = p.rd || 0;
+                const dw = parseFloat(pt && pt.dw), dh = parseFloat(pt && pt.dh);
+                if (!w || !d || !isFinite(dw) || !isFinite(dh)) return false;
+                // 돌려서 앉혔을 수 있으니 가로·세로를 바꾼 것도 이 부속으로 본다
+                return (_같다(dw, w) && _같다(dh, d)) || (_같다(dw, d) && _같다(dh, w));
+            };
             const _곁조각 = pt => {
                 const c = String(pt && pt.bg || '').replace(/\s/g, '').toLowerCase();
                 return c === '#f5f5f4' || c === 'rgb(245,245,244)';
             };
-            const _일순위조각 = p.boardParts.filter(pt => !_곁조각(pt));
-            const _셀것 = _일순위조각.length ? _일순위조각 : p.boardParts;
+            let _일순위조각 = p.boardParts.filter(_내치수);                       // ① 치수로
+            if (!_일순위조각.length) _일순위조각 = p.boardParts.filter(pt => !_곁조각(pt));  // ② 색으로
+            const _셀것 = _일순위조각.length ? _일순위조각 : p.boardParts;          // ③ 통째로
             let maxRightFrac = 0, maxBottomFrac = 0;
             _셀것.forEach(pt => {
                 maxRightFrac  = Math.max(maxRightFrac,  pt.lp + pt.wp);
