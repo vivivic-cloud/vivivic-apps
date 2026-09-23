@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.10.1 (2026-09-19) — 원장재고 거르기를 갈래 단추 한 줄로 접는다(폰에서 덜 정신없게)
+     버전: v1.10.2 (2026-09-23) — 재단편집은 카드째가 아니라 도면 곁 「편집」 단추로만 연다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1127,6 +1127,21 @@
             padding: 2px 7px; border-radius: 6px; line-height: 1.35;
         }
         .cut-추가-칩 b { font-weight: 900; color: #7a4e12; }
+        /* 재단편집으로 가는 자리 — 여태 카드 아무 데나 누르면 넘어갔다. 카드는 잡아
+           옮기는 몸통이라 옮기려다 편집이 열리곤 했다(09-23 지시). 이 단추 하나로
+           좁힌다. 보이는 알약은 작게 두고, 손가락 닿는 자리만 ::after 로 44px 넓힌다. */
+        .wo-cut-편집 {
+            position: relative; display: inline-flex; align-items: center; justify-content: center;
+            font: inherit; font-size: 11.5px; font-weight: 800; color: #37352f;
+            background: #f1f1ef; border: 1px solid #e3e2e0; border-radius: 8px;
+            padding: 5px 12px; line-height: 1.2; cursor: pointer; flex: none;
+        }
+        .wo-cut-편집:active { background: #e3e2e0; }
+        .wo-cut-편집::after {
+            content: ''; position: absolute; left: 50%; top: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%; min-width: 44px; height: 44px;
+        }
         /* ── 길게 눌러 이동 — 재단 보드에서 카드 차례를 손가락으로 바꾼다 ──
               폰에서는 HTML5 끌어놓기가 아예 듣지 않아, 한 칸 안에서 차례를
               바꿀 길이 없었다. 0.4초 길게 누르면 이동이 켜진다. */
@@ -2052,7 +2067,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.10.1</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.10.2</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2178,7 +2193,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.10.1</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.10.2</b></p>
         </div>
     </div>
 
@@ -9521,7 +9536,9 @@
                     // 배지 행: 발주/원장/작업 수량을 색이 있는 알약 배지로만 강조
                     (_pills.length ? `<div style="display:flex;align-items:center;gap:4px;margin-top:6px;flex-wrap:wrap;">${_pills.join('')}</div>` : '') +
                     // 미배정 부속은 아직 기계에 배치되기 전 단계라 도면까지 보여줄 필요가
-                    // 없다는 요청으로 삭제 — 기계에 배치된 카드에는 그대로 도면이 보임
+                    // 없다는 요청으로 삭제 — 기계에 배치된 카드에는 그대로 도면이 보임.
+                    // 도면이 없는 카드라 편집 단추는 배지 줄 아래 오른쪽에 둔다.
+                    `<div style="display:flex;justify-content:flex-end;margin-top:6px;">${_woCutEditBtnHtml(p.cKey, stateKey)}</div>` +
                     _wDoneHtml;
             } else {
                 const _codePool = p.orderCode
@@ -9547,13 +9564,27 @@
             // 그대로 쓰고, 색은 위 배지(_pills)에만 남김 (일반 부속 카드는 기존 유지)
             const _pcs = (p.isCuttingCard || !_pcc.bg) ? '' : `background:${_pcc.bg};border-left:3px solid ${_pcc.bd};`;
             const _pOkPool = (p.orderKey || p.orderCode || '').replace(/'/g, "\\'");
-            // 재단 카드는 클릭 시 실제 재단편집 도구가 팝업으로 뜨며 바로 편집 가능
-            const _cutClick = p.isCuttingCard ? `onclick="woEditCuttingPlan('${p.cKey}','${stateKey}')"` : '';
+            // 재단편집은 카드째가 아니라 카드 안 「편집」 단추로만 연다(09-23 지시).
+            // 카드 전체의 onclick 과 cursor:pointer 를 뗐다 — 눌리는 줄 알고 누르시던 자리다.
             return `<div class="wo-boring-part-card" draggable="${_wDone ? 'false' : 'true'}"
                 data-ck="${p.cKey}" data-sk="${stateKey}" data-ok="${_pOkPool}" data-done="${_wDone ? '1' : '0'}"
-                style="${_pcs}${_wDone ? 'opacity:0.6;' : ''}${p.isCuttingCard ? 'cursor:pointer;' : ''}"
-                ${_cutClick}
+                style="${_pcs}${_wDone ? 'opacity:0.6;' : ''}"
                 ${_wDone ? '' : `ondragstart="woBoardDragStart(event,'${p.cKey}','${stateKey}')" ondragend="woBoardDragEnd(event)"`}>${innerHtml}</div>`;
+        }
+
+        /* 재단편집으로 가는 단추 — 재단 카드에만 붙는다(09-23 지시).
+           카드는 끌어 옮기는 몸통이고 두 번 치기도 걸려 있어, 이 단추에서 일어난
+           누름·끌기·두 번 치기가 카드로 새지 않게 다 막는다. 집에 이미 있는
+           「완료」·「▶ 시작」 단추가 하는 그대로다.
+           (길게 눌러 옮기기는 _woMoveCardAt 이 button 안이면 스스로 비켜 준다) */
+        function _woCutEditBtnHtml(cKey, sk) {
+            const _c = String(cKey).replace(/'/g, "\\'");
+            const _s = String(sk).replace(/'/g, "\\'");
+            return `<button type="button" class="wo-cut-편집" draggable="false" aria-label="재단 도면 편집"` +
+                ` onclick="event.stopPropagation();woEditCuttingPlan('${_c}','${_s}')"` +
+                ` onmousedown="event.stopPropagation()"` +
+                ` ondblclick="event.stopPropagation()"` +
+                ` ondragstart="event.preventDefault();event.stopPropagation()">편집</button>`;
         }
 
         // ── 보링 보드 재렌더 (절대위치 Gantt)
@@ -9614,8 +9645,11 @@
                         (x.수 > 0 ? ` · ${_esc(x.수)} EA` : '') + `</span>`).join('') + `</div>`
                     : '';
                 const _diagCut = _woCuttingDiagramSvg(p);
+                // 「편집」 은 사장님이 짚으신 그대로 **재단도면 곁**에 둔다(09-23 지시).
+                // 도면이 없는 카드에도 편집할 길은 있어야 하므로, 그때는 글 칸 밑에 둔다.
+                const _편집Btn = _woCutEditBtnHtml(cKey, sk);
                 const _diagBox = _diagCut
-                    ? `<div style="width:45%;max-width:230px;flex:none;align-self:center;">${_diagCut}</div>` : '';
+                    ? `<div style="width:45%;max-width:230px;flex:none;align-self:center;display:flex;flex-direction:column;align-items:center;gap:6px;">${_diagCut}${_편집Btn}</div>` : '';
 
                 // 제품명 - 부속명을 한 줄로 붙여 표기, 줄바뀜 없이 넘치면 말줄임표
                 // 제품명이 첫 줄을 다 먹어 정작 부속명이 잘려 안 보였다.
@@ -9634,7 +9668,9 @@
                     `</div>` +
                     (_pills2.length ? `<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:5px;">${_pills2.join('')}</div>` : '');
                 _placedInner = `<div style="display:flex;gap:8px;align-items:stretch;min-width:0;">` +
-                    `<div style="flex:1;min-width:0;">${_textCut}</div>${_diagBox}</div>`;
+                    `<div style="flex:1;min-width:0;">${_textCut}` +
+                    (_diagCut ? '' : `<div style="display:flex;justify-content:flex-start;margin-top:6px;">${_편집Btn}</div>`) +
+                    `</div>${_diagBox}</div>`;
             } else {
                 const _codePlaced = p.orderCode
                     ? `<div style="font-size:10px;font-weight:700;color:#a8a6a2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;font-family:ui-monospace,monospace;">${p.orderCode}</div>`
@@ -9720,16 +9756,16 @@
                     : '';
 
             const _pOk = (p.orderKey || p.orderCode || '').replace(/'/g, "\\'");
-            // 재단 카드는 클릭 시 실제 재단편집 도구가 팝업으로 뜨며 바로 편집 가능
-            const _cutClick = p.isCuttingCard ? ` onclick="woEditCuttingPlan('${cKey}','${sk}')"` : '';
+            // 재단편집은 카드째가 아니라 카드 안 「편집」 단추로만 연다(09-23 지시).
+            // 두 번 치기와 끌어 옮기기는 그대로 카드 몸통이 받는다.
             // 엣지·보링 판에서는 그 부속의 앞 공정이 끝나야 또렷해진다. 아직이면 연한 글씨.
             // 누르는 것은 그대로다 — 보기만 연할 뿐 막지 않는다.
             const _대기카드 = !_bDone && !_woPrevReady(p, _bck, _bComps, sk);
             const _cardCls = 'wo-boring-placed-card' + (p.isCuttingCard ? ' cutting-card' : '')
                 + (_대기카드 ? ' wo-앞대기카드' : '');
             return `<div class="${_cardCls}" draggable="${_bDone ? 'false' : 'true'}"` +
-                ` style="${_bcs}${_bDone ? 'opacity:0.6;' : ''}${p.isCuttingCard ? 'cursor:pointer;' : ''}"` +
-                ` data-ck="${cKey}" data-sk="${sk}" data-mac="${mac}" data-ok="${_pOk}" data-done="${_bDone ? '1' : '0'}"${_grpAttr || ''}${_cutClick}` +
+                ` style="${_bcs}${_bDone ? 'opacity:0.6;' : ''}"` +
+                ` data-ck="${cKey}" data-sk="${sk}" data-mac="${mac}" data-ok="${_pOk}" data-done="${_bDone ? '1' : '0'}"${_grpAttr || ''}` +
                 (!_bDone ? ` ondblclick="woBoardDblClick('${cKey}','${sk}')" ondragstart="woBoardDragStart(event,'${cKey}','${sk}')" ondragend="woBoardDragEnd(event)"` : '') +
                 `>${_placedInner}${_bDoneHtml}</div>`;
         }
