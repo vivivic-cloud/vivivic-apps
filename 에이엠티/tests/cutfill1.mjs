@@ -83,12 +83,27 @@ const 잰것 = await p.evaluate(({ L, O, C }) => {
       bg: 'rgb(245, 245, 244)', dw: '0', dh: '0' },
   ];
 
+  /* ② 자동생성 꼴 — 1순위 조각에도 자투리와 **똑같은 잿빛**이 칠해져 있다.
+     화이트 원장이 그렇다(「화이트」 색이 자투리 잿빛과 같은 #f5f5f4 이고,
+     자동생성은 1순위에도 그 색을 칠한다). 색으로는 못 가르고 치수로 갈라야 한다. */
+  const boardParts자동 = boardParts.map(pt => Object.assign({}, pt, { bg: '#f5f5f4' }));
+  boardParts자동[0].dw = String(첫.w); boardParts자동[0].dh = String(첫.d);
+
   const 보임 = () => [...document.querySelectorAll('.inner-part-card')]
     .filter(c => c.id !== primarySelectedCardId && getComputedStyle(c).display !== 'none')
     .map(c => c.dataset.name);
 
   _woRenderActualBoardParts({ boardParts, rw: 첫.w, rd: 첫.d });
   const 고친뒤 = 보임();
+  // 자동생성 꼴로 다시 — 색이 다 같아도 치수로 갈라 같은 후보가 떠야 한다
+  document.querySelectorAll('.inner-part-card').forEach(c => c.classList.remove('wo-not-fitting'));
+  _woRenderActualBoardParts({ boardParts: boardParts자동, rw: 첫.w, rd: 첫.d });
+  const 자동뒤 = 보임();
+  // 치수도 색도 못 가르는 옛 도면(치수 빈칸 + 색 다 같음)은 예전처럼 통째로 센다
+  document.querySelectorAll('.inner-part-card').forEach(c => c.classList.remove('wo-not-fitting'));
+  const boardParts옛 = boardParts자동.map(pt => Object.assign({}, pt, { dw: '', dh: '' }));
+  _woRenderActualBoardParts({ boardParts: boardParts옛, rw: 첫.w, rd: 첫.d });
+  const 옛뒤 = 보임();
 
   // 예전 셈 — 잿빛까지 넣어 경계를 잡으면 무엇이 남는지 그대로 재 본다
   const 옛오른 = Math.max(...boardParts.map(x => x.lp + x.wp)) * BW;
@@ -107,7 +122,8 @@ const 잰것 = await p.evaluate(({ L, O, C }) => {
   return {
     발주: 고른.ord.orderCode, plate: 고른.plate, 일순위: 첫.이름 + ' ' + 첫.w + 'X' + 첫.d,
     들어야할것: 들것.이름 + ' ' + 들것.w + 'X' + 들것.d,
-    후보수: 목록.length - 1, 고친뒤보임: 고친뒤,
+    후보수: 목록.length - 1, 고친뒤보임: 고친뒤, 자동뒤보임: 자동뒤, 옛뒤보임: 옛뒤,
+    잿빛다같나: boardParts자동.every(x => String(x.bg).toLowerCase() === '#f5f5f4'),
     옛차지:{오른:Math.round(옛오른), 아래:Math.round(옛아래)},
     새차지:{오른:Math.round(새오른), 아래:Math.round(새아래)},
     옛셈, 쓰기: window.__쓰기,
@@ -133,6 +149,13 @@ const 새들어가는것 = 잰것.옛셈.filter(x => x.새 > 0).map(x => x.이�
 판('안 들어가는 부속은 그대로 숨는다',
    잰것.옛셈.filter(x => x.새 <= 0).every(x => !잰것.고친뒤보임.includes(x.이름)),
    JSON.stringify(잰것.옛셈.filter(x => x.새 <= 0).map(x => x.이름)));
+// 자동생성 꼴 — 색이 다 같아도(화이트 원장) 치수로 갈라 같은 후보가 떠야 한다
+판('자동생성 도면은 1순위도 잿빛이다 (색으로는 못 가른다)', 잰것.잿빛다같나 === true, String(잰것.잿빛다같나));
+판('색이 다 같아도 치수로 갈라 후보가 뜬다 (화이트 원장)',
+   잰것.자동뒤보임.length > 0 && JSON.stringify(잰것.자동뒤보임) === JSON.stringify(잰것.고친뒤보임),
+   '자동생성 ' + JSON.stringify(잰것.자동뒤보임) + ' · 손으로 저장한 것 ' + JSON.stringify(잰것.고친뒤보임));
+판('치수도 색도 없는 옛 도면은 예전처럼 통째로 센다 (되돌이가 산다)',
+   잰것.옛뒤보임.length === 0, JSON.stringify(잰것.옛뒤보임));
 판('파이어스토어에 한 줄도 안 썼다', 잰것.쓰기 === 0, 잰것.쓰기 + '번');
 판('페이지오류 없음', errs.length === 0, String(errs.length) + (errs[0] ? ' :: ' + errs[0] : ''));
 console.log(실패 === 0 ? 'cutfill1   OK' : 'cutfill1   FAIL (' + 실패 + ')');
