@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.11.2 (2026-09-23) — 완료 창의 누르는 자리를 다 44px 로 키운다
+     버전: v1.11.3 (2026-09-24) — 일이 잠깐 비었다가 다시 생겨도 공정 캘린더가 돌아오게 한다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2102,7 +2102,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.11.2</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.11.3</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2228,7 +2228,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.11.2</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.11.3</b></p>
         </div>
     </div>
 
@@ -12527,8 +12527,23 @@
                 try { if (typeof TL !== 'undefined' && Array.isArray(TL.renderedDates)) TL.renderedDates.length = 0; } catch (e) {}
             }
             if (cards.length === 0) {
+                /* 안내문으로 타임라인 자리를 통째로 덮으므로, 일이 다시 생기면 처음부터
+                   다시 그려야 한다. 이 줄이 없으면 TL 이 '이미 그렸다' 고 여겨
+                   refreshCards 만 도는데, 방금 지운 자리에는 고칠 카드가 없어
+                   안내문이 그대로 남는다 — 새로 켜기 전까지 캘린더가 안 돌아온다.
+                   바로 위 자료 안내문 갈래가 이미 하는 그것이다. */
+                try { if (typeof TL !== 'undefined' && Array.isArray(TL.renderedDates)) TL.renderedDates.length = 0; } catch (e) {}
                 container.innerHTML = '<div style="padding:40px 16px;text-align:center;font-size:13px;font-weight:700;color:#b0aeaa;font-style:italic;">발주서 탭에서 항목을 선택 후<br>발주확정 버튼을 눌러주세요.</div>';
+                container.dataset.빈안내 = '1';   // 안내문으로 덮어 둔 표
                 return;
+            }
+            // 일이 다시 생겼다 — 덮어 뒀던 안내문을 걷고 처음부터 다시 그린다.
+            // TL._buildRange 는 날짜칸을 붙이기만 하고 자리를 비우지 않으므로,
+            // 여기서 걷지 않으면 안내문이 날짜칸 사이에 그대로 끼어 있는다.
+            if (container.dataset.빈안내 === '1') {
+                delete container.dataset.빈안내;
+                container.innerHTML = '';
+                try { if (typeof TL !== 'undefined' && Array.isArray(TL.renderedDates)) TL.renderedDates.length = 0; } catch (e) {}
             }
 
             // 첫 초기화 or 리셋
