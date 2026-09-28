@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.11.6 (2026-09-28) — 시작하면 뜨는 집중 창에 그 일의 재단도면을 띄운다
+     버전: v1.11.7 (2026-09-28) — 집중 창 시계를 100분의 1초까지 돌린다 (보이는 것만)
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1147,8 +1147,9 @@
             line-height: 1.25; word-break: break-word; }
         #_집중판 .집중-곁 { margin: 4px 0 0; font-size: 12px; font-weight: 700; color: #787774; line-height: 1.45;
             word-break: break-word; }
-        #_집중판 .집중-시계 { margin: 12px 0 0; font-size: 40px; font-weight: 900; color: #37352f;
-            letter-spacing: -1.5px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+        #_집중판 .집중-시계 { margin: 12px 0 0; font-size: 34px; font-weight: 900; color: #37352f;
+            letter-spacing: -1px; line-height: 1.1; font-variant-numeric: tabular-nums;
+            white-space: nowrap; }
         #_집중판 .집중-멈춤글 { display: none; margin: 4px 0 0; font-size: 11.5px; font-weight: 800; color: #c2793a; }
         #_집중판 .집중-줄 { display: flex; gap: 8px; margin-top: 14px; }
         #_집중판 .집중-아랫줄 { margin-top: 8px; }
@@ -2162,7 +2163,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.11.6</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.11.7</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2288,7 +2289,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.11.6</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.11.7</b></p>
         </div>
     </div>
 
@@ -7294,7 +7295,7 @@
                   `<p class="집중-곁">${_e(일.procKey)}${o.orderCode ? ' · ' + _e(o.orderCode) : ''}` +
                     `${o.displayName ? '<br>' + _e(o.displayName) : ''}</p>` +
                   `<div class="집중-도면" id="_집중도면"></div>` +
-                  `<p class="집중-시계" id="_집중시계글">0.0분</p>` +
+                  `<p class="집중-시계" id="_집중시계글">0:00.00</p>` +
                   `<p class="집중-멈춤글" id="_집중멈춤글">잠시 멈춤 — 시간은 계속 갑니다</p>` +
                   `<div class="집중-줄">` +
                     `<button type="button" class="집중-단추 집중-멈춤" id="_집중멈춤">잠시 멈춤</button>` +
@@ -7316,7 +7317,7 @@
                 const g = document.getElementById('_집중시계글');
                 if (!g) return;
                 const r = (window._집중일 && window._집중일.rec) || {};
-                g.textContent = (_쌓인분(r) + _흐른분(r)).toFixed(1) + '분';
+                g.textContent = _집중시계글자(r);
                 const m = document.getElementById('_집중멈춤글');
                 if (m) m.style.display = r.멈춤 ? 'block' : 'none';
                 const b = document.getElementById('_집중멈춤');
@@ -7419,20 +7420,33 @@
             if (!일) { window._집중판닫기(); return; }
             window._집중띠보이기(일);
         };
+        /* 집중 창 시계 — 100분의 1초까지 돈다 (09-28 지시 「긴장감을 주세요」).
+           이것은 **보이는 것**뿐이다. 기록(partCompletions.actualMinutes)은
+           예전 그대로 분(分)으로 쌓는다 — _일한분 은 한 줄도 안 건드렸다.
+           0.05초마다 글자만 갈아 끼운다. 카드나 창을 다시 그리지 않는다. */
+        function _집중시계글자(r){
+            const 밀리 = _쌓인분(r) * 60000 + ((r && r.startMs) ? Math.max(0, Date.now() - r.startMs) : 0);
+            const 분 = Math.floor(밀리 / 60000);
+            const 초 = Math.floor((밀리 % 60000) / 1000);
+            const 백 = Math.floor((밀리 % 1000) / 10);
+            return 분 + ':' + String(초).padStart(2, '0') + '.' + String(백).padStart(2, '0');
+        }
         function _집중시계돌리기(){
             if (_집중시계) clearInterval(_집중시계);
+            let 틱 = 0;
             _집중시계 = setInterval(() => {
+                const r = (window._집중일 && window._집중일.rec) || {};
                 const g = document.getElementById('_집중시계글');
+                if (g) g.textContent = _집중시계글자(r);          // 0.05초마다 이 글자만
+                if ((틱++ % 20) !== 0) return;                    // 나머지는 1초에 한 번
                 if (g) {
-                    const r = (window._집중일 && window._집중일.rec) || {};
-                    g.textContent = (_쌓인분(r) + _흐른분(r)).toFixed(1) + '분';
                     const m = document.getElementById('_집중멈춤글');
                     if (m) m.style.display = r.멈춤 ? 'block' : 'none';
                     const b = document.getElementById('_집중멈춤');
                     if (b) { b.textContent = r.멈춤 ? '다시 하기' : '잠시 멈춤'; b.classList.toggle('on', !!r.멈춤); }
                 }
                 window._집중띠그리기();
-            }, 1000);
+            }, 50);
         }
         /* 새로고침해도 붙잡고 있던 일이 되살아난다 — 다만 「접힌 띠」 로 돌아온다.
            예전에는 큰 창으로 되살아나, 새로고침할 때마다 화면이 다시 막혀
