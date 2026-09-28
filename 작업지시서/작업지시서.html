@@ -238,13 +238,7 @@ body.쪽함 .stage{margin-left:92px}
 <div class="warn" id="warn" hidden></div>
 <div class="stage" id="stage"></div>
 
-<p class="hint">A4 흰 바탕입니다. 자료를 불러와 끌어 옮기고, 오른쪽 아래 손잡이로 크기를 바꿉니다.<br>
-자료를 골라 <b>다른 장으로 끌면</b> 그 장으로 넘어갑니다. 자료끼리 겹쳐 놓아도 됩니다.
-장은 <b>삭제 ×</b> 로 지웁니다.<br>
-여럿 고르기 — 컴퓨터는 <b>Ctrl</b>(맥은 <b>⌘</b>)을 누른 채, 폰은 <b>여러 개</b> 단추를 켜고 하나씩 누릅니다.
-고른 것은 함께 옮기고 함께 지웁니다.<br>
-PDF·PPT 를 불러오면 <b>한 장이 한 쪽</b>이 됩니다. 비율은 원본 그대로 지킵니다.<br>
-인쇄 · PDF 를 누른 뒤 대상에서 <b>PDF로 저장</b>을 고르면 전체가 한 파일이 됩니다.</p>
+<!-- 안내 문단은 뺐다(구구절절 금지). 단추 이름으로 알아보게 한다 -->
 
 <div class="tools">
   <button class="b" data-z="-">축소</button>
@@ -270,7 +264,7 @@ PDF·PPT 를 불러오면 <b>한 장이 한 쪽</b>이 됩니다. 비율은 원�
 
 <!-- 자를 자리를 고르는 동안 아래 도구 대신 뜬다 -->
 <div class="cropbar" id="cropbar" hidden>
-  <span class="cw" id="cropmsg">사진 위에서 손가락으로 끌어 네모를 그리세요</span>
+  <span class="cw" id="cropmsg">네모 끌기</span>
   <button class="b" id="cropdo">이 부분만</button>
   <button class="b" id="cropcopy">복사</button>
   <button class="b" id="cropdup">복제</button>
@@ -279,7 +273,7 @@ PDF·PPT 를 불러오면 <b>한 장이 한 쪽</b>이 됩니다. 비율은 원�
   <button class="b" id="cropend">그만</button>
 </div>
 <div class="cropbar" id="pastebar" hidden>
-  <span class="cw">복사했습니다 · 붙일 곳을 누르세요</span>
+  <span class="cw">붙일 곳</span>
   <button class="b" id="pasteend">그만</button>
 </div>
 
@@ -1024,7 +1018,7 @@ function 글넣기(글){
 /* 어느 장이든 지운다. 물음은 두 갈래 모두에 건다 — 예전엔 else 안에만 있어서
    한 장짜리 문서는 아무것도 안 묻고 통째로 비워졌다 */
 function 장지우기(n){
-  if ((문서.장들[n] || []).length && !confirm(`${n + 1}장을 지웁니다. 되돌릴 수 없습니다.`)) return;
+  if ((문서.장들[n] || []).length && !confirm(`${n + 1}장 지울까요?`)) return;
   if (문서.장들.length <= 1) 문서.장들 = [[]];
   else {
     문서.장들.splice(n, 1);
@@ -1104,7 +1098,7 @@ $('fitw').onclick  = () => { const 것들 = 고른것들(); if (!것들.length) 
     if (it.종류 === 'img'){ it.h = Math.min(H - it.y, it.w * 비); it.w = it.h / 비; it.x = (W - it.w) / 2; }
   });
   저장(); 그리기(); };
-$('clear').onclick = () => { if (!confirm('이 지시서의 모든 장을 지웁니다.')) return;
+$('clear').onclick = () => { if (!confirm('모두 지울까요?')) return;
   문서.장들 = [[]]; 지금장 = 0; 고른것 = null; 저장(); 그리기(); };
 
 /* 미세 이동 — 화면이 0.44배로 줄어 있어 손가락으로는 1mm 를 맞출 수 없다 */
@@ -1113,7 +1107,7 @@ $('step').onclick = () => { 걸음 = 걸음 === 1 ? 5 : 걸음 === 5 ? 10 : 1; $
 $('nudge').addEventListener('click', e => {
   const b = e.target.closest('[data-n]'); if (!b) return;
   const 것들 = 고른것들();
-  if (!것들.length){ $('step').textContent = '고르세요'; setTimeout(() => $('step').textContent = 걸음 + 'mm', 1200); return; }
+  if (!것들.length){ $('step').textContent = '고르기 먼저'; setTimeout(() => $('step').textContent = 걸음 + 'mm', 1200); return; }
   const [W, H] = 지금크기();
   let dx = 0, dy = 0;
   if (b.dataset.n === 'left')  dx = -걸음;
@@ -1154,7 +1148,7 @@ function 띠(어느){
 
 function 자르기시작(){
   const it = 지금것();
-  if (!it || it.종류 !== 'img') return 튕김($('crop'), '사진을 고르세요');
+  if (!it || it.종류 !== 'img') return 튕김($('crop'), '사진 먼저');
   const el = 무대.querySelector('.it[data-id="' + it.id + '"]');
   if (!el) return;
   자르기끝();
@@ -1167,7 +1161,7 @@ function 자르기시작(){
   자르는판.appendChild(네모칸);
   el.appendChild(자르는판);
   고른네모 = null;
-  $('cropmsg').textContent = '사진 위에서 손가락으로 끌어 네모를 그리세요';
+  $('cropmsg').textContent = '네모 끌기';
   띠('crop');
 
   let 시작 = null;
@@ -1198,8 +1192,7 @@ function 자르기시작(){
     document.removeEventListener('pointercancel', 끝);
     시작 = null;
     if (고른네모 && (고른네모.w < .04 || 고른네모.h < .04)){ 고른네모 = null; 그리기네모(); }
-    $('cropmsg').textContent = 고른네모 ? '고른 부분으로 자르거나 복사합니다'
-                                        : '사진 위에서 손가락으로 끌어 네모를 그리세요';
+    $('cropmsg').textContent = 고른네모 ? '고른 부분' : '네모 끌기';
   };
   자르는판.addEventListener('pointerdown', e => {
     e.preventDefault(); e.stopPropagation();
@@ -1225,7 +1218,7 @@ $('cropend').onclick = () => 자르기끝();
    이 부분만·복사·복제·잘라내기·삭제가 모두 이것을 쓴다. */
 function 고른조각(단추){
   const it = 자르는것;
-  if (!it || !고른네모){ 튕김(단추, '네모를 그리세요'); return null; }
+  if (!it || !고른네모){ 튕김(단추, '네모 먼저'); return null; }
   const img = 무대.querySelector('.it[data-id="' + it.id + '"] img');
   if (!img || !img.naturalWidth) return null;
   const g = 그림자리(it, img.naturalWidth, img.naturalHeight);
@@ -1233,7 +1226,7 @@ function 고른조각(단추){
   const 위 = Math.max(고른네모.y * it.h, g.top);
   const 오 = Math.min((고른네모.x + 고른네모.w) * it.w, g.left + g.W);
   const 아 = Math.min((고른네모.y + 고른네모.h) * it.h, g.top + g.H);
-  if (오 - 왼 < 2 || 아 - 위 < 2){ 튕김(단추, '그림 위에서 고르세요'); return null; }
+  if (오 - 왼 < 2 || 아 - 위 < 2){ 튕김(단추, '그림 위에서'); return null; }
   return { it, img, 왼, 위, 오, 아, w: 오 - 왼, h: 아 - 위,
            잘라: { x: (왼 - g.left) / g.W, y: (위 - g.top) / g.H,
                    w: (오 - 왼) / g.W,     h: (아 - 위) / g.H } };
@@ -1325,7 +1318,7 @@ function 붙이기(sh, 장번호, e){
 function 크기바꾸기(배){
   const 단추 = $(배 > 1 ? 'bigger' : 'smaller');
   const 것들 = 고른것들();
-  if (!것들.length) return 튕김(단추, '고르세요');
+  if (!것들.length) return 튕김(단추, '고르기 먼저');
   const [W, H] = 지금크기();
   let 했나 = false;
   것들.forEach(it => {                      // 저마다 제 가운데를 붙잡고 커지고 작아진다
@@ -1339,7 +1332,7 @@ function 크기바꾸기(배){
     it.y = Math.max(0, Math.min(H - h, 가y - h / 2));
     했나 = true;
   });
-  if (!했나) return 튕김(단추, '구분선은 못 바꿉니다');
+  if (!했나) return 튕김(단추, '구분선 안 됨');
   저장(true); 그리기();
 }
 $('bigger').onclick  = () => 크기바꾸기(1.1);
@@ -1348,8 +1341,8 @@ $('smaller').onclick = () => 크기바꾸기(1 / 1.1);
 /* 자르기 되돌리기 — 잘라 둔 표만 뗀다. 원본은 한 번도 건드린 적이 없다 */
 $('uncrop').onclick = () => {
   const it = 지금것();
-  if (!it || it.종류 !== 'img') return 튕김($('uncrop'), '사진을 고르세요');
-  if (!it.잘라) return 튕김($('uncrop'), '안 잘린 사진입니다');
+  if (!it || it.종류 !== 'img') return 튕김($('uncrop'), '사진 먼저');
+  if (!it.잘라) return 튕김($('uncrop'), '안 잘림');
   const img = 무대.querySelector('.it[data-id="' + it.id + '"] img');
   if (img && img.naturalWidth){
     // 배율은 그대로 두고 상자만 원본 전체가 들어가게 넓힌다.
@@ -1432,7 +1425,7 @@ function 연장표시(){
 
 function 그림시작(){
   const it = 지금것();
-  if (!it) return 튕김($('draw'), '먼저 고르세요');
+  if (!it) return 튕김($('draw'), '고르기 먼저');
   const el = 무대.querySelector('.it[data-id="' + it.id + '"]');
   if (!el) return;
   자르기끝(); 그림끝();
@@ -1741,7 +1734,7 @@ function 저장(바로){
 function 저장못함(켬){
   const w = $('warn'); if (!w) return;
   w.hidden = !켬;
-  if (켬) w.textContent = '저장 공간이 모자라 자동 저장이 멈췄습니다 · 인쇄 · PDF 로 먼저 내보내세요';
+  if (켬) w.textContent = '저장 참';
 }
 function 문서목록(){
   try { return JSON.parse(localStorage.getItem(칸 + '목록') || '{}'); } catch (e){ return {}; }
