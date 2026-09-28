@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.11.5 (2026-09-28) — 완료된 부속카드는 편집으로 못 흔들게 세 군데를 잠근다
+     버전: v1.11.6 (2026-09-28) — 시작하면 뜨는 집중 창에 그 일의 재단도면을 띄운다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1163,6 +1163,24 @@
         #_집중판 .집중-취소 { background: #fff; color: #b91c1c; border: 1.5px solid #f0c8c8; }
         #_집중판 .집중-단추:active { filter: brightness(.94); }
         #_집중판 .집중-꼬리 { margin: 12px 0 0; font-size: 11px; color: #a8a6a2; line-height: 1.55; }
+        /* 지금 하는 일의 재단도면 — 눌러서 크게 본다 (09-28 지시) */
+        #_집중판 .집중-도면 { margin: 10px 0 0; display: flex; flex-direction: column;
+            align-items: center; gap: 5px; cursor: pointer; }
+        #_집중판 .집중-도면 svg { max-height: 180px; }
+        #_집중판 .집중-딱지, #_집중띠 .집중-딱지 {
+            font-size: 11px; font-weight: 800; color: #787774;
+            background: #f1f1ef; border: 1px solid #e3e2e0; border-radius: 7px; padding: 4px 9px;
+        }
+        #_집중도면큰것 {
+            position: fixed; inset: 0; z-index: 2147483600; background: rgba(0,0,0,.82);
+            display: flex; align-items: center; justify-content: center;
+            padding: 8px; box-sizing: border-box; overflow: hidden;
+        }
+        #_집중도면큰것 .큰도면-속 {
+            width: 100%; max-width: 760px; background: #fff; border-radius: 12px;
+            padding: 6px; box-sizing: border-box;
+        }
+        #_집중도면큰것 .큰도면-속.돌림 { width: 92vh; max-width: none; flex: none; transform: rotate(90deg); }
         /* ── 접기 · 접어 둔 띠 (09-28 지시) ───────────────────────────────
            「작업중 공정이 있는데 공정캘린더가 안떠요」 — 집중 창이 화면을 통째로
            덮고 있어서였다(inset 0 · 검은 62%). 완료나 취소 전에는 안 걷히고
@@ -2144,7 +2162,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.11.5</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.11.6</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2270,7 +2288,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.11.5</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.11.6</b></p>
         </div>
     </div>
 
@@ -7256,6 +7274,7 @@
             if (_집중시계) { clearInterval(_집중시계); _집중시계 = null; }
             document.getElementById('_집중판')?.remove();
             document.getElementById('_집중띠')?.remove();   // 접어 둔 띠도 같이 걷는다
+            document.getElementById('_집중도면큰것')?.remove();
             window._집중일 = null;
         };
         window._집중판열기 = function(일){
@@ -7274,6 +7293,7 @@
                   `<p class="집중-이름">${_e(일.rec?.partName || 일.cardKey)}</p>` +
                   `<p class="집중-곁">${_e(일.procKey)}${o.orderCode ? ' · ' + _e(o.orderCode) : ''}` +
                     `${o.displayName ? '<br>' + _e(o.displayName) : ''}</p>` +
+                  `<div class="집중-도면" id="_집중도면"></div>` +
                   `<p class="집중-시계" id="_집중시계글">0.0분</p>` +
                   `<p class="집중-멈춤글" id="_집중멈춤글">잠시 멈춤 — 시간은 계속 갑니다</p>` +
                   `<div class="집중-줄">` +
@@ -7308,6 +7328,48 @@
             document.getElementById('_집중완료').onclick = () => window.tl일완료();
             document.getElementById('_집중취소').onclick = () => window.tl일취소();
             document.getElementById('_집중접기').onclick = () => window._집중접기();
+            window._집중도면그리기();
+        };
+        /* ── 지금 하는 일의 재단도면 (09-28 지시) ─────────────────────────────
+           「시작시 나타나는 팝업화면은 해당 작업도면이 나타나야 합니다」
+           찾아가는 길 — 시작을 찍을 때 쓴 그 부속 이름(cardKey)으로 재단 보드의
+           카드를 되짚는다. 이름을 만드는 잣대(_woPartKey)가 시작·완료와 같은
+           것이라 남의 카드로 새지 않는다. 발주(docId)도 같아야 한다.
+           한 부속이 도면 여러 장에 걸쳐 잘리면 여러 장이 잡힌다 — 그때는 첫 장을
+           보이고 「도면 1/N」 딱지를 단다. */
+        window._집중도면찾기 = function(일){
+            const 찾음 = [];
+            try {
+                const ck = 일 && 일.cardKey; if (!ck) return 찾음;
+                const 판들 = window._woBoringParts || {};
+                Object.keys(판들).forEach(sk => (판들[sk] || []).forEach(p => {
+                    if (!p || !p.isCuttingCard || !p.boardParts || !p.boardParts.length) return;
+                    const did = p.orderKey || '';
+                    if (did && 일.docId && did !== 일.docId) return;
+                    if (window._woPartKey(p.cKey, did, p) !== ck) return;
+                    if (!찾음.some(q => q.cKey === p.cKey)) 찾음.push(p);
+                }));
+                찾음.sort((a, b) => String(a.cKey).localeCompare(String(b.cKey)));
+            } catch (e) {}
+            return 찾음;
+        };
+        window._집중도면그리기 = function(){
+            const 칸 = document.getElementById('_집중도면'); if (!칸) return;
+            const 것들 = window._집중도면찾기(window._집중일);
+            const svg = 것들.length ? _woCuttingDiagramSvg(것들[0]) : '';
+            if (!svg) { 칸.innerHTML = '<span class="집중-딱지">도면 없음</span>'; 칸.onclick = null; return; }
+            칸.innerHTML = svg + (것들.length > 1 ? `<span class="집중-딱지">도면 1/${것들.length}</span>` : '');
+            칸.onclick = () => window._집중도면크게(것들[0]);
+        };
+        window._집중도면크게 = function(p){
+            document.getElementById('_집중도면큰것')?.remove();
+            const 덮 = document.createElement('div');
+            덮.id = '_집중도면큰것';
+            // 폰은 세로로 길고 원장은 가로로 길다 — 세로 화면에서는 눕혀서 크게 보인다
+            const 세로폰 = window.innerHeight > window.innerWidth;
+            덮.innerHTML = `<div class="큰도면-속${세로폰 ? ' 돌림' : ''}">${_woCuttingDiagramSvg(p)}</div>`;
+            덮.addEventListener('click', () => 덮.remove());
+            document.body.appendChild(덮);
         };
         /* ── 접기 · 접어 둔 띠 (09-28 지시) ───────────────────────────────────
            집중 창은 화면을 통째로 덮는다. 그래서 일을 붙잡고 있는 동안에는
