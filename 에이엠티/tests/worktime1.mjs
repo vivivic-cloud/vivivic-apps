@@ -101,18 +101,23 @@ const 크기 = await p.evaluate(() => {
   const s = document.querySelector('#_집중판 .집중-속'); const r = s.getBoundingClientRect();
   const 단 = [...document.querySelectorAll('#_집중판 .집중-단추')].map(e => {
     const b = e.getBoundingClientRect();
-    return { 글: e.textContent.trim(), w: Math.round(b.width), h: Math.round(b.height), y: Math.round(b.y) }; });
+    return { 글: e.textContent.trim(), w: Math.round(b.width), h: Math.round(b.height), y: Math.round(b.y),
+             넘침: e.scrollWidth > e.clientWidth + 1 }; });
   return { 판: { w: Math.round(r.width), h: Math.round(r.height) }, 단추: 단,
            문서가로: document.documentElement.scrollWidth };
 });
 console.log('■ 집중 창: ' + JSON.stringify(크기));
 판('① 시작을 누르면 집중 창이 뜬다', 뜸 === true, String(뜸));
-판('① 단추 셋 — 잠시 멈춤 · 완료 · 취소', 크기.단추.map(x => x.글).join(' · ') === '잠시 멈춤 · 완료 · 취소',
+// 사장님이 글자를 못 박으셨다(09-28 03:56~03:57): STOP · CANCLE · COMPLETE.
+// 「CANCLE」 은 사장님 철자 그대로다 — 고치지 않는다(09-23 에도 같은 철자로 쓰셨다).
+판('① 단추 셋 — STOP · COMPLETE · CANCLE', 크기.단추.map(x => x.글).join(' · ') === 'STOP · COMPLETE · CANCLE',
    크기.단추.map(x => x.글).join(' · '));
+판('① 세 글자가 375px 안에 다 든다 (안 잘린다)',
+   크기.단추.every(x => x.넘침 === false), JSON.stringify(크기.단추.map(x => x.글 + ' ' + x.w + 'px' + (x.넘침 ? ' 넘침' : ''))));
 판('① 단추 누르는 높이 44px 이상', 크기.단추.every(x => x.h >= 44), JSON.stringify(크기.단추.map(x => x.w + 'x' + x.h)));
-판('① 「취소」 는 「완료」 와 줄이 다르다 (잘못 눌리지 않게)',
-   크기.단추.find(x => x.글 === '취소').y > 크기.단추.find(x => x.글 === '완료').y,
-   '완료 y ' + 크기.단추.find(x => x.글 === '완료').y + ' · 취소 y ' + 크기.단추.find(x => x.글 === '취소').y);
+판('① 「CANCLE」 은 「COMPLETE」 와 줄이 다르다 (잘못 눌리지 않게)',
+   크기.단추.find(x => x.글 === 'CANCLE').y > 크기.단추.find(x => x.글 === 'COMPLETE').y,
+   'COMPLETE y ' + 크기.단추.find(x => x.글 === 'COMPLETE').y + ' · CANCLE y ' + 크기.단추.find(x => x.글 === 'CANCLE').y);
 판('① 375px 가로 스크롤 없다', 크기.문서가로 <= 375, 크기.문서가로 + 'px');
 // 바깥을 눌러도 · ESC 를 눌러도 안 닫힌다 — 덮개의 빈 구석(왼쪽 위)을 짚는다
 await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 8, y: 8, radiusX: 14, radiusY: 14, force: 1 }] });
