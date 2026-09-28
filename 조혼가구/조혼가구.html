@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- 조혼가구 — 거래처 발주 화면.
-     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.3.9 -->
+     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.4.0 -->
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -56,7 +56,7 @@
                 if (_로그인화면요청) { _로그인화면요청 = false; window.showAuthLoginScreen(); return; }
                 // 로그인 없이 들어와도 그대로 쓸 수 있게 익명으로 들어간다
                 signInAnonymously(auth)
-                    .catch(err => window.showAuthLoginScreen('접속하지 못했습니다: ' + (err.code || err.message)));
+                    .catch(err => window.showAuthLoginScreen('접속 실패: ' + (err.code || err.message)));
                 return;
             }
 
@@ -76,7 +76,7 @@
             try {
                 const accSnap = await getDoc(doc(db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'user_accounts', user.uid));
                 if (!accSnap.exists()) {
-                    window.showAuthLoginScreen('이 계정에 연결된 권한 정보가 없습니다. 관리자에게 문의하세요.');
+                    window.showAuthLoginScreen('권한 없음 · 관리자 문의');
                     await signOut(auth);
                     return;
                 }
@@ -91,7 +91,7 @@
                 initConfirmedOrdersSync();
             } catch (err) {
                 console.error('계정 정보 조회 실패:', err);
-                window.showAuthLoginScreen('계정 정보를 불러오지 못했습니다. 다시 시도해주세요.');
+                window.showAuthLoginScreen('계정 조회 실패');
             }
         });
 
@@ -119,11 +119,11 @@
                 await signInWithEmailAndPassword(auth, email, password);
             } catch (err) {
                 console.error('로그인 실패:', err);
-                let msg = '로그인에 실패했습니다.';
+                let msg = '로그인 실패';
                 if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
-                    msg = '이메일 또는 비밀번호가 올바르지 않습니다.';
+                    msg = '이메일·비밀번호 확인';
                 } else if (err.code === 'auth/too-many-requests') {
-                    msg = '로그인 시도가 너무 많습니다. 잠시 후 다시 시도해주세요.';
+                    msg = '시도 많음 · 잠시 뒤';
                 }
                 window.showAuthLoginScreen(msg);
             }
@@ -318,7 +318,7 @@
 
         /* 수정 단추 안내 한 줄 — 부속 카드 위에 놓는다. 카드 모양은 건드리지 않는다.
            이 기계에서 수정을 한 번 쓰고 나면 안내도 깜빡임도 사라진다. */
-        /* 글씨를 '상품검색 방식을 선택하세요'(12.5px)와 같은 크기로 맞췄다.
+        /* 글씨를 '검색 방법'(12.5px)와 같은 크기로 맞췄다.
            같은 몫의 안내는 같은 크기가 낫다. 빛깔도 그쪽과 같은 먹빛으로. */
         .jh-edit-tip{ display:none; font-size:12.5px; font-weight:700; color:#37352f;
                       line-height:1.4; padding:0 4px 6px;
@@ -1565,7 +1565,7 @@
 </head>
 <body class="min-h-screen pb-20">
 
-    <div id="toast">복사되었습니다!</div>
+    <div id="toast">복사됨</div>
 
     <!-- Custom Confirm Modal -->
     <div id="custom-confirm-modal">
@@ -1582,7 +1582,7 @@
     <div id="loading-overlay" class="fixed inset-0 bg-white/95 flex flex-col items-center justify-center z-[9999] hidden backdrop-blur-sm">
         <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-[#37352f] mb-4"></div>
         <span class="copy-badge mb-2">LOADING</span>
-        <span id="loading-status-text" class="font-bold text-[#37352f] fluid-text-body">데이터를 처리 중입니다...</span>
+        <span id="loading-status-text" class="font-bold text-[#37352f] fluid-text-body">읽는 중…</span>
     </div>
 
     <!-- 로그인 화면 -->
@@ -1606,7 +1606,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.3.9</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.4.0</span>
                 </div>
                 <!-- 페이지 탭: 발주하기 / 작업중 -->
                 <div class="flex items-center gap-1 border border-[#ededeb] rounded-lg bg-[#f7f6f3] p-1 mr-2">
@@ -1651,7 +1651,7 @@
 
             <!-- 처음 쓰는 분에게만 뜬다. 전에 발주했거나 지금 담는 중이면 사라진다. -->
             <div class="jhh-lead" id="jhh-lead">
-                새로운 발주를 시작하세요.
+                새 발주
             </div>
 
             <div class="jhh-tiles">
@@ -1727,10 +1727,7 @@
         <div class="jhm-card">
             <div class="jhm-grip"></div>
             <h4 id="jhm-title">새 박스</h4>
-            <p id="jhm-say">자주 가는 자리를 박스로 만들어 둡니다. 이름과 색을 고르고,
-               열면 갈 곳(주소)을 넣으면 눌러서 바로 갑니다. 비워 두면 이름표로만 남습니다.
-               발주에는 아무 작용도 하지 않습니다.</p>
-            <input id="jhm-name" type="text" placeholder="박스 이름" autocomplete="off" />
+                        <input id="jhm-name" type="text" placeholder="박스 이름" autocomplete="off" />
             <div class="jhm-chips" id="jhm-tones">
                 <button type="button" data-tone="white">흰색</button>
                 <button type="button" data-tone="light">회색</button>
@@ -1765,9 +1762,9 @@
 
                     <!-- 검색 방법 — 폰에서 한 번에 고르게 펼쳐 둔다 -->
                     <div class="dropdown-container jh-pick-box" style="position:relative;">
-                        <p class="jh-pick-msg">상품검색 방식을 선택하세요</p>
+                        <p class="jh-pick-msg">검색 방법</p>
                         <div id="tutorial-search-tooltip" class="tutorial-tooltip hidden" style="top: calc(100% + 10px); left: 0;" onmouseenter="dismissTutorial()">
-                            <span class="tutorial-emoji">👆</span>상품을 검색하세요
+                            <span class="tutorial-emoji">👆</span>상품 검색
                         </div>
                         <span id="search-method-label" class="hidden"></span>
                         <div class="method-pick" onclick="dismissTutorial()">
@@ -1789,10 +1786,10 @@
                         <div id="wrap-part-direct" class="relative hidden flex-shrink-0 flex items-center gap-2">
                             <button id="btn-part-direct" onclick="handlePartSelectClick('direct')" class="btn-part-order">
                                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                                <span class="jh-marq"><span>해당제품의 일부부속만 발주 하려면 이곳에서 선택하세요</span></span>
+                                <span class="jh-marq"><span>부속만 발주</span></span>
                             </button>
                             <div id="popover-part-direct" class="part-confirm-popover hidden">
-                                <p class="text-[11px] font-bold text-[#37352f] mb-3">선택된 부속만 발주됩니다.<br>그래도 진행하시겠습니까?</p>
+                                <p class="text-[11px] font-bold text-[#37352f] mb-3">선택 부속만 발주</p>
                                 <div class="flex items-center gap-2">
                                     <button onclick="confirmPartSelect('direct')" class="flex-1 py-1.5 text-[11px] font-bold bg-[#37352f] text-white rounded-md hover:bg-black transition-all active:scale-95">확인</button>
                                     <button onclick="cancelPartSelect('direct')" class="flex-1 py-1.5 text-[11px] font-bold bg-[#f7f6f3] text-[#787774] rounded-md hover:bg-[#efefec] transition-all active:scale-95 border border-[#ededeb]">취소</button>
@@ -1818,15 +1815,15 @@
                             <select id="sel-ing-code" class="notion-select" style="width:100%; transition:width 0.2s ease;" onchange="onCodeChange()" disabled>
                                 <option value=""></option>
                             </select>
-                            <div id="overlay-ing" class="select-guide-overlay hidden">터치하여 발주할 제품을 선택하세요</div>
+                            <div id="overlay-ing" class="select-guide-overlay hidden">제품 고르기</div>
                         </div>
                         <div id="wrap-part-ing" class="relative hidden flex-shrink-0 flex items-center gap-2">
                             <button id="btn-part-ing" onclick="handlePartSelectClick('ing')" class="btn-part-order">
                                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                                <span class="jh-marq"><span>해당제품의 일부부속만 발주 하려면 이곳에서 선택하세요</span></span>
+                                <span class="jh-marq"><span>부속만 발주</span></span>
                             </button>
                             <div id="popover-part-ing" class="part-confirm-popover hidden">
-                                <p class="text-[11px] font-bold text-[#37352f] mb-3">선택된 부속만 발주됩니다.<br>그래도 진행하시겠습니까?</p>
+                                <p class="text-[11px] font-bold text-[#37352f] mb-3">선택 부속만 발주</p>
                                 <div class="flex items-center gap-2">
                                     <button onclick="confirmPartSelect('ing')" class="flex-1 py-1.5 text-[11px] font-bold bg-[#37352f] text-white rounded-md hover:bg-black transition-all active:scale-95">확인</button>
                                     <button onclick="cancelPartSelect('ing')" class="flex-1 py-1.5 text-[11px] font-bold bg-[#f7f6f3] text-[#787774] rounded-md hover:bg-[#efefec] transition-all active:scale-95 border border-[#ededeb]">취소</button>
@@ -1869,10 +1866,10 @@
                             <div id="wrap-part-category" class="relative hidden flex-shrink-0 flex items-center gap-2">
                                 <button id="btn-part-category" onclick="handlePartSelectClick('category')" class="btn-part-order">
                                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-                                    <span class="jh-marq"><span>해당제품의 일부부속만 발주 하려면 이곳에서 선택하세요</span></span>
+                                    <span class="jh-marq"><span>부속만 발주</span></span>
                                 </button>
                                 <div id="popover-part-category" class="part-confirm-popover hidden">
-                                    <p class="text-[11px] font-bold text-[#37352f] mb-3">선택된 부속만 발주됩니다.<br>그래도 진행하시겠습니까?</p>
+                                    <p class="text-[11px] font-bold text-[#37352f] mb-3">선택 부속만 발주</p>
                                     <div class="flex items-center gap-2">
                                         <button onclick="confirmPartSelect('category')" class="flex-1 py-1.5 text-[11px] font-bold bg-[#37352f] text-white rounded-md hover:bg-black transition-all active:scale-95">확인</button>
                                         <button onclick="cancelPartSelect('category')" class="flex-1 py-1.5 text-[11px] font-bold bg-[#f7f6f3] text-[#787774] rounded-md hover:bg-[#efefec] transition-all active:scale-95 border border-[#ededeb]">취소</button>
@@ -1903,7 +1900,7 @@
                         <div class="flex items-center gap-2 font-bold text-[#787774] fluid-text-mini">발주상품목록</div>
                     </div>
                     <div id="identity-list-container" class="min-h-[100px] flex flex-col">
-                        <div id="list-placeholder" class="p-8 text-center font-bold tracking-tight fluid-text-body italic text-gray-400">데이터가 없습니다.</div>
+                        <div id="list-placeholder" class="p-8 text-center font-bold tracking-tight fluid-text-body italic text-gray-400">없음</div>
                     </div>
                     <div class="p-4 border-t border-[#f1f1ef] bg-[#fbfbfa] flex justify-center">
                         <button onclick="confirmProductOrderBatch()" id="test-confirm-btn" class="px-12 py-3 bg-[#37352f] text-white text-[14px] font-bold rounded-xl hover:bg-black transition-all active:scale-95 shadow-md flex items-center gap-2">
@@ -1921,7 +1918,7 @@
                 <button onclick="bulkDeleteTestData()" class="px-6 py-2 border-2 border-red-200 text-red-500 rounded-xl font-black text-[12px] hover:bg-red-50 transition-all active:scale-95 shadow-sm">
                     ⚠️ 발주기록삭제 (전체, 복구불가)
                 </button>
-                <div class="text-[9px] text-red-400 font-bold">테스트 데이터만이 아니라 지금까지 등록된 모든 발주 기록이 전부 삭제됩니다. 실사용 전 이 버튼은 반드시 제거하세요.</div>
+                <div class="text-[9px] text-red-400 font-bold">전체 삭제 · 복구 불가</div>
             </div>
         </div>
 
@@ -1946,7 +1943,7 @@
                 <!-- 토글 바디 -->
                 <div id="registered-orders-list-body" style="display:block;">
                     <div id="registered-orders-list-container" class="space-y-4 p-4">
-                        <div class="p-8 text-center font-bold tracking-tight fluid-text-body italic text-gray-400">등록 완료된 발주가 없습니다.</div>
+                        <div class="p-8 text-center font-bold tracking-tight fluid-text-body italic text-gray-400">없음</div>
                     </div>
                 </div>
             </div>
@@ -2069,7 +2066,7 @@
         function copyID(idText, badgeElement) { 
             const tempInput = document.createElement('textarea'); tempInput.value = idText; document.body.appendChild(tempInput); tempInput.select(); document.execCommand('copy'); document.body.removeChild(tempInput); 
             if (badgeElement) { badgeElement.classList.add('copied'); setTimeout(() => badgeElement.classList.remove('copied'), 600); }
-            showToastMessage(`${idText} 복사되었습니다!`);
+            showToastMessage(`${idText} 복사됨`);
         }
         function isWeekendOrHoliday(date) { const day = date.getDay(); const dateStr = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`; return day === 0 || day === 6 || KR_HOLIDAYS.includes(dateStr); }
         function dateToStr(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
@@ -2084,14 +2081,14 @@
             while (isWeekendOrHoliday(d)) { d.setDate(d.getDate() + 1); }
             return dateToStr(d);
         }
-        function validateDeliveryDate(el) { const min = getMinDeliveryDate(); if (el.value < min) { showToastMessage("현재일로부터 4일 이후만 고를 수 있습니다. 기본 입고요청일(2주 뒤)로 되돌립니다."); el.value = getInitialDeliveryDate(); return; } let d = new Date(el.value + 'T00:00:00'); if (isWeekendOrHoliday(d)) { showToastMessage("영업일이 아닙니다. 다음 영업일로 조정됩니다."); while (isWeekendOrHoliday(d)) { d.setDate(d.getDate() + 1); } el.value = dateToStr(d); } }
+        function validateDeliveryDate(el) { const min = getMinDeliveryDate(); if (el.value < min) { showToastMessage("4일 이후만"); el.value = getInitialDeliveryDate(); return; } let d = new Date(el.value + 'T00:00:00'); if (isWeekendOrHoliday(d)) { showToastMessage("다음 영업일로"); while (isWeekendOrHoliday(d)) { d.setDate(d.getDate() + 1); } el.value = dateToStr(d); } }
 
         function handleFileUpload(input) {
             const file = input.files[0]; if (!file) return;
             const overlay = document.getElementById('loading-overlay'); 
             const statusText = document.getElementById('loading-status-text');
             overlay.classList.remove('hidden');
-            statusText.textContent = "클라우드 전송을 준비 중입니다...";
+            statusText.textContent = "보내는 중…";
             
             const reader = new FileReader();
             reader.onload = async function(e) { 
@@ -2110,7 +2107,7 @@
                             timestamp: serverTimestamp(),
                             uploadedBy: "anonymous_app_user"
                         });
-                        showToastMessage("클라우드 전송이 완료되었습니다.");
+                        showToastMessage("전송 완료");
                     }
                 } catch (error) { console.error("Upload Error:", error); } finally { overlay.classList.add('hidden'); } 
             };
@@ -2743,9 +2740,9 @@
                 const inp = document.getElementById('product-search');
                 if (inp) {
                     inp.focus();
-                    typePlaceholder(inp, '상품명을 입력하세요...');
+                    typePlaceholder(inp, '상품명');
                     // 실제 타이핑 시작하면 애니메이션 중단
-                    const onInput = () => { clearTyping(); inp.placeholder = '상품명을 입력하세요...'; inp.removeEventListener('input', onInput); };
+                    const onInput = () => { clearTyping(); inp.placeholder = '상품명'; inp.removeEventListener('input', onInput); };
                     inp.addEventListener('input', onInput);
                 }
 
@@ -3051,7 +3048,7 @@
             if (productSearch) {
                 clearTyping();
                 productSearch.value = code;
-                productSearch.placeholder = '상품명을 입력하세요...';
+                productSearch.placeholder = '상품명';
             }
 
             const sr = document.getElementById('search-results');
@@ -3080,8 +3077,8 @@
             const productSearch = document.getElementById('product-search');
             if (productSearch) {
                 productSearch.value = '';
-                typePlaceholder(productSearch, '상품명을 입력하세요...');
-                const onInput = () => { clearTyping(); productSearch.placeholder = '상품명을 입력하세요...'; productSearch.removeEventListener('input', onInput); };
+                typePlaceholder(productSearch, '상품명');
+                const onInput = () => { clearTyping(); productSearch.placeholder = '상품명'; productSearch.removeEventListener('input', onInput); };
                 productSearch.addEventListener('input', onInput);
             }
 
@@ -3232,25 +3229,25 @@
         function renderID0508() {
             const listContainer = document.getElementById('identity-list-container');
             const dataToRender = pendingOrdersMap[appMode]; 
-            if (!dataToRender || dataToRender.length === 0) { listContainer.innerHTML = `<div id="list-placeholder" class="p-8 text-center font-bold tracking-tight fluid-text-body italic text-gray-400">데이터가 없습니다.</div>`; return; } 
+            if (!dataToRender || dataToRender.length === 0) { listContainer.innerHTML = `<div id="list-placeholder" class="p-8 text-center font-bold tracking-tight fluid-text-body italic text-gray-400">없음</div>`; return; } 
             listContainer.innerHTML = dataToRender.map(item => {
                 return `<div id="order-item-${item.idNum}" class="ordered-item border-b border-[#f1f1ef] last:border-none">
                     <div class="px-4 py-2 flex items-center gap-3">
                         <div class="flex items-center gap-2 overflow-hidden flex-1 cursor-pointer group" onclick="toggleOrderDetails(${item.idNum})">
                             <span class="card-hint-wrap font-bold text-[12px] truncate text-[#37352f] group-hover:text-blue-600 transition-colors">
                                 ${displayNameHtml(item, 'text-[#37352f]')}
-                                <span class="card-hint jh-shown jh-marq"><span>터치하여 부속의 발주수량을  확인해 주세요</span></span>
+                                <span class="card-hint jh-shown jh-marq"><span>부속 수량</span></span>
                             </span>
                         </div>
                         <div class="flex items-center gap-2 flex-shrink-0" onclick="event.stopPropagation()">
                             <span class="text-[11px] font-medium text-[#787774] whitespace-nowrap">입고요청일</span>
                             <span class="card-hint-wrap">
                                 <input type="date" class="notion-input !w-32 !py-1 !px-2 !text-[11px] font-bold" value="${item.deliveryDate}" min="${getMinDeliveryDate()}" onchange="validateDeliveryDate(this); updateItemDate(${item.idNum}, this.value)">
-                                <span class="card-hint">희망하는 입고시점을 선택해 주세요.</span>
+                                <span class="card-hint">입고요청일</span>
                             </span>
                             <span class="card-hint-wrap">
                                 <input type="number" min="1" value="${item.orderQty}" class="notion-input !w-14 !py-1 !px-2 !text-center font-black" onchange="updateItemQty(${item.idNum}, this.value)">
-                                <span class="card-hint">발주할 제품의 세트수량을 입력해 주세요.</span>
+                                <span class="card-hint">세트수량</span>
                             </span>
                             <button onclick="event.stopPropagation(); removePendingItem(${item.idNum})" class="p-1.5 hover:bg-red-50 text-red-400 rounded-lg"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
                         </div>
@@ -3266,7 +3263,7 @@
             const container = document.getElementById('confirmed-product-list-container'); if (!container) return; container.innerHTML = '';
             const currentSupplier = getCurrentSupplier();
             const relevantOrders = confirmedOrders.filter(o => o.amtRegistered !== true && o.amtConfirmedCancel !== true && o.amtTimeline !== true && o.supplier === currentSupplier);
-            if (relevantOrders.length === 0) { container.innerHTML = '<div class="p-8 text-center font-bold tracking-tight fluid-text-body italic text-gray-400">확정된 발주가 없습니다.</div>'; renderRegisteredOrders(); return; }
+            if (relevantOrders.length === 0) { container.innerHTML = '<div class="p-8 text-center font-bold tracking-tight fluid-text-body italic text-gray-400">없음</div>'; renderRegisteredOrders(); return; }
             // 날짜(년월일) 기준으로 그룹핑
             const dateGroups = {};
             relevantOrders.forEach(order => {
@@ -3400,7 +3397,7 @@
             if (countBadge) countBadge.textContent = registeredOrders.length > 0 ? `${registeredOrders.length}건` : '';
 
             if (registeredOrders.length === 0) {
-                container.innerHTML = '<div class="p-8 text-center font-bold tracking-tight fluid-text-body italic text-gray-400">작업중인 발주가 없습니다.</div>';
+                container.innerHTML = '<div class="p-8 text-center font-bold tracking-tight fluid-text-body italic text-gray-400">없음</div>';
                 return;
             }
 
@@ -3992,7 +3989,7 @@
             const item = confirmedOrders.find(o => o.docId === docId);
             if (item) {
                 if (item.isEditMode) {
-                    showToastMessage("수정 모드에서는 취소 요청을 할 수 없습니다.");
+                    showToastMessage("수정 모드 — 취소 불가");
                     return;
                 }
                 const { doc, updateDoc } = window.fbFirestore;
@@ -4028,7 +4025,7 @@
                             deliveryDate: item.deliveryDate
                         }))
                     });
-                    showToastMessage("수정 요청이 전송되었습니다. 에이엠티 승인 대기 중입니다.");
+                    showToastMessage("수정 요청 보냄 · 승인 대기");
                 } catch (err) { console.error("Edit Request Fail:", err); }
             }
         }
@@ -4041,7 +4038,7 @@
                 try {
                     const docRef = doc(window.db, 'artifacts', appId, 'public', 'data', COLLECTION_ORDERS, docId);
                     await updateDoc(docRef, { isEditMode: true });
-                    showToastMessage("수정 모드로 진입합니다.");
+                    showToastMessage("수정 모드");
                 } catch (err) { console.error("Start Edit Fail:", err); }
             }
         }
@@ -4065,7 +4062,7 @@
                         orderQty: item.orderQty,
                         deliveryDate: item.deliveryDate
                     });
-                    showToastMessage("발주 수정이 완료되었습니다.");
+                    showToastMessage("수정 완료");
                 } catch (err) { console.error("Finish Edit Fail:", err); }
             }
         }
@@ -4084,7 +4081,7 @@
                         backup: null,
                         isEditMode: false
                     });
-                    showToastMessage("이전 발주 내역으로 복원되었습니다.");
+                    showToastMessage("이전 내역으로 되돌림");
                 } catch (err) { console.error("Revert Fail:", err); }
             }
         }
@@ -4120,13 +4117,13 @@
             item.deliveryDate = item.backup.deliveryDate;
             editHistoryMap[idNum] = []; // 히스토리 초기화
             renderConfirmedBatchList();
-            showToastMessage("원주문으로 초기화되었습니다.");
+            showToastMessage("원주문으로 되돌림");
         }
 
         // 뒤로가기: 히스토리 스택에서 한 단계 복원
         function undoEditStep(idNum) {
             const history = editHistoryMap[idNum];
-            if (!history || history.length === 0) { showToastMessage("되돌릴 변경사항이 없습니다."); return; }
+            if (!history || history.length === 0) { showToastMessage("되돌릴 것 없음"); return; }
             const prev = history.pop();
             const item = confirmedOrders.find(o => o.idNum === idNum);
             if (!item) return;
@@ -4146,20 +4143,20 @@
                 }
             } catch (e) {}
             renderConfirmedBatchList();
-            showToastMessage("한 단계 되돌렸습니다.");
+            showToastMessage("한 단계 되돌림");
         }
         // ────────────────────────────────────────────────────────
 
         async function completeEditRequest(docId) {
-            if (!docId || !confirm("수정을 완료하시겠습니까?")) return;
+            if (!docId || !confirm("수정 완료")) return;
             const { doc, updateDoc } = window.fbFirestore;
             try {
                 const docRef = doc(window.db, 'artifacts', appId, 'public', 'data', COLLECTION_ORDERS, docId);
                 await updateDoc(docRef, { editCompleted: true });
-                showToastMessage("수정이 완료되었습니다.");
+                showToastMessage("수정 완료");
             } catch (err) {
                 console.error("Complete Edit Error:", err);
-                showToastMessage("완료 처리 실패");
+                showToastMessage("완료 실패");
             }
         }
 
@@ -4237,7 +4234,7 @@
                 }
             });
 
-            el.innerHTML = `<div class="jh-edit-tip">수정버튼으로 각 부속의 발주수량을 조정할 수 있습니다</div><div class="space-y-2"><div class="text-[10px] font-bold text-[#787774] px-1 uppercase tracking-wider">기본 발주 부속</div><div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">${basicHtml || '<div class="col-span-full py-4 text-center text-gray-400 italic text-[11px]">발주할 부속이 없습니다.</div>'}</div></div>${specialHtml ? `<div class="space-y-2 pt-4 border-t border-dashed border-[#ededeb]"><div class="text-[10px] font-bold text-blue-500 px-1 uppercase tracking-wider flex items-center gap-2">AMT 외 공급처 부속</div><div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">${specialHtml}</div></div>` : ''}`;
+            el.innerHTML = `<div class="space-y-2"><div class="text-[10px] font-bold text-[#787774] px-1 uppercase tracking-wider">기본 발주 부속</div><div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">${basicHtml || '<div class="col-span-full py-4 text-center text-gray-400 italic text-[11px]">없음</div>'}</div></div>${specialHtml ? `<div class="space-y-2 pt-4 border-t border-dashed border-[#ededeb]"><div class="text-[10px] font-bold text-blue-500 px-1 uppercase tracking-wider flex items-center gap-2">AMT 외 공급처 부속</div><div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">${specialHtml}</div></div>` : ''}`;
         }
 
         async function removeIndividualConfirmedOrderLocal(docId) {
@@ -4245,7 +4242,7 @@
             try {
                 const docRef = doc(window.db, 'artifacts', appId, 'public', 'data', COLLECTION_ORDERS, docId);
                 await deleteDoc(docRef);
-                showToastMessage("발주 항목이 삭제되었습니다.");
+                showToastMessage("삭제됨");
             } catch (err) { console.error("Delete Order Fail:", err); }
         }
 
@@ -4332,14 +4329,14 @@
 
                 btnText.textContent = "전송완료";
                 btn.className = originalClass + " bg-green-600";
-                showToastMessage(`${successCount}개의 발주가 확정되어 클라우드에 저장되었습니다.`);
+                showToastMessage(`발주 ${successCount}건 확정`);
                 pendingOrdersMap[appMode] = []; 
                 renderID0508();
             } catch (err) {
                 console.error("Firebase Save Error:", err);
                 btnText.textContent = "전송실패(재시도)";
                 btn.className = originalClass + " bg-red-600";
-                showToastMessage("전송에 실패했습니다. 네트워크 상태를 확인하세요.");
+                showToastMessage("전송 실패 · 연결 확인");
             } finally {
                 setTimeout(() => {
                     btn.disabled = false;
@@ -4351,7 +4348,7 @@
 
         async function bulkDeleteTestData() {
             const result = await showConfirmModal(
-                "지금까지 등록된 모든 발주 기록(진짜 발주 포함)을 영구 삭제합니다. 테스트로 만든 것인지 여부와 상관없이 confirmed_orders에 있는 모든 문서가 삭제됩니다. (이 작업은 되돌릴 수 없습니다.)",
+                "모든 발주 기록 영구 삭제 · 복구 불가",
                 { title: '⚠️ 발주기록삭제 확인', confirmLabel: '전체 삭제' }
             );
             if (!result) return;
@@ -4359,7 +4356,7 @@
             const overlay = document.getElementById('loading-overlay');
             const statusText = document.getElementById('loading-status-text');
             overlay.classList.remove('hidden');
-            statusText.textContent = "테스트 데이터를 삭제하는 중...";
+            statusText.textContent = "지우는 중…";
 
             const { collection, getDocs, deleteDoc, doc, writeBatch } = window.fbFirestore;
             try {
@@ -4368,7 +4365,7 @@
                 const testDocs = snapshot.docs.filter(d => d.data().is_test_data === true);
                 
                 if (testDocs.length === 0) {
-                    showToastMessage("삭제할 테스트 데이터가 없습니다.");
+                    showToastMessage("지울 것 없음");
                     return;
                 }
 
@@ -4377,10 +4374,10 @@
                     await deleteDoc(doc(window.db, 'artifacts', appId, 'public', 'data', COLLECTION_ORDERS, testDocs[i].id));
                 }
 
-                showToastMessage(`${testDocs.length}개의 테스트 데이터가 일괄 삭제되었습니다.`);
+                showToastMessage(`${testDocs.length}건 삭제됨`);
             } catch (err) {
                 console.error("Bulk Delete Error:", err);
-                showToastMessage("삭제 도중 오류가 발생했습니다.");
+                showToastMessage("삭제 실패");
             } finally {
                 overlay.classList.add('hidden');
             }
@@ -4393,7 +4390,7 @@
             // 현재 페이지(appMode)의 발주처 + amtTimeline === true 항목만 (화면 목록과 동일 조건)
             const currentSupplier = pageToSupplierMap[appMode];
             const registeredOrders = confirmedOrders.filter(o => o.amtTimeline === true && o.supplier === currentSupplier);
-            if (registeredOrders.length === 0) { showToastMessage("다운로드할 데이터가 없습니다."); return; }
+            if (registeredOrders.length === 0) { showToastMessage("내려받을 것 없음"); return; }
             registeredOrders.sort((a, b) => (a.orderCode || '').localeCompare(b.orderCode || '')).forEach(item => {
                 const matchingRow = currentFullData.slice(1).find(r => normalizeValue(r[0]) === item.code);
                 const codeIdx = h.indexOf("ing단품코드");
@@ -4420,7 +4417,7 @@
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Orders");
             XLSX.writeFile(wb, `발주등록완료_${currentSupplier}_${new Date().toISOString().slice(0,10)}.xlsx`);
-            showToastMessage("엑셀 파일이 다운로드되었습니다.");
+            showToastMessage("엑셀 내려받음");
         }
 
         function updateItemQty(idNum, val) {
@@ -4611,11 +4608,11 @@
                     specialHtml += `<div class="bg-blue-50/30 p-2 rounded-lg border border-dashed border-blue-200 flex flex-col gap-1 relative group/special"><div class="flex flex-col min-w-0" style="word-break:break-all;overflow-wrap:anywhere"><span class="text-[10px] font-bold text-blue-800">${row[h.indexOf("부속명")]}</span><span class="text-[9px] text-blue-300">${plateName}${finishColor ? ` · ${finishColor}` : ''}</span><span class="text-[9px] text-blue-300">${finish}</span><span class="text-[9px] text-blue-400 font-medium">${w} X ${d}</span></div>${!isConfirmed ? `<button onclick="addSpecialPart(${idNum}, '${cardKey}')" class="mt-0.5 px-1 py-px bg-white border border-blue-300 text-blue-600 rounded text-[8px] font-black hover:bg-blue-50 shadow-sm transition-all active:scale-95 leading-none">AMT추가</button>` : specialBtn}</div>`;
                 }
             });
-            el.innerHTML = `<div class="jh-edit-tip">수정버튼으로 각 부속의 발주수량을 조정할 수 있습니다</div><div class="space-y-2"><div class="text-[10px] font-bold text-[#787774] px-1 uppercase tracking-wider">기본 발주 부속</div><div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">${basicHtml || '<div class="col-span-full py-4 text-center text-gray-400 italic text-[11px]">발주할 부속이 없습니다.</div>'}</div></div>${specialHtml ? `<div class="space-y-2 pt-4 border-t border-dashed border-[#ededeb]"><div class="text-[10px] font-bold text-blue-500 px-1 uppercase tracking-wider flex items-center gap-2">AMT 외 공급처 부속</div><div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">${specialHtml}</div></div>` : ''}`;
+            el.innerHTML = `<div class="space-y-2"><div class="text-[10px] font-bold text-[#787774] px-1 uppercase tracking-wider">기본 발주 부속</div><div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">${basicHtml || '<div class="col-span-full py-4 text-center text-gray-400 italic text-[11px]">없음</div>'}</div></div>${specialHtml ? `<div class="space-y-2 pt-4 border-t border-dashed border-[#ededeb]"><div class="text-[10px] font-bold text-blue-500 px-1 uppercase tracking-wider flex items-center gap-2">AMT 외 공급처 부속</div><div class="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1.5">${specialHtml}</div></div>` : ''}`;
         }
 
         async function addSpecialPart(idNum, cardKey) {
-            const result = await showConfirmModal("일반적인 발주패턴이 아닙니다. 정말로 AMT 발주에 추가하시나요?");
+            const result = await showConfirmModal("AMT 발주에 추가");
             if (result) {
                 // pendingOrdersMap을 먼저 찾음 (발주상품목록)
                 let item = pendingOrdersMap[appMode].find(d => d.idNum === idNum);
@@ -4628,7 +4625,7 @@
                 if (item && item.partInfoMap[cardKey]) {
                     item.partInfoMap[cardKey].isDeleted = false;  // 기본발주 부속으로 이동
                     renderOrderParts(idNum);  // 화면 갱신
-                    showToastMessage("기본 발주 부속에 추가되었습니다.");  // 메시지 수정
+                    showToastMessage("기본 발주에 추가");  // 메시지 수정
                 }
             }
         }
@@ -5024,7 +5021,7 @@
                 try {
                     const item = (pendingOrdersMap[appMode] || []).find(d => d.idNum === idNum);
                     const 이름 = item ? (item.displayName || '이 상품') : '이 상품';
-                    const ok = await showConfirmModal(`${이름} 을(를) 발주상품목록에서 뺍니다.`,
+                    const ok = await showConfirmModal(`${이름} 빼기`,
                                { title: '발주상품목록에서 빼기', confirmLabel: '빼기' });
                     if (!ok) return;
                 } catch (e) {}
@@ -5042,7 +5039,7 @@
                 try {
                     if (val && val < getInitialDeliveryDate()) {
                         const ok = await showConfirmModal(
-                            '발주 취합 후 입고일이 조정될 수 있습니다.',
+                            '입고일 조정될 수 있음',
                             { title: '입고요청일 확인', confirmLabel: '확인' });
                         if (!ok) {
                             // 되돌린다 — 아직 넣지 않았으므로 칸의 글자만 제자리로
@@ -5223,10 +5220,10 @@
                             || (confirmedOrders || []).find(d => d.idNum === idNum);
                     const p = it && it.partInfoMap && it.partInfoMap[cardKey];
                     if (!p || p.isDeleted !== true) {
-                        showToastMessage('지우지 못했습니다. 화면을 새로 고친 뒤 다시 눌러 주세요.');
+                        showToastMessage('지우지 못함');
                     }
                 } catch (e) {
-                    showToastMessage('지우지 못했습니다. 화면을 새로 고친 뒤 다시 눌러 주세요.');
+                    showToastMessage('지우지 못함');
                 }
                 return r;
             };
@@ -5351,7 +5348,7 @@
                 const all = Object.keys(L).map(k => k.replace(/([a-z0-9])([A-Z])/g,'$1-$2').toLowerCase())
                              .filter(n => n.includes(q)).slice(0, 60);
                 ig.innerHTML = all.length ? all.map(한칸).join('')
-                    : '<p class="jhm-icohead">그런 아이콘이 없습니다</p>';
+                    : '<p class="jhm-icohead">없음</p>';
                 return;
             }
             ig.innerHTML = JOHON_ICONS.map(([이름, 것들]) => {
@@ -5507,13 +5504,13 @@
                 if (!johonBoxEdit) { 값.at = 값.at || Date.now();
                                      johonMyBoxes.push({ id: 'local-' + 값.at, ...값 }); }
                 johonBoxSaveLS(); johonBoxRender();
-                if (hint) hint.textContent = '이 기계에는 만들었지만 클라우드에 올리지 못했습니다. 다른 기기에서는 아직 안 보입니다.';
+                if (hint) hint.textContent = '이 기계에만 저장됨';
             }
         }
 
         async function johonBoxDelete(){
             if (!johonBoxEdit) return;
-            const ok = await showConfirmModal(`'${johonBoxEdit.name || '새 박스'}' 박스를 지웁니다.`,
+            const ok = await showConfirmModal(`'${johonBoxEdit.name || '새 박스'}' 지우기`,
                 { title: '박스 지우기', confirmLabel: '지우기' });
             if (!ok) return;
             const id = johonBoxEdit.id;
