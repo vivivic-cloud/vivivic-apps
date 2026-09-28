@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.11.9 (2026-09-28) — 화면에서 구구절절한 설명을 걷어 낸다
+     버전: v1.12.0 (2026-09-28) — 불량보고 — 집중 창·공정카드에서 올리고 불량보고 판에서 찾는다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2089,6 +2089,113 @@
         }
         #amt-stock-back button:active{ background:#F4F4F2; }
 
+        /* ══ 불량보고 ══════════════════════════════════════════════
+           작업 중 나온 불량을 그 자리에서 사진·글로 올린다(09-28 지시).
+           보고 창은 작업 창 위에 따로 뜬다 — 작업 창은 그대로 있고 시계도 안 끊긴다.
+           판 모양은 원장재고 판과 같은 토큰·같은 크기를 쓴다. */
+        #amt-defect{
+            --vg-bg:#fff; --vg-ink:#111110; --vg-body:#1A1A19; --vg-soft:#6E6E6A;
+            --vg-muted:#9C9C98; --vg-line:#EDEDEB; --vg-edge:#E2E2DF; --vg-fill:#F4F4F2;
+            position:fixed; left:0; right:0; bottom:0; z-index:8200;
+            top:var(--amth-top, 64px);
+            display:none; background:var(--vg-bg); color:var(--vg-body);
+            font:15px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",system-ui,sans-serif;
+            overflow-y:auto; -webkit-overflow-scrolling:touch;
+        }
+        html[data-amtdefect="1"] #amt-defect{ display:block; }
+        #amt-defect *{ box-sizing:border-box; }
+        #amt-defect .amd-wrap{ max-width:560px; margin:0 auto;
+            padding:14px 20px calc(86px + env(safe-area-inset-bottom)); }
+        #amt-defect .amd-head{ display:flex; align-items:baseline; gap:9px; margin:0 0 12px; }
+        #amt-defect .amd-head b{ font-size:22px; font-weight:700; letter-spacing:-.6px; color:var(--vg-ink); }
+        #amt-defect .amd-head span{ font-size:12px; color:var(--vg-muted); }
+        #amt-defect .amd-find{
+            width:100%; min-height:44px; border:1px solid var(--vg-edge); border-radius:12px;
+            padding:11px 14px; font:inherit; font-size:14px; color:var(--vg-body);
+            background:#fff; outline:none; margin:0 0 12px;
+        }
+        #amt-defect .amd-find:focus{ border-color:var(--vg-ink); }
+        #amt-defect .amd-줄{
+            border:1px solid var(--vg-line); border-radius:12px; padding:11px 13px; margin:0 0 9px;
+        }
+        #amt-defect .amd-때{ font-size:11px; font-weight:700; color:var(--vg-muted); }
+        #amt-defect .amd-무엇{ font-size:14px; font-weight:800; color:var(--vg-ink); margin-top:2px;
+            line-height:1.35; word-break:break-word; }
+        #amt-defect .amd-딱지{ display:inline-block; font-size:11px; font-weight:800; color:var(--vg-soft);
+            background:var(--vg-fill); border-radius:7px; padding:3px 8px; margin:5px 5px 0 0; }
+        #amt-defect .amd-글{ font-size:13px; color:var(--vg-body); margin-top:7px; line-height:1.5;
+            white-space:pre-wrap; word-break:break-word; }
+        #amt-defect .amd-사진{ display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+        #amt-defect .amd-사진 img{ width:88px; height:88px; object-fit:cover; border-radius:9px;
+            border:1px solid var(--vg-line); cursor:pointer; }
+        #amt-defect .amd-빔{ text-align:center; color:var(--vg-muted); font-size:13px; padding:34px 0; }
+        #amt-defect-back{
+            display:none; position:fixed; z-index:8300; left:12px;
+            bottom:calc(16px + env(safe-area-inset-bottom));
+        }
+        html[data-amtdefect="1"] #amt-defect-back{ display:block; }
+        #amt-defect-back button{
+            display:inline-flex; align-items:center; gap:7px; background:#fff;
+            border:1px solid #E2E2DF; border-radius:999px; padding:9px 15px;
+            font:inherit; font-size:13px; font-weight:700; color:#6E6E6A; cursor:pointer;
+            box-shadow:0 8px 22px -14px rgba(0,0,0,.55);
+        }
+        #amt-defect-back button:active{ background:#F4F4F2; }
+
+        /* 보고 창 — 집중 창(2147483000)보다 위에 뜬다. 뒤 작업 창은 그대로 산다. */
+        #_불량판{
+            position:fixed; inset:0; z-index:2147483500; background:rgba(0,0,0,.62);
+            display:flex; align-items:center; justify-content:center; padding:14px;
+            box-sizing:border-box; overscroll-behavior:contain;
+        }
+        #_불량판 .불량-속{
+            width:100%; max-width:340px; max-height:92vh; overflow-y:auto; background:#fff;
+            border-radius:18px; padding:16px; box-sizing:border-box;
+            box-shadow:0 18px 50px -12px rgba(0,0,0,.5);
+        }
+        #_불량판 .불량-이름{ margin:0; font-size:17px; font-weight:900; color:#37352f; letter-spacing:-.3px; }
+        #_불량판 .불량-곁{ margin:3px 0 0; font-size:12px; font-weight:700; color:#787774; line-height:1.4;
+            word-break:break-word; }
+        #_불량판 .불량-사진단추{
+            display:flex; align-items:center; justify-content:center; gap:6px; margin-top:12px;
+            min-height:48px; border:1.5px dashed #d3d1cb; border-radius:12px;
+            font-size:14px; font-weight:800; color:#37352f; cursor:pointer;
+        }
+        #_불량판 .불량-사진단추:active{ background:#f7f6f3; }
+        #_불량판 .불량-미리{ display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+        #_불량판 .불량-미리 img{ width:72px; height:72px; object-fit:cover; border-radius:9px; border:1px solid #ededeb; }
+        #_불량판 textarea{
+            width:100%; min-height:96px; margin-top:10px; border:1px solid #e3e2e0; border-radius:12px;
+            padding:11px 12px; font:inherit; font-size:14px; color:#37352f; resize:vertical; outline:none;
+        }
+        #_불량판 textarea:focus{ border-color:#37352f; }
+        #_불량판 .불량-줄{ display:flex; gap:8px; margin-top:12px; }
+        #_불량판 .불량-단추{
+            flex:1 1 0; min-width:0; min-height:48px; border:none; border-radius:12px;
+            font:inherit; font-size:15px; font-weight:900; cursor:pointer; line-height:1.2; padding:8px 6px;
+        }
+        #_불량판 .불량-보냄{ background:#b3261e; color:#fff; }
+        #_불량판 .불량-닫기{ background:#fff; color:#37352f; border:1.5px solid #e3e2e0; }
+        #_불량판 .불량-단추:active{ filter:brightness(.94); }
+        #_불량큰사진{
+            position:fixed; inset:0; z-index:2147483600; background:rgba(0,0,0,.85);
+            display:flex; align-items:center; justify-content:center; padding:8px; box-sizing:border-box;
+        }
+        #_불량큰사진 img{ max-width:100%; max-height:100%; border-radius:10px; }
+        /* 카드·집중 창의 불량 단추 — 보이는 알약은 작게, 닿는 자리는 44px */
+        .wo-불량, .집중-불량{
+            position:relative; display:inline-flex; align-items:center; justify-content:center;
+            font:inherit; font-size:11.5px; font-weight:800; color:#b3261e;
+            background:#fdecea; border:1px solid #f5b5ae; border-radius:8px;
+            padding:5px 12px; line-height:1.2; cursor:pointer; flex:none;
+        }
+        .wo-불량:active, .집중-불량:active{ background:#f9d7d2; }
+        .wo-불량::after, .집중-불량::after{
+            content:''; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+            width:100%; min-width:44px; height:44px;
+        }
+        #_집중판 .집중-불량{ position:absolute; top:4px; left:4px; min-height:44px; padding:0 10px; }
+
         /* 돌아오는 길 — 박스 안에서 첫 화면으로. 엄지가 닿는 자리에 띄운다. */
         #amt-back{
             display:none; position:fixed; z-index:990; left:12px;
@@ -2163,7 +2270,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.11.9</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.12.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2265,7 +2372,7 @@
 
             </div>
 
-            <div class="amth-sec"><b>나머지</b><span>2</span></div>
+            <div class="amth-sec"><b>나머지</b><span>3</span></div>
             <div class="amth-list">
 
                 <button type="button" class="amth-row" onclick="amtOpenBox('process')">
@@ -2273,6 +2380,13 @@
                         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/></svg>
                     </span>
                     <span class="amth-t">공정관리<i id="amth-c-process">상품 검색 · 공정 카드</i></span>
+                </button>
+
+                <button type="button" class="amth-row" onclick="amtOpenDefect()">
+                    <span class="amth-ico">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#111110" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+                    </span>
+                    <span class="amth-t">불량보고<i id="amth-c-defect">사진·글로 보고</i></span>
                 </button>
 
                 <button type="button" class="amth-row" onclick="amtOpenBox('accounts')">
@@ -2289,7 +2403,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.11.9</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.12.0</b></p>
         </div>
     </div>
 
@@ -2322,6 +2436,16 @@
         </div>
     </div>
     <div id="amt-stock-back"><button type="button" onclick="amtCloseStock()">← 박스판</button></div>
+
+    <!-- 불량보고 — 작업 중 나온 불량을 사진·글로 올리고 나중에 찾아본다 -->
+    <div id="amt-defect">
+        <div class="amd-wrap">
+            <div class="amd-head"><b>불량보고</b><span id="amd-sub">—</span></div>
+            <input class="amd-find" id="amd-find" type="text" placeholder="발주번호 · 상품명 · 부속" autocomplete="off">
+            <div class="amd-list" id="amd-list"></div>
+        </div>
+    </div>
+    <div id="amt-defect-back"><button type="button" onclick="amtCloseDefect()">← 박스판</button></div>
 
     <!-- 박스추가 — 박스가 보이는 화면에서만 뜬다 -->
     <button type="button" id="amtb-fab" aria-label="새 박스" title="새 박스">
@@ -7284,6 +7408,7 @@
             덮.id = '_집중판';
             덮.innerHTML =
                 `<div class="집중-속">` +
+                  `<button type="button" class="집중-불량" id="_집중불량">불량</button>` +
                   `<button type="button" class="집중-접기" id="_집중접기">접기</button>` +
                   `<p class="집중-이름">${_e(일.rec?.partName || 일.cardKey)}</p>` +
                   `<p class="집중-곁">${_e(일.procKey)}${o.orderCode ? ' · ' + _e(o.orderCode) : ''}` +
@@ -7318,6 +7443,11 @@
             document.getElementById('_집중완료').onclick = () => window.tl일완료();
             document.getElementById('_집중취소').onclick = () => window.tl일취소();
             document.getElementById('_집중접기').onclick = () => window._집중접기();
+            // 불량보고는 작업 창 위에 따로 뜬다 — 창도 시계도 안 건드린다(09-28 지시)
+            document.getElementById('_집중불량').onclick = () => {
+                const 일 = window._집중일 || {};
+                window.불량보고열기(일.docId, 일.cardKey, 일.procKey, (일.rec && 일.rec.partName) || 일.cardKey, '집중창');
+            };
             window._집중도면그리기();
         };
         /* ── 지금 하는 일의 재단도면 (09-28 지시) ─────────────────────────────
@@ -10031,6 +10161,16 @@
             } catch (e) {}
             return '';
         };
+        /* 공정카드의 「불량」 단추 — 그 카드의 발주·부속·공정을 그대로 들고 보고 창을 연다.
+           카드를 잡아 옮기거나 두 번 치는 것과 섞이지 않게 눌림을 여기서 끊는다. */
+        function _wo불량BtnHtml(docId, cardKey, procKey, partName) {
+            const _q = v => String(v == null ? '' : v).replace(/'/g, "\\'");
+            return `<button type="button" class="wo-불량" draggable="false" aria-label="불량보고"` +
+                ` onclick="event.stopPropagation();불량보고열기('${_q(docId)}','${_q(cardKey)}','${_q(procKey)}','${_q(partName)}','공정카드')"` +
+                ` onmousedown="event.stopPropagation()"` +
+                ` ondblclick="event.stopPropagation()"` +
+                ` ondragstart="event.preventDefault();event.stopPropagation()">불량</button>`;
+        }
         function _woCutEditBtnHtml(cKey, sk, p) {
             const _c = String(cKey).replace(/'/g, "\\'");
             const _s = String(sk).replace(/'/g, "\\'");
@@ -10224,11 +10364,14 @@
             const _대기카드 = !_bDone && !_woPrevReady(p, _bck, _bComps, sk);
             const _cardCls = 'wo-boring-placed-card' + (p.isCuttingCard ? ' cutting-card' : '')
                 + (_대기카드 ? ' wo-앞대기카드' : '');
+            // 불량은 시작 전이든 끝난 뒤든 나올 수 있다 — 카드마다 늘 둔다(09-28 지시)
+            const _b불량 = `<div style="display:flex;justify-content:flex-end;margin-top:6px;">` +
+                _wo불량BtnHtml(_bdid, _bck, _bpk, p.nm || '') + `</div>`;
             return `<div class="${_cardCls}" draggable="${_bDone ? 'false' : 'true'}"` +
                 ` style="${_bcs}${_bDone ? 'opacity:0.6;' : ''}"` +
                 ` data-ck="${cKey}" data-sk="${sk}" data-mac="${mac}" data-ok="${_pOk}" data-done="${_bDone ? '1' : '0'}"${_grpAttr || ''}` +
                 (!_bDone ? ` ondblclick="woBoardDblClick('${cKey}','${sk}')" ondragstart="woBoardDragStart(event,'${cKey}','${sk}')" ondragend="woBoardDragEnd(event)"` : '') +
-                `>${_placedInner}${_bDoneHtml}</div>`;
+                `>${_placedInner}${_bDoneHtml}${_b불량}</div>`;
         }
 
         // 휴식 마커 한 줄 — 카드 N과 N+1 사이에 꽂히는 고정 항목(드래그 불가)
@@ -14339,6 +14482,201 @@
     })();
     </script>
 
+    <!-- ══ 불량보고 ══════════════════════════════════════════════════════════
+         사장님 지시(09-28 04:02): 「작업중 발견된 불량을 보고할 수 있는 버튼을 이
+         팝업창 그리고 각 공정카드에 만들어 주세요… 사진촬영 업로드 테스트 설명 등…
+         각 발주번호별 - 상품명별 - 부속카드별 차후 검색 할 수 있도록 불량보고
+         페이지를… 불량 보고로 인한 작업중 팝업화면의 변동이 있으면 안됩니다.」
+
+         담는 자리 — 새 칸 `defect_reports` 하나뿐이다.
+           artifacts/vivivic-4b7ef/public/data/defect_reports
+         partStarted·partCompletions·confirmed_orders·cutting_plans 는 한 칸도 안 건드린다.
+         한 줄에 담기는 것:
+           때(ms) · 날('YYYY-MM-DD') · 발주번호 · 발주docId · 발주코드 · 상품명 ·
+           부속키 · 부속명 · 공정 · 글 · 사진[{길,주소}] · 올린이 · 어디서
+         사진은 파이어스토어에 넣지 않는다(1MB 한계). 이 집이 이미 쓰는 저장소
+         (window.storage — 원장 엑셀이 그리로 간다)의 `defect_photos/` 밑에 올리고
+         주소만 적는다. 저장소가 막히면 글만 먼저 올리고 사진은 못 올렸다고 적는다.
+         ══════════════════════════════════════════════════════════════════ -->
+    <script>
+    (function(){
+        const appId = 'vivivic-4b7ef';
+        const 칸이름 = 'defect_reports';
+        const $ = id => document.getElementById(id);
+        const _e = v => String(v == null ? '' : v)
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        let 보고들 = [], 붙었나 = false, 고른사진 = [];
+
+        function 칸(){
+            const { collection } = window.fbFirestore;
+            return collection(window.db, 'artifacts', appId, 'public', 'data', 칸이름);
+        }
+        // 실시간 — 올리면 바로 목록에 뜬다
+        window.amtDefectSync = function(){
+            if (붙었나 || !window.db || !window.fbFirestore) return;
+            붙었나 = true;
+            const { onSnapshot } = window.fbFirestore;
+            onSnapshot(칸(), s => {
+                if (!s || typeof s.forEach !== 'function') return;
+                const 새것 = [];
+                s.forEach(d => 새것.push(Object.assign({ id: d.id }, d.data())));
+                새것.sort((a, b) => (b.때 || 0) - (a.때 || 0));
+                보고들 = 새것;
+                그리기();
+            }, () => {});
+        };
+
+        /* ── 보고 창 — 작업 창 위에 따로 뜬다 ─────────────────────────────── */
+        window.불량보고열기 = function(docId, cardKey, procKey, partName, 어디서){
+            const o = (typeof confirmedOrders !== 'undefined' ? confirmedOrders : [])
+                .find(x => (x.docId || String(x.idNum)) === docId) || {};
+            고른사진 = [];
+            document.getElementById('_불량판')?.remove();
+            const 덮 = document.createElement('div');
+            덮.id = '_불량판';
+            덮.dataset.docid = docId || ''; 덮.dataset.ck = cardKey || '';
+            덮.dataset.pk = procKey || '';  덮.dataset.nm = partName || '';
+            덮.dataset.어디 = 어디서 || '';
+            덮.innerHTML =
+                `<div class="불량-속">` +
+                  `<p class="불량-이름">불량보고</p>` +
+                  `<p class="불량-곁">${_e(o.displayName || '')}${partName ? ' · ' + _e(partName) : ''}` +
+                    `${procKey ? ' · ' + _e(procKey) : ''}${o.orderCode ? '<br>' + _e(o.orderCode) : ''}</p>` +
+                  `<label class="불량-사진단추" id="_불량사진단추">사진` +
+                    `<input type="file" id="_불량파일" accept="image/*" capture="environment" multiple hidden></label>` +
+                  `<div class="불량-미리" id="_불량미리"></div>` +
+                  `<textarea id="_불량글" placeholder="설명"></textarea>` +
+                  `<div class="불량-줄">` +
+                    `<button type="button" class="불량-단추 불량-닫기" id="_불량닫기">닫기</button>` +
+                    `<button type="button" class="불량-단추 불량-보냄" id="_불량보냄">보내기</button>` +
+                  `</div>` +
+                `</div>`;
+            document.body.appendChild(덮);
+            // 뒤(작업 창)로 눌림이 새지 않게. 창은 그대로 살아 있다.
+            덮.addEventListener('click', e => { if (e.target === 덮) e.stopPropagation(); });
+            $('_불량파일').addEventListener('change', e => {
+                고른사진 = Array.from(e.target.files || []).slice(0, 5);
+                미리그리기();
+            });
+            $('_불량닫기').onclick = () => window.불량보고닫기();
+            $('_불량보냄').onclick = () => 보내기();
+        };
+        window.불량보고닫기 = function(){
+            document.getElementById('_불량판')?.remove();
+            고른사진 = [];
+        };
+        function 미리그리기(){
+            const 자리 = $('_불량미리'); if (!자리) return;
+            자리.innerHTML = '';
+            고른사진.forEach(f => {
+                const img = document.createElement('img');
+                try { img.src = URL.createObjectURL(f); } catch (e) {}
+                자리.appendChild(img);
+            });
+        }
+        async function 보내기(){
+            const 판 = $('_불량판'); if (!판) return;
+            const 글 = ($('_불량글') || {}).value || '';
+            if (!글.trim() && !고른사진.length) { showToastMessage('사진이나 설명'); return; }
+            const 단추 = $('_불량보냄'); if (단추) { 단추.disabled = true; 단추.textContent = '올리는 중'; }
+            const docId = 판.dataset.docid, cardKey = 판.dataset.ck, procKey = 판.dataset.pk;
+            const o = (typeof confirmedOrders !== 'undefined' ? confirmedOrders : [])
+                .find(x => (x.docId || String(x.idNum)) === docId) || {};
+            const 이제 = Date.now();
+            const 줄 = {
+                때: 이제, 날: new Date().toISOString().slice(0, 10),
+                발주번호: o.idNum ?? null, 발주docId: docId || '', 발주코드: o.orderCode || '',
+                상품명: o.displayName || '', 부속키: cardKey || '', 부속명: 판.dataset.nm || '',
+                공정: procKey || '', 글: 글.trim(), 사진: [], 어디서: 판.dataset.어디 || '',
+                올린이: (window.currentUser && (window.currentUser.email || window.currentUser.uid)) || ''
+            };
+            const 보낼사진 = 고른사진.slice();     // 창을 닫으면 고른 것이 비워지므로 먼저 챙긴다
+            try {
+                const { addDoc, doc, updateDoc } = window.fbFirestore;
+                const 새문서 = await addDoc(칸(), 줄);           // 글부터 바로 올린다(실시간)
+                window.불량보고닫기();
+                showToastMessage('불량보고 올림');
+                // 사진은 뒤따라 — 저장소가 막혀도 보고는 이미 남아 있다
+                if (보낼사진.length) {
+                    const 올린것 = [];
+                    try {
+                        const { ref, uploadBytes, getDownloadURL } = window.fbStorage;
+                        for (let i = 0; i < 보낼사진.length; i++) {
+                            const f = 보낼사진[i];
+                            const 길 = `defect_photos/${새문서.id}/${이제}_${i}_${(f.name || 'photo').replace(/[^\w.\-]/g, '_')}`;
+                            const 자리 = ref(window.storage, 길);
+                            await uploadBytes(자리, f);
+                            올린것.push({ 길, 주소: await getDownloadURL(자리), 이름: f.name || '' });
+                        }
+                        if (올린것.length) await updateDoc(doc(window.db, 'artifacts', appId, 'public', 'data', 칸이름, 새문서.id),
+                            { 사진: 올린것 });
+                    } catch (e) {
+                        try { await updateDoc(doc(window.db, 'artifacts', appId, 'public', 'data', 칸이름, 새문서.id),
+                            { 사진: 올린것, 사진탈: true }); } catch (e2) {}
+                        showToastMessage('사진 못 올림');
+                    }
+                }
+            } catch (e) {
+                if (단추) { 단추.disabled = false; 단추.textContent = '보내기'; }
+                showToastMessage('보고 못 올림: ' + (e.message || e));
+            }
+        }
+
+        /* ── 불량보고 판 ─────────────────────────────────────────────────── */
+        function 걸린것(){
+            const 찾 = (($('amd-find') || {}).value || '').trim().toLowerCase();
+            if (!찾) return 보고들;
+            return 보고들.filter(r => [r.발주번호, r.발주코드, r.상품명, r.부속명, r.부속키, r.공정, r.글]
+                .map(v => String(v == null ? '' : v).toLowerCase()).join(' ').includes(찾));
+        }
+        function 그리기(){
+            const 자리 = $('amd-list'); if (!자리) return;
+            const 것들 = 걸린것();
+            const 셈 = $('amd-sub'); if (셈) 셈.textContent = 보고들.length + '건';
+            if (!것들.length) { 자리.innerHTML = '<div class="amd-빔">보고 없음</div>'; return; }
+            자리.innerHTML = 것들.map(r =>
+                '<div class="amd-줄">' +
+                  '<div class="amd-때">' + _e(r.날 || '') + '</div>' +
+                  '<div class="amd-무엇">' + _e(r.상품명 || '') + (r.부속명 ? ' · ' + _e(r.부속명) : '') + '</div>' +
+                  (r.발주번호 != null ? '<span class="amd-딱지">' + _e(r.발주번호) + '</span>' : '') +
+                  (r.공정 ? '<span class="amd-딱지">' + _e(r.공정) + '</span>' : '') +
+                  (r.발주코드 ? '<span class="amd-딱지">' + _e(r.발주코드) + '</span>' : '') +
+                  (r.사진탈 ? '<span class="amd-딱지">사진 못 올림</span>' : '') +
+                  (r.글 ? '<div class="amd-글">' + _e(r.글) + '</div>' : '') +
+                  ((r.사진 && r.사진.length)
+                    ? '<div class="amd-사진">' + r.사진.map(ph =>
+                        '<img src="' + _e(ph.주소) + '" data-큰사진="' + _e(ph.주소) + '" alt="">').join('') + '</div>'
+                    : '') +
+                '</div>').join('');
+        }
+        document.addEventListener('input', e => {
+            if (e.target && e.target.id === 'amd-find') 그리기();
+        });
+        document.addEventListener('click', e => {
+            const 큰 = e.target && e.target.dataset && e.target.dataset.큰사진;
+            if (!큰) return;
+            document.getElementById('_불량큰사진')?.remove();
+            const 덮 = document.createElement('div');
+            덮.id = '_불량큰사진';
+            덮.innerHTML = '<img src="' + _e(큰) + '" alt="">';
+            덮.addEventListener('click', () => 덮.remove());
+            document.body.appendChild(덮);
+        });
+        window.amtOpenDefect = function(){
+            if (typeof amtFitTop === 'function') amtFitTop();
+            document.documentElement.removeAttribute('data-amthome');
+            document.documentElement.setAttribute('data-amtdefect', '1');
+            try { window.amtDefectSync(); } catch (e) {}
+            그리기();
+            window.scrollTo(0, 0);
+        };
+        window.amtCloseDefect = function(){
+            document.documentElement.removeAttribute('data-amtdefect');
+            if (typeof amtGoHome === 'function') amtGoHome();
+        };
+    })();
+    </script>
+
     <!-- 아이콘 — 작업대가 쓰는 그 파일이다(같은 집 shared/). CDN 이 아니다. -->
     <script src="../shared/lucide.min.js"></script>
     <!-- 아이콘 갈래 목록 — 집이 함께 쓰는 한 벌. lucide 가 가진 것을 그대로 갈라 준다. -->
@@ -14395,7 +14733,7 @@
         const 안쪽 = [['pending','발주확정 대기목록'],['confirmed','발주확정목록'],
                       ['timeline','공정 일정 타임라인'],['cutting','재단발주·도면'],
                       ['process','공정관리'],['accounts','계정관리'],
-                      ['stock','원장재고']];
+                      ['stock','원장재고'],['defect','불량보고']];
 
         /* ── 창고 ── */
         function 칸(){
@@ -14560,6 +14898,7 @@
             const 갈곳 = (b && b.link) || 이름으로(b);
             if (!갈곳) return 박스판(b);                  // 갈 곳이 없으면 고치기 판
             if (갈곳 === 'stock') { if (typeof amtOpenStock === 'function') amtOpenStock(); return; }
+            if (갈곳 === 'defect') { if (typeof amtOpenDefect === 'function') amtOpenDefect(); return; }
             const 안 = 안쪽.find(x => x[0] === 갈곳);
             if (안) { if (typeof amtOpenBox === 'function') amtOpenBox(갈곳); return; }
             window.open(갈곳, '_blank', 'noopener');
