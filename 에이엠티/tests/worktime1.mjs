@@ -282,6 +282,9 @@ await p.screenshot({ path: 그림칸 + '/work-375-완료창.png' });
    완료창 ? JSON.stringify(완료창.창) + ' · 문서가로 ' + 완료창.문서가로 : '창 없음');
 판('⑥ 집중 창 「완료」 를 누르면 쓰던 완료 팝업이 뜬다', 팝업떴나 === true, String(팝업떴나));
 판('⑥ 완료 팝업이 뜨면 집중 창은 닫힌다', (await 판떴나()) === false, String(await 판떴나()));
+// 무대는 시험이 세운 덮개다(z-index 99999). 카드가 커지면 완료 창 위를 덮어
+// 손가락이 창에 안 닿는다 — 창을 누를 동안만 무대를 뒤로 물린다.
+await p.evaluate(() => { const 무 = document.getElementById('__무대'); if (무) 무.style.zIndex = '1'; });
 // 팝업의 등록 단추를 진짜로 누른다 (btn 없이 부른 길 — 여태 아무도 안 밟은 길이다)
 const 등록눌림 = await (async () => {
   const i = await p.evaluate(() => [...document.querySelectorAll('#_partDoneModal button')]
