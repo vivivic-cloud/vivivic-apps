@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.11.3 (2026-09-24) — 일이 잠깐 비었다가 다시 생겨도 공정 캘린더가 돌아오게 한다
+     버전: v1.11.4 (2026-09-28) — 일을 붙잡고 있어도 공정 캘린더를 볼 수 있게 집중 창을 접는다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1137,6 +1137,7 @@
             padding: 16px; box-sizing: border-box; overscroll-behavior: contain;
         }
         #_집중판 .집중-속 {
+            position: relative;
             width: 100%; max-width: 340px; background: #fff; border-radius: 18px;
             padding: 18px 16px 14px; box-sizing: border-box; text-align: center;
             box-shadow: 0 18px 50px -12px rgba(0,0,0,.5);
@@ -1162,6 +1163,38 @@
         #_집중판 .집중-취소 { background: #fff; color: #b91c1c; border: 1.5px solid #f0c8c8; }
         #_집중판 .집중-단추:active { filter: brightness(.94); }
         #_집중판 .집중-꼬리 { margin: 12px 0 0; font-size: 11px; color: #a8a6a2; line-height: 1.55; }
+        /* ── 접기 · 접어 둔 띠 (09-28 지시) ───────────────────────────────
+           「작업중 공정이 있는데 공정캘린더가 안떠요」 — 집중 창이 화면을 통째로
+           덮고 있어서였다(inset 0 · 검은 62%). 완료나 취소 전에는 안 걷히고
+           새로고침해도 되살아나, 일을 붙잡은 동안에는 캘린더를 아예 못 봤다.
+           이제 접을 수 있다. 접으면 아래 띠만 남고 캘린더가 그대로 보인다.
+           일은 안 끊기고 시간도 계속 간다. 띠를 누르면 다시 열린다. */
+        #_집중판 .집중-접기 {
+            position: absolute; top: 4px; right: 4px;
+            min-width: 44px; min-height: 44px; padding: 0 8px;
+            border: none; background: none; font: inherit; font-size: 12px; font-weight: 800;
+            color: #787774; cursor: pointer; border-radius: 10px;
+        }
+        #_집중판 .집중-접기:active { background: #f1f1ef; }
+        #_집중띠 {
+            position: fixed; left: 8px; right: 8px; z-index: 2147482900;
+            bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 8px);
+            display: flex; align-items: center; gap: 10px;
+            min-height: 48px; padding: 8px 12px; box-sizing: border-box;
+            border-radius: 12px; border: 1px solid #e3e2e0; background: #fff;
+            box-shadow: 0 12px 30px -12px rgba(0,0,0,.45); cursor: pointer; text-align: left;
+        }
+        #_집중띠:active { background: #f7f6f3; }
+        #_집중띠 .띠-점 { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #22c55e; }
+        #_집중띠 .띠-점.멈춤 { background: #c2793a; }
+        #_집중띠 .띠-글 { flex: 1 1 auto; min-width: 0; }
+        #_집중띠 .띠-머리 { margin: 0; font-size: 10.5px; font-weight: 800; color: #a8a6a2; letter-spacing: .04em; }
+        #_집중띠 .띠-이름 { margin: 1px 0 0; font-size: 13px; font-weight: 900; color: #37352f;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #_집중띠 .띠-시계 { flex: none; font-size: 15px; font-weight: 900; color: #37352f;
+            font-variant-numeric: tabular-nums; }
+        #_집중띠 .띠-열기 { flex: none; font-size: 11.5px; font-weight: 800; color: #787774;
+            background: #f1f1ef; border: 1px solid #e3e2e0; border-radius: 8px; padding: 6px 10px; }
         /* 재단편집으로 가는 자리 — 여태 카드 아무 데나 누르면 넘어갔다. 카드는 잡아
            옮기는 몸통이라 옮기려다 편집이 열리곤 했다(09-23 지시). 이 단추 하나로
            좁힌다. 보이는 알약은 작게 두고, 손가락 닿는 자리만 ::after 로 44px 넓힌다. */
@@ -2102,7 +2135,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.11.3</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.11.4</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2228,7 +2261,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.11.3</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.11.4</b></p>
         </div>
     </div>
 
@@ -7213,6 +7246,7 @@
         window._집중판닫기 = function(){
             if (_집중시계) { clearInterval(_집중시계); _집중시계 = null; }
             document.getElementById('_집중판')?.remove();
+            document.getElementById('_집중띠')?.remove();   // 접어 둔 띠도 같이 걷는다
             window._집중일 = null;
         };
         window._집중판열기 = function(일){
@@ -7226,6 +7260,7 @@
             덮.id = '_집중판';
             덮.innerHTML =
                 `<div class="집중-속">` +
+                  `<button type="button" class="집중-접기" id="_집중접기">접기</button>` +
                   `<p class="집중-머리">지금 하는 일</p>` +
                   `<p class="집중-이름">${_e(일.rec?.partName || 일.cardKey)}</p>` +
                   `<p class="집중-곁">${_e(일.procKey)}${o.orderCode ? ' · ' + _e(o.orderCode) : ''}` +
@@ -7242,8 +7277,11 @@
                   `<p class="집중-꼬리">취소하면 지금까지 걸린 시간은 이 카드에 쌓아 둡니다.<br>` +
                     `다시 시작하면 그 시간에 이어서 셉니다.</p>` +
                 `</div>`;
+            _집중띠지우기();          // 큰 창이 떠 있는 동안에는 띠를 겹쳐 두지 않는다
             document.body.appendChild(덮);
-            // 바깥을 눌러도 ESC 를 눌러도 안 닫힌다 — 취소나 완료로만 나간다
+            /* 바깥을 눌러도 ESC 를 눌러도 안 닫힌다 — 취소나 완료로만 나간다.
+               (장갑 낀 손으로 빗나가게 누르셔도 창이 사라지면 안 된다.
+                캘린더를 보실 때는 위 「접기」 를 누르신다.) */
             덮.addEventListener('click', e => { if (e.target === 덮) e.stopPropagation(); });
             const 그리기 = () => {
                 const g = document.getElementById('_집중시계글');
@@ -7256,21 +7294,89 @@
                 if (b) { b.textContent = r.멈춤 ? '다시 하기' : '잠시 멈춤'; b.classList.toggle('on', !!r.멈춤); }
             };
             그리기();
-            if (_집중시계) clearInterval(_집중시계);
-            _집중시계 = setInterval(그리기, 1000);
+            _집중시계돌리기();
             document.getElementById('_집중멈춤').onclick = () => window.tl일멈춤();
             document.getElementById('_집중완료').onclick = () => window.tl일완료();
             document.getElementById('_집중취소').onclick = () => window.tl일취소();
+            document.getElementById('_집중접기').onclick = () => window._집중접기();
         };
-        // 새로고침해도 붙잡고 있던 일이 되살아난다
+        /* ── 접기 · 접어 둔 띠 (09-28 지시) ───────────────────────────────────
+           집중 창은 화면을 통째로 덮는다. 그래서 일을 붙잡고 있는 동안에는
+           공정 캘린더를 아예 못 봤다 — 사장님이 「작업중 공정이 있는데
+           공정캘린더가 안떠요」 하신 자리가 이것이다. 접으면 아래 띠만 남는다.
+           일은 안 끊기고(기록은 손대지 않는다) 시간도 계속 간다. */
+        function _집중띠지우기(){ document.getElementById('_집중띠')?.remove(); }
+        window._집중띠그리기 = function(){
+            const 띠 = document.getElementById('_집중띠');
+            if (!띠) return;
+            const r = (window._집중일 && window._집중일.rec) || {};
+            const 시 = 띠.querySelector('.띠-시계');
+            if (시) 시.textContent = (_쌓인분(r) + _흐른분(r)).toFixed(1) + '분';
+            const 점 = 띠.querySelector('.띠-점');
+            if (점) 점.classList.toggle('멈춤', !!r.멈춤);
+            const 머 = 띠.querySelector('.띠-머리');
+            if (머) 머.textContent = r.멈춤 ? '잠시 멈춤 — 시간은 계속 갑니다' : '지금 하는 일';
+        };
+        window._집중띠보이기 = function(일){
+            if (!일) return;
+            window._집중일 = 일;
+            document.getElementById('_집중판')?.remove();
+            _집중띠지우기();
+            const _e = v => String(v == null ? '' : v)
+                .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+            const 띠 = document.createElement('div');
+            띠.id = '_집중띠';
+            띠.setAttribute('role', 'button');
+            띠.innerHTML =
+                `<span class="띠-점"></span>` +
+                `<span class="띠-글">` +
+                  `<span class="띠-머리" style="display:block">지금 하는 일</span>` +
+                  `<span class="띠-이름" style="display:block">${_e(일.rec?.partName || 일.cardKey)} · ${_e(일.procKey)}</span>` +
+                `</span>` +
+                `<span class="띠-시계">0.0분</span>` +
+                `<span class="띠-열기">열기</span>`;
+            document.body.appendChild(띠);
+            띠.addEventListener('click', () => {
+                const 지금 = _집중찾기();
+                if (지금) window._집중판열기(지금); else window._집중판닫기();
+            });
+            window._집중띠그리기();
+            _집중시계돌리기();
+        };
+        window._집중접기 = function(){
+            const 일 = window._집중일 || _집중찾기();
+            if (!일) { window._집중판닫기(); return; }
+            window._집중띠보이기(일);
+        };
+        function _집중시계돌리기(){
+            if (_집중시계) clearInterval(_집중시계);
+            _집중시계 = setInterval(() => {
+                const g = document.getElementById('_집중시계글');
+                if (g) {
+                    const r = (window._집중일 && window._집중일.rec) || {};
+                    g.textContent = (_쌓인분(r) + _흐른분(r)).toFixed(1) + '분';
+                    const m = document.getElementById('_집중멈춤글');
+                    if (m) m.style.display = r.멈춤 ? 'block' : 'none';
+                    const b = document.getElementById('_집중멈춤');
+                    if (b) { b.textContent = r.멈춤 ? '다시 하기' : '잠시 멈춤'; b.classList.toggle('on', !!r.멈춤); }
+                }
+                window._집중띠그리기();
+            }, 1000);
+        }
+        /* 새로고침해도 붙잡고 있던 일이 되살아난다 — 다만 「접힌 띠」 로 돌아온다.
+           예전에는 큰 창으로 되살아나, 새로고침할 때마다 화면이 다시 막혀
+           공정 캘린더를 못 봤다(09-28 지시). 일과 시간은 그대로다. */
         window._집중판다시 = function(){
             const 일 = _집중찾기();
             if (!일) { if (window._집중일) window._집중판닫기(); return; }
             if (window._집중일 && window._집중일.docId === 일.docId
-                && window._집중일.cardKey === 일.cardKey && window._집중일.procKey === 일.procKey) {
-                window._집중일.rec = 일.rec; window._집중일.order = 일.order; return;   // 값만 새로
+                && window._집중일.cardKey === 일.cardKey && window._집중일.procKey === 일.procKey
+                && (document.getElementById('_집중판') || document.getElementById('_집중띠'))) {
+                window._집중일.rec = 일.rec; window._집중일.order = 일.order;   // 값만 새로
+                window._집중띠그리기();
+                return;
             }
-            window._집중판열기(일);
+            window._집중띠보이기(일);
         };
         // ESC 로도 안 닫힌다
         document.addEventListener('keydown', e => {

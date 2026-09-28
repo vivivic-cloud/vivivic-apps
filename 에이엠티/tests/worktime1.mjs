@@ -218,18 +218,28 @@ console.log('■ 세 번 무르고 다시: ' + JSON.stringify(세번));
 판('⑦ 무를 때마다 쌓인다 (2 → 5 → 9)', JSON.stringify(세번.걸음) === JSON.stringify([2, 5, 9]), JSON.stringify(세번.걸음));
 판('⑦ 세 번 무른 뒤 완료하면 다 더해진다 (9 + 1.5 = 10.5)', Math.abs(세번.끝 - 10.5) < 0.2, 세번.끝 + '분');
 
-// ③ 새로고침 — 붙잡고 있던 일이 되살아난다
+// ③ 새로고침 — 붙잡고 있던 일이 「접힌 띠」 로 되살아난다
+//    (09-28 지시 「작업중 공정이 있는데 공정캘린더가 안떠요」 로 바뀐 자리다.
+//     예전에는 큰 창으로 되살아나 새로고침할 때마다 화면이 다시 막혔다.)
 const 되살림 = await p.evaluate(() => {
   window._집중판닫기();                      // 새로고침한 셈 치고 창을 없앤다
   const 전 = !!document.getElementById('_집중판');
   window._집중판다시();                      // 발주 소식이 올 때 부르는 그것
-  const g = document.getElementById('_집중시계글');
-  return { 지운뒤: 전, 되살아남: !!document.getElementById('_집중판'), 시계: g ? g.textContent : null };
+  const 띠 = document.getElementById('_집중띠');
+  return { 지운뒤: 전, 띠: !!띠, 창: !!document.getElementById('_집중판'),
+           띠시계: 띠 ? (띠.querySelector('.띠-시계') || {}).textContent : null };
 });
 console.log('■ 새로고침 흉내: ' + JSON.stringify(되살림));
-판('③ 새로고침해도 집중 창이 되살아난다', 되살림.지운뒤 === false && 되살림.되살아남 === true, JSON.stringify(되살림));
-판('③ 되살아난 창의 시간이 이어진다', parseFloat(되살림.시계) >= 다시시작.쌓인분,
-   '쌓인분 ' + 다시시작.쌓인분 + ' → ' + 되살림.시계);
+판('③ 새로고침하면 접힌 띠로 되살아난다 (화면을 막지 않는다)',
+   되살림.지운뒤 === false && 되살림.띠 === true && 되살림.창 === false, JSON.stringify(되살림));
+판('③ 되살아난 띠의 시간이 이어진다', parseFloat(되살림.띠시계) >= 다시시작.쌓인분,
+   '쌓인분 ' + 다시시작.쌓인분 + ' → ' + 되살림.띠시계);
+// 띠를 진짜로 눌러 창을 다시 연다 — 여기서부터는 예전 걸음 그대로다
+await 톡('#_집중띠');
+const 창시계 = await 시계글();
+판('③ 띠를 누르면 집중 창이 열리고 시간이 이어진다',
+   (await 판떴나()) === true && parseFloat(창시계) >= 다시시작.쌓인분,
+   '창 시계 ' + 창시계);
 await p.screenshot({ path: 그림칸 + '/work-375-집중.png' });
 
 // ⑥-끝 완료 → 완료 팝업 → 등록까지 진짜로 몰고, partCompletions 에 적힌 값을 잰다
