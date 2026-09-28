@@ -45,7 +45,10 @@ await p.evaluate(() => {
       return 쓰기(ref, 값);
     },
     setDoc: async () => {}, deleteDoc: async () => {},
-    addDoc: async (col, 줄) => { const id = 'r' + (window.__올린것.length + 1);
+    addDoc: async (col, 줄) => {
+      // 불량보고 칸만 여기에 담는다 — 빈 시간(idle_times) 같은 남의 칸은 흘려보낸다
+      if (!/defect_reports/.test((col && col.p) || '')) return { id: 'x' + Math.random().toString(36).slice(2, 7) };
+      const id = 'r' + (window.__올린것.length + 1);
       window.__올린것.push(Object.assign({ id }, 줄)); 알림(); return { id }; },
     collection: (db, ...a) => ({ p: a.join('/') }),
     onSnapshot: (col, cb) => { if (col && /defect_reports/.test(col.p || '')) { window.__구독 = cb; 알림(); } },

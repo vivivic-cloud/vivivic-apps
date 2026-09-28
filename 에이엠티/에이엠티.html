@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.12.0 (2026-09-28) — 불량보고 — 집중 창·공정카드에서 올리고 불량보고 판에서 찾는다
+     버전: v1.12.1 (2026-09-28) — 시간을 세 갈래로 — 일한 시간 · 멈춘 시간 · 빈 시간
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2270,7 +2270,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.12.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.12.1</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2403,7 +2403,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.12.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.12.1</b></p>
         </div>
     </div>
 
@@ -7364,6 +7364,14 @@
         function _공정시작됨(rec){ return !!rec && rec.started !== false; }
         function _쌓인분(rec){ const v = Number(rec && rec.쌓인분); return Number.isFinite(v) && v > 0 ? v : 0; }
         function _흐른분(rec){ const ms = rec && rec.startMs; return ms ? Math.round((Date.now() - ms) / 6000) / 10 : 0; }
+        /* 멈춘 분 — STOP 눌러 쉰 시간. 일한 시간과 **따로** 쌓는다(09-28 지시).
+           옛 기록에는 이 칸이 없다 → 0 으로 읽힌다. 지금 멈춰 있는 몫까지 더해 준다. */
+        function _멈춘분(rec){
+            const 쌓 = Number(rec && rec.멈춘분);
+            const 밑 = Number.isFinite(쌓) && 쌓 > 0 ? 쌓 : 0;
+            const 지금 = (rec && rec.멈춤 && rec.멈춤시작ms) ? (Date.now() - rec.멈춤시작ms) / 60000 : 0;
+            return Math.round((밑 + 지금) * 10) / 10;
+        }
         // 완료에 적히는 실제 시간 — 취소했다 다시 한 몫까지 다 더한 값이다
         function _일한분(rec){
             if (!rec) return null;
@@ -7593,28 +7601,63 @@
                      o.partStarted[일.cardKey][일.procKey] = 값; }
             return true;
         }
-        /* 잠시 멈춤 — 시간은 계속 간다(사장님 말씀 그대로). 멈춘 것이 보이게만 한다. */
+        /* STOP — 시간은 계속 간다(09-23 말씀 그대로). 다만 멈춰 있던 분을 따로 센다
+           (09-28 지시 「잠시 멈춰진 시간또한 해당 부속카드의 시간에 분리하여 저장」).
+           멈출 때 시각을 적어 두고, 풀 때 그 사이를 `멈춘분` 에 더한다.
+           `쌓인분`(일한 시간 자리)에는 한 푼도 넣지 않는다. */
         window.tl일멈춤 = async function(){
             const 일 = window._집중일; if (!일) return;
             const r = 일.rec || {};
-            try { await _집중쓰기(Object.assign({}, r, { 멈춤: !r.멈춤 })); }
-            catch (e) { showToastMessage('잠시 멈춤을 적지 못했습니다: ' + (e.message || e)); }
+            const 켠다 = !r.멈춤;
+            const 새것 = Object.assign({}, r, { 멈춤: 켠다 });
+            if (켠다) {
+                새것.멈춤시작ms = Date.now();
+            } else {
+                const 잰것 = r.멈춤시작ms ? (Date.now() - r.멈춤시작ms) / 60000 : 0;
+                새것.멈춘분 = Math.round((((Number(r.멈춘분) > 0) ? Number(r.멈춘분) : 0) + 잰것) * 10) / 10;
+                새것.멈춤시작ms = null;
+            }
+            try { await _집중쓰기(새것); }
+            catch (e) { showToastMessage('STOP 못 적음'); }
         };
-        /* 취소 — 지금까지 흐른 분을 카드에 쌓아 두고 시작을 무른다 */
+        /* CANCLE — 취소한 분은 **일한 시간이 아니다**(09-28 지시).
+           카드의 `쌓인분` 에 한 푼도 더하지 않는다. 대신 「빈 시간」 장부
+           (새 칸 `idle_times`)에 한 줄 남긴다 — 작업자 흐름을 나중에 보시려는 것이다.
+           옛 기록에 이미 쌓여 있는 분은 건드리지 않는다(그대로 둔 채 이어 쓴다). */
+        window._빈시간적기 = async function(일, r, 분, 끝ms){
+            if (!(분 > 0)) return;
+            try {
+                const { collection, addDoc } = window.fbFirestore;
+                const o = 일.order || {};
+                await addDoc(collection(window.db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'idle_times'), {
+                    때: 끝ms, 날: new Date(끝ms).toISOString().slice(0, 10),
+                    발주번호: o.idNum ?? null, 발주docId: 일.docId || '', 발주코드: o.orderCode || '',
+                    상품명: o.displayName || '', 부속키: 일.cardKey || '', 부속명: r.partName || '',
+                    공정: 일.procKey || '', 분: 분,
+                    시작ms: r.startMs || null, 끝ms: 끝ms, 까닭: '취소',
+                    누가: (window.currentUser && (window.currentUser.email || window.currentUser.uid)) || ''
+                });
+            } catch (e) { showToastMessage('빈 시간 못 적음'); }
+        };
         window.tl일취소 = async function(){
             const 일 = window._집중일; if (!일) return;
             const r = 일.rec || {};
-            const 쌓을것 = Math.round((_쌓인분(r) + _흐른분(r)) * 10) / 10;
-            if (!confirm(`이 일을 취소합니다.\n지금까지 ${쌓을것.toFixed(1)}분은 이 카드에 쌓아 두고,\n다시 시작하면 그 시간에 이어서 셉니다.\n\n취소할까요?`)) return;
+            const 빈것 = _흐른분(r);
+            if (!confirm(`이 일을 취소합니다.\n지금까지 ${빈것.toFixed(1)}분은 빈 시간으로 남습니다.\n\n취소할까요?`)) return;
+            const 끝ms = Date.now();
             try {
                 await _집중쓰기({ started: false, startMs: null,
                                   date: r.date || new Date().toISOString().slice(0, 10),
-                                  partName: r.partName || '', 쌓인분: 쌓을것, 멈춤: false });
+                                  partName: r.partName || '',
+                                  쌓인분: _쌓인분(r),                       // 옛 값 그대로 — 더하지 않는다
+                                  멈춘분: (Number(r.멈춘분) > 0 ? Number(r.멈춘분) : 0),
+                                  멈춤: false, 멈춤시작ms: null });
+                await window._빈시간적기(일, r, 빈것, 끝ms);
                 window._집중판닫기();
-                showToastMessage(`취소했습니다. ${쌓을것.toFixed(1)}분을 쌓아 두었습니다.`);
+                showToastMessage(`취소 · 빈 시간 ${빈것.toFixed(1)}분`);
                 if (typeof renderProcessTimeline === 'function') renderProcessTimeline();
                 Object.keys(window._woBoringParts || {}).forEach(sk => { try { _woRenderBoard(sk); } catch (e) {} });
-            } catch (e) { showToastMessage('취소를 적지 못했습니다: ' + (e.message || e)); }
+            } catch (e) { showToastMessage('취소 못 적음'); }
         };
         /* 완료 — 쓰던 완료 팝업을 그대로 부른다(새로 만들지 않는다) */
         window.tl일완료 = function(){
@@ -7912,6 +7955,8 @@
                 // 취소했다 다시 한 몫(쌓인분)까지 더해 적는다 — 지시(09-23)의 「합산」 이다.
                 // 쌓인분이 없는 옛 기록은 0 으로 보므로 예전 값 그대로 나온다.
                 const actualMinutes = _일한분(_startRec);
+                // 멈춰 있던 분은 따로 적는다 — actualMinutes 의 뜻은 그대로 둔다(09-28 지시)
+                const pausedMinutes = _멈춘분(_startRec);
                 const docRef = doc(window.db, 'artifacts', appId, 'public', 'data', 'confirmed_orders', docId);
                 await updateDoc(docRef, {
                     [`partCompletions.${cardKey}.${procKey}`]: {
@@ -7919,6 +7964,7 @@
                         date: doneDate || new Date().toISOString().slice(0, 10),
                         partName: partName || '',
                         ...(actualMinutes != null ? { actualMinutes } : {}),
+                        ...(pausedMinutes > 0 ? { pausedMinutes } : {}),
                         ...(actualQty    != null ? { actualQty }    : {}),
                         ...(reason               ? { reason }       : {})
                     }
@@ -10317,6 +10363,8 @@
                 }
             }
             const _bActMin   = _bComps[_bpk]?.actualMinutes ?? null;
+            // 멈춘 분은 일한 분과 갈라 보인다 — 옛 기록에는 없으니 0
+            const _b멈춘     = Number(_bComps[_bpk]?.pausedMinutes) > 0 ? Number(_bComps[_bpk].pausedMinutes) : 0;
             const _bSafeDocId = _bdid.replace(/'/g, "\\'");
             const _bSafeCK    = _bck.replace(/'/g, "\\'");
             const _bDate     = sk.substring(0, 10);
@@ -10344,7 +10392,7 @@
             const _곁다참2 = p.isCuttingCard && (p.받은몫 > 0) && !(p.sheets > 0) && !_bDone;
             const _곁잘림2 = _곁다참2 && _곁가지도면완료(p);
             const _bDoneHtml  = (_bDone || _곁잘림2)
-                ? `<div style="${_b줄}display:flex;align-items:center;gap:8px;">${_bDoneQtyHtml}<span style="${_b칸}background:#e8f7ee;color:#16a34a;padding:8px 0;flex:0 0 45%;">✓ 완료${_bActMin != null ? ` <span style="font-size:11px;font-weight:700;opacity:.75;">${_bActMin.toFixed(1)}분</span>` : ''}</span></div>`
+                ? `<div style="${_b줄}display:flex;align-items:center;gap:8px;">${_bDoneQtyHtml}<span style="${_b칸}background:#e8f7ee;color:#16a34a;padding:8px 0;flex:0 0 45%;">✓ 완료${_bActMin != null ? ` <span style="font-size:11px;font-weight:700;opacity:.75;">${_bActMin.toFixed(1)}분</span>` : ''}${_b멈춘 > 0 ? `<span style="display:block;font-size:10.5px;font-weight:800;color:#c2793a;">멈춤 ${_b멈춘.toFixed(1)}분</span>` : ''}</span></div>`
                 : _곁다참2
                 // 배치카드도 같다 — 두 줄로 나눠 앉히고 글자만 줄인다(칸은 완료 칸과 같게)
                 ? `<div style="${_b줄}display:flex;align-items:center;gap:8px;"><span style="flex:1;"></span>` +
