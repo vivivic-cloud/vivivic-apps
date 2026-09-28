@@ -135,7 +135,7 @@ await p.screenshot({path:그림칸자리()+'/완료팝업_375.png'});
 const 오바 = await p.evaluate(()=>{
   const m=document.getElementById('_partDoneModal'); if(!m) return {없음:true};
   const 줄=[...m.querySelectorAll('div')].map(d=>(d.textContent||'').replace(/\s+/g,' ').trim());
-  const 박스=줄.find(t=>/발주수량/.test(t)) || 줄.find(t=>/아직 못 맞춰/.test(t)) || '';
+  const 박스=줄.find(t=>/발주수량/.test(t)) || 줄.find(t=>/수량 못 맞춤/.test(t)) || '';
   const q=document.getElementById('_pdQty');
   const 읽기=()=>({합:(document.getElementById('_pdSum')||{}).textContent,
                   이번:(document.getElementById('_pdNow')||{}).textContent,
@@ -184,20 +184,21 @@ const 모름 = await p.evaluate(()=>{
   const 옛=window._자료옴.도면; window._자료옴.도면=false;
   tlShowPartDoneConfirm('DOC1','ck','재단','2026-09-29',null,'가와',10,'ck',window.__고른도면);
   const m1=document.getElementById('_partDoneModal');
-  const a={못맞춤:/아직 못 맞춰 봤습니다/.test((m1&&m1.textContent)||''),
+  const a={못맞춤:/수량 못 맞춤/.test((m1&&m1.textContent)||''),
            오바글:/오바|남습니다|딱 맞습니다/.test((m1&&m1.textContent)||''),
-           글:((m1&&m1.textContent)||'').replace(/\s+/g,' ').match(/아직 못 맞춰 봤습니다[^완]*/)?.[0]||''};
+           글:((m1&&m1.textContent)||'').replace(/\s+/g,' ').match(/수량 못 맞춤[^완]*/)?.[0]||''};
   m1?.remove(); window._자료옴.도면=옛;
   // ② 도면 자체를 못 찾는 카드
   tlShowPartDoneConfirm('DOC1','ck','재단','2026-09-29',null,'가와',10,'ck','없는도면');
   const m2=document.getElementById('_partDoneModal');
-  const b={못맞춤:/아직 못 맞춰 봤습니다/.test((m2&&m2.textContent)||''),
+  const b={못맞춤:/수량 못 맞춤/.test((m2&&m2.textContent)||''),
            오바글:/오바|남습니다|딱 맞습니다/.test((m2&&m2.textContent)||'')};
   m2?.remove();
   return {도면안옴:a, 도면없음:b};
 });
 console.log('못 구할 때: '+JSON.stringify(모름));
-판('재단도면을 다 못 받았으면 「아직 못 맞춰 봤습니다」 라고 한다',
+// 09-28 지시로 긴 설명을 걷고 「수량 못 맞춤」 딱지만 남겼다 — 뜻은 그대로다.
+판('재단도면을 다 못 받았으면 「수량 못 맞춤」 이라고 한다',
    모름.도면안옴.못맞춤===true && 모름.도면안옴.오바글===false, JSON.stringify(모름.도면안옴));
 판('도면을 못 찾아도 0 으로 치지 않는다',
    모름.도면없음.못맞춤===true && 모름.도면없음.오바글===false, JSON.stringify(모름.도면없음));

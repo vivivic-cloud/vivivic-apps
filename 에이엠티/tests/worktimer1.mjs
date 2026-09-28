@@ -122,6 +122,12 @@ console.log('■ 기록(분): ' + JSON.stringify(기록));
    Math.abs(기록.일한분 - 4) < 0.2 && Math.round(기록.일한분 * 10) === 기록.일한분 * 10,
    기록.일한분 + '분');
 
+// 사장님 지시(09-28 세 번) — 구구절절한 설명을 화면에 두지 않는다
+const 창글 = await p.evaluate(() => (document.getElementById('_집중판').textContent || '').replace(/\s+/g, ' ').trim());
+console.log('■ 집중 창 글: 「' + 창글 + '」');
+판('집중 창에 구구절절한 설명이 없다 (문장이 아니라 딱지와 숫자뿐)',
+   !/(습니다|주세요|됩니다)/.test(창글), '「' + 창글 + '」');
+
 await p.screenshot({ path: 그림칸 + '/worktimer-375-시계.png' });
 
 // ④ 창을 닫으면 시계가 멈춘다 — 타이머가 새면 안 된다
