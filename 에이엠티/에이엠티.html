@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.11.4 (2026-09-28) — 일을 붙잡고 있어도 공정 캘린더를 볼 수 있게 집중 창을 접는다
+     버전: v1.11.5 (2026-09-28) — 완료된 부속카드는 편집으로 못 흔들게 세 군데를 잠근다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1205,6 +1205,15 @@
             padding: 5px 12px; line-height: 1.2; cursor: pointer; flex: none;
         }
         .wo-cut-편집:active { background: #e3e2e0; }
+        /* 완료된 카드 — 단추를 지우지 않고 죽인다(09-28 지시). 눌리지 않는 것이 보여야 한다. */
+        .wo-cut-편집-죽음 { color: #b0aeaa; background: #f7f6f3; border-color: #ededeb; cursor: default; }
+        .wo-cut-편집-죽음:active { background: #f7f6f3; }
+        .wo-cut-편집-죽음::after { content: none; }
+        .wo-cut-완료딱지 {
+            display: inline-flex; align-items: center; margin-right: 6px;
+            font-size: 10.5px; font-weight: 800; color: #787774;
+            background: #f1f1ef; border: 1px solid #e3e2e0; border-radius: 7px; padding: 3px 7px;
+        }
         .wo-cut-편집::after {
             content: ''; position: absolute; left: 50%; top: 50%;
             transform: translate(-50%, -50%);
@@ -2135,7 +2144,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.11.4</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.11.5</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2261,7 +2270,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.11.4</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.11.5</b></p>
         </div>
     </div>
 
@@ -9418,6 +9427,8 @@
         window.woEditCuttingPlan = function(cKey, sk) {
             const p = (window._woBoringParts[sk] || []).find(pp => pp.cKey === cKey);
             if (!p || !p.isCuttingCard) { showToastMessage('편집할 수 있는 카드가 아닙니다.'); return; }
+            // 완료된 카드는 여기서도 막는다 — 단추를 죽여도 이 길로 들어올 수 있다.
+            if (window._woCut완료됨(cKey, sk, p)) { showToastMessage('완료된 카드입니다.'); return; }
 
             const orderIds = (p.coveredOrderIds && p.coveredOrderIds.length) ? p.coveredOrderIds
                 : (p.orderIdNum != null ? [p.orderIdNum] : []);
@@ -9897,7 +9908,7 @@
                     // 미배정 부속은 아직 기계에 배치되기 전 단계라 도면까지 보여줄 필요가
                     // 없다는 요청으로 삭제 — 기계에 배치된 카드에는 그대로 도면이 보임.
                     // 도면이 없는 카드라 편집 단추는 배지 줄 아래 오른쪽에 둔다.
-                    `<div style="display:flex;justify-content:flex-end;margin-top:6px;">${_woCutEditBtnHtml(p.cKey, stateKey)}</div>` +
+                    `<div style="display:flex;justify-content:flex-end;margin-top:6px;">${_woCutEditBtnHtml(p.cKey, stateKey, p)}</div>` +
                     _wDoneHtml;
             } else {
                 const _codePool = p.orderCode
@@ -9936,9 +9947,41 @@
            누름·끌기·두 번 치기가 카드로 새지 않게 다 막는다. 집에 이미 있는
            「완료」·「▶ 시작」 단추가 하는 그대로다.
            (길게 눌러 옮기기는 _woMoveCardAt 이 button 안이면 스스로 비켜 준다) */
-        function _woCutEditBtnHtml(cKey, sk) {
+        /* 완료된 부속카드인가 — 잣대는 이미 있는 partCompletions 다(09-28 지시).
+           완료된 뒤에 도면을 고치면 그 카드에 쌓인 작업기록이 흔들린다.
+           한 공정이라도 완료로 찍혀 있으면 이 카드는 잠근다. 재단이 먼저이므로
+           엣지·보링·NC 가 끝났다면 재단은 이미 지난 일이다.
+           완료된 공정 이름을 돌려준다(없으면 빈 글자). */
+        window._woCut완료됨 = function(cKey, sk, p) {
+            try {
+                const part = p || ((window._woBoringParts || {})[sk] || []).find(pp => pp.cKey === cKey);
+                const did  = (part && part.orderKey) || '';
+                const ck   = window._woPartKey(cKey, did, part);
+                const olds = window._woPartOldKeys(cKey, did);
+                const 볼것 = [];
+                const 발주 = (typeof confirmedOrders !== 'undefined' ? confirmedOrders : []);
+                const byDoc = 발주.find(o => (o.docId || String(o.idNum)) === did);
+                if (byDoc) 볼것.push(byDoc);
+                const ids = (part && Array.isArray(part.coveredOrderIds) && part.coveredOrderIds.length)
+                    ? part.coveredOrderIds : (part && part.orderIdNum != null ? [part.orderIdNum] : []);
+                ids.forEach(id => { const o = 발주.find(x => x.idNum === id); if (o && 볼것.indexOf(o) < 0) 볼것.push(o); });
+                for (const o of 볼것) {
+                    const comps = window._partRecMap(o.partCompletions, ck, olds) || {};
+                    for (const k of Object.keys(comps)) if (comps[k] && comps[k].done) return k;
+                }
+            } catch (e) {}
+            return '';
+        };
+        function _woCutEditBtnHtml(cKey, sk, p) {
             const _c = String(cKey).replace(/'/g, "\\'");
             const _s = String(sk).replace(/'/g, "\\'");
+            // 완료된 카드는 단추를 지우지 않고 죽인다 — 눌리지 않는 것이 눈에 보여야 한다.
+            const _끝난공정 = window._woCut완료됨(cKey, sk, p);
+            if (_끝난공정) {
+                return `<span class="wo-cut-완료딱지">완료됨</span>` +
+                    `<button type="button" class="wo-cut-편집 wo-cut-편집-죽음" disabled aria-disabled="true"` +
+                    ` draggable="false" aria-label="완료된 카드 — 편집할 수 없습니다">편집</button>`;
+            }
             return `<button type="button" class="wo-cut-편집" draggable="false" aria-label="재단 도면 편집"` +
                 ` onclick="event.stopPropagation();woEditCuttingPlan('${_c}','${_s}')"` +
                 ` onmousedown="event.stopPropagation()"` +
@@ -10006,7 +10049,7 @@
                 const _diagCut = _woCuttingDiagramSvg(p);
                 // 「편집」 은 사장님이 짚으신 그대로 **재단도면 곁**에 둔다(09-23 지시).
                 // 도면이 없는 카드에도 편집할 길은 있어야 하므로, 그때는 글 칸 밑에 둔다.
-                const _편집Btn = _woCutEditBtnHtml(cKey, sk);
+                const _편집Btn = _woCutEditBtnHtml(cKey, sk, p);
                 const _diagBox = _diagCut
                     ? `<div style="width:45%;max-width:230px;flex:none;align-self:center;display:flex;flex-direction:column;align-items:center;gap:6px;">${_diagCut}${_편집Btn}</div>` : '';
 
@@ -13582,6 +13625,13 @@
         function toggleGroupCuttingCheck(groupIdsStr) { const ids = groupIdsStr.split(',').filter(Boolean).map(Number); const allChecked = ids.every(id => confirmedCuttingData.find(d => d.confirmId === id)?.checked); ids.forEach(id => { const data = confirmedCuttingData.find(d => d.confirmId === id); if (data) data.checked = !allChecked; }); renderConfirmedCuttingList(); }
 
         function confirmCutting() {
+            /* 완료된 카드는 저장으로도 못 흔든다 — 세 번째 빗장이다(09-28 지시).
+               앞의 둘(죽은 단추 · 여는 함수)을 건너뛰고 들어와도 여기서 멈춘다. */
+            const _편집중 = window._editingCuttingPlan;
+            if (_편집중 && window._woCut완료됨(_편집중.oldCKey, _편집중.oldSk)) {
+                showToastMessage('완료된 카드입니다.');
+                return;
+            }
             if (!primarySelectedCardId) return;
             const pAgg = document.getElementById(primarySelectedCardId),
                   sAgg = secondarySelectedCardId ? document.getElementById(secondarySelectedCardId) : null,
