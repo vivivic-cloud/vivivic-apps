@@ -101,12 +101,18 @@ const 톡 = async (sel) => {
 const 카드단추 = await p.evaluate(() => {
   const e = document.querySelector('#__무대 .wo-boring-placed-card .wo-불량');
   if (!e) return null; const r = e.getBoundingClientRect();
-  const a = e.getBoundingClientRect(), cs = getComputedStyle(e, '::after');
-  return { 글: e.textContent.trim(), 높이: Math.round(r.height), 닿는높이: parseFloat(cs.height) || 0 };
+  const cs = getComputedStyle(e, '::after');
+  const 카 = e.closest('.wo-boring-placed-card').getBoundingClientRect();
+  return { 글: e.textContent.trim(), 폭: Math.round(r.width), 높이: Math.round(r.height),
+           닿는높이: parseFloat(cs.height) || 0, 잘림: e.scrollWidth > e.clientWidth + 1,
+           카드높이: Math.round(카.height), 카드폭: Math.round(카.width) };
 });
-console.log('① 카드 불량 단추 : ' + JSON.stringify(카드단추));
-판('① 공정카드에 불량 단추가 있다', !!카드단추 && 카드단추.글 === '불량', JSON.stringify(카드단추));
+console.log('① 카드 불량보고 단추 : ' + JSON.stringify(카드단추));
+// 사장님이 글자를 못 박으셨다(09-28 05:39): 「버튼명 불량보고」
+판('① 공정카드 단추 이름이 「불량보고」 다', !!카드단추 && 카드단추.글 === '불량보고', JSON.stringify(카드단추));
 판('① 닿는 자리가 44px 이상', !!카드단추 && 카드단추.닿는높이 >= 44, (카드단추 ? 카드단추.닿는높이 : 0) + 'px');
+판('① 글자가 안 잘린다', !!카드단추 && 카드단추.잘림 === false, '잘림 ' + (카드단추 || {}).잘림);
+판('① 카드가 375px 안에 그대로 든다', !!카드단추 && 카드단추.카드폭 <= 375, (카드단추 || {}).카드폭 + 'px');
 await 톡('#__무대 .wo-boring-placed-card .wo-불량');
 판('① 카드의 불량 단추를 누르면 보고 창이 뜬다',
    (await p.evaluate(() => !!document.getElementById('_불량판'))) === true, '뜸');
@@ -141,7 +147,14 @@ const ㄴ = await p.evaluate(() => ({
   시계: document.getElementById('_집중시계글').textContent,
   붙든일: !!_집중찾기() }));
 console.log('③ 작업 중 보고 : ' + JSON.stringify(ㄴ));
-판('③ 집중 창에서 불량 단추를 누르면 보고 창이 그 위에 뜬다', ㄴ.보고창 === true && ㄴ.작업창 === true, JSON.stringify(ㄴ));
+판('③ 집중 창에서 불량보고 단추를 누르면 보고 창이 그 위에 뜬다', ㄴ.보고창 === true && ㄴ.작업창 === true, JSON.stringify(ㄴ));
+const 창단추 = await p.evaluate(() => { const e = document.getElementById('_집중불량');
+  const r = e.getBoundingClientRect();
+  return { 글: e.textContent.trim(), 폭: Math.round(r.width), 높이: Math.round(r.height),
+           잘림: e.scrollWidth > e.clientWidth + 1 }; });
+console.log('③ 집중 창 단추 : ' + JSON.stringify(창단추));
+판('③ 집중 창 단추 이름도 「불량보고」 다', 창단추.글 === '불량보고', JSON.stringify(창단추));
+판('③ 집중 창 단추도 44px 이상이고 안 잘린다', 창단추.높이 >= 44 && 창단추.잘림 === false, JSON.stringify(창단추));
 판('③ 작업 창이 다시 그려지지 않는다 (같은 노드 그대로)', ㄴ.같은창 === true && ㄴ.같은시계 === true, JSON.stringify(ㄴ));
 판('③ 시계가 끊기지 않는다', parseFloat(ㄴ.시계.split(':')[1] || '0') >= parseFloat(시계1.split(':')[1] || '0'),
    시계1 + ' → ' + ㄴ.시계);
