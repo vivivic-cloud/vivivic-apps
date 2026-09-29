@@ -1,6 +1,7 @@
 <!-- ==========================================
      보링변환.html
-     버전: v1.0.0 (2026-09-29) — .cix(CID3) 를 Biesse Skipper 100 이 읽는 .bpp 로 바꾼다
+     버전: v1.1.0 (2026-09-29) — 잘 도는 파일에서 꺼낸 [VARIABLES] 32줄을 쓰고,
+           식으로 적힌 값(374-32)과 쉼표 든 CRN("1,4")을 글자 그대로 옮긴다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -107,7 +108,7 @@ body{
   <div class="bhead">
     <span class="bday">보링변환</span>
     <span class="brole">CIX → BPP</span>
-    <span class="bsub" id="b-ver">v1.0.0</span>
+    <span class="bsub" id="b-ver">v1.1.0</span>
   </div>
 
   <button class="btile" id="b-pick" type="button">
@@ -257,6 +258,20 @@ function cix읽기(글){
   return { 판, 구멍, 버린것, 모르는것 };
 }
 
+/* ── 값 재기 ────────────────────────────────────────────────────────────
+   cix 에서 온 값은 `374-32` · `380+0.5` 처럼 식으로 적혀 오기도 한다. 기계는 그대로
+   읽으므로 **bpp 에 적을 때는 계산하지 않고 글자 그대로** 넣는다. 여기서 재는 것은
+   그림을 그리고 집게 밑인지 보려는 것뿐이다. 더하기·빼기만 본다 —
+   못 재는 꼴이면 null 을 내고, 화면이 「잴 수 없다」 고 빨갛게 말한다. */
+function 값재기(글){
+  const s = String(글 == null ? '' : 글).trim();
+  if (!/^[+-]?\d+(?:\.\d+)?(?:[+-]\d+(?:\.\d+)?)*$/.test(s)) return null;
+  const 조각 = s.match(/[+-]?\d+(?:\.\d+)?/g);
+  if (!조각) return null;
+  const v = 조각.reduce((a, b) => a + parseFloat(b), 0);
+  return Number.isFinite(v) ? v : null;
+}
+
 /* ── 집게 밑인가 ────────────────────────────────────────────────────────
    자리는 기계 설정에 따라 달라진다 — 화면에서 고친 값을 그대로 쓴다.
    구멍 가운뎃점이 띠 Y 안에 있고, 집게 둘 가운데 한 X 칸 안에 있으면 걸린다. */
@@ -273,8 +288,8 @@ function 집게읽기(){
 }
 function 집게밑인가(구멍, 집게){
   if (!집게.쓸만한가) return false;
-  const x = parseFloat(구멍.x), y = parseFloat(구멍.y);
-  if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+  const x = 값재기(구멍.x), y = 값재기(구멍.y);
+  if (x === null || y === null) return false;
   if (y < 집게.y[0] || y > 집게.y[1]) return false;
   return 집게.x.some(([a,b]) => x >= a && x <= b);
 }
@@ -282,8 +297,8 @@ function 집게밑인가(구멍, 집게){
 /* ── 도면 ───────────────────────────────────────────────────────────────
    Y 는 아래로 자란다 — 사장님이 보신 기계 화면과 같게, Y 0 이 판 위쪽이다. */
 function 도면그리기(판, 구멍들, 집게){
-  const W = parseFloat(판.LPX), H = parseFloat(판.LPY);
-  if (!Number.isFinite(W) || !Number.isFinite(H) || W <= 0 || H <= 0) return '';
+  const W = 값재기(판.LPX), H = 값재기(판.LPY);
+  if (W === null || H === null || W <= 0 || H <= 0) return '';
   const 여백 = 10, 폭 = 315;
   const 배 = Math.min(폭 / W, 380 / H);
   const w = W * 배, h = H * 배;
@@ -304,9 +319,9 @@ function 도면그리기(판, 구멍들, 집게){
   조각.push(`<rect x="${여백}" y="${여백}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="none" stroke="#111110" stroke-width="1.4"/>`);
   // 구멍
   for (const g of 구멍들) {
-    const x = parseFloat(g.x), y = parseFloat(g.y), d = parseFloat(g.dia);
-    if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-    const r = Math.max(2.6, (Number.isFinite(d) ? d : 5) / 2 * 배);
+    const x = 값재기(g.x), y = 값재기(g.y), d = 값재기(g.dia);
+    if (x === null || y === null) continue;          // 못 재는 것은 못 그린다
+    const r = Math.max(2.6, (d === null ? 5 : d) / 2 * 배);
     const 걸림 = g.걸림;
     조각.push(`<circle cx="${X(x).toFixed(1)}" cy="${Y(y).toFixed(1)}" r="${r.toFixed(1)}" fill="${걸림 ? '#FF3B30' : '#111110'}" stroke="${걸림 ? '#FF3B30' : 'none'}" stroke-width="${걸림 ? 3 : 0}" stroke-opacity=".3"/>`);
   }
@@ -317,10 +332,11 @@ function 도면그리기(판, 구멍들, 집게){
 /* ── bpp 짓기 ───────────────────────────────────────────────────────────
    자리로 뜻이 정해진다. `:` 뒤 BG 자리: 0, CRN, X, Y, Z, DP, DIA, …
    DP(깊이)가 DIA(지름)보다 앞이다. 줄 맨 앞 @ 는 켜짐, 줄 끝은 CRLF. */
-function BG줄(번호, g){
+const 이름짓기 = i => 'P' + (1001 + i);
+function BG줄(번호, g, 이름){
   return `@ BG, "", "", ${번호}, "", 0 : 0, "${g.crn}", ${g.x}, ${g.y}, 0, ${g.dp}, ${g.dia}, `
        + `0, 1, 0, 288, 0, 0, 0, 2, "", 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, -1, `
-       + `"${g.id}", 0, "", "", 0, 0, 0, 0, 0, "", 0, 0, 0, 0, 0, "", "", "BG", 0, 0, 0, 0, -1, 0, 0, 0`;
+       + `"${이름}", 0, "", "", 0, 0, 0, 0, 0, "", 0, 0, 0, 0, 0, "", "", "BG", 0, 0, 0, 0, -1, 0, 0, 0`;
 }
 const WAIT줄 = 번호 => `@ WAIT, "", "", ${번호}, "", 0 : 1, 1, 0, 2, 1, 0`;
 
@@ -328,14 +344,15 @@ function bpp짓기(판, 차례, 변수, WAIT어디){
   const 변수몸 = 변수.map(줄 => {
     const m = /^PAN=(LPX|LPY|LPZ)\|([^|]*)\|/.exec(줄);
     if (!m) return 줄;                                   // 본보기 그대로
-    return 줄.replace(/^PAN=(LPX|LPY|LPZ)\|[^|]*\|/, `PAN=$1|${판[m[1]]}|`);
+    // 값에 $ 가 들어와도 새지 않게 글월 대신 함수로 받는다 ($& 따위가 살아난다)
+    return 줄.replace(/^PAN=(LPX|LPY|LPZ)\|[^|]*\|/, (_, k) => `PAN=${k}|${판[k]}|`);
   });
 
   const 프로그램 = [];
   let 번호 = 0;
   차례.forEach((g, i) => {
     if (WAIT어디 === i) 프로그램.push(WAIT줄(++번호));
-    프로그램.push(BG줄(++번호, g));
+    프로그램.push(BG줄(++번호, g, 이름짓기(i)));
   });
   if (WAIT어디 === 차례.length) 프로그램.push(WAIT줄(++번호));
 
@@ -421,6 +438,8 @@ function 다시그리기(){
   const 집게 = 집게읽기();
   읽은것.구멍.forEach(g => { g.걸림 = 집게밑인가(g, 집게); });
   const 걸린수 = 읽은것.구멍.filter(g => g.걸림).length;
+  // X·Y 를 못 재는 구멍 — 값은 그대로 옮기지만 집게 밑인지는 못 본다
+  const 못잰수 = 읽은것.구멍.filter(g => 값재기(g.x) === null || 값재기(g.y) === null).length;
 
   const 판 = 읽은것.판;
   const 알약 = [
@@ -437,6 +456,9 @@ function 다시그리기(){
   if (모르는것.length) {
     $('b-warn').innerHTML = 막기(모르는것.join(' · ')) + ' — 모르는 매크로다. 이대로 바꾸면 구멍이 빠진다';
     보임($('b-warn'), true);
+  } else if (못잰수) {
+    $('b-warn').textContent = `X·Y 를 못 재는 구멍 ${못잰수}개 — 집게 밑인지 못 본다`;
+    보임($('b-warn'), true);
   } else if (걸린수) {
     $('b-warn').textContent = `집게 밑 — 이대로면 못 뚫는다 (${걸린수}개)`;
     보임($('b-warn'), true);
@@ -446,7 +468,8 @@ function 다시그리기(){
 
   const 막힌다 = 모르는것.length > 0 || 읽은것.구멍.length === 0;
   $('b-go').disabled = 막힌다;
-  $('b-wait').disabled = 막힌다 || 걸린수 === 0;
+  // 못 재는 것이 섞이면 뒤로 미룰지를 가를 수 없다 — WAIT 는 막는다
+  $('b-wait').disabled = 막힌다 || 못잰수 > 0 || 걸린수 === 0;
 }
 
 function 내려받기(이름, 글){

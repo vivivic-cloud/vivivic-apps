@@ -16,6 +16,18 @@ const B = 'http://127.0.0.1:8899';
 const 주소 = B + '/' + encodeURIComponent('보링변환') + '/' + encodeURIComponent('보링변환.html');
 const cix길 = path.join(뿌리, '보링변환/본보기/592x382_1001_01.cix');
 
+/* 겹따옴표 안의 쉼표는 자르지 않는다 — CRN="1,4" 가 실제로 온다 */
+const 꼬리쪼개기 = 글 => {
+  const 것 = []; let 이번 = '', 안 = false;
+  for (const c of String(글)) {
+    if (c === '"') { 안 = !안; 이번 += c; continue; }
+    if (c === ',' && !안) { 것.push(이번.trim()); 이번 = ''; continue; }
+    이번 += c;
+  }
+  것.push(이번.trim());
+  return 것;
+};
+
 const 바라던것 = [
   [19,70,5,12],[19,102,8,14],[19,279,8,14],[19,311,5,12],
   [98,10,5,12],[282,69,5,12],[282,325,5,12],[314,69,5,12],
@@ -95,15 +107,23 @@ if (나온것) {
        본것.length > 0 && 본것.every(줄 => 글.includes(줄)), 본것.length + '줄 그대로');
   재기('LPX·LPY·LPZ 만 갈아 끼웠나',
        글.includes('PAN=LPX|592||4|') && 글.includes('PAN=LPY|382||4|') && 글.includes('PAN=LPZ|18||4|'));
+  재기('나머지 29줄은 한 글자도 안 건드렸나', 본것.length === 29 && 본것.every(줄 => 글.includes(줄)),
+       본것.length + '줄');
+  재기('$ 가 든 CUSTSTR 줄이 그대로 나갔나',
+       글.includes('PAN=CUSTSTR|$B$KBsSkipperProcessor1.PreProc$V"2,2,100,100,,0,0,0"||3|'));
 
   const BG들 = 글.split('\r\n').filter(s => s.startsWith('@ BG,'));
   재기('BG 줄이 16개', BG들.length === 16, BG들.length + '개');
   재기('WAIT 줄은 없다', !글.includes('@ WAIT,'));
+  재기('이름 자리가 P1001 부터 순번인가',
+       BG들.every((줄, i) => 줄.includes(`-1, "P${1001 + i}", 0, "", "", 0,`)),
+       BG들.length ? /-1, "(P\d+)"/.exec(BG들[0])[1] + '…' + /-1, "(P\d+)"/.exec(BG들[15])[1] : '');
+
 
   // 구멍 값이 한 자도 안 달라졌나 — 자리로 읽어 cix 값과 맞춘다
   let 어긋남 = [];
   BG들.forEach((줄, i) => {
-    const 꼬리 = 줄.slice(줄.indexOf(' : ') + 3).split(',').map(s => s.trim());
+    const 꼬리 = 꼬리쪼개기(줄.slice(줄.indexOf(' : ') + 3));
     const [x, y, dia, dp] = 바라던것[i];
     const 봐야할것 = [['SIDE',꼬리[0],'0'], ['CRN',꼬리[1],'"1"'], ['X',꼬리[2],String(x)],
                      ['Y',꼬리[3],String(y)], ['Z',꼬리[4],'0'], ['DP',꼬리[5],String(dp)],
@@ -127,13 +147,13 @@ if (웨잇) {
   const 줄들 = 웨잇.글.split('\r\n').filter(s => /^@ (BG|WAIT),/.test(s));
   const w = 줄들.findIndex(s => s.startsWith('@ WAIT,'));
   const 앞 = 줄들.slice(0, w), 뒤 = 줄들.slice(w + 1);
-  const xy = s => { const t = s.slice(s.indexOf(' : ') + 3).split(',').map(v => v.trim()); return t[2] + ',' + t[3]; };
+  const xy = s => { const t = 꼬리쪼개기(s.slice(s.indexOf(' : ') + 3)); return t[2] + '|' + t[3]; };
   재기('WAIT 줄이 하나 들어갔나', 줄들.filter(s => s.startsWith('@ WAIT,')).length === 1);
   재기('WAIT 줄 꼴이 본보기 그대로',
        /^@ WAIT, "", "", \d+, "", 0 : 1, 1, 0, 2, 1, 0$/.test(줄들[w]), 줄들[w]);
   재기('구멍 16개가 그대로 다 있나', 줄들.length === 17, 줄들.length + '줄');
   재기('집게 밑 둘만 WAIT 뒤로 미뤘나',
-       뒤.length === 2 && 뒤.map(xy).sort().join(' ') === '504,10 98,10',
+       뒤.length === 2 && 뒤.map(xy).sort().join(' ') === '504|10 98|10',
        '앞 ' + 앞.length + ' · 뒤 ' + 뒤.map(xy).join(' '));
   재기('번호가 WAIT 까지 이어 1부터 차례로',
        줄들.every((s, i) => new RegExp(`^@ (BG|WAIT), "", "", ${i+1}, "", 0 : `).test(s)));
@@ -171,6 +191,99 @@ await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }
 재기('짚은 것이 「바꾸기」 인가', /바꾸기/.test(짚은것), 짚은것.trim());
 const 이름 = await p.evaluate(() => document.title);
 재기('손잡이가 부를 이름이 「보링변환」', 이름 === '보링변환', 이름);
+// 지시창을 닫아 둔다 — 열린 채로 두면 inset:0 뒤판이 다음 누름을 다 먹는다
+if (열렸나) { await p.waitForTimeout(500); await p.tap('.vg-sheet .vg-cancel'); await p.waitForTimeout(300); }
+재기('「그만」 을 누르면 지시창이 닫히나', await p.$('.vg-sheet') === null);
+
+
+/* ── 7. 식으로 적힌 값 · 쉼표 든 CRN ──────────────────────────────────
+   관리자가 짚어 준 것: `374-32` · `380+0.5` 처럼 식이 와도 기계가 읽으니 계산하지
+   말고 그대로 넣는다. CRN="1,4" 는 모서리 1 과 4 에서 두 번 뚫으라는 뜻이라 그대로
+   옮긴다. 본보기 자리는 사장님 실제 부속만 두므로 이 판은 시험이 지어서 먹인다. */
+const cix짓기 = (판, 구멍들) => {
+  const T = '\t', L = ['BEGIN ID CID3', T + 'REL= 5.0', 'END ID', 'BEGIN MAINDATA'];
+  for (const [k, v] of Object.entries(판)) L.push(T + k + '=' + v);
+  L.push('END MAINDATA');
+  구멍들.forEach((g, i) => {
+    L.push('BEGIN MACRO', T + 'NAME=BG', T + `PARAM,NAME=ID,VALUE="${i+1}"`,
+           T + 'PARAM,NAME=SIDE,VALUE=0', T + `PARAM,NAME=CRN,VALUE="${g.crn}"`,
+           T + `PARAM,NAME=X,VALUE=${g.x}`, T + `PARAM,NAME=Y,VALUE=${g.y}`,
+           T + `PARAM,NAME=DIA,VALUE=${g.dia}`, T + `PARAM,NAME=DP,VALUE=${g.dp}`, 'END MACRO');
+  });
+  return Buffer.from(L.join('\r\n') + '\r\n', 'utf-8');
+};
+async function 먹이기(이름, 속){
+  await p.setInputFiles('#b-file', { name: 이름, mimeType: 'text/plain', buffer: 속 });
+  await p.waitForTimeout(350);
+}
+
+await 먹이기('식.cix', cix짓기(
+  { LPX:'700+48', LPY:'380+0.5', LPZ:'18+0.1' },
+  [ { crn:'1,4', x:'374-32', y:'50',    dia:'15', dp:'14' },   // 집게 밖
+    { crn:'1',   x:'400+50', y:'30-25', dia:'5',  dp:'10' },   // 재면 450,5 — 집게2 밑
+    { crn:'1',   x:'34',     y:'50',    dia:'15', dp:'14' } ]));
+
+const 식본것 = await p.evaluate(() => ({
+  빨강: [...document.querySelectorAll('#b-draw circle')].filter(c => c.getAttribute('fill') === '#FF3B30').length,
+  동그라미: document.querySelectorAll('#b-draw circle').length,
+  빨간글: document.getElementById('b-warn').classList.contains('bhide') ? '' : document.getElementById('b-warn').textContent,
+  알약: document.getElementById('b-pills').textContent,
+}));
+재기('식으로 적힌 판 크기를 재서 그렸나', 식본것.동그라미 === 3, '동그라미 ' + 식본것.동그라미);
+재기('식(400+50 · 30-25)을 재서 집게 밑을 찾아내나', 식본것.빨강 === 1 && /집게 밑/.test(식본것.빨간글),
+     '빨강 ' + 식본것.빨강 + ' · ' + 식본것.빨간글);
+
+let 식나온것 = null; 탓 = '';
+try { 식나온것 = await 눌러받기('#b-go'); } catch (e) { 탓 = String(e.message || e).split('\n')[0]; }
+// 이름이 `download` 로 나오는 것은 시험이 지은 파일 이름(식.cix)이 한글이라 그렇다.
+// 진짜 CAD 파일 이름은 영문·숫자라 위 첫 시험처럼 그대로 붙는다.
+재기('식이 든 판도 .bpp 가 내려왔나', !!식나온것, 식나온것 ? 식나온것.이름 : 탓);
+if (식나온것) {
+  const 글 = 식나온것.글;
+  재기('판 크기 식을 계산하지 않고 그대로 넣었나',
+       글.includes('PAN=LPX|700+48||4|') && 글.includes('PAN=LPY|380+0.5||4|') && 글.includes('PAN=LPZ|18+0.1||4|'));
+  const BG = 글.split('\r\n').filter(s => s.startsWith('@ BG,'));
+  const 꼬리 = BG.map(s => 꼬리쪼개기(s.slice(s.indexOf(' : ') + 3)));
+  재기('구멍 X·Y 식도 계산하지 않고 그대로',
+       꼬리[0][2] === '374-32' && 꼬리[1][2] === '400+50' && 꼬리[1][3] === '30-25',
+       꼬리.map(t => t[2] + '|' + t[3]).join(' '));
+  재기('쉼표 든 CRN("1,4")을 그대로 옮겼나', 꼬리[0][1] === '"1,4"', 꼬리[0][1]);
+  재기('쉼표가 들어와도 자리가 안 밀렸나 (DP 14 · DIA 15)',
+       꼬리[0][5] === '14' && 꼬리[0][6] === '15', 꼬리[0].slice(0,7).join(' / '));
+}
+
+/* ── 8. 못 재는 값이면 말하고 WAIT 를 막는다 ────────────────────────── */
+await 먹이기('못재.cix', cix짓기(
+  { LPX:'592', LPY:'382', LPZ:'18' },
+  [ { crn:'1', x:'98',    y:'10', dia:'5', dp:'12' },          // 집게 밑
+    { crn:'1', x:'100*2', y:'10', dia:'5', dp:'12' } ]));      // 곱하기는 못 잰다
+const 못잰것 = await p.evaluate(() => ({
+  빨간글: document.getElementById('b-warn').classList.contains('bhide') ? '' : document.getElementById('b-warn').textContent,
+  WAIT: document.getElementById('b-wait').disabled ? '막힘' : '열림',
+  바꾸기: document.getElementById('b-go').disabled ? '막힘' : '열림',
+  동그라미: document.querySelectorAll('#b-draw circle').length,
+}));
+재기('못 재는 값이 있으면 빨갛게 말하나', /못 재는 구멍 1개/.test(못잰것.빨간글), 못잰것.빨간글);
+재기('못 재는 값이 있으면 WAIT 를 막나', 못잰것.WAIT === '막힘', 못잰것.WAIT);
+재기('그래도 바꾸기는 열어 둔다 (값은 그대로 옮긴다)', 못잰것.바꾸기 === '열림', 못잰것.바꾸기);
+재기('못 재는 구멍은 그리지 않는다', 못잰것.동그라미 === 1, '동그라미 ' + 못잰것.동그라미);
+let 못잰내림 = null; 탓 = '';
+try { 못잰내림 = await 눌러받기('#b-go'); } catch (e) { 탓 = String(e.message || e).split('\n')[0]; }
+재기('못 재는 값도 글자 그대로 나가나',
+     !!못잰내림 && 못잰내림.글.includes(', 100*2, 10, 0, 12, 5, '), 못잰내림 ? '나갔다' : 탓);
+
+/* ── 9. 모르는 매크로(BH 따위)면 바꾸기를 막는다 ───────────────────── */
+await 먹이기('모름.cix', Buffer.from(
+  ['BEGIN ID CID3','\tREL= 5.0','END ID','BEGIN MAINDATA','\tLPX=592','\tLPY=382','\tLPZ=18','END MAINDATA',
+   'BEGIN MACRO','\tNAME=BG','\tPARAM,NAME=CRN,VALUE="1"','\tPARAM,NAME=X,VALUE=19','\tPARAM,NAME=Y,VALUE=70',
+   '\tPARAM,NAME=DIA,VALUE=5','\tPARAM,NAME=DP,VALUE=12','\tPARAM,NAME=SIDE,VALUE=0','END MACRO',
+   'BEGIN MACRO','\tNAME=BH','\tPARAM,NAME=SIDE,VALUE=1','\tPARAM,NAME=X,VALUE=50','END MACRO'].join('\r\n') + '\r\n', 'utf-8'));
+const 모름 = await p.evaluate(() => ({
+  빨간글: document.getElementById('b-warn').classList.contains('bhide') ? '' : document.getElementById('b-warn').textContent,
+  바꾸기: document.getElementById('b-go').disabled ? '막힘' : '열림',
+}));
+재기('모르는 매크로(BH)를 만나면 바꾸기를 막나', 모름.바꾸기 === '막힘', 모름.바꾸기);
+재기('무엇이 모르는 것인지 적나', /BH/.test(모름.빨간글) && /구멍이 빠진다/.test(모름.빨간글), 모름.빨간글);
 
 await b.close();
 fs.rmSync(내린칸, { recursive: true, force: true });
