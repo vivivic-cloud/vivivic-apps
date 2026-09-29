@@ -8,8 +8,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { 브라우저열기, devices, 서버, 뿌리 } from '../../에이엠티/tests/도구/터.mjs';
 
+/* 잰 값은 재는 자리에서 바로 적는다 — 뒤에서 무언가 터져도 여기까지 잰 것은 남는다
+   (모아 두었다가 끝에 적으면, 앞이 빨개서 뒤가 터졌을 때 아무것도 안 보인다). */
 const 잰것 = [];
-const 재기 = (이름, 됐나, 곁 = '') => { 잰것.push({ 이름, 됐나, 곁 }); };
+const 재기 = (이름, 됐나, 곁 = '') => {
+    잰것.push({ 이름, 됐나, 곁 });
+    console.log((됐나 ? '  ✓ ' : '  ✗ ') + 이름 + (곁 ? '   [' + 곁 + ']' : ''));
+};
 
 await 서버();
 const B = 'http://127.0.0.1:8899';
@@ -85,6 +90,136 @@ await p.tap('#borb-sheet', { position: { x: 187, y: 6 } });
 await p.waitForTimeout(300);
 재기('바깥을 누르면 만드는 판이 닫히나',
      await p.evaluate(() => document.documentElement.getAttribute('data-borb') === null));
+
+
+/* ── 0-2. 박스를 누르면 그 안으로 들어간다 ──────────────────────────────
+   사장님이 짚으셨다: 「새박스를 만들고 눌렀을때 앞으로 기능을 추가할 빈 페이지가
+   나와야 하는데 … 팝업이 나옵니다」. 작업대가 하는 대로 안으로 들어가야 한다.
+
+   창고(파이어스토어)는 이 상자에서 못 닿는다. 그래서 같은 꼴의 가짜 칸을 끼워
+   넣고 화면이 하는 일만 잰다 — 앱 파일은 한 글자도 안 건드린다. */
+await p.evaluate(() => {
+  const 칸 = new Map(); let 귀 = null;
+  const 스냅 = () => ({ forEach: f => 칸.forEach((v, k) => f({ id: k, data: () => v })) });
+  const 알린다 = () => { if (귀) 귀(스냅()); };
+  window.__칸 = 칸;
+  window.db = {};
+  window.fbFirestore = {
+    collection: () => ({}),
+    doc: (...a) => ({ id: a[a.length - 1] }),
+    onSnapshot: (q, cb) => { 귀 = cb; cb(스냅()); },
+    setDoc:    async (r, v) => { 칸.set(r.id, v); 알린다(); },
+    updateDoc: async (r, v) => { 칸.set(r.id, Object.assign({}, 칸.get(r.id), v)); 알린다(); },
+    deleteDoc: async (r)    => { 칸.delete(r.id); 알린다(); },
+  };
+  window.borBoxSync();
+});
+
+async function 박스만들기(이름){
+  await p.tap('.borh-newbox');
+  await p.waitForTimeout(250);
+  await p.fill('#borb-nm', 이름);
+  await p.tap('#borb-save');
+  await p.waitForTimeout(300);
+}
+const 타일글 = () => p.evaluate(() =>
+  [...document.querySelectorAll('#borh-mine [data-borb-id]')].map(t =>
+    (t.querySelector('.borh-nm')||{}).textContent + '|' + (t.querySelector('.borh-pct')||{}).textContent));
+
+await 박스만들기('시험박스');
+재기('박스를 만들면 타일이 생기나', (await 타일글()).length === 1, (await 타일글()).join(' '));
+재기('빈 박스 아래에 「비었다」 라 적히나', (await 타일글())[0] === '시험박스|비었다', (await 타일글())[0]);
+
+// ★ 짚으신 자리 — 눌렀을 때 팝업이 아니라 빈 판이 나와야 한다
+await p.tap('#borh-mine [data-borb-id]');
+await p.waitForTimeout(350);
+const 안 = await p.evaluate(() => ({
+  고치기판: document.documentElement.getAttribute('data-borb'),
+  들어왔나: document.documentElement.getAttribute('data-borin'),
+  지나온자리: (document.getElementById('borh-path') || {}).textContent || '',
+  셈: (document.getElementById('borh-cnt') || {}).textContent || '',
+  안에든것: document.querySelectorAll('#borh-mine [data-borb-id]').length,
+  새박스: !!document.querySelector('.borh-newbox'),
+  일하는박스: getComputedStyle(document.getElementById('borh-work')).display,
+  뒤로: !!document.getElementById('borh-up') &&
+        Math.round(document.getElementById('borh-up').getBoundingClientRect().height),
+}));
+재기('박스를 누르면 고치기 판이 안 나오나', 안.고치기판 === null, '고치기판 ' + 안.고치기판);
+재기('박스를 누르면 그 안으로 들어가나', 안.들어왔나 === '1' && 안.안에든것 === 0,
+     '안에 든 것 ' + 안.안에든것);
+재기('안이 비었으면 빈 판 + 「새 박스」 만', 안.새박스 && 안.안에든것 === 0);
+재기('지나온 자리를 적나', 안.지나온자리.trim() === '시험박스', 안.지나온자리.trim());
+재기('안에서는 일하는 박스를 안 보인다', 안.일하는박스 === 'none', 안.일하는박스);
+재기('뒤로 가는 단추가 44px 인가', 안.뒤로 >= 44, 안.뒤로 + 'px');
+
+// 안에서 또 만든다 — parent 가 지금 들어와 있는 박스여야 한다
+await 박스만들기('속박스');
+const 속 = await 타일글();
+재기('안에서 만든 박스가 그 안에 들어가나', 속.length === 1 && 속[0].startsWith('속박스'), 속.join(' '));
+// 속박스 안으로 한 칸 더 들어가 본다 — 지나온 자리가 두 칸이 되어야 한다
+await p.tap('#borh-mine [data-borb-id]');
+await p.waitForTimeout(350);
+const 두칸 = await p.evaluate(() => ({
+  자리: document.getElementById('borh-path').textContent.replace(/\s+/g, ' ').trim(),
+  안에든것: document.querySelectorAll('#borh-mine [data-borb-id]').length,
+  새박스: !!document.querySelector('.borh-newbox'),
+}));
+재기('한 칸 더 들어가면 지나온 자리가 두 칸이 되나', 두칸.자리 === '시험박스 › 속박스', 두칸.자리);
+재기('두 칸째도 빈 판 + 「새 박스」', 두칸.안에든것 === 0 && 두칸.새박스);
+
+// 뒤로 한 칸 — 시험박스 안으로 돌아온다
+await p.tap('#borh-up');
+await p.waitForTimeout(300);
+재기('뒤로 누르면 한 칸만 나오나',
+     await p.evaluate(() => document.getElementById('borh-path').textContent.trim() === '시험박스' &&
+                            document.documentElement.getAttribute('data-borin') === '1'));
+
+// 뒤로 한 칸 더 — 맨 위 판
+await p.tap('#borh-up');
+await p.waitForTimeout(300);
+const 나옴 = await p.evaluate(() => ({
+  들어왔나: document.documentElement.getAttribute('data-borin'),
+  타일: [...document.querySelectorAll('#borh-mine [data-borb-id] .borh-pct')].map(e => e.textContent),
+  일하는박스: getComputedStyle(document.getElementById('borh-work')).display,
+}));
+재기('뒤로 누르면 맨 위 판으로 나오나', 나옴.들어왔나 === null && 나옴.일하는박스 !== 'none');
+재기('속에 든 수가 타일에 적히나', 나옴.타일.join('') === '1개', 나옴.타일.join(' '));
+
+// 0.4초 길게 누르면 고치기 판 — 이것이 고치는 유일한 길이다(「새 박스」 단추 말고)
+const 타일칸 = await (await p.$('#borh-mine [data-borb-id]')).boundingBox();
+const cdp0 = await ctx.newCDPSession(p);
+await cdp0.send('Input.dispatchTouchEvent', { type: 'touchStart',
+  touchPoints: [{ x: 타일칸.x + 타일칸.width / 2, y: 타일칸.y + 타일칸.height / 2 }] });
+await p.waitForTimeout(650);
+const 길게 = await p.evaluate(() => ({
+  열렸나: document.documentElement.getAttribute('data-borb'),
+  머리: (document.querySelector('#borb-card h4') || {}).textContent || '',
+  이름칸: (document.getElementById('borb-nm') || {}).value || '',
+}));
+await cdp0.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+재기('0.4초 길게 누르면 고치기 판이 열리나', 길게.열렸나 === '1' && 길게.머리 === '박스설정', 길게.머리);
+재기('고치기 판에 그 박스 이름이 들어와 있나', 길게.이름칸 === '시험박스', 길게.이름칸);
+// 속에 든 박스가 있으면 못 지운다 — 조용히 사라지면 안 된다
+const 막음 = await p.evaluate(async () => {
+  let 말 = ''; const 옛 = window.alert; window.alert = m => { 말 = String(m); };
+  document.getElementById('borb-del').click();
+  await new Promise(r => setTimeout(r, 200));
+  window.alert = 옛;
+  return { 말, 아직있나: window.__칸.size };
+});
+재기('속에 박스가 든 것은 못 지우게 막나', /먼저 치워/.test(막음.말) && 막음.아직있나 === 2, 막음.말);
+await p.tap('#borb-sheet', { position: { x: 187, y: 6 } });
+await p.waitForTimeout(300);
+
+// 시험이 만든 박스는 치우고 간다 — 뒤 시험이 깨끗한 자리에서 돌게
+await p.evaluate(async () => {
+  const { deleteDoc, doc } = window.fbFirestore;
+  for (const id of [...window.__칸.keys()]) await deleteDoc(doc(null, id));
+});
+await p.waitForTimeout(250);
+재기('시험이 만든 박스를 다 치웠나',
+     await p.evaluate(() => window.__칸.size === 0 &&
+                            document.querySelectorAll('#borh-mine [data-borb-id]').length === 0));
 
 // 일하는 박스를 눌러 바꾸기 화면으로 — 여기서부터는 앞과 똑같다
 await p.tap('#bor-home .borh-tile');
@@ -406,6 +541,5 @@ fs.rmSync(내린칸, { recursive: true, force: true });
 
 /* ── 적기 ──────────────────────────────────────────────────────────── */
 const 실패 = 잰것.filter(t => !t.됐나);
-for (const t of 잰것) console.log((t.됐나 ? '  ✓ ' : '  ✗ ') + t.이름 + (t.곁 ? '   [' + t.곁 + ']' : ''));
 console.log(`\n${잰것.length - 실패.length}/${잰것.length} 통과`);
 process.exit(실패.length ? 1 : 0);

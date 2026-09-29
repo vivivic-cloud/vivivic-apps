@@ -1,7 +1,7 @@
 <!-- ==========================================
      보링변환.html
-     버전: v1.3.0 (2026-09-29) — 이 집의 박스 꼴로. 박스 판·「새 박스」 를
-           에이엠티(→ 작업대)에서 그대로 옮겼다. 바꾸기는 한 줄도 안 건드렸다
+     버전: v1.3.1 (2026-09-29) — 박스를 누르면 그 '안으로' 들어간다(작업대 그대로).
+           안이 비면 빈 판 + 「새 박스」. 고치기 판은 길게 눌러야 나온다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -180,6 +180,27 @@ html[data-borhome="1"] #bor-app{ display:none; }
 .borh-sec span{ font-size:12px; color:var(--vg-muted); }
 .borh-foot{ margin:20px 0 0; text-align:center; font-size:11px; color:var(--vg-muted); }
 
+.borh-crumb{
+  display:none; align-items:center; gap:10px; margin:22px 0 10px;
+}
+html[data-borin="1"] .borh-crumb{ display:flex; }
+/* 박스 안에서는 맨 위 판의 것을 안 보인다 — 일하는 박스도, 아래 한 줄도 그 판의 것이다 */
+html[data-borin="1"] #borh-sec,
+html[data-borin="1"] #borh-work,
+html[data-borin="1"] .borh-foot{ display:none; }
+.borh-crumb #borh-up{
+  flex:none; width:44px; height:44px; border-radius:50%; border:1px solid var(--vg-edge);
+  background:#fff; color:var(--vg-ink); font:inherit; font-size:17px; font-weight:700;
+  cursor:pointer; display:grid; place-items:center;
+}
+.borh-crumb #borh-up:active{ background:var(--vg-fill); }
+.borh-path{
+  flex:1; min-width:0; font-size:17px; font-weight:700; letter-spacing:-.4px; color:var(--vg-ink);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.borh-path i{ font-style:normal; color:var(--vg-muted); font-weight:400; }
+.borh-cnt{ flex:none; font-size:12px; color:var(--vg-muted); }
+
 .borh-newbox{
   border:1px dashed var(--vg-edge); background:#fff; display:grid; place-items:center;
   min-height:104px; border-radius:20px; cursor:pointer; color:var(--vg-soft); gap:6px;
@@ -283,7 +304,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
       <span class="borh-sub">CIX → BPP</span>
     </div>
 
-    <div class="borh-tiles">
+    <div class="borh-tiles" id="borh-work">
       <button type="button" class="borh-tile borh-dark" onclick="borOpen()">
         <!-- 아이콘은 집이 같이 쓰는 한 벌(lucide)에서 꺼낸다 — 손으로 그리지 않는다 -->
         <span class="borh-ico" id="borh-work-ico"></span>
@@ -296,10 +317,18 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
 
     <!-- 사장님이 만드신 박스. 일하는 박스(위)와 자리부터 갈라 둔다 —
          여기 것만 고치고 지울 수 있다. -->
-    <div class="borh-sec"><b>내 박스</b><span id="borh-mine-n">0개</span></div>
+    <div class="borh-sec" id="borh-sec"><b>내 박스</b><span id="borh-mine-n">0개</span></div>
+
+    <!-- 박스 안에 들어와 있을 때만 — 지나온 자리와 뒤로 가는 단추 -->
+    <div class="borh-crumb" id="borh-crumb">
+      <button type="button" id="borh-up" aria-label="뒤로">←</button>
+      <span class="borh-path" id="borh-path"></span>
+      <span class="borh-cnt" id="borh-cnt"></span>
+    </div>
+
     <div class="borh-tiles" id="borh-mine"></div>
 
-    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.3.0</b></p>
+    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.3.1</b></p>
   </div>
 </div>
 
@@ -319,7 +348,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
   <div class="bhead">
     <span class="bday">보링변환</span>
     <span class="brole">CIX → BPP</span>
-    <span class="bsub" id="b-ver">v1.3.0</span>
+    <span class="bsub" id="b-ver">v1.3.1</span>
   </div>
 
   <button class="btile" id="b-pick" type="button">
@@ -782,6 +811,7 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 집게밑인가, 변수틀읽
     const 칸이름 = 'boring_boxes';
     const appId  = 'vivivic-4b7ef';
     let 박스들 = [], 붙었나 = false, 지금판 = null;
+    let 지금박스 = null;          // 지금 들어와 있는 박스의 id. null 이면 맨 위 판이다
 
     const $ = id => document.getElementById(id);
     const _e = v => String(v == null ? '' : v)
@@ -842,7 +872,7 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 집게밑인가, 변수틀읽
         return '<button type="button" class="borh-tile ' + 모양 + '" data-borb-id="' + _e(b.id) + '">' +
             '<span class="borh-ico">' + 아이콘(b.icon || 'square', 22) + '</span>' +
             '<span><span class="borh-nm">' + _e(b.name || '새 박스') + '</span>' +
-            '<span class="borh-pct">' + _e(갈곳이름(b.link || 이름으로(b))) + '</span></span></button>';
+            '<span class="borh-pct">' + _e(아래글(b)) + '</span></span></button>';
     }
     // 갈 곳을 안 고르고 이름만 적으셨는데 그 이름이 이 집 안의 화면과 똑같으면 거기로 본다
     function 이름으로(b){
@@ -850,18 +880,49 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 집게밑인가, 변수틀읽
         const 안 = 안쪽.find(x => x[1] === String(b.name || '').trim());
         return 안 ? 안[0] : null;
     }
-    function 갈곳이름(link){
-        if (!link) return '길게 눌러 고치기';
-        const 안 = 안쪽.find(x => x[0] === link);
-        return 안 ? 안[1] : link;
+    const 딸림 = id => 박스들.filter(x => (x.parent || '') === id).length;
+    // 타일 아래 한 줄 — 바깥 주소면 그 주소, 이 집 화면이면 그 이름, 아니면 속에 든 수
+    function 아래글(b){
+        if (b.link && /^https?:/i.test(b.link)) return b.link;
+        const 안 = 안쪽.find(x => x[0] === (b.link || 이름으로(b)));
+        if (안) return 안[1];
+        const n = 딸림(b.id);
+        return n ? n + '개' : '비었다';
+    }
+    // 지나온 자리 — 맨 위에서 여기까지의 이름들
+    function 길(id){
+        const 이름들 = []; let cur = 박스들.find(b => b.id === id), 막기 = 0;
+        while (cur && 막기++ < 30) {
+            이름들.unshift(cur.name || '새 박스');
+            cur = 박스들.find(b => b.id === (cur.parent || ''));
+        }
+        return 이름들;
     }
     const 새단추 = () => '<button type="button" class="borh-newbox" data-borb-new="1">' +
         아이콘('plus', 22) + '<span>새 박스</span></button>';
 
     function 그리기(){
         const el = $('borh-mine'); if (!el) return;
-        el.innerHTML = 박스들.map(타일).join('') + 새단추();
-        const n = $('borh-mine-n'); if (n) n.textContent = 박스들.length + '개';
+        // 들어와 있던 박스가 사라졌으면 맨 위로 — 아무 데도 아닌 자리에 갇히지 않게
+        if (지금박스 && !박스들.some(b => b.id === 지금박스)) 지금박스 = null;
+        const 것들 = 박스들.filter(b => (b.parent || '') === (지금박스 || ''));
+        el.innerHTML = 것들.map(타일).join('') + 새단추();
+
+        const 안이다 = !!지금박스;
+        document.documentElement[안이다 ? 'setAttribute' : 'removeAttribute']('data-borin', '1');
+        if (안이다) {
+            const 이름들 = 길(지금박스);
+            const 앞 = 이름들.slice(0, -1), 끝 = 이름들[이름들.length - 1] || '';
+            $('borh-path').innerHTML = (앞.length ? '<i>' + 앞.map(_e).join(' › ') + ' › </i>' : '') + _e(끝);
+            $('borh-cnt').textContent = 것들.length + '개';
+        } else {
+            const n = $('borh-mine-n'); if (n) n.textContent = 것들.length + '개';
+        }
+    }
+    function 들어가기(id){ 지금박스 = id || null; 그리기(); window.scrollTo(0, 0); }
+    function 나가기(){
+        const b = 박스들.find(x => x.id === 지금박스);
+        들어가기(b && b.parent ? b.parent : null);
     }
 
     /* ── 만들기·고치기 판 (작업대의 박스판 그대로) ── */
@@ -875,7 +936,7 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 집게밑인가, 변수틀읽
     function 박스판(b){
         const 새것 = !b;
         const cur = b || { name:'', icon:'square', tone:'white', link:'' };
-        지금판 = { b: b };
+        지금판 = { b: b, parent: 지금박스 || '' };
         판열기(
           '<h4>' + (새것 ? '새 박스' : '박스설정') + '</h4>' +
           '<input class="borb-fld" id="borb-nm" placeholder="박스 이름" value="' + _e(cur.name) + '">' +
@@ -949,6 +1010,7 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 집게밑인가, 변수틀읽
             if (지금판.b) await updateDoc(문서(지금판.b.id), 것);
             else {
                 const id = 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+                것.parent = 지금판.parent || '';       // 지금 들어와 있는 박스 속에 만든다
                 것.at = Date.now();
                 await setDoc(문서(id), 것);
             }
@@ -957,6 +1019,8 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 집게밑인가, 변수틀읽
     }
     async function 지우기(){
         if (!지금판 || !지금판.b) return;
+        const 속 = 딸림(지금판.b.id);
+        if (속) { alert('안에 든 박스 ' + 속 + '개를 먼저 치워 주십시오.'); return; }
         if (!confirm('이 박스를 지울까요?')) return;
         const { deleteDoc } = window.fbFirestore;
         try { await deleteDoc(문서(지금판.b.id)); }
@@ -964,11 +1028,16 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 집게밑인가, 변수틀읽
         window.borBoxClose();
     }
 
+    /* 누르면 그 박스 '안으로' 들어간다 — 작업대가 하는 그대로다.
+       안이 비었으면 빈 판이 나오고, 거기에 또 「새 박스」 로 채워 나가신다.
+       바깥 주소(http…)가 있고 속이 빈 박스만 바로 그리로 연다.
+       고치기 판은 여기서 열지 않는다 — 「새 박스」 단추와 0.4초 길게 누르기, 두 길뿐이다. */
     function 열기(b){
-        const 갈곳 = (b && b.link) || 이름으로(b);
-        if (!갈곳) return 박스판(b);                  // 갈 곳이 없으면 고치기 판
-        if (갈곳 === 'bpp') { window.borOpen(); return; }
-        window.open(갈곳, '_blank', 'noopener');
+        if (!b) return;
+        if ((b.link || 이름으로(b)) === 'bpp') { window.borOpen(); return; }
+        const 바깥 = /^https?:/i.test(b.link || '');
+        if (바깥 && !딸림(b.id)) { window.open(b.link, '_blank', 'noopener'); return; }
+        들어가기(b.id);
     }
 
     /* ── 손가락 ──────────────────────────────────────────────────────────
@@ -996,6 +1065,7 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 집게밑인가, 변수틀읽
         if (새) { e.preventDefault(); return 박스판(null); }
         const fab = e.target.closest('#borb-fab');
         if (fab) { e.preventDefault(); return 박스판(null); }
+        if (e.target.closest('#borh-up')) { e.preventDefault(); return 나가기(); }
         const 칸판 = e.target.closest('#borb-sheet');
         if (칸판){
             if (e.target.id === 'borb-sheet') return window.borBoxClose();   // 바깥을 누르면 닫는다
