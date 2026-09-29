@@ -319,6 +319,17 @@ if (나온것) {
        다른줄.length ? 다른줄.join(' · ') + ' 이 다르다' : '16줄 다 같다');
   재기('맨 끝에 빈 줄이 하나 있나', /\[SUBPROGS\]\r\n\r\n$/.test(나온것.글),
        JSON.stringify(나온것.글.slice(-14)));
+  // 마지막 줄과 [VBSCRIPT] 사이는 빈 줄 둘이다. 한 줄이면 기계가 읽은 파일과 다르다.
+  const 빈줄세기 = 글 => {
+    const 줄 = 글.split('\r\n'), i = 줄.indexOf('[VBSCRIPT]');
+    if (i < 0) return '[VBSCRIPT] 가 없다';
+    let n = 0;
+    while (i - 1 - n >= 0 && 줄[i - 1 - n] === '') n++;
+    return n + '줄 (앞은 ' + JSON.stringify((줄[i - 1 - n] || '').slice(0, 24)) + ')';
+  };
+  재기('마지막 줄과 [VBSCRIPT] 사이에 빈 줄이 둘', /^2줄 \(앞은 "@ BG, /.test(빈줄세기(나온것.글)),
+       빈줄세기(나온것.글));
+  if (웨잇) 재기('WAIT 판도 빈 줄이 둘', /^2줄 \(앞은 "@ BG, /.test(빈줄세기(웨잇.글)), 빈줄세기(웨잇.글));
 }
 
 await b.close();
