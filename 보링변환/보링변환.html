@@ -1,15 +1,42 @@
 <!-- ==========================================
      보링변환.html
-     버전: v1.2.1 (2026-09-29) — 마지막 줄과 [VBSCRIPT] 사이 빈 줄을 둘로
-           (이것으로 기계가 읽어 준 파일과 번호 자리 빼고 글자 하나 안 틀린다)
+     버전: v1.3.0 (2026-09-29) — 이 집의 박스 꼴로. 박스 판·「새 박스」 를
+           에이엠티(→ 작업대)에서 그대로 옮겼다. 바꾸기는 한 줄도 안 건드렸다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
-<html lang="ko">
+<html lang="ko" data-borhome="1">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>보링변환</title>
+
+<!-- 파이어베이스 — 박스만 담는다. 에이엠티가 쓰는 그 자리, 그 방식이다.
+     로그인 화면은 없다. 익명으로 들어가 박스만 읽고 쓴다.
+     바꾸기(.cix → .bpp)는 이것과 아무 상관이 없다 — 창고가 안 붙어도 그대로 돈다. -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
+  import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+  import { getFirestore, collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc }
+    from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+
+  const app = initializeApp({
+      apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
+      authDomain: "vivivic-4b7ef.firebaseapp.com",
+      projectId: "vivivic-4b7ef",
+      storageBucket: "vivivic-4b7ef.firebasestorage.app",
+      messagingSenderId: "830175660542",
+      appId: "1:830175660542:web:9054030480c8280af8d8af"
+  });
+  const auth = getAuth(app);
+  window.db = getFirestore(app);
+  window.fbFirestore = { collection, doc, onSnapshot, setDoc, updateDoc, deleteDoc };
+  window.fbAuth = { auth };
+  onAuthStateChanged(auth, u => {
+      if (!u) { signInAnonymously(auth).catch(() => {}); return; }
+      if (typeof window.borBoxSync === 'function') window.borBoxSync();
+  });
+</script>
 <style>
 /* 색 토큰·타일·알약은 에이엠티(#amt-home)에서 그대로 가져왔다. 새로 만든 색은 없다.
    이름은 전부 b- 로 시작한다 — 짧은 이름은 남의 규칙과 겹친다. */
@@ -25,7 +52,11 @@ body{
   font:15px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",system-ui,sans-serif;
   -webkit-text-size-adjust:100%;
 }
-.bwrap{max-width:430px; margin:0 auto; padding:14px 20px calc(28px + env(safe-area-inset-bottom));}
+.bwrap{
+  max-width:430px; margin:0 auto;
+  /* 아래를 넉넉히 비운다 — 「← 박스판」 이 바닥에 떠 있어 마지막 줄을 가린다 */
+  padding:14px 20px calc(84px + env(safe-area-inset-bottom));
+}
 
 /* 머리 — 한 줄이다 */
 .bhead{display:flex; align-items:baseline; gap:9px; margin:0 0 14px;}
@@ -99,16 +130,196 @@ body{
 .bbtn[disabled]{opacity:.4; cursor:default;}
 .bnote{margin:6px 0 0; font-size:11.5px; color:var(--vg-muted);}
 
+/* ═══ 박스 판 — 에이엠티(#amt-home · #amtb-*)에서 그대로 옮겼다 ══════════════
+   에이엠티 주석대로 본은 작업대(viggle/index.html)의 타일·알약·「새 박스」 다.
+   색·모서리·글자 크기·칸 수를 한 자도 안 바꿨다. 새로 만든 모양은 없다.
+   이름만 borh-/borb- 로 갈라 두었다 — 이 집이 이름을 가르는 방식이다. */
+#bor-home{ display:none; }
+html[data-borhome="1"] #bor-home{ display:block; }
+html[data-borhome="1"] #bor-app{ display:none; }
+
+.borh-wrap{ max-width:430px; margin:0 auto; padding:14px 20px calc(28px + env(safe-area-inset-bottom)); }
+.borh-head{ display:flex; align-items:baseline; gap:9px; margin:0 0 14px; }
+.borh-day{ font-size:23px; line-height:1.06; letter-spacing:-.9px; font-weight:700; color:var(--vg-ink); }
+.borh-role{
+  display:inline-flex; align-items:center; border:1px solid var(--vg-ink); border-radius:999px;
+  padding:2px 8px; font-size:10px; font-weight:800; letter-spacing:1.1px; color:var(--vg-ink);
+}
+.borh-sub{ margin-left:auto; font-size:12px; color:var(--vg-muted); }
+
+/* 타일 — 작업대의 .tile 그대로 */
+.borh-tiles{ display:grid; grid-template-columns:1.02fr 1fr; gap:12px; }
+.borh-tile{
+  position:relative; border-radius:26px; padding:17px; display:flex;
+  flex-direction:column; justify-content:space-between; overflow:hidden;
+  cursor:pointer; border:1px solid transparent; text-align:left;
+  min-height:150px; transition:transform .12s; width:100%; font:inherit;
+  color:inherit; gap:18px;
+}
+.borh-tile:active{ transform:scale(.975); }
+.borh-tile.borh-light{ background:var(--vg-fill); }
+.borh-tile.borh-white{ background:#fff; border-color:var(--vg-edge); }
+.borh-tile.borh-dark{ background:var(--vg-ink); color:#fff; }
+.borh-tile .borh-ico{
+  width:54px; height:54px; border-radius:50%; display:grid; place-items:center;
+  flex:none; background:rgba(0,0,0,.05);
+}
+.borh-tile.borh-dark .borh-ico{ background:rgba(255,255,255,.14); }
+.borh-tile.borh-white .borh-ico{ background:var(--vg-fill); }
+.borh-tile .borh-nm{
+  display:block; font-size:20px; line-height:1.22; letter-spacing:-.5px;
+  font-weight:700; margin:0; overflow-wrap:anywhere;
+}
+.borh-tile .borh-pct{
+  display:block; margin:5px 0 0; font-size:12.5px; color:var(--vg-muted); font-weight:400;
+}
+.borh-tile.borh-dark .borh-pct{ color:rgba(255,255,255,.5); }
+
+.borh-sec{ display:flex; align-items:center; justify-content:space-between; margin:22px 0 10px; }
+.borh-sec b{ font-size:17px; font-weight:700; letter-spacing:-.4px; color:var(--vg-ink); }
+.borh-sec span{ font-size:12px; color:var(--vg-muted); }
+.borh-foot{ margin:20px 0 0; text-align:center; font-size:11px; color:var(--vg-muted); }
+
+.borh-newbox{
+  border:1px dashed var(--vg-edge); background:#fff; display:grid; place-items:center;
+  min-height:104px; border-radius:20px; cursor:pointer; color:var(--vg-soft); gap:6px;
+  font:inherit;
+}
+.borh-newbox:active{ background:var(--vg-fill); }
+
+/* 돌아오는 길 — 박스 안에서 박스 판으로. 엄지가 닿는 자리에 띄운다.
+   에이엠티의 #amt-back 그대로다. 높이만 이 집 규칙대로 44px 을 채웠다. */
+#bor-back{
+  display:none; position:fixed; z-index:990; left:12px;
+  bottom:calc(16px + env(safe-area-inset-bottom));
+}
+html:not([data-borhome="1"]) #bor-back{ display:block; }
+#bor-back button{
+  display:inline-flex; align-items:center; gap:7px; min-height:44px; background:#fff;
+  border:1px solid #E2E2DF; border-radius:999px; padding:0 15px;
+  font:inherit; font-size:13px; font-weight:700; color:#6E6E6A; cursor:pointer;
+  box-shadow:0 8px 22px -14px rgba(0,0,0,.55);
+}
+#bor-back button:active{ background:#F4F4F2; }
+
+/* 바닥에 늘 떠 있는 단추 — 박스가 보이는 화면에서만 나온다 */
+#borb-fab{
+  display:none; position:fixed; right:16px; z-index:8100;
+  bottom:calc(16px + env(safe-area-inset-bottom));
+  width:56px; height:56px; border-radius:50%; background:#111110; color:#fff; border:0;
+  place-items:center; cursor:pointer; box-shadow:0 6px 20px rgba(17,17,16,.26); font:inherit;
+}
+html[data-borhome="1"] #borb-fab{ display:grid; }
+html[data-borb="1"] #borb-fab{ display:none; }
+#borb-fab:active{ transform:scale(.94); }
+
+/* 만들기·고치기 판 */
+#borb-sheet{
+  display:none; position:fixed; inset:0; z-index:9000; background:rgba(17,17,16,.34);
+  align-items:flex-end; backdrop-filter:blur(2px); font:inherit;
+}
+html[data-borb="1"] #borb-sheet{ display:flex; }
+#borb-card{
+  background:#fff; width:100%; max-width:430px; margin:0 auto; max-height:88vh;
+  border-radius:26px 26px 0 0; overflow:auto; color:#1A1A19;
+  padding:8px 20px calc(20px + env(safe-area-inset-bottom));
+}
+#borb-card .borb-grip{ width:38px; height:4px; border-radius:2px; background:var(--vg-edge); margin:6px auto 14px; }
+#borb-card h4{ margin:0 0 12px; font-size:17px; font-weight:700; letter-spacing:-.3px; }
+.borb-fld{
+  width:100%; border:1px solid var(--vg-edge); border-radius:13px; padding:12px 14px;
+  font:inherit; font-size:15px; background:#fff; outline:none;
+}
+.borb-fld:focus{ border-color:var(--vg-ink); }
+.borb-chips{ display:flex; gap:8px; flex-wrap:wrap; margin:12px 0 0; }
+.borb-chip{
+  border:1px solid var(--vg-edge); background:#fff; border-radius:999px; padding:8px 13px;
+  font:inherit; font-size:13px; cursor:pointer; color:inherit;
+}
+.borb-chip.on{ background:var(--vg-ink); color:#fff; border-color:var(--vg-ink); }
+.borb-icogrid{
+  display:grid; grid-template-columns:repeat(6,1fr); gap:8px; margin-top:12px;
+  max-height:46vh; overflow-y:auto; padding-right:2px;
+}
+.borb-icogrid button{
+  aspect-ratio:1; border:1px solid var(--vg-line); background:#fff; border-radius:12px;
+  display:grid; place-items:center; cursor:pointer; color:inherit;
+}
+.borb-icogrid button.on{ border-color:var(--vg-ink); background:var(--vg-fill); }
+.borb-icohead{
+  grid-column:1/-1; margin:10px 0 0; font-size:11.5px; font-weight:800;
+  color:var(--vg-muted); letter-spacing:.02em;
+  cursor:pointer; user-select:none; padding:6px 2px; border-radius:8px;
+}
+.borb-icohead:first-child{ margin-top:0; }
+.borb-icohead:active{ background:var(--vg-fill); }
+.borb-ico-n{ font-weight:700; color:var(--vg-edge); margin-left:4px; }
+.borb-ico-more{
+  grid-column:1/-1; margin-top:8px; border:1px dashed var(--vg-edge); background:#fff;
+  border-radius:12px; padding:10px; font:inherit; font-size:12px; font-weight:700;
+  color:var(--vg-soft); cursor:pointer;
+}
+.borb-ico-more:active{ background:var(--vg-fill); }
+.borb-go{
+  width:100%; margin-top:12px; border:0; border-radius:13px; background:var(--vg-ink);
+  color:#fff; font:inherit; font-size:15px; font-weight:700; padding:14px; cursor:pointer;
+}
+.borb-go.borb-del{ background:#fff; color:var(--vg-red); border:1px solid var(--vg-edge); margin-top:10px; }
+.borb-empty{ grid-column:1/-1; font-size:13px; color:var(--vg-muted); margin:6px 0; }
+
 .bhide{display:none !important;}
 </style>
 </head>
 <body>
+<!-- ═══ 박스 판 — 이 집의 모든 프로그램이 이 꼴이다 ═══════════════════
+     눈에 나뉘어 보이던 덩어리 하나가 박스 하나다. 누르면 그 구역으로 간다.
+     바꾸기 화면(#bor-app)은 한 줄도 안 고쳤다. 이 판만 빼면 그대로 되돌아간다. -->
+<div id="bor-home">
+  <div class="borh-wrap">
+
+    <div class="borh-head">
+      <span class="borh-day" id="borh-day">—</span>
+      <span class="borh-role">BORING</span>
+      <span class="borh-sub">CIX → BPP</span>
+    </div>
+
+    <div class="borh-tiles">
+      <button type="button" class="borh-tile borh-dark" onclick="borOpen()">
+        <!-- 아이콘은 집이 같이 쓰는 한 벌(lucide)에서 꺼낸다 — 손으로 그리지 않는다 -->
+        <span class="borh-ico" id="borh-work-ico"></span>
+        <span>
+          <span class="borh-nm">보링변환</span>
+          <span class="borh-pct">.cix 를 .bpp 로</span>
+        </span>
+      </button>
+    </div>
+
+    <!-- 사장님이 만드신 박스. 일하는 박스(위)와 자리부터 갈라 둔다 —
+         여기 것만 고치고 지울 수 있다. -->
+    <div class="borh-sec"><b>내 박스</b><span id="borh-mine-n">0개</span></div>
+    <div class="borh-tiles" id="borh-mine"></div>
+
+    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.3.0</b></p>
+  </div>
+</div>
+
+<!-- 박스 안에서 박스 판으로 돌아오는 자리 -->
+<div id="bor-back"><button type="button" onclick="borGoHome()">← 박스판</button></div>
+
+<!-- 박스추가 — 박스가 보이는 화면에서만 뜬다 -->
+<button type="button" id="borb-fab" aria-label="새 박스" title="새 박스">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+</button>
+<div id="borb-sheet"><div id="borb-card"></div></div>
+
+<div id="bor-app">
 <div class="bwrap">
 
   <div class="bhead">
     <span class="bday">보링변환</span>
     <span class="brole">CIX → BPP</span>
-    <span class="bsub" id="b-ver">v1.2.1</span>
+    <span class="bsub" id="b-ver">v1.3.0</span>
   </div>
 
   <button class="btile" id="b-pick" type="button">
@@ -158,6 +369,7 @@ body{
   <button class="bbtn bhide" id="b-wait" type="button">집게 밑 구멍을 뒤로 미루고 WAIT 넣기</button>
   <div class="bnote bhide" id="b-wait-note">되는 것 먼저 뚫고 멈춘다 · 판 옮긴 뒤 나머지</div>
 
+</div>
 </div>
 
 <script>
@@ -544,6 +756,300 @@ $('b-wait').onclick = () => 바꾸기(true);
 
 // 시험이 안에서 재도록 내놓는다 — 화면에는 아무 것도 더하지 않는다
 window.보링 = { cix읽기, bpp짓기, 되짚기, 집게밑인가, 변수틀읽기, 쉼표쪼개기 };
+})();
+</script>
+
+
+<!-- 아이콘 — 집이 함께 쓰는 한 벌. 박스 아이콘 고르기가 이것을 읽는다. -->
+<script src="../shared/lucide.min.js"></script>
+<script src="../shared/아이콘묶음.js"></script>
+<script>
+/* ══ 박스추가 ══════════════════════════════════════════════════════════════
+   에이엠티(에이엠티.html 의 '박스추가')를 그대로 옮겼다. 에이엠티 주석대로 본은
+   작업대(viggle/index.html)의 '새 박스' 다. 만드는 판도, 아이콘 고르기도,
+   색 세 가지도 거기 것이다. 새로 발명한 것 없다.
+
+   ⚠ 일하는 박스는 건드리지 않는다.
+     「보링변환」 박스는 화면에 박혀 있는 markup 이다. 이 코드가 그리지도, 지우지도
+     않는다. 여기서는 사장님이 만드신 박스(#borh-mine 안의 것)만 다룬다.
+     길게 눌러 고치는 것도 [data-borb-id] 가 붙은 것에만 걸린다.
+
+   담는 곳: artifacts/vivivic-4b7ef/public/data/boring_boxes
+     보링변환 제 칸이다. wt_boxes·wt_dev·amt_boxes·confirmed_orders·cutting_plans 은
+     건드리지 않는다. 한 박스에 담기는 것 — 이름 · 아이콘 · 색(흰·회·검정) ·
+     열면 갈 곳 · 만든 때. 구멍 자료는 한 줄도 담지 않는다. */
+(function(){
+    const 칸이름 = 'boring_boxes';
+    const appId  = 'vivivic-4b7ef';
+    let 박스들 = [], 붙었나 = false, 지금판 = null;
+
+    const $ = id => document.getElementById(id);
+    const _e = v => String(v == null ? '' : v)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+    // 아이콘 하나 — 작업대의 ico() 와 같은 방식(lucide 원자료를 svg 로)
+    const 파스칼 = n => String(n||'').split('-').map(w => w.charAt(0).toUpperCase()+w.slice(1)).join('');
+    function 아이콘(name, sz, stroke){
+        const L = (window.lucide && window.lucide.icons) || {};
+        const n = L[파스칼(name)] || L.Square;
+        if (!n) return '';
+        const attrs = n[1], kids = n[2] || [];
+        const a = Object.assign({}, attrs, { width: sz, height: sz, 'stroke-width': stroke || 1.7 });
+        const at = Object.keys(a).map(k => k + '="' + _e(a[k]) + '"').join(' ');
+        const 안 = kids.map(c => '<' + c[0] + ' ' +
+            Object.keys(c[1] || {}).map(k => k + '="' + _e(c[1][k]) + '"').join(' ') + '/>').join('');
+        return '<svg ' + at + '>' + 안 + '</svg>';
+    }
+
+    // 아이콘 갈래는 ../shared/아이콘묶음.js 한 벌을 쓴다 — 집이 같이 쓰는 것이다.
+    const 아이콘묶음들 = () => (typeof window.VG아이콘묶음 === 'function' ? window.VG아이콘묶음() : []);
+    const 아이콘이름들 = () => (typeof window.VG아이콘이름 === 'function' ? window.VG아이콘이름() : []);
+    let 열린갈래 = 0;          // 펼친 갈래 하나만 그린다 — 폰에서 천 개를 한꺼번에 그리면 버벅인다
+    let 더본것 = 0;
+    const 한번에 = 150;
+
+    // 이 집 안에서 갈 수 있는 곳 — 일하는 박스를 바로가기로 걸 수 있게
+    const 안쪽 = [['bpp','보링변환']];
+
+    /* ── 창고 ── */
+    function 칸(){
+        const { collection } = window.fbFirestore;
+        return collection(window.db, 'artifacts', appId, 'public', 'data', 칸이름);
+    }
+    function 문서(id){
+        const { doc } = window.fbFirestore;
+        return doc(window.db, 'artifacts', appId, 'public', 'data', 칸이름, id);
+    }
+    window.borBoxSync = function(){
+        if (붙었나 || !window.db || !window.fbFirestore) return;
+        붙었나 = true;
+        const { onSnapshot } = window.fbFirestore;
+        onSnapshot(칸(), s => {
+            if (!s || typeof s.forEach !== 'function') return;
+            try {
+                const 새것 = [];
+                s.forEach(d => 새것.push(Object.assign({ id: d.id }, d.data())));
+                새것.sort((a,b) => (a.at||0) - (b.at||0));
+                박스들 = 새것;
+                그리기();
+            } catch (e) {}
+        }, () => {});
+    };
+
+    /* ── 그리기 — 새로 만든 박스만 ── */
+    function 타일(b){
+        const 모양 = b.tone === 'dark' ? 'borh-dark' : (b.tone === 'white' ? 'borh-white' : 'borh-light');
+        return '<button type="button" class="borh-tile ' + 모양 + '" data-borb-id="' + _e(b.id) + '">' +
+            '<span class="borh-ico">' + 아이콘(b.icon || 'square', 22) + '</span>' +
+            '<span><span class="borh-nm">' + _e(b.name || '새 박스') + '</span>' +
+            '<span class="borh-pct">' + _e(갈곳이름(b.link || 이름으로(b))) + '</span></span></button>';
+    }
+    // 갈 곳을 안 고르고 이름만 적으셨는데 그 이름이 이 집 안의 화면과 똑같으면 거기로 본다
+    function 이름으로(b){
+        if (!b || b.link) return null;
+        const 안 = 안쪽.find(x => x[1] === String(b.name || '').trim());
+        return 안 ? 안[0] : null;
+    }
+    function 갈곳이름(link){
+        if (!link) return '길게 눌러 고치기';
+        const 안 = 안쪽.find(x => x[0] === link);
+        return 안 ? 안[1] : link;
+    }
+    const 새단추 = () => '<button type="button" class="borh-newbox" data-borb-new="1">' +
+        아이콘('plus', 22) + '<span>새 박스</span></button>';
+
+    function 그리기(){
+        const el = $('borh-mine'); if (!el) return;
+        el.innerHTML = 박스들.map(타일).join('') + 새단추();
+        const n = $('borh-mine-n'); if (n) n.textContent = 박스들.length + '개';
+    }
+
+    /* ── 만들기·고치기 판 (작업대의 박스판 그대로) ── */
+    function 판열기(html){
+        const c = $('borb-card'); if (!c) return;
+        c.innerHTML = '<div class="borb-grip"></div>' + html;
+        document.documentElement.setAttribute('data-borb','1');
+    }
+    window.borBoxClose = function(){ document.documentElement.removeAttribute('data-borb'); 지금판 = null; };
+
+    function 박스판(b){
+        const 새것 = !b;
+        const cur = b || { name:'', icon:'square', tone:'white', link:'' };
+        지금판 = { b: b };
+        판열기(
+          '<h4>' + (새것 ? '새 박스' : '박스설정') + '</h4>' +
+          '<input class="borb-fld" id="borb-nm" placeholder="박스 이름" value="' + _e(cur.name) + '">' +
+          '<div class="borb-chips" id="borb-tones">' +
+            ['white','light','dark'].map(t =>
+              '<button type="button" class="borb-chip ' + (t === cur.tone ? 'on' : '') + '" data-tone="' + t + '">' +
+              ({white:'흰색',light:'회색',dark:'검정'})[t] + '</button>').join('') +
+          '</div>' +
+          '<div class="borb-chips" id="borb-goes">' +
+            안쪽.map(([k, nm]) =>
+              '<button type="button" class="borb-chip ' + (cur.link === k ? 'on' : '') + '" data-go="' + k + '">' +
+              _e(nm) + '</button>').join('') +
+          '</div>' +
+          '<input class="borb-fld" id="borb-link" placeholder="열면 갈 곳 (주소 · 비워도 됨)" ' +
+            'value="' + _e(cur.link || '') + '" style="margin-top:12px" autocomplete="off">' +
+          '<input class="borb-fld" id="borb-q" placeholder="아이콘 찾기 (영문)" style="margin-top:12px">' +
+          '<div class="borb-icogrid" id="borb-ig"></div>' +
+          (새것 ? '' : '<button type="button" class="borb-go borb-del" id="borb-del">박스 지우기</button>') +
+          '<button type="button" class="borb-go" id="borb-save">' + (새것 ? '만들기' : '저장') + '</button>');
+        지금판.tone = cur.tone; 지금판.icon = cur.icon;
+        열린갈래 = 갈래맞추기(cur.icon); 더본것 = 0;
+        아이콘그리기();
+    }
+
+    /* 아이콘 고르기 — 칸 모양은 그대로다(한 줄 여섯 칸·모서리 12px·고른 칸 표시).
+       천 칸을 한꺼번에 그리면 폰이 버벅이므로 갈래 하나만, 그것도 150칸씩 끊어 그린다. */
+    function 아이콘그리기(){
+        const ig = $('borb-ig'); if (!ig || !지금판) return;
+        const 한칸 = n => '<button type="button" data-ic="' + n + '" class="' +
+            (n === 지금판.icon ? 'on' : '') + '">' + 아이콘(n, 20) + '</button>';
+        const q = ($('borb-q') || {}).value ? $('borb-q').value.trim().toLowerCase() : '';
+        if (q){
+            const all = 아이콘이름들().filter(n => n.includes(q)).slice(0, 120);
+            ig.innerHTML = all.length ? all.map(한칸).join('')
+                : '<p class="borb-empty">그런 아이콘이 없습니다</p>';
+            return;
+        }
+        const 묶음 = 아이콘묶음들();
+        if (!묶음.length){ ig.innerHTML = '<p class="borb-empty">아이콘을 아직 못 읽었습니다</p>'; return; }
+        if (열린갈래 >= 묶음.length) 열린갈래 = 0;
+        ig.innerHTML = 묶음.map(([이름, 것들], i) => {
+            const 폄 = (i === 열린갈래);
+            const 머리 = '<h5 class="borb-icohead" data-grp="' + i + '">' +
+                (폄 ? '\u25be ' : '\u25b8 ') + _e(이름) +
+                ' <span class="borb-ico-n">' + 것들.length + '</span></h5>';
+            if (!폄) return 머리;
+            const 볼것 = Math.min(것들.length, 한번에 + 더본것);
+            const 더 = 것들.length - 볼것;
+            return 머리 + 것들.slice(0, 볼것).map(한칸).join('') +
+                (더 > 0 ? '<button type="button" class="borb-ico-more" data-more="1">+ ' +
+                          더 + '개 더 보기</button>' : '');
+        }).join('');
+    }
+
+    // 고른 아이콘이 든 갈래를 펴 둔다 — 고친 박스를 열면 그 아이콘이 보여야 한다
+    function 갈래맞추기(icon){
+        const 묶음 = 아이콘묶음들();
+        for (let i = 0; i < 묶음.length; i++) if (묶음[i][1].indexOf(icon) !== -1) return i;
+        return 0;
+    }
+
+    async function 저장(){
+        if (!지금판) return;
+        if (!window.db || !window.fbFirestore) { alert('창고에 아직 못 닿았습니다. 잠시 뒤 다시 해 주십시오.'); return; }
+        const { setDoc, updateDoc } = window.fbFirestore;
+        const name = ($('borb-nm').value || '').trim() || '새 박스';
+        const link = ($('borb-link').value || '').trim();
+        const 것 = { name: name.slice(0, 60), icon: 지금판.icon || 'square',
+                     tone: 지금판.tone || 'white', link: link };
+        try {
+            if (지금판.b) await updateDoc(문서(지금판.b.id), 것);
+            else {
+                const id = 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+                것.at = Date.now();
+                await setDoc(문서(id), 것);
+            }
+        } catch (e) { alert('박스를 담지 못했습니다: ' + e.message); return; }
+        window.borBoxClose();
+    }
+    async function 지우기(){
+        if (!지금판 || !지금판.b) return;
+        if (!confirm('이 박스를 지울까요?')) return;
+        const { deleteDoc } = window.fbFirestore;
+        try { await deleteDoc(문서(지금판.b.id)); }
+        catch (e) { alert('지우지 못했습니다: ' + e.message); return; }
+        window.borBoxClose();
+    }
+
+    function 열기(b){
+        const 갈곳 = (b && b.link) || 이름으로(b);
+        if (!갈곳) return 박스판(b);                  // 갈 곳이 없으면 고치기 판
+        if (갈곳 === 'bpp') { window.borOpen(); return; }
+        window.open(갈곳, '_blank', 'noopener');
+    }
+
+    /* ── 손가락 ──────────────────────────────────────────────────────────
+       작업대(?viggle=1)의 '0.5초 길게 눌러 짚어서 지시' 와 부딪히지 않게,
+       0.4초에 잡고 그 자리에서 window 에 scroll 을 한 번 흘려 그쪽 시계를 끈다.
+       viggle.js 는 scroll 에 그만() 이 걸려 있다 — 그 파일은 손대지 않았다.
+       0.4초 < 0.5초 라 언제나 이쪽이 먼저 잡는다. 에이엠티의 WO_MOVE_MS 와 같은 길이다. */
+    const 잡는시간 = 400;
+    let 누름 = null, 길게 = false;
+    document.addEventListener('pointerdown', e => {
+        const t = e.target.closest('[data-borb-id]'); if (!t) return;
+        길게 = false;
+        누름 = setTimeout(() => {
+            누름 = null; 길게 = true;
+            try { window.dispatchEvent(new Event('scroll')); } catch (err) {}
+            const b = 박스들.find(x => x.id === t.dataset.borbId);
+            if (b) 박스판(b);
+        }, 잡는시간);
+    }, true);
+    ['pointerup','pointermove','pointercancel','scroll'].forEach(k =>
+        document.addEventListener(k, () => { if (누름) { clearTimeout(누름); 누름 = null; } }, true));
+
+    document.addEventListener('click', e => {
+        const 새 = e.target.closest('[data-borb-new]');
+        if (새) { e.preventDefault(); return 박스판(null); }
+        const fab = e.target.closest('#borb-fab');
+        if (fab) { e.preventDefault(); return 박스판(null); }
+        const 칸판 = e.target.closest('#borb-sheet');
+        if (칸판){
+            if (e.target.id === 'borb-sheet') return window.borBoxClose();   // 바깥을 누르면 닫는다
+            const tone = e.target.closest('[data-tone]');
+            if (tone && 지금판){ 지금판.tone = tone.dataset.tone;
+                [].forEach.call($('borb-tones').children, c => c.classList.toggle('on', c === tone)); return; }
+            const go = e.target.closest('[data-go]');
+            if (go && 지금판){ const v = go.dataset.go;
+                const 끔 = $('borb-link').value === v;
+                $('borb-link').value = 끔 ? '' : v;
+                [].forEach.call($('borb-goes').children, c => c.classList.toggle('on', !끔 && c === go)); return; }
+            const 머리 = e.target.closest('[data-grp]');
+            if (머리 && 지금판){ const i = parseInt(머리.dataset.grp, 10);
+                열린갈래 = (열린갈래 === i) ? -1 : i; 더본것 = 0; 아이콘그리기(); return; }
+            const 더 = e.target.closest('[data-more]');
+            if (더 && 지금판){ 더본것 += 한번에; 아이콘그리기(); return; }
+            const ic = e.target.closest('[data-ic]');
+            if (ic && 지금판){ 지금판.icon = ic.dataset.ic;
+                [].forEach.call($('borb-ig').children, c => c.classList.toggle('on', c === ic)); return; }
+            if (e.target.closest('#borb-save')) return 저장();
+            if (e.target.closest('#borb-del'))  return 지우기();
+            return;
+        }
+        const t = e.target.closest('[data-borb-id]');
+        if (t){ e.preventDefault();
+            if (길게) { 길게 = false; return; }
+            const b = 박스들.find(x => x.id === t.dataset.borbId); if (b) 열기(b); }
+    });
+    document.addEventListener('input', e => { if (e.target.id === 'borb-q') 아이콘그리기(); });
+
+    /* ── 박스 판과 바꾸기 화면 오가기 ── */
+    window.borOpen   = () => document.documentElement.removeAttribute('data-borhome');
+    window.borGoHome = () => document.documentElement.setAttribute('data-borhome','1');
+
+    // 일하는 박스 아이콘 — 사장님이 박스를 만들 때 고르시는 그 한 벌에서 꺼낸다
+    (function(){
+        const el = document.getElementById('borh-work-ico'); if (!el) return;
+        el.innerHTML = 아이콘('drill', 22);
+    })();
+
+    // 머리에 오늘 날짜 — 에이엠티의 amth-day 와 같은 자리다
+    (function(){
+        const el = document.getElementById('borh-day'); if (!el) return;
+        const d = new Date(), 요일 = ['일','월','화','수','목','금','토'][d.getDay()];
+        el.textContent = (d.getMonth()+1) + '월 ' + d.getDate() + '일 ' + 요일;
+    })();
+
+    그리기();                                  // 창고가 붙기 전에도 '새 박스' 는 보인다
+    // 파이어베이스가 늦게 붙는다. 붙을 때까지 조용히 기다린다(최대 30초).
+    (function 기다리기(n){
+        if (붙었나) return;
+        try { window.borBoxSync(); } catch (e) {}
+        if (!붙었나 && n < 20) setTimeout(() => 기다리기(n + 1), 1500);
+    })(0);
 })();
 </script>
 

@@ -45,6 +45,54 @@ const p = await ctx.newPage();
 await p.goto(주소 + '?viggle=1&box=boring', { waitUntil: 'load' });
 await p.waitForTimeout(400);
 
+/* ── 0. 박스 판 — 이 집의 모든 프로그램이 이 꼴이다 ─────────────────── */
+const 박스판 = await p.evaluate(() => ({
+  판떴나: !!document.querySelector('#bor-home') && getComputedStyle(document.getElementById('bor-home')).display !== 'none',
+  바꾸기화면: getComputedStyle(document.getElementById('bor-app')).display,
+  일하는박스: (document.querySelector('#bor-home .borh-tile .borh-nm') || {}).textContent || '',
+  새박스: (document.querySelector('.borh-newbox') || {}).textContent || '',
+  새박스단추: !!document.getElementById('borb-fab') &&
+             getComputedStyle(document.getElementById('borb-fab')).display !== 'none',
+  내박스셈: (document.getElementById('borh-mine-n') || {}).textContent || '',
+}));
+재기('열면 박스 판이 먼저 나오나', 박스판.판떴나 && 박스판.바꾸기화면 === 'none', 박스판.바꾸기화면);
+재기('일하는 박스 「보링변환」 이 있나', 박스판.일하는박스 === '보링변환', 박스판.일하는박스);
+재기('「새 박스」 가 붙었나', /새 박스/.test(박스판.새박스), 박스판.새박스.trim());
+재기('바닥 「새 박스」 단추(FAB)가 떴나', 박스판.새박스단추);
+재기('내 박스 셈이 나오나', /개$/.test(박스판.내박스셈), 박스판.내박스셈);
+
+// 타일 크기 — 작업대·에이엠티와 같은 150px 이다
+const 타일높이 = await p.evaluate(() =>
+  Math.round(document.querySelector('#bor-home .borh-tile').getBoundingClientRect().height));
+재기('타일이 집 규격대로 150px 이상', 타일높이 >= 150, 타일높이 + 'px');
+
+// 「새 박스」 를 눌러 만드는 판이 열리나 — 작업대의 그 판이다
+await p.tap('.borh-newbox');
+await p.waitForTimeout(300);
+const 만들판 = await p.evaluate(() => ({
+  열렸나: document.documentElement.getAttribute('data-borb') === '1',
+  머리: (document.querySelector('#borb-card h4') || {}).textContent || '',
+  색칩: [...document.querySelectorAll('#borb-tones .borb-chip')].map(b => b.textContent),
+  아이콘칸: document.querySelectorAll('#borb-ig button[data-ic]').length,
+  만들기: (document.getElementById('borb-save') || {}).textContent || '',
+}));
+재기('「새 박스」 를 누르면 만드는 판이 열리나', 만들판.열렸나 && 만들판.머리 === '새 박스', 만들판.머리);
+재기('색 세 가지가 작업대 그대로', 만들판.색칩.join('·') === '흰색·회색·검정', 만들판.색칩.join('·'));
+재기('아이콘 고르는 칸이 그려지나', 만들판.아이콘칸 > 0, 만들판.아이콘칸 + '칸');
+재기('단추가 「만들기」 인가', 만들판.만들기 === '만들기', 만들판.만들기);
+// 바깥을 눌러 닫는다 — 판이 아래에서 올라오므로 위쪽 빈 자리를 짚는다
+await p.tap('#borb-sheet', { position: { x: 187, y: 6 } });
+await p.waitForTimeout(300);
+재기('바깥을 누르면 만드는 판이 닫히나',
+     await p.evaluate(() => document.documentElement.getAttribute('data-borb') === null));
+
+// 일하는 박스를 눌러 바꾸기 화면으로 — 여기서부터는 앞과 똑같다
+await p.tap('#bor-home .borh-tile');
+await p.waitForTimeout(300);
+재기('일하는 박스를 누르면 바꾸기 화면이 나오나',
+     await p.evaluate(() => document.documentElement.getAttribute('data-borhome') === null &&
+                            getComputedStyle(document.getElementById('bor-app')).display !== 'none'));
+
 /* ── 1. .cix 를 고른다 ─────────────────────────────────────────────── */
 /* 파일은 이름과 속으로 건넨다 — 이 플레이라이트는 한글이 든 길로는 파일을 못 붙인다
    (붙는 척하고 change 가 안 온다). 앱 쪽 일이 아니라 시험 쪽 일이다. */
@@ -331,6 +379,27 @@ if (나온것) {
        빈줄세기(나온것.글));
   if (웨잇) 재기('WAIT 판도 빈 줄이 둘', /^2줄 \(앞은 "@ BG, /.test(빈줄세기(웨잇.글)), 빈줄세기(웨잇.글));
 }
+
+/* ── 11. 「← 박스판」 으로 돌아오나 ─────────────────────────────────── */
+const 돌아가기 = await p.evaluate(() => {
+  const b = document.querySelector('#bor-back button');
+  return b ? Math.round(b.getBoundingClientRect().height) : 0;
+});
+재기('「← 박스판」 단추가 44px 인가', 돌아가기 >= 44, 돌아가기 + 'px');
+// 바닥에 뜬 「← 박스판」 이 마지막 줄을 가리지 않나 — 끝까지 내려 보고 잰다
+await p.evaluate(() => window.scrollTo(0, 999999));
+await p.waitForTimeout(300);
+const 안가림 = await p.evaluate(() => {
+  const 끝 = document.getElementById('b-wait-note').getBoundingClientRect();
+  const 판 = document.querySelector('#bor-back button').getBoundingClientRect();
+  return { 끝: Math.round(끝.bottom), 판: Math.round(판.top), 겹침: 끝.bottom > 판.top && 끝.left < 판.right };
+});
+재기('「← 박스판」 이 마지막 줄을 안 가리나', !안가림.겹침,
+     '마지막 줄 ' + 안가림.끝 + ' · 단추 ' + 안가림.판);
+await p.tap('#bor-back button');
+await p.waitForTimeout(300);
+재기('「← 박스판」 을 누르면 박스 판으로 돌아오나',
+     await p.evaluate(() => document.documentElement.getAttribute('data-borhome') === '1'));
 
 await b.close();
 fs.rmSync(내린칸, { recursive: true, force: true });
