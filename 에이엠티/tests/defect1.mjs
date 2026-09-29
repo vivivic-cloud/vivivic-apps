@@ -160,9 +160,22 @@ console.log('③ 집중 창 단추 : ' + JSON.stringify(창단추));
    시계1 + ' → ' + ㄴ.시계);
 await p.screenshot({ path: 그림칸 + '/defect-375-보고창.png' });
 
-// ④ 사진을 붙여 보낸다 — 사진은 저장소로, 파이어스토어에는 주소만
-await p.setInputFiles('#_불량파일', { name: '깨짐.png', mimeType: 'image/png',
+// ④ 사진을 여러 장 붙여 보낸다 — 사진은 저장소로, 파이어스토어에는 주소만
+// 사장님 지시(09-29 10:24): 「사진을 여러장 올릴 수 있게 해줘」
+const 파일칸 = await p.evaluate(() => { const e = document.getElementById('_불량파일');
+  return { 여러장: e.hasAttribute('multiple'), 바로찍기: e.getAttribute('capture'),
+           받는것: e.getAttribute('accept') }; });
+console.log('④ 사진 칸 : ' + JSON.stringify(파일칸));
+판('④ 사진 칸이 여러 장을 받는다 (multiple)', 파일칸.여러장 === true, JSON.stringify(파일칸));
+판('④ 카메라로 바로 열리지 않는다 (capture 없음 — 보관함에서 여러 장을 고를 수 있다)',
+   파일칸.바로찍기 === null, 'capture ' + 파일칸.바로찍기);
+판('④ 사진만 받는다 (accept image/*)', 파일칸.받는것 === 'image/*', 파일칸.받는것);
+const 한장 = 이름 => ({ name: 이름, mimeType: 'image/png',
   buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64') });
+await p.setInputFiles('#_불량파일', ['깨짐1.png', '깨짐2.png', '깨짐3.png'].map(한장));
+await p.waitForTimeout(400);
+const 미리 = await p.evaluate(() => document.querySelectorAll('#_불량미리 img').length);
+판('④ 고른 사진 석 장이 미리 보인다', 미리 === 3, 미리 + '장');
 await p.waitForTimeout(400);
 await p.evaluate(() => { document.getElementById('_불량글').value = '엣지 들뜸'; });
 await 톡('#_불량보냄');
@@ -173,10 +186,13 @@ const ㄷ = await p.evaluate(() => ({ 올린수: window.__올린것.length,
   붙든일: !!_집중찾기() }));
 console.log('④ 사진 보고 : ' + JSON.stringify(ㄷ));
 판('④ 사진을 붙여도 올라간다', ㄷ.올린수 === 2 && !!ㄷ.둘째, JSON.stringify(ㄷ.둘째 && ㄷ.둘째.글));
-판('④ 사진은 저장소로 가고 주소만 적힌다',
-   ㄷ.사진올림.length === 1 && /^defect_photos\//.test(ㄷ.사진올림[0].길)
-   && (ㄷ.둘째.사진 || []).length === 1 && /^https:/.test((ㄷ.둘째.사진[0] || {}).주소),
-   JSON.stringify(ㄷ.사진올림) + ' → ' + JSON.stringify(ㄷ.둘째.사진));
+판('④ 석 장이 다 저장소로 가고 주소만 적힌다',
+   ㄷ.사진올림.length === 3 && ㄷ.사진올림.every(x => /^defect_photos\//.test(x.길))
+   && (ㄷ.둘째.사진 || []).length === 3 && ㄷ.둘째.사진.every(x => /^https:/.test(x.주소 || '')),
+   ㄷ.사진올림.length + '장 → ' + JSON.stringify((ㄷ.둘째.사진 || []).map(x => x.이름)));
+판('④ 올린 사진 이름이 그대로 남는다',
+   (ㄷ.둘째.사진 || []).map(x => x.이름).join(',') === '깨짐1.png,깨짐2.png,깨짐3.png',
+   JSON.stringify((ㄷ.둘째.사진 || []).map(x => x.이름)));
 판('④ 사진을 올려도 작업 창과 붙든 일은 그대로다', ㄷ.작업창 === true && ㄷ.붙든일 === true, JSON.stringify([ㄷ.작업창, ㄷ.붙든일]));
 
 // ⑤ 불량보고 판 — 첫 화면에서 열고 찾는다
@@ -193,6 +209,8 @@ const ㄹ = await p.evaluate(() => ({
 console.log('⑤ 불량보고 판 : ' + JSON.stringify(ㄹ));
 판('⑤ 첫 화면에서 불량보고 판이 열린다', ㄹ.열림 === true, String(ㄹ.열림));
 판('⑤ 올린 보고 둘이 다 보인다', ㄹ.줄수 === 2, ㄹ.줄수 + '줄 · ' + ㄹ.셈);
+const 판사진 = await p.evaluate(() => document.querySelectorAll('#amd-list .amd-사진 img').length);
+판('⑤ 불량보고 판에도 사진 석 장이 다 보인다', 판사진 === 3, 판사진 + '장');
 await p.screenshot({ path: 그림칸 + '/defect-375-보고판.png' });
 
 for (const [찾을것, 바람] of [['1401', 2], ['가와1', 2], ['엣지 들뜸', 1], ['없는말', 0]]) {
