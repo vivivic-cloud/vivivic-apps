@@ -1,7 +1,7 @@
 <!-- ==========================================
      보링변환.html
-     버전: v1.3.1 (2026-09-29) — 박스를 누르면 그 '안으로' 들어간다(작업대 그대로).
-           안이 비면 빈 판 + 「새 박스」. 고치기 판은 길게 눌러야 나온다
+     버전: v1.4.0 (2026-09-29) — 「파일」 박스에 드라이브에서 온 보링 파일 목록.
+           볼 폴더는 폰에서 정하신다(boring_config/설정 의 folder)
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -35,6 +35,7 @@
   onAuthStateChanged(auth, u => {
       if (!u) { signInAnonymously(auth).catch(() => {}); return; }
       if (typeof window.borBoxSync === 'function') window.borBoxSync();
+      if (typeof window.borFilesSync === 'function') window.borFilesSync();
   });
 </script>
 <style>
@@ -136,7 +137,12 @@ body{
    이름만 borh-/borb- 로 갈라 두었다 — 이 집이 이름을 가르는 방식이다. */
 #bor-home{ display:none; }
 html[data-borhome="1"] #bor-home{ display:block; }
-html[data-borhome="1"] #bor-app{ display:none; }
+html[data-borhome="1"] #bor-app,
+html[data-borhome="1"] #bor-files{ display:none; }
+/* 박스 판이 아닐 때 어느 화면을 보일지 — 없으면 바꾸기 화면이다 */
+#bor-files{ display:none; }
+html:not([data-borhome="1"])[data-borscreen="files"] #bor-files{ display:block; }
+html:not([data-borhome="1"])[data-borscreen="files"] #bor-app{ display:none; }
 
 .borh-wrap{ max-width:430px; margin:0 auto; padding:14px 20px calc(28px + env(safe-area-inset-bottom)); }
 .borh-head{ display:flex; align-items:baseline; gap:9px; margin:0 0 14px; }
@@ -288,6 +294,37 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
 .borb-go.borb-del{ background:#fff; color:var(--vg-red); border:1px solid var(--vg-edge); margin-top:10px; }
 .borb-empty{ grid-column:1/-1; font-size:13px; color:var(--vg-muted); margin:6px 0; }
 
+/* ═══ 파일 목록 — 줄 모양은 에이엠티의 알약 줄(.amth-row) 그대로다 ══════════ */
+.borf-list{ display:flex; flex-direction:column; gap:9px; margin:12px 0 0; }
+.borf-row{
+  position:relative; display:flex; align-items:center; gap:12px; min-height:44px;
+  background:var(--vg-fill); border-radius:999px; padding:8px 16px 8px 8px;
+  cursor:pointer; border:0; width:100%; transition:transform .12s;
+  font:inherit; color:inherit; text-align:left;
+}
+.borf-row:active{ transform:scale(.985); }
+.borf-row .borf-ico{
+  width:40px; height:40px; border-radius:50%; flex:none; display:grid; place-items:center;
+  background:#fff; font-size:10px; font-weight:800; letter-spacing:-.2px; color:var(--vg-soft);
+}
+.borf-row .borf-t{
+  flex:1; min-width:0; font-size:14.5px; font-weight:600;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.borf-row .borf-t i{
+  display:block; font-style:normal; font-size:11px; color:var(--vg-muted); font-weight:400;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px;
+}
+.borf-empty{
+  margin:12px 0 0; border-radius:14px; padding:13px 15px; font-size:13.5px;
+  background:var(--vg-fill); color:var(--vg-soft);
+}
+.borf-save{
+  min-height:44px; margin-top:10px; border:0; border-radius:13px; background:var(--vg-ink);
+  color:#fff; font:inherit; font-size:15px; font-weight:700; padding:0 20px; cursor:pointer;
+}
+.borf-save:active{ transform:scale(.985); }
+
 .bhide{display:none !important;}
 </style>
 </head>
@@ -328,7 +365,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
 
     <div class="borh-tiles" id="borh-mine"></div>
 
-    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.3.1</b></p>
+    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.4.0</b></p>
   </div>
 </div>
 
@@ -342,13 +379,40 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
 </button>
 <div id="borb-sheet"><div id="borb-card"></div></div>
 
+<!-- ═══ 파일 — 드라이브에서 온 보링 파일 목록 ═══════════════════════════
+     드라이브를 훑어 boring_files 에 담는 일은 구글 앱스 스크립트(서류관리)가 한다.
+     여기서는 담긴 것을 읽어 보여 주기만 한다. -->
+<div id="bor-files">
+  <div class="bwrap">
+    <div class="bhead">
+      <span class="bday">파일</span>
+      <span class="brole">DRIVE</span>
+      <span class="bsub" id="borf-sub">—</span>
+    </div>
+
+    <input class="borb-fld bhide" id="borf-find" type="text" placeholder="이름으로 찾기" autocomplete="off">
+    <div class="borb-chips bhide" id="borf-chips">
+      <button type="button" class="borb-chip on" data-kind="all">전부</button>
+      <button type="button" class="borb-chip" data-kind="cix">.cix</button>
+      <button type="button" class="borb-chip" data-kind="bpp">.bpp</button>
+    </div>
+
+    <div class="borf-list" id="borf-list"></div>
+    <div class="borf-empty bhide" id="borf-none"></div>
+
+    <div class="bsec"><b>볼 폴더</b><span>드라이브</span></div>
+    <input class="borb-fld" id="borf-folder" type="text" placeholder="폴더 이름 (예: 보링)" autocomplete="off">
+    <button type="button" class="borf-save" id="borf-folder-save">저장</button>
+  </div>
+</div>
+
 <div id="bor-app">
 <div class="bwrap">
 
   <div class="bhead">
     <span class="bday">보링변환</span>
     <span class="brole">CIX → BPP</span>
-    <span class="bsub" id="b-ver">v1.3.1</span>
+    <span class="bsub" id="b-ver">v1.4.0</span>
   </div>
 
   <button class="btile" id="b-pick" type="button">
@@ -839,7 +903,7 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 집게밑인가, 변수틀읽
     const 한번에 = 150;
 
     // 이 집 안에서 갈 수 있는 곳 — 일하는 박스를 바로가기로 걸 수 있게
-    const 안쪽 = [['bpp','보링변환']];
+    const 안쪽 = [['bpp','보링변환'], ['files','파일']];
 
     /* ── 창고 ── */
     function 칸(){
@@ -1034,7 +1098,9 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 집게밑인가, 변수틀읽
        고치기 판은 여기서 열지 않는다 — 「새 박스」 단추와 0.4초 길게 누르기, 두 길뿐이다. */
     function 열기(b){
         if (!b) return;
-        if ((b.link || 이름으로(b)) === 'bpp') { window.borOpen(); return; }
+        const 갈곳 = b.link || 이름으로(b);
+        if (갈곳 === 'bpp')   { window.borOpen(); return; }
+        if (갈곳 === 'files') { window.borOpenFiles(); return; }
         const 바깥 = /^https?:/i.test(b.link || '');
         if (바깥 && !딸림(b.id)) { window.open(b.link, '_blank', 'noopener'); return; }
         들어가기(b.id);
@@ -1097,7 +1163,16 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 집게밑인가, 변수틀읽
     document.addEventListener('input', e => { if (e.target.id === 'borb-q') 아이콘그리기(); });
 
     /* ── 박스 판과 바꾸기 화면 오가기 ── */
-    window.borOpen   = () => document.documentElement.removeAttribute('data-borhome');
+    window.borOpen = () => {
+        document.documentElement.removeAttribute('data-borscreen');
+        document.documentElement.removeAttribute('data-borhome');
+    };
+    window.borOpenFiles = () => {
+        document.documentElement.setAttribute('data-borscreen','files');
+        document.documentElement.removeAttribute('data-borhome');
+        if (typeof window.borFilesDraw === 'function') window.borFilesDraw();
+        window.scrollTo(0, 0);
+    };
     window.borGoHome = () => document.documentElement.setAttribute('data-borhome','1');
 
     // 일하는 박스 아이콘 — 사장님이 박스를 만들 때 고르시는 그 한 벌에서 꺼낸다
@@ -1118,6 +1193,156 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 집게밑인가, 변수틀읽
     (function 기다리기(n){
         if (붙었나) return;
         try { window.borBoxSync(); } catch (e) {}
+        if (!붙었나 && n < 20) setTimeout(() => 기다리기(n + 1), 1500);
+    })(0);
+})();
+</script>
+
+<script>
+/* ══ 파일 ══════════════════════════════════════════════════════════════════
+   사장님 구글 드라이브의 한 폴더를 훑어 보링 파일을 Firestore 에 담는 일은
+   **구글 앱스 스크립트(서류관리 쪽)** 가 한다. 이 화면은 담긴 것을 **읽기만** 한다.
+     읽는 곳  artifacts/vivivic-4b7ef/public/data/boring_files
+              칸 — name · path · driveId · size · mtime · ctime
+     쓰는 곳  artifacts/vivivic-4b7ef/public/data/boring_config/설정 의 folder 칸 하나
+              (사장님이 폰에서 정하시는 폴더 이름. 코드에 박지 않는다)
+   파일 속을 가져와 바로 바꾸는 문은 아직 안 열렸다. 누르면 드라이브로 보내는 데까지다. */
+(function(){
+    const appId = 'vivivic-4b7ef';
+    const $ = id => document.getElementById(id);
+    const _e = v => String(v == null ? '' : v)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+    let 파일들 = [], 폴더 = null, 붙었나 = false;   // 폴더 null = 아직 못 읽었다
+    let 거르기 = 'all', 찾는말 = '';
+
+    function 칸(){
+        const { collection } = window.fbFirestore;
+        return collection(window.db, 'artifacts', appId, 'public', 'data', 'boring_files');
+    }
+    function 설정문서(){
+        const { doc } = window.fbFirestore;
+        return doc(window.db, 'artifacts', appId, 'public', 'data', 'boring_config', '설정');
+    }
+
+    window.borFilesSync = function(){
+        if (붙었나 || !window.db || !window.fbFirestore) return;
+        붙었나 = true;
+        const { onSnapshot } = window.fbFirestore;
+        onSnapshot(칸(), s => {
+            if (!s || typeof s.forEach !== 'function') return;
+            try {
+                const 새것 = [];
+                s.forEach(d => 새것.push(Object.assign({ id: d.id }, d.data())));
+                파일들 = 새것;
+                그리기();
+            } catch (e) {}
+        }, () => {});
+        onSnapshot(설정문서(), d => {
+            try {
+                const 것 = d && typeof d.data === 'function' ? (d.data() || {}) : {};
+                폴더 = String(것.folder || '');
+                const el = $('borf-folder');
+                if (el && document.activeElement !== el) el.value = 폴더;
+                그리기();
+            } catch (e) {}
+        }, () => {});
+    };
+
+    const 때글 = v => {
+        const t = typeof v === 'number' ? v : Date.parse(v);
+        if (!t || Number.isNaN(t)) return '';
+        const d = new Date(t), z = n => String(n).padStart(2, '0');
+        return `${d.getFullYear()}.${z(d.getMonth()+1)}.${z(d.getDate())} ${z(d.getHours())}:${z(d.getMinutes())}`;
+    };
+    const 언제 = f => { const t = typeof f.mtime === 'number' ? f.mtime : Date.parse(f.mtime); return t || 0; };
+    const 크기글 = n => {
+        const v = Number(n);
+        if (!Number.isFinite(v) || v <= 0) return '';
+        if (v < 1024) return v + 'B';
+        if (v < 1024 * 1024) return (v / 1024).toFixed(v < 10240 ? 1 : 0) + 'KB';
+        return (v / 1048576).toFixed(1) + 'MB';
+    };
+    const 꼬리 = f => (String(f.name || '').match(/\.([A-Za-z0-9]+)$/) || [, ''])[1].toLowerCase();
+
+    function 거른것(){
+        const q = 찾는말.trim().toLowerCase();
+        return 파일들
+            .filter(f => 거르기 === 'all' ? true : 꼬리(f) === 거르기)
+            .filter(f => !q || String(f.name || '').toLowerCase().includes(q))
+            .sort((a, b) => 언제(b) - 언제(a));          // 새로 고친 것이 위로
+    }
+
+    function 그리기(){
+        if (!$('borf-list')) return;
+        const 것들 = 거른것();
+        const 있나 = 파일들.length > 0;
+
+        $('borf-find').classList.toggle('bhide', !있나);
+        $('borf-chips').classList.toggle('bhide', !있나);
+        $('borf-sub').textContent = 있나
+            ? (것들.length === 파일들.length ? 파일들.length + '개' : 것들.length + ' / ' + 파일들.length)
+            : '—';
+
+        $('borf-list').innerHTML = 것들.map(f =>
+            '<button type="button" class="borf-row" data-drive="' + _e(f.driveId || '') + '">' +
+              '<span class="borf-ico">' + _e((꼬리(f) || '?').toUpperCase()) + '</span>' +
+              '<span class="borf-t">' + _e(f.name || '이름 없음') +
+                '<i>' + _e([f.path, 크기글(f.size), 때글(f.mtime)].filter(Boolean).join(' · ')) + '</i>' +
+              '</span></button>').join('');
+
+        const 빈말 = $('borf-none');
+        if (있나 && 것들.length) { 빈말.classList.add('bhide'); }
+        else {
+            빈말.classList.remove('bhide');
+            빈말.textContent = 있나 ? '찾으시는 것이 없습니다'
+                : 폴더 === null ? '창고에 아직 못 닿았습니다'
+                : !폴더 ? '아직 볼 폴더를 안 정했습니다'
+                /* 되는 척하지 않는다 — 앱스 스크립트를 맥에서 켜셔야 목록이 찬다 */
+                : '폴더는 정해졌습니다. 드라이브를 훑는 일이 아직 안 켜졌습니다 — 맥에서 한 번 켜 주셔야 합니다.';
+        }
+    }
+    window.borFilesDraw = 그리기;
+
+    async function 폴더저장(){
+        const el = $('borf-folder'); if (!el) return;
+        const 이름 = (el.value || '').trim();
+        if (!window.db || !window.fbFirestore) { alert('창고에 아직 못 닿았습니다. 잠시 뒤 다시 해 주십시오.'); return; }
+        const { setDoc } = window.fbFirestore;
+        const 단추 = $('borf-folder-save'); const 옛 = 단추.textContent;
+        단추.disabled = true; 단추.textContent = '담는 중…';
+        try { await setDoc(설정문서(), { folder: 이름.slice(0, 200), at: Date.now() }, { merge: true }); }
+        catch (e) { alert('담지 못했습니다: ' + e.message); 단추.disabled = false; 단추.textContent = 옛; return; }
+        단추.disabled = false; 단추.textContent = '담았습니다';
+        setTimeout(() => { 단추.textContent = 옛; }, 1800);
+        폴더 = 이름; 그리기();
+    }
+
+    document.addEventListener('click', e => {
+        if (e.target.closest('#borf-folder-save')) { e.preventDefault(); return 폴더저장(); }
+        const 칩 = e.target.closest('#borf-chips .borb-chip');
+        if (칩) {
+            거르기 = 칩.dataset.kind;
+            [].forEach.call($('borf-chips').children, c => c.classList.toggle('on', c === 칩));
+            그리기(); return;
+        }
+        const 줄 = e.target.closest('.borf-row');
+        if (줄) {
+            e.preventDefault();
+            const id = 줄.dataset.drive;
+            // 드라이브에서 연다. 파일 속을 가져와 바로 바꾸는 문은 아직 안 열렸다.
+            if (id) window.open('https://drive.google.com/file/d/' + encodeURIComponent(id) + '/view',
+                                '_blank', 'noopener');
+        }
+    });
+    document.addEventListener('input', e => {
+        if (e.target.id === 'borf-find') { 찾는말 = e.target.value || ''; 그리기(); }
+    });
+
+    그리기();
+    (function 기다리기(n){
+        if (붙었나) return;
+        try { window.borFilesSync(); } catch (e) {}
         if (!붙었나 && n < 20) setTimeout(() => 기다리기(n + 1), 1500);
     })(0);
 })();

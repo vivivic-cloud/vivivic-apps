@@ -99,20 +99,35 @@ await p.waitForTimeout(300);
    창고(파이어스토어)는 이 상자에서 못 닿는다. 그래서 같은 꼴의 가짜 칸을 끼워
    넣고 화면이 하는 일만 잰다 — 앱 파일은 한 글자도 안 건드린다. */
 await p.evaluate(() => {
-  const 칸 = new Map(); let 귀 = null;
-  const 스냅 = () => ({ forEach: f => 칸.forEach((v, k) => f({ id: k, data: () => v })) });
-  const 알린다 = () => { if (귀) 귀(스냅()); };
-  window.__칸 = 칸;
+  const 곳간 = { boring_boxes: new Map(), boring_files: new Map(), boring_config: new Map() };
+  const 귀들 = [];
+  const 이름of = (a, 뒤) => a[a.length - 1 - 뒤];
+  const 스냅칸 = 이름 => ({ forEach: f => 곳간[이름].forEach((v, k) => f({ id: k, data: () => v })) });
+  const 스냅문서 = (이름, id) => ({ id, exists: () => 곳간[이름].has(id), data: () => 곳간[이름].get(id) || null });
+  const 알린다 = 이름 => 귀들.forEach(g => {
+    if (g.이름 !== 이름) return;
+    g.cb(g.kind === 'col' ? 스냅칸(이름) : 스냅문서(이름, g.id));
+  });
+  window.__곳간 = 곳간;
+  window.__칸 = 곳간.boring_boxes;          // 박스 시험이 보던 그 칸
   window.db = {};
   window.fbFirestore = {
-    collection: () => ({}),
-    doc: (...a) => ({ id: a[a.length - 1] }),
-    onSnapshot: (q, cb) => { 귀 = cb; cb(스냅()); },
-    setDoc:    async (r, v) => { 칸.set(r.id, v); 알린다(); },
-    updateDoc: async (r, v) => { 칸.set(r.id, Object.assign({}, 칸.get(r.id), v)); 알린다(); },
-    deleteDoc: async (r)    => { 칸.delete(r.id); 알린다(); },
+    collection: (...a) => ({ kind: 'col', 이름: 이름of(a, 0) }),
+    doc:        (...a) => ({ kind: 'doc', 이름: 이름of(a, 1), id: 이름of(a, 0) }),
+    onSnapshot: (ref, cb) => {
+      귀들.push({ kind: ref.kind, 이름: ref.이름, id: ref.id, cb });
+      cb(ref.kind === 'col' ? 스냅칸(ref.이름) : 스냅문서(ref.이름, ref.id));
+    },
+    setDoc: async (r, v, opt) => {
+      곳간[r.이름].set(r.id, opt && opt.merge
+        ? Object.assign({}, 곳간[r.이름].get(r.id), v) : v);
+      알린다(r.이름);
+    },
+    updateDoc: async (r, v) => { 곳간[r.이름].set(r.id, Object.assign({}, 곳간[r.이름].get(r.id), v)); 알린다(r.이름); },
+    deleteDoc: async (r)    => { 곳간[r.이름].delete(r.id); 알린다(r.이름); },
   };
   window.borBoxSync();
+  window.borFilesSync();
 });
 
 async function 박스만들기(이름){
@@ -211,10 +226,112 @@ const 막음 = await p.evaluate(async () => {
 await p.tap('#borb-sheet', { position: { x: 187, y: 6 } });
 await p.waitForTimeout(300);
 
+
+/* ── 0-3. 「파일」 박스 — 드라이브에서 온 목록 ────────────────────────
+   드라이브를 훑어 boring_files 에 담는 일은 앱스 스크립트(서류관리)가 한다.
+   여기서는 담긴 것을 읽어 보여 주는 일만 잰다. */
+await 박스만들기('파일');
+const 파일타일 = await 타일글();
+재기('「파일」 이라 적은 박스는 파일 화면으로 간다고 적히나',
+     파일타일.some(t => t === '파일|파일'), 파일타일.join(' '));
+
+// 맨 위 판에는 앞서 만든 「시험박스」 도 있다 — 「파일」 박스를 집어서 누른다
+const 파일박스 = await p.evaluate(() => {
+  const t = [...document.querySelectorAll('#borh-mine [data-borb-id]')]
+      .find(e => (e.querySelector('.borh-nm') || {}).textContent === '파일');
+  return t ? t.dataset.borbId : '';
+});
+await p.tap(`[data-borb-id="${파일박스}"]`);
+await p.waitForTimeout(400);
+const 빈목록 = await p.evaluate(() => ({
+  화면: document.documentElement.getAttribute('data-borscreen'),
+  보이나: getComputedStyle(document.getElementById('bor-files')).display,
+  빈말: document.getElementById('borf-none').textContent,
+  찾기: document.getElementById('borf-find').classList.contains('bhide'),
+  폴더칸: !!document.getElementById('borf-folder'),
+}));
+재기('「파일」 박스를 누르면 파일 화면이 나오나',
+     빈목록.화면 === 'files' && 빈목록.보이나 !== 'none', 빈목록.보이나);
+재기('폴더를 안 정했으면 그렇다고 적나', 빈목록.빈말 === '아직 볼 폴더를 안 정했습니다', 빈목록.빈말);
+재기('목록이 비면 찾기·거르기를 안 보인다', 빈목록.찾기);
+재기('폴더 넣는 칸이 있나', 빈목록.폴더칸);
+
+// 폴더 이름을 넣고 저장 — boring_config/설정 의 folder 칸에 담겨야 한다
+await p.fill('#borf-folder', '보링/2026');
+await p.tap('#borf-folder-save');
+await p.waitForTimeout(400);
+const 담김 = await p.evaluate(() => ({
+  담긴것: (window.__곳간.boring_config.get('설정') || {}).folder,
+  빈말: document.getElementById('borf-none').textContent,
+}));
+재기('폴더 이름이 boring_config/설정 의 folder 에 담기나', 담김.담긴것 === '보링/2026', String(담김.담긴것));
+재기('아직 안 켜졌다고 솔직하게 적나',
+     /드라이브를 훑는 일이 아직 안 켜졌습니다/.test(담김.빈말), 담김.빈말);
+
+// 앱스 스크립트가 담았다 치고 — 목록이 찬다
+await p.evaluate(async () => {
+  const { setDoc, doc } = window.fbFirestore;
+  const 넣기 = (id, v) => setDoc(doc(null, 'a', 'p', 'd', 'boring_files', id), v);
+  await 넣기('f1', { name:'592x382_1001_01.cix', path:'보링/2026', driveId:'DRV1',
+                     size: 4096, mtime: Date.parse('2026-09-28T10:00:00Z') });
+  await 넣기('f2', { name:'592x382_1001_01.bpp', path:'보링/2026', driveId:'DRV2',
+                     size: 8192, mtime: Date.parse('2026-09-29T09:00:00Z') });
+  await 넣기('f3', { name:'700x400_2002_01.cix', path:'보링/2026/옛것', driveId:'DRV3',
+                     size: 2048, mtime: Date.parse('2026-09-27T08:00:00Z') });
+});
+await p.waitForTimeout(350);
+const 목록 = () => p.evaluate(() =>
+  [...document.querySelectorAll('#borf-list .borf-row')].map(r =>
+    r.querySelector('.borf-t').childNodes[0].textContent));
+재기('담긴 파일이 목록에 뜨나', (await 목록()).length === 3, (await 목록()).join(' '));
+재기('새로 고친 것이 위로', (await 목록())[0] === '592x382_1001_01.bpp', (await 목록())[0]);
+재기('줄에 길·크기·때를 한 줄로 적나',
+     await p.evaluate(() => /보링\/2026 · 4\.0KB · 2026\.09\.28/.test(
+       [...document.querySelectorAll('.borf-row .borf-t i')].map(e => e.textContent).join('|'))),
+     await p.evaluate(() => document.querySelectorAll('.borf-row .borf-t i')[0].textContent));
+const 줄높이 = await p.evaluate(() =>
+  Math.min(...[...document.querySelectorAll('.borf-row')].map(r => Math.round(r.getBoundingClientRect().height))));
+재기('줄이 44px 이상', 줄높이 >= 44, 줄높이 + 'px');
+
+// .cix 만 거르기
+await p.tap('#borf-chips [data-kind="cix"]');
+await p.waitForTimeout(250);
+재기('.cix 만 거르나', (await 목록()).every(n => n.endsWith('.cix')) && (await 목록()).length === 2,
+     (await 목록()).join(' '));
+// 이름으로 찾기
+await p.fill('#borf-find', '700');
+await p.waitForTimeout(250);
+재기('이름으로 찾나', (await 목록()).join('') === '700x400_2002_01.cix', (await 목록()).join(' '));
+await p.fill('#borf-find', '');
+await p.tap('#borf-chips [data-kind="all"]');
+await p.waitForTimeout(250);
+
+// 누르면 드라이브에서 열린다 — 새 창으로 보내는 데까지다
+const 보낸곳 = await p.evaluate(async () => {
+  let 곳 = ''; const 옛 = window.open; window.open = u => { 곳 = String(u); return null; };
+  document.querySelector('.borf-row').click();
+  await new Promise(r => setTimeout(r, 150));
+  window.open = 옛; return 곳;
+});
+재기('파일을 누르면 드라이브로 보내나',
+     보낸곳 === 'https://drive.google.com/file/d/DRV2/view', 보낸곳);
+
+// 치우고 박스 판으로
+await p.evaluate(async () => {
+  const { deleteDoc, doc } = window.fbFirestore;
+  for (const id of [...window.__곳간.boring_files.keys()])
+    await deleteDoc(doc(null, 'a', 'p', 'd', 'boring_files', id));
+});
+await p.tap('#bor-back button');
+await p.waitForTimeout(300);
+재기('파일 화면에서도 「← 박스판」 으로 돌아오나',
+     await p.evaluate(() => document.documentElement.getAttribute('data-borhome') === '1'));
+
 // 시험이 만든 박스는 치우고 간다 — 뒤 시험이 깨끗한 자리에서 돌게
 await p.evaluate(async () => {
   const { deleteDoc, doc } = window.fbFirestore;
-  for (const id of [...window.__칸.keys()]) await deleteDoc(doc(null, id));
+  for (const id of [...window.__칸.keys()])
+    await deleteDoc(doc(null, 'a', 'p', 'd', 'boring_boxes', id));
 });
 await p.waitForTimeout(250);
 재기('시험이 만든 박스를 다 치웠나',
