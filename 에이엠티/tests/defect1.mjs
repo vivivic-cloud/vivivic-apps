@@ -172,10 +172,33 @@ console.log('④ 사진 칸 : ' + JSON.stringify(파일칸));
 판('④ 사진만 받는다 (accept image/*)', 파일칸.받는것 === 'image/*', 파일칸.받는것);
 const 한장 = 이름 => ({ name: 이름, mimeType: 'image/png',
   buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64') });
-await p.setInputFiles('#_불량파일', ['깨짐1.png', '깨짐2.png', '깨짐3.png'].map(한장));
+const 미리수 = () => p.evaluate(() => document.querySelectorAll('#_불량미리 img').length);
+// 사장님 지시(09-29 10:26): 「지금 한장찍고 새로찍으면 이전 사진 사라짐」 — 쌓여야 한다
+await p.setInputFiles('#_불량파일', [한장('깨짐1.png')]);
+await p.waitForTimeout(350);
+판('④ 한 장 고르면 한 장 보인다', (await 미리수()) === 1, (await 미리수()) + '장');
+await p.setInputFiles('#_불량파일', [한장('깨짐2.png')]);
+await p.waitForTimeout(350);
+판('④ 또 한 장 고르면 앞 장이 안 사라지고 쌓인다 (2장)', (await 미리수()) === 2, (await 미리수()) + '장');
+await p.setInputFiles('#_불량파일', ['깨짐3.png', '깨짐4.png', '깨짐5.png'].map(한장));
 await p.waitForTimeout(400);
-const 미리 = await p.evaluate(() => document.querySelectorAll('#_불량미리 img').length);
-판('④ 고른 사진 석 장이 미리 보인다', 미리 === 3, 미리 + '장');
+판('④ 사진첩에서 여러 장을 골라도 이미 있던 것에 더해진다 (5장)', (await 미리수()) === 5, (await 미리수()) + '장');
+await p.setInputFiles('#_불량파일', [한장('깨짐6.png')]);
+await p.waitForTimeout(350);
+판('④ 다섯 장이 한도다 (더 골라도 5장)', (await 미리수()) === 5, (await 미리수()) + '장');
+await p.screenshot({ path: 그림칸 + '/defect-375-사진쌓기.png' });
+// ✕ 로 한 장만 뺀다 — 진짜 손가락으로
+const 뺀자리 = await p.evaluate(() => {
+  const b = document.querySelector('#_불량미리 .불량-빼기'); if (!b) return null;
+  const r = b.getBoundingClientRect(); const af = getComputedStyle(b, '::after');
+  return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2),
+           w: Math.round(r.width), h: Math.round(r.height),
+           닿는높이: Math.max(Math.round(r.height), parseFloat(af.height) || 0) };
+});
+console.log('④ ✕ 단추 : ' + JSON.stringify(뺀자리));
+판('④ 미리보기마다 ✕ 가 있다 (닿는 자리 44px 이상)', !!뺀자리 && 뺀자리.닿는높이 >= 44, JSON.stringify(뺀자리));
+if (뺀자리) await 짚기(뺀자리);
+판('④ ✕ 를 누르면 그 한 장만 빠진다 (5 → 4장)', (await 미리수()) === 4, (await 미리수()) + '장');
 await p.waitForTimeout(400);
 await p.evaluate(() => { document.getElementById('_불량글').value = '엣지 들뜸'; });
 await 톡('#_불량보냄');
@@ -186,12 +209,12 @@ const ㄷ = await p.evaluate(() => ({ 올린수: window.__올린것.length,
   붙든일: !!_집중찾기() }));
 console.log('④ 사진 보고 : ' + JSON.stringify(ㄷ));
 판('④ 사진을 붙여도 올라간다', ㄷ.올린수 === 2 && !!ㄷ.둘째, JSON.stringify(ㄷ.둘째 && ㄷ.둘째.글));
-판('④ 석 장이 다 저장소로 가고 주소만 적힌다',
-   ㄷ.사진올림.length === 3 && ㄷ.사진올림.every(x => /^defect_photos\//.test(x.길))
-   && (ㄷ.둘째.사진 || []).length === 3 && ㄷ.둘째.사진.every(x => /^https:/.test(x.주소 || '')),
+판('④ 남은 넉 장이 다 저장소로 가고 주소만 적힌다',
+   ㄷ.사진올림.length === 4 && ㄷ.사진올림.every(x => /^defect_photos\//.test(x.길))
+   && (ㄷ.둘째.사진 || []).length === 4 && ㄷ.둘째.사진.every(x => /^https:/.test(x.주소 || '')),
    ㄷ.사진올림.length + '장 → ' + JSON.stringify((ㄷ.둘째.사진 || []).map(x => x.이름)));
-판('④ 올린 사진 이름이 그대로 남는다',
-   (ㄷ.둘째.사진 || []).map(x => x.이름).join(',') === '깨짐1.png,깨짐2.png,깨짐3.png',
+판('④ 뺀 한 장은 안 올라가고 나머지 이름은 그대로 남는다',
+   (ㄷ.둘째.사진 || []).map(x => x.이름).join(',') === '깨짐2.png,깨짐3.png,깨짐4.png,깨짐5.png',
    JSON.stringify((ㄷ.둘째.사진 || []).map(x => x.이름)));
 판('④ 사진을 올려도 작업 창과 붙든 일은 그대로다', ㄷ.작업창 === true && ㄷ.붙든일 === true, JSON.stringify([ㄷ.작업창, ㄷ.붙든일]));
 
@@ -210,7 +233,7 @@ console.log('⑤ 불량보고 판 : ' + JSON.stringify(ㄹ));
 판('⑤ 첫 화면에서 불량보고 판이 열린다', ㄹ.열림 === true, String(ㄹ.열림));
 판('⑤ 올린 보고 둘이 다 보인다', ㄹ.줄수 === 2, ㄹ.줄수 + '줄 · ' + ㄹ.셈);
 const 판사진 = await p.evaluate(() => document.querySelectorAll('#amd-list .amd-사진 img').length);
-판('⑤ 불량보고 판에도 사진 석 장이 다 보인다', 판사진 === 3, 판사진 + '장');
+판('⑤ 불량보고 판에도 사진 넉 장이 다 보인다', 판사진 === 4, 판사진 + '장');
 await p.screenshot({ path: 그림칸 + '/defect-375-보고판.png' });
 
 for (const [찾을것, 바람] of [['1401', 2], ['가와1', 2], ['엣지 들뜸', 1], ['없는말', 0]]) {

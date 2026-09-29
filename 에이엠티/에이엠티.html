@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.13.1 (2026-09-29) — 불량보고 사진을 여러 장 고를 수 있게 한다
+     버전: v1.13.2 (2026-09-29) — 불량보고 사진이 쌓이고, 한 장씩 뺄 수 있다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2242,7 +2242,20 @@
         }
         #_불량판 .불량-사진단추:active{ background:#f7f6f3; }
         #_불량판 .불량-미리{ display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+        #_불량판 .불량-한장{ position:relative; display:inline-block; line-height:0; }
         #_불량판 .불량-미리 img{ width:72px; height:72px; object-fit:cover; border-radius:9px; border:1px solid #ededeb; }
+        /* 잘못 찍은 한 장을 뺀다 — 보이는 것은 작고, 닿는 자리는 44px */
+        #_불량판 .불량-빼기{
+            position:absolute; top:-6px; right:-6px; z-index:1;
+            width:24px; height:24px; padding:0; border:1px solid #e3e2e0; border-radius:999px;
+            background:#fff; color:#37352f; font:inherit; font-size:12px; font-weight:800;
+            line-height:1; cursor:pointer; box-shadow:0 2px 6px -2px rgba(0,0,0,.35);
+        }
+        #_불량판 .불량-빼기:active{ background:#f1f1ef; }
+        #_불량판 .불량-빼기::after{
+            content:''; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+            width:44px; height:44px;
+        }
         #_불량판 textarea{
             width:100%; min-height:96px; margin-top:10px; border:1px solid #e3e2e0; border-radius:12px;
             padding:11px 12px; font:inherit; font-size:14px; color:#37352f; resize:vertical; outline:none;
@@ -2350,7 +2363,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.13.1</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.13.2</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2483,7 +2496,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.13.1</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.13.2</b></p>
         </div>
     </div>
 
@@ -14684,7 +14697,11 @@
             // 뒤(작업 창)로 눌림이 새지 않게. 창은 그대로 살아 있다.
             덮.addEventListener('click', e => { if (e.target === 덮) e.stopPropagation(); });
             $('_불량파일').addEventListener('change', e => {
-                고른사진 = Array.from(e.target.files || []).slice(0, 5);
+                /* 사장님 지시(09-29) 「한장찍고 새로찍으면 이전 사진 사라짐」 —
+                   갈아엎지 말고 뒤에 붙인다. 다섯 장까지. 그리고 값을 비워야
+                   같은 사진을 다시 골라도 change 가 다시 뜬다. */
+                고른사진 = 고른사진.concat(Array.from(e.target.files || [])).slice(0, 5);
+                e.target.value = '';
                 미리그리기();
             });
             $('_불량닫기').onclick = () => window.불량보고닫기();
@@ -14697,10 +14714,22 @@
         function 미리그리기(){
             const 자리 = $('_불량미리'); if (!자리) return;
             자리.innerHTML = '';
-            고른사진.forEach(f => {
+            고른사진.forEach((f, i) => {
+                const 칸 = document.createElement('span');
+                칸.className = '불량-한장';
                 const img = document.createElement('img');
                 try { img.src = URL.createObjectURL(f); } catch (e) {}
-                자리.appendChild(img);
+                const 빼기 = document.createElement('button');
+                빼기.type = 'button'; 빼기.className = '불량-빼기';
+                빼기.setAttribute('aria-label', '이 사진 빼기');
+                빼기.textContent = '✕';
+                빼기.addEventListener('click', ev => {
+                    ev.preventDefault(); ev.stopPropagation();
+                    고른사진.splice(i, 1);
+                    미리그리기();
+                });
+                칸.appendChild(img); 칸.appendChild(빼기);
+                자리.appendChild(칸);
             });
         }
         async function 보내기(){
