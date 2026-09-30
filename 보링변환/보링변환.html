@@ -1,7 +1,7 @@
 <!-- ==========================================
      보링변환.html
-     버전: v1.6.0 (2026-09-30) — 드라이브 파일을 눌러 그 자리에서 뜯어 본다.
-           알맹이를 받아 「고르기」 와 똑같은 길에 태운다
+     버전: v1.7.0 (2026-09-30) — 집게 자리·WAIT 를 걷어내고, 파일을 어떻게 읽었는지만
+           글자 그대로 보인다 (낱말을 지어내지 않는다)
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -109,16 +109,23 @@ body{
 .bsec b{font-size:17px; font-weight:700; letter-spacing:-.4px; color:var(--vg-ink);}
 .bsec span{font-size:12px; color:var(--vg-muted);}
 
-/* 집게 자리 값 — 입력칸 34px */
-.brow{display:flex; align-items:center; gap:8px; margin:0 0 8px;}
-.brow label{flex:none; width:64px; font-size:13px; font-weight:700; color:var(--vg-soft);}
-.brow input{
-  flex:1; min-width:0; height:34px; border:1px solid var(--vg-edge); border-radius:10px;
-  padding:0 10px; font:inherit; font-size:15px; background:#fff; color:var(--vg-ink);
-  outline:none; text-align:center;
+/* 읽은 것 표 — 칸이 많아 옆으로 밀린다. 색·선은 이 집 토큰 그대로다 */
+.bread{
+  margin:12px 0 0; border:1px solid var(--vg-edge); border-radius:16px;
+  overflow-x:auto; -webkit-overflow-scrolling:touch; background:#fff;
 }
-.brow input:focus{border-color:var(--vg-ink);}
-.brow i{flex:none; font-style:normal; font-size:12px; color:var(--vg-muted);}
+.bread table{border-collapse:collapse; width:100%; font-size:12.5px;}
+.bread th, .bread td{
+  padding:8px 9px; text-align:right; white-space:nowrap;
+  border-bottom:1px solid var(--vg-line);
+}
+.bread th{
+  font-size:11px; font-weight:800; color:var(--vg-muted); letter-spacing:.02em;
+  background:var(--vg-fill); position:sticky; top:0;
+}
+.bread td{color:var(--vg-ink); font-weight:600;}
+.bread th:first-child, .bread td:first-child{text-align:left; color:var(--vg-muted); font-weight:700;}
+.bread tr:last-child td{border-bottom:0;}
 
 /* 단추 — 44px */
 .bbtn{
@@ -368,7 +375,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
 
     <div class="borh-tiles" id="borh-mine"></div>
 
-    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.6.0</b></p>
+    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.7.0</b></p>
   </div>
 </div>
 
@@ -421,7 +428,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
   <div class="bhead">
     <span class="bday">보링변환</span>
     <span class="brole">CIX → BPP</span>
-    <span class="bsub" id="b-ver">v1.6.0</span>
+    <span class="bsub" id="b-ver">v1.7.0</span>
   </div>
 
   <button class="btile" id="b-pick" type="button">
@@ -445,33 +452,13 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
 
   <div class="bdraw bhide" id="b-draw"></div>
 
+  <!-- 읽은 것 — 파일에 적힌 글자 그대로 보인다. 옮기지도 셈하지도 않는다. -->
+  <div class="bread bhide" id="b-read"></div>
+  <div class="bnote bhide" id="b-drop"></div>
+
   <div class="bwarn bhide" id="b-warn"></div>
 
-  <div id="b-clamp" class="bhide">
-    <div class="bsec"><b>집게</b><span>기계 설정대로</span></div>
-    <div class="brow">
-      <label for="b-y1">띠 Y</label>
-      <input id="b-y1" type="number" inputmode="decimal" value="0">
-      <i>~</i>
-      <input id="b-y2" type="number" inputmode="decimal" value="33">
-    </div>
-    <div class="brow">
-      <label for="b-a1">집게1 X</label>
-      <input id="b-a1" type="number" inputmode="decimal" value="10">
-      <i>~</i>
-      <input id="b-a2" type="number" inputmode="decimal" value="214">
-    </div>
-    <div class="brow">
-      <label for="b-b1">집게2 X</label>
-      <input id="b-b1" type="number" inputmode="decimal" value="380">
-      <i>~</i>
-      <input id="b-b2" type="number" inputmode="decimal" value="580">
-    </div>
-  </div>
-
   <button class="bbtn bprim bhide" id="b-go" type="button">바꾸기</button>
-  <button class="bbtn bhide" id="b-wait" type="button">집게 밑 구멍을 뒤로 미루고 WAIT 넣기</button>
-  <div class="bnote bhide" id="b-wait-note">되는 것 먼저 뚫고 멈춘다 · 판 옮긴 뒤 나머지</div>
 
 </div>
 </div>
@@ -577,8 +564,8 @@ function cix읽기(글){
 /* ── 값 재기 ────────────────────────────────────────────────────────────
    cix 에서 온 값은 `374-32` · `380+0.5` 처럼 식으로 적혀 오기도 한다. 기계는 그대로
    읽으므로 **bpp 에 적을 때는 계산하지 않고 글자 그대로** 넣는다. 여기서 재는 것은
-   그림을 그리고 집게 밑인지 보려는 것뿐이다. 더하기·빼기만 본다 —
-   못 재는 꼴이면 null 을 내고, 화면이 「잴 수 없다」 고 빨갛게 말한다. */
+   여기서 재는 것은 **그림을 그리려는 것뿐**이다. 더하기·빼기만 본다 —
+   못 재는 꼴이면 null 을 내고 그 구멍은 그리지 않는다(표에는 글자 그대로 나온다). */
 function 값재기(글){
   const s = String(글 == null ? '' : 글).trim();
   if (!/^[+-]?\d+(?:\.\d+)?(?:[+-]\d+(?:\.\d+)?)*$/.test(s)) return null;
@@ -588,31 +575,10 @@ function 값재기(글){
   return Number.isFinite(v) ? v : null;
 }
 
-/* ── 집게 밑인가 ────────────────────────────────────────────────────────
-   자리는 기계 설정에 따라 달라진다 — 화면에서 고친 값을 그대로 쓴다.
-   구멍 가운뎃점이 띠 Y 안에 있고, 집게 둘 가운데 한 X 칸 안에 있으면 걸린다. */
-function 집게읽기(){
-  const n = id => parseFloat($(id).value);
-  const y1 = n('b-y1'), y2 = n('b-y2');
-  return {
-    y: [Math.min(y1,y2), Math.max(y1,y2)],
-    x: [[n('b-a1'), n('b-a2')], [n('b-b1'), n('b-b2')]]
-        .map(([a,b]) => [Math.min(a,b), Math.max(a,b)])
-        .filter(([a,b]) => Number.isFinite(a) && Number.isFinite(b)),
-    쓸만한가: Number.isFinite(y1) && Number.isFinite(y2),
-  };
-}
-function 집게밑인가(구멍, 집게){
-  if (!집게.쓸만한가) return false;
-  const x = 값재기(구멍.x), y = 값재기(구멍.y);
-  if (x === null || y === null) return false;
-  if (y < 집게.y[0] || y > 집게.y[1]) return false;
-  return 집게.x.some(([a,b]) => x >= a && x <= b);
-}
-
 /* ── 도면 ───────────────────────────────────────────────────────────────
-   Y 는 아래로 자란다 — 사장님이 보신 기계 화면과 같게, Y 0 이 판 위쪽이다. */
-function 도면그리기(판, 구멍들, 집게){
+   Y 는 아래로 자란다 — Y 0 이 판 위쪽이다.
+   판과 구멍을 눈으로 보는 것뿐이다. 값을 재서 무엇을 가르지 않는다. */
+function 도면그리기(판, 구멍들){
   const W = 값재기(판.LPX), H = 값재기(판.LPY);
   if (W === null || H === null || W <= 0 || H <= 0) return '';
   const 여백 = 10, 폭 = 315;
@@ -622,15 +588,6 @@ function 도면그리기(판, 구멍들, 집게){
 
   const 조각 = [];
   조각.push(`<svg viewBox="0 0 ${(w+여백*2).toFixed(1)} ${(h+여백*2).toFixed(1)}" role="img" aria-label="판과 구멍">`);
-  // 집게 칸
-  if (집게.쓸만한가) {
-    const y0 = Math.max(0, 집게.y[0]), y1 = Math.min(H, 집게.y[1]);
-    if (y1 > y0) for (const [a,b] of 집게.x) {
-      const x0 = Math.max(0, a), x1 = Math.min(W, b);
-      if (x1 <= x0) continue;
-      조각.push(`<rect x="${X(x0).toFixed(1)}" y="${Y(y0).toFixed(1)}" width="${((x1-x0)*배).toFixed(1)}" height="${((y1-y0)*배).toFixed(1)}" fill="rgba(255,59,48,.10)" stroke="#FF3B30" stroke-width="1" stroke-dasharray="4 3"/>`);
-    }
-  }
   // 판
   조각.push(`<rect x="${여백}" y="${여백}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="none" stroke="#111110" stroke-width="1.4"/>`);
   // 구멍
@@ -638,8 +595,7 @@ function 도면그리기(판, 구멍들, 집게){
     const x = 값재기(g.x), y = 값재기(g.y), d = 값재기(g.dia);
     if (x === null || y === null) continue;          // 못 재는 것은 못 그린다
     const r = Math.max(2.6, (d === null ? 5 : d) / 2 * 배);
-    const 걸림 = g.걸림;
-    조각.push(`<circle cx="${X(x).toFixed(1)}" cy="${Y(y).toFixed(1)}" r="${r.toFixed(1)}" fill="${걸림 ? '#FF3B30' : '#111110'}" stroke="${걸림 ? '#FF3B30' : 'none'}" stroke-width="${걸림 ? 3 : 0}" stroke-opacity=".3"/>`);
+    조각.push(`<circle cx="${X(x).toFixed(1)}" cy="${Y(y).toFixed(1)}" r="${r.toFixed(1)}" fill="#111110"/>`);
   }
   조각.push('</svg>');
   return 조각.join('');
@@ -749,43 +705,50 @@ function 되짚기(bpp글, 차례, 판){
 /* ── 화면 ───────────────────────────────────────────────────────────────── */
 let 읽은것 = null, 파일이름 = '', 드라이브 = '';
 
+/* 읽은 것을 그대로 보인다.
+   ⚠ 낱말을 지어내지 않는다 — 파일에 SIDE·CRN 이라 적혀 있으면 SIDE·CRN 그대로 적는다.
+   우리말로 옮겨 짓지 않는다. 읽는 법은 사장님이 실제 일에서 알려 주신다. */
+const 읽은표 = 구멍들 => {
+  const 칸 = ['번호', 'X', 'Y', '지름', '깊이', 'SIDE', 'CRN', 'ID'];
+  return '<table><thead><tr>' + 칸.map(c => '<th>' + 막기(c) + '</th>').join('') +
+    '</tr></thead><tbody>' +
+    구멍들.map((g, i) =>
+      '<tr>' + [i + 1, g.x, g.y, g.dia, g.dp, g.side, g.crn, g.id]
+        .map(v => '<td>' + 막기(v) + '</td>').join('') + '</tr>').join('') +
+    '</tbody></table>';
+};
+
 function 다시그리기(){
   if (!읽은것) return;
-  const 집게 = 집게읽기();
-  읽은것.구멍.forEach(g => { g.걸림 = 집게밑인가(g, 집게); });
-  const 걸린수 = 읽은것.구멍.filter(g => g.걸림).length;
-  // X·Y 를 못 재는 구멍 — 값은 그대로 옮기지만 집게 밑인지는 못 본다
-  const 못잰수 = 읽은것.구멍.filter(g => 값재기(g.x) === null || 값재기(g.y) === null).length;
-
   const 판 = 읽은것.판;
-  const 알약 = [
-    `${판.LPX}×${판.LPY}×${판.LPZ}`,
-    `구멍 ${읽은것.구멍.length}`,
-  ];
-  if (읽은것.버린것.GEOTEXT) 알약.push(`결 글자 ${읽은것.버린것.GEOTEXT} 버림`);
-  // 집게 밑 몇 개인지는 아래 빨간 줄이 말한다 — 알약으로 또 내지 않는다
-  $('b-pills').innerHTML = 알약.map(t => `<span class="bpill">${막기(t)}</span>`).join('');
 
-  $('b-draw').innerHTML = 도면그리기(판, 읽은것.구멍, 집게);
+  // 판 — 파일에 적힌 칸 이름 그대로다
+  $('b-pills').innerHTML = [
+    `LPX ${판.LPX}`, `LPY ${판.LPY}`, `LPZ ${판.LPZ}`, `구멍 ${읽은것.구멍.length}`,
+  ].map(t => `<span class="bpill">${막기(t)}</span>`).join('');
+
+  $('b-draw').innerHTML = 도면그리기(판, 읽은것.구멍);
+  $('b-read').innerHTML = 읽은것.구멍.length ? 읽은표(읽은것.구멍) : '';
+  보임($('b-read'), !!읽은것.구멍.length);
+
+  // 버린 것 · 못 그린 것 — 값만 한 줄
+  const 못그린수 = 읽은것.구멍.filter(g => 값재기(g.x) === null || 값재기(g.y) === null).length;
+  const 곁 = [];
+  if (읽은것.버린것.GEOTEXT) 곁.push(`GEOTEXT ${읽은것.버린것.GEOTEXT} 버림`);
+  if (읽은것.버린것.VB) 곁.push(`VBLINE ${읽은것.버린것.VB}줄 버림`);
+  if (못그린수) 곁.push(`그림에 못 그린 구멍 ${못그린수}`);
+  $('b-drop').textContent = 곁.join(' · ');
+  보임($('b-drop'), !!곁.length);
 
   const 모르는것 = [...읽은것.모르는것.keys()];
   if (모르는것.length) {
     $('b-warn').innerHTML = 막기(모르는것.join(' · ')) + ' — 모르는 매크로다. 이대로 바꾸면 구멍이 빠진다';
     보임($('b-warn'), true);
-  } else if (못잰수) {
-    $('b-warn').textContent = `X·Y 를 못 재는 구멍 ${못잰수}개 — 집게 밑인지 못 본다`;
-    보임($('b-warn'), true);
-  } else if (걸린수) {
-    $('b-warn').textContent = `집게 밑 — 이대로면 못 뚫는다 (${걸린수}개)`;
-    보임($('b-warn'), true);
   } else {
     보임($('b-warn'), false);
   }
 
-  const 막힌다 = 모르는것.length > 0 || 읽은것.구멍.length === 0;
-  $('b-go').disabled = 막힌다;
-  // 못 재는 것이 섞이면 뒤로 미룰지를 가를 수 없다 — WAIT 는 막는다
-  $('b-wait').disabled = 막힌다 || 못잰수 > 0 || 걸린수 === 0;
+  $('b-go').disabled = 모르는것.length > 0 || 읽은것.구멍.length === 0;
 }
 
 function 내려받기(이름, 글){
@@ -802,26 +765,16 @@ function 막힘알림(글){
   보임($('b-warn'), true);
 }
 
-async function 바꾸기(WAIT넣을까){
+async function 바꾸기(){
   if (!읽은것) return;
   let 변수;
   try { 변수 = await 변수틀읽기(); }
   catch (e) { 막힘알림((e.message || '변수틀을 읽지 못했습니다') + ' — 바꾸지 않았다'); return; }
 
-  const 집게 = 집게읽기();
-  읽은것.구멍.forEach(g => { g.걸림 = 집게밑인가(g, 집게); });
-
-  let 차례, WAIT어디 = -1;
-  if (WAIT넣을까) {
-    const 되는것 = 읽은것.구멍.filter(g => !g.걸림);
-    const 미룰것 = 읽은것.구멍.filter(g => g.걸림);
-    차례 = 되는것.concat(미룰것);
-    WAIT어디 = 되는것.length;
-  } else {
-    차례 = 읽은것.구멍.slice();
-  }
-
-  const 글 = bpp짓기(읽은것.판, 차례, 변수, WAIT어디);
+  // 구멍 차례는 파일에 적힌 그대로다. 가르지 않는다.
+  // bpp짓기 는 한 줄도 안 건드렸다 — 넷째 자리에 -1 을 주면 아무것도 끼지 않는다.
+  const 차례 = 읽은것.구멍.slice();
+  const 글 = bpp짓기(읽은것.판, 차례, 변수, -1);
 
   const 어긋남 = 되짚기(글, 차례, 읽은것.판);
   if (차례.length !== 읽은것.구멍.length) 어긋남.unshift('구멍 ' + 차례.length + ' ≠ ' + 읽은것.구멍.length);
@@ -831,10 +784,8 @@ async function 바꾸기(WAIT넣을까){
     return;
   }
 
-  const 밑이름 = 파일이름.replace(/\.cix$/i, '');
-  내려받기(밑이름 + (WAIT넣을까 ? '_WAIT' : '') + '.bpp', 글);
-  $('b-pick-sub').textContent = `${읽은것.구멍.length}개 다 맞았다 · 내려받았다`
-      + (WAIT넣을까 ? ` · WAIT ${WAIT어디 + 1}번째` : '');
+  내려받기(파일이름.replace(/\.cix$/i, '') + '.bpp', 글);
+  $('b-pick-sub').textContent = `${읽은것.구멍.length}개 다 맞았다 · 내려받았다`;
   다시그리기();
 }
 
@@ -848,7 +799,7 @@ function 먹이기(이름, 글, driveId){
   읽은것 = cix읽기(글);
   $('b-pick-nm').textContent = 파일이름;
   $('b-pick-sub').textContent = '';          // 구멍 수는 아래 알약이 말한다
-  ['b-pills','b-draw','b-clamp','b-go','b-wait','b-wait-note'].forEach(id => 보임($(id), true));
+  ['b-pills','b-draw','b-go'].forEach(id => 보임($(id), true));
   보임($('b-drive'), !!드라이브);
   if (!읽은것.구멍.length) 막힘알림('BG 구멍이 없다 — 이 파일에서는 바꿀 것이 없다');
   다시그리기();
@@ -868,12 +819,10 @@ $('b-drive').onclick = () => {
   if (드라이브) window.open('https://drive.google.com/file/d/' + encodeURIComponent(드라이브) + '/view',
                            '_blank', 'noopener');
 };
-$('b-go').onclick = () => 바꾸기(false);
-$('b-wait').onclick = () => 바꾸기(true);
-['b-y1','b-y2','b-a1','b-a2','b-b1','b-b2'].forEach(id => { $(id).oninput = 다시그리기; });
+$('b-go').onclick = () => 바꾸기();
 
 // 시험이 안에서 재도록 내놓는다 — 화면에는 아무 것도 더하지 않는다
-window.보링 = { cix읽기, bpp짓기, 되짚기, 집게밑인가, 변수틀읽기, 쉼표쪼개기 };
+window.보링 = { cix읽기, bpp짓기, 되짚기, 변수틀읽기, 쉼표쪼개기 };
 })();
 </script>
 
@@ -1450,7 +1399,7 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 집게밑인가, 변수틀읽
         return { name: d.name, 글: 풀기(d.b64) };
     }
     /* 줄을 누르면 뜯어 본다 — 알맹이를 받아 「고르기」 와 **똑같은 길**에 태운다.
-       판·구멍 그림, 집게 밑 빨간 표시, 되짚기, 「바꾸기」 까지 다 그 길이 한다. */
+       판·구멍 그림, 읽은 것 표, 되짚기, 「바꾸기」 까지 다 그 길이 한다. */
     let 가져오는중 = false;
     async function 뜯어보기(driveId, 이름){
         if (가져오는중) return;

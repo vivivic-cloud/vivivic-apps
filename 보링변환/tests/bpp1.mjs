@@ -517,15 +517,16 @@ const 뜯음 = await p.evaluate(() => ({
   집: document.documentElement.getAttribute('data-borhome'),
   이름: document.getElementById('b-pick-nm').textContent,
   동그라미: document.querySelectorAll('#b-draw circle').length,
-  빨강: [...document.querySelectorAll('#b-draw circle')].filter(c => c.getAttribute('fill') === '#FF3B30').length,
+  표줄: document.querySelectorAll('#b-read tbody tr').length,
   알약: document.getElementById('b-pills').textContent,
   드라이브단추: !document.getElementById('b-drive').classList.contains('bhide'),
 }));
 재기('뜯어 보면 바꾸기 화면으로 넘어가나', 뜯음.화면 === null && 뜯음.집 === null, String(뜯음.화면));
 재기('파일 이름이 올라오나', 뜯음.이름 === '592x382_1001_01.cix', 뜯음.이름);
 재기('고르기와 똑같이 구멍 16개를 그리나', 뜯음.동그라미 === 16, '동그라미 ' + 뜯음.동그라미);
-재기('집게 밑 빨간 표시도 그대로', 뜯음.빨강 === 2, '빨강 ' + 뜯음.빨강);
-재기('판 크기 알약도 그대로', /592×382×18/.test(뜯음.알약), 뜯음.알약.trim());
+재기('읽은 것 표도 열여섯 줄 그대로', 뜯음.표줄 === 16, '표 ' + 뜯음.표줄 + '줄');
+재기('판 크기도 파일에 적힌 칸 이름 그대로',
+     /LPX 592/.test(뜯음.알약) && /LPY 382/.test(뜯음.알약) && /LPZ 18/.test(뜯음.알약), 뜯음.알약.trim());
 재기('「드라이브에서 열기」 가 뜨나', 뜯음.드라이브단추);
 
 // 「드라이브에서 열기」 — 원본 보는 길도 남아 있다
@@ -614,33 +615,50 @@ await p.setInputFiles('#b-file', {
 });
 await p.waitForTimeout(300);
 
-const 읽음 = await p.evaluate(() => {
-  const g = window.__읽은것 || null;
-  return {
-    알약: document.getElementById('b-pills').textContent,
-    동그라미: document.querySelectorAll('#b-draw circle').length,
-    빨강: [...document.querySelectorAll('#b-draw circle')].filter(c => c.getAttribute('fill') === '#FF3B30').length,
-    빨간글: document.getElementById('b-warn').classList.contains('bhide')
-            ? '' : document.getElementById('b-warn').textContent,
-  };
-});
+const 읽음 = await p.evaluate(() => ({
+  알약: document.getElementById('b-pills').textContent,
+  동그라미: document.querySelectorAll('#b-draw circle').length,
+  빨간글: document.getElementById('b-warn').classList.contains('bhide')
+          ? '' : document.getElementById('b-warn').textContent,
+  표: [...document.querySelectorAll('#b-read tbody tr')].map(tr =>
+        [...tr.children].map(td => td.textContent).join(',')),
+  칸이름: [...document.querySelectorAll('#b-read thead th')].map(th => th.textContent).join(' '),
+  버린것: document.getElementById('b-drop').textContent,
+}));
 재기('구멍 16개를 걷었나', 읽음.동그라미 === 16, '동그라미 ' + 읽음.동그라미);
-재기('알약에 592×382×18 · 구멍 16', /592×382×18/.test(읽음.알약) && /구멍 16/.test(읽음.알약), 읽음.알약.trim());
-재기('결 글자(GEOTEXT)를 버렸나', /결 글자 1 버림/.test(읽음.알약), 읽음.알약.trim());
-재기('집게 밑 둘을 빨갛게 칠했나', 읽음.빨강 === 2, '빨간 동그라미 ' + 읽음.빨강);
-재기('화면에 「집게 밑」 이 두 번 나오지 않나',
-     (읽음.알약.match(/집게/g) || []).length === 0, 읽음.알약.trim() || '(알약에 없다)');
-재기('「집게 밑 — 이대로면 못 뚫는다」 를 적었나',
-     /집게 밑 — 이대로면 못 뚫는다/.test(읽음.빨간글), 읽음.빨간글);
+재기('구멍 수를 적나', /구멍 16/.test(읽음.알약), 읽음.알약.trim());
+재기('빨간 글이 안 뜬다 (성한 파일이다)', 읽음.빨간글 === '', 읽음.빨간글);
+
+/* ★ 사장님: 「이딴 내가 알 수도없는 용어를 사용해서 뭔가 만들지마 … 지금 주어진 파일을
+   어떻게 읽고 있는지를 나에게 보여주면 되는거야」. 읽은 것을 글자 그대로 보인다. */
+재기('판 크기를 파일에 적힌 칸 이름 그대로 보이나',
+     /LPX 592/.test(읽음.알약) && /LPY 382/.test(읽음.알약) && /LPZ 18/.test(읽음.알약), 읽음.알약.trim());
+재기('표 칸 이름이 파일 글자 그대로인가 (SIDE·CRN 을 옮기지 않았나)',
+     읽음.칸이름 === '번호 X Y 지름 깊이 SIDE CRN ID', 읽음.칸이름);
+재기('구멍 열여섯 줄이 다 나오나', 읽음.표.length === 16, 읽음.표.length + '줄');
+재기('표 값이 cix 에 적힌 글자 그대로인가',
+     읽음.표.every((줄, i) => {
+       const [x, y, dia, dp] = 바라던것[i];
+       return 줄 === `${i+1},${x},${y},${dia},${dp},0,1,${i+1}`;
+     }), 읽음.표[0] + ' … ' + 읽음.표[15]);
+재기('버린 것을 한 줄로 적나',
+     /GEOTEXT 1 버림/.test(읽음.버린것) && /VBLINE 2줄 버림/.test(읽음.버린것), 읽음.버린것);
+
+// 사장님이 모르시는 낱말은 화면에 한 군데도 없어야 한다
+const 낱말 = await p.evaluate(() => {
+  const 글 = document.getElementById('bor-app').innerText || '';
+  return { 집게: (글.match(/집게/g) || []).length, WAIT: (글.match(/WAIT/g) || []).length, 글: 글.slice(0, 0) };
+});
+재기('화면에 「집게」 가 0번', 낱말.집게 === 0, 낱말.집게 + '번');
+재기('화면에 「WAIT」 가 0번', 낱말.WAIT === 0, 낱말.WAIT + '번');
 
 /* ── 2. 누르는 자리 크기 (단추 44 · 입력칸 34) ───────────────────────── */
 const 크기 = await p.evaluate(() => {
   const 재 = s => [...document.querySelectorAll(s)].filter(e => e.offsetParent)
       .map(e => Math.round(e.getBoundingClientRect().height));
-  return { 단추: 재('.bbtn, .btile'), 입력: 재('.brow input') };
+  return { 단추: 재('.bbtn, .btile, .borf-again') };
 });
-재기('단추가 다 44px 이상', 크기.단추.length >= 3 && 크기.단추.every(h => h >= 44), 크기.단추.join('·'));
-재기('입력칸이 다 34px', 크기.입력.length === 6 && 크기.입력.every(h => h === 34), 크기.입력.join('·'));
+재기('단추가 다 44px 이상', 크기.단추.length >= 2 && 크기.단추.every(h => h >= 44), 크기.단추.join('·'));
 
 /* ── 3. 바꾸기 — 손가락으로 누르고 내려온 파일을 잰다 ─────────────────── */
 async function 눌러받기(고를것){
@@ -697,27 +715,6 @@ if (나온것) {
   재기('DP 가 DIA 보다 앞이다 (첫 구멍 12 → 5)',
        / : 0, "1", 19, 70, 0, 12, 5, /.test(BG들[0]), BG들[0].slice(0, 70));
   재기('번호가 1부터 차례로', BG들.every((줄, i) => 줄.startsWith(`@ BG, "", "", ${i+1}, "", 0 : `)));
-}
-
-/* ── 4. WAIT 단추 — 사장님이 누를 때만 ──────────────────────────────── */
-let 웨잇 = null; 탓 = '';
-try { 웨잇 = await 눌러받기('#b-wait'); } catch (e) { 탓 = String(e.message || e).split('\n')[0]; }
-재기('WAIT 단추로도 .bpp 가 내려왔나', !!웨잇, 웨잇 ? 웨잇.이름 : 탓);
-if (웨잇) {
-  재기('이름이 _WAIT 로 갈라졌나', 웨잇.이름 === '592x382_1001_01_WAIT.bpp', 웨잇.이름);
-  const 줄들 = 웨잇.글.split('\r\n').filter(s => /^@ (BG|WAIT),/.test(s));
-  const w = 줄들.findIndex(s => s.startsWith('@ WAIT,'));
-  const 앞 = 줄들.slice(0, w), 뒤 = 줄들.slice(w + 1);
-  const xy = s => { const t = 꼬리쪼개기(s.slice(s.indexOf(' : ') + 3)); return t[2] + '|' + t[3]; };
-  재기('WAIT 줄이 하나 들어갔나', 줄들.filter(s => s.startsWith('@ WAIT,')).length === 1);
-  재기('WAIT 줄 꼴이 본보기 그대로',
-       /^@ WAIT, "", "", \d+, "", 0 : 1, 1, 0, 2, 1, 0$/.test(줄들[w]), 줄들[w]);
-  재기('구멍 16개가 그대로 다 있나', 줄들.length === 17, 줄들.length + '줄');
-  재기('집게 밑 둘만 WAIT 뒤로 미뤘나',
-       뒤.length === 2 && 뒤.map(xy).sort().join(' ') === '504|10 98|10',
-       '앞 ' + 앞.length + ' · 뒤 ' + 뒤.map(xy).join(' '));
-  재기('번호가 WAIT 까지 이어 1부터 차례로',
-       줄들.every((s, i) => new RegExp(`^@ (BG|WAIT), "", "", ${i+1}, "", 0 : `).test(s)));
 }
 
 /* ── 5. 값이 어긋나면 내려받기를 막나 ───────────────────────────────── */
@@ -780,19 +777,23 @@ async function 먹이기(이름, 속){
 
 await 먹이기('식.cix', cix짓기(
   { LPX:'700+48', LPY:'380+0.5', LPZ:'18+0.1' },
-  [ { crn:'1,4', x:'374-32', y:'50',    dia:'15', dp:'14' },   // 집게 밖
-    { crn:'1',   x:'400+50', y:'30-25', dia:'5',  dp:'10' },   // 재면 450,5 — 집게2 밑
+  [ { crn:'1,4', x:'374-32', y:'50',    dia:'15', dp:'14' },
+    { crn:'1',   x:'400+50', y:'30-25', dia:'5',  dp:'10' },
     { crn:'1',   x:'34',     y:'50',    dia:'15', dp:'14' } ]));
 
 const 식본것 = await p.evaluate(() => ({
-  빨강: [...document.querySelectorAll('#b-draw circle')].filter(c => c.getAttribute('fill') === '#FF3B30').length,
   동그라미: document.querySelectorAll('#b-draw circle').length,
-  빨간글: document.getElementById('b-warn').classList.contains('bhide') ? '' : document.getElementById('b-warn').textContent,
   알약: document.getElementById('b-pills').textContent,
+  표: [...document.querySelectorAll('#b-read tbody tr')].map(tr =>
+        [...tr.children].map(td => td.textContent).join(',')),
 }));
 재기('식으로 적힌 판 크기를 재서 그렸나', 식본것.동그라미 === 3, '동그라미 ' + 식본것.동그라미);
-재기('식(400+50 · 30-25)을 재서 집게 밑을 찾아내나', 식본것.빨강 === 1 && /집게 밑/.test(식본것.빨간글),
-     '빨강 ' + 식본것.빨강 + ' · ' + 식본것.빨간글);
+재기('판 크기는 계산하지 않고 적힌 그대로 보이나',
+     /LPX 700\+48/.test(식본것.알약) && /LPY 380\+0\.5/.test(식본것.알약), 식본것.알약.trim());
+재기('표에도 식이 계산되지 않고 그대로 나오나',
+     식본것.표[0] === '1,374-32,50,15,14,0,1,4' || /374-32/.test(식본것.표[0] || ''), 식본것.표[0]);
+재기('쉼표 든 CRN 이 표에 그대로 나오나', /,1,4,/.test(식본것.표[0] || '') || 식본것.표[0].includes('1,4'),
+     식본것.표[0]);
 
 let 식나온것 = null; 탓 = '';
 try { 식나온것 = await 눌러받기('#b-go'); } catch (e) { 탓 = String(e.message || e).split('\n')[0]; }
@@ -813,21 +814,22 @@ if (식나온것) {
        꼬리[0][5] === '14' && 꼬리[0][6] === '15', 꼬리[0].slice(0,7).join(' / '));
 }
 
-/* ── 8. 못 재는 값이면 말하고 WAIT 를 막는다 ────────────────────────── */
+/* ── 8. 못 재는 값은 그림에만 못 그린다 — 값은 그대로 나간다 ─────────── */
 await 먹이기('못재.cix', cix짓기(
   { LPX:'592', LPY:'382', LPZ:'18' },
-  [ { crn:'1', x:'98',    y:'10', dia:'5', dp:'12' },          // 집게 밑
+  [ { crn:'1', x:'98',    y:'10', dia:'5', dp:'12' },
     { crn:'1', x:'100*2', y:'10', dia:'5', dp:'12' } ]));      // 곱하기는 못 잰다
 const 못잰것 = await p.evaluate(() => ({
-  빨간글: document.getElementById('b-warn').classList.contains('bhide') ? '' : document.getElementById('b-warn').textContent,
-  WAIT: document.getElementById('b-wait').disabled ? '막힘' : '열림',
+  버린것: document.getElementById('b-drop').textContent,
   바꾸기: document.getElementById('b-go').disabled ? '막힘' : '열림',
   동그라미: document.querySelectorAll('#b-draw circle').length,
+  표: [...document.querySelectorAll('#b-read tbody tr')].map(tr =>
+        [...tr.children].map(td => td.textContent).join(',')),
 }));
-재기('못 재는 값이 있으면 빨갛게 말하나', /못 재는 구멍 1개/.test(못잰것.빨간글), 못잰것.빨간글);
-재기('못 재는 값이 있으면 WAIT 를 막나', 못잰것.WAIT === '막힘', 못잰것.WAIT);
-재기('그래도 바꾸기는 열어 둔다 (값은 그대로 옮긴다)', 못잰것.바꾸기 === '열림', 못잰것.바꾸기);
+재기('못 그린 구멍 수를 한 줄로 적나', /그림에 못 그린 구멍 1/.test(못잰것.버린것), 못잰것.버린것);
 재기('못 재는 구멍은 그리지 않는다', 못잰것.동그라미 === 1, '동그라미 ' + 못잰것.동그라미);
+재기('그래도 표에는 글자 그대로 나온다', /100\*2/.test(못잰것.표.join('|')), 못잰것.표.join(' '));
+재기('바꾸기는 열어 둔다 (값은 그대로 옮긴다)', 못잰것.바꾸기 === '열림', 못잰것.바꾸기);
 let 못잰내림 = null; 탓 = '';
 try { 못잰내림 = await 눌러받기('#b-go'); } catch (e) { 탓 = String(e.message || e).split('\n')[0]; }
 재기('못 재는 값도 글자 그대로 나가나',
@@ -868,7 +870,6 @@ if (나온것) {
   };
   재기('마지막 줄과 [VBSCRIPT] 사이에 빈 줄이 둘', /^2줄 \(앞은 "@ BG, /.test(빈줄세기(나온것.글)),
        빈줄세기(나온것.글));
-  if (웨잇) 재기('WAIT 판도 빈 줄이 둘', /^2줄 \(앞은 "@ BG, /.test(빈줄세기(웨잇.글)), 빈줄세기(웨잇.글));
 }
 
 /* ── 11. 「← 박스판」 으로 돌아오나 ─────────────────────────────────── */
@@ -881,12 +882,12 @@ const 돌아가기 = await p.evaluate(() => {
 await p.evaluate(() => window.scrollTo(0, 999999));
 await p.waitForTimeout(300);
 const 안가림 = await p.evaluate(() => {
-  const 끝 = document.getElementById('b-wait-note').getBoundingClientRect();
+  const 끝 = document.getElementById('b-go').getBoundingClientRect();
   const 판 = document.querySelector('#bor-back button').getBoundingClientRect();
   return { 끝: Math.round(끝.bottom), 판: Math.round(판.top), 겹침: 끝.bottom > 판.top && 끝.left < 판.right };
 });
-재기('「← 박스판」 이 마지막 줄을 안 가리나', !안가림.겹침,
-     '마지막 줄 ' + 안가림.끝 + ' · 단추 ' + 안가림.판);
+재기('「← 박스판」 이 「바꾸기」 를 안 가리나', !안가림.겹침,
+     '바꾸기 ' + 안가림.끝 + ' · 단추 ' + 안가림.판);
 await p.tap('#bor-back button');
 await p.waitForTimeout(300);
 재기('「← 박스판」 을 누르면 박스 판으로 돌아오나',
