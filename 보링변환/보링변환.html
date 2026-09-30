@@ -1,7 +1,7 @@
 <!-- ==========================================
      보링변환.html
-     버전: v1.5.0 (2026-09-30) — 파일을 드라이브 폴더 꼴 그대로 보인다.
-           path 를 쪼개 나무를 짓는다 — 보링 파일이 나온 가지만 나온다
+     버전: v1.5.1 (2026-09-30) — 「볼 폴더」 칸을 화면에서 없앤다.
+           폴더는 창고에서 읽어 쓰기만 한다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -327,11 +327,6 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
 }
 .borf-again:active{ background:var(--vg-fill); }
 .borf-again[disabled]{ opacity:.45; cursor:default; }
-.borf-save{
-  min-height:44px; margin-top:10px; border:0; border-radius:13px; background:var(--vg-ink);
-  color:#fff; font:inherit; font-size:15px; font-weight:700; padding:0 20px; cursor:pointer;
-}
-.borf-save:active{ transform:scale(.985); }
 
 .bhide{display:none !important;}
 </style>
@@ -373,7 +368,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
 
     <div class="borh-tiles" id="borh-mine"></div>
 
-    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.5.0</b></p>
+    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.5.1</b></p>
   </div>
 </div>
 
@@ -417,9 +412,6 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
     <div class="borf-list" id="borf-list"></div>
     <div class="borf-empty bhide" id="borf-none"></div>
 
-    <div class="bsec"><b>볼 폴더</b><span>드라이브</span></div>
-    <input class="borb-fld" id="borf-folder" type="text" placeholder="폴더 이름 (예: 보링)" autocomplete="off">
-    <button type="button" class="borf-save" id="borf-folder-save">저장</button>
   </div>
 </div>
 
@@ -429,7 +421,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
   <div class="bhead">
     <span class="bday">보링변환</span>
     <span class="brole">CIX → BPP</span>
-    <span class="bsub" id="b-ver">v1.5.0</span>
+    <span class="bsub" id="b-ver">v1.5.1</span>
   </div>
 
   <button class="btile" id="b-pick" type="button">
@@ -1224,8 +1216,9 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 집게밑인가, 변수틀읽
    **구글 앱스 스크립트(서류관리 쪽)** 가 한다. 이 화면은 담긴 것을 **읽기만** 한다.
      읽는 곳  artifacts/vivivic-4b7ef/public/data/boring_files
               칸 — name · path · driveId · size · mtime · ctime
-     쓰는 곳  artifacts/vivivic-4b7ef/public/data/boring_config/설정 의 folder 칸 하나
-              (사장님이 폰에서 정하시는 폴더 이름. 코드에 박지 않는다)
+     볼 폴더  같은 곳의 folder 칸. **읽기만 한다.** 화면에서 고치는 길은 없앴다 —
+              사장님이 짚으셨다(09-30 「이런부분 삭제해줘」). 바꿔야 하면 말씀하시면
+              관리자가 고친다. 코드에 폴더 이름을 박지 않는 것은 그대로다.
    파일 속을 가져와 바로 바꾸는 문은 아직 안 열렸다. 누르면 드라이브로 보내는 데까지다. */
 (function(){
     const appId = 'vivivic-4b7ef';
@@ -1271,8 +1264,6 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 집게밑인가, 변수틀읽
                 const 것 = d && typeof d.data === 'function' ? (d.data() || {}) : {};
                 폴더 = String(것.folder || '');
                 부를곳 = String(것.exec || '');
-                const el = $('borf-folder');
-                if (el && document.activeElement !== el) el.value = 폴더;
                 그리기();
                 // 화면을 열 때 주소가 아직 안 와 있었으면, 오는 그때 한 번 부른다
                 if (보이나() && !이번화면에서불렀나) 부르기();
@@ -1437,20 +1428,6 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 집게밑인가, 변수틀읽
     // 화면이 열릴 때 한 번
     window.borFilesOpened = function(){ 이번화면에서불렀나 = false; 부르기(); };
 
-    async function 폴더저장(){
-        const el = $('borf-folder'); if (!el) return;
-        const 이름 = (el.value || '').trim();
-        if (!window.db || !window.fbFirestore) { alert('창고에 아직 못 닿았습니다. 잠시 뒤 다시 해 주십시오.'); return; }
-        const { setDoc } = window.fbFirestore;
-        const 단추 = $('borf-folder-save'); const 옛 = 단추.textContent;
-        단추.disabled = true; 단추.textContent = '담는 중…';
-        try { await setDoc(설정문서(), { folder: 이름.slice(0, 200), at: Date.now() }, { merge: true }); }
-        catch (e) { alert('담지 못했습니다: ' + e.message); 단추.disabled = false; 단추.textContent = 옛; return; }
-        단추.disabled = false; 단추.textContent = '담았습니다';
-        setTimeout(() => { 단추.textContent = 옛; }, 1800);
-        폴더 = 이름; 그리기();
-    }
-
     document.addEventListener('click', e => {
         const 들어갈곳 = e.target.closest('[data-into]');
         if (들어갈곳) { e.preventDefault(); 지금길 = 지금길.concat(들어갈곳.dataset.into);
@@ -1458,7 +1435,6 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 집게밑인가, 변수틀읽
         if (e.target.closest('#borf-up')) { e.preventDefault(); 지금길 = 지금길.slice(0, -1);
                                             그리기(); window.scrollTo(0, 0); return; }
         if (e.target.closest('#borf-again')) { e.preventDefault(); return 두드리기(); }
-        if (e.target.closest('#borf-folder-save')) { e.preventDefault(); return 폴더저장(); }
         const 칩 = e.target.closest('#borf-chips .borb-chip');
         if (칩) {
             거르기 = 칩.dataset.kind;

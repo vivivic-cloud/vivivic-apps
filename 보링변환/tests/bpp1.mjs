@@ -254,19 +254,20 @@ const 빈목록 = await p.evaluate(() => ({
      빈목록.화면 === 'files' && 빈목록.보이나 !== 'none', 빈목록.보이나);
 재기('폴더를 안 정했으면 그렇다고 적나', 빈목록.빈말 === '아직 볼 폴더를 안 정했습니다', 빈목록.빈말);
 재기('목록이 비면 찾기·거르기를 안 보인다', 빈목록.찾기);
-재기('폴더 넣는 칸이 있나', 빈목록.폴더칸);
+// 사장님이 짚으셨다(09-30 「이런부분 삭제해줘」) — 화면에서 폴더를 고치는 길은 없앴다
+재기('「볼 폴더」 칸이 화면에 없다', !빈목록.폴더칸);
+재기('「저장」 단추도 없다', !(await p.evaluate(() => !!document.querySelector('.borf-save'))));
 
-// 폴더 이름을 넣고 저장 — boring_config/설정 의 folder 칸에 담겨야 한다
-await p.fill('#borf-folder', '국내생산');
-await p.tap('#borf-folder-save');
-await p.waitForTimeout(400);
-const 담김 = await p.evaluate(() => ({
-  담긴것: (window.__곳간.boring_config.get('설정') || {}).folder,
-  빈말: document.getElementById('borf-none').textContent,
-}));
-재기('폴더 이름이 boring_config/설정 의 folder 에 담기나', 담김.담긴것 === '국내생산', String(담김.담긴것));
-재기('아직 안 켜졌다고 솔직하게 적나',
-     /드라이브를 훑는 일이 아직 안 켜졌습니다/.test(담김.빈말), 담김.빈말);
+// 폴더는 창고에서 읽어 쓰기만 한다 — 관리자가 넣어 둔 값이 그대로 쓰인다
+await p.evaluate(async () => {
+  const { setDoc, doc } = window.fbFirestore;
+  await setDoc(doc(null, 'a', 'p', 'd', 'boring_config', '설정'), { folder: '국내생산' }, { merge: true });
+});
+await p.waitForTimeout(350);
+재기('창고에 든 폴더를 읽어 쓰나',
+     /드라이브를 훑는 일이 아직 안 켜졌습니다/.test(
+       await p.evaluate(() => document.getElementById('borf-none').textContent)),
+     await p.evaluate(() => document.getElementById('borf-none').textContent));
 
 
 /* ── 드라이브 훑기를 이 화면이 직접 부른다 ─────────────────────────────
@@ -420,13 +421,15 @@ await p.waitForTimeout(250);
 await p.evaluate(() => window.scrollTo(0, 999999));
 await p.waitForTimeout(300);
 const 파일안가림 = await p.evaluate(() => {
-  const 끝 = document.getElementById('borf-folder-save').getBoundingClientRect();
+  // 이 자리에 마지막으로 놓인 것 — 폴더 타일이든 파일 줄이든
+  const 것들 = [...document.querySelectorAll('#borf-folders [data-into], #borf-list .borf-row')];
+  const 끝 = 것들[것들.length - 1].getBoundingClientRect();
   const 판 = document.querySelector('#bor-back button').getBoundingClientRect();
   return { 끝: Math.round(끝.bottom), 판: Math.round(판.top),
            겹침: 끝.bottom > 판.top && 끝.left < 판.right };
 });
-재기('파일 화면에서도 「← 박스판」 이 「저장」 을 안 가리나', !파일안가림.겹침,
-     '저장 ' + 파일안가림.끝 + ' · 단추 ' + 파일안가림.판);
+재기('파일 화면에서도 「← 박스판」 이 마지막 줄을 안 가리나', !파일안가림.겹침,
+     '마지막 줄 ' + 파일안가림.끝 + ' · 단추 ' + 파일안가림.판);
 
 // 맨 위로 나와서 파일 하나를 누른다
 await p.tap('#borf-up');
