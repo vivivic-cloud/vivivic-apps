@@ -896,6 +896,32 @@ const 안쓰는말 = await p.evaluate(() => {
 재기('화면에 「변수」 가 0번', 안쓰는말.변수 === 0, 안쓰는말.변수 + '번');
 재기('화면에 「블록」 이 0번', 안쓰는말.블록 === 0, 안쓰는말.블록 + '번');
 
+/* 「창고」 도 우리 낱말이다. 화면에 뜨는 글에 한 군데도 없어야 한다 —
+   박스 판에서 알림창으로 뜨던 것까지 센다. */
+const 창고세기 = await p.evaluate(() => {
+  const 것들 = [];
+  // 화면에 지금 떠 있는 글
+  것들.push(document.body.innerText || '');
+  // 박스를 담다 실패했을 때 뜨는 알림창 — 창고가 안 붙은 채로 눌러 본다
+  const 옛db = window.db; window.db = null;
+  const 옛집 = document.documentElement.getAttribute('data-borhome');   // 보던 자리를 되돌려 놓는다
+  let 알림 = ''; const 옛alert = window.alert; window.alert = m => { 알림 = String(m); };
+  document.documentElement.setAttribute('data-borhome', '1');
+  const 새박스 = document.querySelector('.borh-newbox');
+  if (새박스) 새박스.click();
+  const 담기 = document.getElementById('borb-save');
+  if (담기) 담기.click();
+  window.alert = 옛alert; window.db = 옛db;
+  if (typeof window.borBoxClose === 'function') window.borBoxClose();
+  if (옛집 === null) document.documentElement.removeAttribute('data-borhome');
+  else document.documentElement.setAttribute('data-borhome', 옛집);
+  것들.push(알림);
+  return { 수: (것들.join('\n').match(/창고/g) || []).length, 알림 };
+});
+재기('화면에 「창고」 가 0번', 창고세기.수 === 0, 창고세기.수 + '번');
+재기('박스를 못 담았을 때 「담지 못했습니다」 라고 적나',
+     창고세기.알림 === '담지 못했습니다. 잠시 뒤 다시 해 주십시오.', 창고세기.알림);
+
 /* ── 10. 기계가 읽어 준 그 파일과 견주기 ─────────────────────────────
    이 프로그램의 기둥이다. 어떤 일이 있어도 지우지 마라. */
 if (나온것) {
