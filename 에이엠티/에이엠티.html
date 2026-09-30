@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.13.0 (2026-09-28) — 공정카드 겉모습을 새로 (폰은 접고 넓은 화면은 편다)
+     버전: v1.13.4 (2026-09-29) — 알림판이 안 가리게 하고, 불량보고를 알림에 띄운다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -68,6 +68,8 @@
             initConfirmedOrdersSync();
             initCuttingPlansSync();
             initBoardOrderSync();
+            // 불량보고도 이때부터 듣는다 — 판을 안 열어도 알림이 뜨게(09-29 지시)
+            try { if (typeof window.amtDefectSync === 'function') window.amtDefectSync(); } catch (e) {}
         }
         window._자료동기시작 = _자료동기시작;   // 밖에서 상태를 확인할 수 있게
 
@@ -1301,6 +1303,20 @@
             padding: 0 14px; min-height: 44px; line-height: 1.2; cursor: pointer; flex: none;
             transition: background .15s ease, border-color .15s ease;
         }
+        /* 발주가 들어온 때 — 날짜 옆에 시각. 딱지 한 낱말과 숫자뿐이다. */
+        .발주-등록 { display: flex; align-items: center; gap: 5px; margin-top: 3px;
+            font-size: 11px; font-weight: 600; color: #9C9C98; font-variant-numeric: tabular-nums; }
+        .발주-등록 b { font-size: 10px; font-weight: 800; color: #6E6E6A;
+            background: #F1F1EF; border-radius: 6px; padding: 2px 6px; }
+        /* 알림판 — 몸통 밑으로 옮긴 뒤의 자리와 높이(09-29 지시).
+           불량보고 창(2147483500)보다 낮고, 박스 첫 화면보다는 높다. */
+        #notification-dropdown {
+            z-index: 2147483200;
+            top: calc(var(--amth-top, 64px) + 6px);
+            right: 12px; left: auto;
+            width: min(320px, calc(100vw - 24px));
+            max-height: min(500px, calc(100vh - var(--amth-top, 64px) - 28px));
+        }
         .wo-cut-편집:hover { background: #FAFAF9; border-color: #D6D6D2; }
         .wo-cut-편집:active { background: #F0EFED; }
         /* 완료된 카드 — 단추를 지우지 않고 죽인다(09-28 지시). 눌리지 않는 것이 보여야 한다. */
@@ -2208,6 +2224,7 @@
         #amt-defect .amd-사진 img{ width:88px; height:88px; object-fit:cover; border-radius:9px;
             border:1px solid var(--vg-line); cursor:pointer; }
         #amt-defect .amd-빔{ text-align:center; color:var(--vg-muted); font-size:13px; padding:34px 0; }
+        #amt-defect .amd-줄.amd-짚음{ border-color:#b3261e; box-shadow:0 0 0 3px rgba(179,38,30,.12); }
         #amt-defect-back{
             display:none; position:fixed; z-index:8300; left:12px;
             bottom:calc(16px + env(safe-area-inset-bottom));
@@ -2242,7 +2259,20 @@
         }
         #_불량판 .불량-사진단추:active{ background:#f7f6f3; }
         #_불량판 .불량-미리{ display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+        #_불량판 .불량-한장{ position:relative; display:inline-block; line-height:0; }
         #_불량판 .불량-미리 img{ width:72px; height:72px; object-fit:cover; border-radius:9px; border:1px solid #ededeb; }
+        /* 잘못 찍은 한 장을 뺀다 — 보이는 것은 작고, 닿는 자리는 44px */
+        #_불량판 .불량-빼기{
+            position:absolute; top:-6px; right:-6px; z-index:1;
+            width:24px; height:24px; padding:0; border:1px solid #e3e2e0; border-radius:999px;
+            background:#fff; color:#37352f; font:inherit; font-size:12px; font-weight:800;
+            line-height:1; cursor:pointer; box-shadow:0 2px 6px -2px rgba(0,0,0,.35);
+        }
+        #_불량판 .불량-빼기:active{ background:#f1f1ef; }
+        #_불량판 .불량-빼기::after{
+            content:''; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+            width:44px; height:44px;
+        }
         #_불량판 textarea{
             width:100%; min-height:96px; margin-top:10px; border:1px solid #e3e2e0; border-radius:12px;
             padding:11px 12px; font:inherit; font-size:14px; color:#37352f; resize:vertical; outline:none;
@@ -2350,7 +2380,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.13.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.13.4</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2483,7 +2513,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.13.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.13.4</b></p>
         </div>
     </div>
 
@@ -3139,6 +3169,22 @@
         // 알림 관리
         let notifications = [];
 
+        /* 알림판이 첫 화면에 가려지던 까닭 (09-29 지시) — 숫자가 낮아서가 아니었다.
+           이 판은 머리줄(header, position:sticky · z-index:100) **안**에 들어 있었다.
+           머리줄이 쌓임 칸(stacking context)을 만들어, 판의 z-index 9999 가 그 칸
+           안에서만 통했다. 바깥에서는 머리줄의 100 으로 겨루니 박스 첫 화면(amth-wrap)
+           에 깔렸다. 그래서 **몸통(body) 바로 밑으로 옮긴다** — 자리는 fixed 라
+           그대로다. 높이는 불량보고 창(2147483500)보다 낮게 둔다. */
+        (function 알림판띄우기(){
+            const 옮기기 = () => {
+                const d = document.getElementById('notification-dropdown');
+                if (d && d.parentElement !== document.body) document.body.appendChild(d);
+            };
+            if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', 옮기기);
+            else 옮기기();
+            window.addEventListener('load', 옮기기);
+        })();
+
         function toggleNotifications() {
             const dropdown = document.getElementById('notification-dropdown');
             dropdown.classList.toggle('hidden');
@@ -3262,6 +3308,24 @@
             badge.textContent = notifications.length;
 
             list.innerHTML = notifications.map(n => {
+                /* 불량보고 알림 (09-29 지시) — 부속명 · 공정 · 올린이만. 사진도 설명도 없다.
+                   누르면 불량보고 판으로 간다(발주 알림이 그 발주 줄로 가는 것과 같은 법). */
+                if (n.kind === '불량') {
+                    return `
+                <div data-불량="${n.보고id}" onclick="불량알림열기('${n.보고id}')" style="cursor:pointer;min-height:44px;"
+                     class="p-2 border-b border-[#ededeb] last:border-none hover:bg-[#f7f6f3] active:bg-[#f1f1ef]">
+                    <div class="flex items-center justify-between gap-2 mb-1.5">
+                        <div class="flex items-center gap-2">
+                            <span style="background:#b3261e;" class="px-1.5 py-0.5 text-white rounded font-black text-[9px] uppercase">불량</span>
+                            <span class="text-[9px] text-[#787774]">${n.timestamp}</span>
+                        </div>
+                        <button onclick="event.stopPropagation();불량알림열기('${n.보고id}')" class="px-1.5 py-0.5 bg-[#f7f6f3] border border-[#ededeb] text-[#37352f] text-[9px] font-bold rounded hover:bg-[#f1f1ef] whitespace-nowrap">보기</button>
+                    </div>
+                    <div class="text-[10px] font-bold text-[#37352f] truncate">
+                        ${n.부속명 || ''}${n.공정 ? ' · ' + n.공정 : ''}${n.올린이 ? ' <span class="text-[#787774]">· ' + n.올린이 + '</span>' : ''}
+                    </div>
+                </div>`;
+                }
                 let btn = '';
                 if (n.actionType === 'cancel') {
                     btn = `<button onclick="event.stopPropagation();handleNotificationAction('${n.docId}', 'cancel', ${n.id})" class="px-1.5 py-0.5 bg-red-600 text-white text-[9px] font-bold rounded hover:bg-red-700 whitespace-nowrap">취소확인</button>`;
@@ -4800,6 +4864,31 @@
 
         // 발주상품목록 렌더링 (amtRegistered !== true만 표시)
 
+        /* ── 발주가 들어온 때 (09-29 지시 「등록시간도 기록되어야함」) ─────────
+           발주를 만드는 곳은 조혼가구·이카운트등록이고, 거기서 이미
+           `createdAt` 을 serverTimestamp 로 찍어 둔다. 에이엠티는 발주를
+           만들지 않으므로 **읽어서 보여 주기만** 한다 — 여기서 새로 쓰면
+           「들어온 때」 가 아니라 「마지막에 만진 때」 가 되어 버린다.
+           옛 발주에는 그 칸이 없다. 그때는 아무것도 지어내지 않고 비워 둔다. */
+        window._등록시각 = function(o){
+            const v = o && (o.createdAt || o.등록시각);
+            if (!v) return '';
+            let ms = null;
+            if (typeof v === 'number') ms = v;
+            else if (typeof v.toDate === 'function') { try { ms = v.toDate().getTime(); } catch (e) {} }
+            else if (typeof v.seconds === 'number') ms = v.seconds * 1000;
+            else if (typeof v === 'string') { const t = Date.parse(v); if (isFinite(t)) ms = t; }
+            if (!ms || !isFinite(ms)) return '';
+            const d = new Date(ms); if (isNaN(d.getTime())) return '';
+            const 두자리 = n => String(n).padStart(2, '0');
+            return d.getFullYear() + '-' + 두자리(d.getMonth() + 1) + '-' + 두자리(d.getDate())
+                 + ' ' + 두자리(d.getHours()) + ':' + 두자리(d.getMinutes());
+        };
+        window._등록줄 = function(o){
+            const t = window._등록시각(o);
+            return t ? `<div class="발주-등록"><b>등록</b>${t}</div>` : '';
+        };
+
         function renderPendingOrders() {
             amtVendorSync();                       // 거래처 판 · 고른 거래처 표시
             const listContainer = document.getElementById('pending-order-list');
@@ -4920,6 +5009,7 @@
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
                         입고요청일: ${item.deliveryDate}
                     </div>
+                    ${_등록줄(item)}
                     ${wtRow}
                     <div id="pending-details-container-${item.idNum}" class="hidden flex flex-col gap-3 mt-4 pt-4 border-t border-dashed border-[#f1f1ef]">
                         <div id="pending-details-${item.idNum}" class="flex flex-col gap-4"></div>
@@ -5136,6 +5226,7 @@
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
                             입고요청일: ${item.deliveryDate}
                         </div>
+                        ${_등록줄(item)}
                         ${wtRow}
                         <div id="tl-conf-details-container-${item.idNum}" class="hidden flex flex-col gap-3 mt-4 pt-4 border-t border-dashed border-[#f1f1ef]">
                             <div id="tl-conf-details-${item.idNum}" class="flex flex-col gap-4"></div>
@@ -5383,6 +5474,7 @@
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
                         입고요청일: ${item.deliveryDate}
                     </div>
+                    ${_등록줄(item)}
                     ${wtRow}
                     <div id="pending-details-container-${item.idNum}" class="hidden flex flex-col gap-3 mt-4 pt-4 border-t border-dashed border-[#f1f1ef]">
                         <div id="pending-details-${item.idNum}" class="flex flex-col gap-4"></div>
@@ -14637,6 +14729,8 @@
             return collection(window.db, 'artifacts', appId, 'public', 'data', 칸이름);
         }
         // 실시간 — 올리면 바로 목록에 뜬다
+        const 켠때 = Date.now();      // 켜기 전에 있던 보고로는 알림을 울리지 않는다
+        const 알린것 = new Set();
         window.amtDefectSync = function(){
             if (붙었나 || !window.db || !window.fbFirestore) return;
             붙었나 = true;
@@ -14648,7 +14742,36 @@
                 새것.sort((a, b) => (b.때 || 0) - (a.때 || 0));
                 보고들 = 새것;
                 그리기();
+                // 새로 올라온 보고는 알림에도 한 줄 (09-29 지시)
+                새것.forEach(r => {
+                    if (!r || !r.id || 알린것.has(r.id)) return;
+                    if (!(Number(r.때) >= 켠때)) return;        // 옛 보고는 조용히 둔다
+                    알린것.add(r.id);
+                    try { window.불량알림넣기(r); } catch (e) {}
+                });
             }, () => {});
+        };
+        /* 알림 한 줄 — 발주 알림과 같은 목록에 같은 꼴로 얹는다. 종 옆 숫자도 함께 센다.
+           「전체삭제」 는 이 줄만 지운다. defect_reports 는 손대지 않는다. */
+        window.불량알림넣기 = function(r){
+            if (typeof notifications === 'undefined') return;
+            const 줄 = { id: Date.now() + Math.random(), kind: '불량', 보고id: r.id,
+                docId: '불량-' + r.id,
+                부속명: r.부속명 || r.부속키 || '', 공정: r.공정 || '', 올린이: r.올린이 || '',
+                timestamp: new Date(Number(r.때) || Date.now())
+                    .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
+            notifications.push(줄);
+            if (typeof renderNotifications === 'function') renderNotifications();
+        };
+        window.불량알림열기 = function(보고id){
+            const d = document.getElementById('notification-dropdown');
+            if (d) d.classList.add('hidden');
+            window.amtOpenDefect();
+            setTimeout(() => {
+                const 줄 = document.querySelector('[data-보고="' + 보고id + '"]');
+                if (줄) { 줄.scrollIntoView({ block: 'center' }); 줄.classList.add('amd-짚음');
+                          setTimeout(() => 줄.classList.remove('amd-짚음'), 1600); }
+            }, 120);
         };
 
         /* ── 보고 창 — 작업 창 위에 따로 뜬다 ─────────────────────────────── */
@@ -14668,7 +14791,11 @@
                   `<p class="불량-곁">${_e(o.displayName || '')}${partName ? ' · ' + _e(partName) : ''}` +
                     `${procKey ? ' · ' + _e(procKey) : ''}${o.orderCode ? '<br>' + _e(o.orderCode) : ''}</p>` +
                   `<label class="불량-사진단추" id="_불량사진단추">사진` +
-                    `<input type="file" id="_불량파일" accept="image/*" capture="environment" multiple hidden></label>` +
+                    /* capture 를 빼야 아이폰이 「사진 보관함 / 사진 찍기」 쪽지를 띄운다.
+                       capture 가 붙어 있으면 카메라가 바로 열려 한 번에 한 장뿐이고
+                       multiple 이 무시된다 — 사장님 지시(09-29) 「사진을 여러장 올릴 수
+                       있게 해줘」. 쪽지에 「사진 찍기」 가 있으니 바로 찍는 길도 남는다. */
+                    `<input type="file" id="_불량파일" accept="image/*" multiple hidden></label>` +
                   `<div class="불량-미리" id="_불량미리"></div>` +
                   `<textarea id="_불량글" placeholder="설명"></textarea>` +
                   `<div class="불량-줄">` +
@@ -14680,7 +14807,11 @@
             // 뒤(작업 창)로 눌림이 새지 않게. 창은 그대로 살아 있다.
             덮.addEventListener('click', e => { if (e.target === 덮) e.stopPropagation(); });
             $('_불량파일').addEventListener('change', e => {
-                고른사진 = Array.from(e.target.files || []).slice(0, 5);
+                /* 사장님 지시(09-29) 「한장찍고 새로찍으면 이전 사진 사라짐」 —
+                   갈아엎지 말고 뒤에 붙인다. 다섯 장까지. 그리고 값을 비워야
+                   같은 사진을 다시 골라도 change 가 다시 뜬다. */
+                고른사진 = 고른사진.concat(Array.from(e.target.files || [])).slice(0, 5);
+                e.target.value = '';
                 미리그리기();
             });
             $('_불량닫기').onclick = () => window.불량보고닫기();
@@ -14693,10 +14824,22 @@
         function 미리그리기(){
             const 자리 = $('_불량미리'); if (!자리) return;
             자리.innerHTML = '';
-            고른사진.forEach(f => {
+            고른사진.forEach((f, i) => {
+                const 칸 = document.createElement('span');
+                칸.className = '불량-한장';
                 const img = document.createElement('img');
                 try { img.src = URL.createObjectURL(f); } catch (e) {}
-                자리.appendChild(img);
+                const 빼기 = document.createElement('button');
+                빼기.type = 'button'; 빼기.className = '불량-빼기';
+                빼기.setAttribute('aria-label', '이 사진 빼기');
+                빼기.textContent = '✕';
+                빼기.addEventListener('click', ev => {
+                    ev.preventDefault(); ev.stopPropagation();
+                    고른사진.splice(i, 1);
+                    미리그리기();
+                });
+                칸.appendChild(img); 칸.appendChild(빼기);
+                자리.appendChild(칸);
             });
         }
         async function 보내기(){
@@ -14760,7 +14903,7 @@
             const 셈 = $('amd-sub'); if (셈) 셈.textContent = 보고들.length + '건';
             if (!것들.length) { 자리.innerHTML = '<div class="amd-빔">보고 없음</div>'; return; }
             자리.innerHTML = 것들.map(r =>
-                '<div class="amd-줄">' +
+                '<div class="amd-줄" data-보고="' + _e(r.id) + '">' +
                   '<div class="amd-때">' + _e(r.날 || '') + '</div>' +
                   '<div class="amd-무엇">' + _e(r.상품명 || '') + (r.부속명 ? ' · ' + _e(r.부속명) : '') + '</div>' +
                   (r.발주번호 != null ? '<span class="amd-딱지">' + _e(r.발주번호) + '</span>' : '') +
