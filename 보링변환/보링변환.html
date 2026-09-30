@@ -1,7 +1,7 @@
 <!-- ==========================================
      보링변환.html
-     버전: v1.4.1 (2026-09-30) — 「파일」 화면이 열릴 때 드라이브 훑기를 스스로 부른다.
-           서류관리를 열 까닭이 없다 (주소는 boring_config/설정 의 exec 에서 읽는다)
+     버전: v1.5.0 (2026-09-30) — 파일을 드라이브 폴더 꼴 그대로 보인다.
+           path 를 쪼개 나무를 짓는다 — 보링 파일이 나온 가지만 나온다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -189,17 +189,18 @@ html:not([data-borhome="1"])[data-borscreen="files"] #bor-app{ display:none; }
 .borh-crumb{
   display:none; align-items:center; gap:10px; margin:22px 0 10px;
 }
-html[data-borin="1"] .borh-crumb{ display:flex; }
+html[data-borin="1"] #borh-crumb{ display:flex; }
+#borf-crumb.on{ display:flex; }
 /* 박스 안에서는 맨 위 판의 것을 안 보인다 — 일하는 박스도, 아래 한 줄도 그 판의 것이다 */
 html[data-borin="1"] #borh-sec,
 html[data-borin="1"] #borh-work,
 html[data-borin="1"] .borh-foot{ display:none; }
-.borh-crumb #borh-up{
+.borh-crumb button{
   flex:none; width:44px; height:44px; border-radius:50%; border:1px solid var(--vg-edge);
   background:#fff; color:var(--vg-ink); font:inherit; font-size:17px; font-weight:700;
   cursor:pointer; display:grid; place-items:center;
 }
-.borh-crumb #borh-up:active{ background:var(--vg-fill); }
+.borh-crumb button:active{ background:var(--vg-fill); }
 .borh-path{
   flex:1; min-width:0; font-size:17px; font-weight:700; letter-spacing:-.4px; color:var(--vg-ink);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
@@ -372,7 +373,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
 
     <div class="borh-tiles" id="borh-mine"></div>
 
-    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.4.1</b></p>
+    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.5.0</b></p>
   </div>
 </div>
 
@@ -406,6 +407,13 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
       <button type="button" class="borb-chip" data-kind="bpp">.bpp</button>
     </div>
 
+    <div class="borh-crumb" id="borf-crumb">
+      <button type="button" id="borf-up" aria-label="뒤로">←</button>
+      <span class="borh-path" id="borf-path"></span>
+      <span class="borh-cnt" id="borf-cnt"></span>
+    </div>
+
+    <div class="borh-tiles bhide" id="borf-folders"></div>
     <div class="borf-list" id="borf-list"></div>
     <div class="borf-empty bhide" id="borf-none"></div>
 
@@ -421,7 +429,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
   <div class="bhead">
     <span class="bday">보링변환</span>
     <span class="brole">CIX → BPP</span>
-    <span class="bsub" id="b-ver">v1.4.1</span>
+    <span class="bsub" id="b-ver">v1.5.0</span>
   </div>
 
   <button class="btile" id="b-pick" type="button">
@@ -904,6 +912,8 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 집게밑인가, 변수틀읽
         return '<svg ' + at + '>' + 안 + '</svg>';
     }
 
+    window.bor아이콘 = 아이콘;     // 파일 화면도 같은 한 벌을 쓴다
+
     // 아이콘 갈래는 ../shared/아이콘묶음.js 한 벌을 쓴다 — 집이 같이 쓰는 것이다.
     const 아이콘묶음들 = () => (typeof window.VG아이콘묶음 === 'function' ? window.VG아이콘묶음() : []);
     const 아이콘이름들 = () => (typeof window.VG아이콘이름 === 'function' ? window.VG아이콘이름() : []);
@@ -1251,6 +1261,8 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 집게밑인가, 변수틀읽
                 const 새것 = [];
                 s.forEach(d => 새것.push(Object.assign({ id: d.id }, d.data())));
                 파일들 = 새것;
+                // 들어와 있던 자리가 사라졌으면 있는 데까지 물러난다
+                while (지금길.length && !파일들.some(f => 여기밑인가(f, 지금길))) 지금길 = 지금길.slice(0, -1);
                 그리기();
             } catch (e) {}
         }, () => {});
@@ -1284,31 +1296,101 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 집게밑인가, 변수틀읽
     };
     const 꼬리 = f => (String(f.name || '').match(/\.([A-Za-z0-9]+)$/) || [, ''])[1].toLowerCase();
 
-    function 거른것(){
-        const q = 찾는말.trim().toLowerCase();
-        return 파일들
-            .filter(f => 거르기 === 'all' ? true : 꼬리(f) === 거르기)
-            .filter(f => !q || String(f.name || '').toLowerCase().includes(q))
-            .sort((a, b) => 언제(b) - 언제(a));          // 새로 고친 것이 위로
+    /* ── 폴더 나무 ──────────────────────────────────────────────────────
+       사장님: 「스캔해서 보링파일이 발견되는 국내생산 하위부터 시작되는 폴더 구조대로
+       파일이 검색 되어야 한다는 뜻이야」(09-30).
+       **드라이브 폴더 목록을 따로 가져오지 않는다.** boring_files 의 `path` 를 `/` 로
+       쪼개서 나오는 것만으로 짓는다 — 그래서 보링 파일이 없는 폴더는 저절로 안 나온다.
+       `path` 에 파일 이름이 붙어 오기도 하고(거실장3종/1200/가.cix) 안 붙어 오기도 한다.
+       붙어 있으면 떼고 폴더 길만 쓴다. */
+    function 폴더길(f){
+        let p = String(f.path || '').replace(/^\/+|\/+$/g, '');
+        const n = String(f.name || '');
+        if (n && (p === n || p.endsWith('/' + n))) p = p.slice(0, p.length - n.length).replace(/\/+$/, '');
+        return p;
     }
+    const 조각 = f => { const p = 폴더길(f); return p ? p.split('/') : []; };
+    const 갈래맞나 = f => 거르기 === 'all' || 꼬리(f) === 거르기;
+    const 여기밑인가 = (f, 길) => {
+        const c = 조각(f);
+        return 길.every((v, i) => c[i] === v);
+    };
+
+    let 지금길 = [];                                  // [] 이면 맨 위(볼 폴더 바로 밑)
+
+    function 이자리(){
+        const 것들 = 파일들.filter(갈래맞나).filter(f => 여기밑인가(f, 지금길));
+        const 폴더들 = new Map();                      // 다음 조각 → 몇 개
+        const 파일줄 = [];
+        for (const f of 것들) {
+            const c = 조각(f);
+            if (c.length > 지금길.length) {
+                const 다음 = c[지금길.length];
+                폴더들.set(다음, (폴더들.get(다음) || 0) + 1);   // 안쪽 폴더까지 합쳐 센다
+            } else 파일줄.push(f);
+        }
+        const 이름순 = (a, b) => String(a).localeCompare(String(b), 'ko');
+        return {
+            폴더: [...폴더들.entries()].sort((a, b) => 이름순(a[0], b[0])),
+            파일: 파일줄.sort((a, b) => 이름순(a.name, b.name)),
+        };
+    }
+
+    // 찾을 때는 나무를 접고 전부에서 찾는다 — 길을 함께 보여 준다
+    function 찾은것(){
+        const q = 찾는말.trim().toLowerCase();
+        return 파일들.filter(갈래맞나)
+            .filter(f => String(f.name || '').toLowerCase().includes(q))
+            .sort((a, b) => 언제(b) - 언제(a));          // 찾을 때는 새로 고친 것이 위로
+    }
+
+    const 줄 = (f, 길보일까) => {
+        const 곁 = [길보일까 ? 폴더길(f) : '', 크기글(f.size), 때글(f.mtime)].filter(Boolean).join(' · ');
+        return '<button type="button" class="borf-row" data-drive="' + _e(f.driveId || '') + '">' +
+            '<span class="borf-ico">' + _e((꼬리(f) || '?').toUpperCase()) + '</span>' +
+            '<span class="borf-t">' + _e(f.name || '이름 없음') +
+              (곁 ? '<i>' + _e(곁) + '</i>' : '') + '</span></button>';
+    };
+    // 폴더는 박스 판에서 쓰던 그 타일 그대로다 — 새 모양이 아니다
+    const 폴더타일 = ([이름, 수]) =>
+        '<button type="button" class="borh-tile borh-light" data-into="' + _e(이름) + '">' +
+          '<span class="borh-ico">' +
+            (typeof window.bor아이콘 === 'function' ? window.bor아이콘('folder', 22) : '') + '</span>' +
+          '<span><span class="borh-nm">' + _e(이름) + '</span>' +
+          '<span class="borh-pct">' + 수 + '개</span></span></button>';
 
     function 그리기(){
         if (!$('borf-list')) return;
-        const 것들 = 거른것();
         const 있나 = 파일들.length > 0;
+        const 찾는중 = !!찾는말.trim();
 
         $('borf-find').classList.toggle('bhide', !있나);
         $('borf-chips').classList.toggle('bhide', !있나);
-        $('borf-sub').textContent = 있나
-            ? (것들.length === 파일들.length ? 파일들.length + '개' : 것들.length + ' / ' + 파일들.length)
-            : '—';
 
-        $('borf-list').innerHTML = 것들.map(f =>
-            '<button type="button" class="borf-row" data-drive="' + _e(f.driveId || '') + '">' +
-              '<span class="borf-ico">' + _e((꼬리(f) || '?').toUpperCase()) + '</span>' +
-              '<span class="borf-t">' + _e(f.name || '이름 없음') +
-                '<i>' + _e([f.path, 크기글(f.size), 때글(f.mtime)].filter(Boolean).join(' · ')) + '</i>' +
-              '</span></button>').join('');
+        let 폴더칸 = [], 파일칸 = [], 셈;
+        if (찾는중) { 파일칸 = 찾은것(); 셈 = 파일칸.length + ' / ' + 파일들.length; }
+        else {
+            const 여기 = 이자리();
+            폴더칸 = 여기.폴더; 파일칸 = 여기.파일;
+            const 밑에든수 = 폴더칸.reduce((a, b) => a + b[1], 0) + 파일칸.length;
+            셈 = 밑에든수 + '개';
+        }
+        $('borf-sub').textContent = 있나 ? 셈 : '—';
+
+        $('borf-folders').innerHTML = 폴더칸.map(폴더타일).join('');
+        $('borf-folders').classList.toggle('bhide', !폴더칸.length);
+        $('borf-list').innerHTML = 파일칸.map(f => 줄(f, 찾는중)).join('');
+
+        // 지나온 자리 — 폴더 안에 들어와 있을 때만. 찾는 동안은 나무를 접는다
+        const 자리 = $('borf-crumb');
+        const 보일까 = !찾는중 && 지금길.length > 0;
+        자리.classList.toggle('on', 보일까);
+        if (보일까) {
+            const 뿌리 = 폴더 || '드라이브';
+            const 앞 = [뿌리].concat(지금길.slice(0, -1));
+            $('borf-path').innerHTML = '<i>' + 앞.map(_e).join(' › ') + ' › </i>' + _e(지금길[지금길.length - 1]);
+            $('borf-cnt').textContent = 셈;
+        }
 
         const 단추 = $('borf-again');
         // 「훑는 중」 은 아래 한 줄이 말한다 — 단추는 잠그기만 하고 이름을 안 바꾼다
@@ -1317,7 +1399,7 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 집게밑인가, 변수틀읽
         const 빈말 = $('borf-none');
         const 말 = 못불렀다 ? '드라이브를 못 불렀습니다'
                  : 훑는중 ? '드라이브를 훑는 중입니다'
-                 : 있나 ? (것들.length ? '' : '찾으시는 것이 없습니다')
+                 : 있나 ? (폴더칸.length + 파일칸.length ? '' : '찾으시는 것이 없습니다')
                  : 폴더 === null ? '창고에 아직 못 닿았습니다'
                  : !폴더 ? '아직 볼 폴더를 안 정했습니다'
                  /* 되는 척하지 않는다 — 부를 곳이 없으면 목록은 영영 안 찬다 */
@@ -1370,6 +1452,11 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 집게밑인가, 변수틀읽
     }
 
     document.addEventListener('click', e => {
+        const 들어갈곳 = e.target.closest('[data-into]');
+        if (들어갈곳) { e.preventDefault(); 지금길 = 지금길.concat(들어갈곳.dataset.into);
+                       그리기(); window.scrollTo(0, 0); return; }
+        if (e.target.closest('#borf-up')) { e.preventDefault(); 지금길 = 지금길.slice(0, -1);
+                                            그리기(); window.scrollTo(0, 0); return; }
         if (e.target.closest('#borf-again')) { e.preventDefault(); return 두드리기(); }
         if (e.target.closest('#borf-folder-save')) { e.preventDefault(); return 폴더저장(); }
         const 칩 = e.target.closest('#borf-chips .borb-chip');

@@ -257,14 +257,14 @@ const 빈목록 = await p.evaluate(() => ({
 재기('폴더 넣는 칸이 있나', 빈목록.폴더칸);
 
 // 폴더 이름을 넣고 저장 — boring_config/설정 의 folder 칸에 담겨야 한다
-await p.fill('#borf-folder', '보링/2026');
+await p.fill('#borf-folder', '국내생산');
 await p.tap('#borf-folder-save');
 await p.waitForTimeout(400);
 const 담김 = await p.evaluate(() => ({
   담긴것: (window.__곳간.boring_config.get('설정') || {}).folder,
   빈말: document.getElementById('borf-none').textContent,
 }));
-재기('폴더 이름이 boring_config/설정 의 folder 에 담기나', 담김.담긴것 === '보링/2026', String(담김.담긴것));
+재기('폴더 이름이 boring_config/설정 의 folder 에 담기나', 담김.담긴것 === '국내생산', String(담김.담긴것));
 재기('아직 안 켜졌다고 솔직하게 적나',
      /드라이브를 훑는 일이 아직 안 켜졌습니다/.test(담김.빈말), 담김.빈말);
 
@@ -328,43 +328,111 @@ await p.waitForTimeout(1200);
      (await p.evaluate(() => window.__부른곳.length)) === 3,
      (await p.evaluate(() => window.__부른곳.length)) + '번');
 
-// 앱스 스크립트가 담았다 치고 — 목록이 찬다
+// 앱스 스크립트가 담았다 치고 — 사장님 드라이브와 같은 꼴로 넣는다.
+// path 에 폴더 길과 파일 이름이 함께 들어 있다(거실장3종/1200/…cix).
 await p.evaluate(async () => {
   const { setDoc, doc } = window.fbFirestore;
   const 넣기 = (id, v) => setDoc(doc(null, 'a', 'p', 'd', 'boring_files', id), v);
-  await 넣기('f1', { name:'592x382_1001_01.cix', path:'보링/2026', driveId:'DRV1',
-                     size: 4096, mtime: Date.parse('2026-09-28T10:00:00Z') });
-  await 넣기('f2', { name:'592x382_1001_01.bpp', path:'보링/2026', driveId:'DRV2',
-                     size: 8192, mtime: Date.parse('2026-09-29T09:00:00Z') });
-  await 넣기('f3', { name:'700x400_2002_01.cix', path:'보링/2026/옛것', driveId:'DRV3',
-                     size: 2048, mtime: Date.parse('2026-09-27T08:00:00Z') });
+  const 때 = t => Date.parse(t);
+  await 넣기('f1', { name:'거실장_서랍형_1001_01.cix', path:'거실장3종/1200/거실장_서랍형_1001_01.cix',
+                     driveId:'D1', size:4096, mtime:때('2026-09-28T10:00:00Z') });
+  await 넣기('f2', { name:'거실장_서랍형_1001_01.bpp', path:'거실장3종/1200/거실장_서랍형_1001_01.bpp',
+                     driveId:'D2', size:8192, mtime:때('2026-09-29T09:00:00Z') });
+  await 넣기('f3', { name:'거실장_서랍형_1006_01.cix', path:'거실장3종/1800/거실장_서랍형_1006_01.cix',
+                     driveId:'D3', size:2048, mtime:때('2026-09-27T08:00:00Z') });
+  await 넣기('f4', { name:'알렉스_상판_2001_01.cix', path:'알렉스/알렉스_상판_2001_01.cix',
+                     driveId:'D4', size:3300, mtime:때('2026-09-30T04:00:00Z') });
+  await 넣기('f5', { name:'베이비장_1001_01.cix', path:'신규 베이비장_로엔/베이비장_1001_01.cix',
+                     driveId:'D5', size:1200, mtime:때('2026-09-26T08:00:00Z') });
 });
-await p.waitForTimeout(350);
+await p.waitForTimeout(400);
+
+const 폴더칸 = () => p.evaluate(() =>
+  [...document.querySelectorAll('#borf-folders [data-into]')].map(t =>
+    t.querySelector('.borh-nm').textContent + '|' + t.querySelector('.borh-pct').textContent));
 const 목록 = () => p.evaluate(() =>
   [...document.querySelectorAll('#borf-list .borf-row')].map(r =>
     r.querySelector('.borf-t').childNodes[0].textContent));
-재기('담긴 파일이 목록에 뜨나', (await 목록()).length === 3, (await 목록()).join(' '));
-재기('새로 고친 것이 위로', (await 목록())[0] === '592x382_1001_01.bpp', (await 목록())[0]);
-재기('줄에 길·크기·때를 한 줄로 적나',
-     await p.evaluate(() => /보링\/2026 · 4\.0KB · 2026\.09\.28/.test(
-       [...document.querySelectorAll('.borf-row .borf-t i')].map(e => e.textContent).join('|'))),
-     await p.evaluate(() => document.querySelectorAll('.borf-row .borf-t i')[0].textContent));
-const 줄높이 = await p.evaluate(() =>
-  Math.min(...[...document.querySelectorAll('.borf-row')].map(r => Math.round(r.getBoundingClientRect().height))));
-재기('줄이 44px 이상', 줄높이 >= 44, 줄높이 + 'px');
+const 자리 = () => p.evaluate(() => ({
+  보이나: document.getElementById('borf-crumb').classList.contains('on'),
+  글: document.getElementById('borf-path').textContent.replace(/\s+/g, ' ').trim(),
+  셈: document.getElementById('borf-sub').textContent,
+}));
 
-// .cix 만 거르기
+// ★ 맨 위 = 국내생산 바로 밑. 파일이 나온 가지만 나온다(빈 폴더 없음)
+재기('맨 위에 폴더가 이름순으로 나오나',
+     (await 폴더칸()).join(' ') === '거실장3종|3개 신규 베이비장_로엔|1개 알렉스|1개',
+     (await 폴더칸()).join(' '));
+재기('폴더 줄에 안쪽까지 합친 수를 적나', (await 폴더칸())[0] === '거실장3종|3개', (await 폴더칸())[0]);
+재기('맨 위에는 파일 줄이 없다', (await 목록()).length === 0, (await 목록()).join(' '));
+재기('맨 위에서는 지나온 자리를 안 보인다', !(await 자리()).보이나);
+재기('머리에 밑에 든 수를 적나', (await 자리()).셈 === '5개', (await 자리()).셈);
+
+// 폴더를 누르면 그 안으로
+await p.tap('#borf-folders [data-into="거실장3종"]');
+await p.waitForTimeout(300);
+재기('폴더를 누르면 그 안으로 들어가나',
+     (await 폴더칸()).join(' ') === '1200|2개 1800|1개', (await 폴더칸()).join(' '));
+재기('지나온 자리를 적나', (await 자리()).글 === '국내생산 › 거실장3종', (await 자리()).글);
+
+await p.tap('#borf-folders [data-into="1200"]');
+await p.waitForTimeout(300);
+재기('한 칸 더 들어가면 파일이 나오나',
+     (await 목록()).join(' ') === '거실장_서랍형_1001_01.bpp 거실장_서랍형_1001_01.cix',
+     (await 목록()).join(' '));
+재기('두 칸째 지나온 자리', (await 자리()).글 === '국내생산 › 거실장3종 › 1200', (await 자리()).글);
+재기('폴더가 없으면 폴더 칸을 안 보인다',
+     await p.evaluate(() => document.getElementById('borf-folders').classList.contains('bhide')));
+const 폴더줄높이 = await p.evaluate(() =>
+  Math.min(...[...document.querySelectorAll('#borf-list .borf-row')].map(r => Math.round(r.getBoundingClientRect().height))));
+재기('줄이 44px 이상', 폴더줄높이 >= 44, 폴더줄높이 + 'px');
+
+// 알약은 지금 들어와 있는 폴더 안에서만 거른다
 await p.tap('#borf-chips [data-kind="cix"]');
 await p.waitForTimeout(250);
-재기('.cix 만 거르나', (await 목록()).every(n => n.endsWith('.cix')) && (await 목록()).length === 2,
-     (await 목록()).join(' '));
-// 이름으로 찾기
-await p.fill('#borf-find', '700');
-await p.waitForTimeout(250);
-재기('이름으로 찾나', (await 목록()).join('') === '700x400_2002_01.cix', (await 목록()).join(' '));
-await p.fill('#borf-find', '');
+재기('이 폴더 안에서만 .cix 를 거르나',
+     (await 목록()).join(' ') === '거실장_서랍형_1001_01.cix', (await 목록()).join(' '));
 await p.tap('#borf-chips [data-kind="all"]');
 await p.waitForTimeout(250);
+
+// 뒤로
+await p.tap('#borf-up');
+await p.waitForTimeout(300);
+재기('← 를 누르면 한 칸 나오나',
+     (await 자리()).글 === '국내생산 › 거실장3종' && (await 폴더칸()).length === 2, (await 자리()).글);
+
+// 찾기는 나무를 접고 전부에서 — 길을 함께 보여 준다
+await p.fill('#borf-find', '1006');
+await p.waitForTimeout(300);
+const 찾음 = await p.evaluate(() => ({
+  줄: [...document.querySelectorAll('#borf-list .borf-row')].map(r => r.querySelector('.borf-t').childNodes[0].textContent),
+  길: [...document.querySelectorAll('#borf-list .borf-t i')].map(e => e.textContent),
+  폴더칸: document.getElementById('borf-folders').classList.contains('bhide'),
+  자리: document.getElementById('borf-crumb').classList.contains('on'),
+}));
+재기('찾을 때는 폴더를 넘어 전부에서 찾나', 찾음.줄.join(' ') === '거실장_서랍형_1006_01.cix', 찾음.줄.join(' '));
+재기('찾은 줄에 길을 함께 보여 주나', /^거실장3종\/1800 · /.test(찾음.길[0] || ''), 찾음.길[0] || '');
+재기('찾는 동안에는 나무를 접나', 찾음.폴더칸 && !찾음.자리);
+await p.fill('#borf-find', '');
+await p.waitForTimeout(250);
+
+// 바닥에 뜬 「← 박스판」 이 「저장」 을 가리지 않나 — 끝까지 내려 보고 잰다
+await p.evaluate(() => window.scrollTo(0, 999999));
+await p.waitForTimeout(300);
+const 파일안가림 = await p.evaluate(() => {
+  const 끝 = document.getElementById('borf-folder-save').getBoundingClientRect();
+  const 판 = document.querySelector('#bor-back button').getBoundingClientRect();
+  return { 끝: Math.round(끝.bottom), 판: Math.round(판.top),
+           겹침: 끝.bottom > 판.top && 끝.left < 판.right };
+});
+재기('파일 화면에서도 「← 박스판」 이 「저장」 을 안 가리나', !파일안가림.겹침,
+     '저장 ' + 파일안가림.끝 + ' · 단추 ' + 파일안가림.판);
+
+// 맨 위로 나와서 파일 하나를 누른다
+await p.tap('#borf-up');
+await p.waitForTimeout(300);
+await p.tap('#borf-folders [data-into="알렉스"]');
+await p.waitForTimeout(300);
 
 // 누르면 드라이브에서 열린다 — 새 창으로 보내는 데까지다
 const 보낸곳 = await p.evaluate(async () => {
@@ -374,7 +442,7 @@ const 보낸곳 = await p.evaluate(async () => {
   window.open = 옛; return 곳;
 });
 재기('파일을 누르면 드라이브로 보내나',
-     보낸곳 === 'https://drive.google.com/file/d/DRV2/view', 보낸곳);
+     보낸곳 === 'https://drive.google.com/file/d/D4/view', 보낸곳);
 
 // 치우고 박스 판으로 — fetch 도 원래대로 돌려 놓는다
 await p.evaluate(async () => {
