@@ -1,7 +1,7 @@
 <!-- ==========================================
      보링변환.html
-     버전: v1.7.1 (2026-09-30) — 못 읽은 것을 꾸짖지 않고 그 속의 값을 표로 편다.
-           화면에 매크로·파라미터·변수·블록 이라는 말을 쓰지 않는다
+     버전: v1.7.2 (2026-09-30) — 단추·글자를 「무엇을 하는지」 로 적는다.
+           「바꾸기」 → 「기계에 넣을 파일 만들기 (.bpp)」
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -379,7 +379,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
 
     <div class="borh-tiles" id="borh-mine"></div>
 
-    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.7.1</b></p>
+    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.7.2</b></p>
   </div>
 </div>
 
@@ -432,7 +432,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
   <div class="bhead">
     <span class="bday">보링변환</span>
     <span class="brole">CIX → BPP</span>
-    <span class="bsub" id="b-ver">v1.7.1</span>
+    <span class="bsub" id="b-ver">v1.7.2</span>
   </div>
 
   <button class="btile" id="b-pick" type="button">
@@ -466,7 +466,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
   <div class="bsec bhide" id="b-unk-head"><b>못 읽은 것</b></div>
   <div class="bread bhide" id="b-unk"></div>
 
-  <button class="bbtn bprim bhide" id="b-go" type="button">바꾸기</button>
+  <button class="bbtn bprim bhide" id="b-go" type="button">기계에 넣을 파일 만들기 (.bpp)</button>
   <div class="bnote bhide" id="b-go-note"></div>
 
 </div>
@@ -795,7 +795,7 @@ async function 바꾸기(){
   try { 변수 = await 변수틀읽기(); }
   catch (e) {
     console.warn('본보기:', e && e.message);      // 자세한 것은 여기에만
-    막힘알림('본보기 파일을 읽지 못했습니다 — 바꾸지 않았다');
+    막힘알림('본보기 파일을 읽지 못했습니다 — 파일을 안 만들었습니다');
     return;
   }
 
@@ -807,13 +807,13 @@ async function 바꾸기(){
   const 어긋남 = 되짚기(글, 차례, 읽은것.판);
   if (차례.length !== 읽은것.구멍.length) 어긋남.unshift('구멍 ' + 차례.length + ' ≠ ' + 읽은것.구멍.length);
   if (어긋남.length) {
-    막힘알림('값이 어긋나 내려받기를 막았다 — ' + 어긋남.slice(0, 3).join(' / ')
+    막힘알림('값이 어긋나 파일을 안 만들었습니다 — ' + 어긋남.slice(0, 3).join(' / ')
              + (어긋남.length > 3 ? ` 외 ${어긋남.length - 3}` : ''));
     return;
   }
 
   내려받기(파일이름.replace(/\.cix$/i, '') + '.bpp', 글);
-  $('b-pick-sub').textContent = `${읽은것.구멍.length}개 다 맞았다 · 내려받았다`;
+  $('b-pick-sub').textContent = `구멍 ${읽은것.구멍.length}개 그대로 · 파일 만들었습니다`;
   다시그리기();
 }
 
@@ -829,7 +829,7 @@ function 먹이기(이름, 글, driveId){
   $('b-pick-sub').textContent = '';          // 구멍 수는 아래 알약이 말한다
   ['b-pills','b-draw','b-go'].forEach(id => 보임($(id), true));
   보임($('b-drive'), !!드라이브);
-  if (!읽은것.구멍.length) 막힘알림('BG 구멍이 없다 — 이 파일에서는 바꿀 것이 없다');
+  if (!읽은것.구멍.length) 막힘알림('BG 구멍이 없습니다 — 이 파일로는 만들 것이 없습니다');
   다시그리기();
 }
 window.bor먹이기 = 먹이기;                     // 「파일」 화면이 이 길을 부른다
@@ -1387,7 +1387,7 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 변수틀읽기, 쉼표쪼개
                  : 못불렀다 ? '드라이브를 못 불렀습니다'
                  : 훑는중 ? '드라이브를 훑는 중입니다'
                  : 있나 ? (폴더칸.length + 파일칸.length ? '' : '찾으시는 것이 없습니다')
-                 : 폴더 === null ? '창고에 아직 못 닿았습니다'
+                 : 폴더 === null ? '아직 읽어 오지 못했습니다'
                  : !폴더 ? '아직 볼 폴더를 안 정했습니다'
                  /* 되는 척하지 않는다 — 부를 곳이 없으면 목록은 영영 안 찬다 */
                  : !부를곳 ? '폴더는 정해졌습니다. 드라이브를 훑는 일이 아직 안 켜졌습니다 — 맥에서 한 번 켜 주셔야 합니다.'
@@ -1489,7 +1489,7 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 변수틀읽기, 쉼표쪼개
             const id = 눌린줄.dataset.drive, 이름 = 눌린줄.dataset.nm || '';
             if (눌린줄.dataset.kind !== 'cix') {
                 // bpp 는 cix읽기 로 못 읽는다. 되는 척하지 않는다 — 원본만 열어 드린다.
-                딴말글 = '이미 bpp 입니다 — 바꿀 것이 없습니다'; 그리기();
+                딴말글 = '이미 .bpp 입니다 — 만들 것이 없습니다'; 그리기();
                 if (id) 드라이브로(id);
                 return;
             }

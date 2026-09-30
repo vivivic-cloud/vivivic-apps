@@ -573,7 +573,7 @@ const bpp눌림 = await p.evaluate(async () => {
   return { 곳, 말: document.getElementById('borf-none').textContent,
            화면: document.documentElement.getAttribute('data-borscreen') };
 });
-재기('.bpp 는 바꿀 것이 없다고 적나', bpp눌림.말 === '이미 bpp 입니다 — 바꿀 것이 없습니다', bpp눌림.말);
+재기('.bpp 는 만들 것이 없다고 적나', bpp눌림.말 === '이미 .bpp 입니다 — 만들 것이 없습니다', bpp눌림.말);
 재기('.bpp 는 원본만 열어 주나',
      bpp눌림.곳 === 'https://drive.google.com/file/d/D2/view' && bpp눌림.화면 === 'files', bpp눌림.곳);
 
@@ -746,7 +746,7 @@ const 열렸나 = await p.$('.vg-sheet') !== null;
 const 짚은것 = 열렸나 ? (await p.textContent('.vg-sheet .vg-what')) : '';
 await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
 재기('길게 누르면 지시창이 열리나', 열렸나, 짚은것.trim());
-재기('짚은 것이 「바꾸기」 인가', /바꾸기/.test(짚은것), 짚은것.trim());
+재기('짚은 것이 그 단추인가', /기계에 넣을 파일 만들기/.test(짚은것), 짚은것.trim());
 const 이름 = await p.evaluate(() => document.title);
 재기('손잡이가 부를 이름이 「보링변환」', 이름 === '보링변환', 이름);
 // 지시창을 닫아 둔다 — 열린 채로 두면 inset:0 뒤판이 다음 누름을 다 먹는다
@@ -875,7 +875,12 @@ const 못읽음 = await p.evaluate(() => ({
      못읽음.줄[0] ? 못읽음.줄[0][1] : '');
 재기('BH 속 값도 다 적나', 못읽음.줄[1] && 못읽음.줄[1][1] === 'SIDE=1 · X=50',
      못읽음.줄[1] ? 못읽음.줄[1][1] : '');
-재기('바꾸기를 막나', 못읽음.바꾸기 === '막힘', 못읽음.바꾸기);
+재기('파일 만들기를 막나', 못읽음.바꾸기 === '막힘', 못읽음.바꾸기);
+
+// ① 단추 이름이 무엇을 하는지로 적혀 있나
+재기('단추 이름이 「기계에 넣을 파일 만들기 (.bpp)」 인가',
+     (await p.evaluate(() => document.getElementById('b-go').textContent)) === '기계에 넣을 파일 만들기 (.bpp)',
+     await p.evaluate(() => document.getElementById('b-go').textContent));
 재기('단추 곁에 「못 읽는 것이 있어 막았습니다」', 못읽음.단추곁 === '못 읽는 것이 있어 막았습니다',
      못읽음.단추곁);
 재기('읽은 구멍은 그대로 표에 나오나', 못읽음.구멍표 === 1, 못읽음.구멍표 + '줄');
