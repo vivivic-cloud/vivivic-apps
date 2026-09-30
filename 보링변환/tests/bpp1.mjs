@@ -268,6 +268,66 @@ const 담김 = await p.evaluate(() => ({
 재기('아직 안 켜졌다고 솔직하게 적나',
      /드라이브를 훑는 일이 아직 안 켜졌습니다/.test(담김.빈말), 담김.빈말);
 
+
+/* ── 드라이브 훑기를 이 화면이 직접 부른다 ─────────────────────────────
+   사장님: 「서류관리 왜열어」. 맞는 말씀이다 — 보링변환만 쓰시는데 다른 프로그램을
+   열 까닭이 없다. 주소(exec)는 boring_config/설정 에서 읽고 코드에 안 박는다. */
+await p.evaluate(() => {
+  window.__부른곳 = [];
+  window.__될까 = false;                       // 처음에는 막힌 셈 친다
+  const 옛 = window.fetch.bind(window);
+  window.fetch = (u, o) => {
+    const 글 = String(u);
+    if (글.includes('script.google.com')) {
+      window.__부른곳.push(글);
+      return window.__될까 ? Promise.resolve({ type: 'opaque' })
+                           : Promise.reject(new Error('막혔다'));
+    }
+    return 옛(u, o);                            // 변수틀 읽기 따위는 그대로 지나간다
+  };
+  window.__옛fetch = 옛;
+});
+재기('주소가 없으면 아무 데도 안 부른다', (await p.evaluate(() => window.__부른곳.length)) === 0);
+
+const 부를곳 = 'https://script.google.com/macros/s/AKfycbTEST/exec';
+await p.evaluate(async (곳) => {
+  const { setDoc, doc } = window.fbFirestore;
+  await setDoc(doc(null, 'a', 'p', 'd', 'boring_config', '설정'), { exec: 곳 }, { merge: true });
+}, 부를곳);
+await p.waitForTimeout(400);
+const 막힘 = await p.evaluate(() => ({
+  부른수: window.__부른곳.length,
+  부른곳: window.__부른곳[0] || '',
+  빈말: document.getElementById('borf-none').textContent,
+  단추: document.getElementById('borf-again').textContent,
+}));
+재기('주소가 오면 그때 한 번 부른다', 막힘.부른수 === 1 && 막힘.부른곳 === 부를곳, 막힘.부른수 + '번');
+재기('못 부르면 솔직히 적는다', 막힘.빈말 === '드라이브를 못 불렀습니다', 막힘.빈말);
+
+// 「새로고침」 을 누르실 때만 다시 부른다
+await p.tap('#borf-again');
+await p.waitForTimeout(350);
+재기('「새로고침」 을 누르면 다시 부른다',
+     (await p.evaluate(() => window.__부른곳.length)) === 2,
+     (await p.evaluate(() => window.__부른곳.length)) + '번');
+
+await p.evaluate(() => { window.__될까 = true; });
+await p.tap('#borf-again');
+await p.waitForTimeout(350);
+const 훑는중 = await p.evaluate(() => ({
+  부른수: window.__부른곳.length,
+  빈말: document.getElementById('borf-none').textContent,
+  단추: document.getElementById('borf-again').textContent,
+  막혔나: document.getElementById('borf-again').disabled,
+}));
+재기('부르고 나면 훑는 중이라 적는다', 훑는중.빈말 === '드라이브를 훑는 중입니다', 훑는중.빈말);
+재기('훑는 동안에는 단추를 잠근다', 훑는중.막혔나, 훑는중.단추);
+재기('「훑는 중」 을 화면에서 두 번 말하지 않나', 훑는중.단추 === '새로고침', 훑는중.단추);
+await p.waitForTimeout(1200);
+재기('저절로 되풀이하지 않는다',
+     (await p.evaluate(() => window.__부른곳.length)) === 3,
+     (await p.evaluate(() => window.__부른곳.length)) + '번');
+
 // 앱스 스크립트가 담았다 치고 — 목록이 찬다
 await p.evaluate(async () => {
   const { setDoc, doc } = window.fbFirestore;
@@ -316,11 +376,12 @@ const 보낸곳 = await p.evaluate(async () => {
 재기('파일을 누르면 드라이브로 보내나',
      보낸곳 === 'https://drive.google.com/file/d/DRV2/view', 보낸곳);
 
-// 치우고 박스 판으로
+// 치우고 박스 판으로 — fetch 도 원래대로 돌려 놓는다
 await p.evaluate(async () => {
   const { deleteDoc, doc } = window.fbFirestore;
   for (const id of [...window.__곳간.boring_files.keys()])
     await deleteDoc(doc(null, 'a', 'p', 'd', 'boring_files', id));
+  if (window.__옛fetch) window.fetch = window.__옛fetch;
 });
 await p.tap('#bor-back button');
 await p.waitForTimeout(300);
