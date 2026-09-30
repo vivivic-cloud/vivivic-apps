@@ -835,23 +835,66 @@ try { 못잰내림 = await 눌러받기('#b-go'); } catch (e) { 탓 = String(e.m
 재기('못 재는 값도 글자 그대로 나가나',
      !!못잰내림 && 못잰내림.글.includes(', 100*2, 10, 0, 12, 5, '), 못잰내림 ? '나갔다' : 탓);
 
-/* ── 9. 모르는 매크로(BH 따위)면 바꾸기를 막는다 ───────────────────── */
-await 먹이기('모름.cix', Buffer.from(
-  ['BEGIN ID CID3','\tREL= 5.0','END ID','BEGIN MAINDATA','\tLPX=592','\tLPY=382','\tLPZ=18','END MAINDATA',
-   'BEGIN MACRO','\tNAME=BG','\tPARAM,NAME=CRN,VALUE="1"','\tPARAM,NAME=X,VALUE=19','\tPARAM,NAME=Y,VALUE=70',
-   '\tPARAM,NAME=DIA,VALUE=5','\tPARAM,NAME=DP,VALUE=12','\tPARAM,NAME=SIDE,VALUE=0','END MACRO',
-   'BEGIN MACRO','\tNAME=BH','\tPARAM,NAME=SIDE,VALUE=1','\tPARAM,NAME=X,VALUE=50','END MACRO'].join('\r\n') + '\r\n', 'utf-8'));
-const 모름 = await p.evaluate(() => ({
-  빨간글: document.getElementById('b-warn').classList.contains('bhide') ? '' : document.getElementById('b-warn').textContent,
+/* ── 9. 못 읽는 것 — 꾸짖지 말고 그 속의 값을 펴 보인다 ────────────────
+   사장님: 「이런슬데없는 소리는 왜 적어 놓는거야 내가 이걸 알아듣는다고 생각하는거야?」
+   (짚으신 자리: 「CUT_G — 모르는 매크로다…」). 실제 파일에 CUT_G 가 들어 있다.
+   무엇인지 우리는 모른다 — 지어내지 말고 적혀 있던 것을 다 보여 드린다. */
+await 먹이기('못읽음.cix', Buffer.from(
+  ['BEGIN ID CID3','\tREL= 5.0','END ID',
+   'BEGIN MAINDATA','\tLPX=592','\tLPY=382','\tLPZ=18','END MAINDATA',
+   'BEGIN MACRO','\tNAME=BG','\tPARAM,NAME=ID,VALUE="1"','\tPARAM,NAME=SIDE,VALUE=0',
+   '\tPARAM,NAME=CRN,VALUE="1"','\tPARAM,NAME=X,VALUE=19','\tPARAM,NAME=Y,VALUE=70',
+   '\tPARAM,NAME=DIA,VALUE=5','\tPARAM,NAME=DP,VALUE=12','END MACRO',
+   'BEGIN MACRO','\tNAME=CUT_G','\tPARAM,NAME=ID,VALUE="2"','\tPARAM,NAME=SIDE,VALUE=0',
+   '\tPARAM,NAME=X,VALUE=100','\tPARAM,NAME=Y,VALUE=50','\tPARAM,NAME=DP,VALUE=6',
+   '\tPARAM,NAME=WID,VALUE=9','\tPARAM,NAME=AZ,VALUE=0','END MACRO',
+   'BEGIN MACRO','\tNAME=BH','\tPARAM,NAME=SIDE,VALUE=1','\tPARAM,NAME=X,VALUE=50','END MACRO',
+  ].join('\r\n') + '\r\n', 'utf-8'));
+
+const 못읽음 = await p.evaluate(() => ({
+  곁한줄: document.getElementById('b-warn').classList.contains('bhide')
+          ? '' : document.getElementById('b-warn').textContent,
+  제목: document.getElementById('b-unk-head').classList.contains('bhide')
+        ? '' : document.getElementById('b-unk-head').textContent,
+  칸이름: [...document.querySelectorAll('#b-unk thead th')].map(th => th.textContent).join(' '),
+  줄: [...document.querySelectorAll('#b-unk tbody tr')].map(tr =>
+        [...tr.children].map(td => td.textContent)),
   바꾸기: document.getElementById('b-go').disabled ? '막힘' : '열림',
+  단추곁: document.getElementById('b-go-note').classList.contains('bhide')
+          ? '' : document.getElementById('b-go-note').textContent,
+  구멍표: document.querySelectorAll('#b-read tbody tr').length,
 }));
-재기('모르는 매크로(BH)를 만나면 바꾸기를 막나', 모름.바꾸기 === '막힘', 모름.바꾸기);
-재기('무엇이 모르는 것인지 적나', /BH/.test(모름.빨간글) && /구멍이 빠진다/.test(모름.빨간글), 모름.빨간글);
+재기('못 읽는 것 수를 곁에 한 줄로 적나',
+     못읽음.곁한줄 === '아직 못 읽는 것 2개 — 이대로 바꾸면 빠집니다', 못읽음.곁한줄);
+재기('표 제목이 「못 읽은 것」 인가', 못읽음.제목 === '못 읽은 것', 못읽음.제목);
+재기('표 칸이 「이름 · 적혀 있던 값」 인가', 못읽음.칸이름 === '이름 적혀 있던 값', 못읽음.칸이름);
+재기('이름을 파일 글자 그대로 적나',
+     못읽음.줄.map(r => r[0]).join(' ') === 'CUT_G BH', 못읽음.줄.map(r => r[0]).join(' '));
+재기('CUT_G 속 값을 하나도 안 빼고 다 적나',
+     못읽음.줄[0] && 못읽음.줄[0][1] === 'ID=2 · SIDE=0 · X=100 · Y=50 · DP=6 · WID=9 · AZ=0',
+     못읽음.줄[0] ? 못읽음.줄[0][1] : '');
+재기('BH 속 값도 다 적나', 못읽음.줄[1] && 못읽음.줄[1][1] === 'SIDE=1 · X=50',
+     못읽음.줄[1] ? 못읽음.줄[1][1] : '');
+재기('바꾸기를 막나', 못읽음.바꾸기 === '막힘', 못읽음.바꾸기);
+재기('단추 곁에 「못 읽는 것이 있어 막았습니다」', 못읽음.단추곁 === '못 읽는 것이 있어 막았습니다',
+     못읽음.단추곁);
+재기('읽은 구멍은 그대로 표에 나오나', 못읽음.구멍표 === 1, 못읽음.구멍표 + '줄');
 
+// 사장님이 모르시는 낱말이 화면에 한 군데도 없어야 한다
+const 안쓰는말 = await p.evaluate(() => {
+  const 글 = document.getElementById('bor-app').innerText || '';
+  const 세기 = w => (글.match(new RegExp(w, 'g')) || []).length;
+  return { 매크로: 세기('매크로'), 파라미터: 세기('파라미터'), 변수: 세기('변수'), 블록: 세기('블록') };
+});
+재기('화면에 「매크로」 가 0번', 안쓰는말.매크로 === 0, 안쓰는말.매크로 + '번');
+재기('화면에 「파라미터」 가 0번', 안쓰는말.파라미터 === 0, 안쓰는말.파라미터 + '번');
+재기('화면에 「변수」 가 0번', 안쓰는말.변수 === 0, 안쓰는말.변수 + '번');
+재기('화면에 「블록」 이 0번', 안쓰는말.블록 === 0, 안쓰는말.블록 + '번');
 
-/* ── 10. 기계가 읽어 준 그 파일과 견주기 ── */
+/* ── 10. 기계가 읽어 준 그 파일과 견주기 ─────────────────────────────
+   이 프로그램의 기둥이다. 어떤 일이 있어도 지우지 마라. */
 if (나온것) {
-  const 우리것 = 나온것.글.split('\r\n').filter(s => s.startsWith('@ BG,')).map(번호지우기);
+  const 우리것 = 나온것.글.split('\r\n').filter(x => x.startsWith('@ BG,')).map(번호지우기);
   const 다른줄 = 기계가읽은것
       .map((바른것, i) => 우리것[i] === 바른것 ? null : (i + 1) + '째')
       .filter(Boolean);
@@ -878,13 +921,14 @@ const 돌아가기 = await p.evaluate(() => {
   return b ? Math.round(b.getBoundingClientRect().height) : 0;
 });
 재기('「← 박스판」 단추가 44px 인가', 돌아가기 >= 44, 돌아가기 + 'px');
-// 바닥에 뜬 「← 박스판」 이 마지막 줄을 가리지 않나 — 끝까지 내려 보고 잰다
+// 바닥에 뜬 「← 박스판」 이 「바꾸기」 를 가리지 않나 — 끝까지 내려 보고 잰다
 await p.evaluate(() => window.scrollTo(0, 999999));
 await p.waitForTimeout(300);
 const 안가림 = await p.evaluate(() => {
   const 끝 = document.getElementById('b-go').getBoundingClientRect();
   const 판 = document.querySelector('#bor-back button').getBoundingClientRect();
-  return { 끝: Math.round(끝.bottom), 판: Math.round(판.top), 겹침: 끝.bottom > 판.top && 끝.left < 판.right };
+  return { 끝: Math.round(끝.bottom), 판: Math.round(판.top),
+           겹침: 끝.bottom > 판.top && 끝.left < 판.right };
 });
 재기('「← 박스판」 이 「바꾸기」 를 안 가리나', !안가림.겹침,
      '바꾸기 ' + 안가림.끝 + ' · 단추 ' + 안가림.판);

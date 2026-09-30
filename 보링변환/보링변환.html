@@ -1,7 +1,7 @@
 <!-- ==========================================
      보링변환.html
-     버전: v1.7.0 (2026-09-30) — 집게 자리·WAIT 를 걷어내고, 파일을 어떻게 읽었는지만
-           글자 그대로 보인다 (낱말을 지어내지 않는다)
+     버전: v1.7.1 (2026-09-30) — 못 읽은 것을 꾸짖지 않고 그 속의 값을 표로 편다.
+           화면에 매크로·파라미터·변수·블록 이라는 말을 쓰지 않는다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -126,6 +126,10 @@ body{
 .bread td{color:var(--vg-ink); font-weight:600;}
 .bread th:first-child, .bread td:first-child{text-align:left; color:var(--vg-muted); font-weight:700;}
 .bread tr:last-child td{border-bottom:0;}
+/* 못 읽은 것의 값은 길다. 줄이지 않고 접는다. */
+.bread.bwrap-td td:last-child{white-space:normal; word-break:break-word; min-width:190px;}
+.bread.bwrap-td th:last-child{text-align:left;}
+.bread.bwrap-td td:last-child{text-align:left;}
 
 /* 단추 — 44px */
 .bbtn{
@@ -375,7 +379,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
 
     <div class="borh-tiles" id="borh-mine"></div>
 
-    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.7.0</b></p>
+    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.7.1</b></p>
   </div>
 </div>
 
@@ -428,7 +432,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
   <div class="bhead">
     <span class="bday">보링변환</span>
     <span class="brole">CIX → BPP</span>
-    <span class="bsub" id="b-ver">v1.7.0</span>
+    <span class="bsub" id="b-ver">v1.7.1</span>
   </div>
 
   <button class="btile" id="b-pick" type="button">
@@ -458,7 +462,12 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
 
   <div class="bwarn bhide" id="b-warn"></div>
 
+  <!-- 못 읽은 것 — 꾸짖지 않는다. 그 속에 적혀 있던 값을 그대로 편다. -->
+  <div class="bsec bhide" id="b-unk-head"><b>못 읽은 것</b></div>
+  <div class="bread bhide" id="b-unk"></div>
+
   <button class="bbtn bprim bhide" id="b-go" type="button">바꾸기</button>
+  <div class="bnote bhide" id="b-go-note"></div>
 
 </div>
 </div>
@@ -510,7 +519,9 @@ function cix읽기(글){
   const 판 = { LPX:'', LPY:'', LPZ:'' };
   const 구멍 = [];
   const 버린것 = { GEOTEXT:0, VB:0 };
-  const 모르는것 = new Map();          // 이름 → 몇 개
+  // 못 읽은 것 — 이름과 그 안에 적혀 있던 칸·값을 통째로 들고 온다.
+  // 무엇이 중요한지 우리는 모른다. 하나도 빼지 않는다.
+  const 모르는것 = [];
   let 어디 = '', 매크로 = null;
 
   for (const 날것 of 줄들) {
@@ -538,7 +549,8 @@ function cix읽기(글){
         } else if (이름 === 'GEOTEXT') {
           버린것.GEOTEXT++;
         } else if (이름) {
-          모르는것.set(이름, (모르는것.get(이름) || 0) + 1);
+          모르는것.push({ 이름: 이름,
+            값: Object.keys(매크로.값).map(k => [k, 껍질벗기기(매크로.값[k])]) });
         }
       }
       어디 = ''; 매크로 = null; continue;
@@ -740,15 +752,27 @@ function 다시그리기(){
   $('b-drop').textContent = 곁.join(' · ');
   보임($('b-drop'), !!곁.length);
 
-  const 모르는것 = [...읽은것.모르는것.keys()];
-  if (모르는것.length) {
-    $('b-warn').innerHTML = 막기(모르는것.join(' · ')) + ' — 모르는 매크로다. 이대로 바꾸면 구멍이 빠진다';
+  /* 못 읽은 것 — 꾸짖는 글을 적을 자리가 아니라, 그 속에 무엇이 적혀 있는지 보여 드릴
+     자리다. 사장님이 보시고 읽는 법을 알려 주신다. 이름도 값도 파일 글자 그대로다. */
+  const 못읽은것 = 읽은것.모르는것 || [];
+  if (못읽은것.length) {
+    $('b-warn').textContent = `아직 못 읽는 것 ${못읽은것.length}개 — 이대로 바꾸면 빠집니다`;
     보임($('b-warn'), true);
+    $('b-unk').innerHTML = '<table><thead><tr><th>이름</th><th>적혀 있던 값</th></tr></thead><tbody>' +
+      못읽은것.map(u => '<tr><td>' + 막기(u.이름) + '</td><td>' +
+        막기(u.값.map(([k, v]) => k + '=' + v).join(' · ')) + '</td></tr>').join('') +
+      '</tbody></table>';
+    $('b-unk').classList.add('bwrap-td');
+    보임($('b-unk'), true); 보임($('b-unk-head'), true);
   } else {
     보임($('b-warn'), false);
+    보임($('b-unk'), false); 보임($('b-unk-head'), false);
   }
 
-  $('b-go').disabled = 모르는것.length > 0 || 읽은것.구멍.length === 0;
+  const 막힌다 = 못읽은것.length > 0 || 읽은것.구멍.length === 0;
+  $('b-go').disabled = 막힌다;
+  $('b-go-note').textContent = 못읽은것.length ? '못 읽는 것이 있어 막았습니다' : '';
+  보임($('b-go-note'), !!못읽은것.length);
 }
 
 function 내려받기(이름, 글){
@@ -769,7 +793,11 @@ async function 바꾸기(){
   if (!읽은것) return;
   let 변수;
   try { 변수 = await 변수틀읽기(); }
-  catch (e) { 막힘알림((e.message || '변수틀을 읽지 못했습니다') + ' — 바꾸지 않았다'); return; }
+  catch (e) {
+    console.warn('본보기:', e && e.message);      // 자세한 것은 여기에만
+    막힘알림('본보기 파일을 읽지 못했습니다 — 바꾸지 않았다');
+    return;
+  }
 
   // 구멍 차례는 파일에 적힌 그대로다. 가르지 않는다.
   // bpp짓기 는 한 줄도 안 건드렸다 — 넷째 자리에 -1 을 주면 아무것도 끼지 않는다.
