@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.13.6 (2026-10-01) — 재단 도면을 CAD 격자·얇은 선 꼴로 그린다
+     버전: v1.13.7 (2026-10-01) — 카드 안 재단 도면을 30도로 눕힌다 (칸·카드 길이 그대로)
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2390,7 +2390,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.13.6</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.13.7</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2523,7 +2523,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.13.6</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.13.7</b></p>
         </div>
     </div>
 
@@ -9809,7 +9809,11 @@
         // 부속과 무관한 원장 전체를 다 그려서 카드가 커 보인다는 피드백에 맞춰
         // 좌측·상단의 불필요한 여백만 잘라내고, 우측·하단의 진짜 남는 부분은 그대로 둠
         let _재단도면번호 = 0;     // 격자 무늬 이름이 겹치지 않게 하는 번호
-        function _woCuttingDiagramSvg(p, w, h, fitHeight) {
+        /* 누움=true 면 카드 안 작은 도면을 30도 등각(아이소메트릭)으로 눕힌다 (10-01 지시).
+           크게 띄우는 도면·집중 창 도면은 반듯한 채로 둔다 — 누운 그림으로 재단 치수를
+           읽으면 비뚤어져 보인다. 눕는 것은 보이는 꼴뿐이고, 조각이 앉은 자리(lp·tp·wp·hp)
+           에서 낸 x·y·width·height 는 한 자도 건드리지 않는다. */
+        function _woCuttingDiagramSvg(p, w, h, fitHeight, 누움) {
             if (!p.isCuttingCard || !p.boardParts || p.boardParts.length === 0) return '';
             const BW = p.boardW || 2440, BD = p.boardH || 1220;
             let minLeftF = Infinity, minTopF = Infinity;
@@ -9848,7 +9852,35 @@
             const sizeStyle = fitHeight
                 ? `height:100%;width:auto;max-width:100%;`
                 : `width:100%;height:auto;`;
-            return `<svg viewBox="0 0 ${cropW.toFixed(1)} ${cropH.toFixed(1)}" style="display:block;${sizeStyle}border:1px solid #d6d4d1;border-radius:4px;margin-top:4px;flex-shrink:0;background:#ecebe8;box-shadow:0 1px 2px rgba(55,53,47,0.10),0 5px 12px rgba(55,53,47,0.07);">${격자}${rects}</svg>`;
+            const 테 = `style="display:block;${sizeStyle}border:1px solid #d6d4d1;border-radius:4px;margin-top:4px;flex-shrink:0;background:#ecebe8;box-shadow:0 1px 2px rgba(55,53,47,0.10),0 5px 12px rgba(55,53,47,0.07);"`;
+            if (!누움)
+                return `<svg viewBox="0 0 ${cropW.toFixed(1)} ${cropH.toFixed(1)}" ${테}>${격자}${rects}</svg>`;
+
+            /* ── 누운 꼴 (30도 등각) ──────────────────────────────────────────
+               x' = cos30·(x−y) · y' = sin30·(x+y) — 반듯한 판을 비스듬히 본 꼴.
+               눕히면 가로로 더 넓어지는데, 보이는 칸(viewBox)을 넓히면 도면 높이가
+               따라 늘어 **카드가 길어진다**. 그래서 칸은 그대로 두고, 누운 판을
+               그 칸 안에 꼭 맞게 줄여 넣는다 — 잘리지도 않고 카드도 안 늘어난다. */
+            const C = 0.8660254, S = 0.5;
+            const 누운폭 = C * (cropW + cropH), 누운높이 = S * (cropW + cropH);
+            const 배 = Math.min(cropW / 누운폭, cropH / 누운높이) * 0.94;   // 0.94 = 가장자리 숨 쉴 자리
+            const 밀기X = (cropW - 배 * 누운폭) / 2 + 배 * C * cropH;       // 왼쪽으로 뻗는 만큼 되민다
+            const 밀기Y = (cropH - 배 * 누운높이) / 2;
+            const 점 = (x, y) => [(밀기X + 배 * C * (x - y)).toFixed(1), (밀기Y + 배 * S * (x + y)).toFixed(1)];
+            const 네귀 = [점(0, 0), 점(cropW, 0), 점(cropW, cropH), 점(0, cropH)];
+            const 그늘이름 = 'amt그늘' + _재단도면번호;
+            // 그늘은 누운 판의 네 귀를 그대로 따 와서 조금 아래에 깔고 흐린다.
+            // (누운 묶음 안에 넣으면 흐림 정도가 줄인 배만큼 같이 줄어든다)
+            const 그늘 =
+                `<defs><filter id="${그늘이름}" x="-20%" y="-20%" width="140%" height="160%">` +
+                `<feGaussianBlur stdDeviation="${(cropH * 0.016).toFixed(1)}"/></filter></defs>` +
+                `<path d="M${네귀.map(q => q.join(' ')).join(' L')} Z" fill="rgba(55,53,47,0.22)" ` +
+                `filter="url(#${그늘이름})" transform="translate(0 ${(cropH * 0.028).toFixed(1)})"/>`;
+            const 바닥 = `<path d="M0 0 H${cropW.toFixed(1)} V${cropH.toFixed(1)} H0 Z" fill="#f7f6f4"/>`;
+            const 눕힘 = `translate(${밀기X.toFixed(1)} ${밀기Y.toFixed(1)}) scale(${배.toFixed(4)}) ` +
+                         `matrix(${C} ${S} ${-C} ${S} 0 0)`;
+            return `<svg viewBox="0 0 ${cropW.toFixed(1)} ${cropH.toFixed(1)}" ${테}>` +
+                   `${그늘}<g transform="${눕힘}">${바닥}${격자}${rects}</g></svg>`;
         }
 
         // 재단 카드의 "도면 보기" 클릭 시 확대 팝업으로 표시
@@ -10490,7 +10522,7 @@
                         (x.w && x.d ? ` ${_esc(x.w)}×${_esc(x.d)}` : '') +
                         (x.수 > 0 ? ` · ${_esc(x.수)} EA` : '') + `</span>`).join('') + `</div>`
                     : '';
-                const _diagCut = _woCuttingDiagramSvg(p);
+                const _diagCut = _woCuttingDiagramSvg(p, null, null, false, true);   // 카드 안 도면만 눕는다
                 // 「편집」 은 사장님이 짚으신 그대로 **재단도면 곁**에 둔다(09-23 지시).
                 // 도면이 없는 카드에도 편집할 길은 있어야 하므로, 그때는 글 칸 밑에 둔다.
                 const _diagBox2 = _diagCut
