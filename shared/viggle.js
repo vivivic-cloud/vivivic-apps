@@ -186,6 +186,8 @@
   .vg-it.cl{background:#F4F4F2;color:#1A1A19}
   .vg-it .vg-when{display:block;font-size:11px;opacity:.6;margin:0 0 4px}
   .vg-it .vg-where{display:block;font-size:11px;opacity:.75;margin:0 0 4px}
+  /* 작업대에서 찾아온 그 말 — 어느 줄인지 한눈에 보이게 테를 두른다 (10-01 사장님 말씀) */
+  .vg-it.vg-here{outline:2px solid #FF3B30;outline-offset:2px}
   .vg-empty{color:#9B9B96;font-size:14px;padding:20px 2px;text-align:center}
   .vg-back{background:#fff;color:#6E6E6A;border:1px solid #E2E2DF !important}`;
   document.head.insertAdjacentHTML('beforeend', `<style>${css}</style>`);
@@ -258,7 +260,7 @@
     e.preventDefault(); e.stopPropagation();
   }, true);
 
-  function 시트(짚은것, 지난부터) {
+  function 시트(짚은것, 지난부터, 찾을때) {
     const s = document.createElement('div');
     s.className = 'vg-sheet';
     s.innerHTML = `<div class="vg-card">
@@ -314,12 +316,28 @@
           const 쪼갬 = /^\s*\[([^\]]{1,80})\]\s*([\s\S]*)$/.exec(글);   // 짚으셨던 자리
           const 어디글 = 쪼갬 ? 쪼갬[1] : '';
           const 본문 = 쪼갬 ? 쪼갬[2] : 글;
-          return '<div class="vg-it ' + (나 ? 'me' : 'cl') + '">'
+          return '<div class="vg-it ' + (나 ? 'me' : 'cl') + '" data-at="' + (m.at || 0) + '">'
                + '<span class="vg-when">' + 때글(m.at) + ' · ' + 막기(나 ? '사장님' : (m.who || '클로드')) + '</span>'
                + (어디글 ? '<span class="vg-where">' + 막기(어디글) + '</span>' : '')
                + 막기(본문) + '</div>';
         }).join('');
       목록.scrollTop = 0;
+      /* 사장님 말씀(10-01): 「이곳을 눌렀을때 내가 본 상세 위치를 보여 줄수는 없는건가요?」
+         작업대가 `vg때` 를 붙여 보내면 **그 말이 있는 자리로 굴러가** 잠깐 드러낸다.
+         때가 1~2초 어긋날 수 있어(손잡이가 적은 때와 글이 담긴 때가 다르다) 가장 가까운 줄을 고른다.
+         못 찾으면 아무 일도 안 한다 — 맨 위 그대로다. */
+      if (찾을때) {
+        const 줄들 = [...목록.querySelectorAll('.vg-it')];
+        let 고른 = null, 가까움 = 6;                       // 6초까지만 같은 것으로 본다
+        줄들.forEach(el => {
+          const d = Math.abs(Number(el.dataset.at || 0) - 찾을때);
+          if (d <= 가까움) { 가까움 = d; 고른 = el; }
+        });
+        if (고른) {
+          고른.classList.add('vg-here');
+          setTimeout(() => 고른.scrollIntoView({ block: 'center' }), 60);
+        }
+      }
     };
     const 보냄 = s.querySelector('.vg-send');
     보냄.onclick = async () => {
@@ -370,5 +388,8 @@
   }
   const 갈페이지 = (표.get('vg페이지') || '').trim();
   if (갈페이지) setTimeout(() => 그페이지로(갈페이지, 20), 300);   // 최대 6초까지 기다린다
-  if (표.get('vg지난') === '1') setTimeout(() => 시트('지난 지시', true), 500);
+  if (표.get('vg지난') === '1') {
+    const 때 = Number(표.get('vg때') || 0) || 0;        // 짚으셨던 그 말의 때 (없으면 맨 위)
+    setTimeout(() => 시트('지난 지시', true, 때), 500);
+  }
 })();
