@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.13.5 (2026-10-01) — 재단편집에서 같은 원장을 쓰는 발주 밖 부속도 불러온다
+     버전: v1.13.6 (2026-10-01) — 재단 도면을 CAD 격자·얇은 선 꼴로 그린다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2390,7 +2390,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.13.5</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.13.6</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2523,7 +2523,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.13.5</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.13.6</b></p>
         </div>
     </div>
 
@@ -9808,6 +9808,7 @@
         // 우측·하단은 실제 원장 끝까지의 남는 폭/길이를 그대로 보여줘야 함 —
         // 부속과 무관한 원장 전체를 다 그려서 카드가 커 보인다는 피드백에 맞춰
         // 좌측·상단의 불필요한 여백만 잘라내고, 우측·하단의 진짜 남는 부분은 그대로 둠
+        let _재단도면번호 = 0;     // 격자 무늬 이름이 겹치지 않게 하는 번호
         function _woCuttingDiagramSvg(p, w, h, fitHeight) {
             if (!p.isCuttingCard || !p.boardParts || p.boardParts.length === 0) return '';
             const BW = p.boardW || 2440, BD = p.boardH || 1220;
@@ -9822,8 +9823,22 @@
             const rects = p.boardParts.map(pt => {
                 const rx = (pt.lp * BW - cropX).toFixed(1), ry = (pt.tp * BD - cropY).toFixed(1);
                 const rw = Math.max(2, pt.wp * BW).toFixed(1), rh = Math.max(2, pt.hp * BD).toFixed(1);
-                return `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="${pt.bg||'#fff'}" stroke="#37352f" stroke-width="1.2" vector-effect="non-scaling-stroke"/>`;
+                return `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="${pt.bg||'#fff'}" stroke="#37352f" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
             }).join('');
+            /* ── CAD 격자 (10-01 지시: 「참조 이미지처럼」) ──────────────────
+               조각이 앉은 자리·치수·회전은 위에서 셈한 그대로다. 여기서 더하는
+               것은 **뒤에 까는 격자와 테두리·그림자뿐**이다.
+               격자는 <rect> 로 만들지 않는다 — 도면의 조각 수를 세는 자리가
+               있어서(집중 창 도면), rect 하나만 더해도 셈이 틀어진다.
+               격자 한 칸은 원장 짧은쪽(1220mm)의 1/4 인 305mm — 눈금이
+               아니라 CAD 바탕 느낌을 내는 눈가늠이다. */
+            const 격자칸 = 305;
+            const 격자이름 = 'amtcad' + (++_재단도면번호);
+            const 격자 =
+                `<defs><pattern id="${격자이름}" width="${격자칸}" height="${격자칸}" patternUnits="userSpaceOnUse">` +
+                `<path d="M${격자칸} 0 H0 V${격자칸}" fill="none" stroke="#d2cfcb" stroke-width="0.8" vector-effect="non-scaling-stroke"/>` +
+                `</pattern></defs>` +
+                `<path d="M0 0 H${cropW.toFixed(1)} V${cropH.toFixed(1)} H0 Z" fill="url(#${격자이름})"/>`;
             // CSS aspect-ratio 속성을 percentage 크기 지정과 같이 쓰면 폭/높이가
             // max-width나 max-height에 눌릴 때 서로 다시 계산되지 않아 레터박싱이
             // 생기는 문제가 있었음 — viewBox 자체가 이미 SVG의 고유 비율을 제공하므로
@@ -9833,7 +9848,7 @@
             const sizeStyle = fitHeight
                 ? `height:100%;width:auto;max-width:100%;`
                 : `width:100%;height:auto;`;
-            return `<svg viewBox="0 0 ${cropW.toFixed(1)} ${cropH.toFixed(1)}" style="display:block;${sizeStyle}border:1px solid #e3e2e0;border-radius:3px;margin-top:4px;flex-shrink:0;background:#f9f9f8;">${rects}</svg>`;
+            return `<svg viewBox="0 0 ${cropW.toFixed(1)} ${cropH.toFixed(1)}" style="display:block;${sizeStyle}border:1px solid #d6d4d1;border-radius:4px;margin-top:4px;flex-shrink:0;background:#ecebe8;box-shadow:0 1px 2px rgba(55,53,47,0.10),0 5px 12px rgba(55,53,47,0.07);">${격자}${rects}</svg>`;
         }
 
         // 재단 카드의 "도면 보기" 클릭 시 확대 팝업으로 표시
