@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.13.4 (2026-09-29) — 알림판이 안 가리게 하고, 불량보고를 알림에 띄운다
+     버전: v1.13.5 (2026-10-01) — 재단편집에서 같은 원장을 쓰는 발주 밖 부속도 불러온다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1317,6 +1317,16 @@
             width: min(320px, calc(100vw - 24px));
             max-height: min(500px, calc(100vh - var(--amth-top, 64px) - 28px));
         }
+        /* 발주 밖 부속 불러오기 — 자동 목록 아래에 접어 둔다(10-01 지시) */
+        .id302-밖단추 {
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+            width: 100%; min-height: 44px; margin-top: 10px; padding: 0 12px;
+            border: 1px dashed #d3d1cb; border-radius: 10px; background: #fff;
+            font: inherit; font-size: 12.5px; font-weight: 800; color: #6E6E6A; cursor: pointer;
+        }
+        .id302-밖단추:active { background: #f7f6f3; }
+        .id302-밖단추 b { font-size: 11px; font-weight: 800; color: #b3261e;
+            background: #fdecea; border-radius: 999px; padding: 2px 7px; }
         .wo-cut-편집:hover { background: #FAFAF9; border-color: #D6D6D2; }
         .wo-cut-편집:active { background: #F0EFED; }
         /* 완료된 카드 — 단추를 지우지 않고 죽인다(09-28 지시). 눌리지 않는 것이 보여야 한다. */
@@ -2380,7 +2390,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.13.4</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.13.5</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2513,7 +2523,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.13.4</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.13.5</b></p>
         </div>
     </div>
 
@@ -13773,7 +13783,55 @@
             orderedPartsList.sort((a, b) => b.totalArea - a.totalArea).forEach(p => renderPartCard(p, normalArea));
             fixedHeader.classList.toggle('hidden', !commonPartsFound);
             if (!commonPartsFound && orderedPartsList.length === 0) inner.innerHTML = '<div class="py-8 text-center text-[#787774] font-bold italic col-span-2">데이터가 없습니다.</div>';
+            /* 발주에 없는 부속도 불러올 수 있게 한다 (10-01 지시).
+               자동으로 올라온 목록은 한 줄도 건드리지 않는다 — 그 아래에 따로 둔다.
+               같은 원장을 가리는 자는 쓰던 그대로(원장명+마감-마감색상).
+               「추가재단 가능성」 을 우리가 셈으로 좁히지 않는다 — 같은 원장이면 다 보이고
+               고르는 것은 사장님이다. 좁히면 잘릴 수 있는 부속이 사라진다. */
+            _발주밖자리만들기(plateInfo, inner);
             updateBoardVisual();
+        }
+
+        /* 발주 밖 부속 — 화면에만 더해지는 고를 거리다.
+           발주 자료(confirmed_orders)·공정 진행(partStarted·partCompletions)에는
+           한 자도 쓰지 않는다. 재단계획에 담길 때는 「발주밖」 표를 달아 둔다. */
+        window._발주밖목록 = function(plateInfo){
+            const h = currentFullData[0]; if (!h) return [];
+            const 올린행 = new Set([...document.querySelectorAll('.inner-part-card')]
+                .map(c => String(c.dataset.rowIndex)));
+            const 것들 = [];
+            currentFullData.slice(1).forEach((row, idx) => {
+                const rowIndex = idx + 1;
+                const 자 = (row[h.indexOf('원장명')] || '') + (row[h.indexOf('마감')] || '') + '-'
+                    + normalizeValue(row[h.indexOf('마감색상')]);
+                if (자 !== plateInfo) return;
+                if (올린행.has(String(rowIndex))) return;          // 이미 올라온 것은 두 번 안 보인다
+                const w = parseFloat(row[h.indexOf('재단W')]), d = parseFloat(row[h.indexOf('재단D')]);
+                if (!(w > 0) || !(d > 0)) return;                   // 치수가 없으면 자를 수 없다
+                것들.push({ id: `agg-밖-${rowIndex}`, w, d, qty: 0,
+                    name: row[h.indexOf('부속명')], displayName: plateInfo,
+                    grain: row[h.indexOf('결보호')], rowIndex, isCommon: false,
+                    발주밖: true, totalArea: w * d, orderIds: [] });
+            });
+            것들.sort((a, b) => b.totalArea - a.totalArea);
+            return 것들;
+        };
+        function _발주밖자리만들기(plateInfo, inner){
+            document.getElementById('id302-발주밖-묶음')?.remove();
+            const 밖 = window._발주밖목록(plateInfo);
+            if (!밖.length) return;
+            const 묶음 = document.createElement('div');
+            묶음.id = 'id302-발주밖-묶음';
+            묶음.innerHTML =
+                `<button type="button" id="id302-발주밖-단추" class="id302-밖단추">발주 밖 부속 불러오기 <b>${밖.length}</b></button>` +
+                `<div id="id302-발주밖-section" class="grid grid-cols-2 gap-2 mt-2 hidden"></div>`;
+            inner.appendChild(묶음);
+            document.getElementById('id302-발주밖-단추').onclick = () => {
+                const 자리 = document.getElementById('id302-발주밖-section');
+                const 접혔나 = 자리.classList.contains('hidden');
+                if (접혔나 && !자리.children.length) 밖.forEach(x => renderPartCard(x, 자리));
+                자리.classList.toggle('hidden', !접혔나);
+            };
         }
 
         function renderPartCard(p, container) {
@@ -13789,12 +13847,15 @@
             card.dataset.rowIndex = p.rowIndex;
             card.dataset.isCommon = p.isCommon;
             card.dataset.orderIds = (p.orderIds || []).join(',');
+            if (p.발주밖) card.dataset.발주밖 = '1';   // 발주에 없는 부속 — 한눈에 보이게 표를 단다
             console.log(`[renderPartCard] ${p.name}, orderIds: ${card.dataset.orderIds}, isCommon: ${p.isCommon}`);
             card.onclick = () => handleCardClick(card);
 
             let rotateHtml = (p.grain === 'X') ? `<button onclick="event.stopPropagation(); toggleRotation(this)" class="rotate-btn">재단회전</button>` : "";
             // 공통부속도 남은 필요수량을 알면 숫자를 찍는다. 모를 때만 「공통」 이라고 둔다.
-            let qtyDisplay = (p.isCommon && !(p.qty > 0)) ? "공통" : Math.round(p.qty), qtyClass = p.isCommon ? "!bg-[#f7f6f3]0" : "bg-[#37352f]";
+            let qtyDisplay = p.발주밖 ? "발주 밖"
+                : (p.isCommon && !(p.qty > 0)) ? "공통" : Math.round(p.qty);
+            let qtyClass = p.발주밖 ? "bg-[#b3261e]" : (p.isCommon ? "!bg-[#f7f6f3]0" : "bg-[#37352f]");
 
             // 상품카드 색상 점 (여러 개면 표시)
             const orderIds = p.orderIds || [];
@@ -14100,6 +14161,9 @@
                 cutD: (currentFullData[0] && currentFullData[parseInt(pAgg.dataset.rowIndex)]) ? (parseFloat(currentFullData[parseInt(pAgg.dataset.rowIndex)][currentFullData[0].indexOf('재단D')]) || 0) : 0
             };
             console.log('[confirmCutting] cuttingData:', { pOrderIds: cuttingData.pOrderIds, sOrderIds: cuttingData.sOrderIds, tOrderIds: cuttingData.tOrderIds });
+            // 발주 밖 부속으로 만든 도면은 그렇다고 남긴다 — 다음 단계가 주문된 일로 세지 않게
+            cuttingData.발주밖 = (pAgg.dataset.발주밖 === '1')
+                || (!!sAgg && sAgg.dataset.발주밖 === '1') || (!!tAgg && tAgg.dataset.발주밖 === '1');
             const _existingIdx = confirmedCuttingData.findIndex(d => d.confirmId === confirmId);
             if (_existingIdx >= 0) confirmedCuttingData[_existingIdx] = cuttingData;
             else confirmedCuttingData.unshift(cuttingData);
