@@ -91,7 +91,9 @@
                + ((글 || '').replace(/\s+/g, ' ').trim().length > 40 ? '…' : '');
     const 몸 = {
       자리: 박스 ? 'box:' + 박스 : '모든박스',
-      짚은자리: [이름, 짚은것].filter(Boolean).join(' · '),
+      짚은자리: [어디(), 짚은것].filter(Boolean).join(' · '),
+      // 짚으셨을 때 켜져 있던 페이지. 작업대가 이것으로 그 페이지를 열어 준다
+      페이지: 어느페이지(),
       말: 글 || '',
       한줄: 한줄 || '(빈 말)',
       상태: '받음',
@@ -241,9 +243,13 @@
     const t = el.tagName.toLowerCase();
     return ({ button: '단추', input: '입력칸', select: '고르는 칸', img: '그림', svg: '그림' })[t] || t;
   }
-  function 어디() {
+  /* 지금 켜져 있는 페이지(탭) 글자. 이것을 적어 두면 작업대가 **그 페이지로** 열어 준다. */
+  function 어느페이지() {
     const 켜진 = document.querySelector('.nav-link.active, .page-tab-link.active, .bnav.on');
-    return [이름, 켜진 && 켜진.textContent.trim()].filter(Boolean).join(' / ');
+    return (켜진 && 켜진.textContent.trim()) || '';
+  }
+  function 어디() {
+    return [이름, 어느페이지()].filter(Boolean).join(' / ');
   }
 
   document.addEventListener('click', (e) => {
@@ -252,7 +258,7 @@
     e.preventDefault(); e.stopPropagation();
   }, true);
 
-  function 시트(짚은것) {
+  function 시트(짚은것, 지난부터) {
     const s = document.createElement('div');
     s.className = 'vg-sheet';
     s.innerHTML = `<div class="vg-card">
@@ -273,7 +279,7 @@
       </div>`;
     document.body.appendChild(s);
     const ta = s.querySelector('textarea');
-    setTimeout(() => ta.focus(), 60);
+    if (!지난부터) setTimeout(() => ta.focus(), 60);   // 지난 지시만 보러 왔으면 자판을 올리지 않는다
     const 닫기 = () => { s.remove(); 겨냥 && 겨냥.classList.remove('vg-mark'); 짚었다 = false; };
     s.querySelector('.vg-cancel').onclick = 닫기;
     /* 길게 누른 손가락을 떼면 click 하나가 뒤따라온다. 그 click 이 방금 열린
@@ -341,5 +347,28 @@
         setTimeout(() => window.open(u, '_blank'), 900);
       }
     };
+    // 주저리주저리 채팅을 보러 오신 길 — 적는 칸 대신 지난 지시를 바로 펼친다
+    if (지난부터) s.querySelector('.vg-log').click();
   }
+
+  /* ── 작업대 「내가 시킨 것」 에서 들어오는 두 꾸러미 ───────────────
+     사장님 말씀(10-01): 「짚은페이지로는 최소한 가줘야 되는거 아니냐」
+                        「주저리주저리 채팅위치로 갈 수 있는 링크 클릭」
+       vg페이지=<켜진 탭 글자>  그 페이지를 눌러 둔다
+       vg지난=1                지난 지시(주저리주저리 채팅)를 바로 펼친다
+     ⚠ 프로그램이 뜨는 데 시간이 걸린다. 탭이 생길 때까지 잠깐 기다린다.
+        없는 탭이면 아무 일도 하지 않는다 — 엉뚱한 곳을 누르지 않는다. */
+  function 그페이지로(글, 남은) {
+    const 후보 = [...document.querySelectorAll('.nav-link, .page-tab-link, .bnav')];
+    const 것 = 후보.find(e => e.textContent.trim() === 글);
+    if (것) {
+      if (!것.classList.contains('active') && !것.classList.contains('on')) 것.click();
+      try { 것.scrollIntoView({ block: 'center' }); } catch (e) {}
+      return;
+    }
+    if (남은 > 0) setTimeout(() => 그페이지로(글, 남은 - 1), 300);
+  }
+  const 갈페이지 = (표.get('vg페이지') || '').trim();
+  if (갈페이지) setTimeout(() => 그페이지로(갈페이지, 20), 300);   // 최대 6초까지 기다린다
+  if (표.get('vg지난') === '1') setTimeout(() => 시트('지난 지시', true), 500);
 })();
