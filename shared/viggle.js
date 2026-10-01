@@ -77,6 +77,37 @@
     if (!w.ok) throw new Error('보내지 못했습니다 (' + w.status + ')');
   }
 
+  /* ── 「내가 시킨 것」 에 한 줄 남긴다 ──────────────────────────
+     사장님 말씀(10-01): 「지시가 올라오면 내가 시킨것에 가장먼저 등록되어야 되는거
+     아니니?」 그리고 「등록을 하는게 작업대 프로그램에 코드화 된게 아니라 혹시 니가
+     직접 등록해주는 거니?」. 그때까지는 관리자가 손으로 적었고, 한 번 빠뜨렸다.
+     **사람 기억에 맡기지 않는다 — 보내는 이 자리에서 적는다.**
+     여기 한 곳만 고치면 모든 프로그램과 작업대가 같이 적힌다.
+
+     ⚠ 이것이 실패해도 **지시 보내기는 성공으로 둔다.** 지시가 들어간 뒤의 덧일이다.
+        여기서 터져서 지시가 안 가면 더 나쁘다. */
+  async function 시킨것남기기(짚은것, 글, 때) {
+    const 한줄 = (글 || '').replace(/\s+/g, ' ').trim().slice(0, 40)
+               + ((글 || '').replace(/\s+/g, ' ').trim().length > 40 ? '…' : '');
+    const 몸 = {
+      자리: 박스 ? 'box:' + 박스 : '모든박스',
+      짚은자리: [이름, 짚은것].filter(Boolean).join(' · '),
+      말: 글 || '',
+      한줄: 한줄 || '(빈 말)',
+      상태: '받음',
+      때: 때,
+    };
+    const 길 = `${창고}/wt_asked/a${때}`;
+    const tok = await 토큰();
+    const 머리 = { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' };
+    // 이미 있으면 덮지 않는다 — 관리자가 적어 둔 상태·결과를 지우면 안 된다
+    const 봄 = await fetch(길, { headers: { Authorization: 'Bearer ' + tok } });
+    if (봄.ok) return;
+    const w = await fetch(길, { method: 'PATCH', headers: 머리,
+      body: JSON.stringify({ fields: Object.fromEntries(Object.entries(몸).map(([k, v]) => [k, 값(v)])) }) });
+    if (!w.ok) throw new Error('내가 시킨 것에 못 적었습니다 (' + w.status + ')');
+  }
+
   /* 지난 지시를 읽어 온다 — 읽기만 한다. 보내기와 같은 자리(wt_dev/<자리>)다 */
   async function 지난것읽기() {
     const 자리 = 박스 ? 'box:' + 박스 : '모든박스';
@@ -289,10 +320,16 @@
       const 글 = ta.value.trim(); if (!글) return;
       보냄.disabled = true; 보냄.textContent = '보내는 중…';
       const 본문 = `[${어디()} · ${짚은것}] ${글}`;
+      const 때 = Math.floor(Date.now() / 1000);
       try {
         await 지시보내기(본문);
+        // 지시는 들어갔다. 이제 「내가 시킨 것」 에 한 줄 남긴다 —
+        // 못 남겨도 지시는 그대로 둔다(알림만 다르게 한다).
+        let 남겼나 = true;
+        try { await 시킨것남기기(짚은것, 글, 때); } catch (e) { 남겼나 = false; }
         닫기();
-        알림('클로드에게 보냈습니다');
+        알림(남겼나 ? '클로드에게 보냈습니다'
+                   : '보냈습니다 — 「내가 시킨 것」 에는 못 적었습니다');
       } catch (e) {
         보냄.disabled = false; 보냄.textContent = '보내기';
         알림((e.message || '보내지 못했습니다') + ' — 새 창으로 보냅니다', true);
