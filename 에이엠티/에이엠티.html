@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.14.2 (2026-10-02) — 도면 자리를 늘 같은 크기로, 부속 그림의 회색 상자를 없앤다
+     버전: v1.14.3 (2026-10-02) — 결이 정해진 부속은 도면에 결방향을 그린다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2405,7 +2405,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.14.2</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.14.3</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2538,7 +2538,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.14.2</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.14.3</b></p>
         </div>
     </div>
 
@@ -9913,6 +9913,21 @@
                    _누워싸기(cropW, cropH, 번호, 바닥 + 격자 + rects) + `</svg>`;
         }
 
+        /* 이 부속의 결보호 값 — 원본 행(원장)에 적힌 그대로 읽는다. 새로 셈하지 않는다.
+           'O' 면 결을 지켜야 하는 부속이고, 'X' 면 돌려 앉혀도 되는 부속이다.
+           비어 있으면 「설정 안 됨」 으로 보아 아무것도 그리지 않는다. */
+        function _wo결보호(p) {
+            try {
+                if (p && p.결보호 != null && String(p.결보호).trim() !== '') return String(p.결보호).trim();
+                const h = (typeof currentFullData !== 'undefined') && currentFullData[0];
+                if (!h || !p || p.pRowIndex == null) return '';
+                const row = currentFullData[p.pRowIndex];
+                if (!row) return '';
+                const i = h.indexOf('결보호');
+                return i < 0 ? '' : String(row[i] == null ? '' : row[i]).trim();
+            } catch (e) { return ''; }
+        }
+
         /* ── 이 카드에서 잘라야 하는 부속 한 장 (10-02 지시) ───────────────────
            재단배치도가 아니다. 칸을 나누지 않은 **민판 한 장**이고, 크기는 그
            부속의 재단 사이즈(rw × rd) 다. 격자·눕히는 셈·그늘은 배치도가 쓰는
@@ -9926,12 +9941,29 @@
             const 바닥 = `<path d="M0 0 H${W} V${H} H0 Z" fill="#ffffff"/>`;
             const 테두리 = `<path d="M0 0 H${W} V${H} H0 Z" fill="none" stroke="#37352f" ` +
                            `stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+            /* ── 결방향 (10-02 지시) ────────────────────────────────────────
+               「만약 결방향이 설정되어 있다면 올바른 결방향을 표현」.
+               결보호가 비었으면 설정 안 된 것이라 아무것도 안 그린다. 'X'(돌려 앉혀도
+               되는 부속)도 안 그린다. 그리는 쪽은 **배치도가 앉힌 방향과 같은 셈
+               (_앉힐방향)** 을 그대로 물어 본다 — 두 쪽이 어긋나면 현장에서 반대로 자른다. */
+            const 결값 = _wo결보호(p);
+            let 결무늬 = '';
+            if (결값 !== '' && normalizeValue(결값) !== 'X') {
+                const 방향 = _앉힐방향(W, H, 결값, p.boardW || 2440, p.boardH || 1220, 5, 4.5);
+                const 가로결 = !방향.돌림;          // 안 돌려 앉혔으면 결은 재단W 쪽으로 간다
+                const 금 = [];
+                for (let k = 1; k <= 7; k++) 가로결
+                    ? 금.push(`M0 ${(H * k / 8).toFixed(1)} H${W}`)
+                    : 금.push(`M${(W * k / 8).toFixed(1)} 0 V${H}`);
+                결무늬 = `<path class="결금" d="${금.join(' ')}" fill="none" stroke="#b7b4af" ` +
+                         `stroke-width="0.7" vector-effect="non-scaling-stroke"/>`;
+            }
             // 「회색 뒷배경을 제거하고 재단할 사이즈의 도면만」(10-02 지시) — 상자(바탕·테두리)는
             // 없다. 판 아래 그늘은 도면 안에서 그리므로 그대로 남는다.
             // 제 크기(width·height)를 적어 둔다 — 자리에 맞춰 줄 때 가로세로가 같이 줄어
             // 찌그러지지 않는다. 자리 크기는 CSS(.woc-부속)가 쥔다.
             return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="display:block;flex-shrink:0;">` +
-                   _누워싸기(W, H, 번호, 바닥 + 격자 + 테두리) + `</svg>`;
+                   _누워싸기(W, H, 번호, 바닥 + 격자 + 결무늬 + 테두리) + `</svg>`;
         }
 
         // 재단 카드의 "도면 보기" 클릭 시 확대 팝업으로 표시
