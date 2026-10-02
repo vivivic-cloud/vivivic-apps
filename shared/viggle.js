@@ -77,6 +77,39 @@
     if (!w.ok) throw new Error('보내지 못했습니다 (' + w.status + ')');
   }
 
+  /* ── 「내가 시킨 것」 에 한 줄 남긴다 ──────────────────────────
+     사장님 말씀(10-01): 「지시가 올라오면 내가 시킨것에 가장먼저 등록되어야 되는거
+     아니니?」 그리고 「등록을 하는게 작업대 프로그램에 코드화 된게 아니라 혹시 니가
+     직접 등록해주는 거니?」. 그때까지는 관리자가 손으로 적었고, 한 번 빠뜨렸다.
+     **사람 기억에 맡기지 않는다 — 보내는 이 자리에서 적는다.**
+     여기 한 곳만 고치면 모든 프로그램과 작업대가 같이 적힌다.
+
+     ⚠ 이것이 실패해도 **지시 보내기는 성공으로 둔다.** 지시가 들어간 뒤의 덧일이다.
+        여기서 터져서 지시가 안 가면 더 나쁘다. */
+  async function 시킨것남기기(짚은것, 글, 때) {
+    const 한줄 = (글 || '').replace(/\s+/g, ' ').trim().slice(0, 40)
+               + ((글 || '').replace(/\s+/g, ' ').trim().length > 40 ? '…' : '');
+    const 몸 = {
+      자리: 박스 ? 'box:' + 박스 : '모든박스',
+      짚은자리: [어디(), 짚은것].filter(Boolean).join(' · '),
+      // 짚으셨을 때 켜져 있던 페이지. 작업대가 이것으로 그 페이지를 열어 준다
+      페이지: 어느페이지(),
+      말: 글 || '',
+      한줄: 한줄 || '(빈 말)',
+      상태: '받음',
+      때: 때,
+    };
+    const 길 = `${창고}/wt_asked/a${때}`;
+    const tok = await 토큰();
+    const 머리 = { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' };
+    // 이미 있으면 덮지 않는다 — 관리자가 적어 둔 상태·결과를 지우면 안 된다
+    const 봄 = await fetch(길, { headers: { Authorization: 'Bearer ' + tok } });
+    if (봄.ok) return;
+    const w = await fetch(길, { method: 'PATCH', headers: 머리,
+      body: JSON.stringify({ fields: Object.fromEntries(Object.entries(몸).map(([k, v]) => [k, 값(v)])) }) });
+    if (!w.ok) throw new Error('내가 시킨 것에 못 적었습니다 (' + w.status + ')');
+  }
+
   /* 지난 지시를 읽어 온다 — 읽기만 한다. 보내기와 같은 자리(wt_dev/<자리>)다 */
   async function 지난것읽기() {
     const 자리 = 박스 ? 'box:' + 박스 : '모든박스';
@@ -153,6 +186,8 @@
   .vg-it.cl{background:#F4F4F2;color:#1A1A19}
   .vg-it .vg-when{display:block;font-size:11px;opacity:.6;margin:0 0 4px}
   .vg-it .vg-where{display:block;font-size:11px;opacity:.75;margin:0 0 4px}
+  /* 작업대에서 찾아온 그 말 — 어느 줄인지 한눈에 보이게 테를 두른다 (10-01 사장님 말씀) */
+  .vg-it.vg-here{outline:2px solid #FF3B30;outline-offset:2px}
   .vg-empty{color:#9B9B96;font-size:14px;padding:20px 2px;text-align:center}
   .vg-back{background:#fff;color:#6E6E6A;border:1px solid #E2E2DF !important}`;
   document.head.insertAdjacentHTML('beforeend', `<style>${css}</style>`);
@@ -210,9 +245,13 @@
     const t = el.tagName.toLowerCase();
     return ({ button: '단추', input: '입력칸', select: '고르는 칸', img: '그림', svg: '그림' })[t] || t;
   }
-  function 어디() {
+  /* 지금 켜져 있는 페이지(탭) 글자. 이것을 적어 두면 작업대가 **그 페이지로** 열어 준다. */
+  function 어느페이지() {
     const 켜진 = document.querySelector('.nav-link.active, .page-tab-link.active, .bnav.on');
-    return [이름, 켜진 && 켜진.textContent.trim()].filter(Boolean).join(' / ');
+    return (켜진 && 켜진.textContent.trim()) || '';
+  }
+  function 어디() {
+    return [이름, 어느페이지()].filter(Boolean).join(' / ');
   }
 
   document.addEventListener('click', (e) => {
@@ -221,7 +260,7 @@
     e.preventDefault(); e.stopPropagation();
   }, true);
 
-  function 시트(짚은것) {
+  function 시트(짚은것, 지난부터, 찾을때) {
     const s = document.createElement('div');
     s.className = 'vg-sheet';
     s.innerHTML = `<div class="vg-card">
@@ -242,7 +281,7 @@
       </div>`;
     document.body.appendChild(s);
     const ta = s.querySelector('textarea');
-    setTimeout(() => ta.focus(), 60);
+    if (!지난부터) setTimeout(() => ta.focus(), 60);   // 지난 지시만 보러 왔으면 자판을 올리지 않는다
     const 닫기 = () => { s.remove(); 겨냥 && 겨냥.classList.remove('vg-mark'); 짚었다 = false; };
     s.querySelector('.vg-cancel').onclick = 닫기;
     /* 길게 누른 손가락을 떼면 click 하나가 뒤따라온다. 그 click 이 방금 열린
@@ -277,22 +316,44 @@
           const 쪼갬 = /^\s*\[([^\]]{1,80})\]\s*([\s\S]*)$/.exec(글);   // 짚으셨던 자리
           const 어디글 = 쪼갬 ? 쪼갬[1] : '';
           const 본문 = 쪼갬 ? 쪼갬[2] : 글;
-          return '<div class="vg-it ' + (나 ? 'me' : 'cl') + '">'
+          return '<div class="vg-it ' + (나 ? 'me' : 'cl') + '" data-at="' + (m.at || 0) + '">'
                + '<span class="vg-when">' + 때글(m.at) + ' · ' + 막기(나 ? '사장님' : (m.who || '클로드')) + '</span>'
                + (어디글 ? '<span class="vg-where">' + 막기(어디글) + '</span>' : '')
                + 막기(본문) + '</div>';
         }).join('');
       목록.scrollTop = 0;
+      /* 사장님 말씀(10-01): 「이곳을 눌렀을때 내가 본 상세 위치를 보여 줄수는 없는건가요?」
+         작업대가 `vg때` 를 붙여 보내면 **그 말이 있는 자리로 굴러가** 잠깐 드러낸다.
+         때가 1~2초 어긋날 수 있어(손잡이가 적은 때와 글이 담긴 때가 다르다) 가장 가까운 줄을 고른다.
+         못 찾으면 아무 일도 안 한다 — 맨 위 그대로다. */
+      if (찾을때) {
+        const 줄들 = [...목록.querySelectorAll('.vg-it')];
+        let 고른 = null, 가까움 = 6;                       // 6초까지만 같은 것으로 본다
+        줄들.forEach(el => {
+          const d = Math.abs(Number(el.dataset.at || 0) - 찾을때);
+          if (d <= 가까움) { 가까움 = d; 고른 = el; }
+        });
+        if (고른) {
+          고른.classList.add('vg-here');
+          setTimeout(() => 고른.scrollIntoView({ block: 'center' }), 60);
+        }
+      }
     };
     const 보냄 = s.querySelector('.vg-send');
     보냄.onclick = async () => {
       const 글 = ta.value.trim(); if (!글) return;
       보냄.disabled = true; 보냄.textContent = '보내는 중…';
       const 본문 = `[${어디()} · ${짚은것}] ${글}`;
+      const 때 = Math.floor(Date.now() / 1000);
       try {
         await 지시보내기(본문);
+        // 지시는 들어갔다. 이제 「내가 시킨 것」 에 한 줄 남긴다 —
+        // 못 남겨도 지시는 그대로 둔다(알림만 다르게 한다).
+        let 남겼나 = true;
+        try { await 시킨것남기기(짚은것, 글, 때); } catch (e) { 남겼나 = false; }
         닫기();
-        알림('클로드에게 보냈습니다');
+        알림(남겼나 ? '클로드에게 보냈습니다'
+                   : '보냈습니다 — 「내가 시킨 것」 에는 못 적었습니다');
       } catch (e) {
         보냄.disabled = false; 보냄.textContent = '보내기';
         알림((e.message || '보내지 못했습니다') + ' — 새 창으로 보냅니다', true);
@@ -304,5 +365,31 @@
         setTimeout(() => window.open(u, '_blank'), 900);
       }
     };
+    // 주저리주저리 채팅을 보러 오신 길 — 적는 칸 대신 지난 지시를 바로 펼친다
+    if (지난부터) s.querySelector('.vg-log').click();
+  }
+
+  /* ── 작업대 「내가 시킨 것」 에서 들어오는 두 꾸러미 ───────────────
+     사장님 말씀(10-01): 「짚은페이지로는 최소한 가줘야 되는거 아니냐」
+                        「주저리주저리 채팅위치로 갈 수 있는 링크 클릭」
+       vg페이지=<켜진 탭 글자>  그 페이지를 눌러 둔다
+       vg지난=1                지난 지시(주저리주저리 채팅)를 바로 펼친다
+     ⚠ 프로그램이 뜨는 데 시간이 걸린다. 탭이 생길 때까지 잠깐 기다린다.
+        없는 탭이면 아무 일도 하지 않는다 — 엉뚱한 곳을 누르지 않는다. */
+  function 그페이지로(글, 남은) {
+    const 후보 = [...document.querySelectorAll('.nav-link, .page-tab-link, .bnav')];
+    const 것 = 후보.find(e => e.textContent.trim() === 글);
+    if (것) {
+      if (!것.classList.contains('active') && !것.classList.contains('on')) 것.click();
+      try { 것.scrollIntoView({ block: 'center' }); } catch (e) {}
+      return;
+    }
+    if (남은 > 0) setTimeout(() => 그페이지로(글, 남은 - 1), 300);
+  }
+  const 갈페이지 = (표.get('vg페이지') || '').trim();
+  if (갈페이지) setTimeout(() => 그페이지로(갈페이지, 20), 300);   // 최대 6초까지 기다린다
+  if (표.get('vg지난') === '1') {
+    const 때 = Number(표.get('vg때') || 0) || 0;        // 짚으셨던 그 말의 때 (없으면 맨 위)
+    setTimeout(() => 시트('지난 지시', true, 때), 500);
   }
 })();

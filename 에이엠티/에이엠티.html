@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.13.4 (2026-09-29) — 알림판이 안 가리게 하고, 불량보고를 알림에 띄운다
+     버전: v1.13.7 (2026-10-01) — 카드 안 재단 도면을 30도로 눕힌다 (칸·카드 길이 그대로)
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1317,6 +1317,16 @@
             width: min(320px, calc(100vw - 24px));
             max-height: min(500px, calc(100vh - var(--amth-top, 64px) - 28px));
         }
+        /* 발주 밖 부속 불러오기 — 자동 목록 아래에 접어 둔다(10-01 지시) */
+        .id302-밖단추 {
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+            width: 100%; min-height: 44px; margin-top: 10px; padding: 0 12px;
+            border: 1px dashed #d3d1cb; border-radius: 10px; background: #fff;
+            font: inherit; font-size: 12.5px; font-weight: 800; color: #6E6E6A; cursor: pointer;
+        }
+        .id302-밖단추:active { background: #f7f6f3; }
+        .id302-밖단추 b { font-size: 11px; font-weight: 800; color: #b3261e;
+            background: #fdecea; border-radius: 999px; padding: 2px 7px; }
         .wo-cut-편집:hover { background: #FAFAF9; border-color: #D6D6D2; }
         .wo-cut-편집:active { background: #F0EFED; }
         /* 완료된 카드 — 단추를 지우지 않고 죽인다(09-28 지시). 눌리지 않는 것이 보여야 한다. */
@@ -2380,7 +2390,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.13.4</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.13.7</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2513,7 +2523,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.13.4</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.13.7</b></p>
         </div>
     </div>
 
@@ -9798,7 +9808,12 @@
         // 우측·하단은 실제 원장 끝까지의 남는 폭/길이를 그대로 보여줘야 함 —
         // 부속과 무관한 원장 전체를 다 그려서 카드가 커 보인다는 피드백에 맞춰
         // 좌측·상단의 불필요한 여백만 잘라내고, 우측·하단의 진짜 남는 부분은 그대로 둠
-        function _woCuttingDiagramSvg(p, w, h, fitHeight) {
+        let _재단도면번호 = 0;     // 격자 무늬 이름이 겹치지 않게 하는 번호
+        /* 누움=true 면 카드 안 작은 도면을 30도 등각(아이소메트릭)으로 눕힌다 (10-01 지시).
+           크게 띄우는 도면·집중 창 도면은 반듯한 채로 둔다 — 누운 그림으로 재단 치수를
+           읽으면 비뚤어져 보인다. 눕는 것은 보이는 꼴뿐이고, 조각이 앉은 자리(lp·tp·wp·hp)
+           에서 낸 x·y·width·height 는 한 자도 건드리지 않는다. */
+        function _woCuttingDiagramSvg(p, w, h, fitHeight, 누움) {
             if (!p.isCuttingCard || !p.boardParts || p.boardParts.length === 0) return '';
             const BW = p.boardW || 2440, BD = p.boardH || 1220;
             let minLeftF = Infinity, minTopF = Infinity;
@@ -9812,8 +9827,22 @@
             const rects = p.boardParts.map(pt => {
                 const rx = (pt.lp * BW - cropX).toFixed(1), ry = (pt.tp * BD - cropY).toFixed(1);
                 const rw = Math.max(2, pt.wp * BW).toFixed(1), rh = Math.max(2, pt.hp * BD).toFixed(1);
-                return `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="${pt.bg||'#fff'}" stroke="#37352f" stroke-width="1.2" vector-effect="non-scaling-stroke"/>`;
+                return `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="${pt.bg||'#fff'}" stroke="#37352f" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
             }).join('');
+            /* ── CAD 격자 (10-01 지시: 「참조 이미지처럼」) ──────────────────
+               조각이 앉은 자리·치수·회전은 위에서 셈한 그대로다. 여기서 더하는
+               것은 **뒤에 까는 격자와 테두리·그림자뿐**이다.
+               격자는 <rect> 로 만들지 않는다 — 도면의 조각 수를 세는 자리가
+               있어서(집중 창 도면), rect 하나만 더해도 셈이 틀어진다.
+               격자 한 칸은 원장 짧은쪽(1220mm)의 1/4 인 305mm — 눈금이
+               아니라 CAD 바탕 느낌을 내는 눈가늠이다. */
+            const 격자칸 = 305;
+            const 격자이름 = 'amtcad' + (++_재단도면번호);
+            const 격자 =
+                `<defs><pattern id="${격자이름}" width="${격자칸}" height="${격자칸}" patternUnits="userSpaceOnUse">` +
+                `<path d="M${격자칸} 0 H0 V${격자칸}" fill="none" stroke="#d2cfcb" stroke-width="0.8" vector-effect="non-scaling-stroke"/>` +
+                `</pattern></defs>` +
+                `<path d="M0 0 H${cropW.toFixed(1)} V${cropH.toFixed(1)} H0 Z" fill="url(#${격자이름})"/>`;
             // CSS aspect-ratio 속성을 percentage 크기 지정과 같이 쓰면 폭/높이가
             // max-width나 max-height에 눌릴 때 서로 다시 계산되지 않아 레터박싱이
             // 생기는 문제가 있었음 — viewBox 자체가 이미 SVG의 고유 비율을 제공하므로
@@ -9823,7 +9852,35 @@
             const sizeStyle = fitHeight
                 ? `height:100%;width:auto;max-width:100%;`
                 : `width:100%;height:auto;`;
-            return `<svg viewBox="0 0 ${cropW.toFixed(1)} ${cropH.toFixed(1)}" style="display:block;${sizeStyle}border:1px solid #e3e2e0;border-radius:3px;margin-top:4px;flex-shrink:0;background:#f9f9f8;">${rects}</svg>`;
+            const 테 = `style="display:block;${sizeStyle}border:1px solid #d6d4d1;border-radius:4px;margin-top:4px;flex-shrink:0;background:#ecebe8;box-shadow:0 1px 2px rgba(55,53,47,0.10),0 5px 12px rgba(55,53,47,0.07);"`;
+            if (!누움)
+                return `<svg viewBox="0 0 ${cropW.toFixed(1)} ${cropH.toFixed(1)}" ${테}>${격자}${rects}</svg>`;
+
+            /* ── 누운 꼴 (30도 등각) ──────────────────────────────────────────
+               x' = cos30·(x−y) · y' = sin30·(x+y) — 반듯한 판을 비스듬히 본 꼴.
+               눕히면 가로로 더 넓어지는데, 보이는 칸(viewBox)을 넓히면 도면 높이가
+               따라 늘어 **카드가 길어진다**. 그래서 칸은 그대로 두고, 누운 판을
+               그 칸 안에 꼭 맞게 줄여 넣는다 — 잘리지도 않고 카드도 안 늘어난다. */
+            const C = 0.8660254, S = 0.5;
+            const 누운폭 = C * (cropW + cropH), 누운높이 = S * (cropW + cropH);
+            const 배 = Math.min(cropW / 누운폭, cropH / 누운높이) * 0.94;   // 0.94 = 가장자리 숨 쉴 자리
+            const 밀기X = (cropW - 배 * 누운폭) / 2 + 배 * C * cropH;       // 왼쪽으로 뻗는 만큼 되민다
+            const 밀기Y = (cropH - 배 * 누운높이) / 2;
+            const 점 = (x, y) => [(밀기X + 배 * C * (x - y)).toFixed(1), (밀기Y + 배 * S * (x + y)).toFixed(1)];
+            const 네귀 = [점(0, 0), 점(cropW, 0), 점(cropW, cropH), 점(0, cropH)];
+            const 그늘이름 = 'amtsh' + _재단도면번호;
+            // 그늘은 누운 판의 네 귀를 그대로 따 와서 조금 아래에 깔고 흐린다.
+            // (누운 묶음 안에 넣으면 흐림 정도가 줄인 배만큼 같이 줄어든다)
+            const 그늘 =
+                `<defs><filter id="${그늘이름}" x="-20%" y="-20%" width="140%" height="160%">` +
+                `<feGaussianBlur stdDeviation="${(cropH * 0.016).toFixed(1)}"/></filter></defs>` +
+                `<path d="M${네귀.map(q => q.join(' ')).join(' L')} Z" fill="rgba(55,53,47,0.22)" ` +
+                `filter="url(#${그늘이름})" transform="translate(0 ${(cropH * 0.028).toFixed(1)})"/>`;
+            const 바닥 = `<path d="M0 0 H${cropW.toFixed(1)} V${cropH.toFixed(1)} H0 Z" fill="#f7f6f4"/>`;
+            const 눕힘 = `translate(${밀기X.toFixed(1)} ${밀기Y.toFixed(1)}) scale(${배.toFixed(4)}) ` +
+                         `matrix(${C} ${S} ${-C} ${S} 0 0)`;
+            return `<svg viewBox="0 0 ${cropW.toFixed(1)} ${cropH.toFixed(1)}" ${테}>` +
+                   `${그늘}<g transform="${눕힘}">${바닥}${격자}${rects}</g></svg>`;
         }
 
         // 재단 카드의 "도면 보기" 클릭 시 확대 팝업으로 표시
@@ -10465,7 +10522,7 @@
                         (x.w && x.d ? ` ${_esc(x.w)}×${_esc(x.d)}` : '') +
                         (x.수 > 0 ? ` · ${_esc(x.수)} EA` : '') + `</span>`).join('') + `</div>`
                     : '';
-                const _diagCut = _woCuttingDiagramSvg(p);
+                const _diagCut = _woCuttingDiagramSvg(p, null, null, false, true);   // 카드 안 도면만 눕는다
                 // 「편집」 은 사장님이 짚으신 그대로 **재단도면 곁**에 둔다(09-23 지시).
                 // 도면이 없는 카드에도 편집할 길은 있어야 하므로, 그때는 글 칸 밑에 둔다.
                 const _diagBox2 = _diagCut
@@ -13773,7 +13830,55 @@
             orderedPartsList.sort((a, b) => b.totalArea - a.totalArea).forEach(p => renderPartCard(p, normalArea));
             fixedHeader.classList.toggle('hidden', !commonPartsFound);
             if (!commonPartsFound && orderedPartsList.length === 0) inner.innerHTML = '<div class="py-8 text-center text-[#787774] font-bold italic col-span-2">데이터가 없습니다.</div>';
+            /* 발주에 없는 부속도 불러올 수 있게 한다 (10-01 지시).
+               자동으로 올라온 목록은 한 줄도 건드리지 않는다 — 그 아래에 따로 둔다.
+               같은 원장을 가리는 자는 쓰던 그대로(원장명+마감-마감색상).
+               「추가재단 가능성」 을 우리가 셈으로 좁히지 않는다 — 같은 원장이면 다 보이고
+               고르는 것은 사장님이다. 좁히면 잘릴 수 있는 부속이 사라진다. */
+            _발주밖자리만들기(plateInfo, inner);
             updateBoardVisual();
+        }
+
+        /* 발주 밖 부속 — 화면에만 더해지는 고를 거리다.
+           발주 자료(confirmed_orders)·공정 진행(partStarted·partCompletions)에는
+           한 자도 쓰지 않는다. 재단계획에 담길 때는 「발주밖」 표를 달아 둔다. */
+        window._발주밖목록 = function(plateInfo){
+            const h = currentFullData[0]; if (!h) return [];
+            const 올린행 = new Set([...document.querySelectorAll('.inner-part-card')]
+                .map(c => String(c.dataset.rowIndex)));
+            const 것들 = [];
+            currentFullData.slice(1).forEach((row, idx) => {
+                const rowIndex = idx + 1;
+                const 자 = (row[h.indexOf('원장명')] || '') + (row[h.indexOf('마감')] || '') + '-'
+                    + normalizeValue(row[h.indexOf('마감색상')]);
+                if (자 !== plateInfo) return;
+                if (올린행.has(String(rowIndex))) return;          // 이미 올라온 것은 두 번 안 보인다
+                const w = parseFloat(row[h.indexOf('재단W')]), d = parseFloat(row[h.indexOf('재단D')]);
+                if (!(w > 0) || !(d > 0)) return;                   // 치수가 없으면 자를 수 없다
+                것들.push({ id: `agg-밖-${rowIndex}`, w, d, qty: 0,
+                    name: row[h.indexOf('부속명')], displayName: plateInfo,
+                    grain: row[h.indexOf('결보호')], rowIndex, isCommon: false,
+                    발주밖: true, totalArea: w * d, orderIds: [] });
+            });
+            것들.sort((a, b) => b.totalArea - a.totalArea);
+            return 것들;
+        };
+        function _발주밖자리만들기(plateInfo, inner){
+            document.getElementById('id302-발주밖-묶음')?.remove();
+            const 밖 = window._발주밖목록(plateInfo);
+            if (!밖.length) return;
+            const 묶음 = document.createElement('div');
+            묶음.id = 'id302-발주밖-묶음';
+            묶음.innerHTML =
+                `<button type="button" id="id302-발주밖-단추" class="id302-밖단추">발주 밖 부속 불러오기 <b>${밖.length}</b></button>` +
+                `<div id="id302-발주밖-section" class="grid grid-cols-2 gap-2 mt-2 hidden"></div>`;
+            inner.appendChild(묶음);
+            document.getElementById('id302-발주밖-단추').onclick = () => {
+                const 자리 = document.getElementById('id302-발주밖-section');
+                const 접혔나 = 자리.classList.contains('hidden');
+                if (접혔나 && !자리.children.length) 밖.forEach(x => renderPartCard(x, 자리));
+                자리.classList.toggle('hidden', !접혔나);
+            };
         }
 
         function renderPartCard(p, container) {
@@ -13789,12 +13894,15 @@
             card.dataset.rowIndex = p.rowIndex;
             card.dataset.isCommon = p.isCommon;
             card.dataset.orderIds = (p.orderIds || []).join(',');
+            if (p.발주밖) card.dataset.발주밖 = '1';   // 발주에 없는 부속 — 한눈에 보이게 표를 단다
             console.log(`[renderPartCard] ${p.name}, orderIds: ${card.dataset.orderIds}, isCommon: ${p.isCommon}`);
             card.onclick = () => handleCardClick(card);
 
             let rotateHtml = (p.grain === 'X') ? `<button onclick="event.stopPropagation(); toggleRotation(this)" class="rotate-btn">재단회전</button>` : "";
             // 공통부속도 남은 필요수량을 알면 숫자를 찍는다. 모를 때만 「공통」 이라고 둔다.
-            let qtyDisplay = (p.isCommon && !(p.qty > 0)) ? "공통" : Math.round(p.qty), qtyClass = p.isCommon ? "!bg-[#f7f6f3]0" : "bg-[#37352f]";
+            let qtyDisplay = p.발주밖 ? "발주 밖"
+                : (p.isCommon && !(p.qty > 0)) ? "공통" : Math.round(p.qty);
+            let qtyClass = p.발주밖 ? "bg-[#b3261e]" : (p.isCommon ? "!bg-[#f7f6f3]0" : "bg-[#37352f]");
 
             // 상품카드 색상 점 (여러 개면 표시)
             const orderIds = p.orderIds || [];
@@ -14100,6 +14208,9 @@
                 cutD: (currentFullData[0] && currentFullData[parseInt(pAgg.dataset.rowIndex)]) ? (parseFloat(currentFullData[parseInt(pAgg.dataset.rowIndex)][currentFullData[0].indexOf('재단D')]) || 0) : 0
             };
             console.log('[confirmCutting] cuttingData:', { pOrderIds: cuttingData.pOrderIds, sOrderIds: cuttingData.sOrderIds, tOrderIds: cuttingData.tOrderIds });
+            // 발주 밖 부속으로 만든 도면은 그렇다고 남긴다 — 다음 단계가 주문된 일로 세지 않게
+            cuttingData.발주밖 = (pAgg.dataset.발주밖 === '1')
+                || (!!sAgg && sAgg.dataset.발주밖 === '1') || (!!tAgg && tAgg.dataset.발주밖 === '1');
             const _existingIdx = confirmedCuttingData.findIndex(d => d.confirmId === confirmId);
             if (_existingIdx >= 0) confirmedCuttingData[_existingIdx] = cuttingData;
             else confirmedCuttingData.unshift(cuttingData);
