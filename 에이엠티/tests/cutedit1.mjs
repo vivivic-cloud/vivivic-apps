@@ -110,7 +110,7 @@ const 잰것 = await p.evaluate(() => {
   const 풀 = document.querySelector('#__무대 .wo-boring-part-card');
   const 단추 = 놓.querySelector('.wo-cut-편집');
   const 닿 = getComputedStyle(단추, '::after');
-  const 도면 = 놓.querySelector('svg');
+  const 도면 = 놓.querySelector('.woc-그림 svg') || 놓.querySelector('svg');   // 재단배치도
   return {
     놓인카드: 재(놓), 풀카드: 재(풀), 놓인단추: 재(단추), 풀단추: 재(풀.querySelector('.wo-cut-편집')),
     닿는자리: { w: 닿.width, h: 닿.height, minW: 닿.minWidth },

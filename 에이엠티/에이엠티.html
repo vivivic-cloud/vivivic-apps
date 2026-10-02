@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.13.7 (2026-10-01) — 카드 안 재단 도면을 30도로 눕힌다 (칸·카드 길이 그대로)
+     버전: v1.14.0 (2026-10-02) — 공정카드를 세 칸으로: 글 · 잘라야 하는 부속(누움) · 재단배치도(반듯)
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1126,19 +1126,30 @@
         [data-grp-open="0"] { display: none !important; }
         .wo-boring-placed-card:hover { box-shadow: 0 2px 6px rgba(16,24,40,.07), 0 12px 24px -14px rgba(16,24,40,.4); z-index: 3; }
         /* 카드 속 — 폰은 접고 넓은 화면은 편다 */
-        .woc-몸 { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-        .woc-글 { min-width: 0; }
-        .woc-그림 { min-width: 0; display: flex; justify-content: center; }
+        /* 세 칸 — 글 / 이 카드에서 잘라야 하는 부속 / 재단배치도 (10-02 지시).
+           폰에서는 글이 한 줄을 다 쓰고 그 밑에 그림 둘이 가로로 나란히 선다
+           (셋을 세로로 쌓으면 카드가 폰 한 화면을 넘는다 — 재어 보고 정했다). */
+        .woc-몸 { display: flex; flex-wrap: wrap; gap: 10px; min-width: 0; }
+        .woc-글 { min-width: 0; flex: 1 1 100%; }
+        .woc-부속 { min-width: 0; flex: 1 1 0; display: flex; justify-content: center; align-items: flex-start; }
+        /* 부속 판은 제 크기(width·height)를 가지고 있다 — 칸에 맞춰 가로세로가 같이 준다 */
+        .woc-부속 svg { width: auto; height: auto; max-width: 100%; max-height: 132px; margin: 0; }
+        .woc-그림 { min-width: 0; flex: 1 1 0; display: flex; justify-content: center; }
         .woc-그림 svg { max-height: 132px; width: auto; max-width: 100%; margin: 0; }
+        .woc-그림속 { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
+        /* 배치도 칸 안으로 들어온 큰 단추는 그 칸 폭을 꽉 채운다 */
+        .woc-그림속 .woc-단추, .woc-그림속 .woc-끝 { flex: 0 0 auto; width: 100%; min-width: 0; box-sizing: border-box; }
         .woc-줄 {
             display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
             margin-top: 10px; padding-top: 10px; border-top: 1px solid #F2F2F0;
         }
         .woc-줄 .woc-밀기 { flex: 1 1 auto; min-width: 0; }
         @media (min-width: 768px) {
-            .woc-몸 { flex-direction: row; align-items: flex-start; gap: 14px; }
-            .woc-글 { flex: 1 1 auto; }
-            .woc-그림 { flex: 0 0 42%; max-width: 280px; justify-content: flex-end; }
+            .woc-몸 { flex-wrap: nowrap; align-items: flex-start; gap: 14px; }
+            .woc-글 { flex: 0 0 45%; max-width: 45%; }
+            .woc-부속 { flex: 0 0 33%; max-width: 33%; }
+            .woc-부속 svg { max-height: 168px; }
+            .woc-그림 { flex: 1 1 22%; max-width: 280px; justify-content: flex-end; }
             .woc-그림 svg { max-height: 168px; }
         }
         /* 누르는 단추 — 44px 아래로 안 내려간다. hover 가 없는 폰에서도 눌린 티가 난다. */
@@ -2390,7 +2401,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.13.7</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.14.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2523,7 +2534,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.13.7</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.14.0</b></p>
         </div>
     </div>
 
@@ -9809,6 +9820,40 @@
         // 부속과 무관한 원장 전체를 다 그려서 카드가 커 보인다는 피드백에 맞춰
         // 좌측·상단의 불필요한 여백만 잘라내고, 우측·하단의 진짜 남는 부분은 그대로 둠
         let _재단도면번호 = 0;     // 격자 무늬 이름이 겹치지 않게 하는 번호
+        /* CAD 격자 한 겹. 격자는 <rect> 로 만들지 않는다 — 도면의 조각 수를 세는
+           자리가 있어서(집중 창 도면) rect 하나만 더해도 셈이 틀어진다.
+           격자 한 칸은 판 짧은쪽의 1/4 — 원장(1220)이면 305mm 그대로다. */
+        function _도면격자(칸, 폭, 높이, 번호) {
+            const 이름 = 'amtcad' + 번호;
+            return `<defs><pattern id="${이름}" width="${칸.toFixed(1)}" height="${칸.toFixed(1)}" patternUnits="userSpaceOnUse">` +
+                `<path d="M${칸.toFixed(1)} 0 H0 V${칸.toFixed(1)}" fill="none" stroke="#d2cfcb" stroke-width="0.8" vector-effect="non-scaling-stroke"/>` +
+                `</pattern></defs>` +
+                `<path d="M0 0 H${폭.toFixed(1)} V${높이.toFixed(1)} H0 Z" fill="url(#${이름})"/>`;
+        }
+
+        /* 30도 등각으로 눕히기 (10-01 지시) — x' = cos30·(x−y) · y' = sin30·(x+y).
+           눕히면 가로로 더 넓어지는데, 보이는 칸(viewBox)을 넓히면 그림 높이가
+           따라 늘어 **카드가 길어진다**. 그래서 칸은 그대로 두고 누운 판을 그 칸
+           안에 꼭 맞게 줄여 넣는다 — 잘리지도 않고 카드도 안 늘어난다.
+           그늘은 누운 판의 네 귀를 그대로 따 와서 조금 아래에 깔고 흐린다
+           (누운 묶음 안에 넣으면 흐림이 줄인 배만큼 같이 줄어든다). */
+        function _누워싸기(폭, 높이, 번호, 안) {
+            const C = 0.8660254, S = 0.5;
+            const 누운폭 = C * (폭 + 높이), 누운높이 = S * (폭 + 높이);
+            const 배 = Math.min(폭 / 누운폭, 높이 / 누운높이) * 0.94;   // 0.94 = 가장자리 숨 쉴 자리
+            const 밀기X = (폭 - 배 * 누운폭) / 2 + 배 * C * 높이;       // 왼쪽으로 뻗는 만큼 되민다
+            const 밀기Y = (높이 - 배 * 누운높이) / 2;
+            const 점 = (x, y) => [(밀기X + 배 * C * (x - y)).toFixed(1), (밀기Y + 배 * S * (x + y)).toFixed(1)];
+            const 네귀 = [점(0, 0), 점(폭, 0), 점(폭, 높이), 점(0, 높이)];
+            const 그늘이름 = 'amtsh' + 번호;
+            return `<defs><filter id="${그늘이름}" x="-20%" y="-20%" width="140%" height="160%">` +
+                `<feGaussianBlur stdDeviation="${(높이 * 0.016).toFixed(1)}"/></filter></defs>` +
+                `<path d="M${네귀.map(q => q.join(' ')).join(' L')} Z" fill="rgba(55,53,47,0.22)" ` +
+                `filter="url(#${그늘이름})" transform="translate(0 ${(높이 * 0.028).toFixed(1)})"/>` +
+                `<g transform="translate(${밀기X.toFixed(1)} ${밀기Y.toFixed(1)}) scale(${배.toFixed(4)}) ` +
+                `matrix(${C} ${S} ${-C} ${S} 0 0)">${안}</g>`;
+        }
+
         /* 누움=true 면 카드 안 작은 도면을 30도 등각(아이소메트릭)으로 눕힌다 (10-01 지시).
            크게 띄우는 도면·집중 창 도면은 반듯한 채로 둔다 — 누운 그림으로 재단 치수를
            읽으면 비뚤어져 보인다. 눕는 것은 보이는 꼴뿐이고, 조각이 앉은 자리(lp·tp·wp·hp)
@@ -9836,13 +9881,8 @@
                있어서(집중 창 도면), rect 하나만 더해도 셈이 틀어진다.
                격자 한 칸은 원장 짧은쪽(1220mm)의 1/4 인 305mm — 눈금이
                아니라 CAD 바탕 느낌을 내는 눈가늠이다. */
-            const 격자칸 = 305;
-            const 격자이름 = 'amtcad' + (++_재단도면번호);
-            const 격자 =
-                `<defs><pattern id="${격자이름}" width="${격자칸}" height="${격자칸}" patternUnits="userSpaceOnUse">` +
-                `<path d="M${격자칸} 0 H0 V${격자칸}" fill="none" stroke="#d2cfcb" stroke-width="0.8" vector-effect="non-scaling-stroke"/>` +
-                `</pattern></defs>` +
-                `<path d="M0 0 H${cropW.toFixed(1)} V${cropH.toFixed(1)} H0 Z" fill="url(#${격자이름})"/>`;
+            const 번호 = ++_재단도면번호;
+            const 격자 = _도면격자(BD / 4, cropW, cropH, 번호);
             // CSS aspect-ratio 속성을 percentage 크기 지정과 같이 쓰면 폭/높이가
             // max-width나 max-height에 눌릴 때 서로 다시 계산되지 않아 레터박싱이
             // 생기는 문제가 있었음 — viewBox 자체가 이미 SVG의 고유 비율을 제공하므로
@@ -9861,26 +9901,28 @@
                눕히면 가로로 더 넓어지는데, 보이는 칸(viewBox)을 넓히면 도면 높이가
                따라 늘어 **카드가 길어진다**. 그래서 칸은 그대로 두고, 누운 판을
                그 칸 안에 꼭 맞게 줄여 넣는다 — 잘리지도 않고 카드도 안 늘어난다. */
-            const C = 0.8660254, S = 0.5;
-            const 누운폭 = C * (cropW + cropH), 누운높이 = S * (cropW + cropH);
-            const 배 = Math.min(cropW / 누운폭, cropH / 누운높이) * 0.94;   // 0.94 = 가장자리 숨 쉴 자리
-            const 밀기X = (cropW - 배 * 누운폭) / 2 + 배 * C * cropH;       // 왼쪽으로 뻗는 만큼 되민다
-            const 밀기Y = (cropH - 배 * 누운높이) / 2;
-            const 점 = (x, y) => [(밀기X + 배 * C * (x - y)).toFixed(1), (밀기Y + 배 * S * (x + y)).toFixed(1)];
-            const 네귀 = [점(0, 0), 점(cropW, 0), 점(cropW, cropH), 점(0, cropH)];
-            const 그늘이름 = 'amtsh' + _재단도면번호;
-            // 그늘은 누운 판의 네 귀를 그대로 따 와서 조금 아래에 깔고 흐린다.
-            // (누운 묶음 안에 넣으면 흐림 정도가 줄인 배만큼 같이 줄어든다)
-            const 그늘 =
-                `<defs><filter id="${그늘이름}" x="-20%" y="-20%" width="140%" height="160%">` +
-                `<feGaussianBlur stdDeviation="${(cropH * 0.016).toFixed(1)}"/></filter></defs>` +
-                `<path d="M${네귀.map(q => q.join(' ')).join(' L')} Z" fill="rgba(55,53,47,0.22)" ` +
-                `filter="url(#${그늘이름})" transform="translate(0 ${(cropH * 0.028).toFixed(1)})"/>`;
             const 바닥 = `<path d="M0 0 H${cropW.toFixed(1)} V${cropH.toFixed(1)} H0 Z" fill="#f7f6f4"/>`;
-            const 눕힘 = `translate(${밀기X.toFixed(1)} ${밀기Y.toFixed(1)}) scale(${배.toFixed(4)}) ` +
-                         `matrix(${C} ${S} ${-C} ${S} 0 0)`;
             return `<svg viewBox="0 0 ${cropW.toFixed(1)} ${cropH.toFixed(1)}" ${테}>` +
-                   `${그늘}<g transform="${눕힘}">${바닥}${격자}${rects}</g></svg>`;
+                   _누워싸기(cropW, cropH, 번호, 바닥 + 격자 + rects) + `</svg>`;
+        }
+
+        /* ── 이 카드에서 잘라야 하는 부속 한 장 (10-02 지시) ───────────────────
+           재단배치도가 아니다. 칸을 나누지 않은 **민판 한 장**이고, 크기는 그
+           부속의 재단 사이즈(rw × rd) 다. 격자·눕히는 셈·그늘은 배치도가 쓰는
+           그것을 그대로 쓴다. 재단 사이즈가 없으면 아무것도 내지 않는다 —
+           빈 자리를 만들지 않는다. */
+        function _wo부속판Svg(p) {
+            const W = parseFloat(p && p.rw) || 0, H = parseFloat(p && p.rd) || 0;
+            if (!(W > 0 && H > 0)) return '';
+            const 번호 = ++_재단도면번호;
+            const 격자 = _도면격자(Math.min(W, H) / 4, W, H, 번호);
+            const 바닥 = `<path d="M0 0 H${W} V${H} H0 Z" fill="#ffffff"/>`;
+            const 테두리 = `<path d="M0 0 H${W} V${H} H0 Z" fill="none" stroke="#37352f" ` +
+                           `stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+            return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="display:block;` +
+                   `border:1px solid #d6d4d1;border-radius:4px;margin-top:4px;flex-shrink:0;background:#ecebe8;` +
+                   `box-shadow:0 1px 2px rgba(55,53,47,0.10),0 5px 12px rgba(55,53,47,0.07);">` +
+                   _누워싸기(W, H, 번호, 바닥 + 격자 + 테두리) + `</svg>`;
         }
 
         // 재단 카드의 "도면 보기" 클릭 시 확대 팝업으로 표시
@@ -10492,6 +10534,7 @@
 
             // ─── 배치 카드 (재단카드: 6개 핵심정보 / 일반카드: 컴팩트 2행) ───
             let _placedInner = '';
+            let _cut글 = '', _cut부속 = '', _cut도면 = '';   // 세 칸 짜기는 「시작」 단추가 난 뒤에 한다
             // 「편집」 은 카드 아래 한 줄(woc-줄)에서도 쓰므로 여기서 만들어 둔다
             const _편집Btn = p.isCuttingCard ? _woCutEditBtnHtml(cKey, sk, p) : '';
             if (p.isCuttingCard) {
@@ -10522,11 +10565,10 @@
                         (x.w && x.d ? ` ${_esc(x.w)}×${_esc(x.d)}` : '') +
                         (x.수 > 0 ? ` · ${_esc(x.수)} EA` : '') + `</span>`).join('') + `</div>`
                     : '';
-                const _diagCut = _woCuttingDiagramSvg(p, null, null, false, true);   // 카드 안 도면만 눕는다
-                // 「편집」 은 사장님이 짚으신 그대로 **재단도면 곁**에 둔다(09-23 지시).
-                // 도면이 없는 카드에도 편집할 길은 있어야 하므로, 그때는 글 칸 밑에 둔다.
-                const _diagBox2 = _diagCut
-                    ? `<div style="display:flex;flex-direction:column;align-items:center;gap:8px;width:100%;">${_diagCut}${_편집Btn}</div>` : '';
+                // 재단배치도는 **반듯하게** 둔다 — 누운 그림으로 재단 치수를 읽으면 비뚤다(10-02 지시).
+                const _diagCut = _woCuttingDiagramSvg(p);
+                // 가운데 칸 — 이 카드에서 잘라야 하는 부속 한 장(누운 민판).
+                const _부속판 = _wo부속판Svg(p);
 
                 // 제품명 - 부속명을 한 줄로 붙여 표기, 줄바뀜 없이 넘치면 말줄임표
                 // 제품명이 첫 줄을 다 먹어 정작 부속명이 잘려 안 보였다.
@@ -10544,12 +10586,12 @@
                     (p.sheets ? `<span class="woc-매">${p.sheets}매</span>` : '') +
                     `</div>` +
                     (_pills2.length ? `<div class="woc-딱지줄">${_pills2.join('')}</div>` : '');
+                // 세 칸은 「시작」 단추(_bDoneHtml)까지 손에 쥔 뒤에 짠다 — 그 값은 아래에서 난다.
+                _cut글 = _textCut; _cut부속 = _부속판; _cut도면 = _diagCut;
                 _placedInner = `<div class="woc-몸">` +
                     `<div class="woc-글">${_textCut}` +
                     (_diagCut ? '' : `<div style="display:flex;justify-content:flex-start;margin-top:8px;">${_편집Btn}</div>`) +
-                    `</div>` +
-                    (_diagCut ? `<div class="woc-그림">${_diagBox2}</div>` : '') +
-                    `</div>`;
+                    `</div></div>`;
             } else {
                 const _codePlaced = p.orderCode
                     ? `<div style="font-size:10px;font-weight:700;color:#a8a6a2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;font-family:ui-monospace,monospace;">${p.orderCode}</div>`
@@ -10638,9 +10680,24 @@
                 + (_대기카드 ? ' wo-앞대기카드' : '');
             // 불량보고는 시작 전이든 끝난 뒤든 나올 수 있다 — 카드마다 늘 둔다(09-28 지시)
             const _b불량 = _wo불량BtnHtml(_bdid, _bck, _bpk, p.nm || '');
+            /* ── 사장님이 짚으신 세 칸 (10-02) ────────────────────────────────
+               [ 글 ][ 이 카드에서 잘라야 하는 부속(누운 한 장) ][ 재단배치도(반듯) ]
+                                                                [ 편집 ]
+                                                                [ ▶ 시작 ]
+               「시작」 은 배치도 칸 안, 편집 밑으로 간다. 불량보고만 아랫줄에 남는다.
+               도면이 없는 카드는 예전 그대로다 — 편집은 글 칸 밑, 시작은 아랫줄. */
+            const _세칸 = p.isCuttingCard && !!_cut도면;
+            if (_세칸)
+                _placedInner = `<div class="woc-몸">` +
+                    `<div class="woc-글">${_cut글}</div>` +
+                    (_cut부속 ? `<div class="woc-부속">${_cut부속}</div>` : '') +
+                    `<div class="woc-그림"><div class="woc-그림속">${_cut도면}${_편집Btn}${_bDoneHtml}</div></div>` +
+                    `</div>`;
             // 누르는 것을 한 줄에 모은다 — 왼쪽에 곁단추(편집·불량보고), 오른쪽에 큰 단추
-            const _b행동줄 = `<div class="woc-줄">${_b불량}` +
-                `<span class="woc-밀기"></span>${_bDoneHtml}</div>`;
+            const _b행동줄 = _세칸
+                ? `<div class="woc-줄">${_b불량}</div>`
+                : `<div class="woc-줄">${_b불량}` +
+                  `<span class="woc-밀기"></span>${_bDoneHtml}</div>`;
             return `<div class="${_cardCls}" draggable="${_bDone ? 'false' : 'true'}"` +
                 ` style="${_bcs}${_bDone ? 'opacity:0.6;' : ''}"` +
                 ` data-ck="${cKey}" data-sk="${sk}" data-mac="${mac}" data-ok="${_pOk}" data-done="${_bDone ? '1' : '0'}"${_grpAttr || ''}` +
