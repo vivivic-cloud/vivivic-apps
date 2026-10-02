@@ -1,7 +1,7 @@
 <!-- ==========================================
      보링변환.html
-     버전: v1.9.0 (2026-10-02) — 「이렇게 읽었습니다」 와 「안 읽은 자리」 를 펴 보인다.
-           사장님이 틀린 데를 짚으실 수 있게 우리 짐작을 글로 드러낸다
+     버전: v1.9.1 (2026-10-02) — 파일 속을 못 가져올 때 왜인지를 갈라 말한다.
+           한마디로 뭉개지 않고 갈래마다 증거를 그대로 보인다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -340,6 +340,13 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
   margin:12px 0 0; border-radius:14px; padding:13px 15px; font-size:13.5px;
   background:var(--vg-fill); color:var(--vg-soft);
 }
+.borf-empty b{display:block; font-weight:700; color:var(--vg-ink); margin:0 0 2px;}
+.borf-empty em{display:block; font-style:normal; margin:4px 0 0;}
+/* 증거 — 부른 주소나 돌아온 글 그대로. 길면 접힌다. 줄이지 않는다 */
+.borf-empty i{
+  display:block; font-style:normal; margin:7px 0 0; font-size:11.5px;
+  color:var(--vg-muted); word-break:break-all; white-space:pre-wrap;
+}
 .borf-again{
   display:inline-flex; align-items:center; gap:7px; min-height:44px; margin:12px 0 0;
   background:#fff; border:1px solid var(--vg-edge); border-radius:999px; padding:0 18px;
@@ -388,7 +395,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
 
     <div class="borh-tiles" id="borh-mine"></div>
 
-    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.9.0</b></p>
+    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.9.1</b></p>
   </div>
 </div>
 
@@ -441,7 +448,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
   <div class="bhead">
     <span class="bday">보링변환</span>
     <span class="brole">CIX → BPP</span>
-    <span class="bsub" id="b-ver">v1.9.0</span>
+    <span class="bsub" id="b-ver">v1.9.1</span>
   </div>
 
   <button class="btile" id="b-pick" type="button">
@@ -1386,7 +1393,7 @@ window.보링 = { cix읽기, bpp읽기, bpp짓기, 되짚기, 변수틀읽기, �
        주소는 boring_config/설정 의 exec 칸에서 읽는다. **코드에 박지 않는다** —
        배포가 바뀌면 스크립트가 그 칸을 스스로 고쳐 쓴다. */
     let 부를곳 = '', 훑는중 = false, 못불렀다 = false, 이번화면에서불렀나 = false;
-    let 딴말글 = '';                 // 줄을 누른 뒤 할 말(가져오는 중·안 되는 까닭)
+    let 딴말글 = null;               // 줄을 누른 뒤 할 말 {말, 할일, 증거}
 
     function 칸(){
         const { collection } = window.fbFirestore;
@@ -1542,7 +1549,7 @@ window.보링 = { cix읽기, bpp읽기, bpp짓기, 되짚기, 변수틀읽기, �
         if (단추) 단추.disabled = 훑는중 || !부를곳;
 
         const 빈말 = $('borf-none');
-        const 말 = 딴말글 ? 딴말글
+        const 말 = 딴말글 ? 딴말글.말
                  : 못불렀다 ? '드라이브를 못 불렀습니다'
                  : 훑는중 ? '드라이브를 훑는 중입니다'
                  : 있나 ? (폴더칸.length + 파일칸.length ? '' : '찾으시는 것이 없습니다')
@@ -1551,7 +1558,15 @@ window.보링 = { cix읽기, bpp읽기, bpp짓기, 되짚기, 변수틀읽기, �
                  /* 되는 척하지 않는다 — 부를 곳이 없으면 목록은 영영 안 찬다 */
                  : !부를곳 ? '폴더는 정해졌습니다. 드라이브를 훑는 일이 아직 안 켜졌습니다 — 맥에서 한 번 켜 주셔야 합니다.'
                  : '아직 아무것도 없습니다';
-        빈말.textContent = 말;
+        if (딴말글 && 딴말글.말 === 말) {
+            // 갈래마다 — 무슨 일인지 · 무엇을 하시면 되는지 · 증거를 그대로
+            // 이 칸은 _e 를 쓴다 — 막기() 는 바꾸기 쪽 것이라 여기서는 없다
+            빈말.innerHTML = '<b>' + _e(딴말글.말) + '</b>' +
+                (딴말글.할일 ? '<em>' + _e(딴말글.할일) + '</em>' : '') +
+                (딴말글.증거 ? '<i>' + _e(딴말글.증거) + '</i>' : '');
+        } else {
+            빈말.textContent = 말;
+        }
         빈말.classList.toggle('bhide', !말);
     }
     window.borFilesDraw = 그리기;
@@ -1568,20 +1583,36 @@ window.보링 = { cix읽기, bpp읽기, bpp짓기, 되짚기, 변수틀읽기, �
         for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
         return new TextDecoder('utf-8').decode(u);
     }
-    const 문안열림 = '파일 속을 가져오는 문이 아직 안 열렸습니다';
+    /* 안 될 때를 갈라 말한다. 사장님: 「이게 뭔소리야 어제는 되었던건데」(10-02).
+       한마디로 뭉개면 무엇이 막혔는지 아실 길이 없다. 갈래마다 **증거를 그대로** 보인다. */
+    const 다시배포 = '맥에서 서류관리 앱스스크립트를 다시 배포해 주십시오';
+    const 탓 = (말, 할일, 증거) => { const e = new Error(말); e.할일 = 할일; e.증거 = 증거 || ''; return e; };
     async function 속가져오기(driveId){
-        if (!부를곳) throw new Error('드라이브를 훑는 일이 아직 안 켜졌습니다');
-        let r, d;
+        if (!부를곳) throw 탓('드라이브를 훑는 일이 아직 안 켜졌습니다', 다시배포);
+        let r, 글;
         try {
             r = await fetch(부를곳, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
                                      body: JSON.stringify({ 일: '보링파일', driveId: driveId }) });
-        } catch (e) { throw new Error(문안열림); }
-        if (!r || !r.ok) throw new Error(문안열림);
-        try { d = await r.json(); } catch (e) { throw new Error(문안열림); }   // 엉뚱한 HTML 이 와도 여기서 걸린다
+        } catch (e) {
+            // ① 아예 못 닿았다 — 부른 주소를 그대로 보인다
+            throw 탓('그 주소에 아예 닿지 못했습니다', 다시배포, '부른 곳: ' + 부를곳);
+        }
+        try { 글 = await r.text(); } catch (e) { 글 = ''; }
+        if (!r || !r.ok) {
+            // ② 닿았는데 돌려보냈다 — 상태 번호와 돌아온 글 앞머리
+            throw 탓(`닿았는데 돌려보냈습니다 (${r ? r.status : '?'})`, 다시배포,
+                     '부른 곳: ' + 부를곳 + (글 ? '\n돌아온 글: ' + 글.slice(0, 200) : ''));
+        }
+        let d;
+        try { d = JSON.parse(글); } catch (e) {
+            // ③ 답은 왔는데 자료가 아니다 — 온 글 앞 200자를 그대로. 로그인 화면이면 거기 다 적혀 있다
+            throw 탓('답이 왔는데 자료가 아니라 웹 화면이었습니다', 다시배포,
+                     '돌아온 글: ' + String(글).slice(0, 200));
+        }
         if (!d || d.ok !== true) {
             const 왜 = d && d.why;
-            if (왜 === '밖') throw new Error('볼 폴더 밖의 파일입니다');
-            throw new Error(왜 ? String(왜) : 문안열림);
+            if (왜 === '밖') throw 탓('볼 폴더 밖의 파일입니다', '');
+            throw 탓(왜 ? String(왜) : '가져오지 못했습니다', 다시배포, 글.slice(0, 200));
         }
         return { name: d.name, 글: 풀기(d.b64) };
     }
@@ -1590,12 +1621,15 @@ window.보링 = { cix읽기, bpp읽기, bpp짓기, 되짚기, 변수틀읽기, �
     let 가져오는중 = false;
     async function 뜯어보기(driveId, 이름, 꼴){
         if (가져오는중) return;
-        if (!driveId) { 딴말글 = '드라이브 번호가 없습니다'; 그리기(); return; }
-        가져오는중 = true; 딴말글 = '파일을 가져오는 중입니다'; 그리기();
+        if (!driveId) { 딴말글 = { 말: '드라이브 번호가 없습니다' }; 그리기(); return; }
+        가져오는중 = true; 딴말글 = { 말: '파일을 가져오는 중입니다' }; 그리기();
         let 것;
         try { 것 = await 속가져오기(driveId); }
-        catch (e) { 딴말글 = e.message || 문안열림; 가져오는중 = false; 그리기(); return; }
-        가져오는중 = false; 딴말글 = ''; 그리기();
+        catch (e) {
+            딴말글 = { 말: e.message || '가져오지 못했습니다', 할일: e.할일 || '', 증거: e.증거 || '' };
+            가져오는중 = false; 그리기(); return;
+        }
+        가져오는중 = false; 딴말글 = null; 그리기();
         window.bor먹이기(것.name || 이름, 것.글, driveId, 꼴);
         window.borOpen();
     }
@@ -1627,15 +1661,15 @@ window.보링 = { cix읽기, bpp읽기, bpp짓기, 되짚기, 변수틀읽기, �
         두드리기();
     }
     // 화면이 열릴 때 한 번
-    window.borFilesOpened = function(){ 딴말글 = ''; 이번화면에서불렀나 = false; 부르기(); 그리기(); };
+    window.borFilesOpened = function(){ 딴말글 = null; 이번화면에서불렀나 = false; 부르기(); 그리기(); };
 
     document.addEventListener('click', e => {
         const 들어갈곳 = e.target.closest('[data-into]');
-        if (들어갈곳) { e.preventDefault(); 딴말글 = ''; 지금길 = 지금길.concat(들어갈곳.dataset.into);
+        if (들어갈곳) { e.preventDefault(); 딴말글 = null; 지금길 = 지금길.concat(들어갈곳.dataset.into);
                        그리기(); window.scrollTo(0, 0); return; }
-        if (e.target.closest('#borf-up')) { e.preventDefault(); 딴말글 = ''; 지금길 = 지금길.slice(0, -1);
+        if (e.target.closest('#borf-up')) { e.preventDefault(); 딴말글 = null; 지금길 = 지금길.slice(0, -1);
                                             그리기(); window.scrollTo(0, 0); return; }
-        if (e.target.closest('#borf-again')) { e.preventDefault(); 딴말글 = ''; return 두드리기(); }
+        if (e.target.closest('#borf-again')) { e.preventDefault(); 딴말글 = null; return 두드리기(); }
         const 칩 = e.target.closest('#borf-chips .borb-chip');
         if (칩) {
             거르기 = 칩.dataset.kind;

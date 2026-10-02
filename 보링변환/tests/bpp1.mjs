@@ -466,7 +466,8 @@ await p.waitForTimeout(300);
    알맹이를 받아 「고르기」 와 똑같은 길에 태운다. 안 될 때는 까닭을 갈라 말한다. */
 const 빈말글 = () => p.evaluate(() => document.getElementById('borf-none').textContent);
 
-// ① 문이 아직 안 열렸을 때 — POST 가 엉뚱한 HTML 로 온다
+/* 안 될 때를 갈라 말하는가 — 사장님: 「이게 뭔소리야 어제는 되었던건데」(10-02).
+   한마디로 뭉개지 않고 갈래마다 증거를 그대로 보여야 한다. */
 await p.evaluate(() => {
   window.__보낸몸 = [];
   const 옛 = window.fetch.bind(window);
@@ -477,11 +478,24 @@ await p.evaluate(() => {
     }
     return 옛(u, o);
   };
-  window.__속답 = () => Promise.resolve({ ok: true, json: () => Promise.reject(new Error('JSON 아님')) });
 });
+const 빈말보기 = () => p.evaluate(() => ({
+  말: (document.querySelector('#borf-none b') || {}).textContent || document.getElementById('borf-none').textContent,
+  할일: (document.querySelector('#borf-none em') || {}).textContent || '',
+  증거: (document.querySelector('#borf-none i') || {}).textContent || '',
+  넘침: document.documentElement.scrollWidth,
+}));
+
+// ① 아예 못 닿았을 때
+await p.evaluate(() => { window.__속답 = () => Promise.reject(new Error('못 닿음')); });
 await p.tap('#borf-list .borf-row');
 await p.waitForTimeout(400);
-재기('문이 안 열렸으면 그렇다고 적나', (await 빈말글()) === '파일 속을 가져오는 문이 아직 안 열렸습니다', await 빈말글());
+let 본것 = await 빈말보기();
+재기('못 닿았으면 그렇다고 적나', 본것.말 === '그 주소에 아예 닿지 못했습니다', 본것.말);
+재기('부른 주소를 그대로 보이나', /^부른 곳: https:\/\/script\.google\.com\//.test(본것.증거), 본것.증거);
+재기('무엇을 하면 되는지 한 줄로 적나',
+     본것.할일 === '맥에서 서류관리 앱스스크립트를 다시 배포해 주십시오', 본것.할일);
+
 const 보낸것 = await p.evaluate(() => {
   const o = window.__보낸몸[0] || {};
   return { 방법: o.method, 머리: o.headers && o.headers['Content-Type'], 몸: o.body };
@@ -492,24 +506,43 @@ const 보낸것 = await p.evaluate(() => {
      JSON.parse(보낸것.몸 || '{}')['일'] === '보링파일' && JSON.parse(보낸것.몸 || '{}').driveId === 'D4',
      보낸것.몸);
 
-// ② 볼 폴더 밖
-await p.evaluate(() => { window.__속답 = () =>
-  Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: false, why: '밖' }) }); });
+// ② 닿았는데 돌려보냈을 때 — 상태 번호를 적는다
+await p.evaluate(() => { window.__속답 = () => Promise.resolve({ ok: false, status: 403,
+  text: () => Promise.resolve('Sorry, unable to open the file at this time.') }); });
 await p.tap('#borf-list .borf-row');
 await p.waitForTimeout(400);
-재기('볼 폴더 밖이면 그렇다고 적나', (await 빈말글()) === '볼 폴더 밖의 파일입니다', await 빈말글());
+본것 = await 빈말보기();
+재기('퇴짜면 상태 번호를 적나', 본것.말 === '닿았는데 돌려보냈습니다 (403)', 본것.말);
+재기('돌아온 글도 그대로 보이나', /돌아온 글: Sorry, unable to open/.test(본것.증거), 본것.증거);
 
-// ③ 그 밖의 ok:false 는 돌아온 why 를 그대로
-await p.evaluate(() => { window.__속답 = () =>
-  Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: false, why: '파일이 없습니다' }) }); });
+// ③ 답은 왔는데 자료가 아니라 웹 화면일 때 — 온 글 앞머리를 그대로
+await p.evaluate(() => { window.__속답 = () => Promise.resolve({ ok: true, status: 200,
+  text: () => Promise.resolve('<!DOCTYPE html><html><head><title>Google 계정으로 로그인</title>') }); });
 await p.tap('#borf-list .borf-row');
 await p.waitForTimeout(400);
-재기('그 밖의 까닭은 온 그대로 적나', (await 빈말글()) === '파일이 없습니다', await 빈말글());
+본것 = await 빈말보기();
+재기('자료가 아니면 그렇다고 적나', 본것.말 === '답이 왔는데 자료가 아니라 웹 화면이었습니다', 본것.말);
+재기('온 글 앞머리를 그대로 보이나', /로그인/.test(본것.증거), 본것.증거.slice(0, 60));
+재기('375px 에서 그 글이 가로로 안 넘친다', 본것.넘침 === 375, 본것.넘침 + 'px');
+
+// ④ 볼 폴더 밖
+await p.evaluate(() => { window.__속답 = () => Promise.resolve({ ok: true, status: 200,
+  text: () => Promise.resolve(JSON.stringify({ ok: false, why: '밖' })) }); });
+await p.tap('#borf-list .borf-row');
+await p.waitForTimeout(400);
+재기('볼 폴더 밖이면 그렇다고 적나', (await 빈말보기()).말 === '볼 폴더 밖의 파일입니다', (await 빈말보기()).말);
+
+// ⑤ 그 밖의 ok:false 는 돌아온 why 를 그대로
+await p.evaluate(() => { window.__속답 = () => Promise.resolve({ ok: true, status: 200,
+  text: () => Promise.resolve(JSON.stringify({ ok: false, why: '파일이 없습니다' })) }); });
+await p.tap('#borf-list .borf-row');
+await p.waitForTimeout(400);
+재기('그 밖의 까닭은 온 그대로 적나', (await 빈말보기()).말 === '파일이 없습니다', (await 빈말보기()).말);
 
 // ④ 문이 열렸을 때 — 알맹이를 받아 「고르기」 와 똑같은 길을 탄다
 const 알맹이 = fs.readFileSync(cix길).toString('base64');
-await p.evaluate(b64 => { window.__속답 = () => Promise.resolve({ ok: true,
-  json: () => Promise.resolve({ ok: true, name: '592x382_1001_01.cix', b64 }) }); }, 알맹이);
+await p.evaluate(b64 => { window.__속답 = () => Promise.resolve({ ok: true, status: 200,
+  text: () => Promise.resolve(JSON.stringify({ ok: true, name: '592x382_1001_01.cix', b64 })) }); }, 알맹이);
 await p.tap('#borf-list .borf-row');
 await p.waitForTimeout(600);
 const 뜯음 = await p.evaluate(() => ({
@@ -573,8 +606,8 @@ const 만든bpp = await p.evaluate(async (cix글) => {
   const o = cix읽기(cix글);
   return bpp짓기(o.판, o.구멍, await 변수틀읽기(), -1);
 }, fs.readFileSync(cix길, 'utf-8'));
-await p.evaluate(b64 => { window.__속답 = () => Promise.resolve({ ok: true,
-  json: () => Promise.resolve({ ok: true, name: '거실장_서랍형_1001_01.bpp', b64 }) }); },
+await p.evaluate(b64 => { window.__속답 = () => Promise.resolve({ ok: true, status: 200,
+  text: () => Promise.resolve(JSON.stringify({ ok: true, name: '거실장_서랍형_1001_01.bpp', b64 })) }); },
   Buffer.from(만든bpp, 'latin1').toString('base64'));
 await p.tap('#borf-list .borf-row[data-kind="bpp"]');
 await p.waitForTimeout(700);
