@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.14.0 (2026-10-02) — 공정카드를 세 칸으로: 글 · 잘라야 하는 부속(누움) · 재단배치도(반듯)
+     버전: v1.14.1 (2026-10-02) — 짚는 화면에서는 박스 길게 누르기가 짚어서 지시를 안 가린다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2401,7 +2401,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.14.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.14.1</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2534,7 +2534,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.14.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.14.1</b></p>
         </div>
     </div>
 
@@ -15342,7 +15342,13 @@
 
         /* ── 손가락 ── */
         let 누름 = null, 길게 = false;
+        /* 짚어서 지시(?viggle=1)로 열었으면 박스 길게 누르기를 걸지 않는다.
+           둘 다 0.5초라 박스 타일을 짚으면 지시 창 위로 「박스 고치기」 판이 겹쳐 떴다
+           (10-02 지시로 재어 확인함). 짚는 화면에서는 짚는 것이 먼저다.
+           직원들이 보는 보통 화면(?viggle 없음)은 그대로 — 길게 누르면 박스를 고친다. */
+        const 짚는화면 = new URLSearchParams(location.search).get('viggle') === '1';
         document.addEventListener('pointerdown', e => {
+            if (짚는화면) return;
             const t = e.target.closest('[data-amtb-id]'); if (!t) return;
             길게 = false;
             누름 = setTimeout(() => {
