@@ -1,7 +1,7 @@
 <!-- ==========================================
      보링변환.html
-     버전: v1.8.0 (2026-10-02) — .bpp 를 읽어 도면을 본다.
-           읽는 자는 하나다(bpp읽기) — 도면도 되짚기도 그것을 쓴다
+     버전: v1.9.0 (2026-10-02) — 「이렇게 읽었습니다」 와 「안 읽은 자리」 를 펴 보인다.
+           사장님이 틀린 데를 짚으실 수 있게 우리 짐작을 글로 드러낸다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -130,6 +130,15 @@ body{
 .bread.bwrap-td td:last-child{white-space:normal; word-break:break-word; min-width:190px;}
 .bread.bwrap-td th:last-child{text-align:left;}
 .bread.bwrap-td td:last-child{text-align:left;}
+
+/* 이렇게 읽었습니다 — 한 줄에 하나. 글자뿐이라 새 카드 모양이 아니다 */
+.bhow{margin:10px 0 0;}
+.bhow p{
+  margin:0 0 7px; padding:0 0 0 13px; position:relative;
+  font-size:13px; line-height:1.5; color:var(--vg-body); overflow-wrap:anywhere;
+}
+.bhow p::before{content:'·'; position:absolute; left:2px; color:var(--vg-muted);}
+.bhow p.bhow-no{color:var(--vg-soft);}
 
 /* 단추 — 44px */
 .bbtn{
@@ -379,7 +388,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
 
     <div class="borh-tiles" id="borh-mine"></div>
 
-    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.8.0</b></p>
+    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.9.0</b></p>
   </div>
 </div>
 
@@ -432,7 +441,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
   <div class="bhead">
     <span class="bday">보링변환</span>
     <span class="brole">CIX → BPP</span>
-    <span class="bsub" id="b-ver">v1.8.0</span>
+    <span class="bsub" id="b-ver">v1.9.0</span>
   </div>
 
   <button class="btile" id="b-pick" type="button">
@@ -459,6 +468,14 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
   <!-- 읽은 것 — 파일에 적힌 글자 그대로 보인다. 옮기지도 셈하지도 않는다. -->
   <div class="bread bhide" id="b-read"></div>
   <div class="bnote bhide" id="b-drop"></div>
+
+  <!-- 내가 이렇게 읽었다 — 사장님이 틀린 데를 짚으실 수 있게 짐작을 글로 드러낸다 -->
+  <div class="bsec bhide" id="b-how-head"><b>이렇게 읽었습니다</b></div>
+  <div class="bhow bhide" id="b-how"></div>
+
+  <!-- 안 읽은 자리 — 「그게 중요한 값이다」 하실 수 있다. 숨기지 않는다 -->
+  <div class="bsec bhide" id="b-skip-head"><b>안 읽은 자리</b></div>
+  <div class="bread bhide" id="b-skip"></div>
 
   <div class="bwarn bhide" id="b-warn"></div>
 
@@ -545,6 +562,8 @@ function cix읽기(글){
             y:   v.Y   != null ? 껍질벗기기(v.Y)   : '',
             dia: v.DIA != null ? 껍질벗기기(v.DIA) : '',
             dp:  v.DP  != null ? 껍질벗기기(v.DP)  : '',
+            // 그 구멍에 적혀 있던 칸을 통째로 — 우리가 안 읽는 자리를 드러내려는 것이다
+            날값: Object.keys(v).map(k => [k, 껍질벗기기(v[k])]),
           });
         } else if (이름 === 'GEOTEXT') {
           버린것.GEOTEXT++;
@@ -705,7 +724,7 @@ function bpp읽기(글){
       side: 꼬리[0], crn: 껍질벗기기(꼬리[1]),
       x: 꼬리[2], y: 꼬리[3], z: 꼬리[4], dp: 꼬리[5], dia: 꼬리[6],
     };
-    줄정보.push({ 꼴맞나: true, 머리칸: 머리.length, 값: 값, 날것: 줄 });
+    줄정보.push({ 꼴맞나: true, 머리칸: 머리.length, 값: 값, 꼬리: 꼬리, 날것: 줄 });
     구멍.push(값);
   });
 
@@ -777,6 +796,66 @@ const 읽은표 = 구멍들 => {
     '</tbody></table>';
 };
 
+/* 「내가 이렇게 읽었다」 — 사장님이 틀린 데를 짚으실 수 있게 우리 짐작을 글로 드러낸다.
+   사장님: 「파일을 일단 니가 어떻게 해석하고 있는지를 보여줘야 내가 틀린점을 이야기하며
+   프로그램을 만들어 갈거 아니야」(10-02).
+   ⚠ 지어내지 마라. **코드가 실제로 하고 있는 그대로** 적는다. 안 쓰는 값은
+   「읽었지만 도면에 아직 안 씁니다」 라고 그대로 적는다 — 쓰는 척하지 않는다. */
+function 읽은법(못그린수, 꼴){
+  const 쓴다 = 글 => ({ 글: 글, 씀: true });
+  const 안쓴다 = 글 => ({ 글: 글, 씀: false });
+  const 것들 = [];
+  // 어느 자리에서 읽었는지 — 사장님이 파일과 맞춰 보실 수 있게
+  if (꼴 === 'bpp') {
+    것들.push(쓴다('@ BG 줄의 「:」 뒤 1~7째 자리를 차례로 SIDE·CRN·X·Y·Z·DP·DIA 로 읽었습니다'));
+    것들.push(쓴다('33째 자리를 ID 로 읽었습니다'));
+    것들.push(안쓴다('Z 는 읽었지만 표에도 도면에도 아직 안 씁니다'));
+    것들.push(쓴다('PAN=LPX|…| · PAN=LPY|…| · PAN=LPZ|…| 에서 판 크기를 읽었습니다'));
+  } else {
+    것들.push(쓴다('BEGIN MACRO 의 NAME=BG 만 구멍으로 읽었습니다'));
+    것들.push(안쓴다('NAME=GEOTEXT 와 BEGIN VB 는 버렸습니다'));
+    것들.push(쓴다('BEGIN MAINDATA 의 LPX · LPY · LPZ 에서 판 크기를 읽었습니다'));
+  }
+  것들.push(
+    쓴다('LPX 는 판 가로로 읽어 테두리를 그렸습니다'),
+    쓴다('LPY 는 판 세로로 읽어 테두리를 그렸습니다'),
+    안쓴다('LPZ 는 읽었지만 도면에 아직 안 씁니다'),
+    쓴다('X 는 왼쪽 끝에서 잰 것으로 읽었습니다'),
+    쓴다('Y 는 위에서 아래로 자라는 것으로 읽었습니다 — Y 0 이 판 위쪽입니다'),
+    쓴다('지름은 동그라미 크기로 썼습니다 — 너무 작으면 보이게 키웁니다'),
+    안쓴다('깊이는 읽었지만 도면에 아직 안 씁니다'),
+    안쓴다('SIDE 는 읽었지만 도면에 아직 안 씁니다'),
+    안쓴다('CRN 은 읽었지만 도면에 아직 안 씁니다'),
+    안쓴다('ID 는 읽었지만 도면에 아직 안 씁니다'),
+    쓴다('374-32 같은 식은 더하기·빼기만 재서 자리를 잡습니다 — 파일에 적힌 글자는 그대로 둡니다'),
+  );
+  if (못그린수) 것들.push(안쓴다(`재지 못하는 꼴이 ${못그린수}개 있어 그 구멍은 안 그렸습니다`));
+  return 것들;
+}
+
+/* 안 읽은 자리 — @ BG 줄·BEGIN MACRO 에서 우리가 안 쓰는 칸을 드러낸다.
+   사장님이 「그게 중요한 값이다」 하실 수 있다. 숨기지 않는다. */
+function 안읽은자리(것){
+  const 모음 = new Map();
+  const 담기 = (이름, 값) => {
+    if (!모음.has(이름)) 모음.set(이름, new Set());
+    모음.get(이름).add(String(값));
+  };
+  if (것.꼴 === 'bpp') {
+    const 쓰는자리 = new Set([0, 1, 2, 3, 4, 5, 6, 32]);   // SIDE·CRN·X·Y·Z·DP·DIA·이름
+    (것.줄정보 || []).forEach(t => {
+      if (!t.꼴맞나 || !t.꼬리) return;
+      t.꼬리.forEach((v, i) => { if (!쓰는자리.has(i)) 담기((i + 1) + '째 자리', v); });
+    });
+  } else {
+    const 쓰는것 = new Set(['ID','SIDE','CRN','X','Y','DIA','DP']);
+    (것.구멍 || []).forEach(g => (g.날값 || []).forEach(([k, v]) => {
+      if (!쓰는것.has(k)) 담기(k, v);
+    }));
+  }
+  return [...모음.entries()].map(([k, s]) => [k, [...s].join(' · ')]);
+}
+
 function 다시그리기(){
   if (!읽은것) return;
   const 판 = 읽은것.판;
@@ -794,6 +873,7 @@ function 다시그리기(){
 
   // 버린 것 · 못 그린 것 — 값만 한 줄
   const 못그린수 = 읽은것.구멍.filter(g => 값재기(g.x) === null || 값재기(g.y) === null).length;
+  보임($('b-read'), !!읽은것.구멍.length);
   const 곁 = [];
   if (읽은것.버린것.GEOTEXT) 곁.push(`GEOTEXT ${읽은것.버린것.GEOTEXT} 버림`);
   if (읽은것.버린것.VB) 곁.push(`VBLINE ${읽은것.버린것.VB}줄 버림`);
@@ -803,6 +883,25 @@ function 다시그리기(){
 
   /* 못 읽은 것 — 꾸짖는 글을 적을 자리가 아니라, 그 속에 무엇이 적혀 있는지 보여 드릴
      자리다. 사장님이 보시고 읽는 법을 알려 주신다. 이름도 값도 파일 글자 그대로다. */
+  // 「이렇게 읽었습니다」
+  const 읽은법들 = 읽은법(못그린수, 읽은것.꼴);
+  $('b-how').innerHTML = 읽은법들
+    .map(x => '<p' + (x.씀 ? '' : ' class="bhow-no"') + '>' + 막기(x.글) + '</p>').join('');
+  보임($('b-how'), true); 보임($('b-how-head'), true);
+
+  // 「안 읽은 자리」
+  const 안읽음 = 안읽은자리(읽은것);
+  if (안읽음.length) {
+    $('b-skip').innerHTML =
+      '<table><thead><tr><th>자리</th><th>적혀 있던 값</th></tr></thead><tbody>' +
+      안읽음.map(([k, v]) => '<tr><td>' + 막기(k) + '</td><td>' + 막기(v) + '</td></tr>').join('') +
+      '</tbody></table>';
+    $('b-skip').classList.add('bwrap-td');
+    보임($('b-skip'), true); 보임($('b-skip-head'), true);
+  } else {
+    보임($('b-skip'), false); 보임($('b-skip-head'), false);
+  }
+
   // cix 는 모르는 것(이름+값), bpp 는 못 읽은 줄(그 줄 그대로). 둘 다 같은 표로 편다.
   const bpp다 = 읽은것.꼴 === 'bpp';
   const 못읽은것 = bpp다

@@ -600,6 +600,21 @@ const bpp본것 = await p.evaluate(() => ({
 재기('.bpp 에서 구멍 열여섯 줄을 읽어 내나', bpp본것.표.length === 16, bpp본것.표.length + '줄');
 재기('.bpp 에서는 만드는 단추를 안 보인다', !bpp본것.만들기단추);
 재기('성한 .bpp 에는 빨간 글이 없다', bpp본것.빨간글 === '', bpp본것.빨간글);
+const bpp해석 = await p.evaluate(() => ({
+  읽은법: [...document.querySelectorAll('#b-how p')].map(e => e.textContent),
+  안읽음: [...document.querySelectorAll('#b-skip tbody tr')].map(tr =>
+            [...tr.children].map(td => td.textContent).join('|')),
+}));
+재기('.bpp 는 몇째 자리에서 읽었는지 적나',
+     bpp해석.읽은법.some(t => /「:」 뒤 1~7째 자리를 차례로 SIDE·CRN·X·Y·Z·DP·DIA 로 읽었습니다/.test(t)) &&
+     bpp해석.읽은법.some(t => t === '33째 자리를 ID 로 읽었습니다'),
+     bpp해석.읽은법.length + '줄');
+재기('.bpp 에서 안 읽은 자리를 값과 함께 다 드러내나',
+     bpp해석.안읽음.length === 50 && bpp해석.안읽음[0] === '8째 자리|0' &&
+     bpp해석.안읽음.some(t => t === '50째 자리|"BG"'),
+     bpp해석.안읽음.length + '자리 · ' + bpp해석.안읽음.slice(0,2).join(' '));
+재기('.bpp 의 Z 는 안 쓴다고 그대로 적나',
+     bpp해석.읽은법.some(t => t === 'Z 는 읽었지만 표에도 도면에도 아직 안 씁니다'));
 재기('375px 에서 가로로 안 넘친다', bpp본것.넘침 === 375, bpp본것.넘침 + 'px');
 
 /* ★ cix 로 그린 도면과 bpp 로 그린 도면이 같은가 — 가장 확실한 증거 */
@@ -745,6 +760,33 @@ const 읽음 = await p.evaluate(() => ({
        const [x, y, dia, dp] = 바라던것[i];
        return 줄 === `${i+1},${x},${y},${dia},${dp},0,1,${i+1}`;
      }), 읽음.표[0] + ' … ' + 읽음.표[15]);
+/* ★ 사장님: 「파일을 일단 니가 어떻게 해석하고 있는지를 보여줘야 내가 틀린점을
+   이야기하며 프로그램을 만들어 갈거 아니야」(10-02). 짐작을 글로 드러낸다. */
+const 해석 = await p.evaluate(() => ({
+  읽은법: [...document.querySelectorAll('#b-how p')].map(e => e.textContent),
+  안쓴다표시: [...document.querySelectorAll('#b-how p.bhow-no')].map(e => e.textContent),
+  제목: (document.getElementById('b-how-head') || {}).textContent || '',
+  안읽음제목: (document.getElementById('b-skip-head') || {}).textContent || '',
+  안읽음: [...document.querySelectorAll('#b-skip tbody tr')].map(tr =>
+            [...tr.children].map(td => td.textContent).join('|')),
+  안읽음칸: [...document.querySelectorAll('#b-skip thead th')].map(th => th.textContent).join(' '),
+}));
+재기('「이렇게 읽었습니다」 를 적나', 해석.제목 === '이렇게 읽었습니다', 해석.제목);
+재기('X 를 어디서 잰 것으로 읽었는지 적나',
+     해석.읽은법.some(t => t === 'X 는 왼쪽 끝에서 잰 것으로 읽었습니다'), 해석.읽은법.length + '줄');
+재기('Y 가 어느 쪽으로 자라는지 적나',
+     해석.읽은법.some(t => /Y 는 위에서 아래로 자라는 것으로 읽었습니다 — Y 0 이 판 위쪽입니다/.test(t)));
+재기('cix 는 어느 자리에서 읽었는지 적나',
+     해석.읽은법.some(t => t === 'BEGIN MACRO 의 NAME=BG 만 구멍으로 읽었습니다') &&
+     해석.읽은법.some(t => /BEGIN MAINDATA 의 LPX · LPY · LPZ/.test(t)));
+재기('안 쓰는 값을 「안 씁니다」 라고 그대로 적나',
+     ['LPZ','깊이','SIDE','CRN','ID'].every(k => 해석.안쓴다표시.some(t => t.startsWith(k))),
+     해석.안쓴다표시.length + '줄');
+재기('「안 읽은 자리」 를 적나', 해석.안읽음제목 === '안 읽은 자리', 해석.안읽음제목);
+재기('안 읽은 자리 칸이 「자리 · 적혀 있던 값」 인가', 해석.안읽음칸 === '자리 적혀 있던 값', 해석.안읽음칸);
+재기('cix 에서 안 읽은 칸을 값과 함께 다 드러내나',
+     해석.안읽음.join(' ') === 'THR|NO RTY|0 DUPLIN|0', 해석.안읽음.join(' '));
+
 재기('버린 것을 한 줄로 적나',
      /GEOTEXT 1 버림/.test(읽음.버린것) && /VBLINE 2줄 버림/.test(읽음.버린것), 읽음.버린것);
 
