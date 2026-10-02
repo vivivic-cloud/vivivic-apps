@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.14.1 (2026-10-02) — 짚는 화면에서는 박스 길게 누르기가 짚어서 지시를 안 가린다
+     버전: v1.14.2 (2026-10-02) — 도면 자리를 늘 같은 크기로, 부속 그림의 회색 상자를 없앤다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1132,10 +1132,15 @@
         .woc-몸 { display: flex; flex-wrap: wrap; gap: 10px; min-width: 0; }
         .woc-글 { min-width: 0; flex: 1 1 100%; }
         .woc-부속 { min-width: 0; flex: 1 1 0; display: flex; justify-content: center; align-items: flex-start; }
-        /* 부속 판은 제 크기(width·height)를 가지고 있다 — 칸에 맞춰 가로세로가 같이 준다 */
-        .woc-부속 svg { width: auto; height: auto; max-width: 100%; max-height: 132px; margin: 0; }
+        /* 「실제사이즈와 상관없이 일정공간을 동일하게 차지하는 도면」(10-02 지시).
+           자리는 카드마다 늘 같은 크기고, 도면은 제 비율을 지킨 채 그 안에 들어갈
+           만큼만 커진다. 남는 데는 비워 둔다 — 늘려서 찌그러뜨리지 않는다.
+           (두 도면 다 제 크기 width·height 를 가지고 있어 가로세로가 같이 준다) */
+        .woc-부속, .woc-도면자리 { height: 132px; width: 100%; display: flex;
+            align-items: center; justify-content: center; }
+        .woc-부속 svg, .woc-도면자리 svg { width: auto; height: auto;
+            max-width: 100%; max-height: 100%; margin: 0; }
         .woc-그림 { min-width: 0; flex: 1 1 0; display: flex; justify-content: center; }
-        .woc-그림 svg { max-height: 132px; width: auto; max-width: 100%; margin: 0; }
         .woc-그림속 { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
         /* 배치도 칸 안으로 들어온 큰 단추는 그 칸 폭을 꽉 채운다 */
         .woc-그림속 .woc-단추, .woc-그림속 .woc-끝 { flex: 0 0 auto; width: 100%; min-width: 0; box-sizing: border-box; }
@@ -1148,9 +1153,8 @@
             .woc-몸 { flex-wrap: nowrap; align-items: flex-start; gap: 14px; }
             .woc-글 { flex: 0 0 45%; max-width: 45%; }
             .woc-부속 { flex: 0 0 33%; max-width: 33%; }
-            .woc-부속 svg { max-height: 168px; }
+            .woc-부속, .woc-도면자리 { height: 168px; }
             .woc-그림 { flex: 1 1 22%; max-width: 280px; justify-content: flex-end; }
-            .woc-그림 svg { max-height: 168px; }
         }
         /* 누르는 단추 — 44px 아래로 안 내려간다. hover 가 없는 폰에서도 눌린 티가 난다. */
         .woc-단추 {
@@ -2401,7 +2405,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.14.1</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.14.2</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2534,7 +2538,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.14.1</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.14.2</b></p>
         </div>
     </div>
 
@@ -9858,7 +9862,7 @@
            크게 띄우는 도면·집중 창 도면은 반듯한 채로 둔다 — 누운 그림으로 재단 치수를
            읽으면 비뚤어져 보인다. 눕는 것은 보이는 꼴뿐이고, 조각이 앉은 자리(lp·tp·wp·hp)
            에서 낸 x·y·width·height 는 한 자도 건드리지 않는다. */
-        function _woCuttingDiagramSvg(p, w, h, fitHeight, 누움) {
+        function _woCuttingDiagramSvg(p, w, h, fitHeight, 누움, 칸맞춤) {
             if (!p.isCuttingCard || !p.boardParts || p.boardParts.length === 0) return '';
             const BW = p.boardW || 2440, BD = p.boardH || 1220;
             let minLeftF = Infinity, minTopF = Infinity;
@@ -9889,12 +9893,15 @@
             // 중복되는 aspect-ratio 선언은 빼고 표준 교체요소 크기계산에 맡김.
             // fitHeight=true는 높이가 확정값을 가진 칸(카드 우측 끝, 폭은 auto)에서
             // 쓰므로 높이 기준(height:100%)+폭 상한(max-width)으로 계산
-            const sizeStyle = fitHeight
+            // 칸맞춤=true 면 크기를 글에 적지 않는다 — 카드의 도면 자리(CSS)가 쥐고,
+            // 도면은 제 비율 그대로 그 자리에 들어갈 만큼만 커진다(10-02 지시).
+            const sizeStyle = 칸맞춤 ? '' : (fitHeight
                 ? `height:100%;width:auto;max-width:100%;`
-                : `width:100%;height:auto;`;
+                : `width:100%;height:auto;`);
+            const 제크기 = 칸맞춤 ? ` width="${cropW.toFixed(1)}" height="${cropH.toFixed(1)}"` : '';
             const 테 = `style="display:block;${sizeStyle}border:1px solid #d6d4d1;border-radius:4px;margin-top:4px;flex-shrink:0;background:#ecebe8;box-shadow:0 1px 2px rgba(55,53,47,0.10),0 5px 12px rgba(55,53,47,0.07);"`;
             if (!누움)
-                return `<svg viewBox="0 0 ${cropW.toFixed(1)} ${cropH.toFixed(1)}" ${테}>${격자}${rects}</svg>`;
+                return `<svg viewBox="0 0 ${cropW.toFixed(1)} ${cropH.toFixed(1)}"${제크기} ${테}>${격자}${rects}</svg>`;
 
             /* ── 누운 꼴 (30도 등각) ──────────────────────────────────────────
                x' = cos30·(x−y) · y' = sin30·(x+y) — 반듯한 판을 비스듬히 본 꼴.
@@ -9902,7 +9909,7 @@
                따라 늘어 **카드가 길어진다**. 그래서 칸은 그대로 두고, 누운 판을
                그 칸 안에 꼭 맞게 줄여 넣는다 — 잘리지도 않고 카드도 안 늘어난다. */
             const 바닥 = `<path d="M0 0 H${cropW.toFixed(1)} V${cropH.toFixed(1)} H0 Z" fill="#f7f6f4"/>`;
-            return `<svg viewBox="0 0 ${cropW.toFixed(1)} ${cropH.toFixed(1)}" ${테}>` +
+            return `<svg viewBox="0 0 ${cropW.toFixed(1)} ${cropH.toFixed(1)}"${제크기} ${테}>` +
                    _누워싸기(cropW, cropH, 번호, 바닥 + 격자 + rects) + `</svg>`;
         }
 
@@ -9919,9 +9926,11 @@
             const 바닥 = `<path d="M0 0 H${W} V${H} H0 Z" fill="#ffffff"/>`;
             const 테두리 = `<path d="M0 0 H${W} V${H} H0 Z" fill="none" stroke="#37352f" ` +
                            `stroke-width="1" vector-effect="non-scaling-stroke"/>`;
-            return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="display:block;` +
-                   `border:1px solid #d6d4d1;border-radius:4px;margin-top:4px;flex-shrink:0;background:#ecebe8;` +
-                   `box-shadow:0 1px 2px rgba(55,53,47,0.10),0 5px 12px rgba(55,53,47,0.07);">` +
+            // 「회색 뒷배경을 제거하고 재단할 사이즈의 도면만」(10-02 지시) — 상자(바탕·테두리)는
+            // 없다. 판 아래 그늘은 도면 안에서 그리므로 그대로 남는다.
+            // 제 크기(width·height)를 적어 둔다 — 자리에 맞춰 줄 때 가로세로가 같이 줄어
+            // 찌그러지지 않는다. 자리 크기는 CSS(.woc-부속)가 쥔다.
+            return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="display:block;flex-shrink:0;">` +
                    _누워싸기(W, H, 번호, 바닥 + 격자 + 테두리) + `</svg>`;
         }
 
@@ -10566,7 +10575,7 @@
                         (x.수 > 0 ? ` · ${_esc(x.수)} EA` : '') + `</span>`).join('') + `</div>`
                     : '';
                 // 재단배치도는 **반듯하게** 둔다 — 누운 그림으로 재단 치수를 읽으면 비뚤다(10-02 지시).
-                const _diagCut = _woCuttingDiagramSvg(p);
+                const _diagCut = _woCuttingDiagramSvg(p, null, null, false, false, true);
                 // 가운데 칸 — 이 카드에서 잘라야 하는 부속 한 장(누운 민판).
                 const _부속판 = _wo부속판Svg(p);
 
@@ -10691,7 +10700,8 @@
                 _placedInner = `<div class="woc-몸">` +
                     `<div class="woc-글">${_cut글}</div>` +
                     (_cut부속 ? `<div class="woc-부속">${_cut부속}</div>` : '') +
-                    `<div class="woc-그림"><div class="woc-그림속">${_cut도면}${_편집Btn}${_bDoneHtml}</div></div>` +
+                    `<div class="woc-그림"><div class="woc-그림속">` +
+                    `<div class="woc-도면자리">${_cut도면}</div>${_편집Btn}${_bDoneHtml}</div></div>` +
                     `</div>`;
             // 누르는 것을 한 줄에 모은다 — 왼쪽에 곁단추(편집·불량보고), 오른쪽에 큰 단추
             const _b행동줄 = _세칸
