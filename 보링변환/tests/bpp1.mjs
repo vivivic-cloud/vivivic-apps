@@ -553,7 +553,9 @@ if (뜯어바꾼것) {
        BG.length + '줄');
 }
 
-// ⑤ .bpp 줄은 바꿀 것이 없다 — 원본만 열어 준다
+/* ⑤ .bpp 줄을 누르면 그 자리에서 도면이 뜬다 ─────────────────────────
+   사장님: 「bpp 로 만드는게 이 프로그램의 목적이 아니고 이파일을 프로그램 내에서
+   읽어들여 실제 보링의 도면을 보려고 하는거야」. cix 와 같은 길로 간다. */
 await p.tap('#bor-back button');                 // 박스판으로
 await p.waitForTimeout(300);
 await p.tap(`[data-borb-id="${파일박스}"]`);      // 「파일」 박스로 다시
@@ -564,18 +566,120 @@ await p.tap('#borf-folders [data-into="거실장3종"]');
 await p.waitForTimeout(300);
 await p.tap('#borf-folders [data-into="1200"]');
 await p.waitForTimeout(300);
-const bpp눌림 = await p.evaluate(async () => {
-  let 곳 = ''; const 옛 = window.open; window.open = u => { 곳 = String(u); return null; };
-  const 줄 = [...document.querySelectorAll('.borf-row')].find(r => r.dataset.kind === 'bpp');
-  줄.click();
-  await new Promise(r => setTimeout(r, 200));
-  window.open = 옛;
-  return { 곳, 말: document.getElementById('borf-none').textContent,
-           화면: document.documentElement.getAttribute('data-borscreen') };
+
+// 본보기 cix 로 .bpp 를 만들어 그것을 알맹이로 준다 — 만드는 길 그대로 쓴다
+const 만든bpp = await p.evaluate(async (cix글) => {
+  const { cix읽기, bpp짓기, 변수틀읽기 } = window.보링;
+  const o = cix읽기(cix글);
+  return bpp짓기(o.판, o.구멍, await 변수틀읽기(), -1);
+}, fs.readFileSync(cix길, 'utf-8'));
+await p.evaluate(b64 => { window.__속답 = () => Promise.resolve({ ok: true,
+  json: () => Promise.resolve({ ok: true, name: '거실장_서랍형_1001_01.bpp', b64 }) }); },
+  Buffer.from(만든bpp, 'latin1').toString('base64'));
+await p.tap('#borf-list .borf-row[data-kind="bpp"]');
+await p.waitForTimeout(700);
+const bpp본것 = await p.evaluate(() => ({
+  화면: document.documentElement.getAttribute('data-borscreen'),
+  집: document.documentElement.getAttribute('data-borhome'),
+  이름: document.getElementById('b-pick-nm').textContent,
+  알약: document.getElementById('b-pills').textContent,
+  동그라미: document.querySelectorAll('#b-draw circle').length,
+  표: [...document.querySelectorAll('#b-read tbody tr')].map(tr =>
+        [...tr.children].map(td => td.textContent).join(',')),
+  만들기단추: !document.getElementById('b-go').classList.contains('bhide'),
+  빨간글: document.getElementById('b-warn').classList.contains('bhide')
+          ? '' : document.getElementById('b-warn').textContent,
+  넘침: document.documentElement.scrollWidth,
+}));
+재기('.bpp 를 누르면 그 자리에서 도면이 뜨나',
+     bpp본것.화면 === null && bpp본것.집 === null && bpp본것.동그라미 === 16,
+     '동그라미 ' + bpp본것.동그라미);
+재기('.bpp 에서 판 크기를 읽어 내나',
+     /LPX 592/.test(bpp본것.알약) && /LPY 382/.test(bpp본것.알약) && /LPZ 18/.test(bpp본것.알약),
+     bpp본것.알약.trim());
+재기('.bpp 에서 구멍 열여섯 줄을 읽어 내나', bpp본것.표.length === 16, bpp본것.표.length + '줄');
+재기('.bpp 에서는 만드는 단추를 안 보인다', !bpp본것.만들기단추);
+재기('성한 .bpp 에는 빨간 글이 없다', bpp본것.빨간글 === '', bpp본것.빨간글);
+재기('375px 에서 가로로 안 넘친다', bpp본것.넘침 === 375, bpp본것.넘침 + 'px');
+
+/* ★ cix 로 그린 도면과 bpp 로 그린 도면이 같은가 — 가장 확실한 증거 */
+const 맞춰보기 = await p.evaluate(async ([cix글, bpp글]) => {
+  const a = window.보링.cix읽기(cix글);
+  const b = window.보링.bpp읽기(bpp글);
+  const 재 = g => [g.x, g.y, g.dp, g.dia, g.side, g.crn].join(',');
+  return {
+    cix판: [a.판.LPX, a.판.LPY, a.판.LPZ].join('×'),
+    bpp판: [b.판.LPX, b.판.LPY, b.판.LPZ].join('×'),
+    cix수: a.구멍.length, bpp수: b.구멍.length,
+    다른줄: a.구멍.map((g, i) => 재(g) === 재(b.구멍[i] || {}) ? null
+              : (i+1) + '째 ' + 재(g) + ' ≠ ' + 재(b.구멍[i] || {})).filter(Boolean),
+    cix첫줄: 재(a.구멍[0]), bpp첫줄: 재(b.구멍[0]),
+  };
+}, [fs.readFileSync(cix길, 'utf-8'), 만든bpp]);
+재기('cix 와 bpp 의 판 크기가 같나', 맞춰보기.cix판 === 맞춰보기.bpp판,
+     맞춰보기.cix판 + ' · ' + 맞춰보기.bpp판);
+재기('cix 와 bpp 의 구멍 수가 같나', 맞춰보기.cix수 === 16 && 맞춰보기.bpp수 === 16,
+     맞춰보기.cix수 + ' · ' + 맞춰보기.bpp수);
+재기('열여섯 줄의 X·Y·DP·DIA·SIDE·CRN 이 다 같나', 맞춰보기.다른줄.length === 0,
+     맞춰보기.다른줄.length ? 맞춰보기.다른줄.slice(0,3).join(' / ') : '첫 줄 ' + 맞춰보기.cix첫줄);
+
+/* 꼴이 다른 .bpp 도 안 터지고 읽은 것까지 보인다 */
+const 험한것 = await p.evaluate(() => {
+  const 읽 = window.보링.bpp읽기;
+  const 한줄 = '@ BG, "", "", 1, "", 0 : 0, "1", 19, 70, 0, 12, 5, 0, 1, 0, 288';
+  return {
+    빈것:   (() => { const r = 읽('[VARIABLES]\r\nPAN=LPX|592||4|\r\n');
+                     return { 구멍: r.구멍.length, LPX: r.판.LPX }; })(),
+    판없음: (() => { const r = 읽('[PROGRAM]\r\n' + 한줄 + '\r\n');
+                     return { 구멍: r.구멍.length, LPX: r.판.LPX, x: r.구멍[0] && r.구멍[0].x }; })(),
+    깨진줄: (() => { const r = 읽('PAN=LPX|592||4|\r\n@ BG, "", "", 1, "", 0\r\n' + 한줄 + '\r\n');
+                     return { 구멍: r.구멍.length, 못읽은: r.못읽은줄.length,
+                              날것: r.못읽은줄[0] && r.못읽은줄[0].날것 }; })(),
+    LF만:   (() => { const r = 읽('PAN=LPX|592||4|\n' + 한줄 + '\n');
+                     return { 구멍: r.구멍.length, LPX: r.판.LPX }; })(),
+  };
 });
-재기('.bpp 는 만들 것이 없다고 적나', bpp눌림.말 === '이미 .bpp 입니다 — 만들 것이 없습니다', bpp눌림.말);
-재기('.bpp 는 원본만 열어 주나',
-     bpp눌림.곳 === 'https://drive.google.com/file/d/D2/view' && bpp눌림.화면 === 'files', bpp눌림.곳);
+재기('구멍이 없는 .bpp 도 안 터지고 판만 보인다',
+     험한것.빈것.구멍 === 0 && 험한것.빈것.LPX === '592', JSON.stringify(험한것.빈것));
+재기('판 크기가 없는 .bpp 도 구멍만 보인다',
+     험한것.판없음.구멍 === 1 && 험한것.판없음.LPX === null && 험한것.판없음.x === '19',
+     JSON.stringify(험한것.판없음));
+재기('줄 하나가 깨져도 나머지는 다 읽는다',
+     험한것.깨진줄.구멍 === 1 && 험한것.깨진줄.못읽은 === 1, JSON.stringify(험한것.깨진줄));
+재기('못 읽은 줄을 그대로 들고 있나', /^@ BG, "", "", 1, "", 0$/.test(험한것.깨진줄.날것 || ''),
+     험한것.깨진줄.날것);
+재기('줄 끝이 LF 뿐이어도 읽는다',
+     험한것.LF만.구멍 === 1 && 험한것.LF만.LPX === '592', JSON.stringify(험한것.LF만));
+
+/* 되짚기의 어긋남 잡기가 전과 똑같이 도는가 — 갈래마다 잰다 */
+const 되짚음 = await p.evaluate(async () => {
+  const { bpp짓기, 되짚기, 변수틀읽기 } = window.보링;
+  const 판 = { LPX:'592', LPY:'382', LPZ:'18' };
+  const 차례 = [{ id:'1', side:'0', crn:'1', x:'19', y:'70', dia:'5', dp:'12' }];
+  const 변수 = await 변수틀읽기();
+  const 성한것 = bpp짓기(판, 차례, 변수, -1);
+  const 재 = 글 => 되짚기(글, 차례, 판);
+  return {
+    성한것: 재(성한것),
+    X바꿈: 재(성한것.replace(' : 0, "1", 19, 70,', ' : 0, "1", 20, 70,')),
+    판바꿈: 재(성한것.replace('PAN=LPX|592||4|', 'PAN=LPX|591||4|')),
+    판없앰: 재(성한것.replace('PAN=LPZ|18||4|\r\n', '')),
+    줄늘림: 재(성한것.replace('[PROGRAM]\r\n\r\n', '[PROGRAM]\r\n\r\n@ BG, "", "", 9, "", 0 : 0, "1", 1, 1, 0, 1, 1\r\n')),
+    꼴틀림: 재(성한것.replace(/^@ BG.*$/m, '@ BG, "", "", 1, "", 0')),
+    Z바꿈:  재(성한것.replace(' : 0, "1", 19, 70, 0, 12,', ' : 0, "1", 19, 70, 1, 12,')),
+    머리늘림: 재(성한것.replace('@ BG, "", "", 1, "", 0 : ', '@ BG, "", "", 1, "", 0, 0 : ')),
+  };
+});
+재기('되짚기 — 성한 것은 어긋남 0', 되짚음.성한것.length === 0, 되짚음.성한것.join(' / '));
+재기('되짚기 — X 한 자', 되짚음.X바꿈.join('|') === '1째 구멍 X 20 ≠ 19', 되짚음.X바꿈.join(' / '));
+재기('되짚기 — 판 크기', 되짚음.판바꿈.join('|') === 'LPX 591 ≠ 592', 되짚음.판바꿈.join(' / '));
+재기('되짚기 — 판 크기 줄이 없을 때', 되짚음.판없앰.join('|') === 'LPZ 없음 ≠ 18', 되짚음.판없앰.join(' / '));
+재기('되짚기 — 구멍 수가 다르면 그것만 말하고 멈춘다',
+     되짚음.줄늘림.join('|') === '구멍 수 2 ≠ 1', 되짚음.줄늘림.join(' / '));
+재기('되짚기 — 줄 꼴이 틀렸을 때', 되짚음.꼴틀림.join('|') === '1째 줄 꼴이 틀렸다', 되짚음.꼴틀림.join(' / '));
+재기('되짚기 — Z 가 0 이 아닐 때', /1째 구멍 Z 1 ≠ 0/.test(되짚음.Z바꿈.join('|')), 되짚음.Z바꿈.join(' / '));
+재기('되짚기 — 머리 칸이 다를 때', /1째 줄 머리 칸이 7개/.test(되짚음.머리늘림.join('|')),
+     되짚음.머리늘림.join(' / '));
 
 // 치우고 박스 판으로 — fetch 도 원래대로 돌려 놓는다
 await p.evaluate(async () => {

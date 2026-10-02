@@ -1,6 +1,7 @@
 <!-- ==========================================
      보링변환.html
-     버전: v1.7.3 (2026-09-30) — 화면에 남아 있던 「창고」 한 군데를 없앤다
+     버전: v1.8.0 (2026-10-02) — .bpp 를 읽어 도면을 본다.
+           읽는 자는 하나다(bpp읽기) — 도면도 되짚기도 그것을 쓴다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -378,7 +379,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
 
     <div class="borh-tiles" id="borh-mine"></div>
 
-    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.7.3</b></p>
+    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.8.0</b></p>
   </div>
 </div>
 
@@ -431,7 +432,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
   <div class="bhead">
     <span class="bday">보링변환</span>
     <span class="brole">CIX → BPP</span>
-    <span class="bsub" id="b-ver">v1.7.3</span>
+    <span class="bsub" id="b-ver">v1.8.0</span>
   </div>
 
   <button class="btile" id="b-pick" type="button">
@@ -668,47 +669,94 @@ function 쉼표쪼개기(글){
   것.push(이번.trim());
   return 것;
 }
-function 되짚기(bpp글, 차례, 판){
-  const 어긋남 = [];
-  const 줄들 = bpp글.split('\r\n');
+/* ── bpp 읽기 ───────────────────────────────────────────────────────────
+   사장님: 「bpp 로 만드는게 이 프로그램의 목적이 아니고 이파일을 프로그램 내에서
+   읽어들여 실제 보링의 도면을 보려고 하는거야」(10-02).
+   **읽는 자는 하나다.** 도면도 되짚기도 이 하나를 쓴다 — 둘을 두면 하나만 틀린다.
+   돌려주는 꼴은 cix읽기 와 같다({판, 구멍}) — 그래야 도면그리기 가 그대로 받는다.
 
-  // 판 크기
+   사장님 기계에서 나온 bpp 는 우리가 만든 것과 꼴이 다를 수 있다. 그래서:
+     · 판 크기를 못 찾으면 null 로 두고 구멍만이라도 읽는다
+     · 한 줄이 이상해도 그 줄만 못읽은줄 에 담고 나머지는 다 읽는다
+     · 줄 끝이 CRLF 든 LF 든 읽는다 */
+function bpp읽기(글){
+  const 줄들 = String(글 == null ? '' : 글).replace(/\r\n?/g, '\n').split('\n');
+
+  const 판 = { LPX: null, LPY: null, LPZ: null };
   for (const k of ['LPX','LPY','LPZ']) {
     const 줄 = 줄들.find(s => s.startsWith('PAN=' + k + '|'));
     const 값 = 줄 && /^PAN=[A-Z]+\|([^|]*)\|/.exec(줄);
-    if (!값 || 값[1] !== String(판[k])) 어긋남.push(k + ' ' + (값 ? 값[1] : '없음') + ' ≠ ' + 판[k]);
+    판[k] = 값 ? 값[1] : null;
+  }
+
+  const 줄정보 = [], 구멍 = [], 못읽은줄 = [];
+  줄들.filter(s => /^@\s*BG\s*,/.test(s)).forEach((줄, i) => {
+    const 나눔 = 줄.indexOf(' : ');
+    if (나눔 < 0) {
+      줄정보.push({ 꼴맞나: false, 날것: 줄 });
+      못읽은줄.push({ 번째: i + 1, 날것: 줄 });
+      return;
+    }
+    const 머리 = 쉼표쪼개기(줄.slice(0, 나눔));
+    const 꼬리 = 쉼표쪼개기(줄.slice(나눔 + 3));
+    const 이름칸 = 꼬리[32] != null ? 껍질벗기기(꼬리[32]) : '';
+    const 값 = {
+      id:   이름칸 !== '' ? 이름칸 : String(i + 1),
+      side: 꼬리[0], crn: 껍질벗기기(꼬리[1]),
+      x: 꼬리[2], y: 꼬리[3], z: 꼬리[4], dp: 꼬리[5], dia: 꼬리[6],
+    };
+    줄정보.push({ 꼴맞나: true, 머리칸: 머리.length, 값: 값, 날것: 줄 });
+    구멍.push(값);
+  });
+
+  // cix읽기 와 같은 꼴로 돌려준다 — 화면이 둘을 갈라 보지 않아도 되게
+  return { 꼴: 'bpp', 판: 판, 구멍: 구멍, 줄정보: 줄정보, 못읽은줄: 못읽은줄,
+           버린것: { GEOTEXT: 0, VB: 0 }, 모르는것: [] };
+}
+
+/* ── 되짚어 확인 ────────────────────────────────────────────────────────
+   만든 bpp 를 도로 읽어 cix 의 값과 하나하나 맞춰 본다. 하나라도 어긋나면
+   파일을 안 만든다. 읽는 일은 위 bpp읽기 가 하고, 여기는 맞춰 보기만 한다 —
+   잡아내는 것은 한 톨도 달라지지 않았다(시험이 갈래마다 잰다). */
+function 되짚기(bpp글, 차례, 판){
+  const 어긋남 = [];
+  const 본것 = bpp읽기(bpp글);
+
+  // 판 크기
+  for (const k of ['LPX','LPY','LPZ']) {
+    const 값 = 본것.판[k];
+    if (값 === null || 값 !== String(판[k])) {
+      어긋남.push(k + ' ' + (값 === null ? '없음' : 값) + ' ≠ ' + 판[k]);
+    }
   }
 
   // BG 줄
-  const BG들 = 줄들.filter(s => /^@\s*BG\s*,/.test(s));
-  if (BG들.length !== 차례.length) {
-    어긋남.push('구멍 수 ' + BG들.length + ' ≠ ' + 차례.length);
+  const 줄정보 = 본것.줄정보;
+  if (줄정보.length !== 차례.length) {
+    어긋남.push('구멍 수 ' + 줄정보.length + ' ≠ ' + 차례.length);
     return 어긋남;
   }
-  BG들.forEach((줄, i) => {
+  줄정보.forEach((t, i) => {
     const g = 차례[i];
-    const 나눔 = 줄.indexOf(' : ');
-    if (나눔 < 0) { 어긋남.push((i+1) + '째 줄 꼴이 틀렸다'); return; }
-    const 머리 = 쉼표쪼개기(줄.slice(0, 나눔));
-    const 꼬리 = 쉼표쪼개기(줄.slice(나눔 + 3));
+    if (!t.꼴맞나) { 어긋남.push((i+1) + '째 줄 꼴이 틀렸다'); return; }
     const 봐야할것 = [
-      ['SIDE', 꼬리[0], g.side],
-      ['CRN',  껍질벗기기(꼬리[1]), g.crn],
-      ['X',    꼬리[2], g.x],
-      ['Y',    꼬리[3], g.y],
-      ['DP',   꼬리[5], g.dp],
-      ['DIA',  꼬리[6], g.dia],
+      ['SIDE', t.값.side, g.side],
+      ['CRN',  t.값.crn,  g.crn],
+      ['X',    t.값.x,    g.x],
+      ['Y',    t.값.y,    g.y],
+      ['DP',   t.값.dp,   g.dp],
+      ['DIA',  t.값.dia,  g.dia],
     ];
     for (const [이름, 적힌것, 와야할것] of 봐야할것) {
       if (String(적힌것) !== String(와야할것)) {
         어긋남.push(`${i+1}째 구멍 ${이름} ${적힌것} ≠ ${와야할것}`);
       }
     }
-    if (머리.length !== 6) 어긋남.push((i+1) + '째 줄 머리 칸이 ' + 머리.length + '개');
-    if (꼬리[4] !== '0') 어긋남.push((i+1) + '째 구멍 Z ' + 꼬리[4] + ' ≠ 0');
+    if (t.머리칸 !== 6) 어긋남.push((i+1) + '째 줄 머리 칸이 ' + t.머리칸 + '개');
+    if (t.값.z !== '0') 어긋남.push((i+1) + '째 구멍 Z ' + t.값.z + ' ≠ 0');
   });
 
-  // 차례가 cix 구멍을 하나도 빠뜨리지 않았나 (WAIT 로 순서를 바꿔도 16개는 16개다)
+  // 차례가 cix 구멍을 하나도 빠뜨리지 않았나
   if (new Set(차례).size !== 차례.length) 어긋남.push('같은 구멍이 두 번 들어갔다');
   return 어긋남;
 }
@@ -733,9 +781,11 @@ function 다시그리기(){
   if (!읽은것) return;
   const 판 = 읽은것.판;
 
-  // 판 — 파일에 적힌 칸 이름 그대로다
+  // 판 — 파일에 적힌 칸 이름 그대로다. 못 찾았으면 — 로 둔다(구멍만이라도 보인다)
+  const 값글 = v => (v === null || v === undefined || v === '') ? '—' : v;
   $('b-pills').innerHTML = [
-    `LPX ${판.LPX}`, `LPY ${판.LPY}`, `LPZ ${판.LPZ}`, `구멍 ${읽은것.구멍.length}`,
+    `LPX ${값글(판.LPX)}`, `LPY ${값글(판.LPY)}`, `LPZ ${값글(판.LPZ)}`,
+    `구멍 ${읽은것.구멍.length}`,
   ].map(t => `<span class="bpill">${막기(t)}</span>`).join('');
 
   $('b-draw').innerHTML = 도면그리기(판, 읽은것.구멍);
@@ -753,13 +803,19 @@ function 다시그리기(){
 
   /* 못 읽은 것 — 꾸짖는 글을 적을 자리가 아니라, 그 속에 무엇이 적혀 있는지 보여 드릴
      자리다. 사장님이 보시고 읽는 법을 알려 주신다. 이름도 값도 파일 글자 그대로다. */
-  const 못읽은것 = 읽은것.모르는것 || [];
+  // cix 는 모르는 것(이름+값), bpp 는 못 읽은 줄(그 줄 그대로). 둘 다 같은 표로 편다.
+  const bpp다 = 읽은것.꼴 === 'bpp';
+  const 못읽은것 = bpp다
+    ? (읽은것.못읽은줄 || []).map(u => ({ 이름: u.번째 + '째 줄', 값: [['', u.날것]] }))
+    : (읽은것.모르는것 || []);
   if (못읽은것.length) {
-    $('b-warn').textContent = `아직 못 읽는 것 ${못읽은것.length}개 — 이대로 바꾸면 빠집니다`;
+    $('b-warn').textContent = bpp다
+      ? `못 읽은 줄 ${못읽은것.length}개`
+      : `아직 못 읽는 것 ${못읽은것.length}개 — 이대로 바꾸면 빠집니다`;
     보임($('b-warn'), true);
     $('b-unk').innerHTML = '<table><thead><tr><th>이름</th><th>적혀 있던 값</th></tr></thead><tbody>' +
       못읽은것.map(u => '<tr><td>' + 막기(u.이름) + '</td><td>' +
-        막기(u.값.map(([k, v]) => k + '=' + v).join(' · ')) + '</td></tr>').join('') +
+        막기(u.값.map(([k, v]) => k ? k + '=' + v : v).join(' · ')) + '</td></tr>').join('') +
       '</tbody></table>';
     $('b-unk').classList.add('bwrap-td');
     보임($('b-unk'), true); 보임($('b-unk-head'), true);
@@ -768,10 +824,12 @@ function 다시그리기(){
     보임($('b-unk'), false); 보임($('b-unk-head'), false);
   }
 
+  // 만드는 단추는 cix 를 보고 있을 때만 있다
   const 막힌다 = 못읽은것.length > 0 || 읽은것.구멍.length === 0;
   $('b-go').disabled = 막힌다;
-  $('b-go-note').textContent = 못읽은것.length ? '못 읽는 것이 있어 막았습니다' : '';
-  보임($('b-go-note'), !!못읽은것.length);
+  const 막음말 = (!bpp다 && 못읽은것.length) ? '못 읽는 것이 있어 막았습니다' : '';
+  $('b-go-note').textContent = 막음말;
+  보임($('b-go-note'), !!막음말);
 }
 
 function 내려받기(이름, 글){
@@ -820,13 +878,16 @@ $('b-pick').onclick = () => $('b-file').click();
 /* cix 글월 하나를 화면에 올린다. 「.cix 고르기」 로 고르셨든 「파일」 에서 뜯어
    보시든 **같은 이 길 하나**를 탄다 — cix읽기 → 그림 → 되짚기 → 바꾸기.
    드라이브에서 온 것이면 driveId 를 함께 받아 「드라이브에서 열기」 를 띄운다. */
-function 먹이기(이름, 글, driveId){
+function 먹이기(이름, 글, driveId, 꼴){
   파일이름 = 이름 || '고른 파일.cix';
   드라이브 = driveId || '';
-  읽은것 = cix읽기(글);
+  // 보려는 것이 cix 든 bpp 든 여기서부터는 같은 길이다 — 돌려주는 꼴이 같다
+  읽은것 = (꼴 === 'bpp' || /\.bpp$/i.test(파일이름)) ? bpp읽기(글) : cix읽기(글);
   $('b-pick-nm').textContent = 파일이름;
   $('b-pick-sub').textContent = '';          // 구멍 수는 아래 알약이 말한다
-  ['b-pills','b-draw','b-go'].forEach(id => 보임($(id), true));
+  ['b-pills','b-draw'].forEach(id => 보임($(id), true));
+  // 이미 bpp 면 만들 것이 없다 — 그 단추는 안 보인다. 만드는 길 자체는 그대로다.
+  보임($('b-go'), 읽은것.꼴 !== 'bpp');
   보임($('b-drive'), !!드라이브);
   if (!읽은것.구멍.length) 막힘알림('BG 구멍이 없습니다 — 이 파일로는 만들 것이 없습니다');
   다시그리기();
@@ -849,7 +910,7 @@ $('b-drive').onclick = () => {
 $('b-go').onclick = () => 바꾸기();
 
 // 시험이 안에서 재도록 내놓는다 — 화면에는 아무 것도 더하지 않는다
-window.보링 = { cix읽기, bpp짓기, 되짚기, 변수틀읽기, 쉼표쪼개기 };
+window.보링 = { cix읽기, bpp읽기, bpp짓기, 되짚기, 변수틀읽기, 쉼표쪼개기 };
 })();
 </script>
 
@@ -1426,9 +1487,9 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 변수틀읽기, 쉼표쪼개
         return { name: d.name, 글: 풀기(d.b64) };
     }
     /* 줄을 누르면 뜯어 본다 — 알맹이를 받아 「고르기」 와 **똑같은 길**에 태운다.
-       판·구멍 그림, 읽은 것 표, 되짚기, 「바꾸기」 까지 다 그 길이 한다. */
+       판·구멍 그림과 읽은 것 표를 그 길이 그대로 한다. .cix 든 .bpp 든 같다. */
     let 가져오는중 = false;
-    async function 뜯어보기(driveId, 이름){
+    async function 뜯어보기(driveId, 이름, 꼴){
         if (가져오는중) return;
         if (!driveId) { 딴말글 = '드라이브 번호가 없습니다'; 그리기(); return; }
         가져오는중 = true; 딴말글 = '파일을 가져오는 중입니다'; 그리기();
@@ -1436,7 +1497,7 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 변수틀읽기, 쉼표쪼개
         try { 것 = await 속가져오기(driveId); }
         catch (e) { 딴말글 = e.message || 문안열림; 가져오는중 = false; 그리기(); return; }
         가져오는중 = false; 딴말글 = ''; 그리기();
-        window.bor먹이기(것.name || 이름, 것.글, driveId);
+        window.bor먹이기(것.name || 이름, 것.글, driveId, 꼴);
         window.borOpen();
     }
     const 드라이브로 = id => window.open(
@@ -1486,13 +1547,7 @@ window.보링 = { cix읽기, bpp짓기, 되짚기, 변수틀읽기, 쉼표쪼개
         if (눌린줄) {
             e.preventDefault();
             const id = 눌린줄.dataset.drive, 이름 = 눌린줄.dataset.nm || '';
-            if (눌린줄.dataset.kind !== 'cix') {
-                // bpp 는 cix읽기 로 못 읽는다. 되는 척하지 않는다 — 원본만 열어 드린다.
-                딴말글 = '이미 .bpp 입니다 — 만들 것이 없습니다'; 그리기();
-                if (id) 드라이브로(id);
-                return;
-            }
-            뜯어보기(id, 이름);
+            뜯어보기(id, 이름, 눌린줄.dataset.kind);
         }
     });
     document.addEventListener('input', e => {
