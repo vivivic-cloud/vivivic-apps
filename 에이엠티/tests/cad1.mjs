@@ -48,7 +48,7 @@ const 차리기 = (조각들) => {
 
 const 재기 = () => {
   const 카드 = document.querySelector('#__무대 .wo-boring-placed-card');
-  const svg  = 카드 ? 카드.querySelector('svg') : null;
+  const svg  = 카드 ? 카드.querySelector('.woc-그림 svg') : null;   // 재단배치도 (가운데 부속판이 아니다)
   if (!svg) return { svg: false };
   const cs = getComputedStyle(svg);
   const r  = svg.getBoundingClientRect();

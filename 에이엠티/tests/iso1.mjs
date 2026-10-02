@@ -1,7 +1,7 @@
-// 재단 도면 누운 꼴 — 사장님 말씀(10-01) 「현재카드에 (아이소메트릭) 표현이 어렵나?」
-// 카드는 늘리지 않는다. 그 도면칸 안에서 30도로 눕기만 한다.
-// 조각이 앉은 자리는 c65b6be 와 한 자도 달라지면 안 되고,
-// 「편집」 으로 크게 띄우는 도면은 반듯한 채로 남아야 한다.
+// 누운 꼴 — 사장님 말씀(10-01) 「현재카드에 (아이소메트릭) 표현이 어렵나?」
+// 10-02 에 누울 것이 갈렸다: **가운데 부속판이 눕고, 재단배치도는 반듯하다.**
+// 그래도 지킬 것은 그대로다 — 눕혀도 칸이 안 커지고, 조각이 앉은 자리는
+// c65b6be 와 한 자도 달라지지 않으며, 크게 띄우는 도면은 반듯하다.
 import { 브라우저열기, devices, 서버, 자재, 그림칸 as 그림칸자리 } from './도구/터.mjs';
 await 서버();
 import { readFileSync } from 'node:fs';
@@ -52,48 +52,41 @@ const 차리기 = (조각들) => {
 // 누운 것을 가려내는 자 — 30도 등각이면 matrix 의 a·b 가 cos30·sin30 이다
 const 재기 = () => {
   const 카드 = document.querySelector('#__무대 .wo-boring-placed-card');
-  const svg  = 카드.querySelector('svg');
-  const 칸   = svg.getBoundingClientRect();
-  const 눕힘 = [...svg.querySelectorAll('g')].find(g => /matrix\(/.test(g.getAttribute('transform') || ''));
-  let 각 = null, 같이누움 = null, 삐짐 = null;
-  if (눕힘) {
-    const m = /matrix\(\s*([-\d.]+)[ ,]+([-\d.]+)/.exec(눕힘.getAttribute('transform'));
-    각 = m ? [Math.round(+m[1] * 1000) / 1000, Math.round(+m[2] * 1000) / 1000] : null;
-    같이누움 = 눕힘.querySelectorAll('rect').length === svg.querySelectorAll('rect').length
-            && [...눕힘.querySelectorAll('path')].some(e => /url\(#/.test(e.getAttribute('fill') || ''));
-    const r = 눕힘.getBoundingClientRect();
-    삐짐 = Math.round(Math.max(0, 칸.left - r.left, r.right - 칸.right, 칸.top - r.top, r.bottom - 칸.bottom));
-  }
+  const 잼 = svg => {
+    if (!svg) return null;
+    const 칸 = svg.getBoundingClientRect();
+    const 눕힘 = [...svg.querySelectorAll('g')].find(g => /matrix\(/.test(g.getAttribute('transform') || ''));
+    const vb = (svg.getAttribute('viewBox') || '').split(/\s+/).map(Number);
+    let 각 = null, 같이누움 = null, 삐짐 = null;
+    if (눕힘) {
+      const m = /matrix\(\s*([-\d.]+)[ ,]+([-\d.]+)/.exec(눕힘.getAttribute('transform'));
+      각 = m ? [Math.round(+m[1] * 1000) / 1000, Math.round(+m[2] * 1000) / 1000] : null;
+      같이누움 = 눕힘.querySelectorAll('rect').length === svg.querySelectorAll('rect').length
+              && [...눕힘.querySelectorAll('path')].some(e => /url\(#/.test(e.getAttribute('fill') || ''));
+      const r = 눕힘.getBoundingClientRect();
+      삐짐 = Math.round(Math.max(0, 칸.left - r.left, r.right - 칸.right, 칸.top - r.top, r.bottom - 칸.bottom));
+    }
+    return {
+      누움: !!눕힘, 각, 같이누움, 삐짐,
+      그늘: /filter=/.test(svg.innerHTML),
+      조각: [...svg.querySelectorAll('rect')].map(e => [
+        +(+e.getAttribute('x')).toFixed(1), +(+e.getAttribute('y')).toFixed(1),
+        +(+e.getAttribute('width')).toFixed(1), +(+e.getAttribute('height')).toFixed(1)]),
+      조각칠: [...svg.querySelectorAll('rect')].map(e => e.getAttribute('fill')),
+      조각선: [...svg.querySelectorAll('rect')].map(e => e.getAttribute('stroke') + ' ' + e.getAttribute('stroke-width')),
+      폭: Math.round(칸.width), 높이: Math.round(칸.height),
+      칸결: Math.round(칸.width / 칸.height * 100) / 100,
+      보기결: vb.length === 4 ? Math.round(vb[2] / vb[3] * 100) / 100 : null,
+      보기: svg.getAttribute('viewBox') };
+  };
   return {
-    조각: [...svg.querySelectorAll('rect')].map(e => [
-      +(+e.getAttribute('x')).toFixed(1), +(+e.getAttribute('y')).toFixed(1),
-      +(+e.getAttribute('width')).toFixed(1), +(+e.getAttribute('height')).toFixed(1)]),
-    조각칠: [...svg.querySelectorAll('rect')].map(e => e.getAttribute('fill')),
-    조각선: [...svg.querySelectorAll('rect')].map(e => e.getAttribute('stroke') + ' ' + e.getAttribute('stroke-width')),
-    누움: !!눕힘, 각, 같이누움, 삐짐,
-    그늘: 눕힘 ? (/filter=/.test(svg.innerHTML) || /filter:/.test(눕힘.getAttribute('style') || '')) : false,
-    도면폭: Math.round(칸.width), 도면높이: Math.round(칸.height),
+    부속: 잼(카드.querySelector('.woc-부속 svg')),
+    배치도: 잼(카드.querySelector('.woc-그림 svg')),
     카드높이: Math.round(카드.getBoundingClientRect().height),
     단추: [...카드.querySelectorAll('button')].map(e => {
       const q = e.getBoundingClientRect(); const af = getComputedStyle(e, '::after');
       return Math.max(Math.round(q.height), parseFloat(af.height) || 0); }),
     문서가로: document.documentElement.scrollWidth };
-};
-
-// 반듯한 도면(눕히기 전 꼴)을 같은 폭에 그려 높이를 견준다 — 카드가 늘어났는지 보는 자
-const 반듯재기 = () => {
-  const 카드 = document.querySelector('#__무대 .wo-boring-placed-card');
-  const 그림 = 카드.querySelector('.woc-그림') || 카드;
-  const 칸 = document.createElement('div');
-  칸.className = 'woc-그림';          // 카드와 같은 칸에 넣어야 같은 자로 잰다(max-height 132px)
-  칸.style.cssText = 'position:fixed;left:-9999px;top:0;width:' + Math.round(그림.getBoundingClientRect().width) + 'px;';
-  칸.innerHTML = _woCuttingDiagramSvg(window.__한장);   // 기본값 = 반듯한 꼴
-  document.body.appendChild(칸);
-  const r = 칸.querySelector('svg').getBoundingClientRect();
-  const 값 = { 폭: Math.round(r.width), 높이: Math.round(r.height),
-               누움: /matrix\(/.test(칸.innerHTML) };
-  칸.remove();
-  return 값;
 };
 
 const ctx = await b.newContext({ ...devices['iPhone 12'], viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
@@ -107,25 +100,29 @@ const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push
 await p.goto(URL, { waitUntil: 'load' }); await p.waitForTimeout(1300);
 await p.evaluate(차리기, 조각들); await p.waitForTimeout(400);
 const 본 = await p.evaluate(재기);
-const 반듯 = await p.evaluate(반듯재기);
-console.log('■ 카드 안 도면: ' + JSON.stringify(본));
-console.log('■ 반듯한 도면: ' + JSON.stringify(반듯));
+console.log('■ 가운데 부속판: ' + JSON.stringify(본.부속));
+console.log('■ 오른쪽 배치도: ' + JSON.stringify(본.배치도));
 
-판('① 카드 안 도면이 30도로 눕는다',
-   본.누움 === true && 본.각 !== null && Math.abs(본.각[0] - 0.866) < 0.01 && Math.abs(본.각[1] - 0.5) < 0.01,
-   본.누움 ? ('matrix ' + JSON.stringify(본.각)) : '안 누웠다');
-판('① 격자와 조각이 같이 눕는다 (바탕만 반듯하지 않다)', 본.같이누움 === true, String(본.같이누움));
-판('① 아래로 부드러운 그늘이 진다', 본.그늘 === true, String(본.그늘));
+판('① 가운데 부속판이 30도로 눕는다',
+   !!본.부속 && 본.부속.누움 === true && Math.abs(본.부속.각[0] - 0.866) < 0.01 && Math.abs(본.부속.각[1] - 0.5) < 0.01,
+   본.부속 ? ('matrix ' + JSON.stringify(본.부속.각)) : '칸이 없다');
+판('① 격자와 판이 같이 눕는다 (바탕만 반듯하지 않다)', !!본.부속 && 본.부속.같이누움 === true,
+   String(본.부속 && 본.부속.같이누움));
+판('① 아래로 부드러운 그늘이 진다', !!본.부속 && 본.부속.그늘 === true, String(본.부속 && 본.부속.그늘));
+판('① 누우면서 칸 밖으로 안 잘린다', !!본.부속 && 본.부속.삐짐 <= 1, (본.부속 ? 본.부속.삐짐 : '-') + 'px 삐져나감');
+판('① 눕혀도 그 칸이 안 커진다 (칸 가로세로비 = 보기칸 가로세로비)',
+   !!본.부속 && Math.abs(본.부속.칸결 - 본.부속.보기결) < 0.02,
+   본.부속 ? (본.부속.폭 + 'x' + 본.부속.높이 + ' · 결 ' + 본.부속.칸결 + ' / ' + 본.부속.보기결) : '-');
 
+판('② 오른쪽 재단배치도는 반듯하다', !!본.배치도 && 본.배치도.누움 === false,
+   String(본.배치도 && 본.배치도.누움));
 판('② 조각이 앉은 자리·치수가 c65b6be 와 한 자도 안 다르다',
-   JSON.stringify(본.조각) === JSON.stringify(자리기준), JSON.stringify(본.조각));
-판('② 조각 바탕칠이 그대로다', 본.조각칠.join(',') === 조각들.map(q => q.bg).join(','), 본.조각칠.join(','));
-판('② 조각 선이 얇고 또렷한 그대로다', 본.조각선.every(s => s === '#37352f 1'), 본.조각선.join(' · '));
-
-판('③ 카드 길이가 안 변한다 (누운 도면과 반듯한 도면의 높이가 같다)',
-   본.도면높이 === 반듯.높이 && 본.도면폭 === 반듯.폭,
-   '누운 ' + 본.도면폭 + 'x' + 본.도면높이 + ' · 반듯 ' + 반듯.폭 + 'x' + 반듯.높이 + ' · 카드 ' + 본.카드높이 + 'px');
-판('③ 누우면서 칸 밖으로 안 잘린다', 본.삐짐 !== null && 본.삐짐 <= 1, 본.삐짐 + 'px 삐져나감');
+   !!본.배치도 && JSON.stringify(본.배치도.조각) === JSON.stringify(자리기준),
+   JSON.stringify(본.배치도 && 본.배치도.조각));
+판('② 조각 바탕칠이 그대로다', !!본.배치도 && 본.배치도.조각칠.join(',') === 조각들.map(q => q.bg).join(','),
+   String(본.배치도 && 본.배치도.조각칠.join(',')));
+판('② 조각 선이 얇고 또렷한 그대로다', !!본.배치도 && 본.배치도.조각선.every(x => x === '#37352f 1'),
+   String(본.배치도 && 본.배치도.조각선.join(' · ')));
 
 // ④ 크게 띄우는 도면은 반듯하다
 const 큰것 = await p.evaluate(() => {
@@ -148,7 +145,7 @@ console.log('■ 크게 띄운 도면: ' + JSON.stringify(큰것));
 판('④ 크게 띄운 도면의 조각 자리도 그대로다',
    JSON.stringify(큰것.조각) === JSON.stringify(자리기준), JSON.stringify(큰것.조각));
 
-판('⑤ 단추는 그대로 44px 이상이다', 본.단추.length >= 1 && 본.단추.every(h => h >= 44), JSON.stringify(본.단추));
+판('⑤ 단추는 그대로 44px 이상이다', 본.단추.length >= 1 && 본.단추.every(h => h >= 44), JSON.stringify(본.단추) + ' · 카드 ' + 본.카드높이 + 'px');
 판('⑤ 375px 가로 넘침 없다', 본.문서가로 <= 375, 본.문서가로 + 'px');
 
 await p.screenshot({ path: 그림칸 + '/iso-375-누운도면.png' });
