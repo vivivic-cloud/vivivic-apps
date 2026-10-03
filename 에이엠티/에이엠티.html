@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.14.7 (2026-10-03) — 수량 0 이 남아 있던 세 자리(공정카드·대기카드·입력칸)도 원장 셈으로
+     버전: v1.14.8 (2026-10-03) — 수량 0 을 셈에 그대로 쓰던 두 자리도 원장 셈으로 받친다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2422,7 +2422,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.14.7</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.14.8</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2555,7 +2555,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.14.7</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.14.8</b></p>
         </div>
     </div>
 
@@ -13763,8 +13763,11 @@
 
                     // 공통부속이 아닌 경우에만 남은 수량 체크
                     if (!isCommon) {
-                        // 총 발주량
-                        const totalOrdered = pData.qty;
+                        // 총 발주량 — 담긴 값이 0 이면 원장 셈으로 받친다. 받침이 없으면
+                        // 「다 재단했다, 남은 게 없다」 로 셈해 이 원장 단추가 아예 안 선다
+                        // (사장님이 자르셔야 할 것을 못 자르신다 · 10-03 지시).
+                        const totalOrdered = pData.qty
+                            || Math.round((parseFloat(partRow[h.indexOf("세트별소모량")]) || 1) * (order.orderQty || 1));
 
                         // 이미 재단 확정된 수량 계산
                         let alreadyProduced = 0;
@@ -13942,7 +13945,9 @@
                         if (partInfoMap[cardKey]) {
                             const pData = partInfoMap[cardKey];
                             if (!pData.isDeleted) {
-                                totalAggregatedQty += pData.qty;
+                                // 담긴 값이 0 이면 원장 셈으로 받친다 — 0 이 섞이면 합계가 모자라다
+                                totalAggregatedQty += pData.qty
+                                    || Math.round((parseFloat(row[h.indexOf("세트별소모량")]) || 1) * (order.orderQty || 1));
                                 matchedInOrders = true;
                                 matchedOrderIds.push(order.idNum); // 상품카드 ID 추가
                             }

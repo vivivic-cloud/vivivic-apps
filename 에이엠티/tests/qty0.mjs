@@ -197,6 +197,38 @@ console.log('■ 입력칸 저장: ' + JSON.stringify(저장));
    !저장.단추없음 && String(저장.후) === String(저장.보임) && String(저장.후) !== '0',
    '보임 ' + 저장.보임 + ' · 담겨 있던 값 ' + 저장.전 + ' → 저장된 값 ' + 저장.후);
 
+// ⑧⑨ 셈하는 자리 둘 (10-03 셋째 지시) — 화면이 아니라 **셈**에 들어가는 수량이다.
+//   ⑧ 재단 원장 단추: 남은 수량 = 총 발주량 − 이미 자른 것. 담긴 qty 가 0 이면
+//      「남은 게 없다」 로 셈해 **그 원장 단추가 아예 안 선다**(자르실 수가 없다).
+//   ⑨ 부속 목록 합계: 여러 발주를 합칠 때 0 이 섞이면 **합계가 모자라게** 나온다.
+const 셈 = await p.evaluate(() => {
+  const 재기 = id => {
+    confirmedOrders.forEach(o => { o.checked = (o.idNum === id); });
+    try { refreshConsolidatedMaterials(); } catch (e) { return { 탈: String(e.message) }; }
+    const 단추 = [...document.querySelectorAll('#consolidated-materials-list button')];
+    const o = confirmedOrders.find(x => x.idNum === id);
+    const 판 = 단추.map(b => (b.textContent || '').trim());
+    // 첫 단추를 눌러 부속 목록을 펴고, 그 합계(남은 수량)를 읽는다
+    let 부속 = [];
+    if (단추[0]) {
+      try { 단추[0].onclick(); } catch (e) {}
+      부속 = [...document.querySelectorAll('#id302-normal-section .part-card, #id302-normal-section [data-row-index]')]
+        .map(e => (e.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 40));
+    }
+    return { 단추수: 단추.length, 판, 부속수: 부속.length, 부속: 부속.slice(0, 4) };
+  };
+  return { 영수량발주: 재기(9001), 정상발주: 재기(9002) };
+});
+console.log('■ 셈하는 자리: ' + JSON.stringify(셈));
+// 두 발주는 **똑같은 부속**을 가졌다 — 한쪽만 수량이 0 으로 담겼을 뿐이다.
+// 그러니 서는 원장 단추도, 뜨는 부속 수도 **같아야 한다.** 다르면 0 때문에 빠진 것이다.
+판('⑧ 담긴 수량이 0 이어도 재단 원장 단추가 똑같이 선다 (「남은 게 없다」 로 셈하지 않는다)',
+   !셈.영수량발주.탈 && 셈.영수량발주.판.join('|') === 셈.정상발주.판.join('|'),
+   '0수량 발주 ' + JSON.stringify(셈.영수량발주.판) + ' · 멀쩡한 발주 ' + JSON.stringify(셈.정상발주.판));
+판('⑨ 그 원장의 부속 목록도 똑같이 뜬다 (합계가 0 이라 빠지지 않는다)',
+   셈.영수량발주.부속수 === 셈.정상발주.부속수 && 셈.영수량발주.부속수 > 0,
+   '0수량 ' + 셈.영수량발주.부속수 + '개 · 멀쩡한 것 ' + 셈.정상발주.부속수 + '개');
+
 판('페이지오류 없음', errs.length === 0, String(errs.length) + (errs[0] ? ' :: ' + errs[0] : ''));
 
 await b.close();
