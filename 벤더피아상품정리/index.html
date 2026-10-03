@@ -155,7 +155,7 @@
             <div id="pt-bad" class="hidden text-[11px] text-amber-600 font-bold mt-1"></div>
         </div>
         <div id="pt-list" class="space-y-2"></div>
-        <button id="btn-parts-back" class="btn w-full bg-white border border-[#ededeb]">돌아가기</button>
+        <button id="btn-parts-up" class="btn w-full bg-white border border-[#ededeb]">새 엑셀 올리기</button>
     </div>
 
     <div id="err" class="hidden mt-3 border-l-4 border-red-400 bg-red-50 rounded-r-lg p-3 text-[12px] text-red-700"></div>
@@ -188,7 +188,10 @@ const show = (...ids) => { ['step-pick','step-read','step-up','step-done','step-
 const esc = s => String(s ?? '').replace(/[&<>"']/g,
     c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-window.initApp = function () { show('step-pick'); };
+// 「자 이렇게 올라간 원본을 계속 올릴필요 없잖아? 새로뭔가 올라가기 전까지
+//   이 데이터 내용이 유지되도록 해줘」 (10-03 사장님)
+// 그래서 **열면 담겨 있는 것이 바로 뜬다.** 엑셀 고르기는 「새로 올릴 때만」 쓴다.
+window.initApp = function () { 뽑기화면(); };
 
 // ════════════════════════════════════════════════════════════════════
 // 1. 엑셀 읽기
@@ -401,7 +404,7 @@ function 단품뽑기(줄들) {
 }
 
 $('btn-parts').addEventListener('click', () => 뽑기화면());
-$('btn-parts-back').addEventListener('click', () => show('step-done'));
+$('btn-parts-up').addEventListener('click', () => show('step-pick'));
 
 async function 뽑기화면() {
     const { collection, getDocs } = window.fb;
@@ -412,6 +415,13 @@ async function 뽑기화면() {
     try {
         const snap = await getDocs(collection(window.db, ...COLLECTION));
         const 줄들 = snap.docs.map(d => (d.data() || {}).fields || {});
+
+        // 아직 아무것도 안 담겼으면 올리러 가시게 한다
+        if (!줄들.length) {
+            $('pt-sum').textContent = '담긴 것이 없습니다. 엑셀을 올려 주십시오.';
+            return;
+        }
+
         const { 상품들, 단품수, 못맞춘줄, 사전크기 } = 단품뽑기(줄들);
 
         $('pt-sum').textContent = '상품 ' + 상품들.length.toLocaleString('ko-KR')
