@@ -61,8 +61,11 @@ const 재기 = () => {
     if (눕힘) {
       const m = /matrix\(\s*([-\d.]+)[ ,]+([-\d.]+)/.exec(눕힘.getAttribute('transform'));
       각 = m ? [Math.round(+m[1] * 1000) / 1000, Math.round(+m[2] * 1000) / 1000] : null;
+      // 10-03 지시로 부속 판의 격자는 빠졌다. 이제 「판에 그린 것이 하나도 안 빠지고
+      // 다 같이 눕는가」 를 본다 — 바닥·테두리·결금이 전부 누운 묶음 안에 있어야 한다.
       같이누움 = 눕힘.querySelectorAll('rect').length === svg.querySelectorAll('rect').length
-              && [...눕힘.querySelectorAll('path')].some(e => /url\(#/.test(e.getAttribute('fill') || ''));
+              && 눕힘.querySelectorAll('path').length === svg.querySelectorAll('g path').length
+              && [...눕힘.querySelectorAll('path')].some(e => (e.getAttribute('fill') || '') === '#ffffff');
       const r = 눕힘.getBoundingClientRect();
       삐짐 = Math.round(Math.max(0, 칸.left - r.left, r.right - 칸.right, 칸.top - r.top, r.bottom - 칸.bottom));
     }
@@ -106,7 +109,7 @@ console.log('■ 오른쪽 배치도: ' + JSON.stringify(본.배치도));
 판('① 가운데 부속판이 30도로 눕는다',
    !!본.부속 && 본.부속.누움 === true && Math.abs(본.부속.각[0] - 0.866) < 0.01 && Math.abs(본.부속.각[1] - 0.5) < 0.01,
    본.부속 ? ('matrix ' + JSON.stringify(본.부속.각)) : '칸이 없다');
-판('① 격자와 판이 같이 눕는다 (바탕만 반듯하지 않다)', !!본.부속 && 본.부속.같이누움 === true,
+판('① 판에 그린 것이 다 같이 눕는다 (바닥·테두리·결금)', !!본.부속 && 본.부속.같이누움 === true,
    String(본.부속 && 본.부속.같이누움));
 판('① 아래로 부드러운 그늘이 진다', !!본.부속 && 본.부속.그늘 === true, String(본.부속 && 본.부속.그늘));
 판('① 누우면서 칸 밖으로 안 잘린다', !!본.부속 && 본.부속.삐짐 <= 1, (본.부속 ? 본.부속.삐짐 : '-') + 'px 삐져나감');
