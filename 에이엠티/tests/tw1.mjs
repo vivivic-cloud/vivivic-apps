@@ -46,9 +46,14 @@ const r = await p.evaluate(({O,C,L})=>{
   ['원장','발주','도면','차례'].forEach(k=>window._자료왔다(k));
   refreshConsolidatedMaterials();
   const 단추=[...document.querySelectorAll('.scenario-plate-btn')];
-  const i=단추.findIndex(x=>/발리오크/.test(x.textContent)); 단추[i>=0?i:0].click();
+  const 줄세움=[...단추].sort((a,b)=>(/발리오크/.test(b.textContent)?1:0)-(/발리오크/.test(a.textContent)?1:0));
+  // 두 칸 격자를 재려면 부속이 남은 원장이어야 한다. 이미 다 잘린 원장은 목록이
+  // 「데이터가 없습니다」 라 잴 것이 없으니, 부속이 선 첫 원장에서 잰다
+  // (10-03: 발리오크가 다 잘려 빈 목록을 재고 있었다).
+  const 뽑=()=>[...document.querySelectorAll('#id302-common-section .inner-part-card, #id302-normal-section .inner-part-card')];
+  let 고른원장=null, 카드=[];
+  for(const 후 of 줄세움){ 후.click(); 카드=뽑(); if(카드.length){고른원장=(후.textContent||'').replace(/\s+/g,' ').trim(); break;} }
   const 재=el=>{const b=el.getBoundingClientRect(); return {가로:Math.round(b.width),세로:Math.round(b.height)};};
-  const 카드=[...document.querySelectorAll('#id302-common-section .inner-part-card, #id302-normal-section .inner-part-card')];
   const 줄={}; 카드.forEach(c=>{const y=Math.round(c.getBoundingClientRect().y); 줄[y]=(줄[y]||0)+1;});
   const 배지=[...document.querySelectorAll('.qty-badge')].map(e=>{
     const bb=e.getBoundingClientRect(); const s=getComputedStyle(e);
@@ -62,7 +67,7 @@ const r = await p.evaluate(({O,C,L})=>{
   const 초기화=document.getElementById('btn-reset-cutting');
   const 확정=document.getElementById('btn-confirm-cutting');
   const 목록=document.getElementById('id302-parts-content');
-  return {카드수:카드.length, 카드:카드[0]?재(카드[0]):null, 한줄:Object.values(줄),
+  return {고른원장, 원장수:단추.length, 카드수:카드.length, 카드:카드[0]?재(카드[0]):null, 한줄:Object.values(줄),
           목록폭:목록?Math.round(목록.getBoundingClientRect().width):null,
           배지, 배지수:배지.length, 넘친:배지.filter(x=>x.넘침).length,
           공통글자:배지.filter(x=>x.글==='공통').length,
@@ -70,6 +75,7 @@ const r = await p.evaluate(({O,C,L})=>{
           초기화:초기화?재(초기화):null, 확정:확정?재(확정):null,
           문서가로:document.documentElement.scrollWidth, 쓰기:window.__쓰기};
 },{O,C,L});
+console.log('고른 원장: '+r.고른원장+' (원장 단추 '+r.원장수+'개)');
 console.log('카드 '+r.카드수+'장 · 한 줄 '+JSON.stringify(r.한줄)+' · 카드 '+JSON.stringify(r.카드)+' · 목록폭 '+r.목록폭);
 console.log('배지: '+JSON.stringify(r.배지));
 console.log('재단회전 단추: '+JSON.stringify(r.돌림)+' ('+r.돌림수+'개)');
