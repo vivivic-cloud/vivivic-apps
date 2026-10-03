@@ -1,11 +1,13 @@
+// ⚠ 자료는 **얼어붙은 본보기**를 쓴다 — 재편집 팝업이 열려야 성립하는데, 진짜 자료에서
+//    그 카드가 완료됐으면 완료 잠금(v1.11.5)이 맞게 막아 떨어진다 (10-03).
 // 두 번째 편집화면 — 보드 카드의 '재편집' 팝업 안에도 초기화 단추가 따라오는가.
-import { 브라우저열기, devices, 서버, 자료, 자재 } from './도구/터.mjs';
+import { 브라우저열기, devices, 서버, 자료, 본보기, 자재 } from './도구/터.mjs';
 await 서버();   // 저장소를 8899 에 내주는 자리 서버 — 없으면 스스로 띄운다
 const B='http://127.0.0.1:8899';
 const URL=B+'/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0.html';
-const O=await 자료('confirmed_orders');
-const C=await 자료('cutting_plans');
-const L=await 자료('원장');
+const O= await 본보기('confirmed_orders');
+const C= await 본보기('cutting_plans');
+const L= await 본보기('원장');
 const b=await 브라우저열기();
 let 실패=0; const 판=(n,t,v)=>{ if(!t) 실패++; console.log((t?'  OK  ':'  FAIL')+'  '+n+'   → '+v); };
 const ctx=await b.newContext({...devices['iPhone 12'],viewport:{width:375,height:812},isMobile:true,hasTouch:true});
