@@ -126,6 +126,77 @@ console.log('■ 수량 못 맞춤 창: ' + JSON.stringify(못맞춤));
 판('④ 그래도 완료 수량 칸에는 숫자가 들어 있다 (0 이 아니다)',
    못맞춤.수량칸 === '34', 못맞춤.수량칸);
 
+// ⑤ 수량이 「0」 으로 담긴 부속을 **세 자리 다** 열어 본다 (10-03 두 번째 지시)
+//    ⓐ 공정관리 쪽 카드(renderTlConfParts) ⓑ 발주대기 카드(renderPendingOrderParts)
+//    ⓒ 발주서 수량 입력칸(renderOrderParts) — 이것은 「수정」 으로 **저장까지** 되는 자리다
+const 세자리 = await p.evaluate(() => {
+  const 짓기 = id => { ['tl-conf-details-', 'pending-details-', 'details-'].forEach(앞 => {
+      document.getElementById(앞 + id)?.remove();
+      const d = document.createElement('div'); d.id = 앞 + id; document.body.appendChild(d); }); };
+  const 재기 = (앞, id) => {
+    const e = document.getElementById(앞 + id);
+    return { 수량딱지: [...e.querySelectorAll('.pt-qty')].map(x => (x.textContent || '').trim()),
+             입력칸: [...e.querySelectorAll('input[type=number]')].map(x => x.value) };
+  };
+  // 발주서 화면에서 「수정」 단추가 서려면 그 발주가 대기 목록에 있어야 한다 — 그 자리를 그대로 만든다
+  if (typeof pendingOrdersMap !== 'undefined') pendingOrdersMap[appMode] = confirmedOrders.slice();
+  const 본 = {};
+  [9001, 9002].forEach(id => {
+    짓기(id);
+    try { renderTlConfParts(id); } catch (e) { 본['탈' + id] = String(e.message); }
+    try { renderPendingOrderParts(id); } catch (e) {}
+    try { renderOrderParts(id); } catch (e) {}
+    본[id] = { 공정카드: 재기('tl-conf-details-', id), 대기카드: 재기('pending-details-', id),
+               발주서: 재기('details-', id) };
+  });
+  return 본;
+});
+console.log('■ 세 자리: ' + JSON.stringify(세자리));
+const 셈값 = 본.셈한값.map(v => String(v));
+const 딱지숫자 = 것 => 것.수량딱지.map(t => t.replace(/[^0-9]/g, ''));
+판('⑤ 공정관리 카드가 0 으로 안 뜬다 (원장 셈으로 되돌린다)',
+   딱지숫자(세자리[9001].공정카드).length > 0 && 딱지숫자(세자리[9001].공정카드).every(v => v !== '0'),
+   JSON.stringify(세자리[9001].공정카드.수량딱지));
+판('⑤ 발주대기 카드도 0 으로 안 뜬다',
+   딱지숫자(세자리[9001].대기카드).length > 0 && 딱지숫자(세자리[9001].대기카드).every(v => v !== '0'),
+   JSON.stringify(세자리[9001].대기카드.수량딱지));
+판('⑤ 발주서 수량 입력칸도 0 이 아니다',
+   세자리[9001].발주서.입력칸.length > 0 && 세자리[9001].발주서.입력칸.every(v => v !== '0'),
+   JSON.stringify(세자리[9001].발주서.입력칸));
+판('⑤ 세 자리 숫자가 원장 셈과 같다',
+   딱지숫자(세자리[9001].공정카드).every(v => 셈값.includes(v))
+   && 딱지숫자(세자리[9001].대기카드).every(v => 셈값.includes(v))
+   && 세자리[9001].발주서.입력칸.every(v => 셈값.includes(v)),
+   '셈 ' + 셈값.join(',') + ' / 공정 ' + 딱지숫자(세자리[9001].공정카드).join(',')
+   + ' / 대기 ' + 딱지숫자(세자리[9001].대기카드).join(',') + ' / 입력칸 ' + 세자리[9001].발주서.입력칸.join(','));
+판('⑥ 수량이 제대로 담긴 발주는 그 값이 이긴다 (받침이 안 덮는다)',
+   딱지숫자(세자리[9002].공정카드).every(v => 셈값.includes(v))
+   && 세자리[9002].발주서.입력칸.every(v => 셈값.includes(v)),
+   '공정 ' + 딱지숫자(세자리[9002].공정카드).join(',') + ' / 입력칸 ' + 세자리[9002].발주서.입력칸.join(','));
+
+// ⑦ 입력칸은 「수정」 으로 저장까지 되는 자리다 — 보이는 숫자와 저장되는 숫자가 같아야 한다
+const 저장 = await p.evaluate(() => {
+  const el = document.getElementById('details-9001');
+  const 입력 = el.querySelector('input[type=number]');
+  const ck = (입력.id || '').replace(/^input-/, '');
+  const 단추 = [...el.querySelectorAll('button')].find(b => b.textContent.trim() === '수정');
+  const 보임 = 입력.value;
+  const 그발주 = (pendingOrdersMap[appMode] || confirmedOrders).find(o => o.idNum === 9001);
+  const 전 = (그발주.partInfoMap[ck] || {}).qty;
+  const 터 = { appMode: typeof appMode !== 'undefined' ? appMode : null,
+               대기목록있나: !!(typeof pendingOrdersMap !== 'undefined' && pendingOrdersMap[appMode]),
+               대기목록수: (typeof pendingOrdersMap !== 'undefined' && pendingOrdersMap[appMode]) ? pendingOrdersMap[appMode].length : null };
+  if (!단추) return { 단추없음: true, 보임, 전, 터 };
+  handleSubPartEdit(단추, 9001, ck, false);     // 수정 켜기
+  handleSubPartEdit(단추, 9001, ck, false);     // 그대로 수정완료
+  const 후 = (그발주.partInfoMap[ck] || {}).qty;
+  return { ck, 보임, 전, 후, 터 };
+});
+console.log('■ 입력칸 저장: ' + JSON.stringify(저장));
+판('⑦ 보이는 숫자와 저장되는 숫자가 같다 (보이는 건 34인데 0 이 저장되면 제일 나쁘다)',
+   !저장.단추없음 && String(저장.후) === String(저장.보임) && String(저장.후) !== '0',
+   '보임 ' + 저장.보임 + ' · 담겨 있던 값 ' + 저장.전 + ' → 저장된 값 ' + 저장.후);
+
 판('페이지오류 없음', errs.length === 0, String(errs.length) + (errs[0] ? ' :: ' + errs[0] : ''));
 
 await b.close();
