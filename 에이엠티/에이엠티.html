@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.14.4 (2026-10-03) — 부속 도면에서 격자를 빼고 재단 치수를 그 변에 적는다
+     버전: v1.14.5 (2026-10-03) — 재단 치수 글씨를 부속 크기와 상관없이 같은 크기로
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1140,6 +1140,22 @@
             align-items: center; justify-content: center; }
         .woc-부속 svg, .woc-도면자리 svg { width: auto; height: auto;
             max-width: 100%; max-height: 100%; margin: 0; }
+        /* 재단 치수 — 도면 위에 얹는 글. 자리는 몫(%)이고 크기는 여기서 못박는다.
+           SVG 안에 적으면 부속마다 글자가 커졌다 작아졌다 한다(10-03 지시). */
+        /* 도면 상자를 칸 안에 꼭 맞게(contain) 잡는다 — 글을 몫(%)으로 얹으려면
+           상자와 그림이 한 치도 안 어긋나야 한다. 칸을 자로 삼아(container) 셈한다. */
+        .woc-부속 { container-type: size; }
+        .woc-부속 .부속판 { position: relative; display: block; line-height: 0;
+            max-width: 100%; max-height: 100%;
+            width: min(100cqw, calc(100cqh * var(--비, 1)));
+            height: min(100cqh, calc(100cqw / var(--비, 1))); }
+        .woc-부속 .부속판 > svg { display: block; width: 100%; height: 100%; }
+        .woc-부속 .부속치수 {
+            position: absolute; transform: translate(-50%, -50%); z-index: 1;
+            font-size: 13px; font-weight: 800; color: #37352f; line-height: 1.15;
+            letter-spacing: -.02em; white-space: nowrap; pointer-events: none;
+            background: rgba(255,255,255,.86); border-radius: 3px; padding: 0 2px;
+        }
         .woc-그림 { min-width: 0; flex: 1 1 0; display: flex; justify-content: center; }
         .woc-그림속 { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
         /* 배치도 칸 안으로 들어온 큰 단추는 그 칸 폭을 꽉 채운다 */
@@ -1154,6 +1170,7 @@
             .woc-글 { flex: 0 0 45%; max-width: 45%; }
             .woc-부속 { flex: 0 0 33%; max-width: 33%; }
             .woc-부속, .woc-도면자리 { height: 168px; }
+            .woc-부속 .부속치수 { font-size: 14px; }
             .woc-그림 { flex: 1 1 22%; max-width: 280px; justify-content: flex-end; }
         }
         /* 누르는 단추 — 44px 아래로 안 내려간다. hover 가 없는 폰에서도 눌린 티가 난다. */
@@ -2405,7 +2422,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.14.4</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.14.5</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2538,7 +2555,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.14.4</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.14.5</b></p>
         </div>
     </div>
 
@@ -9979,25 +9996,25 @@
             const 여유 = 0.76;                       // 글 적을 자리를 가장자리에 남긴다
             const 자리 = _누운자리(W, H, 여유);
             const 큰쪽 = Math.max(W, H);
-            const 글크기 = 큰쪽 * 0.085, 띄움 = 큰쪽 * 0.055;
+            const 띄움 = 큰쪽 * 0.075;      // 변에서 얼마나 바깥으로 띄울지 (도면 단위)
             const W가온 = 자리.점(W / 2, 0), D가온 = 자리.점(0, H / 2);
             // 변의 바깥쪽으로 밀어 낸다 — W 변은 오른위(S,−C), D 변은 왼위(−S,−C)
             const Wx = W가온.x + 띄움 * 자리.S, Wy = W가온.y - 띄움 * 자리.C;
             const Dx = D가온.x - 띄움 * 자리.S, Dy = D가온.y - 띄움 * 자리.C;
-            // 길쭉한 부속은 변 가온이 칸 가장자리에 붙어 글이 잘린다 — 칸 안으로 가둔다
+            /* 글씨는 **도면 밖(HTML)** 에 얹는다. SVG <text> 로 적으면 글자가 viewBox 와
+               함께 줄어 부속마다 크기가 제각각이 된다(10-03 지시: 「제멋대로」).
+               자리는 도면 칸을 100 으로 본 몫(%)이라 도면이 커지든 작아지든 그 변에 그대로 붙고,
+               글자 크기는 CSS 가 쥐므로 어느 부속에서나 같은 px 다. */
             const 가둠 = (v, 작, 큰) => Math.max(작, Math.min(큰, v));
-            const 반폭 = n => n * 글크기 * 0.34, 반높 = 글크기 * 0.62;
-            const 글 = (x0, y0, v) => {
-                const r = 반폭(String(v).length);
-                const x = 가둠(x0, r, W - r), y = 가둠(y0, 반높, H - 반높);
-                return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" ` +
-                `dominant-baseline="middle" font-size="${글크기.toFixed(1)}" font-weight="700" ` +
-                `fill="#37352f" stroke="#ffffff" stroke-width="${(글크기 * 0.22).toFixed(1)}" ` +
-                `paint-order="stroke" style="letter-spacing:-0.02em;">${v}</text>`;
-            };
-            const 치수글 = 글(Wx, Wy, W) + 글(Dx, Dy, H);
-            return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="display:block;flex-shrink:0;">` +
-                   _누워싸기(W, H, 번호, 바닥 + 결무늬 + 테두리, 여유) + 치수글 + `</svg>`;
+            const 몫 = (x0, y0) => ({ x: 가둠(x0 / W * 100, 2, 98), y: 가둠(y0 / H * 100, 6, 94) });
+            const w몫 = 몫(Wx, Wy), d몫 = 몫(Dx, Dy);
+            const 치수글 =
+                `<b class="부속치수" style="left:${w몫.x.toFixed(1)}%;top:${w몫.y.toFixed(1)}%;">${W}</b>` +
+                `<b class="부속치수" style="left:${d몫.x.toFixed(1)}%;top:${d몫.y.toFixed(1)}%;">${H}</b>`;
+            return `<span class="부속판" style="--비:${(W / H).toFixed(4)};">` +
+                   `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="display:block;">` +
+                   _누워싸기(W, H, 번호, 바닥 + 결무늬 + 테두리, 여유) + `</svg>` +
+                   치수글 + `</span>`;
         }
 
         // 재단 카드의 "도면 보기" 클릭 시 확대 팝업으로 표시

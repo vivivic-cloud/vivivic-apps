@@ -76,15 +76,28 @@ const 재기 = () => [...document.querySelectorAll('#__무대 .wo-boring-placed-
   const 가온 = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
   const W변 = 네귀 ? 가온(네귀.영, 네귀.W끝) : null;      // 재단W 가 놓인 변
   const D변 = 네귀 ? 가온(네귀.영, 네귀.D끝) : null;      // 재단D 가 놓인 변
-  const 글들 = [...svg.querySelectorAll('text')].map(t => {
+  // 글은 이제 도면 밖(HTML)에 얹는다 — 크기를 CSS 가 쥐어야 부속마다 안 달라진다
+  const 칸 = c.querySelector('.woc-부속');
+  const 판 = c.querySelector('.woc-부속 .부속판');
+  const 글들 = [...c.querySelectorAll('.woc-부속 .부속치수')].map(t => {
     const r = t.getBoundingClientRect();
     return { 글: (t.textContent || '').trim(), x: r.left + r.width / 2, y: r.top + r.height / 2,
              w: Math.round(r.width), h: Math.round(r.height),
-             기울었나: /matrix\(/.test(t.getAttribute('transform') || '')
-                      || !!t.closest('g[transform*="matrix("]'),
-             칸밖: (() => { const s = svg.getBoundingClientRect();
+             글자: Math.round(parseFloat(getComputedStyle(t).fontSize)),
+             기울었나: (() => { const m = getComputedStyle(t).transform || 'none';
+               if (m === 'none') return false;
+               const v = m.match(/matrix\(([-\d.]+), ([-\d.]+), ([-\d.]+), ([-\d.]+)/);
+               return v ? !(Math.abs(+v[1] - 1) < .01 && Math.abs(+v[2]) < .01 && Math.abs(+v[3]) < .01) : false; })(),
+             칸밖: (() => { const s = 칸.getBoundingClientRect();
                return r.left < s.left - 0.5 || r.right > s.right + 0.5 || r.top < s.top - 0.5 || r.bottom > s.bottom + 0.5; })() };
   });
+  // 그 변 가온에서 얼마나 떨어져 있나 — 판 지름을 1 로 본 몫
+  const 지름 = 네귀 ? Math.hypot(네귀.W끝.x - 네귀.D끝.x, 네귀.W끝.y - 네귀.D끝.y) : 1;
+  const 벗어남 = g => {
+    if (!W변 || !D변) return null;
+    const d = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+    return Math.round(Math.min(d(g, W변), d(g, D변)) / 지름 * 100) / 100;
+  };
   const 가까운변 = g => {
     if (!W변 || !D변) return '?';
     const d = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -99,7 +112,11 @@ const 재기 = () => [...document.querySelectorAll('#__무대 .wo-boring-placed-
     결금수: (() => { const e = svg.querySelector('path.결금');
                      return e ? ((e.getAttribute('d') || '').match(/M/g) || []).length : 0; })(),
     글수: 글들.length,
-    글: 글들.map(t => ({ 글: t.글, 붙은변: 가까운변(t), 기울었나: t.기울었나, 칸밖: t.칸밖, h: t.h })),
+    판칸같나: (() => { if (!판) return null; const a = 판.getBoundingClientRect(), b2 = svg.getBoundingClientRect();
+      return Math.abs(a.width - b2.width) <= 1 && Math.abs(a.height - b2.height) <= 1
+          && Math.abs(a.left - b2.left) <= 1 && Math.abs(a.top - b2.top) <= 1; })(),
+    글: 글들.map(t => ({ 글: t.글, 붙은변: 가까운변(t), 기울었나: t.기울었나, 칸밖: t.칸밖,
+                        h: t.h, 글자: t.글자, 벗어남: 벗어남(t) })),
     조각: svg.querySelectorAll('rect').length,
   };
 });
@@ -153,8 +170,15 @@ for (const 폭 of [375, 1280]) {
   판(`③ ${폭}px — 글씨가 칸 밖으로 안 잘린다`,
      본.every(c => c.글.every(t => t.칸밖 === false)),
      본.map(c => c.글.map(t => t.칸밖).join('/')).join(' · '));
-  판(`③ ${폭}px — 글씨가 읽을 만한 크기다 (8px 이상)`,
-     본.every(c => c.글.every(t => t.h >= 8)), 본.map(c => c.글.map(t => t.h).join('/')).join(' · '));
+  판(`③ ${폭}px — 글자 크기가 부속마다 같다 (제멋대로가 아니다)`,
+     (() => { const 다 = 본.flatMap(c => c.글.map(t => t.글자));
+              return 다.length > 0 && 다.every(v => v === 다[0]); })(),
+     본.map((c, i) => 크기들[i].join('×') + ' ' + c.글.map(t => t.글자 + 'px').join('/')).join(' · '));
+  판(`③ ${폭}px — 폰에서 읽힌다 (13px 이상)`,
+     본.every(c => c.글.every(t => t.글자 >= 13)), 본.map(c => c.글.map(t => t.글자).join('/')).join(' · '));
+  판(`③ ${폭}px — 글이 제 변 가온 가까이에 선다 (판 지름의 30% 안)`,
+     본.every(c => c.글.every(t => t.벗어남 != null && t.벗어남 <= 0.3)),
+     본.map((c, i) => 크기들[i].join('×') + ' ' + c.글.map(t => t.벗어남).join('/')).join(' · '));
   판(`③ ${폭}px — 도면 안에 rect 를 안 만든다`, 본.every(c => c.조각 === 0), 본.map(c => c.조각).join(','));
 }
 판('375px 가로 넘침 없다', 보기[375].넘침 <= 375, 보기[375].넘침 + 'px');
