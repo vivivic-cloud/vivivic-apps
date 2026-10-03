@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.14.3 (2026-10-02) — 결이 정해진 부속은 도면에 결방향을 그린다
+     버전: v1.14.4 (2026-10-03) — 부속 도면에서 격자를 빼고 재단 치수를 그 변에 적는다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2405,7 +2405,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.14.3</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.14.4</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2538,7 +2538,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.14.3</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.14.4</b></p>
         </div>
     </div>
 
@@ -9841,13 +9841,21 @@
            안에 꼭 맞게 줄여 넣는다 — 잘리지도 않고 카드도 안 늘어난다.
            그늘은 누운 판의 네 귀를 그대로 따 와서 조금 아래에 깔고 흐린다
            (누운 묶음 안에 넣으면 흐림이 줄인 배만큼 같이 줄어든다). */
-        function _누워싸기(폭, 높이, 번호, 안) {
+        /* 눕힌 뒤 어느 점이 어디로 가는지 — 그림과 글이 같은 셈을 쓰게 한 군데서 낸다.
+           여유 = 칸 가장자리에 남길 자리(1 이면 꽉 찬다). */
+        function _누운자리(폭, 높이, 여유) {
             const C = 0.8660254, S = 0.5;
             const 누운폭 = C * (폭 + 높이), 누운높이 = S * (폭 + 높이);
-            const 배 = Math.min(폭 / 누운폭, 높이 / 누운높이) * 0.94;   // 0.94 = 가장자리 숨 쉴 자리
+            const 배 = Math.min(폭 / 누운폭, 높이 / 누운높이) * (여유 == null ? 0.94 : 여유);
             const 밀기X = (폭 - 배 * 누운폭) / 2 + 배 * C * 높이;       // 왼쪽으로 뻗는 만큼 되민다
             const 밀기Y = (높이 - 배 * 누운높이) / 2;
-            const 점 = (x, y) => [(밀기X + 배 * C * (x - y)).toFixed(1), (밀기Y + 배 * S * (x + y)).toFixed(1)];
+            return { C, S, 배, 밀기X, 밀기Y,
+                     점: (x, y) => ({ x: 밀기X + 배 * C * (x - y), y: 밀기Y + 배 * S * (x + y) }) };
+        }
+
+        function _누워싸기(폭, 높이, 번호, 안, 여유) {
+            const { C, S, 배, 밀기X, 밀기Y, 점: _점 } = _누운자리(폭, 높이, 여유);
+            const 점 = (x, y) => { const q = _점(x, y); return [q.x.toFixed(1), q.y.toFixed(1)]; };
             const 네귀 = [점(0, 0), 점(폭, 0), 점(폭, 높이), 점(0, 높이)];
             const 그늘이름 = 'amtsh' + 번호;
             return `<defs><filter id="${그늘이름}" x="-20%" y="-20%" width="140%" height="160%">` +
@@ -9937,7 +9945,7 @@
             const W = parseFloat(p && p.rw) || 0, H = parseFloat(p && p.rd) || 0;
             if (!(W > 0 && H > 0)) return '';
             const 번호 = ++_재단도면번호;
-            const 격자 = _도면격자(Math.min(W, H) / 4, W, H, 번호);
+            // 격자무늬는 뺀다(10-03 지시). _도면격자 자체는 재단배치도가 그대로 쓴다.
             const 바닥 = `<path d="M0 0 H${W} V${H} H0 Z" fill="#ffffff"/>`;
             const 테두리 = `<path d="M0 0 H${W} V${H} H0 Z" fill="none" stroke="#37352f" ` +
                            `stroke-width="1" vector-effect="non-scaling-stroke"/>`;
@@ -9962,8 +9970,34 @@
             // 없다. 판 아래 그늘은 도면 안에서 그리므로 그대로 남는다.
             // 제 크기(width·height)를 적어 둔다 — 자리에 맞춰 줄 때 가로세로가 같이 줄어
             // 찌그러지지 않는다. 자리 크기는 CSS(.woc-부속)가 쥔다.
+            /* ── 재단 치수를 「해당 변」 에 적는다 (10-03 지시) ──────────────
+               도면은 30도로 누워 있다. 그래서 화면에서 가로로 보이는 변이 W 가 아니다.
+               눕힌 뒤의 자리를 그림과 **같은 셈(_누운자리)** 으로 다시 내서,
+               W 는 W 변 바깥에, D 는 D 변 바깥에 붙인다.
+               글은 **누운 틀 밖**에 똑바로 세워 적는다 — 틀 안에 넣으면 글자도 같이
+               기울어 폰(부속 칸 158×132)에서 안 읽힌다. */
+            const 여유 = 0.76;                       // 글 적을 자리를 가장자리에 남긴다
+            const 자리 = _누운자리(W, H, 여유);
+            const 큰쪽 = Math.max(W, H);
+            const 글크기 = 큰쪽 * 0.085, 띄움 = 큰쪽 * 0.055;
+            const W가온 = 자리.점(W / 2, 0), D가온 = 자리.점(0, H / 2);
+            // 변의 바깥쪽으로 밀어 낸다 — W 변은 오른위(S,−C), D 변은 왼위(−S,−C)
+            const Wx = W가온.x + 띄움 * 자리.S, Wy = W가온.y - 띄움 * 자리.C;
+            const Dx = D가온.x - 띄움 * 자리.S, Dy = D가온.y - 띄움 * 자리.C;
+            // 길쭉한 부속은 변 가온이 칸 가장자리에 붙어 글이 잘린다 — 칸 안으로 가둔다
+            const 가둠 = (v, 작, 큰) => Math.max(작, Math.min(큰, v));
+            const 반폭 = n => n * 글크기 * 0.34, 반높 = 글크기 * 0.62;
+            const 글 = (x0, y0, v) => {
+                const r = 반폭(String(v).length);
+                const x = 가둠(x0, r, W - r), y = 가둠(y0, 반높, H - 반높);
+                return `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" text-anchor="middle" ` +
+                `dominant-baseline="middle" font-size="${글크기.toFixed(1)}" font-weight="700" ` +
+                `fill="#37352f" stroke="#ffffff" stroke-width="${(글크기 * 0.22).toFixed(1)}" ` +
+                `paint-order="stroke" style="letter-spacing:-0.02em;">${v}</text>`;
+            };
+            const 치수글 = 글(Wx, Wy, W) + 글(Dx, Dy, H);
             return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="display:block;flex-shrink:0;">` +
-                   _누워싸기(W, H, 번호, 바닥 + 격자 + 결무늬 + 테두리) + `</svg>`;
+                   _누워싸기(W, H, 번호, 바닥 + 결무늬 + 테두리, 여유) + 치수글 + `</svg>`;
         }
 
         // 재단 카드의 "도면 보기" 클릭 시 확대 팝업으로 표시
