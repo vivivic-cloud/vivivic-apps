@@ -189,23 +189,63 @@ $('file').addEventListener('change', e => {
     e.target.value = '';   // 같은 파일을 다시 골라도 change 가 뜨도록
 });
 
+// 머리줄이 꼭 첫 줄에 있는 것은 아니다. 한국 ERP 가 내보내는 엑셀은 맨 위에
+// 제목 줄·회사 이름·뽑은 날짜가 한두 줄 붙어 나오는 일이 흔하다. 그것을 머리줄로
+// 못 박으면 멀쩡한 상품목록을 「상품목록이 아니다」 라고 돌려보낸다 (10-03 사장님이 막히셨다).
+// 그래서 위에서 열 줄 안을 훑어 **열쇠 둘을 다 가진 줄**을 머리줄로 본다.
+const 머리줄깊이 = 10;
+
+// 앞뒤 공백을 턴다. trim() 은 전각 공백(U+3000)도 턴다.
+const 칸이름들 = 줄 => (줄 || []).map(h => String(h ?? '').trim());
+
+function 머리줄찾기(aoa) {
+    const 끝 = Math.min(머리줄깊이, aoa.length);
+    for (let i = 0; i < 끝; i++) {
+        const 이름들 = 칸이름들(aoa[i]);
+        if (KEY_COLS.every(k => 이름들.indexOf(k) > -1)) return { 몇째: i, 이름들 };
+    }
+    return null;
+}
+
+// 열쇠를 못 찾았을 때 「이 파일의 칸 이름」 으로 보여 드릴 줄 —
+// 위 열 줄 가운데 **채워진 칸이 가장 많은 줄**. 제목 줄(한 칸짜리)을 보여 드리면
+// 사장님이 아무것도 못 보신다.
+function 칸많은줄(aoa) {
+    let 고른것 = { 몇째: 0, 이름들: 칸이름들(aoa[0]) };
+    const 끝 = Math.min(머리줄깊이, aoa.length);
+    for (let i = 1; i < 끝; i++) {
+        const 이름들 = 칸이름들(aoa[i]);
+        if (이름들.filter(Boolean).length > 고른것.이름들.filter(Boolean).length) {
+            고른것 = { 몇째: i, 이름들 };
+        }
+    }
+    return 고른것;
+}
+
 function readBook(buf, f) {
     const wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
     const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
     if (!aoa.length) return fail(new Error('빈 파일입니다.'));
 
-    headers = (aoa[0] || []).map(h => String(h).trim());
+    const 찾음 = 머리줄찾기(aoa);
 
-    const missing = KEY_COLS.filter(k => headers.indexOf(k) < 0);
-    if (missing.length) {
-        return fail(new Error('상품목록 엑셀이 아닙니다 — 「' + missing.join('」·「') + '」 칸이 없습니다.'));
+    // 못 찾았어도 그냥 돌려보내지 않는다. **읽은 것을 보여 드려야** 사장님이
+    // 그 파일에 무슨 칸이 들었는지 보시고 알려 주실 수 있다. 올리기 단추만 막는다.
+    if (!찾음) {
+        const 보일것 = 칸많은줄(aoa);
+        headers = 보일것.이름들;
+        rows = [];
+        renderRead(f, { 못찾음: KEY_COLS.slice(), 줄수: aoa.length, 몇째줄: 보일것.몇째 + 1 });
+        return;
     }
+
+    headers = 찾음.이름들;
 
     // 한 줄을 { 칸이름: 값 } 으로. 값은 전부 글자로 둔다 —
     // 날짜에 연도가 없고(09-22), 코드가 숫자로 보이는 것도 있어서
     // 숫자로 바꾸면 앞의 0 이나 모양이 망가진다.
     rows = [];
-    for (let i = 1; i < aoa.length; i++) {
+    for (let i = 찾음.몇째 + 1; i < aoa.length; i++) {
         const o = {};
         let any = false;
         headers.forEach((h, c) => {
@@ -219,10 +259,11 @@ function readBook(buf, f) {
     renderRead(f);
 }
 
-function renderRead(f) {
+// 막힘 — 열쇠 칸을 못 찾았을 때만 들어온다. { 못찾음, 줄수, 몇째줄 }
+function renderRead(f, 막힘) {
     $('fname').textContent = fileName;
     $('fsize').textContent = Math.round(f.size / 1024).toLocaleString('ko-KR') + ' KB';
-    $('n-row').textContent = rows.length.toLocaleString('ko-KR');
+    $('n-row').textContent = (막힘 ? 막힘.줄수 : rows.length).toLocaleString('ko-KR');
     $('n-col').textContent = headers.length;
 
     const box = $('cols');
@@ -234,18 +275,29 @@ function renderRead(f) {
         box.appendChild(s);
     });
 
-    // 겹침·빈 열쇠 미리 세어 둔다. 올리기 전에 알려야 사장님이 놀라지 않는다.
-    const seen = new Set(); let dup = 0, blank = 0;
-    rows.forEach(o => {
-        const id = docId(o);
-        if (!id) { blank++; return; }
-        if (seen.has(id)) dup++; else seen.add(id);
-    });
-
     const w = $('warn');
     const msg = [];
-    if (blank) msg.push('열쇠가 빈 줄 <b>' + blank + '</b>건 — 건너뜁니다.');
-    if (dup)   msg.push('문서 이름이 겹치는 줄 <b>' + dup + '</b>건 — 뒤엣것이 앞엣것을 덮어씁니다.');
+
+    if (막힘) {
+        // 올릴 수는 없다. 그래도 읽은 것은 위에 다 보여 드렸다.
+        msg.push('<b>올릴 수 없습니다</b> — 「' + 막힘.못찾음.join('」·「') + '」 칸을 못 찾았습니다.');
+        msg.push('이 파일에서 칸 이름으로 보이는 것은 <b>' + 막힘.몇째줄 + '째 줄</b>입니다. 아래에 그대로 다 있습니다.');
+        msg.push('이 화면을 그대로 알려 주시면 맞춰 드리겠습니다.');
+    } else {
+        // 겹침·빈 열쇠 미리 세어 둔다. 올리기 전에 알려야 사장님이 놀라지 않는다.
+        const seen = new Set(); let dup = 0, blank = 0;
+        rows.forEach(o => {
+            const id = docId(o);
+            if (!id) { blank++; return; }
+            if (seen.has(id)) dup++; else seen.add(id);
+        });
+        if (blank) msg.push('열쇠가 빈 줄 <b>' + blank + '</b>건 — 건너뜁니다.');
+        if (dup)   msg.push('문서 이름이 겹치는 줄 <b>' + dup + '</b>건 — 뒤엣것이 앞엣것을 덮어씁니다.');
+    }
+
+    // 열쇠를 못 찾았으면 올리기만 막는다. 다음에 멀쩡한 파일을 고르시면 다시 열린다.
+    $('btn-up').disabled = !!막힘;
+
     if (msg.length) { w.innerHTML = msg.join('<br>'); w.classList.remove('hidden'); }
     else w.classList.add('hidden');
 
