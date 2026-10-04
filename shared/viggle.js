@@ -86,12 +86,34 @@
 
      ⚠ 이것이 실패해도 **지시 보내기는 성공으로 둔다.** 지시가 들어간 뒤의 덧일이다.
         여기서 터져서 지시가 안 가면 더 나쁘다. */
+  /* ⚠ 10-04 — **바탕을 짚으시면 어디를 짚으셨는지 알 수 없었다.** `무엇()` 은 그 칸의 글을 베끼는데,
+     담은 칸(바탕)을 짚으면 그 안의 글이 통째로 적힌다 — 「VIGGLE 홈 J Hello JUNPHB Make your day
+     easy with me search yo…」 가 그렇게 적혔고, 사장님이 「이거 또 왜 안되냐」 하셨을 때 내가 머리의
+     **어느 자리**인지 못 짚어 되물어야 했다. 사장님 화면(시트의 「짚은 것 · …」)은 **그대로 두고**,
+     기록에만 짚으신 자를 한 줄 더한다 — 보시는 것은 한 톨도 안 바뀐다. */
+  function 짚은자(el) {
+    if (!el || !el.tagName) return '';
+    const 조각 = [];
+    for (let e = el; e && e.tagName && 조각.length < 4; e = e.parentElement) {
+      let t = e.tagName.toLowerCase();
+      if (e.id) t += '#' + e.id;
+      else if (typeof e.className === 'string' && e.className.trim())
+        t += '.' + e.className.trim().split(/\s+/).slice(0, 2).join('.');
+      if (e.dataset && e.dataset.area) t += '[' + e.dataset.area + ']';
+      조각.unshift(t);
+      if (e.dataset && e.dataset.area) break;   // 자리 이름이 붙은 데까지면 충분하다
+    }
+    return 조각.join(' > ').slice(0, 160);
+  }
+
   async function 시킨것남기기(짚은것, 글, 때) {
     const 한줄 = (글 || '').replace(/\s+/g, ' ').trim().slice(0, 40)
                + ((글 || '').replace(/\s+/g, ' ').trim().length > 40 ? '…' : '');
     const 몸 = {
       자리: 박스 ? 'box:' + 박스 : '모든박스',
       짚은자리: [어디(), 짚은것].filter(Boolean).join(' · '),
+      // 관리자만 보는 칸 — 어느 자를 짚으셨는지. 사장님 화면에는 안 나온다
+      짚은자: 짚은자(겨냥),
       // 짚으셨을 때 켜져 있던 페이지. 작업대가 이것으로 그 페이지를 열어 준다
       페이지: 어느페이지(),
       말: 글 || '',
