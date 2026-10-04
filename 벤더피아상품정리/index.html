@@ -59,6 +59,14 @@
     .chip { font-size:11px; padding:3px 8px; border-radius:6px; background:#f0efed; white-space:nowrap; }
     .chip.key { background:#37352f; color:#fff; font-weight:800; }
     .chip.off { opacity:.4; text-decoration:line-through; }
+    /* 매출처 고르는 딱지 — 폰에서 누르신다. 눌리는 높이가 44px 밑돌이다.
+       보이는 크기와 눌리는 자리는 다르니, 높이를 아예 44px 로 둔다. */
+    .vchip { min-height:44px; padding:0 12px; font-size:12px; font-weight:800;
+        border:1px solid #ededeb; border-radius:10px; background:#fff; color:#787774;
+        cursor:pointer; transition:.12s; display:inline-flex; align-items:center; gap:5px; }
+    .vchip:active { transform:scale(.97); }
+    .vchip.on { background:#37352f; color:#fff; border-color:#37352f; }
+    .vchip .n { font-size:10px; opacity:.6; font-variant-numeric:tabular-nums; }
     /* 테일윈드가 늦게 뜨거나 못 뜨면 .hidden 이 안 먹어서 네 단계가 한꺼번에
        보인다 — 실제로 그렇게 나온 것을 보고 넣는다. 우리가 직접 박아 둔다. */
     .hidden { display:none !important; }
@@ -150,6 +158,10 @@
 
     <!-- 5. 상품·단품 뽑기 — 올라간 자료를 읽기만 한다 -->
     <div id="step-parts" class="hidden space-y-3">
+        <div id="pt-vend-box" class="hidden bg-white border border-[#ededeb] rounded-xl p-4">
+            <div class="text-[11px] font-bold text-[#787774] mb-2">매출처</div>
+            <div id="pt-vend" class="flex flex-wrap gap-1.5"></div>
+        </div>
         <div class="bg-white border border-[#ededeb] rounded-xl p-4">
             <div id="pt-sum" class="text-[13px] font-bold">읽는 중…</div>
             <div id="pt-bad" class="hidden text-[11px] text-amber-600 font-bold mt-1"></div>
@@ -398,7 +410,8 @@ function 단품뽑기(줄들) {
         }
         if (!성함) 못맞춘줄++;
         단품수 += 단품.length;
-        return { 상품코드: o['상품코드'] || '', 상품명: o['상품명'] || '', 단품, 성함 };
+        return { 매출처명: o['매출처명'] || '', 상품코드: o['상품코드'] || '',
+                 상품명: o['상품명'] || '', 단품, 성함 };
     });
     return { 상품들, 단품수, 못맞춘줄, 사전크기: 사전.size };
 }
@@ -406,10 +419,15 @@ function 단품뽑기(줄들) {
 $('btn-parts').addEventListener('click', () => 뽑기화면());
 $('btn-parts-up').addEventListener('click', () => show('step-pick'));
 
+let 담긴상품 = [];                  // 파이어스토어에서 한 번 읽어 담아 둔 것
+let 사전가지수 = 0;
+let 고른매출처 = new Set();         // 비어 있으면 「다 보기」
+
 async function 뽑기화면() {
     const { collection, getDocs } = window.fb;
     $('pt-sum').textContent = '읽는 중…';
     $('pt-bad').classList.add('hidden');
+    $('pt-vend-box').classList.add('hidden');
     $('pt-list').innerHTML = '';
     show('step-parts');
     try {
@@ -422,17 +440,62 @@ async function 뽑기화면() {
             return;
         }
 
-        const { 상품들, 단품수, 못맞춘줄, 사전크기 } = 단품뽑기(줄들);
+        // 단품 맞추기는 **담긴 것 전부로 한 번만** 한다 —
+        // 사전을 거른 뒤의 것으로 지으면, 거르는 바람에 이름을 못 찾는 일이 생긴다.
+        const { 상품들, 사전크기 } = 단품뽑기(줄들);
+        담긴상품 = 상품들;
+        사전가지수 = 사전크기;
+        고른매출처.clear();                 // 처음 모습은 「다 보기」
+        매출처딱지그리기();
+        그리기();
+    } catch (err) {
+        console.error(err);
+        $('pt-sum').textContent = '읽지 못했습니다 — ' + err.message;
+    }
+}
 
-        $('pt-sum').textContent = '상품 ' + 상품들.length.toLocaleString('ko-KR')
-            + '개 · 단품 ' + 단품수.toLocaleString('ko-KR') + '개';
-        if (못맞춘줄) {
-            $('pt-bad').textContent = '이름을 못 맞춘 줄 ' + 못맞춘줄 + '건 (단품코드 사전 '
-                + 사전크기 + '가지)';
-            $('pt-bad').classList.remove('hidden');
-        }
+// 매출처 갈래는 **담긴 자료에서 긁어 모은다.** 코드에 박아 넣지 않는다 —
+// 새 엑셀이 올라오면 갈래가 바뀐다. 많은 것부터 보여 드린다.
+function 매출처딱지그리기() {
+    const 셈 = new Map();
+    담긴상품.forEach(p => 셈.set(p.매출처명, (셈.get(p.매출처명) || 0) + 1));
+    const 갈래 = [...셈.entries()].filter(([이름]) => 이름).sort((a, b) => b[1] - a[1]);
 
-        $('pt-list').innerHTML = 상품들.map(p => `
+    const 칸 = $('pt-vend');
+    칸.innerHTML = '';
+    const 딱지 = (글, 수, 켜짐, 누르면) => {
+        const b = document.createElement('button');
+        b.className = 'vchip' + (켜짐 ? ' on' : '');
+        b.innerHTML = esc(글) + (수 == null ? '' : ' <span class="n">' + 수 + '</span>');
+        b.addEventListener('click', 누르면);
+        칸.appendChild(b);
+    };
+    딱지('다 보기', null, 고른매출처.size === 0, () => { 고른매출처.clear(); 매출처딱지그리기(); 그리기(); });
+    갈래.forEach(([이름, 수]) => 딱지(이름, 수, 고른매출처.has(이름), () => {
+        // 여럿을 같이 고를 수 있다 — 누를 때마다 켜고 끈다
+        if (고른매출처.has(이름)) 고른매출처.delete(이름); else 고른매출처.add(이름);
+        매출처딱지그리기(); 그리기();
+    }));
+    $('pt-vend-box').classList.toggle('hidden', 갈래.length === 0);
+}
+
+// 거를 때 파이어스토어를 다시 읽지 않는다 — 담아 둔 것을 그 자리에서 추린다.
+function 그리기() {
+    const 볼것 = 고른매출처.size ? 담긴상품.filter(p => 고른매출처.has(p.매출처명)) : 담긴상품;
+    const 단품수 = 볼것.reduce((a, p) => a + p.단품.length, 0);
+    const 못맞춘줄 = 볼것.filter(p => !p.성함).length;
+
+    $('pt-sum').textContent = '상품 ' + 볼것.length.toLocaleString('ko-KR')
+        + '개 · 단품 ' + 단품수.toLocaleString('ko-KR') + '개';
+    if (못맞춘줄) {
+        $('pt-bad').textContent = '이름을 못 맞춘 줄 ' + 못맞춘줄 + '건 (단품코드 사전 '
+            + 사전가지수 + '가지)';
+        $('pt-bad').classList.remove('hidden');
+    } else {
+        $('pt-bad').classList.add('hidden');
+    }
+
+    $('pt-list').innerHTML = 볼것.map(p => `
             <div class="bg-white border border-[#ededeb] rounded-xl p-4">
                 <div class="font-mono text-[11px] text-[#787774]">${esc(p.상품코드)}</div>
                 <div class="text-[13px] font-bold leading-snug">${esc(p.상품명)}</div>
@@ -445,10 +508,6 @@ async function 뽑기화면() {
                       : '<div class="text-[11px] text-[#a8a6a2]">단품 없음</div>'}
                 </div>
             </div>`).join('');
-    } catch (err) {
-        console.error(err);
-        $('pt-sum').textContent = '읽지 못했습니다 — ' + err.message;
-    }
 }
 
 function fail(err) {
