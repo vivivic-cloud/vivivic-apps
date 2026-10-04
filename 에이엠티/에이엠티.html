@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.14.8 (2026-10-03) — 수량 0 을 셈에 그대로 쓰던 두 자리도 원장 셈으로 받친다
+     버전: v1.15.0 (2026-10-04) — 완료 수량 0 뿌리: 사유 없는 맨 0 은 안 적힌 것으로 보고 원장 셈으로 받친다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2422,7 +2422,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.14.8</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.15.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2555,7 +2555,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.14.8</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.15.0</b></p>
         </div>
     </div>
 
@@ -3554,6 +3554,22 @@
             const uc = parseFloat(row[h.indexOf('세트별소모량')]) || 1;
             return Math.round(uc * (order.orderQty || 1));
         }
+
+        /* 사장님 지시(10-04 01:29) — 「완료시 왜 수량이 0이되는거야 실제 작업된
+           수량이 기준이 되어 나타나야지」. 담긴 수량(partInfoMap[cardKey].qty)이 0 이면
+           「안 적힌 것」 으로 보고 원장 셈으로 받친다. 셈은 새로 만들지 않고 _발주몫 이
+           쓰는 그 잣대 그대로다 — 세트별소모량 × 발주수량.
+           발주수량(orderQty)으로 떨어지지 않는다: 그것은 세트 수지 부속 수가 아니다. */
+        window._원장셈몫 = function(order, cardKey, rowIndexHint) {
+            const h = currentFullData && currentFullData[0];
+            if (!h || !order) return null;
+            let ri = (rowIndexHint != null) ? parseInt(rowIndexHint, 10) : NaN;
+            if (isNaN(ri)) ri = parseInt(String(cardKey || '').split('-')[2], 10);
+            const row = !isNaN(ri) ? currentFullData[ri] : null;
+            if (!row) return null;
+            const uc = parseFloat(row[h.indexOf('세트별소모량')]) || 1;
+            return Math.round(uc * (order.orderQty || 1));
+        };
 
         // 재단계획의 실제 필요수량(필요 EA) — 지금 살아 있는 발주만으로 다시 센다.
         // plan.reqQty 는 계획을 만들 때 여러 발주를 합쳐 굳혀 둔 값이라,
@@ -7513,8 +7529,17 @@
             let effectiveQty = defaultQty;
             let changedBy    = null;
             for (const p of procs) {
-                const aq = completions?.[p]?.actualQty;
-                if (aq != null) { effectiveQty = aq; changedBy = p; }
+                const rec = completions?.[p];
+                const aq  = rec?.actualQty;
+                if (aq == null) continue;
+                /* 사장님 지시(10-04 01:29) — 「실제 작업된 수량이 기준이 되어 나타나야지」.
+                   0 개를 작업했다는 것은 작업이 아니다. 사유(reason) 없이 맨 0 만 적힌
+                   기록은 「안 적힌 것」 으로 보고 예정 수량을 살린다. 한 번 0 으로 찍히면
+                   그 뒤로 영원히 0 을 올바른 수량으로 믿던 자리다.
+                   사유가 적힌 0 은 그대로 믿는다 — 불량으로 한 개도 못 나온 자리다. */
+                const _사유있음 = !!(rec && rec.reason != null && String(rec.reason).trim() !== '');
+                if (Number(aq) === 0 && !_사유있음) continue;
+                effectiveQty = aq; changedBy = p;
             }
             if (changedBy != null && effectiveQty !== defaultQty) {
                 const diff  = effectiveQty - defaultQty;
@@ -7884,8 +7909,12 @@
             const 일 = window._집중일; if (!일) return;
             const o = 일.order || {};
             const 수 = (() => {
+                /* 담긴 0 을 그대로 넘기면 완료 창이 0 으로 열린다(10-04 지시).
+                   0 은 「안 적힌 것」 으로 보고 원장 셈으로 받친다. 발주수량으로
+                   떨어지지 않는다 — 그것은 세트 수지 부속 수가 아니다. */
                 const pm = (o.partInfoMap || {})[일.cardKey];
-                return pm && pm.qty != null ? pm.qty : (o.orderQty || 0);
+                if (pm && pm.qty > 0) return pm.qty;
+                return _원장셈몫(o, 일.cardKey) || 0;
             })();
             window._집중판닫기();
             tlShowPartDoneConfirm(일.docId, 일.cardKey, 일.procKey,
@@ -8009,9 +8038,13 @@
             // 이전 공정에서 수량이 변경됐다면 그 값을 기본값으로 사용
             const _ordDc   = (typeof confirmedOrders !== 'undefined' ? confirmedOrders : []).find(o => (o.docId || String(o.idNum)) === docId);
             const _compsDc = _partRecMap(_ordDc?.partCompletions, cardKey);
-            const _qiDc    = (typeof _partQtyInfo === 'function') ? _partQtyInfo(_compsDc, parseInt(rawDefaultQty || 0)) : { qty: parseInt(rawDefaultQty || 0) };
+            /* 카드가 0 을 건네는 길이 여럿이다(시작 단추가 물려 준 _expQty 도 그렇다).
+               0 을 그대로 미리 채우면 사장님이 그 0 을 그냥 찍으시고, 기록에 0 이 박힌다.
+               어제 고친 다섯 자리와 똑같은 꼴로 원장 셈으로 받친다(10-04 지시). */
+            const _기본Dc  = parseInt(rawDefaultQty || 0) || (_원장셈몫(_ordDc, cardKey) || 0);
+            const _qiDc    = (typeof _partQtyInfo === 'function') ? _partQtyInfo(_compsDc, _기본Dc) : { qty: _기본Dc };
             const expectedQty = _qiDc.qty;  // 이전 공정 actualQty 반영된 현재 유효 수량
-            window._pdConfirmData = { docId, cardKey, procKey, date, btn, partName, expectedQty, rawDefaultQty: parseInt(rawDefaultQty || 0), startKey: startKey || '' };
+            window._pdConfirmData = { docId, cardKey, procKey, date, btn, partName, expectedQty, rawDefaultQty: _기본Dc, startKey: startKey || '' };
             /* 사장님 지시(09-16 00:35) — 한 도면에서 같이 잘려 나온 작업물이 있으면
                그 수량도 같이 보여야 한다. 재단계획에 2·3순위 부속이 이름·치수·개수로
                이미 들어 있다(_woPlanExtras). 완료를 찍는 이 자리에 그대로 펴 보인다.
@@ -10428,15 +10461,19 @@
             // 안 온 자료 없이 작업이 나가면 부속이 빠진 채로 재단이 나간다.
             const _자료막힘 = (typeof window._자료막힘 === 'function') && window._자료막힘();
             const _wPrereq  = !_자료막힘 && _partPrereqDone(_wck, _wpk, _wComps);
-            const _wQI      = _partQtyInfo(_wComps, p.dq || 0);
+            /* p.dq 가 0 으로 오는 길이 있다(담긴 수량 0). 그 0 이 카드 글씨와
+               완료 창 기준 수량에 그대로 내려가 「완료시 수량 0」 이 된다(10-04 지시).
+               0 이면 원장 셈으로 받친다 — 셈은 _원장셈몫(=_발주몫 잣대) 하나뿐이다. */
+            const _w기본    = (p.dq > 0) ? p.dq : (_원장셈몫(_wobj, _wck, p.pRowIndex) || 0);
+            const _wQI      = _partQtyInfo(_wComps, _w기본);
             // 완료 등록 시 "사유 없이 등록 가능한 기준 수량" — 재단은 원장을 통짜로
             // 잘라 발주수량보다 더 나오는 게 정상(예: 발주 17개인데 원장 배치상
             // 18개가 나옴)이라, 발주수량 기준으로 맞추면 실제 작업현장과 달라 매번
             // 사유를 입력해야 하는 문제가 있었음 — 재단은 실제 예상 생산량(총작업수량)을
             // 기준으로 삼음
             const _wDoneQtyBasis = p.isCuttingCard
-                ? (_cuttingYield(p) || (p.dq || 0))
-                : (p.dq || 0);
+                ? (_cuttingYield(p) || _w기본)
+                : _w기본;
             // 미배정 부속 카드의 시작·완료도 배치카드(_b칸)와 똑같은 무게로 — 현장에서
             // 장갑 낀 손으로 누르는 자리라 8px 글씨로는 눌리지 않는다는 피드백.
             const _w줄 = 'margin-top:6px;text-align:right;';
@@ -10622,14 +10659,16 @@
             const _bOld    = _woPartOldKeys(cKey, _bdid);
             const _bComps  = _partRecMap(_bobj?.partCompletions, _bck, _bOld);
             const _bStarts = _partRecMap(_bobj?.partStarted,     _bck, _bOld);
-            const _bQI   = _partQtyInfo(_bComps, p.dq || 0);
+            /* 위 _woCardHtml 과 같은 까닭이다 — 담긴 0 이 카드와 완료 창으로 내려간다. */
+            const _b기본 = (p.dq > 0) ? p.dq : (_원장셈몫(_bobj, _bck, p.pRowIndex) || 0);
+            const _bQI   = _partQtyInfo(_bComps, _b기본);
             // 완료 등록 시 "사유 없이 등록 가능한 기준 수량" — 재단은 원장을
             // 통짜로 잘라 발주수량보다 더 나오는 게 정상이라, 발주수량 대신
             // 실제 예상 생산량(총작업수량)을 기준으로 삼음 (실제 작업현장과
             // 맞지 않다는 피드백)
             const _bDoneQtyBasis = p.isCuttingCard
-                ? (_cuttingYield(p) || (p.dq || 0))
-                : (p.dq || 0);
+                ? (_cuttingYield(p) || _b기본)
+                : _b기본;
 
             // ─── 배치 카드 (재단카드: 6개 핵심정보 / 일반카드: 컴팩트 2행) ───
             let _placedInner = '';
