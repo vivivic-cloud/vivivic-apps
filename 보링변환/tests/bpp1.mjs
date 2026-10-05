@@ -473,7 +473,7 @@ await p.evaluate(() => {
   const 옛 = window.fetch.bind(window);
   window.fetch = (u, o) => {
     if (String(u).includes('script.google.com')) {
-      if (o && o.method === 'POST') { window.__보낸몸.push(o); return window.__속답(); }
+      if (o && o.method === 'POST') { o.__u = String(u); window.__보낸몸.push(o); return window.__속답(); }
       window.__부른곳.push(String(u)); return Promise.resolve({ type: 'opaque' });
     }
     return 옛(u, o);
@@ -493,8 +493,37 @@ await p.waitForTimeout(400);
 let 본것 = await 빈말보기();
 재기('못 닿았으면 그렇다고 적나', 본것.말 === '그 주소에 아예 닿지 못했습니다', 본것.말);
 재기('부른 주소를 그대로 보이나', /^부른 곳: https:\/\/script\.google\.com\//.test(본것.증거), 본것.증거);
-재기('무엇을 하면 되는지 한 줄로 적나',
-     본것.할일 === '맥에서 서류관리 앱스스크립트를 다시 배포해 주십시오', 본것.할일);
+const 고르라는말 = '아래 「고르기로 열기」 를 누르시면 파일 앱이 열립니다 — '
+                 + '거기 구글 드라이브에서 같은 파일을 고르시면 도면이 바로 뜹니다';
+재기('무엇을 하면 되는지 한 줄로 적나', 본것.할일 === 고르라는말, 본것.할일);
+/* 10-05 — 사장님: 「왜 다시 배포해야되는데 … 그냥 빨리 되게하라」.
+   사장님께 시키는 말은 화면에 없어야 한다. 글자로 못 박아 둔다. */
+const 시키는말 = await p.evaluate(() =>
+  /다시 ?배포|재배포|앱스스크립트|스크립트를 다시|맥에서/.test(document.body.innerText));
+재기('「다시 배포」 같은 시키는 말이 화면에 없나', !시키는말);
+/* 말만 하고 끝내지 않는다 — 그 자리에 오늘 되는 길이 단추로 놓여 있어야 한다 */
+const 고르기단추 = await p.evaluate(() => {
+  const b = document.getElementById('borf-pick');
+  return b ? { 글: b.textContent.trim(), 키: Math.round(b.getBoundingClientRect().height) } : null;
+});
+재기('그 자리에 「고르기로 열기」 단추가 뜨나',
+     !!고르기단추 && 고르기단추.글 === '고르기로 열기', 고르기단추 ? 고르기단추.글 : '없다');
+재기('「고르기로 열기」 가 44px 인가', !!고르기단추 && 고르기단추.키 >= 44,
+     (고르기단추 ? 고르기단추.키 : 0) + 'px');
+// 그 단추가 진짜 파일 고르기를 여나 — 손가락으로 눌러 본다
+await p.evaluate(() => { window.__골랐나 = 0;
+                         document.getElementById('b-file').click = () => { window.__골랐나++; }; });
+await p.tap('#borf-pick');
+await p.waitForTimeout(250);
+재기('누르면 파일 고르기가 열리나', await p.evaluate(() => window.__골랐나) === 1);
+/* 사장님 손이 가기 전에 프로그램이 먼저 더 해 봐야 한다 —
+   담긴 주소 하나로 끝내지 않고 /exec · /dev 꼴을 차례로 두드린다. */
+const 두드린곳 = await p.evaluate(() => window.__보낸몸.map(o => o.__u || ''));
+재기('한 꼴만 두드리고 접지 않나', 두드린곳.length >= 2, 두드린곳.length + '군데');
+재기('해 본 곳을 증거에 다 적나', /해 본 곳 \d+군데:/.test(본것.증거),
+     (본것.증거.match(/해 본 곳 \d+군데:/) || ['없다'])[0]);
+// 사장님께 보일 화면 그림은 이 자리에서 찍는다 —  샷=1 node 보링변환/tests/bpp1.mjs
+if (process.env['샷']) await p.screenshot({ path: path.join(뿌리, '보링변환/shots/375-문안열림.png') });
 
 const 보낸것 = await p.evaluate(() => {
   const o = window.__보낸몸[0] || {};
@@ -526,11 +555,17 @@ await p.waitForTimeout(400);
 재기('375px 에서 그 글이 가로로 안 넘친다', 본것.넘침 === 375, 본것.넘침 + 'px');
 
 // ④ 볼 폴더 밖
-await p.evaluate(() => { window.__속답 = () => Promise.resolve({ ok: true, status: 200,
+await p.evaluate(() => { window.__보낸몸.length = 0;   // 이 누름만 센다
+                         window.__속답 = () => Promise.resolve({ ok: true, status: 200,
   text: () => Promise.resolve(JSON.stringify({ ok: false, why: '밖' })) }); });
 await p.tap('#borf-list .borf-row');
 await p.waitForTimeout(400);
 재기('볼 폴더 밖이면 그렇다고 적나', (await 빈말보기()).말 === '볼 폴더 밖의 파일입니다', (await 빈말보기()).말);
+// 또렷한 대답이다 — 다른 꼴을 더 두드려 봐야 같은 답이니 딱 한 번에서 멈춘다
+const 밖몇번 = await p.evaluate(() => window.__보낸몸.length);
+재기('또렷한 대답이면 더 두드리지 않나', 밖몇번 === 1, 밖몇번 + '번');
+재기('또렷한 대답에는 고르기 단추를 안 띄우나',
+     await p.evaluate(() => !document.getElementById('borf-pick')));
 
 // ⑤ 그 밖의 ok:false 는 돌아온 why 를 그대로
 await p.evaluate(() => { window.__속답 = () => Promise.resolve({ ok: true, status: 200,
@@ -561,6 +596,10 @@ const 뜯음 = await p.evaluate(() => ({
 재기('판 크기도 파일에 적힌 칸 이름 그대로',
      /LPX 592/.test(뜯음.알약) && /LPY 382/.test(뜯음.알약) && /LPZ 18/.test(뜯음.알약), 뜯음.알약.trim());
 재기('「드라이브에서 열기」 가 뜨나', 뜯음.드라이브단추);
+/* 된 꼴은 적어 둔다 — 다음부터 그걸 먼저 두드려 헛걸음을 안 한다 */
+재기('된 주소 꼴을 적어 두나',
+     await p.evaluate(() => /script\.google\.com/.test(localStorage.getItem('bor속주소') || '')),
+     await p.evaluate(() => localStorage.getItem('bor속주소') || '없다'));
 
 // 「드라이브에서 열기」 — 원본 보는 길도 남아 있다
 const 원본 = await p.evaluate(async () => {
@@ -1146,6 +1185,33 @@ await p.tap('#bor-back button');
 await p.waitForTimeout(300);
 재기('「← 박스판」 을 누르면 박스 판으로 돌아오나',
      await p.evaluate(() => document.documentElement.getAttribute('data-borhome') === '1'));
+
+/* ── 12. 「파일」 화면에서 고르면 도면까지 가나 ────────────────────────
+   10-05 에 고른 길이다 — 문이 안 열려도 사장님은 그 자리에서 단추 한 번으로
+   같은 파일을 고르실 수 있어야 하고, 고르면 **도면 화면까지** 넘어가야 한다.
+   (아이폰에서는 그 단추가 파일 앱을 열고, 거기에 구글 드라이브가 들어 있다) */
+await p.evaluate(() => window.borOpenFiles());   // 0-3 에서 타일을 진짜 눌러 이 길을 이미 쟀다
+await p.waitForTimeout(400);
+재기('「파일」 화면에 있나',
+     await p.evaluate(() => document.documentElement.getAttribute('data-borscreen') === 'files'));
+// 폰에서 .bpp 도 고를 수 있어야 한다 — 목록에 .bpp 가 있으니 고르기도 받아야 맞다
+재기('파일 고르기가 .cix 와 .bpp 를 다 받나',
+     await p.evaluate(() => (document.getElementById('b-file').accept || '').toLowerCase()
+                            .split(',').map(x => x.trim()).includes('.bpp')),
+     await p.evaluate(() => document.getElementById('b-file').accept));
+await p.setInputFiles('#b-file', { name: '592x382_1001_01.cix', mimeType: 'text/plain',
+                                   buffer: fs.readFileSync(cix길) });
+await p.waitForTimeout(600);
+const 골라본것 = await p.evaluate(() => ({
+  화면: document.documentElement.getAttribute('data-borscreen'),
+  집: document.documentElement.getAttribute('data-borhome'),
+  이름: document.getElementById('b-pick-nm').textContent,
+  동그라미: document.querySelectorAll('#b-draw circle').length,
+}));
+재기('「파일」 화면에서 골라도 도면 화면으로 넘어가나',
+     골라본것.화면 === null && 골라본것.집 === null, String(골라본것.화면));
+재기('고른 파일 이름이 올라오나', 골라본것.이름 === '592x382_1001_01.cix', 골라본것.이름);
+재기('고른 것도 구멍 16개를 그리나', 골라본것.동그라미 === 16, '동그라미 ' + 골라본것.동그라미);
 
 await b.close();
 fs.rmSync(내린칸, { recursive: true, force: true });

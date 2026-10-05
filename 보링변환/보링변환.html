@@ -1,6 +1,7 @@
 <!-- ==========================================
      보링변환.html
-     버전: v1.9.1 (2026-10-02) — 파일 속을 못 가져올 때 왜인지를 갈라 말한다.
+     버전: v1.10.0 (2026-10-05) — 파일 속이 안 열리면 프로그램이 스스로 더 해 보고,
+     그래도 안 되면 그 자리에서 「고르기로 열기」 한 번으로 도면이 뜬다.
            한마디로 뭉개지 않고 갈래마다 증거를 그대로 보인다
      (자세한 내력은 git 에)
      ========================================== -->
@@ -395,7 +396,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
 
     <div class="borh-tiles" id="borh-mine"></div>
 
-    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.9.1</b></p>
+    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.10.0</b></p>
   </div>
 </div>
 
@@ -448,7 +449,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
   <div class="bhead">
     <span class="bday">보링변환</span>
     <span class="brole">CIX → BPP</span>
-    <span class="bsub" id="b-ver">v1.9.1</span>
+    <span class="bsub" id="b-ver">v1.10.0</span>
   </div>
 
   <button class="btile" id="b-pick" type="button">
@@ -464,7 +465,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
       <span class="bpct" id="b-pick-sub">CAD 에서 뽑은 보링 파일</span>
     </span>
   </button>
-  <input type="file" id="b-file" accept=".cix,.CIX" hidden>
+  <input type="file" id="b-file" accept=".cix,.CIX,.bpp,.BPP" hidden>
 
   <button type="button" class="borf-again bhide" id="b-drive">드라이브에서 열기</button>
 
@@ -1008,6 +1009,7 @@ $('b-file').onchange = async (e) => {
   catch (err) { 막힘알림('파일을 읽지 못했습니다'); return; }
   먹이기(f.name, 글, '');
   e.target.value = '';
+  window.borOpen();                 // 「파일」 화면에서 고르셨을 수도 있다 — 도면이 있는 쪽으로 넘긴다
 };
 $('b-drive').onclick = () => {
   if (드라이브) window.open('https://drive.google.com/file/d/' + encodeURIComponent(드라이브) + '/view',
@@ -1563,7 +1565,11 @@ window.보링 = { cix읽기, bpp읽기, bpp짓기, 되짚기, 변수틀읽기, �
             // 이 칸은 _e 를 쓴다 — 막기() 는 바꾸기 쪽 것이라 여기서는 없다
             빈말.innerHTML = '<b>' + _e(딴말글.말) + '</b>' +
                 (딴말글.할일 ? '<em>' + _e(딴말글.할일) + '</em>' : '') +
-                (딴말글.증거 ? '<i>' + _e(딴말글.증거) + '</i>' : '');
+                (딴말글.증거 ? '<i>' + _e(딴말글.증거) + '</i>' : '') +
+                // 하실 수 있는 일을 적었으면 그 자리에 단추를 놓는다 — 말만 하고 끝내지 않는다
+                (딴말글.할일 === 고르기로
+                    ? '<button type="button" class="borf-again" id="borf-pick">고르기로 열기</button>'
+                    : '');
         } else {
             빈말.textContent = 말;
         }
@@ -1584,37 +1590,79 @@ window.보링 = { cix읽기, bpp읽기, bpp짓기, 되짚기, 변수틀읽기, �
         return new TextDecoder('utf-8').decode(u);
     }
     /* 안 될 때를 갈라 말한다. 사장님: 「이게 뭔소리야 어제는 되었던건데」(10-02).
-       한마디로 뭉개면 무엇이 막혔는지 아실 길이 없다. 갈래마다 **증거를 그대로** 보인다. */
-    const 다시배포 = '맥에서 서류관리 앱스스크립트를 다시 배포해 주십시오';
+       한마디로 뭉개면 무엇이 막혔는지 아실 길이 없다. 갈래마다 **증거를 그대로** 보인다.
+
+       10-05 — 사장님: 「왜 다시 배포해야되는데 이럴거면 애초에 왜 배포한거고
+       그냥 빨리 되게하라」. 그래서 이 화면은 사장님께 **시키는 말을 하지 않는다.**
+       「다시 배포하세요」 라는 말은 여기서 영영 없앴다. 되살리지 마라.
+       대신 두 가지를 한다.
+         ㉠ 프로그램이 스스로 더 해 본다 — 주소 꼴을 바꿔가며 차례로 두드리고,
+            되는 꼴이 나오면 그 꼴을 적어 두어 다음부터 그걸 먼저 쓴다.
+         ㉡ 그래도 안 되면 **오늘 이미 되는 길**을 그 자리에 놓는다 —
+            「고르기로 열기」 한 번. 아이폰에서 그 단추는 파일 앱을 열고,
+            거기에 구글 드라이브가 들어 있다. 같은 파일을 고르시면 도면이 바로 뜬다.
+            사장님 손은 한 번, 그것도 늘 쓰시던 그 한 번이다. */
+    const 고르기로 = '아래 「고르기로 열기」 를 누르시면 파일 앱이 열립니다 — '
+                   + '거기 구글 드라이브에서 같은 파일을 고르시면 도면이 바로 뜹니다';
     const 탓 = (말, 할일, 증거) => { const e = new Error(말); e.할일 = 할일; e.증거 = 증거 || ''; return e; };
-    async function 속가져오기(driveId){
-        if (!부를곳) throw 탓('드라이브를 훑는 일이 아직 안 켜졌습니다', 다시배포);
+
+    /* 되는 꼴을 적어 둔다 — 다음부터 그걸 먼저 두드린다. 없으면 없는 대로 간다. */
+    const 적은곳 = 'bor속주소';
+    const 적힌것 = () => { try { return localStorage.getItem(적은곳) || ''; } catch (e) { return ''; } };
+    const 적기 = 주소 => { try { localStorage.setItem(적은곳, 주소); } catch (e) {} };
+    /* 두드려 볼 주소 꼴들. 주소는 코드에 박지 않는다 — 담긴 그 주소에서 꼴만 바꾼다.
+       끝 슬래시를 떼 보고, /exec 과 /dev 를 서로 바꿔 본다. 담긴 주소가 그 사이
+       바뀌었다면 듣고 있는 설정이 이미 새 주소를 넣어 두었으니 그게 첫 꼴이다. */
+    function 주소꼴들(){
+        const 들 = [], 밀기 = u => { if (u && 들.indexOf(u) < 0) 들.push(u); };
+        밀기(적힌것());
+        밀기(부를곳);
+        const 몸 = String(부를곳).replace(/\/+$/, '');
+        밀기(몸);
+        밀기(몸.replace(/\/exec$/, '/dev'));
+        밀기(몸.replace(/\/dev$/, '/exec'));
+        return 들;
+    }
+    async function 한곳에(주소, driveId){
         let r, 글;
         try {
-            r = await fetch(부를곳, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
-                                     body: JSON.stringify({ 일: '보링파일', driveId: driveId }) });
+            r = await fetch(주소, { method: 'POST', headers: { 'Content-Type': 'text/plain' },
+                                   body: JSON.stringify({ 일: '보링파일', driveId: driveId }) });
         } catch (e) {
             // ① 아예 못 닿았다 — 부른 주소를 그대로 보인다
-            throw 탓('그 주소에 아예 닿지 못했습니다', 다시배포, '부른 곳: ' + 부를곳);
+            throw 탓('그 주소에 아예 닿지 못했습니다', 고르기로, '부른 곳: ' + 주소);
         }
         try { 글 = await r.text(); } catch (e) { 글 = ''; }
         if (!r || !r.ok) {
             // ② 닿았는데 돌려보냈다 — 상태 번호와 돌아온 글 앞머리
-            throw 탓(`닿았는데 돌려보냈습니다 (${r ? r.status : '?'})`, 다시배포,
-                     '부른 곳: ' + 부를곳 + (글 ? '\n돌아온 글: ' + 글.slice(0, 200) : ''));
+            throw 탓(`닿았는데 돌려보냈습니다 (${r ? r.status : '?'})`, 고르기로,
+                     '부른 곳: ' + 주소 + (글 ? '\n돌아온 글: ' + 글.slice(0, 200) : ''));
         }
         let d;
         try { d = JSON.parse(글); } catch (e) {
             // ③ 답은 왔는데 자료가 아니다 — 온 글 앞 200자를 그대로. 로그인 화면이면 거기 다 적혀 있다
-            throw 탓('답이 왔는데 자료가 아니라 웹 화면이었습니다', 다시배포,
+            throw 탓('답이 왔는데 자료가 아니라 웹 화면이었습니다', 고르기로,
                      '돌아온 글: ' + String(글).slice(0, 200));
         }
         if (!d || d.ok !== true) {
             const 왜 = d && d.why;
-            if (왜 === '밖') throw 탓('볼 폴더 밖의 파일입니다', '');
-            throw 탓(왜 ? String(왜) : '가져오지 못했습니다', 다시배포, 글.slice(0, 200));
+            // 「밖」 은 또렷한 대답이다 — 다른 꼴을 더 두드려 봐도 같은 답이 온다
+            if (왜 === '밖') { const e = 탓('볼 폴더 밖의 파일입니다', ''); e.그만 = true; throw e; }
+            throw 탓(왜 ? String(왜) : '가져오지 못했습니다', 고르기로, 글.slice(0, 200));
         }
         return { name: d.name, 글: 풀기(d.b64) };
+    }
+    async function 속가져오기(driveId){
+        if (!부를곳) throw 탓('드라이브를 훑는 일이 아직 안 켜졌습니다', 고르기로);
+        const 들 = 주소꼴들();
+        let 마지막 = null;
+        for (let i = 0; i < 들.length; i++) {
+            try { const 것 = await 한곳에(들[i], driveId); 적기(들[i]); return 것; }
+            catch (e) { if (e.그만) throw e; 마지막 = e; }
+        }
+        const e = 마지막 || 탓('가져오지 못했습니다', 고르기로);
+        if (들.length > 1) e.증거 = (e.증거 ? e.증거 + '\n' : '') + '해 본 곳 ' + 들.length + '군데: ' + 들.join('\n');
+        throw e;
     }
     /* 줄을 누르면 뜯어 본다 — 알맹이를 받아 「고르기」 와 **똑같은 길**에 태운다.
        판·구멍 그림과 읽은 것 표를 그 길이 그대로 한다. .cix 든 .bpp 든 같다. */
@@ -1670,6 +1718,10 @@ window.보링 = { cix읽기, bpp읽기, bpp짓기, 되짚기, 변수틀읽기, �
         if (e.target.closest('#borf-up')) { e.preventDefault(); 딴말글 = null; 지금길 = 지금길.slice(0, -1);
                                             그리기(); window.scrollTo(0, 0); return; }
         if (e.target.closest('#borf-again')) { e.preventDefault(); 딴말글 = null; return 두드리기(); }
+        // 오늘 이미 되는 길 — 파일 앱을 연다. 아이폰이면 거기 구글 드라이브가 들어 있다
+        if (e.target.closest('#borf-pick')) { e.preventDefault();
+                                              const 칸 = document.getElementById('b-file');
+                                              if (칸) 칸.click(); return; }
         const 칩 = e.target.closest('#borf-chips .borb-chip');
         if (칩) {
             거르기 = 칩.dataset.kind;
