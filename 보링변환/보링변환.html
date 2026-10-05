@@ -1,7 +1,7 @@
 <!-- ==========================================
      보링변환.html
-     버전: v1.11.0 (2026-10-05) — 파일 속을 **창고를 거쳐** 받는다. 훑기가 목록을
-     넣는 그 길 그대로다 — 주소가 바뀌어도 로그인으로 튕겨도 안 깨지고, 손도 안 간다.
+     버전: v1.12.0 (2026-10-05) — 부를 주소를 **스크립트가 스스로 적어 둔 자리**에서
+     먼저 읽는다. 그 뒤에도 안 되면 창고(boring_requests)를 거쳐 받는다.
            한마디로 뭉개지 않고 갈래마다 증거를 그대로 보인다
      (자세한 내력은 git 에)
      ========================================== -->
@@ -396,7 +396,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
 
     <div class="borh-tiles" id="borh-mine"></div>
 
-    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.11.0</b></p>
+    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.12.0</b></p>
   </div>
 </div>
 
@@ -449,7 +449,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
   <div class="bhead">
     <span class="bday">보링변환</span>
     <span class="brole">CIX → BPP</span>
-    <span class="bsub" id="b-ver">v1.11.0</span>
+    <span class="bsub" id="b-ver">v1.12.0</span>
   </div>
 
   <button class="btile" id="b-pick" type="button">
@@ -1394,7 +1394,15 @@ window.보링 = { cix읽기, bpp읽기, bpp짓기, 되짚기, 변수틀읽기, �
        프로그램을 열 까닭이 없다(09-30 「서류관리 왜열어」). 그래서 이 화면이 직접 부른다.
        주소는 boring_config/설정 의 exec 칸에서 읽는다. **코드에 박지 않는다** —
        배포가 바뀌면 스크립트가 그 칸을 스스로 고쳐 쓴다. */
+    /* 주소는 두 자리에 있다. **스크립트가 스스로 적어 둔 자리가 참 주소다.**
+       서류관리 앱스 스크립트는 doGet 이 돌 때마다 ensureUrl_() 로 제 주소를
+       docs_config/sync 의 url 에 적는다 — 배포가 바뀌면 거기도 저절로 바뀐다.
+       그래서 그 자리를 **먼저** 읽는다. 그러면 주소 때문에 다시 어긋날 일이 없다.
+       boring_config/설정 의 exec 는 사람이 적는 자리라 어긋날 수 있다 — **뒤에 둔다.**
+       ⚠ 두 자리 다 **읽기만 한다. 덮어쓰지 마라.** */
+    let 참주소 = '', 담긴주소 = '';
     let 부를곳 = '', 훑는중 = false, 못불렀다 = false, 이번화면에서불렀나 = false;
+    function 주소정하기(){ 부를곳 = 참주소 || 담긴주소; }
     let 딴말글 = null;               // 줄을 누른 뒤 할 말 {말, 할일, 증거}
 
     function 칸(){
@@ -1404,6 +1412,10 @@ window.보링 = { cix읽기, bpp읽기, bpp짓기, 되짚기, 변수틀읽기, �
     function 설정문서(){
         const { doc } = window.fbFirestore;
         return doc(window.db, 'artifacts', appId, 'public', 'data', 'boring_config', '설정');
+    }
+    function 참주소문서(){
+        const { doc } = window.fbFirestore;
+        return doc(window.db, 'artifacts', appId, 'public', 'data', 'docs_config', 'sync');
     }
 
     window.borFilesSync = function(){
@@ -1425,9 +1437,20 @@ window.보링 = { cix읽기, bpp읽기, bpp짓기, 되짚기, 변수틀읽기, �
             try {
                 const 것 = d && typeof d.data === 'function' ? (d.data() || {}) : {};
                 폴더 = String(것.folder || '');
-                부를곳 = String(것.exec || '');
+                담긴주소 = String(것.exec || '');
+                주소정하기();
                 그리기();
                 // 화면을 열 때 주소가 아직 안 와 있었으면, 오는 그때 한 번 부른다
+                if (보이나() && !이번화면에서불렀나) 부르기();
+            } catch (e) {}
+        }, () => {});
+        // 스크립트가 스스로 적어 둔 자리 — 못 읽어도 그냥 넘어간다(그러면 담긴 주소를 쓴다)
+        onSnapshot(참주소문서(), d => {
+            try {
+                const 것 = d && typeof d.data === 'function' ? (d.data() || {}) : {};
+                참주소 = String(것.url || '');
+                주소정하기();
+                그리기();
                 if (보이나() && !이번화면에서불렀나) 부르기();
             } catch (e) {}
         }, () => {});
@@ -1611,11 +1634,15 @@ window.보링 = { cix읽기, bpp읽기, bpp짓기, 되짚기, 변수틀읽기, �
     function 주소꼴들(){
         const 들 = [], 밀기 = u => { if (u && 들.indexOf(u) < 0) 들.push(u); };
         밀기(적힌것());
-        밀기(부를곳);
-        const 몸 = String(부를곳).replace(/\/+$/, '');
-        밀기(몸);
-        밀기(몸.replace(/\/exec$/, '/dev'));
-        밀기(몸.replace(/\/dev$/, '/exec'));
+        // 참 주소(스크립트가 적어 둔 것)가 먼저, 담긴 주소가 뒤
+        [참주소, 담긴주소].forEach(주소 => {
+            if (!주소) return;
+            밀기(주소);
+            const 몸 = String(주소).replace(/\/+$/, '');
+            밀기(몸);
+            밀기(몸.replace(/\/exec$/, '/dev'));
+            밀기(몸.replace(/\/dev$/, '/exec'));
+        });
         return 들;
     }
     async function 한곳에(주소, driveId){

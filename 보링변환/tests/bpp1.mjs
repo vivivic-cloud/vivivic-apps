@@ -124,7 +124,7 @@ await p.waitForTimeout(300);
    넣고 화면이 하는 일만 잰다 — 앱 파일은 한 글자도 안 건드린다. */
 await p.evaluate(() => {
   const 곳간 = { boring_boxes: new Map(), boring_files: new Map(), boring_config: new Map(),
-                boring_requests: new Map() };
+                boring_requests: new Map(), docs_config: new Map() };
   const 귀들 = [];
   const 이름of = (a, 뒤) => a[a.length - 1 - 뒤];
   const 스냅칸 = 이름 => ({ forEach: f => 곳간[이름].forEach((v, k) => f({ id: k, data: () => v })) });
@@ -489,6 +489,88 @@ const 빈말보기 = () => p.evaluate(() => ({
   넘침: document.documentElement.scrollWidth,
 }));
 
+// 파일 화면의 그 자리로 되돌아가는 길 — 박스판 → 「파일」 박스 → 맨 위 → 알렉스
+async function 파일화면으로(){
+  await p.tap('#bor-back button');            await p.waitForTimeout(300);
+  await p.tap(`[data-borb-id="${파일박스}"]`); await p.waitForTimeout(400);
+  await p.tap('#borf-up');                    await p.waitForTimeout(300);
+  await p.tap('#borf-folders [data-into="알렉스"]'); await p.waitForTimeout(300);
+}
+
+/* ── 부를 주소를 어디서 읽나 ──────────────────────────────────────────
+   10-05 관리자가 뿌리를 찾아 주었다: 서류관리 앱스 스크립트는 doGet 이 돌 때마다
+   제 주소를 **docs_config/sync 의 url** 에 스스로 적는다(ensureUrl_). 그게 참 주소다.
+   boring_config/설정 의 exec 는 사람이 적는 자리라 어긋날 수 있다.
+   실제로 둘이 달랐다 — 그래서 **참 주소를 먼저** 읽는다. */
+const 부른곳들 = () => p.evaluate(() => (window.__보낸몸 || []).map(o => o.__u || ''));
+const 참주소넣기 = (url) => p.evaluate(async url => {
+  const { setDoc, doc } = window.fbFirestore;
+  await setDoc(doc(null, 'a', 'p', 'd', 'docs_config', 'sync'), { url }, { merge: true });
+}, url);
+
+const 참 = 'https://script.google.com/macros/s/AKfycbPARAM_TRUE/exec';
+const 담긴 = 'https://script.google.com/macros/s/AKfycbTEST/exec';
+await p.evaluate(() => { window.__보낸몸.length = 0;
+                         window.__속답 = () => Promise.reject(new Error('못 닿음'));
+  // 이 칸은 **주소만** 본다. 창고를 거치는 길은 바로 아래에서 따로 재니,
+  // 여기서는 빨리 끝나게 막아 둔다 — 안 그러면 기다리는 동안 다음 누름이 먹힌다.
+  window.__옛setDoc = window.fbFirestore.setDoc;
+  window.fbFirestore.setDoc = (r, v, o) => (r.이름 === 'boring_requests')
+      ? Promise.reject(new Error('막음')) : window.__옛setDoc(r, v, o);
+});
+await 참주소넣기(참);
+await p.waitForTimeout(350);
+await p.tap('#borf-list .borf-row');
+await p.waitForTimeout(600);
+let 부른것 = await 부른곳들();
+재기('참 주소가 있으면 그것을 **먼저** 부르나', 부른것[0] === 참, 부른것[0] || '안 불렀다');
+재기('두 주소가 다르면 둘 다 해 보나 (참 주소가 앞)',
+     부른것.indexOf(참) === 0 && 부른것.indexOf(담긴) > 0,
+     부른것.length + '군데 · ' + 부른것.map(u => u.slice(-18)).join(' › '));
+재기('담긴 주소를 덮어쓰지 않나',
+     await p.evaluate(() => (window.__곳간.boring_config.get('설정') || {}).exec)
+       === 'https://script.google.com/macros/s/AKfycbTEST/exec',
+     await p.evaluate(() => (window.__곳간.boring_config.get('설정') || {}).exec || '없다'));
+재기('참 주소 자리도 덮어쓰지 않나',
+     await p.evaluate(() => (window.__곳간.docs_config.get('sync') || {}).url) === 참,
+     await p.evaluate(() => (window.__곳간.docs_config.get('sync') || {}).url || '없다'));
+
+/* 그 자리가 비면 담긴 주소로 넘어간다 */
+await p.evaluate(() => { window.__보낸몸.length = 0; });
+await 참주소넣기('');
+await p.waitForTimeout(350);
+await p.tap('#borf-list .borf-row');
+await p.waitForTimeout(600);
+부른것 = await 부른곳들();
+재기('참 주소 자리가 비면 담긴 주소로 넘어가나', 부른것[0] === 담긴, 부른것[0] || '안 불렀다');
+
+/* 참 주소로 문이 열리면 그대로 들어온다 — 길 전체를 허수아비로 재 본다 */
+await p.evaluate(() => { window.__보낸몸.length = 0; });
+await 참주소넣기(참);
+await p.waitForTimeout(350);
+await p.evaluate(b64 => {
+  window.__속답 = () => Promise.resolve({ ok: true, status: 200,
+    text: () => Promise.resolve(JSON.stringify({ ok: true, name: '참주소로받음.cix', b64 })) });
+}, fs.readFileSync(cix길).toString('base64'));
+await p.tap('#borf-list .borf-row');
+await p.waitForTimeout(800);
+const 참으로받음 = await p.evaluate(() => ({
+  화면: document.documentElement.getAttribute('data-borscreen'),
+  이름: document.getElementById('b-pick-nm').textContent,
+  동그라미: document.querySelectorAll('#b-draw circle').length,
+}));
+재기('참 주소로 부르면 파일 속이 그대로 들어오나',
+     참으로받음.화면 === null && 참으로받음.이름 === '참주소로받음.cix' && 참으로받음.동그라미 === 16,
+     참으로받음.이름 + ' · 동그라미 ' + 참으로받음.동그라미);
+재기('그때는 참 주소 한 군데만 부르고 끝내나', (await 부른곳들()).length === 1,
+     (await 부른곳들()).length + '군데');
+
+// 뒤 시험들은 담긴 주소 하나만 두고 잰다 — 참 주소 자리는 비워 두고 창고 길도 되돌린다
+await p.evaluate(() => { window.fbFirestore.setDoc = window.__옛setDoc; });
+await 참주소넣기('');
+await p.waitForTimeout(300);
+await 파일화면으로();
+
 /* ── 창고를 거치는 길 ────────────────────────────────────────────────
    10-05 사장님: 「뭘 고르기로 열어 빨리 연결해 임마」.
    훑기가 목록을 넣는 그 길 그대로 — 답을 읽지 않고 창고를 거친다. CORS 가 안 낀다.
@@ -510,13 +592,6 @@ const 문지기세우기 = (답) => p.evaluate(답 => {
   }, 40);
 }, 답);
 const 문지기치우기 = () => p.evaluate(() => { clearInterval(window.__문지기); window.__문지기 = null; });
-// 파일 화면의 그 자리로 되돌아가는 길 — 박스판 → 「파일」 박스 → 맨 위 → 알렉스
-async function 파일화면으로(){
-  await p.tap('#bor-back button');            await p.waitForTimeout(300);
-  await p.tap(`[data-borb-id="${파일박스}"]`); await p.waitForTimeout(400);
-  await p.tap('#borf-up');                    await p.waitForTimeout(300);
-  await p.tap('#borf-folders [data-into="알렉스"]'); await p.waitForTimeout(300);
-}
 const 도면상태 = () => p.evaluate(() => ({
   화면: document.documentElement.getAttribute('data-borscreen'),
   이름: document.getElementById('b-pick-nm').textContent,
