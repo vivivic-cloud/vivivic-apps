@@ -1,0 +1,435 @@
+<!-- ==========================================
+     기계배치도.html
+     버전: v0.1.0 (2026-10-05) — 공장 바닥 하나 위에 기계가 놓여 있고,
+           **손가락으로 끌어서 옮긴다.** 옮긴 자리는 저장되고 다시 열어도 그대로다.
+     이 판에 없는 것(돌리기·치수·기계 더하기·지우기)은 다음 판이다.
+     (자세한 내력은 git 에)
+     ========================================== -->
+<!DOCTYPE html>
+<html lang="ko" data-layout="1">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>기계배치도</title>
+
+<!-- 파이어베이스 — 배치만 담는다. 보링변환·에이엠티가 쓰는 그 자리, 그 방식이다.
+     로그인 화면은 없다. 익명으로 들어가 배치만 읽고 쓴다.
+     ⚠ 창고가 안 붙어도 프로그램은 그대로 돈다 — 옮기기와 저장(폰 안)은 창고와 상관없다. -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
+  import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+  import { getFirestore, doc, getDoc, setDoc }
+    from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+
+  const app = initializeApp({
+      apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
+      authDomain: "vivivic-4b7ef.firebaseapp.com",
+      projectId: "vivivic-4b7ef",
+      storageBucket: "vivivic-4b7ef.firebasestorage.app",
+      messagingSenderId: "830175660542",
+      appId: "1:830175660542:web:9054030480c8280af8d8af"
+  });
+  const auth = getAuth(app);
+  window.db = getFirestore(app);
+  window.fbFirestore = { doc, getDoc, setDoc };
+  window.fbAuth = { auth };
+  onAuthStateChanged(auth, u => {
+      if (!u) { signInAnonymously(auth).catch(() => {}); return; }
+      if (typeof window.layoutCloudSync === 'function') window.layoutCloudSync();
+  });
+</script>
+<style>
+/* 색 토큰은 보링변환(--vg-*)에서 그대로 가져왔다. 새로 만든 색은 기계 판 하나뿐이다.
+   이름은 전부 l- 로 시작한다 — 짧은 이름은 남의 규칙과 겹친다. */
+:root{
+  --vg-bg:#fff; --vg-ink:#111110; --vg-body:#1A1A19; --vg-soft:#6E6E6A;
+  --vg-muted:#9C9C98; --vg-line:#EDEDEB; --vg-edge:#E2E2DF;
+  --vg-fill:#F4F4F2; --vg-fill2:#EAEAE7; --vg-red:#FF3B30;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--vg-bg); color:var(--vg-body);
+  font:15px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",system-ui,sans-serif;
+  -webkit-text-size-adjust:100%;
+}
+/* ⚠ 100vh 를 쓰지 않는다 — 폰에서 그것은 보이는 높이가 아니다. 100dvh 를 쓰고,
+   그것을 모르는 낡은 폰에는 자바스크립트가 재어서 넣는다.
+   430px 고정 폭을 걷었다 — 그 폭에 막혀 넓은 화면에서도 바닥이 402px 였다. */
+.lwrap{
+  height:100dvh; display:flex; flex-direction:column;
+  padding:0 env(safe-area-inset-right) calc(10px + env(safe-area-inset-bottom)) env(safe-area-inset-left);
+}
+/* 바닥이 노는 자리 — 남은 세로를 다 받아 둔다. 바닥 크기는 자바스크립트가 넣는다 */
+.lstage{flex:1 1 auto; min-height:0; display:flex; flex-direction:column; align-items:center;}
+
+/* 머리 — 한 줄이다 */
+.lhead{display:flex; align-items:baseline; gap:9px; margin:0 0 12px; padding:14px 14px 0;}
+/* 이름은 한 줄로 둔다 — 두 손가락으로 벌려 320 까지 좁아지면 「기계배치 / 도」 로
+   끊겨 보였다(10-05 에 그림을 보고 잡았다). 좁아지면 바닥 크기 쪽이 줄어든다. */
+.lday{font-size:23px; line-height:1.06; letter-spacing:-.9px; font-weight:700; color:var(--vg-ink);
+  white-space:nowrap; flex:none;}
+.lrole{
+  display:inline-flex; align-items:center; border:1px solid var(--vg-ink); border-radius:999px;
+  padding:2px 8px; font-size:10px; font-weight:800; letter-spacing:1.1px; color:var(--vg-ink);
+}
+.lsub{margin-left:auto; font-size:12px; color:var(--vg-muted); min-width:0; text-align:right;}
+
+/* ── 공장 바닥 ───────────────────────────────────────────────────────
+   가로·세로(mm)를 그대로 담는 판이다. 너비는 화면에 맞추고 높이는 바닥 비율대로
+   자바스크립트가 재어 넣는다(aspect-ratio 를 안 쓴 까닭: 낡은 폰에서도 어긋나지 않게). */
+.lfloor{
+  /* 폭·높이는 자바스크립트가 넣는다. 가로로도 세로로도 들어가는 **가장 큰** 크기다.
+     테두리를 안쪽 그림자로 둔 까닭: 진짜 테두리는 칸을 2px 먹어 10,000×8,000 비를 틀어 놓는다 */
+  position:relative; flex:none; background:var(--vg-fill);
+  box-shadow:inset 0 0 0 1px var(--vg-edge); border-radius:4px; overflow:hidden;
+  /* 1m 눈금. 칸 크기는 자바스크립트가 넣는다 */
+  background-image:
+    linear-gradient(to right, rgba(17,17,16,.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(17,17,16,.07) 1px, transparent 1px);
+}
+/* ── 기계 한 대 ──────────────────────────────────────────────────────
+   자리와 크기는 바닥에 대한 % 다 — 화면이 넓어지거나 두 손가락으로 벌리셔도
+   바닥과 같이 늘어난다. */
+.lmc{
+  position:absolute; background:var(--vg-ink); color:#fff;
+  border-radius:3px; padding:2px 3px; overflow:hidden;
+  display:flex; flex-direction:column; justify-content:center;
+  cursor:grab; transition:box-shadow .12s;
+  /* ⚠ 이것이 있어야 끄는 동안 화면이 같이 안 밀린다. 바닥 바탕에는 안 걸어 두었다 —
+     거기서는 평소처럼 화면을 굴릴 수 있어야 한다. */
+  touch-action:none;
+  -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+}
+/* 손가락이 닿는 자리를 사방 6px 넓힌다. 보이는 크기는 그대로 — 치수는 거짓이 되면 안 된다.
+   얇은 기계(작업대 1200mm ≒ 42px)도 이것으로 44px 자를 넘긴다. */
+.lmc::after{content:''; position:absolute; inset:-6px;}
+/* 층(z-index)은 집을 때 자바스크립트가 넣는다 — 여기 두면 내려놓을 때 다시 깔린다 */
+.lmc.잡힘{box-shadow:0 0 0 2px var(--vg-red); cursor:grabbing;}
+.lmc .lnm{font-size:10px; font-weight:700; line-height:1.15; letter-spacing:-.3px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.lmc .lsz{font-size:9px; line-height:1.15; color:rgba(255,255,255,.62);
+  white-space:nowrap; overflow:hidden;}
+/* 낮은 기계는 크기 줄을 숨긴다 — 글자가 판을 넘어가면 아무것도 안 읽힌다 */
+.lmc.납작 .lsz{display:none}
+.lmc.아주납작 .lnm{font-size:9px}
+
+/* 발 — 지금 무슨 일이 됐는지 한 줄 */
+.lfoot{display:flex; align-items:baseline; gap:8px; margin:10px 0 0; min-height:19px;
+  width:100%; padding:0 14px;}
+.lnote{font-size:12px; color:var(--vg-soft);}
+.lsave{margin-left:auto; font-size:11px; color:var(--vg-muted);}
+</style>
+</head>
+<body>
+
+<div class="lwrap">
+  <header class="lhead" data-area="머리">
+    <span class="lday">기계배치도</span>
+    <span class="lrole">V0.1</span>
+    <span class="lsub" id="l-floor-size" data-area="바닥크기">—</span>
+  </header>
+
+  <div class="lstage" id="l-stage">
+    <!-- ⚠ data-area 는 사장님이 어디를 짚으셨는지 손잡이가 알아보게 달아 둔 것이다 -->
+    <div class="lfloor" id="l-floor" data-area="바닥"></div>
+
+    <div class="lfoot" data-area="알림">
+      <span class="lnote" id="l-note" data-area="안내">기계를 손가락으로 끌어 옮기십시오</span>
+      <span class="lsave" id="l-save" data-area="저장알림"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════
+   기계배치도 v0.1
+   하는 일 넷
+     ① 바닥 하나 · 기계 여섯 대를 그린다
+     ② 손가락으로 기계를 끌어 옮긴다 (터치·마우스 한 길로 — 포인터)
+     ③ 옮긴 자리를 폰에 담고(바로) 창고에도 담는다(좀 뒤). 다시 열면 그대로다
+     ④ 손잡이(viggle)가 붙어 있다 — 길게 누르면 지시를 적으실 수 있다
+   ══════════════════════════════════════════════════════════════════════ */
+(() => {
+    'use strict';
+
+    /* ── 처음 배치 ─────────────────────────────────────────────────────
+       관리자에게: 바닥 10m × 8m 과 기계 여섯 대는 **제가 정한 것**입니다.
+       사장님 공장의 참값이 아닙니다 — 보시고 고치라 하시면 그대로 바꿉니다.
+       (고르는 데 쓴 자: 375px 폰에서 가장 얇은 기계도 손가락에 걸릴 만한 크기) */
+    const 처음바닥 = { 가로: 10000, 세로: 8000 };          // mm
+    const 처음기계 = [
+        { id: 'm1', 이름: '패널쏘',       가로: 3800, 세로: 3300, x:  400, y:  400 },
+        { id: 'm2', 이름: '보링기',       가로: 2400, 세로: 1600, x: 5000, y:  600 },
+        { id: 'm3', 이름: '멤브레인프레스', 가로: 3600, 세로: 1800, x: 5600, y: 2400 },
+        { id: 'm4', 이름: '엣지밴더',     가로: 6000, 세로: 1500, x:  400, y: 4200 },
+        { id: 'm5', 이름: '작업대',       가로: 2400, 세로: 1200, x:  400, y: 6200 },
+        { id: 'm6', 이름: '집진기',       가로: 1500, 세로: 1500, x: 8200, y: 6200 },
+    ];
+    const 눈금 = 10;        // 10mm 단위로 떨어뜨린다. 손가락은 1mm 를 못 짚는다
+    const 칸 = 1000;        // 바닥 눈금 한 칸 = 1m
+
+    /* ── 담는 자리 ─────────────────────────────────────────────────────
+       폰 안(localStorage)이 **본**이다 — 창고가 안 붙어도 ③ 이 된다.
+       창고(파이어스토어)는 폰을 바꾸셔도 남게 하는 거울이다. */
+    const 폰열쇠 = 'layout.배치.v1';
+    const 창고칸 = 'layout_배치도';
+    const 창고문서 = '현재';
+
+    let 바닥 = { ...처음바닥 };
+    let 기계들 = 처음기계.map(m => ({ ...m }));
+    let 잰때 = 0;                         // 이 배치가 바뀐 때(ms). 창고와 견줄 때 쓴다
+    let 배율 = 0;                         // px 하나가 몇 mm 인가의 거꾸로 — px/mm
+
+    const $ = id => document.getElementById(id);
+    const 바닥판 = $('l-floor');
+    const 무대 = $('l-stage');
+    const 감싼것 = document.querySelector('.lwrap');
+    const 발 = document.querySelector('.lfoot');
+    const 쪽지 = $('l-note');
+    const 저장쪽지 = $('l-save');
+    const 수 = n => Number(n).toLocaleString('en-US');
+
+    /* ── 읽기 ──────────────────────────────────────────────────────── */
+    function 받기(것) {
+        if (!것 || typeof 것 !== 'object') return false;
+        const b = 것['바닥'], ms = 것['기계들'];
+        if (!b || !(b['가로'] > 0) || !(b['세로'] > 0)) return false;
+        if (!Array.isArray(ms) || !ms.length) return false;
+        const 성한것 = ms.filter(m => m && m.id && m['이름']
+            && m['가로'] > 0 && m['세로'] > 0
+            && Number.isFinite(+m.x) && Number.isFinite(+m.y));
+        if (성한것.length !== ms.length) return false;      // 하나라도 깨졌으면 통째로 안 받는다
+        바닥 = { 가로: +b['가로'], 세로: +b['세로'] };
+        기계들 = 성한것.map(m => ({
+            id: String(m.id), 이름: String(m['이름']),
+            가로: +m['가로'], 세로: +m['세로'], x: +m.x, y: +m.y,
+        }));
+        잰때 = +것['잰때'] || 0;
+        return true;
+    }
+    function 폰에서읽기() {
+        try { return 받기(JSON.parse(localStorage.getItem(폰열쇠) || 'null')); }
+        catch (e) { return false; }
+    }
+
+    /* ── 쓰기 ──────────────────────────────────────────────────────── */
+    const 담을것 = () => ({ 바닥, 기계들, 잰때 });
+    function 폰에담기() {
+        try { localStorage.setItem(폰열쇠, JSON.stringify(담을것())); return true; }
+        catch (e) { return false; }
+    }
+    let 창고시계 = null;
+    function 창고에담기() {
+        clearTimeout(창고시계);
+        창고시계 = setTimeout(async () => {
+            const F = window.fbFirestore, db = window.db;
+            if (!F || !db) return;                       // 창고가 안 붙었다 — 폰 안에는 이미 담겼다
+            try {
+                await F.setDoc(F.doc(db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 창고칸, 창고문서),
+                               담을것());
+            } catch (e) { /* 창고가 안 되어도 ③ 은 폰 안으로 이미 됐다 */ }
+        }, 1200);
+    }
+    let 저장시계 = null;
+    function 저장(알릴까) {
+        잰때 = Date.now();
+        const 됐나 = 폰에담기();
+        창고에담기();
+        if (알릴까) {
+            저장쪽지.textContent = 됐나 ? '저장했습니다' : '폰에 못 담았습니다';
+            clearTimeout(저장시계);
+            저장시계 = setTimeout(() => { 저장쪽지.textContent = ''; }, 1600);
+        }
+        return 됐나;
+    }
+
+    /* 창고가 붙으면 부른다(위 모듈이 부른다). 창고 것이 **더 새것일 때만** 받는다 */
+    window.layoutCloudSync = async function () {
+        const F = window.fbFirestore, db = window.db;
+        if (!F || !db) return;
+        try {
+            const s = await F.getDoc(F.doc(db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 창고칸, 창고문서));
+            if (!s.exists()) { 창고에담기(); return; }     // 창고가 비었으면 지금 것을 올려 둔다
+            const 것 = s.data();
+            if (!(+것['잰때'] > 잰때)) return;
+            if (받기(것)) { 재기(); 그리기(); 쪽지.textContent = '다른 데서 옮긴 것을 받았습니다'; 폰에담기(); }
+        } catch (e) { /* 못 읽어도 폰 안의 것으로 돈다 */ }
+    };
+
+    /* ── 재기 ──────────────────────────────────────────────────────────
+       **가로로도 세로로도 들어가는 가장 큰 크기**로 바닥을 잡는다.
+       가로세로 비(10,000×8,000)는 그대로 지킨다 — 공장이 찌그러지면 안 된다.
+       그래서 둘 중 작은 배율을 쓴다. 폰(세로로 긴 화면)에서는 거의 늘 가로가
+       먼저 차고, 넓은 화면에서는 세로가 먼저 찬다. */
+    function 재기() {
+        // 100dvh 를 모르는 낡은 폰에만 자바스크립트가 보이는 높이를 넣어 준다
+        if (!(window.CSS && CSS.supports && CSS.supports('height', '100dvh'))) {
+            const 보임 = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+            감싼것.style.height = 보임 + 'px';
+        }
+        const 발참 = getComputedStyle(발);
+        const 발높 = 발.getBoundingClientRect().height
+                   + (parseFloat(발참.marginTop) || 0) + (parseFloat(발참.marginBottom) || 0);
+        const 칸폭 = 무대.clientWidth;
+        const 칸높 = 무대.clientHeight - 발높;
+        if (!(칸폭 > 0) || !(칸높 > 0)) return;
+        배율 = Math.min(칸폭 / 바닥.가로, 칸높 / 바닥.세로);     // px / mm
+        바닥판.style.width  = (바닥.가로 * 배율) + 'px';
+        바닥판.style.height = (바닥.세로 * 배율) + 'px';
+        const 한칸 = (칸 * 배율).toFixed(3) + 'px';
+        바닥판.style.backgroundSize = 한칸 + ' ' + 한칸;
+        $('l-floor-size').textContent = 수(바닥.가로) + ' × ' + 수(바닥.세로) + ' mm';
+    }
+
+    /* ── 그리기 ────────────────────────────────────────────────────── */
+    function 자리넣기(el, m) {
+        el.style.left   = (m.x / 바닥.가로 * 100) + '%';
+        el.style.top    = (m.y / 바닥.세로 * 100) + '%';
+        el.style.width  = (m.가로 / 바닥.가로 * 100) + '%';
+        el.style.height = (m.세로 / 바닥.세로 * 100) + '%';
+    }
+    function 그리기() {
+        바닥판.innerHTML = '';
+        기계들.forEach(m => {
+            const el = document.createElement('div');
+            el.className = 'lmc';
+            el.dataset.id = m.id;
+            /* ⚠ data-area 에 기계 이름을 적어 둔다. 사장님이 이 기계를 짚으셨을 때
+               손잡이가 「바탕」 이 아니라 **이 기계**를 적게 하려는 것이다. */
+            el.dataset.area = '기계:' + m.이름;
+            const 높이px = m.세로 * 배율;
+            if (높이px < 34) el.classList.add('납작');
+            if (높이px < 24) el.classList.add('아주납작');
+            el.innerHTML = '<span class="lnm"></span><span class="lsz"></span>';
+            el.querySelector('.lnm').textContent = m.이름;
+            el.querySelector('.lsz').textContent = 수(m.가로) + '×' + 수(m.세로);
+            자리넣기(el, m);
+            el.addEventListener('pointerdown', 집기);
+            el.addEventListener('pointermove', 끌기);
+            el.addEventListener('pointerup', 놓기);
+            el.addEventListener('pointercancel', 놓기);
+            바닥판.appendChild(el);
+        });
+        글자맞추기();
+    }
+    /* 판에 안 들어가는 크기 글은 아예 숨긴다.
+       「1,500×1,5」 처럼 깎인 숫자는 **없는 것만 못하다** — 사장님이 잘못 읽으신다.
+       (10-05 에 그림을 눈으로 보고 잡았다. 자로만 보면 안 걸린다 — 판 밖으로
+        나간 것이 아니라 판 안에서 깎여 있었다.) */
+    function 글자맞추기() {
+        바닥판.querySelectorAll('.lmc').forEach(el => {
+            const 크기 = el.querySelector('.lsz');
+            if (!크기) return;
+            크기.style.display = '';
+            if (getComputedStyle(크기).display === 'none') return;      // .납작 이 이미 숨겼다
+            if (크기.scrollWidth > 크기.clientWidth + 0.5) 크기.style.display = 'none';
+        });
+    }
+
+    /* ── 끌어 옮기기 ────────────────────────────────────────────────── */
+    let 잡은것 = null;
+    let 맨위 = 50;                        // 잡은 기계를 올려 두는 층. 잡을 때마다 하나 올라간다
+    const 가두기 = (v, 끝) => Math.max(0, Math.min(끝, Math.round(v / 눈금) * 눈금));
+
+    /* ── 기계끼리 겹쳐 놓지 않는다 ───────────────────────────────────────
+       관리자에게: 이것은 **제가 정한 것**입니다. 공장 바닥에 기계 두 대가 같은
+       자리를 차지할 수는 없으니 그대로 둔 것이기도 하지만, 참 까닭은 이것입니다 —
+       겹치게 두면 큰 기계가 작은 기계를 **통째로 덮어** 그 기계를 다시 끌 수가
+       없었습니다(10-05 에 집진기가 보링기 밑에 들어가 그렇게 됐습니다).
+
+       막는 방식: **다른 기계 앞까지는 가고 거기서 선다.** 가로를 먼저 풀고 그
+       가로에서 세로를 푼다 — 그래서 기계 옆을 지날 때는 벽을 따라 밀듯이
+       미끄러진다. (그냥 「겹치면 안 움직인다」 로 두었더니 기계 쪽으로 밀 때
+       아예 꼼짝을 안 해서, 붙여 놓을 수가 없었다 — 10-05 에 재어서 고쳤다.) */
+    const 겹치나 = (m, x, y) => 기계들.some(o => o !== m
+        && x < o.x + o.가로 && o.x < x + m.가로
+        && y < o.y + o.세로 && o.y < y + m.세로);
+
+    /* 가려는 자리를 다른 기계에 막히는 데까지만 줄여 돌려준다.
+       돌려주는 것: { x, y, 막혔나 } — 막혔나는 **기계에** 막혔을 때만 참이다(벽은 아니다) */
+    function 풀기(m, 갈x, 갈y) {
+        let x = 갈x, 막혔나 = false;
+        기계들.forEach(o => {                       // ① 가로 — 지금 세로에서 걸리는 것만 본다
+            if (o === m) return;
+            if (!(m.y < o.y + o.세로 && o.y < m.y + m.세로)) return;
+            if (m.x + m.가로 <= o.x && x > o.x - m.가로) { x = o.x - m.가로; 막혔나 = true; }
+            else if (m.x >= o.x + o.가로 && x < o.x + o.가로) { x = o.x + o.가로; 막혔나 = true; }
+        });
+        let y = 갈y;
+        기계들.forEach(o => {                       // ② 세로 — ① 로 정한 가로에서 걸리는 것만
+            if (o === m) return;
+            if (!(x < o.x + o.가로 && o.x < x + m.가로)) return;
+            if (m.y + m.세로 <= o.y && y > o.y - m.세로) { y = o.y - m.세로; 막혔나 = true; }
+            else if (m.y >= o.y + o.세로 && y < o.y + o.세로) { y = o.y + o.세로; 막혔나 = true; }
+        });
+        if (겹치나(m, x, y)) return { x: m.x, y: m.y, 막혔나: true };   // 마지막 자물쇠
+        return { x, y, 막혔나 };
+    }
+
+    function 집기(e) {
+        if (e.pointerType === 'mouse' && e.button !== 0) return;
+        const el = e.currentTarget;
+        const m = 기계들.find(x => x.id === el.dataset.id);
+        if (!m || !배율) return;
+        잡은것 = { m, el, pid: e.pointerId, 손x: e.clientX, 손y: e.clientY, 첫x: m.x, 첫y: m.y };
+        el.classList.add('잡힘');
+        /* 방금 잡은 것을 맨 위로 올린다. 기계가 겹치면 뒤에 그려진 것이 손가락을
+           가로채는데, 한 번 아래로 깔린 기계는 **다시 끌 수가 없었다**. */
+        el.style.zIndex = String(++맨위);
+        try { el.setPointerCapture(e.pointerId); } catch (err) {}
+        알리기(m);
+        /* ⚠ 여기서 e.preventDefault() 를 부르면 안 된다. 포인터 내림을 막으면
+           뒤따르는 mousedown 이 안 나고, 손잡이(viggle)가 그것으로 0.5초를 세기에
+           **길게 눌러도 지시판이 안 떴다**(10-05 에 재어서 잡았다).
+           화면이 같이 밀리는 것은 .lmc 의 touch-action:none 이 막아 준다. */
+    }
+    function 끌기(e) {
+        if (!잡은것 || e.pointerId !== 잡은것.pid) return;
+        /* 손잡이의 지시판이 떴으면 끌기를 그만둔다 — 판 뒤에서 기계가 따라 움직이면 안 된다 */
+        if (document.querySelector('.vg-sheet')) return 놓기(e);
+        const m = 잡은것.m;
+        const 갈x = 가두기(잡은것.첫x + (e.clientX - 잡은것.손x) / 배율, 바닥.가로 - m.가로);
+        const 갈y = 가두기(잡은것.첫y + (e.clientY - 잡은것.손y) / 배율, 바닥.세로 - m.세로);
+        const 푼것 = 풀기(m, 갈x, 갈y);
+        m.x = 푼것.x; m.y = 푼것.y;
+        자리넣기(잡은것.el, m);
+        알리기(m, 푼것.막혔나);
+    }
+    function 놓기(e) {
+        if (!잡은것 || (e && e.pointerId !== 잡은것.pid)) return;
+        const { m, el, pid, 첫x, 첫y } = 잡은것;
+        잡은것 = null;
+        el.classList.remove('잡힘');
+        try { el.releasePointerCapture(pid); } catch (err) {}
+        // 제자리면 담지 않는다 — 짚기만 하신 것이라 「저장했습니다」 가 뜨면 거짓이다
+        if (m.x !== 첫x || m.y !== 첫y) 저장(true);
+        알리기(m);
+    }
+    /* 끄는 동안 어디로 가는지 보여 준다 — 안 보이면 자리를 잡을 수가 없다 */
+    function 알리기(m, 막혔나) {
+        쪽지.textContent = m.이름 + ' — 왼쪽벽 ' + 수(m.x) + ' · 위벽 ' + 수(m.y) + ' mm'
+                         + (막혔나 ? ' · 다른 기계에 막혔습니다' : '');
+    }
+
+    /* ── 열기 ──────────────────────────────────────────────────────── */
+    폰에서읽기();                                   // 담긴 것이 있으면 그것으로, 없으면 처음 배치로
+    재기();
+    그리기();
+    /* 화면이 돌아가거나 글자 크기가 바뀌면 다시 잰다. 자리(mm)는 그대로다 */
+    let 다시시계 = null;
+    const 다시 = () => {
+        clearTimeout(다시시계);
+        다시시계 = setTimeout(() => { 재기(); 그리기(); }, 120);
+    };
+    addEventListener('resize', 다시);
+    addEventListener('orientationchange', 다시);
+    /* 창고가 우리보다 먼저 붙었을 수도 있다 — 그때는 위 모듈이 부르지 못했으니 여기서 부른다 */
+    if (window.fbFirestore && window.db) window.layoutCloudSync();
+})();
+</script>
+
+<!-- 바이글 손잡이 — 주소에 ?viggle=1 이 있을 때만 켜진다 -->
+<script src="../shared/viggle.js"></script>
+</body>
+</html>
