@@ -123,7 +123,8 @@ await p.waitForTimeout(300);
    창고(파이어스토어)는 이 상자에서 못 닿는다. 그래서 같은 꼴의 가짜 칸을 끼워
    넣고 화면이 하는 일만 잰다 — 앱 파일은 한 글자도 안 건드린다. */
 await p.evaluate(() => {
-  const 곳간 = { boring_boxes: new Map(), boring_files: new Map(), boring_config: new Map() };
+  const 곳간 = { boring_boxes: new Map(), boring_files: new Map(), boring_config: new Map(),
+                boring_requests: new Map() };
   const 귀들 = [];
   const 이름of = (a, 뒤) => a[a.length - 1 - 뒤];
   const 스냅칸 = 이름 => ({ forEach: f => 곳간[이름].forEach((v, k) => f({ id: k, data: () => v })) });
@@ -139,8 +140,10 @@ await p.evaluate(() => {
     collection: (...a) => ({ kind: 'col', 이름: 이름of(a, 0) }),
     doc:        (...a) => ({ kind: 'doc', 이름: 이름of(a, 1), id: 이름of(a, 0) }),
     onSnapshot: (ref, cb) => {
-      귀들.push({ kind: ref.kind, 이름: ref.이름, id: ref.id, cb });
+      const 귀 = { kind: ref.kind, 이름: ref.이름, id: ref.id, cb };
+      귀들.push(귀);
       cb(ref.kind === 'col' ? 스냅칸(ref.이름) : 스냅문서(ref.이름, ref.id));
+      return () => { const i = 귀들.indexOf(귀); if (i >= 0) 귀들.splice(i, 1); };   // 진짜 SDK 가 그렇다
     },
     setDoc: async (r, v, opt) => {
       곳간[r.이름].set(r.id, opt && opt.merge
@@ -486,45 +489,155 @@ const 빈말보기 = () => p.evaluate(() => ({
   넘침: document.documentElement.scrollWidth,
 }));
 
-// ① 아예 못 닿았을 때
+/* ── 창고를 거치는 길 ────────────────────────────────────────────────
+   10-05 사장님: 「뭘 고르기로 열어 빨리 연결해 임마」.
+   훑기가 목록을 넣는 그 길 그대로 — 답을 읽지 않고 창고를 거친다. CORS 가 안 낀다.
+   여기서는 앱스 스크립트 자리에 **허수아비**를 세워 끝까지 재 본다:
+   요청 칸에 「기다림」 이 적히면 같은 자리에 속을 써 넣는다 — 진짜가 할 그 일이다. */
+const 알맹이 = fs.readFileSync(cix길).toString('base64');
+const 문지기세우기 = (답) => p.evaluate(답 => {
+  if (window.__문지기) clearInterval(window.__문지기);   // 먼저 세운 것을 반드시 치운다
+  window.__문지기센것 = 0; window.__문지기본것 = null;
+  window.__문지기 = setInterval(() => {
+    const { setDoc, doc } = window.fbFirestore;
+    window.__곳간.boring_requests.forEach((v, id) => {
+      if (!v || v.상태 !== '기다림') return;
+      window.__문지기센것++;
+      window.__문지기본것 = Object.assign({ id }, v);
+      setDoc(doc(null, 'a', 'p', 'd', 'boring_requests', id),
+             Object.assign({ 답한때: Date.now() }, 답), { merge: true });
+    });
+  }, 40);
+}, 답);
+const 문지기치우기 = () => p.evaluate(() => { clearInterval(window.__문지기); window.__문지기 = null; });
+// 파일 화면의 그 자리로 되돌아가는 길 — 박스판 → 「파일」 박스 → 맨 위 → 알렉스
+async function 파일화면으로(){
+  await p.tap('#bor-back button');            await p.waitForTimeout(300);
+  await p.tap(`[data-borb-id="${파일박스}"]`); await p.waitForTimeout(400);
+  await p.tap('#borf-up');                    await p.waitForTimeout(300);
+  await p.tap('#borf-folders [data-into="알렉스"]'); await p.waitForTimeout(300);
+}
+const 도면상태 = () => p.evaluate(() => ({
+  화면: document.documentElement.getAttribute('data-borscreen'),
+  이름: document.getElementById('b-pick-nm').textContent,
+  동그라미: document.querySelectorAll('#b-draw circle').length,
+}));
+
+/* ⓐ 곧장 묻는 길이 막혀 있어도 창고를 거쳐 들어오나 — 이것이 본론이다 */
 await p.evaluate(() => { window.__속답 = () => Promise.reject(new Error('못 닿음')); });
+await 문지기세우기({ 상태: '됨', name: '592x382_1001_01.cix', b64: 알맹이 });
 await p.tap('#borf-list .borf-row');
-await p.waitForTimeout(400);
-let 본것 = await 빈말보기();
-재기('못 닿았으면 그렇다고 적나', 본것.말 === '그 주소에 아예 닿지 못했습니다', 본것.말);
-재기('부른 주소를 그대로 보이나', /^부른 곳: https:\/\/script\.google\.com\//.test(본것.증거), 본것.증거);
-const 고르라는말 = '아래 「고르기로 열기」 를 누르시면 파일 앱이 열립니다 — '
-                 + '거기 구글 드라이브에서 같은 파일을 고르시면 도면이 바로 뜹니다';
-재기('무엇을 하면 되는지 한 줄로 적나', 본것.할일 === 고르라는말, 본것.할일);
-/* 10-05 — 사장님: 「왜 다시 배포해야되는데 … 그냥 빨리 되게하라」.
-   사장님께 시키는 말은 화면에 없어야 한다. 글자로 못 박아 둔다. */
-const 시키는말 = await p.evaluate(() =>
-  /다시 ?배포|재배포|앱스스크립트|스크립트를 다시|맥에서/.test(document.body.innerText));
-재기('「다시 배포」 같은 시키는 말이 화면에 없나', !시키는말);
-/* 말만 하고 끝내지 않는다 — 그 자리에 오늘 되는 길이 단추로 놓여 있어야 한다 */
-const 고르기단추 = await p.evaluate(() => {
-  const b = document.getElementById('borf-pick');
-  return b ? { 글: b.textContent.trim(), 키: Math.round(b.getBoundingClientRect().height) } : null;
+await p.waitForTimeout(1200);
+let 들어옴 = await 도면상태();
+재기('곧장 묻는 길이 막혀도 창고를 거쳐 파일 속이 들어오나',
+     들어옴.화면 === null && 들어옴.동그라미 === 16,
+     들어옴.이름 + ' · 동그라미 ' + 들어옴.동그라미);
+const 적힌요청 = await p.evaluate(() => window.__문지기본것 || null);
+재기('요청을 driveId 자리에 적나', !!적힌요청 && 적힌요청.id === 'D4' && 적힌요청.driveId === 'D4',
+     적힌요청 ? 적힌요청.id : '안 적혔다');
+재기('언제 빌었는지도 함께 적나', !!적힌요청 && Number(적힌요청.빈때) > 0,
+     적힌요청 ? String(적힌요청.빈때) : '없다');
+
+/* ⓑ 주소가 아예 없어도 되나 — 주소를 일부러 지워 놓고 잰다.
+   주소가 또 바뀌든 로그인으로 튕기든 안 깨진다는 말이 이 줄로 서야 한다. */
+await 파일화면으로();
+await p.evaluate(async () => {
+  const { setDoc, doc } = window.fbFirestore;
+  await setDoc(doc(null, 'a', 'p', 'd', 'boring_config', '설정'), { exec: '' }, { merge: true });
 });
-재기('그 자리에 「고르기로 열기」 단추가 뜨나',
-     !!고르기단추 && 고르기단추.글 === '고르기로 열기', 고르기단추 ? 고르기단추.글 : '없다');
-재기('「고르기로 열기」 가 44px 인가', !!고르기단추 && 고르기단추.키 >= 44,
-     (고르기단추 ? 고르기단추.키 : 0) + 'px');
-// 그 단추가 진짜 파일 고르기를 여나 — 손가락으로 눌러 본다
-await p.evaluate(() => { window.__골랐나 = 0;
-                         document.getElementById('b-file').click = () => { window.__골랐나++; }; });
-await p.tap('#borf-pick');
+await p.waitForTimeout(300);
+await 문지기세우기({ 상태: '됨', name: '주소없이받음.cix', b64: 알맹이 });
+await p.tap('#borf-list .borf-row');
+await p.waitForTimeout(1200);
+들어옴 = await 도면상태();
+재기('주소가 아예 없어도 창고를 거쳐 들어오나',
+     들어옴.화면 === null && 들어옴.동그라미 === 16 && 들어옴.이름 === '주소없이받음.cix',
+     들어옴.이름 + ' · 동그라미 ' + 들어옴.동그라미);
+
+/* ⓒ 지난번 답을 잘못 집지 않나 — 먼저 적힌 답은 이번 것이 아니다 */
+await 파일화면으로();
+await 문지기치우기();
+await p.evaluate(async () => {
+  const { setDoc, doc } = window.fbFirestore;
+  await setDoc(doc(null, 'a', 'p', 'd', 'boring_requests', 'D4'),
+               { 상태: '됨', name: '묵은답.cix', b64: 'eA==', 답한때: 1 }, { merge: true });
+});
+await p.tap('#borf-list .borf-row');
+await p.waitForTimeout(700);
+재기('묵은 답을 집지 않고 새 답을 기다리나',
+     /파일을 가져오는 중입니다/.test(await 빈말글()), (await 빈말글()).slice(0, 40));
+await p.waitForTimeout(700);                 // 초를 세는 것은 1초마다다 — 한 번은 지나야 보인다
+재기('기다리는 동안 센 초를 보이나', /\(\d+초\)/.test(await 빈말글()), (await 빈말글()).slice(0, 40));
+// 화면 그림은 여기서 찍는다 —  env 샷=1 node 보링변환/tests/bpp1.mjs
+if (process.env['샷']) await p.screenshot({ path: path.join(뿌리, '보링변환/shots/375-창고로기다림.png') });
+// 이제 새 답을 넣어 주면 그때 들어온다
+await 문지기세우기({ 상태: '됨', name: '새답.cix', b64: 알맹이 });
+await p.waitForTimeout(900);
+들어옴 = await 도면상태();
+재기('새 답이 오면 그때 들어오나', 들어옴.이름 === '새답.cix' && 들어옴.동그라미 === 16, 들어옴.이름);
+
+/* ⓓ 앱스 스크립트가 못 하겠다고 하면 그 말을 그대로 */
+await 파일화면으로();
+await 문지기치우기();
+await 문지기세우기({ 상태: '못함', why: '파일이 너무 큽니다' });
+await p.tap('#borf-list .borf-row');
+await p.waitForTimeout(900);
+재기('창고로 온 못함 까닭을 그대로 적나', (await 빈말보기()).말 === '파일이 너무 큽니다',
+     (await 빈말보기()).말);
+
+/* ⓔ 두 길이 다 막히면 둘이 각각 무엇이었는지 함께 보인다 */
+await 문지기치우기();
+await p.evaluate(async () => {
+  const { setDoc, doc } = window.fbFirestore;
+  await setDoc(doc(null, 'a', 'p', 'd', 'boring_config', '설정'),
+               { exec: 'https://script.google.com/macros/s/AKfycbTEST/exec' }, { merge: true });
+  // 창고에 적는 길까지 막아 본다
+  window.__옛setDoc = window.fbFirestore.setDoc;
+  window.fbFirestore.setDoc = (r, v, o) => (r.이름 === 'boring_requests')
+      ? Promise.reject(new Error('막음')) : window.__옛setDoc(r, v, o);
+});
 await p.waitForTimeout(250);
-재기('누르면 파일 고르기가 열리나', await p.evaluate(() => window.__골랐나) === 1);
-/* 사장님 손이 가기 전에 프로그램이 먼저 더 해 봐야 한다 —
-   담긴 주소 하나로 끝내지 않고 /exec · /dev 꼴을 차례로 두드린다. */
-const 두드린곳 = await p.evaluate(() => window.__보낸몸.map(o => o.__u || ''));
-재기('한 꼴만 두드리고 접지 않나', 두드린곳.length >= 2, 두드린곳.length + '군데');
-재기('해 본 곳을 증거에 다 적나', /해 본 곳 \d+군데:/.test(본것.증거),
-     (본것.증거.match(/해 본 곳 \d+군데:/) || ['없다'])[0]);
-// 사장님께 보일 화면 그림은 이 자리에서 찍는다 —  샷=1 node 보링변환/tests/bpp1.mjs
+await p.tap('#borf-list .borf-row');
+await p.waitForTimeout(900);
+let 본것 = await 빈말보기();
+재기('창고까지 막히면 그렇다고 적나', 본것.말 === '창고에 적지 못했습니다', 본것.말);
+재기('곧장 물었을 때 무엇이었는지도 함께 적나',
+     /곧장 물었을 때: 그 주소에 아예 닿지 못했습니다/.test(본것.증거), 본것.증거.slice(0, 80));
+재기('부른 주소를 그대로 보이나', /부른 곳: https:\/\/script\.google\.com\//.test(본것.증거), 본것.증거.slice(0, 120));
+재기('375px 에서 그 글이 가로로 안 넘친다', 본것.넘침 === 375, 본것.넘침 + 'px');
 if (process.env['샷']) await p.screenshot({ path: path.join(뿌리, '보링변환/shots/375-문안열림.png') });
 
+/* ⓕ 사장님께 일을 넘기는 말이 화면에 없나 — 「다시 배포」 를 지운 것과 같은 자로 */
+const 넘기는말 = await p.evaluate(() => {
+  const 글 = document.body.innerText;
+  const 걸린것 = [];
+  [/다시 ?배포/, /재배포/, /앱스스크립트/, /고르기/, /고르시/, /선택하/, /골라/].forEach(r => {
+    const m = 글.match(r); if (m) 걸린것.push(m[0]);
+  });
+  return 걸린것;
+});
+재기('파일 화면에 사장님께 일을 넘기는 말이 0개인가', 넘기는말.length === 0,
+     넘기는말.length ? 넘기는말.join(' · ') : '0개');
+재기('「고르기로 열기」 단추가 아예 없나',
+     await p.evaluate(() => !document.getElementById('borf-pick')));
+
+/* ⓖ 「볼 폴더 밖」 은 또렷한 대답이다 — 창고로 더 가지 않고 거기서 멈춘다 */
+await p.evaluate(() => {
+  window.fbFirestore.setDoc = window.__옛setDoc;
+  window.__보낸몸.length = 0;
+  window.__속답 = () => Promise.resolve({ ok: true, status: 200,
+    text: () => Promise.resolve(JSON.stringify({ ok: false, why: '밖' })) });
+});
+await p.tap('#borf-list .borf-row');
+await p.waitForTimeout(700);
+재기('볼 폴더 밖이면 그렇다고 적나', (await 빈말보기()).말 === '볼 폴더 밖의 파일입니다', (await 빈말보기()).말);
+재기('또렷한 대답이면 한 번에서 멈추나', await p.evaluate(() => window.__보낸몸.length) === 1,
+     await p.evaluate(() => window.__보낸몸.length) + '번');
+재기('또렷한 대답이면 창고로 가지 않나',
+     await p.evaluate(() => !window.__곳간.boring_requests.get('D4')
+                         || window.__곳간.boring_requests.get('D4').상태 !== '기다림'));
+
+/* ⓗ 곧장 묻는 길이 열려 있으면 그 길로 바로 — 보내는 꼴은 그대로다 */
 const 보낸것 = await p.evaluate(() => {
   const o = window.__보낸몸[0] || {};
   return { 방법: o.method, 머리: o.headers && o.headers['Content-Type'], 몸: o.body };
@@ -535,47 +648,7 @@ const 보낸것 = await p.evaluate(() => {
      JSON.parse(보낸것.몸 || '{}')['일'] === '보링파일' && JSON.parse(보낸것.몸 || '{}').driveId === 'D4',
      보낸것.몸);
 
-// ② 닿았는데 돌려보냈을 때 — 상태 번호를 적는다
-await p.evaluate(() => { window.__속답 = () => Promise.resolve({ ok: false, status: 403,
-  text: () => Promise.resolve('Sorry, unable to open the file at this time.') }); });
-await p.tap('#borf-list .borf-row');
-await p.waitForTimeout(400);
-본것 = await 빈말보기();
-재기('퇴짜면 상태 번호를 적나', 본것.말 === '닿았는데 돌려보냈습니다 (403)', 본것.말);
-재기('돌아온 글도 그대로 보이나', /돌아온 글: Sorry, unable to open/.test(본것.증거), 본것.증거);
-
-// ③ 답은 왔는데 자료가 아니라 웹 화면일 때 — 온 글 앞머리를 그대로
-await p.evaluate(() => { window.__속답 = () => Promise.resolve({ ok: true, status: 200,
-  text: () => Promise.resolve('<!DOCTYPE html><html><head><title>Google 계정으로 로그인</title>') }); });
-await p.tap('#borf-list .borf-row');
-await p.waitForTimeout(400);
-본것 = await 빈말보기();
-재기('자료가 아니면 그렇다고 적나', 본것.말 === '답이 왔는데 자료가 아니라 웹 화면이었습니다', 본것.말);
-재기('온 글 앞머리를 그대로 보이나', /로그인/.test(본것.증거), 본것.증거.slice(0, 60));
-재기('375px 에서 그 글이 가로로 안 넘친다', 본것.넘침 === 375, 본것.넘침 + 'px');
-
-// ④ 볼 폴더 밖
-await p.evaluate(() => { window.__보낸몸.length = 0;   // 이 누름만 센다
-                         window.__속답 = () => Promise.resolve({ ok: true, status: 200,
-  text: () => Promise.resolve(JSON.stringify({ ok: false, why: '밖' })) }); });
-await p.tap('#borf-list .borf-row');
-await p.waitForTimeout(400);
-재기('볼 폴더 밖이면 그렇다고 적나', (await 빈말보기()).말 === '볼 폴더 밖의 파일입니다', (await 빈말보기()).말);
-// 또렷한 대답이다 — 다른 꼴을 더 두드려 봐야 같은 답이니 딱 한 번에서 멈춘다
-const 밖몇번 = await p.evaluate(() => window.__보낸몸.length);
-재기('또렷한 대답이면 더 두드리지 않나', 밖몇번 === 1, 밖몇번 + '번');
-재기('또렷한 대답에는 고르기 단추를 안 띄우나',
-     await p.evaluate(() => !document.getElementById('borf-pick')));
-
-// ⑤ 그 밖의 ok:false 는 돌아온 why 를 그대로
-await p.evaluate(() => { window.__속답 = () => Promise.resolve({ ok: true, status: 200,
-  text: () => Promise.resolve(JSON.stringify({ ok: false, why: '파일이 없습니다' })) }); });
-await p.tap('#borf-list .borf-row');
-await p.waitForTimeout(400);
-재기('그 밖의 까닭은 온 그대로 적나', (await 빈말보기()).말 === '파일이 없습니다', (await 빈말보기()).말);
-
 // ④ 문이 열렸을 때 — 알맹이를 받아 「고르기」 와 똑같은 길을 탄다
-const 알맹이 = fs.readFileSync(cix길).toString('base64');
 await p.evaluate(b64 => { window.__속답 = () => Promise.resolve({ ok: true, status: 200,
   text: () => Promise.resolve(JSON.stringify({ ok: true, name: '592x382_1001_01.cix', b64 })) }); }, 알맹이);
 await p.tap('#borf-list .borf-row');
