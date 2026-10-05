@@ -115,7 +115,8 @@ const 잰것 = await p.evaluate(() => {
     놓인카드: 재(놓), 풀카드: 재(풀), 놓인단추: 재(단추), 풀단추: 재(풀.querySelector('.wo-cut-편집')),
     닿는자리: { w: 닿.width, h: 닿.height, minW: 닿.minWidth },
     단추글: 단추.textContent.trim(),
-    도면과한칸: !!(도면 && 단추.parentElement === 도면.parentElement),
+    // 도면 자리가 한 겹 더 생겨(10-02 「일정공간」 지시) 부모가 갈렸다 — 같은 칸인지로 본다
+    도면과한칸: !!(도면 && 단추.closest('.woc-그림') && 단추.closest('.woc-그림') === 도면.closest('.woc-그림')),
     카드onclick: !!놓.getAttribute('onclick'), 풀onclick: !!풀.getAttribute('onclick'),
     카드커서: getComputedStyle(놓).cursor, 풀커서: getComputedStyle(풀).cursor,
     카드끌기: 놓.getAttribute('draggable'), 풀끌기: 풀.getAttribute('draggable'),

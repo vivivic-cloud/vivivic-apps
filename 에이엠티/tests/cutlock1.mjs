@@ -93,8 +93,19 @@ const 톡카드 = async (n) => {
   const r = await p.evaluate(n => {
     const 카 = document.querySelectorAll('#__무대 .wo-boring-placed-card')[n - 1];
     const e = 카 ? 카.querySelector('.wo-cut-편집') : null; if (!e) return null;
-    const b = e.getBoundingClientRect();
-    return { x: Math.round(b.x + b.width / 2), y: Math.round(b.y + b.height / 2) }; }, n);
+    // 카드가 길어져 둘째 카드 단추가 화면 밖으로 나갈 수 있다.
+    // 무대는 fixed 라 스크롤이 안 먹으니 무대째 위로 밀어 올려 놓고 누른다.
+    const 무대 = document.getElementById('__무대');
+    무대.style.top = '0px';
+    let b = e.getBoundingClientRect();
+    if (b.bottom > innerHeight - 8) {
+      무대.style.top = Math.round(innerHeight - 8 - b.bottom) + 'px';
+      b = e.getBoundingClientRect();
+    }
+    const x = Math.round(b.x + b.width / 2), y = Math.round(b.y + b.height / 2);
+    if (x < 0 || y < 0 || x > innerWidth || y > innerHeight) return null;
+    return { x, y }; }, n);
+  await p.waitForTimeout(200);
   if (!r) { console.log('   !! 못 집음: ' + n + '번 카드 편집'); return false; }
   await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: r.x, y: r.y, radiusX: 14, radiusY: 14, force: 1 }] });
   await p.waitForTimeout(110);

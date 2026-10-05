@@ -1,12 +1,14 @@
+// ⚠ 자료는 **얼어붙은 본보기**를 쓴다 — 이 시험은 「아직 덜 잘린 공통부속」 이 있어야 성립한다.
+//    진짜 자료에서 그 부속이 다 잘리면 추천에서 빠지는 것이 맞는 셈이라 떨어진다 (10-03).
 // 추천 부속 목록 — 이미 다 잘린 것은 빠지고, 모자란 것은 남은 수량과 함께 서는가.
 // 업무 자료는 읽기만. 파이어베이스 쓰기는 가짜로 막고 몇 번 불렸는지 센다.
-import { 브라우저열기, devices, 서버, 자료, 자재 } from './도구/터.mjs';
+import { 브라우저열기, devices, 서버, 자료, 본보기, 자재 } from './도구/터.mjs';
 await 서버();   // 저장소를 8899 에 내주는 자리 서버 — 없으면 스스로 띄운다
 const B='http://127.0.0.1:8899';
 const URL=B+'/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0.html';
-const O=await 자료('confirmed_orders');
-const C=await 자료('cutting_plans');
-const L=await 자료('원장');
+const O= await 본보기('confirmed_orders');
+const C= await 본보기('cutting_plans');
+const L= await 본보기('원장');
 const b=await 브라우저열기();
 let 실패=0; const 판=(n,t,v)=>{ if(!t) 실패++; console.log((t?'  OK  ':'  FAIL')+'  '+n+'   → '+v); };
 

@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.14.0 (2026-10-02) — 공정카드를 세 칸으로: 글 · 잘라야 하는 부속(누움) · 재단배치도(반듯)
+     버전: v1.15.0 (2026-10-04) — 완료 수량 0 뿌리: 사유 없는 맨 0 은 안 적힌 것으로 보고 원장 셈으로 받친다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1132,10 +1132,31 @@
         .woc-몸 { display: flex; flex-wrap: wrap; gap: 10px; min-width: 0; }
         .woc-글 { min-width: 0; flex: 1 1 100%; }
         .woc-부속 { min-width: 0; flex: 1 1 0; display: flex; justify-content: center; align-items: flex-start; }
-        /* 부속 판은 제 크기(width·height)를 가지고 있다 — 칸에 맞춰 가로세로가 같이 준다 */
-        .woc-부속 svg { width: auto; height: auto; max-width: 100%; max-height: 132px; margin: 0; }
+        /* 「실제사이즈와 상관없이 일정공간을 동일하게 차지하는 도면」(10-02 지시).
+           자리는 카드마다 늘 같은 크기고, 도면은 제 비율을 지킨 채 그 안에 들어갈
+           만큼만 커진다. 남는 데는 비워 둔다 — 늘려서 찌그러뜨리지 않는다.
+           (두 도면 다 제 크기 width·height 를 가지고 있어 가로세로가 같이 준다) */
+        .woc-부속, .woc-도면자리 { height: 132px; width: 100%; display: flex;
+            align-items: center; justify-content: center; }
+        .woc-부속 svg, .woc-도면자리 svg { width: auto; height: auto;
+            max-width: 100%; max-height: 100%; margin: 0; }
+        /* 재단 치수 — 도면 위에 얹는 글. 자리는 몫(%)이고 크기는 여기서 못박는다.
+           SVG 안에 적으면 부속마다 글자가 커졌다 작아졌다 한다(10-03 지시). */
+        /* 도면 상자를 칸 안에 꼭 맞게(contain) 잡는다 — 글을 몫(%)으로 얹으려면
+           상자와 그림이 한 치도 안 어긋나야 한다. 칸을 자로 삼아(container) 셈한다. */
+        .woc-부속 { container-type: size; }
+        .woc-부속 .부속판 { position: relative; display: block; line-height: 0;
+            max-width: 100%; max-height: 100%;
+            width: min(100cqw, calc(100cqh * var(--비, 1)));
+            height: min(100cqh, calc(100cqw / var(--비, 1))); }
+        .woc-부속 .부속판 > svg { display: block; width: 100%; height: 100%; }
+        .woc-부속 .부속치수 {
+            position: absolute; transform: translate(-50%, -50%); z-index: 1;
+            font-size: 13px; font-weight: 800; color: #37352f; line-height: 1.15;
+            letter-spacing: -.02em; white-space: nowrap; pointer-events: none;
+            background: rgba(255,255,255,.86); border-radius: 3px; padding: 0 2px;
+        }
         .woc-그림 { min-width: 0; flex: 1 1 0; display: flex; justify-content: center; }
-        .woc-그림 svg { max-height: 132px; width: auto; max-width: 100%; margin: 0; }
         .woc-그림속 { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
         /* 배치도 칸 안으로 들어온 큰 단추는 그 칸 폭을 꽉 채운다 */
         .woc-그림속 .woc-단추, .woc-그림속 .woc-끝 { flex: 0 0 auto; width: 100%; min-width: 0; box-sizing: border-box; }
@@ -1148,9 +1169,9 @@
             .woc-몸 { flex-wrap: nowrap; align-items: flex-start; gap: 14px; }
             .woc-글 { flex: 0 0 45%; max-width: 45%; }
             .woc-부속 { flex: 0 0 33%; max-width: 33%; }
-            .woc-부속 svg { max-height: 168px; }
+            .woc-부속, .woc-도면자리 { height: 168px; }
+            .woc-부속 .부속치수 { font-size: 14px; }
             .woc-그림 { flex: 1 1 22%; max-width: 280px; justify-content: flex-end; }
-            .woc-그림 svg { max-height: 168px; }
         }
         /* 누르는 단추 — 44px 아래로 안 내려간다. hover 가 없는 폰에서도 눌린 티가 난다. */
         .woc-단추 {
@@ -2401,7 +2422,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.14.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.15.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2534,7 +2555,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.14.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.15.0</b></p>
         </div>
     </div>
 
@@ -3533,6 +3554,22 @@
             const uc = parseFloat(row[h.indexOf('세트별소모량')]) || 1;
             return Math.round(uc * (order.orderQty || 1));
         }
+
+        /* 사장님 지시(10-04 01:29) — 「완료시 왜 수량이 0이되는거야 실제 작업된
+           수량이 기준이 되어 나타나야지」. 담긴 수량(partInfoMap[cardKey].qty)이 0 이면
+           「안 적힌 것」 으로 보고 원장 셈으로 받친다. 셈은 새로 만들지 않고 _발주몫 이
+           쓰는 그 잣대 그대로다 — 세트별소모량 × 발주수량.
+           발주수량(orderQty)으로 떨어지지 않는다: 그것은 세트 수지 부속 수가 아니다. */
+        window._원장셈몫 = function(order, cardKey, rowIndexHint) {
+            const h = currentFullData && currentFullData[0];
+            if (!h || !order) return null;
+            let ri = (rowIndexHint != null) ? parseInt(rowIndexHint, 10) : NaN;
+            if (isNaN(ri)) ri = parseInt(String(cardKey || '').split('-')[2], 10);
+            const row = !isNaN(ri) ? currentFullData[ri] : null;
+            if (!row) return null;
+            const uc = parseFloat(row[h.indexOf('세트별소모량')]) || 1;
+            return Math.round(uc * (order.orderQty || 1));
+        };
 
         // 재단계획의 실제 필요수량(필요 EA) — 지금 살아 있는 발주만으로 다시 센다.
         // plan.reqQty 는 계획을 만들 때 여러 발주를 합쳐 굳혀 둔 값이라,
@@ -5313,7 +5350,7 @@
                                 ${procDotsHtml}
                             </div>
                             <div class="flex flex-col items-end gap-0.5 flex-shrink-0">
-                                <span class="pt-qty text-[9px] font-black text-[#37352f] bg-[#f7f6f3] px-1 rounded">${pData.qty} EA</span>
+                                <span class="pt-qty text-[9px] font-black text-[#37352f] bg-[#f7f6f3] px-1 rounded">${(pData.qty > 0) ? pData.qty : Math.round(partQtyForTime)} EA</span>
                             </div>
                         </div>
                     </div>`;
@@ -6705,14 +6742,20 @@
                                     .filter(b => b['납기'] && b['납기'] !== _dlvOD)
                                     .map(b => ({ date: b['납기'], qty: b.qty }));
                                 const _dlvMovedQty  = _dlvMoved.reduce((s, e) => s + (e.qty || 0), 0);
-                                const _dlvRemain    = pData.qty - _dlvMovedQty;
+                                const _dlvTotalQty   = Math.round(unitCons * (item.orderQty || 1));
+                                /* 발주에 담긴 수량(partInfoMap.qty)이 0 인 발주가 실제로 있다
+                                   (10-03 「여기 수량 어디갔어?」 — 럭스-20260929-01 의 부속 여덟이 다 0 이었다).
+                                   이 줄만 그 값을 그대로 읽어 0EA 로 떴다. 다른 자리(_발주몫·재단 칸·
+                                   부속 목록)는 모두 「담긴 값이 없으면 원장 셈」 으로 되돌린다 —
+                                   같은 잣대를 쓴다. 담긴 자료는 손대지 않는다, 읽는 자리만 맞춘다. */
+                                const _dlv기본      = (pData.qty > 0) ? pData.qty : _dlvTotalQty;
+                                const _dlvRemain    = _dlv기본 - _dlvMovedQty;
                                 const _dlvIsMoved   = _dlvMovedQty > 0;
                                 const _dlvMovedLabel = _dlvIsMoved
                                     ? `<span style="font-size:7px;font-weight:800;color:#787774;white-space:nowrap;flex-shrink:0;">→${_dlvMoved.map(e=>`${e.date.slice(5)}(${e.qty}EA)`).join(' ')}</span>`
                                     : '';
-                                const _dlvDisplayQty = _dlvIsMoved ? Math.max(0, _dlvRemain) : pData.qty;
+                                const _dlvDisplayQty = _dlvIsMoved ? Math.max(0, _dlvRemain) : _dlv기본;
                                 const _dlvOpacity    = (_dlvIsMoved && _dlvRemain <= 0) ? '0.35' : '1';
-                                const _dlvTotalQty   = Math.round(unitCons * (item.orderQty || 1));
                                 partsHtml += `
                                     <div
                                         data-idnum="${item.idNum}"
@@ -7486,8 +7529,17 @@
             let effectiveQty = defaultQty;
             let changedBy    = null;
             for (const p of procs) {
-                const aq = completions?.[p]?.actualQty;
-                if (aq != null) { effectiveQty = aq; changedBy = p; }
+                const rec = completions?.[p];
+                const aq  = rec?.actualQty;
+                if (aq == null) continue;
+                /* 사장님 지시(10-04 01:29) — 「실제 작업된 수량이 기준이 되어 나타나야지」.
+                   0 개를 작업했다는 것은 작업이 아니다. 사유(reason) 없이 맨 0 만 적힌
+                   기록은 「안 적힌 것」 으로 보고 예정 수량을 살린다. 한 번 0 으로 찍히면
+                   그 뒤로 영원히 0 을 올바른 수량으로 믿던 자리다.
+                   사유가 적힌 0 은 그대로 믿는다 — 불량으로 한 개도 못 나온 자리다. */
+                const _사유있음 = !!(rec && rec.reason != null && String(rec.reason).trim() !== '');
+                if (Number(aq) === 0 && !_사유있음) continue;
+                effectiveQty = aq; changedBy = p;
             }
             if (changedBy != null && effectiveQty !== defaultQty) {
                 const diff  = effectiveQty - defaultQty;
@@ -7857,8 +7909,12 @@
             const 일 = window._집중일; if (!일) return;
             const o = 일.order || {};
             const 수 = (() => {
+                /* 담긴 0 을 그대로 넘기면 완료 창이 0 으로 열린다(10-04 지시).
+                   0 은 「안 적힌 것」 으로 보고 원장 셈으로 받친다. 발주수량으로
+                   떨어지지 않는다 — 그것은 세트 수지 부속 수가 아니다. */
                 const pm = (o.partInfoMap || {})[일.cardKey];
-                return pm && pm.qty != null ? pm.qty : (o.orderQty || 0);
+                if (pm && pm.qty > 0) return pm.qty;
+                return _원장셈몫(o, 일.cardKey) || 0;
             })();
             window._집중판닫기();
             tlShowPartDoneConfirm(일.docId, 일.cardKey, 일.procKey,
@@ -7982,9 +8038,13 @@
             // 이전 공정에서 수량이 변경됐다면 그 값을 기본값으로 사용
             const _ordDc   = (typeof confirmedOrders !== 'undefined' ? confirmedOrders : []).find(o => (o.docId || String(o.idNum)) === docId);
             const _compsDc = _partRecMap(_ordDc?.partCompletions, cardKey);
-            const _qiDc    = (typeof _partQtyInfo === 'function') ? _partQtyInfo(_compsDc, parseInt(rawDefaultQty || 0)) : { qty: parseInt(rawDefaultQty || 0) };
+            /* 카드가 0 을 건네는 길이 여럿이다(시작 단추가 물려 준 _expQty 도 그렇다).
+               0 을 그대로 미리 채우면 사장님이 그 0 을 그냥 찍으시고, 기록에 0 이 박힌다.
+               어제 고친 다섯 자리와 똑같은 꼴로 원장 셈으로 받친다(10-04 지시). */
+            const _기본Dc  = parseInt(rawDefaultQty || 0) || (_원장셈몫(_ordDc, cardKey) || 0);
+            const _qiDc    = (typeof _partQtyInfo === 'function') ? _partQtyInfo(_compsDc, _기본Dc) : { qty: _기본Dc };
             const expectedQty = _qiDc.qty;  // 이전 공정 actualQty 반영된 현재 유효 수량
-            window._pdConfirmData = { docId, cardKey, procKey, date, btn, partName, expectedQty, rawDefaultQty: parseInt(rawDefaultQty || 0), startKey: startKey || '' };
+            window._pdConfirmData = { docId, cardKey, procKey, date, btn, partName, expectedQty, rawDefaultQty: _기본Dc, startKey: startKey || '' };
             /* 사장님 지시(09-16 00:35) — 한 도면에서 같이 잘려 나온 작업물이 있으면
                그 수량도 같이 보여야 한다. 재단계획에 2·3순위 부속이 이름·치수·개수로
                이미 들어 있다(_woPlanExtras). 완료를 찍는 이 자리에 그대로 펴 보인다.
@@ -8034,6 +8094,7 @@
                     </div>` : `
                     <div style="margin-bottom:14px;padding:10px 11px;background:#fbfbfa;border:1px dashed #dddbd8;border-radius:8px;">
                         <div style="font-size:11px;font-weight:700;color:#787774;">수량 못 맞춤</div>
+                        ${_pdChk.까닭 ? `<div class="_pd까닭" style="font-size:11px;font-weight:600;color:#37352f;margin-top:4px;">${_pdChk.까닭}</div>` : ''}
                     </div>`;
             const _pdExtraHtml = _pdExtras.length ? `
                     <div style="margin-bottom:14px;padding:10px 11px;background:#f7f6f3;border:1px solid #ededeb;border-radius:8px;">
@@ -9837,13 +9898,21 @@
            안에 꼭 맞게 줄여 넣는다 — 잘리지도 않고 카드도 안 늘어난다.
            그늘은 누운 판의 네 귀를 그대로 따 와서 조금 아래에 깔고 흐린다
            (누운 묶음 안에 넣으면 흐림이 줄인 배만큼 같이 줄어든다). */
-        function _누워싸기(폭, 높이, 번호, 안) {
+        /* 눕힌 뒤 어느 점이 어디로 가는지 — 그림과 글이 같은 셈을 쓰게 한 군데서 낸다.
+           여유 = 칸 가장자리에 남길 자리(1 이면 꽉 찬다). */
+        function _누운자리(폭, 높이, 여유) {
             const C = 0.8660254, S = 0.5;
             const 누운폭 = C * (폭 + 높이), 누운높이 = S * (폭 + 높이);
-            const 배 = Math.min(폭 / 누운폭, 높이 / 누운높이) * 0.94;   // 0.94 = 가장자리 숨 쉴 자리
+            const 배 = Math.min(폭 / 누운폭, 높이 / 누운높이) * (여유 == null ? 0.94 : 여유);
             const 밀기X = (폭 - 배 * 누운폭) / 2 + 배 * C * 높이;       // 왼쪽으로 뻗는 만큼 되민다
             const 밀기Y = (높이 - 배 * 누운높이) / 2;
-            const 점 = (x, y) => [(밀기X + 배 * C * (x - y)).toFixed(1), (밀기Y + 배 * S * (x + y)).toFixed(1)];
+            return { C, S, 배, 밀기X, 밀기Y,
+                     점: (x, y) => ({ x: 밀기X + 배 * C * (x - y), y: 밀기Y + 배 * S * (x + y) }) };
+        }
+
+        function _누워싸기(폭, 높이, 번호, 안, 여유) {
+            const { C, S, 배, 밀기X, 밀기Y, 점: _점 } = _누운자리(폭, 높이, 여유);
+            const 점 = (x, y) => { const q = _점(x, y); return [q.x.toFixed(1), q.y.toFixed(1)]; };
             const 네귀 = [점(0, 0), 점(폭, 0), 점(폭, 높이), 점(0, 높이)];
             const 그늘이름 = 'amtsh' + 번호;
             return `<defs><filter id="${그늘이름}" x="-20%" y="-20%" width="140%" height="160%">` +
@@ -9858,7 +9927,7 @@
            크게 띄우는 도면·집중 창 도면은 반듯한 채로 둔다 — 누운 그림으로 재단 치수를
            읽으면 비뚤어져 보인다. 눕는 것은 보이는 꼴뿐이고, 조각이 앉은 자리(lp·tp·wp·hp)
            에서 낸 x·y·width·height 는 한 자도 건드리지 않는다. */
-        function _woCuttingDiagramSvg(p, w, h, fitHeight, 누움) {
+        function _woCuttingDiagramSvg(p, w, h, fitHeight, 누움, 칸맞춤) {
             if (!p.isCuttingCard || !p.boardParts || p.boardParts.length === 0) return '';
             const BW = p.boardW || 2440, BD = p.boardH || 1220;
             let minLeftF = Infinity, minTopF = Infinity;
@@ -9889,12 +9958,15 @@
             // 중복되는 aspect-ratio 선언은 빼고 표준 교체요소 크기계산에 맡김.
             // fitHeight=true는 높이가 확정값을 가진 칸(카드 우측 끝, 폭은 auto)에서
             // 쓰므로 높이 기준(height:100%)+폭 상한(max-width)으로 계산
-            const sizeStyle = fitHeight
+            // 칸맞춤=true 면 크기를 글에 적지 않는다 — 카드의 도면 자리(CSS)가 쥐고,
+            // 도면은 제 비율 그대로 그 자리에 들어갈 만큼만 커진다(10-02 지시).
+            const sizeStyle = 칸맞춤 ? '' : (fitHeight
                 ? `height:100%;width:auto;max-width:100%;`
-                : `width:100%;height:auto;`;
+                : `width:100%;height:auto;`);
+            const 제크기 = 칸맞춤 ? ` width="${cropW.toFixed(1)}" height="${cropH.toFixed(1)}"` : '';
             const 테 = `style="display:block;${sizeStyle}border:1px solid #d6d4d1;border-radius:4px;margin-top:4px;flex-shrink:0;background:#ecebe8;box-shadow:0 1px 2px rgba(55,53,47,0.10),0 5px 12px rgba(55,53,47,0.07);"`;
             if (!누움)
-                return `<svg viewBox="0 0 ${cropW.toFixed(1)} ${cropH.toFixed(1)}" ${테}>${격자}${rects}</svg>`;
+                return `<svg viewBox="0 0 ${cropW.toFixed(1)} ${cropH.toFixed(1)}"${제크기} ${테}>${격자}${rects}</svg>`;
 
             /* ── 누운 꼴 (30도 등각) ──────────────────────────────────────────
                x' = cos30·(x−y) · y' = sin30·(x+y) — 반듯한 판을 비스듬히 본 꼴.
@@ -9902,8 +9974,23 @@
                따라 늘어 **카드가 길어진다**. 그래서 칸은 그대로 두고, 누운 판을
                그 칸 안에 꼭 맞게 줄여 넣는다 — 잘리지도 않고 카드도 안 늘어난다. */
             const 바닥 = `<path d="M0 0 H${cropW.toFixed(1)} V${cropH.toFixed(1)} H0 Z" fill="#f7f6f4"/>`;
-            return `<svg viewBox="0 0 ${cropW.toFixed(1)} ${cropH.toFixed(1)}" ${테}>` +
+            return `<svg viewBox="0 0 ${cropW.toFixed(1)} ${cropH.toFixed(1)}"${제크기} ${테}>` +
                    _누워싸기(cropW, cropH, 번호, 바닥 + 격자 + rects) + `</svg>`;
+        }
+
+        /* 이 부속의 결보호 값 — 원본 행(원장)에 적힌 그대로 읽는다. 새로 셈하지 않는다.
+           'O' 면 결을 지켜야 하는 부속이고, 'X' 면 돌려 앉혀도 되는 부속이다.
+           비어 있으면 「설정 안 됨」 으로 보아 아무것도 그리지 않는다. */
+        function _wo결보호(p) {
+            try {
+                if (p && p.결보호 != null && String(p.결보호).trim() !== '') return String(p.결보호).trim();
+                const h = (typeof currentFullData !== 'undefined') && currentFullData[0];
+                if (!h || !p || p.pRowIndex == null) return '';
+                const row = currentFullData[p.pRowIndex];
+                if (!row) return '';
+                const i = h.indexOf('결보호');
+                return i < 0 ? '' : String(row[i] == null ? '' : row[i]).trim();
+            } catch (e) { return ''; }
         }
 
         /* ── 이 카드에서 잘라야 하는 부속 한 장 (10-02 지시) ───────────────────
@@ -9915,14 +10002,59 @@
             const W = parseFloat(p && p.rw) || 0, H = parseFloat(p && p.rd) || 0;
             if (!(W > 0 && H > 0)) return '';
             const 번호 = ++_재단도면번호;
-            const 격자 = _도면격자(Math.min(W, H) / 4, W, H, 번호);
+            // 격자무늬는 뺀다(10-03 지시). _도면격자 자체는 재단배치도가 그대로 쓴다.
             const 바닥 = `<path d="M0 0 H${W} V${H} H0 Z" fill="#ffffff"/>`;
             const 테두리 = `<path d="M0 0 H${W} V${H} H0 Z" fill="none" stroke="#37352f" ` +
                            `stroke-width="1" vector-effect="non-scaling-stroke"/>`;
-            return `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="display:block;` +
-                   `border:1px solid #d6d4d1;border-radius:4px;margin-top:4px;flex-shrink:0;background:#ecebe8;` +
-                   `box-shadow:0 1px 2px rgba(55,53,47,0.10),0 5px 12px rgba(55,53,47,0.07);">` +
-                   _누워싸기(W, H, 번호, 바닥 + 격자 + 테두리) + `</svg>`;
+            /* ── 결방향 (10-02 지시) ────────────────────────────────────────
+               「만약 결방향이 설정되어 있다면 올바른 결방향을 표현」.
+               결보호가 비었으면 설정 안 된 것이라 아무것도 안 그린다. 'X'(돌려 앉혀도
+               되는 부속)도 안 그린다. 그리는 쪽은 **배치도가 앉힌 방향과 같은 셈
+               (_앉힐방향)** 을 그대로 물어 본다 — 두 쪽이 어긋나면 현장에서 반대로 자른다. */
+            const 결값 = _wo결보호(p);
+            let 결무늬 = '';
+            if (결값 !== '' && normalizeValue(결값) !== 'X') {
+                const 방향 = _앉힐방향(W, H, 결값, p.boardW || 2440, p.boardH || 1220, 5, 4.5);
+                const 가로결 = !방향.돌림;          // 안 돌려 앉혔으면 결은 재단W 쪽으로 간다
+                const 금 = [];
+                for (let k = 1; k <= 7; k++) 가로결
+                    ? 금.push(`M0 ${(H * k / 8).toFixed(1)} H${W}`)
+                    : 금.push(`M${(W * k / 8).toFixed(1)} 0 V${H}`);
+                결무늬 = `<path class="결금" d="${금.join(' ')}" fill="none" stroke="#b7b4af" ` +
+                         `stroke-width="0.7" vector-effect="non-scaling-stroke"/>`;
+            }
+            // 「회색 뒷배경을 제거하고 재단할 사이즈의 도면만」(10-02 지시) — 상자(바탕·테두리)는
+            // 없다. 판 아래 그늘은 도면 안에서 그리므로 그대로 남는다.
+            // 제 크기(width·height)를 적어 둔다 — 자리에 맞춰 줄 때 가로세로가 같이 줄어
+            // 찌그러지지 않는다. 자리 크기는 CSS(.woc-부속)가 쥔다.
+            /* ── 재단 치수를 「해당 변」 에 적는다 (10-03 지시) ──────────────
+               도면은 30도로 누워 있다. 그래서 화면에서 가로로 보이는 변이 W 가 아니다.
+               눕힌 뒤의 자리를 그림과 **같은 셈(_누운자리)** 으로 다시 내서,
+               W 는 W 변 바깥에, D 는 D 변 바깥에 붙인다.
+               글은 **누운 틀 밖**에 똑바로 세워 적는다 — 틀 안에 넣으면 글자도 같이
+               기울어 폰(부속 칸 158×132)에서 안 읽힌다. */
+            const 여유 = 0.76;                       // 글 적을 자리를 가장자리에 남긴다
+            const 자리 = _누운자리(W, H, 여유);
+            const 큰쪽 = Math.max(W, H);
+            const 띄움 = 큰쪽 * 0.075;      // 변에서 얼마나 바깥으로 띄울지 (도면 단위)
+            const W가온 = 자리.점(W / 2, 0), D가온 = 자리.점(0, H / 2);
+            // 변의 바깥쪽으로 밀어 낸다 — W 변은 오른위(S,−C), D 변은 왼위(−S,−C)
+            const Wx = W가온.x + 띄움 * 자리.S, Wy = W가온.y - 띄움 * 자리.C;
+            const Dx = D가온.x - 띄움 * 자리.S, Dy = D가온.y - 띄움 * 자리.C;
+            /* 글씨는 **도면 밖(HTML)** 에 얹는다. SVG <text> 로 적으면 글자가 viewBox 와
+               함께 줄어 부속마다 크기가 제각각이 된다(10-03 지시: 「제멋대로」).
+               자리는 도면 칸을 100 으로 본 몫(%)이라 도면이 커지든 작아지든 그 변에 그대로 붙고,
+               글자 크기는 CSS 가 쥐므로 어느 부속에서나 같은 px 다. */
+            const 가둠 = (v, 작, 큰) => Math.max(작, Math.min(큰, v));
+            const 몫 = (x0, y0) => ({ x: 가둠(x0 / W * 100, 2, 98), y: 가둠(y0 / H * 100, 6, 94) });
+            const w몫 = 몫(Wx, Wy), d몫 = 몫(Dx, Dy);
+            const 치수글 =
+                `<b class="부속치수" style="left:${w몫.x.toFixed(1)}%;top:${w몫.y.toFixed(1)}%;">${W}</b>` +
+                `<b class="부속치수" style="left:${d몫.x.toFixed(1)}%;top:${d몫.y.toFixed(1)}%;">${H}</b>`;
+            return `<span class="부속판" style="--비:${(W / H).toFixed(4)};">` +
+                   `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="display:block;">` +
+                   _누워싸기(W, H, 번호, 바닥 + 결무늬 + 테두리, 여유) + `</svg>` +
+                   치수글 + `</span>`;
         }
 
         // 재단 카드의 "도면 보기" 클릭 시 확대 팝업으로 표시
@@ -10329,15 +10461,19 @@
             // 안 온 자료 없이 작업이 나가면 부속이 빠진 채로 재단이 나간다.
             const _자료막힘 = (typeof window._자료막힘 === 'function') && window._자료막힘();
             const _wPrereq  = !_자료막힘 && _partPrereqDone(_wck, _wpk, _wComps);
-            const _wQI      = _partQtyInfo(_wComps, p.dq || 0);
+            /* p.dq 가 0 으로 오는 길이 있다(담긴 수량 0). 그 0 이 카드 글씨와
+               완료 창 기준 수량에 그대로 내려가 「완료시 수량 0」 이 된다(10-04 지시).
+               0 이면 원장 셈으로 받친다 — 셈은 _원장셈몫(=_발주몫 잣대) 하나뿐이다. */
+            const _w기본    = (p.dq > 0) ? p.dq : (_원장셈몫(_wobj, _wck, p.pRowIndex) || 0);
+            const _wQI      = _partQtyInfo(_wComps, _w기본);
             // 완료 등록 시 "사유 없이 등록 가능한 기준 수량" — 재단은 원장을 통짜로
             // 잘라 발주수량보다 더 나오는 게 정상(예: 발주 17개인데 원장 배치상
             // 18개가 나옴)이라, 발주수량 기준으로 맞추면 실제 작업현장과 달라 매번
             // 사유를 입력해야 하는 문제가 있었음 — 재단은 실제 예상 생산량(총작업수량)을
             // 기준으로 삼음
             const _wDoneQtyBasis = p.isCuttingCard
-                ? (_cuttingYield(p) || (p.dq || 0))
-                : (p.dq || 0);
+                ? (_cuttingYield(p) || _w기본)
+                : _w기본;
             // 미배정 부속 카드의 시작·완료도 배치카드(_b칸)와 똑같은 무게로 — 현장에서
             // 장갑 낀 손으로 누르는 자리라 8px 글씨로는 눌리지 않는다는 피드백.
             const _w줄 = 'margin-top:6px;text-align:right;';
@@ -10523,14 +10659,16 @@
             const _bOld    = _woPartOldKeys(cKey, _bdid);
             const _bComps  = _partRecMap(_bobj?.partCompletions, _bck, _bOld);
             const _bStarts = _partRecMap(_bobj?.partStarted,     _bck, _bOld);
-            const _bQI   = _partQtyInfo(_bComps, p.dq || 0);
+            /* 위 _woCardHtml 과 같은 까닭이다 — 담긴 0 이 카드와 완료 창으로 내려간다. */
+            const _b기본 = (p.dq > 0) ? p.dq : (_원장셈몫(_bobj, _bck, p.pRowIndex) || 0);
+            const _bQI   = _partQtyInfo(_bComps, _b기본);
             // 완료 등록 시 "사유 없이 등록 가능한 기준 수량" — 재단은 원장을
             // 통짜로 잘라 발주수량보다 더 나오는 게 정상이라, 발주수량 대신
             // 실제 예상 생산량(총작업수량)을 기준으로 삼음 (실제 작업현장과
             // 맞지 않다는 피드백)
             const _bDoneQtyBasis = p.isCuttingCard
-                ? (_cuttingYield(p) || (p.dq || 0))
-                : (p.dq || 0);
+                ? (_cuttingYield(p) || _b기본)
+                : _b기본;
 
             // ─── 배치 카드 (재단카드: 6개 핵심정보 / 일반카드: 컴팩트 2행) ───
             let _placedInner = '';
@@ -10566,7 +10704,7 @@
                         (x.수 > 0 ? ` · ${_esc(x.수)} EA` : '') + `</span>`).join('') + `</div>`
                     : '';
                 // 재단배치도는 **반듯하게** 둔다 — 누운 그림으로 재단 치수를 읽으면 비뚤다(10-02 지시).
-                const _diagCut = _woCuttingDiagramSvg(p);
+                const _diagCut = _woCuttingDiagramSvg(p, null, null, false, false, true);
                 // 가운데 칸 — 이 카드에서 잘라야 하는 부속 한 장(누운 민판).
                 const _부속판 = _wo부속판Svg(p);
 
@@ -10691,7 +10829,8 @@
                 _placedInner = `<div class="woc-몸">` +
                     `<div class="woc-글">${_cut글}</div>` +
                     (_cut부속 ? `<div class="woc-부속">${_cut부속}</div>` : '') +
-                    `<div class="woc-그림"><div class="woc-그림속">${_cut도면}${_편집Btn}${_bDoneHtml}</div></div>` +
+                    `<div class="woc-그림"><div class="woc-그림속">` +
+                    `<div class="woc-도면자리">${_cut도면}</div>${_편집Btn}${_bDoneHtml}</div></div>` +
                     `</div>`;
             // 누르는 것을 한 줄에 모은다 — 왼쪽에 곁단추(편집·불량보고), 오른쪽에 큰 단추
             const _b행동줄 = _세칸
@@ -13322,7 +13461,7 @@
                                 ${procDotsHtml}
                             </div>
                             <div class="flex flex-col items-end gap-0.5 flex-shrink-0">
-                                <span class="pt-qty text-[9px] font-black text-[#37352f] bg-[#f7f6f3] px-1 rounded">${pData.qty} EA</span>
+                                <span class="pt-qty text-[9px] font-black text-[#37352f] bg-[#f7f6f3] px-1 rounded">${(pData.qty > 0) ? pData.qty : Math.round(partQtyForTime)} EA</span>
                             </div>
                         </div>
                     </div>`;
@@ -13452,7 +13591,7 @@
                             <span class="text-[9px] text-[#787774] font-medium" onclick="copyID('${w} X ${d}', this)">${w} X ${d}</span>
                         </div>
                         <div class="flex flex-col items-end gap-0.5 flex-shrink-0" onclick="event.stopPropagation()">
-                            <input id="input-${cardKey}" type="number" value="${pData.qty}" class="notion-input !w-10 !p-0 !text-[9px] !text-center font-black text-[#37352f] bg-[#f7f6f3] border-none disabled:opacity-70" disabled>
+                            <input id="input-${cardKey}" type="number" value="${(pData.qty > 0) ? pData.qty : Math.round((parseFloat(row[h.indexOf("세트별소모량")]) || 1) * (item.orderQty || 1))}" class="notion-input !w-10 !p-0 !text-[9px] !text-center font-black text-[#37352f] bg-[#f7f6f3] border-none disabled:opacity-70" disabled>
                             ${isAmt && canEdit ? `<button onclick="handleSubPartEdit(this, ${idNum}, '${cardKey}', ${isID0508})" class="text-[9px] px-2 py-0.5 bg-white border border-[#ededeb] rounded hover:bg-[#f7f6f3] text-[#787774] font-bold">수정</button>` : ''}
                             <div class="text-[9px] font-black text-[#37352f] bg-[#f7f6f3] px-1 rounded">${partSupplier}</div>
                         </div>
@@ -13663,8 +13802,11 @@
 
                     // 공통부속이 아닌 경우에만 남은 수량 체크
                     if (!isCommon) {
-                        // 총 발주량
-                        const totalOrdered = pData.qty;
+                        // 총 발주량 — 담긴 값이 0 이면 원장 셈으로 받친다. 받침이 없으면
+                        // 「다 재단했다, 남은 게 없다」 로 셈해 이 원장 단추가 아예 안 선다
+                        // (사장님이 자르셔야 할 것을 못 자르신다 · 10-03 지시).
+                        const totalOrdered = pData.qty
+                            || Math.round((parseFloat(partRow[h.indexOf("세트별소모량")]) || 1) * (order.orderQty || 1));
 
                         // 이미 재단 확정된 수량 계산
                         let alreadyProduced = 0;
@@ -13842,7 +13984,9 @@
                         if (partInfoMap[cardKey]) {
                             const pData = partInfoMap[cardKey];
                             if (!pData.isDeleted) {
-                                totalAggregatedQty += pData.qty;
+                                // 담긴 값이 0 이면 원장 셈으로 받친다 — 0 이 섞이면 합계가 모자라다
+                                totalAggregatedQty += pData.qty
+                                    || Math.round((parseFloat(row[h.indexOf("세트별소모량")]) || 1) * (order.orderQty || 1));
                                 matchedInOrders = true;
                                 matchedOrderIds.push(order.idNum); // 상품카드 ID 추가
                             }
@@ -15342,7 +15486,13 @@
 
         /* ── 손가락 ── */
         let 누름 = null, 길게 = false;
+        /* 짚어서 지시(?viggle=1)로 열었으면 박스 길게 누르기를 걸지 않는다.
+           둘 다 0.5초라 박스 타일을 짚으면 지시 창 위로 「박스 고치기」 판이 겹쳐 떴다
+           (10-02 지시로 재어 확인함). 짚는 화면에서는 짚는 것이 먼저다.
+           직원들이 보는 보통 화면(?viggle 없음)은 그대로 — 길게 누르면 박스를 고친다. */
+        const 짚는화면 = new URLSearchParams(location.search).get('viggle') === '1';
         document.addEventListener('pointerdown', e => {
+            if (짚는화면) return;
             const t = e.target.closest('[data-amtb-id]'); if (!t) return;
             길게 = false;
             누름 = setTimeout(() => {

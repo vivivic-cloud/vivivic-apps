@@ -129,6 +129,20 @@ export async function 자료(이름){
     자료들.set(이름, 값);
     return 값;
 }
+/* 얼어붙은 본보기만 본다 — 진짜 업무 자료가 있어도 그것을 안 쓴다.
+   일이 **어디까지 됐느냐**에 매달리는 시험(시작 단추가 있나·재편집이 열리나·
+   추천에 서나)이 쓴다. 진짜 자료는 날마다 바뀌어서, 그 날 일이 다 끝나 있으면
+   시작할 것도 고칠 것도 없어 멀쩡한 화면인데도 시험이 떨어진다 (10-03). */
+export async function 본보기(이름){
+    const 열쇠 = '본보기:' + 이름;
+    if (자료들.has(열쇠)) return 자료들.get(열쇠);
+    const 길 = path.join(시험칸, '본보기자료', 이름 + '.json');
+    if (!있나(길)) throw new Error('본보기 자료가 없습니다: ' + 이름 + '.json');
+    const 값 = JSON.parse(fs.readFileSync(길, 'utf-8'));
+    자료들.set(열쇠, 값);
+    return 값;
+}
+
 export function 자료어디(이름){
     return 있나(path.join(뿌리, 이름 + '.json')) ? '진짜' : '본보기';
 }

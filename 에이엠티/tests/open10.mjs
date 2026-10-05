@@ -1,18 +1,20 @@
+// ⚠ 자료는 **얼어붙은 본보기**를 쓴다 — 「열 번 열어 ▶시작이 제대로 서는가」 를 보므로
+//    진짜 자료에서 그 날 일이 다 끝나 있으면 시작 단추가 0개라 떨어진다 (10-03).
 // 캐시·localStorage 지우고 열 번 열어, 열 때마다 끝까지 따라가며 적는다.
 // 한 번 열 때마다: ① 「불러오는 중」 이 몇 초 보였나 ② 카드가 제대로 떴나
 //                  ③ 빨강이 떴나 ④ ▶시작이 눌리는 상태였나
 // 이 상자는 파이어베이스에 못 닿으므로, 자료가 오는 것은 네 군데 듣기가 답을 준
 // 것과 똑같이 손으로 넣어 흉내낸다. 망이 정말 끊긴 경우는 net1 에서 따로 쟀다.
-import { 브라우저열기, devices, 서버, 자료, 자재 } from './도구/터.mjs';
+import { 브라우저열기, devices, 서버, 자료, 본보기, 자재 } from './도구/터.mjs';
 await 서버();   // 저장소를 8899 에 내주는 자리 서버 — 없으면 스스로 띄운다
 import { readFileSync } from 'node:fs';
 const HERE = await 자재();   // 막힌 CDN 대신 쓸 것들 — 없으면 스스로 갖춘다
 const CSS=readFileSync(HERE+'/tw-built.css','utf-8');
 const B='http://127.0.0.1:8899';
 const URL=B+'/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0.html';
-const O=await 자료('confirmed_orders');
-const C=await 자료('cutting_plans');
-const L=await 자료('원장');
+const O= await 본보기('confirmed_orders');
+const C= await 본보기('cutting_plans');
+const L= await 본보기('원장');
 const b=await 브라우저열기();
 const 폰={...devices['iPhone 12'],viewport:{width:375,height:812},isMobile:true,hasTouch:true};
 const 늦기=[300,900,1500,2400,600,1200,2000,400,1800,1000];   // 자료가 오는 데 걸리는 시간을 번마다 다르게
