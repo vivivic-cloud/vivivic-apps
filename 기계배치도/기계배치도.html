@@ -117,6 +117,17 @@ body{
 /* 발 — 지금 무슨 일이 됐는지 한 줄 */
 .lfoot{display:flex; align-items:baseline; gap:8px; margin:10px 0 0; min-height:19px;
   width:100%; padding:0 14px;}
+/* 돌리기 단추 — 제 줄에 둔다. 알림줄에 끼우면 쪽지가 길어질 때 단추가 밀려
+   한 줄이 두 줄이 되고, 그러면 끄는 도중에 바닥 높이가 흔들린다. */
+.lbar{width:100%; padding:8px 14px 0; display:flex; justify-content:flex-end;}
+.lturn{
+  min-height:44px; min-width:44px; padding:0 16px; flex:none;
+  border:1px solid var(--vg-edge); border-radius:12px; background:#fff; color:var(--vg-ink);
+  font:inherit; font-size:14px; font-weight:700; white-space:nowrap; cursor:pointer;
+  -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none;
+}
+.lturn:active{transform:scale(.97);}
+.lturn[aria-pressed="true"]{background:var(--vg-ink); color:#fff; border-color:var(--vg-ink);}
 .lnote{font-size:12px; color:var(--vg-soft);}
 .lsave{margin-left:auto; font-size:11px; color:var(--vg-muted);}
 </style>
@@ -137,6 +148,11 @@ body{
     <div class="lfoot" data-area="알림">
       <span class="lnote" id="l-note" data-area="안내">기계를 손가락으로 끌어 옮기십시오</span>
       <span class="lsave" id="l-save" data-area="저장알림"></span>
+    </div>
+
+    <div class="lbar">
+      <button class="lturn" id="l-turn" type="button" aria-pressed="false"
+              data-area="돌리기단추">⟲ 세로로</button>
     </div>
   </div>
 </div>
@@ -178,10 +194,17 @@ body{
 
     let 바닥 = { ...처음바닥 };
     let 기계들 = 처음기계.map(m => ({ ...m }));
+    /* 돌려서 보나 — 참이면 10,000 쪽이 세로로 선다.
+       ⚠ 이것은 **보는 각도**일 뿐이다. 기계의 참 자리(mm)는 한 톨도 안 바뀐다.
+          부딪힘·벽 막기·담기는 전부 돌리기 전의 mm 로만 셈한다. */
+    let 돌림 = false;
     let 잰때 = 0;                         // 이 배치가 바뀐 때(ms). 창고와 견줄 때 쓴다
     let 배율 = 0;                         // px 하나가 몇 mm 인가의 거꾸로 — px/mm
 
     const $ = id => document.getElementById(id);
+    /* 화면에 보이는 바닥의 가로·세로(mm). 돌리면 둘이 뒤바뀐다 — 그것뿐이다 */
+    const 보이는가로 = () => 돌림 ? 바닥.세로 : 바닥.가로;
+    const 보이는세로 = () => 돌림 ? 바닥.가로 : 바닥.세로;
     const 바닥판 = $('l-floor');
     const 무대 = $('l-stage');
     const 감싼것 = document.querySelector('.lwrap');
@@ -206,6 +229,7 @@ body{
             가로: +m['가로'], 세로: +m['세로'], x: +m.x, y: +m.y,
         }));
         잰때 = +것['잰때'] || 0;
+        돌림 = !!것['돌림'];
         return true;
     }
     function 폰에서읽기() {
@@ -214,7 +238,7 @@ body{
     }
 
     /* ── 쓰기 ──────────────────────────────────────────────────────── */
-    const 담을것 = () => ({ 바닥, 기계들, 잰때 });
+    const 담을것 = () => ({ 바닥, 기계들, 잰때, 돌림 });
     function 폰에담기() {
         try { localStorage.setItem(폰열쇠, JSON.stringify(담을것())); return true; }
         catch (e) { return false; }
@@ -253,7 +277,7 @@ body{
             if (!s.exists()) { 창고에담기(); return; }     // 창고가 비었으면 지금 것을 올려 둔다
             const 것 = s.data();
             if (!(+것['잰때'] > 잰때)) return;
-            if (받기(것)) { 재기(); 그리기(); 쪽지.textContent = '다른 데서 옮긴 것을 받았습니다'; 폰에담기(); }
+            if (받기(것)) { 단추고치기(); 재기(); 그리기(); 쪽지.textContent = '다른 데서 옮긴 것을 받았습니다'; 폰에담기(); }
         } catch (e) { /* 못 읽어도 폰 안의 것으로 돈다 */ }
     };
 
@@ -268,22 +292,43 @@ body{
             const 보임 = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
             감싼것.style.height = 보임 + 'px';
         }
-        const 발참 = getComputedStyle(발);
-        const 발높 = 발.getBoundingClientRect().height
-                   + (parseFloat(발참.marginTop) || 0) + (parseFloat(발참.marginBottom) || 0);
+        // 바닥 밑에 깔린 것(알림줄·단추줄)이 먹는 높이를 다 뺀다
+        let 아래높 = 0;
+        [...무대.children].forEach(el => {
+            if (el === 바닥판) return;
+            const cs = getComputedStyle(el);
+            아래높 += el.getBoundingClientRect().height
+                    + (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0);
+        });
         const 칸폭 = 무대.clientWidth;
-        const 칸높 = 무대.clientHeight - 발높;
+        const 칸높 = 무대.clientHeight - 아래높;
         if (!(칸폭 > 0) || !(칸높 > 0)) return;
-        배율 = Math.min(칸폭 / 바닥.가로, 칸높 / 바닥.세로);     // px / mm
-        바닥판.style.width  = (바닥.가로 * 배율) + 'px';
-        바닥판.style.height = (바닥.세로 * 배율) + 'px';
+        배율 = Math.min(칸폭 / 보이는가로(), 칸높 / 보이는세로());   // px / mm
+        바닥판.style.width  = (보이는가로() * 배율) + 'px';
+        바닥판.style.height = (보이는세로() * 배율) + 'px';
         const 한칸 = (칸 * 배율).toFixed(3) + 'px';
         바닥판.style.backgroundSize = 한칸 + ' ' + 한칸;
         $('l-floor-size').textContent = 수(바닥.가로) + ' × ' + 수(바닥.세로) + ' mm';
     }
 
     /* ── 그리기 ────────────────────────────────────────────────────── */
+    /* ── 참 자리(mm) → 화면 자리 ────────────────────────────────────────
+       돌리기를 **CSS 로 판을 통째 돌리지 않았다.** 그러면 기계 이름까지 옆으로
+       누워 못 읽는다. 대신 **화면의 가로축에 세로를, 세로축에 가로를** 끼운다
+       — 글자는 그대로 서 있고, 그림만 시계 방향으로 90° 돈 것이 된다.
+
+         돌림 꺼짐 : 왼 = x,                    위 = y
+         돌림 켜짐 : 왼 = (바닥.세로 - y - 세로), 위 = x      (시계 방향 90°)
+
+       ⚠ 바꾸는 것은 **그리는 자리뿐**이다. m.x·m.y 는 손도 안 댄다. */
     function 자리넣기(el, m) {
+        if (돌림) {
+            el.style.left   = ((바닥.세로 - m.y - m.세로) / 바닥.세로 * 100) + '%';
+            el.style.top    = (m.x / 바닥.가로 * 100) + '%';
+            el.style.width  = (m.세로 / 바닥.세로 * 100) + '%';
+            el.style.height = (m.가로 / 바닥.가로 * 100) + '%';
+            return;
+        }
         el.style.left   = (m.x / 바닥.가로 * 100) + '%';
         el.style.top    = (m.y / 바닥.세로 * 100) + '%';
         el.style.width  = (m.가로 / 바닥.가로 * 100) + '%';
@@ -298,7 +343,7 @@ body{
             /* ⚠ data-area 에 기계 이름을 적어 둔다. 사장님이 이 기계를 짚으셨을 때
                손잡이가 「바탕」 이 아니라 **이 기계**를 적게 하려는 것이다. */
             el.dataset.area = '기계:' + m.이름;
-            const 높이px = m.세로 * 배율;
+            const 높이px = (돌림 ? m.가로 : m.세로) * 배율;   // 화면에 보이는 높이
             if (높이px < 34) el.classList.add('납작');
             if (높이px < 24) el.classList.add('아주납작');
             el.innerHTML = '<span class="lnm"></span><span class="lsz"></span>';
@@ -389,8 +434,12 @@ body{
         /* 손잡이의 지시판이 떴으면 끌기를 그만둔다 — 판 뒤에서 기계가 따라 움직이면 안 된다 */
         if (document.querySelector('.vg-sheet')) return 놓기(e);
         const m = 잡은것.m;
-        const 갈x = 가두기(잡은것.첫x + (e.clientX - 잡은것.손x) / 배율, 바닥.가로 - m.가로);
-        const 갈y = 가두기(잡은것.첫y + (e.clientY - 잡은것.손y) / 배율, 바닥.세로 - m.세로);
+        /* 손가락이 간 px → 참 자리(mm). 돌렸으면 축이 바뀐 만큼 되돌려 셈한다.
+           돌림 켜짐: 손가락이 아래로 가면 x 가 늘고, 오른쪽으로 가면 y 가 준다.
+           그래서 돌린 뒤에도 **손가락이 간 거리와 기계가 간 거리는 1:1 그대로**다. */
+        const 민px = e.clientX - 잡은것.손x, 민py = e.clientY - 잡은것.손y;
+        const 갈x = 가두기(잡은것.첫x + (돌림 ?  민py : 민px) / 배율, 바닥.가로 - m.가로);
+        const 갈y = 가두기(잡은것.첫y + (돌림 ? -민px : 민py) / 배율, 바닥.세로 - m.세로);
         const 푼것 = 풀기(m, 갈x, 갈y);
         m.x = 푼것.x; m.y = 푼것.y;
         자리넣기(잡은것.el, m);
@@ -412,8 +461,24 @@ body{
                          + (막혔나 ? ' · 다른 기계에 막혔습니다' : '');
     }
 
+    /* ── 돌리기 단추 ───────────────────────────────────────────────────
+       기본은 안 돌린 것이다. 사장님이 누르셔야 돈다 — 공장을 보시는 방향을
+       내가 멋대로 바꾸지 않는다. 누른 것은 자리와 같은 곳에 담긴다. */
+    const 단추 = $('l-turn');
+    function 단추고치기() {
+        단추.setAttribute('aria-pressed', String(돌림));
+        단추.textContent = 돌림 ? '⟲ 가로로' : '⟲ 세로로';   // 누르면 이렇게 된다는 뜻
+    }
+    단추.addEventListener('click', () => {
+        돌림 = !돌림;
+        단추고치기();
+        재기(); 그리기();
+        저장(true);                       // 다시 열어도 돌린 채로 열리게
+    });
+
     /* ── 열기 ──────────────────────────────────────────────────────── */
     폰에서읽기();                                   // 담긴 것이 있으면 그것으로, 없으면 처음 배치로
+    단추고치기();
     재기();
     그리기();
     /* 화면이 돌아가거나 글자 크기가 바뀌면 다시 잰다. 자리(mm)는 그대로다 */
