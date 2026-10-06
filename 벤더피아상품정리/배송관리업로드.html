@@ -34,6 +34,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>배송관리업로드</title>
 <script src="잠금.js"></script>
+<script src="기록.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 
@@ -41,7 +42,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut }
         from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
-    import { getFirestore, collection, doc, getDocs, deleteDoc, writeBatch, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+    import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc, writeBatch, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
     import { getStorage, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
 
     const firebaseConfig = {
@@ -58,7 +59,7 @@
     const auth = getAuth(app);
     window.db = getFirestore(app);
     window.st = getStorage(app);
-    window.fb = { collection, doc, getDocs, deleteDoc, writeBatch, query, where, serverTimestamp };
+    window.fb = { collection, doc, getDocs, setDoc, deleteDoc, writeBatch, query, where, serverTimestamp };
     window.fs = { ref, uploadBytes };
 
     // 이 집의 다른 프로그램은 익명으로 들어간다. 여기만 사장님 계정으로만 들어간다 —
@@ -70,7 +71,9 @@
         // 로그인 칸을 건너뛰고 들어온다 — 내보내고 다시 묻는다.
         if (user.isAnonymous) { signOut(auth); return; }
         window.잠금.닫기(user, () => signOut(auth));
+        window.나 = user;                                   // 기록에 「누가」로 들어간다
         window.initApp();
+        window.기록.그리기({ db: window.db, fb: window.fb, 넣을곳: '기록자리' });
     });
 </script>
 
@@ -191,6 +194,8 @@
     </div>
 
     <div id="err" class="hidden mt-3 border-l-4 border-red-400 bg-red-50 rounded-r-lg p-3 text-[12px] text-red-700"></div>
+
+    <div id="기록자리" class="mt-6" hidden></div>
 
     <footer class="mt-8 pt-4 border-t border-[#ededeb] text-[11px] text-[#a8a6a2] leading-relaxed">
         <p>원본 — <code>vp_배송원본/</code> 창고</p>
@@ -610,6 +615,17 @@ $('btn-up').addEventListener('click', async () => {
         $('d-doc').textContent = months.length + '개 (달마다 하나) · 열쇠칸 ' + 열쇠칸 + '개';
         $('d-file').textContent = fileNote;
         $('d-sec').textContent = ((Date.now() - t0) / 1000).toFixed(1) + '초';
+
+        // 누가·언제·어느 파일·몇 줄을 남긴다. 지운 칸·가린 번호도 함께 —
+        // 사람 정보가 정말 빠졌는지 나중에 되짚을 수 있어야 한다.
+        await window.기록.적기({ db: window.db, fb: window.fb, user: window.나,
+            무엇: '배송관리', 파일: name, 줄수: c.used, 문서수: months.length,
+            비고: [ c.지운칸.length ? ('사람칸 ' + c.지운칸.length + '개 지움') : '',
+                    c.가린번호 ? ('번호 ' + c.가린번호 + '개 가림') : '',
+                    겹친줄.length ? ('겹침 ' + 겹친줄.length + '줄 건너뜀') : '' ]
+                  .filter(Boolean).join(' · ') });
+        window.기록.그리기({ db: window.db, fb: window.fb, 넣을곳: '기록자리' });
+
         show('step-done');
 
     } catch (err) {
