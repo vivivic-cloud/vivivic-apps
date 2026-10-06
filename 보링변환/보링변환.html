@@ -1,7 +1,7 @@
 <!-- ==========================================
      보링변환.html
-     버전: v1.12.0 (2026-10-05) — 부를 주소를 **스크립트가 스스로 적어 둔 자리**에서
-     먼저 읽는다. 그 뒤에도 안 되면 창고(boring_requests)를 거쳐 받는다.
+     버전: v1.13.0 (2026-10-06) — 구멍을 **지름대로 크게·작게** 그린다.
+     전에는 최소 크기에 먹혀 5파이와 8파이가 똑같아 보였다.
            한마디로 뭉개지 않고 갈래마다 증거를 그대로 보인다
      (자세한 내력은 git 에)
      ========================================== -->
@@ -396,7 +396,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
 
     <div class="borh-tiles" id="borh-mine"></div>
 
-    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.12.0</b></p>
+    <p class="borh-foot">박스를 누르면 그 화면이 그대로 나옵니다.<br><b id="borh-ver">v1.13.0</b></p>
   </div>
 </div>
 
@@ -449,7 +449,7 @@ html[data-borb="1"] #borb-sheet{ display:flex; }
   <div class="bhead">
     <span class="bday">보링변환</span>
     <span class="brole">CIX → BPP</span>
-    <span class="bsub" id="b-ver">v1.12.0</span>
+    <span class="bsub" id="b-ver">v1.13.0</span>
   </div>
 
   <button class="btile" id="b-pick" type="button">
@@ -629,12 +629,32 @@ function 도면그리기(판, 구멍들){
   조각.push(`<svg viewBox="0 0 ${(w+여백*2).toFixed(1)} ${(h+여백*2).toFixed(1)}" role="img" aria-label="판과 구멍">`);
   // 판
   조각.push(`<rect x="${여백}" y="${여백}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" fill="none" stroke="#111110" stroke-width="1.4"/>`);
-  // 구멍
+  /* 구멍 — **지름대로 크게·작게 그린다**(10-06 사장님: 「제시된 정보의 지름에 따라
+     보링표현의 크기를 달리 해주세요」). 자는 **판을 화면에 맞추는 그 자(배)를 그대로**
+     쓴다. 따로 셈하면 판과 구멍이 어긋난다.
+
+     전에는 `Math.max(2.6, …)` 이었다. 592×382 에서 자가 0.53 이라 5파이는 1.33,
+     8파이는 2.13 — **둘 다 2.6 에 먹혀 똑같이** 그려졌다. 그래서 다 같아 보였다.
+
+     최소는 1.2 로 내리고, 그보다 작아지는 구멍은 **먹히지 않고 줄기만** 하게 한다
+     (`0.72 + 0.4×참`). 참=1.2 에서 1.2 로 이어지니 끊기지 않고, 작은 것끼리도
+     **큰 것이 늘 더 크다.** 아무리 작아도 0.72 밑으로는 안 내려가 점으로 안 사라진다.
+     이 받침 때문에 판 밖으로 나갈 수 있는 길이는 최대 0.72(≈0.7px)다.
+
+     지름이 **아예 없는 줄**은 5파이로 **지어내지 않는다** — 최소 크기의 **빈 동그라미**로
+     그려 「크기를 모른다」 는 것이 눈에 보이게 한다. 자리는 그대로 찍힌다. */
+  const 최소 = 1.2;
   for (const g of 구멍들) {
     const x = 값재기(g.x), y = 값재기(g.y), d = 값재기(g.dia);
     if (x === null || y === null) continue;          // 못 재는 것은 못 그린다
-    const r = Math.max(2.6, (d === null ? 5 : d) / 2 * 배);
-    조각.push(`<circle cx="${X(x).toFixed(1)}" cy="${Y(y).toFixed(1)}" r="${r.toFixed(1)}" fill="#111110"/>`);
+    const 가운데 = `cx="${X(x).toFixed(1)}" cy="${Y(y).toFixed(1)}"`;
+    if (d === null || d <= 0) {                      // 지름을 모른다 — 지어내지 않는다
+      조각.push(`<circle ${가운데} r="${최소.toFixed(1)}" fill="none" stroke="#111110" stroke-width="0.7"/>`);
+      continue;
+    }
+    const 참 = d / 2 * 배;
+    const r = 참 >= 최소 ? 참 : 0.72 + 0.4 * 참;
+    조각.push(`<circle ${가운데} r="${r.toFixed(1)}" fill="#111110"/>`);
   }
   조각.push('</svg>');
   return 조각.join('');
