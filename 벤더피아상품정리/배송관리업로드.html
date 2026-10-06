@@ -33,12 +33,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>배송관리업로드</title>
+<script src="잠금.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
-    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut }
+        from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
     import { getFirestore, collection, doc, getDocs, deleteDoc, writeBatch, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
     import { getStorage, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
 
@@ -59,8 +61,12 @@
     window.fb = { collection, doc, getDocs, deleteDoc, writeBatch, query, where, serverTimestamp };
     window.fs = { ref, uploadBytes };
 
+    // 이 집의 다른 프로그램은 익명으로 들어간다. 여기만 사장님 계정으로만 들어간다 —
+    // 벤더피아 자료에는 매입단가·매입금액이, 배송관리 원본에는 사람 정보가 있었다.
+    // 익명 로그인은 주소를 아는 사람이면 누구나 받는다. 잠금.js 와 화베 규칙이 짝이다.
     onAuthStateChanged(auth, (user) => {
-        if (!user) { signInAnonymously(auth).catch(e => console.error('익명 인증 실패:', e)); return; }
+        if (!user) { window.잠금.열기((메일, 비번) => signInWithEmailAndPassword(auth, 메일, 비번)); return; }
+        window.잠금.닫기(user, () => signOut(auth));
         window.initApp();
     });
 </script>
