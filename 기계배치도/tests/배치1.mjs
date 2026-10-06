@@ -202,9 +202,15 @@ const 삐짐 = await p.evaluate(() => {
         });
     const 아래 = Math.max(...[...document.querySelectorAll('.lwrap, .lfoot')]
         .map(el => el.getBoundingClientRect().bottom));
+    /* ⚠ scrollWidth 로 재면 안 된다 — 닿는 자리를 넓히려고 둔 ::after 가 밖으로
+       12px 나가 있어 글이 멀쩡해도 깎인 것으로 잡힌다(10-06 에 헛방을 맞았다).
+       **글 자체의 너비**를 Range 로 재서 칸과 견준다. */
     const 깎인글 = [];
     document.querySelectorAll('.lhead > *, .lfoot > *').forEach(el => {
-        if (el.scrollWidth > el.clientWidth + 1) 깎인글.push(el.id || el.className);
+        const r = document.createRange(); r.selectNodeContents(el);
+        const 글폭 = r.getBoundingClientRect().width; r.detach && r.detach();
+        if (글폭 > el.clientWidth + 1) 깎인글.push((el.id || el.className)
+            + ' 글 ' + Math.round(글폭) + ' > 칸 ' + el.clientWidth);
     });
     return { 넘친가로, 밖, 아래: Math.round(아래), 높이: window.innerHeight, 깎인글 };
 });

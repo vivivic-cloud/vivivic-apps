@@ -64,7 +64,10 @@ body{
 .lstage{flex:1 1 auto; min-height:0; display:flex; flex-direction:column; align-items:center;}
 
 /* 머리 — 한 줄이다 */
-.lhead{display:flex; align-items:baseline; gap:9px; margin:0 0 12px; padding:14px 14px 0;}
+/* 줄바꿈을 열어 둔다 — 바닥 크기를 크게 넣으시면 그 글이 길어진다. 안 열어 두면
+   크기 글이 눌려 「✎」 가 깎였다(10-06 에 재어서 잡았다). 넘치면 아랫줄로 간다. */
+.lhead{display:flex; align-items:baseline; gap:9px; margin:0 0 12px; padding:14px 14px 0;
+  flex-wrap:wrap;}
 /* 이름은 한 줄로 둔다 — 두 손가락으로 벌려 320 까지 좁아지면 「기계배치 / 도」 로
    끊겨 보였다(10-05 에 그림을 보고 잡았다). 좁아지면 바닥 크기 쪽이 줄어든다. */
 .lday{font-size:23px; line-height:1.06; letter-spacing:-.9px; font-weight:700; color:var(--vg-ink);
@@ -74,6 +77,44 @@ body{
   padding:2px 8px; font-size:10px; font-weight:800; letter-spacing:1.1px; color:var(--vg-ink);
 }
 .lsub{margin-left:auto; font-size:12px; color:var(--vg-muted); min-width:0; text-align:right;}
+/* 바닥 크기 — 눌러서 고치는 단추다. 글자 크기는 그대로 두고 닿는 자리만 넓힌다 */
+.lsize{border:0; background:none; font:inherit; font-size:12px; color:var(--vg-muted);
+  padding:0; cursor:pointer; position:relative; white-space:nowrap; flex:none;
+  -webkit-tap-highlight-color:transparent;}
+.lsize::after{content:''; position:absolute; inset:-15px -12px;}
+.lsize .lpen{margin-left:4px; color:var(--vg-ink); font-weight:700;}
+
+/* ── 바닥 크기 넣는 판 ─────────────────────────────────────────────
+   사장님은 아이폰 엄지로 쓰신다. 칸도 단추도 44px 을 넘긴다.
+   글자 16px 아래로 내리지 않는다 — 그 아래면 아이폰이 칸을 눌렀을 때 화면을 확대한다. */
+.lsheet{position:fixed; inset:0; z-index:2147482000; background:rgba(17,17,16,.4);
+  display:flex; align-items:flex-end;}
+.lsheet[hidden]{display:none;}
+.lcard{background:#fff; width:100%; border-radius:20px 20px 0 0;
+  padding:16px 16px calc(16px + env(safe-area-inset-bottom));}
+.lch{font-size:16px; font-weight:700; color:var(--vg-ink); margin:0 0 12px;}
+.lfield{display:flex; align-items:center; gap:10px; margin:0 0 10px;}
+.lfield span{flex:none; width:86px; font-size:14px; color:var(--vg-soft);}
+.lfield input{flex:1; min-width:0; min-height:48px; box-sizing:border-box;
+  border:1px solid var(--vg-edge); border-radius:12px; padding:0 12px;
+  font:inherit; font-size:16px; font-weight:700; color:var(--vg-ink); outline:none;}
+.lfield input:focus{border-color:var(--vg-ink);}
+.lcmsg{font-size:12px; color:var(--vg-soft); margin:2px 0 12px; min-height:16px;}
+.lcmsg.나쁨{color:var(--vg-red); font-weight:700;}
+.lcrow{display:flex; gap:8px;}
+.lcbtn{flex:1; min-height:48px; border:1px solid var(--vg-edge); border-radius:12px;
+  background:#fff; color:var(--vg-soft); font:inherit; font-size:15px; font-weight:700;
+  cursor:pointer; -webkit-tap-highlight-color:transparent;}
+.lcbtn.짙은{background:var(--vg-ink); color:#fff; border-color:var(--vg-ink);}
+
+/* ── 기준 보드판 2,440×1,220 ───────────────────────────────────────
+   기계가 아니다. 끌리지도 부딪히지도 않는다 — 바닥에 깔린 **자**다.
+   그래서 손가락을 안 받고(pointer-events:none) 기계 위에 테만 얹는다. */
+.lboard{position:absolute; border:2px dashed #FF3B30; border-radius:3px;
+  pointer-events:none; z-index:9000; box-sizing:border-box;}
+.lboard .lbnm{position:absolute; left:0; top:0; background:#FF3B30; color:#fff;
+  font-size:9px; font-weight:700; line-height:1.2; padding:2px 4px;
+  border-radius:3px 0 3px 0; white-space:nowrap;}
 
 /* ── 공장 바닥 ───────────────────────────────────────────────────────
    가로·세로(mm)를 그대로 담는 판이다. 너비는 화면에 맞추고 높이는 바닥 비율대로
@@ -138,7 +179,8 @@ body{
   <header class="lhead" data-area="머리">
     <span class="lday">기계배치도</span>
     <span class="lrole">V0.1</span>
-    <span class="lsub" id="l-floor-size" data-area="바닥크기">—</span>
+    <button class="lsub lsize" id="l-floor-size" type="button"
+            data-area="바닥크기">—<span class="lpen">✎</span></button>
   </header>
 
   <div class="lstage" id="l-stage">
@@ -153,6 +195,22 @@ body{
     <div class="lbar">
       <button class="lturn" id="l-turn" type="button" aria-pressed="false"
               data-area="돌리기단추">⟲ 세로로</button>
+    </div>
+  </div>
+
+  <!-- 바닥 크기를 넣는 판. 머리의 크기를 누르면 뜬다 -->
+  <div class="lsheet" id="l-size-sheet" hidden data-area="바닥크기판">
+    <div class="lcard">
+      <div class="lch">공장 바닥 크기</div>
+      <label class="lfield"><span>가로 (mm)</span>
+        <input id="l-w" type="number" inputmode="numeric" step="10" min="1000" max="200000"></label>
+      <label class="lfield"><span>세로 (mm)</span>
+        <input id="l-h" type="number" inputmode="numeric" step="10" min="1000" max="200000"></label>
+      <div class="lcmsg" id="l-size-msg">기계가 놓인 자리(mm)는 그대로 둡니다</div>
+      <div class="lcrow">
+        <button class="lcbtn" id="l-size-no" type="button">그만</button>
+        <button class="lcbtn 짙은" id="l-size-ok" type="button">넣기</button>
+      </div>
     </div>
   </div>
 </div>
@@ -183,6 +241,13 @@ body{
         { id: 'm6', 이름: '집진기',       가로: 1500, 세로: 1500, x: 8200, y: 6200 },
     ];
     const 눈금 = 10;        // 10mm 단위로 떨어뜨린다. 손가락은 1mm 를 못 짚는다
+    /* 기준 보드판 — 사장님 말씀(10-06): 「모든 배치의 기준이 되는 2440*1220mm 사이즈의
+       보드판이 공장바닥의 세팅 비율에 맞게 존재하게 해주세요」.
+       관리자에게: 「기준」 이라 하셨으니 **끌어 옮기는 것이 아니라 바닥에 깔린 자**로
+       읽었습니다. 왼쪽 아래 구석에 100mm 띄워 붙박이로 둡니다. 옮겨 가며 틈을 재고
+       싶다 하시면 한 줄로 끌리게 할 수 있습니다. */
+    const 보드 = { 가로: 2440, 세로: 1220, 띄움: 100 };
+    const 바닥최소 = 1000, 바닥최대 = 200000;      // mm
     const 칸 = 1000;        // 바닥 눈금 한 칸 = 1m
 
     /* ── 담는 자리 ─────────────────────────────────────────────────────
@@ -308,7 +373,10 @@ body{
         바닥판.style.height = (보이는세로() * 배율) + 'px';
         const 한칸 = (칸 * 배율).toFixed(3) + 'px';
         바닥판.style.backgroundSize = 한칸 + ' ' + 한칸;
-        $('l-floor-size').textContent = 수(바닥.가로) + ' × ' + 수(바닥.세로) + ' mm';
+        $('l-floor-size').innerHTML = '';
+        $('l-floor-size').append(수(바닥.가로) + ' × ' + 수(바닥.세로) + ' mm');
+        const 붓 = document.createElement('span'); 붓.className = 'lpen'; 붓.textContent = '✎';
+        $('l-floor-size').append(붓);
     }
 
     /* ── 그리기 ────────────────────────────────────────────────────── */
@@ -356,7 +424,55 @@ body{
             el.addEventListener('pointercancel', 놓기);
             바닥판.appendChild(el);
         });
+        보드그리기();
         글자맞추기();
+    }
+    /* 기준 보드판 — 기계와 같은 자(mm)로, 같은 돌림 셈으로 그린다.
+       바닥이 보드보다 작아지면 구석으로 붙고, 그래도 넘치면 바닥에 잘린다
+       — 그것이 「이 바닥에는 보드가 안 들어간다」 는 참말이라 그대로 보인다. */
+    /* 보드판을 **기계가 없는 자리**에 놓는다. 왼쪽 아래부터 훑어 처음 비는 데다.
+       10-06 에 그림을 보고 잡았다 — 구석에 붙박이로 뒀더니 작업대 위에 겹쳐
+       그 이름을 가렸다. 빈 자리에 놓이면 「보드 한 장 둘 자리가 있나」 까지
+       눈으로 보인다. 어디에도 못 놓으면 왼쪽 아래 구석에 그대로 둔다. */
+    function 보드자리() {
+        const 구석 = { x: Math.max(0, Math.min(보드.띄움, 바닥.가로 - 보드.가로)),
+                       y: Math.max(0, 바닥.세로 - 보드.세로 - 보드.띄움) };
+        if (바닥.가로 < 보드.가로 || 바닥.세로 < 보드.세로) return 구석;
+        const 걸리나 = (x, y) => 기계들.some(o => x < o.x + o.가로 && o.x < x + 보드.가로
+                                               && y < o.y + o.세로 && o.y < y + 보드.세로);
+        const 칸수 = 24;
+        const dx = (바닥.가로 - 보드.가로) / 칸수, dy = (바닥.세로 - 보드.세로) / 칸수;
+        for (let j = 칸수; j >= 0; j--) {                 // 아래에서 위로
+            for (let i = 0; i <= 칸수; i++) {             // 왼쪽에서 오른쪽으로
+                const x = Math.round(i * dx / 눈금) * 눈금, y = Math.round(j * dy / 눈금) * 눈금;
+                if (!걸리나(x, y)) return { x, y };
+            }
+        }
+        return 구석;                                      // 바닥이 기계로 꽉 찼다
+    }
+    function 보드그리기() {
+        const 놓을데 = 보드자리();
+        const 자 = { 가로: 보드.가로, 세로: 보드.세로, x: 놓을데.x, y: 놓을데.y };
+        const el = document.createElement('div');
+        el.className = 'lboard';
+        el.dataset.area = '기준보드판';
+        el.innerHTML = '<span class="lbnm"></span>';
+        const 이름 = el.querySelector('.lbnm');
+        이름.textContent = '보드 ' + 수(보드.가로) + '×' + 수(보드.세로);
+        자리넣기(el, 자);
+        바닥판.appendChild(el);
+        /* 이름표가 보드보다 넓으면 밖으로 삐져나가 **기계 이름을 덮는다.**
+           바닥을 키울수록 보드가 작아져서 더 그렇다. 안 들어가면 줄이고, 그래도
+           안 들어가면 뗀다 — 붉은 점선 테만 남아도 자 노릇은 한다. */
+        const 칸폭 = el.clientWidth;
+        // 숫자가 이 보드판의 전부다. 숫자를 가장 늦게까지 붙들고, 맨 끝에만 뗀다
+        for (const 글 of ['보드 ' + 수(보드.가로) + '×' + 수(보드.세로),
+                          보드.가로 + '×' + 보드.세로,
+                          '보드']) {
+            이름.textContent = 글;
+            if (이름.offsetWidth <= 칸폭) break;
+        }
+        if (이름.offsetWidth > 칸폭) 이름.style.display = 'none';
     }
     /* 판에 안 들어가는 크기 글은 아예 숨긴다.
        「1,500×1,5」 처럼 깎인 숫자는 **없는 것만 못하다** — 사장님이 잘못 읽으신다.
@@ -460,6 +576,63 @@ body{
         쪽지.textContent = m.이름 + ' — 왼쪽벽 ' + 수(m.x) + ' · 위벽 ' + 수(m.y) + ' mm'
                          + (막혔나 ? ' · 다른 기계에 막혔습니다' : '');
     }
+
+    /* ── 바닥 크기 고치기 ──────────────────────────────────────────────
+       사장님 말씀(10-06): 「현장 바닥을 선택하여 가로 세로 길이를 각각 조절 할 수
+       있게 해주세요. **이는 현재 배치된 기계에도 적용해 주세요.**」
+
+       관리자에게: 줄일 때 기계가 밖으로 나가는 경우를 **이렇게 정했습니다** —
+       **기계를 건드리지 않고, 기계가 차 있는 데까지만 줄입니다.**
+         · 기계를 안으로 당기면 사장님이 잡아 둔 배치가 오타 한 번에 뭉개집니다.
+         · 밖에 두면 바닥 밖이라 화면에서 잘려 사라지고 다시 잡을 수도 없습니다.
+       그래서 기계를 벽·다른 기계 앞에서 세우던 그 길과 같게, **바닥도 기계 앞에서
+       섭니다.** 얼마까지 줄었는지는 그 자리에서 글로 알립니다. */
+    const 크기판 = $('l-size-sheet'), 가로칸 = $('l-w'), 세로칸 = $('l-h'), 크기쪽지 = $('l-size-msg');
+    const 기계끝가로 = () => 기계들.reduce((a, m) => Math.max(a, m.x + m.가로), 0);
+    const 기계끝세로 = () => 기계들.reduce((a, m) => Math.max(a, m.y + m.세로), 0);
+
+    function 크기판열기() {
+        가로칸.value = 바닥.가로; 세로칸.value = 바닥.세로;
+        크기쪽지.className = 'lcmsg';
+        크기쪽지.textContent = '기계가 놓인 자리(mm)는 그대로 둡니다';
+        크기판.hidden = false;
+    }
+    const 크기판닫기 = () => { 크기판.hidden = true; };
+
+    function 크기넣기() {
+        const 읽기 = 칸 => {
+            const v = Math.round(Number(칸.value) / 눈금) * 눈금;
+            return Number.isFinite(v) ? v : NaN;
+        };
+        let 새가로 = 읽기(가로칸), 새세로 = 읽기(세로칸);
+        if (!(새가로 >= 바닥최소) || !(새세로 >= 바닥최소)
+            || 새가로 > 바닥최대 || 새세로 > 바닥최대) {
+            크기쪽지.className = 'lcmsg 나쁨';
+            크기쪽지.textContent = 수(바닥최소) + ' 에서 ' + 수(바닥최대) + ' mm 사이로 넣어 주십시오';
+            return;
+        }
+        // 기계가 차 있는 데까지만 줄어든다 — 기계는 한 톨도 안 옮긴다
+        const 막는가로 = 기계끝가로(), 막는세로 = 기계끝세로();
+        const 말 = [];
+        if (새가로 < 막는가로) { 말.push('가로는 ' + 수(막는가로)); 새가로 = 막는가로; }
+        if (새세로 < 막는세로) { 말.push('세로는 ' + 수(막는세로)); 새세로 = 막는세로; }
+
+        바닥 = { 가로: 새가로, 세로: 새세로 };
+        재기(); 그리기(); 저장(true);
+        if (말.length) {
+            크기쪽지.className = 'lcmsg 나쁨';
+            크기쪽지.textContent = '기계가 거기까지 차 있어 ' + 말.join(' · ') + ' mm 까지만 줄었습니다';
+            가로칸.value = 바닥.가로; 세로칸.value = 바닥.세로;
+            쪽지.textContent = '바닥 ' + 수(바닥.가로) + ' × ' + 수(바닥.세로) + ' mm — 기계에 막혀 더는 안 줄었습니다';
+            return;                                   // 판을 열어 둔다 — 왜 멈췄는지 보셔야 한다
+        }
+        쪽지.textContent = '바닥을 ' + 수(바닥.가로) + ' × ' + 수(바닥.세로) + ' mm 로 바꿨습니다';
+        크기판닫기();
+    }
+    $('l-floor-size').addEventListener('click', 크기판열기);
+    $('l-size-no').addEventListener('click', 크기판닫기);
+    $('l-size-ok').addEventListener('click', 크기넣기);
+    크기판.addEventListener('click', e => { if (e.target === 크기판) 크기판닫기(); });
 
     /* ── 돌리기 단추 ───────────────────────────────────────────────────
        기본은 안 돌린 것이다. 사장님이 누르셔야 돈다 — 공장을 보시는 방향을
