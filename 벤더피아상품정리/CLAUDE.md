@@ -534,3 +534,89 @@ git add -f 벤더피아상품정리/CLAUDE.md
 
 > **화면에서 아무리 막아도 ②③ 이 열려 있으면 `vp_배송집계`·`vp_상품목록` 은
 > 주소를 아는 사람이 그대로 읽는다.** 거기엔 사람 정보가 없지만 **매입단가·매입금액**이 있다.
+
+## 잠금 — 사장님 계정만 (10-06, 끝남)
+
+이 집의 다른 프로그램은 **익명으로 들어간다.** 여기만 다르다. 익명 로그인은
+**주소를 아는 사람이면 누구나** 받으므로, 매입단가·매입금액이 든 `vp_*` 는 그걸로 못 지킨다.
+
+### 두 짝이다 — 하나만 있으면 뜻이 없다
+
+```
+화면(잠금.js)   사장님 계정으로만 들어간다
+화베 규칙        vp_ 로 시작하는 칸은 그 uid 만
+```
+
+화면만 조이면 **주소를 아는 사람이 화면을 안 거치고** 자료를 가져간다.
+규칙만 조이면 **사장님이 못 들어가신다.** 그래서 **화면 먼저, 규칙 나중** 순서로 넣었다.
+
+### ⚠ 규칙은 「하나라도 통과시키면 통과」다
+
+`match /{document=**}` 넓은 줄이 있는 한, 아래에 좁은 줄을 **덧붙여도 안 막힌다.**
+넓은 줄 자체를 고쳐야 한다. 그래서 `top != 'artifacts'` 로 artifacts 아래를 **빼놓고**,
+artifacts 아래는 위 줄 하나가 맡는다.
+
+### 지금 걸려 있는 규칙 (콘솔에만 있다 — 여기 적어 둔다)
+
+**Firestore**
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /artifacts/{app}/public/data/{col}/{rest=**} {
+      allow read, write: if request.auth != null
+        && (!col.matches('^vp_.*')
+            || request.auth.uid == 'cpBhoh6cT5bAMdmlidsUYl4A0Uz2');
+    }
+    match /{top}/{rest=**} {
+      allow read, write: if request.auth != null && top != 'artifacts';
+    }
+  }
+}
+```
+
+**Storage**
+```
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /artifacts/{app}/{dir}/{rest=**} {
+      allow read, write: if request.auth != null
+        && (!dir.matches('^vp_.*')
+            || request.auth.uid == 'cpBhoh6cT5bAMdmlidsUYl4A0Uz2');
+    }
+    match /{top}/{rest=**} {
+      allow read, write: if request.auth != null && top != 'artifacts';
+    }
+  }
+}
+```
+
+`cpBhoh6cT5bAMdmlidsUYl4A0Uz2` 는 사장님 계정이다. **uid 는 비밀이 아니다** — 열쇠는
+비밀번호 쪽이고, 그건 어디에도 안 적는다.
+
+### 10-06 에 걸린 탈 — 되풀이하지 마라
+
+**「아무도 없을 때」만 막고 「익명으로 이미 들어와 있을 때」를 안 막았다.**
+전에 이 화면을 열며 받은 익명 통행증이 폰에 남아 있어 로그인 칸을 건너뛰고 들어갔다.
+`user.isAnonymous` 면 `signOut` 하고 다시 묻는다. **이 줄을 지우지 마라.**
+
+### 잰 값 (사장님 폰, 10-06)
+
+```
+사장님 폰        로그인하면 자료 다 보임
+비공개 탭        로그인 칸만 뜨고 자료 0
+조혼가구·에이엠티  그대로 됨
+```
+
+### 아직 안 한 것
+
+| | 무엇 |
+|---|---|
+| 4 | 누가 언제 올렸는지 안 남는다 |
+| 5 | 지우기를 따로 막지 않았다 (들어온 사람은 지울 수 있다) |
+
+### 사람이 늘면
+
+쓸 사람이 둘 이상이 되면 규칙에 uid 를 `in [...]` 으로 늘리지 말고,
+**`vp_허용/{uid}` 문서가 있는지 보는 꼴**로 바꾼다. 그래야 규칙을 안 고치고 사람을 더한다.
