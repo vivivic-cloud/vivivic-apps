@@ -110,6 +110,10 @@ const 잰 = await p.evaluate(() => {
   const 재 = e => e ? { w: Math.round(e.getBoundingClientRect().width), h: Math.round(e.getBoundingClientRect().height) } : null;
   const 하나 = c => ({
     칸: 칸모음(c),
+    부속칸: 재(c.querySelector('.woc-부속')), 도면칸: 재(c.querySelector('.woc-도면자리')),
+    틈: (() => { const a = c.querySelector('.woc-부속 svg'), b2 = c.querySelector('.woc-도면자리 svg');
+      return (a && b2) ? +(b2.getBoundingClientRect().top - a.getBoundingClientRect().bottom).toFixed(1) : null; })(),
+    카드높이: Math.round(c.getBoundingClientRect().height),
     도면: 재(c.querySelector('.woc-도면자리 svg')),
     부속판: 재(c.querySelector('.woc-부속 svg')),
     없음글: (c.querySelector('.woc-도면없음')?.textContent || '').replace(/\s+/g, ' ').trim(),
@@ -123,7 +127,9 @@ const 잰 = await p.evaluate(() => {
   });
   return { 도면카드: 하나(카드[0]), 없음카드: 하나(카드[1]),
            재단카드: { 칸: 칸모음(재단), 도면: 재(재단.querySelector('.woc-도면자리 svg')),
-                      부속판: 재(재단.querySelector('.woc-부속 svg')) },
+                      부속판: 재(재단.querySelector('.woc-부속 svg')),
+                      부속칸: 재(재단.querySelector('.woc-부속')), 도면칸: 재(재단.querySelector('.woc-도면자리')),
+                      카드높이: Math.round(재단.getBoundingClientRect().height) },
            보링카드: 하나(보링),
            문서가로: document.documentElement.scrollWidth, 쓰기: window.__쓰기 };
 });
@@ -155,6 +161,22 @@ const 재단빠진 = 꼭.filter(k => !잰.재단카드.칸.includes(k));
 판('④ 카드 안이 옆으로 안 넘친다', 잰.도면카드.몸넘침 === false && 잰.없음카드.몸넘침 === false,
    '도면칸 ' + 잰.도면카드.몸넘침 + ' · 없음칸 ' + 잰.없음카드.몸넘침);
 판('④ 375px 가로 스크롤 없다', 잰.문서가로 <= 375, 잰.문서가로 + 'px');
+/* ⑦ 10-06 두 번째 지시 — 「부속 한 장과 재단 배치도 사이가 97.5px 비어 있다」.
+   칸이 그림만큼만 차지해야 한다. 그림 크기는 줄면 안 된다. */
+판('⑦ 부속 한 장과 재단 배치도 사이가 안 벌어진다 (24px 이하)',
+   잰.도면카드.틈 != null && 잰.도면카드.틈 <= 24, 잰.도면카드.틈 + 'px');
+판('⑦ 부속 칸이 그 그림만큼만 차지한다 (빈 자리 8px 이하)',
+   !!(잰.도면카드.부속칸 && 잰.도면카드.부속판) && (잰.도면카드.부속칸.h - 잰.도면카드.부속판.h) <= 8,
+   '칸 ' + JSON.stringify(잰.도면카드.부속칸) + ' / 그림 ' + JSON.stringify(잰.도면카드.부속판));
+판('⑦ 도면 칸도 그 그림만큼만 차지한다 (빈 자리 8px 이하)',
+   !!(잰.도면카드.도면칸 && 잰.도면카드.도면) && (잰.도면카드.도면칸.h - 잰.도면카드.도면.h) <= 8,
+   '칸 ' + JSON.stringify(잰.도면카드.도면칸) + ' / 그림 ' + JSON.stringify(잰.도면카드.도면));
+판('⑦ 그래도 도면은 안 작아진다 (카드 폭을 꽉 쓴다)',
+   잰.도면카드.도면.w >= 85 && 잰.도면카드.부속판.w >= 85,
+   '도면 ' + 잰.도면카드.도면.w + 'px · 부속판 ' + 잰.도면카드.부속판.w + 'px');
+판('⑦ 재단 카드의 칸은 그대로 132px 다 (한 픽셀도 안 바뀐다)',
+   잰.재단카드.부속칸.h === 132 && 잰.재단카드.도면칸.h === 132,
+   '부속칸 ' + 잰.재단카드.부속칸.h + ' · 도면칸 ' + 잰.재단카드.도면칸.h);
 판('⑤ 보링 카드는 그대로다 (시킨 것만 고친다)',
    !잰.보링카드.도면 && !잰.보링카드.칸.includes('woc-몸'), JSON.stringify(잰.보링카드.칸));
 판('⑥ 발주 자료에 한 줄도 안 쓴다', 잰.쓰기 === 0, 잰.쓰기 + '번');

@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.16.0 (2026-10-06) — 엣지 부속카드에 그 부속이 잘린 재단도면을 넣고, 재단 도면카드와 같은 칸으로 맞춘다
+     버전: v1.16.1 (2026-10-06) — 엣지 카드에서 그림 밑 빈 자리를 없앤다(그림 크기는 그대로)
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1167,6 +1167,15 @@
         .woc-몸.woc-쌓기 > .woc-글,
         .woc-몸.woc-쌓기 > .woc-부속,
         .woc-몸.woc-쌓기 > .woc-그림 { flex: 0 0 auto; width: 100%; max-width: 100%; }
+        /* 쌓은 카드에서는 칸이 **그림만큼만** 높이를 차지한다 (10-06 지시).
+           옆으로 눕힌 카드에 맞춰 둔 132px 를 그대로 쓰면 부속 한 장과 재단 배치도
+           사이가 97.5px 비었다 — 칸 둘이 132px 씩 잡고 그림은 48·45.6px 뿐이었다.
+           **그림 크기는 한 치도 안 바뀐다**: 칸 비(--부속비)를 그림 비와 같게 두고,
+           132px 는 키가 아니라 **윗한도**로만 남긴다 — 세로로 긴 부속(비 0.674 미만,
+           원장 1309줄 가운데 30줄)은 예전과 똑같이 132px 에서 멈춘다. */
+        .woc-몸.woc-쌓기 > .woc-부속 { height: auto; aspect-ratio: var(--부속비, 1); max-height: 132px; }
+        .woc-몸.woc-쌓기 .woc-도면자리 { height: auto; }
+        .woc-몸.woc-쌓기 .woc-도면자리 svg { max-height: 132px; }
         /* 재단도면을 못 찾은 칸 — 빈 자리를 두지 않고 왜 없는지 적는다 (10-06 지시) */
         .woc-도면없음 { display: flex; flex-direction: column; align-items: center;
             justify-content: center; gap: 3px; width: 100%; height: 100%;
@@ -1183,6 +1192,8 @@
             .woc-글 { flex: 0 0 45%; max-width: 45%; }
             .woc-부속 { flex: 0 0 33%; max-width: 33%; }
             .woc-부속, .woc-도면자리 { height: 168px; }
+            .woc-몸.woc-쌓기 > .woc-부속 { max-height: 168px; }
+            .woc-몸.woc-쌓기 .woc-도면자리 svg { max-height: 168px; }
             .woc-부속 .부속치수 { font-size: 14px; }
             .woc-그림 { flex: 1 1 22%; max-width: 280px; justify-content: flex-end; }
         }
@@ -2435,7 +2446,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.16.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.16.1</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2568,7 +2579,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.16.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.16.1</b></p>
         </div>
     </div>
 
@@ -10927,10 +10938,12 @@
                큰 단추(시작·완료)는 재단 카드와 달리 아랫줄에 그대로 둔다 — 도면 칸에
                넣어 보니 단추가 칸을 넘었다(폰에서 잰 값: 단추 103px > 칸 89px). */
             const _엣지칸 = !!_엣지글;
+            // 부속 칸이 그 부속만큼만 높이를 차지하게 — 칸 비를 적어 준다(CSS 가 쓴다)
+            const _엣지비 = (p.rw > 0 && p.rd > 0) ? ` style="--부속비:${(p.rw / p.rd).toFixed(4)};"` : '';
             if (_엣지칸)
                 _placedInner = `<div class="woc-몸 woc-쌓기">` +
                     `<div class="woc-글">${_엣지글}</div>` +
-                    (_엣지부속 ? `<div class="woc-부속">${_엣지부속}</div>` : '') +
+                    (_엣지부속 ? `<div class="woc-부속"${_엣지비}>${_엣지부속}</div>` : '') +
                     `<div class="woc-그림"><div class="woc-그림속">` +
                     `<div class="woc-도면자리">${_엣지도면 || _엣지없음}</div></div></div>` +
                     `</div>`;
