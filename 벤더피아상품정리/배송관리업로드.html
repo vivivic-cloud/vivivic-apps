@@ -203,6 +203,12 @@ const RAW_DIR  = 'artifacts/vivivic-4b7ef/vp_배송원본';
 const BATCH    = 100;                                   // 문서가 크므로 넉넉히 작게
 const 열쇠칸수 = 20000;                                 // 열쇠 하나 17바이트 → 한 문서 340KB (한 문서 1MB 한계)
 
+// ⚠ 사람 정보는 창고에 올리지 않는다.
+//    화베 규칙이 「로그인한 사람이면 누구나」 하나뿐이라, 창고에 올린 파일은
+//    주소를 아는 사람이면 누구나 받는다. 이름·전화·집주소는 아예 안 올린다.
+//    「어떤 물건이 얼마나 나갔나」 를 세는 데 이 칸들은 하나도 안 쓰인다.
+const 사람칸 = ['수취인','전화','휴대전화','주문자','주문자휴대폰','주소'];
+
 // ⚠ 칸 이름으로 막지 않는다. 10-03 에 그렇게 막았다가 사장님 파일이 두 번 튕겼다.
 //    있으면 쓰고, 없으면 없는 대로 간다. 무엇으로 셌는지는 화면에 한 줄 적어 드린다.
 
@@ -243,6 +249,33 @@ function toMonth(v) {
     return '';
 }
 
+// 사람 칸을 뺀 사본을 만든다. 없으면 null — 그때는 원본 그대로 올린다.
+function 사람정보지우기(aoa, head) {
+    const 뺄자리 = [], 뺀이름 = [];
+    head.forEach((h, i) => { if (사람칸.indexOf(h) > -1) { 뺄자리.push(i); 뺀이름.push(h); } });
+    if (!뺄자리.length) return { 뺀이름: [], 가린수: 0, 파일: null };
+
+    const 남길자리 = head.map((_, i) => i).filter(i => 뺄자리.indexOf(i) < 0);
+    const 새표 = aoa.map(r => 남길자리.map(i => (r && r[i] !== undefined) ? r[i] : ''));
+
+    // 칸만 지워서는 모자란다. 메모·배송메세지 글 속에 번호가 묻혀 있다 —
+    // 「상주인원이 없습니다 배송전 필시 연락 바랍니다 010-3307-1324」 같은 줄이 실제로 있었다.
+    // 앞이 숫자가 아닐 때만 잡는다. 주문번호(2026100118872871)를 가리면 안 된다.
+    const 번호꼴 = /(\D|^)(01[016789][-. ]?\d{3,4}[-. ]?\d{4})(?!\d)/g;
+    let 가린수 = 0;
+    for (const r of 새표) for (let i = 0; i < r.length; i++) {
+        if (typeof r[i] !== 'string' || r[i].length < 10) continue;
+        r[i] = r[i].replace(번호꼴, (m, a) => { 가린수++; return a + '010-****-****'; });
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(새표);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+    const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    return { 뺀이름, 가린수, 파일: new Blob([buf],
+        { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }) };
+}
+
 // 머리줄은 이름으로 찾지 않는다. 위 열 줄 가운데 채워진 칸이 가장 많은 줄이다(같으면 위엣것).
 // 제목 줄·회사 이름·뽑은 날짜는 칸이 한둘뿐이라 저절로 걸러진다.
 function 머리줄찾기(aoa) {
@@ -261,6 +294,8 @@ function count(buf, f) {
 
     const hRow = 머리줄찾기(aoa);
     const head = (aoa[hRow] || []).map(h => String(h).trim());
+
+    const 지움 = 사람정보지우기(aoa, head);
 
     const iN = head.indexOf('상품명'), iQ = head.indexOf('수량'),
           iD = head.indexOf('주문등록일'), iC = head.indexOf('CS');
@@ -298,7 +333,8 @@ function count(buf, f) {
     counted = { 줄들, 열쇠, cs, noDate, noName, dropped,
                 total: aoa.length - hRow - 1, hRow,
                 쓴칸: { 이름: iN >= 0 ? '상품명' : null, 수량: iQ >= 0 ? '수량' : null,
-                        날짜: iD >= 0 ? '주문등록일' : null, 거름: iC >= 0 ? 'CS' : null } };
+                        날짜: iD >= 0 ? '주문등록일' : null, 거름: iC >= 0 ? 'CS' : null },
+                지운칸: 지움.뺀이름, 가린번호: 지움.가린수, 올릴파일: 지움.파일 };
     쓸파일 = f;
     이미있음 = new Set(); 새줄 = counted.줄들.slice(); 겹친줄 = [];
     render(f);              // 먼저 보여 드리고
@@ -443,6 +479,10 @@ function render(f) {
         `달 ${u.날짜 || '못 찾음'} · 거름 ${u.거름 || '없음'}`;
 
     const w = [];
+    if (c.지운칸.length)
+        w.push('창고에 올릴 때 <b>사람 정보 ' + c.지운칸.length + '칸</b>을 지웁니다 — ' +
+               c.지운칸.join(' · ') + '. 세는 데는 안 쓰입니다.' +
+               (c.가린번호 ? ' 메모 속 전화번호 <b>' + c.가린번호 + '</b>개도 가립니다.' : ''));
     if (!u.이름) w.push('셀 칸(<b>상품명</b>)을 못 찾았습니다 — <b>원본만</b> 창고에 담습니다.');
     if (!u.날짜) w.push('날짜 칸(<b>주문등록일</b>)을 못 찾아 <b>「날짜없음」</b> 한 칸에 모았습니다.');
     if (c.dropped) w.push(`CS 「취소」 <b>${c.dropped}</b>줄은 빼고 셌습니다.`);
@@ -510,8 +550,11 @@ $('btn-up').addEventListener('click', async () => {
         // ① 원본을 창고에 — 여기가 싸다. 나중에 새 질문이 생기면 이걸 다시 센다.
         step(5, '원본을 창고에 올리는 중…');
         try {
-            await window.fs.uploadBytes(window.fs.ref(window.st, RAW_DIR + '/' + name), rawFile);
-            fileNote = RAW_DIR + '/' + name;
+            // 사람 칸을 지운 사본을 올린다. 지울 것이 없었으면 원본 그대로.
+            const 올릴것 = c.올릴파일 || rawFile;
+            await window.fs.uploadBytes(window.fs.ref(window.st, RAW_DIR + '/' + name), 올릴것);
+            fileNote = RAW_DIR + '/' + name +
+                       (c.지운칸.length ? ' (사람 정보 ' + c.지운칸.length + '칸 지움)' : '');
         } catch (e) {
             console.warn('창고 올리기 실패', e);
             fileNote = '못 올림 — ' + e.code;
