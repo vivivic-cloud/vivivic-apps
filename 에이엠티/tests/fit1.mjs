@@ -1,12 +1,14 @@
 // 「다른카드에 편집중」 칸이 진짜 완료 칸과 결이 같은가 — 숫자로.
+// 자료는 **얼어붙은 본보기**만 먹는다 — 「다른카드에 편집중」 칸을 재는 자리라, 그 날 업무 자료가
+// 바뀌면(발주가 끝나거나 도면이 한 장으로 합쳐지면) 멀쩡한 화면인데도 떨어진다.
 // 글이 칸을 넘는지 · 글자 크기 · 두 칸 높이 · 제일 긴 부속 이름으로도.
-import { 브라우저열기, devices, 서버, 자료, 자재 } from './도구/터.mjs';
+import { 브라우저열기, devices, 서버, 자료, 본보기, 자재 } from './도구/터.mjs';
 await 서버();   // 저장소를 8899 에 내주는 자리 서버 — 없으면 스스로 띄운다
 const B='http://127.0.0.1:8899';
 const URL=B+'/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0.html';
-const O=await 자료('confirmed_orders');
-const C=await 자료('cutting_plans');
-const L=await 자료('원장');
+const O=await 본보기('confirmed_orders');
+const C=await 본보기('cutting_plans');
+const L=await 본보기('원장');
 const b=await 브라우저열기();
 let 실패=0; const 판=(n,t,v)=>{ if(!t) 실패++; console.log((t?'  OK  ':'  FAIL')+'  '+n+'   → '+v); };
 
