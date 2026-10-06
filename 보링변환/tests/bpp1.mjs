@@ -1361,6 +1361,73 @@ const 골라본것 = await p.evaluate(() => ({
 재기('고른 파일 이름이 올라오나', 골라본것.이름 === '592x382_1001_01.cix', 골라본것.이름);
 재기('고른 것도 구멍 16개를 그리나', 골라본것.동그라미 === 16, '동그라미 ' + 골라본것.동그라미);
 
+/* ── 13. 지름대로 크게·작게 그리나 ───────────────────────────────────
+   10-06 사장님: 「**제시된 정보의 지름에 따라 보링표현의 크기를 달리 해주세요**」.
+   전에는 `Math.max(2.6, …)` 이라 592×382 에서 5파이(참 1.33)와 8파이(참 2.13)가
+   **둘 다 2.6 으로** 그려져 똑같아 보였다. 그 자리를 여기서 못 박는다. */
+const 지름들 = ['5','6','7','8','9','10','12','15','20','35'];
+const 지름글 = ['BEGIN ID CID3','\tREL= 5.0','END ID','BEGIN MAINDATA',
+  '\tLPX=592','\tLPY=382','\tLPZ=18','\tORLST="1"','END MAINDATA']
+  .concat(지름들.concat(['']).flatMap((d, i) => [
+    'BEGIN MACRO','\tNAME=BG',`\tPARAM,NAME=ID,VALUE="${i+1}"`,
+    '\tPARAM,NAME=SIDE,VALUE=0','\tPARAM,NAME=CRN,VALUE="1"',
+    `\tPARAM,NAME=X,VALUE=${40 + i * 48}`,'\tPARAM,NAME=Y,VALUE=100',
+  ].concat(d ? [`\tPARAM,NAME=DIA,VALUE=${d}`] : [])     // 마지막 하나는 지름이 없다
+   .concat(['\tPARAM,NAME=DP,VALUE=12','END MACRO'])))
+  .join('\n') + '\n';
+await p.setInputFiles('#b-file', { name: '지름재보기.cix', mimeType: 'text/plain',
+                                   buffer: Buffer.from(지름글) });
+await p.waitForTimeout(600);
+const 그린것 = await p.evaluate(() => [...document.querySelectorAll('#b-draw circle')].map(e => ({
+  cx: +e.getAttribute('cx'), cy: +e.getAttribute('cy'),
+  r: +e.getAttribute('r'), 채움: e.getAttribute('fill'),
+})));
+재기('구멍을 다 그리나', 그린것.length === 11, 그린것.length + '개');
+const 찬것 = 그린것.filter(o => o.채움 !== 'none');
+재기('지름이 서로 다르면 크기도 서로 다르게 그리나',
+     new Set(찬것.map(o => o.r)).size === 지름들.length,
+     '지름 ' + 지름들.length + '가지 → 크기 ' + new Set(찬것.map(o => o.r)).size + '가지');
+재기('지름이 클수록 늘 더 크게 그리나',
+     찬것.every((o, i) => i === 0 || o.r > 찬것[i-1].r),
+     찬것.map(o => o.r).join(' < '));
+// ★ 사장님이 짚으신 그 자리 — 5파이와 8파이가 같으면 안 된다
+const r5 = 찬것[0].r, r8 = 찬것[3].r, r35 = 찬것[9].r;
+재기('5파이와 8파이가 눈에 다르게 그려지나', r8 > r5 * 1.3, '5파이 ' + r5 + ' · 8파이 ' + r8);
+재기('8파이와 35파이가 확 다르게 그려지나', r35 > r8 * 3, '8파이 ' + r8 + ' · 35파이 ' + r35);
+// 자는 판을 맞추는 그 자 그대로다 — 따로 셈하지 않았는지 숫자로 맞춘다
+const 배 = Math.min(315 / 592, 380 / 382);
+재기('판을 맞추는 그 자로 지름을 그리나 (35파이)',
+     Math.abs(r35 - 35 / 2 * 배) < 0.05, r35 + ' ≈ ' + (35/2*배).toFixed(2));
+// 가장 작은 것이 점으로 사라지지 않나 · 가장 큰 것이 판 밖으로 나가지 않나
+재기('가장 작은 지름도 점으로 사라지지 않나', r5 >= 0.72, '5파이 반지름 ' + r5);
+const 판안 = await p.evaluate(() => {
+  const svg = document.querySelector('#b-draw svg');
+  const 판 = svg.querySelector('rect');
+  const L = +판.getAttribute('x'), T = +판.getAttribute('y');
+  const R = L + +판.getAttribute('width'), B = T + +판.getAttribute('height');
+  return [...svg.querySelectorAll('circle')].every(c => {
+    const x = +c.getAttribute('cx'), y = +c.getAttribute('cy'), r = +c.getAttribute('r');
+    return x - r >= L - 0.75 && x + r <= R + 0.75 && y - r >= T - 0.75 && y + r <= B + 0.75;
+  });
+});
+재기('가장 큰 지름도 판 밖으로 안 나가나', 판안);
+// 지름이 없는 줄 — 5파이로 지어내지 않고 빈 동그라미로 그린다
+const 빈것 = 그린것.filter(o => o.채움 === 'none');
+재기('지름이 없는 줄은 지어내지 않고 빈 동그라미로 그리나',
+     빈것.length === 1 && 빈것[0].r <= r5 + 0.01, 빈것.length + '개 · 반지름 ' + (빈것[0]||{}).r);
+// ★ 자리는 한 톨도 안 움직인다 — 자로 잰 자리와 글자로 맞춘다
+const 자리맞나 = 그린것.every((o, i) => Math.abs(o.cx - (10 + (40 + i * 48) * 배)) < 0.06
+                                      && Math.abs(o.cy - (10 + 100 * 배)) < 0.06);
+재기('구멍 중심 자리는 크기와 상관없이 그대로인가', 자리맞나,
+     그린것.slice(0, 3).map(o => o.cx + ',' + o.cy).join(' | '));
+재기('375px 에서 그림이 가로로 안 넘친다',
+     await p.evaluate(() => document.documentElement.scrollWidth) === 375,
+     await p.evaluate(() => document.documentElement.scrollWidth) + 'px');
+if (process.env['샷']) {
+  const 칸 = await p.$('#b-draw');
+  await 칸.screenshot({ path: path.join(뿌리, '보링변환/shots/375-지름-후.png') });
+}
+
 await b.close();
 fs.rmSync(내린칸, { recursive: true, force: true });
 
