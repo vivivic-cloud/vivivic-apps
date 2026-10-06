@@ -213,6 +213,22 @@ body{
       </div>
     </div>
   </div>
+
+  <!-- 기계 크기를 넣는 판. 기계를 톡 누르면 뜬다 -->
+  <div class="lsheet" id="l-mc-sheet" hidden data-area="기계크기판">
+    <div class="lcard">
+      <div class="lch" id="l-mc-title">기계 크기</div>
+      <label class="lfield"><span>가로 (m)</span>
+        <input id="l-mw" type="number" inputmode="decimal" step="0.01" min="0.1" max="100"></label>
+      <label class="lfield"><span>세로 (m)</span>
+        <input id="l-mh" type="number" inputmode="decimal" step="0.01" min="0.1" max="100"></label>
+      <div class="lcmsg" id="l-mc-msg">놓인 자리는 그대로 두고 크기만 바꿉니다</div>
+      <div class="lcrow">
+        <button class="lcbtn" id="l-mc-no" type="button">그만</button>
+        <button class="lcbtn 짙은" id="l-mc-ok" type="button">넣기</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -248,6 +264,7 @@ body{
        싶다 하시면 한 줄로 끌리게 할 수 있습니다. */
     const 보드 = { 가로: 2440, 세로: 1220, 띄움: 100 };
     const 바닥최소 = 1000, 바닥최대 = 200000;      // mm
+    const 기계최소 = 100, 기계최대 = 100000;       // mm
     const 칸 = 1000;        // 바닥 눈금 한 칸 = 1m
 
     /* ── 담는 자리 ─────────────────────────────────────────────────────
@@ -548,7 +565,8 @@ body{
         const el = e.currentTarget;
         const m = 기계들.find(x => x.id === el.dataset.id);
         if (!m || !배율) return;
-        잡은것 = { m, el, pid: e.pointerId, 손x: e.clientX, 손y: e.clientY, 첫x: m.x, 첫y: m.y };
+        잡은것 = { m, el, pid: e.pointerId, 손x: e.clientX, 손y: e.clientY,
+                   첫x: m.x, 첫y: m.y, 누른때: Date.now() };
         el.classList.add('잡힘');
         /* 방금 잡은 것을 맨 위로 올린다. 기계가 겹치면 뒤에 그려진 것이 손가락을
            가로채는데, 한 번 아래로 깔린 기계는 **다시 끌 수가 없었다**. */
@@ -569,6 +587,15 @@ body{
            돌림 켜짐: 손가락이 아래로 가면 x 가 늘고, 오른쪽으로 가면 y 가 준다.
            그래서 돌린 뒤에도 **손가락이 간 거리와 기계가 간 거리는 1:1 그대로**다. */
         const 민px = e.clientX - 잡은것.손x, 민py = e.clientY - 잡은것.손y;
+        /* ── 끌기 문턱 6px ────────────────────────────────────────────────
+           진짜 손가락은 가만히 누른다고 해도 1~3px 씩 흔들린다. 그런데 이 자에서
+           1px 은 27mm 라, 문턱이 없으면 **톡 누르려다 기계가 밀린다.**
+           6px 을 넘기 전까지는 안 움직인다. 넘는 순간부터 끌기이고, 그때도 **처음
+           짚은 자리에서** 셈하므로 손가락과 기계는 1:1 그대로다. */
+        if (!잡은것.끔) {
+            if (Math.abs(민px) <= 6 && Math.abs(민py) <= 6) return;
+            잡은것.끔 = true;
+        }
         const 갈x = 가두기(잡은것.첫x + (돌림 ?  민py : 민px) / 배율, 바닥.가로 - m.가로);
         const 갈y = 가두기(잡은것.첫y + (돌림 ? -민px : 민py) / 배율, 바닥.세로 - m.세로);
         const 푼것 = 풀기(m, 갈x, 갈y);
@@ -578,13 +605,24 @@ body{
     }
     function 놓기(e) {
         if (!잡은것 || (e && e.pointerId !== 잡은것.pid)) return;
-        const { m, el, pid, 첫x, 첫y } = 잡은것;
+        const { m, el, pid, 첫x, 첫y, 누른때, 끔 } = 잡은것;
         잡은것 = null;
         el.classList.remove('잡힘');
         try { el.releasePointerCapture(pid); } catch (err) {}
+        const 옮겼나 = (m.x !== 첫x || m.y !== 첫y);
         // 제자리면 담지 않는다 — 짚기만 하신 것이라 「저장했습니다」 가 뜨면 거짓이다
-        if (m.x !== 첫x || m.y !== 첫y) 저장(true);
+        if (옮겼나) 저장(true);
         알리기(m);
+        /* ── 톡 누르면 크기 판 ──────────────────────────────────────────
+           사장님 말씀(10-06 12:07): 「각 장비 기계도 사이즈변경 되어야 함」.
+           여는 길을 **톡 누르기**로 정했다. 까닭:
+             · 길게 누르기는 손잡이(viggle)가 0.5초에 쓴다 — 못 쓴다.
+             · 끌기는 손가락이 움직일 때다 — 안 움직이면 비어 있다.
+             · 바닥 크기도 「크기 글을 누르면」 고친다. 같은 버릇이라 익히실 것이 없다.
+           헷갈리지 않게 셋을 다 본다 — 기계가 **안 움직였고**, 손가락이 6px 안에
+           머물렀고, 0.45초 안에 떼었을 때만. 손잡이 판이 떠 있으면 안 연다. */
+        const 톡 = !끔 && Date.now() - 누른때 < 450 && !document.querySelector('.vg-sheet');
+        if (톡) 기계판열기(m);
     }
     /* 끄는 동안 어디로 가는지 보여 준다 — 안 보이면 자리를 잡을 수가 없다 */
     function 알리기(m, 막혔나) {
@@ -652,6 +690,93 @@ body{
     $('l-size-no').addEventListener('click', 크기판닫기);
     $('l-size-ok').addEventListener('click', 크기넣기);
     크기판.addEventListener('click', e => { if (e.target === 크기판) 크기판닫기(); });
+
+    /* ── 기계 크기 고치기 ──────────────────────────────────────────────
+       사장님 말씀(10-06 12:07): 「각 장비 기계도 사이즈변경 되어야 함」.
+
+       관리자에게: 키워서 **벽이나 다른 기계에 닿으면 거기서 섭니다** — 바닥을
+       줄일 때 쓴 그 길과 같습니다. 기계가 겹치거나 바닥 밖으로 나가는 꼴을
+       만들지 않으려는 것이고, 끌 때 「앞까지 가고 선다」 와도 같은 버릇입니다.
+       **놓인 자리(x·y)는 안 건드립니다** — 크기만 바뀝니다. */
+    const 기계판 = $('l-mc-sheet'), 기가로칸 = $('l-mw'), 기세로칸 = $('l-mh');
+    const 기계쪽지 = $('l-mc-msg'), 기계이름 = $('l-mc-title');
+    let 고칠기계 = null;
+
+    /* 이 기계가 **오른쪽으로** 얼마까지 커질 수 있나 — 벽과, 오른쪽에 있는 기계까지 */
+    function 클수있는가로(m, 세로) {
+        let 끝 = 바닥.가로 - m.x;
+        기계들.forEach(o => {
+            if (o === m) return;
+            if (!(m.y < o.y + o.세로 && o.y < m.y + 세로)) return;   // 세로로 안 겹치면 상관없다
+            if (o.x >= m.x + m.가로) 끝 = Math.min(끝, o.x - m.x);   // 오른쪽에 선 것만
+        });
+        return 끝;
+    }
+    /* **아래쪽으로** 얼마까지 — 새로 정해진 가로로 본다 */
+    function 클수있는세로(m, 가로) {
+        let 끝 = 바닥.세로 - m.y;
+        기계들.forEach(o => {
+            if (o === m) return;
+            if (!(m.x < o.x + o.가로 && o.x < m.x + 가로)) return;
+            if (o.y >= m.y + m.세로) 끝 = Math.min(끝, o.y - m.y);
+        });
+        return 끝;
+    }
+
+    function 기계판열기(m) {
+        고칠기계 = m;
+        기계이름.textContent = m.이름 + ' 크기';
+        기가로칸.value = 미터칸값(m.가로); 기세로칸.value = 미터칸값(m.세로);
+        기계쪽지.className = 'lcmsg';
+        기계쪽지.textContent = '놓인 자리는 그대로 두고 크기만 바꿉니다';
+        기계판.hidden = false;
+    }
+    const 기계판닫기 = () => { 기계판.hidden = true; 고칠기계 = null; };
+
+    function 기계크기넣기() {
+        const m = 고칠기계; if (!m) return;
+        let 새가로 = 미터읽기(기가로칸.value), 새세로 = 미터읽기(기세로칸.value);
+        if (!(새가로 >= 기계최소) || !(새세로 >= 기계최소)
+            || 새가로 > 기계최대 || 새세로 > 기계최대) {
+            기계쪽지.className = 'lcmsg 나쁨';
+            const 밀리같은것 = [Number(기가로칸.value), Number(기세로칸.value)]
+                .find(v => Number.isFinite(v) && v >= 1000);
+            기계쪽지.textContent = 밀리같은것
+                ? '미터로 넣어 주십시오 — ' + 수(밀리같은것) + ' mm 는 ' + 미터(밀리같은것) + ' m 입니다'
+                : 미터(기계최소) + ' 에서 ' + 미터(기계최대) + ' m 사이로 넣어 주십시오';
+            return;
+        }
+        // 벽과 다른 기계 앞에서 선다. 자리(x·y)는 안 건드린다
+        const 말 = [];
+        const 가로끝 = 클수있는가로(m, Math.min(새세로, m.세로));
+        if (새가로 > 가로끝) { 말.push('가로는 ' + 미터(가로끝)); 새가로 = 가로끝; }
+        const 세로끝 = 클수있는세로(m, 새가로);
+        if (새세로 > 세로끝) { 말.push('세로는 ' + 미터(세로끝)); 새세로 = 세로끝; }
+
+        const 옛가로 = m.가로, 옛세로 = m.세로;
+        m.가로 = 새가로; m.세로 = 새세로;
+        if (겹치나(m, m.x, m.y)) {                 // 마지막 자물쇠 — 그래도 겹치면 되돌린다
+            m.가로 = 옛가로; m.세로 = 옛세로;
+            기계쪽지.className = 'lcmsg 나쁨';
+            기계쪽지.textContent = '그 크기로는 다른 기계와 겹칩니다';
+            return;
+        }
+        재기(); 그리기(); 저장(true);
+        고칠기계 = 기계들.find(x => x.id === m.id) || m;
+        if (말.length) {
+            기계쪽지.className = 'lcmsg 나쁨';
+            기계쪽지.textContent = '벽이나 다른 기계에 닿아 ' + 말.join(' · ') + ' m 까지만 커졌습니다';
+            기가로칸.value = 미터칸값(m.가로); 기세로칸.value = 미터칸값(m.세로);
+            쪽지.textContent = m.이름 + ' ' + 미터(m.가로) + ' × ' + 미터(m.세로)
+                             + ' m — 더는 안 커졌습니다';
+            return;                                 // 판을 열어 둔다 — 왜 멈췄는지 보셔야 한다
+        }
+        쪽지.textContent = m.이름 + ' 크기를 ' + 미터(m.가로) + ' × ' + 미터(m.세로) + ' m 로 바꿨습니다';
+        기계판닫기();
+    }
+    $('l-mc-no').addEventListener('click', 기계판닫기);
+    $('l-mc-ok').addEventListener('click', 기계크기넣기);
+    기계판.addEventListener('click', e => { if (e.target === 기계판) 기계판닫기(); });
 
     /* ── 돌리기 단추 ───────────────────────────────────────────────────
        기본은 안 돌린 것이다. 사장님이 누르셔야 돈다 — 공장을 보시는 방향을
