@@ -267,7 +267,7 @@ function toMonth(v) {
 function 사람정보지우기(aoa, head) {
     const 뺄자리 = [], 뺀이름 = [];
     head.forEach((h, i) => { if (사람칸.indexOf(h) > -1) { 뺄자리.push(i); 뺀이름.push(h); } });
-    if (!뺄자리.length) return { 뺀이름: [], 가린수: 0, 파일: null };
+    if (!뺄자리.length) return { 뺀이름: [], 가린수: 0, 주소본것: 0, 파일: null };
 
     const 남길자리 = head.map((_, i) => i).filter(i => 뺄자리.indexOf(i) < 0);
     const 새표 = aoa.map(r => 남길자리.map(i => (r && r[i] !== undefined) ? r[i] : ''));
@@ -275,18 +275,32 @@ function 사람정보지우기(aoa, head) {
     // 칸만 지워서는 모자란다. 메모·배송메세지 글 속에 번호가 묻혀 있다 —
     // 「상주인원이 없습니다 배송전 필시 연락 바랍니다 010-3307-1324」 같은 줄이 실제로 있었다.
     // 앞이 숫자가 아닐 때만 잡는다. 주문번호(2026100118872871)를 가리면 안 된다.
-    const 번호꼴 = /(\D|^)(01[016789][-. ]?\d{3,4}[-. ]?\d{4})(?!\d)/g;
-    let 가린수 = 0;
+    // 「010 만 가리는 게 무슨 의미냐」 — 사장님 말씀이 옳다. 집·사무실 번호도 메모에 적힌다.
+    //   휴대폰 01X · 안심 050X · 인터넷 070   — 구분자가 없어도 잡는다
+    //   지역 02·031~064 · 대표 15xx/16xx/18xx — 구분자가 있을 때만. 안 그러면
+    //   송장번호(4082610021059)·주문번호(2026100118872871)를 물어뜯는다.
+    // 앞뒤가 숫자가 아닐 때만 잡는 것은 그대로다.
+    const 번호꼴 = [
+        /(\D|^)((?:01[016789]|070|050\d)[-. ]?\d{3,4}[-. ]?\d{4})(?!\d)/g,
+        /(\D|^)((?:02|0(?:3[1-3]|4[1-4]|5[1-5]|6[1-4]))[-. ]\d{3,4}[-. ]\d{4})(?!\d)/g,
+        /(\D|^)(1[5678]\d\d[-. ]\d{4})(?!\d)/g
+    ];
+    // 주소는 가리지 않는다 — 메모에 섞인 주소를 지우면 「3층 엘리베이터 없음」 같은
+    // 업무 내용까지 깨진다. 몇 건인지 세어 화면에 알리고, 고르는 것은 사장님 몫이다.
+    const 주소꼴 = /(경기|서울|부산|인천|대구|대전|광주|울산|강원|충북|충남|전북|전남|경북|경남|세종|제주)\s*\S*(시|군|구)\s/;
+    let 가린수 = 0, 주소본것 = 0;
     for (const r of 새표) for (let i = 0; i < r.length; i++) {
-        if (typeof r[i] !== 'string' || r[i].length < 10) continue;
-        r[i] = r[i].replace(번호꼴, (m, a) => { 가린수++; return a + '010-****-****'; });
+        if (typeof r[i] !== 'string' || r[i].length < 8) continue;
+        for (const 꼴 of 번호꼴)
+            r[i] = r[i].replace(꼴, (m, a) => { 가린수++; return a + '***-****-****'; });
+        if (주소꼴.test(r[i])) 주소본것++;
     }
 
     const ws = XLSX.utils.aoa_to_sheet(새표);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
     const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    return { 뺀이름, 가린수, 파일: new Blob([buf],
+    return { 뺀이름, 가린수, 주소본것, 파일: new Blob([buf],
         { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }) };
 }
 
@@ -348,7 +362,7 @@ function count(buf, f) {
                 total: aoa.length - hRow - 1, hRow,
                 쓴칸: { 이름: iN >= 0 ? '상품명' : null, 수량: iQ >= 0 ? '수량' : null,
                         날짜: iD >= 0 ? '주문등록일' : null, 거름: iC >= 0 ? 'CS' : null },
-                지운칸: 지움.뺀이름, 가린번호: 지움.가린수, 올릴파일: 지움.파일 };
+                지운칸: 지움.뺀이름, 가린번호: 지움.가린수, 주소본것: 지움.주소본것, 올릴파일: 지움.파일 };
     쓸파일 = f;
     이미있음 = new Set(); 새줄 = counted.줄들.slice(); 겹친줄 = [];
     render(f);              // 먼저 보여 드리고
@@ -497,6 +511,9 @@ function render(f) {
         w.push('창고에 올릴 때 <b>사람 정보 ' + c.지운칸.length + '칸</b>을 지웁니다 — ' +
                c.지운칸.join(' · ') + '. 세는 데는 안 쓰입니다.' +
                (c.가린번호 ? ' 메모 속 전화번호 <b>' + c.가린번호 + '</b>개도 가립니다.' : ''));
+    if (c.주소본것)
+        w.push('메모에 <b>주소처럼 보이는 글 ' + c.주소본것 + '건</b>이 있습니다. ' +
+               '업무 내용이 깨질까 봐 <b>가리지 않았습니다</b> — 그대로 올라갑니다.');
     if (!u.이름) w.push('셀 칸(<b>상품명</b>)을 못 찾았습니다 — <b>원본만</b> 창고에 담습니다.');
     if (!u.날짜) w.push('날짜 칸(<b>주문등록일</b>)을 못 찾아 <b>「날짜없음」</b> 한 칸에 모았습니다.');
     if (c.dropped) w.push(`CS 「취소」 <b>${c.dropped}</b>줄은 빼고 셌습니다.`);
