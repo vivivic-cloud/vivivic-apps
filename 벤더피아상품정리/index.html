@@ -21,13 +21,16 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>벤더피아 상품정리</title>
+<script src="잠금.js"></script>
+<script src="기록.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 
 <!-- Firebase — 다른 프로그램들과 같은 프로젝트. 로그인 화면 없이 익명 인증만. -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
-    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut }
+        from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
     import { getFirestore, collection, doc, getDocs, setDoc, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 
     const firebaseConfig = {
@@ -45,9 +48,18 @@
     window.db = getFirestore(app);
     window.fb = { collection, doc, getDocs, setDoc, writeBatch, serverTimestamp };
 
+    // 이 집의 다른 프로그램은 익명으로 들어간다. 여기만 사장님 계정으로만 들어간다 —
+    // 벤더피아 자료에는 매입단가·매입금액이, 배송관리 원본에는 사람 정보가 있었다.
+    // 익명 로그인은 주소를 아는 사람이면 누구나 받는다. 잠금.js 와 화베 규칙이 짝이다.
     onAuthStateChanged(auth, (user) => {
-        if (!user) { signInAnonymously(auth).catch(e => console.error('익명 인증 실패:', e)); return; }
+        if (!user) { window.잠금.열기((메일, 비번) => signInWithEmailAndPassword(auth, 메일, 비번)); return; }
+        // 전에 이 화면을 열었을 때 받은 익명 통행증이 폰에 남아 있다. 그대로 두면
+        // 로그인 칸을 건너뛰고 들어온다 — 내보내고 다시 묻는다.
+        if (user.isAnonymous) { signOut(auth); return; }
+        window.잠금.닫기(user, () => signOut(auth));
+        window.나 = user;                                   // 기록에 「누가」로 들어간다
         window.initApp();
+        window.기록.그리기({ db: window.db, fb: window.fb, 넣을곳: '기록자리' });
     });
 </script>
 
@@ -174,6 +186,8 @@
     </div>
 
     <div id="err" class="hidden mt-3 border-l-4 border-red-400 bg-red-50 rounded-r-lg p-3 text-[12px] text-red-700"></div>
+
+    <div id="기록자리" class="mt-6" hidden></div>
 
     <footer class="mt-8 pt-4 border-t border-[#ededeb] text-[11px] text-[#a8a6a2] leading-relaxed">
         <p>자리 — <code>artifacts/vivivic-4b7ef/public/data/vp_상품목록</code></p>
@@ -366,6 +380,12 @@ $('btn-up').addEventListener('click', async () => {
         $('d-skip').textContent = skipped.toLocaleString('ko-KR');
         $('d-batch').textContent = nBatch + ' (' + BATCH_SIZE + '씩)';
         $('d-sec').textContent = ((Date.now() - t0) / 1000).toFixed(1) + '초';
+
+        // 누가·언제·어느 파일·몇 줄을 남긴다. 숫자가 이상할 때 여기서 찾는다.
+        await window.기록.적기({ db: window.db, fb: window.fb, user: window.나,
+            무엇: '상품목록', 파일: fileName, 줄수: done, 문서수: done,
+            비고: skipped ? ('건너뜀 ' + skipped) : '' });
+        window.기록.그리기({ db: window.db, fb: window.fb, 넣을곳: '기록자리' });
         show('step-done');
 
     } catch (err) {

@@ -58,9 +58,15 @@ for (const 화 of 화면들) {
         /* 바닥이 쓸 수 있는 칸 — 머리와 알림줄을 뺀 나머지 전부.
            바닥이 이 칸을 세로로 다 못 쓰면, 가로가 먼저 찼다는 뜻이다. */
         const 무대 = document.getElementById('l-stage');
-        const 발참 = getComputedStyle(document.querySelector('.lfoot'));
-        const 발높 = 발.height + (parseFloat(발참.marginTop)||0) + (parseFloat(발참.marginBottom)||0);
-        const 칸폭 = 무대.clientWidth, 칸높 = 무대.clientHeight - 발높;
+        // 바닥 밑에 깔린 것(알림줄·단추줄)을 **다** 뺀다 — 앱이 재는 것과 같은 자다
+        let 아래높 = 0;
+        [...무대.children].forEach(el => {
+            if (el.id === 'l-floor') return;
+            const cs = getComputedStyle(el);
+            아래높 += el.getBoundingClientRect().height
+                    + (parseFloat(cs.marginTop)||0) + (parseFloat(cs.marginBottom)||0);
+        });
+        const 칸폭 = 무대.clientWidth, 칸높 = 무대.clientHeight - 아래높;
         return {
             칸폭: Math.round(칸폭), 칸높: Math.round(칸높),
             막힌쪽: (칸폭 / 10000) <= (칸높 / 8000) ? '가로' : '세로',
