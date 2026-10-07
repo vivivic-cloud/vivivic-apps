@@ -49,7 +49,11 @@ const 본 = await p.evaluate((L) => {
   const 기준 = IDENTITY_HEADERS.map(col => normalizeValue(첫[h.indexOf(col)]));
   const 공급 = normalizeValue(첫[h.indexOf('ing발주처')]);
   const 오늘 = toLocalDateStr(new Date());
+  // 납기는 **일하는 날**이어야 한다 — 토·일·공휴일에는 납기 줄 자체가 안 선다.
+  // 「오늘+3」 으로 잡았더니 수요일에 돌릴 때 토요일이 되어 줄이 하나도 없었다(10-07).
+  // 앱이 쓰는 그 잣대(isWeekendOrHoliday)로 다음 일하는 날까지 민다.
   const 낼 = new Date(); 낼.setDate(낼.getDate() + 3);
+  while (typeof isWeekendOrHoliday === 'function' && isWeekendOrHoliday(낼)) 낼.setDate(낼.getDate() + 1);
   const 납기 = toLocalDateStr(낼);
   const 만들기 = (idNum, code, qty채움) => ({
     idNum, docId: 'd' + idNum, orderCode: code, displayName: '시험상품 ' + code,
