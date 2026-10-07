@@ -12,6 +12,7 @@
    ⚠ page.mouse 로 진짜 누른다. 값만 보지 않고 화면에 보이나까지 잰다. */
 import path from 'node:path';
 import fs from 'node:fs';
+import { 본보기깔기 } from './도구/본보기.mjs';
 import { 브라우저열기, 서버, 뿌리 } from '../../에이엠티/tests/도구/터.mjs';
 
 const 잰것 = [];
@@ -23,7 +24,7 @@ const 그림칸 = path.join(뿌리, '기계배치도/shots');
 fs.mkdirSync(그림칸, { recursive: true });
 await 서버();
 const 주소 = 'http://127.0.0.1:8899/' + encodeURIComponent('기계배치도') + '/' + encodeURIComponent('기계배치도.html');
-const 폰열쇠 = 'layout.배치.v1';
+const 폰열쇠 = 'layout.배치.v2';
 const 허수아비 = {
     'firebase-app.js': `export const initializeApp=()=>({});`,
     'firebase-auth.js': `export const getAuth=()=>({});export const signInAnonymously=async()=>({});
@@ -39,6 +40,7 @@ await ctx.route('**/firebasejs/**', r => {
     const n = Object.keys(허수아비).find(k => r.request().url().endsWith(k));
     return r.fulfill({ status: 200, contentType: 'text/javascript', body: n ? 허수아비[n] : 'export {};' });
 });
+await 본보기깔기(ctx);   // 옛 시험통에는 10,000×8,000 본보기를 깔아 준다
 const p = await ctx.newPage();
 const 터짐 = []; p.on('pageerror', e => 터짐.push(String(e.message || e)));
 
@@ -51,7 +53,7 @@ const 봄 = () => p.evaluate(() => {
     const bd = document.querySelector('.lboard');
     const br = bd ? bd.getBoundingClientRect() : null;
     const 판 = document.getElementById('l-size-sheet');
-    const 담김 = JSON.parse(localStorage.getItem('layout.배치.v1') || 'null');
+    const 담김 = JSON.parse(localStorage.getItem('layout.배치.v2') || 'null');
     return {
         바닥폭: Math.round(f.width), 바닥높: Math.round(f.height), 바닥왼: f.left, 바닥위: f.top,
         크기글: 단.textContent.replace(/\s+/g, ' ').trim(),
@@ -340,6 +342,7 @@ const 끌고 = await p.evaluate(() => {
 const 좁은통 = await b.newContext({ viewport: { width: 320, height: 480 },
     hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
 await 좁은통.route('**/firebasejs/**', r => r.abort());
+await 본보기깔기(좁은통);   // 옛 시험통에는 10,000×8,000 본보기를 깔아 준다
 const p2 = await 좁은통.newPage();
 await p2.goto(주소, { waitUntil: 'domcontentloaded' });
 await p2.waitForTimeout(450);

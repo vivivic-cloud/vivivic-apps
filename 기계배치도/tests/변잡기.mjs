@@ -9,6 +9,7 @@
    ⚠ page.mouse 로 진짜 잡아 끈다. 값만 보지 않고 **손가락이 닿나 · 수가 보이나**까지. */
 import path from 'node:path';
 import fs from 'node:fs';
+import { 본보기깔기 } from './도구/본보기.mjs';
 import { 브라우저열기, 서버, 뿌리 } from '../../에이엠티/tests/도구/터.mjs';
 
 const 잰것 = [];
@@ -20,7 +21,7 @@ const 그림칸 = path.join(뿌리, '기계배치도/shots');
 fs.mkdirSync(그림칸, { recursive: true });
 await 서버();
 const 주소 = 'http://127.0.0.1:8899/' + encodeURIComponent('기계배치도') + '/' + encodeURIComponent('기계배치도.html');
-const 폰열쇠 = 'layout.배치.v1', 눈금 = 10;
+const 폰열쇠 = 'layout.배치.v2', 눈금 = 10;
 const 허수아비 = {
     'firebase-app.js': `export const initializeApp=()=>({});`,
     'firebase-auth.js': `export const getAuth=()=>({});export const signInAnonymously=async()=>({});
@@ -36,6 +37,7 @@ await ctx.route('**/firebasejs/**', r => {
     const n = Object.keys(허수아비).find(k => r.request().url().endsWith(k));
     return r.fulfill({ status: 200, contentType: 'text/javascript', body: n ? 허수아비[n] : 'export {};' });
 });
+await 본보기깔기(ctx);   // 옛 시험통에는 10,000×8,000 본보기를 깔아 준다
 const p = await ctx.newPage();
 const 터짐 = []; p.on('pageerror', e => 터짐.push(String(e.message || e)));
 
@@ -43,7 +45,7 @@ const 봄 = () => p.evaluate(() => {
     const f = document.getElementById('l-floor').getBoundingClientRect();
     const 무대 = document.getElementById('l-stage').getBoundingClientRect();
     const 바 = document.getElementById('l-bar2');
-    const 담김 = JSON.parse(localStorage.getItem('layout.배치.v1') || 'null');
+    const 담김 = JSON.parse(localStorage.getItem('layout.배치.v2') || 'null');
     const 손잡이 = [...document.querySelectorAll('.lhd')].map(h => {
         const r = h.getBoundingClientRect();
         return { 누구: h.dataset.누구, 축: h.dataset.축, 쪽: h.className.match(/lhd-(\S+)/)[1],
@@ -84,7 +86,23 @@ const 손잡이점 = async (누구, 축) => await p.evaluate(([n, a]) => {
     const 거기 = document.elementFromPoint(x, y);
     return { x, y, 잡히나: !!(거기 && 거기.closest('.lhd') === h) };
 }, [누구, 축]);
+/* 기계를 **톡 쳐서 고른다.** 10-07 에 바뀐 것 — 손잡이는 고른 기계 하나에만 난다.
+   기계가 스물이 되니(참 공장) 스무 대에 다 내놓으면 예순 개가 겹쳐 못 짚는다. */
+async function 기계고르기(id) {
+    const 점 = await p.evaluate(i => {
+        const e = document.querySelector('.lmc[data-id="' + i + '"]');
+        if (!e) return null;
+        const r = e.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    }, id);
+    if (!점) return false;
+    await p.mouse.move(점.x, 점.y);
+    await p.mouse.down(); await p.waitForTimeout(40); await p.mouse.up();
+    await p.waitForTimeout(90);
+    return await p.evaluate(i => !!document.querySelector('.lmc[data-id="' + i + '"].고름'), id);
+}
 async function 변끌기(누구, 축, dx, dy, 칸수 = 8) {
+    if (누구 !== '바닥') await 기계고르기(누구);       // 고른 기계에만 손잡이가 난다
     const 점 = await 손잡이점(누구, 축);
     if (!점 || !점.잡히나) return { 못잡음: 점 ? '다른 것이 덮고 있습니다' : '손잡이가 없습니다' };
     await p.mouse.move(점.x, 점.y);
@@ -116,6 +134,45 @@ const 배율 = 처음.바닥폭 / 10000;        // px / mm
 재기('톡 눌러 뜨던 크기 판이 없어졌나', !처음.크기판있나);
 
 /* ══ 손잡이가 있나 · 닿나 ════════════════════════════════════════════ */
+/* ⚠ 10-07 에 바뀐 것 — 손잡이는 **고른 기계 하나**에만 난다.
+   까닭: 참 공장에는 기계가 스물이라 다 내놓으면 손잡이 예순 개가 서로 겹쳐
+   아무것도 못 짚는다(맞춤 배율에서 재단기가 19px 인데 손잡이 하나가 28px 다). */
+재기('아무것도 안 골랐을 때는 바닥 손잡이 둘만 있나',
+     처음.손잡이.length === 2 && 처음.손잡이.every(h => h.누구 === '바닥'),
+     처음.손잡이.length + '개 · ' + 처음.손잡이.map(h => h.누구 + ':' + h.축).join(' '));
+{
+    const 안된것 = [];
+    for (const id of ['m1', 'm2', 'm3', 'm4', 'm5', 'm6']) {
+        if (!await 기계고르기(id)) { 안된것.push(id + ' 안골림'); continue; }
+        const 난것 = await p.evaluate(i => [...document.querySelectorAll('.lmc[data-id="' + i + '"] .lhd')]
+            .map(h => h.dataset.축).sort().join(','), id);
+        if (난것 !== '가로,세로') 안된것.push(id + ':' + (난것 || '없음'));
+        const 다른데 = await p.evaluate(i => document.querySelectorAll('.lmc:not([data-id="' + i + '"]) .lhd').length, id);
+        if (다른데) 안된것.push(id + ' 말고 다른 기계에도 ' + 다른데 + '개');
+    }
+    재기('기계를 톡 치면 그 기계에만 가로·세로 손잡이 둘이 나나',
+         안된것.length === 0, 안된것.join(' · ') || '여섯 대 다 둘씩');
+}
+{   // 빈 바닥을 톡 치면 놓는다
+    /* ⚠ 바닥 오른끝에서 6px 안쪽을 짚었더니 **바닥의 오른 변 손잡이**였다
+       (손잡이는 변에서 −24~+4px 에 걸쳐 있다). 기계도 손잡이도 없는 자리로
+       간다 — 본보기 배치에서 (9,900 · 3,000)mm 는 비어 있다. */
+    const 빈데 = await p.evaluate(() => {
+        const f = document.getElementById('l-floor').getBoundingClientRect();
+        return { x: f.left + 9900 / 10000 * f.width, y: f.top + 3000 / 8000 * f.height };
+    });
+    await p.mouse.move(빈데.x, 빈데.y);
+    await p.mouse.down(); await p.waitForTimeout(40); await p.mouse.up();
+    await p.waitForTimeout(120);
+    const 남은것 = await p.evaluate(() => document.querySelectorAll('.lmc .lhd').length);
+    재기('빈 바닥을 톡 치면 고른 것이 놓이나', 남은것 === 0, '기계 손잡이 ' + 남은것 + '개 남음');
+}
+await 깨끗이();
+처음.손잡이 = (await 봄()).손잡이;
+for (const id of ['m1', 'm2', 'm3', 'm4', 'm5', 'm6']) {   // 다시 다 고른 채로 재려면 하나씩
+    await 기계고르기(id);
+    처음.손잡이 = 처음.손잡이.concat((await 봄()).손잡이.filter(h => h.누구 === id));
+}
 재기('기계 여섯 대 + 바닥에 가로·세로 손잡이가 다 달렸나',
      처음.손잡이.length === 14, 처음.손잡이.length + '개 (기계 12 + 바닥 2)');
 const 작은손잡이 = 처음.손잡이.filter(h => Math.min(h.폭, h.높이) < 28 || Math.max(h.폭, h.높이) < 44);
@@ -124,14 +181,16 @@ const 작은손잡이 = 처음.손잡이.filter(h => Math.min(h.폭, h.높이) <
                        : 처음.손잡이[0].폭 + '×' + 처음.손잡이[0].높이 + ' (모두 같음)');
 const 못잡는것 = [];
 for (const h of 처음.손잡이) {
+    if (h.누구 !== '바닥') await 기계고르기(h.누구);     // 고른 기계에만 난다
     const 점 = await 손잡이점(h.누구, h.축);
     if (!점 || !점.잡히나) 못잡는것.push(h.누구 + ':' + h.축);
 }
+await 깨끗이();
 재기('손잡이 열넷이 **다 손가락에 잡히나**', 못잡는것.length === 0, 못잡는것.join(' · ') || '다 잡힙니다');
 재기('안 돌렸을 때 가로 손잡이는 오른쪽 · 세로 손잡이는 아래인가',
      처음.손잡이.every(h => h.쪽 === (h.축 === '가로' ? '오른' : '아래')),
      처음.손잡이.slice(0, 2).map(h => h.축 + '→' + h.쪽).join(' · '));
-재기('바닥 손잡이가 화면 안에 있나 (바닥을 26px 비웠나)',
+재기('바닥 손잡이가 화면 안에 있나 (바닥을 30px 비웠나)',
      처음.손잡이.filter(h => h.누구 === '바닥').every(h => h.오른 <= 처음.화면폭 + 0.5 && h.왼 >= -0.5),
      '바닥 ' + 처음.바닥 + ' · 오른끝 ' + Math.round(처음.바닥오른)
      + ' · 손잡이 오른끝 ' + Math.round(Math.max(...처음.손잡이.filter(h => h.누구 === '바닥').map(h => h.오른)))
@@ -173,6 +232,7 @@ await p.screenshot({ path: path.join(그림칸, '375-변끈뒤.png') });
 
 /* ══ 끄는 도중 그림 — 수가 보이는 모습 ═══════════════════════════════ */
 await 깨끗이();
+await 기계고르기('m5');                            // 고른 기계에만 손잡이가 난다
 const 점2 = await 손잡이점('m5', '가로');
 await p.mouse.move(점2.x, 점2.y);
 await p.mouse.down();
@@ -215,6 +275,7 @@ const 겹친것 = await p.evaluate(k => {
 await 깨끗이();
 /* ⚠ 여유가 있는 자리로 재야 「맞춤」 이 보인다. 집진기 세로는 아래 벽까지 1,800mm
    뿐이라 2.25 m 는 막히는 것이 맞다. 보링기 가로는 오른쪽이 비어 5,000mm 여유다. */
+await 기계고르기('m2');                            // 고른 기계에만 손잡이가 난다
 const 점3 = await 손잡이점('m2', '가로');          // 보링기
 await p.mouse.move(점3.x, 점3.y); await p.mouse.down(); await p.waitForTimeout(80); await p.mouse.up();
 await p.waitForTimeout(250);
@@ -315,7 +376,11 @@ await p.reload({ waitUntil: 'domcontentloaded' });
 await p.waitForTimeout(600);
 const 열고 = await 봄();
 재기('다시 열어도 바꾼 크기가 그대로인가', 열고.담김.기계 === 닫기전.담김.기계, 열고.담김.기계);
-재기('다시 열어도 손잡이가 다 있나', 열고.손잡이.length === 14, 열고.손잡이.length + '개');
+/* ⚠ 10-07 부터 — 다시 열면 아무것도 안 골라져 있으므로 **바닥 손잡이 둘**만 있다.
+   기계 손잡이는 그 기계를 톡 치면 난다(위에서 따로 쟀다). */
+재기('다시 열면 바닥 손잡이 둘로 서나',
+     열고.손잡이.length === 2 && 열고.손잡이.every(h => h.누구 === '바닥'),
+     열고.손잡이.length + '개 · ' + 열고.손잡이.map(h => h.누구 + ':' + h.축).join(' '));
 재기('처음부터 끝까지 터진 것이 없나', 터짐.length === 0, 터짐.join(' | ') || '없음');
 
 await b.close();

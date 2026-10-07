@@ -13,6 +13,7 @@
    ⚠ page.mouse 로 진짜 누른다. CDP dispatchTouchEvent 로는 안 걸린다. */
 import path from 'node:path';
 import fs from 'node:fs';
+import { 본보기깔기 } from './도구/본보기.mjs';
 import { 브라우저열기, 서버, 뿌리 } from '../../에이엠티/tests/도구/터.mjs';
 
 const 잰것 = [];
@@ -24,7 +25,7 @@ const 그림칸 = path.join(뿌리, '기계배치도/shots');
 fs.mkdirSync(그림칸, { recursive: true });
 await 서버();
 const 주소 = 'http://127.0.0.1:8899/' + encodeURIComponent('기계배치도') + '/' + encodeURIComponent('기계배치도.html');
-const 폰열쇠 = 'layout.배치.v1';
+const 폰열쇠 = 'layout.배치.v2';
 const 바닥가로 = 10000, 바닥세로 = 8000, 눈금 = 10;
 const 허수아비 = {
     'firebase-app.js': `export const initializeApp=()=>({});`,
@@ -41,6 +42,7 @@ await ctx.route('**/firebasejs/**', r => {
     const n = Object.keys(허수아비).find(k => r.request().url().endsWith(k));
     return r.fulfill({ status: 200, contentType: 'text/javascript', body: n ? 허수아비[n] : 'export {};' });
 });
+await 본보기깔기(ctx);   // 옛 시험통에는 10,000×8,000 본보기를 깔아 준다
 const p = await ctx.newPage();
 const 터짐 = []; p.on('pageerror', e => 터짐.push(String(e.message || e)));
 
@@ -62,7 +64,7 @@ const 봄 = () => p.evaluate(() => {
         단추높: Math.round(tr.height), 단추폭: Math.round(tr.width),
         단추오른: Math.round(tr.right),
         기계, 제일작은변: Math.round(Math.min(...기계.map(x => x.작은변))),
-        담김: JSON.parse(localStorage.getItem('layout.배치.v1') || 'null'),
+        담김: JSON.parse(localStorage.getItem('layout.배치.v2') || 'null'),
     };
 });
 const 담긴것 = (이름, 것) => (것.담김 ? (것.담김['기계들'] || []).find(x => x['이름'] === 이름) : null);
@@ -156,7 +158,7 @@ const 후 = await 봄();
      JSON.stringify((전.담김['기계들'] || []).map(m => [m['이름'], m.x, m.y]))
      === JSON.stringify((후.담김['기계들'] || []).map(m => [m['이름'], m.x, m.y])),
      (후.담김['기계들'] || []).map(m => m['이름'] + ' ' + m.x + ',' + m.y).join(' · '));
-재기('돌린 것이 자리와 같은 곳(layout.배치.v1)에 담기나', 후.담김['돌림'] === true,
+재기('돌린 것이 자리와 같은 곳(layout.배치.v2)에 담기나', 후.담김['돌림'] === true,
      '담김.돌림 = ' + JSON.stringify(후.담김['돌림']));
 await p.screenshot({ path: path.join(그림칸, '375-돌린뒤.png') });
 

@@ -63,6 +63,47 @@ body{
 /* 바닥이 노는 자리 — 남은 세로를 다 받아 둔다. 바닥 크기는 자바스크립트가 넣는다 */
 .lstage{flex:1 1 auto; min-height:0; display:flex; flex-direction:column; align-items:center;}
 
+/* ── 보는 창 ────────────────────────────────────────────────────────
+   사장님 말씀(10-07): 「스케치업처럼 축소 확대해서 전체 도는 일부를 볼 수 있게
+   해주고 팬기능으로 잡고이동 하면서 볼 수 있게 해줘」.
+
+   까닭이 있는 말씀이다 — 진짜 공장은 67.8m × 13.8m 다. 375px 폰에 통째로
+   넣으면 재단기가 **19px** 이 되어 짚을 수가 없다(재어서 적는다). 그래서
+   바닥을 이 창 **안쪽에서** 키우고, 창은 그대로 두고 바닥만 끌어 옮긴다.
+
+   ⚠ 창에 overflow:auto(브라우저 굴림)를 쓰지 않았다. 두 손가락 벌리기와
+      한 손가락 끌기를 내가 셈해야 하는데, 그 둘이 브라우저 굴림과 서로
+      싸운다. touch-action:none 으로 다 받아서 내가 자리를 넣는다. */
+.lview{
+  position:relative; flex:1 1 auto; min-height:0; width:100%;
+  overflow:hidden; touch-action:none;
+  -webkit-user-select:none; user-select:none;
+  cursor:grab;
+}
+.lview.끌림{cursor:grabbing;}
+
+/* ── 확대판 ──────────────────────────────────────────────────────────
+   ⚠ **바닥 위에 띄우지 않는다.** 처음에 지도처럼 창 오른쪽 가운데에 띄웠더니
+      바닥의 **오른 변 손잡이를 꼭 덮었다** — 둘 다 「오른쪽 · 위아래 가운데」 라
+      자리가 같다(375px 에서 x 325~369 로 겹쳤다. 10-07 에 시험이 잡아냈다).
+      그래서 늘 자리를 차지하는 **크기 바의 오른쪽 끝**에 앉힌다. 바닥을 한
+      점도 덮지 않고, 높이도 한 px 도 더 먹지 않는다.
+   변을 끄는 동안에는 숨는다 — 그때 이 줄은 수를 보여 주는 일을 한다. */
+.lzoom{flex:none; margin-left:auto; display:flex; gap:6px;}
+.lbar2.켜짐 .lzoom{display:none;}
+.lzb{width:44px; min-height:44px; padding:0; border:1px solid var(--vg-edge);
+  border-radius:12px; background:rgba(255,255,255,.93); color:var(--vg-ink);
+  font:inherit; font-size:20px; font-weight:700; line-height:1; cursor:pointer;
+  box-shadow:0 1px 4px rgba(17,17,16,.12);
+  -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none;}
+.lzb.글{font-size:12px; letter-spacing:-.4px;}
+.lzb:active{transform:scale(.94);}
+.lzb[disabled]{opacity:.38; cursor:default;}
+/* 몇 배로 보고 있나 — 창 왼쪽 아래에 작게 */
+.lmag{position:absolute; left:6px; bottom:4px; z-index:9800; font-size:11px;
+  color:var(--vg-soft); background:rgba(255,255,255,.82); border-radius:6px;
+  padding:1px 5px; pointer-events:none;}
+
 /* 머리 — 한 줄이다 */
 /* 줄바꿈을 열어 둔다 — 바닥 크기를 크게 넣으시면 그 글이 길어진다. 안 열어 두면
    크기 글이 눌려 「✎」 가 깎였다(10-06 에 재어서 잡았다). 넘치면 아랫줄로 간다. */
@@ -122,7 +163,8 @@ body{
 .lfloor{
   /* 폭·높이는 자바스크립트가 넣는다. 가로로도 세로로도 들어가는 **가장 큰** 크기다.
      테두리를 안쪽 그림자로 둔 까닭: 진짜 테두리는 칸을 2px 먹어 10,000×8,000 비를 틀어 놓는다 */
-  position:relative; flex:none; background:var(--vg-fill);
+  /* 보는 창 안에 **떠 있다** — 커져도 창의 높이를 밀지 않는다. 자리는 재기() 가 넣는다 */
+  position:absolute; left:0; top:0; background:var(--vg-fill);
   box-shadow:inset 0 0 0 1px var(--vg-edge); border-radius:4px;
   /* 손잡이가 변 밖으로 나가 앉는다 — 자르면 못 잡으신다 */
   overflow:visible;
@@ -149,6 +191,18 @@ body{
 .lmc::after{content:''; position:absolute; inset:-6px;}
 /* 층(z-index)은 집을 때 자바스크립트가 넣는다 — 여기 두면 내려놓을 때 다시 깔린다 */
 .lmc.잡힘{box-shadow:0 0 0 2px var(--vg-red); cursor:grabbing;}
+/* ── 고른 기계 ──────────────────────────────────────────────────────
+   기계가 스물이다. 손잡이를 다 내놓으면 60개가 서로 겹쳐 아무것도 못 짚는다
+   (재단기가 맞춤에서 19px 인데 손잡이 하나가 28px 다). 그래서 **짚은 기계
+   하나**에만 손잡이를 낸다 — 스케치업에서 고르는 것과 같은 버릇이다. */
+.lmc.고름{box-shadow:0 0 0 2px var(--vg-red);}
+/* 바라보는 쪽 — 돌린 것이 눈에 보여야 한다. 네모난 기계는 크기가 안 바뀌니
+   이 금이 없으면 돌렸는지 알 수가 없다.
+   ⚠ **고른 기계에만** 띄운다. 스무 대에 다 띄웠더니 도면이 통째로 빨개지고,
+      엣지밴더(7,000×600)처럼 납작한 기계에서는 이 금이 **이름을 가로질러**
+      이름을 못 읽게 했다(10-07 에 그림을 눈으로 보고 잡았다. 자로는 안 걸린다). */
+.lmc .lfr{display:none; position:absolute; background:var(--vg-red); border-radius:1px;}
+.lmc.고름 .lfr{display:block;}
 .lmc .lnm{font-size:10px; font-weight:700; line-height:1.15; letter-spacing:-.3px;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
 .lmc .lsz{font-size:9px; line-height:1.15; color:rgba(255,255,255,.62);
@@ -156,6 +210,13 @@ body{
 /* 낮은 기계는 크기 줄을 숨긴다 — 글자가 판을 넘어가면 아무것도 안 읽힌다 */
 .lmc.납작 .lsz{display:none}
 .lmc.아주납작 .lnm{font-size:9px}
+/* 글줄보다 얇은 기계는 **패딩을 걷어** 한 줄이라도 더 들어가게 한다 */
+.lmc.아주납작{padding:0 2px;}
+/* ⚠ 그래도 안 들어가면 이름을 **뗀다.** 엣지밴더(7,000×600)는 2.6배에서 7px 인데
+   글줄은 10px 이라, 글자의 아래 반이 판 밖으로 나가 **흰 바탕 위 흰 글씨**가 됐다
+   — 반 잘린 이름은 없는 것만 못하다(10-07 에 그림을 눈으로 보고 잡았다).
+   크게 보시면 다시 뜬다. 기계 자체는 그대로 짚고 끌 수 있다. */
+.lmc.이름숨김 .lnm{display:none}
 
 /* ── 변을 잡는 손잡이 ──────────────────────────────────────────────
    사장님 말씀(10-07): 「가로세로 변을 잡아 늘리고 늘리는 동작중 정확한 수치
@@ -169,11 +230,17 @@ body{
   -webkit-tap-highlight-color:transparent; -webkit-user-select:none; user-select:none;}
 .lhd i{position:absolute; display:block; background:var(--vg-red); border-radius:2px;}
 .lhd.잡힘 i{background:var(--vg-ink); box-shadow:0 0 0 2px rgba(255,59,48,.35);}
-.lhd-오른{width:28px; height:44px; right:-24px; top:50%; margin-top:-22px;}
+/* ⚠ 손잡이를 **변 밖으로 온전히** 뺀다(−28px). 전에는 4px 을 몸통 안으로
+   물려 두었는데, 그러면 **몸통보다 큰 손잡이가 몸통 한가운데를 덮는다.**
+   스키퍼 1(2,000×800mm)은 2.6배에서 25×10px 인데 손잡이는 28×44px 이라,
+   가운데를 짚으면 몸통이 아니라 손잡이가 잡혀 **끌어 옮기면 기계가 0.1m 로
+   쪼그라들었다**(10-07 에 그림을 눈으로 보고 잡았다 — 자로는 안 걸렸다).
+   작은 기계일수록 옮길 일이 많다. 몸통이 먼저다. */
+.lhd-오른{width:28px; height:44px; right:-28px; top:50%; margin-top:-22px;}
 .lhd-오른 i{width:3px; height:20px; left:3px; top:12px;}
-.lhd-왼{width:28px; height:44px; left:-24px; top:50%; margin-top:-22px;}
+.lhd-왼{width:28px; height:44px; left:-28px; top:50%; margin-top:-22px;}
 .lhd-왼 i{width:3px; height:20px; right:3px; top:12px;}
-.lhd-아래{width:44px; height:28px; bottom:-24px; left:50%; margin-left:-22px;}
+.lhd-아래{width:44px; height:28px; bottom:-28px; left:50%; margin-left:-22px;}
 .lhd-아래 i{width:20px; height:3px; left:12px; top:3px;}
 /* 바닥 손잡이 — 같은 꼴이되 조금 길게 (공장 벽이라 눈에 먼저 들어와야 한다) */
 .lhd.바닥손잡이 i{background:var(--vg-ink);}
@@ -187,7 +254,8 @@ body{
       끌던 것이 어긋난다. 평소엔 안내말을 띄워 둔다. */
 .lbar2{width:100%; padding:0 14px; margin:0 0 8px; min-height:52px;
   display:flex; align-items:center; gap:8px;}
-.lbar2 .l2hint{font-size:12px; color:var(--vg-muted);}
+.lbar2 .l2hint{font-size:12px; color:var(--vg-muted); min-width:0; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap;}
 .lbar2 .l2나{display:none; align-items:center; gap:8px; width:100%;}
 .lbar2.켜짐 .l2hint{display:none;}
 .lbar2.켜짐 .l2나{display:flex;}
@@ -202,12 +270,16 @@ body{
   border-radius:12px; background:var(--vg-ink); color:#fff; font:inherit; font-size:14px;
   font-weight:700; cursor:pointer; -webkit-tap-highlight-color:transparent;}
 
-/* 발 — 지금 무슨 일이 됐는지 한 줄 */
+/* 발 — 지금 무슨 일이 됐는지 **한 줄**.
+   ⚠ 두 줄이 되면 안 된다. 「저장했습니다」 가 뜨는 순간 발이 19 → 35px 로 커지고,
+      보는 창이 그만큼 줄어드는데 바닥은 이미 큰 창에 맞춰 잰 뒤라 **바닥 아래
+      손잡이가 창에 잘렸다**(돌려서 볼 때 아래 손잡이를 못 잡았다. 10-07 에
+      시험이 잡아냈다). 그래서 쪽지는 넘치면 …로 줄이고 발은 한 줄로 못박는다. */
 .lfoot{display:flex; align-items:baseline; gap:8px; margin:10px 0 0; min-height:19px;
-  width:100%; padding:0 14px;}
+  width:100%; padding:0 14px; flex-wrap:nowrap; overflow:hidden;}
 /* 돌리기 단추 — 제 줄에 둔다. 알림줄에 끼우면 쪽지가 길어질 때 단추가 밀려
    한 줄이 두 줄이 되고, 그러면 끄는 도중에 바닥 높이가 흔들린다. */
-.lbar{width:100%; padding:8px 14px 0; display:flex; justify-content:flex-end;}
+.lbar{width:100%; padding:8px 14px 0; display:flex; justify-content:flex-end; gap:8px;}
 .lturn{
   min-height:44px; min-width:44px; padding:0 16px; flex:none;
   border:1px solid var(--vg-edge); border-radius:12px; background:#fff; color:var(--vg-ink);
@@ -216,8 +288,10 @@ body{
 }
 .lturn:active{transform:scale(.97);}
 .lturn[aria-pressed="true"]{background:var(--vg-ink); color:#fff; border-color:var(--vg-ink);}
-.lnote{font-size:12px; color:var(--vg-soft);}
-.lsave{margin-left:auto; font-size:11px; color:var(--vg-muted);}
+.lnote{font-size:12px; color:var(--vg-soft); min-width:0; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap;}
+.lsave{margin-left:auto; font-size:11px; color:var(--vg-muted);
+  flex:none; white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -233,7 +307,7 @@ body{
   <div class="lstage" id="l-stage">
     <!-- 크기 바 — 변을 잡으면 여기에 수가 산다. 바닥 위라 손가락에 안 가린다 -->
     <div class="lbar2" id="l-bar2" data-area="크기바">
-      <span class="l2hint">변의 붉은 손잡이를 잡아 끌면 크기가 바뀝니다</span>
+      <span class="l2hint">붉은 손잡이로 크기 조절</span>
       <span class="l2나">
         <span class="l2누구" id="l-b2who">—</span>
         <span class="l2축" id="l-b2ax">가로</span>
@@ -241,17 +315,29 @@ body{
         <span class="l2축">m</span>
         <button class="l2단" id="l-b2ok" type="button">맞춤</button>
       </span>
+      <!-- 확대판 — 바닥을 덮지 않는 자리다(까닭은 .lzoom 에 적어 두었다) -->
+      <span class="lzoom" data-area="확대판">
+        <button class="lzb" id="l-zout" type="button" data-area="축소" aria-label="작게 보기">−</button>
+        <button class="lzb" id="l-zin"  type="button" data-area="확대" aria-label="크게 보기">＋</button>
+        <button class="lzb 글" id="l-zall" type="button" data-area="전체보기">전체</button>
+      </span>
     </div>
 
-    <!-- ⚠ data-area 는 사장님이 어디를 짚으셨는지 손잡이가 알아보게 달아 둔 것이다 -->
-    <div class="lfloor" id="l-floor" data-area="바닥"></div>
+    <!-- 보는 창 — 바닥은 이 안에서만 움직인다. 잡고 끌면 바닥이 따라온다 -->
+    <div class="lview" id="l-view" data-area="보는창">
+      <!-- ⚠ data-area 는 사장님이 어디를 짚으셨는지 손잡이가 알아보게 달아 둔 것이다 -->
+      <div class="lfloor" id="l-floor" data-area="바닥"></div>
+      <span class="lmag" id="l-mag" data-area="배율"></span>
+    </div>
 
     <div class="lfoot" data-area="알림">
-      <span class="lnote" id="l-note" data-area="안내">기계를 손가락으로 끌어 옮기십시오</span>
+      <span class="lnote" id="l-note" data-area="안내">빈 바닥을 끌면 이동, 두 손가락을 벌리면 확대</span>
       <span class="lsave" id="l-save" data-area="저장알림"></span>
     </div>
 
     <div class="lbar">
+      <button class="lturn" id="l-mturn" type="button"
+              data-area="기계돌리기단추" disabled>◰ 기계 돌리기</button>
       <button class="lturn" id="l-turn" type="button" aria-pressed="false"
               data-area="돌리기단추">⟲ 세로로</button>
     </div>
@@ -287,18 +373,36 @@ body{
 (() => {
     'use strict';
 
-    /* ── 처음 배치 ─────────────────────────────────────────────────────
-       관리자에게: 바닥 10m × 8m 과 기계 여섯 대는 **제가 정한 것**입니다.
-       사장님 공장의 참값이 아닙니다 — 보시고 고치라 하시면 그대로 바꿉니다.
-       (고르는 데 쓴 자: 375px 폰에서 가장 얇은 기계도 손가락에 걸릴 만한 크기) */
-    const 처음바닥 = { 가로: 10000, 세로: 8000 };          // mm
+    /* ── 처음 배치 — **사장님 캐드 도면에서 그대로 꺼낸 참값** ────────────
+       bdee2c5a-…2026_1007_A.dwg (AutoCAD 2010, 단위 mm) 의 「장비 배치」 벌.
+       그 도면은 같은 홀을 네 벌(장비 배치·전선 트레이·집진기 라인·바탕) 쌓아
+       두었고, 기계가 그려진 것은 한 벌뿐이다. 그 벌의 왼위 모서리를 0,0 으로 잡았다.
+
+       홀 67,800 × 13,800 mm. 아래에 붙은 기계실(8×3m)·엣지집진기(2.5×1.2m)는
+       홀 **밖**이라 안 넣었다. 파레트 1200×1200 쉰한 개와 잔 부속도 뺐다.
+       이름은 도면에 적힌 그대로다 — 「엣지밴더 1」 이 둘이라 아래쪽에 (아래)를 붙였다. */
+    const 처음바닥 = { 가로: 67800, 세로: 13800 };          // mm — 진짜 공장 홀
     const 처음기계 = [
-        { id: 'm1', 이름: '패널쏘',       가로: 3800, 세로: 3300, x:  400, y:  400 },
-        { id: 'm2', 이름: '보링기',       가로: 2400, 세로: 1600, x: 5000, y:  600 },
-        { id: 'm3', 이름: '멤브레인프레스', 가로: 3600, 세로: 1800, x: 5600, y: 2400 },
-        { id: 'm4', 이름: '엣지밴더',     가로: 6000, 세로: 1500, x:  400, y: 4200 },
-        { id: 'm5', 이름: '작업대',       가로: 2400, 세로: 1200, x:  400, y: 6200 },
-        { id: 'm6', 이름: '집진기',       가로: 1500, 세로: 1500, x: 8200, y: 6200 },
+        { id: 'm01', 이름: '재단기',            가로: 4000, 세로: 4000, x:   600, y:   600 },
+        { id: 'm02', 이름: '판넬 자동 투입기',   가로: 3000, 세로: 1600, x:  4600, y:  2000 },
+        { id: 'm03', 이름: '투입기',            가로: 2000, 세로: 1400, x:  9339, y:    64 },
+        { id: 'm04', 이름: '엣지밴더 1',        가로: 7000, 세로:  600, x: 11400, y:   600 },
+        { id: 'm05', 이름: '엣지밴더 2',        가로: 7000, 세로:  600, x: 21400, y:   600 },
+        { id: 'm06', 이름: '엣지밴더 3',        가로: 7000, 세로:  600, x: 11400, y:  3800 },
+        { id: 'm07', 이름: '엣지밴더 4',        가로: 7000, 세로:  600, x: 21400, y:  3800 },
+        { id: 'm08', 이름: '엣지밴더 1(아래)',  가로: 7000, 세로:  600, x: 11400, y: 11024 },
+        { id: 'm09', 이름: '적재기 1',          가로: 2000, 세로: 1400, x: 28400, y:   260 },
+        { id: 'm10', 이름: '적재기 2',          가로: 2000, 세로: 1400, x: 28400, y:  3288 },
+        { id: 'm11', 이름: '엣지 보관대',       가로:  600, 세로: 1600, x: 20737, y:  9996 },
+        { id: 'm12', 이름: '멀티 보링기',       가로: 3000, 세로: 1600, x: 23769, y: 11200 },
+        { id: 'm13', 이름: '스키퍼 1',          가로:  800, 세로: 2000, x: 37205, y:  1000 },
+        { id: 'm14', 이름: '스키퍼 2',          가로: 2600, 세로: 2000, x: 34805, y:  9800 },
+        { id: 'm15', 이름: '로버 골드',         가로: 4200, 세로: 2200, x: 43805, y:  1400 },
+        { id: 'm16', 이름: '로버24',            가로: 4200, 세로: 2200, x: 42605, y: 10200 },
+        { id: 'm17', 이름: '곡면 엣지 1',       가로: 2000, 세로: 2000, x: 50405, y:  1400 },
+        { id: 'm18', 이름: '곡면 엣지 2',       가로: 1200, 세로: 1200, x: 49205, y: 11200 },
+        { id: 'm19', 이름: '지에스더 그린테크 작업실', 가로: 9300, 세로: 5000, x: 58500, y:    0 },
+        { id: 'm20', 이름: '에이엠티 조립·자재보관·회의실', 가로: 9300, 세로: 8800, x: 58500, y: 5000 },
     ];
     const 눈금 = 10;        // 10mm 단위로 떨어뜨린다. 손가락은 1mm 를 못 짚는다
     /* 기준 보드판 — 사장님 말씀(10-06): 「모든 배치의 기준이 되는 2440*1220mm 사이즈의
@@ -309,18 +413,26 @@ body{
     const 보드 = { 가로: 2440, 세로: 1220, 띄움: 100 };
     const 바닥최소 = 1000, 바닥최대 = 200000;      // mm
     const 기계최소 = 100, 기계최대 = 100000;       // mm
-    /* 바닥 밖에 손잡이가 앉을 자리(px). 손잡이가 변에서 **24px** 나가 앉으니 그만큼
-       비워야 한다. 14 로 잡았다가 화면이 375 → 392 로 넘치는 것을 재어서 잡았다(10-07).
-       돌리면 비우는 쪽도 같이 돈다. */
-    const 여백 = 26;
+    /* 바닥 밖에 손잡이가 앉을 자리(px). 손잡이가 변에서 **28px** 나가 앉으니 그만큼
+       비워야 한다. 14 로 잡았다가 화면이 375 → 392 로 넘치는 것을 재어서 26 으로
+       잡았고(10-07), 손잡이를 변 밖으로 온전히 빼면서 30 으로 올렸다 — 까닭은
+       .lhd-오른 에 적어 두었다. 돌리면 비우는 쪽도 같이 돈다. */
+    const 여백 = 30;
     const 칸 = 1000;        // 바닥 눈금 한 칸 = 1m
 
     /* ── 담는 자리 ─────────────────────────────────────────────────────
        폰 안(localStorage)이 **본**이다 — 창고가 안 붙어도 ③ 이 된다.
        창고(파이어스토어)는 폰을 바꾸셔도 남게 하는 거울이다. */
-    const 폰열쇠 = 'layout.배치.v1';
+    /* ⚠ v1 → v2 로 올렸다(10-07). 까닭: 사장님 폰에는 **내가 지어낸 본보기 배치**
+       (10,000×8,000 · 기계 여섯)가 이미 담겨 있다. 그것이 담겨 있으면 참 공장
+       수치로 갈아도 화면에는 옛 본보기가 그대로 뜬다 — 사장님이 「세팅해줘」
+       하신 일이 안 된 것처럼 보인다. 열쇠를 새로 내면 참 배치로 한 번 서고,
+       그 뒤로는 사장님이 옮기신 대로 담긴다.
+       창고 문서도 같이 새로 낸다 — 옛 문서(현재)는 **손대지 않고 그대로 둔다.**
+       (파이어스토어를 지우거나 덮어쓰지 않는다는 지시를 지킨다.) */
+    const 폰열쇠 = 'layout.배치.v2';
     const 창고칸 = 'layout_배치도';
-    const 창고문서 = '현재';
+    const 창고문서 = '현재v2';
 
     let 바닥 = { ...처음바닥 };
     let 기계들 = 처음기계.map(m => ({ ...m }));
@@ -330,12 +442,49 @@ body{
     let 돌림 = false;
     let 잰때 = 0;                         // 이 배치가 바뀐 때(ms). 창고와 견줄 때 쓴다
     let 배율 = 0;                         // px 하나가 몇 mm 인가의 거꾸로 — px/mm
+    /* ── 보는 자리 ─────────────────────────────────────────────────────
+       사장님 말씀(10-07): 「스케치업처럼 축소 확대해서 전체 도는 일부를 볼 수 있게
+       해주고 팬기능으로 잡고이동 하면서 볼 수 있게 해줘」.
+         맞춤배율 — 공장 **전체**가 창에 딱 들어가는 배율
+         확대     — 그 맞춤의 몇 배로 보고 있나 (1 이면 전체, 24 면 스물네 배)
+         팬x·팬y  — 창 안에서 바닥 왼위 모서리가 앉은 자리(px)
+       ⚠ 이 셋은 **보는 눈**일 뿐이다. 기계의 참 자리(mm)에는 손도 안 댄다.
+          담지도 않는다 — 다시 여시면 늘 전체가 보이는 것이 덜 헷갈린다. */
+    let 맞춤배율 = 0;
+    let 확대 = 1;
+    let 팬x = 0, 팬y = 0;
+    const 확대최대 = 24;
+    /* 고른 기계 하나. 손잡이는 이 기계에만 난다 — 까닭은 .lmc.고름 에 적어 두었다 */
+    let 고른id = null;
 
     const $ = id => document.getElementById(id);
+
+    /* ── 기계를 돌리는 셈 ──────────────────────────────────────────────
+       사장님 말씀(10-07): 「각 기기별 객체화 해서 회전 이동 등이 가능해야해」.
+
+       기계마다 **각**(0·90·180·270)을 지닌다. 각은 가로·세로 값을 바꾸지 않는다 —
+       재단기는 돌려도 4,000×4,000 이다. 바뀌는 것은 **바닥에서 차지하는 자리**다.
+       그래서 자리·부딪힘·벽 막기는 모두 아래 폭()·높() 으로만 셈한다.
+
+       ⚠ m.가로 · m.세로 를 자리 셈에 바로 쓰면 돌린 기계가 벽을 뚫는다. */
+    const 각의 = m => ((m && +m['각']) | 0) % 360;
+    const 폭 = m => (각의(m) % 180) ? m['세로'] : m['가로'];   // 바닥 가로(x) 쪽으로 차지하는 mm
+    const 높 = m => (각의(m) % 180) ? m['가로'] : m['세로'];   // 바닥 세로(y) 쪽으로 차지하는 mm
+    /* 그 축(가로/세로)을 키우면 모델의 어느 쪽으로 자라나.
+       돌리지 않았으면 가로는 x 쪽, 90° 돌렸으면 가로는 y 쪽으로 자란다. */
+    const 자라는쪽 = (것, 축) => ((축 === '가로') === (각의(것) % 180 === 0)) ? 'x+' : 'y+';
+    /* 기계가 바라보는 쪽(각 0 이면 아래쪽). 돌린 것이 눈에 보이게 금 하나를 긋는다 */
+    const 앞쪽 = m => ['y+', 'x+', 'y-', 'x-'][각의(m) / 90 | 0];
+    /* 모델의 쪽 → 화면의 변. 바닥 돌리기(돌림)까지 함께 셈한 뒤 돌려준다 */
+    const 화면쪽 = 쪽 => 쪽 === 'x+' ? (돌림 ? '아래' : '오른')
+                      : 쪽 === 'x-' ? (돌림 ? '위'   : '왼')
+                      : 쪽 === 'y+' ? (돌림 ? '왼'   : '아래')
+                                    : (돌림 ? '오른' : '위');
     /* 화면에 보이는 바닥의 가로·세로(mm). 돌리면 둘이 뒤바뀐다 — 그것뿐이다 */
     const 보이는가로 = () => 돌림 ? 바닥.세로 : 바닥.가로;
     const 보이는세로 = () => 돌림 ? 바닥.가로 : 바닥.세로;
     const 바닥판 = $('l-floor');
+    const 뷰 = $('l-view');
     const 무대 = $('l-stage');
     const 감싼것 = document.querySelector('.lwrap');
     const 발 = document.querySelector('.lfoot');
@@ -372,6 +521,8 @@ body{
         기계들 = 성한것.map(m => ({
             id: String(m.id), 이름: String(m['이름']),
             가로: +m['가로'], 세로: +m['세로'], x: +m.x, y: +m.y,
+            // 각은 0·90·180·270 만 받는다. 깨진 값은 0 으로 — 그려지기는 해야 한다
+            각: [0, 90, 180, 270].includes(((+m['각']) | 0) % 360) ? ((+m['각']) | 0) % 360 : 0,
         }));
         잰때 = +것['잰때'] || 0;
         돌림 = !!것['돌림'];
@@ -427,44 +578,60 @@ body{
     };
 
     /* ── 재기 ──────────────────────────────────────────────────────────
-       **가로로도 세로로도 들어가는 가장 큰 크기**로 바닥을 잡는다.
-       가로세로 비(10,000×8,000)는 그대로 지킨다 — 공장이 찌그러지면 안 된다.
-       그래서 둘 중 작은 배율을 쓴다. 폰(세로로 긴 화면)에서는 거의 늘 가로가
-       먼저 차고, 넓은 화면에서는 세로가 먼저 찬다. */
+       **맞춤배율** — 공장 전체가 보는 창에 가로로도 세로로도 들어가는 가장 큰 배율.
+       가로세로 비는 그대로 지킨다(공장이 찌그러지면 안 된다). 둘 중 작은 쪽을 쓴다.
+       **배율** = 맞춤배율 × 확대. 확대가 1 이면 전체, 키우면 일부만 크게 본다.
+
+       ⚠ 바닥의 높이를 더는 재지 않는다. 바닥이 보는 창 **안에** 떠 있으므로
+          (position:absolute) 바닥을 키워도 창 높이가 흔들리지 않는다. 전에는
+          바닥이 줄의 하나였던 탓에, 끄는 도중에 바닥이 커지면 아래 단추줄이
+          밀려 끌던 자리가 어긋났다. 이 틀에서는 그 일이 아예 안 난다. */
     function 재기() {
         // 100dvh 를 모르는 낡은 폰에만 자바스크립트가 보이는 높이를 넣어 준다
         if (!(window.CSS && CSS.supports && CSS.supports('height', '100dvh'))) {
             const 보임 = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
             감싼것.style.height = 보임 + 'px';
         }
-        // 바닥 밑에 깔린 것(알림줄·단추줄)이 먹는 높이를 다 뺀다
-        let 아래높 = 0;
-        [...무대.children].forEach(el => {
-            if (el === 바닥판) return;
-            const cs = getComputedStyle(el);
-            아래높 += el.getBoundingClientRect().height
-                    + (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0);
-        });
-        /* 손잡이가 변 밖으로 24px 나가 앉는다. 그 자리를 비워 둔다 —
-           ⚠ 돌리면 가로 손잡이가 **왼쪽**으로 가므로 비우는 쪽도 같이 돈다.
-              한쪽에 못박아 두면 돌렸을 때 손잡이가 화면 밖으로 나간다. */
-        const 칸폭전체 = 무대.clientWidth;
-        const 칸폭 = 칸폭전체 - 여백;
-        const 칸높 = 무대.clientHeight - 아래높 - 여백;
-        if (!(칸폭 > 0) || !(칸높 > 0)) return;
-        배율 = Math.min(칸폭 / 보이는가로(), 칸높 / 보이는세로());   // px / mm
-        const 바닥폭 = 보이는가로() * 배율;
+        const 보기폭 = 뷰.clientWidth, 보기높 = 뷰.clientHeight;
+        if (!(보기폭 > 0) || !(보기높 > 0)) return;
+        /* 손잡이가 변 밖으로 28px 나가 앉는다. 네 변 모두 비워 둔다 —
+           전에는 먼 쪽 둘만 비웠는데, 이제는 바닥을 끌어 옮기니 **가까운 쪽
+           변도 창 가운데로 올 수 있다.** 그때 손잡이가 창에 잘리면 못 잡으신다. */
+        맞춤배율 = Math.min((보기폭 - 여백 * 2) / 보이는가로(),
+                            (보기높 - 여백 * 2) / 보이는세로());
+        if (!(맞춤배율 > 0)) return;
+        확대 = Math.max(1, Math.min(확대최대, 확대));
+        배율 = 맞춤배율 * 확대;                                   // px / mm
+        const 바닥폭 = 보이는가로() * 배율, 바닥높 = 보이는세로() * 배율;
         바닥판.style.width  = 바닥폭 + 'px';
-        바닥판.style.height = (보이는세로() * 배율) + 'px';
-        바닥판.style.marginBottom = 여백 + 'px';
-        const 남는폭 = Math.max(0, 칸폭전체 - 바닥폭 - 여백);
-        바닥판.style.marginLeft = ((돌림 ? 여백 : 0) + 남는폭 / 2) + 'px';
+        바닥판.style.height = 바닥높 + 'px';
+        /* 바닥을 창 밖으로 날려 보내지 않는다. 창보다 작으면 가운데에 두고,
+           크면 변이 창 안으로 들어오는 데까지만(손잡이 자리 26px 은 남긴다). */
+        팬x = (바닥폭 + 여백 * 2 <= 보기폭) ? (보기폭 - 바닥폭) / 2
+            : Math.max(보기폭 - 바닥폭 - 여백, Math.min(여백, 팬x));
+        팬y = (바닥높 + 여백 * 2 <= 보기높) ? (보기높 - 바닥높) / 2
+            : Math.max(보기높 - 바닥높 - 여백, Math.min(여백, 팬y));
+        바닥판.style.left = 팬x + 'px';
+        바닥판.style.top  = 팬y + 'px';
         const 한칸 = (칸 * 배율).toFixed(3) + 'px';
         바닥판.style.backgroundSize = 한칸 + ' ' + 한칸;
         $('l-floor-size').innerHTML = '';
         $('l-floor-size').append(미터(바닥.가로) + ' × ' + 미터(바닥.세로) + ' m');
         const 붓 = document.createElement('span'); 붓.className = 'lpen'; 붓.textContent = '✎';
         $('l-floor-size').append(붓);
+        배율글고치기();
+    }
+    /* 몇 배로 보고 있나 — 전체인지 일부인지 사장님이 알 수 있어야 한다.
+       1m 가 화면에서 몇 px 인지도 같이 적는다(그것이 진짜 자다). */
+    function 배율글고치기() {
+        const 글 = $('l-mag');
+        if (!글) return;
+        const 한칸px = 칸 * 배율;
+        글.textContent = (확대 <= 1.005 ? '전체' : 확대.toFixed(1) + '배')
+                       + ' · 1m = ' + 한칸px.toFixed(0) + 'px';
+        $('l-zin').disabled  = 확대 >= 확대최대 - 1e-6;
+        $('l-zout').disabled = 확대 <= 1 + 1e-6;
+        $('l-zall').disabled = 확대 <= 1 + 1e-6;
     }
 
     /* ── 그리기 ────────────────────────────────────────────────────── */
@@ -478,17 +645,18 @@ body{
 
        ⚠ 바꾸는 것은 **그리는 자리뿐**이다. m.x·m.y 는 손도 안 댄다. */
     function 자리넣기(el, m) {
+        const w = 폭(m), h = 높(m);            // 돌린 만큼 바뀐 **차지하는 자리**
         if (돌림) {
-            el.style.left   = ((바닥.세로 - m.y - m.세로) / 바닥.세로 * 100) + '%';
+            el.style.left   = ((바닥.세로 - m.y - h) / 바닥.세로 * 100) + '%';
             el.style.top    = (m.x / 바닥.가로 * 100) + '%';
-            el.style.width  = (m.세로 / 바닥.세로 * 100) + '%';
-            el.style.height = (m.가로 / 바닥.가로 * 100) + '%';
+            el.style.width  = (h / 바닥.세로 * 100) + '%';
+            el.style.height = (w / 바닥.가로 * 100) + '%';
             return;
         }
         el.style.left   = (m.x / 바닥.가로 * 100) + '%';
         el.style.top    = (m.y / 바닥.세로 * 100) + '%';
-        el.style.width  = (m.가로 / 바닥.가로 * 100) + '%';
-        el.style.height = (m.세로 / 바닥.세로 * 100) + '%';
+        el.style.width  = (w / 바닥.가로 * 100) + '%';
+        el.style.height = (h / 바닥.세로 * 100) + '%';
     }
     function 그리기() {
         바닥판.innerHTML = '';
@@ -499,19 +667,27 @@ body{
             /* ⚠ data-area 에 기계 이름을 적어 둔다. 사장님이 이 기계를 짚으셨을 때
                손잡이가 「바탕」 이 아니라 **이 기계**를 적게 하려는 것이다. */
             el.dataset.area = '기계:' + m.이름;
-            const 높이px = (돌림 ? m.가로 : m.세로) * 배율;   // 화면에 보이는 높이
+            const 높이px = (돌림 ? 폭(m) : 높(m)) * 배율;   // 화면에 보이는 높이
             if (높이px < 34) el.classList.add('납작');
             if (높이px < 24) el.classList.add('아주납작');
-            el.innerHTML = '<span class="lnm"></span><span class="lsz"></span>';
+            if (높이px < 11) el.classList.add('이름숨김');   // 반 잘린 이름은 안 보인다
+            el.innerHTML = '<span class="lnm"></span><span class="lsz"></span><i class="lfr"></i>';
             el.querySelector('.lnm').textContent = m.이름;
             el.querySelector('.lsz').textContent = 미터(m.가로) + '×' + 미터(m.세로) + 'm';
+            앞금넣기(el, m);
             자리넣기(el, m);
             el.addEventListener('pointerdown', 집기);
             el.addEventListener('pointermove', 끌기);
             el.addEventListener('pointerup', 놓기);
             el.addEventListener('pointercancel', 놓기);
-            손잡이붙이기(el, '가로', m.id, false);
-            손잡이붙이기(el, '세로', m.id, false);
+            /* 손잡이는 **고른 기계에만** 낸다. 스무 대에 다 내면 예순 개가 서로
+               겹쳐 아무것도 못 짚는다(까닭은 .lmc.고름 에 적어 두었다). */
+            if (m.id === 고른id) {
+                el.classList.add('고름');
+                el.style.zIndex = String(++맨위);
+                손잡이붙이기(el, '가로', m.id, false);
+                손잡이붙이기(el, '세로', m.id, false);
+            }
             바닥판.appendChild(el);
         });
         보드그리기();
@@ -519,17 +695,33 @@ body{
         글자맞추기();
     }
 
+    /* 바라보는 쪽에 붉은 금을 하나 긋는다. 네모난 기계(재단기 4,000×4,000)는
+       돌려도 차지하는 자리가 안 바뀌니, 이 금이 없으면 돌았는지 알 수가 없다. */
+    function 앞금넣기(el, m) {
+        const 금 = el.querySelector('.lfr');
+        if (!금) return;
+        const 쪽 = 화면쪽(앞쪽(m));
+        금.style.cssText = '';
+        if (쪽 === '오른' || 쪽 === '왼') {
+            금.style.width = '3px'; 금.style.top = '18%'; 금.style.bottom = '18%';
+            금.style[쪽 === '오른' ? 'right' : 'left'] = '1px';
+        } else {
+            금.style.height = '3px'; 금.style.left = '18%'; 금.style.right = '18%';
+            금.style[쪽 === '아래' ? 'bottom' : 'top'] = '1px';
+        }
+    }
+
     /* ── 손잡이가 어느 화면 변에 앉나 ──────────────────────────────────
-       늘 **모델의 먼 쪽(x+가로 · y+세로)** 이 놓인 화면 변이다.
+       늘 **그 축이 자라는 쪽**이 놓인 화면 변이다. 기계를 90° 돌리면 가로가
+       자라는 쪽이 x+ 에서 y+ 로 바뀌므로 손잡이도 그만큼 옮겨 앉는다.
          안 돌렸을 때 — x+가로 → 오른 · y+세로 → 아래
          돌렸을 때   — x+가로 → 아래 · y+세로 → **왼**
        이것을 안 맞추면 오른 변을 당길 때 기계가 **움직인다**(돌림에서 화면 오른은
        모델의 y 쪽이다). 10-07 에 짜기 전에 짚어 둔 자리다. */
-    const 손잡이쪽 = 축 => 축 === '가로' ? (돌림 ? '아래' : '오른')
-                                        : (돌림 ? '왼' : '아래');
+    const 손잡이쪽 = (것, 축) => 화면쪽(자라는쪽(것, 축));
     function 손잡이붙이기(부모, 축, 누구, 바닥것) {
         const h = document.createElement('div');
-        h.className = 'lhd lhd-' + 손잡이쪽(축) + (바닥것 ? ' 바닥손잡이' : '');
+        h.className = 'lhd lhd-' + 손잡이쪽(변주인(누구), 축) + (바닥것 ? ' 바닥손잡이' : '');
         h.dataset.축 = 축;
         h.dataset.누구 = 누구;
         h.dataset.area = (바닥것 ? '바닥' : '기계') + '손잡이:' + 축;
@@ -556,8 +748,8 @@ body{
         const 구석 = { x: Math.max(0, Math.min(보드.띄움, 바닥.가로 - 보드.가로)),
                        y: Math.max(0, 바닥.세로 - 보드.세로 - 보드.띄움) };
         if (바닥.가로 < 보드.가로 || 바닥.세로 < 보드.세로) return 구석;
-        const 걸리나 = (x, y) => 기계들.some(o => x < o.x + o.가로 && o.x < x + 보드.가로
-                                               && y < o.y + o.세로 && o.y < y + 보드.세로);
+        const 걸리나 = (x, y) => 기계들.some(o => x < o.x + 폭(o) && o.x < x + 보드.가로
+                                               && y < o.y + 높(o) && o.y < y + 보드.세로);
         const 칸수 = 24;
         const dx = (바닥.가로 - 보드.가로) / 칸수, dy = (바닥.세로 - 보드.세로) / 칸수;
         for (let j = 칸수; j >= 0; j--) {                 // 아래에서 위로
@@ -622,25 +814,26 @@ body{
        미끄러진다. (그냥 「겹치면 안 움직인다」 로 두었더니 기계 쪽으로 밀 때
        아예 꼼짝을 안 해서, 붙여 놓을 수가 없었다 — 10-05 에 재어서 고쳤다.) */
     const 겹치나 = (m, x, y) => 기계들.some(o => o !== m
-        && x < o.x + o.가로 && o.x < x + m.가로
-        && y < o.y + o.세로 && o.y < y + m.세로);
+        && x < o.x + 폭(o) && o.x < x + 폭(m)
+        && y < o.y + 높(o) && o.y < y + 높(m));
 
     /* 가려는 자리를 다른 기계에 막히는 데까지만 줄여 돌려준다.
        돌려주는 것: { x, y, 막혔나 } — 막혔나는 **기계에** 막혔을 때만 참이다(벽은 아니다) */
     function 풀기(m, 갈x, 갈y) {
+        const w = 폭(m), h = 높(m);
         let x = 갈x, 막혔나 = false;
         기계들.forEach(o => {                       // ① 가로 — 지금 세로에서 걸리는 것만 본다
             if (o === m) return;
-            if (!(m.y < o.y + o.세로 && o.y < m.y + m.세로)) return;
-            if (m.x + m.가로 <= o.x && x > o.x - m.가로) { x = o.x - m.가로; 막혔나 = true; }
-            else if (m.x >= o.x + o.가로 && x < o.x + o.가로) { x = o.x + o.가로; 막혔나 = true; }
+            if (!(m.y < o.y + 높(o) && o.y < m.y + h)) return;
+            if (m.x + w <= o.x && x > o.x - w) { x = o.x - w; 막혔나 = true; }
+            else if (m.x >= o.x + 폭(o) && x < o.x + 폭(o)) { x = o.x + 폭(o); 막혔나 = true; }
         });
         let y = 갈y;
         기계들.forEach(o => {                       // ② 세로 — ① 로 정한 가로에서 걸리는 것만
             if (o === m) return;
-            if (!(x < o.x + o.가로 && o.x < x + m.가로)) return;
-            if (m.y + m.세로 <= o.y && y > o.y - m.세로) { y = o.y - m.세로; 막혔나 = true; }
-            else if (m.y >= o.y + o.세로 && y < o.y + o.세로) { y = o.y + o.세로; 막혔나 = true; }
+            if (!(x < o.x + 폭(o) && o.x < x + w)) return;
+            if (m.y + h <= o.y && y > o.y - h) { y = o.y - h; 막혔나 = true; }
+            else if (m.y >= o.y + 높(o) && y < o.y + 높(o)) { y = o.y + 높(o); 막혔나 = true; }
         });
         if (겹치나(m, x, y)) return { x: m.x, y: m.y, 막혔나: true };   // 마지막 자물쇠
         return { x, y, 막혔나 };
@@ -657,6 +850,7 @@ body{
            가로채는데, 한 번 아래로 깔린 기계는 **다시 끌 수가 없었다**. */
         el.style.zIndex = String(++맨위);
         try { el.setPointerCapture(e.pointerId); } catch (err) {}
+        고르기(m.id);                       // 짚은 기계에 손잡이가 난다
         알리기(m);
         /* ⚠ 여기서 e.preventDefault() 를 부르면 안 된다. 포인터 내림을 막으면
            뒤따르는 mousedown 이 안 나고, 손잡이(viggle)가 그것으로 0.5초를 세기에
@@ -681,8 +875,8 @@ body{
             if (Math.abs(민px) <= 6 && Math.abs(민py) <= 6) return;
             잡은것.끔 = true;
         }
-        const 갈x = 가두기(잡은것.첫x + (돌림 ?  민py : 민px) / 배율, 바닥.가로 - m.가로);
-        const 갈y = 가두기(잡은것.첫y + (돌림 ? -민px : 민py) / 배율, 바닥.세로 - m.세로);
+        const 갈x = 가두기(잡은것.첫x + (돌림 ?  민py : 민px) / 배율, 바닥.가로 - 폭(m));
+        const 갈y = 가두기(잡은것.첫y + (돌림 ? -민px : 민py) / 배율, 바닥.세로 - 높(m));
         const 푼것 = 풀기(m, 갈x, 갈y);
         m.x = 푼것.x; m.y = 푼것.y;
         자리넣기(잡은것.el, m);
@@ -716,8 +910,8 @@ body{
        그래서 기계를 벽·다른 기계 앞에서 세우던 그 길과 같게, **바닥도 기계 앞에서
        섭니다.** 얼마까지 줄었는지는 그 자리에서 글로 알립니다. */
     const 크기판 = $('l-size-sheet'), 가로칸 = $('l-w'), 세로칸 = $('l-h'), 크기쪽지 = $('l-size-msg');
-    const 기계끝가로 = () => 기계들.reduce((a, m) => Math.max(a, m.x + m.가로), 0);
-    const 기계끝세로 = () => 기계들.reduce((a, m) => Math.max(a, m.y + m.세로), 0);
+    const 기계끝가로 = () => 기계들.reduce((a, m) => Math.max(a, m.x + 폭(m)), 0);
+    const 기계끝세로 = () => 기계들.reduce((a, m) => Math.max(a, m.y + 높(m)), 0);
 
     function 크기판열기() {
         가로칸.value = 미터칸값(바닥.가로); 세로칸.value = 미터칸값(바닥.세로);
@@ -767,22 +961,27 @@ body{
     크기판.addEventListener('click', e => { if (e.target === 크기판) 크기판닫기(); });
 
     /* 이 기계가 **오른쪽으로** 얼마까지 커질 수 있나 — 벽과, 오른쪽에 있는 기계까지 */
-    function 클수있는가로(m, 세로) {
-        let 끝 = 바닥.가로 - m.x;
+    /* ── 그 축을 얼마까지 키울 수 있나(mm) ──────────────────────────────
+       ⚠ 돌린 기계는 「가로를 키운다」 가 **바닥의 세로 쪽으로 자란다**는 뜻이다
+          (각 90°). 그래서 어느 쪽으로 자라는지를 먼저 묻고(자라는쪽), 그 쪽의
+          벽과 그 쪽에 선 기계까지만 센다. 이것을 안 맞추면 돌린 기계를 늘릴 때
+          옆 기계를 뚫고 들어갔다. */
+    function 클수있기(m, 축) {
+        const w = 폭(m), h = 높(m);
+        if (자라는쪽(m, 축) === 'x+') {                      // 바닥의 가로 쪽으로 자란다
+            let 끝 = 바닥.가로 - m.x;
+            기계들.forEach(o => {
+                if (o === m) return;
+                if (!(m.y < o.y + 높(o) && o.y < m.y + h)) return;   // 세로로 안 겹치면 상관없다
+                if (o.x >= m.x + w) 끝 = Math.min(끝, o.x - m.x);    // 그 쪽에 선 것만
+            });
+            return 끝;
+        }
+        let 끝 = 바닥.세로 - m.y;                            // 바닥의 세로 쪽으로 자란다
         기계들.forEach(o => {
             if (o === m) return;
-            if (!(m.y < o.y + o.세로 && o.y < m.y + 세로)) return;   // 세로로 안 겹치면 상관없다
-            if (o.x >= m.x + m.가로) 끝 = Math.min(끝, o.x - m.x);   // 오른쪽에 선 것만
-        });
-        return 끝;
-    }
-    /* **아래쪽으로** 얼마까지 — 새로 정해진 가로로 본다 */
-    function 클수있는세로(m, 가로) {
-        let 끝 = 바닥.세로 - m.y;
-        기계들.forEach(o => {
-            if (o === m) return;
-            if (!(m.x < o.x + o.가로 && o.x < m.x + 가로)) return;
-            if (o.y >= m.y + m.세로) 끝 = Math.min(끝, o.y - m.y);
+            if (!(m.x < o.x + 폭(o) && o.x < m.x + w)) return;
+            if (o.y >= m.y + h) 끝 = Math.min(끝, o.y - m.y);
         });
         return 끝;
     }
@@ -812,7 +1011,7 @@ body{
         let v = Math.round(바란값 / 눈금) * 눈금;
         if (것) {
             v = Math.max(기계최소, Math.min(기계최대, v));
-            const 끝 = 축 === '가로' ? 클수있는가로(것, 것.세로) : 클수있는세로(것, 것.가로);
+            const 끝 = 클수있기(것, 축);
             return { 값: Math.min(v, 끝), 막혔나: v > 끝 };
         }
         v = Math.max(바닥최소, Math.min(바닥최대, v));
@@ -851,10 +1050,12 @@ body{
             if (Math.abs(민px) <= 6 && Math.abs(민py) <= 6) return;
             잡은변.끔 = true;
         }
-        /* 손가락이 간 px → 그 축의 mm. 돌리면 축이 바뀐 만큼 되돌려 셈한다.
-             가로 : 안 돌림 +민px · 돌림 +민py
-             세로 : 안 돌림 +민py · 돌림 **−민px** (화면 왼으로 갈수록 커진다) */
-        const 민 = 잡은변.축 === '가로' ? (돌림 ? 민py : 민px) : (돌림 ? -민px : 민py);
+        /* 손가락이 간 px → 그 축의 mm. **자라는 쪽**을 먼저 묻고(기계를 돌리면
+           가로가 자라는 쪽이 바뀐다), 거기에 바닥 돌리기를 얹어 되돌려 셈한다.
+             x+ 로 자람 : 안 돌림 +민px · 돌림 +민py
+             y+ 로 자람 : 안 돌림 +민py · 돌림 **−민px** (화면 왼으로 갈수록 커진다) */
+        const 민 = 자라는쪽(잡은변.것, 잡은변.축) === 'x+' ? (돌림 ? 민py : 민px)
+                                                          : (돌림 ? -민px : 민py);
         크기넣어주기(잡은변.것, 잡은변.축, 잡은변.첫값 + 민 / 배율, true);
         다시맞추기();
         e.stopPropagation();
@@ -881,9 +1082,11 @@ body{
             // 끄는 동안 딱지도 같이 바꾼다 — 바에는 3.83 인데 딱지가 2.4 면 헷갈리신다
             const 딱지 = el.querySelector('.lsz');
             if (딱지) 딱지.textContent = 미터(m.가로) + '×' + 미터(m.세로) + 'm';
-            const 높이px = (돌림 ? m.가로 : m.세로) * 배율;
+            앞금넣기(el, m);
+            const 높이px = (돌림 ? 폭(m) : 높(m)) * 배율;
             el.classList.toggle('납작', 높이px < 34);
             el.classList.toggle('아주납작', 높이px < 24);
+            el.classList.toggle('이름숨김', 높이px < 11);
         });
         const 보 = 바닥판.querySelector('.lboard');
         if (보) { const 놓을데 = 보드자리();
@@ -917,6 +1120,186 @@ body{
         저장(true);                       // 다시 열어도 돌린 채로 열리게
     });
 
+
+    /* ═══ 스케치업처럼 — 확대·축소·팬 ═══════════════════════════════════
+       사장님 말씀(10-07): 「스케치업처럼 축소 확대해서 전체 도는 일부를 볼 수
+       있게 해주고 팬기능으로 잡고이동 하면서 볼 수 있게 해줘」.
+
+       세 길을 다 열어 두었다 —
+         ① 빈 바닥을 **한 손가락으로 잡고 끌면** 바닥이 따라온다(팬).
+         ② **두 손가락을 벌리면** 그 두 손가락 사이를 붙든 채로 커진다.
+         ③ 창 오른쪽 ＋ − 전체 단추 — 한 손으로도 된다(닿는 자리 44×44px).
+       컴퓨터로 보실 때는 바퀴(휠)로도 된다.
+
+       ⚠ 손가락이 둘이 되는 순간 끌던 기계를 **제자리로 되돌린다.** 벌리려고
+          짚었을 뿐인데 기계가 따라 움직이면 배치가 망가진다. */
+
+    /* 고르기 — 손잡이가 날 기계 하나를 정한다. 빈 바닥을 톡 치면 놓는다.
+
+       ⚠ **그리기() 를 부르지 않는다.** 기계를 짚는 그 순간에 고르는데, 그리기() 는
+          바닥 속을 비우고 새로 만들므로 **방금 짚은 그 조각이 사라져** 끌던 것이
+          끊긴다(손가락은 없는 조각을 붙들고 있고, 기계는 화면에서 꼼짝을 안 한다).
+          10-07 에 재어서 잡았다 — 손잡이를 끌 때 겪은 그 덫과 같은 것이다.
+          그래서 있는 조각에 손잡이만 붙이고 뗀다. */
+    function 고르기(id) {
+        if (고른id === id) return;
+        고른id = id;
+        바닥판.querySelectorAll('.lmc').forEach(el => {
+            const 골랐나 = el.dataset.id === id;
+            el.classList.toggle('고름', 골랐나);
+            const 달렸나 = !!el.querySelector('.lhd');
+            if (골랐나 && !달렸나) {
+                el.style.zIndex = String(++맨위);
+                손잡이붙이기(el, '가로', el.dataset.id, false);
+                손잡이붙이기(el, '세로', el.dataset.id, false);
+            } else if (!골랐나 && 달렸나) {
+                el.querySelectorAll('.lhd').forEach(h => h.remove());
+            }
+        });
+        const 단 = $('l-mturn');
+        const m = 기계들.find(x => x.id === id);
+        단.disabled = !m;
+        단.textContent = m ? '◰ ' + 짧은이름(m.이름) : '◰ 기계 돌리기';
+    }
+    /* 단추가 한 줄을 넘기면 바닥 높이가 흔들린다. 긴 이름은 잘라 넣는다 */
+    const 짧은이름 = 이름 => 이름.length > 6 ? 이름.slice(0, 5) + '…' : 이름;
+
+    /* ── 기계 돌리기 ───────────────────────────────────────────────────
+       사장님 말씀(10-07): 「각 기기별 객체화 해서 회전 이동 등이 가능해야해」.
+       한 번 누르면 90° 다. 왼위 모서리는 그대로 두고 그 자리에서 돈다.
+       돌릴 자리가 없으면(벽이나 다른 기계에 걸리면) **안 돌리고 그렇게 알린다**
+       — 몰래 옮겨 놓으면 사장님이 잡아 둔 배치가 어긋난다. */
+    function 기계돌리기() {
+        const m = 기계들.find(x => x.id === 고른id);
+        if (!m) return;
+        const 전각 = m['각'] | 0;
+        m['각'] = (전각 + 90) % 360;
+        /* ⚠ 여기서 가두기() 를 쓰면 안 된다 — 그것은 10mm 눈금에 떨어뜨리는데,
+           캐드 도면의 참값은 눈금에 안 떨어지는 것이 있다(로버 골드 x=43,805).
+           돌리기만 했는데 자리가 5mm 밀렸다(10-07 에 시험이 잡아냈다).
+           **돌리기는 자리를 옮기는 일이 아니다.** 벽 안으로만 들인다. */
+        const 들이기 = (v, 끝) => Math.max(0, Math.min(끝, v));
+        const 갈x = 들이기(m.x, 바닥.가로 - 폭(m)), 갈y = 들이기(m.y, 바닥.세로 - 높(m));
+        if (바닥.가로 < 폭(m) || 바닥.세로 < 높(m) || 겹치나(m, 갈x, 갈y)) {
+            m['각'] = 전각;                  // 되돌린다
+            쪽지.textContent = m.이름 + ' — 돌릴 자리가 없습니다 (벽이나 다른 기계에 걸립니다)';
+            return;
+        }
+        m.x = 갈x; m.y = 갈y;
+        그리기(); 저장(true);
+        쪽지.textContent = m.이름 + ' ' + m['각'] + '° — 바닥에서 '
+                         + 미터(폭(m)) + ' × ' + 미터(높(m)) + ' m 를 차지합니다';
+    }
+    $('l-mturn').addEventListener('click', 기계돌리기);
+
+    /* ── 확대 ──────────────────────────────────────────────────────────
+       창 안의 한 점(cx, cy)을 **붙든 채로** 배율을 바꾼다. 그 점이 가리키던
+       공장의 자리가 손가락 밑에 그대로 남아야 「잡고 벌린다」 가 된다. */
+    function 확대맞추기(새확대, cx, cy, 가볍게) {
+        새확대 = Math.max(1, Math.min(확대최대, 새확대));
+        if (Math.abs(새확대 - 확대) < 1e-9) return;
+        const 전배율 = 배율 || 맞춤배율 || 1;
+        const mmx = (cx - 팬x) / 전배율, mmy = (cy - 팬y) / 전배율;   // 그 점의 공장 자리(mm)
+        확대 = 새확대;
+        const 새배율 = 맞춤배율 * 확대;
+        팬x = cx - mmx * 새배율;
+        팬y = cy - mmy * 새배율;
+        if (가볍게) 다시맞추기(); else { 재기(); 그리기(); }
+    }
+    const 창가운데 = () => [뷰.clientWidth / 2, 뷰.clientHeight / 2];
+    $('l-zin').addEventListener('click',  () => { const [x, y] = 창가운데(); 확대맞추기(확대 * 1.6, x, y); });
+    $('l-zout').addEventListener('click', () => { const [x, y] = 창가운데(); 확대맞추기(확대 / 1.6, x, y); });
+    $('l-zall').addEventListener('click', () => { const [x, y] = 창가운데(); 확대맞추기(1, x, y);
+                                                   쪽지.textContent = '공장 전체를 봅니다'; });
+    뷰.addEventListener('wheel', e => {                   // 컴퓨터로 보실 때
+        e.preventDefault();
+        const 박 = 뷰.getBoundingClientRect();
+        확대맞추기(확대 * (e.deltaY < 0 ? 1.12 : 1 / 1.12), e.clientX - 박.left, e.clientY - 박.top, true);
+    }, { passive: false });
+
+    /* ── 손가락 ────────────────────────────────────────────────────────
+       ⚠ 창에 **거둠(capture) 단계**로 단다. 기계·손잡이가 제 일을 하기 **전에**
+          손 수를 세어야 두 번째 손가락이 닿는 순간 끌기를 멈출 수 있다. */
+    const 손들 = new Map();
+    let 핀치 = null, 팬질 = null;
+    const 사이 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+
+    function 끌기그만() {
+        if (잡은것) {                        // 끌던 기계를 **제자리로** 되돌린다
+            const { m, el, pid, 첫x, 첫y } = 잡은것;
+            잡은것 = null;
+            m.x = 첫x; m.y = 첫y;
+            el.classList.remove('잡힘');
+            try { el.releasePointerCapture(pid); } catch (err) {}
+            자리넣기(el, m);
+        }
+        if (잡은변) {
+            잡은변 = null;
+            document.querySelectorAll('.lhd.잡힘').forEach(x => x.classList.remove('잡힘'));
+        }
+        팬질 = null;
+        뷰.classList.remove('끌림');
+    }
+    function 핀치시작() {
+        const [a, b] = [...손들.values()];
+        const 박 = 뷰.getBoundingClientRect();
+        const mx = (a.x + b.x) / 2 - 박.left, my = (a.y + b.y) / 2 - 박.top;
+        const 쓸배율 = 배율 || 맞춤배율 || 1;
+        핀치 = { 첫사이: Math.max(1, 사이(a, b)), 첫확대: 확대,
+                 mmx: (mx - 팬x) / 쓸배율, mmy: (my - 팬y) / 쓸배율 };
+    }
+    /* 두 손가락 — 벌린 만큼 커지고, 두 손가락이 같이 움직이면 그만큼 끌린다.
+       붙든 공장 자리를 늘 두 손가락 **사이**에 두는 것이 그 둘을 한꺼번에 낸다. */
+    function 핀치끌기() {
+        const [a, b] = [...손들.values()];
+        const 박 = 뷰.getBoundingClientRect();
+        const mx = (a.x + b.x) / 2 - 박.left, my = (a.y + b.y) / 2 - 박.top;
+        확대 = Math.max(1, Math.min(확대최대, 핀치.첫확대 * 사이(a, b) / 핀치.첫사이));
+        const 새배율 = 맞춤배율 * 확대;
+        팬x = mx - 핀치.mmx * 새배율;
+        팬y = my - 핀치.mmy * 새배율;
+        다시맞추기();
+    }
+
+    뷰.addEventListener('pointerdown', e => {
+        손들.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (손들.size === 2) { 끌기그만(); 핀치시작(); return; }
+        if (손들.size !== 1) return;
+        // 기계·손잡이·단추는 제 일이 있다. 빈 바닥을 짚었을 때만 팬이다
+        if (e.target.closest && e.target.closest('.lmc, .lhd, .lzb')) return;
+        팬질 = { pid: e.pointerId, 손x: e.clientX, 손y: e.clientY,
+                 첫팬x: 팬x, 첫팬y: 팬y, 끔: false };
+        try { 뷰.setPointerCapture(e.pointerId); } catch (err) {}
+    }, true);
+
+    뷰.addEventListener('pointermove', e => {
+        const 손 = 손들.get(e.pointerId);
+        if (손) { 손.x = e.clientX; 손.y = e.clientY; }
+        if (핀치 && 손들.size >= 2) { 핀치끌기(); return; }
+        if (!팬질 || e.pointerId !== 팬질.pid) return;
+        const dx = e.clientX - 팬질.손x, dy = e.clientY - 팬질.손y;
+        if (!팬질.끔) {                      // 6px 문턱 — 톡 치려다 화면이 밀리지 않게
+            if (Math.abs(dx) <= 6 && Math.abs(dy) <= 6) return;
+            팬질.끔 = true;
+            뷰.classList.add('끌림');
+        }
+        팬x = 팬질.첫팬x + dx; 팬y = 팬질.첫팬y + dy;
+        재기();                              // 자리(%)는 그대로다 — 다시 그릴 것이 없다
+    }, true);
+
+    const 손뗌 = e => {
+        손들.delete(e.pointerId);
+        if (손들.size < 2 && 핀치) { 핀치 = null; 그리기(); }   // 떼고 나서 온전히 다시 그린다
+        if (!팬질 || e.pointerId !== 팬질.pid) return;
+        const 끔 = 팬질.끔;
+        팬질 = null;
+        뷰.classList.remove('끌림');
+        try { 뷰.releasePointerCapture(e.pointerId); } catch (err) {}
+        if (!끔) 고르기(null);               // 빈 바닥을 톡 — 고른 기계를 놓는다
+    };
+    뷰.addEventListener('pointerup', 손뗌, true);
+    뷰.addEventListener('pointercancel', 손뗌, true);
+
     /* ── 열기 ──────────────────────────────────────────────────────── */
     폰에서읽기();                                   // 담긴 것이 있으면 그것으로, 없으면 처음 배치로
     단추고치기();
@@ -930,6 +1313,21 @@ body{
     };
     addEventListener('resize', 다시);
     addEventListener('orientationchange', 다시);
+    /* ── 창이 바뀌면 스스로 다시 잰다 ──────────────────────────────────
+       위의 발 한 줄 못박기로 지금은 창이 흔들리지 않는다. 그래도 지켜본다 —
+       글자 크기를 바꾸시거나 손잡이 판이 떠서 창이 한 px 이라도 달라지면,
+       바닥은 옛 창에 맞춰진 채로 남아 **변 손잡이가 창에 잘린다.** 그 탈이
+       다시 날 수 없게 못을 하나 더 박는다(자리(%)는 그대로라 다시 맞추기만 한다). */
+    if (window.ResizeObserver) {
+        let 옛폭 = 0, 옛높 = 0;
+        new ResizeObserver(() => {
+            const w = 뷰.clientWidth, h = 뷰.clientHeight;
+            if (!(w > 0) || !(h > 0)) return;
+            if (Math.abs(w - 옛폭) < 1 && Math.abs(h - 옛높) < 1) return;
+            옛폭 = w; 옛높 = h;
+            다시맞추기();
+        }).observe(뷰);
+    }
     /* 창고가 우리보다 먼저 붙었을 수도 있다 — 그때는 위 모듈이 부르지 못했으니 여기서 부른다 */
     if (window.fbFirestore && window.db) window.layoutCloudSync();
 })();

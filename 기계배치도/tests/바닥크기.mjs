@@ -6,6 +6,7 @@
    재는 것: 바닥 크기 · 바닥이 쓰는 세로 % · 바닥 밑의 빈 자리 · 제일 작은 기계 변(본 것과 닿는 것) */
 import path from 'node:path';
 import fs from 'node:fs';
+import { 본보기깔기 } from './도구/본보기.mjs';
 import { 브라우저열기, 서버, 뿌리 } from '../../에이엠티/tests/도구/터.mjs';
 
 const 잰것 = [];
@@ -40,6 +41,7 @@ for (const 화 of 화면들) {
         const n = Object.keys(허수아비).find(k => r.request().url().endsWith(k));
         return r.fulfill({ status: 200, contentType: 'text/javascript', body: n ? 허수아비[n] : 'export {};' });
     });
+    await 본보기깔기(ctx);   // 옛 시험통에는 10,000×8,000 본보기를 깔아 준다
     const p = await ctx.newPage();
     const 터짐 = []; p.on('pageerror', e => 터짐.push(String(e.message || e)));
     await p.goto(주소, { waitUntil: 'domcontentloaded' });
@@ -55,20 +57,14 @@ for (const 화 of 화면들) {
                      닿는: Math.min(r.width + 넓힘*2, r.height + 넓힘*2) };
         });
         const 제일작은 = 기계.reduce((a, c) => c.본 < a.본 ? c : a);
-        /* 바닥이 쓸 수 있는 칸 — 머리와 알림줄을 뺀 나머지 전부.
-           바닥이 이 칸을 세로로 다 못 쓰면, 가로가 먼저 찼다는 뜻이다. */
-        const 무대 = document.getElementById('l-stage');
-        // 바닥 밑에 깔린 것(알림줄·단추줄)을 **다** 뺀다 — 앱이 재는 것과 같은 자다
-        let 아래높 = 0;
-        [...무대.children].forEach(el => {
-            if (el.id === 'l-floor') return;
-            const cs = getComputedStyle(el);
-            아래높 += el.getBoundingClientRect().height
-                    + (parseFloat(cs.marginTop)||0) + (parseFloat(cs.marginBottom)||0);
-        });
-        /* 앱이 변 손잡이가 앉을 자리로 가로·세로 26px 씩 비운다(10-07). 같은 자로 잰다 */
-        const 여백 = 26;
-        const 칸폭 = 무대.clientWidth - 여백, 칸높 = 무대.clientHeight - 아래높 - 여백;
+        /* 바닥이 쓸 수 있는 칸 — **보는 창(.lview)** 에서 손잡이 자리를 뺀 나머지.
+           ⚠ 10-07 에 바뀐 것: 바닥이 무대의 한 줄이 아니라 보는 창 안에 떠 있다
+             (확대·팬 때문이다). 그래서 알림줄 높이를 손으로 뺄 일이 없다 —
+             창의 높이가 곧 쓸 수 있는 세로다. 네 변 모두 26px 씩 비운다(먼 쪽
+             둘만 비웠더니, 바닥을 끌어 옮길 때 가까운 쪽 손잡이가 창에 잘렸다). */
+        const 창 = document.getElementById('l-view');
+        const 여백 = 30;   // 손잡이가 변 밖으로 28px 나가 앉는다(10-07 에 24→28 로 뺐다)
+        const 칸폭 = 창.clientWidth - 여백 * 2, 칸높 = 창.clientHeight - 여백 * 2;
         return {
             칸폭: Math.round(칸폭), 칸높: Math.round(칸높),
             막힌쪽: (칸폭 / 10000) <= (칸높 / 8000) ? '가로' : '세로',

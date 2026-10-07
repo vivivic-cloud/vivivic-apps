@@ -14,6 +14,7 @@
       **화면에 제대로 보이나 · 손가락으로 되나**까지 같이 잰다. */
 import fs from 'node:fs';
 import path from 'node:path';
+import { 본보기깔기 } from './도구/본보기.mjs';
 import { 브라우저열기, 서버, 뿌리 } from '../../에이엠티/tests/도구/터.mjs';
 
 const 잰것 = [];
@@ -34,7 +35,7 @@ fs.mkdirSync(그림칸, { recursive: true });
 await 서버();
 const 주소 = 'http://127.0.0.1:8899/' + encodeURIComponent('기계배치도') + '/' + encodeURIComponent('기계배치도.html');
 const 손잡이주소 = 주소 + '?viggle=1&box=layout&name=' + encodeURIComponent('기계배치도');
-const 폰열쇠 = 'layout.배치.v1';
+const 폰열쇠 = 'layout.배치.v2';
 const 눈금 = 10;
 const 처음기계 = [
     { 이름: '패널쏘',        가로: 3800, 세로: 3300, x:  400, y:  400 },
@@ -77,6 +78,7 @@ const b = await 브라우저열기({ args: ['--no-sandbox'] });
 const 폰 = { viewport: { width: 375, height: 812 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 };
 const ctx = await b.newContext(폰);
 await 허수아비꽂기(ctx);
+await 본보기깔기(ctx);   // 옛 시험통에는 10,000×8,000 본보기를 깔아 준다
 const p = await ctx.newPage();
 const 터진것 = [];
 p.on('pageerror', e => 터진것.push(String(e && e.message || e)));
@@ -281,7 +283,11 @@ await p.screenshot({ path: path.join(그림칸, '375-첫화면.png') });
 /* ══ 3. 손가락으로 끌어 옮긴다 ═══════════════════════════════════════
    집진기를 왼·위로 끈다 — 그 길에 다른 기계가 없어 **끈 만큼 그대로** 간다. */
 await 깨끗이();
-재기('옮기기 전에는 폰에 담긴 것이 없나', (await 담긴것('집진기')) === null);
+/* ⚠ 10-07 부터 이 통에는 본보기 배치를 깔아 둔다(도구/본보기.mjs). 그러니
+   「담긴 것이 아예 없나」 로는 못 잰다 — 재려던 것은 **짚기만 해서는 새로
+   담지 않는다**는 것이므로, 담긴 때(잰때)가 안 올랐는지로 잰다. */
+const 옮기기전잰때 = await p.evaluate(k => (JSON.parse(localStorage.getItem(k) || '{}'))['잰때'] || 0, 폰열쇠);
+재기('옮기기 전에는 아직 새로 담긴 것이 없나', 옮기기전잰때 <= 1, '잰때 ' + 옮기기전잰때);
 
 const 전화면 = await 화면자리('집진기');
 const 끌이동 = { x: -40, y: -60 };
@@ -378,12 +384,12 @@ await p.waitForTimeout(1600);                             // 창고에 담는 �
 const 닫기전 = await 담긴것('집진기');
 const 닫기전화면 = await 화면자리('집진기');
 const 창고 = await p.evaluate(() => {
-    const 길 = 'artifacts/vivivic-4b7ef/public/data/layout_배치도/현재';
+    const 길 = 'artifacts/vivivic-4b7ef/public/data/layout_배치도/현재v2';   // 10-07 에 v2 로 냈다
     const 것 = (window.__창고 || {})[길];
     return { 길있나: !!것, 셈: window.__창고셈 || 0,
              집진기: 것 && (것['기계들'] || []).find(x => x['이름'] === '집진기') || null };
 });
-재기('창고(파이어스토어) 자리에도 담기나 — layout_배치도/현재',
+재기('창고(파이어스토어) 자리에도 담기나 — layout_배치도/현재v2',
      창고.길있나 && 창고.집진기 && 창고.집진기.x === 닫기전.x && 창고.집진기.y === 닫기전.y,
      창고.길있나 ? ('담은 횟수 ' + 창고.셈 + ' · 집진기 ' + 창고.집진기.x + ',' + 창고.집진기.y)
                 : '그 길에 아무것도 없습니다');
@@ -429,8 +435,10 @@ for (const 깬것 of ['{"바닥":{"가로":0},"기계들":[]}', '{}', 'xxx아닌
     await p.reload({ waitUntil: 'domcontentloaded' });
     await p.waitForTimeout(350);
     재기('담긴 것이 깨져 있어도(' + 깬것.slice(0, 22) + ') 처음 배치로 서나',
-         await p.evaluate(() => document.querySelectorAll('.lmc').length === 6
-             && document.getElementById('l-floor').clientHeight > 100),
+         /* 처음 배치는 10-07 에 사장님 캐드 도면의 참값(기계 스물)으로 갈렸다.
+            재는 것은 「깨진 것을 안 받고 제 처음 배치로 선다」 이지 그 숫자가 아니다. */
+         await p.evaluate(() => document.querySelectorAll('.lmc').length === 20
+             && document.getElementById('l-floor').clientHeight > 20),
          '기계 ' + await p.evaluate(() => document.querySelectorAll('.lmc').length) + '대');
 }
 
@@ -513,6 +521,7 @@ const 자리이름 = await p.evaluate(() => [...document.querySelectorAll('[data
    확대하면 보이는 화면이 줄어든다. 320×480 으로 줄여 그때를 흉내 낸다. */
 const 작은폰 = await b.newContext({ ...폰, viewport: { width: 320, height: 480 } });
 await 허수아비꽂기(작은폰);
+await 본보기깔기(작은폰);   // 옛 시험통에는 10,000×8,000 본보기를 깔아 준다
 const p2 = await 작은폰.newPage();
 await p2.goto(손잡이주소, { waitUntil: 'domcontentloaded' });
 await p2.waitForTimeout(500);
@@ -555,6 +564,7 @@ await 작은폰.close();
    이 통에서 참으로 일어나는 일이다 — www.gstatic.com 이 막혀 있다. */
 const 막힌통 = await b.newContext(폰);
 await 막힌통.route('**/firebasejs/**', r => r.abort());
+await 본보기깔기(막힌통);   // 옛 시험통에는 10,000×8,000 본보기를 깔아 준다
 const p3 = await 막힌통.newPage();
 const 막힌터짐 = [];
 p3.on('pageerror', e => 막힌터짐.push(String(e && e.message || e)));
