@@ -1,6 +1,6 @@
 <!-- ==========================================
      벤더피아상품정리 / 제품명료화.html
-     버전: v0.2.0 (2026-10-07) — 올리는 자리를 갈래마다 나눔
+     버전: v0.2.0 (2026-10-07) — 올리는 자리를 갈래마다 나눔 · v0.2.1 읽는 중·담았습니다·오류를 다 보이게
      목적: 벤더피아 엑셀(상품정보·단품정보)을 화베에 담아 두고,
            담긴 자료로 「단품 = 물건, 상품 = 파는 이름」 을 가려 가며
            규칙을 쌓는다. (10-07 사장님)
@@ -131,6 +131,8 @@
             <button id="btn-cancel" class="명료단추 흰">그만두기</button>
         </div>
 
+        <div id="판-끝" class="hidden" style="border:2px solid #10b981;border-radius:12px;background:#fff;color:#047857;font-weight:800;padding:14px 16px;margin-bottom:12px;overflow-wrap:anywhere"></div>
+
         <div id="판-올리는중" class="명료판 hidden">
             <div class="명료막대"><div id="fill"></div></div>
             <div id="올림셈" class="명료잔"></div>
@@ -161,7 +163,7 @@
         <div id="규칙목록" style="margin-top:8px"></div>
     </div>
 
-    <footer><p>v0.2.0</p></footer>
+    <footer><p>v0.2.1</p></footer>
 </div>
 
 <!-- 짚어서 지시하는 손잡이 (?viggle=1 일 때만 켜진다) -->
@@ -174,7 +176,7 @@
 const 뿌리 = ['artifacts','vivivic-4b7ef','public','data'];
 const 자리 = { 상품목록: 'vp_상품목록', 자료: 'vp_명료자료', 묶음: 'vp_명료묶음', 규칙: 'vp_명료규칙' };
 const 묶음줄수 = 200;            // 한 문서에 담는 줄 수
-const 묶음글자 = 600000;         // 한 문서 1MB 한계 — 넉넉히 60만 글자에서 끊는다
+const 묶음글자 = 250000;         // 한 문서 1MB 한계 — 한글은 한 글자가 3바이트라 25만 글자에서 끊는다
 const 머리줄깊이 = 10;
 const 보일건수 = 200;            // 한 갈래에서 화면에 그리는 건수
 
@@ -196,7 +198,11 @@ function fail(err) {
     console.error(err);
     $('err').textContent = err.message || String(err);
     $('err').classList.remove('hidden');
+    $('err').scrollIntoView({ block: 'center' });
 }
+// 어디서 터지든 화면에 보인다 — 조용히 죽으면 「반응이 없다」 가 된다 (10-07 사장님)
+window.addEventListener('error', e => fail(new Error('화면 오류 — ' + (e.message || '까닭 모름'))));
+window.addEventListener('unhandledrejection', e => fail(new Error('화면 오류 — ' + ((e.reason && e.reason.message) || e.reason || '까닭 모름'))));
 
 // ════════════════════════════════════════════════════════════════════
 // 담긴 것 — 열 때 한 번 읽어 여기 담아 둔다. 누를 때마다 다시 읽지 않는다.
@@ -273,18 +279,24 @@ let 고른갈래 = '';
 $('file').addEventListener('change', e => {
     const f = e.target.files[0];
     if (!f) return;
+    // 고르자마자 판을 띄운다 — 큰 엑셀은 읽는 데 몇 초 걸리고, 그동안 아무것도 안 보이면 먹통 같다
+    읽은것 = null;
+    $('err').classList.add('hidden'); $('판-끝').classList.add('hidden');
+    $('읽음이름').textContent = f.name;
+    $('읽음셈').textContent = '읽는 중…';
+    $('btn-up').textContent = 갈래이름(고른갈래) + ' 자리에 담기';
+    $('btn-up').disabled = true;
+    $('판-읽음').classList.remove('hidden');
+    $('판-읽음').scrollIntoView({ block: 'center' });
     const r = new FileReader();
-    r.onload = ev => {
+    r.onload = ev => setTimeout(() => {          // 「읽는 중」 이 먼저 그려지게 한 박자 쉰다
         try {
             읽은것 = 엑셀읽기(ev.target.result, f.name);
-            $('err').classList.add('hidden');
-            $('읽음이름').textContent = f.name;
             $('읽음셈').textContent = 셈(읽은것.줄.length) + '줄 · ' + 읽은것.칸이름.length + '칸 · 머리줄 ' + 읽은것.머리줄 + '째';
-            $('btn-up').textContent = 갈래이름(고른갈래) + ' 자리에 담기';
-            $('판-읽음').classList.remove('hidden');
-        } catch (err) { fail(err); }
-    };
-    r.onerror = () => fail(new Error('파일을 읽지 못했습니다.'));
+            $('btn-up').disabled = false;
+        } catch (err) { $('판-읽음').classList.add('hidden'); fail(new Error('엑셀을 읽지 못했습니다 — ' + err.message)); }
+    }, 30);
+    r.onerror = () => { $('판-읽음').classList.add('hidden'); fail(new Error('파일을 읽지 못했습니다.')); };
     r.readAsArrayBuffer(f);
     e.target.value = '';
 });
@@ -314,10 +326,14 @@ $('btn-up').addEventListener('click', async () => {
     $('판-올리는중').classList.remove('hidden');
     올리는중 = true; 자료그리기();
     let 간줄 = 0;
+    $('올림셈').textContent = '0 / ' + 셈(올릴것.줄.length);
+    // 화베가 답이 없으면 그렇다고 적는다 — 인터넷이 끊기면 쓰기가 끝없이 기다린다
+    const 늦음 = setInterval(() => { if (Date.now() - 마지막답 > 15000) $('올림셈').textContent = 셈(간줄) + ' / ' + 셈(올릴것.줄.length) + ' · 화베 답 없음'; }, 3000);
+    let 마지막답 = Date.now();
     try {
         for (let i = 0; i < 묶음들.length; i++) {
             await setDoc(문서(자리.묶음, id + '__' + String(i).padStart(4, '0')), { 자료: id, 차례: i, 줄들: 묶음들[i] });
-            간줄 += 묶음들[i].length;
+            간줄 += 묶음들[i].length; 마지막답 = Date.now();
             $('fill').style.width = Math.round(간줄 / 올릴것.줄.length * 100) + '%';
             $('올림셈').textContent = 셈(간줄) + ' / ' + 셈(올릴것.줄.length);
         }
@@ -330,11 +346,14 @@ $('btn-up').addEventListener('click', async () => {
         자료들.unshift(Object.assign({ id }, 새자료));
         읽은줄.set(id, 올릴것.줄.map(v => 줄풀기(올릴것.칸이름, v)));
         읽은것 = null;
+        $('판-끝').textContent = '담았습니다 · ' + 갈래이름(올린갈래) + ' · ' + 올릴것.이름 + ' · ' + 셈(올릴것.줄.length) + '줄';
+        $('판-끝').classList.remove('hidden');
         자료그리기();
         await 분석하기();
     } catch (err) {
         fail(new Error(셈(간줄) + '줄까지 담고 멈췄습니다 — ' + err.message));
     }
+    clearInterval(늦음);
     $('판-올리는중').classList.add('hidden');
     $('fill').style.width = '0';
     올리는중 = false; 자료그리기();
