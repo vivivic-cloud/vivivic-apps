@@ -1,0 +1,634 @@
+<!-- ==========================================
+     벤더피아상품정리 / 제품명료화.html
+     버전: v0.2.0 (2026-10-07) — 올리는 자리를 갈래마다 나눔 · v0.2.1 읽는 중·담았습니다·오류를 다 보이게 · v0.3.0 두 파일 칸 연관
+     목적: 벤더피아 엑셀(상품정보·단품정보)을 화베에 담아 두고,
+           담긴 자료로 「단품 = 물건, 상품 = 파는 이름」 을 가려 가며
+           규칙을 쌓는다. (10-07 사장님)
+
+     쓰는 자리 — 셋 다 vp_ 로 시작한다. 화베 규칙이 사장님 계정만 들여보낸다.
+       vp_명료자료   올린 엑셀 한 개 = 문서 한 개 (이름·칸이름·줄수·갈래)
+       vp_명료묶음   그 엑셀의 줄들. 200줄씩 한 문서 — 읽기 횟수를 줄인다.
+       vp_명료규칙   적어 둔 규칙
+     읽기만 하는 자리
+       vp_상품목록   상품정리 화면에서 이미 올린 상품목록. 한 글자도 안 쓴다.
+
+     줄을 JSON 글자로 담는 까닭:
+       칸 이름이 비었거나 겹치면 파이어스토어가 쓰기를 거부한다.
+       값만 차례대로 글자로 담고 칸 이름은 자료 문서에 한 번만 둔다.
+
+     막지 않는다:
+       어떤 엑셀이든 읽고 올린다. 칸 이름으로 돌려보내는 길은 없다.
+       갈래(상품정보·단품정보·그 밖)는 올리는 자리로 정한다. 「옮김」 으로 바꾼다.
+     ========================================== -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제품명료화</title>
+<script src="잠금.js"></script>
+<script src="기록.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut }
+        from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+    import { getFirestore, collection, doc, getDocs, setDoc, query, where, serverTimestamp }
+        from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
+        authDomain: "vivivic-4b7ef.firebaseapp.com",
+        projectId: "vivivic-4b7ef",
+        storageBucket: "vivivic-4b7ef.firebasestorage.app",
+        messagingSenderId: "830175660542",
+        appId: "1:830175660542:web:9054030480c8280af8d8af",
+        measurementId: "G-MCPHWSQBQR"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    window.db = getFirestore(app);
+    window.fb = { collection, doc, getDocs, setDoc, query, where, serverTimestamp };
+
+    // 상품정리 화면과 같은 잠금이다 — 사장님 계정으로만 들어간다.
+    onAuthStateChanged(auth, (user) => {
+        if (!user) { window.잠금.열기((메일, 비번) => signInWithEmailAndPassword(auth, 메일, 비번)); return; }
+        if (user.isAnonymous) { signOut(auth); return; }   // 남아 있던 익명 통행증은 내보낸다
+        window.잠금.닫기(user, () => signOut(auth));
+        window.나 = user;
+        window.initApp();
+    });
+</script>
+
+<style>
+    /* 테일윈드에 기대지 않는다 — 늦게 뜨면 화면이 무너진 적이 있다. 모양을 다 직접 박는다. */
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:'Inter', ui-sans-serif, system-ui, sans-serif; background:#fbfbfa; color:#37352f; font-size:13px; line-height:1.5; }
+    .hidden { display:none !important; }
+    .명료틀 { max-width:36rem; margin:0 auto; padding:24px 16px; }
+    .명료틀 h1 { font-size:22px; font-weight:900; letter-spacing:-.02em; margin:0 0 16px; }
+    .명료판 { background:#fff; border:1px solid #ededeb; border-radius:12px; padding:16px; margin-bottom:12px; min-width:0; }
+    .명료머리 { font-size:11px; font-weight:700; color:#787774; margin-bottom:8px; }
+    .명료단추 { min-height:48px; width:100%; border:0; border-radius:10px; background:#37352f; color:#fff; font-weight:800; font-size:15px; cursor:pointer; }
+    .명료단추.흰 { background:#fff; color:#37352f; border:1px solid #ededeb; }
+    .명료단추:disabled { opacity:.4; }
+    .명료단추 + .명료단추 { margin-top:8px; }
+    .명료셈 { font-size:15px; font-weight:800; font-variant-numeric:tabular-nums; }
+    .명료잔 { font-size:11px; color:#787774; }
+    .명료줄 { display:flex; align-items:center; gap:8px; min-height:44px; min-width:0; border-top:1px solid #f0efed; }
+    .명료줄:first-of-type { border-top:0; }
+    .명료줄 .이름 { min-width:0; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700; cursor:pointer; line-height:44px; }
+    .명료줄 .수 { flex:none; font-variant-numeric:tabular-nums; color:#787774; font-size:12px; }
+    .명료딱지 { flex:none; min-height:44px; min-width:52px; padding:0 10px; border:1px solid #ededeb; border-radius:10px; background:#fff; color:#787774; font-size:12px; font-weight:800; cursor:pointer; }
+    .명료딱지.켬 { background:#37352f; color:#fff; border-color:#37352f; }
+    .명료딱지.노랑 { background:#fef3c7; color:#92400e; border-color:#fde68a; }
+    .명료갈래 { display:flex; align-items:center; gap:8px; min-height:44px; margin-top:14px; border-bottom:1px solid #37352f; }
+    .명료갈래:first-child { margin-top:0; }
+    .명료갈래 b { flex:1; font-size:14px; font-weight:900; }
+    .명료줄.옛 .이름, .명료줄.옛 .수 { font-weight:400; color:#a8a6a2; }
+    .명료줄 .지금 { flex:none; font-size:10px; font-weight:800; color:#fff; background:#059669; border-radius:5px; padding:2px 6px; }
+    details.명료접 { border-top:1px solid #f0efed; }
+    details.명료접:first-of-type { border-top:0; }
+    details.명료접 > summary { min-height:44px; display:flex; align-items:center; gap:8px; cursor:pointer; list-style:none; font-weight:700; }
+    details.명료접 > summary::-webkit-details-marker { display:none; }
+    details.명료접 > summary .수 { margin-left:auto; font-variant-numeric:tabular-nums; }
+    details.명료접 > summary .수.있음 { color:#b45309; }
+    details.명료접 > summary .수.없음 { color:#a8a6a2; font-weight:400; }
+    .명료안 { padding:0 0 12px; }
+    .명료안 .한건 { padding:6px 0; border-top:1px dashed #f0efed; min-width:0; overflow-wrap:anywhere; }
+    .명료안 .한건:first-child { border-top:0; }
+    .명료글씨 { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:11px; color:#787774; }
+    .명료넣기 { width:100%; min-height:48px; padding:0 13px; border:1px solid #ededeb; border-radius:10px; background:#fff; color:#37352f; font-size:16px; margin-bottom:8px; }
+    .명료넣기:focus { outline:none; border-color:#37352f; }
+    .명료막대 { height:10px; background:#f0efed; border-radius:99px; overflow:hidden; margin-bottom:10px; }
+    .명료막대 > div { height:100%; width:0; background:#37352f; border-radius:99px; transition:width .15s; }
+    .명료빨강 { border-left:4px solid #f87171; background:#fef2f2; border-radius:0 8px 8px 0; padding:12px; font-size:12px; color:#b91c1c; margin-bottom:12px; }
+    .명료표 { width:100%; border-collapse:collapse; font-size:12px; }
+    .명료표 td { padding:5px 6px 5px 0; border-top:1px dashed #f0efed; vertical-align:top; overflow-wrap:anywhere; }
+    .명료표 td.오른 { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; color:#787774; }
+    .명료가로 { overflow-x:auto; }
+    footer { margin-top:32px; padding-top:16px; border-top:1px solid #ededeb; font-size:11px; color:#a8a6a2; }
+</style>
+</head>
+<body>
+
+<div class="명료틀">
+    <h1>제품명료화</h1>
+
+    <div id="err" class="명료빨강 hidden"></div>
+
+    <div id="loading" class="명료판" style="text-align:center;color:#787774">여는 중…</div>
+
+    <!-- 올리기 -->
+    <div id="판-올리기" class="hidden">
+        <input type="file" id="file" accept=".xlsx,.xls,.csv" class="hidden">
+        <div id="판-읽음" class="명료판 hidden">
+            <div id="읽음이름" style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
+            <div id="읽음셈" class="명료잔" style="margin:4px 0 12px"></div>
+            <button id="btn-up" class="명료단추">화베에 담기</button>
+            <button id="btn-cancel" class="명료단추 흰">그만두기</button>
+        </div>
+
+        <div id="판-끝" class="hidden" style="border:2px solid #10b981;border-radius:12px;background:#fff;color:#047857;font-weight:800;padding:14px 16px;margin-bottom:12px;overflow-wrap:anywhere"></div>
+
+        <div id="판-올리는중" class="명료판 hidden">
+            <div class="명료막대"><div id="fill"></div></div>
+            <div id="올림셈" class="명료잔"></div>
+        </div>
+    </div>
+
+    <!-- 담긴 자료 -->
+    <div id="판-자료" class="명료판 hidden">
+        <div id="자료목록"></div>
+        <div id="자료칸" class="hidden" style="margin-top:8px"></div>
+    </div>
+
+    <!-- 분석 -->
+    <div id="판-분석" class="명료판 hidden">
+        <div class="명료머리">분석</div>
+        <div id="분석셈" class="명료셈"></div>
+        <div id="분석근거" class="명료잔" style="margin:2px 0 10px"></div>
+        <div id="분석목록"></div>
+        <button id="btn-copy" class="명료단추 흰" style="margin-top:12px">분석 복사</button>
+        <textarea id="복사글" class="hidden" readonly style="width:100%;height:160px;margin-top:8px;font-size:11px;border:1px solid #ededeb;border-radius:10px;padding:10px"></textarea>
+    </div>
+
+    <!-- 규칙 -->
+    <div id="판-규칙" class="명료판 hidden">
+        <div class="명료머리">규칙</div>
+        <input id="규칙글" class="명료넣기" placeholder="규칙 한 줄" autocomplete="off">
+        <button id="btn-rule" class="명료단추">규칙 추가</button>
+        <div id="규칙목록" style="margin-top:8px"></div>
+    </div>
+
+    <footer><p>v0.3.0</p></footer>
+</div>
+
+<!-- 짚어서 지시하는 손잡이 (?viggle=1 일 때만 켜진다) -->
+<script src="../shared/viggle.js"></script>
+
+<script>
+// ════════════════════════════════════════════════════════════════════
+// 설정
+// ════════════════════════════════════════════════════════════════════
+const 뿌리 = ['artifacts','vivivic-4b7ef','public','data'];
+const 자리 = { 상품목록: 'vp_상품목록', 자료: 'vp_명료자료', 묶음: 'vp_명료묶음', 규칙: 'vp_명료규칙' };
+const 묶음줄수 = 200;            // 한 문서에 담는 줄 수
+const 묶음글자 = 250000;         // 한 문서 1MB 한계 — 한글은 한 글자가 3바이트라 25만 글자에서 끊는다
+const 머리줄깊이 = 10;
+const 보일건수 = 200;            // 한 갈래에서 화면에 그리는 건수
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g,
+    c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const 셈 = n => Number(n || 0).toLocaleString('ko-KR');
+const 칸 = 이름 => window.fb.collection(window.db, ...뿌리, 이름);
+const 문서 = (이름, id) => window.fb.doc(window.db, ...뿌리, 이름, id);
+
+function 때이름(d) {
+    const p = n => String(n).padStart(2, '0');
+    return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' +
+           p(d.getHours()) + p(d.getMinutes()) + '-' + p(d.getSeconds());
+}
+const 때보임 = id => { const m = String(id).match(/^\d{4}(\d{2})(\d{2})-(\d{2})(\d{2})/); return m ? `${m[1]}-${m[2]} ${m[3]}:${m[4]}` : ''; };
+
+function fail(err) {
+    console.error(err);
+    $('err').textContent = err.message || String(err);
+    $('err').classList.remove('hidden');
+    $('err').scrollIntoView({ block: 'center' });
+}
+// 어디서 터지든 화면에 보인다 — 조용히 죽으면 「반응이 없다」 가 된다 (10-07 사장님)
+window.addEventListener('error', e => fail(new Error('화면 오류 — ' + (e.message || '까닭 모름'))));
+window.addEventListener('unhandledrejection', e => fail(new Error('화면 오류 — ' + ((e.reason && e.reason.message) || e.reason || '까닭 모름'))));
+
+// ════════════════════════════════════════════════════════════════════
+// 담긴 것 — 열 때 한 번 읽어 여기 담아 둔다. 누를 때마다 다시 읽지 않는다.
+// ════════════════════════════════════════════════════════════════════
+let 담긴상품목록 = [];           // vp_상품목록 의 줄들 ({칸이름: 값})
+let 자료들 = [];                 // vp_명료자료 문서들 (새것이 앞)
+let 규칙들 = [];
+const 읽은줄 = new Map();        // 자료 id → 줄들 ({칸이름: 값})
+let 분석결과 = null;
+
+window.initApp = async function () {
+    try {
+        const { getDocs } = window.fb;
+        const [상, 자, 규] = await Promise.all([
+            getDocs(칸(자리.상품목록)), getDocs(칸(자리.자료)), getDocs(칸(자리.규칙))
+        ]);
+        담긴상품목록 = 상.docs.map(d => (d.data() || {}).fields || {});
+        자료들 = 자.docs.map(d => Object.assign({ id: d.id }, d.data())).sort((a, b) => a.id < b.id ? 1 : -1);
+        규칙들 = 규.docs.map(d => Object.assign({ id: d.id }, d.data())).sort((a, b) => a.id < b.id ? 1 : -1);
+        $('loading').classList.add('hidden');
+        ['판-올리기','판-자료','판-분석','판-규칙'].forEach(i => $(i).classList.remove('hidden'));
+        자료그리기(); 규칙그리기();
+        await 분석하기();
+    } catch (err) { $('loading').classList.add('hidden'); fail(new Error('읽지 못했습니다 — ' + err.message)); }
+};
+
+// ════════════════════════════════════════════════════════════════════
+// 1. 엑셀 읽기 — 어떤 엑셀이든 읽는다. 칸 이름으로 막지 않는다.
+// ════════════════════════════════════════════════════════════════════
+let 읽은것 = null;               // { 이름, 칸이름[], 줄[][] , 머리줄, 건너뜀 }
+
+// 위 열 줄 가운데 채워진 칸이 가장 많은 줄이 머리줄이다 (같으면 위엣것).
+function 머리줄찾기(aoa) {
+    const 이름들 = 줄 => (줄 || []).map(h => String(h ?? '').trim());
+    let 고른것 = { 몇째: 0, 이름들: 이름들(aoa[0]) };
+    for (let i = 1; i < Math.min(머리줄깊이, aoa.length); i++) {
+        const n = 이름들(aoa[i]);
+        if (n.filter(Boolean).length > 고른것.이름들.filter(Boolean).length) 고른것 = { 몇째: i, 이름들: n };
+    }
+    return 고른것;
+}
+
+// 빈 칸 이름은 「칸7」, 겹친 이름은 「이름(2)」 — 그래야 뒤엣것이 앞엣것을 안 덮는다.
+function 칸이름다듬기(이름들) {
+    const 본 = new Map();
+    return 이름들.map((h, i) => {
+        let n = h || ('칸' + (i + 1));
+        const k = (본.get(n) || 0) + 1; 본.set(n, k);
+        return k > 1 ? n + '(' + k + ')' : n;
+    });
+}
+
+function 엑셀읽기(buf, 이름) {
+    const wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
+    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
+    if (!aoa.length) throw new Error('빈 파일입니다.');
+    const 머리 = 머리줄찾기(aoa);
+    const 칸이름 = 칸이름다듬기(머리.이름들);
+    const 줄 = []; let 건너뜀 = 0;
+    for (let i = 머리.몇째 + 1; i < aoa.length; i++) {
+        // 값은 전부 글자로 — 앞자리 0 과 날짜 모양을 지킨다
+        const v = 칸이름.map((_, c) => { const x = aoa[i][c]; return (x === undefined || x === null) ? '' : String(x).trim(); });
+        if (v.some(x => x !== '')) 줄.push(v); else 건너뜀++;
+    }
+    return { 이름, 칸이름, 줄, 머리줄: 머리.몇째 + 1, 건너뜀 };
+}
+
+// 갈래는 **올리는 자리로 정한다.** 칸 이름으로 짐작하지 않는다 —
+// 어느 자리의 「올리기」 를 누르셨는지가 곧 갈래다. (10-07 사장님)
+const 갈래들 = [['상품', '상품정보'], ['단품', '단품정보'], ['', '그 밖']];
+const 갈래이름 = g => (갈래들.find(x => x[0] === (g || '')) || 갈래들[2])[1];
+let 고른갈래 = '';
+
+$('file').addEventListener('change', e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    // 고르자마자 판을 띄운다 — 큰 엑셀은 읽는 데 몇 초 걸리고, 그동안 아무것도 안 보이면 먹통 같다
+    읽은것 = null;
+    $('err').classList.add('hidden'); $('판-끝').classList.add('hidden');
+    $('읽음이름').textContent = f.name;
+    $('읽음셈').textContent = '읽는 중…';
+    $('btn-up').textContent = 갈래이름(고른갈래) + ' 자리에 담기';
+    $('btn-up').disabled = true;
+    $('판-읽음').classList.remove('hidden');
+    $('판-읽음').scrollIntoView({ block: 'center' });
+    const r = new FileReader();
+    r.onload = ev => setTimeout(() => {          // 「읽는 중」 이 먼저 그려지게 한 박자 쉰다
+        try {
+            읽은것 = 엑셀읽기(ev.target.result, f.name);
+            $('읽음셈').textContent = 셈(읽은것.줄.length) + '줄 · ' + 읽은것.칸이름.length + '칸 · 머리줄 ' + 읽은것.머리줄 + '째';
+            $('btn-up').disabled = false;
+        } catch (err) { $('판-읽음').classList.add('hidden'); fail(new Error('엑셀을 읽지 못했습니다 — ' + err.message)); }
+    }, 30);
+    r.onerror = () => { $('판-읽음').classList.add('hidden'); fail(new Error('파일을 읽지 못했습니다.')); };
+    r.readAsArrayBuffer(f);
+    e.target.value = '';
+});
+$('btn-cancel').addEventListener('click', () => { 읽은것 = null; $('판-읽음').classList.add('hidden'); });
+
+// ════════════════════════════════════════════════════════════════════
+// 2. 화베에 담기 — 줄 묶음을 먼저, 자료 문서를 맨 끝에.
+//    끊기면 자료 문서가 없어서 목록에 안 뜬다. 반쯤 담긴 것이 분석에 섞이지 않는다.
+// ════════════════════════════════════════════════════════════════════
+function 묶기(줄) {
+    const 묶음들 = []; let 지금 = [], 글자 = 0;
+    줄.forEach(v => {
+        const s = JSON.stringify(v);
+        if (지금.length && (지금.length >= 묶음줄수 || 글자 + s.length > 묶음글자)) { 묶음들.push(지금); 지금 = []; 글자 = 0; }
+        지금.push(s); 글자 += s.length;
+    });
+    if (지금.length) 묶음들.push(지금);
+    return 묶음들;
+}
+
+$('btn-up').addEventListener('click', async () => {
+    if (!읽은것) return;
+    const { setDoc, serverTimestamp } = window.fb;
+    const 올릴것 = 읽은것, id = 때이름(new Date()), 올린갈래 = 고른갈래;
+    const 묶음들 = 묶기(올릴것.줄);
+    $('판-읽음').classList.add('hidden');
+    $('판-올리는중').classList.remove('hidden');
+    올리는중 = true; 자료그리기();
+    let 간줄 = 0;
+    $('올림셈').textContent = '0 / ' + 셈(올릴것.줄.length);
+    // 화베가 답이 없으면 그렇다고 적는다 — 인터넷이 끊기면 쓰기가 끝없이 기다린다
+    const 늦음 = setInterval(() => { if (Date.now() - 마지막답 > 15000) $('올림셈').textContent = 셈(간줄) + ' / ' + 셈(올릴것.줄.length) + ' · 화베 답 없음'; }, 3000);
+    let 마지막답 = Date.now();
+    try {
+        for (let i = 0; i < 묶음들.length; i++) {
+            await setDoc(문서(자리.묶음, id + '__' + String(i).padStart(4, '0')), { 자료: id, 차례: i, 줄들: 묶음들[i] });
+            간줄 += 묶음들[i].length; 마지막답 = Date.now();
+            $('fill').style.width = Math.round(간줄 / 올릴것.줄.length * 100) + '%';
+            $('올림셈').textContent = 셈(간줄) + ' / ' + 셈(올릴것.줄.length);
+        }
+        const 새자료 = { 이름: 올릴것.이름, 칸이름: 올릴것.칸이름, 줄수: 올릴것.줄.length, 묶음수: 묶음들.length,
+            머리줄: 올릴것.머리줄, 갈래: 올린갈래, 누가: (window.나 && window.나.email) || '' };
+        await setDoc(문서(자리.자료, id), Object.assign({ 언제: serverTimestamp() }, 새자료));
+        if (window.기록) await window.기록.적기({ db: window.db, fb: window.fb, user: window.나,
+            무엇: '제품명료화', 파일: 올릴것.이름, 줄수: 올릴것.줄.length, 문서수: 묶음들.length + 1,
+            비고: 올릴것.건너뜀 ? ('건너뜀 ' + 올릴것.건너뜀) : '' });
+        자료들.unshift(Object.assign({ id }, 새자료));
+        읽은줄.set(id, 올릴것.줄.map(v => 줄풀기(올릴것.칸이름, v)));
+        읽은것 = null;
+        $('판-끝').textContent = '담았습니다 · ' + 갈래이름(올린갈래) + ' · ' + 올릴것.이름 + ' · ' + 셈(올릴것.줄.length) + '줄';
+        $('판-끝').classList.remove('hidden');
+        자료그리기();
+        await 분석하기();
+    } catch (err) {
+        fail(new Error(셈(간줄) + '줄까지 담고 멈췄습니다 — ' + err.message));
+    }
+    clearInterval(늦음);
+    $('판-올리는중').classList.add('hidden');
+    $('fill').style.width = '0';
+    올리는중 = false; 자료그리기();
+});
+
+const 줄풀기 = (칸이름, v) => { const o = {}; 칸이름.forEach((h, i) => o[h] = v[i] ?? ''); return o; };
+
+async function 자료줄읽기(자료) {
+    if (읽은줄.has(자료.id)) return 읽은줄.get(자료.id);
+    const { getDocs, query, where } = window.fb;
+    const 눈 = await getDocs(query(칸(자리.묶음), where('자료', '==', 자료.id)));
+    const 묶음 = 눈.docs.map(d => d.data()).sort((a, b) => a.차례 - b.차례);
+    const 줄 = [];
+    묶음.forEach(m => (m.줄들 || []).forEach(s => 줄.push(줄풀기(자료.칸이름 || [], JSON.parse(s)))));
+    읽은줄.set(자료.id, 줄);
+    return 줄;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// 3. 담긴 자료 — 이름을 누르면 칸마다 채움·가짓수·보기. 딱지를 누르면 갈래가 바뀐다.
+// ════════════════════════════════════════════════════════════════════
+const 갈래차례 = ['', '상품', '단품'];
+let 펼친자료 = null, 올리는중 = false;
+
+function 자료그리기() {
+    const 판 = [];
+    갈래들.forEach(([g, 이름]) => {
+        판.push(`<div class="명료갈래"><b>${esc(이름)}</b><button class="명료딱지 켬" data-pick="${esc(g)}"${올리는중 ? ' disabled' : ''}>올리기</button></div>`);
+        const 것 = 자료들.filter(a => (a.갈래 || '') === g);
+        // 「그 밖」 은 기준이 따로 없다 — 다 같은 무게로 보인다
+        const 줄 = 것.map((a, i) => `<div class="명료줄${g && i ? ' 옛' : ''}"><span class="이름" data-view="${esc(a.id)}">${esc(a.이름)}</span>
+            ${g && !i ? '<span class="지금">지금</span>' : ''}<span class="수">${셈(a.줄수)}줄 · ${esc(때보임(a.id))}</span>
+            <button class="명료딱지" data-role="${esc(a.id)}">옮김</button></div>`);
+        // 상품정리 화면에서 올린 상품목록 — 여기서 상품정보를 올리기 전까지는 이것이 기준이다
+        if (g === '상품' && 담긴상품목록.length) 줄.push(`<div class="명료줄${것.length ? ' 옛' : ''}"><span class="이름" data-view="__상품목록">상품목록 (상품정리)</span>
+            ${것.length ? '' : '<span class="지금">지금</span>'}<span class="수">${셈(담긴상품목록.length)}줄</span></div>`);
+        판.push(줄.join('') || '<div class="명료잔" style="padding:10px 0">없음</div>');
+    });
+    $('자료목록').innerHTML = 판.join('');
+}
+
+$('자료목록').addEventListener('click', async e => {
+    const 갈 = e.target.closest('[data-role]'), 보 = e.target.closest('[data-view]'), 올 = e.target.closest('[data-pick]');
+    try {
+        if (올) { 고른갈래 = 올.dataset.pick; $('file').click(); }
+        else if (갈) {
+            const a = 자료들.find(x => x.id === 갈.dataset.role);
+            a.갈래 = 갈래차례[(갈래차례.indexOf(a.갈래 || '') + 1) % 갈래차례.length];
+            자료그리기();
+            await window.fb.setDoc(문서(자리.자료, a.id), { 갈래: a.갈래 }, { merge: true });
+            await 분석하기();
+        } else if (보) {
+            const id = 보.dataset.view;
+            if (펼친자료 === id) { 펼친자료 = null; $('자료칸').classList.add('hidden'); return; }
+            펼친자료 = id;
+            const 줄 = id === '__상품목록' ? 담긴상품목록 : await 자료줄읽기(자료들.find(x => x.id === id));
+            칸보기(줄);
+        }
+    } catch (err) { fail(err); }
+});
+
+function 칸보기(줄) {
+    const 이름들 = []; const 본 = new Set();
+    줄.forEach(o => Object.keys(o).forEach(k => { if (!본.has(k)) { 본.add(k); 이름들.push(k); } }));
+    const 행 = 이름들.map(k => {
+        const 값 = 줄.map(o => o[k] ?? '').filter(v => v !== '');
+        const 가지 = new Set(값);
+        return `<tr><td><b>${esc(k)}</b><div class="명료글씨">${esc([...가지].slice(0, 3).join(' · '))}</div></td>
+            <td class="오른">${줄.length ? Math.round(값.length / 줄.length * 100) : 0}%</td><td class="오른">${셈(가지.size)}가지</td></tr>`;
+    });
+    $('자료칸').innerHTML = '<div class="명료가로"><table class="명료표">' + 행.join('') + '</table></div>';
+    $('자료칸').classList.remove('hidden');
+}
+
+// ════════════════════════════════════════════════════════════════════
+// 4. 분석 — 단품이 기준이다. 상품은 단품 묶음에 붙인 파는 이름이다.
+// ════════════════════════════════════════════════════════════════════
+// 단품코드·단품명은 한 칸에 「+」 로 이어 붙어 있다. 「 +」 와 「+」 가 섞여 있어
+// 「+」 로 쪼개고 앞뒤 빈칸을 턴다.
+const 쪼개기 = s => String(s ?? '').split('+').map(v => v.trim()).filter(Boolean);
+const 더하기 = (m, k, v) => { if (!m.has(k)) m.set(k, new Set()); m.get(k).add(v); };
+
+function 상품쪽분석(줄들) {
+    // 코드 수와 이름 수가 맞는 줄로 「코드 → 이름」 을 먼저 모은다
+    const 코드이름 = new Map(), 이름코드 = new Map(), 쓰임 = new Map();
+    줄들.forEach(o => {
+        const 코드 = 쪼개기(o['단품코드']), 이름 = 쪼개기(o['단품명']);
+        if (코드.length && 코드.length === 이름.length) 코드.forEach((c, k) => { 더하기(코드이름, c, 이름[k]); 더하기(이름코드, 이름[k], c); });
+    });
+    const 못맞춘 = [], 단품없음 = [], 상품구성 = new Map(), 구성상품 = new Map(), 상품코드들 = new Set();
+    줄들.forEach(o => {
+        const 코드 = 쪼개기(o['단품코드']), 이름 = 쪼개기(o['단품명']);
+        const 상 = o['상품코드'] || '', 명 = o['상품명'] || '';
+        if (상) 상품코드들.add(상);
+        if (!코드.length) { 단품없음.push({ 상, 명 }); return; }
+        if (코드.length !== 이름.length && !코드.every(c => 코드이름.has(c))) 못맞춘.push({ 상, 명, 코드: o['단품코드'] || '', 이름: o['단품명'] || '' });
+        코드.forEach(c => 더하기(쓰임, c, 상 || 명));
+        const 구성 = [...코드].sort().join(' + ');
+        if (상) { 더하기(상품구성, 상, 구성); 더하기(구성상품, 구성, 상); }
+    });
+    const 여럿 = m => [...m.entries()].filter(([, s]) => s.size > 1).map(([k, s]) => ({ 열쇠: k, 값: [...s] }));
+    const 앞머리 = new Map();
+    쓰임.forEach((_, c) => { const p = c.indexOf('-') > 0 ? c.slice(0, c.indexOf('-')) : '(줄표 없음)'; 더하기(앞머리, p, c); });
+    return {
+        줄수: 줄들.length, 상품코드수: 상품코드들.size, 단품코드수: 쓰임.size, 코드이름, 쓰임,
+        코드에이름여럿: 여럿(코드이름), 이름에코드여럿: 여럿(이름코드), 못맞춘, 단품없음,
+        구성다름: 여럿(상품구성), 같은구성: 여럿(구성상품),
+        앞머리: [...앞머리.entries()].map(([p, s]) => ({ 앞: p, 수: s.size, 보기: [...s][0], 이름: [...(코드이름.get([...s][0]) || [])][0] || '' })).sort((a, b) => b.수 - a.수)
+    };
+}
+
+// 단품 자료의 「코드 칸」 은 이름으로 찾지 않는다 — 상품 쪽 단품코드와 가장 많이 겹치는 칸이다.
+function 단품쪽분석(줄들, 상) {
+    const 이름들 = 줄들.length ? Object.keys(줄들[0]) : [];
+    const 겹침 = (k, 모음) => 줄들.reduce((n, o) => n + (모음.has(o[k]) ? 1 : 0), 0);
+    const 고르기 = (모음, 기본) => {
+        let 고른 = '', 많 = 0;
+        이름들.forEach(k => { const n = 겹침(k, 모음); if (n > 많) { 많 = n; 고른 = k; } });
+        return 고른 || (이름들.indexOf(기본) > -1 ? 기본 : '');
+    };
+    const 코드칸 = 고르기(상.쓰임, '단품코드');
+    const 이름모음 = new Set(); 상.코드이름.forEach(s => s.forEach(v => 이름모음.add(v)));
+    const 이름칸 = 고르기(이름모음, '단품명');
+    const 목록 = new Map(), 겹친코드 = new Map();
+    줄들.forEach(o => {
+        const c = 코드칸 ? (o[코드칸] || '') : '';
+        if (!c) return;
+        if (목록.has(c)) 겹친코드.set(c, (겹친코드.get(c) || 1) + 1); else 목록.set(c, 이름칸 ? (o[이름칸] || '') : '');
+    });
+    const 목록에없음 = [...상.쓰임.keys()].filter(c => !목록.has(c)).map(c => ({ 코드: c, 이름: [...(상.코드이름.get(c) || [])][0] || '', 쓰임: 상.쓰임.get(c).size }));
+    const 안쓰임 = [...목록.entries()].filter(([c]) => !상.쓰임.has(c)).map(([c, n]) => ({ 코드: c, 이름: n }));
+    const 이름다름 = [...목록.entries()].filter(([c, n]) => n && 상.코드이름.has(c) && !상.코드이름.get(c).has(n))
+        .map(([c, n]) => ({ 코드: c, 단품쪽: n, 상품쪽: [...상.코드이름.get(c)].join(' / ') }));
+    return { 줄수: 줄들.length, 코드칸, 이름칸, 코드수: 목록.size, 목록에없음, 안쓰임, 이름다름,
+        겹친코드: [...겹친코드.entries()].map(([c, n]) => ({ 코드: c, 줄: n })) };
+}
+
+// 두 파일의 칸끼리 값이 얼마나 겹치는지 다 맞대 본다 — **칸 이름을 하나도 믿지 않는다.**
+// 「두가지 파일의 상품명 상품코드 / 단품명/단품코드등의 관련성을 파악해서 연관가능성을
+//   타진해 보자」 (10-07 사장님). 상품 쪽 칸은 「+」 로 쪼갠 꼴도 같이 본다(단품이 한 칸에 이어 붙어 있다).
+// 짧은 숫자(4자리까지)는 뺀다 — 수량·순번끼리 우연히 겹친다.
+function 칸연관(상줄, 단줄) {
+    const 느슨 = v => v.replace(/\s+/g, '').toLowerCase();
+    const 쓸값 = v => v !== '' && !/^[\d,.\-]{1,4}$/.test(v);
+    const 모으기 = (줄들, 쪼갬) => {
+        const m = new Map();
+        줄들.forEach(o => Object.keys(o).forEach(k => {
+            const v = String(o[k] ?? '');
+            if (!m.has(k)) m.set(k, new Set());
+            (쪼갬 && v.indexOf('+') > -1 ? 쪼개기(v) : [v]).forEach(x => { if (쓸값(x)) m.get(k).add(x); });
+        }));
+        return m;
+    };
+    const 통 = 모으기(상줄, false), 쪼갠 = 모으기(상줄, true), 단 = 모으기(단줄, false);
+    const 단느슨 = new Map([...단].map(([k, S]) => [k, new Set([...S].map(느슨))]));
+    const 나온것 = new Map();
+    const 맞대기 = (상칸, A, 쪼갬) => 단.forEach((B, 단칸) => {
+        let 겹침 = 0; const 보기 = [], 느A = new Set(), Bn = 단느슨.get(단칸);
+        A.forEach(v => { if (B.has(v)) { 겹침++; if (보기.length < 2) 보기.push(v); } 느A.add(느슨(v)); });
+        let 느슨겹침 = 0; 느A.forEach(v => { if (Bn.has(v)) 느슨겹침++; });
+        if (느슨겹침 < 3) return;
+        const 열쇠 = 상칸 + '\u0000' + 단칸, 앞 = 나온것.get(열쇠);
+        if (!앞 || 느슨겹침 > 앞.느슨겹침) 나온것.set(열쇠, { 상칸, 단칸, 쪼갬, 겹침, 느슨겹침, 상가지: A.size, 단가지: B.size, 보기 });
+    });
+    통.forEach((A, k) => 맞대기(k, A, false));
+    // 「+」 가 든 값이 하나라도 있는 칸만 쪼갠 꼴을 본다 (가짓수로 견주면 우연히 같을 때 빠진다)
+    쪼갠.forEach((A, k) => { if ([...통.get(k)].some(v => v.indexOf('+') > -1)) 맞대기(k, A, true); });
+    const 점수 = x => x.느슨겹침 / Math.min(x.상가지, x.단가지);
+    return [...나온것.values()].sort((a, b) => 점수(b) - 점수(a) || b.느슨겹침 - a.느슨겹침).slice(0, 30);
+}
+
+async function 분석하기() {
+    // 상품 쪽 — 「상품」 딱지가 붙은 가장 새 자료. 없으면 이미 담긴 상품목록.
+    const 상자료 = 자료들.find(a => a.갈래 === '상품'), 단자료 = 자료들.find(a => a.갈래 === '단품');
+    const 상줄 = 상자료 ? await 자료줄읽기(상자료) : 담긴상품목록;
+    const 상 = 상품쪽분석(상줄);
+    const 단줄 = 단자료 ? await 자료줄읽기(단자료) : null;
+    const 단 = 단줄 ? 단품쪽분석(단줄, 상) : null;
+    분석결과 = { 상, 단, 연관: 단줄 ? 칸연관(상줄, 단줄) : null,
+        상이름: 상자료 ? 상자료.이름 : '상품목록', 단이름: 단자료 ? 단자료.이름 : '' };
+    분석그리기();
+}
+
+function 분석갈래들() {
+    const { 상, 단 } = 분석결과;
+    const g = [
+        { 이름: '한 코드 · 이름 여럿', 건: 상.코드에이름여럿, 한줄: x => `<span class="명료글씨">${esc(x.열쇠)}</span><div>${x.값.map(esc).join('<br>')}</div>`, 글: x => x.열쇠 + ' → ' + x.값.join(' / ') },
+        { 이름: '한 이름 · 코드 여럿', 건: 상.이름에코드여럿, 한줄: x => `<div>${esc(x.열쇠)}</div><span class="명료글씨">${x.값.map(esc).join(' · ')}</span>`, 글: x => x.열쇠 + ' → ' + x.값.join(' / ') },
+        { 이름: '같은 상품코드 · 구성 다름', 건: 상.구성다름, 한줄: x => `<span class="명료글씨">${esc(x.열쇠)}</span><div class="명료글씨">${x.값.map(esc).join('<br>')}</div>`, 글: x => x.열쇠 + ' → ' + x.값.join(' | ') },
+        { 이름: '같은 구성 · 상품코드 여럿', 건: 상.같은구성, 한줄: x => `<span class="명료글씨">${esc(x.열쇠)}</span><div class="명료글씨">${x.값.map(esc).join(' · ')}</div>`, 글: x => x.열쇠 + ' → ' + x.값.join(' / ') },
+        { 이름: '이름 못 맞춘 줄', 건: 상.못맞춘, 한줄: x => `<span class="명료글씨">${esc(x.상)}</span><div>${esc(x.명)}</div><div class="명료글씨">${esc(x.코드)}<br>${esc(x.이름)}</div>`, 글: x => x.상 + ' | ' + x.코드 + ' | ' + x.이름 },
+        { 이름: '단품 없는 상품', 건: 상.단품없음, 한줄: x => `<span class="명료글씨">${esc(x.상)}</span><div>${esc(x.명)}</div>`, 글: x => x.상 + ' ' + x.명 }
+    ];
+    if (단) g.push(
+        { 이름: '단품목록에 없는 코드', 건: 단.목록에없음, 한줄: x => `<span class="명료글씨">${esc(x.코드)} · 상품 ${x.쓰임}</span><div>${esc(x.이름)}</div>`, 글: x => x.코드 + ' ' + x.이름 + ' (상품 ' + x.쓰임 + ')' },
+        { 이름: '상품에 안 쓰인 단품', 건: 단.안쓰임, 한줄: x => `<span class="명료글씨">${esc(x.코드)}</span><div>${esc(x.이름)}</div>`, 글: x => x.코드 + ' ' + x.이름 },
+        { 이름: '단품목록 안 · 코드 겹침', 건: 단.겹친코드, 한줄: x => `<span class="명료글씨">${esc(x.코드)} · ${x.줄}줄</span>`, 글: x => x.코드 + ' ' + x.줄 + '줄' },
+        { 이름: '두 자료 · 이름 다름', 건: 단.이름다름, 한줄: x => `<span class="명료글씨">${esc(x.코드)}</span><div>${esc(x.단품쪽)}</div><div class="명료잔">${esc(x.상품쪽)}</div>`, 글: x => x.코드 + ' | ' + x.단품쪽 + ' | ' + x.상품쪽 }
+    );
+    return g;
+}
+
+function 분석그리기() {
+    const { 상, 단, 상이름, 단이름 } = 분석결과;
+    $('분석셈').textContent = '상품 ' + 셈(상.줄수) + '줄 · 상품코드 ' + 셈(상.상품코드수) + ' · 단품코드 ' + 셈(상.단품코드수);
+    $('분석근거').textContent = '상품 — ' + 상이름 + (단 ? ' · 단품 — ' + 단이름 + ' (' + 셈(단.코드수) + '가지, 코드 칸 ' + (단.코드칸 || '못 찾음') + ')' : ' · 단품 자료 없음');
+    const 접 = (이름, 수, 안, 늘) => `<details class="명료접"><summary>${esc(이름)}<span class="수 ${늘 ? '' : (수 ? '있음' : '없음')}">${셈(수)}</span></summary><div class="명료안">${안}</div></details>`;
+    const 퍼 = (a, b) => b ? Math.round(a / b * 100) : 0;
+    const 연관줄 = 분석결과.연관 ? [`<details class="명료접" open><summary>두 파일 · 칸 연관<span class="수">${셈(분석결과.연관.length)}</span></summary><div class="명료안">`
+        + (분석결과.연관.map(x => `<div class="한건"><b>${esc(x.상칸)}</b>${x.쪼갬 ? ' <span class="명료잔">(+ 쪼갬)</span>' : ''} ↔ <b>${esc(x.단칸)}</b>
+            <div class="명료글씨">겹침 ${셈(x.겹침)}${x.느슨겹침 > x.겹침 ? ' · 빈칸 무시 ' + 셈(x.느슨겹침) : ''} · 상품 쪽 ${셈(x.상가지)}가지의 ${퍼(x.느슨겹침, x.상가지)}% · 단품 쪽 ${셈(x.단가지)}가지의 ${퍼(x.느슨겹침, x.단가지)}%</div>
+            <div class="명료글씨">${x.보기.map(esc).join(' · ')}</div></div>`).join('') || '<div class="명료잔">겹치는 칸 없음</div>')
+        + '</div></details>'] : [];
+    const 줄 = 연관줄.concat(분석갈래들().map(g => 접(g.이름, g.건.length,
+        g.건.slice(0, 보일건수).map(x => '<div class="한건">' + g.한줄(x) + '</div>').join('')
+        + (g.건.length > 보일건수 ? '<div class="명료잔">밖에 ' + 셈(g.건.length - 보일건수) + '건</div>' : ''))));
+    줄.push(접('코드 앞머리', 상.앞머리.length,
+        '<table class="명료표">' + 상.앞머리.map(a => `<tr><td><b>${esc(a.앞)}</b><div class="명료글씨">${esc(a.보기)} ${esc(a.이름)}</div></td><td class="오른">${셈(a.수)}가지</td></tr>`).join('') + '</table>', true));
+    const 사전 = [...상.쓰임.entries()].map(([c, s]) => ({ 코드: c, 이름: [...(상.코드이름.get(c) || [])][0] || '', 쓰임: s.size })).sort((a, b) => b.쓰임 - a.쓰임);
+    줄.push(접('단품 사전', 사전.length,
+        '<table class="명료표">' + 사전.map(a => `<tr><td><span class="명료글씨">${esc(a.코드)}</span><div>${esc(a.이름)}</div></td><td class="오른">상품 ${셈(a.쓰임)}</td></tr>`).join('') + '</table>', true));
+    $('분석목록').innerHTML = 줄.join('');
+}
+
+// 분석 복사 — 코드와 이름, 셈만 담는다. 금액 칸은 한 글자도 안 들어간다.
+$('btn-copy').addEventListener('click', async () => {
+    if (!분석결과) return;
+    const { 상, 단, 상이름, 단이름 } = 분석결과, L = [];
+    L.push('[제품명료화 분석 ' + 때보임(때이름(new Date())) + ']');
+    L.push('상품 — ' + 상이름 + ' · ' + 상.줄수 + '줄 · 상품코드 ' + 상.상품코드수 + ' · 단품코드 ' + 상.단품코드수);
+    if (단) L.push('단품 — ' + 단이름 + ' · ' + 단.줄수 + '줄 · 코드 ' + 단.코드수 + '가지 · 코드 칸 ' + 단.코드칸 + ' · 이름 칸 ' + 단.이름칸);
+    자료들.forEach(a => L.push('자료 — ' + a.이름 + ' · ' + a.줄수 + '줄 · 갈래 ' + (a.갈래 || '그 밖') + ' · 칸: ' + (a.칸이름 || []).join(', ')));
+    if (분석결과.연관) {     // 칸 이름과 셈만 — 겹친 값은 안 담는다(금액 칸끼리 겹칠 수 있다)
+        L.push('', '■ 두 파일 · 칸 연관 ' + 분석결과.연관.length);
+        분석결과.연관.forEach(x => L.push('  ' + x.상칸 + (x.쪼갬 ? '(+쪼갬)' : '') + ' ↔ ' + x.단칸 + ' · 겹침 ' + x.겹침 + ' · 빈칸무시 ' + x.느슨겹침 + ' · 상품쪽 ' + x.상가지 + '가지 · 단품쪽 ' + x.단가지 + '가지'));
+    }
+    분석갈래들().forEach(g => { L.push('', '■ ' + g.이름 + ' ' + g.건.length); g.건.slice(0, 40).forEach(x => L.push('  ' + g.글(x))); });
+    L.push('', '■ 코드 앞머리 ' + 상.앞머리.length);
+    상.앞머리.forEach(a => L.push('  ' + a.앞 + ' ' + a.수 + '가지 · ' + a.보기 + ' ' + a.이름));
+    L.push('', '■ 규칙 ' + 규칙들.length);
+    규칙들.forEach(r => L.push('  [' + (r.상태 || '추정') + '] ' + r.글));
+    const 글 = L.join('\n'), b = $('btn-copy');
+    try { await navigator.clipboard.writeText(글); b.textContent = '복사됨'; }
+    catch (e) { $('복사글').value = 글; $('복사글').classList.remove('hidden'); $('복사글').select(); b.textContent = '아래 글을 복사'; }
+    setTimeout(() => b.textContent = '분석 복사', 2500);
+});
+
+// ════════════════════════════════════════════════════════════════════
+// 5. 규칙 — 한 줄씩 적어 둔다. 딱지를 누르면 추정 ↔ 확인.
+// ════════════════════════════════════════════════════════════════════
+function 규칙그리기() {
+    $('규칙목록').innerHTML = 규칙들.map(r => `<div class="명료줄"><span style="flex:1;min-width:0;overflow-wrap:anywhere;padding:8px 0">${esc(r.글)}</span>
+        <button class="명료딱지 ${r.상태 === '확인' ? '켬' : '노랑'}" data-rule="${esc(r.id)}">${esc(r.상태 || '추정')}</button></div>`).join('');
+}
+$('btn-rule').addEventListener('click', async () => {
+    const 글 = $('규칙글').value.trim();
+    if (!글) { $('규칙글').focus(); return; }
+    const id = 때이름(new Date()), r = { 글, 상태: '추정', 누가: (window.나 && window.나.email) || '' };
+    $('btn-rule').disabled = true;
+    try {
+        await window.fb.setDoc(문서(자리.규칙, id), Object.assign({ 언제: window.fb.serverTimestamp() }, r));
+        규칙들.unshift(Object.assign({ id }, r)); $('규칙글').value = ''; 규칙그리기();
+    } catch (err) { fail(new Error('규칙을 담지 못했습니다 — ' + err.message)); }
+    $('btn-rule').disabled = false;
+});
+$('규칙글').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('btn-rule').click(); } });
+$('규칙목록').addEventListener('click', async e => {
+    const b = e.target.closest('[data-rule]');
+    if (!b) return;
+    const r = 규칙들.find(x => x.id === b.dataset.rule);
+    r.상태 = r.상태 === '확인' ? '추정' : '확인';
+    규칙그리기();
+    try { await window.fb.setDoc(문서(자리.규칙, r.id), { 상태: r.상태 }, { merge: true }); }
+    catch (err) { fail(new Error('규칙을 바꾸지 못했습니다 — ' + err.message)); }
+});
+</script>
+</body>
+</html>
