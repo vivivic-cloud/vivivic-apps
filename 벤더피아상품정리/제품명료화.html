@@ -1,6 +1,6 @@
 <!-- ==========================================
      벤더피아상품정리 / 제품명료화.html
-     버전: v0.2.0 (2026-10-07) — 올리는 자리를 갈래마다 나눔 · v0.2.1 읽는 중·담았습니다·오류를 다 보이게 · v0.3.0 두 파일 칸 연관
+     버전: v0.2.0 (2026-10-07) — 올리는 자리를 갈래마다 나눔 · v0.2.1 읽는 중·담았습니다·오류를 다 보이게 · v0.3.0 두 파일 칸 연관 · v0.4.0 배송정보 자리
      목적: 벤더피아 엑셀(상품정보·단품정보)을 화베에 담아 두고,
            담긴 자료로 「단품 = 물건, 상품 = 파는 이름」 을 가려 가며
            규칙을 쌓는다. (10-07 사장님)
@@ -163,7 +163,7 @@
         <div id="규칙목록" style="margin-top:8px"></div>
     </div>
 
-    <footer><p>v0.3.0</p></footer>
+    <footer><p>v0.4.0</p></footer>
 </div>
 
 <!-- 짚어서 지시하는 손잡이 (?viggle=1 일 때만 켜진다) -->
@@ -174,7 +174,7 @@
 // 설정
 // ════════════════════════════════════════════════════════════════════
 const 뿌리 = ['artifacts','vivivic-4b7ef','public','data'];
-const 자리 = { 상품목록: 'vp_상품목록', 자료: 'vp_명료자료', 묶음: 'vp_명료묶음', 규칙: 'vp_명료규칙' };
+const 자리 = { 상품목록: 'vp_상품목록', 자료: 'vp_명료자료', 묶음: 'vp_명료묶음', 규칙: 'vp_명료규칙', 배송집계: 'vp_배송집계' };
 const 묶음줄수 = 200;            // 한 문서에 담는 줄 수
 const 묶음글자 = 250000;         // 한 문서 1MB 한계 — 한글은 한 글자가 3바이트라 25만 글자에서 끊는다
 const 머리줄깊이 = 10;
@@ -210,15 +210,17 @@ window.addEventListener('unhandledrejection', e => fail(new Error('화면 오류
 let 담긴상품목록 = [];           // vp_상품목록 의 줄들 ({칸이름: 값})
 let 자료들 = [];                 // vp_명료자료 문서들 (새것이 앞)
 let 규칙들 = [];
+let 배송집계 = [];               // vp_배송집계 — 배송관리업로드가 쌓은 것. 읽기만 한다.
 const 읽은줄 = new Map();        // 자료 id → 줄들 ({칸이름: 값})
 let 분석결과 = null;
 
 window.initApp = async function () {
     try {
         const { getDocs } = window.fb;
-        const [상, 자, 규] = await Promise.all([
-            getDocs(칸(자리.상품목록)), getDocs(칸(자리.자료)), getDocs(칸(자리.규칙))
+        const [상, 자, 규, 배] = await Promise.all([
+            getDocs(칸(자리.상품목록)), getDocs(칸(자리.자료)), getDocs(칸(자리.규칙)), getDocs(칸(자리.배송집계))
         ]);
+        배송집계 = 배.docs.map(d => d.data() || {});
         담긴상품목록 = 상.docs.map(d => (d.data() || {}).fields || {});
         자료들 = 자.docs.map(d => Object.assign({ id: d.id }, d.data())).sort((a, b) => a.id < b.id ? 1 : -1);
         규칙들 = 규.docs.map(d => Object.assign({ id: d.id }, d.data())).sort((a, b) => a.id < b.id ? 1 : -1);
@@ -391,8 +393,26 @@ function 자료그리기() {
         if (g === '상품' && 담긴상품목록.length) 줄.push(`<div class="명료줄${것.length ? ' 옛' : ''}"><span class="이름" data-view="__상품목록">상품목록 (상품정리)</span>
             ${것.length ? '' : '<span class="지금">지금</span>'}<span class="수">${셈(담긴상품목록.length)}줄</span></div>`);
         판.push(줄.join('') || '<div class="명료잔" style="padding:10px 0">없음</div>');
+        if (g === '단품') 판.push(배송자리());
     });
     $('자료목록').innerHTML = 판.join('');
+}
+
+// 배송정보 — **여기서 따로 올리지 않는다.** 「올리기」 는 배송관리업로드로 간다.
+// 「이곳에 배송관리 업로드와 동일하게 업로드 되도록 조치해줘」 (10-07 사장님)
+// 사람 칸 지우기·번호와 주소 가리기·겹친 주문줄 거르기를 여기에 한 벌 더 베끼면 언젠가 두 벌이
+// 달라진다. 한쪽만 고쳐지면 사람 정보가 샌다. 그래서 그 화면을 그대로 쓰고, 쌓인 것만 여기서 보인다.
+function 배송자리() {
+    const 파일 = new Map();
+    배송집계.forEach(d => {
+        const f = 파일.get(d.파일) || { 줄: 0, 달: [] };
+        f.줄 += Number(d.줄수) || 0; if (d.달) f.달.push(String(d.달)); 파일.set(d.파일, f);
+    });
+    const 줄 = [...파일.entries()].map(([이름, f]) => { f.달.sort();
+        const 달 = f.달.length > 1 ? f.달[0] + '~' + f.달[f.달.length - 1] : (f.달[0] || '');
+        return `<div class="명료줄"><span class="이름" style="cursor:default">${esc(이름)}</span><span class="수">${셈(f.줄)}줄 · ${esc(달)}</span></div>`; });
+    return `<div class="명료갈래"><b>배송정보</b><a class="명료딱지 켬" href="배송관리업로드.html" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none">올리기</a></div>`
+        + (줄.join('') || '<div class="명료잔" style="padding:10px 0">없음</div>');
 }
 
 $('자료목록').addEventListener('click', async e => {
