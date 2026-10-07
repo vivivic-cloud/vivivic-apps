@@ -260,10 +260,29 @@
   addEventListener('touchcancel', 그만, true);
   addEventListener('scroll', 그만, true);
 
-  /* 짚은 것이 무엇인지 사람이 알아볼 말로 적는다 */
+  /* 짚은 것이 무엇인지 사람이 알아볼 말로 적는다.
+     ⚠ **속 글이 늘 이름인 것은 아니다.** 여러 자식의 글이 뭉쳐 나오는 칸(공장 바닥처럼)을
+        짚으면 그 안에 든 것이 **다 적혀** 무엇을 짚으셨는지가 되레 묻힌다.
+        10-07 기계배치도 — 빈 바닥을 짚었더니 「패널쏘 3.8×3.3m 보링기 2.4×1.6m …」 이 적혔다.
+        그런 자리는 그 칸이 제 이름(`data-area`·`aria-label`·`title`)을 달고 있으면 그것을 쓴다.
+        **한 마디로 나오는 칸은 그대로 둔다** — 기계 하나를 짚으면 여태처럼 「재단기」 다. */
   function 무엇(el) {
-    const 글 = (el.innerText || el.value || el.placeholder || '').trim().replace(/\s+/g, ' ');
-    if (글) return 글.slice(0, 60);
+    const 다듬 = v => (v || '').trim().replace(/\s+/g, ' ');
+    const 글 = 다듬(el.innerText || el.value || el.placeholder);
+    if (글) {
+      /* 자식 여럿의 글이 뭉친 자리인가 — 제 글과 다른 글을 가진 자식이 **셋 이상**이면 그렇다.
+         ⚠ 둘로 잡으면 「패널쏘」+「3.8×3.3m」 처럼 **이름과 크기를 나눠 단 칸**까지 걸려
+            「기계:패널쏘」 로 바뀐다 — 재서 보고 셋으로 올렸다(10-07). */
+      const 뭉침 = [...(el.children || [])]
+        .map(c => 다듬(c.innerText)).filter(t => t && t !== 글).length >= 3;
+      const 딱지 = 다듬((el.dataset && el.dataset.area)
+        || el.getAttribute('aria-label') || el.getAttribute('title'));
+      if (뭉침 && 딱지) return 딱지.slice(0, 60);
+      return 글.slice(0, 60);
+    }
+    const 딱지 = 다듬((el.dataset && el.dataset.area)
+      || el.getAttribute('aria-label') || el.getAttribute('title'));
+    if (딱지) return 딱지.slice(0, 60);
     const t = el.tagName.toLowerCase();
     return ({ button: '단추', input: '입력칸', select: '고르는 칸', img: '그림', svg: '그림' })[t] || t;
   }
