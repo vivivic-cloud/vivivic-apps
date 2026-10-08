@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.18.0 (2026-10-08) — 엣지 부속 도면의 엣지 작업 면을 초록 선으로 보인다
+     버전: v1.19.0 (2026-10-08) — 작업 타이머에 파레트 A·B·C·D 와 그 큐알. 골라야 완료할 수 있다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1283,6 +1283,17 @@
             letter-spacing: -1px; line-height: 1.1; font-variant-numeric: tabular-nums;
             white-space: nowrap; }
         #_집중판 .집중-멈춤글 { display: none; margin: 4px 0 0; font-size: 11.5px; font-weight: 800; color: #c2793a; }
+        /* 파레트 단추 넷 — 장갑 낀 손으로 누르는 자리라 44px 밑으로 안 내려간다 */
+        #_집중판 .집중-파레트 { display: flex; gap: 8px; margin-top: 12px; }
+        #_집중판 .집중-파 { flex: 1 1 0; min-width: 0; min-height: 44px; border-radius: 10px;
+            border: 2px solid #dddbd8; background: #fff; color: #37352f;
+            font: inherit; font-size: 18px; font-weight: 900; cursor: pointer; }
+        #_집중판 .집중-파.on { background: #37352f; border-color: #37352f; color: #fff; }
+        #_집중판 .집중-큐알 { display: flex; flex-direction: column; align-items: center;
+            gap: 4px; margin-top: 10px; min-height: 44px; justify-content: center; }
+        #_집중판 .집중-큐알 .큐알 { width: 150px; height: 150px; display: block; }
+        #_집중판 .집중-큐알글 { font-size: 11px; font-weight: 800; color: #787774;
+            font-family: ui-monospace, monospace; letter-spacing: .02em; }
         #_집중판 .집중-줄 { display: flex; gap: 8px; margin-top: 14px; }
         #_집중판 .집중-아랫줄 { margin-top: 8px; }
         #_집중판 .집중-단추 {
@@ -2443,7 +2454,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.18.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.19.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2576,7 +2587,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.18.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.19.0</b></p>
         </div>
     </div>
 
@@ -7671,6 +7682,144 @@
             document.getElementById('_집중도면큰것')?.remove();
             window._집중일 = null;
         };
+        /* ── 큐알 한 장 (10-08 사장님 지시) ──────────────────────────────────
+           「선택된 파레트는 발주번호+선택된파레트 ABCD의 조합으로 고유한 큐알코드가
+             나타나야 합니다.」
+           바깥 연장을 못 쓴다 — 이 상자에서는 cdn.* 에 못 닿는다. 그래서 큐알 셈을
+           여기에 직접 둔다. 바이트 모드 · 오류정정 M · 판 1~4(최대 64바이트).
+           jsqr 로 읽어 보며 맞췄다(시험 파레트1 이 그 일을 그대로 한다). */
+        function _큐알판(글) {
+            const 바이트 = [];
+            for (const ch of unescape(encodeURIComponent(String(글)))) 바이트.push(ch.charCodeAt(0));
+            const 판표 = { 1: { 데이터: 16, 오류: 10, 블록: [16] }, 2: { 데이터: 28, 오류: 16, 블록: [28] },
+                           3: { 데이터: 44, 오류: 26, 블록: [44] }, 4: { 데이터: 64, 오류: 18, 블록: [32, 32] } };
+            let 판 = 0;
+            for (const v of [1, 2, 3, 4]) if (바이트.length + 2 <= 판표[v].데이터) { 판 = v; break; }
+            if (!판) return null;                       // 너무 길면 안 만든다(거짓 큐알을 내지 않는다)
+            const { 데이터: 총데이터, 오류: 오류수, 블록: 블록들 } = 판표[판];
+            const 비트 = [];
+            const 넣기 = (값, 수) => { for (let i = 수 - 1; i >= 0; i--) 비트.push((값 >> i) & 1); };
+            넣기(0b0100, 4); 넣기(바이트.length, 8);
+            바이트.forEach(b => 넣기(b, 8));
+            for (let i = 0; i < 4 && 비트.length < 총데이터 * 8; i++) 비트.push(0);
+            while (비트.length % 8) 비트.push(0);
+            const 데이터 = [];
+            for (let i = 0; i < 비트.length; i += 8) 데이터.push(parseInt(비트.slice(i, i + 8).join(''), 2));
+            const 메움 = [0xEC, 0x11];
+            for (let i = 0; 데이터.length < 총데이터; i++) 데이터.push(메움[i % 2]);
+            const 로그 = new Uint8Array(256), 거꿀 = new Uint8Array(512);
+            for (let i = 0, x = 1; i < 255; i++) { 로그[x] = i; 거꿀[i] = x; x <<= 1; if (x & 0x100) x ^= 0x11D; }
+            for (let i = 255; i < 512; i++) 거꿀[i] = 거꿀[i - 255];
+            const 곱 = (a, b) => (a === 0 || b === 0) ? 0 : 거꿀[로그[a] + 로그[b]];
+            const 생성다항 = n => { let g = [1];
+                for (let i = 0; i < n; i++) { const 새 = new Array(g.length + 1).fill(0);
+                    for (let j = 0; j < g.length; j++) { 새[j] ^= 곱(g[j], 거꿀[i]); 새[j + 1] ^= g[j]; }
+                    g = 새; }
+                return g.reverse(); };          // 가장 높은 자리가 앞 — 나눗셈이 그 차례를 쓴다
+            const 오류계산 = (블, n) => { const g = 생성다항(n); const 남 = 블.concat(new Array(n).fill(0));
+                for (let i = 0; i < 블.length; i++) { const c = 남[i]; if (!c) continue;
+                    for (let j = 0; j < g.length; j++) 남[i + j] ^= 곱(g[j], c); }
+                return 남.slice(블.length); };
+            const 데블록 = [], 오블록 = []; let 자리 = 0;
+            블록들.forEach(n => { const b = 데이터.slice(자리, 자리 + n); 자리 += n;
+                데블록.push(b); 오블록.push(오류계산(b, 오류수)); });
+            const 최종 = [];
+            for (let i = 0; i < Math.max.apply(null, 블록들); i++) 데블록.forEach(b => { if (i < b.length) 최종.push(b[i]); });
+            for (let i = 0; i < 오류수; i++) 오블록.forEach(b => 최종.push(b[i]));
+            const 크기 = 17 + 4 * 판;
+            const 칸 = Array.from({ length: 크기 }, () => new Array(크기).fill(null));
+            const 둠 = (r, c, v) => { if (r >= 0 && r < 크기 && c >= 0 && c < 크기) 칸[r][c] = v; };
+            const 찾기무늬 = (r0, c0) => { for (let r = -1; r <= 7; r++) for (let c = -1; c <= 7; c++) {
+                const 안 = (r >= 0 && r <= 6 && (c === 0 || c === 6)) || (c >= 0 && c <= 6 && (r === 0 || r === 6))
+                         || (r >= 2 && r <= 4 && c >= 2 && c <= 4);
+                둠(r0 + r, c0 + c, 안 ? 1 : 0); } };
+            찾기무늬(0, 0); 찾기무늬(0, 크기 - 7); 찾기무늬(크기 - 7, 0);
+            for (let i = 8; i < 크기 - 8; i++) { 칸[6][i] = (i % 2 === 0) ? 1 : 0; 칸[i][6] = (i % 2 === 0) ? 1 : 0; }
+            const 맞춤 = { 1: [], 2: [6, 18], 3: [6, 22], 4: [6, 26] }[판];
+            맞춤.forEach(r => 맞춤.forEach(c => {
+                if ((r === 6 && c === 6) || (r === 6 && c === 크기 - 7) || (r === 크기 - 7 && c === 6)) return;
+                for (let dr = -2; dr <= 2; dr++) for (let dc = -2; dc <= 2; dc++)
+                    둠(r + dr, c + dc, (Math.max(Math.abs(dr), Math.abs(dc)) !== 1) ? 1 : 0); }));
+            칸[크기 - 8][8] = 1;
+            const 꼴자리 = [];
+            for (let i = 0; i <= 5; i++) 꼴자리.push([8, i], [i, 8]);
+            꼴자리.push([8, 7], [8, 8], [7, 8]);
+            for (let i = 0; i < 7; i++) 꼴자리.push([크기 - 1 - i, 8]);
+            for (let i = 0; i < 8; i++) 꼴자리.push([8, 크기 - 1 - i]);
+            꼴자리.forEach(([r, c]) => { if (칸[r][c] === null) 칸[r][c] = 0; });
+            const 담을것 = []; 최종.forEach(b => { for (let i = 7; i >= 0; i--) 담을것.push((b >> i) & 1); });
+            let 쓴것 = 0;
+            for (let 오른 = 크기 - 1; 오른 >= 1; 오른 -= 2) {
+                if (오른 === 6) 오른 = 5;
+                const 위로 = ((오른 + 1) & 2) === 0;
+                for (let k = 0; k < 크기; k++) { const r = 위로 ? 크기 - 1 - k : k;
+                    for (const c of [오른, 오른 - 1]) { if (칸[r][c] !== null) continue;
+                        칸[r][c] = (쓴것 < 담을것.length) ? 담을것[쓴것] : 0; 쓴것++; } }
+            }
+            const 가리개들 = [ (r, c) => (r + c) % 2 === 0, (r, c) => r % 2 === 0, (r, c) => c % 3 === 0,
+                (r, c) => (r + c) % 3 === 0, (r, c) => (Math.floor(r / 2) + Math.floor(c / 3)) % 2 === 0,
+                (r, c) => (r * c) % 2 + (r * c) % 3 === 0, (r, c) => ((r * c) % 2 + (r * c) % 3) % 2 === 0,
+                (r, c) => ((r + c) % 2 + (r * c) % 3) % 2 === 0 ];
+            const 자리임 = new Set(); 꼴자리.forEach(([r, c]) => 자리임.add(r + ',' + c));
+            const 고정 = Array.from({ length: 크기 }, (_, r) => Array.from({ length: 크기 }, (_, c) => {
+                if (자리임.has(r + ',' + c)) return true;
+                if (r === 6 || c === 6) return true;
+                if (r < 9 && c < 9) return true;
+                if (r < 9 && c >= 크기 - 8) return true;
+                if (r >= 크기 - 8 && c < 9) return true;
+                return 맞춤.some(ar => 맞춤.some(ac => {
+                    if ((ar === 6 && ac === 6) || (ar === 6 && ac === 크기 - 7) || (ar === 크기 - 7 && ac === 6)) return false;
+                    return Math.abs(r - ar) <= 2 && Math.abs(c - ac) <= 2; })); }));
+            const 꼴비트 = (가림) => { const v = (0b00 << 3) | 가림; let d = v << 10;
+                for (let i = 4; i >= 0; i--) if ((d >> (10 + i)) & 1) d ^= 0b10100110111 << i;
+                return ((v << 10) | d) ^ 0b101010000010010; };
+            const 벌점 = (m) => { let 점 = 0;
+                for (let r = 0; r < 크기; r++) for (let c = 0; c < 크기; c++) {
+                    if (c < 크기 - 4 && [1,2,3,4].every(k => m[r][c+k] === m[r][c])) { let n=5,k=5;
+                        while (c+k < 크기 && m[r][c+k] === m[r][c]) { n++; k++; } 점 += 3 + (n-5); c += k-1; } }
+                for (let c = 0; c < 크기; c++) for (let r = 0; r < 크기; r++) {
+                    if (r < 크기 - 4 && [1,2,3,4].every(k => m[r+k][c] === m[r][c])) { let n=5,k=5;
+                        while (r+k < 크기 && m[r+k][c] === m[r][c]) { n++; k++; } 점 += 3 + (n-5); r += k-1; } }
+                for (let r = 0; r < 크기 - 1; r++) for (let c = 0; c < 크기 - 1; c++)
+                    if (m[r][c] === m[r][c+1] && m[r][c] === m[r+1][c] && m[r][c] === m[r+1][c+1]) 점 += 3;
+                const 꼴1 = [1,0,1,1,1,0,1,0,0,0,0], 꼴2 = [0,0,0,0,1,0,1,1,1,0,1];
+                for (let r = 0; r < 크기; r++) for (let c = 0; c + 10 < 크기; c++) {
+                    if (꼴1.every((v,i) => m[r][c+i] === v)) 점 += 40;
+                    if (꼴2.every((v,i) => m[r][c+i] === v)) 점 += 40; }
+                for (let c = 0; c < 크기; c++) for (let r = 0; r + 10 < 크기; r++) {
+                    if (꼴1.every((v,i) => m[r+i][c] === v)) 점 += 40;
+                    if (꼴2.every((v,i) => m[r+i][c] === v)) 점 += 40; }
+                let 검 = 0; m.forEach(줄 => 줄.forEach(v => { if (v) 검++; }));
+                점 += Math.floor(Math.abs(검 * 100 / (크기 * 크기) - 50) / 5) * 10;
+                return 점; };
+            let 가장 = null, 가장점 = Infinity, 고른가림 = 0;
+            for (let 가림 = 0; 가림 < 8; 가림++) {
+                const m = 칸.map((줄, r) => 줄.map((v, c) => 고정[r][c] ? v : (가리개들[가림](r, c) ? v ^ 1 : v)));
+                const f = 꼴비트(가림); const 비 = i => (f >> i) & 1;
+                for (let i = 0; i <= 5; i++) m[i][8] = 비(i);
+                m[7][8] = 비(6); m[8][8] = 비(7); m[8][7] = 비(8);
+                for (let i = 9; i < 15; i++) m[8][14 - i] = 비(i);
+                for (let i = 0; i < 8; i++) m[8][크기 - 1 - i] = 비(i);
+                for (let i = 8; i < 15; i++) m[크기 - 15 + i][8] = 비(i);
+                m[크기 - 8][8] = 1;
+                const p = 벌점(m);
+                if (p < 가장점) { 가장점 = p; 가장 = m; 고른가림 = 가림; }
+            }
+            return { 크기, 칸: 가장, 판, 가림: 고른가림 };
+        }
+        /* 큐알 한 장을 그림(SVG)으로. 둘레 빈 칸(여백 4)은 큐알 규격이 요구하는 것이라 둔다. */
+        window._큐알그림 = function (글, 폭) {
+            const q = _큐알판(글);
+            if (!q) return '';
+            const 여백 = 4, 전체 = q.크기 + 여백 * 2;
+            let d = '';
+            for (let r = 0; r < q.크기; r++) for (let c = 0; c < q.크기; c++)
+                if (q.칸[r][c]) d += `M${c + 여백} ${r + 여백}h1v1h-1z`;
+            return `<svg class="큐알" viewBox="0 0 ${전체} ${전체}" width="${폭}" height="${폭}" ` +
+                   `shape-rendering="crispEdges" data-글="${String(글).replace(/"/g, '&quot;')}" data-크기="${q.크기}">` +
+                   `<rect width="${전체}" height="${전체}" fill="#ffffff"/><path d="${d}" fill="#000000"/></svg>`;
+        };
+
         window._집중판열기 = function(일){
             if (!일) return;
             window._집중일 = 일;
@@ -7689,6 +7838,12 @@
                     `${o.displayName ? '<br>' + _e(o.displayName) : ''}</p>` +
                   `<div class="집중-도면" id="_집중도면"></div>` +
                   `<p class="집중-시계" id="_집중시계글">0:00.00</p>` +
+                  /* 파레트 A·B·C·D (10-08 지시) — 하나를 골라야 완료를 누를 수 있다.
+                     고르면 그 밑에 「발주번호-파레트」 큐알이 나타난다. */
+                  `<div class="집중-파레트" id="_집중파레트">` +
+                    ['A', 'B', 'C', 'D'].map(x => `<button type="button" class="집중-파" data-파="${x}">${x}</button>`).join('') +
+                  `</div>` +
+                  `<div class="집중-큐알" id="_집중큐알"></div>` +
                   `<div class="집중-줄">` +
                     `<button type="button" class="집중-단추 집중-멈춤" id="_집중멈춤">STOP</button>` +
                     `<button type="button" class="집중-단추 집중-완료" id="_집중완료">COMPLETE</button>` +
@@ -7717,6 +7872,9 @@
             document.getElementById('_집중완료').onclick = () => window.tl일완료();
             document.getElementById('_집중취소').onclick = () => window.tl일취소();
             document.getElementById('_집중접기').onclick = () => window._집중접기();
+            덮.querySelectorAll('#_집중파레트 .집중-파').forEach(bt =>
+                bt.onclick = () => window._집중파레트고르기(bt.dataset.파));
+            window._집중파레트그리기();
             // 불량보고는 작업 창 위에 따로 뜬다 — 창도 시계도 안 건드린다(09-28 지시)
             document.getElementById('_집중불량').onclick = () => {
                 const 일 = window._집중일 || {};
@@ -7724,6 +7882,39 @@
             };
             window._집중도면그리기();
         };
+        /* ── 파레트 A·B·C·D (10-08 사장님 지시) ───────────────────────────────
+           「작업 타이머 팝업에 파레트 A,B,C,D 버튼을 만들어 이중 하나를 선택해야
+             완료를 누를 수 있게 해주세요. 이렇게 선택된 파레트는 발주번호+선택된파레트
+             ABCD의 조합으로 고유한 큐알코드가 나타나야 합니다.」
+           고른 것은 **이 창에서만** 들고 있는다 — 업무 기록(partCompletions)에 새 칸을
+           쓰라는 말씀이 없었으므로 파이어스토어에는 아무것도 안 쓴다.
+           일(발주·부속·공정)마다 따로 기억한다. 창을 다시 열어도 그대로다. */
+        window._집중파레트들 = window._집중파레트들 || {};
+        window._집중파열쇠 = function (일) {
+            return [일 && 일.docId, 일 && 일.cardKey, 일 && 일.procKey].join('|');
+        };
+        window._집중파레트값 = function (일) {
+            return (일 && window._집중파레트들[window._집중파열쇠(일)]) || '';
+        };
+        window._집중파레트고르기 = function (파) {
+            const 일 = window._집중일; if (!일) return;
+            window._집중파레트들[window._집중파열쇠(일)] = 파;
+            window._집중파레트그리기();
+        };
+        window._집중파레트그리기 = function () {
+            const 일 = window._집중일; if (!일) return;
+            const 고른 = window._집중파레트값(일);
+            document.querySelectorAll('#_집중파레트 .집중-파').forEach(bt =>
+                bt.classList.toggle('on', bt.dataset.파 === 고른));
+            const 칸 = document.getElementById('_집중큐알'); if (!칸) return;
+            if (!고른) { 칸.innerHTML = '<span class="집중-딱지">파레트를 고르세요</span>'; return; }
+            const 글 = ((일.order && 일.order.orderCode) || 일.docId || '') + '-' + 고른;
+            const 그림 = window._큐알그림(글, 150);
+            칸.innerHTML = 그림
+                ? 그림 + `<span class="집중-큐알글">${String(글).replace(/&/g, '&amp;').replace(/</g, '&lt;')}</span>`
+                : '<span class="집중-딱지">큐알을 못 만들었습니다</span>';
+        };
+
         /* ── 지금 하는 일의 재단도면 (09-28 지시) ─────────────────────────────
            「시작시 나타나는 팝업화면은 해당 작업도면이 나타나야 합니다」
            찾아가는 길 — 시작을 찍을 때 쓴 그 부속 이름(cardKey)으로 재단 보드의
@@ -7928,6 +8119,8 @@
         /* 완료 — 쓰던 완료 팝업을 그대로 부른다(새로 만들지 않는다) */
         window.tl일완료 = function(){
             const 일 = window._집중일; if (!일) return;
+            // 파레트를 고르기 전에는 완료로 못 넘어간다 (10-08 지시)
+            if (!window._집중파레트값(일)) { showToastMessage('파레트를 고르세요'); return; }
             const o = 일.order || {};
             const 수 = (() => {
                 /* 담긴 0 을 그대로 넘기면 완료 창이 0 으로 열린다(10-04 지시).
