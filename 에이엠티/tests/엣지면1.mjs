@@ -35,18 +35,37 @@ const 본 = await p.evaluate((L) => {
   const iW = h.indexOf('W엣지면'), iD = h.indexOf('D엣지면');
   if (iW < 0 || iD < 0) return { 칸없음: true };
   const 값 = (r, i) => String((r && r[i]) == null ? '' : r[i]).trim().toLowerCase();
-  // 원장에서 네 갈래를 한 줄씩 고른다 — 4면(2·2) · W만 두 면(2·0) · 한 면(1) · 못함(non)
-  const 고르기 = (w, d) => {
+  /* 네 갈래를 한 줄씩 세운다 — 4면(2·2) · W만 두 면(2·0) · 한 면(1·0) · 못함(non).
+     값은 **이 창에서만** 심는다. 업무 원장이 있는 자리에서만 돌면 안 되기 때문이다 —
+     본보기 원장(tests/본보기자료/원장.json)은 W엣지면·D엣지면 이 1397줄 전부 빈칸이라
+     진짜 값을 찾던 예전 꼴은 그 자리에서 그대로 떨어졌다(10-08 관리자 확인).
+     심는 자리는 화면 안의 복사본(currentFullData)뿐이고, 파일에는 한 줄도 안 쓴다. */
+  const 쓸줄 = [];
+  for (let i = 1; i < currentFullData.length && 쓸줄.length < 4; i++) {
+    const r = currentFullData[i]; if (!r) continue;
+    if (normalizeValue(r[h.indexOf('공급처')]) !== 'AMT') continue;
+    if (!(parseFloat(r[h.indexOf('재단W')]) > 0) || !(parseFloat(r[h.indexOf('재단D')]) > 0)) continue;
+    쓸줄.push(i);
+  }
+  if (쓸줄.length < 4) return { 못세움: true, 쓸줄 };
+  const 심을값 = [['2', '2'], ['2', '0'], ['1', '0'], ['non', 'non']];
+  쓸줄.forEach((ri, i) => {
+    currentFullData[ri] = currentFullData[ri].slice();      // 원본 줄은 그대로 두고 복사본에만
+    currentFullData[ri][iW] = 심을값[i][0];
+    currentFullData[ri][iD] = 심을값[i][1];
+  });
+  const 줄 = { 네면: 쓸줄[0], W두면: 쓸줄[1], 한면: 쓸줄[2], 못함: 쓸줄[3] };
+  /* 진짜 업무 원장이 있는 자리에서는 **심지 않은 진짜 값**으로도 한 번 더 본다.
+     없으면(본보기면) 이 자리는 비워 두고 심은 값만으로 잰다. */
+  const 진짜 = {};
+  ['2|2', '2|0', '1|0', 'non|non'].forEach(짝 => {
+    const [w, d] = 짝.split('|');
     for (let i = 1; i < currentFullData.length; i++) {
-      const r = currentFullData[i]; if (!r) continue;
+      const r = currentFullData[i]; if (!r || 쓸줄.includes(i)) continue;
       if (!(parseFloat(r[h.indexOf('재단W')]) > 0) || !(parseFloat(r[h.indexOf('재단D')]) > 0)) continue;
-      if (값(r, iW) === w && (d == null || 값(r, iD) === d)) return i;
+      if (값(r, iW) === w && 값(r, iD) === d) { 진짜[짝] = i; break; }
     }
-    return -1;
-  };
-  const 줄 = { 네면: 고르기('2', '2'), W두면: 고르기('2', '0'), 한면: 고르기('1', null), 못함: 고르기('non', 'non') };
-  if (Object.values(줄).some(v => v < 0)) return { 못세움: true, 줄 };
-  const 쓸줄 = [...new Set(Object.values(줄))];
+  });
   const 발주 = {
     idNum: 9301, docId: 'd9301', orderCode: '시험-엣지면', displayName: '시험상품 엣지면',
     supplier: normalizeValue(currentFullData[줄.네면][h.indexOf('ing발주처')]),
@@ -77,14 +96,16 @@ const 본 = await p.evaluate((L) => {
   const 재단부속 = Object.assign(부속(줄.네면), { isCuttingCard: true, boardParts: 조각, boardW: 2440, boardH: 1220,
     sheets: 1, perSheet: 2, pRowIndex: 줄.네면, planId: 'x', extras: [] });
   재단칸.innerHTML = _woPlacedCardHtml(재단부속, 재단부속.cKey, '2026-10-16-재단', 'AMT', {}, '');
-  return { 줄, 치수: Object.fromEntries(Object.entries(줄).map(([k, ri]) =>
+  return { 줄, 진짜: 진짜, 치수: Object.fromEntries(Object.entries(줄).map(([k, ri]) =>
     [k, { W: parseFloat(currentFullData[ri][h.indexOf('재단W')]), D: parseFloat(currentFullData[ri][h.indexOf('재단D')]),
           W엣지: 값(currentFullData[ri], iW), D엣지: 값(currentFullData[ri], iD),
           이름: currentFullData[ri][h.indexOf('부속명')] }])) };
 }, L);
 console.log('■ 차림: ' + JSON.stringify(본));
 if (본.칸없음) { console.log('엣지면1   FAIL (원장에 W엣지면·D엣지면 칸이 없다)'); process.exit(1); }
-if (본.못세움) { console.log('엣지면1   FAIL (원장에서 네 갈래를 못 찾음: ' + JSON.stringify(본.줄) + ')'); process.exit(1); }
+if (본.못세움) { console.log('엣지면1   FAIL (원장에서 쓸 만한 AMT 줄 넷을 못 찾음: ' + JSON.stringify(본.쓸줄) + ')'); process.exit(1); }
+console.log('■ 진짜 원장에 그 값이 있는 줄: ' + JSON.stringify(본.진짜) +
+  (Object.keys(본.진짜 || {}).length ? '' : ' (본보기 원장이라 심은 값으로만 잰다)'));
 
 const 잰 = await p.evaluate(() => {
   const 하나 = 갈래 => {
