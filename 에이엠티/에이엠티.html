@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.30.0 (2026-10-09) — 원장 엑셀을 폰에 두고 바뀐 때만 받는다 (새로고침이 느리던 것)
+     버전: v1.31.0 (2026-10-09) — 재단도면을 발주별로만 듣는다 (칸을 통째로 듣던 것)
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -18,7 +18,7 @@
     <script type="module">
         import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";    
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword, setPersistence, indexedDBLocalPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
-        import { getFirestore, collection, addDoc, query, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, getDoc, setDoc, getDocs, deleteField } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, query, where, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, getDoc, setDoc, getDocs, deleteField } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL, getBytes } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
 
         const firebaseConfig = {
@@ -45,7 +45,7 @@
 
         window.db = db;
         window.storage = storage;
-        window.fbFirestore = { collection, addDoc, query, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, getDoc, setDoc, getDocs, deleteField };
+        window.fbFirestore = { collection, addDoc, query, where, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, getDoc, setDoc, getDocs, deleteField };
         window.fbStorage = { ref, uploadBytes, getDownloadURL, getBytes };
         window.fbAuth = { auth, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword };
 
@@ -2548,7 +2548,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.30.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.31.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2681,7 +2681,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.30.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.31.0</b></p>
         </div>
     </div>
 
@@ -3618,6 +3618,8 @@
                     renderProcessTimeline();
                 }
                 window._자료왔다('발주');       // 비어 있어도 '다 받아 봤다' 는 것이다
+                // 발주가 늘고 줄 때마다 재단도면 귀를 붙이고 뗀다 (10-09 2단계)
+                _도면귀맞추기();
             }, (err) => {
                 window._자료탈났다('발주', err);
                 console.error("Orders Sync Error:", err);
@@ -3633,21 +3635,84 @@
         // 재단편집→재단확정으로 만들어진 도면을 Firebase에 저장해 새로고침/다른 세션에서도 유지
         window._cuttingPlans = {};
 
-        function initCuttingPlansSync() {
-            const { collection, onSnapshot } = window.fbFirestore;
+        /* ── 재단도면을 **발주별로** 듣는다 (10-09 2단계) ──────────────────
+           사장님 말씀: 「어떤데이터든 확인하려는것만 그때그때 호출하는 구조를 만들 수는
+           없나?」 여태 `cutting_plans` 칸을 **통째로** 들었다 — where·limit 이 없었다.
+           살아 있는 발주는 다섯인데 도면은 369건이고, 지우는 길이 없어 쌓이기만 한다.
+           이제 발주마다 `where('pOrderIds','array-contains', 발주번호)` 로 **그 발주 것만**
+           듣는다. 한 칸 색인이라 따로 만들 것이 없다.
+           · 한 번 부르고 마는 getDocs 가 아니라 **onSnapshot** 이다 — 남이 재단을 확정하면
+             여태처럼 화면이 바로 바뀐다. 귀가 369건 하나에서 발주 수만큼으로 나뉠 뿐이다.
+           · **담기는 그릇(window._cuttingPlans)은 그대로다.** 보는 자리가 온 코드에 흩어져
+             있어 꼴을 바꾸면 다 깨진다. 채우는 길만 바꾼다.
+           · 발주가 늘고 줄 때 귀를 **붙이고 뗀다.** 떼는 것을 잊으면 귀가 쌓여 더 나빠진다.
+           · 「도면 다 옴」 은 **발주가 다 온 뒤, 살아 있는 발주마다 첫 소식이 온 때**다.
+             발주가 0건이면 기다릴 것이 없으니 그 자리에서 다 온 것으로 친다.
+           ⚠ 끊어 읽는 것이지 버리는 것이 아니다 — 살아 있는 발주에 붙은 도면은 다 온다. */
+        window._도면귀 = {};             // 발주번호 → 귀 떼는 함수
+        window._도면온발주 = new Set();   // 첫 소식이 온 발주번호
+
+        function _살아있는발주번호들() {
+            const 발주 = (typeof confirmedOrders !== 'undefined' ? confirmedOrders : []) || [];
+            return [...new Set(발주.map(o => parseInt(o && o.idNum, 10)).filter(n => !isNaN(n)))];
+        }
+        function _도면다왔나() {
+            // 발주가 와야 귀를 몇 개 걸지 안다 — 그 전에 '다 왔다' 고 하면 덜 온 채로 그린다
+            if (!window._자료옴 || !window._자료옴['발주']) return;
+            const 열쇠들 = _살아있는발주번호들().map(String);
+            if (!열쇠들.length) { window._자료왔다('도면'); return; }
+            if (열쇠들.every(k => window._도면온발주.has(k))) window._자료왔다('도면');
+        }
+        function _도면귀맞추기() {
+            const { collection, onSnapshot, query, where } = window.fbFirestore || {};
+            if (!collection || !onSnapshot || !query || !where) {
+                // 연장이 없으면 귀를 못 건다 — 조용히 멈추면 화면이 「불러오는 중」 에서 안 나온다
+                window._자료탈났다('도면', '화베 연장(where)이 없습니다');
+                return;
+            }
             const appId = "vivivic-4b7ef";
-            const colRef = collection(window.db, 'artifacts', appId, 'public', 'data', 'cutting_plans');
-            onSnapshot(colRef, (snapshot) => {
-                snapshot.docChanges().forEach(change => {
-                    if (change.type === 'removed') {
-                        delete window._cuttingPlans[change.doc.id];
-                    } else {
-                        window._cuttingPlans[change.doc.id] = { ...change.doc.data(), planId: change.doc.id };
-                    }
+            const 살아있는 = _살아있는발주번호들();
+            const 산것 = new Set(살아있는.map(String));
+            // ① 없어진 발주의 귀를 뗀다
+            Object.keys(window._도면귀).forEach(k => {
+                if (산것.has(k)) return;
+                try { window._도면귀[k](); } catch (e) {}
+                delete window._도면귀[k];
+                window._도면온발주.delete(k);
+                // 그 발주에만 붙어 있던 도면은 그릇에서도 내린다 (다른 산 발주가 같이
+                // 쓰는 도면은 그대로 둔다 — 끊어 읽는 것이지 버리는 것이 아니다)
+                Object.keys(window._cuttingPlans).forEach(id => {
+                    const pl = window._cuttingPlans[id];
+                    const ids = (pl && pl.pOrderIds) || [];
+                    if (!ids.some(x => String(x) === k)) return;
+                    if (!ids.some(x => 산것.has(String(x)))) delete window._cuttingPlans[id];
                 });
-                window._자료왔다('도면');
-                renderProcessTimeline();
-            }, (err) => window._자료탈났다('도면', err) || console.error('Cutting Plans Sync Error:', err));
+            });
+            // ② 새 발주에 귀를 붙인다
+            살아있는.forEach(n => {
+                const k = String(n);
+                if (window._도면귀[k]) return;
+                const colRef = collection(window.db, 'artifacts', appId, 'public', 'data', 'cutting_plans');
+                const 물음 = query(colRef, where('pOrderIds', 'array-contains', n));
+                window._도면귀[k] = onSnapshot(물음, (snapshot) => {
+                    snapshot.docChanges().forEach(change => {
+                        if (change.type === 'removed') {
+                            delete window._cuttingPlans[change.doc.id];
+                        } else {
+                            window._cuttingPlans[change.doc.id] = { ...change.doc.data(), planId: change.doc.id };
+                        }
+                    });
+                    window._도면온발주.add(k);
+                    _도면다왔나();
+                    renderProcessTimeline();
+                }, (err) => window._자료탈났다('도면', err) || console.error('Cutting Plans Sync Error:', err));
+            });
+            _도면다왔나();
+        }
+        function initCuttingPlansSync() {
+            // 여기서는 귀를 걸지 않는다 — 발주가 와야 누구 것을 들을지 안다.
+            // 발주 소식이 올 때마다 _도면귀맞추기() 가 불린다.
+            _도면귀맞추기();
         }
 
         async function _persistCuttingPlan(plan) {
