@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.23.0 (2026-10-09) — 공정 머리줄에 「명세서」 단추. 그날 완료된 작업을 양식대로 펴고 발급·인쇄·엑셀
+     버전: v1.24.0 (2026-10-09) — 재단 도면(부속 한 장·배치도)에도 우라홈 빨간 선
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2519,7 +2519,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.23.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.24.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2652,7 +2652,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.23.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.24.0</b></p>
         </div>
     </div>
 
@@ -10488,6 +10488,41 @@
                 `matrix(${C} ${S} ${-C} ${S} 0 0)">${안}</g>`;
         }
 
+        /* ── 재단 배치도에 그릴 우라홈 (10-09 지시) ────────────────────────
+           「재단의 도면에도 우라홈 라인 표현해줘」. 셈은 엣지 쪽에 이미 지은
+           **_wo우라홈 을 그대로** 쓴다 — 새로 짓지 않는다.
+           배치도의 조각은 제 원장 줄을 안 들고 있다. 그래서 이 도면의 재단계획을 찾아
+           1·2·3순위의 원장 줄과 치수를 받아 두고, 조각의 치수(dw·dh)로 어느 부속인지
+           가른다 — 집이 이미 쓰는 그 잣대다(_cuttingPerSheet·_내치수).
+           돌려 앉힌 조각은 가로·세로가 바뀌어 있으므로, **우라홈위치 값과 같은 변**
+           쪽으로 선을 놓아 저절로 따라 돌게 한다. */
+        function _우라홈조각들(p) {
+            const 쓸것 = [];
+            try {
+                if (!p) return 쓸것;
+                let 계획 = null;
+                const 번 = (p.planId != null) ? String(p.planId) : '';
+                if (번) {
+                    const 들 = [].concat(Object.values(window._cuttingPlans || {}),
+                        (typeof confirmedCuttingData !== 'undefined' ? confirmedCuttingData : []));
+                    계획 = 들.find(pl => pl && String(pl.confirmId) === 번) || null;
+                }
+                const 담 = (ri, W, D) => {
+                    if (ri == null || isNaN(ri) || !(W > 0) || !(D > 0)) return;
+                    const u = _wo우라홈({ pRowIndex: ri, rw: W, rd: D });
+                    if (u.그림) 쓸것.push({ W: W, D: D, 위치값: u.위치값 });
+                };
+                담(p.pRowIndex != null ? parseInt(p.pRowIndex, 10) : null,
+                   parseFloat(p.rw) || 0, parseFloat(p.rd) || 0);
+                if (계획) ['s', 't'].forEach(급 => {
+                    const m = String(계획[급 + 'InfoText'] || '').match(/([\d.]+)\s*[Xx\u00d7]\s*([\d.]+)/);
+                    if (!m) return;
+                    담(parseInt(계획[급 + 'RowIndex'], 10), parseFloat(m[1]), parseFloat(m[2]));
+                });
+            } catch (e) {}
+            return 쓸것;
+        }
+
         /* 누움=true 면 카드 안 작은 도면을 30도 등각(아이소메트릭)으로 눕힌다 (10-01 지시).
            크게 띄우는 도면·집중 창 도면은 반듯한 채로 둔다 — 누운 그림으로 재단 치수를
            읽으면 비뚤어져 보인다. 눕는 것은 보이는 꼴뿐이고, 조각이 앉은 자리(lp·tp·wp·hp)
@@ -10507,6 +10542,30 @@
                 const rx = (pt.lp * BW - cropX).toFixed(1), ry = (pt.tp * BD - cropY).toFixed(1);
                 const rw = Math.max(2, pt.wp * BW).toFixed(1), rh = Math.max(2, pt.hp * BD).toFixed(1);
                 return `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="${pt.bg||'#fff'}" stroke="#37352f" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
+            }).join('');
+            /* 우라홈 빨간 선 — 조각 하나하나에 **엣지라인에서 안쪽 2cm**(도면 단위가 mm 라 20).
+               작은 조각에서 가운데를 넘지 않게 그 변의 30% 로 묶는다(부속 한 장과 같은 셈).
+               조각 수를 세는 자리가 있어 <rect> 는 더하지 않는다 — 선은 <path> 다. */
+            const _우조각 = _우라홈조각들(p);
+            const _우같 = (a, b) => isFinite(a) && isFinite(b) && Math.abs(a - b) < 0.5;
+            const 우라홈선들 = !_우조각.length ? '' : p.boardParts.map(pt => {
+                const dw = parseFloat(pt && pt.dw), dh = parseFloat(pt && pt.dh);
+                const 짝 = _우조각.find(x => (_우같(dw, x.W) && _우같(dh, x.D)) ||
+                                              (_우같(dw, x.D) && _우같(dh, x.W)));
+                if (!짝) return '';
+                const rx = pt.lp * BW - cropX, ry = pt.tp * BD - cropY;
+                const rw = Math.max(2, pt.wp * BW), rh = Math.max(2, pt.hp * BD);
+                let d = '';
+                if (_우같(dw, 짝.위치값)) {            // 그 치수가 가로로 누웠다 — 가로 한 줄
+                    const 안 = Math.min(20, rh * 0.3);
+                    d = `M${rx.toFixed(1)} ${(ry + 안).toFixed(1)} H${(rx + rw).toFixed(1)}`;
+                } else if (_우같(dh, 짝.위치값)) {     // 세로로 섰다 — 세로 한 줄
+                    const 안 = Math.min(20, rw * 0.3);
+                    d = `M${(rx + 안).toFixed(1)} ${ry.toFixed(1)} V${(ry + rh).toFixed(1)}`;
+                }
+                if (!d) return '';
+                return `<path class="우라홈" d="${d}" fill="none" stroke="#ef4444" ` +
+                       `stroke-width="2" vector-effect="non-scaling-stroke"/>`;
             }).join('');
             /* ── CAD 격자 (10-01 지시: 「참조 이미지처럼」) ──────────────────
                조각이 앉은 자리·치수·회전은 위에서 셈한 그대로다. 여기서 더하는
@@ -10531,7 +10590,7 @@
             const 제크기 = 칸맞춤 ? ` width="${cropW.toFixed(1)}" height="${cropH.toFixed(1)}"` : '';
             const 테 = `style="display:block;${sizeStyle}border:1px solid #d6d4d1;border-radius:4px;margin-top:4px;flex-shrink:0;background:#ecebe8;box-shadow:0 1px 2px rgba(55,53,47,0.10),0 5px 12px rgba(55,53,47,0.07);"`;
             if (!누움)
-                return `<svg viewBox="0 0 ${cropW.toFixed(1)} ${cropH.toFixed(1)}"${제크기} ${테}>${격자}${rects}</svg>`;
+                return `<svg viewBox="0 0 ${cropW.toFixed(1)} ${cropH.toFixed(1)}"${제크기} ${테}>${격자}${rects}${우라홈선들}</svg>`;
 
             /* ── 누운 꼴 (30도 등각) ──────────────────────────────────────────
                x' = cos30·(x−y) · y' = sin30·(x+y) — 반듯한 판을 비스듬히 본 꼴.
@@ -10540,7 +10599,7 @@
                그 칸 안에 꼭 맞게 줄여 넣는다 — 잘리지도 않고 카드도 안 늘어난다. */
             const 바닥 = `<path d="M0 0 H${cropW.toFixed(1)} V${cropH.toFixed(1)} H0 Z" fill="#f7f6f4"/>`;
             return `<svg viewBox="0 0 ${cropW.toFixed(1)} ${cropH.toFixed(1)}"${제크기} ${테}>` +
-                   _누워싸기(cropW, cropH, 번호, 바닥 + 격자 + rects) + `</svg>`;
+                   _누워싸기(cropW, cropH, 번호, 바닥 + 격자 + rects + 우라홈선들) + `</svg>`;
         }
 
         /* 이 부속의 결보호 값 — 원본 행(원장)에 적힌 그대로 읽는다. 새로 셈하지 않는다.
@@ -10683,7 +10742,10 @@
                엣지 초록선은 **변 자체**이고 이 선은 **안쪽 2cm** 라 서로 덮지 않는다.
                엣지 카드에서만 그린다 — 재단 카드는 그대로다. */
             let 우라홈선 = '';
-            if (엣지표시) {
+            {
+                /* 10-09 지시 「재단의 도면에도 우라홈 라인 표현해줘」 —
+                   엣지 카드에서만 긋던 것을 **재단 카드의 부속 한 장**에서도 긋는다.
+                   엣지 초록선(엣지표시)과는 따로다 — 초록은 엣지 카드에서만 그대로다. */
                 const _우 = _wo우라홈(p);
                 if (_우.그림) {
                     const 안쪽 = _우.쪽 === 'W' ? Math.min(20, H * 0.3) : Math.min(20, W * 0.3);
