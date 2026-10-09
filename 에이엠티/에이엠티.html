@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.31.0 (2026-10-09) — 재단도면을 발주별로만 듣는다 (칸을 통째로 듣던 것)
+     버전: v1.32.0 (2026-10-09) — 열 때는 재단도면을 0건 부른다. 보는 자리에서 그때 부른다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2548,7 +2548,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.31.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.32.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2681,7 +2681,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.31.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.32.0</b></p>
         </div>
     </div>
 
@@ -3174,6 +3174,8 @@
                 renderProcessTimeline();
                 renderTimelineConfirmedList();
             } else if (mode === 'cutting') {
+                // 재단발주 탭은 도면을 두루 본다(추천·이미 잘린 몫) — 다 부른다 (3단계)
+                try { if (typeof window._도면확보모두 === 'function') window._도면확보모두(); } catch (e) {}
                 renderID0508();
                 renderConfirmedCuttingList();
             } else if (mode === 'process') {
@@ -3651,17 +3653,49 @@
            ⚠ 끊어 읽는 것이지 버리는 것이 아니다 — 살아 있는 발주에 붙은 도면은 다 온다. */
         window._도면귀 = {};             // 발주번호 → 귀 떼는 함수
         window._도면온발주 = new Set();   // 첫 소식이 온 발주번호
+        /* 3단계 (10-09) — **열 때는 도면을 하나도 안 부른다.**
+           첫 화면(공정 타임라인)은 재단계획을 한 번도 안 본다(읽기 0·훑기 0 으로 재었고,
+           도면 0건으로 그려도 화면이 한 글자도 안 달랐다). 그래서 도면이 **정말 필요한
+           자리에서** `_도면확보(발주번호)` 를 불러 그때 귀를 붙인다.
+           한 자리를 고르지 않고 **도면을 보는 자리마다** 부른다 — 어느 길로 들어오셔도
+           비지 않는다. 이미 붙어 있으면 아무 일도 안 한다. */
+        window._도면원함 = new Set();     // 화면이 「보자」 고 부른 발주번호
 
         function _살아있는발주번호들() {
             const 발주 = (typeof confirmedOrders !== 'undefined' ? confirmedOrders : []) || [];
             return [...new Set(발주.map(o => parseInt(o && o.idNum, 10)).filter(n => !isNaN(n)))];
         }
-        function _도면다왔나() {
-            // 발주가 와야 귀를 몇 개 걸지 안다 — 그 전에 '다 왔다' 고 하면 덜 온 채로 그린다
-            if (!window._자료옴 || !window._자료옴['발주']) return;
-            const 열쇠들 = _살아있는발주번호들().map(String);
-            if (!열쇠들.length) { window._자료왔다('도면'); return; }
-            if (열쇠들.every(k => window._도면온발주.has(k))) window._자료왔다('도면');
+        /* 「도면 다 옴」 은 **열자마자** 참이다 (3단계).
+           열 때 도면을 안 부르니, 다 오기를 기다리면 작업 단추가 영영 막힌다.
+           도면이 아직 안 온 자리는 그 자리에서 「불러오는 중...」 으로 보인다. */
+        function _도면다왔나() { window._자료왔다('도면'); }
+
+        /* 이 발주들의 도면을 보겠다 — 귀가 없으면 지금 붙인다.
+           이미 와 있으면 true(바로 그릴 수 있다), 아직이면 false(기다리는 티를 내야 한다). */
+        window._도면확보 = function (번호들) {
+            const 들 = (Array.isArray(번호들) ? 번호들 : [번호들])
+                .map(n => parseInt(n, 10)).filter(n => !isNaN(n)).map(String);
+            let 새로 = 0;
+            들.forEach(k => { if (!window._도면원함.has(k)) { window._도면원함.add(k); 새로++; } });
+            if (새로) _도면귀맞추기();
+            return 들.every(k => window._도면온발주.has(k));
+        };
+        window._도면확보모두 = function () { return window._도면확보(_살아있는발주번호들()); };
+        window._도면기다리나 = function (번호들) {
+            const 들 = (Array.isArray(번호들) ? 번호들 : [번호들])
+                .map(n => parseInt(n, 10)).filter(n => !isNaN(n)).map(String);
+            return 들.some(k => !window._도면온발주.has(k));
+        };
+        /* 도면이 늦게 와서 그려야 할 때 — 펼쳐 둔 공정이 기다리고 있었으면 다시 편다.
+           기다리던 자리가 아니면 아무것도 건드리지 않는다(손가락과 싸우지 않게). */
+        function _도면다시그리기() {
+            try {
+                if (typeof renderProcessTimeline === 'function') renderProcessTimeline();
+                const 판 = document.querySelector('#tl-datecard-expand .tl-dc-panel');
+                if (!판 || 판.dataset.도면기다림 !== '1') return;
+                const 공정 = 판.dataset.공정;
+                if (공정 && typeof window.tlDcExpandSection === 'function') window.tlDcExpandSection(공정);
+            } catch (e) {}
         }
         function _도면귀맞추기() {
             const { collection, onSnapshot, query, where } = window.fbFirestore || {};
@@ -3671,7 +3705,11 @@
                 return;
             }
             const appId = "vivivic-4b7ef";
-            const 살아있는 = _살아있는발주번호들();
+            const 산발주 = new Set(_살아있는발주번호들().map(String));
+            // 없어진 발주는 「보자」 던 것도 지운다 — 안 그러면 다시 생길 때 헛귀가 붙는다
+            [...window._도면원함].forEach(k => { if (!산발주.has(k)) window._도면원함.delete(k); });
+            // **부른 발주에만** 귀를 붙인다 (3단계) — 열 때는 부른 것이 하나도 없다
+            const 살아있는 = _살아있는발주번호들().filter(n => window._도면원함.has(String(n)));
             const 산것 = new Set(살아있는.map(String));
             // ① 없어진 발주의 귀를 뗀다
             Object.keys(window._도면귀).forEach(k => {
@@ -3704,15 +3742,16 @@
                     });
                     window._도면온발주.add(k);
                     _도면다왔나();
-                    renderProcessTimeline();
+                    _도면다시그리기();
                 }, (err) => window._자료탈났다('도면', err) || console.error('Cutting Plans Sync Error:', err));
             });
             _도면다왔나();
         }
         function initCuttingPlansSync() {
-            // 여기서는 귀를 걸지 않는다 — 발주가 와야 누구 것을 들을지 안다.
-            // 발주 소식이 올 때마다 _도면귀맞추기() 가 불린다.
-            _도면귀맞추기();
+            /* 여기서는 귀를 하나도 안 건다 (3단계) — 첫 화면은 재단계획을 안 본다.
+               도면을 보는 자리에서 _도면확보() 가 그때 귀를 붙인다.
+               「도면 다 옴」 은 지금 참으로 둔다 — 안 그러면 작업 단추가 영영 막힌다. */
+            window._자료왔다('도면');
         }
 
         async function _persistCuttingPlan(plan) {
@@ -8058,6 +8097,9 @@
 
         window._집중판열기 = function(일){
             if (!일) return;
+            // 집중 창은 그 일의 재단도면을 보인다 — 지금 부른다 (3단계)
+            try { if (typeof window._도면확보 === 'function' && 일.order && 일.order.idNum != null)
+                window._도면확보(일.order.idNum); } catch (e) {}
             window._집중일 = 일;
             document.getElementById('_집중판')?.remove();
             const _e = v => String(v == null ? '' : v)
@@ -8523,6 +8565,8 @@
 
         window.tlShowPartDoneConfirm = function(docId, cardKey, procKey, date, btn, partName, rawDefaultQty, startKey, planId) {
             document.getElementById('_partDoneModal')?.remove();
+            // 완료 창은 같은 도면에서 함께 잘린 부속을 보인다 — 도면을 지금 부른다 (3단계)
+            try { if (planId && typeof window._도면확보모두 === 'function') window._도면확보모두(); } catch (e) {}
             // 이전 공정에서 수량이 변경됐다면 그 값을 기본값으로 사용
             const _ordDc   = (typeof confirmedOrders !== 'undefined' ? confirmedOrders : []).find(o => (o.docId || String(o.idNum)) === docId);
             const _compsDc = _partRecMap(_ordDc?.partCompletions, cardKey);
@@ -9336,6 +9380,15 @@
             window._tlDcDate = dateStr;
             const info = parseDateCard(dateStr);
             if (!info) return;
+            /* 이 날짜에 걸린 발주의 재단도면을 지금 부른다 (3단계) —
+               열 때는 하나도 안 부르고, 펼칠 때 **그날 것만** 붙인다. */
+            try {
+                const _그날 = window._tlDcGetItems(dateStr) || {};
+                const _번호들 = [];
+                Object.values(_그날).forEach(sec => (sec && sec.items || []).forEach(it => {
+                    if (it && it.idNum != null) _번호들.push(it.idNum); }));
+                if (_번호들.length) window._도면확보(_번호들);
+            } catch (e) {}
             const today = toLocalDateStr(new Date());
             const isToday     = dateStr === today;
             const isActivated = TL.activatedWeekendDates.has(dateStr);
@@ -9576,6 +9629,8 @@
         };
 
         window._명세서열기 = function (dateStr, procKey) {
+            // 명세서는 원장수량(재단계획 매수)을 본다 — 지금 부른다 (3단계)
+            try { if (typeof window._도면확보모두 === 'function') window._도면확보모두(); } catch (e) {}
             const 묶음 = window._명세서모으기(dateStr, procKey);
             const 짠 = window._명세서표Html(dateStr, procKey, 묶음);
             window._명세서지금 = { 날짜: dateStr, 공정: procKey, 묶음: 묶음, 총매: 짠.총매, 줄수: 짠.줄수,
@@ -10290,6 +10345,24 @@
                     </div>`;
             } else if (procKey === '재단') {
                 // ── 재단 전용: 기계 배정 보드 (AMT / 경기재단) ─────────────
+                /* 재단 판만 재단도면을 쓴다. 아직 안 왔으면 **이 집이 쓰는 「불러오는 중」**
+                   을 그대로 보인다 — 빈 칸으로 두면 고장 난 줄 아신다 (10-09 지시). */
+                const _그날번호 = sec.items.map(x => x && x.idNum).filter(n => n != null);
+                window._도면확보(_그날번호);
+                if (window._도면기다리나(_그날번호)) {
+                    panel.dataset.도면기다림 = '1';
+                    div.innerHTML = `
+                        <div class="tl-dc-single-hdr" style="border-bottom:2px solid #e3e2e0;flex-shrink:0;">
+                            <button class="tl-dc-back-btn" onclick="tlDcBackToGrid()">← 전체보기</button>
+                            <span style="display:inline-block;width:6px;height:24px;background:${_pcColor};border-radius:3px;flex-shrink:0;"></span>
+                            <span style="font-size:17px;font-weight:900;color:#37352f;letter-spacing:-0.3px;white-space:nowrap;flex-shrink:0;">재단</span>
+                        </div>
+                        ${_procSwitcherHtml}
+                        <div class="p-6 text-center text-[12px] text-[#787774] italic">불러오는 중...</div>`;
+                    panel.appendChild(div);
+                    return;
+                }
+                panel.dataset.도면기다림 = '';
                 const sk = dateStr + '-재단';
                 let cuttingParts = [];
                 let totalMin = 0;
