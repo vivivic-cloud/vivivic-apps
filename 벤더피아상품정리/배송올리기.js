@@ -115,7 +115,8 @@ function 사람정보지우기(aoa, head) {
         if (주.나온수) { r[i] = 주.글; 주소본것 += 주.나온수; }
     }
 
-    const ws = XLSX.utils.aoa_to_sheet(새표);
+    // dense — 칸마다 객체를 만들지 않고 배열로 담는다. 20만 줄 × 32칸이면 640만 개가 안 생긴다.
+    const ws = XLSX.utils.aoa_to_sheet(새표, { dense: true });
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
     const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
