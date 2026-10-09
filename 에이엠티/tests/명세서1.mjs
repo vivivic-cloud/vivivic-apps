@@ -22,6 +22,16 @@ await p.goto(URL, { waitUntil: 'load' }); await p.waitForTimeout(1500);
 const cdp = await ctx.newCDPSession(p);
 const 손 = (t, x, y) => cdp.send('Input.dispatchTouchEvent',
   { type: t, touchPoints: t === 'touchEnd' ? [] : [{ x, y, radiusX: 14, radiusY: 14, force: 1 }] });
+const 끌기 = async (x, y, dx, dy) => {      // 진짜 손가락으로 민다 (밀어서 보는 것도 손가락이다)
+  await 손('touchStart', x, y);
+  const 칸 = 14;
+  for (let i = 1; i <= 칸; i++) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove',
+      touchPoints: [{ x: x + dx * i / 칸, y: y + dy * i / 칸, radiusX: 14, radiusY: 14, force: 1 }] });
+    await p.waitForTimeout(16);
+  }
+  await 손('touchEnd', 0, 0); await p.waitForTimeout(450);
+};
 const 짚기 = async (고르개) => {
   const r = await p.evaluate(s => { const e = document.querySelector(s); if (!e) return null;
     e.scrollIntoView({ block: 'center' }); const b2 = e.getBoundingClientRect();
@@ -188,7 +198,9 @@ const pdf = await p.evaluate(async () => {
   if (!blob) return { 없음: true };
   const buf = new Uint8Array(await blob.arrayBuffer());
   const 끝 = String.fromCharCode(...buf.subarray(buf.length - 6));
+  const 장 = window._명세서장들()[0];
   return { 크기: blob.size, 갈래: blob.type, 장수: window._명세서장들().length,
+           장크기: 장 ? 장.width + '×' + 장.height : '', 종이줄수: window._명세서줄들().줄들.length,
            머리: String.fromCharCode(...buf.subarray(0, 8)), 끝: 끝.trim(),
            쪽수: (String.fromCharCode(...buf.subarray(0, 400)).match(/\/Count (\d+)/) || [])[1] };
 });
@@ -198,6 +210,10 @@ console.log('■ PDF: ' + JSON.stringify(pdf));
    JSON.stringify(pdf));
 판('⑥ 빈 파일이 아니다 (장 수와 크기)', !pdf.없음 && pdf.크기 > 20000 && pdf.장수 >= 1
    && String(pdf.쪽수) === String(pdf.장수), pdf.크기 + '바이트 · ' + pdf.장수 + '장 · PDF 쪽수 ' + pdf.쪽수);
+// 종이 꼴은 화면 꼴과 따로다 — 화면을 고쳐도 종이는 A4 가로 1754×1240 그대로여야 한다
+판('⑥ 종이 꼴은 그대로다 (A4 가로 1754×1240 · 줄 수가 화면과 같다)',
+   pdf.장크기 === '1754×1240' && pdf.종이줄수 > 0,
+   '장 ' + pdf.장크기 + ' · 종이 줄 ' + pdf.종이줄수 + '줄');
 
 /* 외부보내기 — 이 상자에는 공유판이 없다. 허수아비 navigator.share 를 놓고
    **무엇이 실려 나가는지**(파일 이름·크기·형식) 담아서 본다. */
@@ -215,6 +231,71 @@ console.log('■ 외부보내기에 실린 것: ' + JSON.stringify(실린것));
    && 실린것.파일[0].갈래 === 'application/pdf' && 실린것.파일[0].크기 === pdf.크기,
    JSON.stringify(실린것));
 판('⑤ 두 번 발급되지 않는다', 발급뒤.발급죽음 === true, String(발급뒤.발급죽음));
+
+/* ── 팝업 안에서 **내용이 다 닿는가** (10-09 13:16 지시) ─────────────
+   「팝업화면이라도 명세서 내용은 모두 보여줘야 되지 않겠니」.
+   칸을 숨기거나 줄여서 맞추지 않는다 — 열네 칸을 그대로 두고 **창 속에서 밀어** 본다.
+   미는 것도 진짜 손가락으로 한다. */
+const 밀기자리 = await p.evaluate(() => {
+  const r = document.querySelector('#명세서판 .명세-몸').getBoundingClientRect();
+  return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; });
+const 닿나 = () => p.evaluate(() => {
+  const 몸 = document.querySelector('#명세서판 .명세-몸');
+  const 표 = document.querySelector('#명세서판 .명세-표');
+  const mr = 몸.getBoundingClientRect();
+  const 줄들 = [...표.querySelectorAll('tr')];
+  const 머리 = [...줄들[0].children].map(e => (e.textContent || '').trim());
+  const 끝칸 = 줄들.slice(2).map(tr => tr.children[tr.children.length - 1]).filter(Boolean)[0];
+  const 끝 = 끝칸 ? 끝칸.getBoundingClientRect() : null;
+  const 합 = [...document.querySelectorAll('#명세서판 .명세-표 tr')]
+      .find(t => /합\s*계/.test(t.textContent || ''));
+  const hr = 합 ? 합.getBoundingClientRect() : null;
+  const 바닥 = document.querySelector('#명세서판 .명세-바닥').getBoundingClientRect();
+  const 안에 = (r2) => !!r2 && r2.left >= mr.left - 1 && r2.right <= mr.right + 1
+                        && r2.top >= mr.top - 1 && r2.bottom <= mr.bottom + 1;
+  // 합계는 줄 하나가 표 너비를 다 덮는다 — 위아래로 닿는지만 본다. 그 줄의 **금액 칸**은
+  // 가로로도 닿는지 따로 본다.
+  const 위아래 = (r2) => !!r2 && r2.top >= mr.top - 1 && r2.bottom <= mr.bottom + 1;
+  const 합금 = 합 ? 합.children[합.children.length - 2] : null;
+  return { 속폭: Math.round(document.querySelector('#명세서판 .명세-속').getBoundingClientRect().width),
+           보임: 몸.clientWidth, 밀넓: 몸.scrollWidth, 왼쪽: Math.round(몸.scrollLeft),
+           위: Math.round(몸.scrollTop), 높보임: 몸.clientHeight, 밀높: 몸.scrollHeight,
+           칸수: 머리.length + 3,          // 「원 장」 하나가 넷을 덮는다
+           머리끝: 머리[머리.length - 1],
+           끝칸보임: 안에(끝), 끝칸글: 끝칸 ? (끝칸.textContent || '').trim() : '',
+           합계보임: 위아래(hr), 합계글: 합 ? (합.textContent || '').replace(/\s+/g, ' ').trim() : '',
+           합계금액보임: 안에(합금 ? 합금.getBoundingClientRect() : null),
+           합계금액글: 합금 ? (합금.textContent || '').trim() : '',
+           바닥보임: 바닥.bottom <= window.innerHeight + 1,
+           바닥높: Math.round(바닥.height),
+           단추높: [...document.querySelectorAll('#명세서판 .명세-바닥 button')]
+             .map(e => Math.round(e.getBoundingClientRect().height)) };
+});
+const 처음닿 = await 닿나();
+await 끌기(밀기자리.x, 밀기자리.y, -300, 0);
+await 끌기(밀기자리.x, 밀기자리.y, -300, 0);
+const 오른닿 = await 닿나();
+await 끌기(밀기자리.x, 밀기자리.y, 0, -400);
+const 아래닿 = await 닿나();
+console.log('■ 닿나: 연 뒤 ' + JSON.stringify(처음닿) + '\n          오른쪽 끝 ' + JSON.stringify(오른닿) +
+            '\n          아래 끝 ' + JSON.stringify(아래닿));
+판('⑧ 열네 칸을 하나도 안 줄였다 (머리 끝이 「출고예정일」)',
+   처음닿.칸수 === 14 && 처음닿.머리끝 === '출고예정일', 처음닿.칸수 + '칸 · 끝 ' + 처음닿.머리끝);
+판('⑧ 밀면 맨 오른쪽 칸(출고예정일)의 글자까지 닿는다',
+   오른닿.끝칸보임 === true && 오른닿.끝칸글 !== '' && 오른닿.왼쪽 > 처음닿.왼쪽,
+   '민 거리 ' + 오른닿.왼쪽 + 'px (보임 ' + 오른닿.보임 + ' / 밀넓 ' + 오른닿.밀넓 + ') · 글 「' + 오른닿.끝칸글 + '」');
+판('⑧ 마지막 줄과 합계줄까지 닿는다 (아래 끝 · 금액 칸까지)',
+   아래닿.합계보임 === true && /합\s*계/.test(아래닿.합계글)
+   && 아래닿.합계금액보임 === true && 아래닿.합계금액글 !== '',
+   '합계줄 「' + (아래닿.합계글 || '').slice(0, 30) + '」 · 금액 「' + 아래닿.합계금액글 +
+   '」 · 아래로 민 거리 ' + 아래닿.위 + 'px (밀높 ' + 아래닿.밀높 + ' / 보임 ' + 아래닿.높보임 + ')');
+판('⑧ 밀어도 단추 다섯은 늘 보이고 44px 이상이다',
+   아래닿.바닥보임 === true && 아래닿.단추높.length === 5 && 아래닿.단추높.every(h => h >= 44),
+   JSON.stringify(아래닿.단추높));
+판('⑧ 창 속을 눌러도 안 닫힌다',
+   await (async () => { await 짚기('#명세서판 .명세-표'); 
+     return await p.evaluate(() => !!document.getElementById('명세서판')); })(),
+   '표를 눌러도 열린 채');
 
 await 짚기('#명세서판 .명세-닫기');
 const 닫힘 = await p.evaluate(() => !document.getElementById('명세서판'));
