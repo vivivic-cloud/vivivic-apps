@@ -175,7 +175,7 @@
         <div id="규칙목록" style="margin-top:8px"></div>
     </div>
 
-    <footer><p>v0.6.0</p></footer>
+    <footer><p>v0.6.1</p></footer>
 </div>
 
 <!-- 짚어서 지시하는 손잡이 (?viggle=1 일 때만 켜진다) -->
@@ -272,10 +272,48 @@ function 칸이름다듬기(이름들) {
     });
 }
 
+// 엑셀 한 장을 안전하게 줄 배열로. **두 길(상품·단품·그 밖 / 배송정보)이 다 이것을 쓴다.**
+// 「엑셀을 못읽었대」 — 화면에 「Invalid array length」 가 떴다 (10-09 사장님). 까닭 둘을 여기서 막는다:
+//   ① 엑셀에서 **열 통째에 서식**을 먹이면 시트의 테두리(!ref)가 A1:XFD1048576 으로 나온다.
+//      그대로 sheet_to_json 에 넣으면 170억 칸을 만들려다 화면이 굳거나 터진다.
+//      → **!ref 를 안 믿고 실제로 값이 든 칸으로 테두리를 다시 잰다.**
+//   ② 첫 장이 안내문인 파일이 있다. wb.SheetNames[0] 만 보면 자료를 통째로 놓친다.
+//      → **칸이 가장 많이 든 시트**를 고르고, 무엇을 골랐는지 화면에 적는다.
+// ⚠ 못 읽는 파일을 조용히 삼키지 않는다. 사장님이 알아들을 말로 적는다.
+function 시트읽기(buf) {
+    let wb;
+    try { wb = XLSX.read(new Uint8Array(buf), { type: 'array' }); }
+    catch (e) { throw new Error('엑셀로 열리지 않는 파일입니다 — ' + (e.message || e)); }
+    if (!wb || !wb.SheetNames || !wb.SheetNames.length) throw new Error('이 파일에는 시트가 없습니다.');
+
+    let 고른 = null, 많 = -1, 시트이름 = '';
+    wb.SheetNames.forEach(n => {
+        const ws = wb.Sheets[n]; if (!ws) return;
+        const 수 = Object.keys(ws).filter(k => k.charAt(0) !== '!').length;
+        if (수 > 많) { 많 = 수; 고른 = ws; 시트이름 = n; }
+    });
+    if (!고른 || 많 <= 0) throw new Error('이 파일은 시트가 비어 있습니다.');
+
+    // 실제로 값이 든 칸만 보고 테두리를 다시 잰다 — !ref 는 쳐다보지 않는다.
+    let r1 = Infinity, r2 = -1, c1 = Infinity, c2 = -1;
+    Object.keys(고른).forEach(k => {
+        if (k.charAt(0) === '!') return;
+        let a; try { a = XLSX.utils.decode_cell(k); } catch (e) { return; }
+        if (!a || !isFinite(a.r) || !isFinite(a.c) || a.r < 0 || a.c < 0) return;
+        if (a.r < r1) r1 = a.r;
+        if (a.r > r2) r2 = a.r;
+        if (a.c < c1) c1 = a.c;
+        if (a.c > c2) c2 = a.c;
+    });
+    if (r2 < 0 || c2 < 0) throw new Error('이 파일은 시트가 비어 있습니다.');
+
+    const aoa = XLSX.utils.sheet_to_json(고른, { header: 1, defval: '', range: { s: { r: r1, c: c1 }, e: { r: r2, c: c2 } } });
+    if (!aoa.length) throw new Error('이 파일은 시트가 비어 있습니다.');
+    return { aoa, 시트이름, 시트수: wb.SheetNames.length };
+}
+
 function 엑셀읽기(buf, 이름) {
-    const wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
-    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
-    if (!aoa.length) throw new Error('빈 파일입니다.');
+    const { aoa, 시트이름, 시트수 } = 시트읽기(buf);
     const 머리 = 머리줄찾기(aoa);
     const 칸이름 = 칸이름다듬기(머리.이름들);
     const 줄 = []; let 건너뜀 = 0;
@@ -284,7 +322,7 @@ function 엑셀읽기(buf, 이름) {
         const v = 칸이름.map((_, c) => { const x = aoa[i][c]; return (x === undefined || x === null) ? '' : String(x).trim(); });
         if (v.some(x => x !== '')) 줄.push(v); else 건너뜀++;
     }
-    return { 이름, 칸이름, 줄, 머리줄: 머리.몇째 + 1, 건너뜀 };
+    return { 이름, 칸이름, 줄, 머리줄: 머리.몇째 + 1, 건너뜀, 시트이름, 시트수 };
 }
 
 // 갈래는 **올리는 자리로 정한다.** 칸 이름으로 짐작하지 않는다 —
@@ -310,7 +348,8 @@ $('file').addEventListener('change', e => {
         try {
             if (고른갈래 === '배송') { 배송고름(ev.target.result, f); return; }
             읽은것 = 엑셀읽기(ev.target.result, f.name);
-            $('읽음셈').textContent = 셈(읽은것.줄.length) + '줄 · ' + 읽은것.칸이름.length + '칸 · 머리줄 ' + 읽은것.머리줄 + '째';
+            $('읽음셈').textContent = 셈(읽은것.줄.length) + '줄 · ' + 읽은것.칸이름.length + '칸 · 머리줄 ' + 읽은것.머리줄 + '째'
+                + (읽은것.시트수 > 1 ? ' · 시트 ' + 읽은것.시트이름 : '');
             $('btn-up').disabled = false;
         } catch (err) { $('판-읽음').classList.add('hidden'); fail(new Error('엑셀을 읽지 못했습니다 — ' + err.message)); }
     }, 30);
@@ -441,9 +480,7 @@ let 배송읽은것 = null;
 
 function 배송고름(buf, f) {
     const B = window.배송올리기;
-    const wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
-    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' });
-    if (!aoa.length) throw new Error('빈 파일입니다.');
+    const { aoa, 시트이름, 시트수 } = 시트읽기(buf);
     const 머리 = B.머리줄찾기(aoa);
     const head = (aoa[머리] || []).map(h => String(h).trim());
     const 지움 = B.사람정보지우기(aoa, head);        // 사람 칸을 지운 사본을 창고에 올린다
@@ -469,6 +506,7 @@ function 배송고름(buf, f) {
     }));
     배송읽은것 = { 이름: f.name, 날것: f, 줄들, 열쇠, 취소, 이름없음, 지움 };
     $('읽음셈').textContent = 셈(줄들.length) + '줄 · ' + head.length + '칸 · 머리줄 ' + (머리 + 1) + '째'
+        + (시트수 > 1 ? ' · 시트 ' + 시트이름 : '')
         + (취소 ? ' · 취소 ' + 셈(취소) + ' 뺌' : '')
         + ' · 열쇠 ' + 열쇠.이름
         + ' · 사람칸 ' + 지움.뺀이름.length + '개 지움'
