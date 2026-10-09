@@ -159,8 +159,7 @@ const 집중 = await p.evaluate(({ ck, 부속명, 납기 }) => {
   const o = confirmedOrders.find(x => x.idNum === 9101);
   window._집중일 = { order: o, docId: 'd9101', cardKey: ck, procKey: '재단',
                      rec: { date: 납기, partName: 부속명 } };
-  // 10-08 부터는 파레트를 골라야 완료로 넘어간다(사장님 지시) — 하나 고르고 누른다
-  try { window._집중파레트고르기('A'); } catch (e) {}
+  // 10-09 부터 **재단에는 파레트가 없다**(사장님 지시) — 고를 것 없이 바로 완료다
   try { window.tl일완료(); } catch (e) { return { 탈: e.message }; }
   const q = document.getElementById('_pdQty');
   const v = q ? q.value : null;

@@ -167,6 +167,38 @@ console.log('■ 고른 뒤 완료: ' + JSON.stringify(열림));
 판('⑥ 파레트를 고르면 완료 창이 열린다', 열림.완료창 === true, JSON.stringify(열림));
 판('⑦ 375px 가로 스크롤 없다', 고른뒤.문서가로 <= 375, 고른뒤.문서가로 + 'px');
 판('⑦ 발주 자료에 한 줄도 안 쓴다 (고른 파레트는 이 창에서만 들고 있다)', 고른뒤.쓰기 === 0, 고른뒤.쓰기 + '번');
+
+/* ⑧ 재단에는 파레트가 없다 — 10-09 사장님 말씀:
+   「재단 작업에는 파레트 설정이 필요 없습니다.」
+   같은 부속·같은 발주를 **공정만 재단으로** 바꿔 타이머를 열어 잰다.
+   다른 공정(위에서 잰 보링)은 그대로 있어야 한다 — 통째로 되돌린 것이 아니다. */
+const 재단 = await p.evaluate(async ({ ck }) => {
+  document.getElementById('_partDoneModal')?.remove(); window._pdConfirmData = null;
+  const o = confirmedOrders.find(x => x.idNum === 9401);
+  o.partStarted[ck] = Object.assign({}, o.partStarted[ck],
+    { '재단': { started: true, startedAt: Date.now() - 300000 } });
+  window._집중판닫기();
+  window._집중판열기({ order: o, docId: 'd9401', cardKey: ck, procKey: '재단',
+    rec: { date: '2026-10-19', partName: '가와', started: true, startedAt: Date.now() - 300000 } });
+  await new Promise(r => setTimeout(r, 200));
+  const 단 = document.querySelectorAll('#_집중파레트 .집중-파').length;
+  const 큐 = !!document.getElementById('_집중큐알');
+  const 말 = []; const 옛 = window.showToastMessage; window.showToastMessage = t => 말.push(String(t));
+  document.getElementById('_집중완료').click();
+  await new Promise(r => setTimeout(r, 300));
+  window.showToastMessage = 옛;
+  const m = document.getElementById('_partDoneModal');
+  const 값 = { 단추: 단, 큐알칸: 큐, 완료창: !!m, 말, 쓰기: window.__쓰기 };
+  m?.remove(); window._pdConfirmData = null;
+  return 값;
+}, { ck: 본.ck });
+console.log('■ 재단 타이머: ' + JSON.stringify(재단));
+판('⑧ 재단 타이머에는 파레트 단추가 없다', 재단.단추 === 0, 재단.단추 + '개');
+판('⑧ 재단 타이머에는 큐알 자리도 없다', 재단.큐알칸 === false, String(재단.큐알칸));
+판('⑧ 재단은 파레트 없이 그냥 완료된다 (막지 않는다)',
+   재단.완료창 === true && !재단.말.some(t => /파레트/.test(t)), JSON.stringify(재단));
+판('⑧ 그래도 발주 자료에는 안 쓴다', 재단.쓰기 === 0, 재단.쓰기 + '번');
+
 판('페이지오류 없음', errs.length === 0, String(errs.length) + (errs[0] ? ' :: ' + errs[0] : ''));
 await b.close();
 console.log(실패 === 0 ? '파레트1   OK' : '파레트1   FAIL (' + 실패 + ')');

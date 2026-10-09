@@ -255,8 +255,7 @@ const 완료값 = await p.evaluate(() => {
   const rec = o.partStarted['CUT_1']['재단'];
   return { 쌓인분: _쌓인분(rec), 흐른분: _흐른분(rec), 적힐분: _일한분(rec) };
 });
-// 10-08 부터는 파레트를 골라야 완료로 넘어간다(사장님 지시) — 손가락으로 A 를 먼저 누른다
-await 톡('#_집중파레트 .집중-파[data-파="A"]');
+// 10-09 부터 **재단에는 파레트가 없다**(사장님 지시) — 그래서 그냥 완료를 누른다
 await 톡('#_집중완료');
 const 팝업떴나 = await p.evaluate(() => !!document.getElementById('_partDoneModal'));
 // 완료 창은 v1.11.0 부터 완료를 하는 유일한 길이다 — 누르는 자리를 다 잰다
@@ -333,8 +332,7 @@ const 두번뒤 = await p.evaluate(async () => {
   // 다시 1분 하고 완료 팝업까지
   await 적기(Object.assign({}, o.partStarted['CUT_2']['재단'], { started: true, startMs: Date.now() - 1 * 60000 }));
   const 적힐 = _일한분(o.partStarted['CUT_2']['재단']);
-  // 10-08 부터는 파레트를 골라야 완료로 넘어간다(사장님 지시) — 하나 고르고 누른다
-  window._집중파레트고르기('A');
+  // 10-09 부터 **재단에는 파레트가 없다**(사장님 지시) — 고를 것 없이 바로 완료다
   window.tl일완료();
   await new Promise(r => setTimeout(r, 400));
   const 단 = [...document.querySelectorAll('#_partDoneModal button')]

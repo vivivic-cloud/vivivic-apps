@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.20.0 (2026-10-08) — 부속카드에 제품명 풀네임과 부속명을 다 적는다. 부속명이 제일 크다
+     버전: v1.20.1 (2026-10-09) — 재단 작업 타이머에서는 파레트를 안 쓴다 (다른 공정은 그대로)
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2467,7 +2467,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.20.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.20.1</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2600,7 +2600,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.20.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.20.1</b></p>
         </div>
     </div>
 
@@ -7852,11 +7852,14 @@
                   `<div class="집중-도면" id="_집중도면"></div>` +
                   `<p class="집중-시계" id="_집중시계글">0:00.00</p>` +
                   /* 파레트 A·B·C·D (10-08 지시) — 하나를 골라야 완료를 누를 수 있다.
-                     고르면 그 밑에 「발주번호-파레트」 큐알이 나타난다. */
-                  `<div class="집중-파레트" id="_집중파레트">` +
-                    ['A', 'B', 'C', 'D'].map(x => `<button type="button" class="집중-파" data-파="${x}">${x}</button>`).join('') +
-                  `</div>` +
-                  `<div class="집중-큐알" id="_집중큐알"></div>` +
+                     고르면 그 밑에 「발주번호-파레트」 큐알이 나타난다.
+                     재단에는 파레트가 없다(10-09 지시) — 그 칸을 아예 안 만든다. */
+                  (window._집중파레트쓰나(일)
+                    ? `<div class="집중-파레트" id="_집중파레트">` +
+                        ['A', 'B', 'C', 'D'].map(x => `<button type="button" class="집중-파" data-파="${x}">${x}</button>`).join('') +
+                      `</div>` +
+                      `<div class="집중-큐알" id="_집중큐알"></div>`
+                    : '') +
                   `<div class="집중-줄">` +
                     `<button type="button" class="집중-단추 집중-멈춤" id="_집중멈춤">STOP</button>` +
                     `<button type="button" class="집중-단추 집중-완료" id="_집중완료">COMPLETE</button>` +
@@ -7903,6 +7906,12 @@
            쓰라는 말씀이 없었으므로 파이어스토어에는 아무것도 안 쓴다.
            일(발주·부속·공정)마다 따로 기억한다. 창을 다시 열어도 그대로다. */
         window._집중파레트들 = window._집중파레트들 || {};
+        /* 재단에는 파레트가 없다 (10-09 사장님 말씀: 「재단 작업에는 파레트 설정이
+           필요 없습니다.」). 재단 타이머에는 단추도 큐알도 안 세우고, 완료도 안 막는다.
+           엣지·보링·NC 는 10-08 지시 그대로 둔다 — 가르는 자리는 이 한 곳뿐이다. */
+        window._집중파레트쓰나 = function (일) {
+            return !!일 && String(일.procKey || '') !== '재단';
+        };
         window._집중파열쇠 = function (일) {
             return [일 && 일.docId, 일 && 일.cardKey, 일 && 일.procKey].join('|');
         };
@@ -7916,6 +7925,7 @@
         };
         window._집중파레트그리기 = function () {
             const 일 = window._집중일; if (!일) return;
+            if (!window._집중파레트쓰나(일)) return;      // 재단에는 그릴 칸이 없다
             const 고른 = window._집중파레트값(일);
             document.querySelectorAll('#_집중파레트 .집중-파').forEach(bt =>
                 bt.classList.toggle('on', bt.dataset.파 === 고른));
@@ -8132,8 +8142,11 @@
         /* 완료 — 쓰던 완료 팝업을 그대로 부른다(새로 만들지 않는다) */
         window.tl일완료 = function(){
             const 일 = window._집중일; if (!일) return;
-            // 파레트를 고르기 전에는 완료로 못 넘어간다 (10-08 지시)
-            if (!window._집중파레트값(일)) { showToastMessage('파레트를 고르세요'); return; }
+            // 파레트를 고르기 전에는 완료로 못 넘어간다 (10-08 지시).
+            // 재단은 파레트가 없으므로 안 막는다 (10-09 지시).
+            if (window._집중파레트쓰나(일) && !window._집중파레트값(일)) {
+                showToastMessage('파레트를 고르세요'); return;
+            }
             const o = 일.order || {};
             const 수 = (() => {
                 /* 담긴 0 을 그대로 넘기면 완료 창이 0 으로 열린다(10-04 지시).
