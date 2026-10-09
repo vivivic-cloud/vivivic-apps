@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.25.0 (2026-10-09) — 명세서를 팝업 창으로 (이 집 창 꼴 그대로)
+     버전: v1.26.0 (2026-10-09) — 명세서의 재단금액 = 원장수량 × 2,400원 (부가세 포함)
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2528,7 +2528,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.25.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.26.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2661,7 +2661,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.25.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.26.0</b></p>
         </div>
     </div>
 
@@ -9235,6 +9235,15 @@
            읽기만 한다: 발주확정(partCompletions·partInfoMap)과 재단계획. */
         window._명세서지금 = null;            // 지금 펴 놓은 명세서 {날짜,공정,묶음,발급번호,발급시각}
 
+        /* 재단금액 — 원장 **한 장당** 값이다. 10-09 사장님: 「재단 금액은 원장당 2400원
+           부가세 포함가야」. **부가세가 이미 든 값**이라 따로 더하지 않는다.
+           나중에 값이 바뀐다 — 그래서 여기 한 자리에만 두고, 쓰는 곳은 모두 이것을 본다. */
+        window._재단단가 = 2400;
+        window._돈글 = function (n) {
+            const v = Math.round(Number(n) || 0);
+            return v.toLocaleString('ko-KR');
+        };
+
         window._명세서모으기 = function (dateStr, procKey) {
             const 발주들 = (typeof confirmedOrders !== 'undefined' ? confirmedOrders : []);
             // 재단계획은 두 군데에 있다 — 같은 confirmId 는 한 번만 본다(_이미잘린몫 과 같은 잣대)
@@ -9328,8 +9337,10 @@
                         td.push(`<td class="ㄱ">${_e(품.크기)}</td>`);
                         td.push(`<td class="ㄱㄱ">${품.몫}개</td>`);
                         if (j === 0) {
+                            // 재단금액 = 그 줄의 원장 수량 × 원장 한 장당 값(부가세 포함)
+                            const 돈 = (g.매 == null) ? null : g.매 * (window._재단단가 || 0);
                             td.push(`<td rowspan="${g.품목들.length}" class="ㄱㄱ">${g.매 == null ? '-' : g.매 + '매'}</td>`);
-                            td.push(`<td rowspan="${g.품목들.length}" class="ㄱ">${_명세서몰라('')}</td>`);
+                            td.push(`<td rowspan="${g.품목들.length}" class="ㄱㄱ">${돈 == null ? '-' : window._돈글(돈)}</td>`);
                         }
                         if (첫줄) td.push(`<td rowspan="${품목수}" class="ㄱ">${_e((o.deliveryDate || '').slice(5).replace('-', '/'))}</td>`);
                         몸.push('<tr>' + td.join('') + '</tr>');
@@ -9363,7 +9374,7 @@
                 `<tr><th>종류</th><th>색상</th><th>모델명</th><th>출고처</th></tr>` +
                 몸.join('') +
                 `<tr class="합"><td class="ㄱ" colspan="11">합  계</td><td class="ㄱ">${총매}매</td>` +
-                `<td class="ㄱ">${_명세서몰라('')}</td><td></td></tr>` +
+                `<td class="ㄱ">${window._돈글(총매 * (window._재단단가 || 0))}</td><td></td></tr>` +
                 `<tr class="합"><td class="ㄱ" colspan="8">전잔액</td><td class="ㄱ" colspan="3">${_명세서몰라('')}</td>` +
                 `<td class="ㄱ">현잔액</td><td class="ㄱ" colspan="2">${_명세서몰라('')}</td></tr>` +
                 `</table></div>` +
@@ -9449,13 +9460,15 @@
                         칸.push([ 첫 ? i + 1 : '', 첫 ? (o.displayName || '') : '', 첫 ? (o.orderCode || '') : '',
                                   첫 ? g.종류 : '', 첫 ? g.색상 : '', '', '', '',
                                   품.이름, 품.크기, 품.몫,
-                                  j === 0 ? (g.매 == null ? '' : g.매) : '', '',
+                                  j === 0 ? (g.매 == null ? '' : g.매) : '',
+                                  (j === 0 && g.매 != null) ? g.매 * (window._재단단가 || 0) : '',
                                   첫 ? (o.deliveryDate || '') : '' ]);
                         첫 = false;
                     });
                 });
             });
-            칸.push([]); 칸.push(['합계', '', '', '', '', '', '', '', '', '', '', 총매, '', '']);
+            칸.push([]); 칸.push(['합계', '', '', '', '', '', '', '', '', '', '', 총매,
+                                  총매 * (window._재단단가 || 0), '']);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(칸), '내역');
             const 소 = [['출고처', '종류', '모델명', '색상', '전일소요량', '금일소요량', '총소요량']];

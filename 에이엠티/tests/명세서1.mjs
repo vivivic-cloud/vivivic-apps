@@ -114,6 +114,16 @@ const 판본 = await p.evaluate(() => {
            인쇄죽음: !!document.getElementById('명세-인쇄')?.disabled,
            엑셀죽음: !!document.getElementById('명세-엑셀')?.disabled,
            번호: (document.getElementById('명세-번호')?.textContent || '').trim(),
+           단가: window._재단단가,
+           돈줄: [...판.querySelectorAll('.명세-표 tr')].map(tr => {
+             const td = [...tr.children].map(x => (x.textContent || '').trim());
+             const i = td.findIndex(v => /^\d+매$/.test(v));
+             return i < 0 ? null : { 매: parseInt(td[i], 10), 돈: td[i + 1] };
+           }).filter(Boolean),
+           합계줄: (() => { const tr = [...판.querySelectorAll('.명세-표 tr')]
+               .find(x => /합\s*계/.test(x.textContent || ''));
+             if (!tr) return null; const td = [...tr.children].map(x => (x.textContent || '').trim());
+             return { 매: td[1], 돈: td[2] }; })(),
            문서가로: document.documentElement.scrollWidth, 쓰기: window.__쓰기,
            꼴: (() => { const g = getComputedStyle(판); const 속 = 판.querySelector('.명세-속');
              const r = 속 && 속.getBoundingClientRect();
@@ -134,6 +144,14 @@ console.log('■ 펴진 명세서: ' + JSON.stringify(판본));
    !판본.안열림 && 심기.심은.some(x => 판본.줄.join(' ').includes(String(x.이름))) ,
    JSON.stringify(심기.심은.map(x => x.이름)) + ' / ' + JSON.stringify(판본.줄.slice(2, 5)));
 판('③ 모르는 칸은 빨간 「?」 로 둔다 (지어내지 않는다)', 판본.몰라 >= 6, 판본.몰라 + '칸');
+// 재단금액 — 원장 한 장당 2,400원(부가세 포함). 단가는 한 자리(window._재단단가)에만 있다.
+판('③ 단가가 한 자리에 2,400원으로 있다', 판본.단가 === 2400, String(판본.단가));
+판('③ 줄마다 재단금액 = 원장수량 × 2,400 이다',
+   판본.돈줄.length > 0 && 판본.돈줄.every(x => x.돈 === (x.매 * 2400).toLocaleString('ko-KR')),
+   JSON.stringify(판본.돈줄.map(x => x.매 + '매 → ' + x.돈)));
+판('③ 합계 금액도 합계 매수 × 2,400 이다',
+   !!판본.합계줄 && 판본.합계줄.돈 === (parseInt(판본.합계줄.매, 10) * 2400).toLocaleString('ko-KR'),
+   JSON.stringify(판본.합계줄));
 판('④ 발급 전에는 인쇄·엑셀이 죽어 있다', 판본.인쇄죽음 === true && 판본.엑셀죽음 === true,
    '인쇄죽음 ' + 판본.인쇄죽음 + ' · 엑셀죽음 ' + 판본.엑셀죽음);
 판('④ 발급 전에는 발급번호가 없다', 판본.번호 === '', JSON.stringify(판본.번호));
