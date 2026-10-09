@@ -136,7 +136,7 @@
     .맞댐못 { flex:none; font-size:11px; font-weight:800; color:#92400e; background:#fef3c7; border-radius:5px; padding:1px 6px; }
     .재고셈 { display:flex; flex-wrap:wrap; gap:6px; padding:3px 0 0 10px; }
     .재고셈 span { font-size:11px; font-weight:800; color:#787774; background:#f6f5f4; border-radius:5px; padding:2px 6px; font-variant-numeric:tabular-nums; }
-    .재고창고 { padding:3px 0 0 10px; }
+    .재고창고, .재고딴이름 { padding:3px 0 0 10px; }
     footer { margin-top:32px; padding-top:16px; border-top:1px solid #ededeb; font-size:11px; color:#a8a6a2; }
 </style>
 </head>
@@ -189,7 +189,7 @@
         <div id="규칙목록" style="margin-top:8px"></div>
     </div>
 
-    <footer><p>v0.9.1</p></footer>
+    <footer><p>v0.10.0</p></footer>
 </div>
 
 <!-- 짚어서 지시하는 손잡이 (?viggle=1 일 때만 켜진다) -->
@@ -785,7 +785,7 @@ $('자료목록').addEventListener('click', async e => {
             const 자료 = id === '__상품목록' ? null : 자료들.find(x => x.id === id);
             const 줄 = 자료 ? await 자료줄읽기(자료) : 담긴상품목록;
             // 재고는 칸 채움이 아니라 **단품으로 묶은 재고**를 보여 드린다 (10-09 사장님)
-            if (자료 && 자료.갈래 === '재고') 재고보기(줄); else 칸보기(줄);
+            if (자료 && 자료.갈래 === '재고') await 재고보기(줄); else 칸보기(줄);
         }
     } catch (err) { fail(err); }
 });
@@ -820,7 +820,7 @@ const 숫자 = v => { const n = Number(String(v ?? '').replace(/,/g, '').trim())
 
 // 코드 칸·이름 칸은 **이름으로 찾지 않는다** — 맞댐이 쓰는 단품칸찾기() 그대로 부른다.
 // ⚠ 여기에 베껴 쓰지 마라. 두 벌이 되면 언젠가 달라진다.
-function 재고묶기(줄들) {
+function 재고묶기(줄들, 단줄들) {
     const 쓰임 = new Map(), 코드이름 = new Map();
     (맞댐결과 ? 맞댐결과.상품들 : []).forEach(p => p.단품들.forEach(d => {
         더하기(쓰임, d.코드, p.상품코드 || p.상품명 || '');
@@ -828,6 +828,8 @@ function 재고묶기(줄들) {
     }));
     const 칸이름 = 줄들.length ? Object.keys(줄들[0]) : [];
     const 고른칸 = 단품칸찾기(줄들, { 쓰임, 코드이름 });   // 바깥 칸() 을 가리지 않게 이름을 달리 둔다
+    // 단품관리목록 쪽도 **같은 함수**로 코드 칸·이름 칸을 찾는다. 칸 이름이 「품번·품명」 이어도 찾는다.
+    const 단 = (단줄들 && 단줄들.length) ? 단품칸찾기(단줄들, { 쓰임, 코드이름 }) : null;
     const 셈칸 = 재고셈칸.filter(k => 칸이름.indexOf(k) > -1);
     const 창고칸 = 칸이름.indexOf('창고') > -1 ? '창고' : '';
     const 묶음 = new Map(), 창고곳 = new Set();
@@ -843,17 +845,48 @@ function 재고묶기(줄들) {
             if (w) { 창고곳.add(w); g.창고.push({ 곳: w, 값: 셈칸.length ? 숫자(o[셈칸[0]]) : 1 }); } }
     });
     const 단품들 = [...묶음.values()];
+    // ── 단품관리목록과 맞대기 (10-09 사장님 「재고관리의 단품과 단품관리목록의 단품명및 코드가
+    //    매칭되는지 확인해줘」) — 코드가 있나, 있으면 이름까지 같나, 셋으로 가른다.
+    //    ⚠ 안 맞는 것을 숨기지 않는다. 그 줄에 그대로 딱지를 붙이고 몇인지 머리에도 적는다.
+    let 다맞음 = 0, 이름다름 = 0, 목록에없음 = 0;
+    if (단) 단품들.forEach(g => {
+        if (!단.목록.has(g.코드)) { g.맞댐 = '없음'; 목록에없음++; return; }
+        const 목이름 = String(단.목록.get(g.코드) || '').trim();
+        if (목이름 && g.이름 && 목이름 !== g.이름) { g.맞댐 = '이름다름'; g.목록이름 = 목이름; 이름다름++; }
+        else { g.맞댐 = '맞음'; 다맞음++; }
+    });
+    const 재고에없음 = 단 ? [...단.목록.keys()].filter(c => !묶음.has(c)).length : 0;
+    // ⚠ 안 맞는 것을 **앞에 놓는다.** 화면에 200가지만 그리는데 안 맞는 것이 뒤로 밀리면
+    //    머리에 「이름 다름 100」 이라 적혀도 사장님이 그 100을 못 보신다. 숨기는 것과 같다.
+    //    급한 차례로 — 같은 코드인데 이름이 다른 것 → 단품목록에 없는 것 → 맞는 것.
+    //    (맞대지 않을 때는 손대지 않는다. 정렬 단추는 만들지 않는다 — 차례가 하나로 박혀 있다.)
+    if (단) { const 급함 = { '이름다름': 0, '없음': 1, '맞음': 2 };
+        단품들.sort((a, b) => 급함[a.맞댐] - 급함[b.맞댐]); }
     return { 단품들, 줄수: 줄들.length, 셈칸, 창고곳: 창고곳.size, 상품코드수: 쓰임.size,
-        맞물림: 쓰임.size ? 단품들.filter(g => 쓰임.has(g.코드)).length : 0 };
+        맞물림: 쓰임.size ? 단품들.filter(g => 쓰임.has(g.코드)).length : 0,
+        단있나: !!단, 단코드칸: 단 ? 단.코드칸 : '', 단이름칸: 단 ? 단.이름칸 : '',
+        단가짓수: 단 ? 단.목록.size : 0, 다맞음, 이름다름, 목록에없음, 재고에없음 };
 }
 
-function 재고보기(줄들) {
-    const r = 재고묶기(줄들);
+async function 재고보기(줄들) {
+    // 단품관리목록은 「단품」 자리의 가장 새 자료다. 없으면 맞대지 않고 재고만 보인다.
+    const 단자료 = 자료들.find(a => a.갈래 === '단품');
+    const r = 재고묶기(줄들, 단자료 ? await 자료줄읽기(단자료) : null);
     const 머리 = '재고 ' + 셈(r.줄수) + '줄 → 단품 ' + 셈(r.단품들.length) + '가지'
-        + (r.창고곳 ? ' · 창고 ' + 셈(r.창고곳) + '곳' : '')
-        + (r.상품코드수 ? ' · 상품 쪽과 맞물림 ' + 셈(r.맞물림) + '가지' : '');
+        + (r.창고곳 ? ' · 창고 ' + 셈(r.창고곳) + '곳' : '');
+    const 잔 = [];
+    if (r.상품코드수) 잔.push('상품 쪽과 맞물림 ' + 셈(r.맞물림) + '가지');
+    // 안 맞는 것을 숨기지 않는다 — 넷을 다 적는다. 더하면 양쪽 가짓수가 된다.
+    if (r.단있나) 잔.push('단품목록 ' + 셈(r.단가짓수) + '가지 (코드 칸 ' + r.단코드칸 + ') — '
+        + '코드·이름 맞음 ' + 셈(r.다맞음) + ' · 이름 다름 ' + 셈(r.이름다름)
+        + ' · 단품목록에 없음 ' + 셈(r.목록에없음) + ' · 재고에 없음 ' + 셈(r.재고에없음));
+    else 잔.push('단품정보가 없습니다 — 올리시면 맞물리는지 같이 보여 드립니다.');
     const 줄 = r.단품들.slice(0, 보일건수).map(g => '<div class="맞댐상품">'
-        + `<div class="맞댐머리"><span class="맞댐코드">${esc(g.코드)}</span><b>${esc(g.이름)}</b></div>`
+        + `<div class="맞댐머리"><span class="맞댐코드">${esc(g.코드)}</span><b>${esc(g.이름)}</b>`
+        + (g.맞댐 === '없음' ? '<span class="맞댐못">단품목록에 없음</span>'
+         : g.맞댐 === '이름다름' ? '<span class="맞댐못">이름 다름</span>' : '') + '</div>'
+        + (g.맞댐 === '이름다름'
+            ? `<div class="재고딴이름 명료글씨">단품목록 — ${esc(g.목록이름)}</div>` : '')
         + (r.셈칸.length
             ? `<div class="재고셈">${r.셈칸.map(k => `<span>${esc(k)} ${셈(g.셈[k])}</span>`).join('')}</div>`
             : `<div class="재고셈"><span>${셈(g.줄)}줄</span></div>`)
@@ -861,7 +894,8 @@ function 재고보기(줄들) {
         + (g.창고.length > 1
             ? `<div class="재고창고 명료글씨">${esc(g.창고.map(w => w.곳 + ' ' + 셈(w.값)).join(' · '))}</div>` : '')
         + '</div>').join('');
-    $('자료칸').innerHTML = `<div class="명료셈">${esc(머리)}</div>` + 줄
+    $('자료칸').innerHTML = `<div class="명료셈">${esc(머리)}</div>`
+        + 잔.map(t => `<div class="명료잔" style="margin:2px 0 6px">${esc(t)}</div>`).join('') + 줄
         + (r.단품들.length > 보일건수
             ? '<div class="명료잔" style="padding:10px 0">밖에 ' + 셈(r.단품들.length - 보일건수) + '건</div>' : '');
     $('자료칸').classList.remove('hidden');
