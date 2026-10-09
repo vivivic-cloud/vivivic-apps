@@ -38,9 +38,13 @@ await p.goto(URL, { waitUntil: 'load' }); await p.waitForTimeout(1500);
 const 본 = await p.evaluate((L) => {
   document.getElementById('auth-login-overlay')?.style.setProperty('display', 'none');
   ['원장', '발주', '도면', '차례'].forEach(k => window._자료왔다 && window._자료왔다(k));
-  window.__쓰기 = 0; const 셈 = () => async () => { window.__쓰기++; };
+  /* 어디에 쓰는지까지 담는다 — 10-09 지시로 고른 파레트는 **새 칸(wo_pallet)** 에
+     적게 됐다. 발주확정·원장·재단계획·완료기록에 쓰면 그 자리에서 잡힌다. */
+  window.__쓰기 = 0; window.__쓴곳 = [];
+  const 셈 = () => async (d) => { window.__쓰기++; window.__쓴곳.push((d && d.길) || '?'); };
   window.db = {}; window.storage = {};
-  window.fbFirestore = { doc: () => ({}), updateDoc: 셈(), setDoc: 셈(), deleteDoc: 셈(), addDoc: 셈(),
+  window.fbFirestore = { doc: (...a) => ({ 길: a.slice(1).join('/') }), updateDoc: 셈(), setDoc: 셈(),
+    deleteDoc: 셈(), addDoc: 셈(),
     collection: () => ({}), onSnapshot: () => {}, query: x => x, serverTimestamp: () => 0,
     getDoc: async () => ({ exists: () => false }), getDocs: async () => ({ forEach: () => {} }), deleteField: () => null };
   currentFullData.length = 0; L.forEach(r => currentFullData.push(r));
@@ -128,7 +132,7 @@ const 고른뒤 = await p.evaluate(() => {
            본크기: { w: Math.round(svg.getBoundingClientRect().width), h: Math.round(svg.getBoundingClientRect().height) } };
   }
   return { 켜진, 판, 밑글: (document.querySelector('#_집중큐알 .집중-큐알글')?.textContent || '').trim(),
-           문서가로: document.documentElement.scrollWidth, 쓰기: window.__쓰기 };
+           문서가로: document.documentElement.scrollWidth, 쓰기: window.__쓰기, 쓴곳: window.__쓴곳.slice() };
 });
 console.log('■ B 를 손가락으로 누른 뒤: 켜진 ' + JSON.stringify(고른뒤.켜진) + ' · 큐알 ' +
   (고른뒤.판 ? 고른뒤.판.크기 + '×' + 고른뒤.판.크기 + ' ' + JSON.stringify(고른뒤.판.본크기) : '(없음)') +
@@ -166,7 +170,16 @@ const 열림 = await p.evaluate(async () => {
 console.log('■ 고른 뒤 완료: ' + JSON.stringify(열림));
 판('⑥ 파레트를 고르면 완료 창이 열린다', 열림.완료창 === true, JSON.stringify(열림));
 판('⑦ 375px 가로 스크롤 없다', 고른뒤.문서가로 <= 375, 고른뒤.문서가로 + 'px');
-판('⑦ 발주 자료에 한 줄도 안 쓴다 (고른 파레트는 이 창에서만 들고 있다)', 고른뒤.쓰기 === 0, 고른뒤.쓰기 + '번');
+/* ⑦ 는 10-09 13:20 지시로 **뜻이 뒤집힌** 자리다.
+   10-08 에는 「고른 파레트는 이 창에서만 들고 있는다 — 파이어스토어에 안 쓴다」 였다.
+   그런데 「파레트 큐알이 정해지지 않은 제품은 배송출발할 수 없습니다」 가 오면서,
+   고른 것이 창을 닫아도 남아 있어야 한다(안 그러면 새로 연 날은 아무것도 못 나간다).
+   그래서 **새 칸(wo_pallet)에만** 한 번 적는다 — 발주확정·원장·재단계획·완료기록은
+   그대로 읽기만 한다. 시험을 지우지 않고 뜻만 뒤집어 남긴다. */
+판('⑦ 고른 파레트는 새 칸(wo_pallet)에만 적는다 — 업무 기록에는 한 줄도 안 쓴다',
+   고른뒤.쓰기 === 1 && /\/wo_pallet\//.test(고른뒤.쓴곳.join(' '))
+   && !고른뒤.쓴곳.some(x => /confirmed_orders|cutting_plans|원장/.test(x)),
+   JSON.stringify(고른뒤.쓴곳));
 
 /* ⑧ 재단에는 파레트가 없다 — 10-09 사장님 말씀:
    「재단 작업에는 파레트 설정이 필요 없습니다.」
@@ -188,7 +201,7 @@ const 재단 = await p.evaluate(async ({ ck }) => {
   await new Promise(r => setTimeout(r, 300));
   window.showToastMessage = 옛;
   const m = document.getElementById('_partDoneModal');
-  const 값 = { 단추: 단, 큐알칸: 큐, 완료창: !!m, 말, 쓰기: window.__쓰기 };
+  const 값 = { 단추: 단, 큐알칸: 큐, 완료창: !!m, 말, 쓰기: window.__쓰기, 쓴곳: window.__쓴곳.slice() };
   m?.remove(); window._pdConfirmData = null;
   return 값;
 }, { ck: 본.ck });
@@ -197,7 +210,11 @@ console.log('■ 재단 타이머: ' + JSON.stringify(재단));
 판('⑧ 재단 타이머에는 큐알 자리도 없다', 재단.큐알칸 === false, String(재단.큐알칸));
 판('⑧ 재단은 파레트 없이 그냥 완료된다 (막지 않는다)',
    재단.완료창 === true && !재단.말.some(t => /파레트/.test(t)), JSON.stringify(재단));
-판('⑧ 그래도 발주 자료에는 안 쓴다', 재단.쓰기 === 0, 재단.쓰기 + '번');
+/* 재단은 파레트를 안 고르므로 **재단에서는 새로 적는 것도 없다.**
+   앞(⑦)에서 엣지 파레트를 고르며 wo_pallet 에 한 번 적은 그 한 번이 전부다. */
+판('⑧ 재단에서는 아무 데도 더 안 쓴다 (앞서 적은 파레트 한 번 말고는 없다)',
+   재단.쓰기 === 1 && !재단.쓴곳.some(x => /confirmed_orders|cutting_plans|원장/.test(x)),
+   재단.쓰기 + '번 · ' + JSON.stringify(재단.쓴곳));
 
 판('페이지오류 없음', errs.length === 0, String(errs.length) + (errs[0] ? ' :: ' + errs[0] : ''));
 await b.close();

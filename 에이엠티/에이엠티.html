@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.28.0 (2026-10-09) — 명세서 팝업 안에서 열네 칸이 다 닿게 (칸은 하나도 안 줄였다)
+     버전: v1.29.0 (2026-10-09) — 납기를 파레트 큐알별로 묶고, 파레트 없는 제품은 배송출발을 막는다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -68,6 +68,7 @@
             initConfirmedOrdersSync();
             initCuttingPlansSync();
             initBoardOrderSync();
+            initPalletSync();
             // 불량보고도 이때부터 듣는다 — 판을 안 열어도 알림이 뜨게(09-29 지시)
             try { if (typeof window.amtDefectSync === 'function') window.amtDefectSync(); } catch (e) {}
         }
@@ -1606,6 +1607,18 @@
         .wo-boring-order-group-cards {
             padding: 7px 8px; display: flex; flex-wrap: wrap; gap: 6px;
         }
+        /* ── 납기 파레트 큐알별 분류 (10-09 사장님 지시) ──────────────────
+           「납기에는 파레트의 큐알코드별 제품 분류가 되어 있어야 합니다.」
+           묶음 띠와 한두 낱말 딱지뿐이다 — 설명 글을 늘어놓지 않는다. */
+        .납-파묶음 { display:flex; align-items:center; gap:6px; padding:7px 16px; background:#f5f5f4;
+            border-top:1px solid #e9e8e6; border-bottom:1px solid #e9e8e6;
+            font-size:11px; font-weight:800; color:#37352f; }
+        .납-파묶음 .수 { margin-left:auto; color:#787774; font-weight:700; }
+        .납-파 { flex-shrink:0; font-size:10px; font-weight:800; color:#fff; background:#37352f;
+            border-radius:4px; padding:1px 6px; }
+        .납-파.없 { color:#b91c1c; background:#fde2e2; border:1px solid #f0a8a8; }
+        .tl-dc-btn-delivery:disabled { opacity:.4; cursor:default; }
+
         /* ── 명세서 (10-09 사장님 지시) ─────────────────────────────────
            공정명 머리줄 오른쪽 끝의 작은 단추. 보이는 크기는 머리줄에 맞추고
            **닿는 자리만 44px** 로 넓힌다(이 집 규칙). */
@@ -2535,7 +2548,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.28.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.29.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2668,7 +2681,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.28.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.29.0</b></p>
         </div>
     </div>
 
@@ -7984,12 +7997,37 @@
             return [일 && 일.docId, 일 && 일.cardKey, 일 && 일.procKey].join('|');
         };
         window._집중파레트값 = function (일) {
-            return (일 && window._집중파레트들[window._집중파열쇠(일)]) || '';
+            if (!일) return '';
+            const 이번 = window._집중파레트들[window._집중파열쇠(일)];
+            if (이번) return 이번;
+            // 적어 둔 것(wo_pallet)도 본다 — 창을 닫았다 열어도 고른 것이 남는다 (10-09)
+            return window._파레트적힌(일.docId)[[일.cardKey, 일.procKey].join('|')] || '';
         };
         window._집중파레트고르기 = function (파) {
             const 일 = window._집중일; if (!일) return;
             window._집중파레트들[window._집중파열쇠(일)] = 파;
             window._집중파레트그리기();
+            // 창을 닫아도 남아야 한다 — 새 칸(wo_pallet)에만 적는다 (10-09 지시)
+            _파레트저장(일.docId, [일.cardKey, 일.procKey].join('|'), 파);
+        };
+        /* 이 제품(발주)이 실린 파레트들 — 파레트는 **부속·공정마다** 고르므로 여럿일 수
+           있다. 어느 하나로 줄이지 않고 **있는 대로 다 보인다**. 하나도 없으면 빈 목록이고,
+           그 제품은 배송출발을 못 한다 (10-09 지시). */
+        window._제품파레트들 = function (item) {
+            if (!item) return [];
+            const did = String(item.docId || item.idNum || '');
+            const 모음 = new Set();
+            Object.keys(window._집중파레트들 || {}).forEach(k => {
+                if (String(k).split('|')[0] !== did) return;
+                const v = window._집중파레트들[k]; if (v) 모음.add(v);
+            });
+            const 적힌 = window._파레트적힌(did);
+            Object.keys(적힌).forEach(k => { if (적힌[k]) 모음.add(적힌[k]); });
+            return [...모음].sort();
+        };
+        /* 그 파레트의 큐알 글 — 타이머 창이 쓰는 그 잣대 그대로(발주번호 + 파레트) */
+        window._제품큐알글 = function (item, 파) {
+            return ((item && (item.orderCode || item.docId)) || '') + '-' + 파;
         };
         window._집중파레트그리기 = function () {
             const 일 = window._집중일; if (!일) return;
@@ -9786,7 +9824,7 @@
                 }).join('')}
             </div>`;
 
-            const cardsHtml = sec.items.map(item => {
+            const _한장 = (item) => {
                 const pd     = procKey==='납기' ? item.deliveryDate : (item.procOverrides?.[procKey]||null);
                 const procLabel = procKey==='납기' ? '납기일' : procKey+' 작업일';
                 let actBtn;
@@ -9809,13 +9847,26 @@
                         if (_lastDone) _doneCount++;
                     });
                     const _allDone = _partCount > 0 && _doneCount === _partCount;
+                    /* 파레트 큐알이 정해지지 않은 제품은 배송출발할 수 없다 (10-09 지시).
+                       까닭은 한두 낱말 딱지로만 적는다 — 설명을 늘어놓지 않는다. */
+                    const _파있나 = (window._제품파레트들(item) || []).length > 0;
                     actBtn = _allDone
-                        ? `<button class="tl-dc-btn-delivery" onclick="event.stopPropagation();tlDcStartDelivery(${item.idNum},this)">🚚 배송출발</button>`
+                        ? (_파있나
+                            ? `<button class="tl-dc-btn-delivery" onclick="event.stopPropagation();tlDcStartDelivery(${item.idNum},this)">🚚 배송출발</button>`
+                            : `<button class="tl-dc-btn-delivery" disabled aria-disabled="true">🚚 배송출발</button>` +
+                              `<span class="납-파 없" style="margin-left:6px;">파레트 없음</span>`)
                         : `<span style="font-size:9px;font-weight:700;color:#b0aeaa;">⏳ 공정 ${_doneCount}/${_partCount} 완료</span>`;
                 } else {
                     actBtn = `<button class="tl-dc-btn-workorder" onclick="event.stopPropagation();tlDcIssueWorkOrder('${item.docId||''}','${procKey}',this)">📋 작업지시서 발행</button>`;
                 }
 
+                /* 이 제품이 실린 파레트 딱지 — 납기 판에서만 단다 (10-09 지시).
+                   여럿이면 다 적는다(부속마다 다른 파레트에 실릴 수 있다). */
+                const _파칩 = sec.isDlv
+                    ? ((window._제품파레트들(item) || []).length
+                        ? (window._제품파레트들(item) || []).map(x => `<span class="납-파">${x}</span>`).join('')
+                        : `<span class="납-파 없">파레트 없음</span>`)
+                    : '';
                 // 상품카드 총 공정작업시간 계산
                 let _totalMin = 0;
                 if (_fh) {
@@ -9839,7 +9890,7 @@
                     ${item.orderCode ? `<div style="margin-bottom:2px;"><span class="order-code-badge">${item.orderCode}</span></div>` : ''}
                     <div class="tl-dc-full-card-name-row" onclick="tlDcToggleFullCard(${item.idNum},this)">
                         <span class="tl-dc-full-name">${item.displayName}</span>
-                        <span class="tl-dc-full-qty">${item.orderQty} EA</span>
+                        <span style="display:flex;align-items:center;gap:6px;flex-shrink:0;">${_파칩}<span class="tl-dc-full-qty">${item.orderQty} EA</span></span>
                     </div>
                     <div class="tl-dc-full-meta">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -9854,7 +9905,33 @@
                     </div>
                     <div class="tl-dc-full-act-row">${actBtn}</div>
                 </div>`;
-            }).join('');
+            };
+            /* 납기는 **파레트 큐알별로 묶어** 보인다 (10-09 지시).
+               한 제품이 부속마다 다른 파레트에 실릴 수 있어, 그 제품의 파레트를 다 모아
+               묶음 이름으로 쓴다. 파레트가 하나도 안 정해진 제품은 맨 아래 「파레트 없음」
+               묶음으로 모인다 — 거기 것들은 배송출발이 안 눌린다. */
+            let cardsHtml;
+            if (sec.isDlv) {
+                const 묶음 = new Map();
+                sec.items.forEach(item => {
+                    const 열쇠 = (window._제품파레트들(item) || []).join('·');
+                    if (!묶음.has(열쇠)) 묶음.set(열쇠, []);
+                    묶음.get(열쇠).push(item);
+                });
+                const 차례 = [...묶음.keys()].sort((a, b) =>
+                    (a === '' ? 1 : b === '' ? -1 : a.localeCompare(b)));
+                cardsHtml = 차례.map(k => {
+                    const 것들 = 묶음.get(k);
+                    const 머리 = k
+                        ? `<div class="납-파묶음"><span class="납-파">${k}</span>파레트` +
+                          `<span class="수">${것들.length}건</span></div>`
+                        : `<div class="납-파묶음"><span class="납-파 없">파레트 없음</span>` +
+                          `<span class="수">${것들.length}건</span></div>`;
+                    return 머리 + 것들.map(_한장).join('');
+                }).join('');
+            } else {
+                cardsHtml = sec.items.map(_한장).join('');
+            }
 
             const grid = panel.querySelector('.tl-dc-5col-grid');
             if (grid) grid.remove();
@@ -10435,6 +10512,13 @@
             // 풀뷰(.tl-dc-full-card) 또는 미니뷰(.tl-dc-order-card) 모두 지원
             const cardEl = btnEl.closest('.tl-dc-full-card') || btnEl.closest('.tl-dc-order-card');
             if (!cardEl) return;
+            /* 파레트 큐알이 정해지지 않은 제품은 못 나간다 (10-09 지시).
+               단추를 죽여 두었지만, 미니뷰 등 다른 길로도 여기 들어올 수 있어 한 번 더 막는다. */
+            const _발주 = confirmedOrders.find(o => o.idNum === idNum);
+            if (_발주 && !(window._제품파레트들(_발주) || []).length) {
+                if (typeof showToastMessage === 'function') showToastMessage('파레트를 고르세요');
+                return;
+            }
             // 풀뷰에서는 parts-area 안의 delivery-area 사용; 먼저 parts-area 열기
             const partsArea = document.getElementById('dc-parts-' + idNum);
             if (partsArea && !partsArea.classList.contains('open')) {
@@ -13072,6 +13156,46 @@
                 }, (err) => window._자료탈났다('차례', err) || console.error('카드 차례 동기화 오류:', err));
             } catch (err) { window._자료탈났다('차례', err); console.error('카드 차례 동기화 시작 실패:', err); }
         }
+
+        /* ── 고른 파레트를 적어 둔다 (10-09 지시) ─────────────────────────
+           「납기에는 파레트의 큐알코드별 제품 분류가 되어 있어야 합니다.
+             파레트 큐알이 정해지지 않은 제품은 배송출발할 수 없습니다.」
+           이러려면 고른 파레트가 **창을 닫아도 남아** 있어야 한다. 여태 이 창의 기억
+           (window._집중파레트들)에만 있어 새로 열면 사라졌다 — 그대로 두고 배송출발을
+           막으면 **아무것도 못 나간다**(새로 연 날은 고른 것이 하나도 없으므로).
+           발주확정·원장·재단계획·완료기록(partCompletions)은 **한 자도 안 건드린다.**
+           카드 차례(wo_board_order)와 똑같은 꼴로 **새 칸(wo_pallet)** 에 발주마다 문서
+           하나를 두고, 그 안 「고른」 에 부속|공정 마다 글자(A~D)를 적는다. */
+        window._파레트기록 = {};
+        function initPalletSync() {
+            try {
+                const { collection, onSnapshot } = window.fbFirestore;
+                const colRef = collection(window.db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'wo_pallet');
+                onSnapshot(colRef, (snap) => {
+                    snap.docChanges().forEach(ch => {
+                        if (ch.type === 'removed') delete window._파레트기록[ch.doc.id];
+                        else window._파레트기록[ch.doc.id] = ch.doc.data() || {};
+                    });
+                    if (typeof renderProcessTimeline === 'function') renderProcessTimeline();
+                }, (err) => console.error('파레트 동기화 오류:', err));
+            } catch (err) { console.error('파레트 동기화 시작 실패:', err); }
+        }
+        /* 자료가 다 왔는가(_자료옴)에는 안 넣는다 — 파레트가 없어도 화면은 예전과
+           똑같이 굴러야 한다. 없으면 「파레트 없음」 으로 보이고 배송출발만 막힌다. */
+        async function _파레트저장(docId, 열쇠, 파) {
+            if (!docId || !열쇠) return;
+            try {
+                const { doc, setDoc } = window.fbFirestore;
+                await setDoc(doc(window.db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 'wo_pallet', String(docId)),
+                    { docId: String(docId), 고른: { [열쇠]: 파 }, at: Date.now() }, { merge: true });
+            } catch (err) {
+                console.error('파레트 저장 오류:', err);
+                if (typeof showToastMessage === 'function') showToastMessage('파레트 저장 실패 — 새로 열면 되돌아갑니다');
+            }
+        }
+        window._파레트적힌 = function (docId) {
+            return ((window._파레트기록 || {})[String(docId || '')] || {}).고른 || {};
+        };
 
         async function _woSaveBoardOrder(sk) {
             try {
