@@ -39,7 +39,7 @@
         from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
     import { getFirestore, collection, doc, getDocs, setDoc, query, where, serverTimestamp }
         from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
-    import { getStorage, ref, uploadBytes }
+    import { getStorage, ref, uploadBytes, uploadBytesResumable }
         from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
 
     const firebaseConfig = {
@@ -67,7 +67,7 @@
     window.db = getFirestore(app);
     window.fb = { collection, doc, getDocs, setDoc, query, where, serverTimestamp };
     window.st = getStorage(app);                      // 배송 원본은 창고로 간다
-    window.fs = { ref, uploadBytes };
+    window.fs = { ref, uploadBytes, uploadBytesResumable };
 
     // 상품정리 화면과 같은 잠금이다 — 사장님 계정으로만 들어간다.
     onAuthStateChanged(auth, (user) => {
@@ -206,7 +206,7 @@
         <div id="규칙목록" style="margin-top:8px"></div>
     </div>
 
-    <footer><p>v0.12.0</p></footer>
+    <footer><p>v0.13.0</p></footer>
 </div>
 
 <!-- 짚어서 지시하는 손잡이 (?viggle=1 일 때만 켜진다) -->
@@ -245,6 +245,7 @@ document.addEventListener('click', e => {
 const esc = s => String(s ?? '').replace(/[&<>"']/g,
     c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const 셈 = n => Number(n || 0).toLocaleString('ko-KR');
+const 메가 = b => (Number(b || 0) / 1048576).toFixed(1) + 'MB';
 const 칸 = 이름 => window.fb.collection(window.db, ...뿌리, 이름);
 const 문서 = (이름, id) => window.fb.doc(window.db, ...뿌리, 이름, id);
 
@@ -661,7 +662,10 @@ async function 배송흘려담기(것, 이미) {
         const rr = 남길자리.map(i => (값[i] !== undefined) ? String(값[i]) : '');
         B.줄가리기(rr, 셈통);                                  // ← 가리는 셈은 한 벌 그대로
         묶음.push(rr.map(B.칸글).join(','));
-        if (묶음.length >= 5000) { 조각들.push(묶음.join('\n') + '\n'); 묶음.length = 0; }
+        // ⚠ 토막을 **글로 들고 있지 말고 바로 Blob 으로 굳힌다.** 23만 줄이면 CSV 가 50MB 인데,
+        //    글로 들면 한 글자가 두 바이트라 쌓인 몫이 그 곱절로 간다(잰 것: 담기 한 번에 +141MB).
+        //    Blob 은 쌓인 몫 밖에 살고 창이 디스크로 내려 둘 수 있다.
+        if (묶음.length >= 5000) { 조각들.push(new Blob([묶음.join('\n') + '\n'])); 묶음.length = 0; }
 
         // 여기부터는 **세는 쪽**이다. 창고와 상관없다.
         if (줄차례++ <= 것.머리) return;
@@ -681,7 +685,7 @@ async function 배송흘려담기(것, 이미) {
         if (이름) { if (!byMonth[달]) { byMonth[달] = {}; rowsOf[달] = 0; }
             byMonth[달][이름] = (byMonth[달][이름] || 0) + 몇; rowsOf[달]++; }
     });
-    if (묶음.length) 조각들.push(묶음.join('\n') + '\n');
+    if (묶음.length) 조각들.push(new Blob([묶음.join('\n') + '\n']));
     return { 집계: { byMonth, rowsOf, used: 센줄 }, 겹침, 새열쇠: [...새열쇠],
              지움: { 뺀이름, 가린수: 셈통.가린수, 주소본것: 셈통.주소본것,
                      파일: 뺄자리.length ? new Blob(조각들, { type: 'text/csv;charset=utf-8' }) : null } };
@@ -731,6 +735,9 @@ async function 배송담기() {
     올리는중 = true; 자료그리기();
     const t0 = Date.now();
     let 창고 = '못 올림';
+    // ⚠ **어느 자리에서 멈췄는지 빨간 띠에 같이 적는다.** 10-09 에 사장님이 「담다가 멈췄습니다」 만
+    //    전해 주셨는데, 자리가 안 적혀 있어 어디가 터졌는지 아무도 몰랐다.
+    let 자리이름 = '① 겹친 줄을 가리는 중';
     try {
         // ① 이미 담긴 열쇠를 받아 겹친 줄을 뺀다 — 들어가기 전에 뺀다
         $('fill').style.width = '10%'; $('올림셈').textContent = '겹친 줄을 가리는 중…';
@@ -739,6 +746,7 @@ async function 배송담기() {
         // 흘려 읽은 것이면 여기서 **다시 흘리며** 가리고 센다. 줄을 들고 있지 않는다.
         let 집계, 겹침, 담을, 지움;
         if (것.흘림) {
+            자리이름 = '① 세고 가리는 중';
             $('fill').style.width = '15%'; $('올림셈').textContent = '세고 가리는 중 — ' + 셈(것.쓸줄수) + '줄';
             const 흘 = await 배송흘려담기(것, 이미);
             집계 = 흘.집계; 겹침 = 흘.겹침; 담을 = 흘.새열쇠; 지움 = 흘.지움;
@@ -751,15 +759,32 @@ async function 배송담기() {
         }
 
         // ② 사람 칸을 지운 사본을 창고에
+        // ⚠ **되감기 올리기(uploadBytesResumable)** 다. 20만 줄이면 사본이 42.5MB 라(잰 값)
+        //    한 숨에 올리다 끊기면 처음부터 다시다. 되감기면 이어 올리고 **진행률이 나온다.**
+        //    사장님이 「멈춘 건지 올라가는 건지」 아셔야 한다 — 막대와 글을 그 진행률에 잇는다.
+        자리이름 = '② 원본을 창고에 올리는 중';
         $('fill').style.width = '25%'; $('올림셈').textContent = '원본을 창고에 올리는 중…';
         try {
             // 사람 칸을 지운 사본은 CSV 다 — 이름 끝도 그렇게 바꾼다
             const 올릴이름 = 지움.파일 ? 것.이름.replace(/\.[^.]+$/, '') + '.csv' : 것.이름;
-            await window.fs.uploadBytes(window.fs.ref(window.st, 배송원본 + '/' + 올릴이름), 지움.파일 || 것.날것);
+            const 올릴것 = 지움.파일 || 것.날것;
+            const 곳 = window.fs.ref(window.st, 배송원본 + '/' + 올릴이름);
+            if (window.fs.uploadBytesResumable) {
+                await new Promise((맺음, 깨짐) => {
+                    const 짐 = window.fs.uploadBytesResumable(곳, 올릴것);
+                    짐.on('state_changed', s => {
+                        const 몫 = s.totalBytes ? s.bytesTransferred / s.totalBytes : 0;
+                        $('fill').style.width = (25 + Math.round(몫 * 5)) + '%';
+                        $('올림셈').textContent = '원본을 창고에 올리는 중… ' + 메가(s.bytesTransferred)
+                            + ' / ' + 메가(s.totalBytes);
+                    }, 깨짐, 맺음);
+                });
+            } else await window.fs.uploadBytes(곳, 올릴것);     // 옛 길 — 되감기가 없으면
             창고 = '창고 ✓';
         } catch (e) { 창고 = '창고 못 올림 — ' + (e.code || e.message); }
 
         // ③ 센 것을 달마다 한 문서로. 지우지 않고 **보탠다.**
+        자리이름 = '③ 센 것 넣는 중';
         const 달들 = Object.keys(집계.byMonth).sort();
         const 옛것 = {};
         (await getDocs(query(칸(자리.배송집계), where('파일', '==', 것.이름)))).docs
@@ -774,6 +799,7 @@ async function 배송담기() {
         }
 
         // ④ 들어간 줄의 열쇠를 담아 둔다. 다음에 겹치면 여기서 걸린다.
+        자리이름 = '④ 겹침 열쇠를 담는 중';
         $('fill').style.width = '92%'; $('올림셈').textContent = '겹침 열쇠를 담는 중…';
         const 칸들 = (await getDocs(칸(자리.배송열쇠))).docs
             .map(d => ({ id: d.id, 열쇠: (d.data().열쇠 || []).slice() })).sort((a, b) => a.id.localeCompare(b.id));
@@ -786,6 +812,7 @@ async function 배송담기() {
         while (남은.length) 쓸것.push({ id: String(n++).padStart(4, '0'), 열쇠: 남은.splice(0, 열쇠칸수) });
         for (const c of 쓸것) await setDoc(문서(자리.배송열쇠, c.id), { 열쇠: c.열쇠, 수: c.열쇠.length });
 
+        자리이름 = '⑤ 기록 남기는 중';
         if (window.기록) await window.기록.적기({ db: window.db, fb: window.fb, user: window.나,
             무엇: '배송관리', 파일: 것.이름, 줄수: 집계.used, 문서수: 달들.length,
             비고: [ 지움.뺀이름.length ? ('사람칸 ' + 지움.뺀이름.length + '개 지움') : '',
@@ -802,7 +829,7 @@ async function 배송담기() {
         배송집계 = (await getDocs(칸(자리.배송집계))).docs.map(d => d.data() || {});
         자료그리기();
     } catch (err) {
-        fail(new Error('배송정보를 담다가 멈췄습니다 — ' + err.message));
+        fail(new Error('배송정보를 담다가 멈췄습니다 — ' + 자리이름 + ' — ' + (err.code || '') + ' ' + err.message));
     }
     $('판-올리는중').classList.add('hidden');
     $('fill').style.width = '0';

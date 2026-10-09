@@ -44,7 +44,7 @@
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut }
         from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
     import { getFirestore, collection, doc, getDocs, setDoc, deleteDoc, writeBatch, query, where, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
-    import { getStorage, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
+    import { getStorage, ref, uploadBytes, uploadBytesResumable } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
@@ -71,7 +71,7 @@
     window.db = getFirestore(app);
     window.st = getStorage(app);
     window.fb = { collection, doc, getDocs, setDoc, deleteDoc, writeBatch, query, where, serverTimestamp };
-    window.fs = { ref, uploadBytes };
+    window.fs = { ref, uploadBytes, uploadBytesResumable };
 
     // 이 집의 다른 프로그램은 익명으로 들어간다. 여기만 사장님 계정으로만 들어간다 —
     // 벤더피아 자료에는 매입단가·매입금액이, 배송관리 원본에는 사람 정보가 있었다.
@@ -476,7 +476,20 @@ $('btn-up').addEventListener('click', async () => {
             const 올릴것 = c.올릴파일 || rawFile;
             // 사람 칸을 지운 사본은 CSV 다 — 이름 끝도 그렇게 바꾼다
             const 올릴이름 = c.올릴파일 ? name.replace(/\.[^.]+$/, '') + '.csv' : name;
-            await window.fs.uploadBytes(window.fs.ref(window.st, RAW_DIR + '/' + 올릴이름), 올릴것);
+            // ⚠ **되감기 올리기**다. 사본이 수십 MB 라 한 숨에 올리다 끊기면 처음부터 다시고,
+            //    진행이 안 보여 멈춘 것처럼 보인다. 제품명료화도 같은 길로 고쳤다(10-09).
+            const 곳 = window.fs.ref(window.st, RAW_DIR + '/' + 올릴이름);
+            if (window.fs.uploadBytesResumable) {
+                await new Promise((맺음, 깨짐) => {
+                    const 짐 = window.fs.uploadBytesResumable(곳, 올릴것);
+                    짐.on('state_changed', s => {
+                        const 몫 = s.totalBytes ? s.bytesTransferred / s.totalBytes : 0;
+                        step(5 + Math.round(몫 * 8), '원본을 창고에 올리는 중… '
+                            + (s.bytesTransferred / 1048576).toFixed(1) + 'MB / '
+                            + (s.totalBytes / 1048576).toFixed(1) + 'MB');
+                    }, 깨짐, 맺음);
+                });
+            } else await window.fs.uploadBytes(곳, 올릴것);     // 옛 길 — 되감기가 없으면
             fileNote = RAW_DIR + '/' + 올릴이름 +
                        (c.지운칸.length ? ' (사람 정보 ' + c.지운칸.length + '칸 지움)' : '');
         } catch (e) {
