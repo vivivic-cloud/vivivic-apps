@@ -3681,10 +3681,18 @@
             return 들.every(k => window._도면온발주.has(k));
         };
         window._도면확보모두 = function () { return window._도면확보(_살아있는발주번호들()); };
+        /* 이 발주의 도면을 **이미 손에 들고** 있나 — 소식을 안 받고 그릇을 바로 채워 주는
+           자리가 있다(시험·재단확정 직후 `_cuttingPlans[...] = ...`). 그때는 기다릴 것이 없다. */
+        function _그발주도면있나(k) {
+            try {
+                return Object.values(window._cuttingPlans || {}).some(pl =>
+                    pl && (pl.pOrderIds || []).some(x => String(x) === k));
+            } catch (e) { return false; }
+        }
         window._도면기다리나 = function (번호들) {
             const 들 = (Array.isArray(번호들) ? 번호들 : [번호들])
                 .map(n => parseInt(n, 10)).filter(n => !isNaN(n)).map(String);
-            return 들.some(k => !window._도면온발주.has(k));
+            return 들.some(k => !window._도면온발주.has(k) && !_그발주도면있나(k));
         };
         /* 도면이 늦게 와서 그려야 할 때 — 펼쳐 둔 공정이 기다리고 있었으면 다시 편다.
            기다리던 자리가 아니면 아무것도 건드리지 않는다(손가락과 싸우지 않게). */
