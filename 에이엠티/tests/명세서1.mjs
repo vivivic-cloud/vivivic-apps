@@ -96,6 +96,11 @@ console.log('■ 단추: ' + JSON.stringify(단추));
 판('① 닿는 자리가 44px 이상이다 (장갑 낀 손)',
    !단추.없음 && 단추.닿는높이 >= 44 && 단추.폭 >= 44, 단추.폭 + '×' + 단추.닿는높이);
 
+const 열기전 = await p.evaluate(() => ({
+  머리: (document.querySelector('#tl-datecard-expand .tl-dc-single-hdr')?.textContent || '').replace(/\s+/g, ' ').trim(),
+  카드수: document.querySelectorAll('#tl-datecard-expand .wo-boring-placed-card').length,
+  공정: document.querySelector('#tl-datecard-expand .tl-dc-panel')?.dataset.공정 || '',
+  몸넘침: document.body.style.overflow || '' }));
 await 짚기('#tl-datecard-expand .tl-dc-single-hdr .명세-단추');
 const 판본 = await p.evaluate(() => {
   const 판 = document.getElementById('명세서판');
@@ -109,11 +114,21 @@ const 판본 = await p.evaluate(() => {
            인쇄죽음: !!document.getElementById('명세-인쇄')?.disabled,
            엑셀죽음: !!document.getElementById('명세-엑셀')?.disabled,
            번호: (document.getElementById('명세-번호')?.textContent || '').trim(),
-           문서가로: document.documentElement.scrollWidth, 쓰기: window.__쓰기 };
+           문서가로: document.documentElement.scrollWidth, 쓰기: window.__쓰기,
+           꼴: (() => { const g = getComputedStyle(판); const 속 = 판.querySelector('.명세-속');
+             const r = 속 && 속.getBoundingClientRect();
+             return { 자리: g.position, 바탕: g.backgroundColor,
+                      속있나: !!속, 속둥글: 속 ? getComputedStyle(속).borderRadius : '',
+                      속폭: r ? Math.round(r.width) : 0,
+                      바탕보임: r ? Math.round(r.top) > 0 : false }; })() };
 });
 console.log('■ 펴진 명세서: ' + JSON.stringify(판본));
 판('② 단추를 누르면 명세서가 펴진다', !판본.안열림, JSON.stringify(판본.머리 || ''));
 판('② 양식대로 두 쪽이다 (내역 + 원장 소요량)', 판본.표수 === 2, 판본.표수 + '개');
+판('② **팝업 창**으로 뜬다 (어두운 바탕 + 가운데 흰 창 — 이 집 창 꼴)',
+   !판본.안열림 && 판본.꼴.자리 === 'fixed' && /rgba\(0, 0, 0, 0\.6/.test(판본.꼴.바탕)
+   && 판본.꼴.속있나 === true && parseFloat(판본.꼴.속둥글) >= 12 && 판본.꼴.바탕보임 === true,
+   JSON.stringify(판본.꼴));
 판('② 그날 완료된 작업이 줄로 선다', 판본.줄수 >= 4, 판본.줄수 + '줄 / ' + JSON.stringify(판본.줄.slice(2, 4)));
 판('② 심은 부속 이름이 그 안에 보인다',
    !판본.안열림 && 심기.심은.some(x => 판본.줄.join(' ').includes(String(x.이름))) ,
@@ -139,6 +154,25 @@ console.log('■ 발급 뒤: ' + JSON.stringify(발급뒤));
 await 짚기('#명세서판 .명세-닫기');
 const 닫힘 = await p.evaluate(() => !document.getElementById('명세서판'));
 판('⑥ 닫기를 누르면 닫힌다', 닫힘 === true, String(닫힘));
+const 열기후 = await p.evaluate(() => ({
+  머리: (document.querySelector('#tl-datecard-expand .tl-dc-single-hdr')?.textContent || '').replace(/\s+/g, ' ').trim(),
+  카드수: document.querySelectorAll('#tl-datecard-expand .wo-boring-placed-card').length,
+  공정: document.querySelector('#tl-datecard-expand .tl-dc-panel')?.dataset.공정 || '',
+  몸넘침: document.body.style.overflow || '' }));
+판('⑥ 닫으면 **보던 화면이 그대로** 돌아온다 (머리줄·카드 수·공정·몸 스크롤)',
+   JSON.stringify(열기전) === JSON.stringify(열기후),
+   JSON.stringify(열기전) + ' → ' + JSON.stringify(열기후));
+// 어두운 바탕을 눌러도 닫힌다
+await 짚기('#tl-datecard-expand .tl-dc-single-hdr .명세-단추');
+const 또열림 = await p.evaluate(() => !!document.getElementById('명세서판'));
+await p.evaluate(() => { const 판 = document.getElementById('명세서판');
+  const r = 판.getBoundingClientRect(); window.__바탕점 = { x: Math.round(r.x + 8), y: Math.round(r.y + 8) }; });
+const 점 = await p.evaluate(() => window.__바탕점);
+await 손('touchStart', 점.x, 점.y); await p.waitForTimeout(60); await 손('touchEnd', 0, 0);
+await p.waitForTimeout(400);
+const 바탕닫힘 = await p.evaluate(() => !document.getElementById('명세서판'));
+판('⑥ 어두운 바탕을 눌러도 닫힌다', 또열림 === true && 바탕닫힘 === true,
+   '열림 ' + 또열림 + ' · 바탕 눌러 닫힘 ' + 바탕닫힘);
 판('⑦ 파이어스토어에 한 줄도 안 쓴다', 발급뒤.쓰기 === 0, 발급뒤.쓰기 + '번');
 판('⑦ 375px 가로 스크롤 없다', 발급뒤.문서가로 <= 375, 발급뒤.문서가로 + 'px');
 판('페이지오류 없음', errs.length === 0, String(errs.length) + (errs[0] ? ' :: ' + errs[0] : ''));

@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.24.0 (2026-10-09) — 재단 도면(부속 한 장·배치도)에도 우라홈 빨간 선
+     버전: v1.25.0 (2026-10-09) — 명세서를 팝업 창으로 (이 집 창 꼴 그대로)
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1614,8 +1614,15 @@
             border-radius:8px; cursor:pointer; }
         .명세-단추::after { content:''; position:absolute; left:0; right:0; top:50%;
             transform:translateY(-50%); height:44px; }
-        .명세-판 { position:fixed; inset:0; z-index:10000; background:#f6f5f4; display:flex;
-            flex-direction:column; }
+        /* 10-09 지시 「명세발급은 팝업으로 나타나게 해줘」 — 이 집이 쓰는 창 꼴(_집중판)
+           그대로다. 어두운 바탕 + 가운데 흰 창. 닫으면 보던 화면이 그대로 돌아온다
+           (바탕 화면은 한 자도 안 건드린다 — 몸의 스크롤도 안 잠근다). */
+        .명세-판 { position:fixed; inset:0; z-index:2147483000; background:rgba(0,0,0,.62);
+            display:flex; align-items:center; justify-content:center; padding:16px;
+            box-sizing:border-box; overscroll-behavior:contain; }
+        .명세-속 { position:relative; width:100%; max-width:560px; max-height:100%; background:#fff;
+            border-radius:18px; box-shadow:0 18px 50px -12px rgba(0,0,0,.5);
+            display:flex; flex-direction:column; overflow:hidden; box-sizing:border-box; }
         .명세-머리 { display:flex; align-items:center; gap:8px; padding:9px 14px; background:#fff;
             border-bottom:1px solid #e3e2e0; flex-shrink:0; }
         .명세-제목 { font-size:15px; font-weight:900; color:#37352f; }
@@ -1643,7 +1650,9 @@
         .명세-바닥 button:disabled { opacity:.4; cursor:default; }
         @media print {
             body.명세-인쇄중 > *:not(.명세-판) { display:none !important; }
-            body.명세-인쇄중 .명세-판 { position:static; background:#fff; }
+            body.명세-인쇄중 .명세-판 { position:static; background:#fff; padding:0; display:block; }
+            body.명세-인쇄중 .명세-속 { max-width:none; max-height:none; box-shadow:none;
+                border-radius:0; overflow:visible; display:block; }
             body.명세-인쇄중 .명세-몸 { overflow:visible; padding:0; }
             body.명세-인쇄중 .명세-바닥, body.명세-인쇄중 .명세-닫기 { display:none !important; }
             body.명세-인쇄중 .명세-쪽 { border:none; break-inside:auto; }
@@ -2519,7 +2528,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.24.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.25.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2652,7 +2661,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.24.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.25.0</b></p>
         </div>
     </div>
 
@@ -9376,8 +9385,10 @@
             document.getElementById('명세서판')?.remove();
             const 판 = document.createElement('div');
             판.id = '명세서판'; 판.className = '명세-판';
+            // 어두운 바탕을 누르면 닫힌다 — 창 속을 누른 것은 안 닫는다
+            판.onclick = (e) => { if (e.target === 판) window._명세서닫기(); };
             const [, 달, 날] = String(dateStr).split('-');
-            판.innerHTML =
+            판.innerHTML = `<div class="명세-속">` +
                 `<div class="명세-머리">` +
                 `<span class="명세-제목">${parseInt(달, 10)}월 ${parseInt(날, 10)}일 ${procKey} 내역</span>` +
                 `<span class="명세-번호" id="명세-번호"></span>` +
@@ -9389,7 +9400,7 @@
                 (짠.줄수 ? '' : ' disabled') + `>발급</button>` +
                 `<button type="button" id="명세-인쇄" onclick="_명세서인쇄()" disabled>인쇄</button>` +
                 `<button type="button" id="명세-엑셀" onclick="_명세서엑셀()" disabled>엑셀</button>` +
-                `</div>`;
+                `</div></div>`;
             document.body.appendChild(판);
         };
 
