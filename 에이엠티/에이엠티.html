@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.20.1 (2026-10-09) — 재단 작업 타이머에서는 파레트를 안 쓴다 (다른 공정은 그대로)
+     버전: v1.21.0 (2026-10-09) — 공정작업지시서 날짜 좌우에 화살표. 누르면 그 날짜로 넘어간다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -779,6 +779,15 @@
             cursor: pointer; white-space: nowrap;
         }
         .tl-dc-home:active { background: #e3e2e0; }
+        /* 날짜 좌우 화살표 (10-09 지시) — 폰에서 장갑 낀 손으로 누르는 자리라 44px 이다 */
+        .tl-dc-날짜화살 {
+            flex-shrink: 0; min-width: 44px; min-height: 44px; padding: 0 6px;
+            display: inline-flex; align-items: center; justify-content: center;
+            border: 1.5px solid #e3e2e0; border-radius: 10px; background: #fff;
+            font: inherit; font-size: 24px; font-weight: 800; line-height: 1;
+            color: #37352f; cursor: pointer;
+        }
+        .tl-dc-날짜화살:active { background: #f1f1ef; }
         .tl-dc-hdr {
             padding: 10px 20px 10px; border-bottom: 1px solid #f0eeec;
             display: flex; align-items: center; gap: 14px; flex-shrink: 0;
@@ -2467,7 +2476,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.20.1</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.21.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2600,7 +2609,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.20.1</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.21.0</b></p>
         </div>
     </div>
 
@@ -9112,6 +9121,7 @@
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
                         <span>박스판</span>
                     </button>
+                    <button class="tl-dc-날짜화살" onclick="tlDc날짜옮기기(-1)" aria-label="하루 전">‹</button>
                     <div style="display:flex;align-items:baseline;gap:10px;">
                         <span class="tl-dc-day-num" style="color:${dayColor};">${info.day}</span>
                         <div class="dc-줄" style="display:flex;flex-direction:column;gap:1px;">
@@ -9119,6 +9129,7 @@
                             <span class="dc-요일" style="font-size:16px;font-weight:800;color:${wdColor};">${info.weekday}요일</span>
                         </div>
                     </div>
+                    <button class="tl-dc-날짜화살" onclick="tlDc날짜옮기기(1)" aria-label="하루 뒤">›</button>
                     <div class="dc-배지" style="display:flex;align-items:center;gap:6px;margin-left:4px;">
                         ${isToday?'<span style="font-size:11px;font-weight:800;background:#37352f;color:#fff;padding:2px 8px;border-radius:4px;">TODAY</span>':''}
                         ${isActivated?`<span style="font-size:11px;font-weight:700;color:${info.isSat?'#787774':'#37352f'};border:1.5px solid ${info.isSat?'#787774':'#37352f'};padding:2px 8px;border-radius:4px;">작업일</span>`:''}
@@ -9129,6 +9140,23 @@
                 </div>`;
             panel.insertAdjacentHTML('beforeend', window._tlDcBuildGrid(dateStr));
             overlay.classList.add('active');
+        };
+
+        /* ── 날짜 좌우 옮기기 (10-09 사장님 지시) ─────────────────────────────
+           「날짜 좌우로 날짜를 변경 할 수 있는 화살표를 만들어 주세요.」
+           왼쪽이 하루 전, 오른쪽이 하루 뒤다. 날짜를 바꾸는 길은 이미 있다 —
+           tlExpandDateCard 가 그 날짜로 판을 통째로 다시 그린다. 그것을 그대로 부른다.
+           공정 칸을 펴 놓고 보던 중이면 그 공정을 새 날짜에서 다시 편다
+           (그 날짜에 그 공정이 없으면 격자 그대로 — 빈 날도 공정 칸이 0 으로 선다). */
+        window.tlDc날짜옮기기 = function (걸음) {
+            const 지금 = window._tlDcDate; if (!지금) return;
+            const d = new Date(지금 + 'T00:00:00'); if (isNaN(d)) return;
+            d.setDate(d.getDate() + (걸음 || 0));
+            const 새날 = toLocalDateStr(d);
+            const 판 = document.querySelector('#tl-datecard-expand .tl-dc-panel');
+            const 보던공정 = 판 ? (판.dataset.공정 || '') : '';
+            window.tlExpandDateCard(새날);
+            if (보던공정) { try { window.tlDcExpandSection(보던공정); } catch (e) {} }
         };
 
         // 날짜카드를 닫고 박스 판(첫 화면)으로 간다
@@ -9162,6 +9190,7 @@
             const sMap = window._tlDcGetItems(dateStr);
             const sec  = sMap[procKey];
             if (!sec) return;
+            panel.dataset.공정 = procKey;        // 날짜 화살표가 새 날짜에서 이 공정을 다시 편다
 
             const _PC = { '보링':'#37352f', '엣지':'#37352f', 'NC':'#37352f', '재단':'#37352f' };
             const _pcColor = _PC[procKey] || '#787774';
@@ -9677,6 +9706,7 @@
             if (!dateStr) return;
             const panel = document.querySelector('#tl-datecard-expand .tl-dc-panel');
             if (!panel) return;
+            delete panel.dataset.공정;           // 격자로 돌아왔으니 보던 공정은 없다
             const single = panel.querySelector('.tl-dc-single-sec');
             if (single) single.remove();
             panel.insertAdjacentHTML('beforeend', window._tlDcBuildGrid(dateStr));
