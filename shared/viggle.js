@@ -6,8 +6,36 @@
     창을 옮겨 '보냈습니다' 쪽지를 띄웠다. 돌아올 길이 없어 앱을 껐다 켜야 했다.
     지시함이 파이어베이스로 옮겨져 그럴 이유가 없어졌다.) */
 (() => {
+  /* ⚠ 10-09 사장님: 「명료화 프로그램에 짚어서 지시하기가 없어요」.
+     프로그램 코드는 멀쩡했다 — 제품명료화를 로그인한 뒤 화면으로 세워 네 자리에서
+     길게 눌러 보니 손잡이가 다 떴다(초록 8 · 빨강 0). 탈은 **주소**였다.
+     손잡이는 `?viggle=1` 이 붙어 있을 때만 켜졌고, 그 표는 쉽게 사라진다 —
+       ㄱ) 프로그램 안에서 다른 장으로 가면 (제품명료화의 「올리기」 → 배송관리업로드.html)
+       ㄴ) 화면을 새로 고치면
+       ㄷ) 폰 바탕에 걸어 둔 바로가기나, 어제 열어 둔 채 남은 탭에서 열면 처음부터 없다
+     그래서 **한 번 바이글에서 열린 자리는 기억한다.** 표가 없어도 기억으로 켠다.
+     기억은 그 장(場) 하나와 그 프로그램 칸, 두 가지로 적어 둔다 — 장이 먼저다.
+     `viggle=0` 이면 기억을 쓰지 않는다. 「바로가기」 로 여신 맨몸 화면은 맨몸 그대로 둔다. */
   const 표 = new URLSearchParams(location.search);
-  if (표.get('viggle') !== '1') return;
+  const 칸길 = 'vg기억칸:' + location.pathname.replace(/[^/]*$/, '');
+  const 장길 = 'vg기억장:' + location.pathname;
+  const 적기 = (열쇠, 것) => { for (const 통 of [sessionStorage, localStorage]) {
+      try { 통.setItem(열쇠, JSON.stringify(것)); } catch (e) {} } };
+  const 꺼내기 = () => { for (const 열쇠 of [장길, 칸길]) for (const 통 of [sessionStorage, localStorage]) {
+      try { const g = 통.getItem(열쇠); if (g) return JSON.parse(g); } catch (e) {} } return null; };
+
+  if (표.get('viggle') === '0') return;                  // 맨몸으로 보자고 하신 것
+  if (표.get('viggle') === '1') {
+    const 것 = { box: 표.get('box') || '', name: 표.get('name') || '', vg: 표.get('vg') || '' };
+    적기(장길, 것); 적기(칸길, 것);
+  } else {
+    const 것 = 꺼내기();
+    if (!것) return;                                     // 바이글에서 연 적이 없는 화면 — 그대로 둔다
+    표.set('viggle', '1');
+    if (것.box)  표.set('box', 것.box);
+    if (것.name) 표.set('name', 것.name);
+    if (것.vg)   표.set('vg', 것.vg);
+  }
 
   // 지시를 받는 자리. 예전에는 맥의 /take 였고 지금은 클라우드 작업대다.
   // 주소를 통째로 받으므로 뒤에 /take 를 붙이지 않는다.
