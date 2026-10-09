@@ -115,13 +115,24 @@ function 사람정보지우기(aoa, head) {
         if (주.나온수) { r[i] = 주.글; 주소본것 += 주.나온수; }
     }
 
-    // dense — 칸마다 객체를 만들지 않고 배열로 담는다. 20만 줄 × 32칸이면 640만 개가 안 생긴다.
-    const ws = XLSX.utils.aoa_to_sheet(새표, { dense: true });
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
-    const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-    return { 뺀이름, 가린수, 주소본것, 파일: new Blob([buf],
-        { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }) };
+    // ⚠ 창고 사본은 **CSV** 로 쓴다. 엑셀로 쓰지 마라.
+    //    XLSX.write 는 시트 XML 을 **글자 한 덩어리**로 만든다. 20만 줄이면 그 덩어리가 299MB 라
+    //    브라우저가 들 수 있는 글자 길이를 넘어 「Invalid array length」 로 터진다. (10-09 사장님)
+    //    CSV 는 토막토막 배열에 담아 Blob 으로 이어 붙이므로 큰 덩어리가 안 생긴다.
+    //    창고(vp_배송원본)는 보관하는 자리다 — 꼴이 엑셀일 까닭이 없다.
+    const 칸글 = v => {
+        const s = (v === undefined || v === null) ? '' : String(v);
+        return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const 조각들 = ['\uFEFF'];          // BOM — 없으면 나중에 엑셀로 열 때 한글이 깨진다
+    const 묶음 = [];
+    for (let n = 0; n < 새표.length; n++) {
+        묶음.push(새표[n].map(칸글).join(','));
+        if (묶음.length >= 5000) { 조각들.push(묶음.join('\n') + '\n'); 묶음.length = 0; }
+    }
+    if (묶음.length) 조각들.push(묶음.join('\n') + '\n');
+    return { 뺀이름, 가린수, 주소본것, 꼴: 'csv',
+             파일: new Blob(조각들, { type: 'text/csv;charset=utf-8' }) };
 }
 
 // 머리줄은 이름으로 찾지 않는다. 위 열 줄 가운데 채워진 칸이 가장 많은 줄이다(같으면 위엣것).
