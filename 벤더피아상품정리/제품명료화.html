@@ -19,7 +19,7 @@
 
      막지 않는다:
        어떤 엑셀이든 읽고 올린다. 칸 이름으로 돌려보내는 길은 없다.
-       갈래(상품정보·단품정보·그 밖)는 올리는 자리로 정한다. 「옮김」 으로 바꾼다.
+       갈래는 올리는 자리로 정한다 — 어느 자리의 「올리기」 를 누르셨는지가 곧 갈래다.
      ========================================== -->
 <!DOCTYPE html>
 <html lang="ko">
@@ -176,7 +176,7 @@
         <div id="규칙목록" style="margin-top:8px"></div>
     </div>
 
-    <footer><p>v0.8.0</p></footer>
+    <footer><p>v0.8.1</p></footer>
 </div>
 
 <!-- 짚어서 지시하는 손잡이 (?viggle=1 일 때만 켜진다) -->
@@ -488,7 +488,6 @@ async function 자료줄읽기(자료) {
 // ════════════════════════════════════════════════════════════════════
 // 3. 담긴 자료 — 이름을 누르면 칸마다 채움·가짓수·보기. 딱지를 누르면 갈래가 바뀐다.
 // ════════════════════════════════════════════════════════════════════
-const 갈래차례 = ['', '상품', '단품', '재고'];      // 「옮김」 이 도는 차례
 let 펼친자료 = null, 올리는중 = false;
 
 function 자료그리기() {
@@ -498,8 +497,7 @@ function 자료그리기() {
         const 것 = 자료들.filter(a => (a.갈래 || '') === g);
         // 「그 밖」 은 기준이 따로 없다 — 다 같은 무게로 보인다
         const 줄 = 것.map((a, i) => `<div class="명료줄${g && i ? ' 옛' : ''}"><span class="이름" data-view="${esc(a.id)}">${esc(a.이름)}</span>
-            ${g && !i ? '<span class="지금">지금</span>' : ''}<span class="수">${셈(a.줄수)}줄 · ${esc(때보임(a.id))}</span>
-            <button class="명료딱지" data-role="${esc(a.id)}">옮김</button></div>`);
+            ${g && !i ? '<span class="지금">지금</span>' : ''}<span class="수">${셈(a.줄수)}줄 · ${esc(때보임(a.id))}</span></div>`);
         // 상품정리 화면에서 올린 상품목록 — 여기서 상품정보를 올리기 전까지는 이것이 기준이다
         if (g === '상품' && 담긴상품목록.length) 줄.push(`<div class="명료줄${것.length ? ' 옛' : ''}"><span class="이름" data-view="__상품목록">상품목록 (상품정리)</span>
             ${것.length ? '' : '<span class="지금">지금</span>'}<span class="수">${셈(담긴상품목록.length)}줄</span></div>`);
@@ -764,16 +762,10 @@ async function 배송담기() {
 }
 
 $('자료목록').addEventListener('click', async e => {
-    const 갈 = e.target.closest('[data-role]'), 보 = e.target.closest('[data-view]'), 올 = e.target.closest('[data-pick]');
+    const 보 = e.target.closest('[data-view]'), 올 = e.target.closest('[data-pick]');
     try {
         if (올) { 고른갈래 = 올.dataset.pick; $('file').click(); }
-        else if (갈) {
-            const a = 자료들.find(x => x.id === 갈.dataset.role);
-            a.갈래 = 갈래차례[(갈래차례.indexOf(a.갈래 || '') + 1) % 갈래차례.length];
-            자료그리기();
-            await window.fb.setDoc(문서(자리.자료, a.id), { 갈래: a.갈래 }, { merge: true });
-            await 맞댐하기();
-        } else if (보) {
+        else if (보) {
             const id = 보.dataset.view;
             if (펼친자료 === id) { 펼친자료 = null; $('자료칸').classList.add('hidden'); return; }
             펼친자료 = id;
