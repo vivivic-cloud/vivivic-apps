@@ -6,8 +6,36 @@
     창을 옮겨 '보냈습니다' 쪽지를 띄웠다. 돌아올 길이 없어 앱을 껐다 켜야 했다.
     지시함이 파이어베이스로 옮겨져 그럴 이유가 없어졌다.) */
 (() => {
+  /* ⚠ 10-09 사장님: 「명료화 프로그램에 짚어서 지시하기가 없어요」.
+     프로그램 코드는 멀쩡했다 — 제품명료화를 로그인한 뒤 화면으로 세워 네 자리에서
+     길게 눌러 보니 손잡이가 다 떴다(초록 8 · 빨강 0). 탈은 **주소**였다.
+     손잡이는 `?viggle=1` 이 붙어 있을 때만 켜졌고, 그 표는 쉽게 사라진다 —
+       ㄱ) 프로그램 안에서 다른 장으로 가면 (제품명료화의 「올리기」 → 배송관리업로드.html)
+       ㄴ) 화면을 새로 고치면
+       ㄷ) 폰 바탕에 걸어 둔 바로가기나, 어제 열어 둔 채 남은 탭에서 열면 처음부터 없다
+     그래서 **한 번 바이글에서 열린 자리는 기억한다.** 표가 없어도 기억으로 켠다.
+     기억은 그 장(場) 하나와 그 프로그램 칸, 두 가지로 적어 둔다 — 장이 먼저다.
+     `viggle=0` 이면 기억을 쓰지 않는다. 「바로가기」 로 여신 맨몸 화면은 맨몸 그대로 둔다. */
   const 표 = new URLSearchParams(location.search);
-  if (표.get('viggle') !== '1') return;
+  const 칸길 = 'vg기억칸:' + location.pathname.replace(/[^/]*$/, '');
+  const 장길 = 'vg기억장:' + location.pathname;
+  const 적기 = (열쇠, 것) => { for (const 통 of [sessionStorage, localStorage]) {
+      try { 통.setItem(열쇠, JSON.stringify(것)); } catch (e) {} } };
+  const 꺼내기 = () => { for (const 열쇠 of [장길, 칸길]) for (const 통 of [sessionStorage, localStorage]) {
+      try { const g = 통.getItem(열쇠); if (g) return JSON.parse(g); } catch (e) {} } return null; };
+
+  if (표.get('viggle') === '0') return;                  // 맨몸으로 보자고 하신 것
+  if (표.get('viggle') === '1') {
+    const 것 = { box: 표.get('box') || '', name: 표.get('name') || '', vg: 표.get('vg') || '' };
+    적기(장길, 것); 적기(칸길, 것);
+  } else {
+    const 것 = 꺼내기();
+    if (!것) return;                                     // 바이글에서 연 적이 없는 화면 — 그대로 둔다
+    표.set('viggle', '1');
+    if (것.box)  표.set('box', 것.box);
+    if (것.name) 표.set('name', 것.name);
+    if (것.vg)   표.set('vg', 것.vg);
+  }
 
   // 지시를 받는 자리. 예전에는 맥의 /take 였고 지금은 클라우드 작업대다.
   // 주소를 통째로 받으므로 뒤에 /take 를 붙이지 않는다.
@@ -86,12 +114,34 @@
 
      ⚠ 이것이 실패해도 **지시 보내기는 성공으로 둔다.** 지시가 들어간 뒤의 덧일이다.
         여기서 터져서 지시가 안 가면 더 나쁘다. */
+  /* ⚠ 10-04 — **바탕을 짚으시면 어디를 짚으셨는지 알 수 없었다.** `무엇()` 은 그 칸의 글을 베끼는데,
+     담은 칸(바탕)을 짚으면 그 안의 글이 통째로 적힌다 — 「VIGGLE 홈 J Hello JUNPHB Make your day
+     easy with me search yo…」 가 그렇게 적혔고, 사장님이 「이거 또 왜 안되냐」 하셨을 때 내가 머리의
+     **어느 자리**인지 못 짚어 되물어야 했다. 사장님 화면(시트의 「짚은 것 · …」)은 **그대로 두고**,
+     기록에만 짚으신 자를 한 줄 더한다 — 보시는 것은 한 톨도 안 바뀐다. */
+  function 짚은자(el) {
+    if (!el || !el.tagName) return '';
+    const 조각 = [];
+    for (let e = el; e && e.tagName && 조각.length < 4; e = e.parentElement) {
+      let t = e.tagName.toLowerCase();
+      if (e.id) t += '#' + e.id;
+      else if (typeof e.className === 'string' && e.className.trim())
+        t += '.' + e.className.trim().split(/\s+/).slice(0, 2).join('.');
+      if (e.dataset && e.dataset.area) t += '[' + e.dataset.area + ']';
+      조각.unshift(t);
+      if (e.dataset && e.dataset.area) break;   // 자리 이름이 붙은 데까지면 충분하다
+    }
+    return 조각.join(' > ').slice(0, 160);
+  }
+
   async function 시킨것남기기(짚은것, 글, 때) {
     const 한줄 = (글 || '').replace(/\s+/g, ' ').trim().slice(0, 40)
                + ((글 || '').replace(/\s+/g, ' ').trim().length > 40 ? '…' : '');
     const 몸 = {
       자리: 박스 ? 'box:' + 박스 : '모든박스',
       짚은자리: [어디(), 짚은것].filter(Boolean).join(' · '),
+      // 관리자만 보는 칸 — 어느 자를 짚으셨는지. 사장님 화면에는 안 나온다
+      짚은자: 짚은자(겨냥),
       // 짚으셨을 때 켜져 있던 페이지. 작업대가 이것으로 그 페이지를 열어 준다
       페이지: 어느페이지(),
       말: 글 || '',
@@ -238,10 +288,29 @@
   addEventListener('touchcancel', 그만, true);
   addEventListener('scroll', 그만, true);
 
-  /* 짚은 것이 무엇인지 사람이 알아볼 말로 적는다 */
+  /* 짚은 것이 무엇인지 사람이 알아볼 말로 적는다.
+     ⚠ **속 글이 늘 이름인 것은 아니다.** 여러 자식의 글이 뭉쳐 나오는 칸(공장 바닥처럼)을
+        짚으면 그 안에 든 것이 **다 적혀** 무엇을 짚으셨는지가 되레 묻힌다.
+        10-07 기계배치도 — 빈 바닥을 짚었더니 「패널쏘 3.8×3.3m 보링기 2.4×1.6m …」 이 적혔다.
+        그런 자리는 그 칸이 제 이름(`data-area`·`aria-label`·`title`)을 달고 있으면 그것을 쓴다.
+        **한 마디로 나오는 칸은 그대로 둔다** — 기계 하나를 짚으면 여태처럼 「재단기」 다. */
   function 무엇(el) {
-    const 글 = (el.innerText || el.value || el.placeholder || '').trim().replace(/\s+/g, ' ');
-    if (글) return 글.slice(0, 60);
+    const 다듬 = v => (v || '').trim().replace(/\s+/g, ' ');
+    const 글 = 다듬(el.innerText || el.value || el.placeholder);
+    if (글) {
+      /* 자식 여럿의 글이 뭉친 자리인가 — 제 글과 다른 글을 가진 자식이 **셋 이상**이면 그렇다.
+         ⚠ 둘로 잡으면 「패널쏘」+「3.8×3.3m」 처럼 **이름과 크기를 나눠 단 칸**까지 걸려
+            「기계:패널쏘」 로 바뀐다 — 재서 보고 셋으로 올렸다(10-07). */
+      const 뭉침 = [...(el.children || [])]
+        .map(c => 다듬(c.innerText)).filter(t => t && t !== 글).length >= 3;
+      const 딱지 = 다듬((el.dataset && el.dataset.area)
+        || el.getAttribute('aria-label') || el.getAttribute('title'));
+      if (뭉침 && 딱지) return 딱지.slice(0, 60);
+      return 글.slice(0, 60);
+    }
+    const 딱지 = 다듬((el.dataset && el.dataset.area)
+      || el.getAttribute('aria-label') || el.getAttribute('title'));
+    if (딱지) return 딱지.slice(0, 60);
     const t = el.tagName.toLowerCase();
     return ({ button: '단추', input: '입력칸', select: '고르는 칸', img: '그림', svg: '그림' })[t] || t;
   }
