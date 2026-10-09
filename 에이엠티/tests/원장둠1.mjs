@@ -84,7 +84,23 @@ await p.goto(URL, { waitUntil: 'load' }); await p.waitForTimeout(500);
 await p.evaluate(() => new Promise(r => { const q = indexedDB.deleteDatabase('amt원장'); q.onsuccess = q.onerror = q.onblocked = () => r(); }));
 
 const 메타가 = 메타('A.xlsx', 1700000000);
+/* 두는 것(IndexedDB put)은 화면을 막지 않으려고 **기다리지 않고** 건다.
+   그래서 받자마자 바로 새로 열면 두는 일이 끝나기 전일 수 있다(그때는 다음 번에
+   또 받을 뿐 탈은 없다). 시험은 그 경주를 피해 **다 두어진 것을 보고** 다음으로 간다. */
+const 둔것기다리기 = async (바라는열쇠) => {
+  for (let i = 0; i < 100; i++) {
+    const 있나 = await p.evaluate(async (k) => {
+      try { const 둔 = await _원장둔것(); return !!(둔 && 둔.열쇠 === k && Array.isArray(둔.줄)); }
+      catch (e) { return false; }
+    }, 바라는열쇠);
+    if (있나) return true;
+    await p.waitForTimeout(50);
+  }
+  return false;
+};
+const 열쇠가 = [메타가.storagePath, 메타가.fileName, String(메타가.timestamp.seconds)].join('|');
 const 처음 = await 열기(메타가);
+판('① 받은 것을 폰에 둔다', await 둔것기다리기(열쇠가), '열쇠 ' + 열쇠가);
 console.log('■ 처음 열기(둔 것 없음): ' + JSON.stringify(처음));
 판('① 처음 열 때는 창고에서 받아 푼다 (줄 수가 그대로다)',
    처음.받은수 === 1 && 처음.줄 === 가.줄 && 처음.원장왔나 === true && 처음.첫부속 === 가.첫부속,
@@ -102,7 +118,9 @@ console.log('■ 두 번째 열기(둔 것 있음): ' + JSON.stringify(두번째
 
 // ③ 새 원장을 올리셨다 — 파일 이름과 올린 때가 함께 바뀐다
 const 메타나 = 메타('B.xlsx', 1700009999);
+const 열쇠나 = [메타나.storagePath, 메타나.fileName, String(메타나.timestamp.seconds)].join('|');
 const 새원장 = await 열기(메타나);
+await 둔것기다리기(열쇠나);
 console.log('■ 새 원장: ' + JSON.stringify(새원장));
 판('③ 원장을 새로 올리면 **반드시 새것을 받는다** (옛것이 안 뜬다)',
    새원장.받은수 === 1 && 새원장.줄 === 나.줄 && 새원장.첫부속 === '가와B',
