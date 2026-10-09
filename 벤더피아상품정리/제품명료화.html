@@ -173,6 +173,15 @@
         <div id="자료칸" class="hidden" style="margin-top:8px"></div>
     </div>
 
+    <!-- 재고관리 — 「명료화프로그램 안에 재고관리 페이지를 만들어줘」 (10-09 사장님)
+         맞댐 위에 둔다. 맞댐 목록이 200가지까지 길어서 밑에 두면 한참 내려가셔야 한다. -->
+    <div id="판-재고" class="명료판 hidden">
+        <div class="명료머리">재고관리</div>
+        <div id="재고셈" class="명료셈"></div>
+        <div id="재고잔"></div>
+        <div id="재고목록"></div>
+    </div>
+
     <!-- 상품 · 단품 맞댄 표 -->
     <div id="판-맞댐" class="명료판 hidden">
         <div class="명료머리">상품 · 단품</div>
@@ -189,7 +198,7 @@
         <div id="규칙목록" style="margin-top:8px"></div>
     </div>
 
-    <footer><p>v0.10.1</p></footer>
+    <footer><p>v0.11.0</p></footer>
 </div>
 
 <!-- 짚어서 지시하는 손잡이 (?viggle=1 일 때만 켜진다) -->
@@ -254,9 +263,10 @@ window.initApp = async function () {
         자료들 = 자.docs.map(d => Object.assign({ id: d.id }, d.data())).sort((a, b) => a.id < b.id ? 1 : -1);
         규칙들 = 규.docs.map(d => Object.assign({ id: d.id }, d.data())).sort((a, b) => a.id < b.id ? 1 : -1);
         $('loading').classList.add('hidden');
-        ['판-올리기','판-자료','판-맞댐','판-규칙'].forEach(i => $(i).classList.remove('hidden'));
+        ['판-올리기','판-자료','판-재고','판-맞댐','판-규칙'].forEach(i => $(i).classList.remove('hidden'));
         자료그리기(); 규칙그리기();
         await 맞댐하기();
+        await 재고하기();
     } catch (err) { $('loading').classList.add('hidden'); fail(new Error('읽지 못했습니다 — ' + err.message)); }
 };
 
@@ -476,6 +486,7 @@ $('btn-up').addEventListener('click', async () => {
         $('판-끝').classList.remove('hidden');
         자료그리기();
         await 맞댐하기();
+        await 재고하기();
     } catch (err) {
         fail(new Error(셈(간줄) + '줄까지 담고 멈췄습니다 — ' + err.message));
     }
@@ -785,7 +796,12 @@ $('자료목록').addEventListener('click', async e => {
             const 자료 = id === '__상품목록' ? null : 자료들.find(x => x.id === id);
             const 줄 = 자료 ? await 자료줄읽기(자료) : 담긴상품목록;
             // 재고는 칸 채움이 아니라 **단품으로 묶은 재고**를 보여 드린다 (10-09 사장님)
-            if (자료 && 자료.갈래 === '재고') await 재고보기(줄); else 칸보기(줄);
+            // 재고는 **재고관리 자리**에 늘 떠 있다. 같은 것을 여기에 또 그리지 않고 그리로 데려간다.
+            if (자료 && 자료.갈래 === '재고') {
+                펼친자료 = null; $('자료칸').classList.add('hidden');
+                $('판-재고').scrollIntoView({ block: 'start' }); return;
+            }
+            칸보기(줄);
         }
     } catch (err) { fail(err); }
 });
@@ -874,11 +890,23 @@ function 재고묶기(줄들, 단줄들) {
         단가짓수: 단 ? 단.목록.size : 0, 다맞음, 이름다름, 목록에없음, 재고에없음 };
 }
 
-async function 재고보기(줄들) {
+// 재고관리 자리를 다시 그린다. **맞댐 뒤에 부른다** — 상품 쪽 맞물림을 맞댐결과에서 얻는다.
+async function 재고하기() {
+    const 재자료 = 자료들.find(a => a.갈래 === '재고');
+    if (!재자료) {
+        $('재고셈').textContent = '';
+        $('재고잔').innerHTML = '<div class="명료잔">재고정보를 올리시면 여기에 보입니다.</div>';
+        $('재고목록').innerHTML = '';
+        return;
+    }
     // 단품관리목록은 「단품」 자리의 가장 새 자료다. 없으면 맞대지 않고 재고만 보인다.
     const 단자료 = 자료들.find(a => a.갈래 === '단품');
-    const r = 재고묶기(줄들, 단자료 ? await 자료줄읽기(단자료) : null);
-    const 머리 = '재고 ' + 셈(r.줄수) + '줄 → 단품 ' + 셈(r.단품들.length) + '가지'
+    재고그리기(재고묶기(await 자료줄읽기(재자료), 단자료 ? await 자료줄읽기(단자료) : null));
+}
+
+function 재고그리기(r) {
+    // 자료 이름·올린 때는 위 목록에 이미 있다 — 여기엔 **새로 아는 것만** 적는다.
+    $('재고셈').textContent = '재고 ' + 셈(r.줄수) + '줄 → 단품 ' + 셈(r.단품들.length) + '가지'
         + (r.창고곳 ? ' · 창고 ' + 셈(r.창고곳) + '곳' : '');
     const 잔 = [];
     if (r.상품코드수) 잔.push('상품 쪽과 맞물림 ' + 셈(r.맞물림) + '가지');
@@ -887,7 +915,8 @@ async function 재고보기(줄들) {
         + '코드·이름 맞음 ' + 셈(r.다맞음) + ' · 이름 다름 ' + 셈(r.이름다름)
         + ' · 단품목록에 없음 ' + 셈(r.목록에없음) + ' · 재고에 없음 ' + 셈(r.재고에없음));
     else 잔.push('단품정보가 없습니다 — 올리시면 맞물리는지 같이 보여 드립니다.');
-    const 줄 = r.단품들.slice(0, 보일건수).map(g => '<div class="맞댐상품">'
+    $('재고잔').innerHTML = 잔.map(t => `<div class="명료잔" style="margin:2px 0 6px">${esc(t)}</div>`).join('');
+    $('재고목록').innerHTML = r.단품들.slice(0, 보일건수).map(g => '<div class="맞댐상품">'
         + `<div class="맞댐머리"><span class="맞댐코드">${esc(g.코드)}</span><b>${esc(g.이름)}</b>`
         + (g.맞댐 === '없음' ? '<span class="맞댐못">단품목록에 없음</span>'
          : g.맞댐 === '이름다름' ? '<span class="맞댐못">이름 다름</span>' : '') + '</div>'
@@ -899,12 +928,9 @@ async function 재고보기(줄들) {
         // 창고가 둘 이상일 때만 펼쳐 적는다 — 합 하나로는 어디 있는 재고인지 모른다
         + (g.창고.length > 1
             ? `<div class="재고창고 명료글씨">${esc(g.창고.map(w => w.곳 + ' ' + 셈(w.값)).join(' · '))}</div>` : '')
-        + '</div>').join('');
-    $('자료칸').innerHTML = `<div class="명료셈">${esc(머리)}</div>`
-        + 잔.map(t => `<div class="명료잔" style="margin:2px 0 6px">${esc(t)}</div>`).join('') + 줄
+        + '</div>').join('')
         + (r.단품들.length > 보일건수
             ? '<div class="명료잔" style="padding:10px 0">밖에 ' + 셈(r.단품들.length - 보일건수) + '건</div>' : '');
-    $('자료칸').classList.remove('hidden');
 }
 
 // ════════════════════════════════════════════════════════════════════
