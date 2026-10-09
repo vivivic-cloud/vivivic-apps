@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.26.0 (2026-10-09) — 명세서의 재단금액 = 원장수량 × 2,400원 (부가세 포함)
+     버전: v1.27.0 (2026-10-09) — 명세서 PDF 단추와 외부보내기 (바깥 꾸러미 없이 제 손으로)
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1642,9 +1642,9 @@
         .명세-몰라 { display:inline-block; font-size:9.5px; font-weight:800; color:#b91c1c;
             background:#fde2e2; border:1px solid #f0a8a8; border-radius:3px; padding:0 4px; }
         .명세-없음 { padding:24px 10px; text-align:center; color:#a8a6a2; font-size:12px; }
-        .명세-바닥 { display:flex; gap:8px; padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+        .명세-바닥 { display:flex; flex-wrap:wrap; gap:8px; padding:10px 12px calc(10px + env(safe-area-inset-bottom));
             background:#fff; border-top:1px solid #e3e2e0; flex-shrink:0; }
-        .명세-바닥 button { flex:1; min-height:44px; font-size:13px; font-weight:800; border-radius:9px;
+        .명세-바닥 button { flex:1 1 28%; min-width:88px; min-height:44px; font-size:13px; font-weight:800; border-radius:9px;
             border:1px solid #e3e2e0; background:#f5f5f4; color:#37352f; cursor:pointer; }
         .명세-바닥 button.참 { background:#37352f; color:#fff; border-color:#37352f; }
         .명세-바닥 button:disabled { opacity:.4; cursor:default; }
@@ -2528,7 +2528,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.26.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.27.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2661,7 +2661,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.26.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.27.0</b></p>
         </div>
     </div>
 
@@ -9410,7 +9410,9 @@
                 `<button type="button" class="참" id="명세-발급" onclick="_명세서발급()"` +
                 (짠.줄수 ? '' : ' disabled') + `>발급</button>` +
                 `<button type="button" id="명세-인쇄" onclick="_명세서인쇄()" disabled>인쇄</button>` +
+                `<button type="button" id="명세-PDF" onclick="_명세서PDF()" disabled>PDF</button>` +
                 `<button type="button" id="명세-엑셀" onclick="_명세서엑셀()" disabled>엑셀</button>` +
+                `<button type="button" id="명세-보내기" onclick="_명세서보내기()" disabled>외부보내기</button>` +
                 `</div></div>`;
             document.body.appendChild(판);
         };
@@ -9430,7 +9432,7 @@
             if (번) 번.textContent = 지.발급번호 + ' · ' + 지.발급시각;
             const 발 = document.getElementById('명세-발급');
             if (발) { 발.textContent = '발급됨'; 발.disabled = true; }
-            ['명세-인쇄', '명세-엑셀'].forEach(id => {
+            ['명세-인쇄', '명세-PDF', '명세-엑셀', '명세-보내기'].forEach(id => {
                 const b = document.getElementById(id); if (b) b.disabled = false;
             });
         };
@@ -9441,6 +9443,259 @@
             try { window.print(); } finally {
                 setTimeout(() => document.body.classList.remove('명세-인쇄중'), 300);
             }
+        };
+
+        /* ── 종이에 그릴 줄들 (10-09 지시) ─────────────────────────────────
+           화면 표와 **같은 자료**로 종이 한 벌을 만든다. 칸 너비는 양식 차례 그대로다.
+           이어(=true) 는 위 칸과 한 칸으로 묶인 자리다 — 글을 안 적고 윗금도 안 긋는다. */
+        window._명세서줄들 = function () {
+            const 지 = window._명세서지금; if (!지) return null;
+            const 칸들 = [['순번', 54], ['제품명', 300], ['PO NO.', 170], ['종류', 86], ['색상', 86],
+                          ['모델명', 70], ['출고처', 74], ['원장입고일', 86], ['품목', 150], ['사이즈', 120],
+                          [지.공정 + '수량', 86], ['원장수량', 86], ['재단금액', 104], ['출고예정일', 92]];
+            const 줄들 = []; let 총매 = 0;
+            (지.묶음 || []).forEach((묶, i) => {
+                const o = 묶.발주; let 첫 = true;
+                묶.계획들.forEach(g => {
+                    if (g.매 != null) 총매 += g.매;
+                    g.품목들.forEach((품, j) => {
+                        const 값 = new Array(14).fill(''), 이어 = new Array(14).fill(false);
+                        if (첫) {
+                            값[0] = String(i + 1); 값[1] = o.displayName || o.code || '';
+                            값[2] = o.orderCode || ''; 값[3] = g.종류 || ''; 값[4] = g.색상 || '';
+                            값[5] = '?'; 값[6] = '?'; 값[7] = '?';
+                            값[13] = String(o.deliveryDate || '').slice(5).replace('-', '/');
+                        } else { [0, 1, 2, 3, 4, 5, 6, 7, 13].forEach(k => { 이어[k] = true; }); }
+                        값[8] = 품.이름 || ''; 값[9] = 품.크기 || ''; 값[10] = 품.몫 + '개';
+                        if (j === 0) {
+                            값[11] = g.매 == null ? '-' : g.매 + '매';
+                            값[12] = g.매 == null ? '-' : window._돈글(g.매 * (window._재단단가 || 0));
+                        } else { 이어[11] = true; 이어[12] = true; }
+                        줄들.push({ 값, 이어 }); 첫 = false;
+                    });
+                });
+            });
+            const 소 = new Map();
+            (지.묶음 || []).forEach(묶 => 묶.계획들.forEach(g => {
+                if (g.매 == null) return;
+                const k = (g.종류 || '-') + '|' + (g.색상 || '-');
+                소.set(k, (소.get(k) || 0) + g.매);
+            }));
+            return { 칸들, 줄들, 총매, 소요: [...소.entries()].map(([k, 매]) => {
+                const [종, 색] = k.split('|'); return { 종, 색, 매 }; }), 지 };
+        };
+
+        /* ── 종이 장들 (10-09 지시 「pdf로도 발급 되어야 하고」) ─────────────
+           이 상자는 바깥 CDN 을 못 받는다 — PDF 꾸러미를 받아 쓸 수 없다.
+           그래서 **제 손으로** 그린다: A4 가로 한 장씩 캔버스에 표를 그리고,
+           그 장을 JPEG 로 떠서 PDF 안에 그림으로 넣는다(글꼴을 PDF 에 심지 않아도
+           한글이 그대로 나온다). 줄이 많으면 장을 넘긴다. */
+        window._명세서장들 = function () {
+            const 짠 = window._명세서줄들(); if (!짠) return [];
+            const 지 = 짠.지;
+            const 폭 = 1754, 높 = 1240, 여백 = 36;         // A4 가로 · 150dpi
+            const 제목높 = 56, 머리높 = 64, 줄높 = 34;
+            const 표폭 = 짠.칸들.reduce((a, c) => a + c[1], 0);
+            const 장들 = [];
+            const 새장 = () => {
+                const cv = document.createElement('canvas');
+                cv.width = 폭; cv.height = 높;
+                const g = cv.getContext('2d');
+                g.fillStyle = '#ffffff'; g.fillRect(0, 0, 폭, 높);
+                g.textBaseline = 'middle'; g.lineWidth = 1; g.strokeStyle = '#8c8a86';
+                장들.push(cv); return g;
+            };
+            const 글꼴 = (크, 굵) => `${굵 || 400} ${크}px -apple-system,"Malgun Gothic","Apple SD Gothic Neo",sans-serif`;
+            const 가운데 = (g, 글, x, w, y, 색) => {
+                g.fillStyle = 색 || '#1a1a1a'; g.textAlign = 'center';
+                g.fillText(글, x + w / 2, y, w - 8);
+            };
+            const 왼쪽 = (g, 글, x, w, y) => {
+                g.fillStyle = '#1a1a1a'; g.textAlign = 'left'; g.fillText(글, x + 6, y, w - 12);
+            };
+            const 제목그리기 = (g, 덧) => {
+                g.font = 글꼴(26, 900); g.fillStyle = '#1a1a1a'; g.textAlign = 'left';
+                const [, 달, 날] = String(지.날짜).split('-');
+                g.fillText(`${parseInt(달, 10)}월 ${parseInt(날, 10)}일 ${지.공정} 내역${덧 || ''}`, 여백, 여백 + 18);
+                if (지.발급번호) {
+                    g.font = 글꼴(16, 700); g.fillStyle = '#787774'; g.textAlign = 'right';
+                    g.fillText(지.발급번호 + '  ' + 지.발급시각, 폭 - 여백, 여백 + 18);
+                }
+            };
+            // ── 1쪽 이어 그리기 — 내역 표
+            let g = 새장(); 제목그리기(g);
+            let y = 여백 + 제목높;
+            const 머리그리기 = () => {
+                let x = 여백;
+                g.fillStyle = '#efeeec'; g.fillRect(여백, y, 표폭, 머리높);
+                g.font = 글꼴(15, 800);
+                짠.칸들.forEach((c, i) => {
+                    const 위아래 = (i >= 3 && i <= 6);          // 「원 장」 아래 넷
+                    g.strokeRect(x, y, c[1], 머리높);
+                    if (위아래) 가운데(g, c[0], x, c[1], y + 머리높 * 0.75);
+                    else 가운데(g, c[0], x, c[1], y + 머리높 / 2);
+                    x += c[1];
+                });
+                // 「원 장」 머리 — 넷을 덮는다
+                const x0 = 여백 + 짠.칸들.slice(0, 3).reduce((a, c) => a + c[1], 0);
+                const w0 = 짠.칸들.slice(3, 7).reduce((a, c) => a + c[1], 0);
+                g.fillStyle = '#efeeec'; g.fillRect(x0, y, w0, 머리높 / 2);
+                g.strokeRect(x0, y, w0, 머리높 / 2);
+                가운데(g, '원 장', x0, w0, y + 머리높 / 4);
+                y += 머리높;
+            };
+            머리그리기();
+            짠.줄들.forEach(줄 => {
+                if (y + 줄높 > 높 - 여백 - 줄높) {                  // 이 장에 더 못 넣는다
+                    g = 새장(); 제목그리기(g, ' (이어서)'); y = 여백 + 제목높; 머리그리기();
+                }
+                let x = 여백;
+                g.font = 글꼴(15, 400);
+                짠.칸들.forEach((c, i) => {
+                    if (!줄.이어[i]) { g.beginPath(); g.moveTo(x, y); g.lineTo(x + c[1], y); g.stroke(); }
+                    g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 줄높); g.stroke();
+                    const v = 줄.값[i];
+                    if (v !== '' && !줄.이어[i]) {
+                        if (v === '?') { g.font = 글꼴(15, 800); 가운데(g, '?', x, c[1], y + 줄높 / 2, '#b91c1c'); g.font = 글꼴(15, 400); }
+                        else if (i === 1) 왼쪽(g, v, x, c[1], y + 줄높 / 2);
+                        else if (i === 8) 왼쪽(g, v, x, c[1], y + 줄높 / 2);
+                        else 가운데(g, v, x, c[1], y + 줄높 / 2);
+                    }
+                    x += c[1];
+                });
+                g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 줄높); g.stroke();
+                y += 줄높;
+            });
+            // 합계
+            g.beginPath(); g.moveTo(여백, y); g.lineTo(여백 + 표폭, y); g.stroke();
+            g.fillStyle = '#f5f4f2'; g.fillRect(여백, y, 표폭, 줄높);
+            g.strokeRect(여백, y, 표폭, 줄높);
+            g.font = 글꼴(16, 800);
+            const 앞폭 = 짠.칸들.slice(0, 11).reduce((a, c) => a + c[1], 0);
+            가운데(g, '합  계', 여백, 앞폭, y + 줄높 / 2);
+            가운데(g, 짠.총매 + '매', 여백 + 앞폭, 짠.칸들[11][1], y + 줄높 / 2);
+            가운데(g, window._돈글(짠.총매 * (window._재단단가 || 0)),
+                   여백 + 앞폭 + 짠.칸들[11][1], 짠.칸들[12][1], y + 줄높 / 2);
+            y += 줄높 + 26;
+            // ── 원장 소요량 (자리가 모자라면 다음 장)
+            const 소높 = 줄높 * (짠.소요.length + 2) + 46;
+            if (y + 소높 > 높 - 여백) { g = 새장(); 제목그리기(g, ' (이어서)'); y = 여백 + 제목높; }
+            g.font = 글꼴(20, 900); g.fillStyle = '#1a1a1a'; g.textAlign = 'left';
+            g.fillText('원장 소요량', 여백, y + 10); y += 30;
+            const 소칸 = [['출고처', 120], ['종류', 140], ['모델명', 120], ['색상', 140],
+                          ['전일소요량', 150], ['금일 소요량', 150], ['총소요량', 150]];
+            const 소폭 = 소칸.reduce((a, c) => a + c[1], 0);
+            g.fillStyle = '#efeeec'; g.fillRect(여백, y, 소폭, 줄높); 
+            let sx = 여백; g.font = 글꼴(15, 800);
+            소칸.forEach(c => { g.strokeRect(sx, y, c[1], 줄높); 가운데(g, c[0], sx, c[1], y + 줄높 / 2); sx += c[1]; });
+            y += 줄높;
+            짠.소요.forEach(r => {
+                sx = 여백; g.font = 글꼴(15, 400);
+                const 값 = ['?', r.종, '?', r.색, '?', r.매.toFixed(1) + '매', '?'];
+                소칸.forEach((c, i) => {
+                    g.strokeRect(sx, y, c[1], 줄높);
+                    가운데(g, 값[i], sx, c[1], y + 줄높 / 2, 값[i] === '?' ? '#b91c1c' : '#1a1a1a');
+                    sx += c[1];
+                });
+                y += 줄높;
+            });
+            g.fillStyle = '#f5f4f2'; g.fillRect(여백, y, 소폭, 줄높);
+            sx = 여백; g.font = 글꼴(16, 800);
+            const 총값 = ['총 소 요 량', '', '', '', '?', 짠.총매.toFixed(1) + '매', '?'];
+            소칸.forEach((c, i) => {
+                g.strokeRect(sx, y, c[1], 줄높);
+                if (총값[i]) 가운데(g, 총값[i], sx, c[1], y + 줄높 / 2, 총값[i] === '?' ? '#b91c1c' : '#1a1a1a');
+                sx += c[1];
+            });
+            return 장들;
+        };
+
+        function _다타우르바이트(다타) {
+            const b64 = String(다타).split(',')[1] || '';
+            const 날 = atob(b64);
+            const u = new Uint8Array(날.length);
+            for (let i = 0; i < 날.length; i++) u[i] = 날.charCodeAt(i);
+            return u;
+        }
+
+        /* PDF 한 벌 — 장마다 JPEG 하나를 통째로 넣는다(DCTDecode).
+           바깥 꾸러미를 안 쓴다. 자리(xref)는 바이트를 세어 가며 적는다. */
+        window._명세서PDF만들기 = function () {
+            const 장들 = window._명세서장들();
+            if (!장들 || !장들.length) return null;
+            const 조각 = []; let 길이 = 0; const 자리 = [];
+            const 넣기 = u8 => { 조각.push(u8); 길이 += u8.length; };
+            const 글 = t => 넣기(new TextEncoder().encode(t));
+            const 객체 = (n, 머리, 몸) => {
+                자리[n] = 길이; 글(n + ' 0 obj\n' + 머리);
+                if (몸) { 글('stream\n'); 넣기(몸); 글('\nendstream\n'); }
+                글('endobj\n');
+            };
+            const PW = 842, PH = 595;                      // A4 가로(포인트)
+            글('%PDF-1.4\n');
+            const 쪽번호 = i => 3 + i * 3;
+            자리[1] = 길이; 글('1 0 obj\n<</Type/Catalog/Pages 2 0 R>>\nendobj\n');
+            자리[2] = 길이; 글('2 0 obj\n<</Type/Pages/Kids[' +
+                장들.map((_, i) => 쪽번호(i) + ' 0 R').join(' ') + ']/Count ' + 장들.length + '>>\nendobj\n');
+            장들.forEach((cv, i) => {
+                const 쪽 = 쪽번호(i), 그림 = 쪽 + 1, 속 = 쪽 + 2;
+                객체(쪽, '<</Type/Page/Parent 2 0 R/MediaBox[0 0 ' + PW + ' ' + PH + ']' +
+                    '/Resources<</XObject<</I0 ' + 그림 + ' 0 R>>>>/Contents ' + 속 + ' 0 R>>\n');
+                const jpg = _다타우르바이트(cv.toDataURL('image/jpeg', 0.92));
+                객체(그림, '<</Type/XObject/Subtype/Image/Width ' + cv.width + '/Height ' + cv.height +
+                    '/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length ' + jpg.length + '>>\n', jpg);
+                const 속글 = 'q ' + PW + ' 0 0 ' + PH + ' 0 0 cm /I0 Do Q\n';
+                객체(속, '<</Length ' + 속글.length + '>>\n', new TextEncoder().encode(속글));
+            });
+            const xref = 길이, 수 = 3 + 장들.length * 3;
+            let x = 'xref\n0 ' + 수 + '\n0000000000 65535 f \n';
+            for (let n = 1; n < 수; n++) x += String(자리[n] || 0).padStart(10, '0') + ' 00000 n \n';
+            글(x);
+            글('trailer\n<</Size ' + 수 + '/Root 1 0 R>>\nstartxref\n' + xref + '\n%%EOF\n');
+            const 다 = new Uint8Array(길이); let 끝 = 0;
+            조각.forEach(u => { 다.set(u, 끝); 끝 += u.length; });
+            return new Blob([다], { type: 'application/pdf' });
+        };
+
+        function _명세서파일이름(끝) {
+            const 지 = window._명세서지금;
+            return '명세서_' + (지 ? 지.날짜 + '_' + 지.공정 : '') + '.' + 끝;
+        }
+        function _명세서내려받기(blob, 이름) {
+            const 길 = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = 길; a.download = 이름; document.body.appendChild(a); a.click();
+            setTimeout(() => { a.remove(); URL.revokeObjectURL(길); }, 1500);
+        }
+
+        window._명세서PDF = function () {
+            const blob = window._명세서PDF만들기();
+            if (!blob) { if (typeof showToastMessage === 'function') showToastMessage('낼 것이 없습니다.'); return; }
+            const 이름 = _명세서파일이름('pdf');
+            window.__명세서낸것 = { 이름, 크기: blob.size, 갈래: blob.type };   // 잴 수 있게 남긴다
+            _명세서내려받기(blob, 이름);
+        };
+
+        /* 외부보내기 — 폰의 공유판(카톡·메일)에 **파일을 실어** 보낸다.
+           공유판이 없는 자리(판판한 브라우저)에서는 파일로 받아 둔다. */
+        window._명세서보내기 = async function () {
+            const blob = window._명세서PDF만들기();
+            if (!blob) { if (typeof showToastMessage === 'function') showToastMessage('보낼 것이 없습니다.'); return; }
+            const 이름 = _명세서파일이름('pdf');
+            const 지 = window._명세서지금;
+            window.__명세서보낸것 = { 이름, 크기: blob.size, 갈래: blob.type };
+            try {
+                const 파일 = new File([blob], 이름, { type: 'application/pdf' });
+                if (navigator.share && (!navigator.canShare || navigator.canShare({ files: [파일] }))) {
+                    await navigator.share({ files: [파일], title: 이름,
+                        text: (지 ? 지.날짜 + ' ' + 지.공정 + ' 내역' : '명세서') });
+                    return;
+                }
+            } catch (e) {
+                if (e && e.name === 'AbortError') return;      // 사장님이 손수 무르신 것
+            }
+            _명세서내려받기(blob, 이름);
+            if (typeof showToastMessage === 'function') showToastMessage('보내기가 안 되는 기기라 파일로 받았습니다.');
         };
 
         window._명세서엑셀 = function () {

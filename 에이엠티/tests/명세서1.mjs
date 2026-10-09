@@ -113,6 +113,11 @@ const 판본 = await p.evaluate(() => {
            발급: !document.getElementById('명세-발급')?.disabled,
            인쇄죽음: !!document.getElementById('명세-인쇄')?.disabled,
            엑셀죽음: !!document.getElementById('명세-엑셀')?.disabled,
+           PDF죽음: !!document.getElementById('명세-PDF')?.disabled,
+           보내기죽음: !!document.getElementById('명세-보내기')?.disabled,
+           단추자리: [...판.querySelectorAll('.명세-바닥 button')].map(e => {
+             const r = e.getBoundingClientRect();
+             return { 글: (e.textContent || '').trim(), 높: Math.round(r.height), 폭: Math.round(r.width) }; }),
            번호: (document.getElementById('명세-번호')?.textContent || '').trim(),
            단가: window._재단단가,
            돈줄: [...판.querySelectorAll('.명세-표 tr')].map(tr => {
@@ -152,8 +157,12 @@ console.log('■ 펴진 명세서: ' + JSON.stringify(판본));
 판('③ 합계 금액도 합계 매수 × 2,400 이다',
    !!판본.합계줄 && 판본.합계줄.돈 === (parseInt(판본.합계줄.매, 10) * 2400).toLocaleString('ko-KR'),
    JSON.stringify(판본.합계줄));
-판('④ 발급 전에는 인쇄·엑셀이 죽어 있다', 판본.인쇄죽음 === true && 판본.엑셀죽음 === true,
-   '인쇄죽음 ' + 판본.인쇄죽음 + ' · 엑셀죽음 ' + 판본.엑셀죽음);
+판('④ 발급 전에는 인쇄·PDF·엑셀·보내기가 다 죽어 있다',
+   판본.인쇄죽음 === true && 판본.엑셀죽음 === true && 판본.PDF죽음 === true && 판본.보내기죽음 === true,
+   JSON.stringify({ 인쇄: 판본.인쇄죽음, PDF: 판본.PDF죽음, 엑셀: 판본.엑셀죽음, 보내기: 판본.보내기죽음 }));
+판('④ 단추는 모두 44px 이상이다 (장갑 낀 손)',
+   판본.단추자리.length === 5 && 판본.단추자리.every(x => x.높 >= 44),
+   JSON.stringify(판본.단추자리));
 판('④ 발급 전에는 발급번호가 없다', 판본.번호 === '', JSON.stringify(판본.번호));
 
 await 짚기('#명세-발급');
@@ -162,11 +171,49 @@ const 발급뒤 = await p.evaluate(() => ({
   발급죽음: !!document.getElementById('명세-발급')?.disabled,
   인쇄살음: !document.getElementById('명세-인쇄')?.disabled,
   엑셀살음: !document.getElementById('명세-엑셀')?.disabled,
+  PDF살음: !document.getElementById('명세-PDF')?.disabled,
+  보내기살음: !document.getElementById('명세-보내기')?.disabled,
   쓰기: window.__쓰기, 문서가로: document.documentElement.scrollWidth }));
 console.log('■ 발급 뒤: ' + JSON.stringify(발급뒤));
 판('⑤ 발급을 누르면 번호가 찍힌다', /\d{8}-재단/.test(발급뒤.번호), JSON.stringify(발급뒤.번호));
-판('⑤ 그제야 인쇄·엑셀이 살아난다', 발급뒤.인쇄살음 === true && 발급뒤.엑셀살음 === true,
-   '인쇄 ' + 발급뒤.인쇄살음 + ' · 엑셀 ' + 발급뒤.엑셀살음);
+판('⑤ 그제야 인쇄·PDF·엑셀·보내기가 다 살아난다',
+   발급뒤.인쇄살음 === true && 발급뒤.엑셀살음 === true && 발급뒤.PDF살음 === true && 발급뒤.보내기살음 === true,
+   JSON.stringify(발급뒤));
+
+/* ── PDF (10-09 지시 「pdf로도 발급 되어야 하고 외부보내기 가능하게」) ─────
+   바깥 꾸러미(CDN)를 못 받는 상자라 제 손으로 짠다 — 장을 캔버스에 그려 JPEG 로
+   떠서 PDF 에 넣는다. 여기서는 **진짜 바이트**를 꺼내 머리글·크기·쪽수를 잰다. */
+const pdf = await p.evaluate(async () => {
+  const blob = window._명세서PDF만들기();
+  if (!blob) return { 없음: true };
+  const buf = new Uint8Array(await blob.arrayBuffer());
+  const 끝 = String.fromCharCode(...buf.subarray(buf.length - 6));
+  return { 크기: blob.size, 갈래: blob.type, 장수: window._명세서장들().length,
+           머리: String.fromCharCode(...buf.subarray(0, 8)), 끝: 끝.trim(),
+           쪽수: (String.fromCharCode(...buf.subarray(0, 400)).match(/\/Count (\d+)/) || [])[1] };
+});
+console.log('■ PDF: ' + JSON.stringify(pdf));
+판('⑥ PDF 가 **파일로** 나온다 (%PDF 로 시작하고 %%EOF 로 끝난다)',
+   !pdf.없음 && pdf.머리 === '%PDF-1.4' && /%%EOF/.test(pdf.끝) && pdf.갈래 === 'application/pdf',
+   JSON.stringify(pdf));
+판('⑥ 빈 파일이 아니다 (장 수와 크기)', !pdf.없음 && pdf.크기 > 20000 && pdf.장수 >= 1
+   && String(pdf.쪽수) === String(pdf.장수), pdf.크기 + '바이트 · ' + pdf.장수 + '장 · PDF 쪽수 ' + pdf.쪽수);
+
+/* 외부보내기 — 이 상자에는 공유판이 없다. 허수아비 navigator.share 를 놓고
+   **무엇이 실려 나가는지**(파일 이름·크기·형식) 담아서 본다. */
+const 실린것 = await p.evaluate(async () => {
+  window.__실린것 = null;
+  navigator.share = async (d) => { window.__실린것 = { 제목: d.title, 글: d.text,
+    파일: (d.files || []).map(f => ({ 이름: f.name, 크기: f.size, 갈래: f.type })) }; };
+  navigator.canShare = () => true;
+  await window._명세서보내기();
+  return window.__실린것;
+});
+console.log('■ 외부보내기에 실린 것: ' + JSON.stringify(실린것));
+판('⑦ 외부보내기에 PDF 파일이 실려 나간다 (이름·크기·형식)',
+   !!실린것 && 실린것.파일.length === 1 && /^명세서_\d{4}-\d{2}-\d{2}_재단\.pdf$/.test(실린것.파일[0].이름)
+   && 실린것.파일[0].갈래 === 'application/pdf' && 실린것.파일[0].크기 === pdf.크기,
+   JSON.stringify(실린것));
 판('⑤ 두 번 발급되지 않는다', 발급뒤.발급죽음 === true, String(발급뒤.발급죽음));
 
 await 짚기('#명세서판 .명세-닫기');
