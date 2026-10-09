@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.29.0 (2026-10-09) — 납기를 파레트 큐알별로 묶고, 파레트 없는 제품은 배송출발을 막는다
+     버전: v1.30.0 (2026-10-09) — 원장 엑셀을 폰에 두고 바뀐 때만 받는다 (새로고침이 느리던 것)
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2548,7 +2548,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.29.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.30.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2681,7 +2681,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.29.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.30.0</b></p>
         </div>
     </div>
 
@@ -3325,7 +3325,7 @@
                     if (latest && latest.downloadURL) {
                         // storagePath 없으면 fileName으로 경로 유도
                         const sp = latest.storagePath || (latest.fileName ? `artifacts/vivivic-4b7ef/excel_files/${latest.fileName}` : null);
-                        loadCloudExcelData(latest.downloadURL, latest.fileName, sp);
+                        loadCloudExcelData(latest.downloadURL, latest.fileName, sp, _원장열쇠(latest));
                         return;
                     }
                 }
@@ -4413,14 +4413,73 @@
             });
         }
 
-        async function loadCloudExcelData(url, fileName, storagePath) {
+        /* ── 원장을 폰에 두고 **바뀐 때만** 받는다 (10-09 사장님 말씀) ────────
+           「새로고침시 기존데이터를 잘 불러오지 못해 몇번씩 새로고침 해야만 데이터를
+             불러오고 있다」·「데이터가 도착하는 시간지연이 점점 길어지는 느낌」.
+           열 때마다 원장 엑셀을 창고에서 통째로 받아 그 자리에서 XLSX 로 풀고 있었다 —
+           폰에서 제일 오래 걸리는 자리다. 그런데 원장은 자주 안 바뀐다.
+           그래서 **excel_metadata 가 가리키는 그 파일**(storagePath·파일이름·올린 때)을
+           열쇠로 삼아 **푼 결과**를 폰(IndexedDB)에 둔다. 다음에 열 때 열쇠가 같으면
+           둔 것을 쓰고, 다르면 그때만 새로 받는다.
+           ⚠ 둔 것이 없거나 깨졌으면 **지금처럼 받는다** — 아무것도 못 쓰게 되면 안 된다.
+           ⚠ 1·2·3차 받는 길(fetch → getDownloadURL → getBytes)은 한 줄도 안 건드렸다.
+           ⚠ 사장님이 원장을 새로 올리시면 파일 이름(때가 박힌 이름)과 올린 때가 함께
+             바뀐다 → 열쇠가 달라져 **반드시 새것을 받는다.** 그것이 제일 중요하다.
+           ⚠ 화면에는 아무 글도 안 만든다 — 빨라지기만 하면 된다. */
+        function _원장열쇠(meta) {
+            if (!meta) return '';
+            const t = meta.timestamp;
+            const 때 = (t && typeof t === 'object')
+                ? String(t.seconds != null ? t.seconds : (typeof t.toMillis === 'function' ? t.toMillis() : ''))
+                : String(t || '');
+            return [meta.storagePath || '', meta.fileName || '', 때].join('|');
+        }
+        const _원장통 = 'amt원장', _원장칸 = '둔것', _원장키 = '원장';
+        function _원장DB() {
+            return new Promise((풀, 깸) => {
+                try {
+                    if (typeof indexedDB === 'undefined') { 깸(new Error('IndexedDB 없음')); return; }
+                    const req = indexedDB.open(_원장통, 1);
+                    req.onupgradeneeded = () => {
+                        const d = req.result;
+                        if (!d.objectStoreNames.contains(_원장칸)) d.createObjectStore(_원장칸);
+                    };
+                    req.onsuccess = () => 풀(req.result);
+                    req.onerror = () => 깸(req.error || new Error('열기 실패'));
+                } catch (e) { 깸(e); }
+            });
+        }
+        async function _원장둔것() {
+            try {
+                const d = await _원장DB();
+                const 값 = await new Promise((풀, 깸) => {
+                    const t = d.transaction(_원장칸, 'readonly');
+                    const r = t.objectStore(_원장칸).get(_원장키);
+                    r.onsuccess = () => 풀(r.result); r.onerror = () => 깸(r.error);
+                });
+                d.close();
+                return 값 || null;
+            } catch (e) { return null; }          // 못 꺼내면 없는 것으로 본다 — 그냥 받는다
+        }
+        async function _원장두기(열쇠, 줄) {
+            try {
+                const d = await _원장DB();
+                await new Promise((풀, 깸) => {
+                    const t = d.transaction(_원장칸, 'readwrite');
+                    const r = t.objectStore(_원장칸).put({ 열쇠, 줄, 때: Date.now() }, _원장키);
+                    r.onsuccess = () => 풀(); r.onerror = () => 깸(r.error);
+                });
+                d.close();
+            } catch (e) { /* 못 두어도 그만이다 — 다음에 또 받으면 된다 */ }
+        }
+
+        async function loadCloudExcelData(url, fileName, storagePath, 열쇠) {
             const indicator = document.getElementById('cloud-sync-status');
             indicator.className = "sync-indicator sync-active";
             indicator.textContent = "SYNCING...";
 
-            const processArrayBuffer = (arrayBuffer) => {
-                const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
-                const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
+            // 푼 줄을 화면에 들이는 자리 — 받아서 푼 것이든 **둔 것**이든 여기로 온다
+            const 품기 = (jsonData) => {
                 if (jsonData.length > 0) {
                     currentFullData = jsonData;
                     window._자료왔다('원장');       // 원장이 실제로 손에 들어온 자리
@@ -4438,6 +4497,22 @@
                     window._자료탈났다('원장', '원장이 비어 있음');
                 }
             };
+            const processArrayBuffer = (arrayBuffer) => {
+                const workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+                const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
+                품기(jsonData);
+                return jsonData;
+            };
+
+            /* 둔 것이 그 파일의 것이면 창고에 안 간다. 열쇠가 다르면(새 원장을 올리셨다)
+               아래 받는 길로 그냥 내려간다 — 둔 것은 새로 받은 것으로 덮인다. */
+            if (열쇠) {
+                const 둔 = await _원장둔것();
+                if (둔 && 둔.열쇠 === 열쇠 && Array.isArray(둔.줄) && 둔.줄.length > 1) {
+                    품기(둔.줄);
+                    return;
+                }
+            }
 
             try {
                 // 1차: 저장된 URL로 직접 fetch
@@ -4471,7 +4546,9 @@
                 }
 
                 if (fetchOk && arrayBuffer) {
-                    processArrayBuffer(arrayBuffer);
+                    const 줄 = processArrayBuffer(arrayBuffer);
+                    // 다음에 열 때 쓰려고 둔다 — 못 두어도 그만이다(다음에 또 받는다)
+                    if (열쇠 && Array.isArray(줄) && 줄.length > 1) _원장두기(열쇠, 줄);
                 } else {
                     throw new Error("모든 다운로드 방법 실패");
                 }
