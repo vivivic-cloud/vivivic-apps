@@ -206,7 +206,7 @@
         <div id="규칙목록" style="margin-top:8px"></div>
     </div>
 
-    <footer><p>v0.13.1</p></footer>
+    <footer><p>v0.13.2</p></footer>
 </div>
 
 <!-- 짚어서 지시하는 손잡이 (?viggle=1 일 때만 켜진다) -->
@@ -600,6 +600,8 @@ async function 배송흘려고름(buf, f) {
     let 머리 = -1, head = null, 후보 = null, 봉지 = null;
     let 쓸줄수 = 0, 취소 = 0, 이름없음 = 0, iN = -1, iC = -1, 칸수 = 0;
     const 센것 = await S.줄마다(buf, (값, i) => {
+        // 머리줄을 고른 뒤로는 머리줄보다 뒤에 있는 칸을 버린다 (담을 때와 같은 잣대)
+        if (칸수 && 값.length > 칸수) 값.length = 칸수;
         if (머리 < 0) {
             첫줄.push(값.slice());
             if (첫줄.length < 머리줄깊이) return;          // 위 열 줄을 모아 머리줄을 고른다
@@ -663,8 +665,13 @@ async function 배송흘려담기(것, 이미) {
     const 셈통 = { 가린수: 0, 주소본것: 0 };
     const byMonth = {}, rowsOf = {};
     const 조각들 = [B.BOM], 묶음 = [], 새열쇠 = new Set();
+    const 칸수 = 것.head.length;
     let 센줄 = 0, 겹침 = 0, 줄차례 = 0;
     await S.줄마다(await 것.날것.arrayBuffer(), (값) => {
+        // ⚠ **머리줄보다 뒤에 있는 칸은 읽은 자리에서 버린다.** ERP 엑셀은 머리줄 밖으로
+        //    빈 칸·서식 칸이 멀리까지 뻗어 나오는 일이 있다. 세는 데도, 창고 사본에도 안 쓴다.
+        //    ⚠ **자르는 것이지 막는 것이 아니다** — 칸 이름을 보고 돌려보내는 길은 없다(집 규칙).
+        if (값.length > 칸수) 값.length = 칸수;
         // ⚠ **창고 사본에는 모든 줄이 들어간다** — 머리줄도, 취소 줄도, 겹친 줄도.
         //    창고는 원본을 두는 자리다(CLAUDE.md 「원본을 버리지 마라」). 세는 것만 걸러낸다.
         const rr = 남길자리.map(i => (값[i] !== undefined) ? String(값[i]) : '');
