@@ -494,15 +494,32 @@ const 바탕판 = await p.evaluate(() => {
      바탕판 !== null && /바닥/.test(바탕판),
      바탕판 === null ? '안 떴다' : '지금 적히는 것: ' + 바탕판.replace(/\s+/g, ' ').slice(0, 80));
 
-/* 손잡이가 안 켜졌을 때는 아무 일도 없어야 한다 — 직원들이 보는 화면은 그대로다 */
-await p.goto(주소, { waitUntil: 'domcontentloaded' });
-await p.waitForTimeout(400);
-const 평소 = await 집을점('패널쏘');
-await p.mouse.move(평소.x, 평소.y);
-await p.mouse.down(); await p.waitForTimeout(900); await p.mouse.up();
-await p.waitForTimeout(200);
-재기('손잡이를 안 켜면 길게 눌러도 판이 안 뜨나',
-     await p.evaluate(() => !document.querySelector('.vg-sheet')));
+/* 손잡이가 안 켜졌을 때는 아무 일도 없어야 한다 — 직원들이 보는 화면은 그대로다.
+   ⚠ **깨끗한 통에서 재야 한다.** 관리자가 10-10 에 손잡이를 고쳐, 한 번 켜진
+      것을 기억하게 했다(「표가 사라져도 짚어서 지시할 수 있게」 — 69a314c).
+      그래서 ?viggle=1 로 한 번 연 통에서는 주소에 표가 없어도 판이 뜬다.
+      그것은 관리자가 **일부러** 그렇게 한 것이다. 재야 하는 것은 「한 번도
+      안 켠 사람에게는 안 뜬다」 이므로, 통을 새로 내어 잰다. */
+{
+    const 안켠통 = await b.newContext(폰);
+    await 안켠통.route('**/firebasejs/**', r => r.fulfill({ status: 200,
+        contentType: 'text/javascript', body: 'export const x=1;' }));
+    const p0 = await 안켠통.newPage();
+    await 본보기깔기(안켠통);
+    await p0.goto(주소, { waitUntil: 'domcontentloaded' });
+    await p0.waitForTimeout(450);
+    const 평소 = await p0.evaluate(() => {
+        const e = [...document.querySelectorAll('.lmc')].find(x => x.querySelector('.lnm').textContent === '패널쏘');
+        const r = e.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    });
+    await p0.mouse.move(평소.x, 평소.y);
+    await p0.mouse.down(); await p0.waitForTimeout(900); await p0.mouse.up();
+    await p0.waitForTimeout(250);
+    재기('손잡이를 **한 번도 안 켠** 통에서는 길게 눌러도 판이 안 뜨나',
+         await p0.evaluate(() => !document.querySelector('.vg-sheet')));
+    await 안켠통.close();
+}
 /* 손잡이를 켠 채로도 ② 가 그대로 되나 — 지시판이 뜨면 끌기는 멈춰야 한다 */
 await p.goto(손잡이주소, { waitUntil: 'domcontentloaded' });
 await p.waitForTimeout(450);
