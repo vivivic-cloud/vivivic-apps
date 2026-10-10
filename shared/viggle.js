@@ -262,12 +262,20 @@
     // 확대는 대개 한 손가락이 먼저 닿고 둘째가 뒤따른다 — 그때도 touchstart 가
     // 다시 오므로 여기서 걸린다.
     if (e.touches && e.touches.length > 1) return 그만();
+    /* ⚠ **오른쪽 단추는 짚는 것이 아니다 — 복사하시려는 것이다.**
+       10-10 사장님: 「화면에서 복사 하려고 우클릭하면 짚기 팝업떠서 오류 복사가 안된다」.
+       왼쪽 단추(0)와 손가락만 짚기로 센다. */
+    if (!e.touches && e.button !== undefined && e.button !== 0) return 그만();
     const p = e.touches ? e.touches[0] : e;
     if (e.target.closest('.vg-sheet')) return;
     시작 = { x: p.clientX, y: p.clientY };
     시계 = setTimeout(() => {
+      /* ⚠ **글을 집고 계시면 안 뜬다.** 전에는 여기서 집은 글을 지워 버려(removeAllRanges)
+         복사가 막혔다. 집힌 글이 있으면 짚기를 접는다 — 복사가 먼저다. */
+      const sel = getSelection && getSelection();
+      if (sel && String(sel).trim()) { 시계 = null; return; }
       시계 = null; 짚었다 = true;
-      const sel = getSelection && getSelection(); sel && sel.removeAllRanges();
+      sel && sel.removeAllRanges();
       겨냥 = e.target;
       겨냥.classList.add('vg-mark');
       시트(무엇(겨냥));
