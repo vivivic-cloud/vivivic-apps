@@ -206,7 +206,7 @@
         <div id="규칙목록" style="margin-top:8px"></div>
     </div>
 
-    <footer><p>v0.13.0</p></footer>
+    <footer><p>v0.13.1</p></footer>
 </div>
 
 <!-- 짚어서 지시하는 손잡이 (?viggle=1 일 때만 켜진다) -->
@@ -255,6 +255,14 @@ function 때이름(d) {
            p(d.getHours()) + p(d.getMinutes()) + '-' + p(d.getSeconds());
 }
 const 때보임 = id => { const m = String(id).match(/^\d{4}(\d{2})(\d{2})-(\d{2})(\d{2})/); return m ? `${m[1]}-${m[2]} ${m[3]}:${m[4]}` : ''; };
+
+// 오류가 난 **자리(파일·줄 번호)** 를 한 줄로 뽑는다. 사장님이 빨간 띠를 그대로 전해 주시면
+// 그 한 줄로 어느 줄에서 터졌는지 바로 집힌다.
+function 자취한줄(err) {
+    const 줄들 = String((err && err.stack) || '').split('\n').map(s => s.trim()).filter(Boolean);
+    const 쓸것 = 줄들.find(s => /:\d+:\d+/.test(s));
+    return 쓸것 ? ' — ' + 쓸것.replace(/^at\s+/, '').slice(-110) : '';
+}
 
 function fail(err) {
     console.error(err);
@@ -829,7 +837,11 @@ async function 배송담기() {
         배송집계 = (await getDocs(칸(자리.배송집계))).docs.map(d => d.data() || {});
         자료그리기();
     } catch (err) {
-        fail(new Error('배송정보를 담다가 멈췄습니다 — ' + 자리이름 + ' — ' + (err.code || '') + ' ' + err.message));
+        // ⚠ **자취(stack) 첫 줄을 같이 찍는다.** 자리 이름만으로는 모자랐다 —
+        //    10-10 사장님 「① 세고 가리는 중 — Invalid array length」 에서 어느 줄인지 못 집었다.
+        //    사파리는 「함수@…/제품명료화.html:658:40」, 크롬은 「at 함수 (…:658:40)」 꼴이다.
+        fail(new Error('배송정보를 담다가 멈췄습니다 — ' + 자리이름 + ' — ' + (err.code || '') + ' ' + err.message
+            + 자취한줄(err)));
     }
     $('판-올리는중').classList.add('hidden');
     $('fill').style.width = '0';
