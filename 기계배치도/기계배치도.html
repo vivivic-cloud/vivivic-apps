@@ -147,6 +147,25 @@ body{
   background:#fff; color:var(--vg-soft); font:inherit; font-size:15px; font-weight:700;
   cursor:pointer; -webkit-tap-highlight-color:transparent;}
 .lcbtn.짙은{background:var(--vg-ink); color:#fff; border-color:var(--vg-ink);}
+/* ── 속성 판 ─────────────────────────────────────────────────────────
+   사장님 말씀(10-10): 「더블클릭 속성입력 창 기능 안 나타나」.
+   그런 창이 없었다 — 바닥 크기 판 하나뿐이었다. 그래서 짓는다.
+   네모를 **두 번 톡** 치면 이름·갈래·크기·자리·각을 한 판에서 넣는다.
+   ⚠ 고르는 칸은 단추 줄로 둔다. 아이폰의 select 는 아래에서 바퀴가 올라와
+      이 판을 가리고, 엄지로 돌리기가 사납다. 한 번 짚으면 끝나게 한다. */
+.lpick{display:flex; flex-wrap:wrap; gap:6px; margin:0 0 10px;}
+.lpick button{flex:0 0 auto; min-height:44px; min-width:52px; padding:0 10px;
+  border:1px solid var(--vg-edge); border-radius:12px; background:#fff;
+  color:var(--vg-soft); font:inherit; font-size:14px; font-weight:700;
+  cursor:pointer; -webkit-tap-highlight-color:transparent;}
+.lpick button[aria-pressed="true"]{background:var(--vg-ink); color:#fff; border-color:var(--vg-ink);}
+.lpick button[disabled]{opacity:.38; cursor:default;}
+/* 글 칸 — 이름은 숫자가 아니라 글이다 */
+.lfield input[type="text"]{font-weight:700;}
+/* 판 이름줄에 지금 무엇을 고치는지 적는다 */
+.lch .l작은{font-weight:400; font-size:13px; color:var(--vg-soft); margin-left:6px;}
+/* 긴 판은 화면을 넘길 수 있다 — 굴러가게 둔다(폰 세로 480px 도 있다) */
+.lcard.긴것{max-height:88dvh; overflow-y:auto;}
 
 /* ── 기준 보드판 2,440×1,220 ───────────────────────────────────────
    기계가 아니다. 끌리지도 부딪히지도 않는다 — 바닥에 깔린 **자**다.
@@ -452,6 +471,30 @@ body{
       <div class="lcrow">
         <button class="lcbtn" id="l-size-no" type="button">그만</button>
         <button class="lcbtn 짙은" id="l-size-ok" type="button">넣기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 속성 판 — 네모를 두 번 톡 치면 뜬다 (사장님 말씀 10-10) -->
+  <div class="lsheet" id="l-prop-sheet" hidden data-area="속성판">
+    <div class="lcard 긴것">
+      <div class="lch">속성<span class="l작은" id="l-prop-who">—</span></div>
+      <label class="lfield"><span>이름</span>
+        <input id="l-p-name" type="text" maxlength="40" placeholder="예: 재단기"></label>
+      <div class="lpick" id="l-p-kind" data-area="갈래고르기"></div>
+      <label class="lfield"><span>가로 (m)</span>
+        <input id="l-p-w" type="number" inputmode="decimal" step="0.01" min="0.1"></label>
+      <label class="lfield"><span>세로 (m)</span>
+        <input id="l-p-h" type="number" inputmode="decimal" step="0.01" min="0.1"></label>
+      <label class="lfield"><span>왼쪽벽 (m)</span>
+        <input id="l-p-x" type="number" inputmode="decimal" step="0.01" min="0"></label>
+      <label class="lfield"><span>위벽 (m)</span>
+        <input id="l-p-y" type="number" inputmode="decimal" step="0.01" min="0"></label>
+      <div class="lpick" id="l-p-ang" data-area="각고르기"></div>
+      <div class="lcmsg" id="l-prop-msg"></div>
+      <div class="lcrow">
+        <button class="lcbtn" id="l-prop-no" type="button">그만</button>
+        <button class="lcbtn 짙은" id="l-prop-ok" type="button">넣기</button>
       </div>
     </div>
   </div>
@@ -1358,6 +1401,10 @@ body{
         자리다시(m);                        // 덩이면 품은 조각이 다 같이 간다
         알리기(m, 푼것.막혔나);
     }
+    /* 두 번 톡 — 같은 네모를 **400ms 안에 끌지 않고** 두 번 치면 속성 판이 뜬다.
+       ⚠ dblclick 을 안 쓴다. 아이폰에서 touch-action:none 과 손가락 거둠을
+          쓰면 그 사건이 안 나는 일이 있다. 그래서 손으로 센다. */
+    let 앞선톡 = { id: null, 때: 0 };
     function 놓기(e) {
         if (!잡은것 || (e && e.pointerId !== 잡은것.pid)) return;
         const { m, el, pid, 첫x, 첫y } = 잡은것;
@@ -1368,6 +1415,15 @@ body{
         // 제자리면 담지 않는다 — 짚기만 하신 것이라 「저장했습니다」 가 뜨면 거짓이다
         if (옮겼나) 저장(true);
         알리기(m);
+        /* 끌었으면 두 번 톡이 아니다. 여럿 고르는 중에도 아니다(고르는 일이 먼저다) */
+        if (옮겼나 || 여럿모드) { 앞선톡 = { id: null, 때: 0 }; return; }
+        const 이제 = Date.now();
+        if (앞선톡.id === m.id && 이제 - 앞선톡.때 < 400) {
+            앞선톡 = { id: null, 때: 0 };
+            속성판열기(m.id);
+            return;
+        }
+        앞선톡 = { id: m.id, 때: 이제 };
     }
     /* 끄는 동안 어디로 가는지 보여 준다 — 안 보이면 자리를 잡을 수가 없다 */
     function 알리기(m, 막혔나) {
@@ -2139,6 +2195,126 @@ body{
                쪽지.textContent = '자를 치웠습니다'; }
     }
     자판.addEventListener('click', () => 자켜기(!재는중));
+
+    /* ═══ 속성 판 — 두 번 톡 치면 뜬다 ════════════════════════════════
+       사장님 말씀(10-10): 「더블클릭 속성입력 창 기능 안 나타나」.
+       그런 창은 없었다(바닥 크기 판 하나뿐이었다). 그래서 짓는다.
+
+       여기서 고치는 것 — 이름 · 갈래 · 가로 · 세로 · 왼쪽벽에서 · 위벽에서 · 각.
+       사장님이 「하나씩 지정해서 규칙을 알려줄게」 하셨으니, 이름 없는 네모
+       아흔셋에 이름을 달고 갈래를 바로잡는 자리가 바로 이 판이다.
+
+       ⚠ 두 번 짚기를 **손으로 센다.** 아이폰에서 dblclick 은 touch-action:none
+          과 손가락 거둠(pointer capture)을 쓰면 안 나는 일이 있다. 그래서
+          「같은 네모를 400ms 안에 두 번, 끌지 않고 톡」 으로 셈한다.
+       ⚠ 덩이는 크기를 못 고친다 — 테만 늘리면 품은 조각은 그대로라 「모양 유지」
+          가 깨진다(합치기() 에 적어 둔 그 까닭이다). 이름·갈래·자리·각만 연다. */
+    const 속성판 = $('l-prop-sheet'), 속성쪽지 = $('l-prop-msg');
+    const 속칸 = { 이름: $('l-p-name'), 가로: $('l-p-w'), 세로: $('l-p-h'),
+                   x: $('l-p-x'), y: $('l-p-y') };
+    let 속성대상 = null;          // 고치고 있는 것의 id
+    let 첫글 = {};                // 판을 열었을 때 칸에 들어 있던 글
+    let 고른갈래 = '기', 고른각 = 0;
+    const 갈래단추 = [['기', '기계'], ['파', '파레트'], ['둥', '기둥'], ['방', '방'],
+                      ['문', '문'], ['원', '원'], ['밖', '홀 밖'], ['몰', '모름']];
+
+    function 고르개만들기(통, 들, 지금, 고름) {
+        통.innerHTML = '';
+        들.forEach(([값, 글]) => {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.textContent = 글;
+            b.dataset.값 = String(값);
+            b.dataset.area = 통.dataset.area + ':' + 글;
+            b.setAttribute('aria-pressed', String(값 === 지금));
+            b.addEventListener('click', () => {
+                [...통.children].forEach(c => c.setAttribute('aria-pressed',
+                    String(c.dataset.값 === String(값))));
+                고름(값);
+            });
+            통.appendChild(b);
+        });
+    }
+
+    function 속성판열기(id) {
+        if (재는중) return;              // 자를 켜 두셨으면 지금은 재는 중이다
+        const m = 기계들.find(x => x.id === id);
+        if (!m) return;
+        속성대상 = id;
+        const 덩이냐 = !!(m['조각'] && m['조각'].length);
+        $('l-prop-who').textContent = 덩이냐 ? '— 덩이 (조각 ' + m['조각'].length + '개)' : '';
+        속칸.이름.value = m.이름 || '';
+        속칸.이름.placeholder = 부를이름(m);
+        속칸.가로.value = 미터칸값(m.가로);
+        속칸.세로.value = 미터칸값(m.세로);
+        속칸.x.value = 미터칸값(m.x);
+        속칸.y.value = 미터칸값(m.y);
+        /* ⚠ 열었을 때의 글을 적어 둔다. **손대지 않은 칸은 건드리지 않는다** —
+           미터로 보이는 수는 10mm 눈금까지라, 그냥 다시 읽으면 캐드 참값
+           734mm 가 730mm 로 밀린다. 이름만 고치셨는데 자리가 4mm 틀어지면
+           「도면과 1:1」 이 깨진다(10-10 에 재어서 잡았다). */
+        첫글 = { 가로: 속칸.가로.value, 세로: 속칸.세로.value,
+                 x: 속칸.x.value, y: 속칸.y.value };
+        속칸.가로.disabled = 속칸.세로.disabled = 덩이냐;
+        고른갈래 = m['갈래'] || '기';
+        고른각 = 각의(m);
+        고르개만들기($('l-p-kind'), 갈래단추, 고른갈래, v => { 고른갈래 = v; });
+        고르개만들기($('l-p-ang'), [[0, '0°'], [90, '90°'], [180, '180°'], [270, '270°']],
+                     고른각, v => { 고른각 = v; });
+        속성쪽지.className = 'lcmsg';
+        속성쪽지.textContent = 덩이냐
+            ? '덩이는 크기를 못 고칩니다 — 먼저 되돌리십시오'
+            : '벽이나 다른 기계에 닿으면 거기서 섭니다';
+        속성판.hidden = false;
+        속칸.이름.focus();
+    }
+    const 속성판닫기 = () => { 속성판.hidden = true; 속성대상 = null; };
+
+    function 속성넣기() {
+        const m = 기계들.find(x => x.id === 속성대상);
+        if (!m) { 속성판닫기(); return; }
+        const 덩이냐 = !!(m['조각'] && m['조각'].length);
+        /* 손대지 않은 칸은 **본래 mm 값 그대로** 쓴다(까닭은 속성판열기() 에) */
+        const 읽기 = (칸, 본래) => 속칸[칸].value === 첫글[칸]
+            ? 본래 : 미터읽기(속칸[칸].value);
+        const 값 = { 가로: 읽기('가로', m.가로), 세로: 읽기('세로', m.세로),
+                     x: 읽기('x', m.x), y: 읽기('y', m.y) };
+        const 나쁜것 = Object.entries(값).filter(([k, v]) =>
+            !Number.isFinite(v) || ((k === '가로' || k === '세로') && !덩이냐 && v < 기계최소));
+        if (나쁜것.length) {
+            속성쪽지.className = 'lcmsg 나쁨';
+            속성쪽지.textContent = 나쁜것.map(([k]) => k).join('·') + ' 를 미터로 넣어 주십시오'
+                + ' (가장 작은 크기 ' + 미터(기계최소) + ' m)';
+            return;
+        }
+        const 전 = { 가로: m.가로, 세로: m.세로, x: m.x, y: m.y, 각: 각의(m), 갈래: m['갈래'] };
+        m.이름 = 속칸.이름.value.trim();
+        m['갈래'] = 고른갈래;
+        m['각'] = 고른각;
+        if (!덩이냐) { m.가로 = 값.가로; m.세로 = 값.세로; }
+        /* 자리는 **벽 안으로만** 들인다. 눈금에 떨어뜨리지 않는다 — 캐드 참값은
+           눈금에 안 떨어지는 것이 있어, 넣은 수가 몰래 밀리면 안 된다. */
+        const 들이기 = (v, 끝) => Math.max(0, Math.min(Math.max(0, 끝), v));
+        const 갈x = 들이기(값.x, 바닥.가로 - 폭(m)), 갈y = 들이기(값.y, 바닥.세로 - 높(m));
+        const 푼것 = 풀기(m, 갈x, 갈y);
+        m.x = 푼것.x; m.y = 푼것.y;
+        /* 넣은 대로 못 간 데가 있으면 그렇게 알린다 — 몰래 다른 수가 되면 안 된다 */
+        const 밀림 = Math.abs(m.x - 값.x) > 0.5 || Math.abs(m.y - 값.y) > 0.5;
+        속성판닫기();
+        재기(); 그리기(); 저장(true);
+        고르기(m.id);
+        쪽지.textContent = 부를이름(m) + ' — '
+            + 미터(m.가로) + ' × ' + 미터(m.세로) + ' m · 왼쪽벽 ' + 미터(m.x)
+            + ' · 위벽 ' + 미터(m.y) + ' m'
+            + (고른각 ? ' · ' + 고른각 + '°' : '')
+            + (밀림 ? ' (벽이나 다른 기계에 막혀 ' + 미터(값.x) + ',' + 미터(값.y)
+                      + ' 까지는 못 갔습니다)' : '');
+        if (전.가로 === m.가로 && 전.세로 === m.세로 && 전.x === m.x && 전.y === m.y
+            && 전.각 === 각의(m) && 전.갈래 === m['갈래']) { /* 이름만 바뀐 것도 담긴다 */ }
+    }
+    $('l-prop-no').addEventListener('click', 속성판닫기);
+    $('l-prop-ok').addEventListener('click', 속성넣기);
+    속성판.addEventListener('click', e => { if (e.target === 속성판) 속성판닫기(); });
 
     /* ── 열기 ──────────────────────────────────────────────────────── */
     /* 보고 계시던 벌로 연다 */

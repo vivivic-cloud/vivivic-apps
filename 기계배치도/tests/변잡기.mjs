@@ -96,9 +96,18 @@ async function 기계고르기(id) {
         return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
     }, id);
     if (!점) return false;
+    /* ⚠ 앞서 짚은 때로부터 **400ms 를 띄운다.** 10-10 에 「두 번 톡 치면 속성
+       판이 뜬다」 가 들어왔다. 같은 기계를 잇달아 짚으면 그것이 두 번 톡이
+       되어 판이 뜨고, 판이 화면을 덮어 그 뒤로 손잡이를 하나도 못 짚었다.
+       사장님이 손으로 고르실 때는 이만큼 느리다. */
+    await p.waitForTimeout(450);
     await p.mouse.move(점.x, 점.y);
     await p.mouse.down(); await p.waitForTimeout(40); await p.mouse.up();
-    await p.waitForTimeout(90);
+    await p.waitForTimeout(120);
+    /* 그래도 판이 떴으면 닫고 간다 — 떠 있으면 아무것도 못 짚는다 */
+    if (await p.evaluate(() => !document.getElementById('l-prop-sheet').hidden)) {
+        await p.click('#l-prop-no'); await p.waitForTimeout(150);
+    }
     return await p.evaluate(i => !!document.querySelector('.lmc[data-id="' + i + '"].고름'), id);
 }
 async function 변끌기(누구, 축, dx, dy, 칸수 = 8) {
