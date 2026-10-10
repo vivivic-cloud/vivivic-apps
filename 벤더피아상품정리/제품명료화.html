@@ -37,7 +37,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
     import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut }
         from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
-    import { getFirestore, collection, doc, getDocs, setDoc, query, where, serverTimestamp }
+    import { getFirestore, collection, doc, getDocs, setDoc, query, where, orderBy, serverTimestamp }
         from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
     import { getStorage, ref, uploadBytes, uploadBytesResumable }
         from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
@@ -65,7 +65,7 @@
     const app = initializeApp(firebaseConfig, 'vp');
     const auth = getAuth(app);
     window.db = getFirestore(app);
-    window.fb = { collection, doc, getDocs, setDoc, query, where, serverTimestamp };
+    window.fb = { collection, doc, getDocs, setDoc, query, where, orderBy, serverTimestamp };
     window.st = getStorage(app);                      // 배송 원본은 창고로 간다
     window.fs = { ref, uploadBytes, uploadBytesResumable };
 
@@ -123,7 +123,8 @@
     .명료넣기:focus { outline:none; border-color:#37352f; }
     .명료막대 { height:10px; background:#f0efed; border-radius:99px; overflow:hidden; margin-bottom:10px; }
     .명료막대 > div { height:100%; width:0; background:#37352f; border-radius:99px; transition:width .15s; }
-    .명료빨강 { border-left:4px solid #f87171; background:#fef2f2; border-radius:0 8px 8px 0; padding:12px; font-size:12px; color:#b91c1c; margin-bottom:12px; }
+    .명료빨강 { border-left:4px solid #f87171; background:#fef2f2; border-radius:0 8px 8px 0; padding:12px; font-size:12px; color:#b91c1c; margin-bottom:12px; overflow-wrap:anywhere; }
+    /* ⚠ 띠에 터진 자리(파일·줄 번호)가 같이 찍히므로 **안 접으면 쪽이 가로로 늘어난다**(잰 값 375 → 988). */
     .명료표 { width:100%; border-collapse:collapse; font-size:12px; }
     .명료표 td { padding:5px 6px 5px 0; border-top:1px dashed #f0efed; vertical-align:top; overflow-wrap:anywhere; }
     .명료표 td.오른 { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; color:#787774; }
@@ -139,6 +140,27 @@
     .재고셈 { display:flex; flex-wrap:wrap; gap:6px; padding:3px 0 0 10px; }
     .재고셈 span { font-size:11px; font-weight:800; color:#787774; background:#f6f5f4; border-radius:5px; padding:2px 6px; font-variant-numeric:tabular-nums; }
     .재고창고, .재고딴이름 { padding:3px 0 0 10px; }
+
+    /* 배송관리 — 폰 375 가 기준. 누르는 자리는 44px 밑으로 안 내려간다. */
+    .배송거르개 { display:flex; flex-direction:column; gap:8px; margin-bottom:10px; }
+    .배송칸 { width:100%; min-height:44px; box-sizing:border-box; padding:0 10px;
+              border:1px solid #e3e2e0; border-radius:8px; font-size:14px; background:#fff; }
+    .배송날 { display:flex; align-items:center; gap:8px; }
+    .배송날 .날 { flex:1; min-width:0; }
+    .배송빠름 { display:flex; flex-wrap:wrap; gap:6px; }
+    .배송빠름 .명료딱지 { min-height:44px; }
+    /* ⚠ 표는 칸이 서른 넘게 나온다 — **가로로 굴려서** 본다. 쪽 바깥으로 넘치면 안 된다. */
+    .배송표칸 { overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid #e3e2e0; border-radius:8px; }
+    .배송표칸 table { border-collapse:collapse; font-size:12px; white-space:nowrap; }
+    .배송표칸 th, .배송표칸 td { border-right:1px solid #f0efed; border-bottom:1px solid #f0efed;
+              padding:7px 9px; text-align:left; max-width:190px; overflow:hidden; text-overflow:ellipsis; }
+    .배송표칸 thead th { position:sticky; top:0; background:#fafaf9; color:#787774;
+              font-weight:700; font-size:11px; z-index:2; }
+    .배송표칸 tbody tr:nth-child(2n) td { background:#fcfcfb; }
+    .배송쪽 { display:flex; align-items:center; justify-content:center; gap:8px; margin-top:10px; }
+    .배송쪽 button { min-height:44px; min-width:64px; border:1px solid #e3e2e0; border-radius:8px;
+              background:#fff; font-size:14px; }
+    .배송쪽 button:disabled { color:#c7c6c3; }
     footer { margin-top:32px; padding-top:16px; border-top:1px solid #ededeb; font-size:11px; color:#a8a6a2; }
 </style>
 </head>
@@ -151,6 +173,7 @@
     <div id="탭" class="명료탭 hidden">
         <button class="명료딱지 켬" data-tab="명료">제품명료화</button>
         <button class="명료딱지" data-tab="재고">재고관리</button>
+        <button class="명료딱지" data-tab="배송">배송관리</button>
     </div>
 
     <div id="err" class="명료빨강 hidden"></div>
@@ -190,6 +213,34 @@
         <div id="재고목록"></div>
     </div>
 
+    <!-- 배송관리 — 「반품스캔하고 똑같은 페이지를 명료화에 만들어봐」 (10-10 사장님)
+         ⚠ 반품스캔은 CS 칸이 있는 줄만이라 다 읽어도 됐다. 여기는 전부라 200만 줄이다.
+            그래서 **고른 달만** 화베에서 불러온다(판배송읽기). 다 읽으면 하루 열두 번이면
+            무료 읽기 한도가 끝난다 — 사장님이 에이엠티에서 겪으신 그 증상이다. -->
+    <div id="판-배송" class="명료판 hidden">
+        <div class="명료머리">배송관리</div>
+        <div class="배송거르개">
+            <input id="배송찾기" class="배송칸" type="search" placeholder="찾기 — 상품명·주문번호·송장번호…">
+            <div class="배송날">
+                <input id="배송부터" class="배송칸 날" type="month">
+                <span class="명료잔">~</span>
+                <input id="배송까지" class="배송칸 날" type="month">
+            </div>
+            <div class="배송빠름">
+                <button class="명료딱지" data-달="1">1개월</button>
+                <button class="명료딱지" data-달="3">3개월</button>
+                <button class="명료딱지" data-달="6">6개월</button>
+                <button class="명료딱지" data-달="12">1년</button>
+                <button class="명료딱지" data-달="전체">전체</button>
+            </div>
+            <button id="배송보기" class="명료단추" style="margin:0">이 범위 보기</button>
+        </div>
+        <div id="배송셈" class="명료셈"></div>
+        <div id="배송잔" class="명료잔" style="margin:2px 0 8px"></div>
+        <div id="배송표" class="배송표칸"></div>
+        <div id="배송쪽" class="배송쪽"></div>
+    </div>
+
     <!-- 상품 · 단품 맞댄 표 -->
     <div id="판-맞댐" class="명료판 hidden">
         <div class="명료머리">상품 · 단품</div>
@@ -206,7 +257,7 @@
         <div id="규칙목록" style="margin-top:8px"></div>
     </div>
 
-    <footer><p>v0.15.0</p></footer>
+    <footer><p>v0.16.0</p></footer>
 </div>
 
 <!-- 짚어서 지시하는 손잡이 (?viggle=1 일 때만 켜진다) -->
@@ -236,14 +287,23 @@ const 보일건수 = 200;            // 한 갈래에서 화면에 그리는 건
 const $ = id => document.getElementById(id);
 
 // 머리 탭 — 「재고관리」 를 누르면 재고 화면으로 들어간다. 「제품명료화」 로 돌아온다.
-const 탭판 = { 명료: ['판-올리기', '판-자료', '판-맞댐', '판-규칙'], 재고: ['판-재고'] };
+const 탭판 = { 명료: ['판-올리기', '판-자료', '판-맞댐', '판-규칙'], 재고: ['판-재고'], 배송: ['판-배송'] };
 let 지금탭 = '명료';
+let 배송처음 = true;
 function 탭보이기(t) {
     지금탭 = t;
     Object.keys(탭판).forEach(k => 탭판[k].forEach(i => $(i).classList.add('hidden')));
     탭판[t].forEach(i => $(i).classList.remove('hidden'));
     document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('켬', b.dataset.tab === t));
     window.scrollTo(0, 0);
+    /* ⚠ 배송관리는 **누르셔야 읽는다.** 프로그램 열 때 미리 읽지 않는다 —
+       200만 줄이면 열 때마다 문서 4,000개다. 처음 범위는 **최근 한 달**. */
+    if (t === '배송' && 배송처음) {
+        배송처음 = false;
+        배송달맞추기('1');
+        const b = document.querySelector('.배송빠름 [data-달="1"]'); if (b) b.classList.add('켬');
+        배송읽기();
+    }
 }
 document.addEventListener('click', e => {
     const b = e.target.closest('[data-tab]');
@@ -575,6 +635,92 @@ function 자료그리기() {
 //  화면전화 됩니다. 벤더피아 상품정리 프로그램은 이프로그램과 관련시키지 마세요」 (10-09 사장님)
 // 사람 칸 지우기·번호와 주소 가리기·겹친 주문줄 거르기는 **배송올리기.js 한 벌**을 그대로 쓴다.
 // ⚠ 그 셈을 여기에 베끼지 마라 — 두 벌이 되면 언젠가 달라지고 사람 정보가 샌다.
+/* ════════════════════════════════════════════════════════════════════
+   배송관리 — 「반품스캔하고 똑같은 페이지」 (10-10 사장님)
+   ⚠⚠ **고른 달만 불러온다.** 200만 줄이면 문서가 4,000개다. 열 때마다 다 읽으면
+      하루 열두 번에 무료 읽기 한도(5만)가 끝나고, 그때부터 자료가 안 뜬다.
+      그래서 처음 화면은 **최근 한 달**이고, 전체는 일부러 누르셔야 열린다.
+   ⚠ 거르기는 두 켜다 — **달은 화베에서**(적게 읽으려고), **글자 찾기는 손에 든 것에서**.
+   ════════════════════════════════════════════════════════════════════ */
+const 배송쪽줄수 = 100;                      // 한 쪽에 보일 줄 수 (반품스캔과 같다)
+let 배송든것 = { 머리: [], 줄: [], 달: '', 읽은문서: 0 };
+let 배송찾은것 = [];
+let 배송지금쪽 = 0;
+
+const 달글 = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+
+function 배송달맞추기(몇달) {
+    const 끝 = new Date();
+    if (몇달 === '전체') { $('배송부터').value = ''; $('배송까지').value = ''; return; }
+    const 앞 = new Date(); 앞.setMonth(앞.getMonth() - (Number(몇달) - 1));
+    $('배송부터').value = 달글(앞); $('배송까지').value = 달글(끝);
+}
+
+async function 배송읽기() {
+    const { getDocs, query, where, orderBy } = window.fb;
+    const 부터 = $('배송부터').value, 까지 = $('배송까지').value;
+    $('배송셈').textContent = '불러오는 중…'; $('배송잔').textContent = '';
+    $('배송표').innerHTML = ''; $('배송쪽').innerHTML = '';
+    try {
+        let q = 칸(자리.배송줄);
+        if (부터 && 까지)      q = query(q, where('달', '>=', 부터), where('달', '<=', 까지), orderBy('달'));
+        else if (부터)         q = query(q, where('달', '>=', 부터), orderBy('달'));
+        else if (까지)         q = query(q, where('달', '<=', 까지), orderBy('달'));
+        const 눈 = await getDocs(q);
+        const 머리들 = [], 줄 = [];
+        눈.docs.map(d => d.data() || {})
+            .sort((a, b) => String(a.달).localeCompare(String(b.달)) || (a.차례 - b.차례))
+            .forEach(v => {
+                if ((v.칸이름 || []).length > 머리들.length) 머리들.length = 0, 머리들.push(...(v.칸이름 || []));
+                let 것; try { 것 = JSON.parse(v.줄들 || '[]'); } catch (e) { 것 = []; }
+                것.forEach(r => 줄.push(r));
+            });
+        배송든것 = { 머리: 머리들, 줄, 달: (부터 || '처음') + ' ~ ' + (까지 || '끝'), 읽은문서: 눈.docs.length };
+        배송찾기돌리기();
+    } catch (e) {
+        $('배송셈').textContent = '';
+        $('배송잔').textContent = '못 불러왔습니다 — ' + (e.code || '') + ' ' + e.message;
+    }
+}
+
+function 배송찾기돌리기() {
+    const 말 = ($('배송찾기').value || '').trim().toLowerCase();
+    배송찾은것 = 말 ? 배송든것.줄.filter(r => r.some(v => String(v).toLowerCase().indexOf(말) > -1))
+                   : 배송든것.줄;
+    배송지금쪽 = 0;
+    배송그리기();
+}
+
+function 배송그리기() {
+    const 다 = 배송찾은것.length, 쪽수 = Math.max(1, Math.ceil(다 / 배송쪽줄수));
+    if (배송지금쪽 >= 쪽수) 배송지금쪽 = 쪽수 - 1;
+    const 조각 = 배송찾은것.slice(배송지금쪽 * 배송쪽줄수, (배송지금쪽 + 1) * 배송쪽줄수);
+    $('배송셈').textContent = 셈(다) + '건';
+    $('배송잔').textContent = 배송든것.달 + ' · 묶음 ' + 셈(배송든것.읽은문서) + '개 읽음'
+        + (배송든것.줄.length !== 다 ? ' · 전체 ' + 셈(배송든것.줄.length) + '건에서 추림' : '');
+    if (!다) { $('배송표').innerHTML = '<div class="명료잔" style="padding:16px">없습니다</div>';
+               $('배송쪽').innerHTML = ''; return; }
+    const 머리 = 배송든것.머리.length ? 배송든것.머리 : 조각[0].map((_, i) => '칸' + (i + 1));
+    $('배송표').innerHTML = '<table><thead><tr>' + 머리.map(h => `<th>${esc(h)}</th>`).join('')
+        + '</tr></thead><tbody>'
+        + 조각.map(r => '<tr>' + 머리.map((_, i) => `<td>${esc(r[i] ?? '')}</td>`).join('') + '</tr>').join('')
+        + '</tbody></table>';
+    $('배송쪽').innerHTML = `<button data-쪽="앞"${배송지금쪽 === 0 ? ' disabled' : ''}>◀</button>`
+        + `<span class="명료잔">${배송지금쪽 + 1} / ${셈(쪽수)}</span>`
+        + `<button data-쪽="뒤"${배송지금쪽 >= 쪽수 - 1 ? ' disabled' : ''}>▶</button>`;
+}
+
+document.addEventListener('click', e => {
+    const 빠 = e.target.closest('.배송빠름 [data-달]');
+    if (빠) { 배송달맞추기(빠.dataset.달);
+        document.querySelectorAll('.배송빠름 [data-달]').forEach(b => b.classList.toggle('켬', b === 빠));
+        배송읽기(); return; }
+    if (e.target.closest('#배송보기')) { 배송읽기(); return; }
+    const 쪽 = e.target.closest('.배송쪽 [data-쪽]');
+    if (쪽) { 배송지금쪽 += (쪽.dataset.쪽 === '뒤' ? 1 : -1); 배송그리기(); window.scrollTo(0, 0); }
+});
+document.addEventListener('input', e => { if (e.target.id === '배송찾기') 배송찾기돌리기(); });
+
 function 배송자리() {
     const 파일 = new Map();
     배송집계.forEach(d => {
@@ -723,6 +869,9 @@ async function 배송흘려담기(것, 이미, 줄담기) {
     });
     for (const [달, g] of 그릇) await 비우기(달, g);
     return { 집계: { byMonth, rowsOf, used: 센줄 }, 겹침, 새열쇠: [...새열쇠], 줄문서: 담은문서.수,
+             /* ⚠ **남긴 칸 이름**이다. 줄은 사람 칸을 뺀 뒤라 머리 이름도 그만큼이어야 한다 —
+                `것.head`(전부)를 적으면 표에서 칸과 이름이 한 칸씩 밀린다. */
+             남긴이름: 남길자리.map(i => 것.head[i]),
              지움: { 뺀이름, 가린수: 셈통.가린수, 주소본것: 셈통.주소본것 } };
 }
 
@@ -787,9 +936,10 @@ async function 배송담기() {
             /* 줄을 **달마다 따로** 담는다. 흘려 읽으면서 500줄이 차는 대로 바로 보낸다 —
                손에 쌓아 두지 않는다. 뒤에 「배송 목록」 화면이 **고른 달만** 읽어 간다. */
             const 밑 = 것.이름.replace(/[\/.#$\[\]]/g, '_');
+            const 남긴이름 = window.배송올리기.가릴자리(것.head).남길자리.map(i => 것.head[i]);
             const 줄담기 = async (달, 차례, 줄들) => {
                 await setDoc(문서(자리.배송줄, 밑 + '__' + 달 + '__' + String(차례).padStart(4, '0')),
-                    { 파일: 것.이름, 달, 차례, 칸이름: 것.head, 수: 줄들.length,
+                    { 파일: 것.이름, 달, 차례, 칸이름: 남긴이름, 수: 줄들.length,
                       줄들: JSON.stringify(줄들), 올린때: serverTimestamp() });
                 줄문서++;
                 $('올림셈').textContent = '세고 담는 중 — ' + 셈(것.쓸줄수) + '줄 · 묶음 ' + 줄문서;
