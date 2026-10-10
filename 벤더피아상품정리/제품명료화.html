@@ -257,7 +257,7 @@
         <div id="규칙목록" style="margin-top:8px"></div>
     </div>
 
-    <footer><p>v0.16.0</p></footer>
+    <footer><p>v0.16.1</p></footer>
 </div>
 
 <!-- 짚어서 지시하는 손잡이 (?viggle=1 일 때만 켜진다) -->
@@ -324,10 +324,19 @@ const 때보임 = id => { const m = String(id).match(/^\d{4}(\d{2})(\d{2})-(\d{2
 
 // 오류가 난 **자리(파일·줄 번호)** 를 한 줄로 뽑는다. 사장님이 빨간 띠를 그대로 전해 주시면
 // 그 한 줄로 어느 줄에서 터졌는지 바로 집힌다.
+/* 터진 자리를 **짧게** 적는다 — 「파일이름:줄」 만.
+   ⚠ 10-10: 처음에는 자취 줄을 통째로 110자 적었는데, 앞이 길고 긴 주소라
+      사장님이 옮겨 주실 때 **줄 번호가 든 끝이 잘려 나갔다**(「… — %ED%94%」).
+      그래서 주소를 버리고 **파일이름과 줄 번호만** 남긴다. 「제품명료화.html:754」 */
 function 자취한줄(err) {
-    const 줄들 = String((err && err.stack) || '').split('\n').map(s => s.trim()).filter(Boolean);
-    const 쓸것 = 줄들.find(s => /:\d+:\d+/.test(s));
-    return 쓸것 ? ' — ' + 쓸것.replace(/^at\s+/, '').slice(-110) : '';
+    const 글 = String((err && err.stack) || '');
+    const 자리 = [];
+    글.replace(/([^\s/\\)(]+\.(?:html|js)):(\d+):(\d+)/g, (m, f, l) => {
+        try { f = decodeURIComponent(f); } catch (e) {}
+        if (자리.length < 2) 자리.push(f + ':' + l);
+        return m;
+    });
+    return 자리.length ? ' — 자리 ' + 자리.join(' ← ') : '';
 }
 
 function fail(err) {
