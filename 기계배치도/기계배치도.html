@@ -222,6 +222,28 @@ body{
 .lmc.여럿::before{content:''; position:absolute; inset:0; background:rgba(255,59,48,.16);
   pointer-events:none; border-radius:3px;}
 
+/* ── 자로 재기 ───────────────────────────────────────────────────────
+   사장님 말씀(10-10): 「배치도면 안에서 치수를 잴 수 있게 해줘」.
+   두 점을 잡아 끌면 그 사이가 몇 m 인지 나온다. 기계 모서리·벽에 **붙는다** —
+   안 붙으면 「기계와 벽 사이 몇 m」 를 손가락으로는 영영 못 맞춘다.
+   ⚠ 금은 SVG 로 긋는다. 바닥은 가로세로가 따로 늘어나므로(폭·높이를 각각
+      넣는다) 네모를 돌려 쓰면 금 굵기까지 찌그러진다. SVG 에 %로 넣으면
+      굵기는 px 그대로 남는다. */
+.ljaa{position:absolute; inset:0; width:100%; height:100%; z-index:9600;
+  pointer-events:none; overflow:visible;}
+.ljaa line.몸{stroke:var(--vg-red); stroke-width:2;}
+.ljaa line.결{stroke:var(--vg-red); stroke-width:1; stroke-dasharray:3 3; opacity:.5;}
+.ljaa circle{fill:#fff; stroke:var(--vg-red); stroke-width:2;}
+/* 잰 수 — 금 한가운데에 붙인다. 손가락에 안 가리게 조금 위로 */
+.ljab{position:absolute; z-index:9700; transform:translate(-50%,-50%);
+  background:var(--vg-red); color:#fff; font-size:11px; font-weight:700;
+  padding:2px 6px; border-radius:9px; white-space:nowrap; pointer-events:none;
+  box-shadow:0 1px 3px rgba(17,17,16,.3);}
+/* 재는 동안에는 바닥이 안 끌린다 — 손가락은 자를 잡고 있다 */
+.lview.재는중{cursor:crosshair;}
+.lview.재는중 .lmc{cursor:crosshair;}
+.lturn[aria-pressed="true"].ljab단{background:var(--vg-red); border-color:var(--vg-red);}
+
 /* 홀 벽선 — 객체가 아니라 **그어 둔 금**이다. 기계실·엣지집진기가 홀 밖에
    그려져 있어, 홀이 어디까지인지 보이지 않으면 도면을 읽을 수가 없다. */
 .lhall{position:absolute; pointer-events:none; z-index:1;
@@ -411,6 +433,8 @@ body{
     </div>
     <div class="lbar" data-area="보는줄">
       <button class="lturn lsheet-btn" id="l-sheet" type="button" data-area="벌고르기">—</button>
+      <button class="lturn lsm ljab단" id="l-ruler" type="button" aria-pressed="false"
+              data-area="자로재기">📐 재기</button>
       <button class="lturn" id="l-turn" type="button" aria-pressed="false"
               data-area="돌리기단추">⟲ 세로로</button>
     </div>
@@ -1129,6 +1153,7 @@ body{
         바닥손잡이그리기();
         글자맞추기();
         물건줄고치기();
+        자그리기();              // 그리기() 가 바닥 속을 비우므로 금을 다시 긋는다
     }
 
     /* 바라보는 쪽에 붉은 금을 하나 긋는다. 네모난 기계(재단기 4,000×4,000)는
@@ -1892,8 +1917,22 @@ body{
 
     뷰.addEventListener('pointerdown', e => {
         손들.set(e.pointerId, { x: e.clientX, y: e.clientY });
-        if (손들.size === 2) { 끌기그만(); 핀치시작(); return; }
+        if (손들.size === 2) { 끌기그만(); 자질 = null; 핀치시작(); return; }
         if (손들.size !== 1) return;
+        /* ⚠ 자를 켜 두셨으면 **자가 먼저 받는다.** 거둠 단계라 기계·손잡이에
+           닿기 전이다 — 재다가 기계가 밀리면 배치가 망가진다. */
+        if (재는중) {
+            if (e.target.closest && e.target.closest('.lzb')) return;   // 확대 단추는 제 일을
+            e.stopPropagation();
+            붙을자리모으기();          // 그새 기계를 옮기셨을 수 있다
+            const 첫 = 붙이기(짚은점(e.clientX, e.clientY));
+            자질 = { pid: e.pointerId, ax: 첫.x, ay: 첫.y, a붙음: 첫.붙었나, 끔: false };
+            잰금 = { ax: 첫.x, ay: 첫.y, bx: 첫.x, by: 첫.y,
+                     a붙음: 첫.붙었나, b붙음: 첫.붙었나 };
+            try { 뷰.setPointerCapture(e.pointerId); } catch (err) {}
+            자그리기(); 잰것알리기();
+            return;
+        }
         // 기계·손잡이·단추는 제 일이 있다. 빈 바닥을 짚었을 때만 팬이다
         if (e.target.closest && e.target.closest('.lmc, .lhd, .lzb')) return;
         팬질 = { pid: e.pointerId, 손x: e.clientX, 손y: e.clientY,
@@ -1905,6 +1944,15 @@ body{
         const 손 = 손들.get(e.pointerId);
         if (손) { 손.x = e.clientX; 손.y = e.clientY; }
         if (핀치 && 손들.size >= 2) { 핀치끌기(); return; }
+        if (자질 && e.pointerId === 자질.pid) {
+            e.stopPropagation();
+            자질.끔 = true;
+            const 끝 = 붙이기(짚은점(e.clientX, e.clientY));
+            잰금 = { ax: 자질.ax, ay: 자질.ay, bx: 끝.x, by: 끝.y,
+                     a붙음: 자질.a붙음, b붙음: 끝.붙었나 };
+            자그리기(); 잰것알리기();
+            return;
+        }
         if (!팬질 || e.pointerId !== 팬질.pid) return;
         const dx = e.clientX - 팬질.손x, dy = e.clientY - 팬질.손y;
         if (!팬질.끔) {                      // 6px 문턱 — 톡 치려다 화면이 밀리지 않게
@@ -1918,6 +1966,13 @@ body{
 
     const 손뗌 = e => {
         손들.delete(e.pointerId);
+        if (자질 && e.pointerId === 자질.pid) {
+            const 끔 = 자질.끔;
+            자질 = null;
+            try { 뷰.releasePointerCapture(e.pointerId); } catch (err) {}
+            if (!끔) { 잰금 = null; 자그리기(); 잰것알리기(); }   // 톡 치면 금을 지운다
+            return;
+        }
         if (손들.size < 2 && 핀치) { 핀치 = null; 그리기(); }   // 떼고 나서 온전히 다시 그린다
         if (!팬질 || e.pointerId !== 팬질.pid) return;
         const 끔 = 팬질.끔;
@@ -1946,6 +2001,7 @@ body{
         벌 = 새벌;
         try { localStorage.setItem(벌열쇠, 벌.코드); } catch (e) {}
         고른들 = []; 여럿모드 = false;
+        잰금 = null; 자질 = null;                 // 벌이 바뀌면 잰 금은 뜻이 없다
         확대 = 1; 팬x = 팬y = 0;                  // 새 벌은 전체부터 본다
         잰때 = 0;
         if (!폰에서읽기()) {                       // 담긴 것이 없으면 처음 벌로 선다
@@ -1961,6 +2017,128 @@ body{
     벌단추.addEventListener('click', () => {
         벌바꾸기(벌목록[(벌목록.indexOf(벌) + 1) % 벌목록.length]);
     });
+
+    /* ═══ 자로 재기 ═══════════════════════════════════════════════════
+       사장님 말씀(10-10): 「배치도면 안에서 치수를 잴 수 있게 해줘」.
+
+       쓰는 길 — 「📐 재기」 를 켜고 **두 점을 잡아 끈다.** 끄는 동안 수가 살아서
+       바뀌고, 떼면 그 금이 남는다. 다시 끌면 새로 잰다. 끄면 금이 없어진다.
+
+       ⚠ **모서리·벽에 붙는다.** 손가락 하나는 이 자에서 20mm 가 넘는다. 안 붙게
+          두면 「기계와 벽 사이 2.0m」 를 영영 못 맞춘다. 가로는 가로끼리, 세로는
+          세로끼리 따로 붙인다 — 그래야 「옆으로 몇 m · 위아래로 몇 m」 가 깔끔히
+          떨어진다. 붙을 데가 없으면 10mm 눈금에 떨어뜨린다.
+       ⚠ 재는 동안에는 기계가 안 잡힌다. 거둠(capture) 단계에서 손짓을 가로채
+          기계·손잡이에 닿기 전에 자가 먼저 받는다 — 재다가 기계가 밀리면
+          배치가 망가진다. */
+    let 재는중 = false;
+    let 잰금 = null;           // { ax, ay, bx, by } — **참 자리(mm)** 다
+    let 자질 = null;           // 끄는 중
+    const 붙는자리 = 14;        // 화면에서 이만큼 안이면 모서리에 붙는다(px)
+    /* ⚠ 붙는 거리에 **천장을 둔다.** 전체 보기에서는 화면 14px 이 3m 라,
+       3m 떨어진 모서리로 끌려가 잰 수가 몰래 몇 m 씩 달라졌다. 재는 자가
+       그러면 안 된다. 600mm 를 넘겨 끌어가지 않는다(10-10 에 재어서 잡았다). */
+    const 붙는끝 = 600;         // mm
+    const 자판 = $('l-ruler');
+
+    /* 참 자리(mm) → 바닥 안에서의 % 자리. 돌리기를 함께 셈한다
+       (자리넣기() 가 네모에 하는 것과 같은 셈을 점 하나에 한다) */
+    const 점퍼센트 = (x, y) => 돌림
+        ? { 왼: (바닥.세로 - y) / 바닥.세로 * 100, 위: x / 바닥.가로 * 100 }
+        : { 왼: x / 바닥.가로 * 100,               위: y / 바닥.세로 * 100 };
+    /* 손가락이 짚은 화면 자리 → 참 자리(mm). 위의 거꾸로다 */
+    function 짚은점(clientX, clientY) {
+        const f = 바닥판.getBoundingClientRect();
+        const fx = clientX - f.left, fy = clientY - f.top;
+        const x = 돌림 ? fy / 배율 : fx / 배율;
+        const y = 돌림 ? 바닥.세로 - fx / 배율 : fy / 배율;
+        return { x: Math.max(0, Math.min(바닥.가로, x)), y: Math.max(0, Math.min(바닥.세로, y)) };
+    }
+    /* 붙을 자리 — 네모의 네 변과 바닥의 네 변.
+       ⚠ **곁에 있는 것에만 붙는다.** 처음에는 도면 전체의 변을 모아 두고 썼더니,
+          y 로 20m 떨어진 딴 기계의 변에 가로가 끌려갔다 — 사장님 눈에는 아무
+          까닭 없이 수가 9cm 틀어진 것으로 보인다(10-10 에 시험이 잡아냈다).
+          그래서 **짚은 자리를 가로지르는 네모의 변만** 본다. 벽처럼 길게 걸친
+          것은 어디서나 걸리니 「기계와 벽 사이」 는 그대로 잘 붙는다. */
+    let 붙을네모 = [];
+    function 붙을자리모으기() {
+        붙을네모 = [];
+        기계들.forEach(m => 칸들(m, m.x, m.y).forEach(c => 붙을네모.push(c)));
+        (벌.벽 || []).forEach(([w, h, x, y]) => 붙을네모.push({ x, y, w, h }));
+        붙을네모.push({ x: 0, y: 0, w: 바닥.가로, h: 바닥.세로 });     // 바닥 네 변
+    }
+    function 붙이기(점) {
+        const 틈 = Math.min(붙는끝, 붙는자리 / (배율 || 1));   // 화면 14px 과 600mm 중 작은 쪽
+        let sx = null, sy = null, 짧x = 틈, 짧y = 틈;
+        붙을네모.forEach(c => {
+            // 가로 변은 **그 네모의 세로 자리를 짚었을 때만** 걸린다 (틈만큼 넉넉히)
+            if (점.y >= c.y - 틈 && 점.y <= c.y + c.h + 틈) {
+                [c.x, c.x + c.w].forEach(t => { const d = Math.abs(t - 점.x);
+                    if (d < 짧x) { 짧x = d; sx = t; } });
+            }
+            if (점.x >= c.x - 틈 && 점.x <= c.x + c.w + 틈) {
+                [c.y, c.y + c.h].forEach(t => { const d = Math.abs(t - 점.y);
+                    if (d < 짧y) { 짧y = d; sy = t; } });
+            }
+        });
+        return { x: sx === null ? Math.round(점.x / 눈금) * 눈금 : sx,
+                 y: sy === null ? Math.round(점.y / 눈금) * 눈금 : sy,
+                 붙었나: sx !== null || sy !== null };
+    }
+    /* 금을 긋는다 — 가로·세로 결까지 함께 그어 「옆으로 얼마 · 위아래로 얼마」 가 보인다 */
+    function 자그리기() {
+        바닥판.querySelectorAll('.ljaa, .ljab').forEach(e => e.remove());
+        if (!잰금) return;
+        const A = 점퍼센트(잰금.ax, 잰금.ay), B = 점퍼센트(잰금.bx, 잰금.by);
+        const ns = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(ns, 'svg');
+        svg.setAttribute('class', 'ljaa');
+        svg.dataset.area = '잰금';
+        const 긋기 = (x1, y1, x2, y2, 갈) => {
+            const l = document.createElementNS(ns, 'line');
+            l.setAttribute('x1', x1 + '%'); l.setAttribute('y1', y1 + '%');
+            l.setAttribute('x2', x2 + '%'); l.setAttribute('y2', y2 + '%');
+            l.setAttribute('class', 갈); svg.appendChild(l);
+        };
+        긋기(A.왼, A.위, B.왼, A.위, '결');
+        긋기(B.왼, A.위, B.왼, B.위, '결');
+        긋기(A.왼, A.위, B.왼, B.위, '몸');
+        [[A.왼, A.위], [B.왼, B.위]].forEach(([cx, cy]) => {
+            const c = document.createElementNS(ns, 'circle');
+            c.setAttribute('cx', cx + '%'); c.setAttribute('cy', cy + '%');
+            c.setAttribute('r', '4'); svg.appendChild(c);
+        });
+        바닥판.appendChild(svg);
+        const 딱지 = document.createElement('div');
+        딱지.className = 'ljab';
+        딱지.dataset.area = '잰수';
+        딱지.style.left = (A.왼 + B.왼) / 2 + '%';
+        딱지.style.top  = (A.위 + B.위) / 2 + '%';
+        딱지.textContent = 미터(잰길이()) + ' m';
+        바닥판.appendChild(딱지);
+    }
+    const 잰길이 = () => 잰금
+        ? Math.round(Math.hypot(잰금.bx - 잰금.ax, 잰금.by - 잰금.ay)) : 0;
+    function 잰것알리기() {
+        if (!잰금) { 쪽지.textContent = '두 점을 잡아 끌면 그 사이를 잽니다'; return; }
+        const dx = Math.abs(잰금.bx - 잰금.ax), dy = Math.abs(잰금.by - 잰금.ay);
+        /* 모서리에 붙여 잰 것인지 적는다 — 붙었으면 그 수는 **딱 떨어지는 참값**이고,
+           안 붙었으면 손가락이 짚은 자리라 10mm 눈금까지다. 사장님이 알고 보셔야 한다. */
+        const 붙음 = (잰금.a붙음 ? 1 : 0) + (잰금.b붙음 ? 1 : 0);
+        쪽지.textContent = '잰 길이 ' + 미터(잰길이()) + ' m'
+            + ' — 옆으로 ' + 미터(dx) + ' · 위아래로 ' + 미터(dy) + ' m'
+            /* 발은 한 줄이라 길면 …로 잘린다. 수가 먼저고 붙음 알림은 짧게 */
+            + (붙음 === 2 ? ' · 모서리에 붙음' : 붙음 === 1 ? ' · 한쪽만 붙음' : '');
+    }
+    function 자켜기(켤까) {
+        재는중 = !!켤까;
+        자판.setAttribute('aria-pressed', String(재는중));
+        뷰.classList.toggle('재는중', 재는중);
+        if (재는중) { 붙을자리모으기(); 잰것알리기(); }
+        else { 잰금 = null; 자질 = null; 자그리기();
+               쪽지.textContent = '자를 치웠습니다'; }
+    }
+    자판.addEventListener('click', () => 자켜기(!재는중));
 
     /* ── 열기 ──────────────────────────────────────────────────────── */
     /* 보고 계시던 벌로 연다 */
