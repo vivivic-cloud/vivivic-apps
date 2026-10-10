@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.32.0 (2026-10-09) — 열 때는 재단도면을 0건 부른다. 보는 자리에서 그때 부른다
+     버전: v1.33.0 (2026-10-10) — 재단편집에서 사라진 「재단회전」 단추를 되살린다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2548,7 +2548,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.32.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.33.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2681,7 +2681,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.32.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.33.0</b></p>
         </div>
     </div>
 
@@ -11504,7 +11504,18 @@
             const _h0 = currentFullData[0];
             if (rowIndex == null) {
                 // 과거에 만들어진 카드라 행 번호가 없는 경우, 사이즈+공급처로 원본 행을 재탐색
+                /* 10-10 사장님: 「재단편집의 부속카드에 재단회전 버튼이 사라졌다」(800X448).
+                   여태 **사이즈가 같은 맨 앞 줄**을 그냥 집었다. 그런데 오늘 원장에는 같은
+                   800X448 이 여덟 줄이고, **앞줄이 결보호 O(내추럴오크)** 다. 화이트 부속을
+                   열어도 그 O 줄이 잡혀 「재단회전」 단추가 사라졌다(O 는 돌리면 안 되는 부속).
+                   그래서 사이즈가 맞는 줄을 **다 모아** 부속명·마감색상·원장명이 맞는 줄을
+                   먼저 고른다. 하나도 안 맞으면 예전처럼 맨 앞 줄이다 — 없던 때보다 나쁘지 않다. */
                 if (_h0) {
+                    const _값 = (row, 이름) => {
+                        const i = _h0.indexOf(이름);
+                        return i < 0 ? '' : normalizeValue(row[i]);
+                    };
+                    const 후보 = [];
                     for (let ri = 1; ri < currentFullData.length; ri++) {
                         const row = currentFullData[ri];
                         if (!row) continue;
@@ -11512,10 +11523,18 @@
                         const rd2 = parseFloat(row[_h0.indexOf('재단D')]) || 0;
                         if (normalizeValue(row[_h0.indexOf('공급처')]) === 'AMT' &&
                             Math.abs(rw2 - (p.rw || 0)) < 0.5 && Math.abs(rd2 - (p.rd || 0)) < 0.5) {
-                            rowIndex = ri;
-                            break;
+                            후보.push(ri);
                         }
                     }
+                    const 점수 = ri => {
+                        const row = currentFullData[ri]; let 점 = 0;
+                        if (p.nm && _값(row, '부속명') === normalizeValue(p.nm)) 점 += 4;
+                        if (p.finish && _값(row, '마감색상') === normalizeValue(p.finish)) 점 += 2;
+                        if (p.plateName && _값(row, '원장명') === normalizeValue(p.plateName)) 점 += 1;
+                        return 점;
+                    };
+                    후보.sort((a, b) => 점수(b) - 점수(a) || a - b);
+                    if (후보.length) rowIndex = 후보[0];
                 }
             }
             // 결보호(그레인)·부속명 값을 원본 행에서 가져와야 함 — 결보호를 비워두면
