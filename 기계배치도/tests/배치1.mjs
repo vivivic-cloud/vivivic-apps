@@ -309,20 +309,31 @@ const 바란y = Math.round((6200 + 끌이동.y / 배율) / 눈금) * 눈금;
      Math.abs(후.x - 바란x) <= 눈금 && Math.abs(후.y - 바란y) <= 눈금,
      '담긴 ' + 후.x + ',' + 후.y + ' / 바란 ' + 바란x + ',' + 바란y);
 재기('10mm 눈금에 떨어졌나', 후.x % 눈금 === 0 && 후.y % 눈금 === 0, 후.x + ',' + 후.y);
-재기('놓으면 「저장했습니다」 가 뜨나',
-     /저장했습니다/.test(await p.evaluate(() => document.getElementById('l-save').textContent)));
+/* ⚠ 10-10 에 바뀐 것 — 「저장했습니다」 대신 **화베에 올라가는 모습**을 적는다
+   (사장님 말씀: 「실시간으로 화베에 저장 되도록」). 올리는 중 → 올렸습니다,
+   창고가 안 붙었으면 폰에만 담김. 재는 것은 「담겼다고 알리나」 이므로 그대로다. */
+재기('놓으면 담겼다고 알리나 (화베에 올라가는 모습)',
+     /올리는 중|올렸습니다|폰에만 담김/.test(
+         await p.evaluate(() => document.getElementById('l-save').textContent)),
+     await p.evaluate(() => document.getElementById('l-save').textContent));
 재기('끌어도 터진 것이 없나', 터진것.length === 0, 터진것.join(' | ') || '없음');
 await p.screenshot({ path: path.join(그림칸, '375-옮긴뒤.png') });
 
-/* 짚기만 하고 안 옮겼으면 「저장했습니다」 가 뜨지 않아야 한다 — 거짓말이 된다 */
-await p.waitForTimeout(1800);
+/* 짚기만 하고 안 옮겼으면 **새로 담지 않아야** 한다 — 담았다 하면 거짓말이 된다.
+   ⚠ 알림 글로 재지 않는다. 10-10 부터 화베 알림이 2.5초 남아 있어, 앞서 끈 것의
+      알림이 아직 떠 있을 수 있다(그것은 거짓말이 아니라 참말이다). 담긴 것의
+      **잰때**가 안 올랐는지로 잰다 — 그것이 참으로 재려던 것이다. */
+await p.waitForTimeout(3000);
+const 짚기전잰때 = await p.evaluate(k =>
+    (JSON.parse(localStorage.getItem(k) || '{}'))['잰때'] || 0, 폰열쇠);
 const 짚기점 = await 집을점('집진기');
 await p.mouse.move(짚기점.x, 짚기점.y);
 await p.mouse.down(); await p.waitForTimeout(120); await p.mouse.up();
-await p.waitForTimeout(200);
-재기('제자리면 「저장했습니다」 가 뜨지 않나',
-     (await p.evaluate(() => document.getElementById('l-save').textContent)) === '',
-     '[' + await p.evaluate(() => document.getElementById('l-save').textContent) + ']');
+await p.waitForTimeout(300);
+const 짚기후잰때 = await p.evaluate(k =>
+    (JSON.parse(localStorage.getItem(k) || '{}'))['잰때'] || 0, 폰열쇠);
+재기('제자리면 새로 담지 않나 (짚기만 한 것이다)', 짚기후잰때 === 짚기전잰때,
+     '잰때 ' + 짚기전잰때 + ' → ' + 짚기후잰때);
 
 /* ══ 4. 바닥 벽을 넘어가지 않는다 ════════════════════════════════════
    오른·위 쪽은 보링기, 왼·아래 쪽은 작업대 — 둘 다 그 길이 비어 있다. */

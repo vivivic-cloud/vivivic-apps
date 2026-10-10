@@ -167,6 +167,28 @@ body{
 /* 긴 판은 화면을 넘길 수 있다 — 굴러가게 둔다(폰 세로 480px 도 있다) */
 .lcard.긴것{max-height:88dvh; overflow-y:auto;}
 
+/* ── 저장해 둔 것 한 줄 ──────────────────────────────────────────────
+   사장님 말씀(10-10): 「저장버튼을 눌러 현재의 상태를 **각각** 저장 할 수 있게」.
+   이름과 때를 적고, 불러오기·지우기를 한 줄에 둔다. 닿는 자리 44px. */
+.l저장줄{display:flex; align-items:center; gap:8px; padding:6px 0;
+  border-top:1px solid var(--vg-edge);}
+.l저장줄:first-child{border-top:0;}
+.l저장이름{flex:1; min-width:0;}
+.l저장이름 b{display:block; font-size:15px; font-weight:700; color:var(--vg-ink);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.l저장이름 i{display:block; font-style:normal; font-size:11px; color:var(--vg-muted);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.l저장줄 button{flex:none; min-height:44px; min-width:52px; padding:0 10px;
+  border:1px solid var(--vg-edge); border-radius:12px; background:#fff;
+  color:var(--vg-ink); font:inherit; font-size:13px; font-weight:700; cursor:pointer;
+  -webkit-tap-highlight-color:transparent;}
+.l저장줄 button.버림{color:var(--vg-red); border-color:var(--vg-red);}
+.l저장없음{font-size:13px; color:var(--vg-muted); padding:8px 0;}
+/* 화베에 올라가는 중인지 보인다 — 「실시간으로 저장」 이 눈에 보여야 믿으신다 */
+.lsave.올리는중{color:var(--vg-soft);}
+.lsave.올렸음{color:#2e7d32;}
+.lsave.못올림{color:var(--vg-red); font-weight:700;}
+
 /* ── 기준 보드판 2,440×1,220 ───────────────────────────────────────
    기계가 아니다. 끌리지도 부딪히지도 않는다 — 바닥에 깔린 **자**다.
    그래서 손가락을 안 받고(pointer-events:none) 기계 위에 테만 얹는다. */
@@ -450,10 +472,15 @@ body{
       <button class="lturn lsm" id="l-split" type="button"
               data-area="나누기단추" disabled>나누기</button>
     </div>
-    <div class="lbar" data-area="보는줄">
-      <button class="lturn lsheet-btn" id="l-sheet" type="button" data-area="벌고르기">—</button>
+    <!-- 고침 줄 — 되돌리기·저장·자. 사장님 말씀(10-10)으로 낸 줄이다 -->
+    <div class="lbar" data-area="고침줄">
+      <button class="lturn lsm" id="l-undo" type="button" data-area="뒤로가기" disabled>↩ 뒤로</button>
+      <button class="lturn lsm" id="l-save-btn" type="button" data-area="저장">저장</button>
       <button class="lturn lsm ljab단" id="l-ruler" type="button" aria-pressed="false"
               data-area="자로재기">📐 재기</button>
+    </div>
+    <div class="lbar" data-area="보는줄">
+      <button class="lturn lsheet-btn" id="l-sheet" type="button" data-area="벌고르기">—</button>
       <button class="lturn" id="l-turn" type="button" aria-pressed="false"
               data-area="돌리기단추">⟲ 세로로</button>
     </div>
@@ -471,6 +498,24 @@ body{
       <div class="lcrow">
         <button class="lcbtn" id="l-size-no" type="button">그만</button>
         <button class="lcbtn 짙은" id="l-size-ok" type="button">넣기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 저장본 판 — 「저장」 을 누르면 뜬다 (사장님 말씀 10-10) -->
+  <div class="lsheet" id="l-save-sheet" hidden data-area="저장판">
+    <div class="lcard 긴것">
+      <div class="lch">저장<span class="l작은" id="l-save-who">—</span></div>
+      <label class="lfield"><span>이름</span>
+        <input id="l-save-name" type="text" maxlength="30" placeholder="예: 10월 안"></label>
+      <div class="lcrow" style="margin:0 0 12px">
+        <button class="lcbtn 짙은" id="l-save-do" type="button">지금 것을 저장</button>
+      </div>
+      <div class="lch" style="margin:4px 0 8px">저장해 둔 것</div>
+      <div id="l-save-list" data-area="저장목록"></div>
+      <div class="lcmsg" id="l-save-msg"></div>
+      <div class="lcrow">
+        <button class="lcbtn" id="l-save-close" type="button">닫기</button>
       </div>
     </div>
   </div>
@@ -971,15 +1016,43 @@ body{
         catch (e) { return false; }
     }
     let 창고시계 = null;
+    /* ── 화베에 올라가는 모습 ────────────────────────────────────────
+       사장님 말씀(10-10): 「현 편집중인 현재 상태가 **실시간으로 화베에 저장**
+       되도록 해줘」.
+       올리는 일은 전부터 하고 있었다 — 고칠 때마다 1.2초 뒤에 통째로 올린다.
+       다만 **눈에 안 보였다.** 올라갔는지 안 갔는지 모르면 사장님이 믿으실 수가
+       없다. 그래서 올리는 중·올렸음·못 올림을 발에 적는다.
+       ⚠ 1.2초 묶음을 그대로 둔다. 끄는 동안 초당 수십 번 바뀌는데 그때마다
+          올리면 쓰기가 터진다. 끌기가 끝나야 저장()이 불리므로, 사장님 손이
+          멈추고 1.2초면 올라간다. */
+    /* ⚠ 알림 글은 **짧아야** 한다. 발은 한 줄이고 쪽지와 자리를 나눠 쓰는데,
+       「화베에 올렸습니다」 처럼 길게 적었더니 쪽지가 3px 깎였다(10-10 에 시험이
+       잡아냈다). 까닭이 긴 것(못 올림)은 쪽지에 한 번 적어 드린다. */
+    function 창고알림(갈, 글) {
+        저장쪽지.className = 'lsave' + (갈 ? ' ' + 갈 : '');
+        저장쪽지.textContent = 글;
+        저장쪽지.dataset.창고 = 갈 || '';
+    }
     function 창고에담기() {
         clearTimeout(창고시계);
+        const F0 = window.fbFirestore, db0 = window.db;
+        if (!F0 || !db0) { 창고알림('못올림', '폰에만 담김'); return; }
+        창고알림('올리는중', '올리는 중…');
         창고시계 = setTimeout(async () => {
             const F = window.fbFirestore, db = window.db;
-            if (!F || !db) return;                       // 창고가 안 붙었다 — 폰 안에는 이미 담겼다
+            if (!F || !db) { 창고알림('못올림', '폰에만 담김'); return; }
             try {
                 await F.setDoc(F.doc(db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', 창고칸, 창고문서()),
                                담을것());
-            } catch (e) { /* 창고가 안 되어도 ③ 은 폰 안으로 이미 됐다 */ }
+                창고알림('올렸음', '올렸습니다');
+                clearTimeout(저장시계);
+                저장시계 = setTimeout(() => 창고알림('', ''), 2500);
+            } catch (e) {
+                /* 창고가 안 되어도 폰 안에는 이미 담겼다. 그래도 **알린다** —
+                   안 올라간 줄 모르고 폰을 바꾸시면 그 배치가 날아간다. */
+                창고알림('못올림', '못 올림');
+                쪽지.textContent = '화베에 못 올렸습니다 — 폰에는 담겼습니다';
+            }
         }, 1200);
     }
     let 저장시계 = null;
@@ -987,11 +1060,8 @@ body{
         잰때 = Date.now();
         const 됐나 = 폰에담기();
         창고에담기();
-        if (알릴까) {
-            저장쪽지.textContent = 됐나 ? '저장했습니다' : '폰에 못 담았습니다';
-            clearTimeout(저장시계);
-            저장시계 = setTimeout(() => { 저장쪽지.textContent = ''; }, 1600);
-        }
+        /* 폰에 못 담은 것은 창고 알림보다 센 말이라 그것이 이긴다 */
+        if (알릴까 && !됐나) 창고알림('못올림', '폰에 못 담음');
         return 됐나;
     }
 
@@ -1363,6 +1433,7 @@ body{
         const el = e.currentTarget;
         const m = 기계들.find(x => x.id === el.dataset.id);
         if (!m || !배율) return;
+        역사쌓기();                        // 끌기 **전**을 쌓는다. 안 옮기면 아래에서 뺀다
         잡은것 = { m, el, pid: e.pointerId, 손x: e.clientX, 손y: e.clientY, 첫x: m.x, 첫y: m.y };
         el.classList.add('잡힘');
         /* 방금 잡은 것을 맨 위로 올린다. 기계가 겹치면 뒤에 그려진 것이 손가락을
@@ -1414,6 +1485,7 @@ body{
         const 옮겼나 = (m.x !== 첫x || m.y !== 첫y);
         // 제자리면 담지 않는다 — 짚기만 하신 것이라 「저장했습니다」 가 뜨면 거짓이다
         if (옮겼나) 저장(true);
+        else { 역사.pop(); 역사단추고치기(); }   // 안 옮겼으면 쌓아 둔 켜를 뺀다
         알리기(m);
         /* 끌었으면 두 번 톡이 아니다. 여럿 고르는 중에도 아니다(고르는 일이 먼저다) */
         if (옮겼나 || 여럿모드) { 앞선톡 = { id: null, 때: 0 }; return; }
@@ -1477,6 +1549,7 @@ body{
         if (새가로 < 막는가로) { 말.push('가로는 ' + 미터(막는가로)); 새가로 = 막는가로; }
         if (새세로 < 막는세로) { 말.push('세로는 ' + 미터(막는세로)); 새세로 = 막는세로; }
 
+        역사쌓기();
         바닥 = { 가로: 새가로, 세로: 새세로 };
         재기(); 그리기(); 저장(true);
         if (말.length) {
@@ -1578,6 +1651,7 @@ body{
         const 축 = h.dataset.축, 것 = 변주인(h.dataset.누구);
         if (h.dataset.누구 !== '바닥' && !것) return;
         if (!배율) return;
+        역사쌓기();                        // 늘리기 **전**을 쌓는다. 안 늘리면 아래에서 뺀다
         잡은변 = { 것, 축, 손x: e.clientX, 손y: e.clientY, 첫값: 지금값(것, 축),
                    pid: e.pointerId, 끔: false };
         h.classList.add('잡힘');
@@ -1611,6 +1685,7 @@ body{
         document.querySelectorAll('.lhd.잡힘').forEach(x => x.classList.remove('잡힘'));
         try { e && e.target.releasePointerCapture && e.target.releasePointerCapture(pid); } catch (err) {}
         if (끔 && 지금값(것, 축) !== 첫값) { 그리기(); 저장(true); }   // 떼고 나서 온전히 다시 그린다
+        else { 역사.pop(); 역사단추고치기(); }                          // 안 바뀌었으면 켜를 뺀다
         e && e.stopPropagation && e.stopPropagation();
     }
     /* ⚠ 끄는 도중에는 **그림을 새로 만들지 않는다.** 그리기() 가 바닥 속을 비우면
@@ -1650,6 +1725,7 @@ body{
         const 누구 = 바누구.dataset.누구 || '바닥';
         const 것 = 누구 === '바닥' ? null : 기계들.find(x => x.id === 누구);
         if (누구 !== '바닥' && !것) return;
+        역사쌓기();
         크기넣어주기(것, 바축.textContent, mm, true);
         다시맞추기(); 그리기();
         저장(true);
@@ -1801,6 +1877,7 @@ body{
         /* 합친 것의 이름 — 딱지가 좁으니 **짧고 읽히게** 짓는다.
            「파레트 1.2×1.2 외 3개」 는 판에서 「파레트 1.2…」 로 잘려 아무것도
            안 읽혔다(10-07 에 그림을 눈으로 보고 잡았다). */
+        역사쌓기();
         const 한갈래 = 조각.every(c => c['갈래'] === 조각[0]['갈래']);
         const 한크기 = 조각.every(c => c.가로 === 조각[0].가로 && c.세로 === 조각[0].세로);
         const 이름 = (한갈래 && 한크기 && 갈래이름[조각[0]['갈래']])
@@ -1827,6 +1904,7 @@ body{
             /* ⚠ 덩이를 돌려 두셨으면 **돌린 자리 그대로** 풀어야 한다.
                담긴 값(c.x·c.y·c.각)은 안 돌린 테 기준이므로, 조각자리() 로 지금
                자리를 셈해 쓴다. 덩이 각이 0 이면 담긴 값과 똑같다. */
+            역사쌓기();
             const 되살림 = 조각자리(m).map(c => ({
                 id: 새id(), 이름: c.이름, 가로: c.가로, 세로: c.세로,
                 x: m.x + c.x, y: m.y + c.y, 각: c['각'] | 0, 갈래: c['갈래'] || '기', 조각: null }));
@@ -1843,6 +1921,7 @@ body{
                              + 미터(기계최소) + ' m 보다 작아집니다)';
             return;
         }
+        역사쌓기();
         const 왼 = { ...m, id: 새id(), 조각: null,
                      가로: 가로로 ? 반 : m.가로, 세로: 가로로 ? m.세로 : 반 };
         const 오른 = { ...m, id: 새id(), 조각: null,
@@ -1878,6 +1957,7 @@ body{
         const 것들 = 고른것들();
         const m = 것들.length === 1 ? 것들[0] : null;
         if (!m) return;
+        역사쌓기();
         const 전각 = m['각'] | 0;
         m['각'] = (전각 + 90) % 360;
         /* ⚠ 여기서 가두기() 를 쓰면 안 된다 — 그것은 10mm 눈금에 떨어뜨리는데,
@@ -1892,6 +1972,7 @@ body{
         const 걸리나 = 벌.겹침막기 && 겹치나(m, 갈x, 갈y);
         if (바닥.가로 < 폭(m) || 바닥.세로 < 높(m) || 걸리나) {
             m['각'] = 전각;                  // 되돌린다
+            역사.pop(); 역사단추고치기();     // 안 돌렸으니 켜도 뺀다
             쪽지.textContent = 부를이름(m) + ' — 돌릴 자리가 없습니다 (벽이나 다른 기계에 걸립니다)';
             return;
         }
@@ -1938,6 +2019,7 @@ body{
         if (잡은것) {                        // 끌던 기계를 **제자리로** 되돌린다
             const { m, el, pid, 첫x, 첫y } = 잡은것;
             잡은것 = null;
+            역사.pop(); 역사단추고치기();      // 되돌렸으니 쌓아 둔 켜도 뺀다
             m.x = 첫x; m.y = 첫y;
             el.classList.remove('잡힘');
             try { el.releasePointerCapture(pid); } catch (err) {}
@@ -1945,6 +2027,7 @@ body{
         }
         if (잡은변) {
             잡은변 = null;
+            역사.pop(); 역사단추고치기();
             document.querySelectorAll('.lhd.잡힘').forEach(x => x.classList.remove('잡힘'));
         }
         팬질 = null;
@@ -2058,6 +2141,7 @@ body{
         try { localStorage.setItem(벌열쇠, 벌.코드); } catch (e) {}
         고른들 = []; 여럿모드 = false;
         잰금 = null; 자질 = null;                 // 벌이 바뀌면 잰 금은 뜻이 없다
+        역사 = []; 역사단추고치기();              // 다른 벌의 배치로 되감으면 안 된다
         확대 = 1; 팬x = 팬y = 0;                  // 새 벌은 전체부터 본다
         잰때 = 0;
         if (!폰에서읽기()) {                       // 담긴 것이 없으면 처음 벌로 선다
@@ -2196,6 +2280,189 @@ body{
     }
     자판.addEventListener('click', () => 자켜기(!재는중));
 
+    /* ═══ 저장해 두기 — 지금 것을 이름 붙여 따로 담는다 ══════════════
+       사장님 말씀(10-10): 「저장버튼을 눌러 현재의 상태를 **각각** 저장 할 수
+       있게 해줘」.
+
+       ⚠ **폰 안에 담는다.** 지금 이 앱은 폰 안(localStorage)이 본이고 화베는
+          거울이다. 저장본도 같은 길을 따른다. 화베에 저장본을 따로 쌓는 일은
+          칸 이름·규칙·지우기를 바이글 저장소에 여쭈어 둔 상태라, 답을 받으면
+          그대로 붙인다(사장님 분부: 「화베에 대한 내용은 바이글 저장소 채팅에
+          물어봐」).
+       ⚠ 벌마다 따로 담긴다. 「내 배치」 저장본을 「도면 그대로」 에 덮어씌우면
+          안 되므로, 불러올 때 벌이 다르면 알리고 안 받는다. */
+    const 저장본열쇠 = 'layout.저장본.v1';
+    const 저장판 = $('l-save-sheet'), 저장목록 = $('l-save-list'), 저장판쪽지 = $('l-save-msg');
+    const 저장본읽기 = () => {
+        try { const v = JSON.parse(localStorage.getItem(저장본열쇠) || '[]');
+              return Array.isArray(v) ? v : []; } catch (e) { return []; }
+    };
+    const 저장본쓰기 = 들 => {
+        try { localStorage.setItem(저장본열쇠, JSON.stringify(들)); return true; }
+        catch (e) { return false; }
+    };
+    const 때글 = t => { const d = new Date(t);
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
+             + '-' + String(d.getDate()).padStart(2, '0') + ' '
+             + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+
+    function 저장목록그리기() {
+        const 들 = 저장본읽기().filter(v => v && v.벌 === 벌.코드);
+        저장목록.innerHTML = '';
+        if (!들.length) {
+            const p0 = document.createElement('div');
+            p0.className = 'l저장없음';
+            p0.textContent = '아직 저장해 둔 것이 없습니다';
+            저장목록.appendChild(p0);
+            return;
+        }
+        들.sort((a, b) => b.때 - a.때).forEach(v => {
+            const 줄 = document.createElement('div');
+            줄.className = 'l저장줄';
+            줄.dataset.area = '저장본:' + v.이름;
+            const 글 = document.createElement('div');
+            글.className = 'l저장이름';
+            const b1 = document.createElement('b'); b1.textContent = v.이름;
+            const i1 = document.createElement('i');
+            i1.textContent = 때글(v.때) + ' · 네모 ' + (v.기계들 || []).length + '개 · '
+                           + 미터(v.바닥.가로) + '×' + 미터(v.바닥.세로) + ' m';
+            글.append(b1, i1);
+            const 불 = document.createElement('button');
+            불.type = 'button'; 불.textContent = '불러오기';
+            불.dataset.area = '불러오기:' + v.이름;
+            불.addEventListener('click', () => 저장본불러오기(v.id));
+            const 버 = document.createElement('button');
+            버.type = 'button'; 버.className = '버림'; 버.textContent = '지움';
+            버.dataset.area = '저장본지움:' + v.이름;
+            버.addEventListener('click', () => 저장본지우기(v.id, 버));
+            줄.append(글, 불, 버);
+            저장목록.appendChild(줄);
+        });
+    }
+    function 저장판열기() {
+        $('l-save-who').textContent = '— ' + 벌.이름;
+        const d = new Date();
+        $('l-save-name').value = String(d.getMonth() + 1) + '월 ' + d.getDate() + '일 '
+                               + String(d.getHours()).padStart(2, '0') + ':'
+                               + String(d.getMinutes()).padStart(2, '0');
+        저장판쪽지.className = 'lcmsg';
+        저장판쪽지.textContent = '지금 보고 계신 「' + 벌.이름 + '」 을 담습니다';
+        저장목록그리기();
+        저장판.hidden = false;
+    }
+    const 저장판닫기 = () => { 저장판.hidden = true; };
+
+    function 저장본담기() {
+        const 이름 = $('l-save-name').value.trim();
+        if (!이름) {
+            저장판쪽지.className = 'lcmsg 나쁨';
+            저장판쪽지.textContent = '이름을 넣어 주십시오';
+            return;
+        }
+        const 들 = 저장본읽기();
+        들.push({ id: 'v' + Date.now() + '_' + Math.floor(Math.random() * 1000),
+                  이름, 때: Date.now(), 벌: 벌.코드,
+                  바닥: { ...바닥 }, 돌림,
+                  기계들: 기계들.map(m => ({ ...m,
+                      조각: m['조각'] ? m['조각'].map(c => ({ ...c })) : null })) });
+        if (!저장본쓰기(들)) {
+            저장판쪽지.className = 'lcmsg 나쁨';
+            저장판쪽지.textContent = '폰에 못 담았습니다 — 자리가 모자랄 수 있습니다';
+            return;
+        }
+        저장판쪽지.className = 'lcmsg';
+        저장판쪽지.textContent = '「' + 이름 + '」 로 담았습니다';
+        저장목록그리기();
+        쪽지.textContent = '「' + 이름 + '」 로 저장했습니다 — 네모 ' + 기계들.length + '개';
+    }
+    function 저장본불러오기(id) {
+        const v = 저장본읽기().find(x => x.id === id);
+        if (!v) return;
+        if (v.벌 !== 벌.코드) {
+            저장판쪽지.className = 'lcmsg 나쁨';
+            저장판쪽지.textContent = '다른 벌에서 담은 것입니다 — 그 벌로 옮긴 뒤 불러오십시오';
+            return;
+        }
+        역사쌓기();                       // 불러오기도 되돌릴 수 있어야 한다
+        바닥 = { ...v.바닥 };
+        기계들 = (v.기계들 || []).map(m => ({ ...m,
+            조각: m['조각'] ? m['조각'].map(c => ({ ...c })) : null }));
+        돌림 = !!v.돌림;
+        고른들 = []; 여럿모드 = false; 잰금 = null; 자질 = null;
+        저장판닫기();
+        단추고치기(); 재기(); 그리기(); 저장(true);
+        쪽지.textContent = '「' + v.이름 + '」 을 불러왔습니다 — 되돌리려면 ↩ 뒤로';
+    }
+    /* 지우기는 **두 번 눌러야** 지워진다. 한 번에 지우면 엄지가 스쳐도 날아간다 */
+    let 지울것 = null, 지움시계 = null;
+    function 저장본지우기(id, 단) {
+        if (지울것 !== id) {
+            지울것 = id;
+            저장목록.querySelectorAll('button.버림').forEach(b => { b.textContent = '지움'; });
+            단.textContent = '참말로?';
+            clearTimeout(지움시계);
+            지움시계 = setTimeout(() => { 지울것 = null; 단.textContent = '지움'; }, 3000);
+            저장판쪽지.className = 'lcmsg';
+            저장판쪽지.textContent = '한 번 더 누르면 지웁니다';
+            return;
+        }
+        clearTimeout(지움시계); 지울것 = null;
+        const 들 = 저장본읽기();
+        const 간것 = 들.find(x => x.id === id);
+        저장본쓰기(들.filter(x => x.id !== id));
+        저장목록그리기();
+        저장판쪽지.className = 'lcmsg';
+        저장판쪽지.textContent = 간것 ? '「' + 간것.이름 + '」 을 지웠습니다' : '지웠습니다';
+    }
+    $('l-save-btn').addEventListener('click', 저장판열기);
+    $('l-save-close').addEventListener('click', 저장판닫기);
+    $('l-save-do').addEventListener('click', 저장본담기);
+    저장판.addEventListener('click', e => { if (e.target === 저장판) 저장판닫기(); });
+
+    /* ═══ 뒤로가기 — 고친 단계를 차례로 되감는다 ══════════════════════
+       사장님 말씀(10-10): 「편집중 뒤로가기 버튼으로 **모든 단계로 순차적으로**
+       돌아 갈 수 있게 해줘」.
+
+       고치기 **전**의 배치를 통째로 쌓아 둔다. 「↩ 뒤로」 를 누르면 한 단계씩
+       되감긴다. 쌓는 자리 —
+         · 기계를 끌어 옮겼을 때      · 변을 잡아 늘렸을 때
+         · 기계를 돌렸을 때           · 합쳤을 때 · 나눴을 때 · 되돌렸을 때
+         · 속성 판에서 넣었을 때      · 바닥 크기를 고쳤을 때
+         · 저장해 둔 것을 불러왔을 때
+       ⚠ **보는 눈은 안 쌓는다** — 확대·팬·세로로 돌려 보기는 배치를 고친 것이
+          아니다. 그것까지 되감으면 「뒤로」 를 눌러도 기계가 안 돌아와 사장님이
+          고장으로 보신다.
+       ⚠ 벌을 바꾸면 비운다. 다른 벌의 배치로 되감으면 안 된다. */
+    const 역사끝 = 60;            // 이만큼까지 되감는다. 한 켜가 170개라 넉넉하다
+    let 역사 = [];
+    const 역사단추 = $('l-undo');
+    function 역사단추고치기() {
+        역사단추.disabled = 역사.length === 0;
+        역사단추.textContent = 역사.length ? '↩ 뒤로 ' + 역사.length : '↩ 뒤로';
+    }
+    /* 고치기 **직전**에 부른다. 지금 배치를 통째로 베껴 쌓는다 */
+    function 역사쌓기() {
+        역사.push({ 바닥: { ...바닥 },
+                    기계들: 기계들.map(m => ({ ...m,
+                        조각: m['조각'] ? m['조각'].map(c => ({ ...c })) : null })) });
+        if (역사.length > 역사끝) 역사.shift();
+        역사단추고치기();
+    }
+    function 뒤로가기() {
+        const 켜 = 역사.pop();
+        if (!켜) return;
+        바닥 = { ...켜.바닥 };
+        기계들 = 켜.기계들;
+        고른들 = []; 여럿모드 = false;
+        잰금 = null; 자질 = null;
+        역사단추고치기();
+        재기(); 그리기(); 저장(true);
+        쪽지.textContent = '한 단계 되돌렸습니다'
+                         + (역사.length ? ' — ' + 역사.length + '단계 더 되돌릴 수 있습니다'
+                                        : ' — 더 되돌릴 것이 없습니다');
+    }
+    역사단추.addEventListener('click', 뒤로가기);
+
     /* ═══ 속성 판 — 두 번 톡 치면 뜬다 ════════════════════════════════
        사장님 말씀(10-10): 「더블클릭 속성입력 창 기능 안 나타나」.
        그런 창은 없었다(바닥 크기 판 하나뿐이었다). 그래서 짓는다.
@@ -2287,6 +2554,7 @@ body{
                 + ' (가장 작은 크기 ' + 미터(기계최소) + ' m)';
             return;
         }
+        역사쌓기();
         const 전 = { 가로: m.가로, 세로: m.세로, x: m.x, y: m.y, 각: 각의(m), 갈래: m['갈래'] };
         m.이름 = 속칸.이름.value.trim();
         m['갈래'] = 고른갈래;
