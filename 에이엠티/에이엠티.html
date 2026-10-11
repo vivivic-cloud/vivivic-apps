@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.53.0 (2026-10-11) — 큐알 명세서에 입고확인 단추와 책임 글귀
+     버전: v1.54.0 (2026-10-11) — 입고확인은 먼저 적힌 기록을 덮지 않는다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -18,7 +18,7 @@
     <script type="module">
         import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";    
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword, setPersistence, indexedDBLocalPersistence, browserLocalPersistence } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
-        import { getFirestore, collection, addDoc, query, where, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, getDoc, setDoc, getDocs, deleteField } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, query, where, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, getDoc, setDoc, getDocs, deleteField, runTransaction } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
         import { getStorage, ref, uploadBytes, getDownloadURL, getBytes } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
 
         const firebaseConfig = {
@@ -45,7 +45,7 @@
 
         window.db = db;
         window.storage = storage;
-        window.fbFirestore = { collection, addDoc, query, where, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, getDoc, setDoc, getDocs, deleteField };
+        window.fbFirestore = { collection, addDoc, query, where, onSnapshot, serverTimestamp, doc, updateDoc, deleteDoc, getDoc, setDoc, getDocs, deleteField, runTransaction };
         window.fbStorage = { ref, uploadBytes, getDownloadURL, getBytes };
         window.fbAuth = { auth, signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword };
 
@@ -2602,7 +2602,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.53.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.54.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2735,7 +2735,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.53.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.54.0</b></p>
         </div>
     </div>
 
@@ -10088,19 +10088,46 @@
             const 이제 = new Date();
             const 시각글 = 이제.getFullYear() + '-' + 두(이제.getMonth() + 1) + '-' + 두(이제.getDate())
                 + ' ' + 두(이제.getHours()) + ':' + 두(이제.getMinutes());
+            /* ⚠ **먼저 적힌 기록을 덮지 않는다.** 열 때 읽기가 한 번 어긋나면 `지.입고됨` 이
+               안 서는데, 그대로 merge 로 쓰면 **먼저 확인한 사람의 시각·uid 가 지워진다.**
+               책임을 적는 기록이라 그러면 기록이 아니라 거짓이 된다.
+               그래서 **쓰기 바로 앞에서 한 번 더 본다.**
+                 · `runTransaction` 이 있으면 그것으로 — **없을 때만** 넣는다(한 번에 읽고 쓴다).
+                 · 없으면(옛 꾸러미·시험 허수아비) 읽고 나서 쓴다. 그래도 열 때만 보던 것보다 좁다.
+               이미 있으면 **쓰지 않고** 그 기록의 시각으로 잠근다 — 탈이 아니니 붉게 쓰지 않는다. */
+            const 칸 = window._입고칸(지.큐알);
+            const 적을것 = () => ({
+                큐알: 지.큐알, 발주번호: 지.발주번호 || '', 발주문서: 지.발주 || '',
+                파레트: 지.파 || '', 납기일: 지.날짜 || '',
+                업체: 지.업체 || '', 줄수: 지.줄수 || 0, 총수량: 지.총수량 || 0,
+                확인시각: window.fbFirestore.serverTimestamp(), 확인시각글: 시각글,
+                확인uid: (window._myAccount && window._myAccount.uid) || '',
+                글귀: window._입고글귀(지.업체), 판: (document.getElementById('amth-ver') || {}).textContent || '',
+            });
             try {
-                const { setDoc, getDoc, serverTimestamp } = window.fbFirestore;
-                await setDoc(window._입고칸(지.큐알), {
-                    큐알: 지.큐알, 발주번호: 지.발주번호 || '', 발주문서: 지.발주 || '',
-                    파레트: 지.파 || '', 납기일: 지.날짜 || '',
-                    업체: 지.업체 || '', 줄수: 지.줄수 || 0, 총수량: 지.총수량 || 0,
-                    확인시각: serverTimestamp(), 확인시각글: 시각글,
-                    확인uid: (window._myAccount && window._myAccount.uid) || '',
-                    글귀: window._입고글귀(지.업체), 판: (document.getElementById('amth-ver') || {}).textContent || '',
-                }, { merge: true });
+                const { setDoc, getDoc, runTransaction } = window.fbFirestore;
+                let 먼저 = null;
+                if (typeof runTransaction === 'function') {
+                    await runTransaction(window.db, async (t) => {
+                        const 눈 = await t.get(칸);
+                        if (눈 && 눈.exists && 눈.exists()) { 먼저 = (눈.data && 눈.data()) || {}; return; }
+                        t.set(칸, 적을것());
+                    });
+                } else {
+                    const 눈 = await getDoc(칸);
+                    if (눈 && 눈.exists && 눈.exists()) 먼저 = (눈.data && 눈.data()) || {};
+                    else await setDoc(칸, 적을것());
+                }
+                if (먼저) {                                   // 이미 적혀 있다 — 덮지 않는다
+                    지.입고됨 = 먼저.확인시각글 || '확인됨';
+                    window._입고단추잠그기(지.입고됨);
+                    document.getElementById('입고판')?.remove();
+                    if (typeof showToastMessage === 'function') showToastMessage('이미 입고확인 되었습니다');
+                    return;
+                }
                 // **다시 읽어** 들어갔는지 보고 나서 「입고확인」 이라 말한다
-                const 눈 = await getDoc(window._입고칸(지.큐알));
-                if (!눈 || !눈.exists || !눈.exists()) throw new Error('적은 것이 안 보입니다');
+                const 눈2 = await getDoc(칸);
+                if (!눈2 || !눈2.exists || !눈2.exists()) throw new Error('적은 것이 안 보입니다');
                 지.입고됨 = 시각글;
                 window._입고단추잠그기(시각글);
                 document.getElementById('입고판')?.remove();
@@ -10109,6 +10136,7 @@
                 console.error('입고확인 적기 실패:', err);
                 if (단) { 단.disabled = false; 단.textContent = '확인'; }
                 const 글칸 = document.getElementById('입고-글');
+                document.getElementById('입고-탈')?.remove();      // 두 번 떨어져도 한 줄만 둔다
                 if (글칸) 글칸.insertAdjacentHTML('afterend',
                     '<div class="입고-탈" id="입고-탈">기록을 못 남겼습니다</div>');
                 if (typeof showToastMessage === 'function') showToastMessage('기록을 못 남겼습니다');

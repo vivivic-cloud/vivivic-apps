@@ -23,7 +23,8 @@ await ctx.route('https://cdn.tailwindcss.com*', r => r.fulfill({ status: 200, co
 const 큐알 = '유한-20261009-01-A';
 const 글귀바람 = '입고된 수량을 정확히 확인했나요? 확인후 착오된 수량의 책임은 유한가구에 기록됩니다.';
 
-const 심을것 = ({ L, 막나 }) => {
+const 심을것 = ({ L, 막나, 트랜 }) => {
+  window.__트랜잭션쓰나 = !!트랜;
   document.getElementById('auth-login-overlay')?.style.setProperty('display', 'none');
   window.__쓴곳 = []; window.__쓴값 = {}; window.__창고 = {};
   const 방 = (...a) => a.join('/');
@@ -38,6 +39,11 @@ const 심을것 = ({ L, 막나 }) => {
       window.__창고[r.길] = window.__쓴값[r.길];
     },
     getDoc: async (r) => ({ exists: () => !!window.__창고[r.길], data: () => window.__창고[r.길] || {} }),
+    // 진짜 꾸러미에는 runTransaction 이 있다 — 없을 때 길(읽고 나서 쓰기)도 같이 잰다
+    runTransaction: window.__트랜잭션쓰나 ? async (db, 일) => 일({
+      get: async (r) => ({ exists: () => !!window.__창고[r.길], data: () => window.__창고[r.길] || {} }),
+      set: (r, v) => { window.__쓴곳.push(r.길); window.__쓴값[r.길] = v; window.__창고[r.길] = v; },
+    }) : undefined,
     updateDoc: async (r, v) => { window.__쓴곳.push(r.길); },
     deleteDoc: async () => {}, addDoc: async (r) => { window.__쓴곳.push(r.길); },
     onSnapshot: () => {}, query: x => x, serverTimestamp: () => '때',
@@ -82,12 +88,12 @@ const 심을것 = ({ L, 막나 }) => {
   return { 줄 };
 };
 
-const 열기 = async (주소, 막나) => {
+const 열기 = async (주소, 막나, 트랜) => {
   const p = await ctx.newPage(); const errs = [];
   p.on('pageerror', e => errs.push(e.message));
   await p.goto(주소, { waitUntil: 'load' });
   await p.waitForTimeout(900);
-  await p.evaluate(심을것, { L, 막나: !!막나 });
+  await p.evaluate(심을것, { L, 막나: !!막나, 트랜: !!트랜 });
   await p.evaluate(() => { ['원장', '발주', '도면', '차례'].forEach(k => window._자료왔다 && window._자료왔다(k)); });
   await p.waitForTimeout(900);
   const cdp = await ctx.newCDPSession(p);
@@ -205,6 +211,45 @@ console.log('■ 이미 확인한 큐알: ' + JSON.stringify(이미));
    JSON.stringify(이미));
 await 나.p.close();
 
+/* ── ⑥-2 ⚠ **먼저 적힌 기록을 덮지 않는다** ─────────────────────────────
+   열 때 읽기가 한 번 어긋나면 「이미 적혔다」 를 모른 채 확인을 누르게 된다.
+   그때도 **먼저 확인한 사람의 시각·uid 가 그대로** 남아야 한다 — 책임을 적는 기록이다.
+   읽고 나서 쓰는 길과 runTransaction 길 **둘 다** 잰다. */
+for (const 트랜 of [false, true]) {
+  const 꼴 = 트랜 ? '(runTransaction)' : '(읽고 나서 쓰기)';
+  const 마 = await 열기(터 + '?' + encodeURIComponent('명세') + '=' + encodeURIComponent(큐알), false, 트랜);
+  await 마.p.evaluate((큐알) => {
+    const 길 = 'artifacts/vivivic-4b7ef/public/data/입고확인/' + 큐알;
+    window.__창고[길] = { 큐알, 확인시각글: '2026-10-11 09:00', 확인uid: '먼저온사람', 업체: '유한가구' };
+    // ⚠ **열 때 읽기가 어긋난 것처럼** 꾸민다 — 단추가 안 잠긴 채로 누르게 된다
+    window._명세서지금.입고됨 = '';
+    const 단 = document.getElementById('명세-입고');
+    if (단) { 단.textContent = '입고확인'; 단.disabled = false; 단.classList.remove('끝났다'); }
+  }, 큐알);
+  await 마.짚기('#명세-입고');
+  await 마.짚기('#입고-확인');
+  const 덮었나 = await 마.p.evaluate((큐알) => {
+    const 길 = 'artifacts/vivivic-4b7ef/public/data/입고확인/' + 큐알;
+    return { 남은값: window.__창고[길], 쓴곳: window.__쓴곳.length,
+             단추글: (document.getElementById('명세-입고')?.textContent || '').trim(),
+             단추죽음: !!document.getElementById('명세-입고')?.disabled,
+             판남음: !!document.getElementById('입고판'),
+             붉은띠: !!document.getElementById('입고-탈') };
+  }, 큐알);
+  console.log('■ 이미 적힌 큐알에 또 확인 ' + 꼴 + ': ' + JSON.stringify(덮었나));
+  판('⑥ 먼저 적힌 **시각·uid 가 안 바뀐다** ' + 꼴,
+     덮었나.남은값 && 덮었나.남은값.확인시각글 === '2026-10-11 09:00'
+     && 덮었나.남은값.확인uid === '먼저온사람' && 덮었나.쓴곳 === 0,
+     JSON.stringify(덮었나.남은값) + ' · 쓴 곳 ' + 덮었나.쓴곳);
+  판('⑥ 단추는 **먼저 적힌 시각**으로 잠기고 창이 닫힌다 ' + 꼴,
+     덮었나.단추글 === '입고확인 · 2026-10-11 09:00' && 덮었나.단추죽음 === true
+     && 덮었나.판남음 === false,
+     '「' + 덮었나.단추글 + '」 · 창 ' + 덮었나.판남음);
+  판('⑥ 「이미 있다」 는 **탈이 아니다** — 붉은 띠를 안 띄운다 ' + 꼴,
+     덮었나.붉은띠 === false, '붉은 띠 ' + 덮었나.붉은띠);
+  await 마.p.close();
+}
+
 // ── ⑦ 못 적으면 **거짓 초록 없이** 한 줄로 알린다 ───────────────────
 const 다 = await 열기(터 + '?' + encodeURIComponent('명세') + '=' + encodeURIComponent(큐알), true);
 await 다.짚기('#명세-입고');
@@ -224,6 +269,11 @@ console.log('■ 쓰기를 막았을 때: ' + JSON.stringify(막힘));
    '「' + 막힘.단추글 + '」 · 죽음 ' + 막힘.단추죽음 + ' · 쓴 곳 ' + 막힘.쓴곳);
 판('⑦ 다시 눌러 볼 수 있다 (확인 단추가 살아 있다)',
    막힘.확인단추 === '확인', '「' + 막힘.확인단추 + '」');
+// 두 번 떨어져도 붉은 띠는 **한 줄**만 (쌓이지 않는다)
+await 다.짚기('#입고-확인');
+판('⑦ 두 번 떨어져도 붉은 띠는 한 줄이다',
+   (await 다.p.evaluate(() => document.querySelectorAll('.입고-탈').length)) === 1,
+   (await 다.p.evaluate(() => document.querySelectorAll('.입고-탈').length)) + '줄');
 if (그림칸()) await 다.p.screenshot({ path: 그림칸() + '/in-375-입고못적음.png' });
 판('⑦ 터지지 않는다', 다.errs.length === 0, String(다.errs.length) + (다.errs[0] ? ' :: ' + 다.errs[0] : ''));
 await 다.p.close();
