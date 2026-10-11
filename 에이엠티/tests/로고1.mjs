@@ -105,6 +105,13 @@ const 잰것 = () => p.evaluate(() => {
                       색들: svg ? [...svg.querySelectorAll('rect')].map(r => r.getAttribute('fill'))
                              .filter(v => v && !/^#(f|c|e)/i.test(v)) : [],
                       길수: svg ? svg.querySelectorAll('path').length : 0,
+                      // 로고에 쓰인 모든 색 · 가로로 긴 꼴인가 · 그 비
+                      쓴색: svg ? [...new Set([...svg.querySelectorAll('*')]
+                             .map(e => e.getAttribute('fill') || e.getAttribute('stroke'))
+                             .filter(v => v && v !== 'none'))] : [],
+                      넓은: svg ? svg.classList.contains('로고-넓은') : false,
+                      비: svg ? +(svg.getBoundingClientRect().width
+                                  / svg.getBoundingClientRect().height).toFixed(2) : 0,
                       바탕: svg ? ((svg.querySelector('rect') || {}).getAttribute
                                    ? svg.querySelector('rect').getAttribute('fill') : '') : '',
                       죽음: !!e.disabled,
@@ -123,13 +130,18 @@ console.log('■ 누르기 전: ' + JSON.stringify(전));
    전.수 + '개 · ' + JSON.stringify(전.본것.map(x => x.이름)));
 판('② 셋 다 **로고만** 있다 (단추에 적힌 글이 없다)',
    전.본것.every(x => x.그림 && x.글 === ''), JSON.stringify(전.본것.map(x => x.이름 + ':「' + x.글 + '」')));
-판('② 누구나 아는 꼴이다 — 빨강 PDF · 초록 엑셀 · 파랑 이카운트',
-   JSON.stringify(전.본것.map(x => x.색들)) === JSON.stringify([
-     ['#d93025'], ['#107c41'], ['#1a73c7']]),
+판('② 누구나 아는 꼴이다 — 빨강 PDF · 초록 엑셀',
+   JSON.stringify(전.본것.slice(0, 2).map(x => x.색들)) === JSON.stringify([['#d93025'], ['#107c41']]),
    JSON.stringify(전.본것.map(x => x.색들)));
 판('② PDF·엑셀은 **서류 꼴**이다 (종이에 색 띠 — 흔한 파일 표식)',
-   전.본것.slice(0, 2).every(x => x.길수 >= 2) && 전.본것[2].길수 === 0,
-   JSON.stringify(전.본것.map(x => x.이름 + ':길 ' + x.길수)));
+   전.본것.slice(0, 2).every(x => x.길수 >= 2),
+   JSON.stringify(전.본것.slice(0, 2).map(x => x.이름 + ':길 ' + x.길수)));
+/* 이카운트 로고는 **사장님이 주신 그림 그대로**다 (10-11) — 빨간 EC 표식.
+   그림에서 센 빨강 #aa3033 으로 그리고, 가로로 긴 비(124:80)를 지킨다. */
+판('② 이카운트는 **주신 로고**다 (빨강 #aa3033 · 가로로 긴 꼴)',
+   전.본것[2].쓴색.includes('#aa3033') && 전.본것[2].넓은 === true
+   && 전.본것[2].비 > 1.3 && 전.본것[2].비 < 1.7,
+   JSON.stringify({ 색: 전.본것[2].쓴색, 넓은: 전.본것[2].넓은, 비: 전.본것[2].비 }));
 판('② 커서가 닿으면 뜨는 말이 달려 있다 (이카운트는 말씀 그대로)',
    전.본것[2].말 === '이카운트로 데이터를 보냅니다' && 전.본것.every(x => x.말 !== ''),
    JSON.stringify(전.본것.map(x => x.말)));
@@ -164,8 +176,9 @@ console.log('■ 손가락으로 누를 때: ' + JSON.stringify(누르는중) + 
    전.본것.every(x => !x.죽음) && 전.번호.trim() === '',
    JSON.stringify(전.본것.map(x => x.죽음)) + ' · 번호 「' + 전.번호.trim() + '」');
 판('② 로고는 그림파일이 아니라 이 파일 안에 그린 것이다 (바깥에서 안 받는다)',
-   전.그림쓰임 === 0 && 전.본것.every(x => x.그림크기 >= 20 && x.바탕),
-   'img ' + 전.그림쓰임 + '개 · svg 크기 ' + JSON.stringify(전.본것.map(x => x.그림크기)));
+   전.그림쓰임 === 0 && 전.본것.every(x => x.그림크기 >= 20 && x.쓴색.length > 0),
+   'img ' + 전.그림쓰임 + '개 · svg 크기 ' + JSON.stringify(전.본것.map(x => x.그림크기))
+   + ' · 쓴 색 ' + JSON.stringify(전.본것.map(x => x.쓴색.length)));
 
 // 커서를 대면 말이 **창 안에** 다 보여야 한다 — 가장자리 단추가 특히 그렇다
 await p.hover('#명세-이카운트'); await p.waitForTimeout(300);
