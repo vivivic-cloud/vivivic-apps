@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.51.0 (2026-10-11) — 큐알 하나에 그 파레트치 납기 명세서만 보인다
+     버전: v1.52.0 (2026-10-11) — 큐알 명세서가 **그 발주의** 파레트만 센다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2592,7 +2592,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.51.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.52.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2725,7 +2725,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.51.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.52.0</b></p>
         </div>
     </div>
 
@@ -9595,14 +9595,23 @@
            (10-11 사장님: 「납기시 각 파레트별 구분이 되어 명세서의 부속들이 나열되게 한다」).
            수량은 배송 정보 확인 칸이 쓰는 그 셈 그대로다 — 같은 화면에서 두 숫자가 갈리면 안 된다.
            부속코드는 말씀대로 **조립부속코드**다(_명세서코드칸 이 이미 그렇게 짝지어 두었다). */
-        window._납기명세서모으기 = function (dateStr, 파레트) {
+        /* ⚠ 파레트 글자(A·B·C·D)는 **발주마다 따로** 붙는다 — wo_pallet 이 발주 한 건에 한 장이다.
+           그래서 유한의 A 와 럭스의 A 는 **딴 파레트**다. 글자만 보고 추리면 그 날 A 인 줄이
+           모조리 끌려온다(10-11 사장님: 「유한 현재 파레트에 이동선반 한가지 뿐인데 명세서가 왜이래?」
+           — 그 날 A 가 네 발주에 걸려 1줄이어야 할 것이 20줄로 떴다).
+           그러니 **발주까지 같이 가린다.** 큐알 글이 발주번호+파레트인 것과 같은 뜻이다. */
+        window._납기명세서모으기 = function (dateStr, 파레트, 발주열쇠) {
             const 추릴파 = String(파레트 == null ? '' : 파레트).trim();
+            const 추릴발주 = String(발주열쇠 == null ? '' : 발주열쇠).trim();
+            const 그발주인가 = o => !추릴발주 || String(o.docId || '') === 추릴발주
+                || String(o.idNum || '') === 추릴발주 || String(o.orderCode || '') === 추릴발주;
             const 발주들 = (typeof confirmedOrders !== 'undefined' ? confirmedOrders : []);
             const h = (typeof currentFullData !== 'undefined') && currentFullData[0];
             const 묶음 = [];
             발주들.forEach(o => {
                 if (o.amtTimeline !== true || o.amtConfirmedCancel) return;
                 if (String(o.deliveryDate || '') !== String(dateStr)) return;
+                if (!그발주인가(o)) return;              // 큐알 하나치는 **그 발주의** 그 파레트다
                 const 부속파 = (typeof window._부속파레트 === 'function') ? window._부속파레트(o) : {};
                 const 파별 = new Map();
                 Object.entries(o.partInfoMap || {}).forEach(([ck, info]) => {
@@ -9644,8 +9653,8 @@
             return 묶음;
         };
 
-        window._명세서모으기 = function (dateStr, procKey, 파레트) {
-            if (String(procKey) === '납기') return window._납기명세서모으기(dateStr, 파레트);
+        window._명세서모으기 = function (dateStr, procKey, 파레트, 발주열쇠) {
+            if (String(procKey) === '납기') return window._납기명세서모으기(dateStr, 파레트, 발주열쇠);
             const 발주들 = (typeof confirmedOrders !== 'undefined' ? confirmedOrders : []);
             // 재단계획은 두 군데에 있다 — 같은 confirmId 는 한 번만 본다(_이미잘린몫 과 같은 잣대)
             const 본것 = new Set(), 계획들 = [];
@@ -9831,10 +9840,10 @@
             return _원장줄읽기(줄번호, _명세서코드칸[String(공정)] || '');
         }
 
-        window._명세서표Html = function (날짜, 공정, 묶음, 파레트) {
+        window._명세서표Html = function (날짜, 공정, 묶음, 추린이름) {
             const 원장 = _명세서원장보이나(공정);
             const 파칸 = _명세서파레트보이나(공정);
-            const 추린파 = String(파레트 == null ? '' : 파레트).trim();
+            const 추린파 = String(추린이름 == null ? '' : 추린이름).trim();
             const _e = v => String(v == null ? '' : v)
                 .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             let 총매 = 0, 줄수 = 0;
@@ -9883,7 +9892,7 @@
             });
             // 추린 파레트에 줄이 하나도 없으면 **빈 표를 내지 않고 한 줄**로 알린다 (10-11 지시)
             if (!줄수) return { html: `<div class="명세-없음">` + (추린파
-                ? `${_e(추린파)} 파레트에 담긴 것이 없습니다.`
+                ? `${_e(추린파)} 에 담긴 것이 없습니다.`
                 : `${_e(날짜)} ${_e(공정)} — 완료된 작업이 없습니다.`) + `</div>`, 총매: 0, 줄수: 0 };
 
             const 소 = new Map();
@@ -9941,13 +9950,20 @@
 
         /* 파레트를 주면 **그 파레트치만** 펴진다(10-11 지시). 안 주면 그 날 **전체**다 —
            머리줄의 「명세서」 단추는 전과 똑같이 전체를 편다. */
-        window._명세서열기 = function (dateStr, procKey, 파레트) {
+        window._명세서열기 = function (dateStr, procKey, 파레트, 발주열쇠) {
             // 명세서는 원장수량(재단계획 매수)을 본다 — 지금 부른다 (3단계)
             try { if (typeof window._도면확보모두 === 'function') window._도면확보모두(); } catch (e) {}
             const 파 = String(파레트 == null ? '' : 파레트).trim();
-            const 묶음 = window._명세서모으기(dateStr, procKey, 파);
-            const 짠 = window._명세서표Html(dateStr, procKey, 묶음, 파);
-            window._명세서지금 = { 날짜: dateStr, 공정: procKey, 파: 파, 묶음: 묶음, 총매: 짠.총매, 줄수: 짠.줄수,
+            const 발키 = String(발주열쇠 == null ? '' : 발주열쇠).trim();
+            const 묶음 = window._명세서모으기(dateStr, procKey, 파, 발키);
+            // 머리에 적을 이름 — 찍은 큐알 글 그대로다(발주번호-파레트). 발주를 모르면 파레트만.
+            const 그발주 = 발키 ? (typeof confirmedOrders !== 'undefined' ? confirmedOrders : [])
+                .find(o => String(o.docId || '') === 발키 || String(o.idNum || '') === 발키
+                        || String(o.orderCode || '') === 발키) : null;
+            const 이름 = !파 ? '' : (그발주 ? window._제품큐알글(그발주, 파) : 파 + ' 파레트');
+            const 짠 = window._명세서표Html(dateStr, procKey, 묶음, 이름);
+            window._명세서지금 = { 날짜: dateStr, 공정: procKey, 파: 파, 발주: 발키, 이름: 이름,
+                                   묶음: 묶음, 총매: 짠.총매, 줄수: 짠.줄수,
                                    발급번호: '', 발급시각: '' };
             document.getElementById('명세서판')?.remove();
             const 판 = document.createElement('div');
@@ -9958,7 +9974,7 @@
             판.innerHTML = `<div class="명세-속">` +
                 `<div class="명세-머리">` +
                 `<span class="명세-제목">${parseInt(달, 10)}월 ${parseInt(날, 10)}일 ${procKey} 내역` +
-                (파 ? ` · ${String(파).replace(/</g, '&lt;')} 파레트` : '') + `</span>` +
+                (이름 ? ` · ${String(이름).replace(/</g, '&lt;')}` : '') + `</span>` +
                 `<span class="명세-번호" id="명세-번호"></span>` +
                 `<button class="명세-닫기" type="button" onclick="_명세서닫기()" aria-label="닫기">✕</button>` +
                 `</div>` +
@@ -10025,7 +10041,8 @@
                 if (typeof tlDcExpandSection === 'function') tlDcExpandSection('납기');
             } catch (e) {}
             // 찍은 큐알 **하나치**만 편다 — 그 날 전체가 아니다 (10-11 지시)
-            setTimeout(() => { try { window._명세서열기(날, '납기', 파); } catch (e) {} }, 60);
+            const 발키 = String(집힌.발주.docId || 집힌.발주.idNum || '');
+            setTimeout(() => { try { window._명세서열기(날, '납기', 파, 발키); } catch (e) {} }, 60);
         };
 
         /* 10-11 사장님: 「발급 버튼을 삭제하고 각 버튼 누르면 **자동발급**되어 다음 동작을
@@ -11215,7 +11232,7 @@
                              : `<div class="tl-dc-큐알부속 빔">이 큐알에 담긴 부속이 없습니다</div>`)
                          // 그 큐알 하나치 납기 명세서를 여는 자리 (10-11 지시)
                          + `<button type="button" class="tl-dc-큐알명세"`
-                         + ` onclick="event.stopPropagation();_명세서열기('${String(item.deliveryDate || '').replace(/'/g, "\\'")}','납기','${String(파).replace(/'/g, "\\'")}')">명세서</button>`
+                         + ` onclick="event.stopPropagation();_명세서열기('${String(item.deliveryDate || '').replace(/'/g, "\\'")}','납기','${String(파).replace(/'/g, "\\'")}','${String(item.docId || item.idNum || '').replace(/'/g, "\\'")}')">명세서</button>`
                          + `</div>`;
                   }).join('')
                 + `</div></div>`;

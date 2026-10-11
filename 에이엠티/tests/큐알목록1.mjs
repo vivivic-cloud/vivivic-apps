@@ -210,11 +210,23 @@ const 눌러본 = await (async () => {
 console.log('■ B 큐알의 명세서 단추를 눌러: ' + JSON.stringify(눌러본));
 판('⑤ 그 단추를 손가락으로 누르면 **그 큐알치만** 펴진다',
    !눌러본.못누름 && !눌러본.안열림 && 눌러본.파 === 'B'
-   && /납기 내역 · B 파레트$/.test(눌러본.제목 || '')
+   // 머리에는 **찍은 큐알 글 그대로**가 적힌다 (발주번호-파레트) — 10-11 지시
+   && /납기 내역 · 시험-큐알-01-B$/.test(눌러본.제목 || '')
    && 눌러본.줄수 === 1 && JSON.stringify(눌러본.파값) === JSON.stringify(['B'])
    && 눌러본.종이줄 === 1,
    JSON.stringify(눌러본));
-if (그림칸()) await p.screenshot({ path: 그림칸() + '/scan-375-큐알한치.png' });
+if (그림칸()) {
+  /* 큐알 네모의 **부속 목록**과 그 큐알의 **명세서**가 한 화면에 같이 보여야 한다 —
+     둘이 같은 말을 하는지 눈으로 바로 견주시게. 창은 고정이라 뒤쪽만 민다. */
+  await p.evaluate(() => {
+    const 네모 = [...document.querySelectorAll('#tl-datecard-expand .tl-dc-큐알묶음')]
+      .find(e => e.dataset['파'] === 'B');
+    const 줄 = 네모 && 네모.querySelector('.tl-dc-큐알부속');
+    if (줄) 줄.scrollIntoView({ block: 'end' });   // 창 아래쪽에 오게 — 창이 가운데를 덮는다
+  });
+  await p.waitForTimeout(300);
+  await p.screenshot({ path: 그림칸() + '/scan-375-큐알한치.png' });
+}
 
 /* ⑤ 두 큐알을 **다 읽어** 본다 — 키웠다고 못 읽히면 안 된다 */
 const 읽개칸 = path.join(HERE, '큐알읽개');
