@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.41.0 (2026-10-11) — 배송 정보 확인칸에 파레트 큐알코드를 보인다
+     버전: v1.42.0 (2026-10-11) — 뜨는 말이 폰에서도 보인다 (손가락으로 눌렀을 때)
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1683,7 +1683,12 @@
             transform:translateX(-50%); white-space:nowrap; background:#37352f; color:#fff;
             font-size:11.5px; font-weight:700; padding:5px 9px; border-radius:7px;
             opacity:0; pointer-events:none; transition:opacity .12s; }
-        .명세-바닥 button:hover::before, .명세-바닥 button:focus-visible::before { opacity:1; }
+        /* 폰에는 커서가 없다 — `:hover` 도 `:focus-visible` 도 아이폰에서는 안 일어난다.
+           그래서 **누르는 그 순간** 말이 잠깐 떴다 사라지게 한다(`.말보임`).
+           누르는 일은 막지 않는다 — 말만 뜨고 하던 일은 그대로 돈다.
+           데스크탑의 커서는 그대로 둔다 — 더하는 것이지 바꾸는 것이 아니다. */
+        .명세-바닥 button:hover::before, .명세-바닥 button:focus-visible::before,
+        .명세-바닥 button.말보임::before { opacity:1; }
         /* 가장자리 단추의 말은 창 밖으로 나간다 — 안쪽으로 붙인다 */
         .명세-바닥 button:first-child::before { left:0; transform:none; }
         .명세-바닥 button:last-child::before { left:auto; right:0; transform:none; }
@@ -2568,7 +2573,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.41.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.42.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2701,7 +2706,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.41.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.42.0</b></p>
         </div>
     </div>
 
@@ -9787,6 +9792,16 @@
                 `${_명세딱지('E', '#1a73c7', 11)}</button>` +
                 `</div></div>`;
             document.body.appendChild(판);
+            // 손가락으로 눌러도 말이 보이게 — 누르는 순간 띄우고 잠깐 뒤 거둔다
+            판.querySelectorAll('.명세-바닥 button').forEach(단 => {
+                const 띄우기 = () => {
+                    단.classList.add('말보임');
+                    clearTimeout(단._말시계);
+                    단._말시계 = setTimeout(() => 단.classList.remove('말보임'), 1400);
+                };
+                단.addEventListener('touchstart', 띄우기, { passive: true });
+                단.addEventListener('pointerdown', 띄우기, { passive: true });
+            });
         };
 
         window._명세서닫기 = function () {

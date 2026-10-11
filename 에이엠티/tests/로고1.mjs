@@ -125,6 +125,31 @@ console.log('■ 누르기 전: ' + JSON.stringify(전));
 판('② 커서가 닿으면 뜨는 말이 달려 있다 (이카운트는 말씀 그대로)',
    전.본것[2].말 === '이카운트로 데이터를 보냅니다' && 전.본것.every(x => x.말 !== ''),
    JSON.stringify(전.본것.map(x => x.말)));
+
+/* ⚠ **폰에는 커서가 없다.** `:hover` 도 `:focus-visible` 도 아이폰 사파리에서는
+   안 일어난다 — 사장님은 폰으로만 쓰신다. 그래서 **진짜 손가락으로 눌러** 말이
+   실제로 보이는지 잰다. 달려 있는지(data-말)만 봐서는 안 뜨는 것을 못 잡는다. */
+const 손말 = await p.evaluate(() => {
+  const 단 = document.getElementById('명세-이카운트');
+  const r = 단.getBoundingClientRect();
+  return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };
+});
+await 손('touchStart', 손말.x, 손말.y);
+await p.waitForTimeout(260);          // 말이 다 뜨기를 기다린다 (떠오르는 데 .12초)
+const 누르는중 = await p.evaluate(() => {
+  const 단 = document.getElementById('명세-이카운트');
+  const s = getComputedStyle(단, '::before');
+  return { 보임: s.opacity, 글: s.content, 딱지: 단.className };
+});
+await 손('touchEnd', 0, 0);
+await p.waitForTimeout(120);
+const 뗀뒤 = await p.evaluate(() => getComputedStyle(document.getElementById('명세-이카운트'), '::before').opacity);
+console.log('■ 손가락으로 누를 때: ' + JSON.stringify(누르는중) + ' · 뗀 뒤 ' + 뗀뒤);
+판('② **손가락으로 눌러도** 말이 실제로 보인다 (폰에는 커서가 없다)',
+   누르는중.보임 === '1' && /이카운트로 데이터를 보냅니다/.test(누르는중.글),
+   JSON.stringify(누르는중));
+판('② 그래도 누르는 일은 안 막힌다 (뗀 뒤에도 말이 잠깐 남는다)',
+   뗀뒤 === '1', '뗀 뒤 보임 ' + 뗀뒤);
 판('② 단추는 모두 48px 이상이고 안 넘친다',
    전.본것.every(x => x.높 >= 48 && !x.넘침), JSON.stringify(전.본것.map(x => x.폭 + '×' + x.높 + (x.넘침 ? ' 넘침' : ''))));
 판('② 셋 다 처음부터 살아 있다 (발급을 먼저 누를 일이 없다)',
