@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.35.0 (2026-10-11) — 원장재고 색상 알약이 안 잘리게 줄을 바꾼다
+     버전: v1.36.0 (2026-10-11) — 엣지·보링 명세서에서 원장재고·소요량·재단금액을 뺀다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2547,7 +2547,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.35.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.36.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2680,7 +2680,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.35.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.36.0</b></p>
         </div>
     </div>
 
@@ -9555,7 +9555,18 @@
 
         function _명세서몰라(글) { return `<span class="명세-몰라">?${글 ? ' ' + 글 : ''}</span>`; }
 
+        /* 10-11 사장님: 「엣지공정의 명세서는 엣지관련만 나타나야 합니다. 명세서 양식에서
+           재단관련 서식이 나타나서는 안됩니다. … 이는 보링 단계에서도 마찬가지 입니다.」
+           「엣지 보링 납기의 명세서 에서는 원장재고및 소요량 표기가 필요 없습니다 삭제 해주세요.」
+           그래서 **원장재고(원장입고일·원장수량·전잔액/현잔액)와 재단금액, 원장 소요량 쪽은
+           재단 명세서에만** 둔다. 공정 이름을 셋만 박지 않는다 — 재단이 아니면 다 빠진다
+           (엣지·보링·NC·납기). 모르는 칸은 0 이 아니라 **빈칸**으로 둔다. */
+        function _명세서원장보이나(공정) { return String(공정) === '재단'; }
+        // 종이·엑셀에서 뺄 칸 자리 — 원장입고일(7) · 원장수량(11) · 재단금액(12)
+        const _명세서재단칸 = [7, 11, 12];
+
         window._명세서표Html = function (날짜, 공정, 묶음) {
+            const 원장 = _명세서원장보이나(공정);
             const _e = v => String(v == null ? '' : v)
                 .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             let 총매 = 0, 줄수 = 0;
@@ -9575,14 +9586,17 @@
                             td.push(`<td rowspan="${품목수}" class="ㄱ">${_e(o.orderCode || '')}</td>`);
                             td.push(`<td rowspan="${품목수}" class="ㄱ">${_e(g.종류)}</td>`);
                             td.push(`<td rowspan="${품목수}" class="ㄱ">${_e(g.색상)}</td>`);
-                            td.push(`<td rowspan="${품목수}" class="ㄱ">${_명세서몰라('')}</td>`);
-                            td.push(`<td rowspan="${품목수}" class="ㄱ">${_명세서몰라('')}</td>`);
-                            td.push(`<td rowspan="${품목수}" class="ㄱ">${_명세서몰라('')}</td>`);
+                            // 모델명 · 출고처 — 아직 어디서 받을지 모르는 칸이다.
+                            // 재단은 빨간 「?」, 그 밖의 공정은 **빈칸**으로 둔다(10-11 지시).
+                            td.push(`<td rowspan="${품목수}" class="ㄱ">${원장 ? _명세서몰라('') : ''}</td>`);
+                            td.push(`<td rowspan="${품목수}" class="ㄱ">${원장 ? _명세서몰라('') : ''}</td>`);
+                            // 원장입고일 — 원장재고 칸이다. 재단에만 둔다.
+                            if (원장) td.push(`<td rowspan="${품목수}" class="ㄱ">${_명세서몰라('')}</td>`);
                         }
                         td.push(`<td>${_e(품.이름)}</td>`);
                         td.push(`<td class="ㄱ">${_e(품.크기)}</td>`);
                         td.push(`<td class="ㄱㄱ">${품.몫}개</td>`);
-                        if (j === 0) {
+                        if (j === 0 && 원장) {
                             // 재단금액 = 그 줄의 원장 수량 × 원장 한 장당 값(부가세 포함)
                             const 돈 = (g.매 == null) ? null : g.매 * (window._재단단가 || 0);
                             td.push(`<td rowspan="${g.품목들.length}" class="ㄱㄱ">${g.매 == null ? '-' : g.매 + '매'}</td>`);
@@ -9614,23 +9628,30 @@
                 `<div class="명세-쪽">` +
                 `<table class="명세-표">` +
                 `<tr><th rowspan="2">순번</th><th rowspan="2">제품명</th><th rowspan="2">PO NO.</th>` +
-                `<th colspan="4">원 장</th><th rowspan="2">원장<br>입고일</th><th rowspan="2">품목</th>` +
-                `<th rowspan="2">사이즈</th><th rowspan="2">${_e(공정)}<br>수량</th><th rowspan="2">원장<br>수량</th>` +
-                `<th rowspan="2">재단금액</th><th rowspan="2">출고<br>예정일</th></tr>` +
+                `<th colspan="4">원 장</th>` +
+                (원장 ? `<th rowspan="2">원장<br>입고일</th>` : '') +
+                `<th rowspan="2">품목</th>` +
+                `<th rowspan="2">사이즈</th><th rowspan="2">${_e(공정)}<br>수량</th>` +
+                (원장 ? `<th rowspan="2">원장<br>수량</th><th rowspan="2">재단금액</th>` : '') +
+                `<th rowspan="2">출고<br>예정일</th></tr>` +
                 `<tr><th>종류</th><th>색상</th><th>모델명</th><th>출고처</th></tr>` +
                 몸.join('') +
-                `<tr class="합"><td class="ㄱ" colspan="11">합  계</td><td class="ㄱ">${총매}매</td>` +
-                `<td class="ㄱ">${window._돈글(총매 * (window._재단단가 || 0))}</td><td></td></tr>` +
-                `<tr class="합"><td class="ㄱ" colspan="8">전잔액</td><td class="ㄱ" colspan="3">${_명세서몰라('')}</td>` +
-                `<td class="ㄱ">현잔액</td><td class="ㄱ" colspan="2">${_명세서몰라('')}</td></tr>` +
+                (원장
+                  ? `<tr class="합"><td class="ㄱ" colspan="11">합  계</td><td class="ㄱ">${총매}매</td>` +
+                    `<td class="ㄱ">${window._돈글(총매 * (window._재단단가 || 0))}</td><td></td></tr>` +
+                    `<tr class="합"><td class="ㄱ" colspan="8">전잔액</td><td class="ㄱ" colspan="3">${_명세서몰라('')}</td>` +
+                    `<td class="ㄱ">현잔액</td><td class="ㄱ" colspan="2">${_명세서몰라('')}</td></tr>`
+                  : '') +
                 `</table></div>` +
-                `<div class="명세-쪽"><p class="명세-쪽이름">원장 소요량</p>` +
-                `<table class="명세-표">` +
-                `<tr><th>출고처</th><th>종류</th><th>모델명</th><th>색상</th>` +
-                `<th>전일소요량</th><th>금일 소요량</th><th>총소요량</th></tr>` + 소줄 +
-                `<tr class="합"><td class="ㄱ" colspan="4">총 소 요 량</td><td class="ㄱ">${_명세서몰라('')}</td>` +
-                `<td class="ㄱㄱ">${총매}.0매</td><td class="ㄱ">${_명세서몰라('')}</td></tr>` +
-                `</table></div>`;
+                (원장
+                  ? `<div class="명세-쪽"><p class="명세-쪽이름">원장 소요량</p>` +
+                    `<table class="명세-표">` +
+                    `<tr><th>출고처</th><th>종류</th><th>모델명</th><th>색상</th>` +
+                    `<th>전일소요량</th><th>금일 소요량</th><th>총소요량</th></tr>` + 소줄 +
+                    `<tr class="합"><td class="ㄱ" colspan="4">총 소 요 량</td><td class="ㄱ">${_명세서몰라('')}</td>` +
+                    `<td class="ㄱㄱ">${총매}.0매</td><td class="ㄱ">${_명세서몰라('')}</td></tr>` +
+                    `</table></div>`
+                  : '');
             return { html, 총매, 줄수 };
         };
 
@@ -9698,6 +9719,7 @@
            이어(=true) 는 위 칸과 한 칸으로 묶인 자리다 — 글을 안 적고 윗금도 안 긋는다. */
         window._명세서줄들 = function () {
             const 지 = window._명세서지금; if (!지) return null;
+            const 원장 = _명세서원장보이나(지.공정);
             const 칸들 = [['순번', 54], ['제품명', 300], ['PO NO.', 170], ['종류', 86], ['색상', 86],
                           ['모델명', 70], ['출고처', 74], ['원장입고일', 86], ['품목', 150], ['사이즈', 120],
                           [지.공정 + '수량', 86], ['원장수량', 86], ['재단금액', 104], ['출고예정일', 92]];
@@ -9711,11 +9733,12 @@
                         if (첫) {
                             값[0] = String(i + 1); 값[1] = o.displayName || o.code || '';
                             값[2] = o.orderCode || ''; 값[3] = g.종류 || ''; 값[4] = g.색상 || '';
-                            값[5] = '?'; 값[6] = '?'; 값[7] = '?';
+                            // 모델명·출고처는 재단에서만 빨간 「?」 다 — 그 밖은 빈칸(10-11 지시)
+                            값[5] = 원장 ? '?' : ''; 값[6] = 원장 ? '?' : ''; 값[7] = 원장 ? '?' : '';
                             값[13] = String(o.deliveryDate || '').slice(5).replace('-', '/');
                         } else { [0, 1, 2, 3, 4, 5, 6, 7, 13].forEach(k => { 이어[k] = true; }); }
                         값[8] = 품.이름 || ''; 값[9] = 품.크기 || ''; 값[10] = 품.몫 + '개';
-                        if (j === 0) {
+                        if (j === 0 && 원장) {
                             값[11] = g.매 == null ? '-' : g.매 + '매';
                             값[12] = g.매 == null ? '-' : window._돈글(g.매 * (window._재단단가 || 0));
                         } else { 이어[11] = true; 이어[12] = true; }
@@ -9729,8 +9752,15 @@
                 const k = (g.종류 || '-') + '|' + (g.색상 || '-');
                 소.set(k, (소.get(k) || 0) + g.매);
             }));
-            return { 칸들, 줄들, 총매, 소요: [...소.entries()].map(([k, 매]) => {
-                const [종, 색] = k.split('|'); return { 종, 색, 매 }; }), 지 };
+            const 소요 = [...소.entries()].map(([k, 매]) => {
+                const [종, 색] = k.split('|'); return { 종, 색, 매 }; });
+            if (원장) return { 칸들, 줄들, 총매, 소요, 원장, 지 };
+            // 재단이 아니면 원장재고·재단금액 칸을 **빼고** 넘긴다 (빈칸으로 남기지 않는다)
+            const 뺀다 = i => !_명세서재단칸.includes(i);
+            return { 칸들: 칸들.filter((c, i) => 뺀다(i)),
+                     줄들: 줄들.map(줄 => ({ 값: 줄.값.filter((v, i) => 뺀다(i)),
+                                             이어: 줄.이어.filter((v, i) => 뺀다(i)) })),
+                     총매: 0, 소요: [], 원장, 지 };
         };
 
         /* ── 종이 장들 (10-09 지시 「pdf로도 발급 되어야 하고」) ─────────────
@@ -9814,7 +9844,8 @@
                 g.beginPath(); g.moveTo(x, y); g.lineTo(x, y + 줄높); g.stroke();
                 y += 줄높;
             });
-            // 합계
+            // 합계 — 원장수량·재단금액을 더하는 줄이다. 재단에만 둔다(10-11 지시).
+            if (!짠.원장) return 장들;
             g.beginPath(); g.moveTo(여백, y); g.lineTo(여백 + 표폭, y); g.stroke();
             g.fillStyle = '#f5f4f2'; g.fillRect(여백, y, 표폭, 줄높);
             g.strokeRect(여백, y, 표폭, 줄높);
@@ -9952,28 +9983,33 @@
                 if (typeof showToastMessage === 'function') showToastMessage('엑셀을 쓸 수 없습니다.');
                 return;
             }
-            const 칸 = [['순번', '제품명', 'PO NO.', '종류', '색상', '모델명', '출고처', '원장입고일',
-                         '품목', '사이즈', 지.공정 + '수량', '원장수량', '재단금액', '출고예정일']];
+            const 원장 = _명세서원장보이나(지.공정);
+            const 뺀다 = i => 원장 || !_명세서재단칸.includes(i);
+            const 거르 = 줄 => 줄.filter((v, i) => 뺀다(i));
+            const 칸 = [거르(['순번', '제품명', 'PO NO.', '종류', '색상', '모델명', '출고처', '원장입고일',
+                         '품목', '사이즈', 지.공정 + '수량', '원장수량', '재단금액', '출고예정일'])];
             let 총매 = 0;
             지.묶음.forEach((묶, i) => {
                 const o = 묶.발주; let 첫 = true;
                 묶.계획들.forEach(g => {
                     if (g.매 != null) 총매 += g.매;
                     g.품목들.forEach((품, j) => {
-                        칸.push([ 첫 ? i + 1 : '', 첫 ? (o.displayName || '') : '', 첫 ? (o.orderCode || '') : '',
+                        칸.push(거르([ 첫 ? i + 1 : '', 첫 ? (o.displayName || '') : '', 첫 ? (o.orderCode || '') : '',
                                   첫 ? g.종류 : '', 첫 ? g.색상 : '', '', '', '',
                                   품.이름, 품.크기, 품.몫,
                                   j === 0 ? (g.매 == null ? '' : g.매) : '',
                                   (j === 0 && g.매 != null) ? g.매 * (window._재단단가 || 0) : '',
-                                  첫 ? (o.deliveryDate || '') : '' ]);
+                                  첫 ? (o.deliveryDate || '') : '' ]));
                         첫 = false;
                     });
                 });
             });
-            칸.push([]); 칸.push(['합계', '', '', '', '', '', '', '', '', '', '', 총매,
-                                  총매 * (window._재단단가 || 0), '']);
+            // 합계(원장수량·재단금액)와 원장소요량 쪽은 재단에만 (10-11 지시)
+            if (원장) { 칸.push([]); 칸.push(['합계', '', '', '', '', '', '', '', '', '', '', 총매,
+                                  총매 * (window._재단단가 || 0), '']); }
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(칸), '내역');
+            if (!원장) { XLSX.writeFile(wb, '명세서_' + 지.날짜 + '_' + 지.공정 + '.xlsx'); return; }
             const 소 = [['출고처', '종류', '모델명', '색상', '전일소요량', '금일소요량', '총소요량']];
             const 셈 = new Map();
             지.묶음.forEach(묶 => 묶.계획들.forEach(g => {
