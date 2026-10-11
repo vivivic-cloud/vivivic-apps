@@ -1,6 +1,8 @@
-// 「명세서 버튼 로고작업 안하니」 — 사장님 말씀 (10-11)
-// 명세서 단추마다 **로고(그림)** 가 붙었는가 · 닿는 자리는 그대로 44px 인가 ·
-// 발급을 누른 뒤에도 로고가 안 지워지는가 · 375px 에서 안 넘치는가 를 잰다.
+// 「명세서 버튼 로고작업 안하니」 · 「각 버튼에는 **로고만** 표기해 주시고 … 엑셀 pdf 등도
+//  각버튼에 누구나 알아 볼 수 있는 해당로고를 … 이카운트 버튼에 커서 도착시
+//  「이카운트로 데이터를 보냅니다」 라는 메세지가 팝업되도록」 — 사장님 말씀 (10-11)
+// 바닥 단추 셋(PDF·엑셀·이카운트)에 **로고만** 있는가 · 커서가 닿으면 말이 뜨는가 ·
+// 누르면 **저절로 발급**되는가 · 48px 인가 · 375px 에서 안 넘치는가 를 잰다.
 // 로고는 바깥에서 받지 않는다(CDN 이 막혀 있다) — 파일 안에 그린 그림이어야 한다.
 import { 브라우저열기, devices, 서버, 자료, 자재, 그림칸 } from './도구/터.mjs';
 await 서버();
@@ -11,7 +13,8 @@ const URL = 'http://127.0.0.1:8899/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0/%EC%97%9
 const O = await 자료('confirmed_orders'); const C = await 자료('cutting_plans'); const L = await 자료('원장');
 const b = await 브라우저열기();
 let 실패 = 0; const 판 = (n, t, v) => { if (!t) 실패++; console.log((t ? '  OK  ' : '  FAIL') + '  ' + n + '   → ' + v); };
-const ctx = await b.newContext({ ...devices['iPhone 12'], viewport: { width: 375, height: 812 }, isMobile: true, hasTouch: true });
+const ctx = await b.newContext({ ...devices['iPhone 12'], viewport: { width: 375, height: 812 },
+  isMobile: true, hasTouch: true, acceptDownloads: true });
 await ctx.route('https://cdn.tailwindcss.com*', r => r.fulfill({ status: 200, contentType: 'application/javascript',
   body: 'document.write(' + JSON.stringify('<style>' + CSS + '</style>') + ');' }));
 // 로고를 **그림파일로 바깥에서 받아 오지는 않는가** — 그림·글꼴 요청만 본다
@@ -91,37 +94,85 @@ const 잰것 = () => p.evaluate(() => {
   return { 수: 단들.length,
            본것: 단들.map(e => { const r = e.getBoundingClientRect();
              const svg = e.querySelector('svg');
-             return { 글: (e.textContent || '').trim(), 그림: !!svg,
+             return { 이름: e.getAttribute('aria-label') || '',
+                      // 로고 속 글자는 그림의 일부다 — **단추에 적힌 글**만 센다
+                      글: [...e.childNodes].filter(n => n.nodeType === 3)
+                            .map(n => (n.textContent || '').trim()).join(''),
+                      말: e.getAttribute('data-말') || '',
+                      그림: !!svg,
                       그림크기: svg ? Math.round(svg.getBoundingClientRect().width) : 0,
-                      바깥것: svg ? /^(https?:)?\/\//.test(svg.getAttribute('src') || '') : false,
+                      바탕: svg ? ((svg.querySelector('rect') || {}).getAttribute
+                                   ? svg.querySelector('rect').getAttribute('fill') : '') : '',
+                      죽음: !!e.disabled,
                       높: Math.round(r.height), 폭: Math.round(r.width),
-                      넘침: e.scrollWidth > e.clientWidth + 1 }; }),
+                      // 로고가 단추 밖으로 나가지 않는가 (뜨는 말은 일부러 밖에 뜬다 — 안 센다)
+                      넘침: svg ? (svg.getBoundingClientRect().right > r.right + 1
+                                || svg.getBoundingClientRect().bottom > r.bottom + 1) : true }; }),
            그림쓰임: [...document.querySelectorAll('#명세서판 .명세-바닥 img')].length,
+           번호: (document.getElementById('명세-번호') || {}).textContent || '',
            가로: document.documentElement.scrollWidth };
 });
 const 전 = await 잰것();
-console.log('■ 발급 전: ' + JSON.stringify(전));
-판('② 바닥 단추 다섯에 모두 로고가 붙었다',
-   전.수 === 5 && 전.본것.every(x => x.그림), JSON.stringify(전.본것.map(x => x.글 + (x.그림 ? '✓' : '✗'))));
-판('② 글자도 그대로다 (발급·인쇄·PDF·엑셀·외부보내기)',
-   JSON.stringify(전.본것.map(x => x.글)) === JSON.stringify(['발급', '인쇄', 'PDF', '엑셀', '외부보내기']),
-   JSON.stringify(전.본것.map(x => x.글)));
-판('② 단추는 모두 44px 이상이고 글이 안 넘친다',
-   전.본것.every(x => x.높 >= 44 && !x.넘침), JSON.stringify(전.본것.map(x => x.폭 + '×' + x.높 + (x.넘침 ? ' 넘침' : ''))));
+console.log('■ 누르기 전: ' + JSON.stringify(전));
+판('② 바닥 단추는 **셋**이다 (발급·인쇄·외부보내기는 없앴다)',
+   전.수 === 3 && JSON.stringify(전.본것.map(x => x.이름)) === JSON.stringify(['PDF', '엑셀', '이카운트']),
+   전.수 + '개 · ' + JSON.stringify(전.본것.map(x => x.이름)));
+판('② 셋 다 **로고만** 있다 (단추에 적힌 글이 없다)',
+   전.본것.every(x => x.그림 && x.글 === ''), JSON.stringify(전.본것.map(x => x.이름 + ':「' + x.글 + '」')));
+판('② 누구나 아는 꼴이다 — 빨강 PDF · 초록 엑셀 · 파랑 이카운트',
+   JSON.stringify(전.본것.map(x => x.바탕)) === JSON.stringify(['#d93025', '#107c41', '#1a73c7']),
+   JSON.stringify(전.본것.map(x => x.바탕)));
+판('② 커서가 닿으면 뜨는 말이 달려 있다 (이카운트는 말씀 그대로)',
+   전.본것[2].말 === '이카운트로 데이터를 보냅니다' && 전.본것.every(x => x.말 !== ''),
+   JSON.stringify(전.본것.map(x => x.말)));
+판('② 단추는 모두 48px 이상이고 안 넘친다',
+   전.본것.every(x => x.높 >= 48 && !x.넘침), JSON.stringify(전.본것.map(x => x.폭 + '×' + x.높 + (x.넘침 ? ' 넘침' : ''))));
+판('② 셋 다 처음부터 살아 있다 (발급을 먼저 누를 일이 없다)',
+   전.본것.every(x => !x.죽음) && 전.번호.trim() === '',
+   JSON.stringify(전.본것.map(x => x.죽음)) + ' · 번호 「' + 전.번호.trim() + '」');
 판('② 로고는 그림파일이 아니라 이 파일 안에 그린 것이다 (바깥에서 안 받는다)',
-   전.그림쓰임 === 0 && 전.본것.every(x => x.그림크기 >= 12 && !x.바깥것),
+   전.그림쓰임 === 0 && 전.본것.every(x => x.그림크기 >= 20 && x.바탕),
    'img ' + 전.그림쓰임 + '개 · svg 크기 ' + JSON.stringify(전.본것.map(x => x.그림크기)));
 
-await 짚기('#명세-발급');
-const 후 = await 잰것();
-console.log('■ 발급 뒤: ' + JSON.stringify(후));
-판('③ 발급을 눌러 「발급됨」 이 되어도 로고가 안 지워진다',
-   후.본것[0].글 === '발급됨' && 후.본것[0].그림 === true,
-   JSON.stringify(후.본것[0]));
-판('③ 나머지 넷도 로고를 그대로 달고 살아난다',
-   후.본것.slice(1).every(x => x.그림) && 후.수 === 5,
-   JSON.stringify(후.본것.map(x => x.글 + (x.그림 ? '✓' : '✗'))));
+// 커서를 대면 말이 **창 안에** 다 보여야 한다 — 가장자리 단추가 특히 그렇다
+await p.hover('#명세-이카운트'); await p.waitForTimeout(300);
+const 뜬말 = await p.evaluate(() => {
+  const 단 = document.getElementById('명세-이카운트');
+  const 속 = document.querySelector('#명세서판 .명세-속');
+  const s = getComputedStyle(단, '::before');
+  const r = 단.getBoundingClientRect(), sr = 속.getBoundingClientRect();
+  // ::before 의 자리는 못 재니, 글 길이로 폭을 가늠해 오른쪽 끝을 센다
+  const 자 = document.createElement('span');
+  자.style.cssText = 'position:fixed;visibility:hidden;white-space:nowrap;font-size:' + s.fontSize
+    + ';font-weight:' + s.fontWeight + ';padding:' + s.padding;
+  자.textContent = 단.getAttribute('data-말'); document.body.appendChild(자);
+  const 폭 = 자.getBoundingClientRect().width + 18; 자.remove();
+  const 오른끝 = (s.right === 'auto' ? r.left + r.width / 2 + 폭 / 2 : r.right);
+  return { 보임: s.opacity, 말폭: Math.round(폭), 오른끝: Math.round(오른끝),
+           창오른: Math.round(sr.right), 안에: 오른끝 <= sr.right + 1,
+           화면안: 오른끝 <= window.innerWidth + 1 };
+});
+console.log('■ 뜬 말: ' + JSON.stringify(뜬말));
+판('③ 커서를 대면 말이 뜨고, 창 밖으로 안 나간다',
+   뜬말.보임 === '1' && 뜬말.안에 === true && 뜬말.화면안 === true, JSON.stringify(뜬말));
 if (그림칸()) await p.screenshot({ path: 그림칸() + '/logo-375-명세단추.png' });
+
+// ── 진짜 손가락으로 PDF 를 누르면 **저절로 발급**되고 파일이 내려온다 ──────
+const 받은것 = p.waitForEvent('download', { timeout: 8000 }).catch(() => null);
+await 짚기('#명세-PDF');
+const 파일 = await 받은것;
+const 후 = await 잰것();
+console.log('■ PDF 를 누른 뒤: ' + JSON.stringify({ 번호: 후.번호, 파일: 파일 ? 파일.suggestedFilename() : null }));
+판('③ 누르면 **저절로** 발급번호가 찍힌다 (발급 단추 없이)',
+   /\d{8}-재단/.test(후.번호), JSON.stringify(후.번호));
+const 낸것 = await p.evaluate(() => window.__명세서낸것 || null);
+판('③ 그 자리에서 PDF 파일이 내려온다 (파일명 고르는 통상 기능으로 이어진다)',
+   !!파일 && !!낸것 && /^명세서_\d{4}-\d{2}-\d{2}_재단\.pdf$/.test(낸것.이름)
+   && 낸것.갈래 === 'application/pdf' && 낸것.크기 > 20000,
+   (파일 ? '내려받기 1건 · ' : '안 내려옴 · ') + JSON.stringify(낸것));
+판('③ 누른 뒤에도 단추 셋은 그대로 살아 있다',
+   후.수 === 3 && 후.본것.every(x => !x.죽음 && x.그림),
+   JSON.stringify(후.본것.map(x => x.이름 + (x.죽음 ? '죽음' : '삶'))));
 
 const 끝 = await p.evaluate(() => ({ 쓰기: window.__쓰기, 가로: document.documentElement.scrollWidth }));
 판('④ 375px 가로 스크롤 없다', 끝.가로 <= 375, 끝.가로 + 'px');

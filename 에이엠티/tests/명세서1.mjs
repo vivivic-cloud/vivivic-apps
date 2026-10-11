@@ -120,14 +120,20 @@ const 판본 = await p.evaluate(() => {
   const 표수 = 판.querySelectorAll('.명세-표').length;
   return { 머리, 표수, 줄수: 줄.length, 줄: 줄.slice(0, 6),
            몰라: 판.querySelectorAll('.명세-몰라').length,
-           발급: !document.getElementById('명세-발급')?.disabled,
-           인쇄죽음: !!document.getElementById('명세-인쇄')?.disabled,
+           발급단추있나: !!document.getElementById('명세-발급'),
+           인쇄단추있나: !!document.getElementById('명세-인쇄'),
+           보내기단추있나: !!document.getElementById('명세-보내기'),
            엑셀죽음: !!document.getElementById('명세-엑셀')?.disabled,
            PDF죽음: !!document.getElementById('명세-PDF')?.disabled,
-           보내기죽음: !!document.getElementById('명세-보내기')?.disabled,
+           이카운트죽음: !!document.getElementById('명세-이카운트')?.disabled,
            단추자리: [...판.querySelectorAll('.명세-바닥 button')].map(e => {
              const r = e.getBoundingClientRect();
-             return { 글: (e.textContent || '').trim(), 높: Math.round(r.height), 폭: Math.round(r.width) }; }),
+             // 로고 속 글자(SVG 안)는 그림의 일부다 — **단추에 적힌 글**만 센다
+             return { 글: [...e.childNodes].filter(n => n.nodeType === 3)
+                            .map(n => (n.textContent || '').trim()).join(''),
+                      이름: e.getAttribute('aria-label') || '',
+                      말: e.getAttribute('data-말') || '',
+                      높: Math.round(r.height), 폭: Math.round(r.width) }; }),
            번호: (document.getElementById('명세-번호')?.textContent || '').trim(),
            단가: window._재단단가,
            돈줄: [...판.querySelectorAll('.명세-표 tr')].map(tr => {
@@ -167,28 +173,33 @@ console.log('■ 펴진 명세서: ' + JSON.stringify(판본));
 판('③ 합계 금액도 합계 매수 × 2,400 이다',
    !!판본.합계줄 && 판본.합계줄.돈 === (parseInt(판본.합계줄.매, 10) * 2400).toLocaleString('ko-KR'),
    JSON.stringify(판본.합계줄));
-판('④ 발급 전에는 인쇄·PDF·엑셀·보내기가 다 죽어 있다',
-   판본.인쇄죽음 === true && 판본.엑셀죽음 === true && 판본.PDF죽음 === true && 판본.보내기죽음 === true,
-   JSON.stringify({ 인쇄: 판본.인쇄죽음, PDF: 판본.PDF죽음, 엑셀: 판본.엑셀죽음, 보내기: 판본.보내기죽음 }));
-판('④ 단추는 모두 44px 이상이다 (장갑 낀 손)',
-   판본.단추자리.length === 5 && 판본.단추자리.every(x => x.높 >= 44),
+/* 10-11 사장님 지시로 **하단 조작부를 다시 지었다** — 「발급 버튼을 삭제하고 각 버튼
+   누르면 자동발급되어 다음 동작을 할 수 있게 … 외부 보내기,인쇄 버튼도 삭제 …
+   각 버튼에는 로고만 표기」. 그래서 이 넷의 뜻을 뒤집는다:
+   발급·인쇄·외부보내기 단추는 **없다** · 남은 셋은 처음부터 **살아 있다** ·
+   누르면 **저절로** 번호가 찍힌다. 「발급 전에는 번호가 없다」 는 그대로 둔다. */
+판('④ 발급·인쇄·외부보내기 단추는 없다 (10-11 에 없앴다)',
+   판본.발급단추있나 === false && 판본.인쇄단추있나 === false && 판본.보내기단추있나 === false,
+   JSON.stringify({ 발급: 판본.발급단추있나, 인쇄: 판본.인쇄단추있나, 보내기: 판본.보내기단추있나 }));
+판('④ 남은 단추 셋은 처음부터 살아 있다 (PDF·엑셀·이카운트)',
+   판본.엑셀죽음 === false && 판본.PDF죽음 === false && 판본.이카운트죽음 === false,
+   JSON.stringify({ PDF: 판본.PDF죽음, 엑셀: 판본.엑셀죽음, 이카운트: 판본.이카운트죽음 }));
+판('④ 단추는 셋이고 **로고만** 있다 (글자 없음) · 48px 이상',
+   판본.단추자리.length === 3 && 판본.단추자리.every(x => x.글 === '' && x.높 >= 48)
+   && JSON.stringify(판본.단추자리.map(x => x.이름)) === JSON.stringify(['PDF', '엑셀', '이카운트']),
    JSON.stringify(판본.단추자리));
+판('④ 이카운트 단추에 「이카운트로 데이터를 보냅니다」 가 달려 있다',
+   (판본.단추자리[2] || {}).말 === '이카운트로 데이터를 보냅니다',
+   JSON.stringify((판본.단추자리[2] || {}).말));
 판('④ 발급 전에는 발급번호가 없다', 판본.번호 === '', JSON.stringify(판본.번호));
 
-await 짚기('#명세-발급');
+await 짚기('#명세-이카운트');
 const 발급뒤 = await p.evaluate(() => ({
   번호: (document.getElementById('명세-번호')?.textContent || '').trim(),
-  발급죽음: !!document.getElementById('명세-발급')?.disabled,
-  인쇄살음: !document.getElementById('명세-인쇄')?.disabled,
-  엑셀살음: !document.getElementById('명세-엑셀')?.disabled,
-  PDF살음: !document.getElementById('명세-PDF')?.disabled,
-  보내기살음: !document.getElementById('명세-보내기')?.disabled,
   쓰기: window.__쓰기, 문서가로: document.documentElement.scrollWidth }));
-console.log('■ 발급 뒤: ' + JSON.stringify(발급뒤));
-판('⑤ 발급을 누르면 번호가 찍힌다', /\d{8}-재단/.test(발급뒤.번호), JSON.stringify(발급뒤.번호));
-판('⑤ 그제야 인쇄·PDF·엑셀·보내기가 다 살아난다',
-   발급뒤.인쇄살음 === true && 발급뒤.엑셀살음 === true && 발급뒤.PDF살음 === true && 발급뒤.보내기살음 === true,
-   JSON.stringify(발급뒤));
+console.log('■ 한 번 누른 뒤: ' + JSON.stringify(발급뒤));
+판('⑤ 단추를 누르면 **저절로** 번호가 찍힌다 (발급 단추가 없다)',
+   /\d{8}-재단/.test(발급뒤.번호), JSON.stringify(발급뒤.번호));
 
 /* ── PDF (10-09 지시 「pdf로도 발급 되어야 하고 외부보내기 가능하게」) ─────
    바깥 꾸러미(CDN)를 못 받는 상자라 제 손으로 짠다 — 장을 캔버스에 그려 JPEG 로
@@ -230,7 +241,11 @@ console.log('■ 외부보내기에 실린 것: ' + JSON.stringify(실린것));
    !!실린것 && 실린것.파일.length === 1 && /^명세서_\d{4}-\d{2}-\d{2}_재단\.pdf$/.test(실린것.파일[0].이름)
    && 실린것.파일[0].갈래 === 'application/pdf' && 실린것.파일[0].크기 === pdf.크기,
    JSON.stringify(실린것));
-판('⑤ 두 번 발급되지 않는다', 발급뒤.발급죽음 === true, String(발급뒤.발급죽음));
+// 한 장은 한 번호다 — 다른 단추를 또 눌러도 번호가 안 바뀐다
+await 짚기('#명세-이카운트');
+const 또번호 = await p.evaluate(() => (document.getElementById('명세-번호')?.textContent || '').trim());
+판('⑤ 또 눌러도 번호는 안 바뀐다 (한 장은 한 번호)', 또번호 === 발급뒤.번호,
+   '「' + 발급뒤.번호 + '」 → 「' + 또번호 + '」');
 
 /* ── 팝업 안에서 **내용이 다 닿는가** (10-09 13:16 지시) ─────────────
    「팝업화면이라도 명세서 내용은 모두 보여줘야 되지 않겠니」.
@@ -292,8 +307,8 @@ console.log('■ 닿나: 연 뒤 ' + JSON.stringify(처음닿) + '\n          �
    && 아래닿.합계금액보임 === true && 아래닿.합계금액글 !== '',
    '합계줄 「' + (아래닿.합계글 || '').slice(0, 30) + '」 · 금액 「' + 아래닿.합계금액글 +
    '」 · 아래로 민 거리 ' + 아래닿.위 + 'px (밀높 ' + 아래닿.밀높 + ' / 보임 ' + 아래닿.높보임 + ')');
-판('⑧ 밀어도 단추 다섯은 늘 보이고 44px 이상이다',
-   아래닿.바닥보임 === true && 아래닿.단추높.length === 5 && 아래닿.단추높.every(h => h >= 44),
+판('⑧ 밀어도 단추 셋은 늘 보이고 48px 이상이다',
+   아래닿.바닥보임 === true && 아래닿.단추높.length === 3 && 아래닿.단추높.every(h => h >= 48),
    JSON.stringify(아래닿.단추높));
 /* 표가 열다섯 칸으로 넓어져(758px) **표의 한가운데가 창 밖**으로 나갔다 — 창은 8~367,
    표 한가운데는 410 이다. 그 자리를 누르면 창이 아니라 어두운 바탕을 누른 것이 된다.
