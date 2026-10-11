@@ -101,6 +101,10 @@ const 잰것 = () => p.evaluate(() => {
                       말: e.getAttribute('data-말') || '',
                       그림: !!svg,
                       그림크기: svg ? Math.round(svg.getBoundingClientRect().width) : 0,
+                      // 로고에 쓰인 **색 띠**들 — 흰·잿빛(종이 꼴)은 빼고 본다
+                      색들: svg ? [...svg.querySelectorAll('rect')].map(r => r.getAttribute('fill'))
+                             .filter(v => v && !/^#(f|c|e)/i.test(v)) : [],
+                      길수: svg ? svg.querySelectorAll('path').length : 0,
                       바탕: svg ? ((svg.querySelector('rect') || {}).getAttribute
                                    ? svg.querySelector('rect').getAttribute('fill') : '') : '',
                       죽음: !!e.disabled,
@@ -120,8 +124,12 @@ console.log('■ 누르기 전: ' + JSON.stringify(전));
 판('② 셋 다 **로고만** 있다 (단추에 적힌 글이 없다)',
    전.본것.every(x => x.그림 && x.글 === ''), JSON.stringify(전.본것.map(x => x.이름 + ':「' + x.글 + '」')));
 판('② 누구나 아는 꼴이다 — 빨강 PDF · 초록 엑셀 · 파랑 이카운트',
-   JSON.stringify(전.본것.map(x => x.바탕)) === JSON.stringify(['#d93025', '#107c41', '#1a73c7']),
-   JSON.stringify(전.본것.map(x => x.바탕)));
+   JSON.stringify(전.본것.map(x => x.색들)) === JSON.stringify([
+     ['#d93025'], ['#107c41'], ['#1a73c7']]),
+   JSON.stringify(전.본것.map(x => x.색들)));
+판('② PDF·엑셀은 **서류 꼴**이다 (종이에 색 띠 — 흔한 파일 표식)',
+   전.본것.slice(0, 2).every(x => x.길수 >= 2) && 전.본것[2].길수 === 0,
+   JSON.stringify(전.본것.map(x => x.이름 + ':길 ' + x.길수)));
 판('② 커서가 닿으면 뜨는 말이 달려 있다 (이카운트는 말씀 그대로)',
    전.본것[2].말 === '이카운트로 데이터를 보냅니다' && 전.본것.every(x => x.말 !== ''),
    JSON.stringify(전.본것.map(x => x.말)));
