@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- 조혼가구 — 거래처 발주 화면.
-     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.4.2 -->
+     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.5.0 -->
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -1486,6 +1486,69 @@
             padding-bottom:calc(92px + env(safe-area-inset-bottom));
         }
 
+        /* ── 스캔 화면 ────────────────────────────────────────────────────
+           지시(10-11) "스캔박스 클릭시 고성능 스캔큐알을 할 수 있는 화면".
+           겹판 꼴은 #johon-home 그대로다 — 새 꼴을 만들지 않았다. */
+        #johon-scan{
+            --vg-ink:#111110; --vg-body:#1A1A19; --vg-soft:#6E6E6A; --vg-muted:#9C9C98;
+            --vg-edge:#E2E2DF; --vg-fill:#F4F4F2;
+            position:fixed; left:0; right:0; bottom:0; z-index:8000;
+            top:var(--jhh-top, 64px);
+            display:none; background:#fff; color:var(--vg-body);
+            font:15px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",system-ui,sans-serif;
+            overflow-y:auto; -webkit-overflow-scrolling:touch;
+        }
+        html[data-johonscan="1"] #johon-scan{ display:block; }
+        #johon-scan *{ box-sizing:border-box; }
+        #johon-scan .jhs-wrap{
+            max-width:430px; margin:0 auto;
+            padding:14px 20px calc(92px + env(safe-area-inset-bottom));
+        }
+        #johon-scan .jhs-view{
+            position:relative; width:100%; aspect-ratio:3/4; max-width:100%;
+            background:var(--vg-fill); border-radius:20px; overflow:hidden;
+            display:grid; place-items:center;
+        }
+        #johon-scan .jhs-view video{
+            width:100%; height:100%; object-fit:cover; display:block;
+        }
+        /* 읽히는 자리를 눈에 보이게 — 가운데 네모 */
+        #johon-scan .jhs-aim{
+            position:absolute; left:12%; right:12%; top:50%; height:26%;
+            transform:translateY(-50%); border:2px solid rgba(255,255,255,.9);
+            border-radius:12px; box-shadow:0 0 0 2000px rgba(17,17,16,.28); pointer-events:none;
+        }
+        html[data-johonscanon="1"] #johon-scan .jhs-aim{ display:block; }
+        #johon-scan .jhs-aim{ display:none; }
+        /* 한두 낱말 딱지. 긴 글은 쓰지 않는다. */
+        #johon-scan .jhs-tag{
+            margin:12px 0 0; font-size:13px; font-weight:700; color:var(--vg-soft);
+            min-height:1.3em;
+        }
+        #johon-scan .jhs-read{
+            margin:14px 0 0; padding:16px; border:1px solid var(--vg-edge); border-radius:16px;
+            font-size:21px; font-weight:800; line-height:1.3; letter-spacing:-.4px;
+            color:var(--vg-ink); word-break:break-all; display:none;
+        }
+        html[data-johonscanread="1"] #johon-scan .jhs-read{ display:block; }
+        /* 읽고 나면 아랫줄(다시·복사)이 고정된 ← 박스판 단추 띠에 깔렸다.
+           읽은 뒤에만 카메라 창을 남는 높이에 맞춰 잘라 겹치지 않게 한다.
+           280px = 14 여백 + 30 딱지 + 70 읽은칸 + 54 단추줄 + 92 아래여백 + 20 여유. */
+        html[data-johonscanread="1"] #johon-scan .jhs-view{
+            max-height:calc(100vh - var(--jhh-top, 64px) - 280px);
+            max-height:calc(100dvh - var(--jhh-top, 64px) - 280px);
+            min-height:180px;
+        }
+        #johon-scan .jhs-row{ display:none; gap:8px; margin-top:10px; }
+        html[data-johonscanread="1"] #johon-scan .jhs-row{ display:flex; }
+        #johon-scan .jhs-btn{
+            flex:1; min-height:44px; border-radius:14px; border:1px solid var(--vg-edge);
+            background:#fff; color:var(--vg-ink); font:inherit; font-size:15px; font-weight:700;
+            cursor:pointer;
+        }
+        #johon-scan .jhs-btn.jhs-dark{ background:var(--vg-ink); color:#fff; border-color:var(--vg-ink); }
+        #johon-scan .jhs-btn:active{ transform:scale(.985); }
+
         /* 돌아오는 길 — 박스 안에서 첫 화면으로. 엄지가 닿는 자리에 띄운다. */
         #johon-back{
             display:none; position:fixed; z-index:990; left:12px;
@@ -1499,6 +1562,10 @@
             box-shadow:0 8px 22px -14px rgba(0,0,0,.55);
         }
         #johon-back button:active{ background:#F4F4F2; }
+        /* 스캔 판(z-index 8000) 위로 올린다 — 안 그러면 뒤로가 깔려 안 눌린다.
+           그 화면에서만 손가락 크기(44px)로 키운다. 다른 화면은 그대로 둔다. */
+        html[data-johonscan="1"] #johon-back{ z-index:8100; }
+        html[data-johonscan="1"] #johon-back button{ min-height:44px; padding:11px 17px; }
 
         /* ── 박스 안 — 그 박스가 맡은 구역만 남긴다.
               숨기는 것이지 지우는 것이 아니다. 요소는 전부 DOM 에 그대로 있다.
@@ -1606,7 +1673,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.4.2</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.5.0</span>
                 </div>
                 <!-- 페이지 탭: 발주하기 / 작업중 -->
                 <div class="flex items-center gap-1 border border-[#ededeb] rounded-lg bg-[#f7f6f3] p-1 mr-2">
@@ -1739,6 +1806,19 @@
                 <button type="button" class="jhm-ok" id="jhm-go" onclick="johonBoxSave()">만들기</button>
             </div>
             <button type="button" class="jhm-del" id="jhm-del" onclick="johonBoxDelete()">박스 지우기</button>
+        </div>
+    </div>
+
+    <!-- 스캔 화면 — 「스캔」 박스를 누르면 뜬다 -->
+    <div id="johon-scan">
+        <div class="jhs-wrap">
+            <div class="jhs-view" id="jhs-view"><div class="jhs-aim"></div></div>
+            <p class="jhs-tag" id="jhs-tag"></p>
+            <div class="jhs-read" id="jhs-read"></div>
+            <div class="jhs-row">
+                <button type="button" class="jhs-btn" onclick="johonScanAgain()">다시</button>
+                <button type="button" class="jhs-btn jhs-dark" onclick="johonScanCopy()">복사</button>
+            </div>
         </div>
     </div>
 
@@ -5425,7 +5505,12 @@
             const g = e.target.closest && e.target.closest('#jhh-mine [data-go]');
             if (g) {
                 const b = johonMyBoxes.find(x => x.id === g.dataset.go);
-                if (b && b.link) { try { window.open(b.link, '_blank', 'noopener'); } catch (err) {} }
+                if (!b) return;
+                // 「스캔」 박스는 이 안의 스캔 화면을 연다. 사장님이 만드신 박스라
+                // link 가 비어 있고, 파이어스토어에 쓰지 말라 하셔서 채워 넣지 못한다.
+                // 그래서 이름으로 가른다. 이 이름 하나뿐이다 — 「입고확인」 은 안 건드린다.
+                if ((b.name || '').trim() === '스캔') { johonScanOpen(); return; }
+                if (b.link) { try { window.open(b.link, '_blank', 'noopener'); } catch (err) {} }
             }
         });
 
@@ -5526,6 +5611,183 @@
                 if (window.db && window.fbFirestore) { clearInterval(t); johonBoxSync(); return; }
                 if (--남은횟수 <= 0) clearInterval(t);
             }, 500);
+        })();
+
+        /* ── 스캔 화면 ────────────────────────────────────────────────────
+           지시(10-11) "스캔박스 클릭시 고성능 스캔큐알을 할 수 있는 화면".
+
+           ⚠ 바퀴를 새로 만들지 않았다. 반품스캔/반품스캔.html 의
+             startScanner()·stopScanner() 를 그대로 옮긴 것이다.
+             그쪽은 리액트(ref·state)고 여기는 맨 자바스크립트라 함수를 불러올 수
+             없다 — 저장소도 다르다. 그래서 뜻만 그대로 베꼈다.
+               방법 A  BarcodeDetector (폰이 가진 것. 아이폰 사파리가 이것을 쓴다)
+                       facingMode environment · 1280×720 · requestAnimationFrame
+               방법 B  html5-qrcode (A 가 없을 때 받침)
+
+           ⚠ 끄는 길이 핵심이다. 카메라 트랙을 안 끄면 폰 불이 계속 켜져 있고
+             배터리가 녹는다. 닫을 때·뒤로 갈 때·화면을 덮었을 때 모두 끈다.
+
+           ⚠ 읽은 글로 무엇을 할지는 말씀이 없었다. 크게 보여 주고 복사까지만 한다. */
+        let _jhsStream = null, _jhsRaf = null, _jhsQr = null, _jhsText = '';
+
+        function johonScanTag(글){
+            const el = document.getElementById('jhs-tag');
+            if (el) el.textContent = 글 || '';
+        }
+
+        async function johonScanStop(){
+            if (_jhsRaf) { cancelAnimationFrame(_jhsRaf); _jhsRaf = null; }
+            if (_jhsStream) { _jhsStream.getTracks().forEach(t => t.stop()); _jhsStream = null; }
+            if (_jhsQr) { try { await _jhsQr.stop(); } catch (e) {} _jhsQr = null; }
+            const v = document.getElementById('jhs-view');
+            if (v) [...v.querySelectorAll('video,div:not(.jhs-aim)')].forEach(n => n.remove());
+            document.documentElement.removeAttribute('data-johonscanon');
+        }
+
+        // html5-qrcode 를 한 번만 받아 온다. 못 받아 오면 조용히 지나간다 —
+        // 부르는 쪽에서 「카메라 막힘」 딱지를 붙인다.
+        let _jhsQrLoad = null;
+        function johonScanLoadQr(){
+            if (window.Html5Qrcode) return Promise.resolve();
+            if (_jhsQrLoad) return _jhsQrLoad;
+            _jhsQrLoad = new Promise(풀기 => {
+                const s = document.createElement('script');
+                s.src = 'https://unpkg.com/html5-qrcode';
+                s.async = true;
+                s.onload = () => 풀기();
+                s.onerror = () => { _jhsQrLoad = null; 풀기(); };
+                document.head.appendChild(s);
+            });
+            return _jhsQrLoad;
+        }
+
+        async function johonScanStart(){
+            await johonScanStop();
+            johonScanTag('');
+            const 담을곳 = document.getElementById('jhs-view');
+            if (!담을곳) return;
+            const 찾음 = 글 => { johonScanFound(글); };
+
+            // ── 방법 A: BarcodeDetector (네이티브, 빠름) ──
+            if ('BarcodeDetector' in window) {
+                try {
+                    const 꼴 = ['code_128','code_39','ean_13','ean_8','qr_code','data_matrix','itf','codabar'];
+                    const 되는것 = await window.BarcodeDetector.getSupportedFormats().catch(() => 꼴);
+                    const 눈 = new window.BarcodeDetector({ formats: 되는것.filter(f => 꼴.includes(f)) });
+                    _jhsStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: { ideal: 'environment' },
+                                 width: { ideal: 1280 }, height: { ideal: 720 } } });
+                    const v = document.createElement('video');
+                    v.srcObject = _jhsStream;
+                    v.setAttribute('playsinline',''); v.setAttribute('autoplay',''); v.muted = true;
+                    담을곳.appendChild(v);
+                    await v.play();
+                    document.documentElement.setAttribute('data-johonscanon','1');
+                    const 돌기 = async () => {
+                        if (!_jhsStream) return;
+                        try {
+                            const r = await 눈.detect(v);
+                            if (r.length > 0) { 찾음(r[0].rawValue); return; }
+                        } catch (e) {}
+                        _jhsRaf = requestAnimationFrame(돌기);
+                    };
+                    _jhsRaf = requestAnimationFrame(돌기);
+                    return;
+                } catch (e) {
+                    await johonScanStop();
+                    if (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError')) {
+                        johonScanTag('카메라 막힘'); return;
+                    }
+                    if (e && e.name === 'NotFoundError') { johonScanTag('카메라 없음'); return; }
+                    // 그 밖에는 받침으로 내려간다
+                }
+            }
+
+            // ── 방법 B: html5-qrcode (받침) ──
+            // 아이폰 사파리에는 BarcodeDetector 가 없다. 그래서 사장님 폰에서
+            // 실제로 도는 것은 이쪽이다. 반품스캔은 이 꾸러미를 머리에서 미리
+            // 받아 오지만, 여기는 발주를 보는 판이라 스캔 화면을 열 때만 받아 온다.
+            // ⚠ 이 꾸러미는 바깥에서 받아 온다. 이 상자에서는 그 길이 막혀 있어
+            //   못 재 봤다. 사장님 폰에서만 돌아간다.
+            try {
+                await johonScanLoadQr();
+                // 꾸러미를 못 받아 왔다. 카메라 탓이 아니니 딱지를 달리 붙인다 —
+                // 「카메라 막힘」 이라 적으면 사장님이 폰 설정만 뒤지시게 된다.
+                if (!window.Html5Qrcode) { johonScanTag('못 불러옴'); return; }
+                const 기계들 = await window.Html5Qrcode.getCameras();
+                if (!기계들 || 기계들.length === 0) throw Object.assign(new Error(''), {name:'NotFoundError'});
+                const 뒤 = 기계들.find(d => /back|rear|environ/i.test(d.label)) || 기계들[기계들.length-1];
+                _jhsQr = new window.Html5Qrcode('jhs-view');
+                await _jhsQr.start(뒤.id, { fps:15, qrbox:{ width:240, height:240 } }, 찾음, () => {});
+                document.documentElement.setAttribute('data-johonscanon','1');
+            } catch (e) {
+                await johonScanStop();
+                johonScanTag(e && e.name === 'NotFoundError' ? '카메라 없음' : '카메라 막힘');
+            }
+        }
+
+        function johonScanFound(글){
+            _jhsText = String(글 == null ? '' : 글);
+            const el = document.getElementById('jhs-read');
+            if (el) el.textContent = _jhsText;
+            document.documentElement.setAttribute('data-johonscanread','1');
+            johonScanStop();          // 하나 읽으면 멎는다 — 카메라도 같이 끈다
+        }
+
+        function johonScanAgain(){
+            _jhsText = '';
+            document.documentElement.removeAttribute('data-johonscanread');
+            const el = document.getElementById('jhs-read'); if (el) el.textContent = '';
+            johonScanStart();
+        }
+
+        function johonScanCopy(){
+            if (!_jhsText) return;
+            const 알림 = () => { try { showToastMessage('복사됨'); } catch (e) {} };
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(_jhsText).then(알림, () => {});
+                    return;
+                }
+            } catch (e) {}
+            try {
+                const t = document.createElement('textarea');
+                t.value = _jhsText; t.style.position='fixed'; t.style.opacity='0';
+                document.body.appendChild(t); t.select(); document.execCommand('copy'); t.remove();
+                알림();
+            } catch (e) {}
+        }
+
+        function johonScanOpen(){
+            johonFitTop();
+            johonCurrentBox = null;
+            _jhsText = '';
+            document.documentElement.removeAttribute('data-johonscanread');
+            const el = document.getElementById('jhs-read'); if (el) el.textContent = '';
+            document.documentElement.removeAttribute('data-johonhome');
+            document.documentElement.removeAttribute('data-johonbox');
+            document.documentElement.setAttribute('data-johonscan','1');
+            window.scrollTo(0, 0);
+            johonScanStart();
+        }
+
+        function johonScanClose(){
+            johonScanStop();
+            document.documentElement.removeAttribute('data-johonscan');
+            document.documentElement.removeAttribute('data-johonscanread');
+        }
+
+        /* 뒤로 갈 때·화면을 덮었을 때 반드시 끈다 */
+        (function(){
+            const _home = window.johonGoHome;
+            if (typeof _home === 'function') window.johonGoHome = function(){
+                try { johonScanClose(); } catch (e) {}
+                return _home.apply(this, arguments);
+            };
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) { try { johonScanStop(); } catch (e) {} }
+            });
+            window.addEventListener('pagehide', () => { try { johonScanStop(); } catch (e) {} });
         })();
 
         /* ═══ /박스 첫 화면 ══════════════════════════════════════════════ */
