@@ -116,7 +116,12 @@ const 본 = await p.evaluate(() => {
       판 = { 크기, 칸: 칸들 };
     }
     const 상자 = e.getBoundingClientRect();
+    const 단 = e.querySelector('.tl-dc-큐알명세');
+    const 단상자 = 단 ? 단.getBoundingClientRect() : null;
     return { 파: e.dataset['파'],
+             단추: !!단, 단추글: 단 ? (단.textContent || '').trim() : '',
+             단추높: 단상자 ? Math.round(단상자.height) : 0,
+             단추폭: 단상자 ? Math.round(단상자.width) : 0,
              글: (e.querySelector('.tl-dc-큐알글')?.textContent || '').trim(),
              큐알폭: r ? Math.round(r.width) : 0,
              부속: [...e.querySelectorAll('.tl-dc-큐알부속 .tl-dc-part-row')]
@@ -171,6 +176,45 @@ const B = (본.묶음 || []).find(x => x.파 === 'B') || {};
 판('④ 배송 칸의 나머지는 그대로다 (메모 · 취소 · 배송 확정)',
    본.메모있나 === true && JSON.stringify(본.단추) === JSON.stringify(['취소', '✅ 배송 확정']),
    JSON.stringify(본.단추));
+
+/* 10-11 사장님: 「파레트별 큐알쪽에도 **각 큐알의 납기 명세**가 나타나게 해줘야겠어」.
+   큐알 네모마다 그 큐알 하나치 명세서를 여는 단추를 둔다. 장갑 낀 손이라 44px 이다. */
+판('⑤ 큐알마다 「명세서」 단추가 있다 (44px)',
+   본.묶음.length === 2 && 본.묶음.every(x => x.단추 && x.단추글 === '명세서'
+     && x.단추높 >= 44 && x.단추폭 >= 44),
+   JSON.stringify((본.묶음 || []).map(x => x.파 + ':' + x.단추글 + ' ' + x.단추폭 + '×' + x.단추높)));
+// 진짜 손가락으로 B 큐알의 단추를 누른다 — **그 파레트치만** 펴져야 한다
+const 눌러본 = await (async () => {
+  const 자리 = await p.evaluate(() => {
+    const 네모 = [...document.querySelectorAll('#tl-datecard-expand .tl-dc-큐알묶음')]
+      .find(e => e.dataset['파'] === 'B');
+    const 단 = 네모 && 네모.querySelector('.tl-dc-큐알명세'); if (!단) return null;
+    단.scrollIntoView({ block: 'center' });
+    const r = 단.getBoundingClientRect();
+    return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) };
+  });
+  if (!자리) return { 못누름: true };
+  await 손('touchStart', 자리.x, 자리.y); await p.waitForTimeout(60); await 손('touchEnd', 0, 0);
+  await p.waitForTimeout(500);
+  return await p.evaluate(() => {
+    const 판 = document.getElementById('명세서판'); if (!판) return { 안열림: true };
+    const 표 = 판.querySelector('.명세-표');
+    const 줄 = 표 ? [...표.querySelectorAll('tr')].slice(2).filter(tr => !tr.classList.contains('합')) : [];
+    return { 제목: (판.querySelector('.명세-제목')?.textContent || '').replace(/\s+/g, ' ').trim(),
+             파: window._명세서지금.파, 줄수: 줄.length,
+             파값: 줄.map(tr => [...tr.children].map(e => (e.textContent || '').trim())
+               .find(v => /^[ABCD]$|^없음$/.test(v)) || '').filter(Boolean),
+             종이줄: (window._명세서줄들() || { 줄들: [] }).줄들.length };
+  });
+})();
+console.log('■ B 큐알의 명세서 단추를 눌러: ' + JSON.stringify(눌러본));
+판('⑤ 그 단추를 손가락으로 누르면 **그 큐알치만** 펴진다',
+   !눌러본.못누름 && !눌러본.안열림 && 눌러본.파 === 'B'
+   && /납기 내역 · B 파레트$/.test(눌러본.제목 || '')
+   && 눌러본.줄수 === 1 && JSON.stringify(눌러본.파값) === JSON.stringify(['B'])
+   && 눌러본.종이줄 === 1,
+   JSON.stringify(눌러본));
+if (그림칸()) await p.screenshot({ path: 그림칸() + '/scan-375-큐알한치.png' });
 
 /* ⑤ 두 큐알을 **다 읽어** 본다 — 키웠다고 못 읽히면 안 된다 */
 const 읽개칸 = path.join(HERE, '큐알읽개');

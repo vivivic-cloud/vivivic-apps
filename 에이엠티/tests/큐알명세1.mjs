@@ -86,28 +86,44 @@ const 본 = await 가.p.evaluate(() => {
   const 표 = 판.querySelector('.명세-표');
   const 줄들 = [...표.querySelectorAll('tr')];
   const 머리칸 = [...줄들[0].children].map(e => (e.textContent || '').replace(/\s+/g, '').trim());
-  return { 제목: (판.querySelector('.명세-제목')?.textContent || '').trim(),
-           짚딱지: (판.querySelector('.명세-짚')?.textContent || '').trim(),
+  const 몸줄 = 줄들.slice(2).filter(tr => !tr.classList.contains('합'))
+    .map(tr => [...tr.children].map(e => (e.textContent || '').trim()));
+  // 같은 날 **전체**는 몇 줄인가 — 추린 것과 견준다 (셈은 한 벌이다)
+  const 전체 = window._명세서모으기(window._명세서지금.날짜, '납기');
+  const 파별 = {};
+  전체.forEach(묶 => 묶.계획들.forEach(g => { const k = g.파 || '없음';
+    파별[k] = (파별[k] || 0) + g.품목들.length; }));
+  const 전체줄 = Object.values(파별).reduce((a, c) => a + c, 0);
+  return { 제목: (판.querySelector('.명세-제목')?.textContent || '').replace(/\s+/g, ' ').trim(),
            머리칸, 파레트칸: 머리칸.includes('파레트'),
-           짚은줄: [...표.querySelectorAll('tr.짚음')].map(tr =>
-             [...tr.children].map(e => (e.textContent || '').trim())),
-           모든줄: 줄들.slice(2).filter(tr => !tr.classList.contains('합'))
-             .map(tr => [...tr.children].map(e => (e.textContent || '').trim())),
-           지금: window._명세서지금 ? { 날짜: window._명세서지금.날짜, 공정: window._명세서지금.공정 } : null,
-           짚은파: window._명세서짚은파, 쓰기: window.__쓰기,
-           가로: document.documentElement.scrollWidth };
+           몸줄, 줄수: 몸줄.length,
+           파값: 몸줄.map(td => td.find(v => /^[ABCD]$|^없음$/.test(v)) || '').filter(Boolean),
+           전체줄, 파별,
+           지금: window._명세서지금 ? { 날짜: window._명세서지금.날짜, 공정: window._명세서지금.공정,
+                                        파: window._명세서지금.파, 줄수: window._명세서지금.줄수 } : null,
+           종이줄: (window._명세서줄들() || { 줄들: [] }).줄들.length,
+           쓰기: window.__쓰기, 가로: document.documentElement.scrollWidth };
 });
 console.log('■ 열쇠로 연 것: ' + JSON.stringify(본));
 판('① 주소에 큐알 글을 실어 열면 **납기 명세서가 바로 뜬다**',
    !본.안열림 && /납기 내역/.test(본.제목 || ''), JSON.stringify(본.제목 || 본.화면));
 판('① 그 건이 맞다 (납기일 2026-10-21 · 공정 납기)',
    !!본.지금 && 본.지금.날짜 === 날 && 본.지금.공정 === '납기', JSON.stringify(본.지금));
-판('② 찍은 파레트가 머리에 한 낱말로 적힌다',
-   본.짚딱지 === 'A 파레트' && 본.짚은파 === 'A', '「' + 본.짚딱지 + '」 · ' + 본.짚은파);
-판('② 그 파레트 줄만 짚인다 (나머지는 그대로)',
-   본.짚은줄.length === 1 && 본.짚은줄[0].some(v => v === 'A')
-   && 본.모든줄.length >= 2,
-   '짚은 줄 ' + 본.짚은줄.length + ' / 모두 ' + 본.모든줄.length + ' · ' + JSON.stringify(본.짚은줄[0] || []));
+/* 10-11 사장님: 「조혼가구 스캔시 **딱 그 큐알의 해당 명세서만** 보이게 해줘」.
+   그래서 앞 판의 「줄만 짚기」 를 걷고 **그 파레트치만** 편다. */
+판('② 머리에 어느 파레트치인지 적힌다 (「… 납기 내역 · A 파레트」)',
+   /납기 내역 · A 파레트$/.test(본.제목 || '') && (본.지금 || {}).파 === 'A',
+   '「' + 본.제목 + '」 · 지금 파 ' + (본.지금 || {}).파);
+판('② **A 파레트 줄만** 뜬다 (B·없음은 안 나온다)',
+   본.줄수 === (본.파별['A'] || 0) && 본.파값.every(v => v === 'A') && 본.줄수 > 0,
+   'A ' + 본.줄수 + '줄 · 적힌 파레트 ' + JSON.stringify(본.파값));
+판('② 전체는 더 많다 — 추린 것이 전체보다 적다 (더하면 전체와 맞는다)',
+   본.전체줄 > 본.줄수 && Object.values(본.파별).reduce((a, c) => a + c, 0) === 본.전체줄,
+   '전체 ' + 본.전체줄 + '줄 = ' + JSON.stringify(본.파별) + ' → A 만 ' + 본.줄수 + '줄');
+판('② 셈한 줄 수(_명세서지금.줄수)도 추린 것에 맞는다',
+   (본.지금 || {}).줄수 === 본.줄수, (본.지금 || {}).줄수 + ' / 화면 ' + 본.줄수);
+판('② **종이(PDF)·엑셀도 추린 것만** 담긴다 (화면만 추리면 더 나쁘다)',
+   본.종이줄 === 본.줄수, '종이 ' + 본.종이줄 + '줄 · 화면 ' + 본.줄수 + '줄');
 판('② 파이어스토어에 한 줄도 안 쓴다 · 375px 가로 넘침 없다',
    본.쓰기 === 0 && 본.가로 <= 375, 본.쓰기 + '번 · ' + 본.가로 + 'px');
 판('② 페이지오류 없음 (열쇠 붙여 열기)', 가.errs.length === 0,
@@ -119,16 +135,37 @@ await 가.p.close();
 const 나 = await 열기(터);
 const 민낯 = await 나.p.evaluate(() => ({
   판있나: !!document.getElementById('명세서판'),
-  짚은파: window._명세서짚은파,
   했나: window._주소명세했다,
   화면: (document.body.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 80) }));
 console.log('■ 열쇠 없이: ' + JSON.stringify(민낯));
 판('③ 열쇠가 없으면 명세서가 안 뜬다 (첫 화면 그대로)',
-   민낯.판있나 === false && 민낯.했나 === false && 민낯.짚은파 === '',
-   JSON.stringify(민낯));
+   민낯.판있나 === false && 민낯.했나 === false, JSON.stringify(민낯));
 판('③ 페이지오류 없음 (열쇠 없이)', 나.errs.length === 0,
    String(나.errs.length) + (나.errs[0] ? ' :: ' + 나.errs[0] : ''));
 await 나.p.close();
+
+// ── ③-2 머리줄의 「명세서」 단추는 **전체**를 편다 (바꾸면 안 된다) ──────
+const 마 = await 열기(터);
+const 전체본 = await 마.p.evaluate(() => {
+  window.tlExpandDateCard('2026-10-21'); window.tlDcExpandSection('납기');
+  const e = document.querySelector('#tl-datecard-expand .tl-dc-single-hdr .명세-단추');
+  if (!e) return { 단추없음: true };
+  e.click();
+  const 판 = document.getElementById('명세서판'); if (!판) return { 안열림: true };
+  const 표 = 판.querySelector('.명세-표');
+  const 줄 = [...표.querySelectorAll('tr')].slice(2).filter(tr => !tr.classList.contains('합'));
+  return { 제목: (판.querySelector('.명세-제목')?.textContent || '').replace(/\s+/g, ' ').trim(),
+           줄수: 줄.length, 파: window._명세서지금.파,
+           파값: 줄.map(tr => [...tr.children].map(e2 => (e2.textContent || '').trim())
+             .find(v => /^[ABCD]$|^없음$/.test(v)) || '').filter(Boolean) };
+});
+console.log('■ 머리줄 단추(전체): ' + JSON.stringify(전체본));
+판('③ 머리줄 「명세서」 단추는 **그 날 전체**를 편다 (전과 한 글자도 안 다르다)',
+   !전체본.단추없음 && !전체본.안열림 && 전체본.파 === ''
+   && !/파레트$/.test(전체본.제목) && 전체본.줄수 === 본.전체줄
+   && 전체본.파값.length === 전체본.줄수,
+   '「' + 전체본.제목 + '」 · ' + 전체본.줄수 + '줄 · ' + JSON.stringify(전체본.파값));
+await 마.p.close();
 
 // ── ④ 없는 큐알이면 한 줄로 알리고 안 터진다 ───────────────────────
 const 다 = await 열기(터 + '?' + encodeURIComponent('명세') + '=' + encodeURIComponent('없는곳-20991231-99-Z'));
@@ -145,6 +182,25 @@ console.log('■ 없는 큐알: ' + JSON.stringify({ 판있나: 없을때.판있
    String(다.errs.length) + (다.errs[0] ? ' :: ' + 다.errs[0] : ''));
 if (그림칸()) await 다.p.screenshot({ path: 그림칸() + '/scan-375-큐알없음.png' });
 await 다.p.close();
+
+// ── ④-2 발주는 있는데 그 파레트가 비면 **빈 표 대신 한 줄** ────────────
+const 바 = await 열기(터 + '?' + encodeURIComponent('명세') + '=' + encodeURIComponent('유한-20261009-01-Z'));
+const 빈파 = await 바.p.evaluate(() => {
+  const 판 = document.getElementById('명세서판'); if (!판) return { 안열림: true };
+  return { 제목: (판.querySelector('.명세-제목')?.textContent || '').replace(/\s+/g, ' ').trim(),
+           없음글: (판.querySelector('.명세-없음')?.textContent || '').trim(),
+           표있나: !!판.querySelector('.명세-표') };
+});
+console.log('■ 없는 파레트(Z): ' + JSON.stringify(빈파));
+판('④ 그 파레트에 줄이 없으면 **빈 표 대신 한 줄**로 알린다',
+   !빈파.안열림 && 빈파.표있나 === false && /Z 파레트에 담긴 것이 없습니다/.test(빈파.없음글),
+   '「' + 빈파.없음글 + '」 · 표 ' + 빈파.표있나);
+판('④ 그때도 머리에 어느 파레트인지 적힌다',
+   /Z 파레트$/.test(빈파.제목 || ''), '「' + 빈파.제목 + '」');
+판('④ 터지지 않는다 (빈 파레트)', 바.errs.length === 0,
+   String(바.errs.length) + (바.errs[0] ? ' :: ' + 바.errs[0] : ''));
+if (그림칸()) await 바.p.screenshot({ path: 그림칸() + '/scan-375-빈파레트.png' });
+await 바.p.close();
 
 // ── ⑤ 손잡이(?viggle=1)와 같이 와도 둘 다 돈다 ─────────────────────
 const 라 = await 열기(터 + '?viggle=1&box=amt&' + encodeURIComponent('명세') + '=' + encodeURIComponent(큐알));
