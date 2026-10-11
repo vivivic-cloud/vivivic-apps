@@ -2,7 +2,7 @@
 // 기준은 작업대(viggle/index.html)의 .tile 이다. 다섯 가지를 그대로 잰다:
 //   안여백 17px · 최소높이 150px · 아이콘 54px · 이름 글자 20px · 모서리 26px
 // 집 박스판(#amt-home)과 거래처 박스판(#amt-vendor-home) 둘 다 본다.
-import { 브라우저열기, devices, 서버, 자료, 자재, 그림칸 as 그림칸자리 } from './도구/터.mjs';
+import { 브라우저열기, devices, 서버, 자료, 자재, 뿌리, 그림칸 as 그림칸자리 } from './도구/터.mjs';
 await 서버();   // 저장소를 8899 에 내주는 자리 서버 — 없으면 스스로 띄운다
 import { readFileSync } from 'node:fs';
 const HERE = await 자재();   // 막힌 CDN 대신 쓸 것들 — 없으면 스스로 갖춘다
@@ -11,7 +11,23 @@ const CSS=readFileSync(HERE+'/tw-built.css','utf-8');
 const B='http://127.0.0.1:8899';
 const O=await 자료('confirmed_orders');
 // 작업대 원본에서 곧바로 읽어 온 기준값 — 손으로 적지 않는다
-const 작업대글 = readFileSync('/home/user/viggle/index.html','utf-8');
+/* 작업대(바이글)는 이 저장소의 뿌리에 있는 index.html 이다.
+   예전에는 상자마다 /home/user/viggle 로도 풀려 있어 그 길을 박아 두었는데,
+   그 자리가 없는 상자에서는 시험이 통째로 터졌다(10-11 · ENOENT).
+   저장소 안의 길을 먼저 보고, 없으면 예전 길을 본다 — 보는 값은 그대로다. */
+/* 바이글이 풀려 있을 만한 자리들 — 상자마다 다르다.
+   /home/user/viggle (예전 상자) · /home/user/vivivic-cloud/viggle (지금 상자가 푸는 자리) */
+const 작업대길 = ['/home/user/viggle/index.html',
+                  '/home/user/vivivic-cloud/viggle/index.html',
+                  뿌리 + '/../viggle/index.html']
+  .find(길 => { try { return /\n\s*\.tile\s*\{/.test(readFileSync(길, 'utf-8')); } catch (e) { return false; } });
+if (!작업대길) {
+  console.log('tile1   FAIL (작업대 index.html 을 못 찾았습니다 — .tile 이 든 파일이 이 상자에 없습니다.' +
+    ' 바이글(viggle) 저장소를 /home/user/viggle 이나 /home/user/vivivic-cloud/viggle 에 풀어야 합니다 —' +
+    ' git clone https://github.com/vivivic-cloud/viggle)');
+  process.exit(1);
+}
+const 작업대글 = readFileSync(작업대길,'utf-8');
 const 뽑기 = (덩이, 키) => {
   const m = 작업대글.match(new RegExp('\\n\\s*' + 덩이.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '\\{([^}]*)\\}'));
   if(!m) return null; const v = m[1].match(new RegExp('(?:^|;|\\s)' + 키 + '\\s*:\\s*([^;}]+)'));
@@ -24,7 +40,7 @@ const 기준 = {
   부연글자: 뽑기('.tile .pct','font-size'), 부연여백: 뽑기('.tile .pct','margin'),
   칸나눔: 뽑기('.tiles','grid-template-columns'), 칸사이: 뽑기('.tiles','gap'),
 };
-console.log('■ 작업대 원본(viggle/index.html 에서 그대로 읽음): '+JSON.stringify(기준));
+console.log('■ 작업대 원본('+작업대길+' 에서 그대로 읽음): '+JSON.stringify(기준));
 
 const b=await 브라우저열기();
 let 실패=0; const 판=(n,t,v)=>{ if(!t) 실패++; console.log((t?'  OK  ':'  FAIL')+'  '+n+'   → '+v); };
