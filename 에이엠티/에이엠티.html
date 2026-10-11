@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.40.0 (2026-10-11) — 명세서 하단 조작부: 로고만 셋 · 누르면 저절로 발급
+     버전: v1.41.0 (2026-10-11) — 배송 정보 확인칸에 파레트 큐알코드를 보인다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -931,6 +931,8 @@
         .tl-dc-delivery-card-title { font-size: 12px; font-weight: 800; color: #37352f; }
         .tl-dc-delivery-info { display: flex; flex-direction: column; gap: 3px; }
         .tl-dc-delivery-info-row { display: flex; gap: 8px; font-size: 11px; }
+        /* 파레트 큐알 — 여럿이면 줄을 바꾼다 (잘리지 않게) */
+        .tl-dc-큐알칸 { display:flex; flex-wrap:wrap; gap:4px; min-width:0; }
         .tl-dc-delivery-info-label { font-weight: 700; color: #787774; min-width: 56px; flex-shrink: 0; }
         .tl-dc-delivery-parts-title { font-size: 10px; font-weight: 800; color: #37352f; margin-bottom: 4px; }
         .tl-dc-delivery-memo {
@@ -2566,7 +2568,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.40.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.41.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2699,7 +2701,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.40.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.41.0</b></p>
         </div>
     </div>
 
@@ -10927,6 +10929,18 @@
                     </div>`;
                 });
             }
+            /* 10-11 사장님: 「배송정보 확인칸에 이전 작업으로 생성된 파레트의 큐알코드를
+               나타내 주세요」. 큐알 글은 이미 있는 잣대를 그대로 쓴다 — 납기 판에서
+               묶는 그 글(_제품큐알글)이다. 새로 짓지 않는다. 여기서는 읽기만 한다. */
+            const _파들 = (typeof window._제품파레트들 === 'function')
+                ? (window._제품파레트들(item) || []) : [];
+            const _큐알줄 = `<div class="tl-dc-delivery-info-row">`
+                + `<span class="tl-dc-delivery-info-label">파레트 큐알</span>`
+                + `<span class="tl-dc-큐알칸">`
+                + (_파들.length
+                    ? _파들.map(파 => `<span class="납-파">${window._제품큐알글(item, 파)}</span>`).join('')
+                    : `<span class="납-파 없">파레트 없음</span>`)
+                + `</span></div>`;
             const escId = String(idNum);
             area.innerHTML = `<div class="tl-dc-delivery-card">
                 <div class="tl-dc-delivery-card-title">🚚 배송 정보 확인</div>
@@ -10935,6 +10949,7 @@
                     <div class="tl-dc-delivery-info-row"><span class="tl-dc-delivery-info-label">상품명</span><span style="font-weight:700;">${item.displayName}</span></div>
                     <div class="tl-dc-delivery-info-row"><span class="tl-dc-delivery-info-label">수량</span><span style="font-weight:800;">${item.orderQty} EA</span></div>
                     <div class="tl-dc-delivery-info-row"><span class="tl-dc-delivery-info-label">납기일</span><span style="font-weight:700;">${item.deliveryDate}</span></div>
+                    ${_큐알줄}
                     ${item.supplier?`<div class="tl-dc-delivery-info-row"><span class="tl-dc-delivery-info-label">공급처</span><span>${item.supplier}</span></div>`:''}
                 </div>
                 ${partsRows?`<div><div class="tl-dc-delivery-parts-title">📦 부속 목록</div>${partsRows}</div>`:''}

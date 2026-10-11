@@ -3,7 +3,7 @@
 // 납기 판에서 ① 제품이 파레트별로 묶여 보이는지 ② 파레트가 안 정해진 제품의
 // 「배송출발」 이 **진짜 손가락으로 눌러도** 안 열리는지 ③ 파레트가 정해진 제품은
 // 전처럼 그대로 열리는지 ④ 옛 기록(파레트 칸이 없던 발주)이 예전과 똑같이 구는지를 잰다.
-import { 브라우저열기, devices, 서버, 자료, 자재 } from './도구/터.mjs';
+import { 브라우저열기, devices, 서버, 자료, 자재, 그림칸 } from './도구/터.mjs';
 await 서버();
 import { readFileSync } from 'node:fs';
 const HERE = await 자재();
@@ -148,6 +148,39 @@ const 열어본뒤 = await p.evaluate(() => ({
   쓰기: window.__쓰기, 문서가로: document.documentElement.scrollWidth }));
 판('③ 파레트 있는 제품은 전처럼 배송 창이 열린다 (되던 것이 안 막혔다)',
    열어본뒤.열림 === true, JSON.stringify(열어본뒤));
+
+/* 10-11 사장님: 「배송정보 확인칸에 **이전 작업으로 생성된 파레트의 큐알코드**를
+   나타내 주세요」. 납기 판에서 쓰는 그 큐알 글(발주번호-파레트)이 배송 확인 칸에도
+   보여야 한다. 파레트가 없는 제품은 창이 안 열리니 「없음」 꼴은 틀로만 둔다. */
+const 큐알 = await p.evaluate(() => {
+  const 칸 = document.querySelector('#tl-datecard-expand .tl-dc-full-card[data-idnum="9601"] .tl-dc-delivery-card');
+  if (!칸) return { 없음: true };
+  const 줄들 = [...칸.querySelectorAll('.tl-dc-delivery-info-row')].map(e => ({
+    이름: (e.querySelector('.tl-dc-delivery-info-label')?.textContent || '').trim(),
+    값: (e.textContent || '').replace(/\s+/g, ' ').trim() }));
+  const 칩 = [...칸.querySelectorAll('.tl-dc-큐알칸 .납-파')].map(e => (e.textContent || '').trim());
+  const 칸폭 = 칸.getBoundingClientRect();
+  const 넘침 = [...칸.querySelectorAll('.tl-dc-큐알칸 .납-파')]
+    .some(e => e.getBoundingClientRect().right > 칸폭.right + 1);
+  const o = confirmedOrders.find(x => x.idNum === 9601);
+  return { 줄들: 줄들.map(x => x.이름), 칩, 넘침,
+           바란것: (window._제품파레트들(o) || []).map(파 => window._제품큐알글(o, 파)) };
+});
+console.log('■ 배송 정보 확인칸의 큐알: ' + JSON.stringify(큐알));
+if (그림칸()) {
+  await p.evaluate(() => document.querySelector('#tl-datecard-expand .tl-dc-full-card[data-idnum="9601"] .tl-dc-delivery-card')
+    ?.scrollIntoView({ block: 'center' }));
+  await p.waitForTimeout(250);
+  await p.screenshot({ path: 그림칸() + '/dlv-375-큐알줄.png' });
+}
+판('④ 배송 정보 확인칸에 「파레트 큐알」 줄이 있다',
+   !큐알.없음 && 큐알.줄들.includes('파레트 큐알'), JSON.stringify(큐알.줄들));
+판('④ 그 줄에 이전 작업으로 만든 큐알코드가 그대로 적힌다 (발주번호-파레트)',
+   !큐알.없음 && 큐알.칩.length === 1 && 큐알.칩[0] === '시험-파레트-01-B'
+   && JSON.stringify(큐알.칩) === JSON.stringify(큐알.바란것),
+   JSON.stringify(큐알.칩) + ' · 납기 판과 같은 글 ' + JSON.stringify(큐알.바란것));
+판('④ 큐알 딱지가 칸 밖으로 안 나간다 (여럿이면 줄을 바꾼다)',
+   !큐알.없음 && 큐알.넘침 === false, '넘침 ' + 큐알.넘침);
 판('⑤ 파이어스토어에 한 줄도 안 쓴다 (보기만 했다)', 열어본뒤.쓰기 === 0, 열어본뒤.쓰기 + '번');
 판('⑤ 375px 가로 스크롤 없다', 열어본뒤.문서가로 <= 375, 열어본뒤.문서가로 + 'px');
 판('페이지오류 없음', errs.length === 0, String(errs.length) + (errs[0] ? ' :: ' + errs[0] : ''));
