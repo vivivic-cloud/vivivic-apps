@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.43.0 (2026-10-11) — 배송 정보 확인칸의 파레트 큐알을 그림으로 보인다
+     버전: v1.44.0 (2026-10-11) — 큐알마다 그 큐알의 부속 목록을 달고 세 배로 키운다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -931,12 +931,20 @@
         .tl-dc-delivery-card-title { font-size: 12px; font-weight: 800; color: #37352f; }
         .tl-dc-delivery-info { display: flex; flex-direction: column; gap: 3px; }
         .tl-dc-delivery-info-row { display: flex; gap: 8px; font-size: 11px; }
-        /* 파레트 큐알 — 여럿이면 줄을 바꿔 다 보인다. 글자는 그림 밑에 적는다 */
-        .tl-dc-큐알칸 { display:flex; flex-wrap:wrap; gap:10px; min-width:0; }
-        .tl-dc-큐알 { display:flex; flex-direction:column; align-items:center; gap:3px; }
-        .tl-dc-큐알 svg { display:block; border:1px solid #e3e2e0; border-radius:4px; }
-        .tl-dc-큐알글 { font-size:9px; font-weight:800; color:#37352f;
+        /* 파레트 큐알 — 큐알마다 **따로 선 네모** 한 벌(큐알 + 글 + 그 큐알의 부속)이다.
+           둘 이상이면 위아래로 줄줄이 세운다 — 찍을 때 섞이면 안 된다(10-11 지시). */
+        .tl-dc-큐알칸 { display:flex; flex-direction:column; gap:12px; min-width:0; }
+        .tl-dc-큐알묶음 { border:2px solid #e3e2e0; border-radius:12px; padding:10px;
+            background:#fff; }
+        .tl-dc-큐알 { display:flex; flex-direction:column; align-items:center; gap:5px; }
+        .tl-dc-큐알 svg { display:block; border:1px solid #e3e2e0; border-radius:6px;
+            max-width:100%; height:auto; }
+        .tl-dc-큐알글 { font-size:12px; font-weight:800; color:#37352f;
             font-family:ui-monospace,monospace; }
+        .tl-dc-큐알수 { font-size:9px; font-weight:800; color:#fff; background:#37352f;
+            border-radius:4px; padding:1px 5px; }
+        .tl-dc-큐알부속 { margin-top:9px; border-top:1px solid #e9e8e6; padding-top:6px; }
+        .tl-dc-큐알부속.빔 { font-size:10px; color:#a8a6a2; font-weight:700; text-align:center; }
         .tl-dc-delivery-info-label { font-weight: 700; color: #787774; min-width: 56px; flex-shrink: 0; }
         .tl-dc-delivery-parts-title { font-size: 10px; font-weight: 800; color: #37352f; margin-bottom: 4px; }
         .tl-dc-delivery-memo {
@@ -2577,7 +2585,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.43.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.44.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2710,7 +2718,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.43.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.44.0</b></p>
         </div>
     </div>
 
@@ -10928,8 +10936,35 @@
             }
             const item = confirmedOrders.find(o => o.idNum === idNum);
             if (!item) return;
+            /* 10-11 사장님: 「각 큐알에 해당하는 목록이 큐알 아래에 나타나면 되고 …
+               엣지파레트 큐알과 보링파레트 큐알간 혼선이 있다면 **보링큐알이 우선**」.
+               파레트는 **부속·공정마다** 고르므로 한 부속에 엣지 것과 보링 것이 따로
+               있을 수 있다. 그때는 **뒤 공정이 이긴다** — 보링이 가장 뒤다(보링>NC>엣지).
+               고른 것은 두 군데에 있다: 지금 창에서 고른 것(_집중파레트들)과 적어 둔 것
+               (wo_pallet). 같은 자리면 **지금 고른 것**이 이긴다 — _집중파레트값 과 같은 잣대다. */
+            const _파순 = { '보링': 3, 'NC': 2, '엣지': 1 };
+            const _부속파 = {};                       // 부속(cardKey) → { 파, 공정, 점 }
+            const _담기 = (열쇠, 파) => {
+                if (!파) return;
+                const 조각 = String(열쇠).split('|');
+                const ck = 조각[0], 공정 = 조각[1] || '';
+                if (!ck) return;
+                const 점 = _파순[공정] || 0;
+                const 전 = _부속파[ck];
+                if (!전 || 점 > 전.점) _부속파[ck] = { 파, 공정, 점 };
+            };
+            const _did = String(item.docId || item.idNum || '');
+            Object.keys(window._집중파레트들 || {}).forEach(k => {
+                const 조각 = String(k).split('|');
+                if (조각[0] !== _did) return;
+                _담기(조각.slice(1).join('|'), window._집중파레트들[k]);
+            });
+            const _적힌 = (typeof window._파레트적힌 === 'function') ? window._파레트적힌(_did) : {};
+            Object.keys(_적힌).forEach(k => _담기(k, _적힌[k]));
+
             const h = currentFullData[0];
-            let partsRows = '';
+            let partsRows = '';                       // 어느 파레트에도 안 실린 부속
+            const _파별줄 = {};                        // 파레트 → 그 파레트의 부속 줄
             if (h) {
                 Object.entries(item.partInfoMap || {}).forEach(([cKey, pData]) => {
                     if (!pData || pData.isDeleted) return;
@@ -10942,10 +10977,13 @@
                     const batches = item.partMoveLog?.[cKey] || [];
                     const mv = batches.reduce((s,b)=>s+(b['납기']&&b['납기']!==item.deliveryDate?b.qty:0),0);
                     const dq = mv>0 ? Math.max(0,tq-mv) : tq;
-                    partsRows += `<div class="tl-dc-part-row">
+                    const 줄 = `<div class="tl-dc-part-row">
                         <span class="tl-dc-part-name">${nm}</span>
                         <span class="tl-dc-part-qty">${dq}EA</span>
                     </div>`;
+                    const 파 = (_부속파[cKey] || {}).파 || '';
+                    if (파) { (_파별줄[파] = _파별줄[파] || []).push(줄); }
+                    else partsRows += 줄;
                 });
             }
             /* 10-11 사장님: 「배송정보 확인칸에 **이전 작업으로 생성된** 파레트의 큐알코드를
@@ -10954,16 +10992,26 @@
                **파레트가 하나도 안 잡히면 칸을 아예 안 만든다** — 빈 네모를 지어 넣지 않는다. */
             const _파들 = (typeof window._제품파레트들 === 'function')
                 ? (window._제품파레트들(item) || []) : [];
+            /* 큐알이 둘 이상일 때 **스캔하다 섞이면 안 된다**(10-11 지시) — 큐알마다
+               따로 선 네모 안에 큐알·글·그 큐알의 부속 목록을 한 벌로 담고, 위아래로
+               줄줄이 세운다. 큐알 크기는 폰에서 찍을 수 있게 **276px**(앞의 세 배)다. */
             const _큐알칸 = !_파들.length ? '' :
-                `<div><div class="tl-dc-delivery-parts-title">📱 파레트 큐알</div>`
-                + `<div class="tl-dc-큐알칸">`
+                `<div><div class="tl-dc-delivery-parts-title">📱 파레트 큐알`
+                + (_파들.length > 1 ? ` <span class="tl-dc-큐알수">${_파들.length}개</span>` : '')
+                + `</div><div class="tl-dc-큐알칸">`
                 + _파들.map(파 => {
                     const 글 = window._제품큐알글(item, 파);
-                    const 그림 = (typeof window._큐알그림 === 'function') ? window._큐알그림(글, 92) : '';
+                    const 그림 = (typeof window._큐알그림 === 'function') ? window._큐알그림(글, 276) : '';
                     if (!그림) return '';
-                    return `<span class="tl-dc-큐알">${그림}`
+                    const 줄들 = _파별줄[파] || [];
+                    return `<div class="tl-dc-큐알묶음" data-파="${파}">`
+                         + `<div class="tl-dc-큐알">${그림}`
                          + `<span class="tl-dc-큐알글">${String(글).replace(/&/g, '&amp;').replace(/</g, '&lt;')}</span>`
-                         + `</span>`;
+                         + `</div>`
+                         + (줄들.length
+                             ? `<div class="tl-dc-큐알부속">${줄들.join('')}</div>`
+                             : `<div class="tl-dc-큐알부속 빔">이 큐알에 담긴 부속이 없습니다</div>`)
+                         + `</div>`;
                   }).join('')
                 + `</div></div>`;
             const escId = String(idNum);
