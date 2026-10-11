@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.44.0 (2026-10-11) — 큐알마다 그 큐알의 부속 목록을 달고 세 배로 키운다
+     버전: v1.46.0 (2026-10-11) — 전잔액/현잔액 줄은 빼지 않고 빈칸으로 둔다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2585,7 +2585,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.44.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.46.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2718,7 +2718,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.44.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.46.0</b></p>
         </div>
     </div>
 
@@ -8221,6 +8221,38 @@
         window._집중파레트쓰나 = function (일) {
             return !!일 && String(일.procKey || '') !== '재단';
         };
+        /* 공정 차례 — 앞에서 뒤로. **공정이 늘면 여기 한 줄만 고친다.**
+           파레트가 엇갈릴 때 **뒤 공정이 이긴다**는 잣대가 여기서 나온다
+           (10-11 사장님: 「엣지파레트 큐알과 보링파레트 큐알간 혼선이 있다면 보링큐알이 우선」
+            — 보링이 엣지보다 뒤다). 자리마다 따로 박지 않는다. */
+        window._공정차례 = ['재단', '엣지', 'NC', '보링', '납기'];
+        window._공정점 = function (공정) { return window._공정차례.indexOf(String(공정 || '')); };
+        /* 이 발주의 부속마다 **어느 파레트에 실렸나** — 부속·공정마다 고르므로 한 부속에
+           엣지 것과 보링 것이 따로 있을 수 있다. 그때는 위 차례로 뒤 공정이 이긴다.
+           고른 것은 두 군데에 있다: 지금 창에서 고른 것(_집중파레트들)과 적어 둔 것
+           (wo_pallet). 같은 자리면 **지금 고른 것**이 이긴다 — _집중파레트값 과 같은 잣대다. */
+        window._부속파레트 = function (item) {
+            const 본 = {};
+            if (!item) return 본;
+            const 담기 = (열쇠, 파) => {
+                if (!파) return;
+                const 조각 = String(열쇠).split('|');
+                const ck = 조각[0], 공정 = 조각[1] || '';
+                if (!ck) return;
+                const 점 = window._공정점(공정);
+                const 전 = 본[ck];
+                if (!전 || 점 > 전.점) 본[ck] = { 파: 파, 공정: 공정, 점: 점 };
+            };
+            const did = String(item.docId || item.idNum || '');
+            Object.keys(window._집중파레트들 || {}).forEach(k => {
+                const 조각 = String(k).split('|');
+                if (조각[0] !== did) return;
+                담기(조각.slice(1).join('|'), window._집중파레트들[k]);
+            });
+            const 적힌 = (typeof window._파레트적힌 === 'function') ? window._파레트적힌(did) : {};
+            Object.keys(적힌).forEach(k => 담기(k, 적힌[k]));
+            return 본;
+        };
         window._집중파열쇠 = function (일) {
             return [일 && 일.docId, 일 && 일.cardKey, 일 && 일.procKey].join('|');
         };
@@ -9741,6 +9773,8 @@
                     `<td class="ㄱ">${_명세서몰라('')}</td></tr>`;
             }).join('');
 
+            // 이 명세서의 **낱칸 수** — 재단 15 · 그 밖 12 (원장입고일·원장수량·재단금액이 빠진다)
+            const 칸수 = 원장 ? 15 : 12;
             const html =
                 `<div class="명세-쪽">` +
                 `<table class="명세-표">` +
@@ -9755,10 +9789,15 @@
                 몸.join('') +
                 (원장
                   ? `<tr class="합"><td class="ㄱ" colspan="12">합  계</td><td class="ㄱ">${총매}매</td>` +
-                    `<td class="ㄱ">${window._돈글(총매 * (window._재단단가 || 0))}</td><td></td></tr>` +
-                    `<tr class="합"><td class="ㄱ" colspan="9">전잔액</td><td class="ㄱ" colspan="3">${_명세서몰라('')}</td>` +
-                    `<td class="ㄱ">현잔액</td><td class="ㄱ" colspan="2">${_명세서몰라('')}</td></tr>`
+                    `<td class="ㄱ">${window._돈글(총매 * (window._재단단가 || 0))}</td><td></td></tr>`
                   : '') +
+                /* 10-11 사장님: 전잔액/현잔액 줄은 「**빼지말고 빈칸으로**」.
+                   재단에서는 빨간 「?」 그대로, 그 밖의 공정에서는 **빈칸**으로 둔다.
+                   줄 수가 공정마다 다르므로 칸 수에서 내어 쓴다(앞 칸수-6 · 3 · 1 · 2). */
+                `<tr class="합"><td class="ㄱ" colspan="${칸수 - 6}">전잔액</td>` +
+                `<td class="ㄱ" colspan="3">${원장 ? _명세서몰라('') : ''}</td>` +
+                `<td class="ㄱ">현잔액</td>` +
+                `<td class="ㄱ" colspan="2">${원장 ? _명세서몰라('') : ''}</td></tr>` +
                 `</table></div>` +
                 (원장
                   ? `<div class="명세-쪽"><p class="명세-쪽이름">원장 소요량</p>` +
@@ -10942,25 +10981,7 @@
                있을 수 있다. 그때는 **뒤 공정이 이긴다** — 보링이 가장 뒤다(보링>NC>엣지).
                고른 것은 두 군데에 있다: 지금 창에서 고른 것(_집중파레트들)과 적어 둔 것
                (wo_pallet). 같은 자리면 **지금 고른 것**이 이긴다 — _집중파레트값 과 같은 잣대다. */
-            const _파순 = { '보링': 3, 'NC': 2, '엣지': 1 };
-            const _부속파 = {};                       // 부속(cardKey) → { 파, 공정, 점 }
-            const _담기 = (열쇠, 파) => {
-                if (!파) return;
-                const 조각 = String(열쇠).split('|');
-                const ck = 조각[0], 공정 = 조각[1] || '';
-                if (!ck) return;
-                const 점 = _파순[공정] || 0;
-                const 전 = _부속파[ck];
-                if (!전 || 점 > 전.점) _부속파[ck] = { 파, 공정, 점 };
-            };
-            const _did = String(item.docId || item.idNum || '');
-            Object.keys(window._집중파레트들 || {}).forEach(k => {
-                const 조각 = String(k).split('|');
-                if (조각[0] !== _did) return;
-                _담기(조각.slice(1).join('|'), window._집중파레트들[k]);
-            });
-            const _적힌 = (typeof window._파레트적힌 === 'function') ? window._파레트적힌(_did) : {};
-            Object.keys(_적힌).forEach(k => _담기(k, _적힌[k]));
+            const _부속파 = window._부속파레트(item);   // 부속(cardKey) → { 파, 공정, 점 }
 
             const h = currentFullData[0];
             let partsRows = '';                       // 어느 파레트에도 안 실린 부속
