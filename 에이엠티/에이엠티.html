@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.52.0 (2026-10-11) — 큐알 명세서가 **그 발주의** 파레트만 센다
+     버전: v1.53.0 (2026-10-11) — 큐알 명세서에 입고확인 단추와 책임 글귀
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1683,6 +1683,12 @@
         .명세-몰라 { display:inline-block; font-size:9.5px; font-weight:800; color:#b91c1c;
             background:#fde2e2; border:1px solid #f0a8a8; border-radius:3px; padding:0 4px; }
         .명세-없음 { padding:24px 10px; text-align:center; color:#a8a6a2; font-size:12px; }
+        /* 입고확인 묻는 창 — 명세서 창과 같은 결이다. 새 꼴을 만들지 않는다 */
+        .입고-판 { z-index:2147483100; }
+        .입고-속 { max-width:420px; }
+        .입고-글 { padding:16px 16px 6px; font-size:14px; font-weight:700; color:#37352f; line-height:1.55; }
+        .입고-탈 { margin:8px 16px 0; padding:8px 10px; border-radius:7px; font-size:12.5px;
+            font-weight:800; color:#b91c1c; background:#fde2e2; border:1px solid #f0a8a8; }
         .명세-바닥 { display:flex; flex-wrap:wrap; gap:8px; padding:10px 12px calc(10px + env(safe-area-inset-bottom));
             background:#fff; border-top:1px solid #e3e2e0; flex-shrink:0; }
         /* 10-11 사장님: 「각 버튼에는 **로고만** 표기해 주시고 … 엑셀 pdf 등도 각버튼에
@@ -1694,6 +1700,10 @@
             border:1px solid #e3e2e0; background:#f5f5f4; color:#37352f; cursor:pointer;
             display:flex; align-items:center; justify-content:center; }
         .명세-바닥 button svg { width:26px; height:26px; flex-shrink:0; }
+        /* 「입고확인」 은 로고가 없다 — 글자로 둔다. 꼴은 다른 단추와 똑같다 */
+        .명세-바닥 button.글단추 { font-size:13px; font-weight:800; color:#37352f; }
+        .명세-바닥 button.글단추.끝났다 { background:#37352f; color:#fff; border-color:#37352f;
+            font-size:11.5px; font-weight:800; }
         /* 이카운트 로고는 가로로 길다 — 원 그림의 비(124:80)를 지킨다 */
         .명세-바닥 button svg.로고-넓은 { width:40px; height:26px; }
         .명세-바닥 button:active { background:#eceae7; }
@@ -2592,7 +2602,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.52.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.53.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2725,7 +2735,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.52.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.53.0</b></p>
         </div>
     </div>
 
@@ -9950,7 +9960,10 @@
 
         /* 파레트를 주면 **그 파레트치만** 펴진다(10-11 지시). 안 주면 그 날 **전체**다 —
            머리줄의 「명세서」 단추는 전과 똑같이 전체를 편다. */
-        window._명세서열기 = function (dateStr, procKey, 파레트, 발주열쇠) {
+        /* 10-11 사장님: 「조혼가구쪽 **큐알 스캔으로 나타나는 명세서에는 입고확인 버튼이
+           있어야 합니다**」. 그래서 큐알로 들어온 길(`?명세=`)만 그 글을 들려 보낸다 —
+           머리줄 단추(그 날 전체)와 큐알 네모의 단추(사장님이 보시는 쪽)에는 안 붙는다. */
+        window._명세서열기 = function (dateStr, procKey, 파레트, 발주열쇠, 큐알글) {
             // 명세서는 원장수량(재단계획 매수)을 본다 — 지금 부른다 (3단계)
             try { if (typeof window._도면확보모두 === 'function') window._도면확보모두(); } catch (e) {}
             const 파 = String(파레트 == null ? '' : 파레트).trim();
@@ -9962,8 +9975,13 @@
                         || String(o.orderCode || '') === 발키) : null;
             const 이름 = !파 ? '' : (그발주 ? window._제품큐알글(그발주, 파) : 파 + ' 파레트');
             const 짠 = window._명세서표Html(dateStr, procKey, 묶음, 이름);
+            const 큐 = String(큐알글 == null ? '' : 큐알글).trim();
             window._명세서지금 = { 날짜: dateStr, 공정: procKey, 파: 파, 발주: 발키, 이름: 이름,
+                                   큐알: 큐, 업체: (그발주 && 그발주.supplier) || '',
+                                   발주번호: (그발주 && 그발주.orderCode) || '',
                                    묶음: 묶음, 총매: 짠.총매, 줄수: 짠.줄수,
+                                   총수량: 묶음.reduce((a, 묶) => a + 묶.계획들.reduce((b, g) =>
+                                       b + g.품목들.reduce((c, 품) => c + (parseInt(품.몫, 10) || 0), 0), 0), 0),
                                    발급번호: '', 발급시각: '' };
             document.getElementById('명세서판')?.remove();
             const 판 = document.createElement('div');
@@ -9989,8 +10007,13 @@
                 `<button type="button" id="명세-이카운트" onclick="_명세서이카운트()" aria-label="이카운트"` +
                 ` data-말="이카운트로 데이터를 보냅니다"` + (짠.줄수 ? '' : ' disabled') + `>` +
                 `${_명세이카운트()}</button>` +
+                // 큐알을 찍고 들어온 길에만 선다 — 거기가 「입고」 하는 자리다 (10-11 지시)
+                (큐 ? `<button type="button" id="명세-입고" class="글단추" onclick="_입고확인묻기()"` +
+                      ` data-말="입고확인"` + (짠.줄수 ? '' : ' disabled') + `>입고확인</button>` : '') +
                 `</div></div>`;
             document.body.appendChild(판);
+            // 큐알로 들어온 길이면 **이미 확인한 큐알인지** 먼저 읽는다 (10-11 지시)
+            if (큐 && typeof window._입고확인봤나 === 'function') window._입고확인봤나();
             // 손가락으로 눌러도 말이 보이게 — 누르는 순간 띄우고 잠깐 뒤 거둔다
             판.querySelectorAll('.명세-바닥 button').forEach(단 => {
                 const 띄우기 = () => {
@@ -10001,6 +10024,95 @@
                 단.addEventListener('touchstart', 띄우기, { passive: true });
                 단.addEventListener('pointerdown', 띄우기, { passive: true });
             });
+        };
+
+        /* ── 입고확인 (10-11 사장님 말씀 그대로) ───────────────────────────────
+           「입고확인 버튼을 누르면 '확인' 버튼과 함께 '입고된 수량을 정확히 확인했나요?
+             확인후 착오된 수량의 책임은 조혼가구(현재납품중인업체명)에 기록됩니다.'
+             라는 메세지가 팝업이 나타나게해주세요.」
+           괄호 안의 말씀은 **업체 이름을 그때그때 넣으라**는 뜻이다 — 괄호는 화면에 안 쓴다.
+           업체는 **발주 기록**(supplier)에서 꺼낸다. 주소에 실린 값은 안 믿는다 —
+           누구나 고칠 수 있는데 책임을 적는 글귀다.
+           ⚠ 「기록됩니다」 라고 약속했으니 **진짜로 적는다.** 못 적으면 한 줄로 알린다 —
+           초록 딱지 띄우고 넘어가면 사장님이 기록이 있다고 믿으신다. */
+        window._입고글귀 = function (업체) {
+            return '입고된 수량을 정확히 확인했나요? 확인후 착오된 수량의 책임은 '
+                 + (String(업체 || '').trim() || '납품업체') + '에 기록됩니다.';
+        };
+        window._입고칸 = function (큐알) {
+            const { doc } = window.fbFirestore;
+            return doc(window.db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', '입고확인', String(큐알));
+        };
+        /* 이미 확인한 큐알인가 — 창을 열 때 먼저 읽는다. 있으면 단추를 잠근다. */
+        window._입고확인봤나 = async function () {
+            const 지 = window._명세서지금; if (!지 || !지.큐알) return;
+            try {
+                const { getDoc } = window.fbFirestore;
+                const 눈 = await getDoc(window._입고칸(지.큐알));
+                if (!눈 || !눈.exists || !눈.exists()) return;
+                const 값 = (눈.data && 눈.data()) || {};
+                지.입고됨 = 값.확인시각글 || '확인됨';
+                window._입고단추잠그기(지.입고됨);
+            } catch (e) { /* 못 읽어도 단추는 그대로 둔다 — 누르면 다시 적어 본다 */ }
+        };
+        window._입고단추잠그기 = function (글) {
+            const 단 = document.getElementById('명세-입고'); if (!단) return;
+            단.textContent = '입고확인 · ' + 글;
+            단.classList.add('끝났다'); 단.disabled = true;
+        };
+        window._입고확인묻기 = function () {
+            const 지 = window._명세서지금; if (!지 || !지.큐알) return;
+            if (지.입고됨) return;                                  // 한 큐알에 한 번이다
+            const 글귀 = window._입고글귀(지.업체);
+            document.getElementById('입고판')?.remove();
+            const 판 = document.createElement('div');
+            판.id = '입고판'; 판.className = '명세-판 입고-판';
+            판.onclick = (e) => { if (e.target === 판) 판.remove(); };
+            const _e = v => String(v == null ? '' : v)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            판.innerHTML = `<div class="명세-속 입고-속">` +
+                `<div class="명세-머리">` +
+                `<span class="명세-제목">입고확인</span>` +
+                `<button class="명세-닫기" type="button" onclick="document.getElementById('입고판')?.remove()" aria-label="닫기">✕</button>` +
+                `</div>` +
+                `<div class="입고-글" id="입고-글">${_e(글귀)}</div>` +
+                `<div class="명세-바닥"><button type="button" class="참 글단추" id="입고-확인"` +
+                ` onclick="_입고확인하기()">확인</button></div></div>`;
+            document.body.appendChild(판);
+        };
+        window._입고확인하기 = async function () {
+            const 지 = window._명세서지금; if (!지 || !지.큐알) return;
+            const 단 = document.getElementById('입고-확인');
+            if (단) { 단.disabled = true; 단.textContent = '적는 중…'; }
+            const 두 = n => String(n).padStart(2, '0');
+            const 이제 = new Date();
+            const 시각글 = 이제.getFullYear() + '-' + 두(이제.getMonth() + 1) + '-' + 두(이제.getDate())
+                + ' ' + 두(이제.getHours()) + ':' + 두(이제.getMinutes());
+            try {
+                const { setDoc, getDoc, serverTimestamp } = window.fbFirestore;
+                await setDoc(window._입고칸(지.큐알), {
+                    큐알: 지.큐알, 발주번호: 지.발주번호 || '', 발주문서: 지.발주 || '',
+                    파레트: 지.파 || '', 납기일: 지.날짜 || '',
+                    업체: 지.업체 || '', 줄수: 지.줄수 || 0, 총수량: 지.총수량 || 0,
+                    확인시각: serverTimestamp(), 확인시각글: 시각글,
+                    확인uid: (window._myAccount && window._myAccount.uid) || '',
+                    글귀: window._입고글귀(지.업체), 판: (document.getElementById('amth-ver') || {}).textContent || '',
+                }, { merge: true });
+                // **다시 읽어** 들어갔는지 보고 나서 「입고확인」 이라 말한다
+                const 눈 = await getDoc(window._입고칸(지.큐알));
+                if (!눈 || !눈.exists || !눈.exists()) throw new Error('적은 것이 안 보입니다');
+                지.입고됨 = 시각글;
+                window._입고단추잠그기(시각글);
+                document.getElementById('입고판')?.remove();
+                if (typeof showToastMessage === 'function') showToastMessage('입고확인 되었습니다');
+            } catch (err) {
+                console.error('입고확인 적기 실패:', err);
+                if (단) { 단.disabled = false; 단.textContent = '확인'; }
+                const 글칸 = document.getElementById('입고-글');
+                if (글칸) 글칸.insertAdjacentHTML('afterend',
+                    '<div class="입고-탈" id="입고-탈">기록을 못 남겼습니다</div>');
+                if (typeof showToastMessage === 'function') showToastMessage('기록을 못 남겼습니다');
+            }
         };
 
         window._명세서닫기 = function () {
@@ -10042,7 +10154,7 @@
             } catch (e) {}
             // 찍은 큐알 **하나치**만 편다 — 그 날 전체가 아니다 (10-11 지시)
             const 발키 = String(집힌.발주.docId || 집힌.발주.idNum || '');
-            setTimeout(() => { try { window._명세서열기(날, '납기', 파, 발키); } catch (e) {} }, 60);
+            setTimeout(() => { try { window._명세서열기(날, '납기', 파, 발키, 글); } catch (e) {} }, 60);
         };
 
         /* 10-11 사장님: 「발급 버튼을 삭제하고 각 버튼 누르면 **자동발급**되어 다음 동작을
