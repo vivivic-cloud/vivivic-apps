@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- 조혼가구 — 거래처 발주 화면.
-     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.5.0 -->
+     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.6.0 -->
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -1533,12 +1533,27 @@
         html[data-johonscanread="1"] #johon-scan .jhs-read{ display:block; }
         /* 읽고 나면 아랫줄(다시·복사)이 고정된 ← 박스판 단추 띠에 깔렸다.
            읽은 뒤에만 카메라 창을 남는 높이에 맞춰 잘라 겹치지 않게 한다.
-           280px = 14 여백 + 30 딱지 + 70 읽은칸 + 54 단추줄 + 92 아래여백 + 20 여유. */
+           350px = 14 여백 + 30 딱지 + 70 읽은칸 + 58 길단추 + 54 단추줄 + 92 아래여백 + 32 여유.
+           길이 둘 이상이면 넘쳐 밀리는데, 아래여백 92 가 ← 박스판 단추 띠(60)보다 커서
+           끝까지 내리면 단추가 깔리지 않는다. */
         html[data-johonscanread="1"] #johon-scan .jhs-view{
-            max-height:calc(100vh - var(--jhh-top, 64px) - 280px);
-            max-height:calc(100dvh - var(--jhh-top, 64px) - 280px);
+            max-height:calc(100vh - var(--jhh-top, 64px) - 350px);
+            max-height:calc(100dvh - var(--jhh-top, 64px) - 350px);
             min-height:180px;
         }
+        /* 길 단추 — 이름 그대로 선다. 둘 이상이면 나란히 쌓인다. */
+        #johon-scan .jhs-ways{ display:none; flex-direction:column; gap:8px; margin-top:10px; }
+        html[data-johonscanway="1"] #johon-scan .jhs-ways{ display:flex; }
+        #johon-scan .jhs-way{
+            width:100%; min-height:48px; padding:12px 16px; border-radius:14px;
+            border:1px solid var(--vg-ink); background:var(--vg-ink); color:#fff;
+            font:inherit; font-size:16px; font-weight:800; text-align:left; cursor:pointer;
+        }
+        #johon-scan .jhs-way:active{ transform:scale(.985); }
+        #johon-scan .jhs-none{
+            display:none; margin:10px 0 0; font-size:14px; font-weight:600; color:var(--vg-soft);
+        }
+        html[data-johonscanread="1"]:not([data-johonscanway="1"]) #johon-scan .jhs-none{ display:block; }
         #johon-scan .jhs-row{ display:none; gap:8px; margin-top:10px; }
         html[data-johonscanread="1"] #johon-scan .jhs-row{ display:flex; }
         #johon-scan .jhs-btn{
@@ -1673,7 +1688,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.5.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.6.0</span>
                 </div>
                 <!-- 페이지 탭: 발주하기 / 작업중 -->
                 <div class="flex items-center gap-1 border border-[#ededeb] rounded-lg bg-[#f7f6f3] p-1 mr-2">
@@ -1815,6 +1830,11 @@
             <div class="jhs-view" id="jhs-view"><div class="jhs-aim"></div></div>
             <p class="jhs-tag" id="jhs-tag"></p>
             <div class="jhs-read" id="jhs-read"></div>
+            <!-- 찍힌 글로 갈 수 있는 길. 규칙표에서 가려 낸 만큼만 선다.
+                 ⚠ 저절로 넘어가지 않는다 — 사장님 말씀은 「클릭시」 다. -->
+            <div class="jhs-ways" id="jhs-ways"></div>
+            <!-- 길이 하나도 없을 때 한 줄. 조용히 아무 일도 안 하는 것이 제일 나쁘다. -->
+            <p class="jhs-none" id="jhs-none">무엇인지 모르겠습니다</p>
             <div class="jhs-row">
                 <button type="button" class="jhs-btn" onclick="johonScanAgain()">다시</button>
                 <button type="button" class="jhs-btn jhs-dark" onclick="johonScanCopy()">복사</button>
@@ -5726,18 +5746,76 @@
             }
         }
 
+        /* ═══ 찍은 글 → 가는 길 ═════════════════════════════════════════
+           사장님 10-11: 「스캔내용 클릭시 해당 납기 명세서가 나타나야 합니다」
+           「이런 스캔의 종류가 많아 질텐데 … 다른 루트를 보여주는 큐알일때는 어떻게 해지?」
+
+           ⚠⚠ **큐알 종류를 여기에 박지 않는다.** 가는 길은 화베의 규칙표(`큐알규칙`)에
+              줄로 쌓이고, 새 큐알은 줄 하나만 더하면 된다. 셈은 shared/큐알길.js 한 벌이다.
+           ⚠ 규칙표는 **읽기만** 한다. 줄을 더하는 것은 바이글이 한다.
+           ⚠ 규칙표를 **못 읽어도 스캔 화면은 그대로 돈다.** 여기서 터지면 안 된다. */
+        let _jhs규칙 = null;      // 읽어 둔 줄들
+        let _jhs규칙중 = null;    // 읽는 중인 약속
+
+        function johonScanRulesLoad(){
+            _jhs규칙중 = (async () => {
+                try {
+                    if (!window.db || !window.fbFirestore || !window.큐알길) return [];
+                    const { collection, getDocs } = window.fbFirestore;
+                    const 눈 = await getDocs(collection(window.db, ...window.큐알길.자리));
+                    const 줄 = []; 눈.forEach(d => 줄.push(d.data()));
+                    return 줄;
+                } catch (e) { return []; }   // 못 읽어도 그냥 빈 줄로 간다
+            })().then(줄 => { _jhs규칙 = 줄; return 줄; });
+            return _jhs규칙중;
+        }
+
+        function johonScanWaysClear(){
+            document.documentElement.removeAttribute('data-johonscanway');
+            const 통 = document.getElementById('jhs-ways');
+            if (통) 통.innerHTML = '';
+        }
+
+        // 길을 누르면 간다. ⚠ 가기 전에 카메라를 끈다 — 안 끄면 폰 불이 켜진 채 남는다.
+        async function johonScanGo(주소){
+            try { await johonScanStop(); } catch (e) {}
+            try { window.open(주소, '_blank', 'noopener'); } catch (e) {}
+        }
+
+        async function johonScanRoute(글){
+            johonScanWaysClear();
+            let 줄 = _jhs규칙;
+            if (!줄) { try { 줄 = await (_jhs규칙중 || johonScanRulesLoad()); } catch (e) { 줄 = []; } }
+            let 길 = [];
+            try { 길 = (window.큐알길 && window.큐알길.풀기(글, 줄 || [])) || []; } catch (e) { 길 = []; }
+            if (글 !== _jhsText) return;        // 그새 다시 찍으셨으면 버린다
+            const 통 = document.getElementById('jhs-ways');
+            if (!통 || 길.length === 0) return; // 길이 없으면 「무엇인지 모르겠습니다」 한 줄이 선다
+            길.forEach(ㄱ => {
+                const b = document.createElement('button');
+                b.type = 'button'; b.className = 'jhs-way';
+                b.textContent = ㄱ.이름;
+                b.addEventListener('click', () => johonScanGo(ㄱ.주소));
+                통.appendChild(b);
+            });
+            document.documentElement.setAttribute('data-johonscanway','1');
+        }
+
         function johonScanFound(글){
             _jhsText = String(글 == null ? '' : 글);
             const el = document.getElementById('jhs-read');
             if (el) el.textContent = _jhsText;
+            johonScanWaysClear();
             document.documentElement.setAttribute('data-johonscanread','1');
             johonScanStop();          // 하나 읽으면 멎는다 — 카메라도 같이 끈다
+            johonScanRoute(_jhsText); // 길은 뒤따라 선다. 여기서 기다리지 않는다.
         }
 
         function johonScanAgain(){
             _jhsText = '';
             document.documentElement.removeAttribute('data-johonscanread');
             const el = document.getElementById('jhs-read'); if (el) el.textContent = '';
+            johonScanWaysClear();
             johonScanStart();
         }
 
@@ -5764,6 +5842,8 @@
             _jhsText = '';
             document.documentElement.removeAttribute('data-johonscanread');
             const el = document.getElementById('jhs-read'); if (el) el.textContent = '';
+            johonScanWaysClear();
+            johonScanRulesLoad();   // 규칙표는 화면을 열 때 한 번. 찍을 때마다 읽지 않는다.
             document.documentElement.removeAttribute('data-johonhome');
             document.documentElement.removeAttribute('data-johonbox');
             document.documentElement.setAttribute('data-johonscan','1');
@@ -5773,6 +5853,7 @@
 
         function johonScanClose(){
             johonScanStop();
+            johonScanWaysClear();
             document.documentElement.removeAttribute('data-johonscan');
             document.documentElement.removeAttribute('data-johonscanread');
         }
@@ -5794,6 +5875,9 @@
     </script>
     <!-- 아이콘 — 작업대·에이엠티가 쓰는 그 파일 그대로. 바깥 CDN 이 아니다. -->
     <script src="../shared/lucide.min.js"></script>
+    <!-- 찍은 큐알이 어디로 가는 길인지 가리는 셈. 베끼지 않고 부른다 —
+         스캔하는 프로그램이 늘어도 셈은 한 벌이다. 규칙은 화베의 표에 쌓인다. -->
+    <script src="../shared/큐알길.js"></script>
     <!-- 바이글 손잡이 — 주소에 ?viggle=1 이 있을 때만 켜진다 -->
     <script src="../shared/viggle.js"></script>
 </body>
