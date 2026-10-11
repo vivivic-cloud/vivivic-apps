@@ -5,7 +5,9 @@
 // 전처럼 그대로 열리는지 ④ 옛 기록(파레트 칸이 없던 발주)이 예전과 똑같이 구는지를 잰다.
 import { 브라우저열기, devices, 서버, 자료, 자재, 그림칸 } from './도구/터.mjs';
 await 서버();
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import path from 'node:path';
 const HERE = await 자재();
 const CSS = readFileSync(HERE + '/tw-built.css', 'utf-8');
 const URL = 'http://127.0.0.1:8899/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0.html';
@@ -155,32 +157,100 @@ const 열어본뒤 = await p.evaluate(() => ({
 const 큐알 = await p.evaluate(() => {
   const 칸 = document.querySelector('#tl-datecard-expand .tl-dc-full-card[data-idnum="9601"] .tl-dc-delivery-card');
   if (!칸) return { 없음: true };
-  const 줄들 = [...칸.querySelectorAll('.tl-dc-delivery-info-row')].map(e => ({
-    이름: (e.querySelector('.tl-dc-delivery-info-label')?.textContent || '').trim(),
-    값: (e.textContent || '').replace(/\s+/g, ' ').trim() }));
-  const 칩 = [...칸.querySelectorAll('.tl-dc-큐알칸 .납-파')].map(e => (e.textContent || '').trim());
-  const 칸폭 = 칸.getBoundingClientRect();
-  const 넘침 = [...칸.querySelectorAll('.tl-dc-큐알칸 .납-파')]
-    .some(e => e.getBoundingClientRect().right > 칸폭.right + 1);
+  const 칸상자 = 칸.getBoundingClientRect();
+  const 것들 = [...칸.querySelectorAll('.tl-dc-큐알')].map(e => {
+    const svg = e.querySelector('svg.큐알');
+    const r = svg ? svg.getBoundingClientRect() : null;
+    // 그려 놓은 그림에서 **칸판을 되읽는다** — 그린 것이 진짜 큐알인지 시험이 직접 푼다
+    let 판 = null;
+    if (svg) {
+      const 크기 = parseInt(svg.dataset['크기'], 10);
+      const p2 = svg.querySelector('path');
+      const d = p2 ? (p2.getAttribute('d') || '') : '';
+      const 칸들 = Array.from({ length: 크기 }, () => new Array(크기).fill(0));
+      (d.match(/M(\d+) (\d+)h1v1h-1z/g) || []).forEach(m => {
+        const n = m.match(/M(\d+) (\d+)/);
+        칸들[Number(n[2]) - 4][Number(n[1]) - 4] = 1;
+      });
+      판 = { 크기, 칸: 칸들 };
+    }
+    return { 글: (e.querySelector('.tl-dc-큐알글')?.textContent || '').trim(),
+             그림: !!svg, 폭: r ? Math.round(r.width) : 0,
+             넘침: r ? (r.right > 칸상자.right + 1) : true, 판 };
+  });
   const o = confirmedOrders.find(x => x.idNum === 9601);
-  return { 줄들: 줄들.map(x => x.이름), 칩, 넘침,
+  return { 제목: [...칸.querySelectorAll('.tl-dc-delivery-parts-title')].map(e => (e.textContent || '').trim()),
+           것들, 다른줄: [...칸.querySelectorAll('.tl-dc-delivery-info-row')]
+             .map(e => (e.querySelector('.tl-dc-delivery-info-label')?.textContent || '').trim()),
+           메모있나: !!칸.querySelector('.tl-dc-delivery-memo'),
+           단추: [...칸.querySelectorAll('.tl-dc-delivery-btn-row button')].map(e => (e.textContent || '').trim()),
            바란것: (window._제품파레트들(o) || []).map(파 => window._제품큐알글(o, 파)) };
 });
-console.log('■ 배송 정보 확인칸의 큐알: ' + JSON.stringify(큐알));
+console.log('■ 배송 정보 확인칸의 큐알: ' + JSON.stringify(
+  { 제목: 큐알.제목, 것들: (큐알.것들 || []).map(x => ({ 글: x.글, 폭: x.폭, 넘침: x.넘침 })), 바란것: 큐알.바란것 }));
 if (그림칸()) {
   await p.evaluate(() => document.querySelector('#tl-datecard-expand .tl-dc-full-card[data-idnum="9601"] .tl-dc-delivery-card')
     ?.scrollIntoView({ block: 'center' }));
   await p.waitForTimeout(250);
   await p.screenshot({ path: 그림칸() + '/dlv-375-큐알줄.png' });
 }
-판('④ 배송 정보 확인칸에 「파레트 큐알」 줄이 있다',
-   !큐알.없음 && 큐알.줄들.includes('파레트 큐알'), JSON.stringify(큐알.줄들));
-판('④ 그 줄에 이전 작업으로 만든 큐알코드가 그대로 적힌다 (발주번호-파레트)',
-   !큐알.없음 && 큐알.칩.length === 1 && 큐알.칩[0] === '시험-파레트-01-B'
-   && JSON.stringify(큐알.칩) === JSON.stringify(큐알.바란것),
-   JSON.stringify(큐알.칩) + ' · 납기 판과 같은 글 ' + JSON.stringify(큐알.바란것));
-판('④ 큐알 딱지가 칸 밖으로 안 나간다 (여럿이면 줄을 바꾼다)',
-   !큐알.없음 && 큐알.넘침 === false, '넘침 ' + 큐알.넘침);
+판('④ 배송 정보 확인칸에 파레트 큐알이 **그림으로** 선다',
+   !큐알.없음 && 큐알.제목.includes('📱 파레트 큐알')
+   && 큐알.것들.length === 1 && (큐알.것들[0] || {}).그림 === true && (큐알.것들[0] || {}).폭 >= 80,
+   JSON.stringify(큐알.제목) + ' · ' + JSON.stringify((큐알.것들 || []).map(x => x.폭 + 'px')));
+판('④ 큐알 밑에 그 글자가 적힌다 (이전 작업에서 만든 그 글 그대로)',
+   !큐알.없음 && (큐알.것들[0] || {}).글 === '시험-파레트-01-B'
+   && JSON.stringify(큐알.것들.map(x => x.글)) === JSON.stringify(큐알.바란것),
+   JSON.stringify(큐알.것들.map(x => x.글)) + ' · 납기 판과 같은 글 ' + JSON.stringify(큐알.바란것));
+판('④ 큐알이 칸 밖으로 안 나간다 (여럿이면 줄을 바꾼다)',
+   !큐알.없음 && 큐알.것들.every(x => !x.넘침), JSON.stringify(큐알.것들.map(x => x.넘침)));
+판('④ 배송 정보 확인칸의 나머지는 그대로다 (메모·취소·배송 확정·다른 줄)',
+   !큐알.없음 && 큐알.메모있나 === true
+   && JSON.stringify(큐알.단추) === JSON.stringify(['취소', '✅ 배송 확정'])
+   && JSON.stringify(큐알.다른줄) === JSON.stringify(['오더코드', '상품명', '수량', '납기일', '공급처']),
+   JSON.stringify(큐알.다른줄) + ' · ' + JSON.stringify(큐알.단추));
+
+/* ⑤ 그린 큐알을 **읽어** 본다 — 「그렸다」 가 아니라 **읽힌다**까지가 한 벌이다.
+   읽는 연장(jsqr)은 시험 쪽에서만 쓴다. 앱은 큐알 셈을 제 안에 갖고 있다. */
+const 읽개칸 = path.join(HERE, '큐알읽개');
+const jsqr길 = path.join(읽개칸, 'node_modules/jsqr/dist/jsQR.js');
+if (!existsSync(jsqr길)) {
+  mkdirSync(읽개칸, { recursive: true });
+  writeFileSync(path.join(읽개칸, 'package.json'),
+    JSON.stringify({ name: 'amt-큐알읽개', private: true, version: '0.0.0' }, null, 2) + '\n');
+  spawnSync('npm', ['install', '--no-audit', '--no-fund', 'jsqr'], { cwd: 읽개칸, stdio: 'inherit' });
+}
+let 읽힌 = '(연장 없음)';
+if (existsSync(jsqr길) && 큐알.것들 && 큐알.것들[0] && 큐알.것들[0].판) {
+  const { default: jsQR } = await import('file://' + jsqr길);
+  const q = 큐알.것들[0].판, 배 = 10, 여백 = 4, px = (q.크기 + 여백 * 2) * 배;
+  const 점 = new Uint8ClampedArray(px * px * 4).fill(255);
+  for (let r = 0; r < q.크기; r++) for (let c = 0; c < q.크기; c++) if (q.칸[r][c])
+    for (let y = 0; y < 배; y++) for (let x = 0; x < 배; x++) {
+      const Y = (r + 여백) * 배 + y, X = (c + 여백) * 배 + x, i = (Y * px + X) * 4;
+      점[i] = 점[i + 1] = 점[i + 2] = 0;
+    }
+  const 나온것 = jsQR(점, px, px);
+  읽힌 = 나온것 ? 나온것.data : '(못 읽음)';
+}
+판('⑤ 그 큐알이 **진짜로 읽힌다** (jsqr 로 읽어 글자를 견준다)',
+   읽힌 === '시험-파레트-01-B', '읽힌 글 「' + 읽힌 + '」');
+/* ⑥ 파레트가 하나도 없으면 **칸을 아예 안 만든다** — 빈 네모나 「없음」 을 지어 넣지 않는다. */
+const 없을때 = await p.evaluate(() => {
+  const o = confirmedOrders.find(x => x.idNum === 9602);
+  const area = document.querySelector('#tl-datecard-expand .tl-dc-full-card[data-idnum="9602"] .tl-dc-delivery-area');
+  return { 파레트: (window._제품파레트들(o) || []).length, 글: area ? area.innerHTML : '' };
+});
+console.log('■ 파레트 없는 제품: ' + JSON.stringify({ 파레트: 없을때.파레트, 창길이: (없을때.글 || '').length }));
+판('⑥ 파레트가 없으면 큐알 칸을 아예 안 만든다 (빈 네모를 짓지 않는다)',
+   없을때.파레트 === 0 && !/파레트 큐알/.test(없을때.글 || ''),
+   '파레트 ' + 없을때.파레트 + '개 · 창에 큐알 칸 ' + (/파레트 큐알/.test(없을때.글 || '') ? '있음' : '없음'));
+if (그림칸()) {
+  await p.evaluate(() => document.querySelector('#tl-datecard-expand .tl-dc-full-card[data-idnum="9602"]')
+    ?.scrollIntoView({ block: 'center' }));
+  await p.waitForTimeout(250);
+  await p.screenshot({ path: 그림칸() + '/dlv-375-큐알없음.png' });
+}
 판('⑤ 파이어스토어에 한 줄도 안 쓴다 (보기만 했다)', 열어본뒤.쓰기 === 0, 열어본뒤.쓰기 + '번');
 판('⑤ 375px 가로 스크롤 없다', 열어본뒤.문서가로 <= 375, 열어본뒤.문서가로 + 'px');
 판('페이지오류 없음', errs.length === 0, String(errs.length) + (errs[0] ? ' :: ' + errs[0] : ''));
