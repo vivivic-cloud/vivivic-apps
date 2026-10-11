@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.49.0 (2026-10-11) — 이카운트 로고를 주신 그림대로 바꾼다
+     버전: v1.50.0 (2026-10-11) — 큐알 글로 그 건의 납기 명세서를 연다 (?명세=…)
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -1676,6 +1676,10 @@
         .명세-표 td.ㄱㄱ { text-align:center; font-weight:800; }
         .명세-표 tr.합 td { background:#f7f6f5; font-weight:800; }
         .명세-빈파 { color:#a8a6a2; font-weight:700; }
+        /* 큐알로 찍어 들어온 파레트 줄 — 눈에 띄게 짚는다 (10-11 지시) */
+        .명세-표 tr.짚음 td { background:#fff6de; font-weight:800; }
+        .명세-짚 { font-size:10px; font-weight:800; color:#fff; background:#37352f;
+            border-radius:5px; padding:2px 7px; flex-shrink:0; }
         .명세-몰라 { display:inline-block; font-size:9.5px; font-weight:800; color:#b91c1c;
             background:#fde2e2; border:1px solid #f0a8a8; border-radius:3px; padding:0 4px; }
         .명세-없음 { padding:24px 10px; text-align:center; color:#a8a6a2; font-size:12px; }
@@ -2588,7 +2592,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.49.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.50.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2721,7 +2725,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.49.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.50.0</b></p>
         </div>
     </div>
 
@@ -3326,6 +3330,8 @@
             window._자료옴[무엇] = true;
             delete window._자료탈[무엇];
             if (typeof renderProcessTimeline === 'function') renderProcessTimeline();
+            // 주소에 큐알 글이 실려 왔으면 발주가 온 뒤 한 번 펴 본다 (10-11 지시)
+            if (typeof window._주소명세열기 === 'function') window._주소명세열기();
         };
         window._자료탈났다 = function (무엇, 까닭) {
             window._자료탈[무엇] = String((까닭 && (까닭.code ||까닭.message)) || 까닭 || '못 받음');
@@ -8292,6 +8298,27 @@
         window._제품큐알글 = function (item, 파) {
             return ((item && (item.orderCode || item.docId)) || '') + '-' + 파;
         };
+        /* 큐알 글을 **도로 가른다** — 바로 위 `_제품큐알글` 이 짓는 규칙의 반대다.
+           짓기는 `발주번호 + '-' + 파레트` 라 **맨 뒤 토막이 파레트**다.
+           (조혼가구가 큐알을 찍어 이 글을 보내온다 — 10-11 지시.)
+           짓는 자리와 **짝으로 붙여 둔다**: 한쪽을 고치면 다른 쪽이 바로 보인다. */
+        window._큐알글가르기 = function (글) {
+            const t = String(글 == null ? '' : 글).trim();
+            const m = t.match(/^(.+)-([A-Za-z0-9]{1,3})$/);
+            return m ? { 발주: m[1], 파: m[2] } : { 발주: t, 파: '' };
+        };
+        /* 큐알 글(또는 발주번호)로 그 발주를 집는다. 글 그대로 맞으면 파레트는 없는 것이다. */
+        window._큐알글발주 = function (글) {
+            const 들 = (typeof confirmedOrders !== 'undefined' ? confirmedOrders : []);
+            const 찾 = 코드 => 들.find(o => String(o.orderCode || '') === 코드
+                                         || String(o.docId || '') === 코드);
+            const t = String(글 == null ? '' : 글).trim();
+            let 발주 = 찾(t);
+            if (발주) return { 발주, 파: '' };
+            const 갈 = window._큐알글가르기(t);
+            발주 = 찾(갈.발주);
+            return 발주 ? { 발주, 파: 갈.파 } : null;
+        };
         window._집중파레트그리기 = function () {
             const 일 = window._집중일; if (!일) return;
             if (!window._집중파레트쓰나(일)) return;      // 재단에는 그릴 칸이 없다
@@ -9800,6 +9827,7 @@
         window._명세서표Html = function (날짜, 공정, 묶음) {
             const 원장 = _명세서원장보이나(공정);
             const 파칸 = _명세서파레트보이나(공정);
+            const 짚은파 = String(window._명세서짚은파 || '');
             const _e = v => String(v == null ? '' : v)
                 .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             let 총매 = 0, 줄수 = 0;
@@ -9812,7 +9840,7 @@
                 묶.계획들.forEach(g => {
                     if (g.매 != null) 총매 += g.매;
                     g.품목들.forEach((품, j) => {
-                        const td = [];
+                        const td = []; let 짚을줄 = false;
                         if (첫줄) {
                             td.push(`<td rowspan="${품목수}" class="ㄱ">${i + 1}</td>`);
                             td.push(`<td rowspan="${품목수}">${_e(o.displayName || o.code || '')}</td>`);
@@ -9829,6 +9857,8 @@
                         // 파레트는 그 묶음의 **첫 줄에만** 적고 아래로 덮는다 — 묶음이 눈에 보인다
                         if (파칸 && j === 0) td.push(`<td rowspan="${g.품목들.length}" class="ㄱㄱ">`
                             + (g.파 ? _e(g.파) : '<span class="명세-빈파">없음</span>') + `</td>`);
+                        // 큐알로 찍어 들어온 파레트면 그 줄을 짚어 준다 (10-11 지시)
+                        if (파칸 && 짚은파 && g.파 === 짚은파) 짚을줄 = true;
                         td.push(`<td class="ㄱ">${_e(품.코드)}</td>`);
                         td.push(`<td>${_e(품.이름)}</td>`);
                         td.push(`<td class="ㄱ">${_e(품.크기)}</td>`);
@@ -9840,7 +9870,7 @@
                             td.push(`<td rowspan="${g.품목들.length}" class="ㄱㄱ">${돈 == null ? '-' : window._돈글(돈)}</td>`);
                         }
                         if (첫줄) td.push(`<td rowspan="${품목수}" class="ㄱ">${_e((o.deliveryDate || '').slice(5).replace('-', '/'))}</td>`);
-                        몸.push('<tr>' + td.join('') + '</tr>');
+                        몸.push('<tr' + (짚을줄 ? ' class="짚음"' : '') + '>' + td.join('') + '</tr>');
                         첫줄 = false;
                     });
                 });
@@ -9916,6 +9946,8 @@
             판.innerHTML = `<div class="명세-속">` +
                 `<div class="명세-머리">` +
                 `<span class="명세-제목">${parseInt(달, 10)}월 ${parseInt(날, 10)}일 ${procKey} 내역</span>` +
+                (window._명세서짚은파 && procKey === '납기'
+                    ? `<span class="명세-짚">${String(window._명세서짚은파).replace(/</g, '&lt;')} 파레트</span>` : '') +
                 `<span class="명세-번호" id="명세-번호"></span>` +
                 `<button class="명세-닫기" type="button" onclick="_명세서닫기()" aria-label="닫기">✕</button>` +
                 `</div>` +
@@ -9947,6 +9979,43 @@
         window._명세서닫기 = function () {
             document.getElementById('명세서판')?.remove();
             window._명세서지금 = null;
+            window._명세서짚은파 = '';
+        };
+
+        /* 10-11 사장님(조혼가구 화면): 「스캔내용 클릭시 해당 납기 명세서가 나타나야 합니다.」
+           조혼가구가 큐알을 찍어 **주소에 그 글을 실어** 이 화면을 연다:
+               …/에이엠티/에이엠티.html?명세=유한-20261009-01-A
+           그 글로 발주를 집어 **그 발주의 납기일** 납기 명세서를 펴고, 찍은 파레트 줄을 짚어 준다.
+           · 열쇠가 없으면 **아무 일도 안 한다** — 첫 화면은 한 글자도 안 바뀐다.
+           · 손잡이(?viggle=1&box=…)와 따로 논다 — 주소에 둘 다 와도 둘 다 돈다.
+           · 못 찾으면 조용히 넘어가지 않고 **한 줄로** 알린다.
+           · 읽기만 한다 — 파이어스토어 쓰기 0. */
+        window._명세서짚은파 = '';
+        window._주소명세했다 = false;
+        window._주소명세글 = function () {
+            try { return new URLSearchParams(location.search).get('명세') || ''; }
+            catch (e) { return ''; }
+        };
+        window._주소명세열기 = function () {
+            if (window._주소명세했다) return;
+            const 글 = window._주소명세글();
+            if (!글) return;                                  // 열쇠가 없으면 손대지 않는다
+            if (!window._자료옴 || !window._자료옴.발주) return;   // 발주가 아직 안 왔다 — 다음에 다시
+            window._주소명세했다 = true;
+            const 집힌 = window._큐알글발주(글);
+            if (!집힌 || !집힌.발주 || !집힌.발주.deliveryDate) {
+                if (typeof showToastMessage === 'function') showToastMessage('그 큐알의 발주를 못 찾았습니다');
+                return;
+            }
+            const 날 = String(집힌.발주.deliveryDate);
+            window._명세서짚은파 = 집힌.파 || '';
+            try {
+                if (typeof switchPage === 'function') switchPage('process');
+                if (typeof appMode !== 'undefined') appMode = 'process';
+                if (typeof tlExpandDateCard === 'function') tlExpandDateCard(날);
+                if (typeof tlDcExpandSection === 'function') tlDcExpandSection('납기');
+            } catch (e) {}
+            setTimeout(() => { try { window._명세서열기(날, '납기'); } catch (e) {} }, 60);
         };
 
         /* 10-11 사장님: 「발급 버튼을 삭제하고 각 버튼 누르면 **자동발급**되어 다음 동작을
