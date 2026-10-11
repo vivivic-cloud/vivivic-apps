@@ -28,7 +28,7 @@ console.log('■ 색상 칩:', JSON.stringify(await 칩('#ams-색')));
 console.log('■ 두께 칩:', JSON.stringify(await 칩('#ams-두께')));
 const 셈=()=>p.evaluate(()=>({머리:document.getElementById('ams-sub').textContent,
   줄:document.querySelectorAll('#ams-list .ams-row').length,
-  푸는단추:document.getElementById('ams-푼다').classList.contains('on')}));
+  푸는단추있나:!!document.getElementById('ams-푼다')}));
 console.log('■ 아무것도 안 고름:', JSON.stringify(await 셈()));
 const cdp=await ctx.newCDPSession(p);
 const 탭=async(sel,n=0)=>{const c=await p.evaluate(({s,n})=>{const e=document.querySelectorAll(s)[n]; if(!e) return null;
@@ -71,15 +71,32 @@ await p.waitForTimeout(250);
 console.log('■ 걸러진 채로 둘째 줄에 55 적기:', JSON.stringify(잰것),
   '\n   담긴 곳:', JSON.stringify(await p.evaluate(()=>{const k=window.__쓴곳[window.__쓴곳.length-1];
     return {칸:k.split('/').pop(), 값:window.__창고[k]};})));
+/* 10-11 사장님 지시로 **「거르기 풀기」 단추를 없앴다** — 「해당버튼 삭제하고 선택된
+   필터 재선택시 해당 필터가 풀린것으로 작동하게 해줘」. 푸는 길은 **켠 알약을 다시
+   누르는 것** 하나다. 여기서는 그 길로 푼다. */
+const 다풀기 = async () => {
+  for (const 갈래 of ['색','두께','가공']){
+    const 켠값 = await p.evaluate(g=>{ const e=document.querySelector('#ams-'+g+' .amtb-chip.on');
+      return e ? (e.textContent||'').trim() : null; }, 갈래);
+    if (켠값 == null) continue;
+    await 갈래펼치기(갈래);
+    await 탭('#ams-'+갈래+' .amtb-chip.on');
+  }
+  const f = await p.evaluate(()=>{ const e=document.getElementById('ams-find');
+    if (!e || !e.value) return false; e.value=''; e.dispatchEvent(new Event('input',{bubbles:true})); return true; });
+  if (f) await p.waitForTimeout(200);
+};
 // 빈칸·any 가 남아 있는가
-await 탭('#ams-푼다');
-console.log('■ 거르기 푼 뒤:', JSON.stringify(await 셈()));
+await 다풀기();
+console.log('■ 알약을 다시 눌러 푼 뒤:', JSON.stringify(await 셈()));
 for(const g of ['(색상 없음)','any']){
   await 칩누르기('#ams-색',g);
   console.log('■ 색상 «'+g+'»:', JSON.stringify(await 셈()),
     '\n   보이는 것:', JSON.stringify(await p.evaluate(()=>[...document.querySelectorAll('#ams-list .ams-nm')].map(e=>e.textContent))));
-  await 탭('#ams-푼다');
+  await 다풀기();
 }
+console.log('■ 「거르기 풀기」 단추 있나:', (await 셈()).푸는단추있나,
+  '(10-11 에 없앴다 — 켠 알약을 다시 눌러 푼다)');
 // 폭
 // 늘 보이는 것은 갈래 단추 한 줄이다. 알약 줄은 펼쳤을 때만 잴 것이 있으므로 펼쳐 놓고 잰다.
 await 갈래펼치기('색');
