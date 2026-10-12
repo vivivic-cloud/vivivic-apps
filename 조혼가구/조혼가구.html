@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- 조혼가구 — 거래처 발주 화면.
-     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.6.0 -->
+     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.7.0 -->
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -1564,6 +1564,44 @@
         #johon-scan .jhs-btn.jhs-dark{ background:var(--vg-ink); color:#fff; border-color:var(--vg-ink); }
         #johon-scan .jhs-btn:active{ transform:scale(.985); }
 
+        /* ── 거래내역 화면 ─────────────────────────────────────────────
+           사장님 10-12: 「입고확인된 명세표는 해당 조혼가구의 해당 거래처에
+           거래내역 박스를 만들어 명세서가 도착하도록 해주세요.」
+           겹판 꼴은 #johon-scan 그대로다 — 새 꼴을 만들지 않았다.
+           ⚠ 명세서는 여기서 그리지 않는다. 그 종이는 에이엠티 것이다. */
+        #johon-deal{
+            --vg-ink:#111110; --vg-body:#1A1A19; --vg-soft:#6E6E6A; --vg-muted:#9C9C98;
+            --vg-edge:#E2E2DF; --vg-fill:#F4F4F2;
+            position:fixed; left:0; right:0; bottom:0; z-index:8000;
+            top:var(--jhh-top, 64px);
+            display:none; background:#fff; color:var(--vg-body);
+            font:15px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",system-ui,sans-serif;
+            overflow-y:auto; -webkit-overflow-scrolling:touch;
+        }
+        html[data-johondeal="1"] #johon-deal{ display:block; }
+        #johon-deal *{ box-sizing:border-box; }
+        #johon-deal .jhd-wrap{
+            max-width:430px; margin:0 auto;
+            padding:14px 20px calc(92px + env(safe-area-inset-bottom));
+        }
+        /* 한두 마디 딱지. 긴 글은 쓰지 않는다. */
+        #johon-deal .jhd-tag{
+            margin:0 0 10px; font-size:13px; font-weight:700; color:var(--vg-soft);
+            min-height:1.3em;
+        }
+        #johon-deal .jhd-list{ display:flex; flex-direction:column; gap:8px; }
+        /* 한 줄 = 명세표 하나. 누르면 에이엠티로 간다. */
+        #johon-deal .jhd-row{
+            width:100%; min-height:62px; padding:11px 14px; border-radius:14px;
+            border:1px solid var(--vg-edge); background:#fff; color:var(--vg-ink);
+            font:inherit; text-align:left; cursor:pointer;
+            display:flex; flex-direction:column; gap:3px;
+        }
+        #johon-deal .jhd-row:active{ background:var(--vg-fill); }
+        #johon-deal .jhd-q{ font-size:16px; font-weight:800; letter-spacing:-.3px; word-break:break-all; }
+        #johon-deal .jhd-sub{ font-size:12px; font-weight:700; color:var(--vg-soft); }
+        #johon-deal .jhd-sub b{ color:var(--vg-body); font-weight:800; }
+
         /* 돌아오는 길 — 박스 안에서 첫 화면으로. 엄지가 닿는 자리에 띄운다. */
         #johon-back{
             display:none; position:fixed; z-index:990; left:12px;
@@ -1581,6 +1619,8 @@
            그 화면에서만 손가락 크기(44px)로 키운다. 다른 화면은 그대로 둔다. */
         html[data-johonscan="1"] #johon-back{ z-index:8100; }
         html[data-johonscan="1"] #johon-back button{ min-height:44px; padding:11px 17px; }
+        html[data-johondeal="1"] #johon-back{ z-index:8100; }
+        html[data-johondeal="1"] #johon-back button{ min-height:44px; padding:11px 17px; }
 
         /* ── 박스 안 — 그 박스가 맡은 구역만 남긴다.
               숨기는 것이지 지우는 것이 아니다. 요소는 전부 DOM 에 그대로 있다.
@@ -1688,7 +1728,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.6.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.7.0</span>
                 </div>
                 <!-- 페이지 탭: 발주하기 / 작업중 -->
                 <div class="flex items-center gap-1 border border-[#ededeb] rounded-lg bg-[#f7f6f3] p-1 mr-2">
@@ -1839,6 +1879,15 @@
                 <button type="button" class="jhs-btn" onclick="johonScanAgain()">다시</button>
                 <button type="button" class="jhs-btn jhs-dark" onclick="johonScanCopy()">복사</button>
             </div>
+        </div>
+    </div>
+
+    <!-- 거래내역 화면 — 「거래내역」 박스를 누르면 뜬다.
+         지금 고른 거래처에 온 입고확인 명세표만 쌓인다. -->
+    <div id="johon-deal">
+        <div class="jhd-wrap">
+            <p class="jhd-tag" id="jhd-tag"></p>
+            <div class="jhd-list" id="jhd-list"></div>
         </div>
     </div>
 
@@ -5530,6 +5579,8 @@
                 // link 가 비어 있고, 파이어스토어에 쓰지 말라 하셔서 채워 넣지 못한다.
                 // 그래서 이름으로 가른다. 이 이름 하나뿐이다 — 「입고확인」 은 안 건드린다.
                 if ((b.name || '').trim() === '스캔') { johonScanOpen(); return; }
+                // 「거래내역」 도 같은 길이다 — 이 안의 화면을 연다 (10-12 지시).
+                if ((b.name || '').trim() === '거래내역') { johonDealOpen(); return; }
                 if (b.link) { try { window.open(b.link, '_blank', 'noopener'); } catch (err) {} }
             }
         });
@@ -5858,11 +5909,125 @@
             document.documentElement.removeAttribute('data-johonscanread');
         }
 
+        /* ═══ 거래내역 ══════════════════════════════════════════════════
+           사장님 10-12: 「입고확인된 명세표는 해당 조혼가구의 해당 거래처에
+           거래내역 박스를 만들어 명세서가 도착하도록 해주세요.」
+
+           한 벌을 둘이 본다 — 에이엠티가 담고(출고내역), 여기서 본다(거래내역).
+           자리는 `입고확인` 한 곳뿐이다.
+           ⚠⚠ **읽기만 한다. 한 글자도 쓰지 않는다** — 책임이 적히는 기록이다.
+              지우기·고치기 길을 만들지 않는다.
+           ⚠ 명세서(종이)는 여기서 그리지 않는다. 줄을 누르면 에이엠티로 보낸다.
+           ⚠ 열 때 한 번만 읽는다. 줄마다 읽으면 돈이 들고 폰이 느려진다. */
+        const JOHON_DEALCOL = '입고확인';
+        let _jhd줄 = null;      // 읽어 둔 명세표들
+        let _jhd중 = null;      // 읽는 중인 약속
+
+        // 화면의 거래처 이름(appMode)을 기록에 적힌 업체 이름으로 옮긴다.
+        // ING 만 다르다 — 기록에는 「본사」 로 적힌다(supplierToPageMode 와 같은 잣대).
+        function johonDealWho(){
+            const m = { 'ing': '본사' };
+            return m[appMode] || appMode;
+        }
+
+        function johonDealTag(글){
+            const el = document.getElementById('jhd-tag');
+            if (el) el.textContent = 글 || '';
+        }
+
+        function johonDealLoad(){
+            _jhd중 = (async () => {
+                if (!window.db || !window.fbFirestore) throw new Error('못 읽음');
+                const { collection, getDocs } = window.fbFirestore;
+                const 눈 = await getDocs(collection(window.db, 'artifacts', appId, 'public', 'data', JOHON_DEALCOL));
+                const 줄 = []; 눈.forEach(d => 줄.push({ id: d.id, ...d.data() }));
+                return 줄;
+            })().then(줄 => { _jhd줄 = 줄; return 줄; });
+            return _jhd중;
+        }
+
+        // 줄을 누르면 에이엠티로. 길은 v1.6.0 규칙표를 그대로 쓴다 —
+        // 갈곳을 두 군데 적어 두면 바이글이 고칠 때 한쪽만 바뀐다.
+        // 규칙표를 못 읽었을 때만 옆집 주소로 물러선다.
+        async function johonDealGo(큐알){
+            let 주소 = '';
+            try {
+                let 규칙 = _jhs규칙;
+                if (!규칙) { try { 규칙 = await (_jhs규칙중 || johonScanRulesLoad()); } catch (e) {} }
+                const 길 = (window.큐알길 && window.큐알길.풀기(큐알, 규칙 || [])) || [];
+                if (길.length) 주소 = 길[0].주소;
+            } catch (e) {}
+            if (!주소) 주소 = '../에이엠티/에이엠티.html?' +
+                encodeURIComponent('명세') + '=' + encodeURIComponent(큐알);
+            try { window.open(주소, '_blank', 'noopener'); } catch (e) {}
+        }
+
+        function johonDealRender(){
+            const 통 = document.getElementById('jhd-list');
+            if (!통) return;
+            통.innerHTML = '';
+            if (_jhd줄 === null) { johonDealTag('읽는 중'); return; }
+            const 나 = johonDealWho();
+            const 것들 = _jhd줄.filter(r => String(r.업체 || '').trim() === 나)
+                .sort((a, b) => String(b.확인시각 || '').localeCompare(String(a.확인시각 || '')));
+            if (것들.length === 0) { johonDealTag('아직 온 명세서가 없습니다'); return; }
+            johonDealTag(나 + ' · ' + 것들.length + '건');
+            것들.forEach(r => {
+                const 큐알 = String(r.큐알 || r.id || '');
+                const b = document.createElement('button');
+                b.type = 'button'; b.className = 'jhd-row';
+                const 머리 = document.createElement('span');
+                머리.className = 'jhd-q'; 머리.textContent = 큐알;
+                const 밑 = document.createElement('span');
+                밑.className = 'jhd-sub';
+                밑.textContent = String(r.확인시각글 || '') +
+                    ' · ' + (r.줄수 == null ? '?' : r.줄수) + '줄' +
+                    ' · ' + (r.총수량 == null ? '?' : r.총수량) + '개';
+                b.appendChild(머리); b.appendChild(밑);
+                b.addEventListener('click', () => johonDealGo(큐알));
+                통.appendChild(b);
+            });
+        }
+
+        function johonDealOpen(){
+            johonFitTop();
+            johonCurrentBox = null;
+            document.documentElement.removeAttribute('data-johonhome');
+            document.documentElement.removeAttribute('data-johonbox');
+            document.documentElement.setAttribute('data-johondeal','1');
+            window.scrollTo(0, 0);
+            _jhd줄 = null;
+            johonDealRender();                    // 「읽는 중」 한 줄
+            johonDealLoad().then(() => johonDealRender())
+                .catch(() => { johonDealTag('기록을 못 읽었습니다'); });
+        }
+
+        function johonDealClose(){
+            document.documentElement.removeAttribute('data-johondeal');
+            const 통 = document.getElementById('jhd-list'); if (통) 통.innerHTML = '';
+            johonDealTag('');
+        }
+
+        // 거래처 탭을 바꾸면 보던 목록도 그 거래처 것으로 바뀐다.
+        // 기록은 다시 읽지 않는다 — 이미 손에 들고 있다.
+        (function(){
+            const _sw = window.switchSupplier;
+            if (typeof _sw !== 'function') return;
+            window.switchSupplier = function(){
+                const r = _sw.apply(this, arguments);
+                if (document.documentElement.getAttribute('data-johondeal') === '1') {
+                    try { johonDealRender(); } catch (e) {}
+                }
+                return r;
+            };
+        })();
+
         /* 뒤로 갈 때·화면을 덮었을 때 반드시 끈다 */
         (function(){
             const _home = window.johonGoHome;
             if (typeof _home === 'function') window.johonGoHome = function(){
                 try { johonScanClose(); } catch (e) {}
+                try { johonDealClose(); } catch (e) {}
                 return _home.apply(this, arguments);
             };
             document.addEventListener('visibilitychange', () => {
