@@ -1,0 +1,60 @@
+# 객체 — 이 집에 실제로 있는 것들. 코드에서 찾아 센 것이다.
+#
+# ⚠ 「객체」 와 「칸」 을 가른다.
+#   객체 = 일에서 하나로 세는 것 (발주 하나 · 부속 하나 · 파레트 하나)
+#   칸   = 그것이 담기는 화베 자리
+#   둘은 1:1 이 아니다 — **박스**는 객체 하나인데 칸이 넷이고,
+#   **공정시작·공정완료**는 칸이 아니라 `confirmed_orders` 문서 **안의 열쇠**다.
+#
+# ⚠ 사는곳 에 적힌 칸은 **코드가 부르는 칸**이다. 산 화베에 그 칸이 진짜 있는지,
+#   줄이 몇인지는 이 판에서 못 쟀다 — 자동 승인기가 산 화베 읽기를 막는다
+#   (「Production Reads」). `tools/화베읽기.py` 를 사장님 폰·관리자 쪽에서 돌려야 한다.
+#
+# 칸은 탭으로 가른다.
+#
+번호	객체	사는 곳	집는 열쇠	이어지는 데	쪽지
+1	발주	confirmed_orders	idNum · docId · orderCode (셋)	부속 1:N · 재단계획 · 파레트 · 명세표	조혼가구가 짓고 에이엠티가 받는다. 진짜 업무 기록이다. 꼴은 조혼가구.html:3455 에 있다
+2	부속	confirmed_orders.partInfoMap (문서 안)	cardKey = card-{idNum}-{rowIndex}	발주 N:1 · 공정 · 파레트 · 원장	칸이 아니다 — 발주 문서 안의 지도다
+3	재단계획	cutting_plans	confirmId	발주 1:1 · 원장 · 부속	진짜 업무 기록이다
+4	공정	(코드에 박혀 있다) · process_time	procKey	부속 N:N	재단 · 엣지 · NC · 보링 · 납기 다섯. 목록을 모아 둔 자리가 없다
+5	공정시작	confirmed_orders.partStarted (문서 안)	cardKey + procKey	부속 · 공정	⚠ **칸이 아니다.** 발주 문서 안의 열쇠다. 취소하면 {started:false} 로 남는다
+6	공정완료	confirmed_orders.partCompletions (문서 안)	cardKey + procKey	부속 · 공정	⚠ **칸이 아니다.** 이카운트등록도 이것을 읽는다
+7	부속옮김기록	confirmed_orders.partMoveLog (문서 안)	cardKey	부속	⚠ 칸이 아니다
+8	파레트	wo_pallet/{docId}	{cardKey}|{procKey} → A·B·C·D	부속 N:1 · 큐알	글자는 **발주 안에서만** 다르다. 재단에는 파레트가 없다
+9	큐알	큐알규칙 (규칙표)	{orderCode}-{파레트글자}	발주 · 파레트 · 명세표	길을 코드에 박지 않고 규칙표에 줄로 쌓는다. 셈은 shared/큐알길.js
+10	명세표	입고확인 · 출고명세표	발주 + 파레트	발주 · 부속 · 원장	그리는 법은 shared/거래명세표.js 한 벌. 에이엠티와 조혼가구가 같이 쓴다
+11	입고확인	입고확인	(명세표 꼴)	명세표	⚠ **책임 기록이다.** 지우기·고치기 금지
+12	거래처	(코드에 박혀 있다)	이름 글자	발주 · 상품 · 서류	supplier/vendor/업체/매출처명 으로 갈려 있다. 대조표가 없다
+13	계정	user_accounts	(계정 id)	거래처	에이엠티·조혼가구가 같이 읽는다
+14	불량	defect_reports	—	발주 · 부속	에이엠티
+15	쉰시간	idle_times	—	공정	에이엠티
+16	카드차례	wo_board_order	docId	발주 · 부속	화면에 보이는 차례를 담는다
+17	외주재단	outsource_cutting	—	재단계획	에이엠티
+18	재단기록	amt_cutting	—	재단계획	에이엠티
+19	원장재고	amt_plate_stock	—	원장	에이엠티
+20	엑셀자료	excel_metadata	—	발주 · 원장	에이엠티 · 조혼가구 · 원장관리 **셋**이 같이 쓰는 칸이다
+21	원장(판재)	product_master + product_overrides	product_master 문서 id (둘이 1:1)	부속 · 재단계획 · 원장재고	원장관리. 엑셀을 다시 가져와도 사람이 고친 값은 overrides 에 남는다
+22	박스	amt_boxes · johon_boxes · wt_boxes · boring_boxes	박스 id	지시 · 업무대화	⚠ **객체 하나에 칸이 넷이다**
+23	지시	wt_dev	자리 (box:<id>)	박스 · 작업자	사장님이 화면을 짚어 남기신다. 서류관리도 읽는다
+24	시킨것	wt_asked	a{때}	지시	작업대
+25	업무대화	wt_chat	박스 id	박스	작업대
+26	설정·자국	amt_meta · johon_meta · docs_config · boring_config	(한 문서)	—	집집마다 제 칸. 꼴은 서로 같다고 적혀 있다
+27	반품	cs_records	docId + innerIndex	발주 · 상품	반품스캔. 작업대 뿌리(index.html)도 읽는다
+28	제품기록	product_records	—	상품	반품스캔
+29	보링파일	boring_files	driveId	보링요청	.cix · .bpp. 서류관리 쪽 Apps Script 가 알맹이를 내준다
+30	보링요청	boring_requests	—	보링파일 · 부속	보링변환
+31	배치도	layout_배치도 · layout_저장	—	기계	기계배치도. 화베 없이도 도는 자리가 있다
+32	기계	layout_배치도 안	—	배치도	기계배치도
+33	서류	docs_files	driveId	거래처 · 차수 · 상품	서류관리. 드라이브 파일명으로 거래처·차수·7단계를 가린다
+34	차수	docs_overlay	batchId	서류 · 거래처	서류관리
+35	서류규칙	docs_rules	—	서류	사람이 쌓는 규칙
+36	상품	vp_상품목록	매출처명__상품코드	단품 · 거래처 · 배송	벤더피아가 담고 **서류관리가 읽는다**(VP_상품). 357건 · 상품코드 287가지 (관리자가 읽어 준 참값)
+37	단품	vp_상품목록 안 (「+」 로 이어 붙음)	단품코드	상품 N:1	⚠ 칸이 아니다. 단품코드 **213가지** — 밑줄 두 꼴로 46쌍이 갈리는 그 213이다
+38	배송	vp_배송열쇠 · vp_배송집계	—	상품 · 거래처	벤더피아
+39	벤더피아기록	vp_기록	—	상품	벤더피아
+40	가구품목	cabinet-studio (화베 없음)	품목 이름	가구부속	수납장 · 서랍장. ⚠ 그 집에는 **파이어스토어가 아예 없다** (collection( 0번)
+41	가구부속	cabinet-studio (화베 없음)	짝 번호	가구품목 1:N · 엣지 · 결	상판·하판·측판·뒷판·선반·도어·전면밴드·밴드·보호대·서랍
+42	엣지	cabinet-studio · 에이엠티	부속마다	가구부속 · 부속	두 집에 다 있다. 맞댄 자리가 없다
+43	도면(쪽)	작업지시서 · cabinet-studio	쪽 번호	가구품목 · 부속	A4 여러 쪽. 인쇄로 PDF
+44	서랍	cabinet-studio (화베 없음)	짝 번호	가구품목	레일·유격이 딸린다
+45	결(grain)	cabinet-studio · 에이엠티	부속마다	가구부속	부속마다 켜는 것이다. 안 켜면 아무 데도 안 적는다
