@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.57.0 (2026-10-12) — 지운 출고내역 박스는 다시 안 선다
+     버전: v1.58.0 (2026-10-12) — 거래명세표 그리는 법을 shared 한 벌로
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -13,6 +13,9 @@
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/gsap@3/dist/gsap.min.js"></script>
+    <!-- 거래명세표 그리는 법 — 조혼가구와 **같은 한 벌**이다(같은 집 shared/). CDN 이 아니다.
+         여기서 베껴 두 벌로 만들면 두 집이 다른 종이를 보게 된다. -->
+    <script src="../shared/거래명세표.js"></script>
     
     <!-- Firebase SDK (Modular) -->
     <script type="module">
@@ -2643,7 +2646,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.57.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.58.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2776,7 +2779,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.57.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.58.0</b></p>
         </div>
     </div>
 
@@ -9900,112 +9903,25 @@
             return _원장줄읽기(줄번호, _명세서코드칸[String(공정)] || '');
         }
 
+        /* 10-12 사장님: 「에이엠티의 거래명세표를 조혼가구에 따로 받아와서 사용할 수 있는
+           방법을 강구하라」. 그려 내는 법은 `../shared/거래명세표.js` **한 벌**로 뺐다 —
+           조혼가구가 제 집에서 같은 종이를 편다. 여기는 **무엇을 넘길지만** 정한다.
+           ⚠ 베껴 두 벌로 만들지 마라. 넘기는 것이 달라지면 두 집의 종이가 달라진다. */
         window._명세서표Html = function (날짜, 공정, 묶음, 추린이름) {
-            const 원장 = _명세서원장보이나(공정);
-            const 파칸 = _명세서파레트보이나(공정);
-            const 추린파 = String(추린이름 == null ? '' : 추린이름).trim();
-            const _e = v => String(v == null ? '' : v)
-                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            let 총매 = 0, 줄수 = 0;
-            const 몸 = [];
-            묶음.forEach((묶, i) => {
-                const o = 묶.발주;
-                const 품목수 = 묶.계획들.reduce((a, g) => a + g.품목들.length, 0);
-                줄수 += 품목수;
-                let 첫줄 = true;
-                묶.계획들.forEach(g => {
-                    if (g.매 != null) 총매 += g.매;
-                    g.품목들.forEach((품, j) => {
-                        const td = [];
-                        if (첫줄) {
-                            td.push(`<td rowspan="${품목수}" class="ㄱ">${i + 1}</td>`);
-                            td.push(`<td rowspan="${품목수}">${_e(o.displayName || o.code || '')}</td>`);
-                            td.push(`<td rowspan="${품목수}" class="ㄱ">${_e(o.orderCode || '')}</td>`);
-                            td.push(`<td rowspan="${품목수}" class="ㄱ">${_e(g.종류)}</td>`);
-                            td.push(`<td rowspan="${품목수}" class="ㄱ">${_e(g.색상)}</td>`);
-                            // 모델명 · 출고처 — 아직 어디서 받을지 모르는 칸이다.
-                            // 재단은 빨간 「?」, 그 밖의 공정은 **빈칸**으로 둔다(10-11 지시).
-                            td.push(`<td rowspan="${품목수}" class="ㄱ">${원장 ? _명세서몰라('') : ''}</td>`);
-                            td.push(`<td rowspan="${품목수}" class="ㄱ">${원장 ? _명세서몰라('') : ''}</td>`);
-                            // 원장입고일 — 원장재고 칸이다. 재단에만 둔다.
-                            if (원장) td.push(`<td rowspan="${품목수}" class="ㄱ">${_명세서몰라('')}</td>`);
-                        }
-                        // 파레트는 그 묶음의 **첫 줄에만** 적고 아래로 덮는다 — 묶음이 눈에 보인다
-                        if (파칸 && j === 0) td.push(`<td rowspan="${g.품목들.length}" class="ㄱㄱ">`
-                            + (g.파 ? _e(g.파) : '<span class="명세-빈파">없음</span>') + `</td>`);
-
-                        td.push(`<td class="ㄱ">${_e(품.코드)}</td>`);
-                        td.push(`<td>${_e(품.이름)}</td>`);
-                        td.push(`<td class="ㄱ">${_e(품.크기)}</td>`);
-                        td.push(`<td class="ㄱㄱ">${품.몫 == null ? '' : 품.몫 + '개'}</td>`);
-                        if (j === 0 && 원장) {
-                            // 재단금액 = 그 줄의 원장 수량 × 원장 한 장당 값(부가세 포함)
-                            const 돈 = (g.매 == null) ? null : g.매 * (window._재단단가 || 0);
-                            td.push(`<td rowspan="${g.품목들.length}" class="ㄱㄱ">${g.매 == null ? '-' : g.매 + '매'}</td>`);
-                            td.push(`<td rowspan="${g.품목들.length}" class="ㄱㄱ">${돈 == null ? '-' : window._돈글(돈)}</td>`);
-                        }
-                        if (첫줄) td.push(`<td rowspan="${품목수}" class="ㄱ">${_e((o.deliveryDate || '').slice(5).replace('-', '/'))}</td>`);
-                        몸.push('<tr>' + td.join('') + '</tr>');
-                        첫줄 = false;
-                    });
-                });
+            const 그리개 = window.거래명세표;
+            if (!그리개 || typeof 그리개.그리기 !== 'function') {
+                // 공용 파일을 못 읽었다 — 빈 표를 내지 않고 한 줄로 알린다
+                return { html: '<div class="명세-없음">명세서를 그리지 못했습니다.</div>', 총매: 0, 줄수: 0 };
+            }
+            return 그리개.그리기(묶음, {
+                날짜: 날짜, 공정: 공정,
+                원장: _명세서원장보이나(공정),
+                파칸: _명세서파레트보이나(공정),
+                추린이름: 추린이름,
+                몰라: _명세서몰라,
+                돈글: window._돈글,
+                재단단가: window._재단단가 || 0,
             });
-            // 추린 파레트에 줄이 하나도 없으면 **빈 표를 내지 않고 한 줄**로 알린다 (10-11 지시)
-            if (!줄수) return { html: `<div class="명세-없음">` + (추린파
-                ? `${_e(추린파)} 에 담긴 것이 없습니다.`
-                : `${_e(날짜)} ${_e(공정)} — 완료된 작업이 없습니다.`) + `</div>`, 총매: 0, 줄수: 0 };
-
-            const 소 = new Map();
-            묶음.forEach(묶 => 묶.계획들.forEach(g => {
-                if (g.매 == null) return;
-                const k = (g.종류 || '-') + '|' + (g.색상 || '-');
-                소.set(k, (소.get(k) || 0) + g.매);
-            }));
-            const 소줄 = [...소.entries()].map(([k, 매]) => {
-                const [종, 색] = k.split('|');
-                return `<tr><td class="ㄱ">${_명세서몰라('')}</td><td class="ㄱ">${_e(종)}</td>` +
-                    `<td class="ㄱ">${_명세서몰라('')}</td><td class="ㄱ">${_e(색)}</td>` +
-                    `<td class="ㄱ">${_명세서몰라('')}</td><td class="ㄱㄱ">${매}.0매</td>` +
-                    `<td class="ㄱ">${_명세서몰라('')}</td></tr>`;
-            }).join('');
-
-            // 이 명세서의 **낱칸 수** — 재단 15 · 그 밖 12 (원장입고일·원장수량·재단금액이 빠진다)
-            const 칸수 = (원장 ? 15 : 12) + (파칸 ? 1 : 0);
-            const html =
-                `<div class="명세-쪽">` +
-                `<table class="명세-표">` +
-                `<tr><th rowspan="2">순번</th><th rowspan="2">제품명</th><th rowspan="2">PO NO.</th>` +
-                `<th colspan="4">원 장</th>` +
-                (원장 ? `<th rowspan="2">원장<br>입고일</th>` : '') +
-                (파칸 ? `<th rowspan="2">파레트</th>` : '') +
-                `<th rowspan="2">부속코드</th><th rowspan="2">품목</th>` +
-                `<th rowspan="2">사이즈</th><th rowspan="2">${_e(공정)}<br>수량</th>` +
-                (원장 ? `<th rowspan="2">원장<br>수량</th><th rowspan="2">재단금액</th>` : '') +
-                `<th rowspan="2">출고<br>예정일</th></tr>` +
-                `<tr><th>종류</th><th>색상</th><th>모델명</th><th>출고처</th></tr>` +
-                몸.join('') +
-                (원장
-                  ? `<tr class="합"><td class="ㄱ" colspan="12">합  계</td><td class="ㄱ">${총매}매</td>` +
-                    `<td class="ㄱ">${window._돈글(총매 * (window._재단단가 || 0))}</td><td></td></tr>`
-                  : '') +
-                /* 10-11 사장님: 전잔액/현잔액 줄은 「**빼지말고 빈칸으로**」.
-                   재단에서는 빨간 「?」 그대로, 그 밖의 공정에서는 **빈칸**으로 둔다.
-                   줄 수가 공정마다 다르므로 칸 수에서 내어 쓴다(앞 칸수-6 · 3 · 1 · 2). */
-                `<tr class="합"><td class="ㄱ" colspan="${칸수 - 6}">전잔액</td>` +
-                `<td class="ㄱ" colspan="3">${원장 ? _명세서몰라('') : ''}</td>` +
-                `<td class="ㄱ">현잔액</td>` +
-                `<td class="ㄱ" colspan="2">${원장 ? _명세서몰라('') : ''}</td></tr>` +
-                `</table></div>` +
-                (원장
-                  ? `<div class="명세-쪽"><p class="명세-쪽이름">원장 소요량</p>` +
-                    `<table class="명세-표">` +
-                    `<tr><th>출고처</th><th>종류</th><th>모델명</th><th>색상</th>` +
-                    `<th>전일소요량</th><th>금일 소요량</th><th>총소요량</th></tr>` + 소줄 +
-                    `<tr class="합"><td class="ㄱ" colspan="4">총 소 요 량</td><td class="ㄱ">${_명세서몰라('')}</td>` +
-                    `<td class="ㄱㄱ">${총매}.0매</td><td class="ㄱ">${_명세서몰라('')}</td></tr>` +
-                    `</table></div>`
-                  : '');
-            return { html, 총매, 줄수 };
         };
 
         /* 파레트를 주면 **그 파레트치만** 펴진다(10-11 지시). 안 주면 그 날 **전체**다 —
