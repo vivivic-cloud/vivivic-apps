@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.58.0 (2026-10-12) — 거래명세표 그리는 법을 shared 한 벌로
+     버전: v1.59.0 (2026-10-12) — 배송 확정 때 거래명세표를 보낸다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2646,7 +2646,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.58.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.59.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2779,7 +2779,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.58.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.59.0</b></p>
         </div>
     </div>
 
@@ -11390,15 +11390,83 @@
             btnEl.textContent = '▲ 접기';
         };
 
+        /* 10-12 사장님: 「에이엠티의 거래명세표를 조혼가구에 따로 받아와서 사용할 수 있는
+           방법을 강구하라」 — 거래처를 **에이엠티 안으로 들이지 않는다.** 그 대신 물건이
+           나갈 때 거래명세표를 화베에 **보내 둔다.** 거래처는 찍은 큐알 글로 제 집에서 집는다.
+           그리는 법은 `../shared/거래명세표.js` 한 벌이라 두 집이 같은 종이를 본다.
+
+           ⚠ **언제 쓰나 — 배송을 확정하실 때 그 한 번뿐이다.** 화면을 그릴 때마다 쓰면
+             시키지 않은 쓰기가 된다. 그 발주의 **파레트마다 한 장**이고, 문서 이름이 큐알 글이다.
+           ⚠ 다시 확정하시면 **덮는다** — 이것은 「보낸 것」 이지 책임 기록이 아니다.
+             책임 기록은 `입고확인` 이고 **그쪽은 여전히 덮지 않는다**(v1.54.0).
+           ⚠ `?명세=` 길은 그대로 둔다 — 사장님이 에이엠티 안에서 쓰시는 길이다. */
+        window._출고명세칸 = function (큐알) {
+            const { doc } = window.fbFirestore;
+            const 길 = (window.거래명세표 && window.거래명세표.자리)
+                || ['artifacts', 'vivivic-4b7ef', 'public', 'data', '출고명세표'];
+            return doc(window.db, ...길, String(큐알));
+        };
+        window._출고명세표보내기 = async function (item) {
+            const 밖 = { 보냄: 0, 모두: 0, 글들: [], 탈: '' };
+            if (!item || !window.db || !window.fbFirestore) { 밖.탈 = '화베가 없습니다'; return 밖; }
+            const 파들 = (typeof window._제품파레트들 === 'function') ? (window._제품파레트들(item) || []) : [];
+            밖.모두 = 파들.length;
+            if (!파들.length) return 밖;                     // 파레트가 없으면 보낼 것도 없다
+            const { setDoc, getDoc, serverTimestamp } = window.fbFirestore;
+            const 두 = n => String(n).padStart(2, '0');
+            const 이제 = new Date();
+            const 시각글 = 이제.getFullYear() + '-' + 두(이제.getMonth() + 1) + '-' + 두(이제.getDate())
+                + ' ' + 두(이제.getHours()) + ':' + 두(이제.getMinutes());
+            const 발키 = String(item.docId || item.idNum || '');
+            for (const 파 of 파들) {
+                const 글 = window._제품큐알글(item, 파);
+                try {
+                    const 묶음 = window._명세서모으기(item.deliveryDate, '납기', 파, 발키);
+                    const 적을것 = {
+                        큐알: 글, 발주번호: item.orderCode || '', 발주문서: 발키,
+                        파레트: 파, 납기일: item.deliveryDate || '', 업체: item.supplier || '',
+                        줄수: 묶음.reduce((a, 묶) => a + 묶.계획들.reduce((b, g) => b + g.품목들.length, 0), 0),
+                        총수량: 묶음.reduce((a, 묶) => a + 묶.계획들.reduce((b, g) =>
+                            b + g.품목들.reduce((c, 품) => c + (parseInt(품.몫, 10) || 0), 0), 0), 0),
+                        명세표: window._명세표담기(묶음),     // 담는 꼴 그대로다 — 새 꼴이 아니다
+                        보낸때: serverTimestamp(), 보낸때글: 시각글,
+                        보낸uid: (window._myAccount && window._myAccount.uid) || '',
+                        판: (document.getElementById('amth-ver') || {}).textContent || '',
+                    };
+                    await setDoc(window._출고명세칸(글), 적을것);
+                    /* ⚠ **쓰고 다시 읽어 본다.** 안 들어갔는데 「보냈다」 고 하면 거래처가
+                       빈손으로 찍는다 — 거짓 초록은 안 된다. */
+                    const 눈 = await getDoc(window._출고명세칸(글));
+                    const 들어간것 = (눈 && 눈.exists && 눈.exists()) ? ((눈.data && 눈.data()) || {}) : null;
+                    if (들어간것 && (들어간것.명세표 || []).length === 적을것.명세표.length) {
+                        밖.보냄++; 밖.글들.push(글);
+                    } else 밖.탈 = 글 + ' 이 안 들어갔습니다';
+                } catch (e) { 밖.탈 = (e && e.message) || '못 보냈습니다'; }
+            }
+            return 밖;
+        };
+
         // 배송 확정 처리
-        window.tlDcConfirmDelivery = function(idNum, btnEl) {
+        window.tlDcConfirmDelivery = async function(idNum, btnEl) {
             const memo = btnEl.closest('.tl-dc-delivery-card').querySelector('.tl-dc-delivery-memo')?.value.trim() || '';
+            const 자리 = btnEl.closest('.tl-dc-delivery-area');
+            btnEl.disabled = true; btnEl.textContent = '보내는 중…';
+            const item = (typeof confirmedOrders !== 'undefined' ? confirmedOrders : [])
+                .find(o => o.idNum === idNum);
+            let 보냄 = { 보냄: 0, 모두: 0, 글들: [], 탈: '' };
+            try { 보냄 = await window._출고명세표보내기(item); }
+            catch (e) { 보냄.탈 = (e && e.message) || '못 보냈습니다'; }
             showToastMessage(`배송 시작 처리되었습니다.${memo?'  메모: '+memo:''}`);
-            btnEl.closest('.tl-dc-delivery-area').innerHTML =
+            const 다보냄 = 보냄.모두 > 0 && 보냄.보냄 === 보냄.모두;
+            if (!자리) return;
+            자리.innerHTML =
                 `<div style="padding:10px 14px;background:#f5f5f4;border-top:2px solid #b0aeaa;display:flex;align-items:center;gap:8px;">
                     <span style="font-size:18px;">✅</span>
-                    <span style="font-size:11px;font-weight:700;color:#b0aeaa;">배송 시작 처리 완료${memo?' · '+memo:''}</span>
-                </div>`;
+                    <span style="font-size:11px;font-weight:700;color:#b0aeaa;" id="출-보냄">배송 시작 처리 완료${memo?' · '+memo:''}${다보냄?` · 거래명세표 ${보냄.보냄}장 보냄`:''}</span>
+                </div>`
+                + (보냄.모두 > 0 && !다보냄
+                    ? `<div class="입고-탈" id="출-탈">거래명세표를 못 보냈습니다 — ${보냄.모두}장 중 ${보냄.보냄}장</div>`
+                    : '');
         };
 
         // ── 재단/엣지/보링 기계배정: 순서 있는 목록(큐) ──────────────────────
