@@ -7,14 +7,94 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{background:#1a1a1a;color:#c8c8c8;font-family:-apple-system,BlinkMacSystemFont,sans-serif;min-height:100vh}
-body{display:flex;align-items:center;justify-content:center}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
 input[type=file]{display:none}
-label{display:inline-block;padding:16px 32px;border:1px solid #444;border-radius:6px;background:#222;color:#fff;font-size:15px;cursor:pointer;transition:background .15s}
-label:hover{background:#2a2a2a}
+button{padding:16px 32px;border:1px solid #444;border-radius:6px;background:#222;color:#fff;font-size:15px;cursor:pointer;transition:background .15s}
+button:hover{background:#2a2a2a}
+button:disabled{opacity:.5;cursor:default}
+#msg{font-size:13px;color:#888;min-height:1em;text-align:center;padding:0 16px;word-break:break-all}
+#msg a{color:#8ab4f8}
 </style>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 <input type="file" id="video" accept="video/*">
-<label for="video">동영상 업로드</label>
+<button id="btn">동영상 업로드</button>
+<div id="msg"></div>
+<script>
+// Google Cloud Console 에서 만든 OAuth 웹 클라이언트 ID
+const CLIENT_ID = 'YOUR_CLIENT_ID.apps.googleusercontent.com';
+// 올릴 드라이브 폴더 ID (비우면 내 드라이브 맨 위)
+const FOLDER_ID = '';
+
+const btn = document.getElementById('btn');
+const input = document.getElementById('video');
+const msg = document.getElementById('msg');
+let token = null, tokenExp = 0, tokenClient = null;
+
+function getTokenClient() {
+  if (!tokenClient) {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: CLIENT_ID,
+      scope: 'https://www.googleapis.com/auth/drive.file',
+      callback: r => {
+        if (r.error) { msg.textContent = '로그인 실패: ' + r.error; return; }
+        token = r.access_token;
+        tokenExp = Date.now() + (r.expires_in - 60) * 1000;
+        btn.textContent = '동영상 선택';
+        msg.textContent = '로그인 됨 — 버튼을 눌러 동영상을 고르세요';
+      }
+    });
+  }
+  return tokenClient;
+}
+
+btn.onclick = () => {
+  if (token && Date.now() < tokenExp) { input.click(); return; }
+  if (!window.google?.accounts?.oauth2) { msg.textContent = '구글 로그인 불러오는 중… 잠시 후 다시 눌러주세요'; return; }
+  getTokenClient().requestAccessToken();
+};
+
+input.onchange = async () => {
+  const file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  btn.disabled = true;
+  msg.textContent = '업로드 준비 중…';
+  try {
+    const meta = { name: file.name, mimeType: file.type || 'video/mp4' };
+    if (FOLDER_ID) meta.parents = [FOLDER_ID];
+    const init = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,webViewLink', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + token,
+        'Content-Type': 'application/json; charset=UTF-8',
+        'X-Upload-Content-Type': meta.mimeType,
+        'X-Upload-Content-Length': file.size
+      },
+      body: JSON.stringify(meta)
+    });
+    if (!init.ok) throw new Error('세션 생성 실패 (' + init.status + ')');
+    const url = init.headers.get('Location');
+    const res = await new Promise((ok, fail) => {
+      const x = new XMLHttpRequest();
+      x.open('PUT', url);
+      x.setRequestHeader('Content-Type', meta.mimeType);
+      x.upload.onprogress = e => { if (e.lengthComputable) msg.textContent = '업로드 중… ' + Math.floor(e.loaded / e.total * 100) + '%'; };
+      x.onload = () => x.status < 300 ? ok(JSON.parse(x.responseText)) : fail(new Error('업로드 실패 (' + x.status + ')'));
+      x.onerror = () => fail(new Error('네트워크 오류'));
+      x.send(file);
+    });
+    msg.innerHTML = '';
+    const a = document.createElement('a');
+    a.href = res.webViewLink; a.target = '_blank'; a.textContent = '업로드 완료: ' + file.name;
+    msg.appendChild(a);
+  } catch (e) {
+    msg.textContent = e.message;
+  } finally {
+    btn.disabled = false;
+  }
+};
+</script>
 </body>
 </html>
