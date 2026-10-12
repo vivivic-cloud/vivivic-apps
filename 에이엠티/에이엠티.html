@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.55.0 (2026-10-12) — 입고확인에 그때 그 명세표를 담는다
+     버전: v1.56.0 (2026-10-12) — 출고내역 박스 · 거래처별 거래명세표
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2105,19 +2105,19 @@
             border-radius:999px; padding:2px 8px; font-size:10px; font-weight:800;
             letter-spacing:1.1px; color:var(--vg-ink);
         }
-        #amt-home .amth-sub, #amt-vendor-home .amth-sub{ margin-left:auto; font-size:12px; color:var(--vg-muted); }
+        #amt-home .amth-sub, #amt-vendor-home .amth-sub, #amt-출고 .amth-sub{ margin-left:auto; font-size:12px; color:var(--vg-muted); }
 
         /* 타일 — 작업대의 .tile 그대로 */
         #amt-home .amth-tiles, #amt-vendor-home .amth-tiles{ display:grid; grid-template-columns:1.02fr 1fr; gap:12px; }
-        #amt-home .amth-tile, #amt-vendor-home .amth-tile{
+        #amt-home .amth-tile, #amt-vendor-home .amth-tile, #amt-출고 .amth-tile{
             position:relative; border-radius:26px; padding:17px; display:flex;
             flex-direction:column; justify-content:space-between; overflow:hidden;
             cursor:pointer; border:1px solid transparent; text-align:left;
             min-height:150px; transition:transform .12s; width:100%; font:inherit;
             color:inherit; gap:18px;
         }
-        #amt-home .amth-tile:active, #amt-vendor-home .amth-tile:active{ transform:scale(.975); }
-        #amt-home .amth-tile.amth-light, #amt-vendor-home .amth-tile.amth-light{ background:var(--vg-fill); }
+        #amt-home .amth-tile:active, #amt-vendor-home .amth-tile:active, #amt-출고 .amth-tile:active{ transform:scale(.975); }
+        #amt-home .amth-tile.amth-light, #amt-vendor-home .amth-tile.amth-light, #amt-출고 .amth-tile.amth-light{ background:var(--vg-fill); }
         #amt-home .amth-tile.amth-white, #amt-vendor-home .amth-tile.amth-white{ background:#fff; border-color:var(--vg-edge); }
         #amt-home .amth-tile.amth-dark, #amt-vendor-home .amth-tile.amth-dark{ background:var(--vg-ink); color:#fff; }
         #amt-home .amth-tile .amth-ico, #amt-vendor-home .amth-tile .amth-ico{
@@ -2126,7 +2126,7 @@
         }
         #amt-home .amth-tile.amth-dark .amth-ico, #amt-vendor-home .amth-tile.amth-dark .amth-ico{ background:rgba(255,255,255,.14); }
         #amt-home .amth-tile.amth-white .amth-ico, #amt-vendor-home .amth-tile.amth-white .amth-ico{ background:var(--vg-fill); }
-        #amt-home .amth-tile .amth-nm, #amt-vendor-home .amth-tile .amth-nm{
+        #amt-home .amth-tile .amth-nm, #amt-vendor-home .amth-tile .amth-nm, #amt-출고 .amth-tile .amth-nm{
             display:block; font-size:20px; line-height:1.22; letter-spacing:-.5px;
             font-weight:700; margin:0;
         }
@@ -2291,6 +2291,47 @@
             overflow-y:auto; -webkit-overflow-scrolling:touch;
         }
         html[data-amtstock="1"] #amt-stock{ display:block; }
+        /* 10-12 사장님: 「에이엠티에도 **출고내역 박스**를 만들고 거래처별 박스를 만들어
+           동일한 거래명세표가 해당 거래처 박스안에 기록되게 해주세요.」
+           틀은 원장재고 화면 그대로다 — 새 꼴을 만들지 않는다. */
+        #amt-출고{
+            /* 색 값은 박스판(#amt-home)에 적힌 그대로다 — 타일이 같은 꼴로 보이려면 있어야 한다 */
+            --vg-bg:#fff; --vg-ink:#111110; --vg-body:#1A1A19; --vg-soft:#6E6E6A;
+            --vg-muted:#9C9C98; --vg-line:#EDEDEB; --vg-edge:#E2E2DF;
+            --vg-fill:#F4F4F2; --vg-fill2:#EAEAE7; --vg-red:#FF3B30;
+            position:fixed; left:0; right:0; bottom:0; z-index:8200;
+            top:var(--amth-top, 64px);
+            display:none; background:var(--vg-bg); color:var(--vg-body);
+            font:15px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",system-ui,sans-serif;
+            overflow-y:auto; -webkit-overflow-scrolling:touch;
+        }
+        html[data-amt출고="1"] #amt-출고{ display:block; }
+        html[data-amt출고="1"] #amt-출고-back{ display:block; }
+        #amt-출고 *{ box-sizing:border-box; }
+        #amt-출고 .ams-wrap{ max-width:560px; margin:0 auto;
+            padding:14px 20px calc(86px + env(safe-area-inset-bottom)); }
+        #amt-출고 .ams-head{ display:flex; align-items:baseline; gap:9px; margin:0 0 12px; }
+        #amt-출고 .ams-empty{ padding:28px 0; text-align:center; color:var(--vg-muted); font-size:13px; }
+        /* 거래처 네모 — 박스판 타일 그대로다(.amth-tile). 열두 값을 새로 쓰지 않는다 */
+        /* 박스판과 같은 짜임이다 — 간격도 거기 값 그대로(12px) */
+        #amt-출고 .출-판{ display:grid; grid-template-columns:1.02fr 1fr; gap:12px; }
+        #amt-출고 .출-줄{ display:flex; align-items:center; gap:10px; width:100%; min-height:44px;
+            padding:10px 12px; background:#fff; border:1px solid var(--vg-edge); border-radius:10px;
+            font:inherit; font-size:13px; font-weight:700; color:var(--vg-body); text-align:left; cursor:pointer; }
+        #amt-출고 .출-줄 .때{ color:var(--vg-muted); font-weight:700; flex-shrink:0; }
+        #amt-출고 .출-줄 .큐{ font-family:ui-monospace,monospace; font-weight:800;
+            overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        #amt-출고 .출-줄 .셈{ margin-left:auto; color:var(--vg-muted); font-weight:700; flex-shrink:0; }
+        #amt-출고 .출-줄들{ display:flex; flex-direction:column; gap:8px; }
+        #amt-출고-back{ display:none; position:fixed; z-index:8300; left:12px;
+            bottom:calc(16px + env(safe-area-inset-bottom)); }
+        #amt-출고-back button{ display:inline-flex; align-items:center; gap:7px; background:#fff;
+            border:1px solid #E2E2DF; border-radius:999px; padding:9px 15px;
+            font:inherit; font-size:13px; font-weight:700; color:#6E6E6A; cursor:pointer;
+            min-height:44px; }
+        /* 다시 그린 옛 줄에 다는 한 줄 — 숨기지 않는다 */
+        .출-다시그림{ margin:0 0 10px; padding:8px 10px; border-radius:7px; font-size:12px;
+            font-weight:800; color:#92400e; background:#fef3c7; border:1px solid #fcd34d; }
         #amt-stock *{ box-sizing:border-box; }
         #amt-stock .ams-wrap{
             max-width:560px; margin:0 auto;
@@ -2602,7 +2643,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.55.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.56.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2735,7 +2776,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.55.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.56.0</b></p>
         </div>
     </div>
 
@@ -2767,6 +2808,15 @@
         </div>
     </div>
     <div id="amt-stock-back"><button type="button" onclick="amtCloseStock()">← 박스판</button></div>
+
+    <!-- 출고내역 — 입고확인된 거래명세표를 거래처별로 모아 본다 (10-12 지시) -->
+    <div id="amt-출고">
+        <div class="ams-wrap">
+            <div class="ams-head"><b id="출-제목">출고내역</b><span id="출-셈">—</span></div>
+            <div id="출-몸"></div>
+        </div>
+    </div>
+    <div id="amt-출고-back"><button type="button" id="출-뒤" onclick="amt출고뒤()">← 박스판</button></div>
 
     <!-- 불량보고 — 작업 중 나온 불량을 사진·글로 올리고 나중에 찾아본다 -->
     <div id="amt-defect">
@@ -17068,6 +17118,125 @@
             }
         });
 
+/* ══ 출고내역 — 입고확인된 거래명세표를 거래처별로 모아 본다 ═══════════════
+   사장님 (10-12): 「에이엠티에도 출고내역 박스를 만들고 **거래처별 박스**를 만들어
+   동일한 거래명세표가 **해당 거래처 박스안에 기록**되게 해주세요.」
+
+   · 자리는 `입고확인` 하나다 — 조혼가구와 **같은 한 벌**을 본다. 여기서는 **읽기만** 한다.
+   · 거래처 네모는 **박스 문서로 짓지 않는다.** 적힌 업체 이름으로 그린다 —
+     그래야 거래처가 늘어도 손댈 것이 없고 **빈 거래처 네모가 안 남는다.**
+     보이기는 박스판 타일(.amth-tile) 그대로다.
+   · **열 때 한 번만 읽는다.** 네모마다 읽으면 돈이 들고 폰이 느려진다.
+   · 못 읽으면 터지지 말고 한 줄로 알린다. */
+(function(){
+    const appId = 'vivivic-4b7ef';
+    let 줄들 = null, 본곳 = '', 탈 = '';
+    const $ = id => document.getElementById(id);
+    const _e = v => String(v == null ? '' : v)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+    window.amt출고읽기 = async function(){
+        줄들 = null; 탈 = '';
+        try {
+            const { collection, getDocs } = window.fbFirestore;
+            const 눈 = await getDocs(collection(window.db, 'artifacts', appId, 'public', 'data', '입고확인'));
+            const 모 = [];
+            눈.forEach(d => 모.push(Object.assign({ id: d.id }, (d.data && d.data()) || {})));
+            모.sort((a,b) => String(b.확인시각글||'').localeCompare(String(a.확인시각글||'')));
+            줄들 = 모;
+        } catch (e) { 줄들 = []; 탈 = '출고내역을 못 읽었습니다'; }
+    };
+    const 업체별 = () => {
+        const m = new Map();
+        (줄들 || []).forEach(r => { const k = String(r.업체 || '').trim() || '납품업체';
+            if (!m.has(k)) m.set(k, []); m.get(k).push(r); });
+        return [...m.entries()].sort((a,b) => a[0].localeCompare(b[0]));
+    };
+    function 그리기(){
+        const 몸 = $('출-몸'); if (!몸) return;
+        if (탈) { 몸.innerHTML = '<div class="ams-empty">' + _e(탈) + '</div>';
+                  $('출-셈').textContent = ''; $('출-제목').textContent = '출고내역'; return; }
+        if (줄들 === null) { 몸.innerHTML = '<div class="ams-empty">불러오는 중</div>'; return; }
+        if (!본곳) {
+            const 들 = 업체별();
+            $('출-제목').textContent = '출고내역';
+            $('출-셈').textContent = 들.length ? 들.length + '곳' : '';
+            몸.innerHTML = 들.length
+                ? '<div class="출-판">' + 들.map(([이름, rs]) =>
+                    '<button type="button" class="amth-tile amth-light" data-출업체="' + _e(이름) + '">' +
+                    '<span class="amth-nm">' + _e(이름) + '</span>' +
+                    '<span class="amth-sub">' + rs.length + '장</span></button>').join('') + '</div>'
+                : '<div class="ams-empty">아직 입고확인된 것이 없습니다</div>';
+            return;
+        }
+        const 것들 = (줄들 || []).filter(r => (String(r.업체 || '').trim() || '납품업체') === 본곳);
+        $('출-제목').textContent = 본곳;
+        $('출-셈').textContent = 것들.length + '장';
+        몸.innerHTML = 것들.length
+            ? '<div class="출-줄들">' + 것들.map(r =>
+                '<button type="button" class="출-줄" data-출큐알="' + _e(r.id) + '">' +
+                '<span class="때">' + _e(String(r.확인시각글 || '').slice(5)) + '</span>' +
+                '<span class="큐">' + _e(r.큐알 || r.id) + '</span>' +
+                '<span class="셈">' + (r.줄수 || 0) + '줄 · ' + (r.총수량 || 0) + '개</span></button>').join('') + '</div>'
+            : '<div class="ams-empty">이 거래처의 거래명세표가 없습니다</div>';
+    }
+    window.amtOpen출고 = async function(){
+        본곳 = ''; 줄들 = null;
+        if (typeof amtFitTop === 'function') amtFitTop();
+        document.documentElement.removeAttribute('data-amthome');
+        document.documentElement.setAttribute('data-amt출고', '1');
+        그리기(); window.scrollTo(0, 0);
+        await window.amt출고읽기();                 // **열 때 한 번만** 읽는다
+        그리기();
+    };
+    window.amt출고뒤 = function(){
+        if (본곳) { 본곳 = ''; 그리기(); window.scrollTo(0, 0); return; }   // 거래처 → 목록
+        document.documentElement.removeAttribute('data-amt출고');
+        if (typeof amtGoHome === 'function') amtGoHome();
+    };
+    /* 거래명세표 한 장 — **입고확인 때 담은 그 표**를 그대로 편다.
+       담긴 표가 없는 옛 줄(v1.55.0 앞)은 **지금 자료로 다시 그리고** 그 사실을 한 줄 적는다.
+       숨기지 않는다 — 그때 표가 아닌 것을 그때 표인 양 보이면 그게 거짓이다. */
+    window.amt출고펴기 = function(큐알){
+        const r = (줄들 || []).find(x => x.id === 큐알); if (!r) return;
+        const 담김 = Array.isArray(r.명세표) && r.명세표.length;
+        const 묶음 = 담김 ? r.명세표
+            : (typeof window._명세서모으기 === 'function'
+                ? window._명세서모으기(r.납기일, '납기', r.파레트 || '', r.발주문서 || r.발주번호 || '') : []);
+        const 짠 = window._명세서표Html(r.납기일, '납기', 묶음, r.큐알 || r.id);
+        window._명세서지금 = { 날짜: r.납기일, 공정: '납기', 파: r.파레트 || '', 발주: r.발주문서 || '',
+                               발주번호: r.발주번호 || '', 이름: r.큐알 || r.id, 큐알: '',
+                               업체: r.업체 || '', 묶음: 묶음, 총매: 짠.총매, 줄수: 짠.줄수,
+                               총수량: r.총수량 || 0, 발급번호: '', 발급시각: '' };
+        document.getElementById('명세서판')?.remove();
+        const 판 = document.createElement('div');
+        판.id = '명세서판'; 판.className = '명세-판';
+        판.onclick = (e) => { if (e.target === 판) window._명세서닫기(); };
+        판.innerHTML = '<div class="명세-속">' +
+            '<div class="명세-머리">' +
+            '<span class="명세-제목">' + _e(r.큐알 || r.id) + '</span>' +
+            '<span class="명세-번호">입고확인 ' + _e(r.확인시각글 || '') + '</span>' +
+            '<button class="명세-닫기" type="button" onclick="_명세서닫기()" aria-label="닫기">✕</button>' +
+            '</div>' +
+            '<div class="명세-몸">' +
+            (담김 ? '' : '<div class="출-다시그림">그때 표가 안 담겨 있습니다 — 지금 자료로 그렸습니다</div>') +
+            짠.html + '</div>' +
+            '<div class="명세-바닥">' +
+            '<button type="button" id="명세-PDF" onclick="_명세서PDF()" aria-label="PDF" data-말="PDF 로 내려받습니다">'
+            + _명세서류딱지('PDF', '#d93025', 6.6) + '</button>' +
+            '<button type="button" id="명세-엑셀" onclick="_명세서엑셀()" aria-label="엑셀" data-말="엑셀로 내려받습니다">'
+            + _명세서류딱지('X', '#107c41', 8.6) + '</button>' +
+            '</div></div>';
+        document.body.appendChild(판);
+    };
+    document.addEventListener('click', e => {
+        const 업 = e.target.closest && e.target.closest('[data-출업체]');
+        if (업) { 본곳 = 업.dataset['출업체'] || ''; 그리기(); window.scrollTo(0, 0); return; }
+        const 큐 = e.target.closest && e.target.closest('[data-출큐알]');
+        if (큐) { window.amt출고펴기(큐.dataset['출큐알']); }
+    });
+})();
+
         window.amtOpenStock = function(){
             고른색 = ''; 고른두께 = ''; 고른가공 = ''; 편갈래 = '';   // 들어오면 아무것도 안 걸린 채로
             if (typeof amtFitTop === 'function') amtFitTop();
@@ -17386,7 +17555,8 @@
         const 안쪽 = [['pending','발주확정 대기목록'],['confirmed','발주확정목록'],
                       ['timeline','공정 일정 타임라인'],['cutting','재단발주·도면'],
                       ['process','공정관리'],['accounts','계정관리'],
-                      ['stock','원장재고'],['defect','불량보고']];
+                      ['stock','원장재고'],['defect','불량보고'],
+                      ['출고','출고내역']];
 
         /* ── 창고 ── */
         function 칸(){
@@ -17409,9 +17579,25 @@
                     새것.sort((a,b) => (a.at||0) - (b.at||0));
                     박스들 = 새것;
                     그리기();
+                    출고박스세우기();
                 } catch (e) {}
             }, () => {});
         };
+
+        /* 10-12 사장님: 「에이엠티에도 **출고내역 박스**를 만들고」 — 박스판에 한 번 세운다.
+           문서 이름을 못박아 두어 **두 번 생기지 않는다.** 지우시면 다음에 열 때 다시 선다 —
+           그것이 싫으시면 이 줄을 빼면 된다(그때는 「새 박스」 로 손수 만드시면 된다). */
+        let 출고세웠나 = false;
+        async function 출고박스세우기(){
+            if (출고세웠나) return;
+            if (박스들.some(b => String(b.name || '').trim() === '출고내역')) { 출고세웠나 = true; return; }
+            출고세웠나 = true;
+            try {
+                const { setDoc, serverTimestamp } = window.fbFirestore;
+                await setDoc(문서('출고내역'), { name: '출고내역', icon: 'truck', tone: 'light',
+                    link: '출고', 곳: 'home', at: Date.now(), 만든때: serverTimestamp() }, { merge: true });
+            } catch (e) { /* 못 세워도 다른 박스는 그대로 돈다 */ }
+        }
 
         /* ── 그리기 — 새로 만든 박스만 ── */
         function 타일(b, i){
@@ -17552,6 +17738,7 @@
             if (!갈곳) return 박스판(b);                  // 갈 곳이 없으면 고치기 판
             if (갈곳 === 'stock') { if (typeof amtOpenStock === 'function') amtOpenStock(); return; }
             if (갈곳 === 'defect') { if (typeof amtOpenDefect === 'function') amtOpenDefect(); return; }
+            if (갈곳 === '출고') { if (typeof amtOpen출고 === 'function') amtOpen출고(); return; }
             const 안 = 안쪽.find(x => x[0] === 갈곳);
             if (안) { if (typeof amtOpenBox === 'function') amtOpenBox(갈곳); return; }
             window.open(갈곳, '_blank', 'noopener');
