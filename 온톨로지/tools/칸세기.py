@@ -68,6 +68,16 @@ PAT_CONST = re.compile(rf"(?:const|let|var)\s+({NAME})\s*=\s*{Q}([^\"'`]+?){Q}")
 # 큰글자로 시작하는 상수. `VP_상품` 처럼 뒤에 한글이 붙은 것도 받는다
 PAT_UPPER = re.compile(r"^[A-Z][A-Z0-9_가-힣]{1,30}$")
 
+# 꼴6: 옛 꼴(compat·v8) — `db.collection('artifacts').doc(appId)
+#        .collection('public').doc('data').collection('칸')`
+#   ⚠ 이카운트등록 **한 집만** 이 꼴을 쓴다. 모듈 꼴(`collection(db, …)`)만 잡다가
+#     이 집을 통째로 놓쳤다 — 그런데 이 집은 `confirmed_orders` 를 **읽고 쓴다.**
+#     한 집을 놓치면 이음 짝이 통째로 사라진다 (2026-10-12 에 겪음).
+PAT_V8 = re.compile(
+    rf"\.collection\(\s*{Q}public{Q}\s*\)\s*\.doc\(\s*{Q}data{Q}\s*\)"
+    rf"\s*\.collection\(\s*(?:{Q}([^\"'`/]+?){Q}|({NAME}))",
+    re.S)
+
 
 def 파일들():
     for 뿌리 in ROOTS.values():
@@ -179,6 +189,13 @@ def 센다():
                 담기(v, p, 줄번호(m.start()))
         for m in PAT_URL.finditer(글):
             담기(m.group(1), p, 줄번호(m.start()))
+        for m in PAT_V8.finditer(글):
+            글자, 이름 = m.group(1), m.group(2)
+            if 글자:
+                담기(글자, p, 줄번호(m.start()))
+            elif 이름:
+                for v in 풀기(이름):
+                    담기(v, p, 줄번호(m.start()))
         for pat in 꼴45:
             for m in pat.finditer(글):
                 글자, 이름 = m.group(1), m.group(2)
