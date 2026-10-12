@@ -7,31 +7,70 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{background:#1a1a1a;color:#c8c8c8;font-family:-apple-system,BlinkMacSystemFont,sans-serif;min-height:100vh}
-body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px 16px}
 input[type=file]{display:none}
 button{padding:16px 32px;border:1px solid #444;border-radius:6px;background:#222;color:#fff;font-size:15px;cursor:pointer;transition:background .15s}
 button:hover{background:#2a2a2a}
 button:disabled{opacity:.5;cursor:default}
-#msg{font-size:13px;color:#888;min-height:1em;text-align:center;padding:0 16px;word-break:break-all}
+button.sm{padding:10px 14px;font-size:14px}
+#msg{font-size:13px;color:#888;min-height:1em;text-align:center;word-break:break-all;line-height:1.7}
 #msg a{color:#8ab4f8}
+#editor{display:none;width:100%;max-width:800px;flex-direction:column;gap:12px}
+#name{font-size:13px;color:#888;word-break:break-all}
+#wave{width:100%;background:#111;border:1px solid #2a2a2a;border-radius:6px;touch-action:none}
+#wave ::part(region-handle){width:14px!important}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row label{font-size:13px;color:#888;display:flex;align-items:center;gap:8px;flex:1;min-width:160px}
+.row input[type=range]{flex:1}
+#time{font-size:13px;color:#888;font-variant-numeric:tabular-nums;margin-left:auto}
+#list{display:flex;flex-direction:column;gap:6px}
+.clip{display:flex;align-items:center;gap:8px;padding:8px 10px;background:#222;border:1px solid #333;border-radius:6px;font-size:14px;font-variant-numeric:tabular-nums}
+.clip span{flex:1}
+.clip button{padding:8px 12px;font-size:13px}
+.hint{font-size:12px;color:#666;line-height:1.6}
 </style>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://unpkg.com/wavesurfer.js@7.12.11/dist/wavesurfer.min.js"></script>
+<script src="https://unpkg.com/wavesurfer.js@7.12.11/dist/plugins/regions.min.js"></script>
 </head>
 <body>
 <input type="file" id="video" accept="video/*">
-<button id="btn">동영상 업로드</button>
+<button id="btn">동영상 선택</button>
+
+<div id="editor">
+  <div id="name"></div>
+  <div id="wave"></div>
+  <div class="row">
+    <button class="sm" id="play">▶ 재생</button>
+    <button class="sm" id="add">+ 구간 추가</button>
+    <span id="time">0:00.0</span>
+  </div>
+  <div class="row">
+    <label>확대 <input type="range" id="zoom" min="0" max="300" value="0"></label>
+  </div>
+  <div class="hint">파형 위를 손가락으로 끌면 구간이 생깁니다. 구간 양끝을 끌어 길이를 맞추세요.</div>
+  <div id="list"></div>
+  <button id="save" disabled>고른 구간 드라이브에 저장</button>
+</div>
+
 <div id="msg"></div>
 <script>
 // Google Cloud Console 에서 만든 OAuth 웹 클라이언트 ID
 const CLIENT_ID = '830175660542-r1fiqhs9jc5g33t6t7aeqhm0e7r4ru2p.apps.googleusercontent.com';
 // 올릴 드라이브 폴더 ID (비우면 내 드라이브 맨 위)
 const FOLDER_ID = '';
+// 뽑은 소리의 표본 빈도 (말소리는 이 정도면 충분하다, 1분에 약 2.6MB)
+const RATE = 22050;
 
-const btn = document.getElementById('btn');
-const input = document.getElementById('video');
-const msg = document.getElementById('msg');
-let token = null, tokenExp = 0, tokenClient = null;
+const $ = id => document.getElementById(id);
+const btn = $('btn'), input = $('video'), msg = $('msg'), editor = $('editor');
+const playBtn = $('play'), addBtn = $('add'), saveBtn = $('save'), list = $('list'), timeEl = $('time');
+let token = null, tokenExp = 0, tokenClient = null, afterLogin = null;
+let samples = null, baseName = '', ws = null, regions = null;
 
+const fmt = t => Math.floor(t / 60) + ':' + (t % 60).toFixed(1).padStart(4, '0');
+
+/* ── 구글 로그인 ─────────────────────────────── */
 function getTokenClient() {
   if (!tokenClient) {
     tokenClient = google.accounts.oauth2.initTokenClient({
@@ -41,10 +80,11 @@ function getTokenClient() {
         if (r.error) { msg.textContent = '로그인 실패: ' + r.error; return; }
         token = r.access_token;
         tokenExp = Date.now() + (r.expires_in - 60) * 1000;
-        btn.textContent = '동영상 선택';
-        msg.textContent = '로그인 됨 — 버튼을 눌러 동영상을 고르세요';
+        const next = afterLogin; afterLogin = null;
+        if (next) next();
       },
       error_callback: e => {
+        afterLogin = null;
         msg.textContent = e.type === 'popup_closed' ? '로그인 창이 닫혔습니다 — 다시 눌러주세요'
           : e.type === 'popup_failed_to_open' ? '로그인 창이 안 열렸습니다 — 팝업 차단을 풀고 다시 눌러주세요'
           : '로그인 실패: ' + (e.message || e.type);
@@ -54,52 +94,184 @@ function getTokenClient() {
   return tokenClient;
 }
 
-btn.onclick = () => {
-  if (token && Date.now() < tokenExp) { input.click(); return; }
+function withLogin(fn) {
+  if (token && Date.now() < tokenExp) { fn(); return; }
   if (!window.google?.accounts?.oauth2) { msg.textContent = '구글 로그인 불러오는 중… 잠시 후 다시 눌러주세요'; return; }
+  afterLogin = fn;
   getTokenClient().requestAccessToken();
-};
+}
+
+/* ── 영상에서 소리 뽑기 ─────────────────────────── */
+btn.onclick = () => input.click();
 
 input.onchange = async () => {
   const file = input.files[0];
   input.value = '';
   if (!file) return;
   btn.disabled = true;
-  msg.textContent = '업로드 준비 중…';
+  msg.textContent = '소리 뽑는 중…';
   try {
-    const meta = { name: file.name, mimeType: file.type || 'video/mp4' };
-    if (FOLDER_ID) meta.parents = [FOLDER_ID];
-    const init = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,webViewLink', {
-      method: 'POST',
-      headers: {
-        Authorization: 'Bearer ' + token,
-        'Content-Type': 'application/json; charset=UTF-8',
-        'X-Upload-Content-Type': meta.mimeType,
-        'X-Upload-Content-Length': file.size
-      },
-      body: JSON.stringify(meta)
-    });
-    if (!init.ok) throw new Error('세션 생성 실패 (' + init.status + ')');
-    const url = init.headers.get('Location');
-    const res = await new Promise((ok, fail) => {
-      const x = new XMLHttpRequest();
-      x.open('PUT', url);
-      x.setRequestHeader('Content-Type', meta.mimeType);
-      x.upload.onprogress = e => { if (e.lengthComputable) msg.textContent = '업로드 중… ' + Math.floor(e.loaded / e.total * 100) + '%'; };
-      x.onload = () => x.status < 300 ? ok(JSON.parse(x.responseText)) : fail(new Error('업로드 실패 (' + x.status + ')'));
-      x.onerror = () => fail(new Error('네트워크 오류'));
-      x.send(file);
-    });
-    msg.innerHTML = '';
-    const a = document.createElement('a');
-    a.href = res.webViewLink; a.target = '_blank'; a.textContent = '업로드 완료: ' + file.name;
-    msg.appendChild(a);
+    const buf = await file.arrayBuffer();
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    let audio;
+    try {
+      audio = await new Promise((ok, fail) => ctx.decodeAudioData(buf, ok, fail));
+    } catch (e) {
+      throw new Error('이 영상에서 소리를 못 읽었습니다 (소리가 없는 영상일 수 있습니다)');
+    } finally {
+      ctx.close && ctx.close();
+    }
+    // 한 채널 · RATE 로 줄인다
+    const off = new OfflineAudioContext(1, Math.ceil(audio.duration * RATE), RATE);
+    const src = off.createBufferSource();
+    src.buffer = audio;
+    src.connect(off.destination);
+    src.start();
+    samples = (await off.startRendering()).getChannelData(0);
+    baseName = file.name.replace(/\.[^.]+$/, '');
+    showEditor(toWav(samples));
+    msg.textContent = '';
   } catch (e) {
     msg.textContent = e.message;
   } finally {
     btn.disabled = false;
   }
 };
+
+/* ── 파형 · 구간 ─────────────────────────────── */
+function showEditor(wavBlob) {
+  if (ws) ws.destroy();
+  list.innerHTML = '';
+  $('name').textContent = baseName;
+  editor.style.display = 'flex';
+  btn.textContent = '다른 동영상 선택';
+  $('zoom').value = 0;
+
+  regions = WaveSurfer.Regions.create();
+  ws = WaveSurfer.create({
+    container: '#wave',
+    height: 140,
+    waveColor: '#5a6a7a',
+    progressColor: '#8ab4f8',
+    cursorColor: '#fff',
+    normalize: true,
+    plugins: [regions]
+  });
+  regions.enableDragSelection({ color: 'rgba(138,180,248,.25)' });
+  ws.loadBlob(wavBlob);
+
+  ws.on('timeupdate', t => { timeEl.textContent = fmt(t); });
+  ws.on('play', () => { playBtn.textContent = '❚❚ 멈춤'; });
+  ws.on('pause', () => { playBtn.textContent = '▶ 재생'; });
+  ws.on('finish', () => { playBtn.textContent = '▶ 재생'; });
+  regions.on('region-created', renderList);
+  regions.on('region-updated', renderList);
+  regions.on('region-removed', renderList);
+  regions.on('region-clicked', (r, e) => { e.stopPropagation(); r.play(true); });
+}
+
+playBtn.onclick = () => ws && ws.playPause();
+
+addBtn.onclick = () => {
+  if (!ws) return;
+  const start = ws.getCurrentTime();
+  const end = Math.min(start + 3, ws.getDuration());
+  if (end - start < 0.1) return;
+  regions.addRegion({ start, end, color: 'rgba(138,180,248,.25)' });
+};
+
+$('zoom').oninput = e => ws && ws.zoom(Number(e.target.value));
+
+function renderList() {
+  const rs = regions.getRegions().slice().sort((a, b) => a.start - b.start);
+  list.innerHTML = '';
+  rs.forEach((r, i) => {
+    const row = document.createElement('div');
+    row.className = 'clip';
+    const label = document.createElement('span');
+    label.textContent = (i + 1) + '.  ' + fmt(r.start) + ' – ' + fmt(r.end) + '  (' + (r.end - r.start).toFixed(1) + '초)';
+    const p = document.createElement('button');
+    p.textContent = '▶';
+    p.onclick = () => r.play(true);
+    const x = document.createElement('button');
+    x.textContent = '✕';
+    x.onclick = () => r.remove();
+    row.append(label, p, x);
+    list.appendChild(row);
+  });
+  saveBtn.disabled = rs.length === 0;
+}
+
+/* ── WAV 만들기 ─────────────────────────────── */
+function toWav(data) {
+  const n = data.length, out = new DataView(new ArrayBuffer(44 + n * 2));
+  const str = (o, s) => { for (let i = 0; i < s.length; i++) out.setUint8(o + i, s.charCodeAt(i)); };
+  str(0, 'RIFF'); out.setUint32(4, 36 + n * 2, true); str(8, 'WAVE');
+  str(12, 'fmt '); out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 1, true);
+  out.setUint32(24, RATE, true); out.setUint32(28, RATE * 2, true); out.setUint16(32, 2, true); out.setUint16(34, 16, true);
+  str(36, 'data'); out.setUint32(40, n * 2, true);
+  for (let i = 0; i < n; i++) {
+    const s = Math.max(-1, Math.min(1, data[i]));
+    out.setInt16(44 + i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+  }
+  return new Blob([out], { type: 'audio/wav' });
+}
+
+/* ── 드라이브에 저장 ─────────────────────────── */
+async function upload(blob, name, onProgress) {
+  const meta = { name, mimeType: blob.type };
+  if (FOLDER_ID) meta.parents = [FOLDER_ID];
+  const init = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,webViewLink', {
+    method: 'POST',
+    headers: {
+      Authorization: 'Bearer ' + token,
+      'Content-Type': 'application/json; charset=UTF-8',
+      'X-Upload-Content-Type': meta.mimeType,
+      'X-Upload-Content-Length': blob.size
+    },
+    body: JSON.stringify(meta)
+  });
+  if (!init.ok) throw new Error('세션 생성 실패 (' + init.status + ')');
+  const url = init.headers.get('Location');
+  return new Promise((ok, fail) => {
+    const x = new XMLHttpRequest();
+    x.open('PUT', url);
+    x.setRequestHeader('Content-Type', meta.mimeType);
+    x.upload.onprogress = e => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+    x.onload = () => x.status < 300 ? ok(JSON.parse(x.responseText)) : fail(new Error('업로드 실패 (' + x.status + ')'));
+    x.onerror = () => fail(new Error('네트워크 오류'));
+    x.send(blob);
+  });
+}
+
+saveBtn.onclick = () => withLogin(async () => {
+  const rs = regions.getRegions().slice().sort((a, b) => a.start - b.start);
+  if (!rs.length) return;
+  saveBtn.disabled = btn.disabled = true;
+  const done = [];
+  try {
+    for (let i = 0; i < rs.length; i++) {
+      const r = rs[i];
+      const clip = samples.subarray(Math.floor(r.start * RATE), Math.ceil(r.end * RATE));
+      const name = baseName + '_' + String(i + 1).padStart(2, '0') + '.wav';
+      const res = await upload(toWav(clip), name, f => {
+        msg.textContent = '저장 중… ' + (i + 1) + '/' + rs.length + ' (' + Math.floor(f * 100) + '%)';
+      });
+      done.push([name, res.webViewLink]);
+    }
+    msg.innerHTML = '';
+    msg.append(done.length + '개 저장 완료');
+    done.forEach(([name, link]) => {
+      const a = document.createElement('a');
+      a.href = link; a.target = '_blank'; a.textContent = name;
+      msg.append(document.createElement('br'), a);
+    });
+  } catch (e) {
+    msg.textContent = e.message + (done.length ? ' — ' + done.length + '개는 저장됨' : '');
+  } finally {
+    saveBtn.disabled = btn.disabled = false;
+  }
+});
 </script>
 </body>
 </html>
