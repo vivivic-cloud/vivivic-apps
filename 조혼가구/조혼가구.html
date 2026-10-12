@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- 조혼가구 — 거래처 발주 화면.
-     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.7.2 -->
+     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.7.3 -->
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -1728,7 +1728,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.7.2</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.7.3</span>
                 </div>
                 <!-- 페이지 탭: 발주하기 / 작업중 -->
                 <div class="flex items-center gap-1 border border-[#ededeb] rounded-lg bg-[#f7f6f3] p-1 mr-2">
@@ -5541,22 +5541,36 @@
         }
 
         /* 10-12 사장님: 「해당 거래처에 **거래내역 박스를 만들어** 명세서가 도착하도록」 —
-           박스판에 한 번 세운다. 문서 이름을 못박아 두어 **두 번 생기지 않는다.**
-           에이엠티가 같은 말씀에 「출고내역」 박스를 세운 것과 같은 길이다(v1.56.0).
-           지우시면 다음에 열 때 다시 선다 — 그것이 싫으시면 이 줄을 빼면 된다. */
-        let _jhd박스세웠나 = false;
+           박스판에 **딱 한 번** 세운다.
+
+           ⚠⚠ **박스판은 사장님이 손수 꾸리시는 자리다.** 지우신 것이 새로고침마다
+              돌아오면 「왜 자꾸 생기냐」 하신다. 그래서 「한 번 세웠다」 는 **자국**을
+              박스와 **다른 자리**(`johon_meta/박스세움`)에 남긴다.
+              · 박스를 지워도 자국은 안 지워진다 — 지운 채로 남는다.
+              · 자국은 다른 칸이라 **박스판에 네모로 뜨지 않는다.**
+              · 화베에 남기므로 폰을 바꾸셔도 또 생기지 않는다(localStorage 는 안 쓴다).
+           차례 — 박스를 먼저 쓰고 자국을 쓴다. 자국부터 쓰면 박스 쓰기가 실패했을 때
+                  영영 안 세워진다. */
+        const JOHON_METACOL = 'johon_meta';
+        const JOHON_METADOC = '박스세움';
+        let _jhd박스봤나 = false;
         async function johonDealBoxSeed(){
-            if (_jhd박스세웠나) return;
-            if (johonMyBoxes.some(b => String(b.name || '').trim() === '거래내역')) {
-                _jhd박스세웠나 = true; return;
-            }
-            _jhd박스세웠나 = true;
+            if (_jhd박스봤나) return;
+            _jhd박스봤나 = true;
             try {
-                const { doc, setDoc } = window.fbFirestore || {};
-                if (!doc || !setDoc || !window.db) return;
-                await setDoc(doc(window.db, 'artifacts', appId, 'public', 'data', JOHON_BOXCOL, '거래내역'),
-                    { name: '거래내역', icon: 'receipt', tone: 'white', link: '', at: Date.now() },
-                    { merge: true });
+                const { doc, getDoc, setDoc } = window.fbFirestore || {};
+                if (!doc || !getDoc || !setDoc || !window.db) return;
+                const 자국칸 = doc(window.db, 'artifacts', appId, 'public', 'data',
+                                   JOHON_METACOL, JOHON_METADOC);
+                const 자국 = await getDoc(자국칸);
+                if (자국 && 자국.exists() && (자국.data() || {}).거래내역) return;   // 이미 한 번 세웠다
+                if (!johonMyBoxes.some(b => String(b.name || '').trim() === '거래내역')) {
+                    await setDoc(doc(window.db, 'artifacts', appId, 'public', 'data',
+                                     JOHON_BOXCOL, '거래내역'),
+                        { name: '거래내역', icon: 'receipt', tone: 'white', link: '', at: Date.now() },
+                        { merge: true });
+                }
+                await setDoc(자국칸, { 거래내역: Date.now() }, { merge: true });
             } catch (e) { /* 못 세워도 다른 박스는 그대로 돈다 */ }
         }
 
