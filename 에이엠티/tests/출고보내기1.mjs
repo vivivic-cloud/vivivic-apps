@@ -9,6 +9,8 @@
 import { 브라우저열기, devices, 서버, 자료, 자재, 그림칸 } from './도구/터.mjs';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 await 서버();
 import { readFileSync } from 'node:fs';
 const HERE = await 자재();
@@ -167,7 +169,7 @@ Object.entries(견줌).forEach(([글, v]) => {
 });
 // 조혼가구는 노드/제 집에서 그린다 — window 없이도 같은 표가 나와야 한다
 const require = createRequire(import.meta.url);
-const 공용 = require('../../shared/거래명세표.js');
+const 공용 = require(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../shared/거래명세표.js'));
 판('③ **노드에서 그려도** 같은 표다 (조혼가구가 제 집에서 그리는 길)',
    Object.entries(보낸뒤.문서).every(([글, v]) =>
      md5(공용.그리기(v.명세표, { 날짜: 날, 추린이름: 글 }).html) === md5(견줌[글].집)),

@@ -18,7 +18,8 @@ await ctx.route('https://cdn.tailwindcss.com*', r => r.fulfill({ status: 200, co
 const p = await ctx.newPage(); const errs = []; p.on('pageerror', e => errs.push(e.message));
 
 const 박스칸 = 'artifacts/vivivic-4b7ef/public/data/amt_boxes/출고내역';
-const 자국칸 = 'artifacts/vivivic-4b7ef/public/data/amt_한번/출고내역박스';
+// 조혼가구와 **같은 꼴**이다 — 그 집은 johon_meta/박스세움 의 「거래내역」 칸
+const 자국칸 = 'artifacts/vivivic-4b7ef/public/data/amt_meta/박스세움';
 
 // 창고를 **노드 쪽에 들고** 다닌다 — 새로고침해도 화베는 안 비워지기 때문이다
 async function 열기(창고, 막나) {
@@ -39,9 +40,13 @@ async function 열기(창고, 막나) {
         return { exists: () => !!window.__창고[r.길], data: () => window.__창고[r.길] || {} }; },
       getDocs: async () => ({ forEach: () => {} }),
       onSnapshot: (r, cb) => {
-        if (/amt_boxes$/.test(r.길)) window.__박스듣기 = () => cb({ forEach: (f) =>
-          Object.entries(window.__창고).filter(([k]) => k.indexOf('/amt_boxes/') >= 0)
-            .forEach(([k, v]) => f({ id: k.split('/').pop(), data: () => v })) });
+        if (/amt_boxes$/.test(r.길)) {
+          // 진짜 화베처럼 **첫 소식에 이미 있는 박스가 실려 온다**
+          window.__박스듣기 = () => cb({ forEach: (f) =>
+            Object.entries(window.__창고).filter(([k]) => k.indexOf('/amt_boxes/') >= 0)
+              .forEach(([k, v]) => f({ id: k.split('/').pop(), data: () => v })) });
+          window.__박스듣기(); return () => {};
+        }
         if (cb) cb({ forEach: () => {} }); return () => {}; },
       query: x => x, serverTimestamp: () => '때', deleteField: () => null };
   }, { 창고, 막나 });
@@ -62,8 +67,13 @@ console.log('■ 첫 판: ' + JSON.stringify({ 쓴곳: 한.쓴곳, 네모: 한.�
 판('① 처음 한 번은 박스가 제대로 선다',
    !!한.창고[박스칸] && 한.창고[박스칸].name === '출고내역' && 한.네모.includes('출고내역'),
    JSON.stringify(한.창고[박스칸]) + ' · 네모 ' + JSON.stringify(한.네모));
-판('① 「한 번 세웠다」 자국이 **박스 칸 밖에** 남는다',
-   !!한.창고[자국칸] && /amt_한번\//.test(자국칸), JSON.stringify(한.창고[자국칸]));
+판('① 「한 번 세웠다」 자국이 **박스 칸 밖에** 남는다 (amt_meta/박스세움 의 출고내역 칸)',
+   !!한.창고[자국칸] && !!한.창고[자국칸].출고내역 && /amt_meta\/박스세움$/.test(자국칸),
+   JSON.stringify(한.창고[자국칸]));
+// 조혼가구가 지킨 차례 그대로 — **박스를 먼저, 자국을 나중에** 쓴다
+판('① 차례가 박스 먼저 · 자국 나중이다',
+   한.쓴곳.indexOf(박스칸) >= 0 && 한.쓴곳.indexOf(박스칸) < 한.쓴곳.indexOf(자국칸),
+   JSON.stringify(한.쓴곳.map(k => k.split('/').slice(-2).join('/'))));
 판('② 소식이 두 번 와도 박스 문서는 하나다',
    한.쓴곳.filter(k => k === 박스칸).length === 1 && 한.쓴곳.filter(k => k === 자국칸).length === 1,
    JSON.stringify(한.쓴곳));
@@ -96,6 +106,16 @@ console.log('■ 지우고 다시 연 판: ' + JSON.stringify({ 쓴곳: 셋.쓴�
 판('③ **지우고 다시 열어도 출고내역 박스가 안 생긴다**',
    !셋.창고[박스칸] && !셋.네모.includes('출고내역') && 셋.쓴곳.length === 0,
    '박스 ' + !!셋.창고[박스칸] + ' · 네모 ' + JSON.stringify(셋.네모) + ' · 쓴 곳 ' + JSON.stringify(셋.쓴곳));
+
+// ── 박스는 이미 있는데 자국만 없을 때 — **박스는 안 쓰고 자국만** 적는다 ──
+// (조혼가구가 잰 셋째 값: 「이미 있음 → 박스 0회」)
+const 다섯 = await 열기({ [박스칸]: { name: '출고내역', icon: 'truck', tone: 'light',
+  link: '출고', 곳: 'home', at: 1 } });
+console.log('■ 박스만 있을 때: ' + JSON.stringify({ 쓴곳: 다섯.쓴곳, 네모: 다섯.네모 }));
+판('② 박스가 이미 있으면 **박스는 0회** 쓰고 자국만 적는다',
+   다섯.쓴곳.filter(k => k === 박스칸).length === 0
+   && 다섯.쓴곳.filter(k => k === 자국칸).length === 1 && 다섯.네모.includes('출고내역'),
+   JSON.stringify(다섯.쓴곳.map(k => k.split('/').slice(-2).join('/'))));
 
 // ── ⑥ 자국을 못 읽어도 안 터지고, 함부로 세우지도 않는다 ───────────
 const 넷 = await 열기({}, true);

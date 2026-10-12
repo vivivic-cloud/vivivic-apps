@@ -223,10 +223,10 @@ const 끝 = await p.evaluate(() => ({
   기록그대로: JSON.stringify(confirmedOrders) === window.__기록전,
   가로: document.documentElement.scrollWidth }));
 console.log('■ 쓴 곳: ' + JSON.stringify(끝.쓴곳));
-// v1.57.0 부터 **「한 번 세웠다」 자국**(amt_한번)이 하나 더 적힌다 — 그 둘뿐이다
+// v1.57.0 부터 **「한 번 세웠다」 자국**(amt_meta/박스세움)이 하나 더 적힌다 — 그 둘뿐이다
 판('⑧ 쓴 곳은 **박스와 그 자국뿐**이다 (입고확인·업무기록에 쓰기 0)',
    끝.쓴곳.length === 2 && /amt_boxes\/출고내역$/.test(끝.쓴곳[0])
-   && /amt_한번\/출고내역박스$/.test(끝.쓴곳[1]) && 끝.기록그대로 === true,
+   && /amt_meta\/박스세움$/.test(끝.쓴곳[1]) && 끝.기록그대로 === true,
    JSON.stringify(끝.쓴곳) + ' · 업무기록 그대로 ' + 끝.기록그대로);
 판('⑧ 375px 가로 스크롤 없다', 끝.가로 <= 375, 끝.가로 + 'px');
 판('페이지오류 없음', errs.length === 0, String(errs.length) + (errs[0] ? ' :: ' + errs[0] : ''));

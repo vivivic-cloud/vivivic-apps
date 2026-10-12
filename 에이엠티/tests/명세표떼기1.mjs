@@ -7,6 +7,8 @@ import { 브라우저열기, devices, 서버, 자재, 그림칸 } from './도구
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 await 서버();
 const URL = 'http://127.0.0.1:8899/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0/%EC%97%90%EC%9D%B4%EC%97%A0%ED%8B%B0.html';
 const CSS = readFileSync((await 자재()) + '/tw-built.css', 'utf-8');
@@ -75,7 +77,9 @@ console.log('■ 공용 함수를 부르나: ' + JSON.stringify(부르나));
 
 // ── ③ 노드에서도 — window·업무자료 없이 똑같이 그린다 ──────────────
 const require = createRequire(import.meta.url);
-const 공용 = require('../../shared/거래명세표.js');
+// ⚠ 이 파일은 `URL` 을 제 이름으로 쓰고 있다 — 전역 URL 을 쓰면 안 된다
+const 공용길 = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../shared/거래명세표.js');
+const 공용 = require(공용길);
 const 밖납기 = 공용.그리기(본, { 날짜: '2026-10-21' }).html;
 판('③ **노드에서도 같은 표가 나온다** — 조혼가구가 제 집에서 그려도 같다',
    md5(밖납기) === 전판.납기, md5(밖납기) + ' (에이엠티 ' + md5(집.납기) + ')');
@@ -121,7 +125,8 @@ if (그림칸()) {
   // 같은 표를 **공용 그리개만으로** 그려 본다 — 남의 집에서 펴는 그 꼴이다
   const p2 = await ctx.newPage();
   await p2.setContent('<html><head><meta charset="utf-8"></head><body></body></html>');
-  await p2.addScriptTag({ path: '../shared/거래명세표.js' });
+  // ⚠ 상대 경로는 **돌리는 자리**를 따라간다 — 다돌리기가 다른 자리에서 부르면 못 찾는다
+  await p2.addScriptTag({ path: 공용길 });
   await p2.evaluate(({ 본, 꾸밈 }) => {
     const 스 = document.createElement('style'); 스.textContent = 꾸밈; document.head.appendChild(스);
     document.body.innerHTML = '<div class="밖집"><p class="밖집이름">조혼가구 — 공용 그리개로만 그린 같은 표</p>'
