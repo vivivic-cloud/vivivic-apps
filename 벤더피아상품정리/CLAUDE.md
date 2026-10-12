@@ -213,7 +213,8 @@ const COLLECTION = ['artifacts','vivivic-4b7ef','public','data','vp_상품목록
 > ⚠ **`vp_` 로 시작하지 않는 자리에는 쓰지 마라. 읽지도 마라.**
 > 같은 자리에 집 안 다른 프로그램의 **진짜 업무 기록**이 산다 —
 > `product_master`·`product_overrides`·`excel_metadata` (원장관리),
-> `confirmed_orders`·`cutting_plans`·`partStarted`·`partCompletions` (에이엠티),
+> `confirmed_orders`·`cutting_plans` (에이엠티 — `partStarted`·`partCompletions` 는
+> 칸이 아니라 `confirmed_orders` 문서 안의 열쇠다),
 > `wt_dev`·`wt_asked` (작업대), `amt_boxes`·`johon_boxes`·`boring_*`·`defect_reports` …
 > **이름이 비슷하다고 `product_master` 에 쓰면 사장님 원장이 망가진다.**
 

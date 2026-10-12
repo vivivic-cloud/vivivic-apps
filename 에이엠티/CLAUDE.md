@@ -15,7 +15,9 @@
   글자를 새로 쓸 때 「사장님이 이 말을 쓰시나」 를 먼저 묻는다.
 
 ## 업무 기록 (파이어스토어)
-- `partStarted`·`partCompletions`·`confirmed_orders`·`cutting_plans` 는 **진짜 업무 기록**이다.
+- `confirmed_orders`·`cutting_plans` 는 **진짜 업무 기록**이다.
+  `partStarted`·`partCompletions`·`partInfoMap` 도 업무 기록인데 **칸이 아니라**
+  `confirmed_orders` 문서 **안의 열쇠**다(에이엠티.html:7783·8056 · 10-12 산 화베에서 실측).
   **칸을 늘리기만 하고 뜻을 바꾸지 않는다.** 시키지 않은 쓰기는 하지 않는다.
 - 옛 기록은 새 칸이 없다 — **없으면 0/예전대로** 로 보아 예전과 똑같이 굴러야 한다.
 - 시작됐나는 **`_공정시작됨(rec)`** 으로만 묻는다. 취소한 자리는 `{started:false}` 로 남는다
