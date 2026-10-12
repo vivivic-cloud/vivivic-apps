@@ -4,7 +4,8 @@
 무엇을 재나
   ㄱ) `이름갈림.tsv` 에 적은 **이름이 진짜 코드에 있나**
   ㄴ) `객체.tsv` 에 적은 **칸이 진짜 코드에서 불리나** (칸세기.py 와 맞대 본다)
-  ㄷ) 둘 다 셈을 찍는다 — 객체 몇 가지 · 갈린 자리 몇 군데
+  ㄷ) `못이음.tsv` 에 적은 **짝이 진짜 그 됨(이어짐·반쯤·안됨)인지** (이음세기.py 와 맞대 본다)
+  ㄹ) 셈을 찍는다 — 객체 몇 가지 · 갈린 자리 몇 군데 · 못 이어진 짝 몇 쌍
 
 없는 이름을 적어 두면 **빨개진다.** 그래야 「아마」 로 적은 줄이 표에 못 남는다.
 
@@ -77,6 +78,18 @@ def 몇번(글, 이름):
     return len(pat.findall(글))
 
 
+def 이음():
+    """이음세기.py 가 세어 준 **이어진 짝**. {(집,집): 무엇으로} 꼴."""
+    글 = subprocess.run([sys.executable, "-I", f"{HERE}/이음세기.py"],
+                        capture_output=True, text=True, check=True).stdout
+    밖 = {}
+    for 줄 in 글.splitlines():
+        m = re.match(r"^\s{2}(\S+) ↔ (\S+)\s+(.+)$", 줄)
+        if m:
+            밖[tuple(sorted((m.group(1), m.group(2))))] = m.group(3).strip()
+    return 밖
+
+
 def 칸목록():
     """칸세기.py 가 세어 준 칸 이름들."""
     글 = subprocess.run([sys.executable, "-I", f"{HERE}/칸세기.py"],
@@ -138,11 +151,43 @@ def main():
             elif 몇번(글, 바탕) == 0:
                 탈.append(f"객체 {번호} ({이름}) — 사는 곳 「{바탕}」 이 코드에 없다")
 
-    # ── ㄷ) 셈
+    # ── ㄷ) 못이음.tsv 의 됨이 잰 값과 맞나
+    짝표 = list(줄읽기(f"{온}/못이음.tsv"))
+    이어진 = 이음()
+    for 칸 in 짝표:
+        번호, 짝글, 됨 = 칸[0], 칸[1], 칸[2]
+        집들 = [x.strip() for x in 짝글.split("↔")]
+        if len(집들) != 2 or "·" in 집들[1] or 집들[1] == "아무 집":
+            continue                      # 여럿을 한 줄에 적은 것은 손으로 본다
+        키 = tuple(sorted(집들))
+        있나 = 키 in 이어진
+        if 됨 == "안됨" and 있나:
+            탈.append(f"못이음 {번호} ({짝글}) — 「안됨」 이라 적었는데 "
+                      f"실제로 이어져 있다: {이어진[키]}")
+        if 됨 in ("이어짐", "반쯤") and not 있나:
+            탈.append(f"못이음 {번호} ({짝글}) — 「{됨}」 이라 적었는데 "
+                      f"이은 자리가 하나도 없다")
+        if a.자세히:
+            print(f"  못이음 {번호:>2} {짝글:28} {됨:4} "
+                  f"{'(이어져 있다)' if 있나 else '(이은 자리 없음)'}")
+
+    # ── ㄹ) 셈
     print()
     print(f"객체           {len(객체)} 가지")
     print(f"이름 갈린 자리  {len(갈림)} 군데  (적어 둔 이름 {이름수} 개)")
     print(f"코드가 부르는 칸 {len(칸들)} 가지")
+    여럿 = sum(1 for c in 객체 if len(c) > 4 and c[4] != "(없다)"
+               and len(c[4].split("·")) >= 2)
+    print(f"  그중 **두 집 이상을 잇는 객체** {여럿} 가지 "
+          f"(나머지 {len(객체) - 여럿} 가지는 한 집 안에만 있다 — 뒤로 미룬다)")
+    print(f"이어진 짝       {len(이어진)} 쌍 / 있을 수 있는 짝 105 쌍")
+    못 = [c for c in 짝표 if len(c) > 2 and c[2] == "안됨"]
+    반 = [c for c in 짝표 if len(c) > 2 and c[2] == "반쯤"]
+    print(f"못 이어진 짝     {len(못)} 줄 · 반쯤 이어진 짝 {len(반)} 줄 "
+          f"(`못이음.tsv` 에 적은 것)")
+    값3 = [c for c in 짝표 if len(c) > 3 and c[3] == "3"]
+    print(f"이으면 바로 쓰실 것(값 3) {len(값3)} 줄 — "
+          + " · ".join(c[1] for c in 값3))
     급함3 = [c for c in 갈림 if len(c) > 4 and c[4] == "3"]
     print(f"급한 자리(급함 3) {len(급함3)} 군데 — "
           + " · ".join(c[1] for c in 급함3))
