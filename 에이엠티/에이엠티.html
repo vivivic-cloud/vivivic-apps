@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.54.0 (2026-10-11) — 입고확인은 먼저 적힌 기록을 덮지 않는다
+     버전: v1.55.0 (2026-10-12) — 입고확인에 그때 그 명세표를 담는다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2602,7 +2602,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.54.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.55.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2735,7 +2735,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.54.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.55.0</b></p>
         </div>
     </div>
 
@@ -10039,6 +10039,32 @@
             return '입고된 수량을 정확히 확인했나요? 확인후 착오된 수량의 책임은 '
                  + (String(업체 || '').trim() || '납품업체') + '에 기록됩니다.';
         };
+        /* 10-12 사장님: 「이렇게 입고확인된 명세표는 … 거래명세표가 … 기록되게 해주세요.」
+           ⚠ 줄수·총수량만 적어 두면 나중에 **그때 자료로 다시 그려야** 한다. 발주가 바뀌면
+           그때 확인한 것과 **다른 종이**가 나온다 — 그것은 기록이 아니다.
+           그래서 찍는 그 순간의 **명세표 줄을 그대로** 담는다(칸을 늘리기만 한다).
+           꼴은 `_명세서모으기` 가 내놓는 묶음 그대로다 — 같은 `_명세서표Html` 로 다시 그린다.
+           다만 `발주` 는 **화면이 읽는 넷**만 남긴다. 발주 기록을 통째로 베끼면 업무 기록이
+           두 벌이 되고, 문서도 쓸데없이 커진다. */
+        window._명세표담기 = function (묶음) {
+            return (묶음 || []).map(묶 => ({
+                발주: {
+                    displayName: (묶.발주 && 묶.발주.displayName) || '',
+                    code: (묶.발주 && 묶.발주.code) || '',
+                    orderCode: (묶.발주 && 묶.발주.orderCode) || '',
+                    deliveryDate: (묶.발주 && 묶.발주.deliveryDate) || '',
+                },
+                계획들: (묶.계획들 || []).map(g => ({
+                    파: g.파 || '', 매: (g.매 == null ? null : g.매),
+                    종류: g.종류 || '', 색상: g.색상 || '',
+                    품목들: (g.품목들 || []).map(품 => ({
+                        이름: 품.이름 || '', 크기: 품.크기 || '',
+                        몫: (품.몫 == null ? null : 품.몫), 코드: 품.코드 || '',
+                    })),
+                })),
+            }));
+        };
+
         window._입고칸 = function (큐알) {
             const { doc } = window.fbFirestore;
             return doc(window.db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', '입고확인', String(큐알));
@@ -10100,6 +10126,7 @@
                 큐알: 지.큐알, 발주번호: 지.발주번호 || '', 발주문서: 지.발주 || '',
                 파레트: 지.파 || '', 납기일: 지.날짜 || '',
                 업체: 지.업체 || '', 줄수: 지.줄수 || 0, 총수량: 지.총수량 || 0,
+                명세표: window._명세표담기(지.묶음),      // 그때 그 표 그대로 (10-12 지시)
                 확인시각: window.fbFirestore.serverTimestamp(), 확인시각글: 시각글,
                 확인uid: (window._myAccount && window._myAccount.uid) || '',
                 글귀: window._입고글귀(지.업체), 판: (document.getElementById('amth-ver') || {}).textContent || '',
