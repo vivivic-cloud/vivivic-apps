@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.56.0 (2026-10-12) — 출고내역 박스 · 거래처별 거래명세표
+     버전: v1.57.0 (2026-10-12) — 지운 출고내역 박스는 다시 안 선다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2643,7 +2643,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.56.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.57.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2776,7 +2776,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.56.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.57.0</b></p>
         </div>
     </div>
 
@@ -17585,18 +17585,37 @@
         };
 
         /* 10-12 사장님: 「에이엠티에도 **출고내역 박스**를 만들고」 — 박스판에 한 번 세운다.
-           문서 이름을 못박아 두어 **두 번 생기지 않는다.** 지우시면 다음에 열 때 다시 선다 —
-           그것이 싫으시면 이 줄을 빼면 된다(그때는 「새 박스」 로 손수 만드시면 된다). */
+
+           ⚠ **「지금 그 박스가 있나」 로 물으면 안 된다.** 이 박스판은 사장님이 손수 꾸리시는
+             자리다. 길게 눌러 지우시면 문서가 통째로 없어지니, 다음에 여실 때 또 선다 —
+             「왜 자꾸 생기냐」 가 된다. 그래서 **「한 번 세웠다」 는 자국을 따로 남긴다.**
+
+           자국을 **박스 칸(`amt_boxes`) 밖**에 둔 까닭 — 박스를 지우는 길(`지우기`)이
+           그 칸의 문서를 지운다. 같은 칸에 두면 자국도 같이 날아가 지금과 똑같아진다.
+           칸이 다르니 ㄱ) 지워도 안 지워지고 ㄴ) 박스판·거래처 판에 네모로 안 뜬다.
+           화베에 두니 ㄷ) 폰을 바꾸셔도 따라간다(localStorage 가 아니다). */
+        const 자국칸이름 = 'amt_한번';
+        function 자국문서(id){
+            const { doc } = window.fbFirestore;
+            return doc(window.db, 'artifacts', appId, 'public', 'data', 자국칸이름, id);
+        }
         let 출고세웠나 = false;
         async function 출고박스세우기(){
             if (출고세웠나) return;
-            if (박스들.some(b => String(b.name || '').trim() === '출고내역')) { 출고세웠나 = true; return; }
-            출고세웠나 = true;
+            출고세웠나 = true;                       // 이 판에서는 한 번만 묻는다
             try {
-                const { setDoc, serverTimestamp } = window.fbFirestore;
-                await setDoc(문서('출고내역'), { name: '출고내역', icon: 'truck', tone: 'light',
-                    link: '출고', 곳: 'home', at: Date.now(), 만든때: serverTimestamp() }, { merge: true });
-            } catch (e) { /* 못 세워도 다른 박스는 그대로 돈다 */ }
+                const { getDoc, setDoc, serverTimestamp } = window.fbFirestore;
+                const 자국 = 자국문서('출고내역박스');
+                const 눈 = await getDoc(자국);
+                /* 한 번 세운 적이 있다 — 지금 없으면 **사장님이 지우신 것**이다. 그대로 둔다. */
+                if (눈 && 눈.exists && 눈.exists()) return;
+                if (!박스들.some(b => String(b.name || '').trim() === '출고내역')) {
+                    await setDoc(문서('출고내역'), { name: '출고내역', icon: 'truck', tone: 'light',
+                        link: '출고', 곳: 'home', at: Date.now(), 만든때: serverTimestamp() }, { merge: true });
+                }
+                await setDoc(자국, { 한일: '출고내역 박스 세움', 때: serverTimestamp(),
+                    판: (document.getElementById('amth-ver') || {}).textContent || '' });
+            } catch (e) { /* 자국을 못 읽었으면 **짓지 않는다** — 모르면서 세우면 또 되살아난다 */ }
         }
 
         /* ── 그리기 — 새로 만든 박스만 ── */
