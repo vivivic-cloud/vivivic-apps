@@ -38,8 +38,27 @@
   적기("vg기억장:" + location.pathname);
   적기("vg기억칸:" + location.pathname.replace(/[^/]*$/, ""));
 
-  const s = document.createElement("script");
-  s.src = "https://vivivic-cloud.github.io/vivivic-apps/shared/viggle.js";
-  s.onerror = () => console.error("[벤더피아 보기] 짚어서 지시하기 손잡이를 못 불렀습니다");
-  (document.head || document.documentElement).appendChild(s);
+  /* ⚠⚠ 10-13 사장님: 「이전에 있던 **지시영역 선택 영역표시마저 사라진** 상태이다」.
+     손잡이를 **바깥(github.io)에서만** 불러오고 있었다. 벤더피아가 바깥 글을 막거나
+     인터넷이 느리면 **아무 일도 안 난다** — 붉은 테조차 안 생긴다. 뒷길을 둔다.
+       ① 바깥(늘 새것)  → ② 안 되면 **확장 안의 것**(손잡이.js) → ③ 그래도 안 되면 **붉은 줄로 알린다.**
+     ⚠ `손잡이.js` 는 `shared/viggle.js` 를 **그대로 베껴 둔 뒷길**이다. 집 꼴을 다시 묶을 때
+        반드시 같이 베껴라(배포 차례에 적어 두었다). 고치는 곳은 늘 `shared/viggle.js` 하나다. */
+  const 넣기 = (주소) => new Promise((풀) => {
+    const s = document.createElement("script");
+    s.src = 주소; s.async = false;
+    s.onload = () => 풀(true); s.onerror = () => 풀(false);
+    (document.head || document.documentElement).appendChild(s);
+  });
+  (async () => {
+    if (await 넣기("https://vivivic-cloud.github.io/vivivic-apps/shared/viggle.js")) return;
+    if (await 넣기(chrome.runtime.getURL("손잡이.js"))) return;
+    console.error("[벤더피아 보기] 짚어서 지시하기 손잡이를 못 불렀습니다");
+    if (innerWidth < 320 || innerHeight < 240) return;        // 작은 틀에는 안 적는다
+    const 줄 = document.createElement("div");
+    줄.textContent = "벤더피아 보기 — 짚어서 지시하기를 못 불렀습니다. 바이글에게 알려 주세요.";
+    줄.style.cssText = "position:fixed;left:0;right:0;top:0;z-index:2147483647;background:#c92a2a;"
+      + "color:#fff;font:600 13px/1.5 sans-serif;padding:8px 12px;text-align:center";
+    (document.body || document.documentElement).appendChild(줄);
+  })();
 })();
