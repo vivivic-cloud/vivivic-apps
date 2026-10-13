@@ -1,20 +1,20 @@
 <!DOCTYPE html>
 <!-- 납품내역 — 자료는 창고에서 받아 보이고, 분석은 분석 탭에 둔다.
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v3.0.1
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v3.1.0
      ⚠ 업무 값(금액·단가·거래처·제품명·사이즈·PO)은 이 파일에 **한 톨도 넣지 않는다.**
         이 저장소는 공개다. 값은 창고(화베)에서 받는다.
-     ⚠ 창고는 **읽는 함수만** 들여온다(collection·getDocs·query·where).
+     ⚠ 창고는 **읽는 함수만** 들여온다(collection·getDocs·query·where·doc·getDoc).
         setDoc·addDoc·updateDoc·writeBatch 는 들이지 않는다 — 쓰고 싶어도 못 쓴다. -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>납품내역 — 5월 1~15일</title>
+<title>납품내역</title>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
-    import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+    import { getFirestore, collection, getDocs, query, where, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
@@ -28,7 +28,7 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     window.db = getFirestore(app);
-    window.fbRead = { collection, getDocs, query, where };
+    window.fbRead = { collection, getDocs, query, where, doc, getDoc };
     onAuthStateChanged(auth, (user) => {
         if (!user) {
             signInAnonymously(auth).catch(err => window.자료못읽음('창고에 들어가지 못했습니다', err && (err.code || err.message)));
@@ -121,9 +121,9 @@ footer{font-size:10px;color:#2a2a2a;padding:30px 0 24px;border-top:1px solid #1e
 
 <header>
   <div class="logo"><b>VIVIVIC</b> — 납품내역</div>
-  <div class="badge">v3.0.1</div>
+  <div class="badge">v3.1.0</div>
 </header>
-<h1>5월 1일 ~ 15일</h1>
+<h1>납품·재단·보링·엣지 내역</h1>
 
 <div class="tabs">
   <button class="tab on" data-p="자료" type="button">자료<span class="n" id="자료수"></span></button>
@@ -138,6 +138,8 @@ footer{font-size:10px;color:#2a2a2a;padding:30px 0 24px;border-top:1px solid #1e
   </div>
 
   <div id="자료틀" style="display:none">
+    <div class="barlab">어느 달</div>
+    <div class="bar" id="달바"></div>
     <div class="barlab">어느 것</div>
     <div class="bar" id="갈래"></div>
     <div class="barlab">며칠</div>
@@ -154,6 +156,7 @@ footer{font-size:10px;color:#2a2a2a;padding:30px 0 24px;border-top:1px solid #1e
 <!-- ════════ 분석 ════════ -->
 <div class="pane" id="p분석">
   <div class="where">
+    이 탭은 <b>5월 1일~15일</b>을 들여다본 것입니다. 자료 탭은 모든 달이 있습니다.<br>
     <span class="lock">⚠ 이 탭에는 <b>칸 이름만</b> 있습니다.</span>
     금액·단가·거래처·제품 이름·크기·PO 번호는 <b>한 톨도 넣지 않았습니다.</b>
   </div>
@@ -179,7 +182,7 @@ footer{font-size:10px;color:#2a2a2a;padding:30px 0 24px;border-top:1px solid #1e
 
 <footer>
   읽기만 합니다. 창고에도 드라이브에도 아무것도 쓰지 않습니다.<br>
-  5월 1~15일분만 담았습니다.
+  자료는 창고에서 받습니다. 분석 탭은 <b>5월 1~15일</b>을 본 것입니다.
 </footer>
 </div>
 
@@ -235,7 +238,10 @@ setTimeout(() => {
    칸은 **「납품내역」 하나**다. 달마다 칸을 새로 만들지 않는다.
    달은 칸 이름이 아니라 **줄의 한 칸(`달`)** 이다. 이 집의 다른 칸들과 같은 꼴이다. */
 const 창고자리 = ['artifacts','vivivic-4b7ef','public','data','납품내역'];
-const 보는달 = '2026-05';
+const 달목록줄 = '_달목록';     // 어느 달이 들어 있는지 적어 둔 한 줄
+let 달들 = [];                   // 창고가 알려 준 달
+let 달줄수 = {};
+let 보는달 = '';                 // 고른 달. 처음에는 가장 나중 달
 
 function 상태(큰, 작, 까닭){
   document.getElementById('자료틀').style.display = 'none';
@@ -253,38 +259,59 @@ window.자료못읽음 = function(큰, 까닭){
 
 window.자료읽기 = async function(){
   try {
-    const { collection, getDocs, query, where } = window.fbRead;
-    const 눈 = await getDocs(query(collection(window.db, ...창고자리), where('달','==',보는달)));
+    const { collection, getDocs, query, where, doc, getDoc } = window.fbRead;
+    /* 1) 어느 달이 들어 있는지부터 한 줄 읽는다. 12,000줄을 다 받아다 세지 않는다. */
+    const 목 = await getDoc(doc(window.db, ...창고자리, 달목록줄));
     답했나 = true;
-    const 받은 = [];
-    눈.forEach(d => 받은.push(d.data()));
-    if (!받은.length) {
+    if (!목.exists()) {
       상태('자료가 아직 창고에 안 들어왔습니다',
-           '읽을 자리는 비어 있습니다. 넣어도 되는지 여쭙고 있습니다 — 넣는 즉시 이 자리에 뜹니다.<br>' +
+           '읽을 자리는 비어 있습니다. 넣는 즉시 이 자리에 뜹니다.<br>' +
            '그동안 <b>분석</b> 탭은 그대로 보실 수 있습니다.');
       return;
     }
-    줄 = {}; 갈래들.forEach(g => 줄[g] = []);
-    받은.forEach(r => { if (줄[r.갈래]) 줄[r.갈래].push(r); });
-    갈래들.forEach(g => 줄[g].sort((a,b) => (a.일-b.일) || 0));
-    document.getElementById('자료상태').style.display = 'none';
-    document.getElementById('자료틀').style.display = 'block';
-    document.getElementById('자료수').textContent = 받은.length;
-    그리기();
+    const m = 목.data();
+    달들 = (m.달들 || []).slice().sort().reverse();      // 나중 달이 앞에
+    (m.달들 || []).forEach((d,i) => 달줄수[d] = (m.줄수 || [])[i] || 0);
+    document.getElementById('자료수').textContent = m.모두 || '';
+    if (!달들.length) { 상태('창고에 달이 하나도 적혀 있지 않습니다'); return; }
+    보는달 = 달들[0];
+    await 달받기();
   } catch (e) {
     답했나 = true;
     window.자료못읽음('창고를 읽지 못했습니다', (e && (e.code || e.message)) || '');
   }
 };
 
+async function 달받기(){
+  const { collection, getDocs, query, where } = window.fbRead;
+  상태('' + 보는달 + ' 을 받는 중입니다…');
+  try {
+    const 눈 = await getDocs(query(collection(window.db, ...창고자리), where('달','==',보는달)));
+    const 받은 = []; 눈.forEach(d => 받은.push(d.data()));
+    줄 = {}; 갈래들.forEach(g => 줄[g] = []);
+    받은.forEach(r => { if (줄[r.갈래]) 줄[r.갈래].push(r); });
+    갈래들.forEach(g => 줄[g].sort((a,b) => (a.일-b.일) || 0));
+    고른갈래 = 갈래들.find(g => 줄[g].length) || '재단';
+    고른날 = 0;
+    document.getElementById('자료상태').style.display = 'none';
+    document.getElementById('자료틀').style.display = 'block';
+    그리기();
+  } catch (e) {
+    window.자료못읽음(보는달 + ' 을 읽지 못했습니다', (e && (e.code || e.message)) || '');
+  }
+}
+
 function 날짜목록(g){ return [...new Set(줄[g].map(r=>r.일))].sort((a,b)=>a-b); }
 
 function 그리기(){
+  document.getElementById('달바').innerHTML = 달들.map(m =>
+    `<div class="pill ${m===보는달?'on':''}" data-m="${m}">${m}<span class="n">${달줄수[m]||0}</span></div>`).join('');
   document.getElementById('갈래').innerHTML = 갈래들.map(g=>
     `<div class="pill ${g===고른갈래?'on':''}" data-g="${g}">${g}<span class="n">${줄[g].length}</span></div>`).join('');
   const 있는날 = 날짜목록(고른갈래);
   let h = `<div class="pill ${고른날===0?'on':''}" data-d="0">전부</div>`;
-  for(let i=1;i<=15;i++){
+  const 끝날 = 있는날.length ? Math.max(...있는날) : 0;
+  for(let i=1;i<=Math.max(끝날,1);i++){
     const 있 = 있는날.includes(i);
     const n = 줄[고른갈래].filter(r=>r.일===i).length;
     h += `<div class="pill ${!있?'off':''} ${고른날===i?'on':''}" data-d="${있?i:''}">${i}일${있?`<span class="n">${n}</span>`:''}</div>`;
@@ -295,14 +322,14 @@ function 그리기(){
   let 줄들 = 줄[고른갈래];
   if(고른날) 줄들 = 줄들.filter(r=>r.일===고른날);
   document.getElementById('셈').innerHTML =
-    `<b>${고른갈래}</b> · ${고른날?고른날+'일':'5월 1~15일 전부'} · <b>${줄들.length}</b>줄`;
+    `<b>${보는달}</b> · <b>${고른갈래}</b> · ${고른날?고른날+'일':'그 달 전부'} · <b>${줄들.length}</b>줄`;
 
   const 표 = document.getElementById('표');
   if(!줄들.length){ 표.innerHTML = '<tbody><tr><td class="d">이 날은 적힌 것이 없습니다.</td></tr></tbody>'; return; }
   let t = '<thead><tr>' + 칸.map(c=>`<th>${c}</th>`).join('') + '</tr></thead><tbody>';
   let 앞날 = null;
   줄들.forEach(r=>{
-    if(!고른날 && r.일!==앞날){ t += `<tr class="daysep"><td colspan="${칸.length}">5월 ${r.일}일</td></tr>`; 앞날 = r.일; }
+    if(!고른날 && r.일!==앞날){ t += `<tr class="daysep"><td colspan="${칸.length}">${(+보는달.slice(5,7))}월 ${r.일}일</td></tr>`; 앞날 = r.일; }
     t += '<tr>' + 칸.map(c=>{
       const v = (r[c]===undefined||r[c]===null)?'':String(r[c]);
       const cls = v===''?'d':(숫자칸.has(c)?'num':'');
@@ -314,7 +341,9 @@ function 그리기(){
 
 document.addEventListener('click', e=>{
   const p = e.target.closest('#p자료 .pill');
-  if(!p || !줄) return;
+  if(!p) return;
+  if(!줄 && !p.dataset.m) return;
+  if(p.dataset.m){ if(p.dataset.m!==보는달){ 보는달 = p.dataset.m; 달받기(); } return; }
   if(p.dataset.g){ 고른갈래 = p.dataset.g; 고른날 = 0; 그리기(); return; }
   if(p.dataset.d!==undefined && p.dataset.d!==''){ 고른날 = +p.dataset.d; 그리기(); }
 });
