@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 버전: 아래 #ver 배지와 같다. 고칠 때마다 둘을 같이 올린다: v1.3.0 -->
+<!-- 버전: 아래 #ver 배지와 같다. 고칠 때마다 둘을 같이 올린다: v1.4.0 -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -67,12 +67,12 @@ button.sm{padding:10px 14px;font-size:14px}
 </div>
 
 <div id="msg"></div>
-<div id="ver">v1.3.0</div>
+<div id="ver">v1.4.0</div>
 <script>
 // Google Cloud Console 에서 만든 OAuth 웹 클라이언트 ID
 const CLIENT_ID = '830175660542-r1fiqhs9jc5g33t6t7aeqhm0e7r4ru2p.apps.googleusercontent.com';
-// 올릴 드라이브 폴더 ID (비우면 내 드라이브 맨 위)
-const FOLDER_ID = '';
+// 이 페이지에서 저장하는 파일이 모두 모이는 드라이브 폴더 (없으면 처음 저장할 때 만든다)
+const FOLDER_NAME = '동영상업로드';
 // 뽑은 소리의 표본 빈도 (말소리는 이 정도면 충분하다, 1분에 약 2.6MB)
 const RATE = 22050;
 
@@ -279,9 +279,27 @@ function toWav(data) {
 }
 
 /* ── 드라이브에 저장 ─────────────────────────── */
+// 폴더는 이름이 아니라 표시(appProperties)로 찾는다 — 사장님이 폴더 이름을 바꿔도 같은 폴더에 모인다
+let folder = null;
+async function ensureFolder() {
+  if (folder) return folder;
+  const auth = { Authorization: 'Bearer ' + token };
+  const q = "appProperties has { key='vivivic' and value='동영상업로드' } and mimeType='application/vnd.google-apps.folder' and trashed=false";
+  const found = await fetch('https://www.googleapis.com/drive/v3/files?fields=files(id,webViewLink)&q=' + encodeURIComponent(q), { headers: auth });
+  if (!found.ok) throw new Error('폴더 찾기 실패 (' + found.status + ')');
+  const list = (await found.json()).files;
+  if (list.length) return (folder = list[0]);
+  const made = await fetch('https://www.googleapis.com/drive/v3/files?fields=id,webViewLink', {
+    method: 'POST',
+    headers: { ...auth, 'Content-Type': 'application/json; charset=UTF-8' },
+    body: JSON.stringify({ name: FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder', appProperties: { vivivic: '동영상업로드' } })
+  });
+  if (!made.ok) throw new Error('폴더 만들기 실패 (' + made.status + ')');
+  return (folder = await made.json());
+}
+
 async function upload(blob, name, onProgress) {
-  const meta = { name, mimeType: blob.type };
-  if (FOLDER_ID) meta.parents = [FOLDER_ID];
+  const meta = { name, mimeType: blob.type, parents: [(await ensureFolder()).id] };
   const init = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,webViewLink', {
     method: 'POST',
     headers: {
@@ -321,7 +339,9 @@ saveBtn.onclick = () => withLogin(async () => {
       done.push([name, res.webViewLink]);
     }
     msg.innerHTML = '';
-    msg.append(done.length + '개 저장 완료');
+    const f = document.createElement('a');
+    f.href = folder.webViewLink; f.target = '_blank'; f.textContent = '「' + FOLDER_NAME + '」 폴더';
+    msg.append(f, '에 ' + done.length + '개 저장 완료');
     done.forEach(([name, link]) => {
       const a = document.createElement('a');
       a.href = link; a.target = '_blank'; a.textContent = name;
