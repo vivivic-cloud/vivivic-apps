@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <!-- 납품내역 — 자료는 창고에서 받아 보이고, 분석은 분석 탭에 둔다.
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v3.0.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v3.0.1
      ⚠ 업무 값(금액·단가·거래처·제품명·사이즈·PO)은 이 파일에 **한 톨도 넣지 않는다.**
         이 저장소는 공개다. 값은 창고(화베)에서 받는다.
-     ⚠ 창고는 **읽는 함수만** 들여온다(collection·getDocs·query·orderBy).
+     ⚠ 창고는 **읽는 함수만** 들여온다(collection·getDocs·query·where).
         setDoc·addDoc·updateDoc·writeBatch 는 들이지 않는다 — 쓰고 싶어도 못 쓴다. -->
 <html lang="ko">
 <head>
@@ -14,7 +14,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
-    import { getFirestore, collection, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+    import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
@@ -28,7 +28,7 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     window.db = getFirestore(app);
-    window.fbRead = { collection, getDocs, query, orderBy };
+    window.fbRead = { collection, getDocs, query, where };
     onAuthStateChanged(auth, (user) => {
         if (!user) {
             signInAnonymously(auth).catch(err => window.자료못읽음('창고에 들어가지 못했습니다', err && (err.code || err.message)));
@@ -121,7 +121,7 @@ footer{font-size:10px;color:#2a2a2a;padding:30px 0 24px;border-top:1px solid #1e
 
 <header>
   <div class="logo"><b>VIVIVIC</b> — 납품내역</div>
-  <div class="badge">v3.0.0</div>
+  <div class="badge">v3.0.1</div>
 </header>
 <h1>5월 1일 ~ 15일</h1>
 
@@ -231,8 +231,11 @@ setTimeout(() => {
     '<b>분석</b> 탭은 인터넷 없이도 그대로 보입니다.');
 }, 15000);
 
-/* 창고 자리. ⚠ 이름은 아직 **정하지 않았다** — 관리자가 정해 주면 여기만 고친다. */
-const 창고자리 = ['artifacts','vivivic-4b7ef','public','data','납품내역_26년5월'];
+/* 창고 자리 — 관리자가 정했다(10-13).
+   칸은 **「납품내역」 하나**다. 달마다 칸을 새로 만들지 않는다.
+   달은 칸 이름이 아니라 **줄의 한 칸(`달`)** 이다. 이 집의 다른 칸들과 같은 꼴이다. */
+const 창고자리 = ['artifacts','vivivic-4b7ef','public','data','납품내역'];
+const 보는달 = '2026-05';
 
 function 상태(큰, 작, 까닭){
   document.getElementById('자료틀').style.display = 'none';
@@ -250,8 +253,8 @@ window.자료못읽음 = function(큰, 까닭){
 
 window.자료읽기 = async function(){
   try {
-    const { collection, getDocs } = window.fbRead;
-    const 눈 = await getDocs(collection(window.db, ...창고자리));
+    const { collection, getDocs, query, where } = window.fbRead;
+    const 눈 = await getDocs(query(collection(window.db, ...창고자리), where('달','==',보는달)));
     답했나 = true;
     const 받은 = [];
     눈.forEach(d => 받은.push(d.data()));
