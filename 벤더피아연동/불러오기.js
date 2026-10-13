@@ -16,9 +16,8 @@
   if (있나("firmdvlist.aspx"))    { 글.push("search.js"); 꾸밈.push("search.css"); }
   if (있나("goods.aspx") || 있나("salesgoods.aspx") || 있나("stocklist.aspx"))
                                   { 글.push("johon.js", "amt-draw.js", "goods.js"); 꾸밈.push("goods.css"); }
-  // 짚어서 지시하기 — 배송관리에는 일부러 안 붙인다(수취인·전화·주소가 지시에 딸려 간다)
-  if (!있나("firmdvlist.aspx") && (있나("/index.aspx") || 있나("goods.aspx")
-      || 있나("salesgoods.aspx") || 있나("stocklist.aspx"))) 글.push("짚개.js");
+  /* ⚠ 짚개.js 는 여기서 안 넣는다 — **틀(frameset) 안쪽까지** 붙어야 해서 제 자리로 뺐다
+     (집 꼴의 all_frames). 10-13 「메인화면에서는 영역만 짚어진다」 가 그 탈이었다. */
 
   /* ── 저장소 다리 — 바깥에서 온 글이 chrome.storage 를 쓰게 해 준다 ── */
   addEventListener("message", async (e) => {
@@ -46,7 +45,11 @@
      무엇이 돌고 있는지 **화면에서 바로** 보이게 한다. 세 가지를 적는다 —
        판번호 · 화면 글이 어디서 왔나(깃/확장) · 짚어서 지시 손잡이가 붙었나.
      이것만 보면 「덮어썼나 안 썼나」 와 「왜 짚기가 안 되나」 가 한눈에 갈린다. */
+  /* ⚠ 틀(frameset) 안에서는 이 글이 **틀마다** 돈다. 작은 틀(가름줄·숨은 틀)에까지
+     딱지를 붙이면 화면이 지저분해진다. 사람이 보는 크기일 때만 붙인다. */
+  const 볼만한틀 = () => (innerWidth >= 320 && innerHeight >= 240);
   function 딱지(글자, 나쁨) {
+    if (!볼만한틀()) return;
     const d = document.getElementById("vp-판") || document.createElement("div");
     d.id = "vp-판"; d.textContent = 글자;
     d.style.cssText = "position:fixed;left:6px;bottom:6px;z-index:2147483646;"
@@ -54,6 +57,8 @@
       + "font:600 11px/1.4 sans-serif;padding:3px 7px;border-radius:9px;pointer-events:none";
     if (!d.parentNode) (document.body || document.documentElement).appendChild(d);
   }
+
+  if (!document.body || document.body.tagName === "FRAMESET") return;   // 틀 문서엔 아무것도 안 그려진다
 
   (async () => {
     for (const f of 꾸밈) 꾸미기(깃 + encodeURIComponent(f));
@@ -70,8 +75,8 @@
     setTimeout(() => {
       const 짚기 = !!document.querySelector(".vg-hint");
       const 어디 = 확장에서 ? (깃에서 ? "깃+확장" : "확장") : "깃";
-      딱지("벤더피아 보기 " + 판 + " · " + 어디 + (글.includes("짚개.js") ? (짚기 ? " · 짚기 ✓" : " · 짚기 ✗") : ""),
-           !!못온것.length || (글.includes("짚개.js") && !짚기));
+      딱지("벤더피아 보기 " + 판 + " · " + 어디 + (/firmdvlist/i.test(길) ? "" : (짚기 ? " · 짚기 ✓" : " · 짚기 ✗")),
+           !!못온것.length || (!/firmdvlist/i.test(길) && !짚기));
     }, 1500);
     if (!못온것.length) return;
     for (const f of 꾸밈) 꾸미기(chrome.runtime.getURL(f));
