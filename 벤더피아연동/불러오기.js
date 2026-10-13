@@ -1,0 +1,63 @@
+/* 화면 글을 **깃허브에서 바로** 불러온다 — 확장은 얇은 껍데기만 남는다.
+   사장님 10-13: 「확장파일을 계속 수정시마다 덮어 써야되는거야?」 → 「1」.
+   이제 화면 글을 고치면 **덮어쓰지 않아도** 새로고침만 하면 새것이 돈다.
+
+   ⚠ 못 불러오면(벤더피아가 바깥 글을 막거나 인터넷이 끊기면) **확장 안의 것**으로 돈다.
+      그래도 안 되면 붉은 줄을 띄운다 — 조용히 비는 것이 이 집에서 제일 나쁘다.
+   ⚠ 글 차례를 지킨다. `vp-data.js` 가 `goods.js` 보다 먼저 돌아야 한다. */
+(() => {
+  const 깃 = "https://vivivic-cloud.github.io/vivivic-apps/%EB%B2%A4%EB%8D%94%ED%94%BC%EC%95%84%EC%97%B0%EB%8F%99/";
+  const 길 = location.pathname.toLowerCase();
+  const 있나 = (t) => 길.includes(t);
+
+  const 글 = ["저장다리.js", "vp-data.js", "login.js"];       // 모든 화면
+  const 꾸밈 = ["login.css"];
+  if (있나("/index.aspx"))        { 글.push("menu.js");   꾸밈.push("menu.css"); }
+  if (있나("firmdvlist.aspx"))    { 글.push("search.js"); 꾸밈.push("search.css"); }
+  if (있나("goods.aspx") || 있나("salesgoods.aspx") || 있나("stocklist.aspx"))
+                                  { 글.push("johon.js", "amt-draw.js", "goods.js"); 꾸밈.push("goods.css"); }
+  // 짚어서 지시하기 — 배송관리에는 일부러 안 붙인다(수취인·전화·주소가 지시에 딸려 간다)
+  if (!있나("firmdvlist.aspx") && (있나("/index.aspx") || 있나("goods.aspx")
+      || 있나("salesgoods.aspx") || 있나("stocklist.aspx"))) 글.push("짚개.js");
+
+  /* ── 저장소 다리 — 바깥에서 온 글이 chrome.storage 를 쓰게 해 준다 ── */
+  addEventListener("message", async (e) => {
+    if (e.source !== window || !e.data || e.data.__vp !== "저장") return;
+    let 답 = null;
+    try {
+      const 통 = chrome.storage.local;
+      if (e.data.일 === "get") 답 = await 통.get(e.data.열쇠);
+      else if (e.data.일 === "set") { await 통.set(e.data.값); 답 = true; }
+      else if (e.data.일 === "remove") { await 통.remove(e.data.열쇠); 답 = true; }
+    } catch (err) {}
+    window.postMessage({ __vp: "저장답", 표: e.data.표, 답 }, location.origin);
+  });
+
+  const 넣기 = (주소) => new Promise((풀) => {
+    const s = document.createElement("script");
+    s.src = 주소; s.async = false;
+    s.onload = () => 풀(true); s.onerror = () => 풀(false);
+    (document.head || document.documentElement).appendChild(s);
+  });
+  const 꾸미기 = (주소) => { const l = document.createElement("link");
+    l.rel = "stylesheet"; l.href = 주소; (document.head || document.documentElement).appendChild(l); };
+
+  (async () => {
+    for (const f of 꾸밈) 꾸미기(깃 + encodeURIComponent(f));
+    let 못온것 = [];
+    for (const f of 글) {
+      // 다리는 늘 확장 안의 것 — 인터넷이 끊겨도 길이 살아 있어야 한다
+      if (f === "저장다리.js") { await 넣기(chrome.runtime.getURL(f)); continue; }
+      if (await 넣기(깃 + encodeURIComponent(f))) continue;
+      if (await 넣기(chrome.runtime.getURL(f))) continue;      // 바깥이 막히면 확장 안의 것
+      못온것.push(f);
+    }
+    if (!못온것.length) return;
+    for (const f of 꾸밈) 꾸미기(chrome.runtime.getURL(f));
+    const 줄 = document.createElement("div");
+    줄.textContent = "벤더피아 보기 — 화면 글을 못 불렀습니다 (" + 못온것.join(", ") + "). 바이글에게 알려 주세요.";
+    줄.style.cssText = "position:fixed;left:0;right:0;top:0;z-index:2147483647;background:#c92a2a;"
+      + "color:#fff;font:600 13px/1.5 sans-serif;padding:8px 12px;text-align:center";
+    (document.body || document.documentElement).appendChild(줄);
+  })();
+})();

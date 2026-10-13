@@ -31,7 +31,10 @@
     }
   }
   setJohon(typeof VP_JOHON_PARTS === "undefined" ? [] : VP_JOHON_PARTS);
-  chrome.storage?.local.get("vpJohon", ({ vpJohon }) => {
+  // 깃허브에서 온 글은 확장 저장소에 바로 못 닿는다 — 다리(VP저장)를 먼저 본다.
+  const 창고 = window.VP저장 || (typeof chrome !== 'undefined' ? chrome.storage?.local : null);
+  Promise.resolve(창고 && 창고.get("vpJohon")).then((받은 = {}) => {
+    const vpJohon = 받은 && 받은.vpJohon;
     if (!vpJohon?.parts?.length) return;  // 비어 있는 자료면 johon.js 목록을 그대로 쓴다
     setJohon(vpJohon.parts);
     johonCards = vpJohon.cards || {};

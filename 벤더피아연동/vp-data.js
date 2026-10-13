@@ -220,7 +220,9 @@ const VP_DATA = (() => {
   // 새로고침이면 저장해 둔 목록을 모두 버린다 (그 화면이 새 목록을 받는다).
   // 메뉴를 옮겨 다니는 것(보통 이동·뒤로 가기)은 그대로 쓴다.
   const PREFIX = "vpCache:";
-  const store = chrome.storage?.local;
+  // 깃허브에서 온 글은 확장 저장소에 바로 못 닿는다 — 다리(VP저장)를 먼저 본다.
+  // 확장 안에서 돌 때(옛 길)는 chrome.storage 를 그대로 쓴다. 둘 다 같은 곳에 담긴다.
+  const store = window.VP저장 || (typeof chrome !== 'undefined' ? chrome.storage?.local : null);
   async function clearCache() {
     if (!store) return;
     const all = await store.get(null);
