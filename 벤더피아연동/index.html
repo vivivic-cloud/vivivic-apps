@@ -35,6 +35,16 @@
 <body>
 <main>
   <h1>벤더피아 연동</h1>
+
+  <!-- 깔려 있는 컴퓨터에서만 보인다. 확장(깔렸다표시.js)이 <html> 에 표시를 남기면 아래 글이 그것을 보고 켠다. -->
+  <section class="card" id="깔림" hidden style="border-color:#2f9e44">
+    <h2 id="깔림제목">이 컴퓨터에 깔려 있습니다</h2>
+    <p id="깔림글">벤더피아를 엽니다…</p>
+    <div class="row">
+      <a class="btn" href="https://vendorpia.com/" id="열기">벤더피아 열기</a>
+      <button type="button" class="btn light" id="그만">설치 안내 보기</button>
+    </div>
+  </section>
   <p class="sub">벤더피아(vendorpia.com)를 필요한 것만 깔끔하게 보여주는 크롬 확장 프로그램입니다. 벤더피아 아이디·비밀번호로 로그인하면 배송관리·단품관리·상품관리·재고조회가 보입니다. 크롬이 깔린 컴퓨터에서만 쓸 수 있고, 폰에서는 안 됩니다.</p>
 
   <section class="card">
@@ -55,6 +65,38 @@
   <p class="note">새 버전이 나오면 같은 방법으로 받아 같은 폴더에 덮어쓴 뒤, <code>chrome://extensions</code> 에서 「벤더피아 보기」의 새로고침(↻)을 누릅니다.</p>
 </main>
 <script>
+  /* 깔려 있으면 벤더피아로 바로 보낸다 — 사장님: 「세팅 완료됨을 감지해서 프로그램열기 누르면
+     벤더피아 페이지가 열려서 작동하게는 못하는거니?」 (10-13)
+     확장은 크롬에서만 돈다. 폰에는 표시가 없으니 이 글은 아무 일도 하지 않고 설치 안내가 그대로 보인다.
+     ⚠ 표시는 확장이 document_idle 에 남긴다 — 이 글보다 늦을 수 있어 잠깐 기다려 본다. */
+  (() => {
+    const 안내만 = new URLSearchParams(location.search).has("안내");
+    const 칸 = document.getElementById("깔림");
+    let 시계 = null, 그만둠 = false;
+    const 봄 = () => document.documentElement.getAttribute("data-벤더피아연동");
+
+    document.getElementById("그만").addEventListener("click", () => {
+      그만둠 = true; clearTimeout(시계);
+      document.getElementById("깔림글").textContent = "안 갑니다. 위 「벤더피아 열기」 를 누르면 그때 엽니다.";
+    });
+
+    function 켜기(판) {
+      칸.hidden = false;
+      document.getElementById("깔림제목").textContent = "이 컴퓨터에 깔려 있습니다 (" + 판 + ")";
+      if (안내만) { document.getElementById("깔림글").textContent = "설치 안내를 보고 계십니다."; return; }
+      시계 = setTimeout(() => { if (!그만둠) location.replace("https://vendorpia.com/"); }, 1200);
+    }
+
+    const 판 = 봄();
+    if (판) return 켜기(판);
+    let 셈 = 0;                                  // 0.1초마다 열여덟 번, 1.8초까지 기다린다
+    const 다시 = setInterval(() => {
+      const 판 = 봄();
+      if (판) { clearInterval(다시); 켜기(판); }
+      else if (++셈 >= 18) clearInterval(다시);   // 안 깔린 컴퓨터·폰 — 설치 안내 그대로
+    }, 100);
+  })();
+
   // 크롬은 웹페이지에서 chrome:// 주소로 바로 가는 링크를 막으므로 주소를 복사해 준다
   document.getElementById("copy").addEventListener("click", async () => {
     const out = document.getElementById("copied");
@@ -66,5 +108,8 @@
     }
   });
 </script>
+<!-- 짚어서 지시하는 손잡이 — 바이글 박스에서 열면 켜진다. 공유판에서 짚을 수 있는 단 하나의 프로그램이다.
+     모든 프로그램이 같이 쓰는 한 벌이라 shared/viggle.js 는 손대지 않는다. (바이글이 10-13 에 달았다) -->
+<script src="../shared/viggle.js"></script>
 </body>
 </html>

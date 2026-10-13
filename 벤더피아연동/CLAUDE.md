@@ -15,6 +15,7 @@
 | `System/Delivery/firmDvList.aspx` | `search.js` | 배송관리. 기간 + **검색창 하나**. 검색어를 보고 송장·주문번호·단품코드·수취인·주문자·주소·상품명 칸에 나눠 보낸다. **늘 벤더피아에 바로 묻는다 (저장 안 함 — 시시각각 바뀌어 실제와 같아야 한다)** |
 | `System/Master/goods.aspx` (단품관리) · `salesGoods.aspx` (상품관리) · `System/Stock/StockList.aspx` (재고조회) | `vp-data.js` · `goods.js` · `goods.css` | 목록을 **이름 버튼**으로. 필터, 상세 창 |
 | 조혼가구 화면 (`vivivic-apps/조혼가구`) | `johon-read.js`(MAIN) · `johon-save.js` | 조혼가구 엑셀에서 ING단품명·부속카드를 읽어 확장 저장소(`vpJohon`, v:3)에 넘긴다 |
+| 설치 안내 화면 (`vivivic-apps/*`) | `깔렸다표시.js` | `<html>` 에 `data-벤더피아연동="판번호"` 표시만 남긴다. 설치 안내(`index.html`)가 그것을 보고 **벤더피아로 바로 보낸다** — 사장님 10-13 분부. 자료는 읽지도 보내지도 않는다 |
 | — | `johon.js` | 조혼가구 단품명 고정 목록 (예비) |
 | — | `amt-draw.js` | 에이엠티 엣지공정지시서 부속카드·재단도면 그리기 — **에이엠티 코드를 그대로 옮긴 것**이다 |
 
