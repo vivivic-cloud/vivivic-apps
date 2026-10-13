@@ -156,10 +156,11 @@
 
   const box = document.createElement("div");
   box.id = "vp-guide";
-  box.innerHTML = `<div class="vp-g-card"><h1 class="vp-g-title">생산·외주 등록 순서</h1><p class="vp-g-sub">박스를 누르면 현재 상태와 올릴 내용이 보입니다. SystemCloud 상태는 ${CHECKED} 확인 기준.</p><div class="vp-g-list"></div></div>`;
+  box.innerHTML = `<div class="vp-g-card"><div class="vp-g-head"><h1 class="vp-g-title">생산·외주 등록 순서</h1><button type="button" class="vp-g-reload">↻ 새로고침</button></div><p class="vp-g-sub">박스를 누르면 현재 상태와 올릴 내용이 보입니다. SystemCloud 상태는 ${CHECKED} 확인 기준.</p><div class="vp-g-list"></div></div>`;
   document.body.appendChild(box);
   document.documentElement.classList.add("vp-guide-on");
   const listEl = box.querySelector(".vp-g-list");
+  box.querySelector(".vp-g-reload").addEventListener("click", () => location.reload());
 
   const fileName = (i) => `${String(i + 1).padStart(2, "0")}_${STEPS[i].title.replace(/[\\/:*?"<>|→]/g, "").replace(/\s+/g, "")}_양식.xlsx`;
   const storeKey = (i) => `vpGuideUpload${i + 1}`;
