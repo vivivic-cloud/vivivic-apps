@@ -26,7 +26,8 @@
 
   if (표.get('viggle') === '0') return;                  // 맨몸으로 보자고 하신 것
   if (표.get('viggle') === '1') {
-    const 것 = { box: 표.get('box') || '', name: 표.get('name') || '', vg: 표.get('vg') || '' };
+    const 것 = { box: 표.get('box') || '', name: 표.get('name') || '', vg: 표.get('vg') || '',
+                 누구: 표.get('누구') || '' };
     적기(장길, 것); 적기(칸길, 것);
   } else {
     const 것 = 꺼내기();
@@ -35,6 +36,7 @@
     if (것.box)  표.set('box', 것.box);
     if (것.name) 표.set('name', 것.name);
     if (것.vg)   표.set('vg', 것.vg);
+    if (것.누구) 표.set('누구', 것.누구);
   }
 
   // 지시를 받는 자리. 예전에는 맥의 /take 였고 지금은 클라우드 작업대다.
@@ -137,6 +139,9 @@
   async function 시킨것남기기(짚은것, 글, 때) {
     const 한줄 = (글 || '').replace(/\s+/g, ' ').trim().slice(0, 40)
                + ((글 || '').replace(/\s+/g, ' ').trim().length > 40 ? '…' : '');
+    /* 누가 짚었는지 — 주소의 `?누구=` 로 들어온다(공유 쓰는 분 박스에만 달아 둔다).
+       ⚠ 사장님은 이 칸이 **없다.** 없으면 전과 한 글자도 안 달라진다. */
+    const 누구 = (표.get('누구') || '').trim().slice(0, 24);
     const 몸 = {
       자리: 박스 ? 'box:' + 박스 : '모든박스',
       짚은자리: [어디(), 짚은것].filter(Boolean).join(' · '),
@@ -149,7 +154,12 @@
       상태: '받음',
       때: 때,
     };
-    const 길 = `${창고}/wt_asked/a${때}`;
+    if (누구) 몸.보낸이 = 누구;
+    /* ⚠ 문서 이름이 초 하나뿐이면 **두 사람이 같은 초에 누를 때 뒤엣것이 조용히 사라진다**
+       (아래 「이미 있으면 덮지 않는다」 에 걸린다). 보낸이가 있을 때만 꼬리를 붙인다 —
+       사장님 쪽 이름은 `a<초>` 그대로다. */
+    const 꼬리 = 누구 ? '_' + 누구.replace(/[^0-9A-Za-z가-힣]/g, '') : '';
+    const 길 = `${창고}/wt_asked/a${때}${꼬리}`;
     const tok = await 토큰();
     const 머리 = { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' };
     // 이미 있으면 덮지 않는다 — 관리자가 적어 둔 상태·결과를 지우면 안 된다
