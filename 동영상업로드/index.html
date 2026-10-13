@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 버전: 아래 #ver 배지와 같다. 고칠 때마다 둘을 같이 올린다: v1.2.0 -->
+<!-- 버전: 아래 #ver 배지와 같다. 고칠 때마다 둘을 같이 올린다: v1.3.0 -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -20,6 +20,9 @@ button.sm{padding:10px 14px;font-size:14px}
 #name{font-size:13px;color:#888;word-break:break-all}
 #wave{width:100%;background:#111;border:1px solid #2a2a2a;border-radius:6px;touch-action:none}
 #wave ::part(region-handle){width:14px!important}
+#wave ::part(region-handle-left){border-left:3px solid #ff3b30!important}
+#wave ::part(region-handle-right){border-right:3px solid #ff3b30!important}
+#wave ::part(marker){border-left:3px solid #ff3b30!important}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .row label{font-size:13px;color:#888;display:flex;align-items:center;gap:8px;flex:1;min-width:160px}
 .row input[type=range]{flex:1}
@@ -49,8 +52,8 @@ button.sm{padding:10px 14px;font-size:14px}
     <span id="time">0:00.0</span>
   </div>
   <div class="row">
-    <button class="sm" id="mstart">[ 여기서 시작</button>
-    <button class="sm" id="mend">여기서 끝 ]</button>
+    <button class="sm" id="mstart">[ 영역 시작</button>
+    <button class="sm" id="mend">영역 끝 ]</button>
     <span id="mark" class="hint"></span>
   </div>
   <div class="row">
@@ -58,13 +61,13 @@ button.sm{padding:10px 14px;font-size:14px}
     <label>확대 <input type="range" id="zoom" min="20" max="1000" value="100"></label>
     <button class="sm" id="zin">＋</button>
   </div>
-  <div class="hint">큰 파형을 짚으면 재생 막대가 그 자리로 오고, 누르고 있는 동안 그 자리 소리가 나옵니다. 짚은 채로 끌면 막대가 따라옵니다.<br>막대를 시작할 곳에 두고 「여기서 시작」, 끝날 곳에 두고 「여기서 끝」 을 누르면 구간이 생깁니다. 구간 양끝을 끌어 길이를 맞출 수 있습니다.<br>위의 작은 파형은 전체 모습입니다 — 눌러서 옮겨 다니세요. ＋/－ 로 확대합니다.</div>
+  <div class="hint">큰 파형을 짚으면 재생 막대가 그 자리로 오고, 누르고 있는 동안 그 자리 소리가 나옵니다. 짚은 채로 끌면 막대가 따라옵니다.<br>막대를 시작할 곳에 두고 「영역 시작」 을 누르면 그 자리에 붉은 선이 섭니다. 막대를 끝날 곳에 두고 「영역 끝」 을 누르면 끝에도 붉은 선이 서고 그 사이가 구간이 됩니다. 구간 양끝을 끌어 길이를 맞출 수 있습니다.<br>위의 작은 파형은 전체 모습입니다 — 눌러서 옮겨 다니세요. ＋/－ 로 확대합니다.</div>
   <div id="list"></div>
   <button id="save" disabled>고른 구간 드라이브에 저장</button>
 </div>
 
 <div id="msg"></div>
-<div id="ver">v1.2.0</div>
+<div id="ver">v1.3.0</div>
 <script>
 // Google Cloud Console 에서 만든 OAuth 웹 클라이언트 ID
 const CLIENT_ID = '830175660542-r1fiqhs9jc5g33t6t7aeqhm0e7r4ru2p.apps.googleusercontent.com';
@@ -158,6 +161,7 @@ function showEditor(wavBlob) {
   btn.textContent = '다른 동영상 선택';
   $('zoom').value = 100;
   markStart = null;
+  startMarker = null;
   $('mark').textContent = '';
 
   regions = WaveSurfer.Regions.create();
@@ -206,17 +210,25 @@ addBtn.onclick = () => {
   regions.addRegion({ start, end, drag: false, color: 'rgba(138,180,248,.25)' });
 };
 
-let markStart = null;
+let markStart = null, startMarker = null;
+// 재생 막대와 상관없이 누른 순간의 자리에 붉은 선을 세운다
 $('mstart').onclick = () => {
   if (!ws) return;
+  if (ws.isPlaying()) ws.pause();
+  if (startMarker) startMarker.remove();
   markStart = ws.getCurrentTime();
-  $('mark').textContent = '시작 ' + fmt(markStart) + ' — 끝날 곳에서 「여기서 끝」';
+  startMarker = regions.addRegion({ start: markStart, drag: false, color: '#ff3b30' });
+  $('mark').textContent = '시작 ' + fmt(markStart) + ' — 끝날 곳에서 「영역 끝」';
 };
 $('mend').onclick = () => {
   if (!ws) return;
-  if (markStart === null) { $('mark').textContent = '먼저 「여기서 시작」 을 누르세요'; return; }
-  const a = Math.min(markStart, ws.getCurrentTime()), b = Math.max(markStart, ws.getCurrentTime());
+  if (ws.isPlaying()) ws.pause();
+  if (markStart === null) { $('mark').textContent = '먼저 「영역 시작」 을 누르세요'; return; }
+  const t = ws.getCurrentTime();
+  const a = Math.min(markStart, t), b = Math.max(markStart, t);
   if (b - a < 0.1) { $('mark').textContent = '시작과 끝이 너무 가깝습니다'; return; }
+  if (startMarker) startMarker.remove();
+  startMarker = null;
   regions.addRegion({ start: a, end: b, drag: false, color: 'rgba(138,180,248,.25)' });
   markStart = null;
   $('mark').textContent = '';
@@ -232,7 +244,7 @@ $('zin').onclick = () => setZoom(Number($('zoom').value) * 1.6);
 $('zout').onclick = () => setZoom(Number($('zoom').value) / 1.6);
 
 function renderList() {
-  const rs = regions.getRegions().slice().sort((a, b) => a.start - b.start);
+  const rs = regions.getRegions().filter(r => r.end > r.start).sort((a, b) => a.start - b.start);
   list.innerHTML = '';
   rs.forEach((r, i) => {
     const row = document.createElement('div');
@@ -294,7 +306,7 @@ async function upload(blob, name, onProgress) {
 }
 
 saveBtn.onclick = () => withLogin(async () => {
-  const rs = regions.getRegions().slice().sort((a, b) => a.start - b.start);
+  const rs = regions.getRegions().filter(r => r.end > r.start).sort((a, b) => a.start - b.start);
   if (!rs.length) return;
   saveBtn.disabled = btn.disabled = true;
   const done = [];
