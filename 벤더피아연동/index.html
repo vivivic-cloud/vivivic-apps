@@ -75,7 +75,15 @@
      확장은 크롬에서만 돈다. 폰에는 표시가 없으니 이 글은 아무 일도 하지 않고 설치 안내가 그대로 보인다.
      ⚠ 표시는 확장이 document_idle 에 남긴다 — 이 글보다 늦을 수 있어 잠깐 기다려 본다. */
   (() => {
-    const 안내만 = new URLSearchParams(location.search).has("안내");
+    const 표 = new URLSearchParams(location.search);
+    const 안내만 = 표.has("안내");
+    /* ⚠ 바이글 박스로 들어왔으면(viggle=1) **보내지 않는다.**
+       사장님 10-13: 「바이글에 올라온 박스를 통해 들어간 프로그램은 모두 짚어서 지시하게
+       되어야 하는데 … 벤더피아연동 짚어서 지시가 안된다」.
+       벤더피아 사이트로 가 버리면 거기엔 손잡이가 없어 **짚을 수가 없다.**
+       그래서 박스로 들어오면 여기 머물며 「벤더피아 열기」 를 한 번 눌러 가신다.
+       맨 주소(바로가기·즐겨찾기)로 들어오면 전처럼 저절로 간다. */
+    const 박스에서 = 표.get("viggle") === "1";
     const 칸 = document.getElementById("깔림");
     let 시계 = null, 그만둠 = false;
     const 봄 = () => document.documentElement.getAttribute("data-벤더피아연동");
@@ -89,6 +97,13 @@
       칸.hidden = false;
       document.getElementById("깔림제목").textContent = "이 컴퓨터에 깔려 있습니다 (" + 판 + ")";
       if (안내만) { document.getElementById("깔림글").textContent = "설치 안내를 보고 계십니다."; return; }
+      if (박스에서) {
+        document.getElementById("깔림글").textContent =
+          "바이글 박스로 들어오셨습니다 — 여기서 꾹 눌러 짚어서 지시하실 수 있습니다. "
+          + "벤더피아로 가시려면 아래 「벤더피아 열기」 를 누르세요.";
+        document.getElementById("그만").hidden = true;      // 안 가므로 「설치 안내 보기」 가 할 일이 없다
+        return;
+      }
       시계 = setTimeout(() => { if (!그만둠) location.replace("https://vendorpia.com/"); }, 1200);
     }
 
