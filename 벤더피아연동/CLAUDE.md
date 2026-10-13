@@ -16,6 +16,7 @@
 | `System/Master/goods.aspx` (단품관리) · `salesGoods.aspx` (상품관리) · `System/Stock/StockList.aspx` (재고조회) | `vp-data.js` · `goods.js` · `goods.css` | 목록을 **이름 버튼**으로. 필터, 상세 창 |
 | 조혼가구 화면 (`vivivic-apps/조혼가구`) | `johon-read.js`(MAIN) · `johon-save.js` | 조혼가구 엑셀에서 ING단품명·부속카드를 읽어 확장 저장소(`vpJohon`, v:3)에 넘긴다 |
 | 설치 안내 화면 (`vivivic-apps/*`) | `깔렸다표시.js` | `<html>` 에 `data-벤더피아연동="판번호"` 표시만 남긴다. 설치 안내(`index.html`)가 그것을 보고 **벤더피아로 바로 보낸다** — 사장님 10-13 분부. 자료는 읽지도 보내지도 않는다 |
+| `index.aspx` · `goods.aspx` · `salesGoods.aspx` · `StockList.aspx` | `짚개.js` | 그 화면에 **짚어서 지시하기** 손잡이를 붙인다(손잡이가 보는 기억 `vg기억장`·`vg기억칸` 을 적고 `shared/viggle.js` 를 불러온다). 지시는 「밴더피아연동」 박스로 간다. ⚠ **배송관리(`firmDvList.aspx`)에는 일부러 안 붙인다** — 수취인·전화·주소가 지시에 딸려 누구나 읽는 칸(`wt_asked`)에 적힐 수 있다. 늘리려면 이 줄을 먼저 읽어라 |
 | — | `johon.js` | 조혼가구 단품명 고정 목록 (예비) |
 | — | `amt-draw.js` | 에이엠티 엣지공정지시서 부속카드·재단도면 그리기 — **에이엠티 코드를 그대로 옮긴 것**이다 |
 
