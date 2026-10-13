@@ -42,16 +42,37 @@
   const 꾸미기 = (주소) => { const l = document.createElement("link");
     l.rel = "stylesheet"; l.href = 주소; (document.head || document.documentElement).appendChild(l); };
 
+  /* 판번호 딱지 — 사장님 10-13: 「수정된건 프로그램에 버전표시해줘」.
+     무엇이 돌고 있는지 **화면에서 바로** 보이게 한다. 세 가지를 적는다 —
+       판번호 · 화면 글이 어디서 왔나(깃/확장) · 짚어서 지시 손잡이가 붙었나.
+     이것만 보면 「덮어썼나 안 썼나」 와 「왜 짚기가 안 되나」 가 한눈에 갈린다. */
+  function 딱지(글자, 나쁨) {
+    const d = document.getElementById("vp-판") || document.createElement("div");
+    d.id = "vp-판"; d.textContent = 글자;
+    d.style.cssText = "position:fixed;left:6px;bottom:6px;z-index:2147483646;"
+      + "background:" + (나쁨 ? "#c92a2a" : "rgba(0,0,0,.55)") + ";color:#fff;"
+      + "font:600 11px/1.4 sans-serif;padding:3px 7px;border-radius:9px;pointer-events:none";
+    if (!d.parentNode) (document.body || document.documentElement).appendChild(d);
+  }
+
   (async () => {
     for (const f of 꾸밈) 꾸미기(깃 + encodeURIComponent(f));
-    let 못온것 = [];
+    const 판 = chrome.runtime.getManifest().version;
+    딱지("벤더피아 보기 " + 판 + " · 부르는 중…");
+    let 못온것 = [], 깃에서 = 0, 확장에서 = 0;
     for (const f of 글) {
       // 다리는 늘 확장 안의 것 — 인터넷이 끊겨도 길이 살아 있어야 한다
       if (f === "저장다리.js") { await 넣기(chrome.runtime.getURL(f)); continue; }
-      if (await 넣기(깃 + encodeURIComponent(f))) continue;
-      if (await 넣기(chrome.runtime.getURL(f))) continue;      // 바깥이 막히면 확장 안의 것
+      if (await 넣기(깃 + encodeURIComponent(f))) { 깃에서++; continue; }
+      if (await 넣기(chrome.runtime.getURL(f))) { 확장에서++; continue; }   // 바깥이 막히면 확장 안의 것
       못온것.push(f);
     }
+    setTimeout(() => {
+      const 짚기 = !!document.querySelector(".vg-hint");
+      const 어디 = 확장에서 ? (깃에서 ? "깃+확장" : "확장") : "깃";
+      딱지("벤더피아 보기 " + 판 + " · " + 어디 + (글.includes("짚개.js") ? (짚기 ? " · 짚기 ✓" : " · 짚기 ✗") : ""),
+           !!못온것.length || (글.includes("짚개.js") && !짚기));
+    }, 1500);
     if (!못온것.length) return;
     for (const f of 꾸밈) 꾸미기(chrome.runtime.getURL(f));
     const 줄 = document.createElement("div");
