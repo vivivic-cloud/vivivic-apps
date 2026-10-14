@@ -3,7 +3,7 @@
      ⚠ 10-14 사장님 분부: 「**폴더구조는 안보여도되니 삭제해줘**」 → v5.2.0 에서 폴더 나무를 걷어냈다.
         맨 위 **갯수**(폴더 8 · 빈 폴더 1)는 갯수라서 남겼다. 그것까지 지우라 하시면 그때 지운다.
         ⚠ 다시 폴더 나무를 붙이지 마라 — 사장님이 **안 보여도 된다** 하셨다.
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v5.4.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v5.5.0
 
      ⚠ 이 화면에는 **업무 값이 한 톨도 없다.** 금액·단가·거래처·제품 이름·크기·PO 번호
         어느 것도 넣지 않는다. 이 저장소는 누구나 보는 곳이다.
@@ -90,6 +90,12 @@ h2{font-size:12px;color:#8a8a8a;font-weight:600;letter-spacing:.04em;padding:28p
 .note b{color:#bdbdbd;font-weight:600}
 .note .warn{color:#c9a227}
 
+.papers{font-size:11px;color:#2a2a2a;background:#f2efe9;border:1px solid #d8d2c6;
+  border-radius:4px;padding:8px 10px;margin:0 0 8px;line-height:1.7;display:none}
+.papers b{color:#1a1a1a}
+.papers .f{display:block;padding:2px 0;border-top:1px dotted #cfc8ba}
+.papers .f:first-of-type{border-top:0}
+.papers .n{color:#6b6257;margin-left:6px}
 footer{font-size:10px;color:#2a2a2a;padding:30px 0 24px;border-top:1px solid #1e1e1e;margin-top:30px;line-height:2}
 @media(max-width:560px){.wrap{padding:0 14px}.nm{font-size:12px}}
 </style>
@@ -99,7 +105,7 @@ footer{font-size:10px;color:#2a2a2a;padding:30px 0 24px;border-top:1px solid #1e
 
 <header>
   <div class="logo"><b>VIVIVIC</b> — 납품내역</div>
-  <div class="badge">v5.4.0</div>
+  <div class="badge">v5.5.0</div>
 </header>
 <h1>담당 폴더에서 읽어낸 줄 — 2026년</h1>
 <div class="where">
@@ -114,8 +120,10 @@ footer{font-size:10px;color:#2a2a2a;padding:30px 0 24px;border-top:1px solid #1e
 <div id="목틀" style="display:none">
   <div class="barlab">어느 달</div><div class="bar" id="달바"></div>
   <div class="barlab">어느 것</div><div class="bar" id="갈바"></div>
+  <div class="barlab">어느 거래처</div><div class="bar" id="처바"></div>
   <div class="barlab">며칠</div><div class="bar" id="날바"></div>
   <div class="count" id="줄셈"></div>
+  <div class="papers" id="서류칸"></div>
   <div class="tbox" id="표통"><table id="표"></table></div>
 </div>
 <div class="state" id="목상태"><div class="big">창고를 읽는 중입니다…</div></div>
@@ -180,9 +188,18 @@ const 목칸 = {
  '실제청구명세서':['일','서류','PO','출고업체명','제품명','품목','규격','수량','단가','합계',
                    '원장종류','원장색상','원장모델명','원장출고처','원장입고일','원장수량','출고일','필름','비고']
 };
+/* 거래처 이름은 갈래마다 **다른 칸**에 적혀 있다. 창고를 세어 보고 적은 것(10-14):
+     거래처      3,837줄 · 이름 5 (납품)
+     출고업체명   9,072줄 · 이름 5 (보링·엣지·실제청구명세서) — 거래처와 같은 다섯이다
+     원장출고처   5,839줄 · 이름 4 (재단·실제청구명세서) — 원장을 보낸 곳이다
+   ⚠ 비고 칸은 **쓰지 않는다.** 754줄에 이름이 397가지인데 거의 다 거래처가 아니다
+     (60조·24조·신제품·샘플…). 넣으면 알약이 덮인다. */
+const 처칸들 = ['거래처','출고업체명','원장출고처'];
+const 온해 = '2026년 전부';
+const 많으면 = 2000;          /* 폰에서 줄을 그리다 멎지 않게 한 번에 그리는 윗금 */
 const 숫자칸 = new Set(['재단수량','원장수량','재단금액','수량','단가','합계','필름','금액']);
 const 갈들 = ['재단','보링','엣지','납품','실제청구명세서'];
-let 달목=[], 달셈={}, 이달=null, 달='', 갈='재단', 날=0, 답했나=false, 숨긴줄=0;
+let 달목=[], 달셈={}, 이달=null, 달='', 갈='재단', 처='', 날=0, 답했나=false, 숨긴줄=0;
 
 function 목상태(큰,작,까닭){
   document.getElementById('목틀').style.display='none';
@@ -224,19 +241,37 @@ async function 달받기(){
   목상태(달 + ' 을 받는 중입니다…');
   try{
     const { collection, getDocs, query, where } = window.fbRead;
-    const 눈 = await getDocs(query(collection(window.db, ...창고자리), where('달','==',달)));
-    이달 = []; 눈.forEach(d => 이달.push(d.data()));
+    /* 사장님 10-14: 「모든 거래처명으로 필터링」. 납품은 달이 아니라 거래처로 갈라져 있어서
+       **달을 안 고르고도** 거래처로 볼 수 있어야 뜻이 산다. 그래서 「2026년 전부」 를 뒀다.
+       달을 하나씩 받아 잇는다 — 한 번에 받는 길이 없다(창고는 달로 갈라 두었다). */
+    const 받을달 = (달 === 온해) ? 달목 : [달];
+    이달 = [];
+    for(let i=0; i<받을달.length; i++){
+      if(받을달.length > 1) 목상태(온해 + ' 을 받는 중입니다…', (i+1) + ' / ' + 받을달.length + ' 달');
+      const 눈 = await getDocs(query(collection(window.db, ...창고자리), where('달','==',받을달[i])));
+      눈.forEach(d => 이달.push(d.data()));
+    }
     const 있 = 갈들.filter(g => 이달.some(r=>r.갈===g));
     if(!있.includes(갈)) 갈 = 있[0] || '재단';
-    날 = 0;
+    처 = ''; 날 = 0;
     document.getElementById('목상태').style.display='none';
     document.getElementById('목틀').style.display='block';
     목록그리기();
   }catch(e){ window.목록못읽음(달 + ' 을 읽지 못했습니다',(e&&(e.code||e.message))||''); }
 }
 
+/* 한 줄에 적힌 거래처 이름들. 칸이 갈래마다 달라서 세 칸을 다 본다. */
+function 처들(r){
+  const 것 = [];
+  for(const c of 처칸들){ const v = r[c]; if(v!=null && String(v).trim()) 것.push(String(v).trim()); }
+  return 것;
+}
+
 function 목록그리기(){
-  document.getElementById('달바').innerHTML = 달목.map(m=>
+  const 온해줄 = 달목.reduce((a,m)=> a + (달셈[m]||0), 0);
+  document.getElementById('달바').innerHTML =
+    `<div class="pill ${달===온해?'on':''}" data-m="${온해}">${온해}<span class="n">${온해줄}</span></div>` +
+    달목.map(m=>
     `<div class="pill ${m===달?'on':''}" data-m="${m}">${m}<span class="n">${달셈[m]||0}</span></div>`).join('');
   document.getElementById('갈바').innerHTML = 갈들.map(g=>{
     const n = 이달.filter(r=>r.갈===g).length;
@@ -245,25 +280,57 @@ function 목록그리기(){
     return `<div class="pill ${n===0?'zero':''} ${g===갈?'on':''}" data-g="${g}">${g}<span class="n">${n}</span></div>`;
   }).join('');
   let 것 = 이달.filter(r=>r.갈===갈);
+
+  /* 어느 거래처 — 이 달·이 갈래에 **실제로 적혀 있는 이름만** 알약으로 낸다.
+     없는 이름을 세워 두면 눌러도 빈 화면이 된다. */
+  const 처셈 = {};
+  것.forEach(r => 처들(r).forEach(v => { 처셈[v] = (처셈[v]||0) + 1; }));
+  const 처목 = Object.keys(처셈).sort((a,b)=> 처셈[b]-처셈[a] || a.localeCompare(b,'ko'));
+  if(처 && !처목.includes(처)) 처 = '';
+  document.getElementById('처바').innerHTML =
+    `<div class="pill ${처===''?'on':''}" data-c="">전부<span class="n">${것.length}</span></div>` +
+    처목.map(v=>`<div class="pill ${v===처?'on':''}" data-c="${v}">${v}<span class="n">${처셈[v]}</span></div>`).join('');
+  if(처) 것 = 것.filter(r => 처들(r).includes(처));
+
   const 날들 = [...new Set(것.map(r=>r.일))].filter(d=>d).sort((a,b)=>a-b);
   document.getElementById('날바').innerHTML =
     `<div class="pill ${날===0?'on':''}" data-d="0">전부</div>` +
     날들.map(d=>`<div class="pill ${날===d?'on':''}" data-d="${d}">${d}일<span class="n">${것.filter(r=>r.일===d).length}</span></div>`).join('');
   if(날) 것 = 것.filter(r=>r.일===날);
-  것 = 것.slice().sort((a,b)=>(a.일||0)-(b.일||0));
+  것 = 것.slice().sort((a,b)=> String(a.달||'').localeCompare(String(b.달||'')) || (a.일||0)-(b.일||0));
   document.getElementById('줄셈').innerHTML =
-    `<b>${달}</b> · <b>${갈}</b> · ${날?날+'일':'그 달 전부'} · <b>${것.length}</b>줄` +
+    `<b>${달}</b> · <b>${갈}</b>` + (처?` · <b>${처}</b>`:'') +
+    ` · ${날?날+'일':(달===온해?'한 해 전부':'그 달 전부')} · <b>${것.length}</b>줄` +
     (숨긴줄 ? ` <span class="q">· 2026년이 아니라 안 보이는 줄 ${숨긴줄}개</span>` : '');
+
+  /* 사장님 10-14: 「관련 파일을 볼 수 있게」. 지금 보이는 줄이 **어느 서류에서 나왔는지** 적는다.
+     줄을 다 그리지 못해도 이 셈은 **보이는 줄 전부**를 두고 센다. */
+  const 서류셈 = {};
+  것.forEach(r => { const v = (r.서류==null?'':String(r.서류)) || '(서류 안 적힌 줄)';
+                    서류셈[v] = (서류셈[v]||0) + 1; });
+  const 서류목 = Object.keys(서류셈).sort((a,b)=> 서류셈[b]-서류셈[a] || a.localeCompare(b,'ko'));
+  const 서류틀 = document.getElementById('서류칸');
+  if(것.length){
+    서류틀.style.display = 'block';
+    서류틀.innerHTML = `<b>관련 서류 ${서류목.length}개</b> — 지금 보이는 ${것.length}줄이 나온 파일입니다.` +
+      서류목.map(v=>`<span class="f">${v.replace(/&/g,'&amp;').replace(/</g,'&lt;')}<span class="n">${서류셈[v]}줄</span></span>`).join('');
+  } else 서류틀.style.display = 'none';
+
   const C = 목칸[갈];
   if(!것.length){
     document.getElementById('표').innerHTML =
-      `<tbody><tr><td style="color:#8c5a5a;padding:14px 10px">${달} 에 <b>${갈}</b> 은 없습니다.</td></tr></tbody>`;
+      `<tbody><tr><td style="color:#8c5a5a;padding:14px 10px">${달===온해?'2026년':달} 에 <b>${갈}</b>${처?` · <b>${처}</b>`:''} 은 없습니다.</td></tr></tbody>`;
     return;
   }
+  /* 폰에서 줄을 몇 천 개씩 그리면 멎는다. 그린 수를 **숨기지 않고 적는다.** */
+  const 그릴 = 것.length > 많으면 ? 것.slice(0, 많으면) : 것;
   let t = '<thead><tr>' + C.map(c=>`<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+  if(그릴.length < 것.length)
+    t += `<tr class="daysep"><td colspan="${C.length}">${것.length}줄 가운데 <b>앞 ${많으면}줄</b>만 그렸습니다 — 거래처나 달을 골라 좁히십시오. 위 <b>관련 서류</b> 셈은 ${것.length}줄 전부를 두고 센 것입니다.</td></tr>`;
   let 앞 = null;
-  for(const r of 것){
-    if(!날 && r.일!==앞){ t += `<tr class="daysep"><td colspan="${C.length}">${+달.slice(5,7)}월 ${r.일||'?'}일</td></tr>`; 앞=r.일; }
+  for(const r of 그릴){
+    const 때 = (달===온해 ? (r.달||'') + ' ' : '') + (달===온해 ? '' : +달.slice(5,7)+'월 ') + (r.일||'?') + '일';
+    if(!날 && 때!==앞){ t += `<tr class="daysep"><td colspan="${C.length}">${때}</td></tr>`; 앞=때; }
     t += '<tr>' + C.map(c=>{
       const v = (r[c]==null)?'':String(r[c]);
       return `<td class="${v===''?'d':(숫자칸.has(c)?'num':'')}">${v===''?'·':v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,' ')}</td>`;
@@ -276,6 +343,7 @@ document.addEventListener('click', e=>{
   const p = e.target.closest('.bar .pill'); if(!p || !이달) return;
   if(p.dataset.m){ if(p.dataset.m!==달){ 달=p.dataset.m; 달받기(); } return; }
   if(p.dataset.g){ 갈=p.dataset.g; 날=0; 목록그리기(); return; }
+  if(p.dataset.c!==undefined){ 처=p.dataset.c; 날=0; 목록그리기(); return; }
   if(p.dataset.d!==undefined){ 날=+p.dataset.d; 목록그리기(); }
 });
 </script>
