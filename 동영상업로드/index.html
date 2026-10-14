@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 버전: 아래 #ver 배지와 같다. 고칠 때마다 둘을 같이 올린다: v1.4.0 -->
+<!-- 버전: 아래 #ver 배지와 같다. 고칠 때마다 둘을 같이 올린다: v1.5.0 -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -32,6 +32,15 @@ button.sm{padding:10px 14px;font-size:14px}
 .clip span{flex:1}
 .clip button{padding:8px 12px;font-size:13px}
 .hint{font-size:12px;color:#666;line-height:1.6}
+#pick{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);align-items:flex-end;justify-content:center;z-index:10}
+#pick .sheet{width:100%;max-width:520px;max-height:80vh;overflow:auto;background:#1e1e1e;border-top:1px solid #333;border-radius:12px 12px 0 0;padding:20px 16px 28px;display:flex;flex-direction:column;gap:8px}
+#pick h3{font-size:15px;font-weight:500;color:#fff;margin-bottom:4px}
+#folders{display:flex;flex-direction:column;gap:8px}
+#pick .fd{width:100%;text-align:left;padding:14px 16px;font-size:15px}
+#pick .fd.last{border-color:#8ab4f8}
+#pick .new{display:flex;gap:8px;margin-top:8px}
+#pick .new input{flex:1;min-width:0;padding:12px;border:1px solid #444;border-radius:6px;background:#111;color:#fff;font-size:16px}
+#pick .new button{padding:12px 16px;font-size:14px}
 #ver{position:fixed;right:12px;top:10px;font-size:11px;color:#555;font-family:ui-monospace,monospace}
 </style>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -66,8 +75,15 @@ button.sm{padding:10px 14px;font-size:14px}
   <button id="save" disabled>고른 구간 드라이브에 저장</button>
 </div>
 
+<div id="pick"><div class="sheet">
+  <h3>어디에 저장할까요?</h3>
+  <div id="folders"></div>
+  <div class="new"><input id="newname" placeholder="새 폴더 이름"><button id="mkdir">+ 새 폴더</button></div>
+  <button id="pickclose" class="sm" style="margin-top:8px">취소</button>
+</div></div>
+
 <div id="msg"></div>
-<div id="ver">v1.4.0</div>
+<div id="ver">v1.5.0</div>
 <script>
 // Google Cloud Console 에서 만든 OAuth 웹 클라이언트 ID
 const CLIENT_ID = '830175660542-r1fiqhs9jc5g33t6t7aeqhm0e7r4ru2p.apps.googleusercontent.com';
@@ -298,8 +314,26 @@ async function ensureFolder() {
   return (folder = await made.json());
 }
 
-async function upload(blob, name, onProgress) {
-  const meta = { name, mimeType: blob.type, parents: [(await ensureFolder()).id] };
+// 「동영상업로드」 폴더 안의 폴더들 — 이 페이지가 만든 것만 보인다
+async function listSubfolders(root) {
+  const q = "'" + root.id + "' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false";
+  const res = await fetch('https://www.googleapis.com/drive/v3/files?orderBy=name&fields=files(id,name,webViewLink)&q=' + encodeURIComponent(q), { headers: { Authorization: 'Bearer ' + token } });
+  if (!res.ok) throw new Error('폴더 목록 읽기 실패 (' + res.status + ')');
+  return (await res.json()).files;
+}
+
+async function makeSubfolder(root, name) {
+  const res = await fetch('https://www.googleapis.com/drive/v3/files?fields=id,name,webViewLink', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json; charset=UTF-8' },
+    body: JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder', parents: [root.id] })
+  });
+  if (!res.ok) throw new Error('폴더 만들기 실패 (' + res.status + ')');
+  return res.json();
+}
+
+async function upload(blob, name, parentId, onProgress) {
+  const meta = { name, mimeType: blob.type, parents: [parentId] };
   const init = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&fields=id,webViewLink', {
     method: 'POST',
     headers: {
@@ -323,9 +357,58 @@ async function upload(blob, name, onProgress) {
   });
 }
 
+/* ── 저장할 폴더 고르기 ─────────────────────── */
+const pick = $('pick'), foldersEl = $('folders');
+let lastFolder = null;
+try { lastFolder = localStorage.getItem('vu.folder'); } catch (e) {}
+const closePick = () => { pick.style.display = 'none'; };
+$('pickclose').onclick = closePick;
+pick.onclick = e => { if (e.target === pick) closePick(); };
+
 saveBtn.onclick = () => withLogin(async () => {
+  if (!regions.getRegions().some(r => r.end > r.start)) return;
+  saveBtn.disabled = true;
+  msg.textContent = '폴더 불러오는 중…';
+  try {
+    const root = await ensureFolder();
+    const subs = await listSubfolders(root);
+    foldersEl.innerHTML = '';
+    [{ ...root, name: FOLDER_NAME + ' (맨 위)' }, ...subs].forEach(fd => {
+      const b = document.createElement('button');
+      b.className = 'fd' + (fd.id === lastFolder ? ' last' : '');
+      b.textContent = '📁 ' + fd.name + (fd.id === lastFolder ? '  · 지난번' : '');
+      b.onclick = () => { closePick(); saveTo(fd); };
+      foldersEl.appendChild(b);
+    });
+    $('newname').value = '';
+    $('mkdir').onclick = async () => {
+      const name = $('newname').value.trim();
+      if (!name) { $('newname').focus(); return; }
+      $('mkdir').disabled = true;
+      try {
+        const fd = await makeSubfolder(root, name);
+        closePick();
+        saveTo(fd);
+      } catch (e) {
+        msg.textContent = e.message;
+      } finally {
+        $('mkdir').disabled = false;
+      }
+    };
+    msg.textContent = '';
+    pick.style.display = 'flex';
+  } catch (e) {
+    msg.textContent = e.message;
+  } finally {
+    saveBtn.disabled = false;
+  }
+});
+
+async function saveTo(target) {
   const rs = regions.getRegions().filter(r => r.end > r.start).sort((a, b) => a.start - b.start);
   if (!rs.length) return;
+  try { localStorage.setItem('vu.folder', target.id); } catch (e) {}
+  lastFolder = target.id;
   saveBtn.disabled = btn.disabled = true;
   const done = [];
   try {
@@ -333,14 +416,14 @@ saveBtn.onclick = () => withLogin(async () => {
       const r = rs[i];
       const clip = samples.subarray(Math.floor(r.start * RATE), Math.ceil(r.end * RATE));
       const name = baseName + '_' + String(i + 1).padStart(2, '0') + '.wav';
-      const res = await upload(toWav(clip), name, f => {
+      const res = await upload(toWav(clip), name, target.id, f => {
         msg.textContent = '저장 중… ' + (i + 1) + '/' + rs.length + ' (' + Math.floor(f * 100) + '%)';
       });
       done.push([name, res.webViewLink]);
     }
     msg.innerHTML = '';
     const f = document.createElement('a');
-    f.href = folder.webViewLink; f.target = '_blank'; f.textContent = '「' + FOLDER_NAME + '」 폴더';
+    f.href = target.webViewLink; f.target = '_blank'; f.textContent = '「' + target.name.replace(/ \(맨 위\)$/, '') + '」 폴더';
     msg.append(f, '에 ' + done.length + '개 저장 완료');
     done.forEach(([name, link]) => {
       const a = document.createElement('a');
@@ -352,7 +435,7 @@ saveBtn.onclick = () => withLogin(async () => {
   } finally {
     saveBtn.disabled = btn.disabled = false;
   }
-});
+}
 </script>
 </body>
 </html>
