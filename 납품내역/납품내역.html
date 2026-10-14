@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- 납품내역 — 사장님 드라이브 「관리프로그램 / Amt양식」 **폴더 구조 그대로** 보인다.
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v5.1.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v5.2.0
 
      ⚠ 이 화면에는 **업무 값이 한 톨도 없다.** 금액·단가·거래처·제품 이름·크기·PO 번호
         어느 것도 넣지 않는다. 이 저장소는 누구나 보는 곳이다.
@@ -67,8 +67,10 @@ h2{font-size:12px;color:#8a8a8a;font-weight:600;letter-spacing:.04em;padding:28p
 .pill.on{background:#e8e8e8;color:#111;border-color:#e8e8e8;font-weight:600}
 .pill .n{font-size:10px;opacity:.55;margin-left:4px}
 .pill.off{color:#333;border-color:#1f1f1f;background:#1c1c1c;cursor:default}
+.pill.zero{color:#6a4a4a;border-color:#2a2020}
 .count{font-size:11px;color:#555;padding:14px 0 6px}
 .count b{color:#c8c8c8;font-weight:600}
+.count .q{color:#5f5f5f}
 #표통{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid #242424;background:#1c1c1c}
 #표{border-collapse:collapse;font-size:11.5px;min-width:100%;white-space:nowrap}
 #표 th{background:#232323;color:#8f8f8f;font-weight:600;text-align:left;padding:7px 9px;border-bottom:1px solid #2c2c2c;border-right:1px solid #262626}
@@ -94,9 +96,9 @@ footer{font-size:10px;color:#2a2a2a;padding:30px 0 24px;border-top:1px solid #1e
 
 <header>
   <div class="logo"><b>VIVIVIC</b> — 납품내역</div>
-  <div class="badge">v5.1.0</div>
+  <div class="badge">v5.2.0</div>
 </header>
-<h1>담당 폴더에서 읽어낸 모든 줄</h1>
+<h1>담당 폴더에서 읽어낸 줄 — 2026년</h1>
 <div class="where">
   구글드라이브 <code>관리프로그램 / Amt양식</code><br>
   <b>2026-10-14</b> 에 읽어 센 값입니다.<br>
@@ -170,7 +172,7 @@ const 목칸 = {
 };
 const 숫자칸 = new Set(['재단수량','원장수량','재단금액','수량','단가','합계','필름','금액']);
 const 갈들 = ['재단','보링','엣지','납품'];
-let 달목=[], 달셈={}, 이달=null, 달='', 갈='재단', 날=0, 답했나=false;
+let 달목=[], 달셈={}, 이달=null, 달='', 갈='재단', 날=0, 답했나=false, 숨긴줄=0;
 
 function 목상태(큰,작,까닭){
   document.getElementById('목틀').style.display='none';
@@ -191,9 +193,18 @@ window.목록읽기 = async function(){
     답했나 = true;
     if(!목.exists()){ 목상태('목록이 아직 창고에 안 들어왔습니다'); return; }
     const m = 목.data();
-    달목 = (m.달들||[]).slice().sort().reverse();
-    (m.달들||[]).forEach((d,i)=> 달셈[d] = (m.줄수||[])[i] || 0);
-    if(!달목.length){ 목상태('창고에 달이 하나도 적혀 있지 않습니다'); return; }
+    /* ⚠ **2026년 것만 보인다**(사장님 10-14). 지운 것이 아니라 **안 보이게만** 한 것이다 —
+       2023·2024·2025년 줄은 창고에 그대로 있다.
+       해는 **장 이름이 아니라 서류 안의 거래일자**로 갈랐다. 담을 때 이미 그렇게 했다
+       (장 이름만 믿으면 해가 통째로 틀린다 — v3.1.0 에서 36줄이 그랬다). */
+    const 보는해 = '2026';
+    const 온달 = (m.달들||[]);
+    달목 = 온달.filter(d => String(d).startsWith(보는해+'-')).slice().sort().reverse();
+    온달.forEach((d,i)=> 달셈[d] = (m.줄수||[])[i] || 0);
+    숨긴줄 = 온달.filter(d => !String(d).startsWith(보는해+'-'))
+                 .reduce((a,d)=> a + (달셈[d]||0), 0);
+    if(!달목.length){ 목상태('2026년 자료가 창고에 없습니다',
+        숨긴줄 ? ('2026년이 아닌 줄 <b>' + 숨긴줄 + '</b>개는 있습니다 — 보이지 않게 해 두었습니다.') : ''); return; }
     달 = 달목[0];
     await 달받기();
   }catch(e){ 답했나=true; window.목록못읽음('창고를 읽지 못했습니다',(e&&(e.code||e.message))||''); }
@@ -219,7 +230,9 @@ function 목록그리기(){
     `<div class="pill ${m===달?'on':''}" data-m="${m}">${m}<span class="n">${달셈[m]||0}</span></div>`).join('');
   document.getElementById('갈바').innerHTML = 갈들.map(g=>{
     const n = 이달.filter(r=>r.갈===g).length;
-    return `<div class="pill ${n===0?'off':''} ${g===갈?'on':''}" data-g="${n?g:''}">${g}<span class="n">${n}</span></div>`;
+    /* 줄이 0 이어도 **누를 수 있게** 둔다. 누르면 「없습니다」 가 뜬다 —
+       못 누르게 해 두면 조용히 비는 것과 같다. */
+    return `<div class="pill ${n===0?'zero':''} ${g===갈?'on':''}" data-g="${g}">${g}<span class="n">${n}</span></div>`;
   }).join('');
   let 것 = 이달.filter(r=>r.갈===갈);
   const 날들 = [...new Set(것.map(r=>r.일))].filter(d=>d).sort((a,b)=>a-b);
@@ -229,8 +242,14 @@ function 목록그리기(){
   if(날) 것 = 것.filter(r=>r.일===날);
   것 = 것.slice().sort((a,b)=>(a.일||0)-(b.일||0));
   document.getElementById('줄셈').innerHTML =
-    `<b>${달}</b> · <b>${갈}</b> · ${날?날+'일':'그 달 전부'} · <b>${것.length}</b>줄`;
+    `<b>${달}</b> · <b>${갈}</b> · ${날?날+'일':'그 달 전부'} · <b>${것.length}</b>줄` +
+    (숨긴줄 ? ` <span class="q">· 2026년이 아니라 안 보이는 줄 ${숨긴줄}개</span>` : '');
   const C = 목칸[갈];
+  if(!것.length){
+    document.getElementById('표').innerHTML =
+      `<tbody><tr><td style="color:#8c5a5a;padding:14px 10px">${달} 에 <b>${갈}</b> 은 없습니다.</td></tr></tbody>`;
+    return;
+  }
   let t = '<thead><tr>' + C.map(c=>`<th>${c}</th>`).join('') + '</tr></thead><tbody>';
   let 앞 = null;
   for(const r of 것){
