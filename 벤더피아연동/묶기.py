@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""벤더피아연동.zip 을 묶는다. **늘 이것으로 묶어라.**
+"""vendorpia-viewer.zip 을 묶는다. **늘 이것으로 묶어라.**
 
 ⚠⚠ 10-14 — 왜 이 글이 있나
 사장님: 「공유된 판에서 벤더피아 연동 확장프로그램 압축다운받은게 폴더가 비어있다고 나온다는데」
@@ -28,8 +28,11 @@ import zipfile
 
 집 = os.path.dirname(os.path.abspath(__file__))
 속폴더 = "벤더피아보기"          # ⚠ 사장님 컴퓨터의 ~/Desktop/벤더피아보기 와 같아야 한다.
-밖 = os.path.join(집, "벤더피아연동.zip")   #    이름이 같아야 풀어서 덮어쓰고 ↻ 만 누르면 된다.
-뺄것 = {"벤더피아연동.zip", "잰것", "묶기.py", "__pycache__"}
+# ⚠⚠ 10-14 — zip **파일 이름은 아스키**로 둔다. 공유받으신 분: 「압축파일로 바꿔줘」.
+# 「압축파일 받기」 로 받으면 이름이 **`download`** 로 떨어져 **.zip 이 아예 없었다**(재서 확인).
+# 안 폴더 이름(벤더피아보기)은 한글 그대로다 — 그래야 풀어서 덮어쓰고 ↻ 만 누르면 된다.
+밖 = os.path.join(집, "vendorpia-viewer.zip")
+뺄것 = {"vendorpia-viewer.zip", "잰것", "묶기.py", "__pycache__"}
 손잡이원본 = os.path.join(집, "..", "shared", "viggle.js")
 
 
@@ -115,7 +118,7 @@ def 재기():
 
 
 if __name__ == "__main__":
-    print("■ 벤더피아연동.zip 묶기")
+    print("■ vendorpia-viewer.zip 묶기")
     if not 베끼기():
         sys.exit(1)
     print("  손잡이.js 를 shared/viggle.js 에서 다시 베꼈습니다.")
