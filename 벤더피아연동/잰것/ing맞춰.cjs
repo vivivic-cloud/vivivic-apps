@@ -26,8 +26,14 @@ const 원래 = `<html><head><meta charset="utf-8"><title>상품관리</title></h
 <input type="image" name="btnSearch" id="btnSearch" src="s.gif"><div id="divGrid"></div>
 </form></body></html>`;
 const 머리 = ["상품코드","상품명","매출처명","매출처코드","매입처명","배송사명","판매상태","옵션상품유무","단품코드","단품명","배송수량","양품수"];
-const 줄들 = 상품이름.map((t, i) => ["KLS-"+(i+1), t, "가매출처", "1014", "가매입처", "○○택배",
-  "판매중", "N", "ING-"+(i+1), "가나다 단품 "+(i+1), String(10+i), String(5+i)]);
+const 매출처들 = ["가매출처", "나매출처", "협찬"];
+/* 첫 상품만 매출처 셋으로 들어온다 (벤더피아는 매출처마다 한 줄이다) */
+const 줄들 = [];
+상품이름.forEach((t, i) => {
+  const 몇 = i === 0 ? 3 : 1;
+  for (let k = 0; k < 몇; k++) 줄들.push(["KLS-"+(i+1), t, 매출처들[k], "101"+k, "가매입처", "○○택배",
+    "판매중", "N", "ING-"+(i+1)+"-"+k, "가나다 단품 "+(i+1), String(10+i), String(5+i)]);
+});
 const VP흉내 = `
 var VP_DATA = { PAGES: ${JSON.stringify(PAGES)},
   ymd: function (d) { var z=function(n){return String(n).padStart(2,"0");};

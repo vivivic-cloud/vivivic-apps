@@ -512,11 +512,56 @@
     ? { col: "단품명", render: (row) => partChips(heads, row) }
     : { extra: "관련 상품", render: (row) => productChips(heads, row) });
 
+  /* ⚠⚠ 10-14 사장님 (상품관리 상세를 짚으시고): 「상품관리 상세에 나타나는 내용을
+       매출처명 차이로 중복 나열하지말고 매출처버튼으로 필터링 시켜줘」
+     한 상품이 벤더피아에 **매출처마다 한 줄**로 들어 있다. 그래서 상세를 열면 같은 상품이
+     매출처 수만큼 통째로 겹쳐 나왔다(짚으신 자리에 「매출처명 협찬 · 매출처코드 1014」 가 보였다).
+     → 매출처 **알약**을 상세 창 위에 두고, 고른 매출처의 줄만 보인다. 처음에는 **첫 매출처** 하나만.
+       「전부」 를 누르면 전처럼 다 보인다 — **값을 지운 것이 아니라 가린 것뿐이다.**
+     ⚠ 줄 하나하나는 전처럼 `detailFields` 가 그대로 그린다 — 금액 칸 숨기기·전체속성 보기·
+       연결된 단품 단추·부속보기가 한 톨도 안 바뀐다.
+     ⚠ 매출처가 **하나뿐**이면 알약 줄을 **아예 안 그린다** (자리만 먹는다). */
+  function 매출처별로(h, items) {
+    const i매출처 = h.indexOf("매출처명");
+    const 묶음 = [];                                   // [[매출처명, 줄], …] — 받은 차례 그대로
+    for (const row of items) 묶음.push([(i매출처 >= 0 ? (row[i매출처] || "") : "").trim() || "(없음)", row]);
+    const 이름들 = [...new Set(묶음.map(([n]) => n))];
+    const 그릇 = document.createElement("div");
+    const 줄판 = [];
+    for (const [n, row] of 묶음) {
+      const 칸 = 그릇.appendChild(document.createElement("div"));
+      칸.className = "vp-store-one";
+      칸.dataset.store = n;
+      칸.appendChild(detailFields(h, row, linkCell));   // ← 전과 똑같이 그린다
+      줄판.push(칸);
+    }
+    if (i매출처 < 0 || 이름들.length < 2) return [그릇];  // 매출처가 하나뿐 — 알약을 안 그린다
+    let 고른것 = 이름들[0];                             // 처음에는 첫 매출처만 (겹쳐 보이지 않게)
+    const 알약칸 = document.createElement("div");
+    알약칸.className = "vp-store-pills";
+    const 다시그리기 = () => {
+      알약칸.replaceChildren();
+      for (const [값, 글] of [["", "전부"], ...이름들.map((n) => [n, n])]) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "vp-store-pill";
+        b.textContent = 글;
+        b.setAttribute("aria-pressed", 고른것 === 값 ? "true" : "false");
+        b.addEventListener("click", () => { 고른것 = 값; 다시그리기(); });
+        알약칸.appendChild(b);
+      }
+      for (const 칸 of 줄판) 칸.hidden = !!고른것 && 칸.dataset.store !== 고른것;
+    };
+    다시그리기();
+    return [알약칸, 그릇];
+  }
+
   function show(name, h, items) {
     panel.dataset.name = name;
     panel._args = [h, items];
     panelTitle.textContent = name;
     if (page.locationTabs) panelBody.replaceChildren(...locationView(h, items));
+    else if (page.nameCol === "상품명") panelBody.replaceChildren(...매출처별로(h, items));
     else panelBody.replaceChildren(...items.map((row) => detailFields(h, row, linkCell)));
     panel.hidden = false;
   }
