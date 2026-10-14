@@ -132,6 +132,7 @@
         <span class="vp-dates" ${page.noDates ? "hidden" : ""}><input type="date" name="from"><span>~</span><input type="date" name="to"></span>
       </div>
       <div class="vp-note">불러오는 중…</div>
+      <div class="vp-ing-note" hidden></div>
       <div class="vp-cached"></div>
       <div class="vp-loc-tabs vp-chips" hidden>
         <button type="button" class="on" data-view="all">전체보기</button>
@@ -167,6 +168,7 @@
   const note = root.querySelector(".vp-note");
   const cached = root.querySelector(".vp-cached");
   const list = root.querySelector(".vp-goods-list");
+  const ingNote = root.querySelector(".vp-ing-note");
   const more = root.querySelector(".vp-more");
   const locTabs = root.querySelector(".vp-loc-tabs");
   const placesList = root.querySelector(".vp-places-list");
@@ -211,6 +213,46 @@
   const modalGoto = modal.querySelector(".vp-goto");
   modal.querySelector("button").addEventListener("click", () => { modal.hidden = true; });
   modal.addEventListener("click", (e) => { if (e.target === modal) modal.hidden = true; });
+
+  /* ⚠⚠ 10-14 사장님 (단품 상세 팝업을 짚으시고): 「상세팝업 외부바탕화면 클릭시 상세팝업 닫히게 해줘」
+     팝업이 넷인데 **상세 창만** 바깥 닫기가 없었다 —
+       .vp-modal(연결된 항목) · .vp-notice(안내) · .vp-edge-pop(부속 도면) → 이미 있었다
+       .vp-goods-panel(상세 창)                                          → **없었다. 여기에 넣는다.**
+     상세 창은 어두운 뒤바탕이 없는 **떠 있는 카드**라, 「바깥을 눌렀다」 를 이렇게 가린다 —
+       ㄱ) 누르기 시작한 자리와 뗀 자리가 **둘 다 상세 창 바깥**일 때만 닫는다
+           (카드 안을 누르다 끌어서 밖에서 뗀 것에 안 닫힌다. 카드 속을 눌러 닫히면 더 나쁘다.)
+       ㄴ) ⚠ **0.5초 넘게 누른 것은 짚어서 지시하기다** — 그때는 안 닫는다.
+           사장님이 꾹 눌러 짚으시면 손을 뗄 때 click 이 떨어지는데, 그것으로 닫히면 안 된다.
+           (`shared/viggle.js` 도 같은 탈을 겪어 거기서는 click 하나를 흘려보내 풀었다.)
+       ㄷ) 위에 다른 팝업(연결·안내·부속)이 떠 있으면 그 뒤바탕을 누른 것이니 상세 창은 그대로 둔다. */
+  const 안에있나 = (el, 고르개) => !!(el && el.closest && el.closest(고르개));
+  const 상세밖인가 = (t) => !panel.hidden && !(panel.contains && panel.contains(t))
+    && !안에있나(t, ".vp-modal, .vp-notice");
+  let 누른때 = 0, 밖에서눌렀다 = false;
+  addEventListener("mousedown", (e) => {
+    누른때 = Date.now(); 밖에서눌렀다 = 상세밖인가(e.target);
+  }, true);
+  addEventListener("mouseup", (e) => {
+    if (!밖에서눌렀다) return;
+    밖에서눌렀다 = false;
+    if (Date.now() - 누른때 >= 500) return;            // 꾹 누른 것 = 짚어서 지시하기
+    if (!상세밖인가(e.target)) return;                 // 뗀 자리가 상세 창 안이면 안 닫는다
+    panel.hidden = true; delete panel.dataset.name;
+  }, true);
+
+  /* ESC 로도 닫는다 — **맨 위의 것 하나만.** (넷 다 같은 꼴이 되게) */
+  const 맨위팝업 = () => {
+    const 덮개 = [...root.querySelectorAll(".vp-notice")].pop();   // 안내·부속 (나중 것이 맨 위)
+    if (덮개) return () => 덮개.remove();
+    if (!modal.hidden) return () => { modal.hidden = true; };
+    if (!panel.hidden) return () => { panel.hidden = true; delete panel.dataset.name; };
+    return null;
+  };
+  addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    const 닫기 = 맨위팝업(); if (!닫기) return;
+    e.preventDefault(); 닫기();
+  });
 
   // 연결된 화면의 항목을 팝업으로 보여준다. "…로 가기"는 그 화면에서 이 항목만 보이게 연다
   function popup(title, heads, rows, findBy) {
@@ -470,11 +512,73 @@
     ? { col: "단품명", render: (row) => partChips(heads, row) }
     : { extra: "관련 상품", render: (row) => productChips(heads, row) });
 
+  /* ⚠⚠ 10-14 사장님 (상품관리 상세를 짚으시고): 「상품관리 상세에 나타나는 내용을
+       매출처명 차이로 중복 나열하지말고 매출처버튼으로 필터링 시켜줘」
+     한 상품이 벤더피아에 **매출처마다 한 줄**로 들어 있다. 그래서 상세를 열면 같은 상품이
+     매출처 수만큼 통째로 겹쳐 나왔다(짚으신 자리에 「매출처명 협찬 · 매출처코드 1014」 가 보였다).
+     → 매출처 **알약**을 상세 창 위에 두고, 고른 매출처의 줄만 보인다. 처음에는 **첫 매출처** 하나만.
+       「전부」 를 누르면 전처럼 다 보인다 — **값을 지운 것이 아니라 가린 것뿐이다.**
+     ⚠ 줄 하나하나는 전처럼 `detailFields` 가 그대로 그린다 — 금액 칸 숨기기·전체속성 보기·
+       연결된 단품 단추·부속보기가 한 톨도 안 바뀐다.
+     ⚠ 매출처가 **하나뿐**이면 알약 줄을 **아예 안 그린다** (자리만 먹는다). */
+  function 매출처별로(h, items) {
+    const i매출처 = h.indexOf("매출처명");
+    const 묶음 = [];                                   // [[매출처명, 줄], …] — 받은 차례 그대로
+    for (const row of items) 묶음.push([(i매출처 >= 0 ? (row[i매출처] || "") : "").trim() || "(없음)", row]);
+    const 이름들 = [...new Set(묶음.map(([n]) => n))];
+    const 그릇 = document.createElement("div");
+    const 줄판 = [];
+    for (const [n, row] of 묶음) {
+      const 칸 = 그릇.appendChild(document.createElement("div"));
+      칸.className = "vp-store-one";
+      칸.dataset.store = n;
+      칸.appendChild(detailFields(h, row, linkCell));   // ← 전과 똑같이 그린다
+      줄판.push(칸);
+    }
+    if (i매출처 < 0 || 이름들.length < 2) return [그릇];  // 매출처가 하나뿐 — 알약을 안 그린다
+    let 고른것 = 이름들[0];                             // 처음에는 첫 매출처만 (겹쳐 보이지 않게)
+    const 알약칸 = document.createElement("div");
+    알약칸.className = "vp-store-pills";
+    const 다시그리기 = () => {
+      알약칸.replaceChildren();
+      for (const [값, 글] of [["", "전부"], ...이름들.map((n) => [n, n])]) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "vp-store-pill";
+        b.textContent = 글;
+        b.setAttribute("aria-pressed", 고른것 === 값 ? "true" : "false");
+        b.addEventListener("click", () => { 고른것 = 값; 다시그리기(); });
+        알약칸.appendChild(b);
+      }
+      for (const 칸 of 줄판) 칸.hidden = !!고른것 && 칸.dataset.store !== 고른것;
+    };
+    다시그리기();
+    return [알약칸, 그릇];
+  }
+
+  /* ② 상세에 **그 상품의 inghome 페이지 링크**를 건다 (맞은 상품에만) */
+  function ing링크(name) {
+    const 것 = ing맞은것.get(name);
+    if (!것 || !것.u) return null;
+    const 줄 = document.createElement("div");
+    줄.className = "vp-ing-link";
+    const a = 줄.appendChild(document.createElement("a"));
+    a.href = 것.u;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = "inghome 에서 보기";
+    const 작게 = 줄.appendChild(document.createElement("small"));
+    작게.textContent = 것.꼴 === "그대로" ? " 이름이 그대로 맞습니다" : " 이름이 거의 맞습니다 — " + 것.t;
+    return 줄;
+  }
+
   function show(name, h, items) {
     panel.dataset.name = name;
     panel._args = [h, items];
     panelTitle.textContent = name;
     if (page.locationTabs) panelBody.replaceChildren(...locationView(h, items));
+    else if (page.nameCol === "상품명")
+      panelBody.replaceChildren(...[ing링크(name), ...매출처별로(h, items)].filter(Boolean));
     else panelBody.replaceChildren(...items.map((row) => detailFields(h, row, linkCell)));
     panel.hidden = false;
   }
@@ -680,13 +784,79 @@
       const group = { b, items: [row] };
       labelGroup(name, group);
       b.addEventListener("click", () => {
-        list.querySelectorAll("button.on").forEach((x) => x.classList.remove("on"));
+        /* ⚠⚠ 10-14 사장님: 「선택된버튼이 검게 변한후 다른선택시 해제되지않고
+             모든 선택된버튼이 검은상태로 유지되는 현상 수정해줘」
+           까닭 — 이름 단추를 담는 통이 **둘**이다. [전체보기] 는 `list`(.vp-goods-list) 하나지만,
+           [현위치별 보기] 는 **현위치마다 제 통**을 만들고(renderPlaces 의 `body`, 같은 class)
+           **같은 단추를 그리로 옮겨 담는다.** 그런데 여기서는 `list` 안에서만 `.on` 을 뗐다.
+           그래서 현위치별 보기에서는 앞의 것이 안 풀려 누른 것이 **다 검게 쌓였다.**
+           (재서 확인: 전체보기 1개 · 현위치별 보기 **3개**)
+           → 통을 가리지 않고 **이름 단추 통 전부**에서 뗀다.
+           ⚠ `.vp-place-head`(현위치 펼침)와 보기 탭도 `.on` 을 쓰지만 **그것들은 이 통 밖**이라
+             건드리지 않는다 — 현위치를 여럿 펼쳐 두신 것은 그대로 남아야 한다. */
+        root.querySelectorAll(".vp-goods-list button.on").forEach((x) => x.classList.remove("on"));
         b.classList.add("on");
         show(name, heads, group.items);
       });
       list.appendChild(b);
       groups.set(name, group);
     }
+  }
+
+  /* ⚠⚠ 10-14 사장님 (상품관리를 짚으시고): 「상품관리 - 상품버튼의 명칭과 inghome 카탈로그
+       작업자 프로그램의 inghome 스크랩된 모든 제품명을 비교하여 연결지을수 있는지 확인하고
+       어느정도 연결점을 찾을 수 있다면 상세에 해당 상품의 페이지링크를 걸고
+       이렇게 링크가 걸린 상품박스 한단에 붉은색 마킹해줘」
+     사장님이 차례를 정해 주셨다 — **① 먼저 맞춰 보고 확인**, 그다음에 링크·붉은 줄.
+     그런데 벤더피아 상품명은 **사장님 컴퓨터에만** 있다(클라우드에서는 벤더피아에 못 들어간다).
+     그래서 **① 세기를 프로그램이 제 손으로** 한다 — 사장님 화면에 숫자만 적는다.
+     ⚠ 아직 **링크도 붉은 줄도 걸지 않는다.** 숫자를 보고 정한다. */
+  const ING깃 = "https://vivivic-cloud.github.io/vivivic-apps/inghome%EC%B9%B4%ED%83%88%EB%A1%9C%EA%B7%B8/data/";
+  /* 맞은 것만 담는다 — 상품명 → { u(그 상품 페이지 주소), t(inghome 이름), 꼴("그대로"/"거의") }
+     ⚠ 남의 회사 **그림은 안 가져온다.** 주소(링크)만 쓴다. */
+  const ing맞은것 = new Map();
+  const 맞춤 = (t) => String(t || "").trim().toLowerCase();        // 이 집의 비교 방식
+  const 바짝 = (t) => String(t || "").toLowerCase()
+    .replace(/\([^)]*\)/g, " ")                                   // 괄호 꼬리말 (색상 따위)
+    .replace(/[^0-9a-z가-힣]/g, "");                                // 빈칸·기호 다 지움
+  async function ing맞춰보기() {
+    if (page.nameCol !== "상품명") return;                         // 상품관리에서만
+    const 적기 = (글, 나쁨) => { ingNote.hidden = false; ingNote.textContent = 글;
+      ingNote.classList.toggle("vp-ing-bad", !!나쁨); };
+    let 목록 = [];
+    try {
+      const 쪽들 = await Promise.all([0, 1, 2, 3].map((i) =>
+        fetch(ING깃 + "p" + i + ".json", { cache: "no-store" }).then((r) => r.ok ? r.json() : [])));
+      목록 = 쪽들.flat();
+    } catch (e) { return 적기("inghome 목록을 못 받았습니다 — " + (e.message || "알 수 없음"), true); }
+    if (!목록.length) return 적기("inghome 목록을 못 받았습니다 (빈 목록)", true);
+    const 그대로 = new Set(목록.map((o) => 맞춤(o.t)).filter(Boolean));
+    const 줄여서 = new Set(목록.map((o) => 바짝(o.t)).filter(Boolean));
+    /* 어느 줄에 걸지 고를 수 있게 이름 → 줄 로 담아 둔다.
+       ⚠ **바짝 줄이면 겹치는 이름이 있다**(쟀다: 684개 중 14개 이름이 32줄로 겹친다).
+         겹치는 이름은 어디에 걸지 고를 수 없으니 **아예 안 건다.** 엉뚱한 데로 보내면 더 나쁘다. */
+    const 그대로줄 = new Map(), 줄인줄 = new Map(), 줄인겹침 = new Set();
+    for (const o of 목록) {
+      const a = 맞춤(o.t), b = 바짝(o.t);
+      if (a && !그대로줄.has(a)) 그대로줄.set(a, o);
+      if (b) { if (줄인줄.has(b)) 줄인겹침.add(b); else 줄인줄.set(b, o); }
+    }
+    const 이름들 = [...groups.keys()];
+    let 딱 = 0, 거의 = 0;
+    ing맞은것.clear();
+    for (const n of 이름들) {
+      const a = 맞춤(n), b = 바짝(n);
+      if (그대로.has(a)) { 딱++; ing맞은것.set(n, { ...그대로줄.get(a), 꼴: "그대로" }); }
+      else if (줄여서.has(b) && !줄인겹침.has(b)) { 거의++; ing맞은것.set(n, { ...줄인줄.get(b), 꼴: "거의" }); }
+      else if (줄여서.has(b)) 거의++;                 // 겹쳐서 못 거는 것 — 세기는 센다
+    }
+    /* ③ 링크가 걸린 상품 단추 **한 단에 붉은색 마킹** (조혼가구 붉은 줄과 같은 색·같은 꼴) */
+    for (const [n, g] of groups) g.b.classList.toggle("vp-ing", ing맞은것.has(n));
+    if (panel.dataset.name) show(panel.dataset.name, ...panel._args);   // 열려 있으면 상세도 새로
+    적기(`inghome 맞춰보기 — 우리 상품 ${이름들.length}개 · inghome ${목록.length}개 · `
+       + `이름이 그대로 맞는 것 ${딱}개 · 거의 맞는 것 ${거의}개`
+       + ` (합쳐 ${딱 + 거의}개, ${이름들.length ? Math.round((딱 + 거의) * 100 / 이름들.length) : 0}%)`
+       + ` · 링크를 건 것 ${ing맞은것.size}개 — 그 단추 밑에 붉은 줄이 그어집니다`);
   }
 
   async function load() {
@@ -711,6 +881,8 @@
       cached.textContent = got1.cachedAt
         ? `${new Date(got1.cachedAt).toTimeString().slice(0, 5)}에 받아 둔 목록 · 새로고침하면 새로 받습니다` : "";
       apply();
+      /* 목록이 다 들어온 뒤에 한 번만 맞춰 본다 (상품관리에서만) */
+      ing맞춰보기();
     } catch (err) {
       if (id === loadId) { loading = false; note.textContent = "불러오지 못했습니다. 다시 로그인한 뒤 시도해 주세요."; }
     }

@@ -42,8 +42,9 @@
     <p id="깔림글">벤더피아를 엽니다…</p>
     <div class="row">
       <a class="btn" href="https://vendorpia.com/" id="열기">벤더피아 열기</a>
-      <button type="button" class="btn light" id="그만">설치 안내 보기</button>
+      <button type="button" class="btn light" id="그만">여기 머물기</button>
     </div>
+    <p class="note" id="머무는법" hidden>머무시려면 <b>「여기 머물기」</b> 를 누르세요. 주소 뒤에 <code>?안내</code> 를 붙여 여시면 아예 안 갑니다.</p>
   </section>
 
   <!-- 확장을 못 찾았을 때 — 왜 설치 안내만 나오는지 바로 보이게 적는다 (사장님 10-13) -->
@@ -77,43 +78,76 @@
   (() => {
     const 표 = new URLSearchParams(location.search);
     const 안내만 = 표.has("안내");
-    /* ⚠ 바이글 박스로 들어왔으면(viggle=1) **보내지 않는다.**
-       사장님 10-13: 「바이글에 올라온 박스를 통해 들어간 프로그램은 모두 짚어서 지시하게
-       되어야 하는데 … 벤더피아연동 짚어서 지시가 안된다」.
-       벤더피아 사이트로 가 버리면 거기엔 손잡이가 없어 **짚을 수가 없다.**
-       그래서 박스로 들어오면 여기 머물며 「벤더피아 열기」 를 한 번 눌러 가신다.
-       맨 주소(바로가기·즐겨찾기)로 들어오면 전처럼 저절로 간다. */
-    const 박스에서 = 표.get("viggle") === "1";
     const 칸 = document.getElementById("깔림");
-    let 시계 = null, 그만둠 = false;
+    const 글 = document.getElementById("깔림글");
+    const 머무는법 = document.getElementById("머무는법");
+    const 로그인 = "https://vendorpia.com/";
+    let 시계 = null, 셈계 = null, 그만둠 = false;
     const 봄 = () => document.documentElement.getAttribute("data-벤더피아연동");
 
-    document.getElementById("그만").addEventListener("click", () => {
-      그만둠 = true; clearTimeout(시계);
-      document.getElementById("깔림글").textContent = "안 갑니다. 위 「벤더피아 열기」 를 누르면 그때 엽니다.";
-    });
+    /* ⚠⚠ 10-14 사장님 (설치 안내 화면에서 짚어 보내신 말씀, 그대로):
+         「이미 확장프로그램이 설치됨을 확인하여 설치되었고 버전이 맞다면
+           프로그램실행시 바로 로그인화면 나오게 해줘」
+       ⚠⚠ 전에 바로 보내기가 **짚기를 잡아먹은** 적이 있다 — 화면이 바로 넘어가 짚을 틈이 없었다.
+          그래서 **머물 길을 반드시 남긴다** — 2초 세면서 「여기 머물기」 를 보이고,
+          그 방법을 화면에 한 줄로 적는다(위 `머무는법`). `?안내` 로 여시면 아예 안 간다. */
+    const 머물기 = (까닭) => { 그만둠 = true; clearTimeout(시계); clearInterval(셈계);
+      글.textContent = 까닭; 머무는법.hidden = true; };
+    document.getElementById("그만").addEventListener("click", () =>
+      머물기("여기 머뭅니다. 꾹 눌러 짚어서 지시하실 수 있습니다. 벤더피아로 가시려면 「벤더피아 열기」 를 누르세요."));
 
-    function 켜기(판) {
-      칸.hidden = false;
-      document.getElementById("깔림제목").textContent = "이 컴퓨터에 깔려 있습니다 (" + 판 + ")";
-      if (안내만) { document.getElementById("깔림글").textContent = "설치 안내를 보고 계십니다."; return; }
-      if (박스에서) {
-        document.getElementById("깔림글").textContent =
-          "바이글 박스로 들어오셨습니다 — 여기서 꾹 눌러 짚어서 지시하실 수 있습니다. "
-          + "벤더피아로 가시려면 아래 「벤더피아 열기」 를 누르세요.";
-        document.getElementById("그만").hidden = true;      // 안 가므로 「설치 안내 보기」 가 할 일이 없다
-        return;
+    /* ⚠⚠ 「판이 맞다」 의 **잣대** — 여기 적는다.
+       잣대는 **「꼭 덮어써야 하는 가장 낮은 판」(아래 `꼭판`)** 이다. 깔린 판이 그보다
+       **낮지 않으면 맞다**고 본다. 깃허브에 올라와 있는 **맨 새 판과는 견주지 않는다.**
+       까닭 — 이 집은 화면 글(`search.js`·`goods.js`·CSS 따위)을 **깃허브에서 바로** 보낸다.
+       그런 고침은 사장님이 **새로고침만** 하시면 되는데, 집 규칙상 판번호는 그때도 올라간다.
+       맨 새 판과 견주면 **고칠 때마다 「덮어쓰세요」** 가 떠서, 안 해도 되는 덮어쓰기를
+       사장님께 시키게 된다. (10-14 에만 두 번 「덮어 써야 하나요?」 물으셨다.)
+       → 그러니 `꼭판` 은 **확장 안의 글**(`manifest.json`·`불러오기.js`·`저장다리.js`·
+         `깔렸다표시.js`)이 바뀌어 **정말로 덮어쓰셔야 할 때만** 올린다.
+       지금 값 0.34.3 — 배송관리 짚기 막음을 `manifest.json` 에서 뺀 판이다(10-14).
+       숫자는 점으로 나눠 앞자리부터 견준다 (0.34.4 > 0.34.3 > 0.9.9). */
+    const 꼭판 = "0.34.3";
+    const 판비교 = (ㄱ, ㄴ) => {
+      const A = String(ㄱ).split("."), B = String(ㄴ).split(".");
+      for (let i = 0; i < Math.max(A.length, B.length); i++) {
+        const x = parseInt(A[i] || "0", 10) || 0, y = parseInt(B[i] || "0", 10) || 0;
+        if (x !== y) return x - y;
       }
-      시계 = setTimeout(() => { if (!그만둠) location.replace("https://vendorpia.com/"); }, 1200);
+      return 0;
+    };
+    function 보내기(말머리) {
+      머무는법.hidden = false;
+      let 남음 = 2;
+      const 적기 = () => { 글.textContent = 말머리 + " " + 남음 + "초 뒤 로그인 화면으로 갑니다."; };
+      적기();
+      셈계 = setInterval(() => { 남음--; if (남음 > 0) 적기(); else clearInterval(셈계); }, 1000);
+      시계 = setTimeout(() => { if (!그만둠) location.replace(로그인); }, 2000);
     }
 
+    function 켜기(깔린판) {
+      칸.hidden = false;
+      document.getElementById("깔림제목").textContent = "이 컴퓨터에 깔려 있습니다 (" + 깔린판 + ")";
+      if (안내만) { 글.textContent = "설치 안내를 보고 계십니다. 벤더피아로 가시려면 「벤더피아 열기」 를 누르세요."; return; }
+      if (판비교(깔린판, 꼭판) < 0) {
+        /* 판이 낮다 — **조용히 보내지 않는다.** 묵은 판으로 가면 왜 안 되는지 아무도 모른다. */
+        칸.style.borderColor = "#e8590c";
+        글.innerHTML = "<b>덮어쓰셔야 합니다.</b> 깔린 판은 <b>" + 깔린판 + "</b> 인데 <b>" + 꼭판
+          + "</b> 이상이어야 합니다. 아래 「압축파일 받기」 로 받아 풀고 「벤더피아보기」 폴더에 덮어쓴 뒤, "
+          + "<code>chrome://extensions</code> 에서 ↻ 를 눌러 주세요. (그래도 지금 가시려면 「벤더피아 열기」)";
+        return;
+      }
+      보내기("판이 맞습니다 (" + 깔린판 + ").");
+    }
+
+    /* ⚠ 표시는 확장이 document_idle 에 남긴다 — 이 글보다 늦을 수 있어 잠깐 기다려 본다. */
     const 판 = 봄();
-    if (판) return 켜기(판);
+    if (판) { 켜기(판); return; }
     let 셈 = 0;                                  // 0.1초마다 열여덟 번, 1.8초까지 기다린다
     const 다시 = setInterval(() => {
       const 판 = 봄();
       if (판) { clearInterval(다시); 켜기(판); }
-      else if (++셈 >= 18){                      // 안 깔린 컴퓨터·폰 — 설치 안내 그대로
+      else if (++셈 >= 18) {                     // 안 깔린 컴퓨터·폰 — 설치 안내 그대로
         clearInterval(다시);
         /* ⚠ 그냥 설치 안내만 보이면 「왜 안 되는지」 를 알 수가 없다. 한 줄로 적어 둔다.
            폰에서는 당연한 일이라 크롬일 때만 적는다. */
