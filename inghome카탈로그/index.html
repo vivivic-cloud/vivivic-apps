@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- inghome 상품 카탈로그 — VG-VER v1.2.0
+<!-- inghome 상품 카탈로그 — VG-VER v1.3.0
      판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다. -->
 <html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>inghome 상품 카탈로그</title>
@@ -114,8 +114,8 @@ details summary{cursor:pointer;font-size:var(--fluid-small);color:var(--accent)}
 .tile .nm{display:block;font-size:20px;line-height:1.22;letter-spacing:-.5px;font-weight:700}
 .tile .pct{display:block;margin:5px 0 0;font-size:12.5px;color:var(--vg-muted)}
 .tile.dark .pct{color:rgba(255,255,255,.62)}
-/* 스크랩할 웹사이트 주소 — 첫 화면에 늘 보인다. 접어 두지 않는다 */
-.ask{margin-top:20px}
+/* 스크랩할 웹사이트 주소 — 첫 화면 맨 위에 늘 보인다. 접어 두지 않는다 */
+.ask{margin:0 0 24px}
 .ask h2{font:700 19px var(--body);letter-spacing:-.4px;margin:0 0 8px}
 .ask form{display:flex;gap:8px}
 .ask input{flex:1 1 auto;min-width:0;font:inherit;font-size:var(--fluid-small);
@@ -126,19 +126,16 @@ details summary{cursor:pointer;font-size:var(--fluid-small);color:var(--accent)}
 .ask button[disabled]{background:var(--vg-muted);cursor:default}
 .ask .say{margin:8px 0 0;font-size:var(--fluid-small);color:var(--vg-soft)}
 .ask .say.bad{color:var(--vg-red)}
+.none{margin:0;font-size:var(--fluid-small);color:var(--vg-soft);
+  background:var(--vg-fill);border-radius:18px;padding:16px 18px}
 .back{font:500 var(--fluid-small) var(--body);color:var(--muted);background:none;border:0;padding:0 0 10px;cursor:pointer;min-height:44px}
 </style>
 
-<div class="vgbar"><b>VIVIVIC</b><span class="ver">v1.2.0</span></div>
+<div class="vgbar"><b>VIVIVIC</b><span class="ver">v1.3.0</span></div>
 
 <div class="wrap home" id="home">
-  <h1>스크랩한 회사</h1>
-  <div class="tiles">
-    <button type="button" class="tile light" id="open-inghome">
-      <span class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M9 21v-7h6v7"/></svg></span>
-      <span><span class="nm">inghome</span><span class="pct">스크랩 위치 1곳</span></span>
-    </button>
-  </div>
+  <!-- 사장님 10-14 08:30: 「이미 스크랩되어 박스가 만들어 지면 스크랩할 주소
+       넣는 칸 아래로 나열해줘」 — 넣는 자리가 늘 맨 위다 -->
   <div class="ask">
     <h2>스크랩할 웹사이트 주소</h2>
     <!-- novalidate — 브라우저가 제 말풍선을 띄우고 멈추면 우리 알림 줄이 안 뜬다.
@@ -150,6 +147,15 @@ details summary{cursor:pointer;font-size:var(--fluid-small);color:var(--accent)}
     </form>
     <p class="say" id="ask-say" hidden></p>
   </div>
+  <h1>스크랩한 회사</h1>
+  <div class="tiles" id="sites">
+    <button type="button" class="tile light" id="open-inghome">
+      <span class="ico"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M9 21v-7h6v7"/></svg></span>
+      <span><span class="nm">inghome</span><span class="pct">스크랩 위치 1곳</span></span>
+    </button>
+  </div>
+  <!-- 조용히 비는 것이 제일 나쁘다 — 회사가 하나도 없으면 이 줄이 뜬다 -->
+  <p class="none" id="no-site" hidden>아직 긁어 둔 회사가 없습니다. 위에 주소를 넣어 주세요.</p>
 </div>
 <div class="wrap home" id="site" hidden>
   <button type="button" class="back" id="back-site">← 스크랩한 회사</button>
@@ -286,6 +292,8 @@ $("grid").addEventListener("click",e=>{const b=e.target.closest("[data-open]");i
 $("modal").addEventListener("click",e=>{if(e.target.id==="modal"||e.target.id==="close")closeSheet()});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("modal").hidden)closeSheet()});
 function show(id){["home","site","cat"].forEach(k=>$(k).hidden=k!==id);window.scrollTo(0,0)}
+/* 긁어 둔 회사가 하나도 없으면 빈 채로 두지 않는다 */
+$("no-site").hidden=$("sites").childElementCount>0;
 $("open-inghome").addEventListener("click",()=>show("site"));
 $("back-site").addEventListener("click",()=>show("home"));
 $("open-site").addEventListener("click",()=>show("cat"));
