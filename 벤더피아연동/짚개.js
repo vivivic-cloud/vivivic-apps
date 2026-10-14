@@ -58,6 +58,10 @@
     /* 손잡이가 **붙은 뒤**에 난 탈이면 다 적는다. 벤더피아 제 탈까지 적으면 시끄럽지만,
        지금은 왜 판이 안 뜨는지 아는 것이 먼저다. 터진 말이 제일 빠른 길이다. */
     if (!window.__vp손잡이붙음 && !/viggle|손잡이|vg-/.test(글 + " " + 어디)) return;
+    /* ⚠ 10-14 — 바깥 글·꾸밈 거부로 터지면 브라우저가 **빈 말**을 준다. 그때 전에는
+       「짚기 v0.34.1 터졌습니다 — 」 만 떴다 (잰 값으로 확인). 아무 쓸모가 없고,
+       붉은 줄이 떴다는 것만으로 다른 길(딱지)까지 가린다. **말이 비면 띄우지 않는다.** */
+    if (!글.trim()) return;
     if (innerWidth < 320 || innerHeight < 240) return;
     const 옛 = document.getElementById("vp-탈"); if (옛) 옛.remove();   // 터진 말이 더 쓸모 있다
     const 줄 = document.createElement("div");
