@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- 버전: 아래 #ver 배지와 같다. 고칠 때마다 둘을 같이 올린다: v1.5.0 -->
+<!-- 버전: 아래 #ver 배지와 같다. 고칠 때마다 둘을 같이 올린다: v1.5.1 -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -83,7 +83,7 @@ button.sm{padding:10px 14px;font-size:14px}
 </div></div>
 
 <div id="msg"></div>
-<div id="ver">v1.5.0</div>
+<div id="ver">v1.5.1</div>
 <script>
 // Google Cloud Console 에서 만든 OAuth 웹 클라이언트 ID
 const CLIENT_ID = '830175660542-r1fiqhs9jc5g33t6t7aeqhm0e7r4ru2p.apps.googleusercontent.com';
@@ -196,6 +196,20 @@ function showEditor(wavBlob) {
     plugins: [regions, WaveSurfer.Minimap.create({ height: 36, waveColor: '#3a4652', progressColor: '#5a7aa8', overlayColor: 'rgba(255,255,255,.12)', insertPosition: 'beforebegin' })]
   });
   ws.loadBlob(wavBlob);
+
+  // 아이폰 사파리는 재생 시각(currentTime)을 띄엄띄엄 올려 준다 — 그 사이 막대가 멎었다가 툭 뛴다.
+  // 재생 중에는 마지막으로 받은 시각에서 흐른 시간만큼 이어 그려 막대가 매 화면마다 움직이게 한다.
+  const media = ws.getMediaElement();
+  let anchorT = -1, anchorAt = 0, shown = 0;
+  ws.getCurrentTime = () => {
+    const m = media.currentTime;
+    if (media.paused || media.seeking) { anchorT = -1; return (shown = m); }
+    const now = performance.now();
+    if (m !== anchorT) { if (m < anchorT) shown = m; anchorT = m; anchorAt = now; }   // 뒤로 옮겼으면 그대로 따른다
+    let t = anchorT + Math.min((now - anchorAt) / 1000 * media.playbackRate, 0.5);
+    if (t < shown && shown - t < 0.5) t = shown;   // 조금 앞서 갔으면 뒤로 튀지 않고 기다린다
+    return (shown = Math.min(t, ws.getDuration()));
+  };
 
   ws.on('timeupdate', t => { timeEl.textContent = fmt(t); });
   ws.on('play', () => { playBtn.textContent = '❚❚ 멈춤'; });
