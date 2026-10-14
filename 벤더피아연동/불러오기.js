@@ -47,7 +47,9 @@
      이것만 보면 「덮어썼나 안 썼나」 와 「왜 짚기가 안 되나」 가 한눈에 갈린다. */
   /* ⚠ 틀(frameset) 안에서는 이 글이 **틀마다** 돈다. 작은 틀(가름줄·숨은 틀)에까지
      딱지를 붙이면 화면이 지저분해진다. 사람이 보는 크기일 때만 붙인다. */
-  const 볼만한틀 = () => (innerWidth >= 320 && innerHeight >= 240);
+  /* ⚠ 10-14 — 전에는 작은 틀에 딱지를 안 붙였다. 그래서 사장님이 보시는 화면에서
+     딱지가 아예 안 뜨는 일이 생겼다. 이제 **아주 작은 틀만** 뺀다. */
+  const 볼만한틀 = () => (innerWidth >= 200 && innerHeight >= 80);
   function 딱지(글자, 나쁨) {
     if (!볼만한틀()) return;
     const d = document.getElementById("vp-판") || document.createElement("div");
@@ -57,6 +59,19 @@
       + "font:600 11px/1.4 sans-serif;padding:3px 7px;border-radius:9px;pointer-events:none";
     if (!d.parentNode) (document.body || document.documentElement).appendChild(d);
   }
+
+  /* ⚠⚠ 10-14 사장님: 판번호는 0.33.0 이 맞는데 **왼쪽 아래 딱지가 안 보인다**.
+     딱지는 화면에 그리는 것이라 남의 CSS·틀·크기에 얼마든지 가려진다.
+     그래서 **아무도 못 가리는 자리**에 표를 남긴다 — **창 제목(탭 글자)**이다.
+     제목은 맨 위 문서의 것이고 CSS 와 상관없다. 탭에 「·짚기v0.33.1」 이 보이면
+     확장이 그 화면까지 **닿은 것**이고, 안 보이면 **아예 안 닿은 것**이다. 이것으로 갈린다.
+     ⚠ 틀 문서(FRAMESET)에서 돌아서기 **전에** 찍는다 — 틀 문서가 바로 그 맨 위 창이다. */
+  try {
+    const 꼭 = window.top || window;
+    if (꼭.document && !/·짚기v/.test(꼭.document.title || "")) {
+      꼭.document.title = (꼭.document.title || "벤더피아") + " ·짚기v" + chrome.runtime.getManifest().version;
+    }
+  } catch (e) {}
 
   if (!document.body || document.body.tagName === "FRAMESET") return;   // 틀 문서엔 아무것도 안 그려진다
 
