@@ -132,6 +132,7 @@
         <span class="vp-dates" ${page.noDates ? "hidden" : ""}><input type="date" name="from"><span>~</span><input type="date" name="to"></span>
       </div>
       <div class="vp-note">불러오는 중…</div>
+      <div class="vp-ing-note" hidden></div>
       <div class="vp-cached"></div>
       <div class="vp-loc-tabs vp-chips" hidden>
         <button type="button" class="on" data-view="all">전체보기</button>
@@ -167,6 +168,7 @@
   const note = root.querySelector(".vp-note");
   const cached = root.querySelector(".vp-cached");
   const list = root.querySelector(".vp-goods-list");
+  const ingNote = root.querySelector(".vp-ing-note");
   const more = root.querySelector(".vp-more");
   const locTabs = root.querySelector(".vp-loc-tabs");
   const placesList = root.querySelector(".vp-places-list");
@@ -739,6 +741,44 @@
     }
   }
 
+  /* ⚠⚠ 10-14 사장님 (상품관리를 짚으시고): 「상품관리 - 상품버튼의 명칭과 inghome 카탈로그
+       작업자 프로그램의 inghome 스크랩된 모든 제품명을 비교하여 연결지을수 있는지 확인하고
+       어느정도 연결점을 찾을 수 있다면 상세에 해당 상품의 페이지링크를 걸고
+       이렇게 링크가 걸린 상품박스 한단에 붉은색 마킹해줘」
+     사장님이 차례를 정해 주셨다 — **① 먼저 맞춰 보고 확인**, 그다음에 링크·붉은 줄.
+     그런데 벤더피아 상품명은 **사장님 컴퓨터에만** 있다(클라우드에서는 벤더피아에 못 들어간다).
+     그래서 **① 세기를 프로그램이 제 손으로** 한다 — 사장님 화면에 숫자만 적는다.
+     ⚠ 아직 **링크도 붉은 줄도 걸지 않는다.** 숫자를 보고 정한다. */
+  const ING깃 = "https://vivivic-cloud.github.io/vivivic-apps/inghome%EC%B9%B4%ED%83%88%EB%A1%9C%EA%B7%B8/data/";
+  const 맞춤 = (t) => String(t || "").trim().toLowerCase();        // 이 집의 비교 방식
+  const 바짝 = (t) => String(t || "").toLowerCase()
+    .replace(/\([^)]*\)/g, " ")                                   // 괄호 꼬리말 (색상 따위)
+    .replace(/[^0-9a-z가-힣]/g, "");                                // 빈칸·기호 다 지움
+  async function ing맞춰보기() {
+    if (page.nameCol !== "상품명") return;                         // 상품관리에서만
+    const 적기 = (글, 나쁨) => { ingNote.hidden = false; ingNote.textContent = 글;
+      ingNote.classList.toggle("vp-ing-bad", !!나쁨); };
+    let 목록 = [];
+    try {
+      const 쪽들 = await Promise.all([0, 1, 2, 3].map((i) =>
+        fetch(ING깃 + "p" + i + ".json", { cache: "no-store" }).then((r) => r.ok ? r.json() : [])));
+      목록 = 쪽들.flat();
+    } catch (e) { return 적기("inghome 목록을 못 받았습니다 — " + (e.message || "알 수 없음"), true); }
+    if (!목록.length) return 적기("inghome 목록을 못 받았습니다 (빈 목록)", true);
+    const 그대로 = new Set(목록.map((o) => 맞춤(o.t)).filter(Boolean));
+    const 줄여서 = new Set(목록.map((o) => 바짝(o.t)).filter(Boolean));
+    const 이름들 = [...groups.keys()];
+    let 딱 = 0, 거의 = 0;
+    for (const n of 이름들) {
+      if (그대로.has(맞춤(n))) 딱++;
+      else if (줄여서.has(바짝(n))) 거의++;
+    }
+    적기(`inghome 맞춰보기 — 우리 상품 ${이름들.length}개 · inghome ${목록.length}개 · `
+       + `이름이 그대로 맞는 것 ${딱}개 · 거의 맞는 것 ${거의}개`
+       + ` (합쳐 ${딱 + 거의}개, ${이름들.length ? Math.round((딱 + 거의) * 100 / 이름들.length) : 0}%)`
+       + ` — 아직 링크는 걸지 않았습니다`);
+  }
+
   async function load() {
     const id = ++loadId;
     groups.clear();
@@ -761,6 +801,8 @@
       cached.textContent = got1.cachedAt
         ? `${new Date(got1.cachedAt).toTimeString().slice(0, 5)}에 받아 둔 목록 · 새로고침하면 새로 받습니다` : "";
       apply();
+      /* 목록이 다 들어온 뒤에 한 번만 맞춰 본다 (상품관리에서만) */
+      ing맞춰보기();
     } catch (err) {
       if (id === loadId) { loading = false; note.textContent = "불러오지 못했습니다. 다시 로그인한 뒤 시도해 주세요."; }
     }
