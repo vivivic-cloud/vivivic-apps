@@ -680,7 +680,17 @@
       const group = { b, items: [row] };
       labelGroup(name, group);
       b.addEventListener("click", () => {
-        list.querySelectorAll("button.on").forEach((x) => x.classList.remove("on"));
+        /* ⚠⚠ 10-14 사장님: 「선택된버튼이 검게 변한후 다른선택시 해제되지않고
+             모든 선택된버튼이 검은상태로 유지되는 현상 수정해줘」
+           까닭 — 이름 단추를 담는 통이 **둘**이다. [전체보기] 는 `list`(.vp-goods-list) 하나지만,
+           [현위치별 보기] 는 **현위치마다 제 통**을 만들고(renderPlaces 의 `body`, 같은 class)
+           **같은 단추를 그리로 옮겨 담는다.** 그런데 여기서는 `list` 안에서만 `.on` 을 뗐다.
+           그래서 현위치별 보기에서는 앞의 것이 안 풀려 누른 것이 **다 검게 쌓였다.**
+           (재서 확인: 전체보기 1개 · 현위치별 보기 **3개**)
+           → 통을 가리지 않고 **이름 단추 통 전부**에서 뗀다.
+           ⚠ `.vp-place-head`(현위치 펼침)와 보기 탭도 `.on` 을 쓰지만 **그것들은 이 통 밖**이라
+             건드리지 않는다 — 현위치를 여럿 펼쳐 두신 것은 그대로 남아야 한다. */
+        root.querySelectorAll(".vp-goods-list button.on").forEach((x) => x.classList.remove("on"));
         b.classList.add("on");
         show(name, heads, group.items);
       });
