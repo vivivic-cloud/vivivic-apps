@@ -20,6 +20,9 @@
           손잡이가 아예 없었다 — 「본 메뉴에 들어가서도 안된다」.
      그래서 ① 집 꼴에 `all_frames` 를 켜 **틀 안쪽마다** 붙이고,
             ② 틀 문서 자체에는 **안 붙인다**(아래 두 줄). */
+  /* 판번호를 붉은 줄에도 적는다 — 사장님이 그 한 줄만 보시면 「덮어썼나」 까지 갈린다 */
+  const 판번호 = () => { try { return "v" + chrome.runtime.getManifest().version; } catch (e) { return "v?"; } };
+
   if (!document.body || document.body.tagName === "FRAMESET") return;
   if (window.__vp짚개) return;                       // 한 문서에 두 번 붙지 않는다
   window.__vp짚개 = true;
@@ -59,7 +62,7 @@
     const 옛 = document.getElementById("vp-탈"); if (옛) 옛.remove();   // 터진 말이 더 쓸모 있다
     const 줄 = document.createElement("div");
     줄.id = "vp-탈";
-    줄.textContent = "짚기가 터졌습니다 — " + 글.slice(0, 160);
+    줄.textContent = "짚기 " + 판번호() + " 터졌습니다 — " + 글.slice(0, 160);
     줄.style.cssText = "position:fixed;left:0;right:0;top:0;z-index:2147483647;background:#c92a2a;"
       + "color:#fff;font:600 12px/1.5 sans-serif;padding:8px 12px;text-align:center;word-break:break-all";
     (document.body || document.documentElement).appendChild(줄);
@@ -73,7 +76,7 @@
     if (document.getElementById("vp-탈")) return;              // 터진 말이 이미 적혔으면 그대로 둔다
     const 줄 = document.createElement("div");
     줄.id = "vp-탈";
-    줄.textContent = "짚기 — 테는 칠했는데 지시판이 안 떴습니다 (틀 "
+    줄.textContent = "짚기 " + 판번호() + " — 테는 칠했는데 지시판이 안 떴습니다 (틀 "
       + innerWidth + "×" + innerHeight + ", " + (window.top === window ? "맨 위" : "틀 안쪽") + ")";
     줄.style.cssText = "position:fixed;left:0;right:0;top:0;z-index:2147483647;background:#c92a2a;"
       + "color:#fff;font:600 12px/1.5 sans-serif;padding:8px 12px;text-align:center";
