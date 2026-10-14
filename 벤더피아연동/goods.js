@@ -556,12 +556,29 @@
     return [알약칸, 그릇];
   }
 
+  /* ② 상세에 **그 상품의 inghome 페이지 링크**를 건다 (맞은 상품에만) */
+  function ing링크(name) {
+    const 것 = ing맞은것.get(name);
+    if (!것 || !것.u) return null;
+    const 줄 = document.createElement("div");
+    줄.className = "vp-ing-link";
+    const a = 줄.appendChild(document.createElement("a"));
+    a.href = 것.u;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    a.textContent = "inghome 에서 보기";
+    const 작게 = 줄.appendChild(document.createElement("small"));
+    작게.textContent = 것.꼴 === "그대로" ? " 이름이 그대로 맞습니다" : " 이름이 거의 맞습니다 — " + 것.t;
+    return 줄;
+  }
+
   function show(name, h, items) {
     panel.dataset.name = name;
     panel._args = [h, items];
     panelTitle.textContent = name;
     if (page.locationTabs) panelBody.replaceChildren(...locationView(h, items));
-    else if (page.nameCol === "상품명") panelBody.replaceChildren(...매출처별로(h, items));
+    else if (page.nameCol === "상품명")
+      panelBody.replaceChildren(...[ing링크(name), ...매출처별로(h, items)].filter(Boolean));
     else panelBody.replaceChildren(...items.map((row) => detailFields(h, row, linkCell)));
     panel.hidden = false;
   }
@@ -795,6 +812,9 @@
      그래서 **① 세기를 프로그램이 제 손으로** 한다 — 사장님 화면에 숫자만 적는다.
      ⚠ 아직 **링크도 붉은 줄도 걸지 않는다.** 숫자를 보고 정한다. */
   const ING깃 = "https://vivivic-cloud.github.io/vivivic-apps/inghome%EC%B9%B4%ED%83%88%EB%A1%9C%EA%B7%B8/data/";
+  /* 맞은 것만 담는다 — 상품명 → { u(그 상품 페이지 주소), t(inghome 이름), 꼴("그대로"/"거의") }
+     ⚠ 남의 회사 **그림은 안 가져온다.** 주소(링크)만 쓴다. */
+  const ing맞은것 = new Map();
   const 맞춤 = (t) => String(t || "").trim().toLowerCase();        // 이 집의 비교 방식
   const 바짝 = (t) => String(t || "").toLowerCase()
     .replace(/\([^)]*\)/g, " ")                                   // 괄호 꼬리말 (색상 따위)
@@ -812,16 +832,31 @@
     if (!목록.length) return 적기("inghome 목록을 못 받았습니다 (빈 목록)", true);
     const 그대로 = new Set(목록.map((o) => 맞춤(o.t)).filter(Boolean));
     const 줄여서 = new Set(목록.map((o) => 바짝(o.t)).filter(Boolean));
+    /* 어느 줄에 걸지 고를 수 있게 이름 → 줄 로 담아 둔다.
+       ⚠ **바짝 줄이면 겹치는 이름이 있다**(쟀다: 684개 중 14개 이름이 32줄로 겹친다).
+         겹치는 이름은 어디에 걸지 고를 수 없으니 **아예 안 건다.** 엉뚱한 데로 보내면 더 나쁘다. */
+    const 그대로줄 = new Map(), 줄인줄 = new Map(), 줄인겹침 = new Set();
+    for (const o of 목록) {
+      const a = 맞춤(o.t), b = 바짝(o.t);
+      if (a && !그대로줄.has(a)) 그대로줄.set(a, o);
+      if (b) { if (줄인줄.has(b)) 줄인겹침.add(b); else 줄인줄.set(b, o); }
+    }
     const 이름들 = [...groups.keys()];
     let 딱 = 0, 거의 = 0;
+    ing맞은것.clear();
     for (const n of 이름들) {
-      if (그대로.has(맞춤(n))) 딱++;
-      else if (줄여서.has(바짝(n))) 거의++;
+      const a = 맞춤(n), b = 바짝(n);
+      if (그대로.has(a)) { 딱++; ing맞은것.set(n, { ...그대로줄.get(a), 꼴: "그대로" }); }
+      else if (줄여서.has(b) && !줄인겹침.has(b)) { 거의++; ing맞은것.set(n, { ...줄인줄.get(b), 꼴: "거의" }); }
+      else if (줄여서.has(b)) 거의++;                 // 겹쳐서 못 거는 것 — 세기는 센다
     }
+    /* ③ 링크가 걸린 상품 단추 **한 단에 붉은색 마킹** (조혼가구 붉은 줄과 같은 색·같은 꼴) */
+    for (const [n, g] of groups) g.b.classList.toggle("vp-ing", ing맞은것.has(n));
+    if (panel.dataset.name) show(panel.dataset.name, ...panel._args);   // 열려 있으면 상세도 새로
     적기(`inghome 맞춰보기 — 우리 상품 ${이름들.length}개 · inghome ${목록.length}개 · `
        + `이름이 그대로 맞는 것 ${딱}개 · 거의 맞는 것 ${거의}개`
        + ` (합쳐 ${딱 + 거의}개, ${이름들.length ? Math.round((딱 + 거의) * 100 / 이름들.length) : 0}%)`
-       + ` — 아직 링크는 걸지 않았습니다`);
+       + ` · 링크를 건 것 ${ing맞은것.size}개 — 그 단추 밑에 붉은 줄이 그어집니다`);
   }
 
   async function load() {

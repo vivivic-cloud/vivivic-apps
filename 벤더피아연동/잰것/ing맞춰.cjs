@@ -93,7 +93,24 @@ var VP_JOHON_PARTS = [];`;
   const 적힌 = (본것.글||'').match(/그대로 맞는 것 (\d+)개 · 거의 맞는 것 (\d+)개/);
   const 셈맞나 = 적힌 && Number(적힌[1]) === 답딱 && Number(적힌[2]) === 답거의;
   console.log('  **셈이 맞나**: ' + (적힌 ? (셈맞나 ? '맞다 ✓' : '틀리다 ✗ (적힌 것 ' + 적힌[1] + '/' + 적힌[2] + ')') : '못 읽었다'));
-  console.log('  ⚠ 링크를 건 것: ' + 본것.링크수 + '개 · 붉은 마킹: ' + 본것.붉은줄수 + '개  (둘 다 0이어야 맞다 — 아직 안 건다)');
+  /* ⚠ 링크는 **상세를 열어야** 생긴다. 목록만 떠 있을 때 0개인 것이 맞다. */
+  console.log('  목록만 떠 있을 때 링크: ' + 본것.링크수 + '개 (상세를 열어야 생기니 0이 맞다)');
+  console.log('  **붉은 마킹 단추: ' + 본것.붉은줄수 + '개** (맞은 수 ' + (답딱+답거의) + '개와 같아야 한다)');
+  /* 상세를 열어 링크가 진짜로 걸렸나 본다 — 맞은 상품 하나와 안 맞은 상품 하나 */
+  const 열고보기 = async (글자) => {
+    await page.evaluate((t) => { const b=[...document.querySelectorAll("#vp-root .vp-goods-list button")]
+      .find(x=>(x.textContent||"").startsWith(t)); b && b.click(); }, 글자);
+    await page.waitForTimeout(300);
+    return page.evaluate(() => { const a=document.querySelector("#vp-root .vp-goods-panel .vp-ing-link a");
+      return { 링크있나: !!a, 주소: a ? a.href.slice(0, 62) : null,
+               새창: a ? a.target : null,
+               곁글: (document.querySelector("#vp-root .vp-goods-panel .vp-ing-link small")||{}).textContent || null }; });
+  };
+  console.log('\n  [맞은 상품 상세] ' + JSON.stringify(await 열고보기(상품이름[0])));
+  console.log('  [안 맞은 상품 상세] ' + JSON.stringify(await 열고보기('없는상품 가가가')) + '  (링크 없어야 맞다)');
+  const 붉은목록 = await page.evaluate(() => [...document.querySelectorAll("#vp-root .vp-goods-list button.vp-ing")]
+    .map(b => (b.textContent||'').slice(0,22)));
+  console.log('  붉은 줄이 그어진 단추: ' + JSON.stringify(붉은목록));
   if (탈.length) console.log('  터진 말: ' + JSON.stringify([...new Set(탈)].slice(0,2)));
   await b.close();
 })();
