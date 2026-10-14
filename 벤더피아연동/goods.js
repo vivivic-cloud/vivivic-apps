@@ -212,6 +212,46 @@
   modal.querySelector("button").addEventListener("click", () => { modal.hidden = true; });
   modal.addEventListener("click", (e) => { if (e.target === modal) modal.hidden = true; });
 
+  /* ⚠⚠ 10-14 사장님 (단품 상세 팝업을 짚으시고): 「상세팝업 외부바탕화면 클릭시 상세팝업 닫히게 해줘」
+     팝업이 넷인데 **상세 창만** 바깥 닫기가 없었다 —
+       .vp-modal(연결된 항목) · .vp-notice(안내) · .vp-edge-pop(부속 도면) → 이미 있었다
+       .vp-goods-panel(상세 창)                                          → **없었다. 여기에 넣는다.**
+     상세 창은 어두운 뒤바탕이 없는 **떠 있는 카드**라, 「바깥을 눌렀다」 를 이렇게 가린다 —
+       ㄱ) 누르기 시작한 자리와 뗀 자리가 **둘 다 상세 창 바깥**일 때만 닫는다
+           (카드 안을 누르다 끌어서 밖에서 뗀 것에 안 닫힌다. 카드 속을 눌러 닫히면 더 나쁘다.)
+       ㄴ) ⚠ **0.5초 넘게 누른 것은 짚어서 지시하기다** — 그때는 안 닫는다.
+           사장님이 꾹 눌러 짚으시면 손을 뗄 때 click 이 떨어지는데, 그것으로 닫히면 안 된다.
+           (`shared/viggle.js` 도 같은 탈을 겪어 거기서는 click 하나를 흘려보내 풀었다.)
+       ㄷ) 위에 다른 팝업(연결·안내·부속)이 떠 있으면 그 뒤바탕을 누른 것이니 상세 창은 그대로 둔다. */
+  const 안에있나 = (el, 고르개) => !!(el && el.closest && el.closest(고르개));
+  const 상세밖인가 = (t) => !panel.hidden && !(panel.contains && panel.contains(t))
+    && !안에있나(t, ".vp-modal, .vp-notice");
+  let 누른때 = 0, 밖에서눌렀다 = false;
+  addEventListener("mousedown", (e) => {
+    누른때 = Date.now(); 밖에서눌렀다 = 상세밖인가(e.target);
+  }, true);
+  addEventListener("mouseup", (e) => {
+    if (!밖에서눌렀다) return;
+    밖에서눌렀다 = false;
+    if (Date.now() - 누른때 >= 500) return;            // 꾹 누른 것 = 짚어서 지시하기
+    if (!상세밖인가(e.target)) return;                 // 뗀 자리가 상세 창 안이면 안 닫는다
+    panel.hidden = true; delete panel.dataset.name;
+  }, true);
+
+  /* ESC 로도 닫는다 — **맨 위의 것 하나만.** (넷 다 같은 꼴이 되게) */
+  const 맨위팝업 = () => {
+    const 덮개 = [...root.querySelectorAll(".vp-notice")].pop();   // 안내·부속 (나중 것이 맨 위)
+    if (덮개) return () => 덮개.remove();
+    if (!modal.hidden) return () => { modal.hidden = true; };
+    if (!panel.hidden) return () => { panel.hidden = true; delete panel.dataset.name; };
+    return null;
+  };
+  addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    const 닫기 = 맨위팝업(); if (!닫기) return;
+    e.preventDefault(); 닫기();
+  });
+
   // 연결된 화면의 항목을 팝업으로 보여준다. "…로 가기"는 그 화면에서 이 항목만 보이게 연다
   function popup(title, heads, rows, findBy) {
     modalTitle.textContent = title;
