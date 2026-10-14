@@ -1,4 +1,4 @@
-/* peekit — 네이버 브랜드스토어 상품 수집기 · VG-VER v1.6.0
+/* peekit — 네이버 브랜드스토어 상품 수집기 · VG-VER v1.7.0
    판 번호는 index.html 머리띠 배지와 같다. 고칠 때 둘을 같이 올린다.
 
    왜 이 꼴인가 —
@@ -12,12 +12,18 @@
      1. 브랜드스토어를 크롬에서 연다.  https://brand.naver.com/inggagu
      2. F12 → 위쪽 Console 칸.  (처음이면 「붙여넣기 허용」 을 물어본다 →
         칸에 allow pasting 이라 적고 Enter 한 번, 그 다음 아래 글을 붙인다)
-     3. 이 글을 붙여 넣고 Enter. 끝나면 n0.json 이 저절로 내려온다.
-     4. 그 n0.json 을 바이글에게 보내 주시면 담아 넣습니다.
+     3. 이 글을 붙여 넣고 Enter. 그러고 기다리시면 끝이다.
+     4. 받는 족족 화베(파이어스토어)의 cat_naver 에 바로 담긴다. 폰에서 peekit 을
+        열면 그대로 보인다 — 파일을 옮기실 일이 없다.
+        화베가 막히면 그때만 n0.json 이 내려온다. 그 파일만 바이글에게 주시면 된다.
 
    줄 꼴은 data/p*.json(inghome) 과 같다 — t·n·u·img·c·cp·sp·o·cw·th.
    th(썸네일)는 비워 둔다. 네이버 그림 서버(shop-phinf.pstatic.net)가 이 상자에서
-   막혀 있어 작은 그림을 만들 수 없다. img 에 주소만 담는다.                      */
+   막혀 있어 작은 그림을 만들 수 없다. img 에 주소만 담는다.
+
+   아래 창고 주소와 웹 열쇠는 index.html·shared/viggle.js 에 이미 적혀 있는 것과
+   같다. 브라우저가 들고 다니는 공개된 표다 — 숨기는 낱말이 아니다.
+   담는 자리는 cat_naver 다. vp_ 로 시작하지 않으니 익명 토큰으로 쓰기가 된다.    */
 
 (async () => {
   'use strict';
@@ -34,6 +40,52 @@
   }
   const 가게 = (location.pathname.split('/')[1] || '').trim();
   if (!가게) { 로그('가게 이름을 주소에서 못 읽었습니다. 가게 첫 화면에서 돌려 주세요.'); return; }
+
+  /* ── 화베(파이어스토어) ──────────────────────────────────────────
+     한 줄 = 한 문서, 문서 id 는 상품번호다. 그래야 다시 긁어도 덮어써지고
+     겹치지 않는다. 통째로 한 문서에 넣지 않는다(한 문서 1MB 가 끝이다).      */
+  const VG_PROJ = 'vivivic-4b7ef';
+  const VG_KEY = 'AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs';
+  const VG_창고 = `https://firestore.googleapis.com/v1/projects/${VG_PROJ}/databases/(default)/documents/artifacts/${VG_PROJ}/public/data`;
+  const VG_칸 = 'cat_naver';
+
+  let 토큰 = null, 토큰끝 = 0;
+  async function vg토큰() {
+    if (토큰 && Date.now() < 토큰끝 - 300000) return 토큰;   /* 5분 남으면 새로 받는다 */
+    const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${VG_KEY}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ returnSecureToken: true }) });
+    if (!r.ok) throw new Error('화베에 들어가지 못했습니다 (' + r.status + ')');
+    const d = await r.json();
+    토큰 = d.idToken; 토큰끝 = Date.now() + 3300000;
+    return 토큰;
+  }
+  const vg값 = v => v === null || v === undefined ? { nullValue: null }
+    : typeof v === 'boolean' ? { booleanValue: v }
+    : typeof v === 'number' ? (Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v })
+    : Array.isArray(v) ? { arrayValue: { values: v.map(vg값) } }
+    : typeof v === 'object' ? { mapValue: { fields: Object.fromEntries(Object.entries(v).map(([k, x]) => [k, vg값(x)])) } }
+    : { stringValue: String(v) };
+
+  /* 한 줄을 담는다. 담았으면 true. 거절당하면 2s·4s·8s 로 물러나며 다시 */
+  async function 화베담기(줄) {
+    const id = String(줄.n).replace(/[^0-9A-Za-z_-]/g, '');
+    if (!id) return false;
+    for (let i = 0; i < 4; i++) {
+      try {
+        const tok = await vg토큰();
+        const r = await fetch(`${VG_창고}/${VG_칸}/${id}`, {
+          method: 'PATCH',
+          headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields: Object.fromEntries(Object.entries(줄).map(([k, v]) => [k, vg값(v)])) })
+        });
+        if (r.ok) return true;
+        if (r.status === 401 || r.status === 403) { 토큰 = null; }   /* 토큰이 쉬었다 — 새로 받는다 */
+        if (r.status >= 400 && r.status < 500 && r.status !== 401 && r.status !== 403 && r.status !== 429) return false;
+      } catch (e) { /* 그물이 끊겼다 — 물러나며 다시 */ }
+      await 잠깐(2000 * 2 ** i);
+    }
+    return false;
+  }
 
   /* 집어온다 — 429·5xx 면 2s·4s·8s·16s 로 물러나며 다시. 몰아치지 않는다 */
   async function 받기(길) {
@@ -195,7 +247,14 @@
     return { hidden: false, count: 줄.length, rowName: A, mode: 'list', list, base: 바닥, colors: [], sizes: 값들, add: [] };
   }
 
+  /* 긴 일을 시작하기 전에 화베 문이 열리는지 먼저 본다 —
+     45분 긁고 나서 못 담는 것을 아는 것보다 2초에 아는 쪽이 낫다 */
+  let 화베된다 = true;
+  try { await vg토큰(); 로그('화베 문 열렸습니다 — 받는 족족 담습니다.'); }
+  catch (e) { 화베된다 = false; 로그('화베에 못 들어갔습니다(' + e.message + '). 그래도 끝까지 긁고 파일로 내려 드립니다.'); }
+
   const 줄들 = [];
+  let 담긴 = 0, 못담은 = 0;
   로그(`상품 ${묶음.length}개의 옵션표를 받습니다 — 한 개에 3~5초, 어림 ${Math.ceil(묶음.length * 4 / 60)}분입니다. 창을 닫지 마세요.`);
 
   for (let i = 0; i < 묶음.length; i++) {
@@ -216,7 +275,7 @@
     const 상세 = await 받기(`/n/v2/channels/${ch}/products/${no}`) || await 받기(`/n/v1/channels/${ch}/products/${no}`);
     const o = 옵션꼴(상세, 이름, 팔값);
 
-    줄들.push({
+    const 줄 = {
       n: /^\d+$/.test(no) ? Number(no) : no,
       t: 이름,
       c: 분류(상세 || p),
@@ -227,23 +286,40 @@
       th: '',                                   /* 그림 서버가 막혀 비워 둔다 */
       o,
       cw: o.colors
-    });
+    };
+    줄들.push(줄);
+
+    /* 받는 족족 담는다 — 중간에 창이 닫혀도 여기까지는 남는다.
+       네이버에서 받느라 어차피 3~5초를 쉬니, 담는 데 더 드는 시간은 없다 */
+    if (화베된다) {
+      if (await 화베담기(줄)) 담긴++;
+      else { 못담은++; if (못담은 === 5 && 담긴 === 0) { 화베된다 = false; 로그('화베가 계속 거절합니다 — 담기를 접고 파일로 내려 드립니다.'); } }
+    } else 못담은++;
 
     if ((i + 1) % 10 === 0 || i + 1 === 묶음.length)
-      로그(`옵션표 ${i + 1}/${묶음.length} — 429 ${막힘}번`);
+      로그(`옵션표 ${i + 1}/${묶음.length} — 담김 ${담긴} · 못담음 ${못담은} · 429 ${막힘}번`);
   }
 
-  /* 5) 내려 준다 */
-  const 글 = JSON.stringify(줄들);
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([글], { type: 'application/json' }));
-  a.download = 'n0.json';
-  document.body.appendChild(a); a.click(); a.remove();
+  /* 5) 끝맺음 — 다 담겼으면 파일은 안 내린다. 하나라도 못 담았으면 파일로 내려 준다.
+        내려받기는 지우지 않고 예비로 남긴다 — 언제든 peekit내려받기() 로 부를 수 있다 */
+  window.peekit내려받기 = () => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(줄들)], { type: 'application/json' }));
+    a.download = 'n0.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    로그('n0.json 을 내렸습니다.');
+  };
 
   const 초 = Math.round((Date.now() - 시작) / 1000);
   const 옵션수 = 줄들.reduce((s, r) => s + (r.o.count || 0), 0);
   로그(`끝났습니다 — 상품 ${줄들.length}개 · 옵션 ${옵션수}개 · ${초}초 · 429 ${막힘}번`);
   로그(`끝점: ${쓸끝점(1)}`);
-  로그('n0.json 이 내려왔습니다. 이 줄과 함께 바이글에게 보내 주세요.');
-  window.peekit결과 = { 상품: 줄들.length, 옵션: 옵션수, 초, 막힘, 끝점: 쓸끝점(1), 줄들 };
+
+  if (못담은 === 0 && 담긴 === 줄들.length) {
+    로그(`%c화베에 담겼습니다 ${담긴}개 — 폰에서 peekit 을 열면 보입니다.`, 'color:#0a7;font-weight:700;font-size:13px');
+  } else {
+    window.peekit내려받기();
+    로그(`%c못 담아서 파일로 내려받았습니다 — 담김 ${담긴}개 · 못담음 ${못담은}개. n0.json 을 바이글에게 보내 주세요.`, 'color:#c00;font-weight:700;font-size:13px');
+  }
+  window.peekit결과 = { 상품: 줄들.length, 옵션: 옵션수, 담긴, 못담은, 초, 막힘, 끝점: 쓸끝점(1), 줄들 };
 })();
