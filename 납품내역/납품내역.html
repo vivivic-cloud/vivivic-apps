@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- 납품내역 — 사장님 드라이브 「관리프로그램 / Amt양식」 **폴더 구조 그대로** 보인다.
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v4.1.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v5.0.0
 
      ⚠ 이 화면에는 **업무 값이 한 톨도 없다.** 금액·단가·거래처·제품 이름·크기·PO 번호
         어느 것도 넣지 않는다. 이 저장소는 누구나 보는 곳이다.
@@ -14,6 +14,27 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>납품내역</title>
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+    import { getFirestore, collection, getDocs, query, where, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+    const app = initializeApp({
+        apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
+        authDomain: "vivivic-4b7ef.firebaseapp.com",
+        projectId: "vivivic-4b7ef",
+        storageBucket: "vivivic-4b7ef.firebasestorage.app",
+        messagingSenderId: "830175660542",
+        appId: "1:830175660542:web:9054030480c8280af8d8af"
+    });
+    const auth = getAuth(app);
+    window.db = getFirestore(app);
+    window.fbRead = { collection, getDocs, query, where, doc, getDoc };
+    onAuthStateChanged(auth, (u) => {
+        if (!u) { signInAnonymously(auth).catch(e => window.목록못읽음('창고에 들어가지 못했습니다', (e&&(e.code||e.message))||'')); return; }
+        window.목록읽기();
+    });
+</script>
+
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{background:#1a1a1a;color:#c8c8c8;font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;-webkit-text-size-adjust:100%}
@@ -74,6 +95,27 @@ h2{font-size:12px;color:#8a8a8a;font-weight:600;letter-spacing:.04em;padding:28p
 .col .q{color:#5f6f7a}
 .shape{font-size:11px;color:#7a7a7a;line-height:1.75;padding:3px 0;word-break:break-all}
 .dig-t{color:#8aa87a;border-color:#2a352a}
+.barlab{font-size:10px;color:#3a3a3a;letter-spacing:.12em;padding:14px 0 6px;text-transform:uppercase}
+.bar{display:flex;gap:5px;flex-wrap:wrap}
+.pill{font-size:12px;color:#8a8a8a;background:#202020;border:1px solid #262626;padding:6px 11px;border-radius:14px;cursor:pointer;line-height:1;white-space:nowrap}
+.pill:hover{background:#262626}
+.pill.on{background:#e8e8e8;color:#111;border-color:#e8e8e8;font-weight:600}
+.pill .n{font-size:10px;opacity:.55;margin-left:4px}
+.pill.off{color:#333;border-color:#1f1f1f;background:#1c1c1c;cursor:default}
+.count{font-size:11px;color:#555;padding:14px 0 6px}
+.count b{color:#c8c8c8;font-weight:600}
+#표통{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid #242424;background:#1c1c1c}
+#표{border-collapse:collapse;font-size:11.5px;min-width:100%;white-space:nowrap}
+#표 th{background:#232323;color:#8f8f8f;font-weight:600;text-align:left;padding:7px 9px;border-bottom:1px solid #2c2c2c;border-right:1px solid #262626}
+#표 td{padding:6px 9px;border-bottom:1px solid #222;border-right:1px solid #212121;color:#bdbdbd;vertical-align:top}
+#표 tr:hover td{background:#212121}
+#표 td.d{color:#4a4a4a}
+#표 td.num{text-align:right;font-variant-numeric:tabular-nums}
+#표 .daysep td{background:#191919;color:#777;font-size:10.5px;letter-spacing:.1em;padding:5px 9px;font-weight:600}
+.state{border:1px solid #242424;background:#1c1c1c;padding:24px 16px;text-align:center}
+.state .big{font-size:13px;color:#9a9a9a;padding-bottom:6px}
+.state .sub{font-size:11.5px;color:#5f5f5f;line-height:1.9}
+.state .why{font-size:10.5px;color:#8c5a5a;padding-top:6px;font-family:ui-monospace,monospace}
 .note{font-size:11.5px;color:#6a6a6a;line-height:1.95;padding:2px 0 2px 13px;text-indent:-13px}
 .note b{color:#bdbdbd;font-weight:600}
 .note .warn{color:#c9a227}
@@ -87,16 +129,26 @@ footer{font-size:10px;color:#2a2a2a;padding:30px 0 24px;border-top:1px solid #1e
 
 <header>
   <div class="logo"><b>VIVIVIC</b> — 납품내역</div>
-  <div class="badge">v4.1.0</div>
+  <div class="badge">v5.0.0</div>
 </header>
 <h1>담당 폴더에 들어 있는 것</h1>
 <div class="where">
   구글드라이브 <code>관리프로그램 / Amt양식</code><br>
   <b>2026-10-14</b> 에 읽어 센 값입니다.<br>
-  <span class="lock">⚠ 이 화면에는 금액·단가·거래처·제품 이름이 <b>없습니다.</b> 이 저장소는 누구나 보는 곳입니다.</span>
+  <span class="lock">⚠ 목록의 값은 <b>창고</b>에서 받습니다 — 이 파일 안에는 없습니다.</span>
 </div>
 
 <div class="cnt" id="셈"></div>
+
+<h2>전체 목록 — 읽어낸 모든 줄</h2>
+<div id="목틀" style="display:none">
+  <div class="barlab">어느 달</div><div class="bar" id="달바"></div>
+  <div class="barlab">어느 것</div><div class="bar" id="갈바"></div>
+  <div class="barlab">며칠</div><div class="bar" id="날바"></div>
+  <div class="count" id="줄셈"></div>
+  <div class="tbox" id="표통"><table id="표"></table></div>
+</div>
+<div class="state" id="목상태"><div class="big">창고를 읽는 중입니다…</div></div>
 
 <h2>폴더 구조 그대로</h2>
 <div class="tree" id="나무"></div>
@@ -266,5 +318,98 @@ document.getElementById('나무').addEventListener('click', e => {
      ⚠ v4.0.0 에서 화면을 다시 쓰면서 이 줄이 빠졌다(10-14). 사장님이 짚으실 수가 없었다.
      화면을 갈아엎을 때도 **이 줄은 남긴다.** shared/viggle.js 는 열넷이 같이 쓰는 한 벌이라 손대지 않는다. -->
 <script src="../shared/viggle.js"></script>
+
+<script>/* ════ 전체 목록 — 값은 **창고에서 받는다.** 이 파일 안에는 없다. ════
+   창고는 읽기만 한다. 들여온 것은 collection·getDocs·query·where·doc·getDoc 여섯뿐이고
+   여섯 다 읽는 함수다. setDoc·addDoc·updateDoc·writeBatch 는 들이지 않았다. */
+const 창고자리 = ['artifacts','vivivic-4b7ef','public','data','납품내역'];
+const 목칸 = {
+ '재단':['일','순번','제품명','PO','원장종류','원장색상','원장모델명','원장출고처','원장입고일','품목','사이즈','재단수량','원장수량','재단금액','출고예정일','비고'],
+ '보링':['일','출고일','PO','출고업체명','제품명','품목','규격','수량','단가','합계'],
+ '엣지':['일','출고일','PO','출고업체명','제품명','품목','규격','수량','단가','합계','필름'],
+ '납품':['일','거래처','거래일자','제품명','품목','규격','수량','단가','금액','비고']
+};
+const 숫자칸 = new Set(['재단수량','원장수량','재단금액','수량','단가','합계','필름','금액']);
+const 갈들 = ['재단','보링','엣지','납품'];
+let 달목=[], 달셈={}, 이달=null, 달='', 갈='재단', 날=0, 답했나=false;
+
+function 목상태(큰,작,까닭){
+  document.getElementById('목틀').style.display='none';
+  const el=document.getElementById('목상태'); el.style.display='block';
+  el.innerHTML = `<div class="big">${큰}</div>` + (작?`<div class="sub">${작}</div>`:'') + (까닭?`<div class="why">${까닭}</div>`:'');
+}
+window.목록못읽음 = (큰,까닭) => { 답했나=true; 목상태(큰,'관리자에게 알려 주십시오.',까닭||''); };
+
+/* ⚠ 창고 꾸러미를 아예 못 받아 오면 아래 module 이 안 돈다. 그러면 「읽는 중」 에서
+   **영영 멈춘다.** 되는 척하지 않는다 — 20초 안에 답이 없으면 그렇다고 적는다. */
+setTimeout(() => { if(!답했나) 목상태('창고에 닿지 못했습니다',
+  '인터넷이 끊겼거나 창고가 막혀 있습니다. 새로고침해 보십시오.<br>아래 <b>폴더 구조</b>는 인터넷 없이도 보입니다.'); }, 20000);
+
+window.목록읽기 = async function(){
+  try{
+    const { doc, getDoc } = window.fbRead;
+    const 목 = await getDoc(doc(window.db, ...창고자리, '_달목록'));
+    답했나 = true;
+    if(!목.exists()){ 목상태('목록이 아직 창고에 안 들어왔습니다'); return; }
+    const m = 목.data();
+    달목 = (m.달들||[]).slice().sort().reverse();
+    (m.달들||[]).forEach((d,i)=> 달셈[d] = (m.줄수||[])[i] || 0);
+    if(!달목.length){ 목상태('창고에 달이 하나도 적혀 있지 않습니다'); return; }
+    달 = 달목[0];
+    await 달받기();
+  }catch(e){ 답했나=true; window.목록못읽음('창고를 읽지 못했습니다',(e&&(e.code||e.message))||''); }
+};
+
+async function 달받기(){
+  목상태(달 + ' 을 받는 중입니다…');
+  try{
+    const { collection, getDocs, query, where } = window.fbRead;
+    const 눈 = await getDocs(query(collection(window.db, ...창고자리), where('달','==',달)));
+    이달 = []; 눈.forEach(d => 이달.push(d.data()));
+    const 있 = 갈들.filter(g => 이달.some(r=>r.갈===g));
+    if(!있.includes(갈)) 갈 = 있[0] || '재단';
+    날 = 0;
+    document.getElementById('목상태').style.display='none';
+    document.getElementById('목틀').style.display='block';
+    목록그리기();
+  }catch(e){ window.목록못읽음(달 + ' 을 읽지 못했습니다',(e&&(e.code||e.message))||''); }
+}
+
+function 목록그리기(){
+  document.getElementById('달바').innerHTML = 달목.map(m=>
+    `<div class="pill ${m===달?'on':''}" data-m="${m}">${m}<span class="n">${달셈[m]||0}</span></div>`).join('');
+  document.getElementById('갈바').innerHTML = 갈들.map(g=>{
+    const n = 이달.filter(r=>r.갈===g).length;
+    return `<div class="pill ${n===0?'off':''} ${g===갈?'on':''}" data-g="${n?g:''}">${g}<span class="n">${n}</span></div>`;
+  }).join('');
+  let 것 = 이달.filter(r=>r.갈===갈);
+  const 날들 = [...new Set(것.map(r=>r.일))].filter(d=>d).sort((a,b)=>a-b);
+  document.getElementById('날바').innerHTML =
+    `<div class="pill ${날===0?'on':''}" data-d="0">전부</div>` +
+    날들.map(d=>`<div class="pill ${날===d?'on':''}" data-d="${d}">${d}일<span class="n">${것.filter(r=>r.일===d).length}</span></div>`).join('');
+  if(날) 것 = 것.filter(r=>r.일===날);
+  것 = 것.slice().sort((a,b)=>(a.일||0)-(b.일||0));
+  document.getElementById('줄셈').innerHTML =
+    `<b>${달}</b> · <b>${갈}</b> · ${날?날+'일':'그 달 전부'} · <b>${것.length}</b>줄`;
+  const C = 목칸[갈];
+  let t = '<thead><tr>' + C.map(c=>`<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+  let 앞 = null;
+  for(const r of 것){
+    if(!날 && r.일!==앞){ t += `<tr class="daysep"><td colspan="${C.length}">${+달.slice(5,7)}월 ${r.일||'?'}일</td></tr>`; 앞=r.일; }
+    t += '<tr>' + C.map(c=>{
+      const v = (r[c]==null)?'':String(r[c]);
+      return `<td class="${v===''?'d':(숫자칸.has(c)?'num':'')}">${v===''?'·':v.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,' ')}</td>`;
+    }).join('') + '</tr>';
+  }
+  document.getElementById('표').innerHTML = t + '</tbody>';
+}
+
+document.addEventListener('click', e=>{
+  const p = e.target.closest('.bar .pill'); if(!p || !이달) return;
+  if(p.dataset.m){ if(p.dataset.m!==달){ 달=p.dataset.m; 달받기(); } return; }
+  if(p.dataset.g){ 갈=p.dataset.g; 날=0; 목록그리기(); return; }
+  if(p.dataset.d!==undefined){ 날=+p.dataset.d; 목록그리기(); }
+});
+</script>
 </body>
 </html>
