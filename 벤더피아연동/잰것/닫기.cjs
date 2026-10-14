@@ -23,7 +23,7 @@ const VP흉내 = `
 var VP_DATA = { PAGES: ${JSON.stringify(PAGES)},
   ymd: function (d) { var z=function(n){return String(n).padStart(2,"0");};
     return d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate()); },
-  list: async function (cfg, url, status, dates, cb) { cb(${JSON.stringify(머리)}, ${JSON.stringify(줄들)}); },
+  list: async function (cfg, url, status, dates, cb) { cb(${JSON.stringify(머리)}, ${JSON.stringify(줄들)}, ${줄들.length}, ${줄들.length}); return { cachedAt: null }; },
   prefetch: function () {}, clearCache: async function () {} };
 window.VP저장 = { get: async function(){return {};}, set: async function(){}, remove: async function(){} };
 var VP_JOHON_PARTS = [];`;
