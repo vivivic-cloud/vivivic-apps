@@ -37,6 +37,12 @@ const 자리들 = [
     csp: "default-src 'self' 'unsafe-inline' data: https:; script-src 'self' 'unsafe-inline'" },
   { 이름: "⑦ 단품관리 + CSP style-src 'self'  ★",            길: '/System/Master/goods.aspx',      몸: 흉내.목록('단품관리'), 못: '#칸5',
     csp: "default-src 'self' 'unsafe-inline' data: https:; script-src 'self' 'unsafe-inline' https:; style-src 'self'" },
+  /* ⑧ ⚠⚠ **이 자의 구멍을 메우는 자리.** 위 일곱은 내가 불러오기.js·짚개.js 를 **내 손으로 넣어 준다** —
+     그러니 「글이 아예 안 돈다」 는 꼴은 구조상 만들 수 없고, 영원히 초록이다.
+     그런데 사장님 꼴(딱지까지 안 보임)이 바로 그 꼴이다. 그래서 **글을 넣지 않는 자리**를 둔다.
+     여기서 딱지 없음 · 테 없음 · 붉은 줄 없음 셋이 다 나오면, 뿌리는 「닿지 않는다」 다. */
+  { 이름: '⑧ 단품관리 · **확장 글을 아예 안 넣는다** ★ (사장님 꼴과 맞춰 보는 자리)',
+    길: '/System/Master/goods.aspx', 몸: 흉내.목록('단품관리'), 못: '#칸5', 글안넣음: true },
 ];
 
 /* 짚개·불러오기 가 쓰는 chrome 을 흉내 낸다 */
@@ -128,6 +134,7 @@ const 재기 = () => {
     /* ㄴ) content_script 차례 그대로 — 틀마다, 문서가 생길 때 */
     const 넣은틀 = new Set();
     const 붙이기 = async (f) => {
+      if (자리.글안넣음) return;                      // ⑧ — 확장이 안 닿은 꼴
       if (!f || 넣은틀.has(f) || f.isDetached()) return;
       try {
         const 몸 = await f.evaluate(() => document.body && document.body.tagName);
