@@ -42,8 +42,8 @@
     l.rel = "stylesheet"; l.href = 주소; (document.head || document.documentElement).appendChild(l); };
 
   /* 판번호 딱지 — 사장님 10-13: 「수정된건 프로그램에 버전표시해줘」.
-     무엇이 돌고 있는지 **화면에서 바로** 보이게 한다. 세 가지를 적는다 —
-       판번호 · 화면 글이 어디서 왔나(깃/확장) · 짚어서 지시 손잡이가 붙었나.
+     무엇이 돌고 있는지 **화면에서 바로** 보이게 한다. 적는 것 —
+       판번호 · 화면 글이 어디서 왔나(깃/확장) · 짚어서 지시가 **어디까지 갔나**(짚개·기억·손잡이·꾸밈).
      이것만 보면 「덮어썼나 안 썼나」 와 「왜 짚기가 안 되나」 가 한눈에 갈린다. */
   /* ⚠ 틀(frameset) 안에서는 이 글이 **틀마다** 돈다. 작은 틀(가름줄·숨은 틀)에까지
      딱지를 붙이면 화면이 지저분해진다. 사람이 보는 크기일 때만 붙인다. */
@@ -87,12 +87,39 @@
       if (await 넣기(chrome.runtime.getURL(f))) { 확장에서++; continue; }   // 바깥이 막히면 확장 안의 것
       못온것.push(f);
     }
-    setTimeout(() => {
-      const 짚기 = !!document.querySelector(".vg-hint");
+    /* ⚠⚠ 10-14 — 전에는 `.vg-hint` 가 **있나**만 보고 「짚기 ✓」 를 찍었다. 그것이 **거짓 초록**이었다.
+       손잡이 꾸밈(<style>)이 거부되는 꼴을 세워 재 보니, 붉은 테도 지시판도 안 보이는데
+       딱지는 그대로 「짚기 ✓」 를 찍었다 (잰 값: outline 이 `0px none` 인데 ✓).
+       그 딱지로 사장님께 여쭈면 **틀린 답**을 받는다. 그래서 **넷을 따로 재서** 적는다 —
+         짚개   짚개.js 가 그 문서에서 돌았나 (같은 세상이라 바로 보인다)
+         기억   손잡이를 켜는 기억(vg기억장)이 적혔나
+         손잡이 손잡이 글이 붙었나
+         꾸밈   손잡이 꾸밈이 **실제로 먹었나** — 버리는 칸에 vg-mark 를 달아 outline 을 읽는다
+       한 줄, 짧게. 길면 사장님이 못 읽으신다. */
+    const 기억적혔나 = () => { try {
+      return !!sessionStorage.getItem("vg기억장:" + location.pathname); } catch (e) { return false; } };
+    const 꾸밈먹었나 = () => { try {
+      const p = document.createElement("div");
+      p.className = "vg-mark";
+      p.style.cssText = "position:fixed;left:-9999px;top:-9999px;width:1px;height:1px";
+      /* ⚠ 몸이 아니라 **뿌리**에 단다 — vp-clean 이 몸의 바로 밑 자식을 감춘다 */
+      document.documentElement.appendChild(p);
+      const 굵기 = parseFloat(getComputedStyle(p).outlineWidth) || 0;
+      p.remove();
+      return 굵기 > 0;
+    } catch (e) { return false; } };
+    const 그리기 = () => {
       const 어디 = 확장에서 ? (깃에서 ? "깃+확장" : "확장") : "깃";
-      딱지("벤더피아 보기 " + 판 + " · " + 어디 + (/firmdvlist/i.test(길) ? "" : (짚기 ? " · 짚기 ✓" : " · 짚기 ✗")),
-           !!못온것.length || (!/firmdvlist/i.test(길) && !짚기));
-    }, 1500);
+      /* 배송관리에는 손잡이를 일부러 안 붙인다 — 거기서는 넷을 적지 않는다 */
+      if (/firmdvlist/i.test(길)) return 딱지("벤더피아 보기 " + 판 + " · " + 어디, !!못온것.length);
+      const 못 = [["짚개", !!window.__vp짚개], ["기억", 기억적혔나()],
+                  ["손잡이", !!window.__vp손잡이붙음], ["꾸밈", 꾸밈먹었나()]];
+      딱지("벤더피아 보기 " + 판 + " · " + 어디 + " · " + 못.map(([n, 참]) => n + (참 ? "✓" : "✗")).join(" "),
+           !!못온것.length || 못.some(([, 참]) => !참));
+    };
+    setTimeout(그리기, 1500);
+    /* 손잡이는 깃허브에서 온다 — 느리면 1.5초에 ✗ 가 찍힌다. 그것도 거짓이다. 한 번 더 고쳐 적는다. */
+    setTimeout(그리기, 4000);
     if (!못온것.length) return;
     for (const f of 꾸밈) 꾸미기(chrome.runtime.getURL(f));
     const 줄 = document.createElement("div");
