@@ -91,6 +91,7 @@
         <input name="q" class="vp-q" placeholder="송장번호, 주문번호, 이름, 상품명, 주소, 전화번호, 배송상태…">
         <button type="submit">조회</button>
       </form>
+      <div class="vp-pills"></div>
       <div class="vp-note"></div>
       <div class="vp-table"></div>
     </div>`;
@@ -100,6 +101,62 @@
   const bar = root.querySelector(".vp-bar");
   const note = root.querySelector(".vp-note");
   const table = root.querySelector(".vp-table");
+  const 알약칸 = root.querySelector(".vp-pills");
+
+  /* ⚠⚠ 10-14 사장님 (배송관리 화면에서 짚어 보내신 말씀, 그대로):
+       「벤더피아 배송관리의 실제 필터들을 확인하여 필터를 버튼형식으로 페이지상단에 보여주세요」
+     벤더피아 진짜 폼의 고르는 칸은 **열하나**다 (위 SELECTS 줄). 그 가운데 **넷**을 알약으로 깐다.
+     나머지 일곱은 지금처럼 검색창에 그 말을 치면 그대로 잡힌다(matchSelect).
+     ⚠ **고를 수 있는 값은 짐작하지 않는다** — 그 화면의 <select> 에 든 <option> 을 그때그때 읽는다.
+       화면에 없는 칸이나, 「전체」 말고 고를 것이 없는 칸은 **아예 안 그린다.**
+     ⚠ 칸 이름(한글)은 id 에서 미루어 적은 것이다. 진짜 화면 글자와 다르면 여기만 고치면 된다. */
+  const 알약칸들 = [
+    ["ddlDStatus", "배송상태"],
+    ["ddlDeliveryCo", "배송사"],
+    ["ddlInvoiceSendYn", "송장전송"],
+    ["ddlStore", "매출처"],
+  ];
+  const 고른것 = {};                                   // { 칸id: 고른 값 } — 빈 값이면 「전부」
+
+  function 알약그리기() {
+    알약칸.replaceChildren();
+    for (const [id, 이름] of 알약칸들) {
+      const sel = document.getElementById(id);
+      if (!sel) continue;                              // 그 화면에 없는 칸
+      const 전체 = [...sel.options].find((o) => o.text.trim() === "전체");
+      const 고를것 = [...sel.options].filter((o) => o !== 전체 && o.text.trim());
+      if (고를것.length < 2) continue;                 // 고를 것이 하나뿐이면 알약이 필요 없다
+      const 줄 = document.createElement("div");
+      줄.className = "vp-pill-row";
+      const 딱지 = document.createElement("span");
+      딱지.className = "vp-pill-name";
+      딱지.textContent = 이름;
+      줄.appendChild(딱지);
+      const 담 = document.createElement("div");
+      담.className = "vp-pill-list";
+      /* 끄는 길 — 「전부」 가 늘 맨 앞에 있다 */
+      const 보기 = [[전체 ? 전체.value : "", "전부"], ...고를것.map((o) => [o.value, o.text.trim()])];
+      for (const [값, 글] of 보기) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "vp-pill";
+        b.textContent = 글;
+        const 켜짐 = (고른것[id] || "") === (값 || "");
+        b.setAttribute("aria-pressed", 켜짐 ? "true" : "false");
+        b.addEventListener("click", () => {
+          고른것[id] = 값 || "";
+          알약그리기();
+          bar.requestSubmit();                         // 누르면 그 조건으로 바로 다시 조회
+        });
+        담.appendChild(b);
+      }
+      줄.appendChild(담);
+      알약칸.appendChild(줄);
+    }
+  }
+  /* 켜진 알약만 조회에 싣는다 (「전부」 는 안 싣는다 — 원래 폼 값 그대로 둔다) */
+  const 알약값 = () => Object.fromEntries(Object.entries(고른것).filter(([, v]) => v));
+  알약그리기();
   bar.from.value = startDt.value;
   bar.to.value = endDt.value;
   bar.q.focus();
@@ -158,14 +215,14 @@
       status(true);
       const more = [];
       for (const [, fields] of variants) {
-        const r = await fetchList({ ...dates, ...filters, ...fields }, "50");
+        const r = await fetchList({ ...dates, ...알약값(), ...filters, ...fields }, "50");
         if (searchId !== currentSearch) return;
         take(r);
         status(true);
         if (Number(r.count.replace(/,/g, "")) > r.rows.length) more.push(fields);
       }
       for (const fields of more) {
-        const r = await fetchList({ ...dates, ...filters, ...fields }, "600");
+        const r = await fetchList({ ...dates, ...알약값(), ...filters, ...fields }, "600");
         if (searchId !== currentSearch) return;
         take(r);
         if (Number(r.count.replace(/,/g, "")) > r.rows.length) cut = true;
