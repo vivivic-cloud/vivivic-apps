@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- 조혼가구 — 거래처 발주 화면.
-     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.8.0 -->
+     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.9.0 -->
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -1713,7 +1713,13 @@
         html[data-johonbox="danger"]     #product-name-container > .notion-card,
         html[data-johonbox="danger"]     #confirmed-product-order-section,
         html[data-johonbox="registered"] #order-timeline-section,
-        html[data-johonbox="timeline"]   #registered-orders-section{
+        html[data-johonbox="timeline"]   #registered-orders-section,
+        /* 10-15 — 발주완료리스트가 발주하기 쪽 아래로 옮겨 다닌다. 박스 안은
+           그 박스가 맡은 구역만 보이는 자리라, 거기서는 전처럼 안 보이게 둔다.
+           (박스 화면의 지금 모습을 한 칸도 안 바꾼다.) */
+        html[data-johonbox="order"]      #registered-orders-section,
+        html[data-johonbox="waiting"]    #registered-orders-section,
+        html[data-johonbox="danger"]     #registered-orders-section{
             display:none !important;
         }
 
@@ -1806,7 +1812,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.8.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.0</span>
                 </div>
                 <!-- 페이지 탭: 발주하기 / 작업중 -->
                 <div class="flex items-center gap-1 border border-[#ededeb] rounded-lg bg-[#f7f6f3] p-1 mr-2">
@@ -4986,6 +4992,46 @@
                 }
                 return _origSwitchPageTab.apply(this, arguments);
             };
+        })();
+
+        /* ═══ 발주완료리스트를 발주하기 쪽 아래에도 보인다 ══════════════
+           사장님 10-15: 「이 박스의 내용을 발주하기 페이지의 하단에
+           발주완료리스트 로 보이게 해주세요.」
+
+           ⚠ **옮기는 것이 아니라 보이게** 하라는 말씀이다 — 「작업중」 쪽은 그대로다.
+           ⚠ **세는 셈을 두 벌로 만들지 않는다.** 베껴 그리면 그 안의 아이디
+             (`registered-item-…`·`registered-details-…`)가 두 벌이 되어, 펼치기가
+             엉뚱한 것을 집는다. 그리는 셈도 두 군데가 되어 곧 어긋난다.
+           그래서 — 두 쪽은 **한 번에 하나만 보인다.** 그 덩어리 **하나를**
+           보이는 쪽으로 옮긴다. 셈도 아이디도 한 벌로 남는다. */
+        (function(){
+            const 덩이 = () => document.getElementById('registered-orders-section');
+            const 처음 = 덩이();
+            if (!처음 || !처음.parentNode) return;
+            // 「작업중」 에서 섰던 자리를 적어 둔다 — 돌아갈 때 그 자리에 그대로 넣는다.
+            const 제자리 = document.createComment('발주등록완료 리스트 제자리');
+            처음.parentNode.insertBefore(제자리, 처음);
+
+            function 옮기기(tab){
+                const el = 덩이(); if (!el) return;
+                if (tab === '발주하기') {
+                    const 쪽 = document.getElementById('page-발주하기');
+                    if (쪽 && el.parentNode !== 쪽) 쪽.appendChild(el);   // 맨 아래
+                } else if (제자리.parentNode) {
+                    제자리.parentNode.insertBefore(el, 제자리.nextSibling);
+                }
+                try { renderRegisteredOrders(); } catch (e) {}
+            }
+
+            const _sw = window.switchPageTab;
+            if (typeof _sw === 'function') window.switchPageTab = function(tab){
+                const r = _sw.apply(this, arguments);
+                try { 옮기기(tab); } catch (e) {}
+                return r;
+            };
+            // 처음 열릴 때. 첫 쪽은 「발주하기」 다.
+            try { 옮기기(typeof _currentPageTab !== 'undefined' ? _currentPageTab : '발주하기'); }
+            catch (e) {}
         })();
 
         function johonHomeRefresh(){
