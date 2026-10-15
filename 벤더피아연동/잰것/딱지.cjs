@@ -47,6 +47,9 @@ chrome.runtime = { getManifest: () => ({ version: ${JSON.stringify(깔린판)} }
     return r.fulfill({ status:200, contentType:'text/html; charset=utf-8', body: 쪽 });
   });
   const page = await ctx.newPage();
+  /* 깃허브로 나가는 주소를 모두 적어 둔다 — **캐시 표(?t=)가 붙는지** 보려고 */
+  const 깃주소 = [];
+  page.on('request', (r) => { if (r.url().includes('github.io')) 깃주소.push(r.url()); });
   await page.goto('https://vendorpia.com/System/Delivery/firmDvList.aspx');
   await page.addScriptTag({ content: 크롬흉내 });
   await page.addScriptTag({ content: fs.readFileSync(path.join(확장, '불러오기.js'), 'utf8') });  // 진짜 그대로
@@ -63,6 +66,9 @@ chrome.runtime = { getManifest: () => ({ version: ${JSON.stringify(깔린판)} }
     return { 있나: !!d, 글: d ? d.textContent : null, 보이나: 보임(d),
              단추: !!document.getElementById('vp-바꾸기') };
   });
+  const 표붙은것 = 깃주소.filter((u) => /\?t=\d+$/.test(u));
+  console.log('\n■ 깃허브로 나간 주소 ' + 깃주소.length + '개 · **캐시 표(?t=) 붙은 것 ' + 표붙은것.length + '개**');
+  if (깃주소.length) console.log('  보기: ' + 깃주소[0].replace(/^.*벤더피아연동\//, '…/').slice(0, 70));
   console.log('\n■ 딱지에 화면글 판이 찍히나 (깔린 판 ' + 깔린판 + ')');
   console.log('  ★ 딱지 글 : 「' + v.글 + '」');
   console.log('     길이 ' + (v.글 || '').length + '자 · 보이나 ' + v.보이나);

@@ -7,6 +7,17 @@
    ⚠ 글 차례를 지킨다. `vp-data.js` 가 `goods.js` 보다 먼저 돌아야 한다. */
 (() => {
   const 깃 = "https://vivivic-cloud.github.io/vivivic-apps/%EB%B2%A4%EB%8D%94%ED%94%BC%EC%95%84%EC%97%B0%EB%8F%99/";
+  /* ⚠⚠ 10-15 사장님: 「이게 뭐야 … 드롭다운 목록으로 만들어 달라니까, 그리고, 송장전송필터링은
+       필요없다고」 — **새 글은 올라가 있었는데 사장님 화면에는 옛 글이 돌고 있었다.**
+     까닭: 여기서 깃허브 주소를 **아무 표 없이** 걸어 브라우저와 깃허브 CDN 이 **옛 글을 들고 있었다.**
+     깃허브 페이지는 보통 10분쯤 캐시한다. 우리는 「새로고침만 하시면 됩니다」 라고 적어 왔는데,
+     그 새로고침이 **옛 글을 다시 가져오고 있었던 것**이다.
+     → 주소 뒤에 **1분마다 바뀌는 표**를 붙인다. 늦어도 1분이면 새 글이 간다.
+       한 쪽을 여는 동안은 같은 표라 **두 번 받지 않는다.**
+     ⚠ 이 줄은 **확장 안**이라 사장님이 **한 번 덮어쓰셔야** 먹는다. 그 한 번이면 다시는 안 겪는다.
+       (바이글: 「덮어쓰기를 만들지 마십시오」 — 그런데 주소를 짓는 자리가 **여기뿐**이라
+        덮어쓰기 없이는 못 고친다. 그래서 하고 적어 둔다.) */
+  const 캐시표 = () => "?t=" + Math.floor(Date.now() / 60000);
   const 길 = location.pathname.toLowerCase();
   const 있나 = (t) => 길.includes(t);
 
@@ -76,14 +87,14 @@
   if (!document.body || document.body.tagName === "FRAMESET") return;   // 틀 문서엔 아무것도 안 그려진다
 
   (async () => {
-    for (const f of 꾸밈) 꾸미기(깃 + encodeURIComponent(f));
+    for (const f of 꾸밈) 꾸미기(깃 + encodeURIComponent(f) + 캐시표());
     const 판 = chrome.runtime.getManifest().version;
     딱지("벤더피아 보기 " + 판 + " · 부르는 중…");
     let 못온것 = [], 깃에서 = 0, 확장에서 = 0;
     for (const f of 글) {
       // 다리는 늘 확장 안의 것 — 인터넷이 끊겨도 길이 살아 있어야 한다
       if (f === "저장다리.js") { await 넣기(chrome.runtime.getURL(f)); continue; }
-      if (await 넣기(깃 + encodeURIComponent(f))) { 깃에서++; continue; }
+      if (await 넣기(깃 + encodeURIComponent(f) + 캐시표())) { 깃에서++; continue; }
       if (await 넣기(chrome.runtime.getURL(f))) { 확장에서++; continue; }   // 바깥이 막히면 확장 안의 것
       못온것.push(f);
     }
