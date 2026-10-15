@@ -3,8 +3,21 @@
 // 버튼을 누르면 그 항목의 데이터를 보여준다.
 (() => {
   const { PAGES, list: fetchList, ymd } = VP_DATA;
-  const page = PAGES[location.pathname];
+  /* ④ **곁다리 모드** — 사장님 10-15: 「이곳에 도착하는 상품명을 상품관리와 동일한
+       상품버튼으로 변경해 주세요. 이버튼으로 나타나는 동작은 상품관리의 상품버튼과 동일 합니다.」
+       (장부 a1792028003 아래 · 짚으신 곳은 배송관리 표의 상품명 칸)
+     배송관리(`search.js`)가 이 글을 **불러** 쓸 때가 그때다. 그러면 이 글은
+     **상품관리와 똑같이** 돈다 — `PAGES` 의 상품관리 칸을 그대로 쓴다.
+     ⚠ 상품관리 코드를 **베끼지 않는다.** 단추 꼴(`labelButton`)도 누른 뒤 하는 일(`show`)도
+       상품관리가 쓰는 **그 하나**를 부른다. 두 벌이 되면 갈라진다.
+     ⚠ 곁다리일 때는 제 화면(검색칸·목록)을 **그리지 않는다** — 상세 판과 창만 쓴다
+       (`search.css` 의 `.vp-곁다리` 가 몸통을 감춘다). */
+  const 곁다리길 = "/System/Master/salesGoods.aspx";
+  const page = PAGES[location.pathname]
+    || (window.VP상품단추요청 ? PAGES[곁다리길] : null);
   if (!page) return;
+  const 곁다리 = !PAGES[location.pathname];
+  const 내길 = 곁다리 ? 곁다리길 : location.pathname;
 
   const startDt = document.getElementById("dcStartDt");
   const endDt = document.getElementById("dcEndDt");
@@ -157,8 +170,17 @@
         </div>
       </div>
     </div>`;
-  document.body.appendChild(root);
-  document.documentElement.classList.add("vp-clean");
+  if (곁다리) {
+    /* 배송관리 화면의 `#vp-root` **안**에 넣는다. 그래야 ㄱ) `goods.css` 의 `#vp-root …`
+       규칙이 그대로 먹고 ㄴ) 전환 단추가 우리 것을 숨길 때 **같이 숨고**
+       ㄷ) `vp-clean` 의 「몸의 자식은 숨긴다」 규칙에 걸리지 않는다.
+       ⚠ 겹친 `id` 를 쓰지만 `getElementById` 는 **앞엣것**(배송관리 것)을 돌려준다. */
+    root.classList.add("vp-곁다리");
+    (document.getElementById("vp-root") || document.body).appendChild(root);
+  } else {
+    document.body.appendChild(root);
+    document.documentElement.classList.add("vp-clean");
+  }
 
   const filters = root.querySelector(".vp-filters");
   const q = filters.querySelector(".vp-q");
@@ -869,7 +891,7 @@
     const serverValue = serverSel ? (serverSel.value || "전체") : "";
     const dates = page.serverDates ? { from: from.value || "2000-01-01", to: to.value } : { from: "2000-01-01" };
     try {
-      const got1 = await fetchList(page, location.pathname, serverValue, dates, (h, rows, got, total) => {
+      const got1 = await fetchList(page, 내길, serverValue, dates, (h, rows, got, total) => {
         heads = h;
         fillSelects(rows);
         addRows(rows);
@@ -890,9 +912,13 @@
 
   // 벤더피아에서 거르는 칸은 원래 화면의 항목을 그대로 쓰고, 바꾸면 새로 받아온다
   if (serverSel) {
+    /* ⚠ 곁다리로 돌 때는 이 화면(배송관리)에 `ddlStatus` 같은 칸이 **없다.**
+       없으면 그냥 넘긴다 — 여기서 터지면 상품 단추가 아예 안 온다. */
     const src = document.getElementById(page.serverSelect[1]);
-    for (const o of [...src.options].filter((o) => o.value !== "전체")) serverSel.add(new Option(o.text, o.value));
-    serverSel.value = src.value === "전체" ? "" : src.value;
+    if (src) {
+      for (const o of [...src.options].filter((o) => o.value !== "전체")) serverSel.add(new Option(o.text, o.value));
+      serverSel.value = src.value === "전체" ? "" : src.value;
+    }
     serverSel.addEventListener("change", (e) => { e.stopPropagation(); load(); });
   }
   if (page.serverDates) {
@@ -917,6 +943,9 @@
   load().then(() => {
     for (const [s, v] of firstValues) if (v && [...s.options].some((o) => o.value === v)) s.value = v;
     apply();
+    /* ④ 목록이 들어왔다고 알린다 — 배송관리가 이미 그려 둔 상품명 칸을 그때 단추로 바꾼다.
+       ⚠ `load()` 를 또 부르지 않는다. 이미 있는 이 차례에 얹는다. */
+    if (곁다리) window.dispatchEvent(new Event("vp상품단추준비"));
     // 첫 목록을 다 받은 뒤에 연결된 화면의 목록을 받는다 (벤더피아가 요청을 하나씩 처리해서, 동시에 받으면 첫 목록이 늦어진다)
     (page.top ? loadTop().catch(() => { top = null; apply(); }) : Promise.resolve())
       .then(() => (page.stock === "link" || page.stock === "parts") && loadStock().catch(() => {}))
@@ -924,4 +953,28 @@
       // 지금 화면의 목록을 다 받았으면 다른 메뉴가 쓸 목록을 뒤에서 받아 둔다
       .then(() => VP_DATA.prefetch());
   });
+
+  /* ④ 곁다리 — 배송관리가 쓸 **상품 단추 한 개**를 만들어 준다.
+     ⚠ 없는 이름에는 **`null`** 을 돌려준다. 사장님 분부대로 그 칸은 **글자 그대로** 둔다 —
+       가짜 단추를 만들지 않는다. */
+  if (곁다리) {
+    window.VP상품단추 = (이름) => {
+      const 이것 = groups.get(String(이름 == null ? "" : 이름).trim());
+      if (!이것) return null;
+      const b = document.createElement("button");
+      b.type = "button";
+      /* 상품관리의 `labelGroup` 이 하는 것과 **같은 것을 부른다** */
+      labelButton(b, 이름, 이것.items.map((r) => r[col(page.codeCol)]), stockQty(이것.items));
+      b.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        /* 누른 단추만 검게 — 상품관리와 같은 결 */
+        document.querySelectorAll("#vp-root .vp-상품칸 button.on").forEach((x) => x.classList.remove("on"));
+        b.classList.add("on");
+        show(이름, heads, 이것.items);        // ← 상품관리가 쓰는 **그 상세**를 그대로 연다
+      });
+      return b;
+    };
+    window.VP상품목록몇개 = () => groups.size;
+  }
 })();

@@ -226,8 +226,54 @@
   bar.to.value = endDt.value;
   bar.q.focus();
 
+  /* ④ **상품명 칸을 상품관리의 그 상품버튼으로** — 사장님 10-15:
+       「이곳에 도착하는 상품명을 상품관리와 동일한 상품버튼으로 변경해 주세요.
+         이버튼으로 나타나는 동작은 상품관리의 상품버튼과 동일 합니다.」
+     ⚠ 상품관리 코드를 **베끼지 않는다.** `goods.js` 를 **그대로 불러** 곁다리로 돌리고
+       (`window.VP상품단추요청`), 단추는 그 글이 만들어 준다.
+     ⚠ `불러오기.js`(확장 안)는 배송관리 쪽에 `goods.js` 를 안 보낸다. 거기를 고치면
+       사장님이 **덮어쓰셔야** 한다. 그래서 **이 글이 온 그 주소**에서 형제 파일을 불러온다 —
+       깃이든 확장이든, 캐시표(`?v=…&t=…`)까지 그대로 따라온다.
+     ⚠ 상품관리에 **없는 이름**은 글자 그대로 둔다. 가짜 단추를 만들지 않는다. */
+  const 내주소 = (() => {
+    const me = document.currentScript
+      || [...document.querySelectorAll("script[src]")].reverse()
+           .find((x) => /search\.js(\?|$)/.test(x.src));
+    return me ? me.src : null;
+  })();
+  const 형제 = (이름) => 내주소 && 내주소.replace(/search\.js(?=\?|$)/, 이름);
+  function 상품단추불러오기() {
+    const js = 형제("goods.js");
+    if (!js || window.VP상품단추요청) return;          // 주소를 못 찾으면 글자 그대로 둔다
+    window.VP상품단추요청 = true;
+    const css = 형제("goods.css");
+    if (css && !document.querySelector('link[data-vp="goods.css"]')) {
+      const l = document.createElement("link");
+      l.rel = "stylesheet"; l.href = css; l.dataset.vp = "goods.css";
+      document.head.appendChild(l);
+    }
+    const sc = document.createElement("script");
+    sc.src = js;
+    sc.async = false;
+    document.head.appendChild(sc);
+  }
+  상품단추불러오기();
+
   let tbody = null;
   let currentSearch = 0;
+  /* 상품명 칸들을 적어 둔다 — 목록이 늦게 와도 그때 단추로 바꿔 끼운다 */
+  let 상품칸들 = [];
+  let 상품칸자리 = -1;
+  function 상품칸채우기(td, 이름) {
+    const 만들기 = window.VP상품단추;
+    const b = 만들기 ? 만들기(이름) : null;
+    if (!b) { td.textContent = 이름; return false; }   // 상품관리에 없는 이름 → 글자 그대로
+    td.replaceChildren(b);
+    return true;
+  }
+  window.addEventListener("vp상품단추준비", () => {
+    for (const [td, 이름] of 상품칸들) 상품칸채우기(td, 이름);
+  });
 
   let 그린머리 = null;                                 // 지금 그려 둔 머리줄 (벤더피아가 준 그대로)
   function addRows(heads, rows) {
@@ -237,6 +283,8 @@
       /* ⑤ 머리줄을 이제 알았다 — CS 칸이 있으면 거르개 줄에 CS 를 내놓는다 */
       const 찾은것 = cs찾기(heads);
       if (찾은것 !== cs칸) { cs칸 = 찾은것; 알약그리기(); }
+      /* ④ 상품명 칸이 몇 번째인가 — 그 칸만 단추로 바꾼다 */
+      상품칸자리 = 그린머리.indexOf("상품명");
       const t = document.createElement("table");
       const head = t.createTHead().insertRow();
       그린머리.forEach((c, i) => {
@@ -251,7 +299,14 @@
       const tr = tbody.insertRow();
       그린머리.forEach((c, i) => {
         const td = tr.insertCell();
-        td.textContent = row[i] === undefined ? "" : row[i];
+        const 값 = row[i] === undefined ? "" : row[i];
+        if (i === 상품칸자리 && String(값).trim()) {
+          td.className = "vp-상품칸" + (i === 0 ? " vp-first" : "");
+          상품칸들.push([td, 값]);
+          상품칸채우기(td, 값);
+          return;
+        }
+        td.textContent = 값;
         if (i === 0) td.className = "vp-first";
       });
     }
@@ -265,7 +320,7 @@
     const { filters, variants, local } = plan(bar.q.value);
     const dates = { dcStartDt: bar.from.value, dcEndDt: bar.to.value };
 
-    tbody = null; 그린머리 = null;
+    tbody = null; 그린머리 = null; 상품칸들 = []; 상품칸자리 = -1;
     table.replaceChildren();
     const seen = new Set();
     let shown = 0;
