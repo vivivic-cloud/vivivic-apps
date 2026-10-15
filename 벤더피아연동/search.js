@@ -306,20 +306,42 @@
   });
 
   let 그린머리 = null;                                 // 지금 그려 둔 머리줄 (벤더피아가 준 그대로)
+  /* ⚠⚠ **머리줄 배우기는 줄 수와 떼어 놓는다 (10-15).**
+       전에는 이 일이 `addRows` 안에 있었다. 그런데 `addRows` 는 첫 줄이
+       `if (!rows.length) return;` 이다 — **줄이 하나도 없으면 바로 돌아선다.**
+       그러면 머리줄을 영영 못 배우고 **CS 거르개가 끝내 안 선다.**
+       줄이 0 이 되는 길이 셋이나 있다:
+         ㄱ) 벤더피아가 「총 0 건」 을 줄 때
+         ㄴ) 검색어로 우리가 거른 뒤 하나도 안 남을 때
+         ㄷ) 「CS 있는 것만」 으로 거른 뒤 하나도 안 남을 때
+       그래서 **받자마자**(`take` 맨 앞) 머리줄만 따로 배운다. 거르기 전이다.
+       사장님 10-15: CS 단추가 안 섰다 — 바이글이 이 길을 짚어 주었다. */
+  let 머리본것 = null;
+  function 머리알기(heads) {
+    if (!heads || !heads.length) {
+      /* `fetchList` 는 머리줄을 **「수취인」 칸으로** 찾는다. 그 칸이 없으면 아무것도 못 읽는다. */
+      window.VP말?.("머리줄:못읽음(수취인칸없음)");
+      return;
+    }
+    const 글 = heads.join("\u0001");
+    if (머리본것 === 글) return;                       // 같은 머리줄은 한 번만
+    머리본것 = 글;
+    /* ⑤ CS 칸이 있으면 거르개 줄에 CS 를 내놓는다 */
+    const 찾은것 = cs찾기(heads);
+    if (찾은것 !== cs칸) { cs칸 = 찾은것; 알약그리기(); }
+    /* ④ 상품명 칸이 몇 번째인가 — 그 칸만 단추로 바꾼다 */
+    상품칸자리 = heads.indexOf("상품명");
+    /* ⚠ 까닭을 적는다 — 못 찾았으면 **벤더피아가 준 칸 이름 그대로** 적는다.
+         그래야 「CS」 인지 「CS구분」 인지 「cs상태」 인지 사장님 화면에서 보인다. */
+    window.VP말?.("칸" + heads.length + "개 CS자리" + cs칸 + " 상품명자리" + 상품칸자리);
+    if (cs칸 < 0 || 상품칸자리 < 0)
+      window.VP말?.("머리줄:" + heads.slice(0, 12).join(","));
+  }
+
   function addRows(heads, rows) {
     if (!rows.length) return;
     if (!tbody) {
       그린머리 = heads.slice();                        // ⚠ 벤더피아 칸을 **하나도 안 빼고** 그대로
-      /* ⑤ 머리줄을 이제 알았다 — CS 칸이 있으면 거르개 줄에 CS 를 내놓는다 */
-      const 찾은것 = cs찾기(heads);
-      if (찾은것 !== cs칸) { cs칸 = 찾은것; 알약그리기(); }
-      /* ④ 상품명 칸이 몇 번째인가 — 그 칸만 단추로 바꾼다 */
-      상품칸자리 = 그린머리.indexOf("상품명");
-      /* ⚠ 까닭을 적는다 — 못 찾았으면 **벤더피아가 준 칸 이름 그대로** 적는다.
-           그래야 「CS」 인지 「CS구분」 인지 「cs상태」 인지 사장님 화면에서 보인다. */
-      window.VP말?.("칸" + 그린머리.length + "개 CS자리" + cs칸 + " 상품명자리" + 상품칸자리);
-      if (cs칸 < 0 || 상품칸자리 < 0)
-        window.VP말?.("머리줄:" + 그린머리.slice(0, 12).join(","));
       const t = document.createElement("table");
       const head = t.createTHead().insertRow();
       그린머리.forEach((c, i) => {
@@ -356,13 +378,16 @@
     const { filters, variants, local } = plan(bar.q.value);
     const dates = { dcStartDt: bar.from.value, dcEndDt: bar.to.value };
 
-    tbody = null; 그린머리 = null; 상품칸들 = []; 상품칸자리 = -1; 단추된것 = 0;
+    tbody = null; 그린머리 = null; 상품칸들 = []; 상품칸자리 = -1; 단추된것 = 0; 머리본것 = null;
     table.replaceChildren();
     const seen = new Set();
     let shown = 0;
     let cut = false;
 
     const take = (r) => {
+      /* ⚠ **거르기 전에** 머리줄부터 배운다 — 거른 뒤 하나도 안 남아도 거르개는 서야 한다 */
+      머리알기(r.heads);
+      if (!r.rows.length) window.VP말?.("조회:벤더피아가 0줄");
       /* ⑤ 「CS 있는 것만」 — 받아 온 줄에서 CS 칸이 빈 줄을 버린다.
          칸을 못 찾으면(-1) 아무것도 안 거른다 — 빈 표를 보여 드리는 것이 더 나쁘다. */
       const cs만 = (고른것.__cs || "") === "있음";

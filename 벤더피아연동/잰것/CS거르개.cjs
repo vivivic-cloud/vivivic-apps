@@ -72,6 +72,38 @@ const 본다 = () => {
   };
 };
 
+/* ⚠⚠ 10-15 — **줄이 0 이어도 CS 거르개가 서야 한다.** 전에는 `addRows` 가
+     `if (!rows.length) return` 으로 바로 돌아서서 머리줄을 영영 못 배웠다.
+     사장님 화면에서 CS 단추가 안 섰고, 바이글이 이 길을 짚어 주었다. 그 판을 따로 잰다. */
+async function 줄없을때(b, 머리) {
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
+  await ctx.route('**://vivivic-cloud.github.io/**', r => r.abort('blockedbyclient'));
+  await ctx.route('**://vendorpia.com/**', (r) => {
+    const req = r.request();
+    if (req.method() === 'POST')
+      /* 머리줄은 오고 **줄은 하나도 없다** */
+      return r.fulfill({ status:200, contentType:'text/html; charset=utf-8',
+        body: `<html><body><span>총 0 건</span><table><tr>${머리.map(x=>`<th>${x}</th>`).join('')}</tr></table></body></html>` });
+    if (new URL(req.url()).pathname.endsWith('.js'))
+      return r.fulfill({ status:200, contentType:'text/javascript', body:'/* 손잡이 (흉내) */' });
+    return r.fulfill({ status:200, contentType:'text/html; charset=utf-8', body: 배송쪽 });
+  });
+  const page = await ctx.newPage();
+  const 탈 = []; page.on('pageerror', e => 탈.push(String(e && e.message).slice(0,140)));
+  await page.goto('https://vendorpia.com/System/Delivery/firmDvList.aspx');
+  await page.addStyleTag({ content: ['login.css','search.css']
+    .map(f => fs.readFileSync(path.join(확장, f), 'utf8')).join('\n') });
+  await page.addScriptTag({ content: VP흉내 });
+  for (const f of ['login.js','search.js'])
+    await page.addScriptTag({ content: fs.readFileSync(path.join(확장, f), 'utf8') });
+  await page.waitForTimeout(600);
+  await page.click('.vp-bar button[type=submit]');
+  await page.waitForTimeout(900);
+  const 것 = await page.evaluate(본다);
+  await ctx.close();
+  return { ...것, 탈 };
+}
+
 (async () => {
   const b = await chromium.launch({ executablePath: EXE });
   console.log('\n■ ⑤ CS 거르개 — 「CS 있는 것만」');
@@ -169,6 +201,14 @@ const 본다 = () => {
     if (탈.length) { console.log('    터진 말: ' + JSON.stringify([...new Set(탈)].slice(0,2))); 빨강++; }
     await ctx.close();
   }
+  /* ★ 줄이 0 일 때도 CS 거르개가 서나 */
+  const 빔 = await 줄없을때(b, 머리있음);
+  console.log('\n  ③ 머리줄은 오고 **줄이 0개**일 때');
+  console.log('    줄 ' + 빔.줄수 + '개 · 안내 「' + 빔.안내 + '」');
+  console.log('    ★ 거르개 ' + JSON.stringify(빔.갈래들.map(x=>x.이름))
+    + ' — **CS 가 섰나** ' + 못(빔.갈래들.some(x => x.이름 === 'CS')));
+  if (빔.탈.length) { console.log('    터진 말: ' + JSON.stringify([...new Set(빔.탈)].slice(0,2))); 빨강++; }
+
   console.log('\n  ★ 초록 ' + 초록 + ' · 빨강 ' + 빨강);
   await b.close();
   process.exit(빨강 ? 1 : 0);
