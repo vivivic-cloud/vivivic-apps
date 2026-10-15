@@ -76,6 +76,26 @@ const 본다 = (p) => p.evaluate(()=>{
   못('㉠ 줄도 다섯', r.줄수, 5);
   못('⚠ ㉠ 같은 아이디가 두 벌이 아니다', r.아이디겹침, 0);
   못('㉠ 375 가로 넘침 0', r.넘침, [375,375]);
+  /* 10-15 사장님: 「이거 왜 아직 여깃냐 발주하기 속으로 넣으라했는데」 —
+     박스판에 「발주등록완료 리스트」 **타일이 남아 있었다.** 한 번 더 누르실 까닭이 없다.
+     ⚠ 타일만 없앤 것이지 알맹이는 그대로다 — 줄 수가 5 그대로인지 바로 밑에서 본다. */
+  await p.evaluate(()=>johonGoHome());
+  await p.waitForTimeout(400);
+  const 보드 = await p.evaluate(()=>({
+    타일: [...document.querySelectorAll('#johon-home .jhh-tile')]
+      .map(e=>(e.querySelector('.jhh-nm')||{}).textContent.replace(/\s+/g,' ').trim()),
+    등록타일: [...document.querySelectorAll('#johon-home .jhh-tile')]
+      .filter(e=>/발주등록완료/.test((e.querySelector('.jhh-nm')||{}).textContent||'')).length }));
+  못('⚠ ㉠ 박스판에 「발주등록완료」 타일 0개', 보드.등록타일, 0);
+  // 사장님이 짚으신 그 자리 — **타일이 없어진 것이 그림에 보여야** 한다.
+  await p.screenshot({ path: 그림+'발주완료-2박스판.png' });
+  // 타일 이름에 <br> 이 있어 textContent 로는 빈칸 없이 붙는다 — 보이는 그대로 적는다.
+  못('㉠ 남은 타일 셋은 그대로', 보드.타일, ['발주하기','확정대기 List','공정 일정타임라인']);
+  await p.evaluate(()=>switchPageTab('발주하기'));
+  await p.waitForTimeout(500);
+  const r4 = await 본다(p);
+  못('⚠ ㉠ 알맹이는 안 지워졌다 — 그대로 5줄', [r4.줄수, r4.셈], [5, '5건']);
+  참('㉠ 발주하기에서 바로 보인다', r4.보이나 && r4.어느쪽==='발주하기', r4.어느쪽);
   await p.screenshot({ path: 그림+'발주완료-1발주하기.png', fullPage:true });
 
   // ㉡ 작업중으로 가면 제자리
