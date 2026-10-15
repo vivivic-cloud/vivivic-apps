@@ -66,9 +66,10 @@ chrome.runtime = { getManifest: () => ({ version: ${JSON.stringify(깔린판)} }
     return { 있나: !!d, 글: d ? d.textContent : null, 보이나: 보임(d),
              단추: !!document.getElementById('vp-바꾸기') };
   });
-  const 표붙은것 = 깃주소.filter((u) => /\?t=\d+$/.test(u));
+  const 표붙은것 = 깃주소.filter((u) => /\?v=[^&]+&t=\d+$/.test(u));
   console.log('\n■ 깃허브로 나간 주소 ' + 깃주소.length + '개 · **캐시 표(?t=) 붙은 것 ' + 표붙은것.length + '개**');
-  if (깃주소.length) console.log('  보기: ' + 깃주소[0].replace(/^.*벤더피아연동\//, '…/').slice(0, 70));
+  if (깃주소.length) console.log('  보기: …/' + decodeURIComponent(깃주소[0]).split('/').pop());
+  console.log('  판 표(v=) 가 깔린 판과 같나 : ' + 깃주소.every((u) => u.includes('v=' + 깔린판)));
   console.log('\n■ 딱지에 화면글 판이 찍히나 (깔린 판 ' + 깔린판 + ')');
   console.log('  ★ 딱지 글 : 「' + v.글 + '」');
   console.log('     길이 ' + (v.글 || '').length + '자 · 보이나 ' + v.보이나);
