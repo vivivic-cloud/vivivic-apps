@@ -115,11 +115,36 @@ const 본다 = (p) => p.evaluate(()=>{
   참('㉢ 다시 맨 아래', r3.맨아래냐, r3.맨아래냐);
   못('㉢ 숫자도 그대로', r3.셈, '5건');
 
-  // ㉣ 박스 안에서는 전처럼 안 보인다
-  for (const 박스 of ['order','waiting','danger']) {
+  /* ㉣ 박스 안 — 10-15 사장님: 「확정목록 박스는 사라졌는데 그곳에 있던정보를
+     이곳에 넣기로 한 약속을 져버렸네요」
+     ⚠ 사장님은 **「발주하기」 박스**로 들어가신다. 거기서 보여야 한다.
+       처음에 세 박스를 다 막고 박스판 타일까지 없앴더니 아무 데서도 못 보셨다.
+     waiting·danger 는 그 박스가 맡은 구역만 보이는 자리라 전처럼 안 보인다. */
+  await p.evaluate(()=>johonOpenBox('order'));
+  await p.waitForTimeout(400);
+  const 박스안 = await p.evaluate(()=>{
+    const el = document.getElementById('registered-orders-section');
+    const 발 = document.getElementById('page-발주하기');
+    return { 보이나: !!el && getComputedStyle(el).display !== 'none',
+             맨아래냐: !!(el && 발 && 발.lastElementChild === el),
+             덩이수: document.querySelectorAll('#registered-orders-section').length,
+             셈: (document.getElementById('registered-orders-count-badge')||{}).textContent,
+             줄수: document.querySelectorAll('#registered-orders-list-container .job-item').length,
+             아이디겹침: (()=>{ const n=document.querySelectorAll('[id^="registered-item-"]').length;
+               const q=new Set([...document.querySelectorAll('[id^="registered-item-"]')].map(e=>e.id));
+               return n - q.size; })(),
+             넘침: [document.documentElement.scrollWidth, document.documentElement.clientWidth] }; });
+  참('⚠ ㉣ 발주하기 박스 안에서 **보인다**', 박스안.보이나, 박스안.보이나);
+  참('㉣ 발주하기 박스 안에서도 **맨 아래**', 박스안.맨아래냐, 박스안.맨아래냐);
+  못('㉣ 발주하기 박스 안에서 5건', [박스안.줄수, 박스안.셈], [5, '5건']);
+  못('㉣ 박스 안에서도 덩어리 하나뿐', 박스안.덩이수, 1);
+  못('㉣ 박스 안에서도 아이디 겹침 0', 박스안.아이디겹침, 0);
+  못('㉣ 박스 안 375 가로 넘침 0', 박스안.넘침, [375,375]);
+  await p.screenshot({ path: 그림+'발주완료-3발주하기박스.png', fullPage:true });
+  for (const 박스 of ['waiting','danger']) {
     await p.evaluate(k=>johonOpenBox(k), 박스);
     await p.waitForTimeout(350);
-    못('㉣ 박스 「'+박스+'」 안에서는 안 보인다',
+    못('㉣ 박스 「'+박스+'」 안에서는 전처럼 안 보인다',
        await p.evaluate(()=>{ const el=document.getElementById('registered-orders-section');
          return !!el && getComputedStyle(el).display !== 'none'; }), false);
   }
