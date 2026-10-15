@@ -75,7 +75,13 @@
     return { count, heads, rows };
   }
 
-  const COLUMNS = ["주문번호", "상품명", "수취인", "휴대전화", "주소", "배송사", "송장번호", "상태"];
+  /* ⚠⚠ 10-15 사장님 (배송관리를 짚으시고, 그대로):
+       「불러온 데이터 가로스크롤로 실제 벤더피아의 모든 정보를 동일하게 볼 수 있게해줘」
+     가로스크롤은 10-14 에 이미 됐다. 모자란 것은 **칸**이었다 —
+     여기 여덟 개만 적어 두고 **그 여덟만 그리고 있었다.** 벤더피아가 준 나머지 칸은
+     `fetchList` 가 **받아는 오는데**(`heads`) 그리지 않고 버렸다.
+     → 이제 **벤더피아가 준 머리줄(`heads`)을 그대로** 그린다. 이름도 차례도 벤더피아 것이다.
+     칸을 줄이지도 합치지도 않는다. 넘치면 **가로로 민다**(10-14 에 깐 그대로). */
 
   const root = document.createElement("div");
   root.id = "vp-root";
@@ -198,19 +204,28 @@
   let tbody = null;
   let currentSearch = 0;
 
+  let 그린머리 = null;                                 // 지금 그려 둔 머리줄 (벤더피아가 준 그대로)
   function addRows(heads, rows) {
     if (!rows.length) return;
     if (!tbody) {
+      그린머리 = heads.slice();                        // ⚠ 벤더피아 칸을 **하나도 안 빼고** 그대로
       const t = document.createElement("table");
       const head = t.createTHead().insertRow();
-      for (const c of COLUMNS) head.appendChild(document.createElement("th")).textContent = c;
+      그린머리.forEach((c, i) => {
+        const th = head.appendChild(document.createElement("th"));
+        th.textContent = c;
+        if (i === 0) th.className = "vp-first";        // 첫 칸은 가로로 밀어도 붙어 있는다
+      });
       tbody = t.createTBody();
       table.replaceChildren(t);
     }
-    const idx = COLUMNS.map((c) => heads.indexOf(c));
     for (const row of rows) {
       const tr = tbody.insertRow();
-      for (const i of idx) tr.insertCell().textContent = i >= 0 ? row[i] : "";
+      그린머리.forEach((c, i) => {
+        const td = tr.insertCell();
+        td.textContent = row[i] === undefined ? "" : row[i];
+        if (i === 0) td.className = "vp-first";
+      });
     }
   }
 
@@ -222,7 +237,7 @@
     const { filters, variants, local } = plan(bar.q.value);
     const dates = { dcStartDt: bar.from.value, dcEndDt: bar.to.value };
 
-    tbody = null;
+    tbody = null; 그린머리 = null;
     table.replaceChildren();
     const seen = new Set();
     let shown = 0;
