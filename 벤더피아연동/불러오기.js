@@ -69,6 +69,35 @@
     window.postMessage({ __vp: "저장답", 표: e.data.표, 답 }, location.origin);
   });
 
+  /* ── ⑧ **밖에서 받아 오는 다리** (10-15) ──────────────────────
+     벤더피아 쪽 CSP(`connect-src`)가 창고로 나가는 것을 막아도, 확장 쪽 받아오기는
+     그 CSP에 묶이지 않는다. 그래서 화면 글이 「이 주소 좀 받아 주십시오」 하면 여기서 받는다.
+     ⚠⚠ **허락한 집은 둘뿐이다.** 아무 주소나 받아 주면 이 다리가 **구멍**이 된다.
+       화면 글은 깃허브에서 오고, 벤더피아 쪽 글도 같은 창에서 돈다 — 둘 다 이 길을 쓸 수 있다.
+       그러니 여기서 **집 이름으로 막는다.** 이 목록을 넓히지 마라.
+     ⚠ 쿠키를 **안 싣는다**(`credentials: "omit"`). 벤더피아 로그인을 밖으로 내보내지 않는다.
+     ⚠ 저장·등록이 아니다 — 창고에서 **읽기만** 한다(묻는 쪽이 그렇게 쓴다). */
+  const 허락한집 = ["https://firestore.googleapis.com", "https://identitytoolkit.googleapis.com"];
+  addEventListener("message", async (e) => {
+    if (e.source !== window || !e.data || e.data.__vp !== "밖에") return;
+    const 보내기 = (답) => window.postMessage({ __vp: "밖에답", 표: e.data.표, 답 }, location.origin);
+    let 집 = "";
+    try { 집 = new URL(e.data.주소).origin; } catch (err) {}
+    if (!허락한집.includes(집)) return 보내기({ 다리: true, ok: false, status: 0, 글: "", 탈: "안 허락한 집" });
+    const 옛 = e.data.옵션 || {};
+    try {
+      const r = await fetch(e.data.주소, {
+        method: 옛.method || "GET",
+        headers: 옛.headers || undefined,
+        body: 옛.body || undefined,
+        credentials: "omit",
+      });
+      보내기({ 다리: true, ok: r.ok, status: r.status, 글: await r.text() });
+    } catch (err) {
+      보내기({ 다리: true, ok: false, status: 0, 글: "", 탈: String(err && err.message || err) });
+    }
+  });
+
   const 넣기 = (주소) => new Promise((풀) => {
     const s = document.createElement("script");
     s.src = 주소; s.async = false;

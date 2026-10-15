@@ -104,6 +104,50 @@ const 본다 = () => {
   };
 };
 
+/* ⚠⚠ ⑧ **다리 길** (10-15) — 벤더피아 쪽 CSP 가 창고로 나가는 것을 막아도
+     확장 다리(`window.VP밖에`)로는 받아야 한다. 그 판을 따로 잰다.
+     `저장다리.js`·`불러오기.js` 가 하는 일을 **같은 꼴로** 흉내 낸다 —
+     page 쪽 `window.VP밖에` 가 postMessage 로 묻고, 「확장 쪽」 이 받아 돌려준다. */
+const 다리흉내 = `
+(() => {
+  let 표 = 0; const 기다림 = new Map();
+  addEventListener("message", (e) => {
+    if (e.source !== window || !e.data || e.data.__vp !== "밖에답") return;
+    const p = 기다림.get(e.data.표); if (p) { 기다림.delete(e.data.표); p(e.data.답); }
+  });
+  window.VP밖에 = (주소, 옵션) => new Promise((풀) => {
+    const 내표 = ++표; 기다림.set(내표, 풀);
+    window.postMessage({ __vp: "밖에", 표: 내표, 주소, 옵션: 옵션 || null }, location.origin);
+    setTimeout(() => { if (기다림.delete(내표)) 풀(null); }, 20000);
+  });
+})();`;
+/* 「확장 쪽」 — 이 상자에서는 page 안에서 하지만, 받아오기는 **playwright 가 가로채** 돌려준다.
+   ⚠ 바로받기(page 의 fetch)는 **막은 척**한다. 그래야 다리로만 되는지 갈린다. */
+const 확장쪽흉내 = `
+(() => {
+  const 허락한집 = ["https://firestore.googleapis.com", "https://identitytoolkit.googleapis.com"];
+  const 진짜받기 = window.fetch.bind(window);
+  addEventListener("message", async (e) => {
+    if (e.source !== window || !e.data || e.data.__vp !== "밖에") return;
+    const 보내기 = (답) => window.postMessage({ __vp: "밖에답", 표: e.data.표, 답 }, location.origin);
+    let 집 = ""; try { 집 = new URL(e.data.주소).origin; } catch (err) {}
+    if (!허락한집.includes(집)) return 보내기({ 다리: true, ok: false, status: 0, 글: "", 탈: "안 허락한 집" });
+    const 옛 = e.data.옵션 || {};
+    try {
+      const r = await 진짜받기(e.data.주소, { method: 옛.method || "GET", headers: 옛.headers,
+        body: 옛.body, credentials: "omit", __다리: 1 });
+      보내기({ 다리: true, ok: r.ok, status: r.status, 글: await r.text() });
+    } catch (err) { 보내기({ 다리: true, ok: false, status: 0, 글: "", 탈: String(err && err.message || err) }); }
+  });
+  /* 화면 글이 **제가 바로** 받으려 하면 CSP 처럼 막는다 */
+  window.fetch = (주소, 옵션) => {
+    const u = String(주소 && 주소.url ? 주소.url : 주소);
+    if (!(옵션 && 옵션.__다리) && /googleapis\.com/.test(u))
+      return Promise.reject(new TypeError("Refused to connect (CSP 흉내)"));
+    return 진짜받기(주소, 옵션);
+  };
+})();`;
+
 (async () => {
   const b = await chromium.launch({ executablePath: EXE });
   console.log('\n■ ② 단품 상세의 「수입정보」 단추');
@@ -111,7 +155,8 @@ const 본다 = () => {
   let 초록 = 0, 빨강 = 0;
   const 못 = (참) => { if (참) { 초록++; return '✓'; } 빨강++; return '✗'; };
 
-  for (const 자료줌 of [true, false]) {
+  for (const 판 of ['바로', '다리만', '못받음']) {
+    const 자료줌 = 판 !== '못받음';
     const 보낸물음 = [];
     const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
     await ctx.route('**://vivivic-cloud.github.io/**', r => r.abort('blockedbyclient'));
@@ -137,12 +182,26 @@ const 본다 = () => {
     await page.goto('https://vendorpia.com/System/Master/goods.aspx');
     await page.addStyleTag({ content: ['login.css','goods.css']
       .map(f => fs.readFileSync(path.join(확장, f), 'utf8')).join('\n') });
+    if (판 === '다리만') {
+      await page.addScriptTag({ content: 다리흉내 });
+      await page.addScriptTag({ content: 확장쪽흉내 });
+    }
+    /* 딱지와 `login.js` 를 세운다 — 까닭(`VP말`)이 딱지에 적혀야 어느 길로 됐는지 읽힌다.
+       실제로도 `login.js` 는 모든 화면에 함께 간다. */
+    await page.addScriptTag({ content:
+      'window.chrome=window.chrome||{};chrome.runtime={getManifest:()=>({version:"잰것"}),getURL:f=>"/"+f};'
+      + '(function(){var d=document.createElement("div");d.id="vp-판";'
+      + 'd.textContent="벤더피아 보기 잰것 · 확장";'
+      + 'd.style.cssText="position:fixed;left:6px;bottom:6px";document.body.appendChild(d);})();' });
+    await page.addScriptTag({ content: fs.readFileSync(path.join(확장, 'login.js'), 'utf8') });
     await page.addScriptTag({ content: VP흉내() });
     for (const f of ['johon.js','amt-draw.js','goods.js'])
       await page.addScriptTag({ content: fs.readFileSync(path.join(확장, f), 'utf8') }).catch(()=>{});
     await page.waitForTimeout(1800);               // 서류관리 자료를 받을 틈
 
-    console.log('\n  ' + (자료줌 ? '① 서류관리 자료를 받았을 때' : '② 서류관리 자료를 **못 받았을 때**(403)'));
+    console.log('\n  ◆ ' + (판 === '바로' ? '① 제가 바로 받을 때'
+      : 판 === '다리만' ? '② **바로받기가 막히고(CSP 흉내) 다리로만** 될 때'
+      : '③ 아예 **못 받을 때**(403)'));
     const 쓴것 = 보낸물음.filter((x) => /"writes"|:commit|setDoc/.test(x));
     console.log('    창고에 **쓴 적 있나** ' + (쓴것.length > 0) + ' ' + 못(쓴것.length === 0)
       + ' (읽기만 해야 한다)');
@@ -183,6 +242,13 @@ const 본다 = () => {
     }
     if (탈.length) { console.log('    터진 말: ' + JSON.stringify([...new Set(탈)].slice(0,2))); 빨강++; }
     /* 자료를 못 받아도 목록·상세는 그대로 돌아야 한다 */
+    if (판 === '다리만') {
+      const 길 = await page.evaluate(() =>
+        (document.getElementById('vp-판')?.textContent || ''));
+      const 토막 = 길.split('‖').map(x=>x.trim()).filter(x=>/수입정보/.test(x));
+      console.log('    ★ 어느 길로 받았나 — ' + JSON.stringify(토막) + ' '
+        + 못(토막.some(x => /다리/.test(x) && !/못받음/.test(x))));
+    }
     if (!자료줌) {
       const 것 = await page.evaluate(() => ({
         단추수: document.querySelectorAll('.vp-goods-list button').length,

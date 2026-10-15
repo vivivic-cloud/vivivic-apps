@@ -348,16 +348,35 @@
     PROJ: "vivivic-4b7ef",
     머리: ["단품코드", "상품명", "수량", "FOB", "포장규격", "입수", "CBM", "색", "서류 날짜"],
   };
+  /* ⚠⚠ **밖으로 나가는 길을 둘 둔다 (10-15).** 사장님 PC 에서 수입정보 단추가 **아예 안
+       생겼다** — 403 길의 모습과 같았다. 벤더피아 쪽 **CSP `connect-src`** 가 창고로 나가는
+       것을 막으면 화면 글이 아무리 애써도 못 받는다.
+     그래서 **확장 다리(`window.VP밖에`)를 먼저** 쓴다 — 확장 쪽 받아오기는 그 CSP에 안 묶인다.
+     다리가 없으면(확장이 옛 판) 전처럼 **제가 바로** 받는다.
+     ⚠ 어느 길로 됐는지 **까닭에 적는다** — 다음에 또 모르면 안 된다. */
+  let 어느길 = "";
+  async function 밖에서(주소, 옵션) {
+    if (window.VP밖에) {
+      const 답 = await window.VP밖에(주소, 옵션 || null);
+      if (답 && 답.다리) { 어느길 = "다리"; return 답; }
+      어느길 = "다리무응답";                           // 다리가 답을 안 줬다 — 제가 받아 본다
+    }
+    const r = await fetch(주소, Object.assign({ credentials: "omit" }, 옵션 || {}));
+    if (!어느길 || 어느길 === "다리무응답") 어느길 = window.VP밖에 ? "다리무응답→바로" : "바로";
+    return { ok: r.ok, status: r.status, 글: await r.text(), 다리: false };
+  }
+
   async function 서류표() {
     try {
       const 둔것 = JSON.parse(localStorage.getItem("vg.tok") || "null");
       if (둔것 && 둔것.until > Date.now() + 60000) return 둔것.tok;
     } catch (e) {}
-    const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${서류.KEY}`,
+    const r = await 밖에서(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${서류.KEY}`,
       { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ returnSecureToken: true }) });
-    if (!r.ok) throw new Error("표 " + r.status);     // 익명 로그인이 막혔나
-    const d = await r.json();
+    if (!r.ok) throw new Error("표 " + r.status + (r.탈 ? "/" + r.탈 : ""));   // 익명 로그인이 막혔나
+    const d = JSON.parse(r.글);
+    if (!d.idToken) throw new Error("표 없음");
     try { localStorage.setItem("vg.tok", JSON.stringify({ tok: d.idToken, until: Date.now() + 3300000 })); } catch (e) {}
     return d.idToken;
   }
@@ -387,12 +406,12 @@
       where: { fieldFilter: { field: { fieldPath: "cipl.v" }, op: "GREATER_THAN_OR_EQUAL",
                               value: { integerValue: "1" } } },
       select: { fields: [{ fieldPath: "cipl" }] } } };   // ⚠ `cipl` 만. 사람 칸은 받지 않는다
-    const r = await fetch(주소, { method: "POST",
+    const r = await 밖에서(주소, { method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + tok },
       body: JSON.stringify(물음) });
-    if (!r.ok) throw new Error("창고 " + r.status);   // 창고가 막았나(403)
+    if (!r.ok) throw new Error("창고 " + r.status + (r.탈 ? "/" + r.탈 : ""));  // 창고가 막았나(403)
     const 칸 = new Map();
-    for (const 한줄 of await r.json()) {
+    for (const 한줄 of JSON.parse(r.글)) {
       const cipl = 풀기(한줄?.document?.fields?.cipl);
       for (const it of (cipl && cipl.items) || []) {
         const 코드 = String(it.code == null ? "" : it.code).trim();
@@ -1105,11 +1124,12 @@
          ⚠ 못 받아도 화면은 그대로 돌아야 한다. 그때는 단추가 안 생길 뿐이다. */
       .then(() => (page.nameCol === "단품명"
         ? 수입받기()
-            .then(() => window.VP말?.("수입정보:코드" + (수입 ? 수입.size : 0) + "가지"))
+            .then(() => window.VP말?.("수입정보:코드" + (수입 ? 수입.size : 0) + "가지/" + 어느길))
             /* ⚠ 까닭을 적는다 (10-15) — 사장님 PC 에서 단추 자체가 안 생겼다.
                  403 인지, CSP 로 막힌 것인지, 표를 못 받은 것인지 **글로** 남긴다. */
             .catch((e) => { 수입 = null;
-              window.VP말?.("수입정보:못받음 " + (e && e.message ? e.message : e));
+              window.VP말?.("수입정보:못받음 " + (e && e.message ? e.message : e)
+                + " · 길" + (어느길 || (window.VP밖에 ? "다리있음" : "다리없음")));
               console.warn("수입정보", e); })
         : Promise.resolve()))
       // 지금 화면의 목록을 다 받았으면 다른 메뉴가 쓸 목록을 뒤에서 받아 둔다
