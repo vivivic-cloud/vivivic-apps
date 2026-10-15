@@ -1,0 +1,198 @@
+/* ② **단품 상세의 「수입정보」 단추**를 재는 자.
+   사장님 10-15: 「단품코드와 서류관리프로그램에서 사용되는 코드와 일치시 서류관리 프로그램의
+   해당코드에 대한 상세정보가 본 단품버튼의 상세팝업에서 수입정보 버튼을 누르면 나타나게 해줘」
+   (장부 a1792025546)
+   보아야 하는 것 —
+     ㄱ) **코드 꼴이 달라도 맞나** (밑줄 꼴 `▁`·`＿` · 대소문자 · `-`↔`_`)
+     ㄴ) **안 맞는 단품엔 단추가 없나** (가짜 단추를 만들지 않는다)
+     ㄷ) 누르면 창이 뜨고 줄 수가 맞나 · `+` 로 이어진 단품코드 둘 다 보나
+     ㄹ) **사람 칸이 새지 않나** — 보낸 물음에 `cipl` 말고는 없나, 화면에 전화·주소가 없나
+     ㅁ) 서류관리 자료를 **못 받아도** 화면이 그대로 도나
+   ⚠ 진짜 vendorpia.com·창고는 못 닿는다. 흉내로 세워 잰다. 자료는 전부 가짜. */
+const { chromium } = require('playwright');
+const fs = require('fs'), path = require('path');
+const 확장 = path.join(__dirname, '..');
+const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const PAGES = require('./본보기/PAGES.cjs');
+
+/* ── 벤더피아 단품관리 줄 ─────────────────────────────── */
+const 단품머리 = ["단품코드","단품명","매입처명","단품분류","재고유형","발주유형","판매상태",
+  "배송수량","양품수","상품코드","상품명","매출처명","매출처코드","창고","바코드","등록일"];
+const 단품들 = [
+  /* ① 대소문자 + 밑줄 꼴이 다르다 — 서류관리는 `myT▁3C` 로 적어 두었다 */
+  ["MYT_3C","가나다 3단 서랍장","가매입처","서랍장","재고","발주","판매중","5","3","KLS-1","가나다 세트","가매출처","1010","0.본사","B1","2026-01-02"],
+  /* ② `-` 와 `_` 가 다르다 — 서류관리는 `BH-LKB` 로 적어 두었다 (바이글이 같게 보라 했다) */
+  ["BH_LKB","가나다 문짝","가매입처","문짝","재고","발주","판매중","2","1","KLS-2","가나다 세트","가매출처","1010","0.본사","B2","2026-01-03"],
+  /* ③ `+` 로 둘이 이어져 있다 — 둘 다 보여야 한다 */
+  ["EF-al55 + bd-whsqa","가나다 다리+손잡이","가매입처","부속","재고","발주","판매중","9","4","KLS-3","가나다 세트","가매출처","1010","0.본사","B3","2026-01-04"],
+  /* ④ 서류관리에 **없는** 코드 — 단추가 없어야 한다 */
+  ["ZZ_NONE","가나다 없는것","가매입처","기타","재고","발주","판매중","1","0","KLS-4","가나다 세트","가매출처","1010","0.본사","B4","2026-01-05"],
+];
+/* ── 서류관리(docs_files)의 cipl 흉내 ───────────────────
+   ⚠ 사람 칸(`수취인`·`전화`·`주소`)을 **일부러 문서에 심어 둔다** — 우리가 그것을 받지도,
+     보이지도 않는지 재려고. 품목 안에도 하나 심는다. */
+/* 창고가 돌려주는 꼴을 손으로 짜지 않고 **값 → Firestore 꼴** 로 싸는 작은 셈을 쓴다
+   (깊은 괄호를 손으로 맞추다 한 번 틀렸다 — 10-15). */
+const 싸기 = (v) => {
+  if (v === null || v === undefined) return { nullValue: null };
+  if (typeof v === 'boolean') return { booleanValue: v };
+  if (typeof v === 'number') return Number.isInteger(v)
+    ? { integerValue: String(v) } : { doubleValue: v };
+  if (Array.isArray(v)) return { arrayValue: { values: v.map(싸기) } };
+  if (typeof v === 'object') return { mapValue: { fields:
+    Object.fromEntries(Object.entries(v).map(([k, x]) => [k, 싸기(x)])) } };
+  return { stringValue: String(v) };
+};
+const 서류문서 = (코드, 이름, 날) => ({ document: { fields: 싸기({
+  /* ⚠ 사람 칸과 거래처·경로를 **일부러 심어 둔다** — 받지도 보이지도 않는지 재려고 */
+  path: "/제헤우드/2026-01/CI&PL.xlsx", vendor: "제헤우드",
+  수취인: "홍길동", 전화: "010-1234-5678", 주소: "서울시 ○○구 ○○로 1",
+  cipl: { v: 2, invoiceDate: 날, items: [ {
+    code: 코드, name: 이름, qty: 120, price: 12.5, size: "800*400*250",
+    perCtn: 2, cbm: 0.08, colors: ["흰색"],
+    수취인: "홍길동", 전화: "010-1234-5678",
+  } ] },
+}).mapValue.fields } });
+const 서류들 = [
+  서류문서("myT▁3C", "3단 서랍장 몸통", "2026-01-10"),
+  서류문서("BH-LKB", "문짝 LKB", "2026-01-11"),
+  서류문서("EF-al55", "55형 다리", "2026-01-12"),
+  서류문서("bd-whsqa", "흰 손잡이", "2026-01-13"),
+  /* 같은 코드가 서류 두 장에 — 두 줄 다 보여야 한다 */
+  서류문서("myT＿3C", "3단 서랍장 몸통 (수정본)", "2026-02-01"),
+];
+
+const 표 = (머리, 줄) => `<html><body><span>총 ${줄.length} 건</span>
+<table><tr>${머리.map(h=>`<th>${h}</th>`).join('')}</tr>
+${줄.map(r=>`<tr>${r.map(v=>`<td>${v}</td>`).join('')}</tr>`).join('')}</table></body></html>`;
+const 빈표 = '<html><body><span>총 0 건</span><table><tr><th>없음</th></tr></table></body></html>';
+const 폼 = (액션, 칸들) => `<form name="aspnetForm" method="post" action="${액션}" id="aspnetForm">
+<input type="hidden" name="__VIEWSTATE" value="x">
+<input name="dcStartDt" id="dcStartDt" value="2026-07-15"><input name="dcEndDt" id="dcEndDt" value="2026-10-15">
+<select name="ddlStatus" id="ddlStatus"><option value="전체">전체</option><option value="판매중" selected>판매중</option></select>
+<select name="ddlSupplier" id="ddlSupplier"><option value="전체">전체</option></select>
+<select name="ddlRowCnt" id="ddlRowCnt"><option value="50">50</option></select>
+${칸들}<input type="image" name="btnSearch" id="btnSearch" src="s.gif"><div id="divGrid"></div></form>`;
+const 단품쪽 = `<html><head><meta charset="utf-8"><title>단품관리</title></head><body id="body">
+${폼('/System/Master/goods.aspx','')}</body></html>`;
+
+const VP흉내 = (쪽) => `
+var VP_DATA = { PAGES: ${JSON.stringify(PAGES)},
+  ymd: function (d) { var z=function(n){return String(n).padStart(2,"0");};
+    return d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate()); },
+  list: async function (cfg, url, status, dates, cb) {
+    if (String(url).indexOf("goods.aspx") >= 0 && String(url).indexOf("salesGoods") < 0) {
+      cb(${JSON.stringify(단품머리)}, ${JSON.stringify(단품들)}, ${단품들.length}, ${단품들.length});
+    } else { cb([], [], 0, 0); }
+    return { cachedAt: null }; },
+  prefetch: function(){}, clearCache: async function(){} };
+window.VP저장 = { get: async function(){return {};}, set: async function(){}, remove: async function(){} };
+/* VP_JOHON_PARTS 는 johon.js 가 밝힌다 — 여기서 또 밝히면 두 번 밝혔다고 터진다 */`;
+
+const 본다 = () => {
+  const 판 = document.querySelector('.vp-goods-panel');
+  const 창 = document.querySelector('.vp-modal');
+  const 단추 = 판 && !판.hidden ? 판.querySelector('.vp-수입 button') : null;
+  const 글 = (el) => (el && el.textContent) || '';
+  return {
+    판떴나: !!판 && !판.hidden, 판제목: 글(판 && 판.querySelector('strong')).trim(),
+    수입단추있나: !!단추, 단추글: 단추 ? 단추.textContent : null,
+    창떴나: !!창 && !창.hidden, 창제목: 글(창 && 창.querySelector('strong')).trim(),
+    창줄수: 창 && !창.hidden ? 창.querySelectorAll('.vp-modal-body dl').length : 0,
+    창글: 창 && !창.hidden ? 글(창.querySelector('.vp-modal-body')) : '',
+    가기단추: 창 && !창.hidden ? 글(창.querySelector('.vp-goto')).trim() : null,
+  };
+};
+
+(async () => {
+  const b = await chromium.launch({ executablePath: EXE });
+  console.log('\n■ ② 단품 상세의 「수입정보」 단추');
+  console.log('  ⚠ 자료는 전부 가짜. 서류 문서에 **사람 칸을 일부러 심어** 새는지 본다.');
+  let 초록 = 0, 빨강 = 0;
+  const 못 = (참) => { if (참) { 초록++; return '✓'; } 빨강++; return '✗'; };
+
+  for (const 자료줌 of [true, false]) {
+    const 보낸물음 = [];
+    const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
+    await ctx.route('**://vivivic-cloud.github.io/**', r => r.abort('blockedbyclient'));
+    await ctx.route('**://identitytoolkit.googleapis.com/**', (r) =>
+      r.fulfill({ status: 200, contentType: 'application/json',
+                  body: JSON.stringify({ idToken: 'ascii-fake-token' }) }));
+    await ctx.route('**://firestore.googleapis.com/**', (r) => {
+      보낸물음.push(r.request().postData() || '');
+      if (!자료줌) return r.fulfill({ status: 403, contentType: 'application/json',
+        body: JSON.stringify({ error: { code: 403, status: 'PERMISSION_DENIED' } }) });
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(서류들) });
+    });
+    await ctx.route('**://vendorpia.com/**', (r) => {
+      const 길 = new URL(r.request().url()).pathname;
+      if (r.request().method() === 'POST') return r.fulfill({ status:200,
+        contentType:'text/html; charset=utf-8', body: 빈표 });
+      if (길.endsWith('.js')) return r.fulfill({ status:200, contentType:'text/javascript', body:'/* 손잡이 (흉내) */' });
+      return r.fulfill({ status:200, contentType:'text/html; charset=utf-8', body: 단품쪽 });
+    });
+    ctx.setDefaultTimeout(5000);                 // 오래 기다리지 않는다
+    const page = await ctx.newPage();
+    const 탈 = []; page.on('pageerror', e => 탈.push(String(e && e.message).slice(0,160)));
+    await page.goto('https://vendorpia.com/System/Master/goods.aspx');
+    await page.addStyleTag({ content: ['login.css','goods.css']
+      .map(f => fs.readFileSync(path.join(확장, f), 'utf8')).join('\n') });
+    await page.addScriptTag({ content: VP흉내() });
+    for (const f of ['johon.js','amt-draw.js','goods.js'])
+      await page.addScriptTag({ content: fs.readFileSync(path.join(확장, f), 'utf8') }).catch(()=>{});
+    await page.waitForTimeout(1800);               // 서류관리 자료를 받을 틈
+
+    console.log('\n  ' + (자료줌 ? '① 서류관리 자료를 받았을 때' : '② 서류관리 자료를 **못 받았을 때**(403)'));
+    const 쓴것 = 보낸물음.filter((x) => /"writes"|:commit|setDoc/.test(x));
+    console.log('    창고에 **쓴 적 있나** ' + (쓴것.length > 0) + ' ' + 못(쓴것.length === 0)
+      + ' (읽기만 해야 한다)');
+    const 물음 = 보낸물음.find((x) => /structuredQuery/.test(x)) || '';
+    console.log('    보낸 물음의 받을 칸 : '
+      + JSON.stringify((물음.match(/"fieldPath":"(\w+)"/g) || [])) + ' '
+      + 못(/"collectionId":"docs_files"/.test(물음) && /"fieldPath":"cipl"/.test(물음)
+           && !/수취인|전화|주소|"path"|vendor/.test(물음)));
+
+    for (const [i, 단품] of 단품들.entries()) {
+      /* ⚠ 첫 화면은 「많이 나간 순 50개」 라 단추가 숨어 있을 수 있다(`apply` 의 stage).
+           보이는지는 `단추.cjs` 가 따로 잰다. 여기서는 **누른 뒤**를 재려는 것이니
+           화면 안에서 바로 누른다. */
+      await page.evaluate((k) => {
+        const b = document.querySelectorAll('.vp-goods-list button')[k];
+        if (b) b.click();
+      }, i);
+      await page.waitForTimeout(250);
+      const 것 = await page.evaluate(본다);
+      const 맞아야 = 자료줌 && i < 3;
+      console.log('    [' + (i+1) + '] 「' + 단품[1] + '」 코드 ' + 단품[0]
+        + ' → 판 ' + 것.판떴나 + ' · 수입정보 단추 **' + 것.수입단추있나 + '**'
+        + (것.단추글 ? ' 「' + 것.단추글 + '」' : '') + ' ' + 못(것.수입단추있나 === 맞아야));
+      if (!것.수입단추있나) continue;
+      await page.evaluate(() => document.querySelector('.vp-수입 button').click());
+      await page.waitForTimeout(250);
+      const 창 = await page.evaluate(본다);
+      const 바라는줄 = i === 0 ? 2 : i === 1 ? 1 : 2;   // ①같은코드 두장 ②한장 ③`+` 둘
+      console.log('        창 「' + 창.창제목 + '」 · 줄 **' + 창.창줄수 + '개** (바라는 것 '
+        + 바라는줄 + ') ' + 못(창.창떴나 && 창.창줄수 === 바라는줄));
+      console.log('        ★ 사람 칸이 샜나 — 전화 ' + /010-1234-5678/.test(창.창글)
+        + ' · 이름 ' + /홍길동/.test(창.창글) + ' · 주소 ' + /○○로 1/.test(창.창글)
+        + ' · 거래처 ' + /제헤우드/.test(창.창글) + ' '
+        + 못(!/010-1234-5678|홍길동|○○로 1|제헤우드/.test(창.창글)));
+      console.log('        FOB·규격·입수·CBM 보이나 '
+        + 못(/12\.5/.test(창.창글) && /800\*400\*250/.test(창.창글) && /0\.08/.test(창.창글)));
+      await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+    }
+    if (탈.length) { console.log('    터진 말: ' + JSON.stringify([...new Set(탈)].slice(0,2))); 빨강++; }
+    /* 자료를 못 받아도 목록·상세는 그대로 돌아야 한다 */
+    if (!자료줌) {
+      const 것 = await page.evaluate(() => ({
+        단추수: document.querySelectorAll('.vp-goods-list button').length,
+        판떴나: !document.querySelector('.vp-goods-panel').hidden }));
+      console.log('    목록 단추 ' + 것.단추수 + '개 · 상세도 뜬다 ' + 것.판떴나 + ' '
+        + 못(것.단추수 === 단품들.length && 것.판떴나));
+    }
+    await ctx.close();
+  }
+  console.log('\n  ★ 초록 ' + 초록 + ' · 빨강 ' + 빨강);
+  await b.close();
+  process.exit(빨강 ? 1 : 0);
+})();

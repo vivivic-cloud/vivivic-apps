@@ -28,6 +28,20 @@
   //  단품관리 → 상품관리: 단품코드 → 그 단품이 들어간 상품 줄들
   // 단품코드 뒤에 공백이 붙어 있거나 대소문자가 다른 경우가 있어 맞춰서 비교한다
   const codeKey = (code) => code.trim().toLowerCase();
+  /* ② **맞댈 때만 쓰는 열쇠** (바이글 10-15 가 정했다) — 서류관리와 코드 꼴이 달라
+       조용히 안 맞던 것을 잡는다:
+         벤더피아연동  `code.trim().toLowerCase()`            (소문자로 만든다)
+         서류관리      `replace(밑줄꼴, "_")`                  (소문자로 안 만든다)
+       어느 쪽도 다른 쪽을 품지 못한다. 그래서 셋을 다 한다 —
+       **앞뒤 빈칸 털기 → 밑줄 꼴과 `-` 를 `_` 하나로 → 소문자.**
+     ⚠ **저장된 값은 안 고친다.** 화면에 보이는 코드는 서류에 적힌 그대로다.
+       이 열쇠는 **맞대는 순간에만** 씌운다.
+     ⚠ 서류관리의 `코드열쇠`(그쪽 `js/parse.js`)를 **고치지 마라** — 딴 작업자 자리다.
+     ⚠⚠ `-` 를 `_` 로 함께 보는 것은 **바이글이 정한 것**이고, 서류관리 쪽 주석과 어긋난다:
+       거기엔 「`-`(U+002D) 는 **넣지 마십시오** — 진짜로 다른 제품입니다」 라고 적혀 있다.
+       바이글에게 그 글귀를 그대로 올렸다. 되돌리려면 아래 묶음에서 `\u002D` 만 빼면 된다. */
+  const 맞대기열쇠 = (v) => String(v == null ? "" : v).trim()
+    .replace(/[\u005F\u2581\uFF3F\u2017\u002D]/g, "_").toLowerCase();
   const toNumber = (text) => Number(String(text).replace(/,/g, "")) || 0;
   // 조혼가구 프로그램의 단품명 검색(모든 거래처 탭)과 연결된 단품 (ing단품코드 = 단품코드) → 버튼 아래 붉은 선
   // 목록은 조혼가구 프로그램을 크롬에서 열 때 받아 둔 것(vpJohon)을 쓰고, 아직 없으면 johon.js에 넣어 둔 목록을 쓴다
@@ -305,6 +319,132 @@
     overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
     root.appendChild(overlay);
     overlay.querySelector("button").focus();
+  }
+
+  /* ── ② 수입정보 (서류관리 자료) ──────────────────────────
+     사장님 10-15: 「단품코드와 서류관리프로그램에서 사용되는 코드와 일치시 서류관리
+       프로그램의 해당코드에 대한 상세정보가 본 단품버튼의 상세팝업에서 수입정보 버튼을
+       누르면 나타나게 해줘」 (장부 a1792025546)
+     읽는 곳 — `artifacts/vivivic-4b7ef/public/data/docs_files` 의 **`cipl` 칸만**.
+       서류관리(`vivivic-docs`)의 앱스 스크립트가 잔액서류(CI&PL) 엑셀을 읽어 적어 둔 것이다.
+       ⚠ **읽기만 한다. 한 글자도 안 쓴다.** 서류관리 코드는 한 줄도 건드리지 않았다.
+       ⚠ `cipl` 만 받는다 — 파일 이름·경로·거래처 칸은 **받지도 않는다**(사람 칸이 샐 틈을 없앤다).
+       ⚠ **거래처 이름을 조건에 박지 않는다.** 코드가 맞으면 뜨고, 안 맞으면 단추가 안 생긴다.
+         그래서 다음 거래처가 들어와도 그대로 된다.
+     ⚠ 표(토큰)는 손잡이가 쓰는 `vg.tok` 칸을 **같이 쓴다**. `shared/viggle.js` 는
+       고치지 않기로 되어 있어 거기서 꺼내 쓸 수 없다. */
+  const 서류 = {
+    KEY: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
+    PROJ: "vivivic-4b7ef",
+    머리: ["단품코드", "상품명", "수량", "FOB", "포장규격", "입수", "CBM", "색", "서류 날짜"],
+  };
+  async function 서류표() {
+    try {
+      const 둔것 = JSON.parse(localStorage.getItem("vg.tok") || "null");
+      if (둔것 && 둔것.until > Date.now() + 60000) return 둔것.tok;
+    } catch (e) {}
+    const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${서류.KEY}`,
+      { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ returnSecureToken: true }) });
+    if (!r.ok) throw new Error("표를 못 받았습니다");
+    const d = await r.json();
+    try { localStorage.setItem("vg.tok", JSON.stringify({ tok: d.idToken, until: Date.now() + 3300000 })); } catch (e) {}
+    return d.idToken;
+  }
+  const 풀기 = (v) => {
+    if (!v) return null;
+    if ("stringValue" in v) return v.stringValue;
+    if ("integerValue" in v) return Number(v.integerValue);
+    if ("doubleValue" in v) return v.doubleValue;
+    if ("booleanValue" in v) return v.booleanValue;
+    if ("nullValue" in v) return null;
+    if ("arrayValue" in v) return (v.arrayValue.values || []).map(풀기);
+    if ("mapValue" in v) {
+      const o = {};
+      for (const [k, x] of Object.entries(v.mapValue.fields || {})) o[k] = 풀기(x);
+      return o;
+    }
+    return null;
+  };
+  let 수입 = null;            // 맞대기열쇠 → [줄] · null 이면 아직 안 받았다/못 받았다
+  async function 수입받기() {
+    const tok = await 서류표();
+    const 주소 = `https://firestore.googleapis.com/v1/projects/${서류.PROJ}/databases/(default)`
+      + `/documents/artifacts/${서류.PROJ}/public/data:runQuery`;
+    const 물음 = { structuredQuery: {
+      from: [{ collectionId: "docs_files" }],
+      /* 표를 이미 읽어 둔 줄만 받는다 — 나머지는 품목이 없어 받을 것이 없다 */
+      where: { fieldFilter: { field: { fieldPath: "cipl.v" }, op: "GREATER_THAN_OR_EQUAL",
+                              value: { integerValue: "1" } } },
+      select: { fields: [{ fieldPath: "cipl" }] } } };   // ⚠ `cipl` 만. 사람 칸은 받지 않는다
+    const r = await fetch(주소, { method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + tok },
+      body: JSON.stringify(물음) });
+    if (!r.ok) throw new Error("서류관리 자료를 못 받았습니다 " + r.status);
+    const 칸 = new Map();
+    for (const 한줄 of await r.json()) {
+      const cipl = 풀기(한줄?.document?.fields?.cipl);
+      for (const it of (cipl && cipl.items) || []) {
+        const 코드 = String(it.code == null ? "" : it.code).trim();
+        if (!코드) continue;
+        const 열쇠 = 맞대기열쇠(코드);
+        /* ⚠ 칸은 **모두 글자**여야 한다. `detailFields` 가 `row[i].trim()` 을 부른다 —
+             숫자를 그대로 넣으면 상세가 **한 줄도 안 그려진다**(10-15 재서 잡았다). */
+        const 글자 = (v) => (v === null || v === undefined || v === "" ? "" : String(v));
+        const 줄 = [코드, 글자(it.name), 글자(it.qty), 글자(it.price), 글자(it.size),
+                    글자(it.perCtn), 글자(it.cbm), (it.colors || []).join(" · "),
+                    글자(cipl.invoiceDate)];
+        const 둔것 = 칸.get(열쇠) || [];
+        /* 같은 코드가 서류 여러 장에 오면 **다 보여 드린다** — 다만 똑같은 줄은 한 번만 */
+        if (!둔것.some((x) => x.join("\u0001") === 줄.join("\u0001"))) 둔것.push(줄);
+        칸.set(열쇠, 둔것);
+      }
+    }
+    수입 = 칸;
+    /* 늦게 왔으면 열려 있는 상세를 다시 그려 단추를 끼운다 */
+    if (!panel.hidden && panel.dataset.name && panel._args) show(panel.dataset.name, ...panel._args);
+  }
+
+  /* 이 단품(들)에 맞는 서류 줄 — 없으면 빈 배열. 거래처 이름은 아무 데도 안 쓴다. */
+  function 수입찾기(h, items) {
+    if (!수입) return [];
+    const 본것 = new Set();
+    const 모음 = [];
+    for (const row of items) {
+      for (const 코드 of String(row[h.indexOf(page.codeCol)] || "").split("+")) {
+        const 열쇠 = 맞대기열쇠(코드);
+        if (!열쇠 || 본것.has(열쇠)) continue;
+        본것.add(열쇠);
+        모음.push(...(수입.get(열쇠) || []));
+      }
+    }
+    return 모음;
+  }
+
+  function 수입창(이름, 줄들) {
+    modalTitle.textContent = 이름 + " · 수입정보";
+    modalBody.replaceChildren(...줄들.map((줄) => detailFields(서류.머리, 줄)));
+    modalGoto.textContent = "";                    // 「…로 가기」 는 둘 곳이 없다
+    modalGoto.removeAttribute("href");
+    modal.hidden = false;
+  }
+
+  /* 상세 맨 위에 놓는 「수입정보」 단추. **맞는 것이 없으면 아무것도 안 만든다**(분부). */
+  function 수입단추(h, items) {
+    const 줄들 = 수입찾기(h, items);
+    if (!줄들.length) return null;
+    const 통 = document.createElement("div");
+    통.className = "vp-수입";
+    const b = 통.appendChild(document.createElement("button"));
+    b.type = "button";
+    b.textContent = "수입정보";
+    b.appendChild(Object.assign(document.createElement("small"),
+      { textContent: 줄들.length > 1 ? 줄들.length + "건" : "" }));
+    b.addEventListener("click", (e) => {
+      e.preventDefault();
+      수입창(items[0][h.indexOf(page.nameCol)] || "", 줄들);
+    });
+    return 통;
   }
 
   // 에이엠티 발주확정목록의 부속카드 (renderTlConfParts)와 같은 모양. 발주가 없으니 수량은 1세트 기준
@@ -601,7 +741,8 @@
     if (page.locationTabs) panelBody.replaceChildren(...locationView(h, items));
     else if (page.nameCol === "상품명")
       panelBody.replaceChildren(...[ing링크(name), ...매출처별로(h, items)].filter(Boolean));
-    else panelBody.replaceChildren(...items.map((row) => detailFields(h, row, linkCell)));
+    else panelBody.replaceChildren(...[수입단추(h, items),
+      ...items.map((row) => detailFields(h, row, linkCell))].filter(Boolean));
     panel.hidden = false;
   }
 
@@ -950,6 +1091,11 @@
     (page.top ? loadTop().catch(() => { top = null; apply(); }) : Promise.resolve())
       .then(() => (page.stock === "link" || page.stock === "parts") && loadStock().catch(() => {}))
       .then(() => page.link && loadLinked().catch(() => { linked = { heads: [], byCode: new Map() }; }))
+      /* ② 단품관리에서만 — 서류관리 자료를 뒤에서 조용히 받는다.
+         ⚠ 못 받아도 화면은 그대로 돌아야 한다. 그때는 단추가 안 생길 뿐이다. */
+      .then(() => (page.nameCol === "단품명"
+        ? 수입받기().catch((e) => { 수입 = null; console.warn("수입정보", e); })
+        : Promise.resolve()))
       // 지금 화면의 목록을 다 받았으면 다른 메뉴가 쓸 목록을 뒤에서 받아 둔다
       .then(() => VP_DATA.prefetch());
   });
