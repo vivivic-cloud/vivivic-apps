@@ -128,20 +128,44 @@
     ["ddlDStatus", "배송상태"],
     ["ddlDeliveryCo", "배송사"],
     ["ddlStore", "매출처"],
+    /* ⑤ CS — 사장님 10-15: 「cs버튼을 추가하여 해당 필터 선택시 cs열값에 값이 있는 목록만
+         보이게 해주세요」 (장부 a1792028103)
+       ⚠ 이것만은 **벤더피아에 보내는 거르개가 아니다.** 벤더피아에도 `ddlCSType` 칸이
+         있으나 그것은 「**어느** CS 인가」 를 고르는 칸이라 「**값이 있는 것만**」 을
+         한 번에 못 묻는다. 그래서 **받아 온 줄을 우리가 거른다.**
+       ⚠ 받아 온 줄만 거른다 — 「결과가 많아 일부만 받아왔습니다」 가 뜬 조회에서는
+         안 받아 온 줄의 CS 는 셈에 안 든다. 기간을 좁히시면 다 든다.
+       ⚠ 이름이 `__` 로 시작하는 것은 **벤더피아로 안 보낸다**(`알약값`). */
+    ["__cs", "CS", [["", "전부"], ["있음", "CS 있는 것만"]]],
   ];
   const 고른것 = {};                                   // { 칸id: 고른 값 } — 빈 값이면 「전부」
+
+  /* 벤더피아가 준 머리줄에서 CS 칸이 몇 번째인가. -1 이면 그 화면엔 CS 칸이 없다.
+     ⚠ 칸 이름을 코드에 박지 않는다 — 머리글에 「cs」 가 든 칸을 찾는다
+       (「CS」·「CS구분」·「CS유형」 어느 꼴로 와도 받는다). */
+  let cs칸 = -1;
+  const cs찾기 = (heads) =>
+    (heads || []).findIndex((h) => /cs/i.test(String(h == null ? "" : h).replace(/\s/g, "")));
 
   let 펼친것 = null;                                   // 지금 펼쳐 둔 갈래 (하나만 펼친다)
   function 알약그리기() {
     알약칸.replaceChildren();
-    for (const [id, 이름] of 거르개들) {
-      const sel = document.getElementById(id);
-      if (!sel) continue;                              // 그 화면에 없는 칸
-      const 전체 = [...sel.options].find((o) => o.text.trim() === "전체");
-      const 고를것 = [...sel.options].filter((o) => o !== 전체 && o.text.trim());
-      if (고를것.length < 2) continue;                 // 고를 것이 하나뿐이면 둘 까닭이 없다
-      /* 끄는 길 — 「전부」 가 늘 맨 앞에 있다 */
-      const 보기 = [[전체 ? 전체.value : "", "전부"], ...고를것.map((o) => [o.value, o.text.trim()])];
+    for (const [id, 이름, 제보기] of 거르개들) {
+      let 보기;
+      if (제보기) {
+        /* 우리 것 (CS) — 머리줄에 그 칸이 **있을 때만** 둔다. 없는 화면에 두면
+           눌러도 아무 일이 없는 **가짜 단추**가 된다. 첫 조회로 머리줄을 알면 다시 그린다. */
+        if (cs칸 < 0) continue;
+        보기 = 제보기;
+      } else {
+        const sel = document.getElementById(id);
+        if (!sel) continue;                            // 그 화면에 없는 칸
+        const 전체 = [...sel.options].find((o) => o.text.trim() === "전체");
+        const 고를것 = [...sel.options].filter((o) => o !== 전체 && o.text.trim());
+        if (고를것.length < 2) continue;               // 고를 것이 하나뿐이면 둘 까닭이 없다
+        /* 끄는 길 — 「전부」 가 늘 맨 앞에 있다 */
+        보기 = [[전체 ? 전체.value : "", "전부"], ...고를것.map((o) => [o.value, o.text.trim()])];
+      }
       const 지금값 = 고른것[id] || "";
       const 지금글 = (보기.find(([값]) => (값 || "") === 지금값) || [, "전부"])[1];
 
@@ -195,7 +219,8 @@
   });
 
   /* 켜진 알약만 조회에 싣는다 (「전부」 는 안 싣는다 — 원래 폼 값 그대로 둔다) */
-  const 알약값 = () => Object.fromEntries(Object.entries(고른것).filter(([, v]) => v));
+  const 알약값 = () => Object.fromEntries(Object.entries(고른것)
+    .filter(([k, v]) => v && !k.startsWith("__")));    // `__` 로 시작하는 것은 우리끼리 쓰는 것
   알약그리기();
   bar.from.value = startDt.value;
   bar.to.value = endDt.value;
@@ -209,6 +234,9 @@
     if (!rows.length) return;
     if (!tbody) {
       그린머리 = heads.slice();                        // ⚠ 벤더피아 칸을 **하나도 안 빼고** 그대로
+      /* ⑤ 머리줄을 이제 알았다 — CS 칸이 있으면 거르개 줄에 CS 를 내놓는다 */
+      const 찾은것 = cs찾기(heads);
+      if (찾은것 !== cs칸) { cs칸 = 찾은것; 알약그리기(); }
       const t = document.createElement("table");
       const head = t.createTHead().insertRow();
       그린머리.forEach((c, i) => {
@@ -244,10 +272,15 @@
     let cut = false;
 
     const take = (r) => {
+      /* ⑤ 「CS 있는 것만」 — 받아 온 줄에서 CS 칸이 빈 줄을 버린다.
+         칸을 못 찾으면(-1) 아무것도 안 거른다 — 빈 표를 보여 드리는 것이 더 나쁘다. */
+      const cs만 = (고른것.__cs || "") === "있음";
+      const cs자리 = cs만 ? cs찾기(r.heads) : -1;
       const fresh = r.rows.filter((row) => {
         const key = row.join("\t");
         if (seen.has(key)) return false;
         seen.add(key);
+        if (cs자리 >= 0 && !String(row[cs자리] == null ? "" : row[cs자리]).trim()) return false;
         const text = row.join(" ");
         const digits = text.replace(/\D/g, "");
         return local.every((w) => text.includes(w) || (/^[\d-]+$/.test(w) && digits.includes(w.replace(/-/g, ""))));
