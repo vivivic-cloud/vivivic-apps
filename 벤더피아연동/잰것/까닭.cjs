@@ -11,6 +11,10 @@ const 확장 = path.join(__dirname, '..');
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const 깃 = 'https://vivivic-cloud.github.io/vivivic-apps/%EB%B2%A4%EB%8D%94%ED%94%BC%EC%95%84%EC%97%B0%EB%8F%99/';
 const PAGES = require('./본보기/PAGES.cjs');
+/* ⚠ 판번호를 손으로 박지 않는다 — `login.js` 의 `VP_화면글판` 을 **그대로 읽는다.**
+     박아 두면 판을 올릴 때 자가 조용히 거짓 빨강을 낸다 (10-15 겪었다). */
+const 화면글판 = (fs.readFileSync(path.join(확장, 'login.js'), 'utf8')
+  .match(/VP_화면글판\s*=\s*"([^"]+)"/) || [, '?'])[1];
 
 /* 사장님 화면의 **진짜 칸 이름** (10-15 장부 짚은자리에서 그대로 옮겼다) */
 const 참머리 = ["CS","CS주문번호","IMG","매출처","주문번호","주문번호2","가용수량","상품명","몰","주문자",
@@ -101,9 +105,9 @@ const 딱지읽기 = () => {
     const page = await ctx.newPage();
     await page.goto('https://vendorpia.com/System/Delivery/firmDvList.aspx?vg판=1');
     await page.addScriptTag({ content:
-      'window.chrome=window.chrome||{};chrome.runtime={getManifest:()=>({version:"0.34.18"}),getURL:f=>"/"+f};'
+      'window.chrome=window.chrome||{};chrome.runtime={getManifest:()=>({version:"' + 화면글판 + '"}),getURL:f=>"/"+f};'
       + 'window.VP저장={get:async()=>({}),set:async()=>{},remove:async()=>{}};' });
-    await page.addScriptTag({ content: 불러오기흉내('0.34.18') });
+    await page.addScriptTag({ content: 불러오기흉내(화면글판) });
     for (const f of ['login.css','search.css']) await page.addStyleTag({ url: 깃 + encodeURIComponent(f) });
     for (const f of ['vp-data.js','login.js','search.js'])
       await page.addScriptTag({ url: 깃 + encodeURIComponent(f) });
@@ -117,7 +121,7 @@ const 딱지읽기 = () => {
     console.log('    딱지 : ' + 글);
     console.log('    적힌 까닭 ' + 토막.length + '토막 ' + JSON.stringify(토막) + ' '
       + 못(토막.length > 0));
-    console.log('    화면글 판이 그대로 남았나 ' + 못(/화면글 0\.34\.18/.test(글 || '')));
+    console.log('    화면글 판이 그대로 남았나 ' + 못(글 ? 글.includes('화면글 ' + 화면글판) : false));
 
     if (판 === '잘됨') {
       console.log('    상품단추 부름·받음·준비가 적혔나 '
@@ -144,11 +148,11 @@ const 딱지읽기 = () => {
     }
 
     /* 딱지를 다시 써도(불러오기.js 가 1.5초·4초에 그렇게 한다) 까닭이 안 지워지나 */
-    await page.evaluate(() => window.__vp딱지다시("벤더피아 보기 0.34.18 · 확장 · 짚개✓ 기억✓ 손잡이✓ 꾸밈✓"));
+    await page.evaluate((판) => window.__vp딱지다시("벤더피아 보기 " + 판 + " · 확장 · 짚개✓ 기억✓ 손잡이✓ 꾸밈✓"), 화면글판);
     await page.waitForTimeout(300);
     const 다시 = await page.evaluate(딱지읽기);
     console.log('    딱지를 다시 써도 까닭이 남나 (' + (다시||'').split('‖').length + '토막) '
-      + 못((다시 || '').includes('‖') && /화면글 0\.34\.18/.test(다시 || '')));
+      + 못((다시 || '').includes('‖') && (다시 || '').includes('화면글 ' + 화면글판)));
     await ctx.close();
   }
   console.log('\n  ★ 초록 ' + 초록 + ' · 빨강 ' + 빨강);

@@ -13,9 +13,19 @@
      ⚠ 곁다리일 때는 제 화면(검색칸·목록)을 **그리지 않는다** — 상세 판과 창만 쓴다
        (`search.css` 의 `.vp-곁다리` 가 몸통을 감춘다). */
   const 곁다리길 = "/System/Master/salesGoods.aspx";
+  /* 곁다리로 부른 표 둘 — 어느 쪽이든 받는다.
+     ㄱ) `search.js` 가 세운 `window.VP상품단추요청` (뒷길로 불렀을 때)
+     ㄴ) **배송관리 길 그 자체** — 10-15 부터 `불러오기.js` 가 이 글을 거기에도 보낸다.
+         차례에 안 기대려고 길도 본다(search.js 가 먼저 안 돌아도 선다). */
+  const 배송관리인가 = /firmdvlist\.aspx/i.test(location.pathname);
   const page = PAGES[location.pathname]
-    || (window.VP상품단추요청 ? PAGES[곁다리길] : null);
+    || ((window.VP상품단추요청 || 배송관리인가) ? PAGES[곁다리길] : null);
   if (!page) return;
+  /* ⚠⚠ **두 번 돌지 않는다.** 10-15 부터 이 글이 배송관리에 **두 길로** 올 수 있다 —
+     `불러오기.js` 가 보내는 것과 `search.js` 의 뒷길. 두 번 돌면 곁다리 통이 둘이 되고
+     벤더피아에 같은 조회를 두 번 보낸다. 여기서 한 번만 돌게 막는다. */
+  if (window.__vp굿즈돌았나) return;
+  window.__vp굿즈돌았나 = true;
   const 곁다리 = !PAGES[location.pathname];
   const 내길 = 곁다리 ? 곁다리길 : location.pathname;
 

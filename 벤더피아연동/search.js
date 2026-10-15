@@ -243,14 +243,28 @@
   })();
   const 형제 = (이름) => 내주소 && 내주소.replace(/search\.js(?=\?|$)/, 이름);
   function 상품단추불러오기() {
+    /* ⚠⚠ 이것은 **뒷길**이다. 10-15 부터는 `불러오기.js`(확장)가 배송관리에도
+       `goods.js`·`goods.css` 를 **제대로 보낸다.** 이 길은 확장이 옛 판인 분을 위해 남겨 둔다.
+       ⚠ 확장이 이미 보냈으면 **또 넣지 않는다** — 넣으면 같은 글을 두 번 받는다.
+         (그래도 `goods.js` 가 스스로 한 번만 돌게 막아 둔다 — 두 겹으로 막는다.) */
+    window.VP상품단추요청 = true;                      // 뒤에 올 goods.js 에게 알리는 표
+    /* ⚠⚠ **차례를 재서 잡았다 (10-15).** `불러오기.js` 는 `search.js` 를 **먼저** 넣고
+         `goods.js` 를 **그 뒤에** 넣는다. 그래서 이 자리에서 `script[src*=goods.js]` 를
+         찾아봐도 **아직 없다** — 그 검사는 영영 안 맞는다(재서 확인).
+       그러니 **기다렸다가** 본다. 확장이 보냈으면 그동안 `goods.js` 가 돌아
+         `__vp굿즈돌았나` 가 서니, 뒷길은 **아예 안 나선다**. 옛 판을 쓰시는 분 화면에서만 나선다. */
+    setTimeout(() => {
+      if (window.__vp굿즈돌았나 || window.VP상품단추) return;   // 확장이 이미 보냈다
+      뒷길로부르기();
+    }, 2500);
+  }
+  function 뒷길로부르기() {
     const js = 형제("goods.js");
     /* ⚠ 까닭을 적는다 (10-15) — 사장님 PC 에서 **조용히** 안 됐다 */
     if (!js) { window.VP말?.("상품단추:내주소못찾음"); return; }
-    if (window.VP상품단추요청) return;
-    window.VP상품단추요청 = true;
     window.VP말?.("상품단추:부름 " + (js.split("/").pop() || "").slice(0, 24));
     const css = 형제("goods.css");
-    if (css && !document.querySelector('link[data-vp="goods.css"]')) {
+    if (css && !document.querySelector('link[href*="goods.css"]')) {
       const l = document.createElement("link");
       l.rel = "stylesheet"; l.href = css; l.dataset.vp = "goods.css";
       document.head.appendChild(l);

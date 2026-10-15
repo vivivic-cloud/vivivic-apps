@@ -35,7 +35,22 @@
   const 글 = ["저장다리.js", "vp-data.js", "login.js"];       // 모든 화면
   const 꾸밈 = ["login.css"];
   if (있나("/index.aspx"))        { 글.push("menu.js");   꾸밈.push("menu.css"); }
-  if (있나("firmdvlist.aspx"))    { 글.push("search.js"); 꾸밈.push("search.css"); }
+  if (있나("firmdvlist.aspx")) {
+    /* ⚠⚠ 10-15 — 배송관리에도 **`goods.js`·`goods.css` 를 보낸다.** 사장님 말씀 그대로:
+         「**그러니까 난 안되니까 이거 확장프로그램 덮어씌어야 되는거 아니냐고**」
+       배송관리 표의 상품명 칸을 **상품관리의 그 상품버튼**으로 바꾸는 데 그 글이 쓰인다.
+       앞서 `search.js` 가 **제 주소로 형제를 불러오는 우회로**를 썼는데 사장님 화면에서
+       안 돌았다. 우회로는 뒷길로 남겨 두었다(옛 판을 쓰시는 분) — `goods.js` 가 두 번
+       돌지 않게 **스스로 막는다**.
+       ⚠ `johon.js`·`amt-draw.js` 는 **안 보낸다.** 상품 단추가 안 쓴다
+         (goods.js 60줄·512줄에서 둘 다 `typeof` 로 막혀 있다). **쓰는 것만** 보낸다.
+       ⚠⚠ **꾸밈 차례를 지켜라 — `goods.css` 가 `search.css` 보다 먼저다.**
+         둘 다 첫 줄이 `#vp-root.vp-wide { … }` 로 **같은 셀렉터**다. 셈이 같으니
+         **뒤에 온 것이 이긴다.** goods.css 가 뒤에 오면 그 `display:block` 이
+         search.css 의 쪽스크롤 없애기(`display:flex`)를 덮어 **③ 이 다시 깨진다.** */
+    글.push("search.js", "goods.js");
+    꾸밈.push("goods.css", "search.css");
+  }
   if (있나("goods.aspx") || 있나("salesgoods.aspx") || 있나("stocklist.aspx"))
                                   { 글.push("johon.js", "amt-draw.js", "goods.js"); 꾸밈.push("goods.css"); }
   /* ⚠ 짚개.js 는 여기서 안 넣는다 — **틀(frameset) 안쪽까지** 붙어야 해서 제 자리로 뺐다
