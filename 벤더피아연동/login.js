@@ -28,7 +28,7 @@
      이 고침은 **새로고침만으로** 먹어야 한다. 그게 핵심이다. */
 /* ⚠⚠ 화면글 판은 **여기 한 군데서만** 적는다. `manifest.json` 의 version 과 **늘 같이** 올려라
    (배포 차례에 적어 두었다). 두 군데서 적으면 반드시 어긋난다. */
-const VP_화면글판 = "0.34.10";   // ⚠ manifest.json 의 version 과 **같은 값**
+const VP_화면글판 = "0.34.11";   // ⚠ manifest.json 의 version 과 **같은 값**
 
 (() => {
   const 딱지글 = (옛글) => {
@@ -67,8 +67,56 @@ const VP_화면글판 = "0.34.10";   // ⚠ manifest.json 의 version 과 **같�
 
   function 꼴맞추기() {
     if (!단추) return;
-    단추.textContent = 원래보는중 ? "← 우리 화면으로" : "벤더피아 원래 화면 보기";
+    /* 사장님 10-15 「너무크고」 — 글을 짧게 줄였다. 긴 말은 손 올렸을 때만 뜬다. */
+    단추.textContent = 원래보는중 ? "← 우리 화면" : "원래 화면";
+    단추.title = 원래보는중 ? "우리 화면으로 돌아가기" : "벤더피아 원래 화면 보기";
     단추.setAttribute("aria-pressed", 원래보는중 ? "true" : "false");
+  }
+
+  /* 쪽 맨 위 빈 띠에 선다. 그 자리에 남의 것이 **겹쳐** 있으면 왼쪽으로 비켜 선다.
+     ⚠ 띠는 `html.vp-위여백` 이 만든다(login.css). 띠가 밀어 주지 못하는 것은
+       벤더피아가 `position:fixed` 로 띄워 둔 것뿐이다 — 그때만 비켜 선다.
+       벤더피아 제 화면 꼴은 우리가 모른다. 그래서 **재서** 비킨다. */
+  function 자리잡기() {
+    if (!단추) return;
+    const 뿌리 = document.documentElement;
+    /* 무엇이 깔려 있나 — 단추 네 귀를 찍어 본다. 깔린 것이 있으면 그것을 돌려준다. */
+    const 걸린것 = () => {
+      const r = 단추.getBoundingClientRect();
+      if (r.width < 2 || r.height < 2) return null;
+      const 점 = [[r.left + 2, r.top + 2], [r.right - 2, r.top + 2],
+                  [r.left + 2, r.bottom - 2], [r.right - 2, r.bottom - 2]];
+      단추.style.pointerEvents = "none";          // 제 몸이 잡히지 않게
+      let 걸림 = null;
+      for (const [x, y] of 점) {
+        const el = document.elementFromPoint(x, y);
+        if (el && el !== 뿌리 && el !== document.body && !단추.contains(el)) { 걸림 = el; break; }
+      }
+      단추.style.pointerEvents = "";
+      return 걸림;
+    };
+    /* 늘 처음 자리에서 다시 잰다 — 앞서 비켜선 것을 물려야 한다 */
+    뿌리.style.removeProperty("--vp-위여백");
+    단추.style.removeProperty("top");
+    단추.style.right = "12px";
+    let 걸림 = 걸린것();
+    if (!걸림) return;
+    /* ㄱ) 옆으로 비켜 선다 */
+    for (let i = 1; i <= 4 && 걸림; i++) {
+      단추.style.right = (12 + i * 110) + "px";
+      걸림 = 걸린것();
+    }
+    if (!걸림) return;
+    /* ㄴ) 쪽 너비를 **다 덮은** 것(벤더피아가 `position:fixed` 로 붙여 둔 머리띠)은
+          옆으로 못 피한다. 빈 띠를 그만큼 **더 벌려 그 아래**에 선다 —
+          머리띠도 안 가리고 자료도 안 가린다. 겹친 넓이는 그대로 0 이다.
+       ⚠ 쪽을 통째로 덮은 것(팝업 따위)에 끌려가지 않게 쪽 키의 1/3 까지만 받는다. */
+    단추.style.right = "12px";
+    const 밑 = Math.ceil(걸림.getBoundingClientRect().bottom);
+    if (밑 > 0 && 밑 < innerHeight / 3) {
+      뿌리.style.setProperty("--vp-위여백", (밑 + 26) + "px");
+      단추.style.setProperty("top", (밑 + 3) + "px", "important");
+    }
   }
   function 뒤집기() {
     원래보는중 = !원래보는중;
@@ -80,6 +128,7 @@ const VP_화면글판 = "0.34.10";   // ⚠ manifest.json 의 version 과 **같�
       for (const id of 우리것) { const el = document.getElementById(id); if (el) el.classList.remove(숨김표); }
     }
     꼴맞추기();
+    자리잡기();
   }
   function 단추달기() {
     if (단추) return;
@@ -88,7 +137,12 @@ const VP_화면글판 = "0.34.10";   // ⚠ manifest.json 의 version 과 **같�
     단추.id = "vp-바꾸기";
     단추.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); 뒤집기(); });
     document.documentElement.appendChild(단추);                // ⚠ 몸이 아니라 뿌리에
+    /* 쪽 맨 위에 빈 띠를 만든다 — 단추가 설 자리다(login.css `html.vp-위여백`).
+       우리 화면·벤더피아 제 화면 **두 모습 다**에 두어야 어느 쪽도 안 가린다. */
+    document.documentElement.classList.add("vp-위여백");
     꼴맞추기();
+    자리잡기();
+    addEventListener("resize", 자리잡기, { passive: true });
   }
   /* 우리 화면이 떠 있을 때만 단추를 단다. 화면 글이 늦게 붙어도 받아 준다. */
   if (document.documentElement.classList.contains("vp-clean")) 단추달기();
