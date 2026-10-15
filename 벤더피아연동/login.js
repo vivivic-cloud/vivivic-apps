@@ -28,7 +28,7 @@
      이 고침은 **새로고침만으로** 먹어야 한다. 그게 핵심이다. */
 /* ⚠⚠ 화면글 판은 **여기 한 군데서만** 적는다. `manifest.json` 의 version 과 **늘 같이** 올려라
    (배포 차례에 적어 두었다). 두 군데서 적으면 반드시 어긋난다. */
-const VP_화면글판 = "0.34.24";   // ⚠ manifest.json 의 version 과 **같은 값**
+const VP_화면글판 = "0.34.25";   // ⚠ manifest.json 의 version 과 **같은 값**
 
 /* ⚠⚠ **까닭 적기** (10-15) — 사장님 PC 에서 CS 거르개·상품 단추·수입정보 셋이
      **조용히** 안 됐다. 사장님도 바이글도 **왜**인지를 못 봤다. 그것이 진짜 탈이었다.
@@ -172,6 +172,16 @@ const VP_화면글판 = "0.34.24";   // ⚠ manifest.json 의 version 과 **같�
     뿌리.style.removeProperty("--vp-위여백");
     단추.style.removeProperty("top");
     단추.style.right = "12px";
+    /* ⚠ 원래 화면일 때는 **띠가 없다.** 그러면 단추 밑에 벤더피아 제 것이 늘 깔려 있어
+         아래 ㄴ) 가 띠를 다시 벌리게 되고, 그것이 바로 10-15 의 탈이었다.
+         그래서 원래 화면에서는 **옆으로만** 비켜 서고 띠는 안 벌린다. */
+    const 띠쓰나 = 뿌리.classList.contains("vp-위여백");
+    /* ⚠⚠ **원래 화면에서는 비키지 않는다 (10-15).** 띠가 없으니 단추 밑에 벤더피아 제 것이
+         늘 깔려 있다. 그러면 비켜서기가 **끝까지 돌아** 좁은 화면에서 단추가 창 밖으로
+         나가 버린다(390px 에서 오른쪽 452px → 안 보인다. 재서 잡았다).
+       원래 화면에서는 **떠 있는 채로 둔다** — 반투명이라 밑이 비치고,
+       살짝 겹쳐도 괜찮다(바이글 10-15). 비키기는 **우리 띠를 지킬 때만** 쓴다. */
+    if (!띠쓰나) return;
     let 걸림 = 걸린것();
     if (!걸림) return;
     /* ㄱ) 옆으로 비켜 선다 */
@@ -196,9 +206,18 @@ const VP_화면글판 = "0.34.24";   // ⚠ manifest.json 의 version 과 **같�
     if (원래보는중) {
       document.documentElement.classList.remove("vp-clean");   // 가린 것을 걷는다
       for (const id of 우리것) { const el = document.getElementById(id); if (el) el.classList.add(숨김표); }
+      /* ⚠⚠ **띠도 같이 걷는다 (10-15).** 사장님: 「이것을 위로 올려주세요 텍스트가 안보여요」
+           — 벤더피아 제 로고(`#imglogo`)를 짚으셨다(장부 a1792059225).
+         우리가 얹은 26px 띠가 **원래 화면에서도 남아** 벤더피아 제 머리칸을 아래로 밀고 있었다.
+         원래 화면은 **벤더피아 것**이다. 우리가 밀 까닭이 없다 — 우리가 얹은 것만 치운다.
+         (벤더피아 제 글·제 꼴은 한 군데도 안 고친다. 조회만 한다.)
+         단추는 그때 **떠 있게** 둔다 — 반투명이라 밑이 비친다. */
+      document.documentElement.classList.remove("vp-위여백");
+      document.documentElement.style.removeProperty("--vp-위여백");
     } else {
       document.documentElement.classList.add("vp-clean");      // 다시 덮는다
       for (const id of 우리것) { const el = document.getElementById(id); if (el) el.classList.remove(숨김표); }
+      document.documentElement.classList.add("vp-위여백");      // 우리 화면에는 띠를 다시 둔다
     }
     꼴맞추기();
     자리잡기();
