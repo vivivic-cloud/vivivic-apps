@@ -77,17 +77,38 @@
        그러니 여기서 **집 이름으로 막는다.** 이 목록을 넓히지 마라.
      ⚠ 쿠키를 **안 싣는다**(`credentials: "omit"`). 벤더피아 로그인을 밖으로 내보내지 않는다.
      ⚠ 저장·등록이 아니다 — 창고에서 **읽기만** 한다(묻는 쪽이 그렇게 쓴다). */
+  /* ──밖에다리시작── (자가 이 토막을 그대로 떼어 돌린다. 이 표를 지우지 마라) */
   const 허락한집 = ["https://firestore.googleapis.com", "https://identitytoolkit.googleapis.com"];
+  /* ⚠⚠ **집만 묶으면 막음이 아니다.** 집은 둘로 묶었는데 「무엇을 하라는지」 를 안 묶으면
+       이 창의 아무 글이나 `POST`·`PATCH`·`DELETE` 를 창고로 보내 **사장님 자료를 쓰거나
+       지울 수 있다.** 「묻는 쪽이 읽기만 한다」 는 **막음이 아니다** — 여기서 막는다.
+     · `GET` 은 받는다 — 창고에 `GET` 으로 쓰는 길은 없다.
+     · `POST` 는 **창고 묻기(`:runQuery`)와 익명로그인(`accounts:signUp`) 길에서만** 받는다.
+     · 그 밖은 다 거절. 쓰기는 `:commit`·`:batchWrite`·`PATCH`·`DELETE` 로 가니 다 막힌다.
+     ⚠ 길은 `pathname` 으로 본다 — `?key=…` 가 붙어도 맞게 갈린다.
+     ⚠ 이 목록을 넓히지 마라. */
+  const 허락한셈 = (집, 길, 셈) => {
+    if (셈 === "GET") return true;
+    if (셈 !== "POST") return false;
+    if (집 === "https://firestore.googleapis.com") return /:runQuery$/.test(길);
+    if (집 === "https://identitytoolkit.googleapis.com") return /\/accounts:signUp$/.test(길);
+    return false;
+  };
   addEventListener("message", async (e) => {
     if (e.source !== window || !e.data || e.data.__vp !== "밖에") return;
     const 보내기 = (답) => window.postMessage({ __vp: "밖에답", 표: e.data.표, 답 }, location.origin);
-    let 집 = "";
-    try { 집 = new URL(e.data.주소).origin; } catch (err) {}
+    let 집 = "", 길 = "";
+    try { const u = new URL(e.data.주소); 집 = u.origin; 길 = u.pathname; } catch (err) {}
     if (!허락한집.includes(집)) return 보내기({ 다리: true, ok: false, status: 0, 글: "", 탈: "안 허락한 집" });
     const 옛 = e.data.옵션 || {};
+    const 셈 = String(옛.method || "GET").toUpperCase();
+    if (!허락한셈(집, 길, 셈)) {
+      try { window.VP말?.("밖에:안 허락한 셈 " + 셈); } catch (err) {}
+      return 보내기({ 다리: true, ok: false, status: 0, 글: "", 탈: "안 허락한 셈 " + 셈 });
+    }
     try {
       const r = await fetch(e.data.주소, {
-        method: 옛.method || "GET",
+        method: 셈,
         headers: 옛.headers || undefined,
         body: 옛.body || undefined,
         credentials: "omit",
@@ -97,6 +118,7 @@
       보내기({ 다리: true, ok: false, status: 0, 글: "", 탈: String(err && err.message || err) });
     }
   });
+  /* ──밖에다리끝── */
 
   const 넣기 = (주소) => new Promise((풀) => {
     const s = document.createElement("script");
