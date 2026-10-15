@@ -28,7 +28,7 @@
      이 고침은 **새로고침만으로** 먹어야 한다. 그게 핵심이다. */
 /* ⚠⚠ 화면글 판은 **여기 한 군데서만** 적는다. `manifest.json` 의 version 과 **늘 같이** 올려라
    (배포 차례에 적어 두었다). 두 군데서 적으면 반드시 어긋난다. */
-const VP_화면글판 = "0.34.11";   // ⚠ manifest.json 의 version 과 **같은 값**
+const VP_화면글판 = "0.34.12";   // ⚠ manifest.json 의 version 과 **같은 값**
 
 (() => {
   const 딱지글 = (옛글) => {
@@ -58,6 +58,43 @@ const VP_화면글판 = "0.34.11";   // ⚠ manifest.json 의 version 과 **같�
     기다림.observe(document.documentElement, { childList: true, subtree: true });
     setTimeout(() => 기다림.disconnect(), 20000);
   }
+})();
+
+/* ① 속엣말 감추기 — 사장님 10-15 「이 내부정보표기는 보이지 안도록해주세요」.
+   딱지 자체는 `login.css` 가 감춘다. 여기서는 **보는 길**과 **탭 글자**를 맡는다.
+   ⚠ 탭 글자의 「·짚기v…」 는 `불러오기.js`(확장 안)가 붙인 것이다. 거기를 고치면
+     사장님이 덮어쓰셔야 하니, **화면 쪽에서 털어 낸다.** 판보기일 때는 그대로 둔다. */
+(() => {
+  /* ⚠ 주소에 적은 한글은 브라우저가 `%ED%8C%90` 꼴로 바꿔 둔다. **풀어서** 봐야 맞는다
+       (10-15 재서 잡았다 — 안 풀면 `?vg판=1` 이 끝내 안 먹는다). */
+  const 푼것 = (s) => { try { return decodeURIComponent(s || ""); } catch (e) { return s || ""; } };
+  const 판보기인가 = () => {
+    try {
+      if (/[?&]vg판=1/.test(푼것(location.search))) return true;
+      const 꼭 = window.top || window;
+      if (꼭 !== window && /[?&]vg판=1/.test(푼것(꼭.location.search))) return true;
+    } catch (e) {}                                    // 틀을 못 들여다보면 그냥 넘긴다
+    return false;
+  };
+  if (판보기인가()) document.documentElement.classList.add("vp-판보기");
+
+  function 제목털기() {
+    if (document.documentElement.classList.contains("vp-판보기")) return;
+    try {
+      const 꼭 = window.top || window;
+      const 옛 = 꼭.document.title || "";
+      const 깎음 = 옛.replace(/\s*·짚기v[\d.]+/g, "");
+      if (깎음 !== 옛) 꼭.document.title = 깎음;
+    } catch (e) {}
+  }
+  제목털기();
+  setTimeout(제목털기, 1500);                          // 딱지를 찍는 때와 같은 결
+  setTimeout(제목털기, 4000);
+  window.VP판보기토글 = () => {
+    const 켬 = document.documentElement.classList.toggle("vp-판보기");
+    if (!켬) 제목털기();
+    return 켬;
+  };
 })();
 
 (() => {
@@ -135,7 +172,19 @@ const VP_화면글판 = "0.34.11";   // ⚠ manifest.json 의 version 과 **같�
     단추 = document.createElement("button");
     단추.type = "button";
     단추.id = "vp-바꾸기";
-    단추.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); 뒤집기(); });
+    /* 두 번 빠르게 누르면 **속엣말 딱지**를 켜고 끈다 (①).
+       ⚠ 바이글 안은 「길게 누르기」 였으나 그 손짓은 임자가 있다 — 짚기(손잡이)가
+         0.5초 길게누름을 **창 캡처**로 먼저 잡고 뒤따르는 click 을 삼킨다
+         (`shared/viggle.js` 292·301·374줄). 그래서 **두 번 누르기**로 갔다.
+       두 번 누르면 화면은 두 번 뒤집혀 **제자리**로 돌아온다 — 보시던 것이 안 바뀐다. */
+    let 앞선때 = 0;
+    단추.addEventListener("click", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      뒤집기();
+      const 이제 = Date.now();
+      if (이제 - 앞선때 < 400) { 앞선때 = 0; window.VP판보기토글?.(); return; }
+      앞선때 = 이제;
+    });
     document.documentElement.appendChild(단추);                // ⚠ 몸이 아니라 뿌리에
     /* 쪽 맨 위에 빈 띠를 만든다 — 단추가 설 자리다(login.css `html.vp-위여백`).
        우리 화면·벤더피아 제 화면 **두 모습 다**에 두어야 어느 쪽도 안 가린다. */
