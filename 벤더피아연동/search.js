@@ -244,8 +244,11 @@
   const 형제 = (이름) => 내주소 && 내주소.replace(/search\.js(?=\?|$)/, 이름);
   function 상품단추불러오기() {
     const js = 형제("goods.js");
-    if (!js || window.VP상품단추요청) return;          // 주소를 못 찾으면 글자 그대로 둔다
+    /* ⚠ 까닭을 적는다 (10-15) — 사장님 PC 에서 **조용히** 안 됐다 */
+    if (!js) { window.VP말?.("상품단추:내주소못찾음"); return; }
+    if (window.VP상품단추요청) return;
     window.VP상품단추요청 = true;
+    window.VP말?.("상품단추:부름 " + (js.split("/").pop() || "").slice(0, 24));
     const css = 형제("goods.css");
     if (css && !document.querySelector('link[data-vp="goods.css"]')) {
       const l = document.createElement("link");
@@ -255,6 +258,9 @@
     const sc = document.createElement("script");
     sc.src = js;
     sc.async = false;
+    sc.addEventListener("error", () => window.VP말?.("상품단추:goods.js못받음"));
+    sc.addEventListener("load", () => window.VP말?.("상품단추:goods.js받음"
+      + (window.VP상품단추 ? "/셈있음" : "/**셈없음**")));
     document.head.appendChild(sc);
   }
   상품단추불러오기();
@@ -264,15 +270,25 @@
   /* 상품명 칸들을 적어 둔다 — 목록이 늦게 와도 그때 단추로 바꿔 끼운다 */
   let 상품칸들 = [];
   let 상품칸자리 = -1;
+  let 단추된것 = 0;
   function 상품칸채우기(td, 이름) {
     const 만들기 = window.VP상품단추;
     const b = 만들기 ? 만들기(이름) : null;
     if (!b) { td.textContent = 이름; return false; }   // 상품관리에 없는 이름 → 글자 그대로
     td.replaceChildren(b);
+    단추된것++;
     return true;
   }
+  /* ⚠ 까닭 적기 — **그려 놓고 보니** 몇 칸이 단추가 됐나. 이것이 ⑤ 를 가른다:
+       칸이 0개면 상품명 칸을 못 찾은 것, 칸은 있고 단추가 0개면 **이름이 하나도 안 맞은** 것. */
+  const 상품칸셈적기 = () => window.VP말?.(
+    "상품칸:" + 상품칸들.length + "개중 단추" + 단추된것 + "개");
   window.addEventListener("vp상품단추준비", () => {
-    for (const [td, 이름] of 상품칸들) 상품칸채우기(td, 이름);
+    let 바뀐것 = 0;
+    for (const [td, 이름] of 상품칸들) if (상품칸채우기(td, 이름)) 바뀐것++;
+    window.VP말?.("상품단추:준비 상품" + (window.VP상품목록몇개?.() ?? "?")
+      + "가지 · 늦게바꾼칸 " + 바뀐것 + "개");
+    상품칸셈적기();
   });
 
   let 그린머리 = null;                                 // 지금 그려 둔 머리줄 (벤더피아가 준 그대로)
@@ -285,6 +301,11 @@
       if (찾은것 !== cs칸) { cs칸 = 찾은것; 알약그리기(); }
       /* ④ 상품명 칸이 몇 번째인가 — 그 칸만 단추로 바꾼다 */
       상품칸자리 = 그린머리.indexOf("상품명");
+      /* ⚠ 까닭을 적는다 — 못 찾았으면 **벤더피아가 준 칸 이름 그대로** 적는다.
+           그래야 「CS」 인지 「CS구분」 인지 「cs상태」 인지 사장님 화면에서 보인다. */
+      window.VP말?.("칸" + 그린머리.length + "개 CS자리" + cs칸 + " 상품명자리" + 상품칸자리);
+      if (cs칸 < 0 || 상품칸자리 < 0)
+        window.VP말?.("머리줄:" + 그린머리.slice(0, 12).join(","));
       const t = document.createElement("table");
       const head = t.createTHead().insertRow();
       그린머리.forEach((c, i) => {
@@ -310,6 +331,7 @@
         if (i === 0) td.className = "vp-first";
       });
     }
+    상품칸셈적기();
   }
 
   // 벤더피아에 매번 직접 조회한다 (항상 최신 상태).
@@ -320,7 +342,7 @@
     const { filters, variants, local } = plan(bar.q.value);
     const dates = { dcStartDt: bar.from.value, dcEndDt: bar.to.value };
 
-    tbody = null; 그린머리 = null; 상품칸들 = []; 상품칸자리 = -1;
+    tbody = null; 그린머리 = null; 상품칸들 = []; 상품칸자리 = -1; 단추된것 = 0;
     table.replaceChildren();
     const seen = new Set();
     let shown = 0;

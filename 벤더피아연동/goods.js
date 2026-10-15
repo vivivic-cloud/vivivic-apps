@@ -346,7 +346,7 @@
     const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${서류.KEY}`,
       { method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ returnSecureToken: true }) });
-    if (!r.ok) throw new Error("표를 못 받았습니다");
+    if (!r.ok) throw new Error("표 " + r.status);     // 익명 로그인이 막혔나
     const d = await r.json();
     try { localStorage.setItem("vg.tok", JSON.stringify({ tok: d.idToken, until: Date.now() + 3300000 })); } catch (e) {}
     return d.idToken;
@@ -380,7 +380,7 @@
     const r = await fetch(주소, { method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + tok },
       body: JSON.stringify(물음) });
-    if (!r.ok) throw new Error("서류관리 자료를 못 받았습니다 " + r.status);
+    if (!r.ok) throw new Error("창고 " + r.status);   // 창고가 막았나(403)
     const 칸 = new Map();
     for (const 한줄 of await r.json()) {
       const cipl = 풀기(한줄?.document?.fields?.cipl);
@@ -1094,7 +1094,13 @@
       /* ② 단품관리에서만 — 서류관리 자료를 뒤에서 조용히 받는다.
          ⚠ 못 받아도 화면은 그대로 돌아야 한다. 그때는 단추가 안 생길 뿐이다. */
       .then(() => (page.nameCol === "단품명"
-        ? 수입받기().catch((e) => { 수입 = null; console.warn("수입정보", e); })
+        ? 수입받기()
+            .then(() => window.VP말?.("수입정보:코드" + (수입 ? 수입.size : 0) + "가지"))
+            /* ⚠ 까닭을 적는다 (10-15) — 사장님 PC 에서 단추 자체가 안 생겼다.
+                 403 인지, CSP 로 막힌 것인지, 표를 못 받은 것인지 **글로** 남긴다. */
+            .catch((e) => { 수입 = null;
+              window.VP말?.("수입정보:못받음 " + (e && e.message ? e.message : e));
+              console.warn("수입정보", e); })
         : Promise.resolve()))
       // 지금 화면의 목록을 다 받았으면 다른 메뉴가 쓸 목록을 뒤에서 받아 둔다
       .then(() => VP_DATA.prefetch());
@@ -1122,5 +1128,6 @@
       return b;
     };
     window.VP상품목록몇개 = () => groups.size;
+    window.VP말?.("곁다리:섬");                      // ⚠ 까닭 적기 (10-15)
   }
 })();

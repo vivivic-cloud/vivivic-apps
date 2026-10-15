@@ -28,14 +28,31 @@
      이 고침은 **새로고침만으로** 먹어야 한다. 그게 핵심이다. */
 /* ⚠⚠ 화면글 판은 **여기 한 군데서만** 적는다. `manifest.json` 의 version 과 **늘 같이** 올려라
    (배포 차례에 적어 두었다). 두 군데서 적으면 반드시 어긋난다. */
-const VP_화면글판 = "0.34.18";   // ⚠ manifest.json 의 version 과 **같은 값**
+const VP_화면글판 = "0.34.19";   // ⚠ manifest.json 의 version 과 **같은 값**
 
+/* ⚠⚠ **까닭 적기** (10-15) — 사장님 PC 에서 CS 거르개·상품 단추·수입정보 셋이
+     **조용히** 안 됐다. 사장님도 바이글도 **왜**인지를 못 봤다. 그것이 진짜 탈이었다.
+   그래서 화면 글들이 「무엇이 안 됐나」 를 한 토막씩 여기에 적는다.
+     `VP말("CS칸없음")` → 딱지 끝에 ` ‖ CS칸없음` 이 붙는다.
+   ⚠ 딱지는 평소 **숨어 있다**(①). 그래서 사장님 화면을 더럽히지 않는다 —
+     주소 끝에 **`&vg판=1`** 을 붙이시면 그때만 보인다.
+   ⚠ `불러오기.js` 가 딱지를 1.5초·4초에 **다시 쓴다.** 그래서 적어 둔 토막을 들고 있다가
+     다시 쓸 때마다 **또 붙인다**(아래 `봄`).
+   ⚠ 터진 말과 **못 받은 글**(CSP 로 막힌 `<script src>` 따위)도 저절로 적는다. */
 (() => {
+  const 말들 = [];
+  const 짧게 = (t) => String(t == null ? "" : t).replace(/\s+/g, " ").slice(0, 60);
   const 딱지글 = (옛글) => {
-    if (!옛글 || 옛글.includes("화면글")) return null;              // 이미 붙였으면 그만
-    const m = /^(벤더피아 보기 )([^ ·]+)([\s\S]*)$/.exec(옛글);
-    if (!m) return null;
-    return m[1] + "깔림 " + m[2] + " · 화면글 " + VP_화면글판 + m[3];
+    if (!옛글) return null;
+    let 글 = 옛글;
+    if (!글.includes("화면글")) {
+      const m = /^(벤더피아 보기 )([^ ·]+)([\s\S]*)$/.exec(글);
+      if (!m) return null;
+      글 = m[1] + "깔림 " + m[2] + " · 화면글 " + VP_화면글판 + m[3];
+    }
+    /* 적어 둔 토막을 뒤에 붙인다. 이미 붙어 있으면 그만. */
+    for (const t of 말들) if (!글.includes(t)) 글 += " ‖ " + t;
+    return 글 === 옛글 ? null : 글;
   };
   const 덧붙이기 = () => {
     const d = document.getElementById("vp-판");
@@ -44,6 +61,25 @@ const VP_화면글판 = "0.34.18";   // ⚠ manifest.json 의 version 과 **같�
     if (새글) d.textContent = 새글;
     return true;
   };
+  window.VP말 = (t) => {
+    const 토막 = 짧게(t);
+    if (!토막 || 말들.includes(토막)) return;
+    말들.push(토막);
+    덧붙이기();
+  };
+  /* 터진 말 · 못 받은 글을 저절로 적는다 — 이것이 「왜 조용히 안 되나」 를 가른다 */
+  addEventListener("error", (e) => {
+    const el = e && e.target;
+    if (el && el !== window && el.tagName) {                       // 글·꾸밈을 못 받았다
+      const 주소 = String(el.src || el.href || "");
+      window.VP말("못받음:" + (주소.split("/").pop() || el.tagName));
+      return;
+    }
+    window.VP말("터짐:" + (e && e.message));
+  }, true);
+  addEventListener("unhandledrejection", (e) => {
+    window.VP말("못끝냄:" + (e && e.reason && (e.reason.message || e.reason)));
+  });
   /* 딱지는 `불러오기.js` 가 1.5초·4초에 **다시 쓴다.** 다시 쓰면 또 붙여야 한다. */
   const 봄 = new MutationObserver(() => 덧붙이기());
   const 붙자 = () => {
