@@ -6,7 +6,8 @@ const { chromium } = require('playwright');
 const fs = require('fs'), path = require('path');
 const 확장 = path.join(__dirname, '..');
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const PAGES = JSON.parse(fs.readFileSync('/tmp/claude-0/-home-user-vivivic-apps/459edaf4-304e-56e1-9eb8-ad6dc33034a4/scratchpad/PAGES.json','utf8'));
+/* ⚠ 시험이 쓰는 것은 **저장소 안**에 둔다 — 작업자 임시폴더를 가리키면 남의 손에서 안 돈다 (10-15) */
+const PAGES = require('./본보기/PAGES.cjs');
 
 const 로그인쪽 = `<html><head><meta charset="utf-8"><title>로그인</title></head><body>
 <div id="벤더피아제화면">벤더피아 원래 로그인 화면입니다</div>

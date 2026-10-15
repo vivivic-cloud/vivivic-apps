@@ -2,7 +2,7 @@
    공유받으신 분 10-14 11:38, 「압축파일 받기」 를 짚으시고: 「압축파일로 바꿔줘」
    ⚠ 진짜 깃허브 페이지에는 이 상자에서 못 닿는다 — 설치 안내 화면만 그대로 세워 잰다. */
 const { chromium } = require('playwright');
-const fs = require('fs'), path = require('path');
+const fs = require('fs'), path = require('path'), os = require('os');
 const 확장 = path.join(__dirname, '..');
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 
@@ -44,7 +44,8 @@ const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
   console.log('\n  ★ **받아지는 이름: 「' + 이름 + '」**');
   console.log('     아스키뿐인가 : ' + /^[\x20-\x7e]+$/.test(이름));
   console.log('     .zip 으로 끝나나 : ' + 이름.toLowerCase().endsWith('.zip'));
-  const 둘곳 = '/tmp/claude-0/-home-user-vivivic-apps/459edaf4-304e-56e1-9eb8-ad6dc33034a4/scratchpad/받은것.bin';
+  /* ⚠ 받은 몸은 저장소 밖 임시칸에 둔다 (10-15) */
+  const 둘곳 = path.join(fs.mkdtempSync(path.join(os.tmpdir(), '벤더피아-받기-')), '받은것.bin');
   try {
     await 받음.saveAs(둘곳);
     const 몸 = fs.readFileSync(둘곳);
