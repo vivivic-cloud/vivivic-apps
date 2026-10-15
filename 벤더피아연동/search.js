@@ -384,35 +384,42 @@
   /* 어느 줄에 이력이 있나 — **셈만** 받는다(`mask`). 글까지 받으면 쌓일수록 무거워진다. */
   async function 상담셈받기() {
     try {
-      const 답 = await 상담읽기(상담뿌리() + "?pageSize=300&mask.fieldPaths=cnt");
+      const 답 = await 상담읽기(상담뿌리()
+        + "?pageSize=300&mask.fieldPaths=cnt&mask.fieldPaths=open&mask.fieldPaths=kind");
       if (!답.ok) { window.VP말?.("상담:셈못받음 " + 답.status); return; }
+      let 연것 = 0;
       for (const d of (JSON.parse(답.글).documents || [])) {
         const 이름 = String(d.name || "").split("/").pop();
-        상담셈.set(이름, 풀기(d.fields && d.fields.cnt) || 0);
+        const f = d.fields || {};
+        상담셈.set(이름, { 수: 풀기(f.cnt) || 0, 열림: !!풀기(f.open), 종류: 풀기(f.kind) || "" });
+        if (풀기(f.open)) 연것++;
       }
-      window.VP말?.("상담:이력있는줄 " + 상담셈.size + "개");
+      window.VP말?.("상담:이력있는줄 " + 상담셈.size + "개 · 안끝난접수 " + 연것 + "건");
       for (const [칸, 주문] of 상담칸들) 상담점찍기(칸, 주문);
     } catch (e) {
       window.VP말?.("상담:셈못받음 " + (e && e.message ? e.message : e));
     }
   }
 
+  /* ⚠ **접수 안 끝난 것은 더 또렷하게.** 사장님이 그걸 찾으시려고 쓰신다(바이글 10-15). */
   function 상담점찍기(칸, 주문) {
     const 알 = 칸.querySelector(".vp-상담알");
     if (!알) return;
-    const 수 = 상담셈.get(상담열쇠(주문)) || 0;
-    알.classList.toggle("vp-있음", 수 > 0);
-    알.textContent = 수 > 0 ? "상담 " + 수 : "상담";
+    const 것 = 상담셈.get(상담열쇠(주문)) || { 수: 0, 열림: false, 종류: "" };
+    알.classList.toggle("vp-있음", 것.수 > 0);
+    알.classList.toggle("vp-열림", !!것.열림);
+    알.textContent = 것.열림 ? (것.종류 || "접수") + " 접수중"
+      : 것.수 > 0 ? "상담 " + 것.수 : "상담";
   }
 
   /* 주문번호 칸에 **작은 단추 하나**만 더한다 — 칸을 새로 내지 않는다.
      (배송관리 23칸을 밀어내지 않는다 — 사장님이 그 칸을 다 보셔야 한다) */
-  function 상담단추(td, 주문) {
+  function 상담단추(td, 주문, 상품명) {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "vp-상담알";
-    b.title = "상담 이력 남기기 · 보기";
-    b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); 상담판열기(주문); });
+    b.title = "상담 이력 · 교환 · 반품 · AS 접수";
+    b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); 상담판열기(주문, 상품명); });
     td.appendChild(b);
     상담칸들.push([td, 주문]);
     상담점찍기(td, 주문);
@@ -423,32 +430,77 @@
   function 상담판닫기() { if (상담판) { 상담판.remove(); 상담판 = null; } }
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") 상담판닫기(); });
 
-  async function 상담판열기(주문) {
+  const 접수종류 = ["교환", "반품", "AS"];
+  const 접수상태 = ["접수", "처리중", "끝"];
+
+  async function 상담판열기(주문, 상품명) {
     상담판닫기();
     const 열쇠 = 상담열쇠(주문);
     if (!열쇠) return;
     const 덮개 = document.createElement("div");
     덮개.className = "vp-상담덮개";
-    덮개.innerHTML = `<div class="vp-상담판" role="dialog" aria-label="상담 이력">
-      <div class="vp-상담머리"><strong></strong><button type="button" class="vp-상담닫기" aria-label="닫기">×</button></div>
+    덮개.innerHTML = `<div class="vp-상담판" role="dialog" aria-label="상담 이력과 접수">
+      <div class="vp-상담머리"><strong></strong><small></small>
+        <button type="button" class="vp-상담닫기" aria-label="닫기">×</button></div>
+      <div class="vp-상담접수"></div>
       <div class="vp-상담목록">불러오는 중…</div>
       <form class="vp-상담적기">
+        <div class="vp-상담고르기">
+          <span class="vp-상담라벨">접수</span>
+          ${접수종류.map((k) => `<button type="button" class="vp-상담종류" data-k="${k}">${k}</button>`).join("")}
+        </div>
         <textarea rows="3" placeholder="오간 말을 적으십시오 (지울 수 없습니다 — 쌓입니다)"></textarea>
         <div class="vp-상담발"><span class="vp-상담알림"></span><button type="submit">남기기</button></div>
       </form></div>`;
-    덮개.querySelector("strong").textContent = "상담 이력 · " + 주문;
+    덮개.querySelector("strong").textContent = 상품명 || "상담";
+    덮개.querySelector(".vp-상담머리 small").textContent = "주문 " + 주문;
     덮개.querySelector(".vp-상담닫기").addEventListener("click", 상담판닫기);
     덮개.addEventListener("mousedown", (e) => { if (e.target === 덮개) 상담판닫기(); });
     document.getElementById("vp-root")?.appendChild(덮개) || document.body.appendChild(덮개);
     상담판 = 덮개;
 
     const 목록 = 덮개.querySelector(".vp-상담목록");
+    const 접수칸 = 덮개.querySelector(".vp-상담접수");
     const 알림 = 덮개.querySelector(".vp-상담알림");
     const 적기 = 덮개.querySelector(".vp-상담적기");
     const 글칸 = 덮개.querySelector("textarea");
-    let 쌓인것 = [];
+    let 쌓인것 = [], 지금접수 = null, 고른종류 = "";
+
+    /* 종류 단추 — 하나만 켜진다. 다시 누르면 꺼진다(그냥 상담만 남기실 때). */
+    for (const b of 덮개.querySelectorAll(".vp-상담종류")) {
+      b.addEventListener("click", () => {
+        고른종류 = 고른종류 === b.dataset.k ? "" : b.dataset.k;
+        for (const x of 덮개.querySelectorAll(".vp-상담종류"))
+          x.setAttribute("aria-pressed", x.dataset.k === 고른종류 ? "true" : "false");
+        적기.querySelector("button[type=submit]").textContent = 고른종류 ? 고른종류 + " 접수" : "남기기";
+      });
+    }
+
+    const 접수그리기 = () => {
+      접수칸.replaceChildren();
+      if (!지금접수 || !지금접수.k) { 접수칸.hidden = true; return; }
+      접수칸.hidden = false;
+      const 줄 = 접수칸.appendChild(document.createElement("div"));
+      줄.className = "vp-상담접수줄" + (지금접수.st !== "끝" ? " vp-열림" : "");
+      const 이름 = 줄.appendChild(document.createElement("strong"));
+      이름.textContent = 지금접수.k + " 접수";
+      const 때 = 줄.appendChild(document.createElement("small"));
+      때.textContent = 지금접수.at ? new Date(지금접수.at * 1000).toLocaleString("ko-KR") : "";
+      const 고름 = 줄.appendChild(document.createElement("div"));
+      고름.className = "vp-상담상태";
+      for (const st of 접수상태) {
+        const b = 고름.appendChild(document.createElement("button"));
+        b.type = "button";
+        b.textContent = st;
+        b.setAttribute("aria-pressed", 지금접수.st === st ? "true" : "false");
+        /* ⚠ 지우지 않는다 — 상태를 바꾸면 **새 줄로 쌓는다**(바이글 10-15). */
+        b.addEventListener("click", () => 남기기({ 글: 지금접수.k + " 접수 → " + st,
+                                                  종류: 지금접수.k, 상태: st }));
+      }
+    };
 
     const 그리기 = () => {
+      접수그리기();
       if (!쌓인것.length) { 목록.textContent = "아직 남긴 것이 없습니다."; return; }
       목록.replaceChildren(...쌓인것.slice().reverse().map((x) => {
         const 줄 = document.createElement("div");
@@ -456,36 +508,31 @@
         const 머리 = 줄.appendChild(document.createElement("small"));
         const 때 = x.at ? new Date(x.at * 1000) : null;
         머리.textContent = (때 ? 때.toLocaleString("ko-KR") : "") + (x.by ? " · " + x.by : "");
+        if (x.k) {
+          const 표 = 머리.appendChild(document.createElement("b"));
+          표.className = "vp-상담표";
+          표.textContent = x.k;
+        }
         const 몸 = 줄.appendChild(document.createElement("p"));
         몸.textContent = x.s || "";
         return 줄;
       }));
     };
 
-    try {
-      const 답 = await 상담읽기(상담뿌리() + "/" + encodeURIComponent(열쇠));
-      if (답.ok) 쌓인것 = (풀기(JSON.parse(답.글).fields?.log) || []).filter(Boolean);
-      else if (답.status !== 404) { 목록.textContent = "못 읽었습니다 (" + 답.status + ")"; return; }
-      그리기();
-    } catch (e) {
-      목록.textContent = "못 읽었습니다";
-      window.VP말?.("상담:읽기못함 " + (e && e.message ? e.message : e));
-      return;
-    }
-
-    적기.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const 글 = 글칸.value.trim();
-      if (!글) return;
-      const 단추 = 적기.querySelector("button");
+    async function 남기기({ 글, 종류, 상태 }) {
+      const 단추 = 적기.querySelector("button[type=submit]");
       단추.disabled = true;
       알림.textContent = "남기는 중…";
       try {
-        await 상담쓰기(열쇠, 주문, 글, 쌓인것);
-        쌓인것 = 쌓인것.concat([{ s: 글, at: Math.floor(Date.now() / 1000), by: 적은이() }]);
-        상담셈.set(열쇠, 쌓인것.length);
+        const 온것 = await 상담쓰기(열쇠, 주문, { 글, 종류, 상태, 앞것: 쌓인것, 앞접수: 지금접수 });
+        쌓인것 = 온것.log;
+        지금접수 = 온것.req;
+        상담셈.set(열쇠, { 수: 쌓인것.length, 열림: 온것.open, 종류: (온것.req && 온것.req.k) || "" });
         for (const [칸, 주] of 상담칸들) 상담점찍기(칸, 주);
         글칸.value = "";
+        고른종류 = "";
+        for (const x of 덮개.querySelectorAll(".vp-상담종류")) x.setAttribute("aria-pressed", "false");
+        단추.textContent = "남기기";
         알림.textContent = "남겼습니다";
         그리기();
       } catch (err) {
@@ -495,6 +542,30 @@
       } finally {
         단추.disabled = false;
       }
+    }
+
+    try {
+      const 답 = await 상담읽기(상담뿌리() + "/" + encodeURIComponent(열쇠));
+      if (답.ok) {
+        const f = JSON.parse(답.글).fields || {};
+        쌓인것 = (풀기(f.log) || []).filter(Boolean);
+        지금접수 = 풀기(f.req) || null;
+      } else if (답.status !== 404) { 목록.textContent = "못 읽었습니다 (" + 답.status + ")"; return; }
+      그리기();
+    } catch (e) {
+      목록.textContent = "못 읽었습니다";
+      window.VP말?.("상담:읽기못함 " + (e && e.message ? e.message : e));
+      return;
+    }
+
+    적기.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const 글 = 글칸.value.trim();
+      if (!글 && !고른종류) return;
+      /* 종류를 고르셨으면 **접수**다 — 그래도 **이력 줄로 같이 쌓인다**
+         (사장님 10-15: 「이력을 남기면서 **동시에**」). */
+      남기기({ 글: 글 || (고른종류 + " 접수"), 종류: 고른종류,
+               상태: 고른종류 ? "접수" : "" });
     });
     글칸.focus();
   }
@@ -502,19 +573,31 @@
   /* 한 줄 쌓기 — **앞 글을 그대로 두고 뒤에 더한다.** 지우지 않는다.
      ⚠ 쓰기는 **화면 쪽에서 바로** 보낸다. 확장 다리는 읽기만 지나가게 막혀 있고
        그 막음을 넓히지 않는다(10-15). */
-  async function 상담쓰기(열쇠, 주문, 글, 앞것) {
+  async function 상담쓰기(열쇠, 주문, { 글, 종류, 상태, 앞것, 앞접수 }) {
     const tok = await 상담표받기();
     const 이제 = Math.floor(Date.now() / 1000);
-    const 쌓기 = (앞것 || []).concat([{ s: 글, at: 이제, by: 적은이() }]);
+    const 적은 = 적은이();
+    const 쌓기 = (앞것 || []).concat([{ s: 글, at: 이제, by: 적은, k: 종류 || "" }]);
+    /* 접수 — 종류를 고르셨으면 새로 열고, 상태만 바뀌면 그 접수의 상태를 고친다.
+       ⚠ 앞 줄은 **그대로 둔다.** 취소는 「끝」 으로 바꾸고 그 사실이 **새 줄로** 남는다. */
+    let 접수 = 앞접수 || null;
+    if (종류) 접수 = { k: 종류, at: (접수 && 접수.k === 종류 && 접수.at) || 이제,
+                      by: (접수 && 접수.k === 종류 && 접수.by) || 적은,
+                      st: 상태 || "접수" };
+    const 열림 = !!(접수 && 접수.k && 접수.st !== "끝");
     const 주소 = 상담뿌리() + "/" + encodeURIComponent(열쇠)
-      + "?updateMask.fieldPaths=ord&updateMask.fieldPaths=cnt"
-      + "&updateMask.fieldPaths=at&updateMask.fieldPaths=log";
+      + "?updateMask.fieldPaths=ord&updateMask.fieldPaths=cnt&updateMask.fieldPaths=at"
+      + "&updateMask.fieldPaths=log&updateMask.fieldPaths=req"
+      + "&updateMask.fieldPaths=open&updateMask.fieldPaths=kind";
     const 몸 = JSON.stringify({ fields: {
-      ord: 싸기(String(주문)), cnt: 싸기(쌓기.length), at: 싸기(이제), log: 싸기(쌓기) } });
+      ord: 싸기(String(주문)), cnt: 싸기(쌓기.length), at: 싸기(이제), log: 싸기(쌓기),
+      req: 접수 ? 싸기(접수) : { nullValue: null },
+      open: { booleanValue: 열림 }, kind: 싸기((접수 && 접수.k) || "") } });
     const r = await fetch(주소, { method: "PATCH", credentials: "omit",
       headers: { Authorization: "Bearer " + tok, "Content-Type": "application/json" }, body: 몸 });
     if (!r.ok) throw new Error("창고 " + r.status);
-    window.VP말?.("상담:남김 " + 쌓기.length + "줄");
+    window.VP말?.("상담:남김 " + 쌓기.length + "줄" + (열림 ? " · " + 접수.k + " " + 접수.st : ""));
+    return { log: 쌓기, req: 접수, open: 열림 };
   }
 
   let tbody = null;
@@ -604,6 +687,23 @@
           td.className = "vp-상품칸" + (i === 0 ? " vp-first" : "");
           상품칸들.push([td, 값]);
           상품칸채우기(td, 값);
+          /* ⚠⚠ 사장님 10-15: 「**상품명 클릭하면 상담을 남길수있도록** 해주세요
+               이력을 남기면서 동시에 교환. 반품,AS 접수할수있도록 해주세요」(장부 a1792056443)
+             ⚠ 상품 단추의 **원래 동작(상품관리 상세 창)을 없애지 않는다.** 그 단추의
+               제 처리는 `goods.js` 안에 있고 그대로 돈다. 여기서는 **그 칸에 하나 더** 듣는다 —
+               그래서 상세 창과 상담 판이 **같이** 뜬다(서로 안 가린다 — 재서 확인).
+             ⚠ 상품관리에 **없는 이름**이면 단추가 아니라 글자다. 그래도 **눌러서 상담은 된다** —
+               사장님 말씀은 「상품명 클릭하면」 이지 「단추면」 이 아니다. */
+          const 그줄주문 = String(row[주문칸자리] == null ? "" : row[주문칸자리]).trim();
+          if (그줄주문) {
+            td.classList.add("vp-상담열림칸");
+            /* ⚠⚠ **잡는 결(capture)로 듣는다.** 상품 단추(`goods.js` 의 `VP상품단추`)는
+                 제 처리에서 `stopPropagation()` 을 한다. 그래서 **올라오는 결로 들으면
+                 단추인 상품명에서는 상담이 영영 안 열린다** — 사장님이 누르실 바로 그 자리다.
+                 잡는 결은 단추보다 **먼저** 오므로 둘 다 돈다:
+                 상품관리 상세 창(원래 동작)과 상담 판이 **같이** 뜬다. 10-15 재서 잡았다. */
+            td.addEventListener("click", () => 상담판열기(그줄주문, 값), true);
+          }
           return;
         }
         td.textContent = 값;
@@ -612,7 +712,8 @@
            (배송관리 23칸을 밀어내지 않는다 — 사장님이 그 칸을 다 보셔야 한다). */
         if (i === 주문칸자리 && String(값).trim()) {
           td.classList.add("vp-주문칸");
-          상담단추(td, String(값).trim());
+          상담단추(td, String(값).trim(),
+                   상품칸자리 >= 0 ? String(row[상품칸자리] == null ? "" : row[상품칸자리]).trim() : "");
         }
       });
     }

@@ -183,6 +183,30 @@ const 본다 = () => {
     + ' (goods.css 의 block 에 안 덮였나)');
   console.log('    ③ 쪽 넘침 ' + 것.쪽넘침 + 'px · 표 통 밑 ' + 것.표통밑 + ' / 창 ' + 것.창키 + ' '
     + 못(것.쪽넘침 <= 1 && 것.표통밑 <= 것.창키 + 1));
+  /* ★ 상담 판과 상품관리 상세 창이 **같이 떠도 안 가리나** (10-15 a1792056443)
+       상품 단추의 원래 동작(상세 창)을 없애지 않기로 했으니, 둘이 겹치면 안 된다. */
+  /* ⚠ **한 번만** 누른다. 상품 단추를 누르면 상세 창과 상담 판이 **같이** 뜬다
+       (칸이 잡는 결로 먼저 듣는다). 두 번 누르면 덮개에 막혀 자가 멈춘다 — 재서 잡았다. */
+  await page.click('#vp-root tbody tr:nth-child(1) .vp-상품칸 button');
+  await page.waitForTimeout(900);
+  const 겹침 = await page.evaluate(() => {
+    const a = document.querySelector('.vp-상담판');
+    const g = document.querySelector('.vp-곁다리 .vp-goods-panel:not([hidden])');
+    if (!a || !g) return { a: !!a, g: !!g, 넓이: null,
+      판들: [...document.querySelectorAll('[class*=상담]')].map(x=>x.className),
+      곁: document.querySelectorAll('.vp-곁다리 .vp-goods-panel').length,
+      숨: document.querySelector('.vp-곁다리 .vp-goods-panel')?.hidden };
+    const A = a.getBoundingClientRect(), B = g.getBoundingClientRect();
+    const w = Math.max(0, Math.min(A.right, B.right) - Math.max(A.left, B.left));
+    const h = Math.max(0, Math.min(A.bottom, B.bottom) - Math.max(A.top, B.top));
+    return { a: true, g: true, 넓이: Math.round(w * h),
+             상담: [Math.round(A.left), Math.round(A.right)],
+             상세: [Math.round(B.left), Math.round(B.right)] };
+  });
+  console.log('    ★ 상담 판 ' + JSON.stringify(겹침.상담) + ' · 상품관리 상세 창 '
+    + JSON.stringify(겹침.상세) + ' · **겹친 넓이 ' + 겹침.넓이 + 'px²** '
+    + 못(겹침.a && 겹침.g && 겹침.넓이 === 0));
+  if (!겹침.a || !겹침.g) console.log('      (못 찾음) ' + JSON.stringify(겹침));
   console.log('    ⑧ 수입정보는 403 — 딱지에 까닭이 적혔나 '
     + 못(/수입정보/.test(것.딱지 || '') === false || /수입정보:/.test(것.딱지 || '')));
   console.log('    딱지 : ' + 것.딱지);

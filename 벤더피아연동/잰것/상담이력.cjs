@@ -53,6 +53,7 @@ const 본다 = () => {
   const 머리줄 = [...(통?.querySelectorAll('thead th') || [])].map(th => th.textContent);
   const 알들 = [...(통?.querySelectorAll('tbody .vp-상담알') || [])].map(b => ({
     글: b.textContent, 띄나: b.classList.contains('vp-있음'),
+    열림: b.classList.contains('vp-열림'),
     주문칸안인가: !!b.closest('td.vp-주문칸'),
   }));
   return {
@@ -62,6 +63,21 @@ const 본다 = () => {
     지우기단추있나: !!document.querySelector('.vp-상담덮개 [class*=지우], .vp-상담덮개 button[aria-label*=지우]'),
     판떴나: !!document.querySelector('.vp-상담덮개'),
     판줄수: document.querySelectorAll('.vp-상담줄').length,
+    판제목: document.querySelector('.vp-상담머리 strong')?.textContent || null,
+    접수줄: document.querySelector('.vp-상담접수줄')?.textContent || null,
+    접수열림: !!document.querySelector('.vp-상담접수줄.vp-열림'),
+    종류단추: [...document.querySelectorAll('.vp-상담종류')].map(b => b.textContent),
+    상태단추: [...document.querySelectorAll('.vp-상담상태 button')]
+      .map(b => b.textContent + (b.getAttribute('aria-pressed') === 'true' ? '(켬)' : '')),
+    겹친넓이: (() => {
+      const a = document.querySelector('.vp-상담판');
+      const g = document.querySelector('.vp-곁다리 .vp-goods-panel:not([hidden])');
+      if (!a || !g) return null;
+      const A = a.getBoundingClientRect(), B = g.getBoundingClientRect();
+      const w = Math.max(0, Math.min(A.right, B.right) - Math.max(A.left, B.left));
+      const h = Math.max(0, Math.min(A.bottom, B.bottom) - Math.max(A.top, B.top));
+      return Math.round(w * h);
+    })(),
     알림: document.querySelector('.vp-상담알림')?.textContent || null,
   };
 };
@@ -77,7 +93,7 @@ const 본다 = () => {
   for (const [w, h] of [[1280, 900], [375, 812]]) {
     /* 창고 흉내 — 나간 것을 **다 적어 둔다** */
     const 창고로 = [];
-    let 쌓인것 = [];                                  // 창고에 쌓인 log
+    let 쌓인것 = [], 쓴접수 = null;                   // 창고에 쌓인 log · req
     const ctx = await b.newContext({ viewport: { width: w, height: h } });
     await ctx.route('**://vivivic-cloud.github.io/**', r => r.abort('blockedbyclient'));
     await ctx.route('**://identitytoolkit.googleapis.com/**', (r) => {
@@ -90,13 +106,20 @@ const 본다 = () => {
       const 몸 = r.request().postData() || '';
       창고로.push({ 셈, 길: u.pathname, 몸 });
       if (셈 === 'PATCH') {
-        try { 쌓인것 = JSON.parse(몸).fields.log.arrayValue.values.map(x => x.mapValue.fields); } catch (e) {}
+        try {
+          const f = JSON.parse(몸).fields;
+          쌓인것 = f.log.arrayValue.values.map(x => x.mapValue.fields);
+          쓴접수 = f.req && f.req.mapValue ? f.req.mapValue.fields : null;
+        } catch (e) {}
         return r.fulfill({ status: 200, contentType: 'application/json', body: 몸 });
       }
       if (/vpcs_note$/.test(u.pathname))              // 셈 받기 — 한 줄에 이력 2개가 있다
         return r.fulfill({ status: 200, contentType: 'application/json',
           body: JSON.stringify({ documents: [{ name: '…/vpcs_note/20261015-101',
-            fields: { cnt: { integerValue: '2' } } }] }) });
+            fields: { cnt: { integerValue: '2' } } },
+            { name: '…/vpcs_note/20261015-102',           // 접수가 **안 끝난** 줄
+              fields: { cnt: { integerValue: '1' }, open: { booleanValue: true },
+                        kind: { stringValue: '반품' } } }] }) });
       if (/vpcs_note\/[^/]+$/.test(u.pathname))        // 한 줄 읽기
         return r.fulfill({ status: 200, contentType: 'application/json',
           body: JSON.stringify({ fields: { log: { arrayValue: { values: 쌓인것.length ? 쌓인것.map(f => ({ mapValue: { fields: f } }))
@@ -141,29 +164,55 @@ const 본다 = () => {
       + 못(것.알수 === 줄들.length && 것.알들.every(x => x.주문칸안인가)));
     console.log('    ★ 이력 있는 줄이 **눈에 띄나** '
       + JSON.stringify(것.알들.map(x => x.글 + (x.띄나 ? '(띔)' : ''))) + ' '
-      /* ⚠ 흉내 창고가 이력을 둔 줄은 `20261015-101` = **둘째 줄**이다(i=1). 첫째가 아니다. */
-      + 못(것.알들.filter(x => x.띄나).length === 1 && 것.알들[1] && 것.알들[1].띄나));
+      /* ⚠ 흉내 창고가 이력을 둔 줄은 **둘**이다 — `…-101`(둘째, 이력 2줄)과
+           `…-102`(셋째, **반품 접수중**). 셋째는 더 또렷해야 한다. */
+      + 못(것.알들.filter(x => x.띄나).length === 2
+           && 것.알들[1] && 것.알들[1].띄나 && !것.알들[1].열림
+           && 것.알들[2] && 것.알들[2].열림));
     await page.screenshot({ path: path.join(그림칸, '상담-표-' + w + '.png'), fullPage: false });
 
     /* 판을 열고 한 줄 남긴다 */
-    await page.click('tbody tr:nth-child(2) .vp-상담알');
+    /* ★ 사장님 분부 — **상품명을 눌러** 연다 (장부 a1792056443) */
+    await page.click('tbody tr:nth-child(2) td.vp-상품칸');
     await page.waitForTimeout(600);
     let 판 = await page.evaluate(본다);
-    console.log('    판 떴나 ' + 판.판떴나 + ' · 앞서 쌓인 줄 ' + 판.판줄수 + '개 '
-      + 못(판.판떴나 && 판.판줄수 === 1));
+    console.log('    ★ **상품명을 눌러** 판이 떴나 ' + 판.판떴나 + ' · 제목 「' + 판.판제목 + '」 '
+      + 못(판.판떴나 && 판.판제목 === '토리블리 2단 와이드 교구장'));
+    console.log('    앞서 쌓인 줄 ' + 판.판줄수 + '개 ' + 못(판.판줄수 === 1));
+    console.log('    접수 단추 ' + JSON.stringify(판.종류단추) + ' '
+      + 못(JSON.stringify(판.종류단추) === JSON.stringify(['교환','반품','AS'])));
     console.log('    ★ **지우는 단추가 없나** ' + 못(!판.지우기단추있나));
     await page.fill('.vp-상담적기 textarea', '전화 상담: 문짝 흠 있어 교환 원하심. 다음 주 수요일 재배송 약속.');
+    await page.click('.vp-상담종류[data-k="교환"]');
+    await page.waitForTimeout(150);
+    console.log('    단추 글이 「교환 접수」 로 바뀌나 '
+      + 못((await page.textContent('.vp-상담적기 button[type=submit]')) === '교환 접수'));
     await page.click('.vp-상담적기 button[type=submit]');
     await page.waitForTimeout(900);
     판 = await page.evaluate(본다);
     console.log('    남긴 뒤 — 알림 「' + 판.알림 + '」 · 판 줄 ' + 판.판줄수 + '개 (쌓였나) '
       + 못(/남겼습니다/.test(판.알림 || '') && 판.판줄수 === 2));
+    console.log('    ★ **접수가 이력 줄로도 남나** · 접수줄 「' + 판.접수줄 + '」 '
+      + 못(/교환 접수/.test(판.접수줄 || '') && 판.접수열림));
+    console.log('    상태 단추 ' + JSON.stringify(판.상태단추) + ' '
+      + 못(JSON.stringify(판.상태단추) === JSON.stringify(['접수(켬)','처리중','끝'])));
+    /* 상태를 「끝」 으로 — **지우지 않고 새 줄로 쌓여야** 한다 */
+    await page.click('.vp-상담상태 button:nth-child(3)');
+    await page.waitForTimeout(800);
+    판 = await page.evaluate(본다);
+    console.log('    ★ 「끝」 으로 바꾸니 — 판 줄 ' + 판.판줄수 + '개(쌓였나) · 접수 열림 '
+      + 판.접수열림 + ' ' + 못(판.판줄수 === 3 && !판.접수열림));
+    console.log('    창고에 쌓인 접수 : ' + JSON.stringify(쓴접수 && {
+      k: 쓴접수.k.stringValue, st: 쓴접수.st.stringValue }) + ' '
+      + 못(!!쓴접수 && 쓴접수.k.stringValue === '교환' && 쓴접수.st.stringValue === '끝'));
     await page.screenshot({ path: path.join(그림칸, '상담-판-' + w + '.png'), fullPage: false });
     await page.keyboard.press('Escape'); await page.waitForTimeout(200);
     const 뒤 = await page.evaluate(본다);
-    console.log('    닫힌 뒤 그 줄 단추가 **띄나** '
+    console.log('    닫힌 뒤 줄 단추 '
       + JSON.stringify(뒤.알들.map(x => x.글 + (x.띄나 ? '(띔)' : ''))) + ' '
       + 못(뒤.알들[1] && 뒤.알들[1].띄나));
+    console.log('    ★ **접수 안 끝난 줄이 더 또렷한가** (셋째 줄 「반품 접수중」) '
+      + 못(!!뒤.알들[2] && 뒤.알들[2].열림 && /반품 접수중/.test(뒤.알들[2].글)));
 
     /* ★★ 창고로 나간 것 — 사람 칸이 샜나 */
     const 쓴것 = 창고로.filter(x => x.셈 === 'PATCH');
@@ -175,9 +224,11 @@ const 본다 = () => {
       + 못(!/가나다|010-7777-8888|○○로 99/.test(몸전부)));
     console.log('    쓴 것에 담긴 칸 : '
       + JSON.stringify(쓴것.length ? Object.keys(JSON.parse(쓴것[0].몸).fields) : []) + ' '
-      + 못(쓴것.length === 1
-          && JSON.stringify(Object.keys(JSON.parse(쓴것[0].몸).fields).sort())
-             === JSON.stringify(['at','cnt','log','ord'])));
+      /* 담는 칸은 일곱뿐이다 — 사람 칸은 하나도 없다.
+         `ord`(주문번호) `cnt`(줄 수) `at`(때) `log`(쌓인 글) `req`(접수) `open`(안 끝났나) `kind`(무엇) */
+      + 못(쓴것.length >= 1 && 쓴것.every((x) =>
+          JSON.stringify(Object.keys(JSON.parse(x.몸).fields).sort())
+             === JSON.stringify(['at','cnt','kind','log','open','ord','req']))));
     console.log('    쓴 길이 `vpcs_note/<문서>` 하나인가 '
       + 못(쓴것.every(x => /\/data\/vpcs_note\/[^/]+$/.test(x.길))));
     console.log('    ★ 벤더피아로 **쓴 적 있나** ' + 벤더로.some(x => /^(PATCH|PUT|DELETE)/.test(x)) + ' '

@@ -174,6 +174,10 @@ const 판본다 = () => {
   await page.click('#vp-root .vp-상품칸 button');
   await page.waitForTimeout(400);
   const 판 = await page.evaluate(판본다);
+  /* ⚠ 10-15 부터 상품명을 누르면 **상담 판도 같이** 뜬다(잡는 결로 듣는다).
+       이 자는 상품 단추를 재는 자라 상담은 치워 두고 간다 — 안 그러면 덮개가 다음 누르기를 막는다. */
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
   console.log('\n  ★ 단추를 눌렀다 → 상세 판 ' + JSON.stringify(판));
   console.log('    떴나 ' + 못(!!판 && 판.떴나) + ' · 제목이 그 상품명인가 '
     + 못(판?.제목 === '비스켓 800 주방수납장') + ' · 상세 줄 ' + 판?.줄수 + '개 '
@@ -187,6 +191,8 @@ const 판본다 = () => {
   await page.click('#vp-root tbody tr:nth-child(2) .vp-상품칸 button');
   await page.waitForTimeout(400);
   const 판2 = await page.evaluate(판본다);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
   console.log('    다른 단추를 눌렀다 → 제목 「' + 판2?.제목 + '」 · 검은 단추 '
     + 판2?.검은단추수 + '개 ' + 못(판2?.검은단추수 === 1 && 판2?.제목 === '비스켓 1200 주방수납장'));
 
