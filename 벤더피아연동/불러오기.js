@@ -84,15 +84,36 @@
        지울 수 있다.** 「묻는 쪽이 읽기만 한다」 는 **막음이 아니다** — 여기서 막는다.
      · `GET` 은 받는다 — 창고에 `GET` 으로 쓰는 길은 없다.
      · `POST` 는 **창고 묻기(`:runQuery`)와 익명로그인(`accounts:signUp`) 길에서만** 받는다.
-     · 그 밖은 다 거절. 쓰기는 `:commit`·`:batchWrite`·`PATCH`·`DELETE` 로 가니 다 막힌다.
+     · `PATCH` 는 **상담 이력 칸(`vpcs_note`) 한 문서 자리에만** 받는다 (아래 참조).
+     · 그 밖은 다 거절. `:commit`·`:batchWrite`·`DELETE`·딴 칸 `PATCH` 는 **다 막힌다.**
      ⚠ 길은 `pathname` 으로 본다 — `?key=…` 가 붙어도 맞게 갈린다.
-     ⚠ 이 목록을 넓히지 마라. */
+     ⚠ 이 목록을 넓히지 마라.
+
+     ⚠⚠ **쓰기 한 길을 왜 여기로 내는가 (10-15)**
+       사장님: 「상담할때 고객문의에 이력을 남기는데 이력남길수있게 해주세요」.
+       처음엔 다리를 안 넓히려고 **쓰기만 화면 쪽에서** 보내려 했다. 그런데 그것이
+       **앞뒤가 안 맞는다** — 벤더피아 쪽 `connect-src` 는 **받는 것만 막는 게 아니라
+       보내는 것도 같이 막는다**(`fetch` 는 읽기든 쓰기든 한 울타리다). ⑧ 수입정보가
+       안 됐던 까닭이 바로 그것이고, 그래서 이 다리를 지었다. 같은 창에서 쓰기만 통할 리가
+       없다 — 바이글이 짚어 주었다. 그래서 **넓히지 않고 바늘구멍만** 낸다.
+
+     ⚠⚠ **바늘구멍의 못 — 길이 이 자리로 「시작」해야 한다.**
+       `startsWith` 가 아니라 **앞에서부터 통째로** 맞춰 본다. 그래야
+       `…/vpcs_note/../product_master/x` 처럼 **빠져나가는 길**이 안 통한다.
+       문서 이름 자리에는 `/` 도 `.` 도 안 받는다. */
+  const 쓰는칸 = "vpcs_note";
+  /* `/v1/projects/<집>/databases/(default)/documents/artifacts/<집>/public/data/vpcs_note/<문서>` */
+  const 쓰는길 = new RegExp(
+    "^/v1/projects/[\\w-]+/databases/\\([^)]+\\)/documents/artifacts/[\\w-]+/public/data/"
+    + 쓰는칸 + "/[A-Za-z0-9_-]+$");
   const 허락한셈 = (집, 길, 셈) => {
     if (셈 === "GET") return true;
-    if (셈 !== "POST") return false;
-    if (집 === "https://firestore.googleapis.com") return /:runQuery$/.test(길);
-    if (집 === "https://identitytoolkit.googleapis.com") return /\/accounts:signUp$/.test(길);
-    return false;
+    if (집 === "https://identitytoolkit.googleapis.com")
+      return 셈 === "POST" && /\/accounts:signUp$/.test(길);
+    if (집 !== "https://firestore.googleapis.com") return false;
+    if (셈 === "POST") return /:runQuery$/.test(길);
+    if (셈 === "PATCH") return 쓰는길.test(길);          // ← 열린 길은 이것 하나뿐이다
+    return false;                                       // :commit·:batchWrite·DELETE·그 밖
   };
   addEventListener("message", async (e) => {
     if (e.source !== window || !e.data || e.data.__vp !== "밖에") return;

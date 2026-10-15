@@ -25,17 +25,28 @@ function 화면다리토막() {
 }
 
 /* 재어 볼 물음들 — 읽기는 통과해야 하고 **쓰기는 다 막혀야** 한다 */
-const 창고 = 'https://firestore.googleapis.com/v1/projects/p/databases/(default)/documents/artifacts/p/public/data';
+const 창고 = 'https://firestore.googleapis.com/v1/projects/vivivic-4b7ef/databases/(default)'
+  + '/documents/artifacts/vivivic-4b7ef/public/data';
 const 로그인 = 'https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=KKK';
 const 물음들 = [
   { 이름: '창고 묻기 (읽기)',        주소: 창고 + ':runQuery',          셈: 'POST',   되나: true },
   { 이름: '익명 로그인',             주소: 로그인,                       셈: 'POST',   되나: true },
   { 이름: '창고 한 줄 읽기',         주소: 창고 + '/docs_files/abc',     셈: 'GET',    되나: true },
+  /* 10-15 — **쓰기 한 길**을 열었다. `vpcs_note` 의 한 문서 자리에 `PATCH` 만. */
+  { 이름: '상담 이력 쌓기',           주소: 창고 + '/vpcs_note/20261015-1', 셈: 'PATCH', 되나: true },
   { 이름: '★ 창고에 **쓰기**(commit)', 주소: 창고 + ':commit',           셈: 'POST',   되나: false },
   { 이름: '★ 창고에 **여럿 쓰기**',   주소: 창고 + ':batchWrite',        셈: 'POST',   되나: false },
   { 이름: '★ 줄 **만들기**',          주소: 창고 + '/docs_files',        셈: 'POST',   되나: false },
   { 이름: '★ 줄 **고치기**(PATCH)',   주소: 창고 + '/docs_files/abc',    셈: 'PATCH',  되나: false },
   { 이름: '★ 줄 **지우기**(DELETE)',  주소: 창고 + '/docs_files/abc',    셈: 'DELETE',되나: false },
+  /* ★ 바늘구멍으로 **빠져나가려는 것들** (바이글 10-15) */
+  { 이름: '★ 상담칸 **지우기**',       주소: 창고 + '/vpcs_note/20261015-1', 셈: 'DELETE', 되나: false },
+  { 이름: '★ `..` 로 빠져나가기',      주소: 창고 + '/vpcs_note/../product_master/x', 셈: 'PATCH', 되나: false },
+  { 이름: '★ 딴 칸에 쓰기',           주소: 창고 + '/confirmed_orders/x', 셈: 'PATCH',  되나: false },
+  { 이름: '★ 상담칸 **통째로** 쓰기',  주소: 창고 + '/vpcs_note',          셈: 'PATCH',  되나: false },
+  { 이름: '★ 상담칸 **아래 또 아래**', 주소: 창고 + '/vpcs_note/a/b/c',    셈: 'PATCH',  되나: false },
+  { 이름: '★ 딴 집 상담칸 흉내',       주소: 'https://firestore.googleapis.com.evil.example/v1/projects/p'
+      + '/databases/(default)/documents/artifacts/p/public/data/vpcs_note/x', 셈: 'PATCH', 되나: false },
   { 이름: '★ 셈을 숨긴 것(post)',     주소: 창고 + ':commit',            셈: 'post',   되나: false },
   { 이름: '★ 딴 집 (남의 서버)',      주소: 'https://example.com/x',     셈: 'GET',    되나: false },
   { 이름: '★ 딴 집 (구글 다른 칸)',   주소: 'https://www.googleapis.com/x', 셈: 'GET', 되나: false },
@@ -80,8 +91,12 @@ const 물음들 = [
   }
   console.log('\n  다리를 지나 **진짜로 나간 것** ' + 나간것.length + '개:');
   for (const x of 나간것) console.log('    ' + x);
-  console.log('  ★ 쓰기 길이 하나도 안 나갔나 '
-    + 못(!나간것.some(x => /:commit|:batchWrite|^PATCH |^DELETE |^POST .*\/docs_files$/.test(x))));
+  /* 열린 쓰기는 **상담칸 한 문서**뿐이어야 한다 */
+  const 나간쓰기 = 나간것.filter(x => /^(PATCH|DELETE|PUT) /.test(x)
+    || /:commit|:batchWrite/.test(x) || /^POST .*\/docs_files$/.test(x));
+  console.log('  ★ 나간 쓰기 ' + JSON.stringify(나간쓰기));
+  console.log('  ★ **상담칸 한 문서 PATCH 하나뿐인가** '
+    + 못(나간쓰기.length === 1 && /^PATCH .*\/vpcs_note\/20261015-1$/.test(나간쓰기[0])));
   if (탈.length) { console.log('  터진 말: ' + JSON.stringify([...new Set(탈)].slice(0,2))); 빨강++; }
   console.log('\n  ★ 초록 ' + 초록 + ' · 빨강 ' + 빨강);
   await ctx.close(); await b.close();

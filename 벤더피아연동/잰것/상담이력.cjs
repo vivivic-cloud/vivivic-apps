@@ -283,6 +283,85 @@ const 본다 = () => {
       .filter(x=>/상담/.test(x)))) + ' ' + 못(/상담:못남김/.test(것.딱지)));
     await ctx.close();
   }
+  /* ◆ **바로받기가 막히고(CSP 흉내) 다리로만** 될 때 — 사장님 화면이 바로 이 꼴일 수 있다.
+       `connect-src` 는 받는 것만이 아니라 **보내는 것도** 막는다. 그때도 남겨져야 한다. */
+  {
+    const 다리흉내 = `
+(() => {
+  let 표 = 0; const 기다림 = new Map();
+  addEventListener("message", (e) => {
+    if (e.source !== window || !e.data || e.data.__vp !== "밖에답") return;
+    const p = 기다림.get(e.data.표); if (p) { 기다림.delete(e.data.표); p(e.data.답); }
+  });
+  window.VP밖에 = (주소, 옵션) => new Promise((풀) => {
+    const 내표 = ++표; 기다림.set(내표, 풀);
+    window.postMessage({ __vp: "밖에", 표: 내표, 주소, 옵션: 옵션 || null }, location.origin);
+    setTimeout(() => { if (기다림.delete(내표)) 풀(null); }, 20000);
+  });
+})();`;
+    /* 「확장 쪽」 — 막음 토막은 `불러오기.js` 에서 **그대로 떼어** 온다(베끼지 않는다) */
+    const t = fs.readFileSync(path.join(확장, '불러오기.js'), 'utf8');
+    const 시작 = t.indexOf('/* ──밖에다리시작──'), 끝 = t.indexOf('/* ──밖에다리끝── */');
+    const 확장쪽 = `(() => {
+  const 진짜받기 = window.fetch.bind(window);
+  window.fetch = (주소, 옵션) => {
+    const u = String(주소 && 주소.url ? 주소.url : 주소);
+    if (!(옵션 && 옵션.__다리) && /googleapis\\.com/.test(u))
+      return Promise.reject(new TypeError("Refused to connect (CSP 흉내)"));
+    return 진짜받기(주소, 옵션);
+  };
+  ${t.slice(시작, 끝).replace(/await fetch\(/g, 'await 진짜받기(').replace(/credentials: "omit",/g, 'credentials: "omit", __다리: 1,')}
+})();`;
+    let 쌓인것 = [], 쓴것 = null;
+    const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
+    await ctx.route('**://vivivic-cloud.github.io/**', r => r.abort('blockedbyclient'));
+    await ctx.route('**://identitytoolkit.googleapis.com/**', (r) =>
+      r.fulfill({ status: 200, contentType: 'application/json', body: '{"idToken":"ascii-fake"}' }));
+    await ctx.route('**://firestore.googleapis.com/**', (r) => {
+      if (r.request().method() === 'PATCH') { 쓴것 = r.request().postData() || '';
+        return r.fulfill({ status: 200, contentType: 'application/json', body: 쓴것 }); }
+      return r.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
+    });
+    await ctx.route('**://vendorpia.com/**', (r) => {
+      if (r.request().method() === 'POST')
+        return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: 표 });
+      if (new URL(r.request().url()).pathname.endsWith('.js'))
+        return r.fulfill({ status: 200, contentType: 'text/javascript', body: '/* 손잡이 */' });
+      return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: 배송쪽 });
+    });
+    const page = await ctx.newPage();
+    await page.goto('https://vendorpia.com/System/Delivery/firmDvList.aspx?vg판=1');
+    await page.addScriptTag({ content:
+      'window.chrome=window.chrome||{};chrome.runtime={getManifest:()=>({version:"잰것"}),getURL:f=>"/"+f};'
+      + 'document.cookie="VP_Cookie=LOGON_EMP_NO%3D7";'
+      + '(function(){var d=document.createElement("div");d.id="vp-판";'
+      + 'd.textContent="벤더피아 보기 잰것 · 확장";'
+      + 'd.style.cssText="position:fixed;left:6px;bottom:6px";document.body.appendChild(d);})();' });
+    await page.addScriptTag({ content: 다리흉내 });
+    await page.addScriptTag({ content: 확장쪽 });
+    await page.addStyleTag({ content: ['login.css','search.css']
+      .map(f => fs.readFileSync(path.join(확장, f), 'utf8')).join('\n') });
+    await page.addScriptTag({ content: VP흉내 });
+    for (const f of ['login.js','search.js'])
+      await page.addScriptTag({ content: fs.readFileSync(path.join(확장, f), 'utf8') });
+    await page.waitForTimeout(500);
+    await page.click('.vp-bar button[type=submit]'); await page.waitForTimeout(1200);
+    await page.click('tbody tr:nth-child(1) td.vp-상품칸'); await page.waitForTimeout(600);
+    await page.fill('.vp-상담적기 textarea', '전화 상담 — 다리로 남깁니다');
+    await page.click('.vp-상담종류[data-k="반품"]');
+    await page.click('.vp-상담적기 button[type=submit]'); await page.waitForTimeout(900);
+    const 것 = await page.evaluate(() => ({
+      알림: document.querySelector('.vp-상담알림')?.textContent || null,
+      딱지: document.getElementById('vp-판')?.textContent || '' }));
+    console.log('\n  ◆ **바로받기가 막히고(CSP 흉내) 다리로만** 될 때');
+    console.log('    ★ 남겼나 「' + 것.알림 + '」 ' + 못(/남겼습니다/.test(것.알림 || '')));
+    const 토막 = 것.딱지.split('‖').map(x => x.trim()).filter(x => /상담:남김/.test(x));
+    console.log('    ★ **다리로 갔나** ' + JSON.stringify(토막) + ' '
+      + 못(토막.some(x => /\/다리/.test(x))));
+    console.log('    ★ 사람 칸이 샜나 ' + 못(!/가나다|010-7777-8888|○○로 99/.test(쓴것 || '')));
+    await ctx.close();
+  }
+
   console.log('\n  그림: 잰것/그림/상담-표-1280.png · 상담-판-1280.png · 상담-표-375.png · 상담-판-375.png');
   console.log('\n  ★ 초록 ' + 초록 + ' · 빨강 ' + 빨강);
   await b.close();

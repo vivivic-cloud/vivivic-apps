@@ -593,10 +593,26 @@
       ord: 싸기(String(주문)), cnt: 싸기(쌓기.length), at: 싸기(이제), log: 싸기(쌓기),
       req: 접수 ? 싸기(접수) : { nullValue: null },
       open: { booleanValue: 열림 }, kind: 싸기((접수 && 접수.k) || "") } });
-    const r = await fetch(주소, { method: "PATCH", credentials: "omit",
-      headers: { Authorization: "Bearer " + tok, "Content-Type": "application/json" }, body: 몸 });
-    if (!r.ok) throw new Error("창고 " + r.status);
-    window.VP말?.("상담:남김 " + 쌓기.length + "줄" + (열림 ? " · " + 접수.k + " " + 접수.st : ""));
+    /* ⚠⚠ **다리를 먼저** 쓴다 (10-15). 벤더피아 쪽 `connect-src` 는 받는 것만이 아니라
+         **보내는 것도 같이 막는다** — `fetch` 는 읽기든 쓰기든 한 울타리다. 그래서
+         「쓰기만 화면 쪽에서」 는 안 통한다(⑧ 수입정보가 안 됐던 그 까닭이다).
+         다리는 그 CSP 에 안 묶인다. 다리가 없으면(확장이 옛 판) 전처럼 바로 보낸다.
+       ⚠ 다리는 이 한 길만 받는다 — `vpcs_note` 의 한 문서 자리에 `PATCH`.
+         `:commit`·`:batchWrite`·`DELETE`·딴 칸은 **계속 막혀 있다**(`불러오기.js`). */
+    const 옵션 = { method: "PATCH",
+      headers: { Authorization: "Bearer " + tok, "Content-Type": "application/json" }, body: 몸 };
+    let 길 = "바로", ok = false, 번호 = 0, 탈 = "";
+    if (window.VP밖에) {
+      const 답 = await window.VP밖에(주소, 옵션);
+      if (답 && 답.다리) { 길 = "다리"; ok = !!답.ok; 번호 = 답.status; 탈 = 답.탈 || ""; }
+    }
+    if (길 === "바로") {
+      const r = await fetch(주소, Object.assign({ credentials: "omit" }, 옵션));
+      ok = r.ok; 번호 = r.status;
+    }
+    if (!ok) throw new Error("창고 " + 번호 + (탈 ? "/" + 탈 : "") + " (" + 길 + ")");
+    window.VP말?.("상담:남김 " + 쌓기.length + "줄/" + 길
+      + (열림 ? " · " + 접수.k + " " + 접수.st : ""));
     return { log: 쌓기, req: 접수, open: 열림 };
   }
 
