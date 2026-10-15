@@ -110,50 +110,84 @@
      ⚠ **고를 수 있는 값은 짐작하지 않는다** — 그 화면의 <select> 에 든 <option> 을 그때그때 읽는다.
        화면에 없는 칸이나, 「전체」 말고 고를 것이 없는 칸은 **아예 안 그린다.**
      ⚠ 칸 이름(한글)은 id 에서 미루어 적은 것이다. 진짜 화면 글자와 다르면 여기만 고치면 된다. */
-  const 알약칸들 = [
+  /* ⚠⚠ 10-15 사장님 (배송관리 거르개를 짚으시고, 그대로):
+       「지금 형태의 필터링 버튼을 나열하기 보다 각 필터링제목 즉 배송상태 배송사 매출처 별
+         드롭다운 해당 선택 하게 해줘 , 송장전송 필터링은 없어도 됨」
+     10-14 에 깐 **알약 나열**을 이 말씀이 고쳐 쓰신다 → **제목별 드롭다운 셋.**
+     · 제목 단추에 **고른 값이 함께 보인다** (보기: 「배송사 · 경동택배(포천)」).
+     · **송장전송은 뺀다** — 사장님이 「없어도 됨」 하셨다.
+     · 「전부」 는 갈래마다 맨 앞에 그대로 둔다 (끄는 길).
+     ⚠ **거르는 셈은 한 글자도 안 바꿨다** — 바뀐 것은 고르는 **모습**뿐이다. */
+  const 거르개들 = [
     ["ddlDStatus", "배송상태"],
     ["ddlDeliveryCo", "배송사"],
-    ["ddlInvoiceSendYn", "송장전송"],
     ["ddlStore", "매출처"],
   ];
   const 고른것 = {};                                   // { 칸id: 고른 값 } — 빈 값이면 「전부」
 
+  let 펼친것 = null;                                   // 지금 펼쳐 둔 갈래 (하나만 펼친다)
   function 알약그리기() {
     알약칸.replaceChildren();
-    for (const [id, 이름] of 알약칸들) {
+    for (const [id, 이름] of 거르개들) {
       const sel = document.getElementById(id);
       if (!sel) continue;                              // 그 화면에 없는 칸
       const 전체 = [...sel.options].find((o) => o.text.trim() === "전체");
       const 고를것 = [...sel.options].filter((o) => o !== 전체 && o.text.trim());
-      if (고를것.length < 2) continue;                 // 고를 것이 하나뿐이면 알약이 필요 없다
-      const 줄 = document.createElement("div");
-      줄.className = "vp-pill-row";
-      const 딱지 = document.createElement("span");
-      딱지.className = "vp-pill-name";
-      딱지.textContent = 이름;
-      줄.appendChild(딱지);
-      const 담 = document.createElement("div");
-      담.className = "vp-pill-list";
+      if (고를것.length < 2) continue;                 // 고를 것이 하나뿐이면 둘 까닭이 없다
       /* 끄는 길 — 「전부」 가 늘 맨 앞에 있다 */
       const 보기 = [[전체 ? 전체.value : "", "전부"], ...고를것.map((o) => [o.value, o.text.trim()])];
-      for (const [값, 글] of 보기) {
-        const b = document.createElement("button");
-        b.type = "button";
-        b.className = "vp-pill";
-        b.textContent = 글;
-        const 켜짐 = (고른것[id] || "") === (값 || "");
-        b.setAttribute("aria-pressed", 켜짐 ? "true" : "false");
-        b.addEventListener("click", () => {
-          고른것[id] = 값 || "";
-          알약그리기();
-          bar.requestSubmit();                         // 누르면 그 조건으로 바로 다시 조회
-        });
-        담.appendChild(b);
+      const 지금값 = 고른것[id] || "";
+      const 지금글 = (보기.find(([값]) => (값 || "") === 지금값) || [, "전부"])[1];
+
+      const 갈래 = document.createElement("div");
+      갈래.className = "vp-drop" + (지금값 ? " vp-drop-on" : "");
+      const 머리 = document.createElement("button");
+      머리.type = "button";
+      머리.className = "vp-drop-head";
+      머리.setAttribute("aria-expanded", 펼친것 === id ? "true" : "false");
+      머리.setAttribute("aria-pressed", 지금값 ? "true" : "false");
+      머리.appendChild(Object.assign(document.createElement("span"),
+        { className: "vp-drop-name", textContent: 이름 }));
+      머리.appendChild(Object.assign(document.createElement("span"),
+        { className: "vp-drop-value", textContent: 지금글 }));
+      머리.appendChild(Object.assign(document.createElement("span"),
+        { className: "vp-drop-arrow", textContent: "▾" }));
+      머리.addEventListener("click", (e) => {
+        e.stopPropagation();
+        펼친것 = 펼친것 === id ? null : id;
+        알약그리기();
+      });
+      갈래.appendChild(머리);
+
+      if (펼친것 === id) {
+        const 판 = document.createElement("div");
+        판.className = "vp-drop-list";
+        for (const [값, 글] of 보기) {
+          const b = document.createElement("button");
+          b.type = "button";
+          b.className = "vp-drop-item";
+          b.textContent = 글;
+          b.setAttribute("aria-pressed", (값 || "") === 지금값 ? "true" : "false");
+          b.addEventListener("click", (e) => {
+            e.stopPropagation();
+            고른것[id] = 값 || "";
+            펼친것 = null;
+            알약그리기();
+            bar.requestSubmit();                       // 고르면 그 조건으로 바로 다시 조회
+          });
+          판.appendChild(b);
+        }
+        갈래.appendChild(판);
       }
-      줄.appendChild(담);
-      알약칸.appendChild(줄);
+      알약칸.appendChild(갈래);
     }
   }
+  /* 바깥을 누르면 펼친 것을 접는다 */
+  document.addEventListener("click", () => { if (펼친것) { 펼친것 = null; 알약그리기(); } });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && 펼친것) { 펼친것 = null; 알약그리기(); }
+  });
+
   /* 켜진 알약만 조회에 싣는다 (「전부」 는 안 싣는다 — 원래 폼 값 그대로 둔다) */
   const 알약값 = () => Object.fromEntries(Object.entries(고른것).filter(([, v]) => v));
   알약그리기();
