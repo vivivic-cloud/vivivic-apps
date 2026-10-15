@@ -16,6 +16,50 @@
      · 단추는 **뿌리(documentElement)** 에 단다. 몸에 달면 `vp-clean` 이 그것까지 감춘다.
      · 우리 것 중 화면에 남는 것은 **이 단추 하나뿐** — 판번호 딱지(#vp-판)·붉은 줄(#vp-탈)도 같이 숨긴다.
      · 짚어서 지시하기는 **두 모습 다에서** 그대로 산다 — 손잡이는 문서에 붙어 있어 상관없다. */
+/* ⚠⚠ 10-15 사장님: 「새로고침해도 버전정보가 변하지 않는데?」 — 사장님이 옳으시다.
+   왼쪽 아래 딱지는 `chrome.runtime.getManifest().version` 을 찍는다. 그것은 **깔린 확장의 번호**라
+   **덮어쓰기 전에는 안 바뀐다.** 그런데 새로고침으로 실제로 바뀌는 것은 **깃에서 오는 화면 글**이다.
+   → **지금 돌고 있는 화면 글이 몇 판인지 보여 주는 자리가 아예 없었다.**
+     우리가 「새로고침만 하시면 됩니다」 라고 적어 놓고 **왔는지 확인할 길을 안 드린 것**이다.
+   그래서 **깃에서 바로 오는 이 글**이 제 판을 딱지에 덧붙인다 —
+     「벤더피아 보기 **깔림** 0.34.5 · **화면글** 0.34.8 · 깃 · 짚개✓ …」
+   둘이 다르면 덮어쓰면 맞춰진다는 뜻이고, **화면글 판이 올라가 있으면 새 글이 온 것**이다.
+   ⚠ `불러오기.js`(확장 안)는 **안 건드린다** — 고치면 사장님이 덮어쓰셔야 한다.
+     이 고침은 **새로고침만으로** 먹어야 한다. 그게 핵심이다. */
+/* ⚠⚠ 화면글 판은 **여기 한 군데서만** 적는다. `manifest.json` 의 version 과 **늘 같이** 올려라
+   (배포 차례에 적어 두었다). 두 군데서 적으면 반드시 어긋난다. */
+const VP_화면글판 = "0.34.8";   // ⚠ manifest.json 의 version 과 **같은 값**
+
+(() => {
+  const 딱지글 = (옛글) => {
+    if (!옛글 || 옛글.includes("화면글")) return null;              // 이미 붙였으면 그만
+    const m = /^(벤더피아 보기 )([^ ·]+)([\s\S]*)$/.exec(옛글);
+    if (!m) return null;
+    return m[1] + "깔림 " + m[2] + " · 화면글 " + VP_화면글판 + m[3];
+  };
+  const 덧붙이기 = () => {
+    const d = document.getElementById("vp-판");
+    if (!d) return false;
+    const 새글 = 딱지글(d.textContent);
+    if (새글) d.textContent = 새글;
+    return true;
+  };
+  /* 딱지는 `불러오기.js` 가 1.5초·4초에 **다시 쓴다.** 다시 쓰면 또 붙여야 한다. */
+  const 봄 = new MutationObserver(() => 덧붙이기());
+  const 붙자 = () => {
+    const d = document.getElementById("vp-판");
+    if (!d) return false;
+    덧붙이기();
+    봄.observe(d, { childList: true, characterData: true, subtree: true });
+    return true;
+  };
+  if (!붙자()) {
+    const 기다림 = new MutationObserver(() => { if (붙자()) 기다림.disconnect(); });
+    기다림.observe(document.documentElement, { childList: true, subtree: true });
+    setTimeout(() => 기다림.disconnect(), 20000);
+  }
+})();
+
 (() => {
   const 우리것 = ["vp-root", "vp-판", "vp-탈"];
   let 단추 = null, 원래보는중 = false;
