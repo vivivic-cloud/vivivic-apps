@@ -28,7 +28,7 @@
      이 고침은 **새로고침만으로** 먹어야 한다. 그게 핵심이다. */
 /* ⚠⚠ 화면글 판은 **여기 한 군데서만** 적는다. `manifest.json` 의 version 과 **늘 같이** 올려라
    (배포 차례에 적어 두었다). 두 군데서 적으면 반드시 어긋난다. */
-const VP_화면글판 = "0.34.25";   // ⚠ manifest.json 의 version 과 **같은 값**
+const VP_화면글판 = "0.34.26";   // ⚠ manifest.json 의 version 과 **같은 값**
 
 /* ⚠⚠ **까닭 적기** (10-15) — 사장님 PC 에서 CS 거르개·상품 단추·수입정보 셋이
      **조용히** 안 됐다. 사장님도 바이글도 **왜**인지를 못 봤다. 그것이 진짜 탈이었다.
@@ -41,7 +41,9 @@ const VP_화면글판 = "0.34.25";   // ⚠ manifest.json 의 version 과 **같�
    ⚠ 터진 말과 **못 받은 글**(CSP 로 막힌 `<script src>` 따위)도 저절로 적는다. */
 (() => {
   const 말들 = [];
-  const 짧게 = (t) => String(t == null ? "" : t).replace(/\s+/g, " ").slice(0, 60);
+  /* ⚠ 60자는 **너무 짧았다** — 10-16 에 「… padding-top 34」 가 「… 3」 으로 잘려
+       잰 숫자가 거짓이 됐다. 딱지는 평소 숨어 있으니(①) 길어도 사장님 화면을 안 더럽힌다. */
+  const 짧게 = (t) => String(t == null ? "" : t).replace(/\s+/g, " ").slice(0, 120);
   const 딱지글 = (옛글) => {
     if (!옛글) return null;
     let 글 = 옛글;
@@ -221,7 +223,57 @@ const VP_화면글판 = "0.34.25";   // ⚠ manifest.json 의 version 과 **같�
     }
     꼴맞추기();
     자리잡기();
+    로고올리기();
   }
+  /* ⚠⚠ **로고를 창 맨 위로 (10-16)** — 사장님: 「그림 이미지 위쪽으로 창의 제일 위쪽으로
+       이동해주세요」(장부 a1792110677). 어제(10-15) 우리가 얹은 26px 띠를 걷었는데도
+       **아직 낮다** 하신다. 그러면 남은 빈자리는 **벤더피아 제 것**이다.
+     ⚠ 이 상자에서는 진짜 그 화면을 못 본다. 그래서 **짐작으로 꼴을 고치지 않는다** —
+       사장님 화면에서 **그때그때 재서**, 로고 위에 **아무것도 없는 빈자리**(margin·padding)만
+       걷는다. 앞에 **보이는 형제가 있으면 손대지 않고** 그 이름을 까닭에 적는다.
+       그래야 그 집 글이나 단추를 우리가 지우는 일이 없다.
+     ⚠ 우리 화면(`vp-clean`)일 때는 아무것도 안 한다 — 거기선 로고가 아예 안 보인다.
+     ⚠ 되돌릴 수 있게 **고친 것을 적어 둔다.** 우리 화면으로 돌아가면 그대로 되돌린다. */
+  const 로고고친것 = [];
+  function 로고되돌리기() {
+    for (const { el, 칸, 옛 } of 로고고친것.splice(0)) {
+      if (옛) el.style.setProperty(칸, 옛); else el.style.removeProperty(칸);
+    }
+  }
+  function 로고올리기() {
+    if (document.documentElement.classList.contains("vp-clean")) { 로고되돌리기(); return; }
+    const 그림 = document.getElementById("imglogo") || document.getElementById("divLogo");
+    if (!그림) return;                                  // 그 화면엔 로고가 없다
+    const 위 = () => Math.round(그림.getBoundingClientRect().top);
+    const 처음 = 위();
+    if (처음 <= 2) return;                              // 이미 맨 위다
+    const 보이나 = (el) => {
+      if (!el || el.nodeType !== 1) return false;
+      const r = el.getBoundingClientRect();
+      return r.width > 1 && r.height > 1 && getComputedStyle(el).display !== "none";
+    };
+    const 걷은것 = [];
+    let 막은것 = null;
+    for (let el = 그림; el && el !== document.documentElement; el = el.parentElement) {
+      if (위() <= 2) break;
+      /* 앞에 **보이는 형제**가 있으면 그 위는 빈자리가 아니다 — 손대지 않는다 */
+      let 앞 = el.previousElementSibling;
+      while (앞 && !보이나(앞)) 앞 = 앞.previousElementSibling;
+      if (앞) { 막은것 = (앞.id ? "#" + 앞.id : 앞.tagName.toLowerCase()); break; }
+      const cs = getComputedStyle(el);
+      for (const 칸 of ["margin-top", "padding-top"]) {
+        const 값 = parseFloat(cs.getPropertyValue(칸)) || 0;
+        if (값 <= 0) continue;
+        로고고친것.push({ el, 칸, 옛: el.style.getPropertyValue(칸) });
+        el.style.setProperty(칸, "0px", "important");
+        걷은것.push((el.id ? "#" + el.id : el.tagName.toLowerCase()) + " " + 칸 + " " + Math.round(값));
+      }
+    }
+    window.VP말?.("로고:" + 처음 + "px→" + 위() + "px"
+      + (걷은것.length ? " · 걷음 " + 걷은것.join(", ") : " · 걷을 빈자리 없음")
+      + (막은것 ? " · 막은것 " + 막은것 : ""));
+  }
+
   function 단추달기() {
     if (단추) return;
     단추 = document.createElement("button");
@@ -257,6 +309,13 @@ const VP_화면글판 = "0.34.25";   // ⚠ manifest.json 의 version 과 **같�
     봄.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
     setTimeout(() => 봄.disconnect(), 20000);                  // 끝내 안 뜨면 그만 본다
   }
+
+  /* ⚠ 로고가 있는 쪽은 **우리 화면이 아닌** 경우가 많다(거기엔 전환 단추가 없어
+       `뒤집기` 가 안 돈다). 그래서 들어오자마자 한 번 보고, 늦게 그려지는 것을 받아
+       두 번 더 본다. 우리 화면이면 `로고올리기` 가 제자리로 되돌려 놓고 돌아선다. */
+  로고올리기();
+  setTimeout(로고올리기, 1500);
+  setTimeout(로고올리기, 4000);
 })();
 
 (() => {
