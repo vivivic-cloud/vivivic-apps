@@ -101,6 +101,13 @@ const 본다 = () => {
     창줄수: 창 && !창.hidden ? 창.querySelectorAll('.vp-modal-body dl').length : 0,
     창글: 창 && !창.hidden ? 글(창.querySelector('.vp-modal-body')) : '',
     가기단추: 창 && !창.hidden ? 글(창.querySelector('.vp-goto')).trim() : null,
+    /* 10-16 — 칸 이름이 **차례 그대로** 한 번씩만 나오나 (되풀이 0) */
+    칸이름: 창 && !창.hidden
+      ? [...창.querySelectorAll('.vp-modal-body dl dt')].map((x) => x.textContent) : [],
+    금액단추: 창 && !창.hidden
+      ? 글([...창.querySelectorAll('.vp-modal-body .vp-toggle')]
+          .find((b) => /금액속성/.test(b.textContent))) : '',
+    알림글: 글(document.querySelector('.vp-notice-card p')),
   };
 };
 
@@ -229,16 +236,60 @@ const 확장쪽흉내 = `
       await page.evaluate(() => document.querySelector('.vp-수입 button').click());
       await page.waitForTimeout(250);
       const 창 = await page.evaluate(본다);
-      const 바라는줄 = i === 0 ? 2 : i === 1 ? 1 : 2;   // ①같은코드 두장 ②한장 ③`+` 둘
-      console.log('        창 「' + 창.창제목 + '」 · 줄 **' + 창.창줄수 + '개** (바라는 것 '
-        + 바라는줄 + ') ' + 못(창.창떴나 && 창.창줄수 === 바라는줄));
+      /* ⚠ 10-16 부터 **공통정보 한 벌**이다 — 서류가 두 장이어도 묶음(dl)은 하나다
+           (사장님: 「공통정보로 한번만 표기」). 그 전에는 서류 수만큼 그렸다. */
+      console.log('        창 「' + 창.창제목 + '」 · 묶음 **' + 창.창줄수 + '개** (바라는 것 1) '
+        + 못(창.창떴나 && 창.창줄수 === 1));
+      const 바란차례 = ['단품코드','상품명','색상','포장규격','입수','CBM'];
+      console.log('        ★ 칸 차례 ' + JSON.stringify(창.칸이름) + ' '
+        + 못(JSON.stringify(창.칸이름) === JSON.stringify(바란차례))
+        + ' (FOB 는 가려져 이름도 안 나온다)');
+      console.log('        ★ 되풀이 0 인가 — 칸 ' + 창.칸이름.length + '개 중 다른 이름 '
+        + new Set(창.칸이름).size + '개 ' + 못(창.칸이름.length === new Set(창.칸이름).size));
+      console.log('        ★ 수량·서류 날짜가 **지워졌나** — 수량 '
+        + /120/.test(창.창글) + ' · 날짜 ' + /2026-0[12]-\d\d/.test(창.창글) + ' '
+        + 못(!/120/.test(창.창글) && !/2026-0[12]-\d\d/.test(창.창글)));
       console.log('        ★ 사람 칸이 샜나 — 전화 ' + /010-1234-5678/.test(창.창글)
         + ' · 이름 ' + /홍길동/.test(창.창글) + ' · 주소 ' + /○○로 1/.test(창.창글)
         + ' · 거래처 ' + /제헤우드/.test(창.창글) + ' '
         + 못(!/010-1234-5678|홍길동|○○로 1|제헤우드/.test(창.창글)));
-      console.log('        FOB·규격·입수·CBM 보이나 '
-        + 못(/12\.5/.test(창.창글) && /800\*400\*250/.test(창.창글) && /0\.08/.test(창.창글)));
+      console.log('        규격·입수·CBM 보이나 '
+        + 못(/800\*400\*250/.test(창.창글) && /0\.08/.test(창.창글)));
+      /* ★★ 10-16 사장님: 「FOB는 가격정보로서 … 값을 볼 수 있는 사용자를 제한 해 주어야 합니다」
+           ⚠ **값이 글 속에 남으면 안 된다** — 숨긴 자리에 적어 두고 접기만 해서는 안 된다. */
+      console.log('        ★ FOB 값(12.5)이 글 속에 **안 남나** ' + !/12\.5/.test(창.창글) + ' '
+        + 못(!/12\.5/.test(창.창글)) + ' · 금액 단추 「' + 창.금액단추 + '」 '
+        + 못(/금액속성 보기 \(1\)/.test(창.금액단추)));
+      await page.evaluate(() => [...document.querySelectorAll('.vp-modal-body .vp-toggle')]
+        .find((b) => /금액속성/.test(b.textContent))?.click());
+      await page.waitForTimeout(200);
+      const 알림 = await page.evaluate(본다);
+      console.log('        ★ 눌렀을 때 뜨는 알림 「' + 알림.알림글 + '」 '
+        + 못(알림.알림글 === '금액 속성은 승인된 아이디만 볼 수 있습니다.')
+        + ' · 그래도 값은 안 보이나 ' + 못(!/12\.5/.test(알림.창글)));
+      await page.evaluate(() => document.querySelector('.vp-notice-card button')?.click());
+      await page.waitForTimeout(150);
       await page.keyboard.press('Escape'); await page.waitForTimeout(150);
+    }
+    /* ★ 그림 — 사장님 폭(375)과 넓은 폭(1280) 둘 다, **공통정보 한 벌**이 보이게 */
+    if (판 === '바로') {
+      const 그림칸 = path.join(__dirname, '그림');
+      fs.mkdirSync(그림칸, { recursive: true });
+      for (const w of [1280, 375]) {
+        await page.setViewportSize({ width: w, height: 900 });
+        await page.waitForTimeout(250);
+        await page.evaluate(() => document.querySelectorAll('.vp-goods-list button')[0]?.click());
+        await page.waitForTimeout(250);
+        await page.evaluate(() => document.querySelector('.vp-수입 button')?.click());
+        await page.waitForTimeout(300);
+        const 찍기 = await page.evaluate(본다);
+        console.log('    ' + w + ' — 창 ' + 찍기.창떴나 + ' · 묶음 ' + 찍기.창줄수 + '개 · 칸 '
+          + 찍기.칸이름.length + '개 ' + 못(찍기.창떴나 && 찍기.창줄수 === 1 && 찍기.칸이름.length === 6));
+        await page.screenshot({ path: path.join(그림칸, '수입공통-' + w + '.png') });
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(150);
+      }
+      await page.setViewportSize({ width: 1280, height: 900 });
     }
     if (탈.length) { console.log('    터진 말: ' + JSON.stringify([...new Set(탈)].slice(0,2))); 빨강++; }
     /* 자료를 못 받아도 목록·상세는 그대로 돌아야 한다 */

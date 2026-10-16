@@ -312,7 +312,11 @@
   // 모든 상세(단품·상품·재고, 패널과 팝업): 값이 있는 속성만 바로 보이고, 값이 빈 속성은 [전체속성 보기]에,
   // 금액 속성은 그 안의 [금액속성 보기]에 다시 숨긴다. 금액은 승인된 아이디만 볼 수 있다.
   // 금액 속성: 단가·수수료·원가·비용·금액·이익과 배송·설치 관련 비용 (선착불처럼 금액이 아닌 칸은 제외)
-  const AMOUNT = /단가|수수료|원가|비용|금액|이익|선불비|착불비|설치비|유리비|제품비/;
+  /* ⚠ 10-16 사장님: 「**FOB는 가격정보로서 이 상세의 규칙에 따라 값을 볼 수 있는 사용자를
+       제한 해 주어야 합니다**」(장부 a1792135808) — 새 규칙을 만들지 않고 **이 규칙에 한 낱말만** 더했다.
+       이러면 승인 안 된 아이디에게는 값이 **글 속에 아예 안 들어간다**(아래 `detailFields` 가
+       승인 때만 `listOf(amounts)` 를 부른다). */
+  const AMOUNT = /단가|수수료|원가|비용|금액|이익|선불비|착불비|설치비|유리비|제품비|FOB/;
   const APPROVED_IDS = [];  // 금액을 볼 수 있는 벤더피아 아이디 (아직 없음)
   const myId = decodeURIComponent((document.cookie.match(/VP_Cookie=([^;]*)/) || [])[1] || "")
     .match(/LOGON_EMP_NO=([^&]*)/)?.[1] || "";
@@ -346,7 +350,11 @@
   const 서류 = {
     KEY: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
     PROJ: "vivivic-4b7ef",
-    머리: ["단품코드", "상품명", "수량", "FOB", "포장규격", "입수", "CBM", "색", "서류 날짜"],
+    /* ⚠⚠ 10-16 사장님 (수입정보 상세 창을 짚어 보내신 말씀, 그대로):
+         「**단품코드/상품명/색상/포장규격/입수/CBM/FOB 순으로 표기를 해주고 지금 언급한 표기는
+           공통정보로 한번만 표기해 주면됩니다. … 수량과 서류날짜는 부분은 삭제하고**」
+         ⚠ 차례를 바꾸지 마라. ⚠ **수량·서류 날짜는 여기 넣지 않는다** — 차수 박스로 갈 것이다. */
+    머리: ["단품코드", "상품명", "색상", "포장규격", "입수", "CBM", "FOB"],
   };
   /* ⚠⚠ **밖으로 나가는 길을 둘 둔다 (10-15).** 사장님 PC 에서 수입정보 단추가 **아예 안
        생겼다** — 403 길의 모습과 같았다. 벤더피아 쪽 **CSP `connect-src`** 가 창고로 나가는
@@ -420,9 +428,8 @@
         /* ⚠ 칸은 **모두 글자**여야 한다. `detailFields` 가 `row[i].trim()` 을 부른다 —
              숫자를 그대로 넣으면 상세가 **한 줄도 안 그려진다**(10-15 재서 잡았다). */
         const 글자 = (v) => (v === null || v === undefined || v === "" ? "" : String(v));
-        const 줄 = [코드, 글자(it.name), 글자(it.qty), 글자(it.price), 글자(it.size),
-                    글자(it.perCtn), 글자(it.cbm), (it.colors || []).join(" · "),
-                    글자(cipl.invoiceDate)];
+        const 줄 = [코드, 글자(it.name), (it.colors || []).join(" · "), 글자(it.size),
+                    글자(it.perCtn), 글자(it.cbm), 글자(it.price)];
         const 둔것 = 칸.get(열쇠) || [];
         /* 같은 코드가 서류 여러 장에 오면 **다 보여 드린다** — 다만 똑같은 줄은 한 번만 */
         if (!둔것.some((x) => x.join("\u0001") === 줄.join("\u0001"))) 둔것.push(줄);
@@ -450,9 +457,23 @@
     return 모음;
   }
 
+  /* 여러 장에서 온 줄을 **한 벌로** 모은다 — 사장님: 「공통정보로 한번만 표기」.
+     ⚠ 장마다 값이 다르면 **버리지 않고** 가운뎃점으로 잇는다(없는 것으로 보이면 안 된다). */
+  function 공통한벌(줄들) {
+    return 서류.머리.map((_, i) => {
+      const 본것 = [];
+      for (const 줄 of 줄들) {
+        const v = String(줄[i] == null ? "" : 줄[i]).trim();
+        if (v && !본것.includes(v)) 본것.push(v);
+      }
+      return 본것.join(" · ");
+    });
+  }
+
   function 수입창(이름, 줄들) {
     modalTitle.textContent = 이름 + " · 수입정보";
-    modalBody.replaceChildren(...줄들.map((줄) => detailFields(서류.머리, 줄)));
+    /* ⚠ 차수마다 되풀이하지 않는다 — **한 벌만** 그린다 (10-16 분부) */
+    modalBody.replaceChildren(detailFields(서류.머리, 공통한벌(줄들)));
     modalGoto.textContent = "";                    // 「…로 가기」 는 둘 곳이 없다
     modalGoto.removeAttribute("href");
     modal.hidden = false;
