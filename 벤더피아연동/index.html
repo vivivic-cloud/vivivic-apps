@@ -27,6 +27,9 @@
   .btn.light { background: var(--bg); color: var(--ink); border: 1px solid var(--line); }
   code { padding: 1px 6px; border-radius: 6px; background: var(--fill); font-size: 13px; }
   .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+  /* ⚠ `.row` 의 `display:flex` 는 `hidden` 을 **이긴다** — 재 보니 깔린 컴퓨터에서
+       「벤더피아 열기」 가 두 개 떴다(10-16, `잰것/열기단추.cjs`). 그래서 한 줄 박는다. */
+  .row[hidden] { display: none; }
   ol li > div { min-width: 0; }
   .shot { display: block; width: 100%; height: auto; margin-top: 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
   .note { margin-top: 16px; font-size: 12.5px; color: var(--muted); line-height: 1.6; }
@@ -49,6 +52,18 @@
 
   <!-- 확장을 못 찾았을 때 — 왜 설치 안내만 나오는지 바로 보이게 적는다 (사장님 10-13) -->
   <p class="note" id="못찾음" hidden></p>
+
+  <!-- ⚠⚠ 10-16 사장님 (이 화면에서 짚어 보내신 말씀, 그대로):
+         「이페이지에 벤더피아 연결링크 버튼 만들어 주세요 이전에는 있었습니다」
+       「벤더피아 열기」 는 위 `#깔림` 칸 안에만 있었고, 그 칸은 **확장을 찾았을 때만** 켜진다.
+       그래서 못 찾은 컴퓨터·폰에서는 벤더피아로 갈 단추가 **한 개도 없었다.**
+       확장이 없어도 벤더피아는 그냥 열린다 — 못 가게 막을 까닭이 없다.
+       ⚠ 위 `#못찾음` 글은 `chrome://extensions` 이야기라 크롬·비모바일일 때만 적는다.
+         이 단추를 그 조건에 묶으면 **폰에서 또 안 보인다** — 그래서 **묶지 않는다.**
+       ⚠ `#깔림` 쪽 단추와 **같이 뜨지 않는다** — 못 찾았을 때만 켠다(찾으면 `켜기()` 가 그쪽을 켠다). -->
+  <div class="row" id="못찾음열기" hidden>
+    <a class="btn" href="https://vendorpia.com/" id="열기2">벤더피아 열기</a>
+  </div>
   <p class="sub">벤더피아(vendorpia.com)를 필요한 것만 깔끔하게 보여주는 크롬 확장 프로그램입니다. 벤더피아 아이디·비밀번호로 로그인하면 배송관리·단품관리·상품관리·재고조회가 보입니다. 크롬이 깔린 컴퓨터에서만 쓸 수 있고, 폰에서는 안 됩니다.</p>
 
   <section class="card">
@@ -169,6 +184,9 @@
       if (판) { clearInterval(다시); 켜기(판); }
       else if (++셈 >= 18) {                     // 안 깔린 컴퓨터·폰 — 설치 안내 그대로
         clearInterval(다시);
+        /* 벤더피아로 갈 단추를 켠다 — 확장이 없어도 벤더피아는 열린다 (사장님 10-16).
+           ⚠ 폰에서도 보여야 하니 아래 크롬·비모바일 조건 **밖에** 둔다. */
+        document.getElementById("못찾음열기").hidden = false;
         /* ⚠ 그냥 설치 안내만 보이면 「왜 안 되는지」 를 알 수가 없다. 한 줄로 적어 둔다.
            폰에서는 당연한 일이라 크롬일 때만 적는다. */
         if (/Chrome\//.test(navigator.userAgent) && !/Mobile/.test(navigator.userAgent)) {
