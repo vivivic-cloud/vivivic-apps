@@ -171,12 +171,19 @@ const 본다 = () => {
            && 것.알들[2] && 것.알들[2].열림));
     await page.screenshot({ path: path.join(그림칸, '상담-표-' + w + '.png'), fullPage: false });
 
-    /* 판을 열고 한 줄 남긴다 */
-    /* ★ 사장님 분부 — **상품명을 눌러** 연다 (장부 a1792056443) */
+    /* ★ 10-16 사장님: 「상품명 버튼을 누르면 상담버튼과 동일한팝업이 나타납니다.
+         **이는 잘못된 작동 입니다**」(장부 a1792133915) — 상품명을 눌러도 **안 떠야** 한다 */
     await page.click('tbody tr:nth-child(2) td.vp-상품칸');
+    await page.waitForTimeout(400);
+    const 눌러봄 = await page.evaluate(본다);
+    console.log('    ★ **상품명을 눌렀을 때 상담 판이 안 뜨나** ' + !눌러봄.판떴나 + ' '
+      + 못(!눌러봄.판떴나));
+
+    /* 판을 열고 한 줄 남긴다 — **상담 단추로만** 연다 (10-16) */
+    await page.click('tbody tr:nth-child(2) .vp-상담알');
     await page.waitForTimeout(600);
     let 판 = await page.evaluate(본다);
-    console.log('    ★ **상품명을 눌러** 판이 떴나 ' + 판.판떴나 + ' · 제목 「' + 판.판제목 + '」 '
+    console.log('    ★ **상담 단추를 눌러** 판이 떴나 ' + 판.판떴나 + ' · 제목 「' + 판.판제목 + '」 '
       + 못(판.판떴나 && 판.판제목 === '토리블리 2단 와이드 교구장'));
     console.log('    앞서 쌓인 줄 ' + 판.판줄수 + '개 ' + 못(판.판줄수 === 1));
     console.log('    접수 단추 ' + JSON.stringify(판.종류단추) + ' '
@@ -346,7 +353,7 @@ const 본다 = () => {
       await page.addScriptTag({ content: fs.readFileSync(path.join(확장, f), 'utf8') });
     await page.waitForTimeout(500);
     await page.click('.vp-bar button[type=submit]'); await page.waitForTimeout(1200);
-    await page.click('tbody tr:nth-child(1) td.vp-상품칸'); await page.waitForTimeout(600);
+    await page.click('tbody tr:nth-child(1) .vp-상담알'); await page.waitForTimeout(600);
     await page.fill('.vp-상담적기 textarea', '전화 상담 — 다리로 남깁니다');
     await page.click('.vp-상담종류[data-k="반품"]');
     await page.click('.vp-상담적기 button[type=submit]'); await page.waitForTimeout(900);

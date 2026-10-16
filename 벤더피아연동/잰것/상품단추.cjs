@@ -98,7 +98,17 @@ const 판본다 = () => {
     줄수: p.querySelectorAll('dl').length,
     inghome링크: !!p.querySelector('.vp-ing-link'),
     매출처알약: [...p.querySelectorAll('.vp-store-pill')].map(b=>b.textContent),
-    검은단추수: document.querySelectorAll('#vp-root .vp-상품칸 button.on').length };
+    검은단추수: document.querySelectorAll('#vp-root .vp-상품칸 button.on').length,
+    /* ★ 10-16 사장님: 「상품명 버튼을 누르면 상담버튼과 동일한팝업이 나타납니다.
+         **이는 잘못된 작동 입니다**」 — 상품 단추를 눌렀을 때 상담 덮개가 **없어야** 한다 */
+    상담판떴나: !!document.querySelector('.vp-상담덮개') };
+};
+/* 상담 판이 떴나 · 어디서 열었나 */
+const 상담본다 = () => {
+  const 덮 = document.querySelector('.vp-상담덮개');
+  return { 떴나: !!덮, 제목: 덮?.querySelector('.vp-상담머리 strong')?.textContent || null,
+    주문: 덮?.querySelector('.vp-상담머리 small')?.textContent || null,
+    상담단추수: document.querySelectorAll('#vp-root .vp-주문칸 .vp-상담알').length };
 };
 
 (async () => {
@@ -174,11 +184,10 @@ const 판본다 = () => {
   await page.click('#vp-root .vp-상품칸 button');
   await page.waitForTimeout(400);
   const 판 = await page.evaluate(판본다);
-  /* ⚠ 10-15 부터 상품명을 누르면 **상담 판도 같이** 뜬다(잡는 결로 듣는다).
-       이 자는 상품 단추를 재는 자라 상담은 치워 두고 간다 — 안 그러면 덮개가 다음 누르기를 막는다. */
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(200);
   console.log('\n  ★ 단추를 눌렀다 → 상세 판 ' + JSON.stringify(판));
+  /* ★★ 10-16 사장님 (장부 a1792133915): 「상품명 버튼을 누르면 상담버튼과 동일한팝업이
+       나타납니다. **이는 잘못된 작동 입니다**」 — 상품명은 **상품 상세만** 열어야 한다. */
+  console.log('    ★ 상담 판이 **안 떴나** ' + !판.상담판떴나 + ' ' + 못(!판.상담판떴나));
   console.log('    떴나 ' + 못(!!판 && 판.떴나) + ' · 제목이 그 상품명인가 '
     + 못(판?.제목 === '비스켓 800 주방수납장') + ' · 상세 줄 ' + 판?.줄수 + '개 '
     + 못((판?.줄수 || 0) >= 1));
@@ -191,10 +200,100 @@ const 판본다 = () => {
   await page.click('#vp-root tbody tr:nth-child(2) .vp-상품칸 button');
   await page.waitForTimeout(400);
   const 판2 = await page.evaluate(판본다);
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(200);
   console.log('    다른 단추를 눌렀다 → 제목 「' + 판2?.제목 + '」 · 검은 단추 '
     + 판2?.검은단추수 + '개 ' + 못(판2?.검은단추수 === 1 && 판2?.제목 === '비스켓 1200 주방수납장'));
+  console.log('    상담 판이 **안 떴나** ' + !판2.상담판떴나 + ' ' + 못(!판2.상담판떴나));
+
+  /* ★ 글자뿐인 칸(상품관리에 없는 이름)도 눌러 본다 — 여기서도 상담이 열리면 안 된다 */
+  await page.click('#vp-root tbody tr:nth-child(4) .vp-상품칸');
+  await page.waitForTimeout(300);
+  const 글자눌름 = await page.evaluate(상담본다);
+  console.log('    글자뿐인 상품명을 눌렀다 → 상담 판 ' + 글자눌름.떴나 + ' ' + 못(!글자눌름.떴나));
+
+  /* ★ 그러면 상담은 **어디서 여나** — 주문번호 칸의 「상담」 단추 하나다 */
+  console.log('\n  ★ 상담 단추가 줄마다 있나 ' + 글자눌름.상담단추수 + '개 '
+    + 못(글자눌름.상담단추수 === 배송줄.length));
+  await page.click('#vp-root tbody tr:nth-child(1) .vp-주문칸 .vp-상담알');
+  await page.waitForTimeout(500);
+  const 상담 = await page.evaluate(상담본다);
+  console.log('    눌렀다 → 상담 판 ' + 상담.떴나 + ' · 제목 「' + 상담.제목 + '」 · '
+    + 상담.주문 + ' ' + 못(상담.떴나 && 상담.제목 === '비스켓 800 주방수납장'
+      && /20261015-1/.test(상담.주문 || '')));
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+  console.log('    닫혔나 ' + 못(!(await page.evaluate(상담본다)).떴나));
+
+  /* ★ 그림 — 사장님 폭(375)과 넓은 폭(1280) 둘 다, **상품 상세**와 **상담** 따로 */
+  const 그림칸 = path.join(__dirname, '그림');
+  fs.mkdirSync(그림칸, { recursive: true });
+  for (const w of [1280, 375]) {
+    await page.setViewportSize({ width: w, height: 900 });
+    await page.waitForTimeout(300);
+    await page.click('#vp-root tbody tr:nth-child(1) .vp-상품칸 button');
+    await page.waitForTimeout(500);
+    const ㄱ = await page.evaluate(판본다);
+    console.log('    ' + w + ' — 상품명 누름 → 상세 ' + (ㄱ && ㄱ.떴나) + ' · 상담 '
+      + (ㄱ && ㄱ.상담판떴나) + ' ' + 못(!!ㄱ && ㄱ.떴나 && !ㄱ.상담판떴나));
+    await page.screenshot({ path: path.join(그림칸, '상품명누름-상세-' + w + '.png') });
+    /* ⚠ 좁은 폭에서는 상세 판이 **표를 덮는다**(상품관리와 같은 꼴이다 — 안 바꿨다).
+         그래서 상담 단추를 누르기 전에 상세를 닫는다(Esc — `goods.js` 의 맨위팝업 닫기). */
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(300);
+    await page.click('#vp-root tbody tr:nth-child(1) .vp-주문칸 .vp-상담알');
+    await page.waitForTimeout(500);
+    const ㄴ = await page.evaluate(상담본다);
+    console.log('    ' + w + ' — 상담 단추 누름 → 상담 판 ' + ㄴ.떴나 + ' ' + 못(ㄴ.떴나));
+    await page.screenshot({ path: path.join(그림칸, '상품명누름-상담-' + w + '.png') });
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  /* ★ 바이글 10-16: 「상품관리 쪽과 **같은 꼴인가**(크기·색 숫자로)」 — 두 화면의 단추를 **재서** 댄다 */
+  /* ⚠ 고르는 자리를 **또렷이 준다.** 배송관리에도 (숨은) `.vp-goods-list` 가 있어서
+       아무거나 집으면 **숨은 단추끼리 대 보는** 꼴이 된다 — 그래서 키(px)도 같이 재고 따진다. */
+  const 꼴보기 = (고를것) => {
+    const b = document.querySelector(고를것);
+    if (!b) return null;
+    const s = getComputedStyle(b), r = b.getBoundingClientRect();
+    return { 글씨: s.fontSize, 굵기: s.fontWeight, 글색: s.color, 바탕: s.backgroundColor,
+      테: s.borderWidth + ' ' + s.borderStyle + ' ' + s.borderColor, 둥글기: s.borderRadius,
+      안여백: s.padding, 키: Math.round(r.height) };
+  };
+  /* ⚠ **안 눌린** 단추를 잰다 — 앞에서 누른 단추는 `.on` 이라 검다(그건 눌린 꼴이다). */
+  const 배송꼴 = await page.evaluate(꼴보기, '#vp-root .vp-상품칸 button:not(.on)');
+  const 상품쪽쪽 = await ctx.newPage();
+  await 상품쪽쪽.goto('https://vendorpia.com/System/Master/salesGoods.aspx');
+  await 상품쪽쪽.addScriptTag({ content:
+    'window.chrome=window.chrome||{};chrome.runtime={getManifest:()=>({version:"잰것"}),getURL:f=>"/"+f};'
+    + 'window.VP저장={get:async()=>({}),set:async()=>{},remove:async()=>{}};' });
+  for (const f of ['login.css','goods.css']) await 상품쪽쪽.addStyleTag({ url: 깃 + encodeURIComponent(f) });
+  for (const f of ['vp-data.js','login.js','goods.js'])
+    await 상품쪽쪽.addScriptTag({ url: 깃 + encodeURIComponent(f) });
+  await 상품쪽쪽.waitForTimeout(2500);
+  console.log('    (살핌) ' + JSON.stringify(await 상품쪽쪽.evaluate(() => ({
+    통: document.querySelectorAll('#vp-root .vp-goods-list').length,
+    단추: document.querySelectorAll('#vp-root .vp-goods-list button').length,
+    통숨: [...document.querySelectorAll('#vp-root .vp-goods-list')].map((x) =>
+      (x.hidden ? 'hidden' : '') + getComputedStyle(x).display + '/' + Math.round(x.getBoundingClientRect().height)),
+    몇가지: window.VP상품목록몇개 ? window.VP상품목록몇개() : null,
+    딱지: (document.getElementById('vp-판')?.textContent || '').slice(0, 120) }))));
+  const 상품꼴 = await 상품쪽쪽.evaluate(꼴보기, '#vp-root .vp-goods-list button');
+  await 상품쪽쪽.close();
+  console.log('\n  ★ 단추 꼴 — 상품관리 ' + JSON.stringify(상품꼴));
+  console.log('              배송관리 ' + JSON.stringify(배송꼴));
+  /* ⚠ 흉내 상품관리 쪽에서는 단추가 **안 그려진 자리**(키 0)다 — 그래서 **꼴값만** 댄다.
+       꼴값(getComputedStyle)은 안 그려져도 참이다. 키는 **배송관리 쪽만** 따로 따진다. */
+  /* ⚠ 안여백은 **일부러 다르다** — 표 칸이라 `search.css` 가 좁힌다. 그 두 값을 **박아 두고**
+       따진다. 빼고 넘어가면 자가 거짓 초록을 낸다. */
+  const 어긋난것 = !상품꼴 || !배송꼴 ? ['단추를 못 찾았다']
+    : Object.keys(상품꼴).filter((k) => k !== '키' && k !== '안여백'
+        && String(상품꼴[k]) !== String(배송꼴[k]));
+  console.log('    어긋난 꼴값 ' + JSON.stringify(어긋난것) + ' ' + 못(어긋난것.length === 0));
+  console.log('    안여백(일부러 다르다) 상품관리 ' + 상품꼴?.안여백 + ' · 배송관리 ' + 배송꼴?.안여백
+    + ' ' + 못(상품꼴?.안여백 === '8px 14px' && 배송꼴?.안여백 === '6px 10px'));
+  console.log('    배송관리 단추가 **정말 그려져 있나**(키 px) ' + 배송꼴?.키 + ' '
+    + 못((배송꼴?.키 || 0) > 0) + ' (상품관리 흉내 쪽은 키 ' + 상품꼴?.키 + ' — 안 그려진 자리라 꼴값만 댔다)');
 
   console.log('\n  벤더피아에 POST 한 길 ' + JSON.stringify([...new Set(보낸길)])
     + ' ' + 못(보낸길.some(x=>x.includes('salesGoods')) && 보낸길.some(x=>x.includes('firmDvList'))));
