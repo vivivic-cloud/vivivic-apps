@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- 조혼가구 — 거래처 발주 화면.
-     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.9.3 -->
+     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.9.4 -->
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -1625,6 +1625,18 @@
         }
         #johon-bill .jhb-q{ font-size:17px; font-weight:800; letter-spacing:-.3px; word-break:break-all; }
         #johon-bill .jhb-tag{ margin:3px 0 0; font-size:13px; font-weight:700; color:var(--vg-soft); }
+        /* 종이가 없을 때 — 13px 회색 한 줄은 사장님 눈에 안 들어왔다(10-17).
+           그 한 줄만 크고 진하게 세운다. 종이가 서면 이 꼴이 아니다. */
+        #johon-bill .jhb-tag.빔{
+            margin:8px 0 0; padding:11px 13px; font-size:16px; font-weight:800;
+            color:var(--vg-ink); background:var(--vg-fill); border-radius:12px;
+        }
+        /* 손에 있는 것 — 입고확인에 적힌 것만 적는다. 없는 값은 아예 안 적는다. */
+        #johon-bill .jhb-info{ display:none; margin:9px 0 2px; }
+        #johon-bill .jhb-info.참{ display:grid; grid-template-columns:auto 1fr; gap:4px 12px; }
+        #johon-bill .jhb-info dt{ font-size:12.5px; font-weight:700; color:var(--vg-soft); }
+        #johon-bill .jhb-info dd{ margin:0; font-size:14px; font-weight:800; color:var(--vg-body);
+            overflow-wrap:anywhere; }
         /* 종이는 가로로도 길다 — 칸을 숨기거나 줄이지 않고 한 밀개로 민다. */
         #johon-bill .jhb-body{
             flex:1; min-height:0; overflow:auto; -webkit-overflow-scrolling:touch;
@@ -1814,7 +1826,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.3</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.4</span>
                 </div>
                 <!-- 페이지 탭: 발주하기 / 작업중 -->
                 <div class="flex items-center gap-1 border border-[#ededeb] rounded-lg bg-[#f7f6f3] p-1 mr-2">
@@ -1997,6 +2009,10 @@
         <div class="jhb-head">
             <div class="jhb-q" id="jhb-q"></div>
             <p class="jhb-tag" id="jhb-tag"></p>
+            <!-- 10-17 사장님: 「거래명세표가 안보입니다」 — 에이엠티가 아직 안 보낸
+                 건이라 그릴 종이가 없었다. 그때도 **손에 있는 것은 보여 드린다** —
+                 입고확인에 적힌 업체·납기·줄수·총수량·확인시각. 종이가 서면 안 뜬다. -->
+            <dl class="jhb-info" id="jhb-info"></dl>
         </div>
         <div class="jhb-body">
             <div id="jhb-paper"></div>
@@ -6239,8 +6255,45 @@
         let _jhb업체 = '';        // 그 종이에 적힌 업체 — 화면에서 고른 거래처를 믿지 않는다
         let _jhb종이 = null;      // 읽어 온 문서
 
-        function johonBillTag(글){
-            const el = document.getElementById('jhb-tag'); if (el) el.textContent = 글 || '';
+        function johonBillTag(글, 크게){
+            const el = document.getElementById('jhb-tag'); if (!el) return;
+            el.textContent = 글 || '';
+            el.classList.toggle('빔', !!크게);
+        }
+
+        // `입고확인` 에 적힌 줄을 집어 온다. 없으면 null. **읽기만** 한다.
+        async function johonBillSaid기록(큐알){
+            try {
+                const { doc, getDoc } = window.fbFirestore || {};
+                if (!doc || !getDoc || !window.db) return null;
+                const 눈 = await getDoc(doc(window.db, 'artifacts', appId, 'public', 'data',
+                                            JOHON_DEALCOL, 큐알));
+                if (큐알 !== _jhb큐알) return null;
+                return (눈 && 눈.exists()) ? (눈.data() || {}) : null;
+            } catch (e) { return null; }
+        }
+
+        /* 종이가 없을 때 펴는 머리글. **있는 값만** 적는다 — 없는 칸은 아예 안 만든다.
+           ⚠ 종이(표)를 흉내 내지 않는다. 이것은 기록에 적힌 몇 줄일 뿐이다. */
+        function johonBillInfo(기록){
+            const 통 = document.getElementById('jhb-info'); if (!통) return;
+            통.innerHTML = ''; 통.classList.remove('참');
+            if (!기록) return;
+            const 줄들 = [
+                ['업체',   기록.업체],
+                ['납기',   기록.납기일],
+                ['파레트', 기록.파레트],
+                ['줄수',   기록.줄수 == null ? '' : 기록.줄수 + '줄'],
+                ['총수량', 기록.총수량 == null ? '' : 기록.총수량 + '개'],
+                ['입고확인', 기록.확인시각글]
+            ].filter(([, v]) => String(v == null ? '' : v).trim() !== '');
+            if (!줄들.length) return;
+            줄들.forEach(([이름, 값]) => {
+                const dt = document.createElement('dt'); dt.textContent = 이름;
+                const dd = document.createElement('dd'); dd.textContent = String(값);
+                통.appendChild(dt); 통.appendChild(dd);
+            });
+            통.classList.add('참');
         }
         function johonBillSaid(글, 빨강){
             const el = document.getElementById('jhb-said'); if (!el) return;
@@ -6267,7 +6320,7 @@
             document.documentElement.setAttribute('data-johonbill','1');
             const q = document.getElementById('jhb-q'); if (q) q.textContent = _jhb큐알;
             const 종 = document.getElementById('jhb-paper'); if (종) 종.innerHTML = '';
-            johonBillSaid(''); johonBillTag('읽는 중');
+            johonBillSaid(''); johonBillInfo(null); johonBillTag('읽는 중');
             window.scrollTo(0, 0);
             johonBillDraw(_jhb큐알);
         }
@@ -6277,7 +6330,17 @@
             try { 종이 = await johonBillRead(큐알); }
             catch (e) { if (큐알 === _jhb큐알) johonBillTag('명세표를 못 읽었습니다'); return; }
             if (큐알 !== _jhb큐알) return;          // 그새 다른 것을 여셨다
-            if (!종이) { johonBillTag('아직 에이엠티에서 안 보냈습니다'); return; }
+            if (!종이) {
+                /* 10-17 사장님: 「거래명세표가 안보입니다」
+                   에이엠티가 아직 안 보낸 건이라 **그릴 종이가 창고에 없다**
+                   (`출고명세표` 0장). 그렇다고 큐알 글 하나만 남겨 두면
+                   사장님은 「안 보인다」 고 하신다 — 맞는 말씀이다.
+                   ⚠ 종이를 **지어내지 않는다.** 대신 손에 있는 것
+                     (`입고확인` 에 적힌 업체·납기·줄수·총수량·확인시각)을 편다. */
+                johonBillTag('아직 에이엠티에서 안 보냈습니다', true);
+                johonBillInfo(await johonBillSaid기록(큐알));
+                return;
+            }
             _jhb종이 = 종이;
             _jhb업체 = String(종이.업체 || '').trim();
             let 그린것 = null;
@@ -6320,7 +6383,7 @@
             const 종 = document.getElementById('jhb-paper'); if (종) 종.innerHTML = '';
             const b = document.getElementById('jhb-ok'); if (b) b.disabled = false;
             _jhb큐알 = ''; _jhb업체 = ''; _jhb종이 = null;
-            johonBillTag(''); johonBillSaid('');
+            johonBillTag(''); johonBillSaid(''); johonBillInfo(null);
             johonAskClose();
         }
 
