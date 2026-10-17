@@ -770,11 +770,31 @@
 
   // 버튼 글자: 이름 + 작은 글씨의 코드 (같은 이름에 코드가 여러 개면 모두)
   // qty가 있으면(재고조회에 있는 단품) 양품수를 붙이고 연두색 버튼으로
+  /* ⚠⚠ 10-16 사장님: 「**서류관리에서 코드가 연결된 단품버튼은 주황색 버튼** 버튼하단에
+       붉은색 테두리 표현 해주세요」(장부 a1792135920)
+     「연결」 의 잣대는 **차수 수량과 같은 자리**(`docs_단품수량`)다 — 두 벌로 만들지 않는다.
+     ⚠ 밑의 붉은 줄은 **조혼가구** 표다(`vp-johon`). 그것은 그대로 두고 **칠만** 주황으로 바꾼다 —
+       그래야 둘이 같이 보인다. 연두(재고)도 안 지운다(겹치면 왼쪽에 연두 줄로 남는다). */
+  const 서류연결 = (codes) => {
+    if (!수량) return false;
+    /* ⚠ 한 칸에 `A + B` 로 둘이 들어오는 단품이 있다 — **갈라서** 본다
+         (갈라 보지 않아 `EF-al55 + bd-whsqa` 가 안 주황이었다. 10-16 재서 잡았다). */
+    for (const c of codes.flatMap((x) => String(x == null ? "" : x).split("+"))) {
+      const 코드 = String(c).trim();
+      if (!코드) continue;
+      if (수량.has(엄열쇠(코드))) return true;
+      const 짝 = 수량헐 && 수량헐.get(맞대기열쇠(코드));
+      if (짝 && 짝.size === 1) return true;
+    }
+    return false;
+  };
+
   function labelButton(b, name, codes, qty) {
     const shown = [...new Set(codes.map((c) => c.trim()).filter(Boolean))];
     b.replaceChildren(name);
     if (shown.length) b.appendChild(Object.assign(document.createElement("small"), { className: "vp-code", textContent: shown.join(", ") }));
     b.classList.toggle("vp-instock", qty !== undefined);
+    b.classList.toggle("vp-서류", 서류연결(codes));
     if (qty !== undefined) {
       b.appendChild(Object.assign(document.createElement("small"), { className: "vp-qty", textContent: `양품 ${qty.toLocaleString()}` }));
     }
@@ -1271,6 +1291,13 @@
       .then(() => page.link && loadLinked().catch(() => { linked = { heads: [], byCode: new Map() }; }))
       /* ② 단품관리에서만 — 서류관리 자료를 뒤에서 조용히 받는다.
          ⚠ 못 받아도 화면은 그대로 돌아야 한다. 그때는 단추가 안 생길 뿐이다. */
+      /* ⚠ 차수 수량도 **같이** 받아 둔다 — 주황 칠(`서류연결`)이 그 자리를 쓴다 (10-16).
+           못 받아도 화면은 그대로 돈다. 그때는 아무것도 주황이 안 될 뿐이다. */
+      .then(() => (page.nameCol === "단품명"
+        ? 수량받기()
+            .then(() => { for (const [name, group] of groups) labelGroup(name, group); })
+            .catch(() => {})
+        : Promise.resolve()))
       .then(() => (page.nameCol === "단품명"
         ? 수입받기()
             .then(() => window.VP말?.("수입정보:코드" + (수입 ? 수입.size : 0) + "가지/" + 어느길))

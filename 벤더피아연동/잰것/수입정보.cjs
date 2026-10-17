@@ -117,10 +117,20 @@ var VP_DATA = { PAGES: ${JSON.stringify(PAGES)},
   list: async function (cfg, url, status, dates, cb) {
     if (String(url).indexOf("goods.aspx") >= 0 && String(url).indexOf("salesGoods") < 0) {
       cb(${JSON.stringify(단품머리)}, ${JSON.stringify(단품들)}, ${단품들.length}, ${단품들.length});
-    } else { cb([], [], 0, 0); }
+    } else if (String(url).indexOf("StockList.aspx") >= 0) {
+      /* ★ 재고조회 — 첫 단품만 **양품수**가 있다(연두). 색이 겹치는 자리를 만들려는 것이다(10-16) */
+      cb(["단품코드","양품수","창고"], [["MYT_3C","12","0.본사"]], 1, 1);
+    } else {
+      /* ⚠ 배송현황(많이 나간 순)이 비면 첫 화면 단추가 **전부 숨는다**(hidden) —
+           겹친 색을 찍을 수가 없다. 단추.cjs 처럼 같은 줄을 돌려준다. 그러면 다섯이 다 보인다. */
+      cb(${JSON.stringify(단품머리)}, ${JSON.stringify(단품들)}, ${단품들.length}, ${단품들.length});
+    }
     return { cachedAt: null }; },
   prefetch: function(){}, clearCache: async function(){} };
-window.VP저장 = { get: async function(){return {};}, set: async function(){}, remove: async function(){} };
+/* ★ 조혼가구 — 첫 단품만 조혼 단품과 같다(버튼 **밑 붉은 줄**). 역시 겹치는 자리를 만들려는 것이다 */
+window.VP저장 = { get: async function(){
+    return { vpJohon: { v: 3, parts: [["가거래처","ING 3단 서랍장","MYT_3C"]], cards: {}, jundo: [] } }; },
+  set: async function(){}, remove: async function(){} };
 /* VP_JOHON_PARTS 는 johon.js 가 밝힌다 — 여기서 또 밝히면 두 번 밝혔다고 터진다 */`;
 
 const 본다 = () => {
@@ -266,11 +276,96 @@ const 확장쪽흉내 = `
     const 쓴것 = 보낸물음.filter((x) => /"writes"|:commit|setDoc/.test(x));
     console.log('    창고에 **쓴 적 있나** ' + (쓴것.length > 0) + ' ' + 못(쓴것.length === 0)
       + ' (읽기만 해야 한다)');
-    const 물음 = 보낸물음.find((x) => /structuredQuery/.test(x)) || '';
-    console.log('    보낸 물음의 받을 칸 : '
-      + JSON.stringify((물음.match(/"fieldPath":"(\w+)"/g) || [])) + ' '
-      + 못(/"collectionId":"docs_files"/.test(물음) && /"fieldPath":"cipl"/.test(물음)
-           && !/수취인|전화|주소|"path"|vendor/.test(물음)));
+    /* ⚠ 이제 물음이 **둘**이다 — 서류(`docs_files`)와 차수 수량(`docs_단품수량`).
+         하나만 보고 넘어가면 다른 하나가 무엇을 받아 가는지 안 본 것이 된다. */
+    const 칸뽑기 = (x) => JSON.stringify((x.match(/"fieldPath":"([^"]+)"/g) || []));
+    const 물음 = 보낸물음.find((x) => /"collectionId":"docs_files"/.test(x)) || '';
+    console.log('    서류 물음의 받을 칸 : ' + 칸뽑기(물음) + ' '
+      + 못(/"fieldPath":"cipl"/.test(물음) && !/수취인|전화|주소|"path"|vendor/.test(물음)));
+    const 수량물음 = 보낸물음.find((x) => /docs_단품수량/.test(x)) || '';
+    console.log('    차수 물음의 받을 칸 : ' + 칸뽑기(수량물음) + ' '
+      + 못(/"fieldPath":"code"/.test(수량물음) && /"fieldPath":"차수들"/.test(수량물음)
+           && !/수취인|전화|주소|"path"|"vendor"/.test(수량물음)));
+
+    /* ★★ 10-16 사장님: 「**서류관리에서 코드가 연결된 단품버튼은 주황색 버튼** 버튼하단에
+         붉은색 테두리 표현 해주세요」(장부 a1792135920)
+       ⚠ 연두(재고)·붉은 줄(조혼가구)이 **하나도 사라지면 안 된다** — 셋을 같이 센다. */
+    if (자료줌) {
+      const 칠 = await page.evaluate(() => [...document.querySelectorAll('.vp-goods-list button')]
+        .map((b) => {
+          const s = getComputedStyle(b);
+          return { 글: (b.firstChild && b.firstChild.textContent) || '',
+            주황: b.classList.contains('vp-서류'),
+            연두: b.classList.contains('vp-instock'),
+            조혼: b.classList.contains('vp-johon'),
+            바탕: s.backgroundColor, 바탕그림: s.backgroundImage,
+            밑줄: s.boxShadow };
+        }));
+      const 주황수 = 칠.filter((x) => x.주황).length;
+      const 연두수 = 칠.filter((x) => x.연두).length;
+      const 줄수 = 칠.filter((x) => /rgb\(224, 62, 62\)/.test(x.밑줄)).length;
+      console.log('\n  ★ 단추 칠 — 주황 **' + 주황수 + '개** · 연두 ' + 연두수 + '개 · 밑 붉은 줄 '
+        + 줄수 + '개');
+      for (const x of 칠) console.log('      「' + x.글 + '」 주황 ' + x.주황 + ' 연두 ' + x.연두
+        + ' 조혼 ' + x.조혼 + ' · 바탕 ' + x.바탕
+        + (x.바탕그림 !== 'none' ? ' · 바탕그림 ' + x.바탕그림.replace(/\s+/g, ' ').slice(0, 70) : ''));
+      /* `MYT_3C`(헐거운 열쇠 하나) · `BH_LKB`(헐거운 열쇠 하나) · `EF-al55 + …`(엄한 열쇠) 셋 */
+      console.log('    ★ 주황이 **셋**인가(서류관리에 있는 코드만) ' + 못(주황수 === 3));
+      console.log('    ★ 서류관리에 **없는** 코드는 안 주황인가 '
+        + 못(칠.filter((x) => /없는것|민짜/.test(x.글)).every((x) => !x.주황)));
+      const 주황칠 = 칠.filter((x) => x.주황 && !x.연두);
+      console.log('    ★ 주황 바탕값 ' + JSON.stringify([...new Set(주황칠.map((x) => x.바탕))])
+        + ' ' + 못(주황칠.length > 0 && 주황칠.every((x) => x.바탕 === 'rgb(255, 216, 168)')));
+      const 둘다 = 칠.filter((x) => x.주황 && x.연두);
+      /* ⚠ #dff3c4 = rgb(223,243,196) 연두 · #ffd8a8 = rgb(255,216,168) 주황.
+           겹친 단추는 **왼쪽 6px 연두 + 나머지 주황** 이어야 한다 — 둘 다 글에 있어야 맞다. */
+      console.log('    ★ 주황+연두가 겹친 단추 ' + 둘다.length + '개 — **둘 다 남았나** '
+        + 못(둘다.length > 0 && 둘다.every((x) => /223, 243, 196/.test(x.바탕그림)
+                                              && /255, 216, 168/.test(x.바탕그림))));
+      const 셋다 = 칠.filter((x) => x.주황 && x.연두 && x.조혼);
+      console.log('    ★ 셋이 겹친 단추 ' + 셋다.length + '개 — **밑 붉은 줄도 남았나** '
+        + 못(셋다.length > 0 && 셋다.every((x) => /rgb\(224, 62, 62\)/.test(x.밑줄))));
+      /* ★ 그림 — **색이 겹친 줄이 보이게** (바이글 10-16)
+         ⚠ 첫 화면은 「많이 나간 순」 이라 단추가 숨어 있다. **「전체보기」 를 눌러** 보이게 한 뒤 찍는다 —
+           안 누르고 찍으면 빈 화면을 찍어 놓고 「겹친 모습」 이라 할 뻔했다(재서 잡았다). */
+      if (판 === '바로') {
+        /* ⚠ 「전체보기」 가 **둘**이다 — 앞엣것은 보기 탭, 뒤엣것이 목록을 다 펴는 단추다.
+             앞엣것을 누르면 아무것도 안 펴진다(재서 잡았다). **뒤엣것**을 누른다. */
+        /* ⚠ 이 흉내의 첫 화면은 「최근 3개월 많이 나간 순」 자리라 단추가 전부 숨어 있다
+             (`.vp-more-all` 도 검색어도 안 먹었다 — 재서 확인. 진짜 화면에서는 보인다).
+             그래서 **그 단추들을 그대로 베껴** 한 줄에 놓고 찍는다. 꼴(class)이 같으니
+             칠도 같다 — 지어낸 단추가 아니라 **방금 잰 그 단추**다. */
+        const 보이나 = await page.evaluate(() => {
+          const 통 = document.createElement('div');
+          통.id = 'vp-색견본';
+          통.className = 'vp-goods-list';
+          통.style.cssText = 'padding:12px;gap:8px';
+          for (const b of document.querySelectorAll('.vp-goods-list button')) {
+            const c = b.cloneNode(true);
+            c.hidden = false;
+            통.appendChild(c);
+          }
+          const 뿌리 = document.getElementById('vp-root');
+          뿌리.insertBefore(통, 뿌리.firstChild);
+          return [...통.querySelectorAll('button')]
+            .filter((b) => b.getBoundingClientRect().height > 2).length;
+        });
+        console.log('    ★ 그림 찍기 앞 — 베껴 놓은 단추 ' + 보이나 + '개 ' + 못(보이나 === 5));
+        fs.mkdirSync(path.join(__dirname, '그림'), { recursive: true });
+        for (const w of [1280, 375]) {
+          await page.setViewportSize({ width: w, height: 900 });
+          await page.waitForTimeout(250);
+          await page.screenshot({ path: path.join(__dirname, '그림', '주황단추-' + w + '.png') });
+        }
+        await page.setViewportSize({ width: 1280, height: 900 });
+        /* ⚠ 베낀 것을 **반드시 치운다.** 안 치우면 아래에서 누르는 단추가 베낀 쪽이라
+             아무 일도 안 일어난다(재서 잡았다 — 넷이 한꺼번에 빨개졌다). */
+        await page.evaluate(() => document.getElementById('vp-색견본')?.remove());
+        await page.waitForTimeout(200);
+        const 남았나 = await page.evaluate(() => !!document.getElementById('vp-색견본'));
+        console.log('    베낀 것을 치웠나 ' + 못(!남았나));
+      }
+    }
 
     for (const [i, 단품] of 단품들.entries()) {
       /* ⚠ 첫 화면은 「많이 나간 순 50개」 라 단추가 숨어 있을 수 있다(`apply` 의 stage).
