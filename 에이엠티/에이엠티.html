@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.61.0 (2026-10-12) — 출고내역: 못 읽은 것을 「없다」 고 하지 않는다
+     버전: v1.62.0 (2026-10-17) — 거래명세표를 그 장에서 손수 보낸다
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2646,7 +2646,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.61.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.62.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2779,7 +2779,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.61.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.62.0</b></p>
         </div>
     </div>
 
@@ -11406,42 +11406,58 @@
                 || ['artifacts', 'vivivic-4b7ef', 'public', 'data', '출고명세표'];
             return doc(window.db, ...길, String(큐알));
         };
+        /* 한 장을 보내는 자리는 **여기 하나**다 — 배송 확정도, 나중에 손으로 다시 보내는
+           것도 이 함수를 부른다. 담는 칸이 두 벌이 되면 두 집의 종이가 달라진다.
+           것 = { 큐알, 발주번호, 발주문서, 파레트, 납기일, 업체, 묶음 } */
+        window._출고명세시각글 = function () {
+            const 두 = n => String(n).padStart(2, '0');
+            const 이제 = new Date();
+            return 이제.getFullYear() + '-' + 두(이제.getMonth() + 1) + '-' + 두(이제.getDate())
+                + ' ' + 두(이제.getHours()) + ':' + 두(이제.getMinutes());
+        };
+        window._출고명세한장 = async function (것, 시각글) {
+            const 묶음 = (것 && 것.묶음) || [];
+            const 글 = String((것 && 것.큐알) || '');
+            if (!글) return { 됨: false, 탈: '큐알 글이 없습니다' };
+            const { setDoc, getDoc, serverTimestamp } = window.fbFirestore;
+            const 적을것 = {
+                큐알: 글, 발주번호: (것.발주번호 || ''), 발주문서: String(것.발주문서 || ''),
+                파레트: (것.파레트 || ''), 납기일: (것.납기일 || ''), 업체: (것.업체 || ''),
+                줄수: 묶음.reduce((a, 묶) => a + 묶.계획들.reduce((b, g) => b + g.품목들.length, 0), 0),
+                총수량: 묶음.reduce((a, 묶) => a + 묶.계획들.reduce((b, g) =>
+                    b + g.품목들.reduce((c, 품) => c + (parseInt(품.몫, 10) || 0), 0), 0), 0),
+                명세표: window._명세표담기(묶음),     // 담는 꼴 그대로다 — 새 꼴이 아니다
+                보낸때: serverTimestamp(), 보낸때글: 시각글 || window._출고명세시각글(),
+                보낸uid: (window._myAccount && window._myAccount.uid) || '',
+                판: (document.getElementById('amth-ver') || {}).textContent || '',
+            };
+            try {
+                await setDoc(window._출고명세칸(글), 적을것);
+                /* ⚠ **쓰고 다시 읽어 본다.** 안 들어갔는데 「보냈다」 고 하면 거래처가
+                   빈손으로 찍는다 — 거짓 초록은 안 된다. */
+                const 눈 = await getDoc(window._출고명세칸(글));
+                const 들어간것 = (눈 && 눈.exists && 눈.exists()) ? ((눈.data && 눈.data()) || {}) : null;
+                if (들어간것 && (들어간것.명세표 || []).length === 적을것.명세표.length)
+                    return { 됨: true, 탈: '', 시각글: 적을것.보낸때글 };
+                return { 됨: false, 탈: 글 + ' 이 안 들어갔습니다' };
+            } catch (e) { return { 됨: false, 탈: (e && e.message) || '못 보냈습니다' }; }
+        };
         window._출고명세표보내기 = async function (item) {
             const 밖 = { 보냄: 0, 모두: 0, 글들: [], 탈: '' };
             if (!item || !window.db || !window.fbFirestore) { 밖.탈 = '화베가 없습니다'; return 밖; }
             const 파들 = (typeof window._제품파레트들 === 'function') ? (window._제품파레트들(item) || []) : [];
             밖.모두 = 파들.length;
             if (!파들.length) return 밖;                     // 파레트가 없으면 보낼 것도 없다
-            const { setDoc, getDoc, serverTimestamp } = window.fbFirestore;
-            const 두 = n => String(n).padStart(2, '0');
-            const 이제 = new Date();
-            const 시각글 = 이제.getFullYear() + '-' + 두(이제.getMonth() + 1) + '-' + 두(이제.getDate())
-                + ' ' + 두(이제.getHours()) + ':' + 두(이제.getMinutes());
+            const 시각글 = window._출고명세시각글();
             const 발키 = String(item.docId || item.idNum || '');
             for (const 파 of 파들) {
                 const 글 = window._제품큐알글(item, 파);
-                try {
-                    const 묶음 = window._명세서모으기(item.deliveryDate, '납기', 파, 발키);
-                    const 적을것 = {
-                        큐알: 글, 발주번호: item.orderCode || '', 발주문서: 발키,
-                        파레트: 파, 납기일: item.deliveryDate || '', 업체: item.supplier || '',
-                        줄수: 묶음.reduce((a, 묶) => a + 묶.계획들.reduce((b, g) => b + g.품목들.length, 0), 0),
-                        총수량: 묶음.reduce((a, 묶) => a + 묶.계획들.reduce((b, g) =>
-                            b + g.품목들.reduce((c, 품) => c + (parseInt(품.몫, 10) || 0), 0), 0), 0),
-                        명세표: window._명세표담기(묶음),     // 담는 꼴 그대로다 — 새 꼴이 아니다
-                        보낸때: serverTimestamp(), 보낸때글: 시각글,
-                        보낸uid: (window._myAccount && window._myAccount.uid) || '',
-                        판: (document.getElementById('amth-ver') || {}).textContent || '',
-                    };
-                    await setDoc(window._출고명세칸(글), 적을것);
-                    /* ⚠ **쓰고 다시 읽어 본다.** 안 들어갔는데 「보냈다」 고 하면 거래처가
-                       빈손으로 찍는다 — 거짓 초록은 안 된다. */
-                    const 눈 = await getDoc(window._출고명세칸(글));
-                    const 들어간것 = (눈 && 눈.exists && 눈.exists()) ? ((눈.data && 눈.data()) || {}) : null;
-                    if (들어간것 && (들어간것.명세표 || []).length === 적을것.명세표.length) {
-                        밖.보냄++; 밖.글들.push(글);
-                    } else 밖.탈 = 글 + ' 이 안 들어갔습니다';
-                } catch (e) { 밖.탈 = (e && e.message) || '못 보냈습니다'; }
+                const r = await window._출고명세한장({
+                    큐알: 글, 발주번호: item.orderCode || '', 발주문서: 발키, 파레트: 파,
+                    납기일: item.deliveryDate || '', 업체: item.supplier || '',
+                    묶음: window._명세서모으기(item.deliveryDate, '납기', 파, 발키),
+                }, 시각글);
+                if (r.됨) { 밖.보냄++; 밖.글들.push(글); } else 밖.탈 = r.탈;
             }
             return 밖;
         };
@@ -17235,7 +17251,9 @@
         window._명세서지금 = { 날짜: r.납기일, 공정: '납기', 파: r.파레트 || '', 발주: r.발주문서 || '',
                                발주번호: r.발주번호 || '', 이름: r.큐알 || r.id, 큐알: '',
                                업체: r.업체 || '', 묶음: 묶음, 총매: 짠.총매, 줄수: 짠.줄수,
-                               총수량: r.총수량 || 0, 발급번호: '', 발급시각: '' };
+                               총수량: r.총수량 || 0, 발급번호: '', 발급시각: '',
+                               // 거래처로 다시 보낼 때 쓸 글 — 문서 이름이 이 글이다
+                               보낼큐알: String(r.큐알 || r.id || '') };
         document.getElementById('명세서판')?.remove();
         const 판 = document.createElement('div');
         판.id = '명세서판'; 판.className = '명세-판';
@@ -17254,9 +17272,38 @@
             + _명세서류딱지('PDF', '#d93025', 6.6) + '</button>' +
             '<button type="button" id="명세-엑셀" onclick="_명세서엑셀()" aria-label="엑셀" data-말="엑셀로 내려받습니다">'
             + _명세서류딱지('X', '#107c41', 8.6) + '</button>' +
+            /* 10-17 사장님(조혼가구에서): 「거래명세표가 안보입니다」 — 10-12 에 나간 건은
+               **보내는 길이 생기기 전**에 확정된 것이라 창고에 한 장도 없었다. 확정은 끝나서
+               다시 누를 자리가 없으니, **보시는 바로 그 장에서** 손수 보내실 수 있게 한다.
+               여기 말고 다른 자리는 만들지 않는다 — 사장님이 서 계신 자리가 여기다. */
+            '<button type="button" id="명세-보내기" class="글단추" onclick="_출고다시보내기()"'
+            + ' data-말="거래처로 보냅니다"' + ((담김 || 짠.줄수) ? '' : ' disabled') + '>보내기</button>' +
             '</div></div>';
         document.body.appendChild(판);
         if (못받음.length) window._출고기다리기(큐알);     // 들어오는 대로 스스로 다시 그린다
+    };
+    /* 「보내기」 — 보고 계신 그 표를 그대로 `출고명세표/<큐알 글>` 에 보낸다.
+       · 담긴 표가 있으면 **그때 그 표**를, 없으면 지금 그린 그 표를 보낸다(화면과 같다).
+       · 배송 확정과 **같은 함수**(`_출고명세한장`)를 쓴다 — 담는 칸이 두 벌이 되면 안 된다.
+       · 쓰고 **다시 읽어** 들어간 것을 보고 나서 「보냄」 이라 적는다. 거짓 초록 금지.
+       · ⚠ `입고확인` 은 **한 자도 안 건드린다** — 책임 기록이다. 읽기만 한다. */
+    window._출고다시보내기 = async function(){
+        const 지 = window._명세서지금; if (!지 || !지.보낼큐알) return;
+        const 단 = document.getElementById('명세-보내기');
+        if (단) { 단.disabled = true; 단.textContent = '보내는 중…'; }
+        document.getElementById('출-보냄탈')?.remove();
+        const r = await window._출고명세한장({
+            큐알: 지.보낼큐알, 발주번호: 지.발주번호 || '', 발주문서: 지.발주 || '',
+            파레트: 지.파 || '', 납기일: 지.날짜 || '', 업체: 지.업체 || '', 묶음: 지.묶음 || [],
+        });
+        if (r.됨) {
+            if (단) { 단.textContent = '보냄 · ' + (r.시각글 || ''); 단.classList.add('끝났다'); }
+            return;
+        }
+        if (단) { 단.disabled = false; 단.textContent = '보내기'; }
+        const 몸 = document.querySelector('#명세서판 .명세-몸');
+        if (몸) 몸.insertAdjacentHTML('afterbegin',
+            '<div class="입고-탈" id="출-보냄탈">거래처로 못 보냈습니다</div>');
     };
     document.addEventListener('click', e => {
         const 업 = e.target.closest && e.target.closest('[data-출업체]');
