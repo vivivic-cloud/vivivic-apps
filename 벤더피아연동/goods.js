@@ -473,7 +473,7 @@
   function 수입창(이름, 줄들) {
     modalTitle.textContent = 이름 + " · 수입정보";
     /* ⚠ 차수마다 되풀이하지 않는다 — **한 벌만** 그린다 (10-16 분부) */
-    modalBody.replaceChildren(detailFields(서류.머리, 공통한벌(줄들)));
+    modalBody.replaceChildren(detailFields(서류.머리, 공통한벌(줄들), null, true));
     modalGoto.textContent = "";                    // 「…로 가기」 는 둘 곳이 없다
     modalGoto.removeAttribute("href");
     modal.hidden = false;
@@ -586,14 +586,19 @@
     return box;
   }
 
-  function detailFields(heads, row, linkCell) {
+  /* `빈칸도` — 값이 비어도 칸 이름을 **그대로 보인다.**
+     ⚠ 10-16 사장님이 수입정보 상세에서 **일곱 칸의 차례를 집어** 시키셨다. 그런데 창고에는
+       아직 `code·name·qty` 뿐이라(재서 확인) 나머지는 비어 있다. 비었다고 감추면 사장님께는
+       「시킨 대로 안 됐다」 로 보인다 — **이름은 보이고 값만 비어** 있어야 무엇이 없는지 아신다.
+     ⚠ 벤더피아 제 목록(23칸)에는 이것을 쓰지 않는다 — 거기선 빈 칸을 접는 것이 맞다. */
+  function detailFields(heads, row, linkCell, 빈칸도) {
     const visible = [];
     const empty = [];
     const amounts = [];
     heads.forEach((h, i) => {
       if (!h || h === "Page") return;
       if (AMOUNT.test(h)) amounts.push(i);
-      else if (row[i].trim() || (linkCell && h === linkCell.col)) visible.push(i);
+      else if (빈칸도 || row[i].trim() || (linkCell && h === linkCell.col)) visible.push(i);
       else empty.push(i);
     });
     const listOf = (idx) => fields(heads, row, linkCell, idx);
