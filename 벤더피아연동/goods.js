@@ -470,10 +470,133 @@
     });
   }
 
+  /* ── ㄷ 차수 박스 (10-16) ────────────────────────────────
+     사장님: 「**수입내역보기 클릭시** … 차수 박스 … 관련된 단품의 발주 또는 상차 수량이
+       표기 되어야 합니다. 잔액서류 올라오기전 - **발주수량(입고전)** / 잔액서류가 있는 차수는
+       **상차수량**」(장부 a1792135808)
+     읽는 곳 — 서류관리(`vivivic-docs` ce1f071)가 내주는 `docs_단품수량`.
+       칸은 넷뿐이다: `vendor · code · 차수들 · updatedAt`,
+       `차수들[] = { batch · 수량 · 어디 · 잔액있음 }`.
+     ⚠ **읽기만 한다.** 한 글자도 안 쓴다. 글귀(「발주수량(입고전)」·「상차수량」)는
+       서류관리가 적어 준 것을 **그대로** 보인다 — 여기서 새로 짓지 않는다.
+     ⚠ 그 단품이 안 들어간 차수는 아예 안 온다. **0 과 「없음」 은 다르다.**
+     ⚠ 거래처 이름을 조건에 박지 않는다 — 칸을 통째로 읽어 **코드로** 찾는다. */
+  const 수량칸 = "docs_단품수량";
+  /* ⚠⚠ 열쇠가 **두 가지**다. 서류관리는 밑줄 꼴만 모으고 **대소문자·`-` 는 살린다**
+       (`BHP8_B` 와 `BHP_B` 는 남이다 — 그 집 `js/parse.js` 주석). 이 집 열쇠(`맞대기열쇠`)는
+       `-` 까지 `_` 로 바꾸고 소문자로 내린다 — 더 헐겁다.
+       그래서 **엄한 열쇠로 먼저** 찾고, 못 찾으면 헐거운 열쇠로 찾되 **딱 하나일 때만** 쓴다.
+       둘 이상이 걸리면 남의 수량을 보일 수 있으니 **안 보인다.** */
+  const 엄열쇠 = (v) => String(v == null ? "" : v).trim().replace(/[\u005F\u2581\uFF3F\u2017]/g, "_");
+  let 수량 = null;                 // 엄열쇠 → 차수들
+  let 수량헐 = null;               // 헐거운열쇠 → Set(엄열쇠)
+  let 수량받는중 = null;
+  async function 수량받기() {
+    if (수량) return 수량;
+    if (수량받는중) return 수량받는중;
+    수량받는중 = (async () => {
+      const tok = await 서류표();
+      const 주소 = `https://firestore.googleapis.com/v1/projects/${서류.PROJ}/databases/(default)`
+        + `/documents/artifacts/${서류.PROJ}/public/data:runQuery`;
+      /* ⚠ `code` 와 `차수들` 만 받는다 — 거래처 이름은 받지도 않는다 */
+      const 물음 = { structuredQuery: {
+        from: [{ collectionId: 수량칸 }],
+        select: { fields: [{ fieldPath: "code" }, { fieldPath: "차수들" }] } } };
+      const r = await 밖에서(주소, { method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + tok },
+        body: JSON.stringify(물음) });
+      if (!r.ok) throw new Error("창고 " + r.status);
+      const 칸 = new Map(), 헐 = new Map();
+      for (const 한줄 of JSON.parse(r.글)) {
+        const f = 한줄 && 한줄.document && 한줄.document.fields;
+        if (!f) continue;
+        const 코드 = 풀기(f.code);
+        const 차수들 = 풀기(f["차수들"]) || [];
+        const 엄 = 엄열쇠(코드);
+        if (!엄 || !차수들.length) continue;
+        칸.set(엄, (칸.get(엄) || []).concat(차수들));
+        const 헐열 = 맞대기열쇠(코드);
+        헐.set(헐열, (헐.get(헐열) || new Set()).add(엄));
+      }
+      수량 = 칸; 수량헐 = 헐;
+      window.VP말?.("차수:" + 칸.size + "코드");
+      return 칸;
+    })().catch((e) => {
+      수량받는중 = null;
+      window.VP말?.("차수:못받음 " + (e && e.message ? e.message : e));
+      throw e;
+    });
+    return 수량받는중;
+  }
+
+  /* 이 단품(들)의 차수 줄 — 없으면 빈 배열. 같은 차수가 둘 오면 수량을 더한다. */
+  function 차수찾기(코드들) {
+    if (!수량) return [];
+    const 모음 = new Map();
+    const 본열쇠 = new Set();
+    for (const 코드 of 코드들) {
+      /* ⚠ **같은 열쇠를 두 번 더하지 않는다.** 서류 두 장에 `myT▁3C`·`myT＿3C` 로 적혀 와도
+           열쇠는 하나다 — 두 번 돌면 수량이 **갑절**이 된다(10-16 재서 잡았다). */
+      let 열 = 엄열쇠(코드);
+      let 것 = 수량.get(열);
+      if (!것) {
+        const 짝 = 수량헐 && 수량헐.get(맞대기열쇠(코드));
+        if (짝 && 짝.size === 1) { 열 = [...짝][0]; 것 = 수량.get(열); }   // 하나일 때만 쓴다
+      }
+      if (!것 || 본열쇠.has(열)) continue;
+      본열쇠.add(열);
+      for (const b of 것 || []) {
+        const 열 = String(b.batch) + "\u0001" + String(b["어디"]);
+        const 둔것 = 모음.get(열);
+        if (둔것) 둔것.수량 = (Number(둔것.수량) || 0) + (Number(b["수량"]) || 0);
+        else 모음.set(열, { batch: b.batch, 수량: b["수량"], 어디: b["어디"] });
+      }
+    }
+    return [...모음.values()].sort((a, z) => String(z.batch).localeCompare(String(a.batch)));
+  }
+
+  function 차수한칸(글, 밑글) {
+    const 칸 = document.createElement("div");
+    칸.className = "vp-차수";
+    칸.appendChild(document.createElement("strong")).textContent = 글;
+    칸.appendChild(document.createElement("small")).textContent = 밑글;
+    return 칸;
+  }
+
+  /* 「수입내역보기」 — 누르면 차수 박스를 그린다. 아직 없으면 「아직 없음」 한 칸. */
+  function 수입내역칸(코드들) {
+    const 통 = document.createElement("div");
+    통.className = "vp-차수통";
+    const b = 통.appendChild(document.createElement("button"));
+    b.type = "button";
+    b.className = "vp-toggle";
+    b.textContent = "수입내역보기";
+    const 몸 = 통.appendChild(document.createElement("div"));
+    몸.className = "vp-차수들";
+    몸.hidden = true;
+    let 받아봤나 = false;
+    b.addEventListener("click", async () => {
+      몸.hidden = !몸.hidden;
+      b.classList.toggle("on", !몸.hidden);
+      if (몸.hidden || 받아봤나) return;
+      받아봤나 = true;
+      몸.replaceChildren(차수한칸("불러오는 중…", ""));
+      try { await 수량받기(); } catch (e) {}
+      const 줄 = 차수찾기(코드들);
+      /* ⚠ 못 받았거나 아직 안 올라온 단품이면 **빈 박스에 「아직 없음」** — 붉은 줄은 안 띄운다 */
+      몸.replaceChildren(...(줄.length
+        ? 줄.map((x) => 차수한칸(String(x.batch), String(x["어디"]) + " " + String(x["수량"])))
+        : [차수한칸("아직 없음", "")]));
+    });
+    return 통;
+  }
+
   function 수입창(이름, 줄들) {
     modalTitle.textContent = 이름 + " · 수입정보";
     /* ⚠ 차수마다 되풀이하지 않는다 — **한 벌만** 그린다 (10-16 분부) */
-    modalBody.replaceChildren(detailFields(서류.머리, 공통한벌(줄들), null, true));
+    const 코드들 = [...new Set(줄들.map((줄) => String(줄[0] == null ? "" : 줄[0]).trim()).filter(Boolean))];
+    modalBody.replaceChildren(detailFields(서류.머리, 공통한벌(줄들), null, true),
+                              수입내역칸(코드들));
     modalGoto.textContent = "";                    // 「…로 가기」 는 둘 곳이 없다
     modalGoto.removeAttribute("href");
     modal.hidden = false;

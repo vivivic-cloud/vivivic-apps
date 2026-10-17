@@ -63,6 +63,31 @@ const 서류들 = [
   /* 같은 코드가 서류 두 장에 — 두 줄 다 보여야 한다 */
   서류문서("myT＿3C", "3단 서랍장 몸통 (수정본)", "2026-02-01"),
 ];
+/* ── ㄷ 차수 수량 (서류관리 `docs_단품수량`, 10-16) ─────────
+   그 집이 적는 칸은 **넷뿐**이다: vendor · code · 차수들 · updatedAt.
+   `차수들[] = { batch · 수량 · 어디 · 잔액있음 }` · 「어디」 는 두 글귀뿐이다.
+   ⚠ 금액·규격 칸은 **없다**(그 집 `js/firebase.js` 주석에 「두지 마십시오」 라 적혀 있다).
+   ⚠ 열쇠가 다른 꼴로도 와 본다 — 서류관리는 밑줄 꼴만 모으고 대소문자를 살린다. */
+const 수량문서 = (vendor, code, 차수들) => ({ document: { fields: 싸기({
+  vendor, code, 차수들, updatedAt: 1760000000000 }).mapValue.fields } });
+const 수량들 = [
+  /* ① 벤더피아 단품코드 `MYT_3C` ↔ 서류관리 `myT▁3C` — 밑줄 꼴만 다르고 **대소문자가 다르다**.
+       엄한 열쇠로는 안 맞고 **헐거운 열쇠로 하나만** 걸리니 보여야 한다. */
+  수량문서("가거래처", "myT▁3C", [
+    { batch: "26-22", 수량: 10, 어디: "발주수량(입고전)", 잔액있음: false },
+    { batch: "26-17", 수량: 10, 어디: "상차수량", 잔액있음: true },
+    { batch: "26-13", 수량: 4,  어디: "상차수량", 잔액있음: true },
+  ]),
+  /* ② `BH-LKB` — 대소문자·밑줄이 그대로 맞는다(엄한 열쇠로 바로 걸린다) */
+  수량문서("가거래처", "BH-LKB", [
+    { batch: "26-22", 수량: 7, 어디: "발주수량(입고전)", 잔액있음: false },
+  ]),
+  /* ③ ⚠ **헐거운 열쇠로는 둘이 걸리는** 짝 — `-` 와 `_` 는 서류관리가 **남이라** 한다.
+       이런 때는 **아무것도 안 보여야** 한다(남의 수량을 보이면 안 된다). */
+  수량문서("가거래처", "EF-al55", [{ batch: "26-20", 수량: 3, 어디: "상차수량", 잔액있음: true }]),
+  수량문서("가거래처", "EF_al55", [{ batch: "26-19", 수량: 9, 어디: "상차수량", 잔액있음: true }]),
+];
+
 /* ⚠⚠ **진짜 창고 꼴** — 10-16 에 창고를 재 보니 품목 칸이 `code·name·qty` **셋뿐**이었다
      (품목 줄 310개 전부). 색상·포장규격·입수·CBM·FOB 는 **아직 아무 데도 없다.**
      그래서 그런 줄도 하나 넣어 **칸 이름은 그대로 보이는지**(값만 빈지) 잰다. */
@@ -123,6 +148,16 @@ const 본다 = () => {
       ? 글([...창.querySelectorAll('.vp-modal-body .vp-toggle')]
           .find((b) => /금액속성/.test(b.textContent))) : '',
     알림글: 글(document.querySelector('.vp-notice-card p')),
+    /* ㄷ 차수 박스 (10-16) */
+    내역단추: 창 && !창.hidden
+      ? 글([...창.querySelectorAll('.vp-차수통 .vp-toggle')][0]) : '',
+    차수들: 창 && !창.hidden
+      ? [...창.querySelectorAll('.vp-차수통 .vp-차수')].map((x) => ({
+          글: (x.querySelector('strong') || {}).textContent || '',
+          밑: (x.querySelector('small') || {}).textContent || '',
+          높이: Math.round(x.getBoundingClientRect().height) })) : [],
+    차수보이나: !!(창 && !창.hidden && 창.querySelector('.vp-차수통 .vp-차수들')
+                  && !창.querySelector('.vp-차수통 .vp-차수들').hidden),
   };
 };
 
@@ -186,9 +221,13 @@ const 확장쪽흉내 = `
       r.fulfill({ status: 200, contentType: 'application/json',
                   body: JSON.stringify({ idToken: 'ascii-fake-token' }) }));
     await ctx.route('**://firestore.googleapis.com/**', (r) => {
-      보낸물음.push(r.request().postData() || '');
+      const 물음 = r.request().postData() || '';
+      보낸물음.push(물음);
       if (!자료줌) return r.fulfill({ status: 403, contentType: 'application/json',
         body: JSON.stringify({ error: { code: 403, status: 'PERMISSION_DENIED' } }) });
+      /* 차수 수량은 **딴 칸**이다 — 물음을 보고 가른다 */
+      if (/docs_\\uB2E8\\uD488\\uC218\\uB7C9|docs_단품수량/.test(물음))
+        return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(수량들) });
       return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(서류들) });
     });
     await ctx.route('**://vendorpia.com/**', (r) => {
@@ -287,6 +326,39 @@ const 확장쪽흉내 = `
         + ' · 그래도 값은 안 보이나 ' + 못(!/12\.5/.test(알림.창글)));
       await page.evaluate(() => document.querySelector('.vp-notice-card button')?.click());
       await page.waitForTimeout(150);
+
+      /* ★★ ㄷ **수입내역보기 → 차수 박스** (10-16 장부 a1792135808) */
+      console.log('        ★ 「수입내역보기」 단추 「' + 창.내역단추 + '」 '
+        + 못(창.내역단추 === '수입내역보기') + ' · 누르기 전 박스 ' + 창.차수들.length + '개 '
+        + 못(창.차수들.length === 0 && !창.차수보이나));
+      await page.evaluate(() => [...document.querySelectorAll('.vp-차수통 .vp-toggle')][0]?.click());
+      await page.waitForTimeout(700);
+      const 차수 = await page.evaluate(본다);
+      const 바란차수 = {
+        'MYT_3C': [['26-22','발주수량(입고전) 10'], ['26-17','상차수량 10'], ['26-13','상차수량 4']],
+        'BH_LKB': [['26-22','발주수량(입고전) 7']],
+        'EF-al55 + bd-whsqa': [['26-20','상차수량 3']],   // 엄한 열쇠가 먼저다 — `EF_al55`(26-19)는 남
+        'MIN_BARE': [['아직 없음','']],
+      }[단품[0]];
+      const 본차수 = 차수.차수들.map((x) => [x.글, x.밑]);
+      console.log('        ★ 차수 박스 **' + 본차수.length + '개** ' + JSON.stringify(본차수) + ' '
+        + 못(JSON.stringify(본차수) === JSON.stringify(바란차수)));
+      console.log('        ★ 글귀가 **두 가지 그대로인가** '
+        + 못(본차수.every(([, m]) => !m || /^(발주수량\(입고전\)|상차수량) \d+$/.test(m))));
+      /* ⚠ 높이는 **서류관리 차수 카드(103px)의 절반 = 52px.** 그 103 은 그 집 css·꼴을 그대로
+           그려서 쟀다(`vivivic-docs` ce1f071 · `js/app.js:452`). */
+      console.log('        ★ 박스 높이 ' + JSON.stringify([...new Set(차수.차수들.map((x) => x.높이))])
+        + 'px (서류관리 103px 의 절반 52) '
+        + 못(차수.차수들.length > 0 && 차수.차수들.every((x) => x.높이 === 52)));
+      if (단품[0] === 'MYT_3C') {
+        for (const w of [1280, 375]) {
+          await page.setViewportSize({ width: w, height: 900 });
+          await page.waitForTimeout(250);
+          await page.screenshot({ path: path.join(__dirname, '그림', '차수박스-' + w + '.png') });
+        }
+        await page.setViewportSize({ width: 1280, height: 900 });
+        await page.waitForTimeout(200);
+      }
       await page.keyboard.press('Escape'); await page.waitForTimeout(150);
     }
     /* ★ 그림 — 사장님 폭(375)과 넓은 폭(1280) 둘 다, **공통정보 한 벌**이 보이게 */
