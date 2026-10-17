@@ -384,14 +384,18 @@
   /* 어느 줄에 이력이 있나 — **셈만** 받는다(`mask`). 글까지 받으면 쌓일수록 무거워진다. */
   async function 상담셈받기() {
     try {
+      /* ⚠ `ord`·`at` 도 같이 받는다 — **CS등록 판**이 「무슨 주문인지·언제인지」 를 보여야 한다
+           (10-16 사장님 「cs등록 항목을 만들어줘」). `log` 는 안 받는다 — 길고 여기선 안 쓴다. */
       const 답 = await 상담읽기(상담뿌리()
-        + "?pageSize=300&mask.fieldPaths=cnt&mask.fieldPaths=open&mask.fieldPaths=kind");
+        + "?pageSize=300&mask.fieldPaths=cnt&mask.fieldPaths=open&mask.fieldPaths=kind"
+        + "&mask.fieldPaths=ord&mask.fieldPaths=at");
       if (!답.ok) { window.VP말?.("상담:셈못받음 " + 답.status); return; }
       let 연것 = 0;
       for (const d of (JSON.parse(답.글).documents || [])) {
         const 이름 = String(d.name || "").split("/").pop();
         const f = d.fields || {};
-        상담셈.set(이름, { 수: 풀기(f.cnt) || 0, 열림: !!풀기(f.open), 종류: 풀기(f.kind) || "" });
+        상담셈.set(이름, { 수: 풀기(f.cnt) || 0, 열림: !!풀기(f.open), 종류: 풀기(f.kind) || "",
+                          주문: 풀기(f.ord) || 이름, 때: Number(풀기(f.at)) || 0 });
         if (풀기(f.open)) 연것++;
       }
       window.VP말?.("상담:이력있는줄 " + 상담셈.size + "개 · 안끝난접수 " + 연것 + "건");
@@ -428,10 +432,78 @@
   /* ── 상담 판 ── */
   let 상담판 = null;
   function 상담판닫기() { if (상담판) { 상담판.remove(); 상담판 = null; } }
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") 상담판닫기(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") { 상담판닫기(); CS판닫기(); } });
 
   const 접수종류 = ["교환", "반품", "AS"];
   const 접수상태 = ["접수", "처리중", "끝"];
+
+  /* ── CS등록 (10-16) ──────────────────────────────────────
+     사장님: 「**cs등록 항목을 만들어줘**」(장부 a1792145842) — 메뉴 화면을 짚어 보내셨다.
+     메뉴의 「CS등록」 은 배송관리로 오면서 `#vgCS` 를 달고 온다(`menu.js`). 그것을 보고 이 판을 연다.
+     ⚠ **상담 판을 두 벌로 만들지 않는다.** 여기서는 **남긴 것을 모아 보여 주고**,
+       누르면 배송관리 줄에서 여는 **그 상담 판**(`상담판열기`)을 그대로 연다.
+     ⚠ 주문번호를 모르실 때는 배송관리 표에서 그 줄의 「상담」 단추로 여시면 된다 —
+       여기에는 **주문번호로 바로 여는 길**을 둔다(치시거나 붙여 넣으시면 된다).
+     ⚠ 사람 칸(수취인·전화·주소)은 **한 글자도 안 싣는다.** 창고에 담지도 않았다. */
+  let CS판 = null;
+  function CS판닫기() { if (CS판) { CS판.remove(); CS판 = null; } }
+
+  async function CS판열기() {
+    CS판닫기();
+    const 덮개 = document.createElement("div");
+    덮개.className = "vp-상담덮개 vp-cs덮개";
+    덮개.innerHTML = `<div class="vp-상담판 vp-cs판" role="dialog" aria-label="CS등록">
+      <div class="vp-상담머리"><strong>CS등록</strong><small></small>
+        <button type="button" class="vp-상담닫기" aria-label="닫기">×</button></div>
+      <form class="vp-cs찾기">
+        <input type="text" inputmode="latin" placeholder="주문번호를 적으시거나 붙여 넣으십시오">
+        <button type="submit">열기</button>
+      </form>
+      <div class="vp-cs목록">불러오는 중…</div></div>`;
+    덮개.querySelector(".vp-상담닫기").addEventListener("click", CS판닫기);
+    덮개.addEventListener("mousedown", (e) => { if (e.target === 덮개) CS판닫기(); });
+    document.getElementById("vp-root")?.appendChild(덮개) || document.body.appendChild(덮개);
+    CS판 = 덮개;
+
+    const 칸 = 덮개.querySelector(".vp-cs찾기 input");
+    덮개.querySelector(".vp-cs찾기").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const 주문 = 칸.value.trim();
+      if (!주문) { 칸.focus(); return; }
+      CS판닫기();
+      상담판열기(주문, "");
+    });
+    setTimeout(() => 칸.focus(), 0);
+
+    if (!상담셈.size) await 상담셈받기();
+    const 목록 = 덮개.querySelector(".vp-cs목록");
+    const 줄들 = [...상담셈.entries()]
+      .filter(([, v]) => (v.수 || 0) > 0 || v.열림)
+      .sort((a, z) => (z[1].때 || 0) - (a[1].때 || 0));
+    덮개.querySelector(".vp-상담머리 small").textContent = "남긴 것 " + 줄들.length + "건";
+    if (!줄들.length) {
+      목록.replaceChildren(Object.assign(document.createElement("p"),
+        { className: "vp-cs없음", textContent: "아직 남긴 것이 없습니다. 주문번호로 새로 남기십시오." }));
+      return;
+    }
+    목록.replaceChildren(...줄들.map(([, v]) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "vp-cs줄" + (v.열림 ? " vp-열림" : "");
+      b.appendChild(document.createElement("strong")).textContent = v.주문;
+      const 적 = b.appendChild(document.createElement("small"));
+      적.textContent = (v.열림 ? (v.종류 || "접수") + " 접수중 · " : "") + "상담 " + (v.수 || 0)
+        + (v.때 ? " · " + new Date(v.때 * 1000).toLocaleDateString("ko-KR") : "");
+      b.addEventListener("click", () => { CS판닫기(); 상담판열기(v.주문, ""); });
+      return b;
+    }));
+  }
+
+  /* 메뉴에서 「CS등록」 으로 들어오면 바로 연다. ⚠ 주소의 `#vgCS` 하나만 본다 —
+     그 표가 없으면 배송관리는 **전과 똑같이** 뜬다. */
+  function CS등록인가() { return /(^|[#&])vgCS\b/i.test(location.hash || ""); }
+  if (CS등록인가()) setTimeout(() => { CS판열기(); }, 400);
+  window.addEventListener("hashchange", () => { if (CS등록인가()) CS판열기(); });
 
   async function 상담판열기(주문, 상품명) {
     상담판닫기();
