@@ -7,6 +7,11 @@
 - `tools/관리자/지금까지.md` — 지금 상태 · 작업자 방 주소 · 재는 법
 - `tools/관리자/읽어라.md` — 연장 쓰는 법
 
+⚠ `/home/user/viggle` 가 **없으면** 먼저 받아와라 — 셋이 다 거기 있다:
+```bash
+[ -d /home/user/viggle ] || git clone -q https://github.com/vivivic-cloud/viggle.git /home/user/viggle
+```
+
 사장님이 **「짚어서 지시한것 처리해줘」** 하시면 —
 ```bash
 cd /home/user/viggle
