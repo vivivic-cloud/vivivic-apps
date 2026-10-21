@@ -130,6 +130,8 @@ const CS본다 = () => {
     await 쪽.waitForSelector('.vp-cs찾기 input');
     await 쪽.fill('.vp-cs찾기 input', '20261015-101');
     await 쪽.click('.vp-cs찾기 button[type=submit]');
+    await 쪽.waitForSelector('.vp-cs결과 .vp-cs찾은', { timeout: 5000 });
+    await 쪽.click('.vp-cs결과 .vp-cs찾은');   /* 0.34.34 부터 찾으면 줄로 보이고, 상품명을 눌러야 판이 열린다 */
     await 쪽.waitForTimeout(900);
     g = await 읽기();
     console.log('    ★ CS등록에서 주문번호로 연 판 — 칸 ' + g.이름.length + '/' + 채운(줄들[1]).length + ' ' + 못(g.이름.join() === 채운(줄들[1]).join()));
@@ -142,7 +144,8 @@ const CS본다 = () => {
     await 쪽.click('.vp-cs찾기 button[type=submit]');
     await 쪽.waitForTimeout(900);
     g = await 읽기();
-    console.log('    ★ 없는 주문은 「찾지 못했습니다」, 남의 값 0 ' + 못(/찾지 못했습니다/.test(g.글) && !g.이름.length));
+    const 없음 = await 쪽.evaluate(() => (document.querySelector('.vp-cs결과') || {}).textContent || '');
+    console.log('    ★ 없는 주문은 「찾은 주문이 없습니다」, 판 안 열리고 남의 값 0 ' + 못(/찾은 주문이 없습니다/.test(없음) && !g.있나 && !g.이름.length));
     console.log('    ★ 창고로 사람 칸 샘 ' + 못(창고로.every((x) => !사람.test(x.몸))) + ' · 쓰기 ' + 창고로.filter((x) => x.셈 === 'PATCH').length + '개');
     console.log('    ★ 벤더피아에는 조회만 ' + 못(벤더로.every((x) => /^(GET|POST) /.test(x))));
     if (탈.length) { console.log('    터진 말: ' + JSON.stringify(탈.slice(0, 3))); 빨강++; }

@@ -214,12 +214,14 @@ const CS본다 = () => {
     await 쪽2.waitForTimeout(200);
     await 쪽2.evaluate(() => { location.hash = ''; location.hash = '#vgCS'; });
     await 쪽2.waitForTimeout(800);
-    await 쪽2.fill('.vp-cs찾기 input', '20261015-777');
+    await 쪽2.fill('.vp-cs찾기 input', '20261015-101');
     await 쪽2.click('.vp-cs찾기 button[type=submit]');
+    await 쪽2.waitForSelector('.vp-cs결과 .vp-cs찾은', { timeout: 5000 });
+    await 쪽2.click('.vp-cs결과 .vp-cs찾은:has-text("주문 20261015-101")');   /* 0.34.34 부터 찾으면 줄로 먼저 보이고, 상품명을 눌러야 상담 판이 열린다 */
     await 쪽2.waitForTimeout(700);
     const 친것 = await 쪽2.evaluate(CS본다);
     console.log('    ★ 주문번호를 쳐서 상담 판이 열리나 ' + 친것.상담떴나 + ' · ' + 친것.상담머리 + ' '
-      + 못(친것.상담떴나 && /20261015-777/.test(친것.상담머리 || '')));
+      + 못(친것.상담떴나 && /20261015-101/.test(친것.상담머리 || '')));
 
     /* ㅅ `#vgCS` 가 없으면 전과 똑같아야 한다 */
     const 쪽3 = await ctx.newPage();
