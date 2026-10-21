@@ -28,7 +28,7 @@
      이 고침은 **새로고침만으로** 먹어야 한다. 그게 핵심이다. */
 /* ⚠⚠ 화면글 판은 **여기 한 군데서만** 적는다. `manifest.json` 의 version 과 **늘 같이** 올려라
    (배포 차례에 적어 두었다). 두 군데서 적으면 반드시 어긋난다. */
-const VP_화면글판 = "0.34.35";   // ⚠ manifest.json 의 version 과 **같은 값**
+const VP_화면글판 = "0.34.36";   // ⚠ manifest.json 의 version 과 **같은 값**
 
 /* ⚠⚠ **까닭 적기** (10-15) — 사장님 PC 에서 CS 거르개·상품 단추·수입정보 셋이
      **조용히** 안 됐다. 사장님도 바이글도 **왜**인지를 못 봤다. 그것이 진짜 탈이었다.
@@ -140,6 +140,43 @@ const VP_화면글판 = "0.34.35";   // ⚠ manifest.json 의 version 과 **같�
   let 단추 = null, 원래보는중 = false;
   const 숨김표 = "vp-숨김";
 
+  /* ⚠⚠ **원래 화면 = 벤더피아 전체 화면 (10-21, 장부 a1792566604 바로잡음).** 사장님: 「벤더피아 전체화면이 보여야
+       한다고요 지금 연동된 화면뿐 아니라 그 주위를 둘러싼 각종 메뉴들 이 보이는 원래의전체화면이요」.
+     까닭 — 우리 메뉴 단추(`<a href>`)가 그 화면을 **틀 밖(맨 위 창)** 으로 열면, 원래 화면은 그 한 장뿐이다.
+       둘러싼 메뉴는 **벤더피아 메인 틀**에 있는데 그 틀이 없어졌기 때문이다.
+     그래서 ① 틀 안쪽에서 돌 때마다 **맨 위 틀 주소를 적어 두고**(sessionStorage `vp틀`),
+       ② 틀 밖에서 「원래 화면」 을 누르면 **그 틀로 가서** 보던 쪽을 그 틀 안에 연다
+          (sessionStorage `vp원래` — 거기서는 우리 화면 덮기를 걷어 두고 「← 우리 화면」 만 남긴다),
+       ③ 틀 안쪽에서 누르면 **옆 틀(메뉴)에 우리가 덮은 것도** 같이 걷는다.
+     ⚠ 새로고침은 안 하는 길(③)과 하는 길(②)이 갈린다. 조회 결과는 ②에서 날아가나, 돌아오면 다시 조회한다. */
+  const 저장 = (열쇠, 값) => { try { sessionStorage.setItem(열쇠, 값); } catch (e) {} };
+  const 읽기 = (열쇠) => { try { return sessionStorage.getItem(열쇠); } catch (e) { return null; } };
+  const 지우기 = (열쇠) => { try { sessionStorage.removeItem(열쇠); } catch (e) {} };
+  const 틀안인가 = () => { try { return window.top !== window && !!window.top.location.href; } catch (e) { return false; } };
+  const 원래기록 = () => { try { return JSON.parse(읽기("vp원래") || "null"); } catch (e) { return null; } };
+  if (틀안인가()) { try { 저장("vp틀", window.top.location.href); } catch (e) {} }
+  else if (/\/index\.aspx$/i.test(location.pathname)) 저장("vp틀", location.href);   // 틀 없이 메인이 맨 위 창이면 그 메인이 둘레다
+  /* 이 화면이 **옆 틀 둘레**를 어떻게 가졌나 — 재서 딱지 끝에 적는다 */
+  const 틀모습 = () => {
+    if (!틀안인가()) return "틀:맨위(둘레 없음)";
+    let 옆 = [];
+    try { for (let i = 0; i < window.top.frames.length; i++) { const f = window.top.frames[i]; if (f === window) continue;
+      try { 옆.push(f.location.pathname.split("/").pop() + (f.document.documentElement.classList.contains("vp-clean") ? "(덮임)" : "")); } catch (e) { 옆.push("?"); } } } catch (e) {}
+    return "틀:안쪽 옆틀 " + (옆.join(",") || "없음");
+  };
+  /* 옆 틀에 우리가 덮은 것(vp-clean)을 걷거나 다시 덮는다 — 같은 출처 틀만 된다 */
+  const 옆틀덮기 = (덮나) => {
+    if (!틀안인가()) return;
+    try { for (let i = 0; i < window.top.frames.length; i++) { const f = window.top.frames[i]; if (f === window) continue;
+      try { const h = f.document.documentElement; if (덮나) { if (h.dataset.vp옆걷음) { h.classList.add("vp-clean"); delete h.dataset.vp옆걷음; } }
+        else if (h.classList.contains("vp-clean")) { h.classList.remove("vp-clean"); h.dataset.vp옆걷음 = "1"; } } catch (e) {} } } catch (e) {}
+  };
+  /* 틀 밖에서 눌렀다 — 벤더피아 틀로 가서 보던 쪽을 그 안에 연다 */
+  const 틀로가기 = () => {
+    저장("vp원래", JSON.stringify({ 보던: location.pathname + location.search, 돌: location.href, 열었나: false }));
+    location.href = 읽기("vp틀");
+  };
+
   function 꼴맞추기() {
     if (!단추) return;
     /* 사장님 10-15 「너무크고」 — 글을 짧게 줄였다. 긴 말은 손 올렸을 때만 뜬다. */
@@ -204,7 +241,12 @@ const VP_화면글판 = "0.34.35";   // ⚠ manifest.json 의 version 과 **같�
     }
   }
   function 뒤집기() {
+    /* 틀 밖에서 원래 화면을 누르면 벤더피아 틀로 간다 (위 ⚠⚠). 이미 틀로 와 있으면(`vp원래`) 돌아가는 길이다. */
+    if (원래기록()) { const 기록 = 원래기록(); 지우기("vp원래"); (window.top || window).location.href = 기록.돌; return; }   // 맨 위 창이 우리 화면으로 돌아온다
+    if (!원래보는중 && !틀안인가() && 읽기("vp틀") && !/\/index\.aspx$/i.test(location.pathname)) { 틀로가기(); return; }   // 둘레(틀·메인)를 한 번도 못 봤으면 제자리에서 걷는다
     원래보는중 = !원래보는중;
+    옆틀덮기(!원래보는중);
+    window.VP말?.(틀모습());
     if (원래보는중) {
       document.documentElement.classList.remove("vp-clean");   // 가린 것을 걷는다
       for (const id of 우리것) { const el = document.getElementById(id); if (el) el.classList.add(숨김표); }
@@ -303,6 +345,38 @@ const VP_화면글판 = "0.34.35";   // ⚠ manifest.json 의 version 과 **같�
     꼴맞추기();
     자리잡기();
     addEventListener("resize", 자리잡기, { passive: true });
+  }
+  /* ② 도착 — 틀 밖에서 눌러 벤더피아 틀로 왔다. 우리 덮기를 걷고 「← 우리 화면」 만 남기고, 보던 쪽을 그 틀 안에 연다. */
+  const 도착 = 원래기록();
+  if (도착) {
+    원래보는중 = true;
+    const 걷기 = () => {
+      const 뿌리 = document.documentElement;
+      if (!단추) 단추달기();
+      if (뿌리.classList.contains("vp-clean")) {
+        뿌리.classList.remove("vp-clean");
+        for (const id of 우리것) { const el = document.getElementById(id); if (el) el.classList.add(숨김표); }
+      }
+      /* ⚠ 없는 것을 remove 해도 class 속성이 다시 쓰여 이 관찰자가 끝없이 돈다 — 있을 때만 */
+      if (뿌리.classList.contains("vp-위여백")) 뿌리.classList.remove("vp-위여백");
+      if (뿌리.style.getPropertyValue("--vp-위여백")) 뿌리.style.removeProperty("--vp-위여백");
+      꼴맞추기();
+    };
+    new MutationObserver(걷기).observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    const 열기 = () => {
+      const 지금 = 원래기록(); if (!지금 || 지금.열었나) return;
+      const 길 = 지금.보던.split("?")[0].toLowerCase();
+      if (location.pathname.toLowerCase() === 길) { 지금.열었나 = true; 저장("vp원래", JSON.stringify(지금)); return; }
+      if (!/\/index\.aspx$/i.test(location.pathname)) return;   // 메뉴가 있는 쪽에서만 연다
+      지금.열었나 = true; 저장("vp원래", JSON.stringify(지금));
+      if (틀안인가()) { location.replace(지금.보던); return; }   // 틀 안쪽 → 그 틀 안에서 그 쪽으로 (둘레 메뉴는 그대로)
+      const 벤 = [...document.querySelectorAll("a[href]")].find((a) => { try { return new URL(a.href, location.href).pathname.toLowerCase() === 길; } catch (e) { return false; } });
+      if (벤) 벤.click();                                         // 벤더피아 제 메뉴 줄을 누른다 (조회만)
+      else window.VP말?.("원래화면:메뉴 줄 못 찾음 " + 길);
+    };
+    걷기();
+    setTimeout(걷기, 300); setTimeout(열기, 400); setTimeout(열기, 1500);
+    window.VP말?.("원래화면:틀로 옴 " + 틀모습());
   }
   /* 우리 화면이 떠 있을 때만 단추를 단다. 화면 글이 늦게 붙어도 받아 준다. */
   if (document.documentElement.classList.contains("vp-clean")) 단추달기();
