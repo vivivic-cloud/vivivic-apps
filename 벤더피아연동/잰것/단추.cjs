@@ -42,7 +42,7 @@ const 검은수 = () => {
   const 보임 = (el) => { const r = el.getBoundingClientRect(); return r.width > 4 && r.height > 4; };
   const 모든 = [...document.querySelectorAll("#vp-root .vp-goods-list button")];
   const 검정 = 모든.filter((b) => b.classList.contains("on"));
-  return { 통수: document.querySelectorAll("#vp-root .vp-goods-list").length,
+  return { 통수: document.querySelectorAll("#vp-root .vp-gt tbody tr:not([hidden])").length,   /* 10-21: 표 줄 수 */
            단추수: 모든.filter(보임).length,
            검은단추: 검정.length,
            검은글: 검정.map((b) => (b.textContent || "").trim().slice(0, 18)) };
@@ -70,7 +70,7 @@ const 검은수 = () => {
   const 보기 = async (이름) => {
     console.log('\n──── [' + (process.argv[2] || '/System/Master/goods.aspx') + '] ' + 이름 + ' ────');
     const 앞 = await page.evaluate(검은수);
-    console.log('  단추 통 ' + 앞.통수 + '개 · 보이는 단추 ' + 앞.단추수 + '개 · 검은 단추 ' + 앞.검은단추 + '개');
+    console.log('  단추 줄 ' + 앞.통수 + '개 · 보이는 단추 ' + 앞.단추수 + '개 · 검은 단추 ' + 앞.검은단추 + '개');
     for (const n of [1, 2, 3]) {
       const 됐나 = await page.evaluate((i) => {
         const bs = [...document.querySelectorAll("#vp-root .vp-goods-list button")]

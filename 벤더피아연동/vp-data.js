@@ -8,6 +8,8 @@ const VP_DATA = (() => {
   //  noDates: 등록기간이 없는 화면
   //  stock: 단품 버튼에 재고조회의 양품수를 표시하고 연두색으로 (재고는 단품으로만 관리한다)
   //         "self": 이 화면의 줄에서, "link": 재고조회에서 단품코드로 찾아서, "parts": 상품 상세의 단품 버튼만
+  //  cols: 목록 표의 칸 (첫 칸은 늘 이름 버튼). 글자 = 줄 칸 이름 그대로, 객체 = {name, col|place|sum|ing}
+  //  pill: 검색칸 아래 거르개 알약 {label, col} — col 은 줄 칸 이름, place 는 재고조회의 현위치(창고, 0.본사면 매입처)
   //  fixed: 받을 때 항상 넣는 검색칸 값
   //  splits: 한 번에 700줄을 넘으면 나눠 받는 기준 (앞에서부터). "date"는 등록기간을 반씩, 그 밖은 그 검색칸의 항목별
   //          벤더피아는 페이지를 넘길 때 줄 순서가 일정하지 않아 줄이 빠지거나 겹치므로, 페이지를 넘기지 않고 나눠 받는다
@@ -16,13 +18,14 @@ const VP_DATA = (() => {
       title: "단품관리",
       nameCol: "단품명",
       codeCol: "단품코드",
-      // 현위치: 매입처를 단품이 지금 있는 곳으로 보고, 목록 위에 [전체보기] [현위치별 보기] 탭을 둔다
-      locationCol: "매입처명",
+      // 현위치 = 매입처. 검색칸 아래 거르개 알약으로 (10-21: [전체보기] [현위치별 보기] 탭을 없앴다)
+      pill: { label: "현위치", col: "매입처명" },
+      cols: ["단품분류", { name: "현위치", col: "매입처명" }, "재고유형", "발주유형", "판매상태"],
       stock: "link",
       resetSelects: ["ddlSupplier", "ddlStockYn", "ddlOrderingType", "ddlStatus"],
       resetTexts: ["tbSupplierNm", "tbCategoryNm", "tbCategoryCd", "tbGoodsCd", "tbGoodsNm", "tbModelNo",
         "tbFrPurchaseAmt", "tbToPurchaseAmt"],
-      selects: [["매입처명", "매입처"], ["단품분류", "단품분류"], ["재고유형", "재고유형"],
+      selects: [["단품분류", "단품분류"], ["재고유형", "재고유형"],
         ["발주유형", "발주유형"], ["판매상태", "판매상태", "ddlStatus"]],
       search: ["단품명", "단품코드", "바코드", "단품분류", "매입처명"],
       splits: ["date", "ddlStatus", "ddlSupplier"],
@@ -39,7 +42,11 @@ const VP_DATA = (() => {
       resetSelects: ["ddlStore", "ddlSupplier", "ddlStatus", "ddlUser", "ddlDCo"],
       resetTexts: ["tbSGoodsCd", "tbSGoodsNm", "tbSupplierNm", "tbGoodsCd", "tbGoodsNm", "tbModelNo"],
       uncheck: ["cbOptionGoodsYn"],
-      selects: [["매출처명", "매출처"], ["매입처명", "매입처"], ["배송사명", "배송사"],
+      // 매출처는 검색칸 아래 거르개 알약으로 (10-21) — 한 상품이 매출처마다 한 줄이어도 표에는 한 줄만
+      pill: { label: "매출처", col: "매출처명" },
+      cols: [{ name: "매출처", col: "매출처명" }, "매입처명", "배송사명", "판매상태", "옵션상품유무",
+        { name: "상품정보", ing: true }],
+      selects: [["매입처명", "매입처"], ["배송사명", "배송사"],
         ["판매상태", "판매상태", "ddlStatus"], ["옵션상품유무", "옵션상품"]],
       serverSelect: ["판매상태", "ddlStatus"],
       serverDates: true,
@@ -58,6 +65,9 @@ const VP_DATA = (() => {
       stock: "self",
       // 상세: 창고별 줄을 현위치 탭으로 나눠 하나씩 본다 (창고가 0.본사면 매입처로 나눈다)
       locationTabs: true,
+      // 거르개 알약: 현위치. 표에는 같은 단품이 한 줄만 (현위치가 여럿이면 한 칸에 모아 적는다)
+      pill: { label: "현위치", place: true },
+      cols: ["분류명", { name: "현위치", place: true }, { name: "양품수", sum: "양품수" }],
       // 첫 화면: 최근 3개월 배송수량이 많은 순 50개 (배송현황관리 › 단품별, 단품관리와 같음)
       top: { url: "/System/SResult/prePostDeliveryList4.aspx", nameCol: "단품명" },
       // 원래 화면처럼 창고별로 받는다 (버튼은 단품명마다, 상세에 창고별 재고)

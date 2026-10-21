@@ -1,4 +1,4 @@
-// 단품관리·상품관리·재고조회 화면을 VIVIVIC 디자인의 이름 버튼 목록으로 바꾼다.
+// 단품관리·상품관리·재고조회 화면을 VIVIVIC 디자인의 표로 바꾼다 (10-21: 이름 버튼이 첫 칸인 표. 서류관리 제품표 꼴).
 // 목록은 벤더피아에서 받아 저장해 두고(새로고침·새 로그인 전까지), 필터는 받아온 목록에서 바로 적용한다.
 // 버튼을 누르면 그 항목의 데이터를 보여준다.
 (() => {
@@ -168,15 +168,14 @@
           `<select data-col="${col}" data-src="${src || ""}"><option value="">${label} 전체</option></select>`).join("")}
         <span class="vp-dates" ${page.noDates ? "hidden" : ""}><input type="date" name="from"><span>~</span><input type="date" name="to"></span>
       </div>
+      <div class="vp-pillbar" hidden>
+        <strong class="vp-pillbar-t"></strong>
+        <div class="vp-pills"></div>
+      </div>
       <div class="vp-note">불러오는 중…</div>
       <div class="vp-ing-note" hidden></div>
       <div class="vp-cached"></div>
-      <div class="vp-loc-tabs vp-chips" hidden>
-        <button type="button" class="on" data-view="all">전체보기</button>
-        <button type="button" data-view="place">현위치별 보기</button>
-      </div>
-      <div class="vp-goods-list"></div>
-      <div class="vp-places-list" hidden></div>
+      <div class="vp-gt"><table><thead><tr></tr></thead><tbody></tbody></table></div>
       <div class="vp-more" hidden>
         <button type="button" class="vp-more-fold">접기</button>
         <button type="button" class="vp-more-next">더보기</button>
@@ -213,24 +212,33 @@
   const to = filters.querySelector("[name=to]");
   const note = root.querySelector(".vp-note");
   const cached = root.querySelector(".vp-cached");
-  const list = root.querySelector(".vp-goods-list");
+  const gt = root.querySelector(".vp-gt");
+  const tbody = gt.querySelector("tbody");
+  const pillBar = root.querySelector(".vp-pillbar");
+  const pillsBox = pillBar.querySelector(".vp-pills");
   const ingNote = root.querySelector(".vp-ing-note");
   const more = root.querySelector(".vp-more");
-  const locTabs = root.querySelector(".vp-loc-tabs");
-  const placesList = root.querySelector(".vp-places-list");
-  // 보기: "all" 전체보기 / "place" 현위치별 보기
-  // 현위치별 보기: 위치 이름이 토글 헤더. 펼치면 그 위치의 3개월 상위 50 제품 → [더보기]로 전부
-  let view = "all";
-  const openPlaces = new Set();   // 펼친 위치
-  const fullPlaces = new Set();   // [더보기]를 누른 위치
-  locTabs.hidden = !page.locationCol;
-  locTabs.addEventListener("click", (e) => {
-    const b = e.target.closest("button[data-view]");
-    if (!b) return;
-    view = b.dataset.view;
-    locTabs.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
-    apply();
-  });
+  /* ── 표 (10-21) ─────────────────────────────────────────
+     사장님: 「단품관리와 상품관리 재고조회의 각 버튼이 메인이 되는 표형식으로 나열해줘」
+     첫 칸 = 이름 버튼(전처럼 누르면 상세). 나머지 칸은 `page.cols` (vp-data.js).
+     ⚠ 이름 하나에 줄 하나다. 같은 단품·상품의 줄이 여럿(창고별·매출처별)이어도 표에는 한 줄이고,
+       칸에는 값들을 모아 적는다. 줄이 불어나지 않는 것이 이 표의 약속이다.
+     ⚠ 버튼은 `div.vp-goods-list` 안에 넣는다 — 연두·주황·붉은 줄·검정(눌림) 꼴이 전부 그 이름에
+       걸려 있어, 같은 통에 담으면 버튼의 뜻이 표 안에서도 그대로다(두 벌로 만들지 않는다). */
+  const colDefs = (page.cols || []).map((c) => (typeof c === "string" ? { name: c, col: c } : c));
+  const headRow = gt.querySelector("thead tr");
+  for (const d of [{ name: page.nameCol, main: true }, ...colDefs]) {
+    const th = headRow.appendChild(document.createElement("th"));
+    th.textContent = d.name;
+    if (d.main) th.className = "vp-main";
+    if (d.sum) th.className = "vp-num";
+  }
+  /* 거르개 알약 (검색부 아래) — 사장님: 「필터로 꼭넣어서 같은 단품의 중복줄이 생기지 않도록」.
+     고른 값이 든 줄이 하나라도 있는 이름만 남기고, 그 이름은 여전히 한 줄이다. */
+  let pillPick = "";
+  const pillNames = new Map();   // 값 → 그 값이 든 줄을 가진 이름들
+  let pillSig = "";
+  if (page.pill) { pillBar.hidden = false; pillBar.querySelector(".vp-pillbar-t").textContent = page.pill.label; }
   const moreNext = more.querySelector(".vp-more-next");
   const moreAll = more.querySelector(".vp-more-all");
   const moreFold = more.querySelector(".vp-more-fold");
@@ -244,7 +252,7 @@
   moreFold.addEventListener("click", () => {
     stage = history.pop() ?? 0;
     apply();
-    list.scrollIntoView({ block: "start" });
+    gt.scrollIntoView({ block: "start" });
   });
   const panel = root.querySelector(".vp-goods-panel");
   const panelTitle = panel.querySelector("strong");
@@ -814,6 +822,7 @@
     const codes = group.items.map((r) => r[col(page.codeCol)]);
     labelButton(group.b, name, codes, stockQty(group.items));
     if (page.nameCol === "단품명") markJohon(group.b, codes);
+    fillRow(group);
   }
 
   const chipBox = () => Object.assign(document.createElement("div"), { className: "vp-chips" });
@@ -896,7 +905,7 @@
       줄판.push(칸);
     }
     if (i매출처 < 0 || 이름들.length < 2) return [그릇];  // 매출처가 하나뿐 — 알약을 안 그린다
-    let 고른것 = 이름들[0];                             // 처음에는 첫 매출처만 (겹쳐 보이지 않게)
+    let 고른것 = 이름들.includes(pillPick) ? pillPick : 이름들[0];   // 거르개로 고른 매출처가 있으면 그것, 아니면 첫 매출처만
     const 알약칸 = document.createElement("div");
     알약칸.className = "vp-store-pills";
     const 다시그리기 = () => {
@@ -946,10 +955,7 @@
 
   // 재고조회 상세: 현위치(창고, 0.본사면 매입처) 탭 — 누른 위치의 상세만 보인다
   function locationView(h, items) {
-    const placeOf = (row) => {
-      const warehouse = row[h.indexOf("창고")].trim();
-      return warehouse === "0.본사" ? (row[h.indexOf("매입처")].trim() || warehouse) : warehouse;
-    };
+    const placeOf = (row) => placeIn(h, row);
     const places = new Map();
     for (const row of items) {
       const place = placeOf(row);
@@ -975,20 +981,87 @@
       b.textContent = place;
       b.addEventListener("click", () => pick(place, b));
     }
-    pick(places.keys().next().value, tabs.firstChild);
+    const first = places.has(pillPick) ? [...places.keys()].indexOf(pillPick) : 0;   // 거르개로 고른 현위치가 있으면 그 탭부터
+    pick([...places.keys()][first], tabs.children[first]);
     return [box, detail];
   }
 
   let heads = [];
   const col = (name) => heads.indexOf(name);
-  const groups = new Map();   // 이름 → { b: 버튼, items: 줄들 }
+  const groups = new Map();   // 이름 → { b: 버튼, items: 줄들, tr, tds, i }
   const serverSel = page.serverSelect && selects.find((x) => x.dataset.col === page.serverSelect[0]);
   const localSelects = selects.filter((x) => x !== serverSel);
   let loading = false;
   let loadId = 0;
 
-  // 필터에 맞는 항목이 하나라도 있는 버튼만 보여준다
+  // 현위치 = 창고, 창고가 0.본사면 매입처 (재고조회 상세의 「현위치」 탭과 같은 논리)
+  const placeIn = (h, row) => {
+    const warehouse = row[h.indexOf("창고")].trim();
+    return warehouse === "0.본사" ? (row[h.indexOf("매입처")].trim() || warehouse) : warehouse;
+  };
+  // 거르개 알약이 보는 값 (단품관리 현위치 = 매입처, 상품관리 = 매출처명, 재고조회 = 위의 현위치)
+  const pillOf = (row) => page.pill.place ? placeIn(heads, row)
+    : ((row[col(page.pill.col)] || "").trim() || "(없음)");
+  const pillItems = (g) => (pillPick ? g.items.filter((r) => pillOf(r) === pillPick) : g.items);
+
+  // 표의 한 칸에 적는 값: 줄들에서 모은 값(중복 없이). 거르개를 골랐으면 그 값이 든 줄만 본다
+  const MOST = 3;
+  function fillRow(g) {
+    const items = page.pill ? pillItems(g) : g.items;
+    colDefs.forEach((d, k) => {
+      const td = g.tds[k];
+      if (d.ing) {
+        td.replaceChildren();
+        const 것 = ing맞은것.get(g.name);
+        if (것 && 것.u) {
+          const a = td.appendChild(document.createElement("a"));
+          a.href = 것.u; a.target = "_blank"; a.rel = "noopener noreferrer";
+          a.textContent = "inghome 에서 보기";
+          a.title = 것.꼴 === "그대로" ? "이름이 그대로 맞습니다" : "이름이 거의 맞습니다 — " + 것.t;
+        }
+        return;
+      }
+      if (d.sum) { td.textContent = items.reduce((n, r) => n + toNumber(r[col(d.sum)]), 0).toLocaleString(); return; }
+      const vals = [...new Set(items.map((r) => (d.place ? placeIn(heads, r) : ((r[col(d.col)] || "").trim())))
+        .filter(Boolean))];
+      td.textContent = vals.length > MOST ? `${vals.slice(0, MOST).join(", ")} 외 ${vals.length - MOST}` : vals.join(", ");
+      td.title = vals.length > MOST ? vals.join(", ") : "";
+    });
+  }
+
+  function renderPills() {
+    if (!page.pill) return;
+    const vals = [...pillNames.keys()].sort((a, z) => a.localeCompare(z, "ko", { numeric: true }));
+    const sig = vals.map((v) => v + pillNames.get(v).size).join("|") + "#" + groups.size + "#" + pillPick;
+    if (sig === pillSig) return;
+    pillSig = sig;
+    pillsBox.replaceChildren();
+    for (const [값, 글, 몇] of [["", "전체", groups.size], ...vals.map((v) => [v, v, pillNames.get(v).size])]) {
+      const b = pillsBox.appendChild(document.createElement("button"));
+      b.type = "button";
+      b.className = "vp-fpill";
+      b.setAttribute("aria-pressed", pillPick === 값 ? "true" : "false");
+      b.append(글, Object.assign(document.createElement("small"), { textContent: 몇.toLocaleString() }));
+      b.addEventListener("click", () => {
+        pillPick = 값;
+        for (const g of groups.values()) fillRow(g);
+        apply();
+      });
+    }
+  }
+
+  // 표 줄 차례를 바꾼다 (테이블 줄에는 CSS order 가 안 먹어 실제로 옮긴다). 이미 그 차례면 안 건드린다.
+  function reorder(keyOf) {
+    const arr = [...groups.values()].sort((a, z) => keyOf(a) - keyOf(z));
+    const cur = tbody.children;
+    let same = cur.length === arr.length;
+    for (let i = 0; same && i < arr.length; i++) if (cur[i] !== arr[i].tr) same = false;
+    if (!same) tbody.append(...arr.map((g) => g.tr));
+  }
+
+  // 필터에 맞는 항목이 하나라도 있는 줄만 보여준다
   const apply = () => {
+    renderPills();
     const words = q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
     const searchIdx = page.search.map(col).filter((i) => i >= 0);
     const dateIdx = col("등록일");
@@ -997,38 +1070,22 @@
       const text = searchIdx.map((i) => row[i]).join(" ").toLowerCase();
       if (!words.every((w) => text.includes(w))) return false;
       if (!picked.every(([i, v]) => row[i] === v)) return false;
+      if (pillPick && pillOf(row) !== pillPick) return false;
       if (!page.serverDates && from.value && row[dateIdx] < from.value) return false;
       if (!page.serverDates && to.value && row[dateIdx] > to.value) return false;
       return true;
     };
 
-    // 현위치별 보기
-    if (page.locationCol && view === "place") {
-      list.hidden = true;
-      placesList.hidden = false;
-      more.hidden = true;
-      renderPlaces(matches, words.length || picked.length);
-      return;
-    }
-    if (page.locationCol && placesList.hidden === false) {
-      // 전체보기로 돌아오면 버튼을 원래 목록으로 되돌린다
-      for (const { b } of groups.values()) list.appendChild(b);
-      placesList.replaceChildren();
-      placesList.hidden = true;
-      list.hidden = false;
-    }
-
-    // 첫 화면(검색어·필터 없음): 단계(stage)에 따라 많이 나간 순으로 보여준다 (전체보기는 모든 버튼, 많이 나간 순서가 앞)
-    if (page.top && top !== null && !words.length && !picked.length) {
+    // 첫 화면(검색어·필터 없음): 단계(stage)에 따라 많이 나간 순으로 보여준다 (전체보기는 모든 줄, 많이 나간 순서가 앞)
+    if (page.top && top !== null && !words.length && !picked.length && !pillPick) {
       const ranked = (top || []).filter((name) => groups.has(name));
       const names = stage === 0 ? ranked.slice(0, 50)
         : stage === 1 ? ranked.filter((name) => shipped.has(name))
         : ranked;
       const rank = new Map(names.map((name, i) => [name, i]));
-      for (const [name, { b }] of groups) {
-        b.hidden = stage !== 2 && !rank.has(name);
-        b.style.order = rank.has(name) ? rank.get(name) : ranked.length;
-      }
+      const rankAll = new Map(ranked.map((name, i) => [name, i]));
+      for (const [name, { tr }] of groups) tr.hidden = stage !== 2 && !rank.has(name);
+      reorder((g) => (rankAll.has(g.name) ? rankAll.get(g.name) : ranked.length + g.i));
       note.textContent = !top ? "최근 3개월 많이 나간 순서를 불러오는 중…"
         : stage === 2 ? `전체 ${groups.size.toLocaleString()}개 · 최근 3개월 많이 나간 순서가 앞에 있습니다`
         : stage === 1 ? `최근 3개월 1개 이상 출고된 ${names.length.toLocaleString()}개 · 많이 나간 순`
@@ -1042,80 +1099,14 @@
     more.hidden = true;
 
     let count = 0;
-    for (const { b, items } of groups.values()) {
-      const on = items.some(matches);
-      b.hidden = !on;
-      b.style.order = "";
+    for (const g of groups.values()) {
+      const on = g.items.some(matches);
+      g.tr.hidden = !on;
       if (on) count++;
     }
+    reorder((g) => g.i);
     note.textContent = `${count.toLocaleString()}개` + (loading ? " · 불러오는 중…" : "");
   };
-
-  // 단품의 현위치 = 매입처
-  const placeOf = (group) => (group.items[0][col(page.locationCol)] || "").trim() || "(없음)";
-
-  // 현위치별 보기 — 위치 이름을 위에서 아래로. 최근 3개월 상위 50 제품이 많은 위치부터
-  // (같으면 더 많이 나간 제품이 있는 곳, 그다음 이름순). 위치 이름은 누를 때마다 펼치고 접는 헤더다.
-  function renderPlaces(matches, filtering) {
-    const ranked = (top || []).filter((name) => groups.has(name));
-    const rankOf = new Map(ranked.map((name, i) => [name, i]));
-    const top50 = new Set(ranked.slice(0, 50));
-    const byPlace = new Map();
-    for (const [name, g] of groups) {
-      if (filtering && !g.items.some(matches)) continue;
-      const where = placeOf(g);
-      if (!byPlace.has(where)) byPlace.set(where, []);
-      byPlace.get(where).push(name);
-    }
-    const order = (a, b) => (rankOf.get(a) ?? Infinity) - (rankOf.get(b) ?? Infinity) || a.localeCompare(b, "ko");
-    const places = [...byPlace].map(([where, names]) => {
-      names.sort(order);
-      return { where, names, best: names.filter((n) => top50.has(n)) };
-    }).sort((a, b) => b.best.length - a.best.length
-      || (rankOf.get(a.names[0]) ?? Infinity) - (rankOf.get(b.names[0]) ?? Infinity)
-      || a.where.localeCompare(b.where, "ko"));
-
-    placesList.replaceChildren();
-    let shown = 0;
-    for (const { where, names, best } of places) {
-      const section = placesList.appendChild(document.createElement("div"));
-      section.className = "vp-place";
-      const head = section.appendChild(document.createElement("button"));
-      head.type = "button";
-      head.className = "vp-place-head";
-      const open = openPlaces.has(where);
-      head.classList.toggle("on", open);
-      head.innerHTML = `<span></span><small></small>`;
-      head.firstChild.textContent = where;
-      head.lastChild.textContent = best.length ? `상위50 ${best.length} · 전체 ${names.length}` : `전체 ${names.length}`;
-      head.addEventListener("click", () => {
-        if (openPlaces.has(where)) openPlaces.delete(where); else openPlaces.add(where);
-        apply();
-      });
-      if (!open) continue;
-
-      // 상위 50 제품이 있으면 그것만 먼저, 없거나 [더보기]를 눌렀으면 전부
-      const showAll = filtering || !best.length || fullPlaces.has(where);
-      const body = section.appendChild(document.createElement("div"));
-      body.className = "vp-goods-list";
-      for (const name of showAll ? names : best) {
-        const { b } = groups.get(name);
-        b.hidden = false;
-        b.style.order = "";
-        body.appendChild(b);
-        shown++;
-      }
-      if (!showAll) {
-        const moreBtn = section.appendChild(document.createElement("button"));
-        moreBtn.type = "button";
-        moreBtn.className = "vp-place-more";
-        moreBtn.textContent = `더보기 (${names.length - best.length})`;
-        moreBtn.addEventListener("click", () => { fullPlaces.add(where); apply(); });
-      }
-    }
-    note.textContent = !top ? "최근 3개월 많이 나간 순서를 불러오는 중…"
-      : `현위치 ${places.length}곳 · 위치를 누르면 펼쳐집니다` + (shown ? ` · ${shown.toLocaleString()}개 보는 중` : "");
-  }
 
   // 목록 칸의 항목은 받아온 데이터에 실제로 있는 값으로 채운다
   function fillSelects(rows) {
@@ -1129,6 +1120,14 @@
     }
   }
 
+  // 거르개 알약에 쓸 값을 모은다 (이름마다 한 번만 센다)
+  function noteRow(name, row) {
+    if (!page.pill) return;
+    const v = pillOf(row);
+    if (!pillNames.has(v)) pillNames.set(v, new Set());
+    pillNames.get(v).add(name);
+  }
+
   function addRows(rows) {
     for (const row of rows) {
       const name = row[col(page.nameCol)];
@@ -1138,17 +1137,28 @@
         const group = groups.get(name);
         group.items.push(row);
         labelGroup(name, group);
+        noteRow(name, row);
         continue;
       }
       const b = document.createElement("button");
       b.type = "button";
-      const group = { b, items: [row] };
+      const tr = document.createElement("tr");
+      const 통 = tr.appendChild(document.createElement("td")).appendChild(document.createElement("div"));
+      tr.firstChild.className = "vp-main";
+      통.className = "vp-goods-list";      // ⚠ 버튼 꼴이 이 이름에 걸려 있다 — 위 표 설명 참고
+      통.appendChild(b);
+      const tds = colDefs.map((d) => {
+        const td = tr.appendChild(document.createElement("td"));
+        if (d.sum) td.className = "vp-num";
+        return td;
+      });
+      const group = { b, items: [row], name, tr, tds, i: groups.size };
       labelGroup(name, group);
       b.addEventListener("click", () => {
         /* ⚠⚠ 10-14 사장님: 「선택된버튼이 검게 변한후 다른선택시 해제되지않고
              모든 선택된버튼이 검은상태로 유지되는 현상 수정해줘」
            까닭 — 이름 단추를 담는 통이 **둘**이다. [전체보기] 는 `list`(.vp-goods-list) 하나지만,
-           [현위치별 보기] 는 **현위치마다 제 통**을 만들고(renderPlaces 의 `body`, 같은 class)
+           [현위치별 보기] 는 **현위치마다 제 통**을 만들고(10-21 에 그 보기는 없앴다 — 지금은 표 칸마다 통 하나)
            **같은 단추를 그리로 옮겨 담는다.** 그런데 여기서는 `list` 안에서만 `.on` 을 뗐다.
            그래서 현위치별 보기에서는 앞의 것이 안 풀려 누른 것이 **다 검게 쌓였다.**
            (재서 확인: 전체보기 1개 · 현위치별 보기 **3개**)
@@ -1159,8 +1169,9 @@
         b.classList.add("on");
         show(name, heads, group.items);
       });
-      list.appendChild(b);
+      tbody.appendChild(tr);
       groups.set(name, group);
+      noteRow(name, row);
     }
   }
 
@@ -1212,7 +1223,7 @@
       else if (줄여서.has(b)) 거의++;                 // 겹쳐서 못 거는 것 — 세기는 센다
     }
     /* ③ 링크가 걸린 상품 단추 **한 단에 붉은색 마킹** (조혼가구 붉은 줄과 같은 색·같은 꼴) */
-    for (const [n, g] of groups) g.b.classList.toggle("vp-ing", ing맞은것.has(n));
+    for (const [n, g] of groups) { g.b.classList.toggle("vp-ing", ing맞은것.has(n)); fillRow(g); }   // 표의 「상품정보」 칸도 채운다
     if (panel.dataset.name) show(panel.dataset.name, ...panel._args);   // 열려 있으면 상세도 새로
     적기(`inghome 맞춰보기 — 우리 상품 ${이름들.length}개 · inghome ${목록.length}개 · `
        + `이름이 그대로 맞는 것 ${딱}개 · 거의 맞는 것 ${거의}개`
@@ -1223,7 +1234,8 @@
   async function load() {
     const id = ++loadId;
     groups.clear();
-    list.replaceChildren();
+    pillNames.clear(); pillSig = "";
+    tbody.replaceChildren();
     panel.hidden = true;
     loading = true;
     note.textContent = "불러오는 중…";
