@@ -51,6 +51,10 @@
     글.push("search.js", "goods.js");
     꾸밈.push("goods.css", "search.css");
   }
+  /* ⚠⚠ 10-21 — 주문관리(`/System/Sales/orderMst.aspx`)에는 **CS 판만** 띄운다. 원래 화면은 가리지 않는다.
+     `search.js`(CS 판·조회)와 `search.css`(판 꾸밈)만 보낸다. `goods.js` 는 안 보낸다(상품 단추 불필요).
+     `search.js` 가 주소를 보고 스스로 CS 전용으로 돈다(`CS전용`). ⚠ 이 줄은 확장 안 — 덮어쓰기 필요. */
+  if (있나("/system/sales/ordermst.aspx")) { 글.push("search.js"); 꾸밈.push("search.css"); }
   if (있나("goods.aspx") || 있나("salesgoods.aspx") || 있나("stocklist.aspx"))
                                   { 글.push("johon.js", "amt-draw.js", "goods.js"); 꾸밈.push("goods.css"); }
   /* ⚠ 짚개.js 는 여기서 안 넣는다 — **틀(frameset) 안쪽까지** 붙어야 해서 제 자리로 뺐다

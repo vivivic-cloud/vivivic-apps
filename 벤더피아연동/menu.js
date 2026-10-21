@@ -2,12 +2,10 @@
 // 누르면 그 화면만 따로 연다.
 (() => {
   /* ⚠⚠ 10-21 사장님: 「연동 메인메뉴의 CS등록의 경우 배송관리 화면이 아닌 벤더피아 -판매관리-주문관리 화면이 연동되어야 합니다.」
-     벤더피아 「판매관리 → 주문관리」 화면 주소(aspx)는 저장소·기록 어디에도 없어 **짐작해 넣지 않았다.**
-     알게 되면 **이 한 줄에만** 적는다(예 `/System/Sales/OrderList.aspx` 꼴 — 반드시 진짜 주소로).
-     비어 있는 동안은 전처럼 배송관리 위에서 CS 판이 열린다.
-     ⚠ 주소를 적은 뒤에도 그 화면에서 글이 돌려면 `불러오기.js`(확장 안, 덮어쓰기 필요)의 주소→글 짝에
-       주문관리 주소를 더하고, `search.js` 의 `fetchList`·`plan` 이 읽는 검색 폼 칸 이름을 그 화면 것으로 맞춰야 한다. */
-  const 주문관리주소 = "";
+     사장님이 알려 주신 주소: `view-source:https://vendorpia.com/System/Sales/orderMst.aspx` → 주문관리 = 아래 주소.
+     그 화면에서는 CS 판만 뜬다(원래 화면은 그대로) — `불러오기.js` 가 `search.js` 를 보내고 `search.js` 가 가른다.
+     비우면 전처럼 배송관리 위에서 CS 판이 열린다. */
+  const 주문관리주소 = "/System/Sales/orderMst.aspx";
 
   const PAGES = [
     { name: "배송관리", url: "/System/Delivery/firmDvList.aspx" },

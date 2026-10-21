@@ -1,13 +1,20 @@
 // 배송관리(배송목록조회) 화면을 기간 + 검색창 하나로 바꾼다.
 // 조회는 원래 화면의 검색 폼을 그대로 벤더피아에 보내고, 받은 결과에서 목록만 뽑아 보여준다.
 (() => {
+  /* ⚠⚠ 10-21 사장님: 「연동 메인메뉴의 CS등록의 경우 배송관리 화면이 아닌 벤더피아 -판매관리-주문관리
+       화면이 연동되어야 합니다.」 (주문관리 = `/System/Sales/orderMst.aspx`)
+     주문관리 화면에서는 **CS 판만** 띄운다 — 그 화면의 원래 모습은 가리지도 바꾸지도 않는다.
+     그래서 아래 배송관리 화면(검색줄·표·거르개)은 **떼어 놓은 빈 통**에만 그려지고 쪽에 안 붙는다.
+     ⚠ 주문관리 폼의 칸 이름은 저장소에 없다 — **페이지에서 읽어 맞춘다**(`주문관리조회`). 못 맞추면
+       배송목록 조회(`배송틀받기`)를 그대로 쓴다. */
+  const CS전용 = /\/system\/sales\/ordermst\.aspx/i.test(location.pathname);
   const form = document.forms[0];
   const searchBtn = document.getElementById("btnSearch");
   const startDt = document.getElementById("dcStartDt");
   const endDt = document.getElementById("dcEndDt");
-  if (!form || !searchBtn || !startDt || !endDt) return;
+  if (CS전용 ? !form : (!form || !searchBtn || !startDt || !endDt)) return;
 
-  const fieldNames = [...new FormData(form).keys()];
+  const fieldNames = CS전용 ? [] : [...new FormData(form).keys()];
   const fullName = (id) => fieldNames.find((n) => n === id || n.endsWith("$" + id)) || id;
 
   // 검색어 한 단어가 목록 칸의 항목과 똑같으면 그 칸을 고른다 (앞에 있을수록 우선)
@@ -16,6 +23,7 @@
   const norm = (s) => s.replace(/^\d+\s+/, "").replace(/\s/g, "").toLowerCase();
 
   function matchSelect(token) {
+    if (CS전용) return null;     // 주문관리 화면의 고르는 칸은 배송목록 폼의 것이 아니다 — 섞어 보내지 않는다
     for (const id of SELECTS) {
       const sel = document.getElementById(id);
       if (!sel) continue;
@@ -55,24 +63,122 @@
     return { filters, variants: variants || [["전체", {}]], local };
   }
 
-  async function fetchList(fields, rowCnt) {
-    const fd = new FormData(form);
-    for (const k of [...fd.keys()]) if (k.includes("chkItem")) fd.delete(k);
-    fd.append(searchBtn.name + ".x", "5");
-    fd.append(searchBtn.name + ".y", "5");
-    fd.set(fullName("ddlRowCnt"), rowCnt);
-    for (const [id, v] of Object.entries(fields)) fd.set(fullName(id), v);
-
-    const res = await fetch(form.action, { method: "POST", body: fd, credentials: "include" });
-    const doc = new DOMParser().parseFromString(await res.text(), "text/html");
+  /* 받은 글에서 머리줄(수취인 칸이 든 줄 — 주문관리는 칸이 가장 많은 머리줄)과 줄들을 뽑는다 */
+  function 표뽑기(글, 머리찾기) {
+    const doc = new DOMParser().parseFromString(글, "text/html");
     const count = (doc.body.textContent.match(/([\d,]+)\s*건/) || [])[1] || "0";
-    const th = [...doc.querySelectorAll("th")].find((c) => c.textContent.trim() === "수취인");
+    const th = 머리찾기(doc);
     if (!th) return { count, heads: [], rows: [] };
     const heads = [...th.parentElement.children].map((c) => c.textContent.trim());
     const rows = [...doc.querySelectorAll("tr")]
       .filter((tr) => tr.children.length === heads.length && !tr.querySelector("th"))
       .map((tr) => [...tr.children].map((c) => c.textContent.trim()));
     return { count, heads, rows };
+  }
+  async function 보내기(틀, 이름, 몫, rowCnt) {
+    const fd = new FormData(틀.form);
+    for (const k of [...fd.keys()]) if (k.includes("chkItem")) fd.delete(k);
+    if (틀.버튼) {
+      if (틀.버튼.type === "image") { fd.append(틀.버튼.name + ".x", "5"); fd.append(틀.버튼.name + ".y", "5"); }
+      else if (틀.버튼.name) fd.append(틀.버튼.name, 틀.버튼.value || "");
+    }
+    if (틀.행수칸) fd.set(틀.행수칸, rowCnt);
+    for (const [id, v] of Object.entries(몫)) fd.set(이름(id), v);
+    const res = await fetch(틀.form.action, { method: "POST", body: fd, credentials: "include" });
+    return res.text();
+  }
+
+  /* ── 주문관리(`orderMst.aspx`) 조회 ─────────────────────────
+     칸 이름을 **짐작해 박지 않는다.** 이 쪽의 폼을 읽어서 맞춘다 —
+       · 기간  : 날짜 꼴(2026-10-21 · 2026/10/21 · 2026.10.21) 값이 든 글칸 둘 (앞이 시작, 뒤가 끝)
+       · 그 밖 : 폼 안 머리글(th·td·label)이 「주문번호」「수취인」… 인 곳 바로 옆 칸
+       · 조회 단추 : 폼 안의 이미지·제출 단추 가운데 이름·값이 search·조회·검색 인 것(없으면 제출 단추가 하나뿐일 때 그것)
+     ⚠ 하나라도 못 맞추면 `null` — 그때는 배송목록 조회를 쓴다(아래 `fetchList`).
+     ⚠ 받은 결과의 머리줄에 「주문번호」「상품명」이 없어도 `null` — CS 판이 읽는 칸이다. */
+  const 칸이름표 = { tbSOrderNo: "주문번호", tbRecipient: "수취인", tbOrderer: "주문자",
+    tbAddr0: "주소", tbSGoodsNm: "상품명", tbInvoiceNo: "송장번호", tbGoodsCd: "단품코드" };
+  const 깎 = (t) => String(t || "").replace(/[\s:：*]/g, "");
+  const 쓸칸 = (e) => e && /^(INPUT|SELECT|TEXTAREA)$/.test(e.tagName)
+    && !/^(hidden|image|submit|button|checkbox|radio)$/i.test(e.type || "") && e.name;
+  function 머리글옆칸(글) {
+    for (const c of form.querySelectorAll("th,td,label")) {
+      if (깎(c.textContent) !== 글) continue;
+      if (c.tagName === "LABEL" && c.htmlFor && 쓸칸(document.getElementById(c.htmlFor)))
+        return document.getElementById(c.htmlFor);
+      const 옆 = c.nextElementSibling;
+      const 칸 = 옆 && (쓸칸(옆) ? 옆 : [...옆.querySelectorAll("input,select,textarea")].find(쓸칸));
+      if (칸) return 칸;
+    }
+    return null;
+  }
+  let 주문틀 = undefined;
+  function 주문틀읽기() {
+    if (주문틀 !== undefined) return 주문틀;
+    주문틀 = null;
+    const 날 = [...form.elements].filter((e) => e.tagName === "INPUT" && 쓸칸(e)
+      && /^\d{4}([-/.])\d{2}\1\d{2}$/.test((e.value || "").trim()));
+    const 단추들 = [...form.querySelectorAll("input[type=image],input[type=submit],button[type=submit]")];
+    const 버튼 = 단추들.find((e) => /search|srch|조회|검색/i.test((e.name || "") + (e.id || "") + (e.value || "") + (e.alt || "")))
+      || (단추들.length === 1 ? 단추들[0] : null);        // 이름으로 못 알아도 폼에 제출 단추가 하나뿐이면 그것
+    if (날.length < 2 || !버튼) { window.VP말?.("주문관리:폼못맞춤 날짜" + 날.length + " 단추" + (버튼 ? 1 : 0)); return null; }
+    const 칸 = { dcStartDt: 날[0], dcEndDt: 날[1] };
+    for (const [id, 글] of Object.entries(칸이름표)) { const e = 머리글옆칸(글); if (e) 칸[id] = e; }
+    /* ⚠ 한 칸이라도 못 맞추면 **통째로** 배송목록 쪽으로 간다 — 한 검색의 줄이 두 곳에서 섞여 겹치면 안 된다 */
+    const 빠진 = Object.keys(칸이름표).filter((id) => !칸[id]);
+    if (빠진.length) { window.VP말?.("주문관리:폼못맞춤 빠진 칸 " + 빠진.join(",")); return null; }
+    const 행수 = [...form.elements].find((e) => e.tagName === "SELECT" && /rowcnt|pagesize|pagecnt|listcnt/i.test(e.name + e.id));
+    주문틀 = { form, 버튼, 칸, 행수칸: 행수 ? 행수.name : "" };
+    window.VP말?.("주문관리:폼읽음 칸 " + Object.keys(칸).join(","));
+    return 주문틀;
+  }
+  const 날모양 = (본, ymd) => { const m = /^\d{4}([-/.])\d{2}\1\d{2}$/.exec((본 || "").trim());
+    return m ? ymd.replace(/-/g, m[1]) : ""; };
+  async function 주문관리조회(fields, rowCnt) {
+    const t = 주문틀읽기();
+    if (!t) return null;
+    const 몫 = {};
+    for (const [id, v] of Object.entries(fields)) {
+      const e = t.칸[id];
+      if (!e) { window.VP말?.("주문관리:칸없음 " + id); return null; }   // 맞는 칸이 없으면 지어내지 않는다
+      const 값 = /^dc(Start|End)Dt$/.test(id) ? 날모양(e.value, v) : v;
+      if (!값) return null;
+      몫[e.name] = 값;
+    }
+    const 글 = await 보내기(t, (n) => n, 몫, rowCnt);
+    const r = 표뽑기(글, (doc) => [...doc.querySelectorAll("tr")]
+      .filter((tr) => tr.querySelectorAll("th").length >= 5)
+      .sort((a, z) => z.querySelectorAll("th").length - a.querySelectorAll("th").length)[0]?.querySelector("th"));
+    if (!r.heads.includes("주문번호") || !r.heads.includes("상품명")) {
+      window.VP말?.("주문관리:머리줄이 CS 판이 읽는 꼴이 아님 → 배송목록으로"); return null; }
+    return r;
+  }
+
+  /* 주문관리에서는 배송목록 폼이 쪽에 없다 — 배송목록 쪽을 **한 번 받아서** 그 폼으로 묻는다(조회만) */
+  let 배송틀캐시 = null;
+  async function 배송틀받기() {
+    if (!CS전용) return { form, 버튼: searchBtn, 행수칸: fullName("ddlRowCnt") };
+    if (!배송틀캐시) 배송틀캐시 = (async () => {
+      const res = await fetch("/System/Delivery/firmDvList.aspx", { credentials: "include" });
+      const doc = new DOMParser().parseFromString(await res.text(), "text/html");
+      const f = doc.forms[0], b = doc.getElementById("btnSearch");
+      if (!f || !b) throw new Error("배송목록 폼 없음");
+      const 이름들 = [...new FormData(f).keys()];
+      f.action = new URL(f.getAttribute("action") || "/System/Delivery/firmDvList.aspx", location.href).href;
+      return { form: f, 버튼: b, 행수칸: 이름들.find((n) => n === "ddlRowCnt" || n.endsWith("$ddlRowCnt")) || "ddlRowCnt", 이름들 };
+    })();
+    return 배송틀캐시;
+  }
+
+  async function fetchList(fields, rowCnt) {
+    if (CS전용) {
+      const r = await 주문관리조회(fields, rowCnt);
+      if (r) return r;
+    }
+    const 틀 = await 배송틀받기();
+    const 이름들 = 틀.이름들 || fieldNames;
+    const 이름 = (id) => 이름들.find((n) => n === id || n.endsWith("$" + id)) || id;
+    const 글 = await 보내기(틀, 이름, fields, rowCnt);
+    return 표뽑기(글, (doc) => [...doc.querySelectorAll("th")].find((c) => c.textContent.trim() === "수취인"));
   }
 
   /* ⚠⚠ 10-15 사장님 (배송관리를 짚으시고, 그대로):
@@ -101,8 +207,16 @@
       <div class="vp-note"></div>
       <div class="vp-table"></div>
     </div>`;
-  document.body.appendChild(root);
-  document.documentElement.classList.add("vp-clean");
+  if (CS전용) {
+    /* 크기 없는 자리만 — CS 판 덮개(`position:fixed`)가 여기 붙어 `#vp-root` 꾸밈을 받는다. 쪽은 그대로 */
+    root.className = "vp-cs전용";
+    const 자리 = document.createElement("div");
+    자리.id = "vp-root"; 자리.className = "vp-cs전용";
+    document.body.appendChild(자리);
+  } else {
+    document.body.appendChild(root);
+    document.documentElement.classList.add("vp-clean");
+  }
 
   const bar = root.querySelector(".vp-bar");
   const note = root.querySelector(".vp-note");
@@ -222,9 +336,11 @@
   const 알약값 = () => Object.fromEntries(Object.entries(고른것)
     .filter(([k, v]) => v && !k.startsWith("__")));    // `__` 로 시작하는 것은 우리끼리 쓰는 것
   알약그리기();
-  bar.from.value = startDt.value;
-  bar.to.value = endDt.value;
-  bar.q.focus();
+  if (!CS전용) {
+    bar.from.value = startDt.value;
+    bar.to.value = endDt.value;
+    bar.q.focus();
+  }
 
   /* ④ **상품명 칸을 상품관리의 그 상품버튼으로** — 사장님 10-15:
        「이곳에 도착하는 상품명을 상품관리와 동일한 상품버튼으로 변경해 주세요.
@@ -277,7 +393,7 @@
       + (window.VP상품단추 ? "/셈있음" : "/**셈없음**")));
     document.head.appendChild(sc);
   }
-  상품단추불러오기();
+  if (!CS전용) 상품단추불러오기();         // 주문관리에서는 CS 판만 — 상품 단추를 안 건다
 
   /* ── 상담 이력 ──────────────────────────────────────────
      사장님 10-15: 「**상담할때 고객문의에 이력을 남기는데 이력남길수있게 해주세요**」
