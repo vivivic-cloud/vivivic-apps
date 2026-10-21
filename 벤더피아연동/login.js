@@ -28,7 +28,7 @@
      이 고침은 **새로고침만으로** 먹어야 한다. 그게 핵심이다. */
 /* ⚠⚠ 화면글 판은 **여기 한 군데서만** 적는다. `manifest.json` 의 version 과 **늘 같이** 올려라
    (배포 차례에 적어 두었다). 두 군데서 적으면 반드시 어긋난다. */
-const VP_화면글판 = "0.34.34";   // ⚠ manifest.json 의 version 과 **같은 값**
+const VP_화면글판 = "0.34.35";   // ⚠ manifest.json 의 version 과 **같은 값**
 
 /* ⚠⚠ **까닭 적기** (10-15) — 사장님 PC 에서 CS 거르개·상품 단추·수입정보 셋이
      **조용히** 안 됐다. 사장님도 바이글도 **왜**인지를 못 봤다. 그것이 진짜 탈이었다.
@@ -256,6 +256,10 @@ const VP_화면글판 = "0.34.34";   // ⚠ manifest.json 의 version 과 **같�
     let 막은것 = null;
     for (let el = 그림; el && el !== document.documentElement; el = el.parentElement) {
       if (위() <= 2) break;
+      /* ⚠⚠ **붙박이(fixed·sticky) 머리띠에서 멈춘다 (10-21, 장부 a1792566604).** 로고가 붙박이 띠 안에 있으면
+           그 위 조상(몸)의 윗여백은 **띠 밑으로 밀려 내려간 본문 자리**다. 그것을 0 으로 걷으면
+           본문이 띠 밑에 깔려 **가려진다**(재서 잡았다: 본문 55px → 0px, 띠 55px 에 55px 가려짐). */
+      if (/^(fixed|sticky)$/.test(getComputedStyle(el).position)) { 막은것 = (el.id ? "#" + el.id : el.tagName.toLowerCase()) + "(붙박이)"; break; }
       /* 앞에 **보이는 형제**가 있으면 그 위는 빈자리가 아니다 — 손대지 않는다 */
       let 앞 = el.previousElementSibling;
       while (앞 && !보이나(앞)) 앞 = 앞.previousElementSibling;
