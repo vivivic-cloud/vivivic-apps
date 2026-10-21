@@ -418,12 +418,12 @@
 
   /* 주문번호 칸에 **작은 단추 하나**만 더한다 — 칸을 새로 내지 않는다.
      (배송관리 23칸을 밀어내지 않는다 — 사장님이 그 칸을 다 보셔야 한다) */
-  function 상담단추(td, 주문, 상품명) {
+  function 상담단추(td, 주문, 상품명, 줄, 머리) {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "vp-상담알";
     b.title = "상담 이력 · 교환 · 반품 · AS 접수";
-    b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); 상담판열기(주문, 상품명); });
+    b.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); 상담판열기(주문, 상품명, 줄, 머리); });
     td.appendChild(b);
     상담칸들.push([td, 주문]);
     상담점찍기(td, 주문);
@@ -505,7 +505,35 @@
   if (CS등록인가()) setTimeout(() => { CS판열기(); }, 400);
   window.addEventListener("hashchange", () => { if (CS등록인가()) CS판열기(); });
 
-  async function 상담판열기(주문, 상품명) {
+  /* ── 고객정보 (10-21) ──────────────────────────────────
+     사장님: 「cs등록할때 주문관리에 있는 모든 고객정보가 확인되게 해주세요」(장부 a1792555506)
+     CS 판(상담 판)을 열면 그 주문의 **벤더피아 배송목록 한 줄을 머리줄과 짝지어 전부** 보인다
+     (주문자·수취인·연락처·주소… 벤더피아가 준 칸 모두, 이름·차례 그대로).
+     ⚠ 배송관리 표에서 열면 이미 받은 그 줄을, CS등록에서 주문번호로 열면 **그 자리에서 벤더피아에 조회**한다.
+     ⚠ **보이기만 한다.** 창고(`vpcs_note`)에 싣지 않는다 — 늘 벤더피아에 바로 묻는다. 벤더피아에는 조회만. */
+  async function 고객줄받기(주문) {
+    const 오늘 = new Date(), 먼저 = new Date(오늘.getTime() - 400 * 86400000);
+    const ymd = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0")
+      + "-" + String(d.getDate()).padStart(2, "0");
+    const r = await fetchList({ dcStartDt: ymd(먼저), dcEndDt: ymd(오늘), tbSOrderNo: 주문 }, "50");
+    /* ⚠ 주문번호가 **똑같은 줄만** 쓴다 — 다른 사람 줄을 대신 보이면 안 된다. 없으면 없다고 알린다. */
+    const 줄 = r.rows.find((x) => x.some((v) => String(v).trim() === String(주문).trim()));
+    return 줄 ? { 줄, 머리: r.heads } : null;
+  }
+  function 고객그리기(칸, 줄, 머리) {
+    칸.replaceChildren();
+    const 틀 = 칸.appendChild(document.createElement("dl"));
+    틀.className = "vp-고객목록";
+    머리.forEach((이름, i) => {
+      const 값 = 줄[i] === undefined || 줄[i] === null ? "" : String(줄[i]).trim();
+      if (!이름 || !값) return;
+      틀.appendChild(document.createElement("dt")).textContent = 이름;
+      틀.appendChild(document.createElement("dd")).textContent = 값;
+    });
+    if (!틀.children.length) 칸.textContent = "고객정보가 비어 있습니다.";
+  }
+
+  async function 상담판열기(주문, 상품명, 받은줄, 받은머리) {
     상담판닫기();
     const 열쇠 = 상담열쇠(주문);
     if (!열쇠) return;
@@ -514,6 +542,7 @@
     덮개.innerHTML = `<div class="vp-상담판" role="dialog" aria-label="상담 이력과 접수">
       <div class="vp-상담머리"><strong></strong><small></small>
         <button type="button" class="vp-상담닫기" aria-label="닫기">×</button></div>
+      <div class="vp-고객정보">고객정보 불러오는 중…</div>
       <div class="vp-상담접수"></div>
       <div class="vp-상담목록">불러오는 중…</div>
       <form class="vp-상담적기">
@@ -533,6 +562,15 @@
 
     const 목록 = 덮개.querySelector(".vp-상담목록");
     const 접수칸 = 덮개.querySelector(".vp-상담접수");
+    const 고객칸 = 덮개.querySelector(".vp-고객정보");
+    if (받은줄 && 받은머리) 고객그리기(고객칸, 받은줄, 받은머리);
+    else 고객줄받기(주문).then((답) => {
+      if (답) 고객그리기(고객칸, 답.줄, 답.머리);
+      else 고객칸.textContent = "벤더피아 배송목록에서 이 주문을 찾지 못했습니다.";
+    }).catch((e) => {
+      고객칸.textContent = "고객정보를 못 읽었습니다. 다시 로그인한 뒤 시도해 주세요.";
+      window.VP말?.("고객정보:못읽음 " + (e && e.message ? e.message : e));
+    });
     const 알림 = 덮개.querySelector(".vp-상담알림");
     const 적기 = 덮개.querySelector(".vp-상담적기");
     const 글칸 = 덮개.querySelector("textarea");
@@ -794,7 +832,8 @@
         if (i === 주문칸자리 && String(값).trim()) {
           td.classList.add("vp-주문칸");
           상담단추(td, String(값).trim(),
-                   상품칸자리 >= 0 ? String(row[상품칸자리] == null ? "" : row[상품칸자리]).trim() : "");
+                   상품칸자리 >= 0 ? String(row[상품칸자리] == null ? "" : row[상품칸자리]).trim() : "",
+                   row, 그린머리);
         }
       });
     }
