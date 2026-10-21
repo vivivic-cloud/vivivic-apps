@@ -448,6 +448,45 @@
   let CS판 = null;
   function CS판닫기() { if (CS판) { CS판.remove(); CS판 = null; } }
 
+  /* 찾은 주문을 줄마다 보인다 — 이름·지역·전화·상품명·주문번호. 상품명을 누르면 그 주문의 상담 판이 열린다.
+     ⚠ 보이기만 한다 — 창고에 싣지 않는다. */
+  function CS결과그리기(칸, 줄들, 머리, 끝) {
+    if (!줄들.length) { 칸.textContent = 끝 ? "찾은 주문이 없습니다." : "찾는 중…"; return; }
+    const 자리 = (re) => 머리.findIndex((h) => re.test(String(h || "").replace(/\s/g, "")));
+    const 값 = (줄, i) => (i < 0 || 줄[i] == null ? "" : String(줄[i]).trim());
+    const 상 = 머리.indexOf("상품명"), 주 = 머리.indexOf("주문번호");
+    const 받 = 머리.indexOf("수취인"), 시 = 자리(/^주문자/), 소 = 자리(/주소/);
+    const 전 = 머리.map((h, i) => (/전화|연락|휴대|핸드폰|tel|hp/i.test(String(h || "")) ? i : -1)).filter((i) => i >= 0);
+    const 만들기 = 줄들.map(({ 줄 }) => {
+      const 주문 = 값(줄, 주);
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "vp-cs줄 vp-cs찾은";
+      const 상품명 = 값(줄, 상);
+      b.appendChild(document.createElement("strong")).textContent = 상품명 || "(상품명 없음)";
+      const 사람 = [값(줄, 받), 값(줄, 시) && 값(줄, 시) !== 값(줄, 받) ? "주문자 " + 값(줄, 시) : ""].filter(Boolean).join(" · ");
+      const 번호들 = [...new Set(전.map((i) => 값(줄, i)).filter(Boolean))].join(" / ");
+      const 가 = b.appendChild(document.createElement("small"));
+      가.textContent = [사람, 번호들, 값(줄, 소), 주문 && "주문 " + 주문].filter(Boolean).join(" · ");
+      const 접수 = 상담셈.get(상담열쇠(주문));
+      if (접수 && (접수.수 > 0 || 접수.열림)) {
+        const t = b.appendChild(document.createElement("small"));
+        t.textContent = (접수.열림 ? (접수.종류 || "접수") + " 접수중 · " : "") + "상담 " + (접수.수 || 0);
+        if (접수.열림) b.classList.add("vp-열림");
+      }
+      b.addEventListener("click", () => {
+        if (!주문) return;
+        CS판닫기();
+        상담판열기(주문, 상품명, 줄, 머리);
+      });
+      return b;
+    });
+    const 머릿글 = document.createElement("p");
+    머릿글.className = "vp-cs없음";
+    머릿글.textContent = 줄들.length + "건" + (끝 ? "" : " · 더 찾는 중…") + " — 상품명을 누르면 상담·접수 판이 열립니다.";
+    칸.replaceChildren(머릿글, ...만들기);
+  }
+
   async function CS판열기() {
     CS판닫기();
     const 덮개 = document.createElement("div");
@@ -456,9 +495,10 @@
       <div class="vp-상담머리"><strong>CS등록</strong><small></small>
         <button type="button" class="vp-상담닫기" aria-label="닫기">×</button></div>
       <form class="vp-cs찾기">
-        <input type="text" inputmode="latin" placeholder="주문번호를 적으시거나 붙여 넣으십시오">
-        <button type="submit">열기</button>
+        <input type="text" placeholder="이름 · 지역 · 전화번호 · 주문상품명 · 주문번호 …">
+        <button type="submit">찾기</button>
       </form>
+      <div class="vp-cs결과" hidden></div>
       <div class="vp-cs목록">불러오는 중…</div></div>`;
     덮개.querySelector(".vp-상담닫기").addEventListener("click", CS판닫기);
     덮개.addEventListener("mousedown", (e) => { if (e.target === 덮개) CS판닫기(); });
@@ -466,12 +506,48 @@
     CS판 = 덮개;
 
     const 칸 = 덮개.querySelector(".vp-cs찾기 input");
-    덮개.querySelector(".vp-cs찾기").addEventListener("submit", (e) => {
+    const 결과칸 = 덮개.querySelector(".vp-cs결과");
+    let 찾는번호 = 0;
+    덮개.querySelector(".vp-cs찾기").addEventListener("submit", async (e) => {
       e.preventDefault();
-      const 주문 = 칸.value.trim();
-      if (!주문) { 칸.focus(); return; }
-      CS판닫기();
-      상담판열기(주문, "");
+      const 말 = 칸.value.trim();
+      const 번호 = ++찾는번호;
+      if (!말) { 결과칸.hidden = true; 결과칸.replaceChildren(); 칸.focus(); return; }
+      결과칸.hidden = false;
+      결과칸.textContent = "찾는 중…";
+      const 줄들 = [];
+      let 머리 = null;
+      const 보이기 = (끝) => {
+        if (번호 !== 찾는번호) return;
+        CS결과그리기(결과칸, 줄들, 머리, 끝);
+      };
+      try {
+        /* 검색어 나눠 보내기는 배송관리 검색창의 `plan`·`fetchList` 를 그대로 쓴다. */
+        const { filters, variants, local } = plan(말);
+        const 오늘 = new Date(), 먼저 = new Date(오늘.getTime() - 400 * 86400000);
+        const ymd = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0")
+          + "-" + String(d.getDate()).padStart(2, "0");
+        const 날 = { dcStartDt: ymd(먼저), dcEndDt: ymd(오늘) };
+        const 봤다 = new Set();
+        for (const [이름, 칸들] of variants) {
+          const r = await fetchList({ ...날, ...filters, ...칸들 }, 이름 === "전체" ? "600" : "100");
+          if (번호 !== 찾는번호) return;
+          if (!머리 && r.heads.length) 머리 = r.heads;
+          for (const row of r.rows) {
+            const 키 = row.join("\t");
+            if (봤다.has(키)) continue;
+            봤다.add(키);
+            const 글 = row.join(" "), 숫자 = 글.replace(/\D/g, "");
+            if (!local.every((w) => 글.includes(w) || (/^[\d-]+$/.test(w) && 숫자.includes(w.replace(/-/g, ""))))) continue;
+            줄들.push({ 줄: row, 머리: r.heads });
+          }
+          보이기(false);
+        }
+        보이기(true);
+      } catch (err) {
+        if (번호 === 찾는번호) 결과칸.textContent = "조회에 실패했습니다. 다시 로그인한 뒤 시도해 주세요.";
+        window.VP말?.("CS찾기:실패 " + (err && err.message ? err.message : err));
+      }
     });
     setTimeout(() => 칸.focus(), 0);
 
