@@ -70,13 +70,20 @@
     const doc = new DOMParser().parseFromString(글, "text/html");
     const count = (doc.body.textContent.match(/([\d,]+)\s*건/) || [])[1] || "0";
     const th = 머리찾기(doc);
-    if (!th) return { count, heads: [], rows: [] };
+    /* 까닭 적기 — 진짜 화면에서 왜 비는지 보이게(10-22): 응답 길이·로그인 칸·머리줄 칸 수·그 밖 줄 칸 수들 */
+    const 칸수들 = {};
+    for (const tr of doc.querySelectorAll("tr")) if (!tr.querySelector("th")) { const n = tr.children.length; 칸수들[n] = (칸수들[n] || 0) + 1; }
+    const 몸 = { 길이: 글.length, 로그인칸: !!doc.querySelector("input[type=password]"), 틀: doc.querySelectorAll("frame,iframe").length,
+      표수: doc.querySelectorAll("table").length, 칸수들: Object.entries(칸수들).sort((a, z) => z[1] - a[1]).slice(0, 4).map(([n, c]) => n + "칸×" + c).join(" "),
+      제목: ((doc.querySelector("title") || {}).textContent || "").trim().slice(0, 30) };
+    if (!th) return { count, heads: [], rows: [], 몸 };
     const heads = [...th.parentElement.children].map((c) => c.textContent.trim());
     const rows = [...doc.querySelectorAll("tr")]
       .filter((tr) => tr.children.length === heads.length && !tr.querySelector("th"))
       .map((tr) => [...tr.children].map((c) => c.textContent.trim()));
-    return { count, heads, rows };
+    return { count, heads, rows, 몸 };
   }
+  let 마지막응답 = null;
   async function 보내기(틀, 이름, 몫, rowCnt) {
     const fd = new FormData(틀.form);
     for (const k of [...fd.keys()]) if (k.includes("chkItem")) fd.delete(k);
@@ -87,6 +94,8 @@
     if (틀.행수칸) fd.set(틀.행수칸, rowCnt);
     for (const [id, v] of Object.entries(몫)) fd.set(이름(id), v);
     const res = await fetch(틀.form.action, { method: "POST", body: fd, credentials: "include" });
+    마지막응답 = { 상태: res.status, 넘어옴: res.redirected, 주소: (res.url || "").replace(/^https?:\/\/[^/]+/, "").slice(0, 60),
+      보낸: [...fd.entries()].filter(([k, v]) => typeof v === "string" && v && !/^__|chkItem/.test(k)).map(([k, v]) => k.split("$").pop() + "=" + String(v).slice(0, 20)).slice(0, 8).join(" ") };
     return res.text();
   }
 
@@ -122,15 +131,24 @@
     const 단추들 = [...form.querySelectorAll("input[type=image],input[type=submit],button[type=submit]")];
     const 버튼 = 단추들.find((e) => /search|srch|조회|검색/i.test((e.name || "") + (e.id || "") + (e.value || "") + (e.alt || "")))
       || (단추들.length === 1 ? 단추들[0] : null);        // 이름으로 못 알아도 폼에 제출 단추가 하나뿐이면 그것
-    if (날.length < 2 || !버튼) { window.VP말?.("주문관리:폼못맞춤 날짜" + 날.length + " 단추" + (버튼 ? 1 : 0)); return null; }
+    if (날.length < 2 || !버튼) { window.VP말?.("주문관리:폼못맞춤 날짜" + 날.length + " 단추" + (버튼 ? 1 : 0));
+      진단적기("주문관리 폼못맞춤: 폼" + document.forms.length + "개(첫 폼 칸 " + form.elements.length + "개) 날짜꼴 칸 " + 날.length + "개["
+        + 날.slice(0, 3).map((e) => e.name.split("$").pop() + "=" + e.value).join(",") + "] 제출단추 " + 단추들.length + "개["
+        + 단추들.slice(0, 3).map((e) => (e.name || e.id || e.tagName).split("$").pop()).join(",") + "] 창 " + (window === window.top ? "맨위" : "틀안") + " " + location.pathname.split("/").pop());
+      return null; }
     const 칸 = { dcStartDt: 날[0], dcEndDt: 날[1] };
     for (const [id, 글] of Object.entries(칸이름표)) { const e = 머리글옆칸(글); if (e) 칸[id] = e; }
     /* ⚠ 한 칸이라도 못 맞추면 **통째로** 배송목록 쪽으로 간다 — 한 검색의 줄이 두 곳에서 섞여 겹치면 안 된다 */
     const 빠진 = Object.keys(칸이름표).filter((id) => !칸[id]);
-    if (빠진.length) { window.VP말?.("주문관리:폼못맞춤 빠진 칸 " + 빠진.join(",")); return null; }
+    if (빠진.length) { window.VP말?.("주문관리:폼못맞춤 빠진 칸 " + 빠진.join(","));
+      진단적기("주문관리 폼못맞춤: 못 찾은 칸 " + 빠진.map((id) => 칸이름표[id]).join(",") + " · 찾은 칸 " + Object.keys(칸).filter((k) => 칸이름표[k]).map((k) => 칸이름표[k]).join(",")
+        + " · 날짜 " + 날.slice(0, 2).map((e) => e.name.split("$").pop() + "=" + e.value).join(","));
+      return null; }
     const 행수 = [...form.elements].find((e) => e.tagName === "SELECT" && /rowcnt|pagesize|pagecnt|listcnt/i.test(e.name + e.id));
     주문틀 = { form, 버튼, 칸, 행수칸: 행수 ? 행수.name : "" };
     window.VP말?.("주문관리:폼읽음 칸 " + Object.keys(칸).join(","));
+    진단적기("주문관리 폼읽음: " + Object.entries(칸).map(([k, e]) => (칸이름표[k] || k) + "=" + e.name.split("$").pop()).join(" ")
+      + " 단추 " + (버튼.name || 버튼.id).split("$").pop() + "(" + 버튼.type + ")");
     return 주문틀;
   }
   const 날모양 = (본, ymd) => { const m = /^\d{4}([-/.])\d{2}\1\d{2}$/.exec((본 || "").trim());
@@ -150,8 +168,10 @@
     const r = 표뽑기(글, (doc) => [...doc.querySelectorAll("tr")]
       .filter((tr) => tr.querySelectorAll("th").length >= 5)
       .sort((a, z) => z.querySelectorAll("th").length - a.querySelectorAll("th").length)[0]?.querySelector("th"));
+    진단적기(응답말("주문관리", r));
     if (!r.heads.includes("주문번호") || !r.heads.includes("상품명")) {
-      window.VP말?.("주문관리:머리줄이 CS 판이 읽는 꼴이 아님 → 배송목록으로"); return null; }
+      window.VP말?.("주문관리:머리줄이 CS 판이 읽는 꼴이 아님 → 배송목록으로");
+      진단적기("주문관리 머리줄에 「주문번호」「상품명」 이 없어 배송목록으로 돌아감"); return null; }
     return r;
   }
 
@@ -172,7 +192,18 @@
   }
 
   /* 지금 자료가 어디서 오는지 화면에 작게 적는다 (CS등록 화면만) — 배송목록으로 돌면 사장님이 알아채시게 */
-  let 출처칸 = null;
+  let 출처칸 = null, 진단칸 = null;
+  const 진단줄 = []; let 폼줄 = "";
+  /* 화면에 작게 까닭을 적는다(CS등록 화면만) — 사장님이 그대로 알려 주시면 된다. 최근 세 줄만. */
+  function 진단적기(줄) {
+    window.VP말?.("진단:" + 줄.slice(0, 80));
+    /* 폼 읽은 줄(`주문관리 폼…`)은 늘 맨 위에 붙여 두고, 응답 줄은 최근 둘만 */
+    if (/^주문관리 폼/.test(줄)) 폼줄 = 줄; else { 진단줄.push(줄); while (진단줄.length > 2) 진단줄.shift(); }
+    if (진단칸) 진단칸.textContent = [폼줄, ...진단줄].filter(Boolean).join("\n");
+  }
+  const 응답말 = (이름, r) => 이름 + " 응답 " + (마지막응답 ? "HTTP" + 마지막응답.상태 + (마지막응답.넘어옴 ? " 넘어옴→" + 마지막응답.주소 : "") + " 보냄[" + 마지막응답.보낸 + "] " : "")
+    + "길이" + r.몸.길이 + (r.몸.로그인칸 ? " 로그인칸있음" : "") + " 제목[" + r.몸.제목 + "] 표" + r.몸.표수 + " 틀" + r.몸.틀
+    + " 머리" + r.heads.length + "칸[" + r.heads.slice(0, 8).join(",") + "] 줄" + r.rows.length + " 건수" + r.count + " 줄칸수[" + r.몸.칸수들 + "]";
   function 출처적기(어디) {
     if (!출처칸) return;
     const 주문 = 어디 === "주문관리";
@@ -190,7 +221,9 @@
     const 이름들 = 틀.이름들 || fieldNames;
     const 이름 = (id) => 이름들.find((n) => n === id || n.endsWith("$" + id)) || id;
     const 글 = await 보내기(틀, 이름, fields, rowCnt);
-    return 표뽑기(글, (doc) => [...doc.querySelectorAll("th")].find((c) => c.textContent.trim() === "수취인"));
+    const r = 표뽑기(글, (doc) => [...doc.querySelectorAll("th")].find((c) => c.textContent.trim() === "수취인"));
+    if (CS전용) 진단적기(응답말("배송목록", r));
+    return r;
   }
 
   /* ⚠⚠ 10-15 사장님 (배송관리를 짚으시고, 그대로):
@@ -216,13 +249,14 @@
         <button type="submit">조회</button>
       </form>
       <div class="vp-pills"></div>
-      ${CS전용 ? '<div class="vp-출처">자료: 주문관리 폼을 읽는 중…</div>' : ""}
+      ${CS전용 ? '<div class="vp-출처">자료: 주문관리 폼을 읽는 중…</div><pre class="vp-진단"></pre>' : ""}
       <div class="vp-note"></div>
       <div class="vp-table"></div>
     </div>`;
   document.body.appendChild(root);
   document.documentElement.classList.add("vp-clean");
   출처칸 = root.querySelector(".vp-출처");
+  진단칸 = root.querySelector(".vp-진단");
 
   const bar = root.querySelector(".vp-bar");
   const note = root.querySelector(".vp-note");
@@ -1121,6 +1155,7 @@
       if (!shown) table.textContent = "결과가 없습니다.";
     } catch (err) {
       if (searchId === currentSearch) note.textContent = "조회에 실패했습니다. 다시 로그인한 뒤 시도해 주세요.";
+      if (CS전용) 진단적기("조회 실패(터짐): " + (err && err.message ? err.message : err));
     }
   });
 })();

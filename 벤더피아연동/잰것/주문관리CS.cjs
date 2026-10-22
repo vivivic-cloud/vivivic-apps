@@ -96,6 +96,9 @@ const VP흉내 = `window.VP저장 = { get: async function(){return {};}, set: as
           console.log('    ★ 화면에 「대신 씀」 이 작게 붉게 보이나 ' + 못(/대신 씀/.test(표.출처)
             && await 쪽.evaluate(() => document.querySelector('.vp-출처').classList.contains('vp-출처-대신'))));
         }
+        const 진단 = await 쪽.evaluate(() => (document.querySelector('.vp-진단') || {}).textContent || '');
+        console.log('    ★ 화면에 까닭 글(진단)이 보이나: ' + JSON.stringify(진단.slice(0, 260)));
+        console.log('    ★ 진단에 응답 건수·머리·줄이 적힘 ' + 못(/응답 .*머리\d+칸\[.*줄1 건수1/.test(진단) && (칸있나 ? /주문관리 폼읽음/.test(진단) && /주문관리 응답/.test(진단) : /못 찾은 칸/.test(진단) && /배송목록 응답/.test(진단))));
         await 쪽.click('.vp-table .vp-cs상품');
         await 쪽.waitForTimeout(900);
         const 고객 = await 쪽.evaluate(() => (document.querySelector('.vp-고객목록') || {}).textContent || '');
