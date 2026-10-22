@@ -2,7 +2,9 @@
 <!-- 납품내역 / 재단 — 담당 폴더 「관리프로그램 / Amt양식 / 거래내역 / 재단」 의 파일만 정리해 보인다.
      사장님 10-22: 「폴더별로 … 각 페이지를 만들어서 … 해당 파일만 정리되어 보이는 페이지로」.
      거르는 알약(거래처·갈래)은 두지 않는다. 파일 목록 → 파일을 누르면 그 파일의 줄.
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v6.1.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v6.2.0
+     v6.2.0(10-22): 사장님 「작은 월별 버튼으로 해당 자료가 나타나게」·「재단 내역과 소요량을 재단페이지내에 각각 버튼을 만들어서
+     해당 내역만 보이게」 → 파일 박스를 걷고 **월 버튼** + **「재단 내역」·「소요량」 버튼**. 고른 달·고른 쪽 표 하나만 보인다.
      v6.1.0(10-22): 흰 바탕 · 표는 서류관리 제품관리 표 꼴(.dpr-t) — 납품내역/CLAUDE.md 「표 디자인」 을 따른다.
 
      ⚠ 창고는 **읽기만** 한다. Firebase 설정·익명 로그인·20초 안내·2,000줄 윗금·#표통 높이 묶기는
@@ -64,17 +66,14 @@ h2{font-size:19px;font-weight:700;letter-spacing:-.4px;color:var(--vg-ink);paddi
 .how{font-size:12.5px;color:var(--vg-muted);line-height:1.8;padding:0 0 10px}
 .how b{color:var(--vg-body);font-weight:600}
 
-/* 파일 목록 — 박스 하나가 파일 하나 (바이글 .abox 꼴) */
-.files{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
-.file{border:1px solid var(--vg-edge);border-radius:20px;background:#fff;padding:14px;cursor:pointer;transition:transform .12s}
-.file:active{transform:scale(.975)}
-.file.on{background:var(--vg-ink);border-color:var(--vg-ink)}
-.file.on .fn{color:#fff}
-.file.on .fs{color:rgba(255,255,255,.5)}
-.file .fn{font-size:15px;font-weight:600;color:var(--vg-ink);line-height:1.25;word-break:break-all}
-.file .fs{font-size:12px;color:var(--vg-muted);padding-top:8px;font-variant-numeric:tabular-nums}
-.file.zero{border-style:dashed}
-.file.zero .fn{color:var(--vg-muted)}
+/* v6.2.0 — 월 버튼·재단 내역/소요량 버튼: 서류관리(vivivic-docs index.html) .chip 꼴(둥근 알, 12px/600, 5px 12px). 색은 --vg-* 낱말. */
+.months{display:flex;flex-wrap:wrap;gap:6px}
+.months + .months{padding-top:10px}
+.chip{border-radius:999px;font-family:inherit;font-size:12px;font-weight:600;line-height:1.45;padding:5px 12px;background:#fff;
+  border:1px solid var(--vg-edge);color:var(--vg-body);cursor:pointer;font-variant-numeric:tabular-nums;transition:all .12s}
+.chip:hover{background:var(--vg-fill)}
+.chip.on{background:var(--vg-ink);border-color:var(--vg-ink);color:#fff}
+.mfiles{font-size:12px;color:var(--vg-muted);line-height:1.8;padding-top:10px;word-break:break-all}
 
 /* 표 묶음 머리 = 제품관리 .dpr-gh / .dpr-gn / .dpr-gc */
 .dpr-gh{display:flex;align-items:baseline;gap:8px;margin:18px 0 4px;flex-wrap:wrap}
@@ -110,7 +109,7 @@ footer{font-size:11px;color:var(--vg-muted);padding:26px 0 24px;border-top:1px s
 <a class="back" href="납품내역.html">← 납품내역</a>
 <header>
   <div class="logo"><b>VIVIVIC</b> — 재단</div>
-  <div class="badge">v6.1.0</div>
+  <div class="badge">v6.2.0</div>
 </header>
 <h1>재단</h1>
 <div class="where">
@@ -118,9 +117,9 @@ footer{font-size:11px;color:var(--vg-muted);padding:26px 0 24px;border-top:1px s
   2026년 것만 보입니다. 값은 <b>창고</b>에서 받습니다 — 이 파일 안에는 없습니다.
 </div>
 
-<h2>파일</h2>
+<h2>달</h2>
 <div class="how" id="잣대"></div>
-<div class="files" id="파일들"></div>
+<div id="고름"></div>
 <div class="state" id="목상태"><div class="big">창고를 읽는 중입니다…</div></div>
 
 <div id="속"></div>
@@ -152,7 +151,7 @@ const 폴더파일 = {
 const 보는해 = '2026';
 const 많으면 = 2000;          /* 폰에서 줄을 그리다 멎지 않게 한 번에 그리는 윗금 */
 const 숫자칸 = new Set(['전일소요량','금일소요량','총소요량','재단수량','원장수량','재단금액']);
-let 줄들 = [], 묶음 = {}, 고른 = '', 답했나 = false, 서류로 = 0;
+let 줄들 = [], 묶음 = {}, 고른 = '', 고른갈 = '재단', 답했나 = false, 서류로 = 0;
 
 const 글 = v => String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
 function 목상태(큰,작,까닭){
@@ -165,9 +164,8 @@ window.목록못읽음 = (큰,까닭) => { 답했나=true; 목상태(큰,'관리
 setTimeout(() => { if(!답했나) 목상태('창고에 닿지 못했습니다',
   '인터넷이 끊겼거나 창고가 막혀 있습니다. 새로고침해 보십시오.'); }, 20000);
 
-/* 줄이 어느 파일에서 나왔나 — 줄에 「서류」 칸이 있으면 그것, 없으면 달(파일이 달별이다). */
-const 파일이름 = r => (r.서류 != null && String(r.서류).trim()) ? String(r.서류).trim()
-                   : (폴더파일[r.달] || ('(폴더에 파일 없음) ' + (r.달||'?')));
+/* v6.2.0: 줄은 **달** 칸으로 묶는다(파일이 달별이다 — 4월분 파일 = 2026-04 줄). 그 달 파일 이름은 줄의 「서류」 칸, 없으면 폴더파일 표. */
+const 달글 = 달 => { const n = +String(달).slice(5,7); return n ? n+'월' : String(달); };
 
 window.목록읽기 = async function(){
   try{
@@ -198,32 +196,34 @@ window.목록읽기 = async function(){
 
 function 묶기(){
   묶음 = {};
-  Object.values(폴더파일).forEach(f => 묶음[f] = []);
-  줄들.forEach(r => { const f = 파일이름(r); (묶음[f] = 묶음[f] || []).push(r); });
+  Object.keys(폴더파일).forEach(m => 묶음[m] = []);
+  줄들.forEach(r => { const m = String(r.달); (묶음[m] = 묶음[m] || []).push(r); });
   서류로 = 줄들.filter(r => r.서류 != null && String(r.서류).trim()).length;
   document.getElementById('잣대').innerHTML =
-    (서류로 === 줄들.length
-      ? '<b>묶은 잣대: 줄마다 적힌 서류 이름</b>으로 파일을 나눴습니다.'
-      : '<b>묶은 잣대: 달</b> — 창고 줄에 어느 파일인지 적힌 칸(서류)이 ' +
-        (서류로 ? `${줄들.length}줄 가운데 ${서류로}줄에만 있어` : '없어') +
-        ', 나머지는 <b>달</b>로 묶었습니다(파일이 달별입니다 — 4월분 파일 = 2026-04 줄).') +
-    ` 2026년 재단·원장소요량 <b>${줄들.length}</b>줄. 파일을 누르십시오.`;
-  파일그리기();
+    '<b>달로 나눴습니다</b> — 창고 줄마다 적힌 「달」 칸으로 갈랐습니다(파일이 달별입니다).' +
+    ` 2026년 재단·원장소요량 <b>${줄들.length}</b>줄. 달을 누르고, <b>재단 내역</b>·<b>소요량</b> 가운데 볼 것을 누르십시오.`;
+  고름그리기();
 }
 
-function 파일그리기(){
-  const 이름들 = Object.keys(묶음).sort((a,b)=> a.localeCompare(b,'ko',{numeric:true}));
-  document.getElementById('파일들').innerHTML = 이름들.map(f => {
-    const 것 = 묶음[f];
-    const 재 = 것.filter(r=>r.갈==='재단').length, 원 = 것.length - 재;
-    return `<div class="file ${f===고른?'on':''} ${것.length?'':'zero'}" data-f="${글(f)}">` +
-      `<div class="fn">${글(f)}</div><div class="fs">재단 내역 ${재}줄 · 원장소요량 ${원}줄</div></div>`;
-  }).join('');
+function 고름그리기(){
+  const 달들 = Object.keys(묶음).sort();
+  const 것 = 묶음[고른] || [];
+  const 재 = 것.filter(r=>r.갈==='재단').length, 원 = 것.length - 재;
+  /* 그 달 줄이 나온 파일 이름 — 서류 칸 그대로. 줄이 없으면 폴더파일 표의 이름. */
+  const 파 = {}; 것.forEach(r => { const f = (r.서류 != null && String(r.서류).trim()) || 폴더파일[고른] || '(폴더에 파일 없음)'; 파[f] = (파[f]||0) + 1; });
+  const 파글 = 고른 ? (Object.keys(파).length ? Object.keys(파).map(글).join('<br>') : `${글(폴더파일[고른] || '(폴더에 파일 없음)')} — 줄 없음`) +
+      `<br>재단 내역 ${재}줄 · 소요량 ${원}줄` : '';
+  document.getElementById('고름').innerHTML =
+    `<div class="months">` + 달들.map(m => `<button type="button" class="chip ${m===고른?'on':''}" data-m="${글(m)}">${글(달글(m))}</button>`).join('') + `</div>` +
+    (고른 ? `<div class="months">` +
+      `<button type="button" class="chip ${고른갈==='재단'?'on':''}" data-g="재단">재단 내역</button>` +
+      `<button type="button" class="chip ${고른갈==='원장소요량'?'on':''}" data-g="원장소요량">소요량</button></div>` +
+      `<div class="mfiles">${파글}</div>` : '');
 }
 
 function 표(갈, 것){
   const C = 목칸[갈];
-  if(!것.length) return `<div class="empty">이 파일에 <b>${갈==='재단'?'재단 내역':'원장소요량'}</b> 줄은 없습니다.</div>`;
+  if(!것.length) return `<div class="empty">이 달에 <b>${갈==='재단'?'재단 내역':'원장소요량'}</b> 줄은 없습니다.</div>`;
   것 = 것.slice().sort((a,b)=> String(a.달||'').localeCompare(String(b.달||'')) || (a.일||0)-(b.일||0));
   /* 폰에서 줄을 몇 천 개씩 그리면 멎는다. 그린 수를 숨기지 않고 적는다. */
   const 그릴 = 것.length > 많으면 ? 것.slice(0, 많으면) : 것;
@@ -243,18 +243,19 @@ function 표(갈, 것){
 }
 
 function 속그리기(){
-  const 것 = 묶음[고른] || [];
-  const 재 = 것.filter(r=>r.갈==='재단'), 원 = 것.filter(r=>r.갈==='원장소요량');
+  const 것 = (묶음[고른] || []).filter(r => r.갈 === 고른갈);
   document.getElementById('속').innerHTML =
-    `<h2>${글(고른)}</h2>` +
-    `<div class="dpr-gh"><span class="dpr-gn">재단 내역</span><span class="dpr-gc">${재.length}줄</span></div>` + 표('재단', 재) +
-    `<div class="dpr-gh"><span class="dpr-gn">원장소요량</span><span class="dpr-gc">${원.length}줄 · 전일·금일·총소요량이 다 「-」 인 줄은 뺐습니다</span></div>` + 표('원장소요량', 원);
+    `<h2>${글(달글(고른))}</h2>` +
+    (고른갈 === '재단'
+      ? `<div class="dpr-gh"><span class="dpr-gn">재단 내역</span><span class="dpr-gc">${것.length}줄</span></div>` + 표('재단', 것)
+      : `<div class="dpr-gh"><span class="dpr-gn">원장소요량</span><span class="dpr-gc">${것.length}줄 · 전일·금일·총소요량이 다 「-」 인 줄은 뺐습니다</span></div>` + 표('원장소요량', 것));
 }
 
 document.addEventListener('click', e=>{
-  const p = e.target.closest('.file'); if(!p) return;
-  고른 = p.dataset.f; 파일그리기(); 속그리기();
-  document.getElementById('속').scrollIntoView({behavior:'smooth'});
+  const p = e.target.closest('#고름 .chip'); if(!p) return;
+  if(p.dataset.m) 고른 = p.dataset.m; else 고른갈 = p.dataset.g;
+  고름그리기(); 속그리기();
+  /* 표는 버튼 바로 아래에 나온다 — 밀어 내리면 재단 내역·소요량 버튼이 화면 밖으로 나가 굴리지 않는다. */
 });
 </script>
 </body>
