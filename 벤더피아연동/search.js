@@ -1,12 +1,14 @@
 // 배송관리(배송목록조회) 화면을 기간 + 검색창 하나로 바꾼다.
 // 조회는 원래 화면의 검색 폼을 그대로 벤더피아에 보내고, 받은 결과에서 목록만 뽑아 보여준다.
 (() => {
-  /* ⚠⚠ 10-21 사장님: 「연동 메인메뉴의 CS등록의 경우 배송관리 화면이 아닌 벤더피아 -판매관리-주문관리
-       화면이 연동되어야 합니다.」 (주문관리 = `/System/Sales/orderMst.aspx`)
-     주문관리 화면에서는 **CS 판만** 띄운다 — 그 화면의 원래 모습은 가리지도 바꾸지도 않는다.
-     그래서 아래 배송관리 화면(검색줄·표·거르개)은 **떼어 놓은 빈 통**에만 그려지고 쪽에 안 붙는다.
+  /* ⚠⚠ 10-22 사장님 (바로잡음, 한 글자도 안 고침): 「내가 말을 잘못전달했네 CS등록 메뉴 입장시 이런 벤더피아
+       화면 그대로가 아니라 현재 프로그램의 배송관리와 같은 화면이 나오고 대신 그 검색 데이터가
+       -판매관리의 주문관리의 데이터에서 검색될어져야 한다는거였어」
+     → 주문관리(`/System/Sales/orderMst.aspx`) 쪽 위에서 **배송관리와 같은 꼴**(기간 + 검색창 + 결과 표 +
+       줄마다 「상담」 단추)을 그린다. 다른 것은 **자료의 출처뿐** — 주문관리 조회에서 온다.
+       (10-21 0.34.39 는 이것을 「원래 화면 위에 CS 판만」 으로 잘못 읽었다.)
      ⚠ 주문관리 폼의 칸 이름은 저장소에 없다 — **페이지에서 읽어 맞춘다**(`주문관리조회`). 못 맞추면
-       배송목록 조회(`배송틀받기`)를 그대로 쓴다. */
+       배송목록 조회(`배송틀받기`)로 돌아가며, 그때는 화면에 작게 그렇다고 적는다(`.vp-출처`). */
   const CS전용 = /\/system\/sales\/ordermst\.aspx/i.test(location.pathname);
   const form = document.forms[0];
   const searchBtn = document.getElementById("btnSearch");
@@ -169,10 +171,20 @@
     return 배송틀캐시;
   }
 
+  /* 지금 자료가 어디서 오는지 화면에 작게 적는다 (CS등록 화면만) — 배송목록으로 돌면 사장님이 알아채시게 */
+  let 출처칸 = null;
+  function 출처적기(어디) {
+    if (!출처칸) return;
+    const 주문 = 어디 === "주문관리";
+    출처칸.textContent = 주문 ? "자료: 주문관리 조회"
+      : "자료: 배송목록 조회 — 주문관리 폼을 못 맞춰 대신 씀 (벤더피아 판매관리→주문관리 폼 칸을 확인해야 합니다)";
+    출처칸.classList.toggle("vp-출처-대신", !주문);
+  }
   async function fetchList(fields, rowCnt) {
     if (CS전용) {
       const r = await 주문관리조회(fields, rowCnt);
-      if (r) return r;
+      if (r) { 출처적기("주문관리"); return r; }
+      출처적기("배송목록");
     }
     const 틀 = await 배송틀받기();
     const 이름들 = 틀.이름들 || fieldNames;
@@ -195,28 +207,22 @@
   root.innerHTML = `
     <div class="vp-search">
       <a class="vp-home" href="/index.aspx">← 메인</a>
-      <h1>배송관리</h1>
+      <h1>${CS전용 ? "CS등록" : "배송관리"}</h1>
       <form class="vp-bar">
         <input type="date" name="from" required>
         <span>~</span>
         <input type="date" name="to" required>
-        <input name="q" class="vp-q" placeholder="송장번호, 주문번호, 이름, 상품명, 주소, 전화번호, 배송상태…">
+        <input name="q" class="vp-q" placeholder="${CS전용 ? "주문번호, 이름, 상품명, 주소, 전화번호…" : "송장번호, 주문번호, 이름, 상품명, 주소, 전화번호, 배송상태…"}">
         <button type="submit">조회</button>
       </form>
       <div class="vp-pills"></div>
+      ${CS전용 ? '<div class="vp-출처">자료: 주문관리 폼을 읽는 중…</div>' : ""}
       <div class="vp-note"></div>
       <div class="vp-table"></div>
     </div>`;
-  if (CS전용) {
-    /* 크기 없는 자리만 — CS 판 덮개(`position:fixed`)가 여기 붙어 `#vp-root` 꾸밈을 받는다. 쪽은 그대로 */
-    root.className = "vp-cs전용";
-    const 자리 = document.createElement("div");
-    자리.id = "vp-root"; 자리.className = "vp-cs전용";
-    document.body.appendChild(자리);
-  } else {
-    document.body.appendChild(root);
-    document.documentElement.classList.add("vp-clean");
-  }
+  document.body.appendChild(root);
+  document.documentElement.classList.add("vp-clean");
+  출처칸 = root.querySelector(".vp-출처");
 
   const bar = root.querySelector(".vp-bar");
   const note = root.querySelector(".vp-note");
@@ -339,8 +345,16 @@
   if (!CS전용) {
     bar.from.value = startDt.value;
     bar.to.value = endDt.value;
-    bar.q.focus();
+  } else {
+    /* 기간 첫값 = 주문관리 폼이 보여 주는 기간. 폼을 못 읽으면 최근 30일 */
+    const 틀 = 주문틀읽기();
+    const ymd = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    const 오늘 = new Date();
+    bar.from.value = 틀 ? 틀.칸.dcStartDt.value.trim().replace(/[/.]/g, "-") : ymd(new Date(오늘.getTime() - 30 * 86400000));
+    bar.to.value = 틀 ? 틀.칸.dcEndDt.value.trim().replace(/[/.]/g, "-") : ymd(오늘);
+    출처적기(틀 ? "주문관리" : "배송목록");
   }
+  bar.q.focus();
 
   /* ④ **상품명 칸을 상품관리의 그 상품버튼으로** — 사장님 10-15:
        「이곳에 도착하는 상품명을 상품관리와 동일한 상품버튼으로 변경해 주세요.
@@ -393,7 +407,7 @@
       + (window.VP상품단추 ? "/셈있음" : "/**셈없음**")));
     document.head.appendChild(sc);
   }
-  if (!CS전용) 상품단추불러오기();         // 주문관리에서는 CS 판만 — 상품 단추를 안 건다
+  if (!CS전용) 상품단추불러오기();         // CS등록 화면은 상품 단추 대신 상품명으로 상담 판을 연다
 
   /* ── 상담 이력 ──────────────────────────────────────────
      사장님 10-15: 「**상담할때 고객문의에 이력을 남기는데 이력남길수있게 해주세요**」
@@ -694,8 +708,11 @@
   /* 메뉴에서 「CS등록」 으로 들어오면 바로 연다. ⚠ 주소의 `#vgCS` 하나만 본다 —
      그 표가 없으면 배송관리는 **전과 똑같이** 뜬다. */
   function CS등록인가() { return /(^|[#&])vgCS\b/i.test(location.hash || ""); }
-  if (CS등록인가()) setTimeout(() => { CS판열기(); }, 400);
-  window.addEventListener("hashchange", () => { if (CS등록인가()) CS판열기(); });
+  /* ⚠ 주문관리 위(CS전용)에서는 화면 자체가 CS등록이다 — 위에 덮개를 또 열지 않는다(10-22) */
+  if (!CS전용) {
+    if (CS등록인가()) setTimeout(() => { CS판열기(); }, 400);
+    window.addEventListener("hashchange", () => { if (CS등록인가()) CS판열기(); });
+  }
 
   /* ── 고객정보 (10-21) ──────────────────────────────────
      사장님: 「cs등록할때 주문관리에 있는 모든 고객정보가 확인되게 해주세요」(장부 a1792555506)
@@ -1001,6 +1018,17 @@
       그린머리.forEach((c, i) => {
         const td = tr.insertCell();
         const 값 = row[i] === undefined ? "" : row[i];
+        if (CS전용 && i === 상품칸자리 && String(값).trim()) {
+          /* CS등록 화면: 상품명을 누르면 그 주문의 상담 판(이력 + 교환·반품·AS 접수 + 고객정보)이 열린다 */
+          td.className = "vp-상품칸" + (i === 0 ? " vp-first" : "");
+          const 주문 = 주문칸자리 >= 0 ? String(row[주문칸자리] == null ? "" : row[주문칸자리]).trim() : "";
+          const b = document.createElement("button");
+          b.type = "button"; b.className = "vp-cs상품"; b.textContent = 값;
+          b.title = "상담 이력 · 교환 · 반품 · AS 접수";
+          b.addEventListener("click", () => { if (주문) 상담판열기(주문, String(값).trim(), row, 그린머리); });
+          td.appendChild(b);
+          return;
+        }
         if (i === 상품칸자리 && String(값).trim()) {
           td.className = "vp-상품칸" + (i === 0 ? " vp-first" : "");
           상품칸들.push([td, 값]);

@@ -1,5 +1,5 @@
 /* **주문관리(`/System/Sales/orderMst.aspx`)의 CS등록 판**을 재는 자 (10-21).
-   사장님: 「연동 메인메뉴의 CS등록의 경우 배송관리 화면이 아닌 벤더피아 -판매관리-주문관리 화면이 연동되어야 합니다.」
+   사장님: 「연동 메인메뉴의 CS등록의 경우 배송관리 화면이 아닌 …」 → 바로잡음 10-22: 우리 배송관리와 같은 화면 + 자료만 주문관리에서
    보아야 하는 것 —
      ㄱ) 주문관리에 `#vgCS` 로 오면 CS 판이 뜨나 · 원래 화면(폼·표)은 그대로인가(가리지 않나)
      ㄴ) 검색이 **주문관리 폼**(페이지에서 읽은 칸)으로 가나 — 배송목록을 안 건드리나
@@ -39,7 +39,7 @@ const VP흉내 = `window.VP저장 = { get: async function(){return {};}, set: as
   for (const 칸있나 of [true, false]) {
     console.log('\n  ◆ 주문관리 폼 ' + (칸있나 ? '칸 모두 있음 → 주문관리 조회' : '주문자·주소·상품명 칸 없음 → 배송목록으로 돌아가기'));
     for (const 해시 of ['#vgCS', '']) {
-      const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
+      const ctx = await b.newContext({ viewport: { width: +(process.env.VW || 1280), height: 900 } });
       await ctx.route('**://identitytoolkit.googleapis.com/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"idToken":"x"}' }));
       await ctx.route('**://firestore.googleapis.com/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
       const 부름 = [];
@@ -59,42 +59,52 @@ const VP흉내 = `window.VP저장 = { get: async function(){return {};}, set: as
       await 쪽.addScriptTag({ content: VP흉내 });
       await 쪽.addScriptTag({ content: fs.readFileSync(path.join(확장, 'search.js'), 'utf8') });
       await 쪽.waitForTimeout(1200);
-      const 떴나 = await 쪽.evaluate(() => !!document.querySelector('.vp-cs판'));
-      const 원래 = await 쪽.evaluate(() => {
+      const 화면 = await 쪽.evaluate(() => {
         const f = document.getElementById('f'), p = document.getElementById('원래글');
-        const 보임 = (e) => { const r = e.getBoundingClientRect(), s = getComputedStyle(e); return r.width > 5 && r.height > 5 && s.display !== 'none' && s.visibility !== 'hidden'; };
-        return { 폼: f && 보임(f), 글: p && 보임(p), 청소: document.documentElement.classList.contains('vp-clean'),
-          우리쪽: !!document.querySelector('.vp-search'), 쪽키: document.documentElement.scrollHeight };
+        const 보임 = (e) => { if (!e) return false; const r = e.getBoundingClientRect(), s = getComputedStyle(e); return r.width > 5 && r.height > 5 && s.display !== 'none' && s.visibility !== 'hidden'; };
+        return { 원래폼: 보임(f), 원래글: 보임(p), 청소: document.documentElement.classList.contains('vp-clean'),
+          우리쪽: 보임(document.querySelector('.vp-search')), 제목: (document.querySelector('.vp-search h1') || {}).textContent,
+          기간: !!document.querySelector('.vp-bar input[name=from]') && !!document.querySelector('.vp-bar input[name=q]'),
+          덮개: !!document.querySelector('.vp-cs판'), 출처: (document.querySelector('.vp-출처') || {}).textContent || '',
+          시작: (document.querySelector('.vp-bar input[name=from]') || {}).value };
       });
+      console.log('   ─ ' + (해시 ? '#vgCS 로 옴' : '#vgCS 없이 옴') + ' (둘 다 같아야 한다)');
+      console.log('    ★ 배송관리와 같은 꼴(기간+검색창, 제목 ' + 화면.제목 + ') · 원래 주문관리 화면은 가림(' + 화면.청소 + ') · CS 덮개 자동으로 안 뜸(' + !화면.덮개 + ') '
+        + 못(화면.기간 && 화면.우리쪽 && 화면.제목 === 'CS등록' && 화면.청소 && !화면.원래폼 && !화면.덮개));
+      console.log('    ★ 첫 기간 = 주문관리 폼 값(' + 화면.시작 + ') ' + 못(칸있나 ? 화면.시작 === '2026-09-21' : /^\d{4}-\d\d-\d\d$/.test(화면.시작)));
+      console.log('    ★ 출처 글 "' + 화면.출처 + '" ' + 못(칸있나 ? /주문관리 조회/.test(화면.출처) : /배송목록/.test(화면.출처)));
       if (해시) {
-        console.log('   ─ #vgCS 로 옴');
-        console.log('    ★ CS 판이 떴나 ' + 못(떴나));
-        console.log('    ★ **원래 화면이 그대로 보이나** 폼 ' + 원래.폼 + ' · 글 ' + 원래.글 + ' · 가림(vp-clean) ' + 원래.청소 + ' · 배송관리 화면 붙음 ' + 원래.우리쪽
-          + ' ' + 못(원래.폼 && 원래.글 && !원래.청소 && !원래.우리쪽));
-        await 쪽.fill('.vp-cs찾기 input', '가나다');
-        await 쪽.click('.vp-cs찾기 button');
+        await 쪽.fill('.vp-bar input[name=q]', '가나다');
+        await 쪽.click('.vp-bar button[type=submit]');
         await 쪽.waitForTimeout(1500);
-        const 줄 = await 쪽.evaluate(() => [...document.querySelectorAll('.vp-cs찾은')].map((x) => x.textContent));
+        const 표 = await 쪽.evaluate(() => ({ 줄: [...document.querySelectorAll('.vp-table tbody tr')].map((x) => x.textContent),
+          상담: document.querySelectorAll('.vp-table .vp-상담알').length, 상품단추: document.querySelectorAll('.vp-table .vp-cs상품').length,
+          머리: [...document.querySelectorAll('.vp-table th')].map((x) => x.textContent), 출처: (document.querySelector('.vp-출처') || {}).textContent }));
         const 포스트 = 부름.filter((x) => x.startsWith('POST'));
-        console.log('    ★ 찾은 줄 ' + JSON.stringify(줄) + ' ' + 못(줄.length === 1 && /가나다/.test(줄[0]) && /토리블리 책상/.test(줄[0])));
+        console.log('    ★ 표 줄 ' + JSON.stringify(표.줄) + ' · 머리 ' + 표.머리.join(',') + ' ' + 못(표.줄.length === 1 && /가나다/.test(표.줄[0]) && /토리블리 책상/.test(표.줄[0])));
+        console.log('    ★ 줄마다 「상담」 단추 ' + 표.상담 + ' · 상품명 단추 ' + 표.상품단추 + ' ' + 못(표.상담 === 1 && 표.상품단추 === 1));
         const 주문쪽 = 포스트.filter((x) => /orderMst/.test(x)), 배송쪽 = 포스트.filter((x) => /firmDvList/.test(x));
         if (칸있나) {
           const 몸 = 주문쪽.map((x) => JSON.parse(x.slice(x.indexOf('{'))));
-          console.log('    ★ 조회가 주문관리 폼으로 갔나 (읽은 칸에 가나다, 날짜는 2026/.. 꼴, 조회 단추 .x) ' + 못(몸.length >= 1
+          console.log('    ★ 자료가 주문관리 폼으로 갔나 (읽은 칸에 가나다, 날짜 2026/.. 꼴, 조회 단추 .x) ' + 못(몸.length >= 1
             && 몸.every((m) => Object.values(m).includes('가나다') && /^\d{4}\/\d\d\/\d\d$/.test(m['ctl00$txtFrom']) && m['ctl00$btnSrch.x'] === '5')
             && 몸.some((m) => m['ctl00$txtRcv'] === '가나다')));
           console.log('    ★ 배송목록은 안 건드렸나 (POST ' + 배송쪽.length + ') ' + 못(배송쪽.length === 0));
+          console.log('    ★ 출처 글이 주문관리 ' + 못(/주문관리 조회/.test(표.출처) && !/대신/.test(표.출처)));
         } else {
           console.log('    ★ 칸이 모자라니 배송목록 조회로 돌아갔나 (POST ' + 배송쪽.length + ') ' + 못(배송쪽.length >= 1 && /"tbRecipient":"가나다"/.test(배송쪽.join('\n'))));
+          console.log('    ★ 화면에 「대신 씀」 이 작게 붉게 보이나 ' + 못(/대신 씀/.test(표.출처)
+            && await 쪽.evaluate(() => document.querySelector('.vp-출처').classList.contains('vp-출처-대신'))));
         }
-        await 쪽.click('.vp-cs찾은');
+        await 쪽.click('.vp-table .vp-cs상품');
         await 쪽.waitForTimeout(900);
         const 고객 = await 쪽.evaluate(() => (document.querySelector('.vp-고객목록') || {}).textContent || '');
-        console.log('    ★ 줄을 누르면 상담 판에 고객정보 ' + 못(/라마바/.test(고객) && /010-1111-2222/.test(고객)));
-        await 쪽.screenshot({ path: path.join(__dirname, '그림', '주문관리CS-' + (칸있나 ? '칸있음' : '칸없음') + '.png') });
-      } else {
-        console.log('   ─ #vgCS 없이 옴');
-        console.log('    ★ 아무 판도 안 뜨고 원래 화면 그대로 ' + 못(!떴나 && 원래.폼 && 원래.글 && !원래.청소 && !원래.우리쪽));
+        console.log('    ★ 상품명을 누르면 상담 판에 고객정보 ' + 못(/라마바/.test(고객) && /010-1111-2222/.test(고객)));
+        await 쪽.keyboard.press('Escape');
+        await 쪽.click('.vp-table .vp-상담알');
+        await 쪽.waitForTimeout(600);
+        console.log('    ★ 「상담」 단추도 상담 판을 연다 ' + 못(await 쪽.evaluate(() => !!document.querySelector('.vp-상담판'))));
+        await 쪽.screenshot({ path: path.join(__dirname, '그림', '주문관리CS-' + (칸있나 ? '칸있음' : '칸없음') + (process.env.VW ? '-' + process.env.VW : '') + '.png') });
       }
       console.log('    ★ 쪽 오류 ' + 탈.length + '건 ' + 못(탈.length === 0) + (탈.length ? ' ' + JSON.stringify(탈) : ''));
       await ctx.close();
