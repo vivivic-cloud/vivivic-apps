@@ -198,6 +198,29 @@ const 꼴본다 = () => {
         && 꼴.머리.fs === '11px' && 꼴.머리.fw === '700' && 꼴.머리.color === 'rgb(155, 154, 151)' && 꼴.머리.bg === 'rgb(247, 247, 245)' && 꼴.머리.pad === '4px 8px'
         && 꼴.몸.fs === '11px' && 꼴.몸.pad === '4px 8px' && 꼴.몸.color === 'rgb(55, 53, 47)';
       봤다(맞나, '서류관리 제품표 꼴과 같다(11px·머리 700 #9b9a97 바탕 #f7f7f5·안여백 4px 8px·줄 #ededeb·모서리 8px)');
+      /* ── 10-22 글자 + 점 ──────────────────────────────────────────
+         사장님: 「각 버튼을 버튼 형태가 아닌 활성화된 텍스트로 … 텍스트아래 연동수준을 표기하는 점 … 재고조회 목록에 있으면
+         초록색점 조혼가구와 일치하면 붉은색점 카탈로그와 맞으면 주황색점 … 페이지 헤더에 작게 해당 점에대한 설명」 */
+      const 점 = await page.evaluate(() => {
+        const 줄 = [...document.querySelectorAll('#vp-root .vp-gt tbody tr')].filter((t) => !t.hidden).map((tr) => {
+          const b = tr.querySelector('td button'), s = getComputedStyle(b), q = b.querySelector('.vp-점');
+          const 켜짐 = [...q.querySelectorAll('i')].filter((i) => getComputedStyle(i).display !== 'none').map((i) => getComputedStyle(i).backgroundColor);
+          return { 이름: b.firstChild.textContent, 글색: s.color, 바탕: s.backgroundColor, 그림자: s.boxShadow, 밑줄: s.textDecorationLine,
+            안여백: s.padding, 둥글기: s.borderRadius, 점: 켜짐, 점이글자아래: q.getBoundingClientRect().top >= b.firstChild.parentNode.getBoundingClientRect().top + 8 };
+        });
+        const 설명 = [...document.querySelectorAll('#vp-root .vp-legend span')].map((x) => [x.textContent, getComputedStyle(x, '::before').color]);
+        return { 줄, 설명 };
+      });
+      const 초 = 'rgb(47, 158, 68)', 붉 = 'rgb(224, 62, 62)', 주 = 'rgb(240, 140, 0)';
+      봤다(점.설명.length === 3 && 점.설명[0][1] === 초 && 점.설명[1][1] === 붉 && 점.설명[2][1] === 주, '페이지 머리에 점 설명 셋(초록·빨강·주황): ' + JSON.stringify(점.설명.map((x) => x[0])));
+      봤다(점.줄.length > 0 && 점.줄.every((x) => x.글색 === 'rgb(51, 126, 169)' && x.바탕 === 'rgba(0, 0, 0, 0)' && x.그림자 === 'none' && x.안여백 === '0px' && x.둥글기 === '0px'),
+        '이름이 버튼 꼴이 아닌 글자(#337ea9·바탕 없음·그림자 없음)');
+      봤다(점.줄.every((x) => x.점이글자아래), '점이 글자 아래에 있다');
+      const 점의 = (n) => (점.줄.find((x) => x.이름 === n) || {}).점;
+      const 같다 = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+      if (이름 === '단품관리') 봤다(같다(점의('가나다 서랍장'), [초, 붉]) && 같다(점의('라마바 장'), [초]) && 같다(점의('사아자 선반'), []), '단품관리 점: 재고조회에 있으면 초록 · 조혼과 맞으면 빨강도 나란히 · 둘 다 아니면 점 없음 ' + JSON.stringify(점의('가나다 서랍장')) + ' · 흉내 재고조회에 없는 단품엔 초록 없음');
+      if (이름 === '재고조회') 봤다(같다(점의('가나다 서랍장'), [초, 붉]), '재고조회 점: 목록에 있으면 초록 · 조혼과 맞으면 빨강도 나란히 ' + JSON.stringify(점의('가나다 서랍장')));
+      if (이름 === '상품관리') 봤다(같다(점의('가나다 세트'), [주]) && 같다(점의('라마바 장'), []), '상품관리 점: 카탈로그와 맞으면 주황 ' + JSON.stringify(점의('가나다 세트')));
       if (!맞나) console.log('      ' + JSON.stringify(꼴));
       if (v.보이는줄 >= 2) 봤다(꼴.둘째줄위선 && 꼴.둘째줄위선[0] === '1px', '줄과 줄 사이 선 ' + JSON.stringify(꼴.둘째줄위선));
       const 넘침 = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

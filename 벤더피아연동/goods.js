@@ -162,6 +162,7 @@
     <div class="vp-goods">
       <a class="vp-home" href="/index.aspx">← 메인</a>
       <h1>${page.title}</h1>
+      <div class="vp-legend"><span class="g">재고조회 목록에 있음</span><span class="r">조혼가구와 일치</span><span class="o">카탈로그(inghome)와 맞음</span></div>
       <div class="vp-filters">
         <input name="q" class="vp-q" placeholder="${page.search.join(", ")}…">
         ${page.selects.map(([col, label, src]) =>
@@ -802,10 +803,12 @@
     b.replaceChildren(name);
     if (shown.length) b.appendChild(Object.assign(document.createElement("small"), { className: "vp-code", textContent: shown.join(", ") }));
     b.classList.toggle("vp-instock", qty !== undefined);
-    b.classList.toggle("vp-서류", 서류연결(codes));
+    b.classList.toggle("vp-서류", 서류연결(codes));   // 판단만 둔다 — 10-22 에 화면 표시는 뺐다 (주황은 카탈로그 점)
     if (qty !== undefined) {
       b.appendChild(Object.assign(document.createElement("small"), { className: "vp-qty", textContent: `양품 ${qty.toLocaleString()}` }));
     }
+    // 연동 점 (초록·빨강·주황) — 어느 점이 켜지는지는 위 클래스(vp-instock·vp-johon·vp-ing)를 보고 CSS 가 정한다
+    b.appendChild(Object.assign(document.createElement("span"), { className: "vp-점", innerHTML: '<i class="g"></i><i class="r"></i><i class="o"></i>' }));
   }
 
   // 목록 버튼의 재고 수량: 재고조회 화면은 창고별 줄의 양품수 합, 단품관리는 재고조회에서 찾은 값
@@ -1228,7 +1231,7 @@
     적기(`inghome 맞춰보기 — 우리 상품 ${이름들.length}개 · inghome ${목록.length}개 · `
        + `이름이 그대로 맞는 것 ${딱}개 · 거의 맞는 것 ${거의}개`
        + ` (합쳐 ${딱 + 거의}개, ${이름들.length ? Math.round((딱 + 거의) * 100 / 이름들.length) : 0}%)`
-       + ` · 링크를 건 것 ${ing맞은것.size}개 — 그 단추 밑에 붉은 줄이 그어집니다`);
+       + ` · 링크를 건 것 ${ing맞은것.size}개 — 그 이름 밑에 주황 점이 찍힙니다`);
   }
 
   async function load() {
