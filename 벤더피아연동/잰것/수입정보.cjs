@@ -320,7 +320,7 @@ const 확장쪽흉내 = `
         + 못(칠.every((x) => x.바탕 === 'rgba(0, 0, 0, 0)' && x.바탕그림 === 'none' && x.밑줄 === 'none')));
       /* ★ 10-22 파란 점 = 서류관리 연결: 서류연결(vp-서류)인 단품에만 켜지고(#1c7ed6), 아니면 꺼져 있다 */
       console.log('    ★ 파란 점이 서류연결 단품에만 뜨나(' + 주황수 + '개) '
-        + 못(칠.every((x) => x.주황 ? x.파란점 === 'block|rgb(28, 126, 214)' : (x.파란점 || '').startsWith('none'))));
+        + 못(칠.every((x) => x.주황 ? x.파란점 === 'block|rgb(8, 103, 136)' : (x.파란점 || '').startsWith('none'))));
       const 둘다 = 칠.filter((x) => x.주황 && x.연두);
       const 셋다 = 칠.filter((x) => x.주황 && x.연두 && x.조혼);
       console.log('    ★ 판단은 그대로 — 주황+연두 ' + 둘다.length + '개 · 셋 겹침 ' + 셋다.length + '개 ' + 못(둘다.length > 0 && 셋다.length > 0));
