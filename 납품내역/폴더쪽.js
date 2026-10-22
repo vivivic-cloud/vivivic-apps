@@ -1,4 +1,5 @@
-/* 폴더쪽 — 보링·엣지·납품·실제청구명세서 네 쪽이 같이 쓰는 한 벌 (v6.0.0).
+/* 폴더쪽 — 보링·엣지·납품·실제청구명세서 네 쪽이 같이 쓰는 한 벌 (v6.1.0).
+   표 꼴(v6.1.0): 서류관리 제품관리 표와 같다 — 첫 칸 dpr-k, 숫자 칸 num, 날짜 가름줄 안 글은 dpr-gn. 납품내역/CLAUDE.md 「표 디자인」.
    쪽마다 window.폴더 = { 갈, 묶음?, 파일:[{이름, 열쇠?, 없음?}] } 를 먼저 적고 이 파일을 부른다.
    ⚠ 재단.html 은 이 파일을 쓰지 않는다.
 
@@ -94,22 +95,22 @@ function 표그리기(){
   const C = 목칸[F.갈];
   if(!f.줄.length){
     document.getElementById('표').innerHTML =
-      `<tbody><tr><td style="color:#8c5a5a;padding:14px 10px;white-space:normal">줄 없음 — ${씻(f.없음 || '창고에 이 파일에서 나온 줄이 없습니다')}</td></tr></tbody>`;
+      `<tbody><tr><td class="dpr-none">줄 없음 — ${씻(f.없음 || '창고에 이 파일에서 나온 줄이 없습니다')}</td></tr></tbody>`;
     return;
   }
   const 것 = f.줄.slice().sort((a,b)=> String(a.달||'').localeCompare(String(b.달||'')) || (a.일||0)-(b.일||0));
   /* 폰에서 줄을 몇 천 개씩 그리면 멎는다. 그린 수를 **숨기지 않고 적는다.** */
   const 그릴 = 것.length > 많으면 ? 것.slice(0, 많으면) : 것;
-  let t = '<thead><tr>' + C.map(c=>`<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+  let t = '<thead><tr>' + C.map((c,i)=>`<th class="${i?(숫자칸.has(c)?'num':''):'dpr-k'}">${c}</th>`).join('') + '</tr></thead><tbody>';
   if(그릴.length < 것.length)
-    t += `<tr class="daysep"><td colspan="${C.length}">${것.length}줄 가운데 <b>앞 ${많으면}줄</b>만 그렸습니다.</td></tr>`;
+    t += `<tr class="daysep"><td colspan="${C.length}"><span class="dpr-gn">${것.length}줄 가운데 <b>앞 ${많으면}줄</b>만 그렸습니다.</span></td></tr>`;
   let 앞 = null;
   for(const r of 그릴){
     const 때 = (r.달 ? +String(r.달).slice(5,7)+'월 ' : '') + (r.일||'?') + '일';
-    if(때!==앞){ t += `<tr class="daysep"><td colspan="${C.length}">${때}</td></tr>`; 앞=때; }
-    t += '<tr>' + C.map(c=>{
+    if(때!==앞){ t += `<tr class="daysep"><td colspan="${C.length}"><span class="dpr-gn">${때}</span></td></tr>`; 앞=때; }
+    t += '<tr>' + C.map((c,i)=>{
       const v = (r[c]==null)?'':String(r[c]);
-      return `<td class="${v===''?'d':(숫자칸.has(c)?'num':'')}">${v===''?'·':씻(v).replace(/\n/g,' ')}</td>`;
+      return `<td class="${i?'':'dpr-k '}${v===''?'d':(숫자칸.has(c)?'num':'')}">${v===''?'·':씻(v).replace(/\n/g,' ')}</td>`;
     }).join('') + '</tr>';
   }
   document.getElementById('표').innerHTML = t + '</tbody>';

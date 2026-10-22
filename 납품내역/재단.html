@@ -2,7 +2,8 @@
 <!-- 납품내역 / 재단 — 담당 폴더 「관리프로그램 / Amt양식 / 거래내역 / 재단」 의 파일만 정리해 보인다.
      사장님 10-22: 「폴더별로 … 각 페이지를 만들어서 … 해당 파일만 정리되어 보이는 페이지로」.
      거르는 알약(거래처·갈래)은 두지 않는다. 파일 목록 → 파일을 누르면 그 파일의 줄.
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v6.0.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v6.1.0
+     v6.1.0(10-22): 흰 바탕 · 표는 서류관리 제품관리 표 꼴(.dpr-t) — 납품내역/CLAUDE.md 「표 디자인」 을 따른다.
 
      ⚠ 창고는 **읽기만** 한다. Firebase 설정·익명 로그인·20초 안내·2,000줄 윗금·#표통 높이 묶기는
         납품내역.html 에서 그대로 가져왔다. 그 파일과 따로 놀지 않게 고칠 때 같이 본다. -->
@@ -33,54 +34,74 @@
 </script>
 
 <style>
+/* v6.1.0 (10-22) — 사장님: 「다크화면 컨셉은 삭제해줘」 → 흰 바탕.
+   표는 서류관리(vivivic-docs index.html) 「제품관리」 표와 같은 꼴 — 납품내역/CLAUDE.md 「표 디자인」 을 따른다.
+   색 낱말은 그 파일 --vg-* 와 같은 값이다. 값을 새로 짓지 마라. */
+:root{
+  --vg-bg:#fff; --vg-ink:#111110; --vg-body:#1A1A19;
+  --vg-muted:#9C9C98; --vg-edge:#E2E2DF; --vg-fill:#F4F4F2; --vg-red:#FF3B30;
+}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{background:#1a1a1a;color:#c8c8c8;font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;-webkit-text-size-adjust:100%}
-.wrap{max-width:900px;margin:0 auto;padding:0 16px}
+html,body{background:var(--vg-bg);color:var(--vg-body);
+  font:15px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",system-ui,sans-serif;
+  -webkit-text-size-adjust:100%}
+.wrap{max-width:1100px;margin:0 auto;padding:0 16px}
 
-.back{display:inline-block;font-size:12px;color:#8a8a8a;text-decoration:none;padding:16px 0 0}
-.back:hover{color:#d8d8d8}
-header{padding:10px 0 10px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
-.logo{font-size:12px;color:#444;letter-spacing:.16em;text-transform:uppercase}
-.logo b{color:#fff;font-weight:600}
-.badge{font-size:10px;color:#2e2e2e;border:1px solid #262626;padding:2px 6px;border-radius:3px;letter-spacing:.06em}
-h1{font-size:15px;color:#d8d8d8;font-weight:500;padding:2px 0 12px}
-.where{font-size:11.5px;color:#555;line-height:1.9;padding-bottom:14px;border-bottom:1px solid #222}
-.where code{color:#7a7a7a;font-size:10.5px}
-.where b{color:#9a9a9a}
+.back{display:inline-block;font-size:13px;font-weight:600;color:var(--vg-muted);text-decoration:none;padding:16px 0 0}
+.back:hover{color:var(--vg-ink)}
+header{padding:10px 0 6px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.logo{font-size:13px;color:var(--vg-muted)}
+.logo b{font-size:15px;font-weight:800;letter-spacing:3.2px;color:var(--vg-ink);margin-right:4px}
+.badge{font-size:11px;font-weight:800;letter-spacing:1.2px;color:var(--vg-ink);
+  border:1px solid var(--vg-ink);border-radius:999px;padding:3px 9px}
+h1{font-size:30px;line-height:1.1;letter-spacing:-1.2px;font-weight:700;color:var(--vg-ink);padding:8px 0 10px}
+.where{font-size:12.5px;color:var(--vg-muted);line-height:1.85;padding-bottom:14px;border-bottom:1px solid var(--vg-edge)}
+.where code{color:var(--vg-body);font-size:12px}
+.where b{color:var(--vg-body);font-weight:600}
+.where .q{color:var(--vg-muted)}
 
-h2{font-size:12px;color:#8a8a8a;font-weight:600;letter-spacing:.04em;padding:28px 0 8px;border-bottom:1px solid #222;margin-bottom:12px}
-.how{font-size:11px;color:#5f5f5f;line-height:1.8;padding:0 0 10px}
-.how b{color:#9a9a9a}
+h2{font-size:19px;font-weight:700;letter-spacing:-.4px;color:var(--vg-ink);padding:26px 0 12px;word-break:break-all}
+.how{font-size:12.5px;color:var(--vg-muted);line-height:1.8;padding:0 0 10px}
+.how b{color:var(--vg-body);font-weight:600}
 
-/* 파일 목록 — 박스 하나가 파일 하나 */
-.files{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px}
-.file{border:1px solid #262626;background:#1f1f1f;padding:10px 12px;cursor:pointer}
-.file:hover{background:#242424}
-.file.on{background:#e8e8e8;border-color:#e8e8e8}
-.file.on .fn{color:#111}
-.file.on .fs{color:#444}
-.file .fn{font-size:12.5px;color:#d8d8d8;line-height:1.45;word-break:break-all}
-.file .fs{font-size:10.5px;color:#5f5f5f;padding-top:5px;font-variant-numeric:tabular-nums}
-.file.zero .fn{color:#6a4a4a}
+/* 파일 목록 — 박스 하나가 파일 하나 (바이글 .abox 꼴) */
+.files{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.file{border:1px solid var(--vg-edge);border-radius:20px;background:#fff;padding:14px;cursor:pointer;transition:transform .12s}
+.file:active{transform:scale(.975)}
+.file.on{background:var(--vg-ink);border-color:var(--vg-ink)}
+.file.on .fn{color:#fff}
+.file.on .fs{color:rgba(255,255,255,.5)}
+.file .fn{font-size:15px;font-weight:600;color:var(--vg-ink);line-height:1.25;word-break:break-all}
+.file .fs{font-size:12px;color:var(--vg-muted);padding-top:8px;font-variant-numeric:tabular-nums}
+.file.zero{border-style:dashed}
+.file.zero .fn{color:var(--vg-muted)}
 
-.sec{font-size:11.5px;color:#9a9a9a;font-weight:600;padding:18px 0 6px}
-.sec .n{font-weight:400;color:#5f5f5f;margin-left:6px}
+/* 표 묶음 머리 = 제품관리 .dpr-gh / .dpr-gn / .dpr-gc */
+.dpr-gh{display:flex;align-items:baseline;gap:8px;margin:18px 0 4px;flex-wrap:wrap}
+.dpr-gh .dpr-gn{font-size:17px;font-weight:700;color:var(--vg-ink)}
+.dpr-gh .dpr-gc{font-size:12px;color:var(--vg-muted)}
 /* 사장님 10-20: 가로 스크롤이 표 맨 아래에 있어 위쪽을 볼 때 못 쓴다 → 표 상자를 화면 높이로 묶어 스크롤 막대가 늘 보는 화면 아래에 오게 한다 */
-.표통{overflow:auto;max-height:calc(100vh - 24px);-webkit-overflow-scrolling:touch;border:1px solid #242424;background:#1c1c1c}
-.표통 table{border-collapse:collapse;font-size:11.5px;min-width:100%;white-space:nowrap}
-.표통 th{background:#232323;color:#8f8f8f;font-weight:600;text-align:left;padding:7px 9px;border-bottom:1px solid #2c2c2c;border-right:1px solid #262626}
-.표통 td{padding:6px 9px;border-bottom:1px solid #222;border-right:1px solid #212121;color:#bdbdbd;vertical-align:top}
-.표통 tr:hover td{background:#212121}
-.표통 td.d{color:#4a4a4a}
-.표통 td.num{text-align:right;font-variant-numeric:tabular-nums}
-.표통 .daysep td{background:#191919;color:#777;font-size:10.5px;letter-spacing:.1em;padding:5px 9px;font-weight:600}
-.empty{font-size:11.5px;color:#8c5a5a;border:1px solid #242424;background:#1c1c1c;padding:12px 10px}
-.state{border:1px solid #242424;background:#1c1c1c;padding:24px 16px;text-align:center}
-.state .big{font-size:13px;color:#9a9a9a;padding-bottom:6px}
-.state .sub{font-size:11.5px;color:#5f5f5f;line-height:1.9}
-.state .why{font-size:10.5px;color:#8c5a5a;padding-top:6px;font-family:ui-monospace,monospace}
-footer{font-size:10px;color:#2a2a2a;padding:30px 0 24px;border-top:1px solid #1e1e1e;margin-top:30px;line-height:2}
-@media(max-width:560px){.wrap{padding:0 14px}}
+.표통{overflow:auto;max-height:calc(100vh - 24px);-webkit-overflow-scrolling:touch;background:var(--vg-bg)}
+/* 표 — 서류관리 제품관리(.dpr-t)와 같은 꼴: 굵은 머리줄, 그 아래 굵은 선 하나, 줄마다 옅은 선, 숫자는 가운데, 첫 칸은 붙어 선다. */
+.dpr-t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.dpr-t th{font-size:13px;font-weight:800;color:var(--vg-ink);text-align:left;vertical-align:bottom;
+  padding:10px 12px;border-bottom:2px solid var(--vg-ink);background:var(--vg-bg);white-space:nowrap}
+.dpr-t th.num{min-width:84px}
+.dpr-t td{font-size:14px;color:var(--vg-body);padding:13px 12px;
+  border-bottom:1px solid #D6D6D3;vertical-align:top;white-space:nowrap}
+.dpr-t .num{text-align:center}
+.dpr-t td.d{color:var(--vg-muted)}
+.dpr-t .dpr-k{position:sticky;left:0;z-index:1;background:var(--vg-bg);font-weight:700;color:var(--vg-ink)}
+/* 날짜 가름줄 = 제품관리의 묶음 머리(.dpr-gh / .dpr-gn) 꼴 */
+.dpr-t tr.daysep td{font-size:17px;font-weight:700;color:var(--vg-ink);padding:18px 2px 4px;border-bottom:0;background:var(--vg-bg)}
+.dpr-t tr.daysep td .dpr-gn{display:inline-block;position:sticky;left:2px}
+.dpr-t td.dpr-none{font-size:12px;color:var(--vg-muted);padding:6px 2px;white-space:normal}
+.empty{font-size:12px;color:var(--vg-muted);padding:6px 2px}
+.state{background:var(--vg-fill);border-radius:14px;padding:22px 16px;text-align:center}
+.state .big{font-size:14px;font-weight:600;color:var(--vg-ink);padding-bottom:6px}
+.state .sub{font-size:12.5px;color:var(--vg-muted);line-height:1.85}
+.state .why{font-size:11.5px;color:var(--vg-red);padding-top:6px;font-family:ui-monospace,monospace}
+footer{font-size:11px;color:var(--vg-muted);padding:26px 0 24px;border-top:1px solid var(--vg-edge);margin-top:30px;line-height:1.9}
 </style>
 </head>
 <body>
@@ -89,7 +110,7 @@ footer{font-size:10px;color:#2a2a2a;padding:30px 0 24px;border-top:1px solid #1e
 <a class="back" href="납품내역.html">← 납품내역</a>
 <header>
   <div class="logo"><b>VIVIVIC</b> — 재단</div>
-  <div class="badge">v6.0.0</div>
+  <div class="badge">v6.1.0</div>
 </header>
 <h1>재단</h1>
 <div class="where">
@@ -206,16 +227,16 @@ function 표(갈, 것){
   것 = 것.slice().sort((a,b)=> String(a.달||'').localeCompare(String(b.달||'')) || (a.일||0)-(b.일||0));
   /* 폰에서 줄을 몇 천 개씩 그리면 멎는다. 그린 수를 숨기지 않고 적는다. */
   const 그릴 = 것.length > 많으면 ? 것.slice(0, 많으면) : 것;
-  let t = '<div class="표통"><table><thead><tr>' + C.map(c=>`<th>${c}</th>`).join('') + '</tr></thead><tbody>';
+  let t = '<div class="표통"><table class="dpr-t"><thead><tr>' + C.map((c,i)=>`<th class="${i?(숫자칸.has(c)?'num':''):'dpr-k'}">${c}</th>`).join('') + '</tr></thead><tbody>';
   if(그릴.length < 것.length)
-    t += `<tr class="daysep"><td colspan="${C.length}">${것.length}줄 가운데 <b>앞 ${많으면}줄</b>만 그렸습니다.</td></tr>`;
+    t += `<tr class="daysep"><td colspan="${C.length}"><span class="dpr-gn">${것.length}줄 가운데 <b>앞 ${많으면}줄</b>만 그렸습니다.</span></td></tr>`;
   let 앞 = null;
   for(const r of 그릴){
     const 때 = (r.달 ? +String(r.달).slice(5,7)+'월 ' : '') + (r.일||'?') + '일';
-    if(때!==앞){ t += `<tr class="daysep"><td colspan="${C.length}">${때}</td></tr>`; 앞=때; }
-    t += '<tr>' + C.map(c=>{
+    if(때!==앞){ t += `<tr class="daysep"><td colspan="${C.length}"><span class="dpr-gn">${때}</span></td></tr>`; 앞=때; }
+    t += '<tr>' + C.map((c,i)=>{
       const v = (r[c]==null)?'':String(r[c]);
-      return `<td class="${v===''?'d':(숫자칸.has(c)?'num':'')}">${v===''?'·':글(v).replace(/\n/g,' ')}</td>`;
+      return `<td class="${i?'':'dpr-k '}${v===''?'d':(숫자칸.has(c)?'num':'')}">${v===''?'·':글(v).replace(/\n/g,' ')}</td>`;
     }).join('') + '</tr>';
   }
   return t + '</tbody></table></div>';
@@ -226,8 +247,8 @@ function 속그리기(){
   const 재 = 것.filter(r=>r.갈==='재단'), 원 = 것.filter(r=>r.갈==='원장소요량');
   document.getElementById('속').innerHTML =
     `<h2>${글(고른)}</h2>` +
-    `<div class="sec">재단 내역<span class="n">${재.length}줄</span></div>` + 표('재단', 재) +
-    `<div class="sec">원장소요량<span class="n">${원.length}줄 · 전일·금일·총소요량이 다 「-」 인 줄은 뺐습니다</span></div>` + 표('원장소요량', 원);
+    `<div class="dpr-gh"><span class="dpr-gn">재단 내역</span><span class="dpr-gc">${재.length}줄</span></div>` + 표('재단', 재) +
+    `<div class="dpr-gh"><span class="dpr-gn">원장소요량</span><span class="dpr-gc">${원.length}줄 · 전일·금일·총소요량이 다 「-」 인 줄은 뺐습니다</span></div>` + 표('원장소요량', 원);
 }
 
 document.addEventListener('click', e=>{
