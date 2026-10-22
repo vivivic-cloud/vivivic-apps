@@ -14,6 +14,13 @@
    (ASP.NET 이 주소로 되돌려 보내는 화면이라 함부로 건드리면 안 된다).
    대신 손잡이가 보는 **기억**(vg기억장·vg기억칸)을 이 자리에서 적어 둔다. 손잡이가 그것을 보고 켠다. */
 (() => {
+  /* ⚠⚠ 10-22 「벤더피아」 단추가 연 **새 창 오리지널** — 표식 `window.name === "vp원본"` (login.js 가 `window.open(주소, "vp원본", "noopener")` 로 붙인다).
+     그 창과 안쪽 모든 frame 에서는 우리 글이 **하나도** 돌지 않아야 한다 → 여기서 가장 먼저 멈춘다.
+     ⚠ 틀 안쪽 frame 은 제 이름이 없어 `window.top.name` 으로 본다(같은 출처라 읽힌다). 새 페이지로 가도 창 이름은 그대로다.
+     ⚠ 그 창의 sessionStorage 에도 표식을 적어 둔다 — 그 창에서 `window.open` 으로 열린 딴 창(이름 없음, sessionStorage 는 복사됨)도 오리지널로 남게.
+       이 창(우리 화면)에는 표식이 **없다** — 이름이 맞을 때만 적는다. */
+  try { if (window.top.name === "vp원본") { try { sessionStorage.setItem("vp원본", "1"); } catch (e) {} return; } } catch (e) {}
+  try { if (sessionStorage.getItem("vp원본") === "1") return; } catch (e) {}
   /* ⚠⚠ 10-13 사장님: 「메인화면에서는 **영역만 짚어지고** 지시내용을 보내는 부분이 안나타난다」.
      까닭을 찾았다 — 벤더피아 메인은 **틀(frameset)** 로 짜여 있다.
        ㄱ) 틀 문서에는 몸(body) 대신 `<frameset>` 이 있다. 거기에 지시판을 붙이면 **안 그려진다.**

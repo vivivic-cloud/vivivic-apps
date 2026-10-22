@@ -86,11 +86,12 @@ const 본다 = () => {
       const 또 = await page.evaluate(본다);
       console.log('    또 두 번 누름   → 딱지 ' + 또.딱지보이나 + ' ' + 못(!또.딱지보이나)
         + ' · 「·짚기v」 ' + 또.짚기v들었나 + ' ' + 못(!또.짚기v들었나));
-      /* 한 번만 누르면 화면이 바뀌어야 한다 (전환이 안 죽었나) */
-      await page.click('#vp-바꾸기'); await page.waitForTimeout(350);
+      /* 한 번만 누르면 새 창이 열릴 뿐 이 화면은 제자리여야 한다 (0.34.40 — 옛 「원래 화면」 뒤집기는 지웠다) */
+      const 열림 = ctx.waitForEvent('page', { timeout: 3000 }).then(() => true, () => false);
+      await page.click('#vp-바꾸기'); await page.waitForTimeout(700);
       const 한번 = await page.evaluate(본다);
-      console.log('    한 번만 누름    → 벤더피아 제 화면으로 갔나 ' + !한번.우리화면인가 + ' '
-        + 못(한번.우리화면인가 !== 것.우리화면인가));
+      console.log('    한 번만 누름    → 새 창이 떴나 ' + await 열림 + ' ' + 못(await 열림)
+        + ' · 이 화면은 제자리 ' + 한번.우리화면인가 + ' ' + 못(한번.우리화면인가 === 것.우리화면인가));
     }
     if (탈.length) { console.log('    터진 말: ' + JSON.stringify([...new Set(탈)].slice(0,2))); 빨강++; }
     await ctx.close();

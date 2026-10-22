@@ -6,6 +6,13 @@
       그래도 안 되면 붉은 줄을 띄운다 — 조용히 비는 것이 이 집에서 제일 나쁘다.
    ⚠ 글 차례를 지킨다. `vp-data.js` 가 `goods.js` 보다 먼저 돌아야 한다. */
 (() => {
+  /* ⚠⚠ 10-22 「벤더피아」 단추가 연 **새 창 오리지널** — 표식 `window.name === "vp원본"` (login.js 가 `window.open(주소, "vp원본", "noopener")` 로 붙인다).
+     그 창과 안쪽 모든 frame 에서는 우리 글이 **하나도** 돌지 않아야 한다 → 여기서 가장 먼저 멈춘다.
+     ⚠ 틀 안쪽 frame 은 제 이름이 없어 `window.top.name` 으로 본다(같은 출처라 읽힌다). 새 페이지로 가도 창 이름은 그대로다.
+     ⚠ 그 창의 sessionStorage 에도 표식을 적어 둔다 — 그 창에서 `window.open` 으로 열린 딴 창(이름 없음, sessionStorage 는 복사됨)도 오리지널로 남게.
+       이 창(우리 화면)에는 표식이 **없다** — 이름이 맞을 때만 적는다. */
+  try { if (window.top.name === "vp원본") { try { sessionStorage.setItem("vp원본", "1"); } catch (e) {} return; } } catch (e) {}
+  try { if (sessionStorage.getItem("vp원본") === "1") return; } catch (e) {}
   const 깃 = "https://vivivic-cloud.github.io/vivivic-apps/%EB%B2%A4%EB%8D%94%ED%94%BC%EC%95%84%EC%97%B0%EB%8F%99/";
   /* ⚠⚠ 10-15 사장님: 「이게 뭐야 … 드롭다운 목록으로 만들어 달라니까, 그리고, 송장전송필터링은
        필요없다고」 — **새 글은 올라가 있었는데 사장님 화면에는 옛 글이 돌고 있었다.**
