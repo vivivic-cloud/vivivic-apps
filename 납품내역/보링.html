@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<!-- 납품내역 / 보링 — 드라이브 「관리프로그램 / Amt양식 / 거래내역 / 보링」 폴더의 파일만 보인다.
+     판 번호는 머리의 배지와 같다: v6.0.0
+     ⚠ 사장님 10-22: 필터링 화면을 없애고 폴더별 쪽으로 — 거르는 알약을 다시 붙이지 마라.
+     ⚠ 창고는 읽기만 한다. 몸통은 폴더쪽.js 한 벌(보링·엣지·납품·실제청구명세서 넷이 같이 쓴다).
+     ⚠ 아래 파일 목록은 2026-10-22 에 드라이브 폴더를 읽어 적은 것이다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>보링 — 납품내역</title>
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+    import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+    const app = initializeApp({
+        apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
+        authDomain: "vivivic-4b7ef.firebaseapp.com",
+        projectId: "vivivic-4b7ef",
+        storageBucket: "vivivic-4b7ef.firebasestorage.app",
+        messagingSenderId: "830175660542",
+        appId: "1:830175660542:web:9054030480c8280af8d8af"
+    });
+    const auth = getAuth(app);
+    window.db = getFirestore(app);
+    window.fbRead = { collection, getDocs, query, where };
+    onAuthStateChanged(auth, (u) => {
+        if (!u) { signInAnonymously(auth).catch(e => window.목록못읽음('창고에 들어가지 못했습니다', (e&&(e.code||e.message))||'')); return; }
+        window.목록읽기();
+    });
+</script>
+
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{background:#1a1a1a;color:#c8c8c8;font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;-webkit-text-size-adjust:100%}
+.wrap{max-width:900px;margin:0 auto;padding:0 16px}
+
+.back{display:inline-block;font-size:12.5px;color:#9a9a9a;text-decoration:none;padding:16px 0 0}
+.back:hover{color:#e8e8e8}
+header{padding:10px 0 10px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.logo{font-size:12px;color:#444;letter-spacing:.16em;text-transform:uppercase}
+.logo b{color:#fff;font-weight:600}
+.badge{font-size:10px;color:#2e2e2e;border:1px solid #262626;padding:2px 6px;border-radius:3px;letter-spacing:.06em}
+h1{font-size:15px;color:#d8d8d8;font-weight:500;padding:2px 0 12px}
+.where{font-size:11.5px;color:#555;line-height:1.9;padding-bottom:14px;border-bottom:1px solid #222}
+.where code{color:#7a7a7a;font-size:10.5px}
+.where b{color:#9a9a9a}
+.where .q{color:#5f5f5f}
+
+.cnt{display:flex;gap:6px;flex-wrap:wrap;padding:16px 0 4px}
+.c{border:1px solid #262626;background:#1f1f1f;padding:8px 11px;min-width:88px}
+.c .k{font-size:10.5px;color:#5f5f5f}
+.c .v{font-size:17px;color:#d8d8d8;font-variant-numeric:tabular-nums;padding-top:2px}
+.c .v small{font-size:10px;color:#4a4a4a;margin-left:2px}
+
+h2{font-size:12px;color:#8a8a8a;font-weight:600;letter-spacing:.04em;padding:28px 0 8px;border-bottom:1px solid #222;margin-bottom:12px}
+
+.files{display:flex;flex-direction:column;gap:4px}
+.file{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;font-size:12px;color:#bdbdbd;background:#1f1f1f;border:1px solid #262626;padding:9px 11px;cursor:pointer;line-height:1.5}
+.file:hover{background:#262626}
+.file.on{background:#e8e8e8;color:#111;border-color:#e8e8e8;font-weight:600}
+.file .nm{word-break:break-all}
+.file .n{font-size:11px;color:#6a6a6a;font-variant-numeric:tabular-nums;white-space:nowrap}
+.file.on .n{color:#555}
+.file.empty{color:#5f5f5f;background:#1c1c1c;border-color:#222}
+.file .none{font-size:10.5px;color:#8c5a5a}
+.file .q{color:#5f5f5f;font-weight:400}
+
+.count{font-size:11px;color:#555;padding:14px 0 6px;word-break:break-all}
+.count b{color:#c8c8c8;font-weight:600}
+/* 사장님 10-20: 가로 스크롤이 표 맨 아래에 있어 위쪽을 볼 때 못 쓴다 → 표 상자를 화면 높이로 묶어 스크롤 막대가 늘 보는 화면 아래에 오게 한다 */
+#표통{overflow:auto;max-height:calc(100vh - 24px);-webkit-overflow-scrolling:touch;border:1px solid #242424;background:#1c1c1c}
+#표{border-collapse:collapse;font-size:11.5px;min-width:100%;white-space:nowrap}
+#표 th{background:#232323;color:#8f8f8f;font-weight:600;text-align:left;padding:7px 9px;border-bottom:1px solid #2c2c2c;border-right:1px solid #262626}
+#표 td{padding:6px 9px;border-bottom:1px solid #222;border-right:1px solid #212121;color:#bdbdbd;vertical-align:top}
+#표 tr:hover td{background:#212121}
+#표 td.d{color:#4a4a4a}
+#표 td.num{text-align:right;font-variant-numeric:tabular-nums}
+#표 .daysep td{background:#191919;color:#777;font-size:10.5px;letter-spacing:.1em;padding:5px 9px;font-weight:600}
+.state{border:1px solid #242424;background:#1c1c1c;padding:24px 16px;text-align:center;margin-top:10px}
+.state .big{font-size:13px;color:#9a9a9a;padding-bottom:6px}
+.state .sub{font-size:11.5px;color:#5f5f5f;line-height:1.9}
+.state .why{font-size:10.5px;color:#8c5a5a;padding-top:6px;font-family:ui-monospace,monospace}
+footer{font-size:10px;color:#2a2a2a;padding:30px 0 24px;border-top:1px solid #1e1e1e;margin-top:30px;line-height:2}
+@media(max-width:560px){.wrap{padding:0 14px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<a class="back" href="납품내역.html">← 납품내역</a>
+<header>
+  <div class="logo"><b>VIVIVIC</b> — 납품내역</div>
+  <div class="badge">v6.0.0</div>
+</header>
+<h1>보링</h1>
+<div class="where">
+  구글드라이브 <code>관리프로그램 / Amt양식 / 거래내역 / 보링</code> — 2026년<br>
+  <span id="묶은것"></span>
+</div>
+
+<div class="cnt" id="셈"></div>
+
+<h2>파일 — 누르면 그 파일의 줄이 아래에 나옵니다</h2>
+<div class="files" id="파일목"></div>
+<div class="state" id="상태" style="display:none"></div>
+
+<div id="표틀" style="display:none">
+  <h2>줄</h2>
+  <div class="count" id="줄셈"></div>
+  <div class="tbox" id="표통"><table id="표"></table></div>
+</div>
+
+<footer>
+  읽기만 합니다. 드라이브에도 창고에도 아무것도 쓰지 않습니다.<br>
+  파일 이름은 폴더에 적힌 그대로입니다.
+</footer>
+</div>
+
+<script>
+window.폴더 = {
+  "갈": "보링",
+  "묶음": "TalkFile_보링4월~9월.zip.zip",
+  "파일": [
+   {
+    "이름": "26년 4월 보링출고내역.xlsx",
+    "열쇠": "26년 4월 보링출고내역.xlsx (TalkFile_보링4월~9월.zip.zip 속)"
+   },
+   {
+    "이름": "26년 5월 보링출고내역.xlsx",
+    "열쇠": "26년 5월 보링출고내역.xlsx (TalkFile_보링4월~9월.zip.zip 속)"
+   },
+   {
+    "이름": "26년 6월 보링출고내역.xlsx",
+    "열쇠": "26년 6월 보링출고내역.xlsx (TalkFile_보링4월~9월.zip.zip 속)"
+   },
+   {
+    "이름": "26년 7월 보링출고내역.xlsx",
+    "열쇠": "26년 7월 보링출고내역.xlsx (TalkFile_보링4월~9월.zip.zip 속)"
+   },
+   {
+    "이름": "26년 8월 보링출고내역.xlsx",
+    "열쇠": "26년 8월 보링출고내역.xlsx (TalkFile_보링4월~9월.zip.zip 속)"
+   },
+   {
+    "이름": "26년 9월 보링출고내역.xlsx",
+    "열쇠": "26년 9월 보링출고내역.xlsx (TalkFile_보링4월~9월.zip.zip 속)"
+   }
+  ]
+ };
+</script>
+<script src="폴더쪽.js"></script>
+<!-- 짚어서 지시하는 손잡이 — 바이글 박스에서 열면 켜진다. 화면을 갈아엎을 때도 이 줄은 남긴다. -->
+<script src="../shared/viggle.js"></script>
+</body>
+</html>
