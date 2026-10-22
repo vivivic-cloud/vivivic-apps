@@ -298,6 +298,7 @@ const 확장쪽흉내 = `
             주황: b.classList.contains('vp-서류'),
             연두: b.classList.contains('vp-instock'),
             조혼: b.classList.contains('vp-johon'),
+            파란점: (() => { const i = b.querySelector('.vp-점 i.b'); return i ? getComputedStyle(i).display + '|' + getComputedStyle(i).backgroundColor : null; })(),
             바탕: s.backgroundColor, 바탕그림: s.backgroundImage,
             밑줄: s.boxShadow };
         }));
@@ -317,6 +318,9 @@ const 확장쪽흉내 = `
            여기서는 단품 이름이 **글자 꼴**(바탕 없음·밑줄 그림자 없음)인지, 서류 때문에 칠이 남지 않았는지 잰다. */
       console.log('    ★ 서류 주황 칠·붉은 줄이 안 남았나(바탕 없음·그림자 없음) '
         + 못(칠.every((x) => x.바탕 === 'rgba(0, 0, 0, 0)' && x.바탕그림 === 'none' && x.밑줄 === 'none')));
+      /* ★ 10-22 파란 점 = 서류관리 연결: 서류연결(vp-서류)인 단품에만 켜지고(#1c7ed6), 아니면 꺼져 있다 */
+      console.log('    ★ 파란 점이 서류연결 단품에만 뜨나(' + 주황수 + '개) '
+        + 못(칠.every((x) => x.주황 ? x.파란점 === 'block|rgb(28, 126, 214)' : (x.파란점 || '').startsWith('none'))));
       const 둘다 = 칠.filter((x) => x.주황 && x.연두);
       const 셋다 = 칠.filter((x) => x.주황 && x.연두 && x.조혼);
       console.log('    ★ 판단은 그대로 — 주황+연두 ' + 둘다.length + '개 · 셋 겹침 ' + 셋다.length + '개 ' + 못(둘다.length > 0 && 셋다.length > 0));
