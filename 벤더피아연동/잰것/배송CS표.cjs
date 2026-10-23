@@ -66,6 +66,12 @@ const VP흉내 = `window.VP저장 = { get: async function(){return {};}, set: as
       console.log('    ★ 칸 수 그대로(배송 23 · CS 주문관리 머리 8) ' + 못(화면 === '배송관리' ? 내용.머리 === 23 && 내용.줄 === 3 : 내용.머리 === 8 && 내용.줄 === 3));
       console.log('    ★ 첫 칸은 밀어도 붙음 ' + 못(내용.통.첫칸붙음) + ' · 세로줄 ' + 내용.세로줄 + '개 ' + 못(내용.세로줄 === 0));
       if (화면 === '배송관리') console.log('    ★ 23칸이 **창 안에 욱여넣어지지 않고** 옆으로 밀리나 ' + 못(내용.통.밀수있나));
+      /* 사장님 10-23 (장부 a1792740601) 「이렇게 텍스트 열바뀜 안되게 해줘」 — 머리글은 전부 **한 줄**(줄바꿈 없음, 주문번호 포함) */
+      const 머리줄 = await 쪽.evaluate(() => [...document.querySelectorAll('.vp-table thead th')].map((th) => { const c = getComputedStyle(th); const lh = parseFloat(c.lineHeight);
+        return { 글: th.textContent, 줄바꿈: c.whiteSpace, 줄수: Math.round((th.clientHeight - parseFloat(c.paddingTop) - parseFloat(c.paddingBottom)) / lh) }; }));
+      const 두줄 = 머리줄.filter((x) => x.줄수 > 1 || !/^nowrap$/.test(x.줄바꿈));
+      console.log('    ★ 머리글 ' + 머리줄.length + '개 전부 한 줄(nowrap) — 두 줄 이상 ' + 두줄.length + '개 ' + 못(두줄.length === 0 && 머리줄.some((x) => x.글 === '주문번호')));
+      두줄.forEach((x) => console.log('       ✗ ' + x.글 + ' ' + x.줄바꿈 + ' ' + x.줄수 + '줄'));
       const 머리 = 우리.머리.보통, 몸 = 우리.몸.보통, 첫 = 우리.몸.첫;
       console.log('    머리 ' + 머리.fontSize + '/' + 머리.fontWeight + ' ' + 머리.color + ' 바탕 ' + 머리.backgroundColor + ' 안여백 ' + 머리.paddingTop + ' ' + 머리.paddingLeft + ' 밑선 ' + 머리.borderBottomWidth + ' ' + 머리.borderBottomColor);
       console.log('    몸   ' + 몸.fontSize + '/' + 몸.fontWeight + ' ' + 몸.color + ' 안여백 ' + 몸.paddingTop + ' ' + 몸.paddingLeft + ' 밑선 ' + 몸.borderBottomWidth + ' ' + 몸.borderBottomColor + ' · 첫 칸 굵기 ' + 첫.fontWeight + ' · 줄 높이 ' + 우리.줄높이);
