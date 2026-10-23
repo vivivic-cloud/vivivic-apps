@@ -15,15 +15,15 @@ const 머리 = ["선택","주문번호","상품명","수취인","주문자","휴
 const 표만들기 = (줄) => `<html><body><span>총 ${줄.length} 건</span><table><tr>${머리.map(h=>`<th>${h}</th>`).join('')}</tr>
 ${줄.map(r=>`<tr>${r.map(v=>`<td>${v}</td>`).join('')}</tr>`).join('')}</table></body></html>`;
 const 자료 = [["", "20261021-777", "토리블리 책상", "가나다", "라마바", "010-1111-2222", "서울 ○○구", "2026-10-20"]];
-const 주문폼 = (칸있나) => `<form name="f" method="post" action="/System/Sales/orderMst.aspx" id="f">
+const 주문폼 = (모양) => `<form name="f" method="post" action="/System/Sales/orderMst.aspx" id="f">
 <input type="hidden" name="__VIEWSTATE" value="x">
-<table id="원래화면"><tr><th>주문기간</th><td><input type="text" name="ctl00$txtFrom" value="2026/09/21"> ~ <input type="text" name="ctl00$txtTo" value="2026/10/21"></td></tr>
+<table id="원래화면"><tr><th>주문기간</th><td><input type="text" name="ctl00$txtFrom" value="${모양 === 'none' ? '' : '2026/09/21'}"> ~ <input type="text" name="ctl00$txtTo" value="${모양 === 'none' ? '' : '2026/10/21'}"></td></tr>
 <tr><th>주문번호</th><td><input type="text" name="ctl00$txtOrdNo"></td><th>수취인</th><td><input type="text" name="ctl00$txtRcv"></td></tr>
-${칸있나 ? `<tr><th>주문자</th><td><input type="text" name="ctl00$txtOrd"></td><th>주소</th><td><input type="text" name="ctl00$txtAd"></td></tr>
-<tr><th>상품명</th><td><input type="text" name="ctl00$txtGn"></td><th>송장번호</th><td><input type="text" name="ctl00$txtIv"></td></tr>
-<tr><th>단품코드</th><td><input type="text" name="ctl00$txtGc"></td></tr>` : ''}</table>
+<tr><th>주문자</th><td><input type="text" name="ctl00$txtOrd"></td><th>주소</th><td><input type="text" name="ctl00$txtAd"></td></tr>
+<tr><th>상품명</th><td><input type="text" name="ctl00$txtGn"></td></tr>
+${모양 === 'all' ? `<tr><th>송장번호</th><td><input type="text" name="ctl00$txtIv"></td><th>단품코드</th><td><input type="text" name="ctl00$txtGc"></td></tr>` : ''}</table>
 <input type="image" name="ctl00$btnSrch" id="btnSrch" src="s.gif"></form><p id="원래글">주문관리 원래 화면</p>`;
-const 배송폼 = `<form name="aspnetForm" method="post" action="/System/Delivery/firmDvList.aspx" id="aspnetForm">
+const 배송폼 = `<form name="aspnetForm" method="post" action="firmDvList.aspx" id="aspnetForm">
 <input type="hidden" name="__VIEWSTATE" value="x"><input name="dcStartDt" id="dcStartDt" value="2026-07-15"><input name="dcEndDt" id="dcEndDt" value="2026-10-15">
 <select name="ddlRowCnt" id="ddlRowCnt"><option value="50">50</option></select>
 <input type="image" name="btnSearch" id="btnSearch" src="s.gif"></form>`;
@@ -36,8 +36,9 @@ const VP흉내 = `window.VP저장 = { get: async function(){return {};}, set: as
   let 초록 = 0, 빨강 = 0;
   const 못 = (참) => { if (참) { 초록++; return '✓'; } 빨강++; return '✗'; };
   console.log('\n■ 주문관리 CS등록 (10-21 사장님)');
-  for (const 칸있나 of [true, false]) {
-    console.log('\n  ◆ 주문관리 폼 ' + (칸있나 ? '칸 모두 있음 → 주문관리 조회' : '주문자·주소·상품명 칸 없음 → 배송목록으로 돌아가기'));
+  for (const 모양 of ['all', 'five', 'none']) {
+    const 칸있나 = 모양 !== 'none', 칸다 = 모양 === 'all';
+    console.log('\n  ◆ 주문관리 폼 ' + ({ all: '칸 모두 있음 → 주문관리 조회', five: '사장님 진짜 모양: 송장번호·단품코드 칸만 없음 → 그래도 주문관리 조회', none: '기간 칸도 못 읽음 → 배송목록으로 돌아가기(action 이 상대 주소)' })[모양]);
     for (const 해시 of ['#vgCS', '']) {
       const ctx = await b.newContext({ viewport: { width: +(process.env.VW || 1280), height: 900 } });
       await ctx.route('**://identitytoolkit.googleapis.com/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"idToken":"x"}' }));
@@ -47,7 +48,8 @@ const VP흉내 = `window.VP저장 = { get: async function(){return {};}, set: as
         const u = new URL(r.request().url()), m = r.request().method();
         부름.push(m + ' ' + u.pathname + (m === 'POST' ? ' ' + JSON.stringify(Object.fromEntries([...(r.request().postData() || '').matchAll(/name="([^"]+)"\r\n\r\n([^\r]*)\r\n/g)].map((x) => [x[1], x[2]]))) : ''));
         const 화 = (t) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: t });
-        if (/orderMst/.test(u.pathname)) return m === 'POST' ? 화(표만들기(자료)) : 화(`<html><head><meta charset="utf-8"></head><body id="body">${주문폼(칸있나)}</body></html>`);
+        if (/orderMst/.test(u.pathname)) return m === 'POST' ? 화(표만들기(자료)) : 화(`<html><head><meta charset="utf-8"></head><body id="body">${주문폼(모양)}</body></html>`);
+        if (/firmDvList/.test(u.pathname) && u.pathname !== '/System/Delivery/firmDvList.aspx') return r.fulfill({ status: 404, contentType: 'text/html', body: '리소스를 찾을 수 없습니다.' });
         if (/firmDvList/.test(u.pathname)) return m === 'POST' ? 화(배송표) : 화(`<html><body>${배송폼}</body></html>`);
         return r.fulfill({ status: 200, contentType: 'text/javascript', body: '' });
       });
@@ -98,7 +100,7 @@ const VP흉내 = `window.VP저장 = { get: async function(){return {};}, set: as
         }
         const 진단 = await 쪽.evaluate(() => (document.querySelector('.vp-진단') || {}).textContent || '');
         console.log('    ★ 화면에 까닭 글(진단)이 보이나: ' + JSON.stringify(진단.slice(0, 260)));
-        console.log('    ★ 진단에 응답 건수·머리·줄이 적힘 ' + 못(/응답 .*머리\d+칸\[.*줄1 건수1/.test(진단) && (칸있나 ? /주문관리 폼읽음/.test(진단) && /주문관리 응답/.test(진단) : /못 찾은 칸/.test(진단) && /배송목록 응답/.test(진단))));
+        console.log('    ★ 진단에 응답 건수·머리·줄이 적힘 ' + 못(/응답 .*머리\d+칸\[.*줄1 건수1/.test(진단) && (칸있나 ? /주문관리 폼읽음/.test(진단) && /주문관리 응답/.test(진단) && (칸다 || /폼에 없는 칸.*송장번호,단품코드/.test(진단)) : /배송목록 응답 HTTP200/.test(진단) && !/404/.test(진단))));
         await 쪽.click('.vp-table .vp-cs상품');
         await 쪽.waitForTimeout(900);
         const 고객 = await 쪽.evaluate(() => (document.querySelector('.vp-고객목록') || {}).textContent || '');
@@ -107,7 +109,7 @@ const VP흉내 = `window.VP저장 = { get: async function(){return {};}, set: as
         await 쪽.click('.vp-table .vp-상담알');
         await 쪽.waitForTimeout(600);
         console.log('    ★ 「상담」 단추도 상담 판을 연다 ' + 못(await 쪽.evaluate(() => !!document.querySelector('.vp-상담판'))));
-        await 쪽.screenshot({ path: path.join(__dirname, '그림', '주문관리CS-' + (칸있나 ? '칸있음' : '칸없음') + (process.env.VW ? '-' + process.env.VW : '') + '.png') });
+        await 쪽.screenshot({ path: path.join(__dirname, '그림', '주문관리CS-' + 모양 + (process.env.VW ? '-' + process.env.VW : '') + '.png') });
       }
       console.log('    ★ 쪽 오류 ' + 탈.length + '건 ' + 못(탈.length === 0) + (탈.length ? ' ' + JSON.stringify(탈) : ''));
       await ctx.close();

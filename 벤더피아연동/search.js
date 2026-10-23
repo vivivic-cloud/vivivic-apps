@@ -138,17 +138,16 @@
       return null; }
     const 칸 = { dcStartDt: 날[0], dcEndDt: 날[1] };
     for (const [id, 글] of Object.entries(칸이름표)) { const e = 머리글옆칸(글); if (e) 칸[id] = e; }
-    /* ⚠ 한 칸이라도 못 맞추면 **통째로** 배송목록 쪽으로 간다 — 한 검색의 줄이 두 곳에서 섞여 겹치면 안 된다 */
+    /* ⚠ 10-23 사장님 화면: 주문관리 폼에 「송장번호」「단품코드」 칸이 없었다(찾은 칸 = 주문번호·수취인·주문자·주소·상품명).
+       예전엔 **한 칸이라도 없으면 통째로 배송목록**으로 갔는데, 그 길이 막혀 있어 조회가 다 비었다.
+       이제 **있는 칸으로 주문관리를 조회**한다. 없는 칸으로 묻는 검색(송장번호·단품코드)만 주문관리에 그 칸이 없다고 알리고 비운다 — 지어내지 않는다. */
     const 빠진 = Object.keys(칸이름표).filter((id) => !칸[id]);
-    if (빠진.length) { window.VP말?.("주문관리:폼못맞춤 빠진 칸 " + 빠진.join(","));
-      진단적기("주문관리 폼못맞춤: 못 찾은 칸 " + 빠진.map((id) => 칸이름표[id]).join(",") + " · 찾은 칸 " + Object.keys(칸).filter((k) => 칸이름표[k]).map((k) => 칸이름표[k]).join(",")
-        + " · 날짜 " + 날.slice(0, 2).map((e) => e.name.split("$").pop() + "=" + e.value).join(","));
-      return null; }
     const 행수 = [...form.elements].find((e) => e.tagName === "SELECT" && /rowcnt|pagesize|pagecnt|listcnt/i.test(e.name + e.id));
     주문틀 = { form, 버튼, 칸, 행수칸: 행수 ? 행수.name : "" };
     window.VP말?.("주문관리:폼읽음 칸 " + Object.keys(칸).join(","));
     진단적기("주문관리 폼읽음: " + Object.entries(칸).map(([k, e]) => (칸이름표[k] || k) + "=" + e.name.split("$").pop()).join(" ")
-      + " 단추 " + (버튼.name || 버튼.id).split("$").pop() + "(" + 버튼.type + ")");
+      + " 단추 " + (버튼.name || 버튼.id).split("$").pop() + "(" + 버튼.type + ")"
+      + (빠진.length ? " · 폼에 없는 칸(그 칸 검색은 못 함): " + 빠진.map((id) => 칸이름표[id]).join(",") : ""));
     return 주문틀;
   }
   const 날모양 = (본, ymd) => { const m = /^\d{4}([-/.])\d{2}\1\d{2}$/.exec((본 || "").trim());
@@ -159,7 +158,9 @@
     const 몫 = {};
     for (const [id, v] of Object.entries(fields)) {
       const e = t.칸[id];
-      if (!e) { window.VP말?.("주문관리:칸없음 " + id); return null; }   // 맞는 칸이 없으면 지어내지 않는다
+      if (!e) { window.VP말?.("주문관리:칸없음 " + id);
+        진단적기("주문관리에는 「" + (칸이름표[id] || id) + "」 칸이 없어 그 검색은 못 합니다");
+        return { count: "0", heads: [], rows: [], 몸: { 길이: 0, 로그인칸: false, 틀: 0, 표수: 0, 칸수들: "", 제목: "" }, 칸없음: true }; }   // 맞는 칸이 없으면 지어내지 않는다
       const 값 = /^dc(Start|End)Dt$/.test(id) ? 날모양(e.value, v) : v;
       if (!값) return null;
       몫[e.name] = 값;
@@ -185,7 +186,9 @@
       const f = doc.forms[0], b = doc.getElementById("btnSearch");
       if (!f || !b) throw new Error("배송목록 폼 없음");
       const 이름들 = [...new FormData(f).keys()];
-      f.action = new URL(f.getAttribute("action") || "/System/Delivery/firmDvList.aspx", location.href).href;
+      /* ⚠ 10-23 사장님 화면: 배송목록 응답 HTTP404. 폼의 action 은 배송목록 쪽 기준 상대 주소라
+         (예 `firmDvList.aspx`) **지금 쪽(/System/Sales/)** 기준으로 풀면 틀린 곳(/System/Sales/firmDvList.aspx)이 된다. 받아 온 그 주소 기준으로 푼다. */
+      f.action = new URL(f.getAttribute("action") || "firmDvList.aspx", res.url || new URL("/System/Delivery/firmDvList.aspx", location.href).href).href;
       return { form: f, 버튼: b, 행수칸: 이름들.find((n) => n === "ddlRowCnt" || n.endsWith("$ddlRowCnt")) || "ddlRowCnt", 이름들 };
     })();
     return 배송틀캐시;
