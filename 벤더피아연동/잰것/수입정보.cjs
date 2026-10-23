@@ -14,6 +14,7 @@ const fs = require('fs'), path = require('path');
 const 확장 = path.join(__dirname, '..');
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const PAGES = require('./본보기/PAGES.cjs');
+const { 기준재기, 재기, 견주기 } = require('./표꼴자.cjs');
 
 /* ── 벤더피아 단품관리 줄 ─────────────────────────────── */
 const 단품머리 = ["단품코드","단품명","매입처명","단품분류","재고유형","발주유형","판매상태",
@@ -142,18 +143,18 @@ const 본다 = () => {
     판떴나: !!판 && !판.hidden, 판제목: 글(판 && 판.querySelector('strong')).trim(),
     수입단추있나: !!단추, 단추글: 단추 ? 단추.textContent : null,
     창떴나: !!창 && !창.hidden, 창제목: 글(창 && 창.querySelector('strong')).trim(),
-    창줄수: 창 && !창.hidden ? 창.querySelectorAll('.vp-modal-body dl').length : 0,
+    창줄수: 창 && !창.hidden ? 창.querySelectorAll('.vp-modal-body .vp-gt').length : 0,
     창글: 창 && !창.hidden ? 글(창.querySelector('.vp-modal-body')) : '',
     가기단추: 창 && !창.hidden ? 글(창.querySelector('.vp-goto')).trim() : null,
     /* 10-16 — 칸 이름이 **차례 그대로** 한 번씩만 나오나 (되풀이 0)
        ⚠ **맨 앞 묶음(접히지 않은 자리)만** 센다. 접은 자리(「전체속성 보기」 안)에 있는 이름을
          같이 세면, 빈 칸을 숨겨 두고도 차례가 맞는 것처럼 보인다 — 재서 잡았다(10-16). */
     칸이름: 창 && !창.hidden
-      ? [...(창.querySelector('.vp-modal-body dl')?.querySelectorAll('dt') || [])]
+      ? [...(창.querySelector('.vp-modal-body .vp-gt')?.querySelectorAll('th') || [])]
           .map((x) => x.textContent) : [],
     접힌칸: 창 && !창.hidden
-      ? [...창.querySelectorAll('.vp-modal-body dl')].slice(1)
-          .reduce((n, dl) => n + dl.querySelectorAll('dt').length, 0) : 0,
+      ? [...창.querySelectorAll('.vp-modal-body .vp-gt')].slice(1)
+          .reduce((n, t) => n + t.querySelectorAll('th').length, 0) : 0,
     금액단추: 창 && !창.hidden
       ? 글([...창.querySelectorAll('.vp-modal-body .vp-toggle')]
           .find((b) => /금액속성/.test(b.textContent))) : '',
@@ -469,6 +470,14 @@ const 확장쪽흉내 = `
         const 찍기 = await page.evaluate(본다);
         console.log('    ' + w + ' — 창 ' + 찍기.창떴나 + ' · 묶음 ' + 찍기.창줄수 + '개 · 칸 '
           + 찍기.칸이름.length + '개 ' + 못(찍기.창떴나 && 찍기.창줄수 === 1 && 찍기.칸이름.length === 6));
+        /* 10-23 수입정보 표 = 서류관리 제품관리 표와 나란히 숫자로(머리줄·몸줄 다른 값 0) */
+        const 기준 = await 기준재기(b, w);
+        if (!기준) console.log('    – 서류관리 저장소가 없어 나란히 견주기를 건너뜀');
+        else {
+          const 다름 = 견주기(기준, await 재기(page, '.vp-modal-body .vp-gt table'));
+          console.log('    ' + w + ' — 수입정보 표가 서류관리 제품관리 표와 다른 값 ' + 다름.length + '개 ' + 못(다름.length === 0)
+            + (다름.length ? ' ' + 다름.slice(0, 4).join(' / ') : ''));
+        }
         await page.screenshot({ path: path.join(그림칸, '수입공통-' + w + '.png') });
         await page.keyboard.press('Escape');
         await page.waitForTimeout(150);

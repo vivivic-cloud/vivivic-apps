@@ -12,6 +12,7 @@ const fs = require('fs'), path = require('path');
 const 확장 = path.join(__dirname, '..');
 const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const PAGES = require('./본보기/PAGES.cjs');
+const { 기준재기, 재기, 견주기 } = require('./표꼴자.cjs');
 const 그림칸 = path.join(__dirname, '그림');
 
 const 원래 = (제목, 쪽) => `<html><head><meta charset="utf-8"><title>${제목}</title></head><body>
@@ -70,7 +71,7 @@ window.VP저장 = { get: async function(k){ return ${JSON.stringify({ vpJohon: {
   set: async function(){}, remove: async function(){} };
 var VP_JOHON_PARTS = [];`;
 
-let 초록 = 0, 빨강 = 0;
+let 초록 = 0, 빨강 = 0, 건너뜀 = 0;
 const 봤다 = (참, 글) => { if (참) 초록++; else 빨강++; console.log('    ' + (참 ? '✓ ' : '✗ ') + 글); };
 
 const 표본다 = () => {
@@ -97,13 +98,14 @@ const 꼴본다 = () => {
   const 둘째 = [...document.querySelectorAll('#vp-root .vp-gt tbody tr')].filter((t) => !t.hidden)[1];
   const 둘째td = 둘째 && getComputedStyle(둘째.children[1]);
   return { 표: g('#vp-root .vp-gt table'), 머리: g('#vp-root .vp-gt th'), 몸: g('#vp-root .vp-gt tbody td:nth-child(2)'),
-    둘째줄위선: 둘째td ? [둘째td.borderTopWidth, 둘째td.borderTopColor] : null };
+    둘째줄밑선: 둘째td ? [둘째td.borderBottomWidth, 둘째td.borderBottomColor] : null };
 };
 
 (async () => {
   const b = await chromium.launch({ executablePath: EXE });
   for (const 너비 of [1280, 375]) {
     const ctx = await b.newContext({ viewport: { width: 너비, height: 900 } });
+    const 기준 = await 기준재기(b, 너비);
     for (const [길, 자료] of Object.entries(판)) {
       const 이름 = 자료.제목;
       console.log('\n■ ' + 이름 + ' · 창 ' + 너비);
@@ -193,11 +195,19 @@ const 꼴본다 = () => {
         await 알약('전체');
       }
       /* 모양 */
+      /* ── 10-23 서류관리 제품관리 표와 **나란히 숫자로** 견준다 (사장님: 「완벽하게 동일한 디자인」·특히 머리줄) ──
+         기준 = 서류관리 css 를 그 자리에서 뽑아 같은 마크업으로 그려 잰 값(`표꼴자.cjs`). 다른 값 0 이어야 한다.
+         일부러 다른 것 하나: 목록 표 첫 칸(이름)은 긴 이름이 줄바꿈한다(white-space·min-width) — 서류관리 첫 칸은 짧은 코드다. */
+      const 우리 = await 재기(page, '#vp-root .vp-gt table');
+      const 다름 = 기준 ? 견주기(기준, 우리).filter((x) => !/^몸\.첫\.(whiteSpace|minWidth)/.test(x)) : null;
+      if (!기준) { 건너뜀++; console.log('    – 서류관리 저장소가 없어 나란히 견주기를 건너뜀'); }
+      else {
+        봤다(다름.length === 0, '머리줄·몸줄이 서류관리 제품관리 표와 **다른 값 0** (' + (다름.length ? 다름.slice(0, 4).join(' / ') : '머리 13px·800/700·#111110·밑선 2px, 몸 14px·안여백 13px 12px·줄 #D6D6D3 …') + ')');
+        if (너비 === 1280) 봤다(Math.abs(우리.줄높이 - 기준.줄높이) <= 0.5, '몸 줄 높이(375 는 이름·코드·딱지가 줄바꿈해 더 높을 수 있어 1280 만) ' + 우리.줄높이 + 'px (서류관리 ' + 기준.줄높이 + 'px)');
+        if (너비 === 1280) 봤다(Math.abs(우리.머리줄높이 - 기준.머리줄높이) <= 0.5 || 우리.머리줄높이 > 기준.머리줄높이, '머리줄 높이 ' + 우리.머리줄높이 + 'px (서류관리 ' + 기준.머리줄높이 + 'px, 머리글이 줄바꿈하면 더 높다)');
+      }
       const 꼴 = await page.evaluate(꼴본다);
-      const 맞나 = 꼴.표 && 꼴.표.fs === '11px' && 꼴.표.bc === 'rgb(237, 237, 235)' && 꼴.표.bw === '1px' && 꼴.표.br === '8px' && 꼴.표.col === 'collapse'
-        && 꼴.머리.fs === '11px' && 꼴.머리.fw === '700' && 꼴.머리.color === 'rgb(155, 154, 151)' && 꼴.머리.bg === 'rgb(247, 247, 245)' && 꼴.머리.pad === '4px 8px'
-        && 꼴.몸.fs === '11px' && 꼴.몸.pad === '4px 8px' && 꼴.몸.color === 'rgb(55, 53, 47)';
-      봤다(맞나, '서류관리 제품표 꼴과 같다(11px·머리 700 #9b9a97 바탕 #f7f7f5·안여백 4px 8px·줄 #ededeb·모서리 8px)');
+      const 맞나 = true;
       /* ── 10-22 글자 + 점 ──────────────────────────────────────────
          사장님: 「각 버튼을 버튼 형태가 아닌 활성화된 텍스트로 … 텍스트아래 연동수준을 표기하는 점 … 재고조회 목록에 있으면
          초록색점 조혼가구와 일치하면 붉은색점 카탈로그와 맞으면 주황색점 … 페이지 헤더에 작게 해당 점에대한 설명」 */
@@ -222,7 +232,7 @@ const 꼴본다 = () => {
       if (이름 === '재고조회') 봤다(같다(점의('가나다 서랍장'), [초, 붉]), '재고조회 점: 목록에 있으면 초록 · 조혼과 맞으면 빨강도 나란히 ' + JSON.stringify(점의('가나다 서랍장')));
       if (이름 === '상품관리') 봤다(같다(점의('가나다 세트'), [주]) && 같다(점의('라마바 장'), []), '상품관리 점: 카탈로그와 맞으면 주황 ' + JSON.stringify(점의('가나다 세트')));
       if (!맞나) console.log('      ' + JSON.stringify(꼴));
-      if (v.보이는줄 >= 2) 봤다(꼴.둘째줄위선 && 꼴.둘째줄위선[0] === '1px', '줄과 줄 사이 선 ' + JSON.stringify(꼴.둘째줄위선));
+      if (v.보이는줄 >= 2) 봤다(꼴.둘째줄밑선 && 꼴.둘째줄밑선[0] === '1px' && 꼴.둘째줄밑선[1] === 'rgb(214, 214, 211)', '줄과 줄 사이 선(줄마다 밑 1px #D6D6D3) ' + JSON.stringify(꼴.둘째줄밑선));
       const 넘침 = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
       봤다(넘침 <= 0, '쪽 전체가 옆으로 밀리지 않는다(표 통만 민다) — 넘침 ' + 넘침 + 'px');
       if (탈.length) { 빨강++; console.log('    ✗ 터진 말: ' + JSON.stringify([...new Set(탈)].slice(0, 2))); }
@@ -232,7 +242,7 @@ const 꼴본다 = () => {
     }
     await ctx.close();
   }
-  console.log('\n  ★ 초록 ' + 초록 + ' · 빨강 ' + 빨강);
+  console.log('\n  ★ 초록 ' + 초록 + ' · 빨강 ' + 빨강 + ' · 건너뜀 ' + 건너뜀);
   await b.close();
   process.exit(빨강 ? 1 : 0);
 })();

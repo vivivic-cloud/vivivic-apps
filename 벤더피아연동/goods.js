@@ -176,7 +176,7 @@
       <div class="vp-note">불러오는 중…</div>
       <div class="vp-ing-note" hidden></div>
       <div class="vp-cached"></div>
-      <div class="vp-gt"><table><thead><tr></tr></thead><tbody></tbody></table></div>
+      <div class="vp-gt vp-gt-목록"><table><thead><tr></tr></thead><tbody></tbody></table></div>
       <div class="vp-more" hidden>
         <button type="button" class="vp-more-fold">접기</button>
         <button type="button" class="vp-more-next">더보기</button>
@@ -733,7 +733,8 @@
       else if (빈칸도 || row[i].trim() || (linkCell && h === linkCell.col)) visible.push(i);
       else empty.push(i);
     });
-    const listOf = (idx) => fields(heads, row, linkCell, idx);
+    /* ⚠ 빈칸도(= 수입정보 창만 쓴다)면 **표**로 그린다 — 서류관리 제품관리 표와 같은 꼴(10-23). 칸·차례·값은 그대로. */
+    const listOf = (idx) => fields(heads, row, linkCell, idx, 빈칸도);
 
     const box = document.createElement("div");
     box.className = "vp-fields";
@@ -760,8 +761,29 @@
     return box;
   }
 
+  /* 수입정보 창의 표 — 머리줄 한 줄 + 값 한 줄. 서류관리 제품관리 표(CODE#·Product model·…)와 같은 클래스·같은 꼴(`goods.css` 「표 꼴」).
+     첫 칸(단품코드)은 굵게, 상품명은 줄바꿈 허용, 포장규격·입수·CBM·FOB 는 숫자 칸(가운데). 빈 값은 빈 칸으로 둔다(이름은 보인다). */
+  function 서류표로(heads, row, only) {
+    const 통 = document.createElement("div");
+    통.className = "vp-gt";
+    const 표 = 통.appendChild(document.createElement("table"));
+    const 머리 = 표.appendChild(document.createElement("thead")).appendChild(document.createElement("tr"));
+    const 몸 = 표.appendChild(document.createElement("tbody")).appendChild(document.createElement("tr"));
+    heads.forEach((h, i) => {
+      if (!h || h === "Page" || (only && !only.includes(i))) return;
+      const th = 머리.appendChild(document.createElement("th"));
+      const td = 몸.appendChild(document.createElement("td"));
+      th.textContent = h;
+      td.textContent = row[i];
+      const 클래스 = i === 0 ? "vp-main" : /^(포장규격|입수|CBM|FOB)$/.test(h) ? "vp-num" : h === "상품명" ? "vp-m" : "";
+      if (클래스) { th.className = 클래스; td.className = 클래스; }
+    });
+    return 통;
+  }
+
   // only: 보여줄 칸 번호들 (없으면 모두)
-  function fields(heads, row, linkCell, only) {
+  function fields(heads, row, linkCell, only, 표) {
+    if (표) return 서류표로(heads, row, only);
     const dl = document.createElement("dl");
     heads.forEach((h, i) => {
       if (!h || h === "Page" || (only && !only.includes(i))) return;
@@ -1150,9 +1172,10 @@
       tr.firstChild.className = "vp-main";
       통.className = "vp-goods-list";      // ⚠ 버튼 꼴이 이 이름에 걸려 있다 — 위 표 설명 참고
       통.appendChild(b);
-      const tds = colDefs.map((d) => {
+      const tds = colDefs.map((d, i) => {
         const td = tr.appendChild(document.createElement("td"));
         if (d.sum) td.className = "vp-num";
+        else if (i === 0) td.className = "vp-m";      // 서류관리 표의 둘째 칸(Product model)처럼 줄바꿈 허용
         return td;
       });
       const group = { b, items: [row], name, tr, tds, i: groups.size };
