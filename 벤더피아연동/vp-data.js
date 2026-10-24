@@ -244,17 +244,22 @@ const VP_DATA = (() => {
   // 없으면 벤더피아에서 받으며 onPage 를 부르고, 끝까지 다 받았으면 저장한다.
   // src: 그 화면의 처음 문서(검색 폼). 없으면 그 화면을 새로 열어 쓴다.
   // background: 뒤에서 받기 — 지금 화면이 받는 동안은 기다렸다가 받는다
+  const 받는중 = new Map();   // 저장 열쇠 → 받는 동안 서 있는 약속
   async function list(cfg, url, serverValue, dates, onPage, isCurrent = () => true, src = null, background = false) {
     const to = dates.to || ymd(new Date());
     const key = PREFIX + [url, cfg.nameCol, JSON.stringify(cfg.fixed || {}), serverValue,
       cfg.noDates ? "" : dates.from, cfg.noDates ? "" : to].join("|");
     await ready;
+    /* 10-24 — 같은 목록을 **이미 받는 중이면** 그것이 끝나길 기다렸다 저장된 것을 쓴다.
+       배송관리·CS등록은 상품관리 한 벌과 단품관리 한 벌(goods.js)을 같이 돌려, 서로 쓰는 목록(단품·상품)을 동시에 받으려 한다 — 벤더피아에 같은 조회를 두 번 보내지 않는다. */
+    while (받는중.has(key)) await 받는중.get(key);
     const hit = store && (await store.get(key))[key];
     if (hit) {
       if (isCurrent()) onPage(hit.heads, hit.rows, hit.rows.length, hit.rows.length);
       return { cachedAt: hit.at };
     }
     if (!background) foreground++;
+    let 끝냄; 받는중.set(key, new Promise((r) => { 끝냄 = r; }));
     try {
       if (background) await idle();
       src ||= new DOMParser().parseFromString(await (await fetch(url, { credentials: "include" })).text(), "text/html");
@@ -270,6 +275,7 @@ const VP_DATA = (() => {
       return { cachedAt: null };
     } finally {
       if (!background) foreground--;
+      받는중.delete(key); 끝냄();
     }
   }
 

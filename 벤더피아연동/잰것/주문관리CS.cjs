@@ -80,11 +80,11 @@ const VP흉내 = `window.VP저장 = { get: async function(){return {};}, set: as
         await 쪽.click('.vp-bar button[type=submit]');
         await 쪽.waitForTimeout(1500);
         const 표 = await 쪽.evaluate(() => ({ 줄: [...document.querySelectorAll('.vp-table tbody tr')].map((x) => x.textContent),
-          상담: document.querySelectorAll('.vp-table .vp-상담알').length, 상품단추: document.querySelectorAll('.vp-table .vp-cs상품').length,
+          상담: document.querySelectorAll('.vp-table .vp-상담알').length, 줄누름: document.querySelectorAll('.vp-table tbody tr.vp-줄상담').length,
           머리: [...document.querySelectorAll('.vp-table th')].map((x) => x.textContent), 출처: (document.querySelector('.vp-출처') || {}).textContent }));
         const 포스트 = 부름.filter((x) => x.startsWith('POST'));
         console.log('    ★ 표 줄 ' + JSON.stringify(표.줄) + ' · 머리 ' + 표.머리.join(',') + ' ' + 못(표.줄.length === 1 && /가나다/.test(표.줄[0]) && /토리블리 책상/.test(표.줄[0])));
-        console.log('    ★ 줄마다 「상담」 단추 ' + 표.상담 + ' · 상품명 단추 ' + 표.상품단추 + ' ' + 못(표.상담 === 1 && 표.상품단추 === 1));
+        console.log('    ★ 줄마다 「상담」 단추 ' + 표.상담 + ' · 줄 누르면 상담(vp-줄상담) ' + 표.줄누름 + ' ' + 못(표.상담 === 1 && 표.줄누름 === 1));
         const 주문쪽 = 포스트.filter((x) => /orderMst/.test(x)), 배송쪽 = 포스트.filter((x) => /firmDvList/.test(x));
         if (칸있나) {
           const 몸 = 주문쪽.map((x) => JSON.parse(x.slice(x.indexOf('{'))));
@@ -101,10 +101,10 @@ const VP흉내 = `window.VP저장 = { get: async function(){return {};}, set: as
         const 진단 = await 쪽.evaluate(() => (document.querySelector('.vp-진단') || {}).textContent || '');
         console.log('    ★ 화면에 까닭 글(진단)이 보이나: ' + JSON.stringify(진단.slice(0, 260)));
         console.log('    ★ 진단에 응답 건수·머리·줄이 적힘 ' + 못(/응답 .*머리\d+칸\[.*줄1 건수1/.test(진단) && (칸있나 ? /주문관리 폼읽음/.test(진단) && /주문관리 응답/.test(진단) && (칸다 || /폼에 없는 칸.*송장번호,단품코드/.test(진단)) : /배송목록 응답 HTTP200/.test(진단) && !/404/.test(진단))));
-        await 쪽.click('.vp-table .vp-cs상품');
+        await 쪽.click('.vp-table tbody tr td:last-child');   /* 10-24: 줄 누름 = 상담 판 (상품명 단추는 상세 전용이 됐다) */
         await 쪽.waitForTimeout(900);
         const 고객 = await 쪽.evaluate(() => (document.querySelector('.vp-고객목록') || {}).textContent || '');
-        console.log('    ★ 상품명을 누르면 상담 판에 고객정보 ' + 못(/라마바/.test(고객) && /010-1111-2222/.test(고객)));
+        console.log('    ★ 줄을 누르면 상담 판에 고객정보 ' + 못(/라마바/.test(고객) && /010-1111-2222/.test(고객)));
         await 쪽.keyboard.press('Escape');
         await 쪽.click('.vp-table .vp-상담알');
         await 쪽.waitForTimeout(600);

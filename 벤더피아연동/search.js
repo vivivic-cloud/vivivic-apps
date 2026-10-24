@@ -420,6 +420,7 @@
          찾아봐도 **아직 없다** — 그 검사는 영영 안 맞는다(재서 확인).
        그러니 **기다렸다가** 본다. 확장이 보냈으면 그동안 `goods.js` 가 돌아
          `__vp굿즈돌았나` 가 서니, 뒷길은 **아예 안 나선다**. 옛 판을 쓰시는 분 화면에서만 나선다. */
+    if (CS전용) { 뒷길로부르기(); return; }            // 주문관리에는 확장이 goods.js 를 안 보낸다 — 기다릴 일이 없다
     setTimeout(() => {
       if (window.__vp굿즈돌았나 || window.VP상품단추) return;   // 확장이 이미 보냈다
       뒷길로부르기();
@@ -444,7 +445,9 @@
       + (window.VP상품단추 ? "/셈있음" : "/**셈없음**")));
     document.head.appendChild(sc);
   }
-  if (!CS전용) 상품단추불러오기();         // CS등록 화면은 상품 단추 대신 상품명으로 상담 판을 연다
+  /* 10-24 — CS등록 화면(주문관리)도 이름 단추를 쓴다. `불러오기.js`(확장 안)는 그 주소에 `goods.js` 를 안 보내므로
+     (고치면 덮어쓰기) 여기서 **깃허브 글 쪽으로** 형제 `goods.js`·`goods.css` 를 바로 부른다(뒷길, 기다림 없이). */
+  상품단추불러오기();
 
   /* ── 상담 이력 ──────────────────────────────────────────
      사장님 10-15: 「**상담할때 고객문의에 이력을 남기는데 이력남길수있게 해주세요**」
@@ -601,6 +604,51 @@
   function 상담판닫기() { if (상담판) { 상담판.remove(); 상담판 = null; } }
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") { 상담판닫기(); CS판닫기(); } });
 
+  /* 10-24 사장님: 「현재 상담버튼 클릭시 나타나는 팝업화면을 이동 가능한 팝업화면으로 수정해 주세요」
+     상담 판·CS등록 판의 **머리**(`.vp-상담머리`)를 잡고 끌면 판이 화면 안에서 움직인다.
+     ⚠ 화면 밖으로 안 나간다(가로·세로 모두 판 전체가 안에 든다) — 창을 줄이거나 판 안이 길어져도 다시 안으로 당긴다.
+     ⚠ 마우스·터치·펜 모두 포인터 이벤트 하나로(머리의 `touch-action: none`). 머리 안의 단추(닫기)는 끌기가 아니다.
+     ⚠ 처음 잡을 때만 판을 `position: fixed` 로 바꾼다 — 잡기 전 자리(왼쪽/가운데)는 그대로라 튀지 않는다. */
+  function 끌수있게(덮개) {
+    const 판 = 덮개.querySelector(".vp-상담판"), 머리 = 덮개.querySelector(".vp-상담머리");
+    if (!판 || !머리) return;
+    머리.classList.add("vp-끌개");
+    let 잡음 = null;
+    const 안으로 = (x, y) => {
+      const vw = document.documentElement.clientWidth || window.innerWidth;
+      const vh = window.innerHeight || document.documentElement.clientHeight;
+      return [Math.min(Math.max(0, x), Math.max(0, vw - 판.offsetWidth)),
+              Math.min(Math.max(0, y), Math.max(0, vh - 판.offsetHeight))];
+    };
+    const 놓기 = (e) => { if (잡음 && e.pointerId === 잡음.id) { 잡음 = null; 판.classList.remove("vp-끄는중"); } };
+    머리.addEventListener("pointerdown", (e) => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      if (e.target.closest && e.target.closest("button, input, a, select, textarea")) return;
+      const r = 판.getBoundingClientRect();
+      잡음 = { id: e.pointerId, dx: e.clientX - r.left, dy: e.clientY - r.top };
+      Object.assign(판.style, { position: "fixed", margin: "0", left: r.left + "px", top: r.top + "px", width: r.width + "px" });
+      판.classList.add("vp-끄는중");
+      try { 머리.setPointerCapture(e.pointerId); } catch (x) {}
+      e.preventDefault();
+    });
+    머리.addEventListener("pointermove", (e) => {
+      if (!잡음 || e.pointerId !== 잡음.id) return;
+      const [x, y] = 안으로(e.clientX - 잡음.dx, e.clientY - 잡음.dy);
+      판.style.left = x + "px"; 판.style.top = y + "px";
+    });
+    머리.addEventListener("pointerup", 놓기);
+    머리.addEventListener("pointercancel", 놓기);
+    머리.addEventListener("lostpointercapture", 놓기);
+    const 다시안으로 = () => {
+      if (!판.isConnected) { window.removeEventListener("resize", 다시안으로); return; }
+      if (판.style.position !== "fixed") return;
+      const [x, y] = 안으로(parseFloat(판.style.left) || 0, parseFloat(판.style.top) || 0);
+      판.style.left = x + "px"; 판.style.top = y + "px";
+    };
+    window.addEventListener("resize", 다시안으로);
+    if (window.ResizeObserver) new ResizeObserver(다시안으로).observe(판);
+  }
+
   const 접수종류 = ["교환", "반품", "AS"];
   const 접수상태 = ["접수", "처리중", "끝"];
 
@@ -626,11 +674,16 @@
     const 전 = 머리.map((h, i) => (/전화|연락|휴대|핸드폰|tel|hp/i.test(String(h || "")) ? i : -1)).filter((i) => i >= 0);
     const 만들기 = 줄들.map(({ 줄 }) => {
       const 주문 = 값(줄, 주);
-      const b = document.createElement("button");
-      b.type = "button";
+      /* 10-24 줄은 상담 판을 여는 **줄 전체**, 그 안의 상품명은 상품관리의 이름 단추(누르면 상품 상세, 상담은 안 열림).
+         단추 안에 단추를 넣을 수 없어 줄을 `div[role=button]` 으로 둔다. */
+      const b = document.createElement("div");
+      b.setAttribute("role", "button");
+      b.tabIndex = 0;
       b.className = "vp-cs줄 vp-cs찾은";
       const 상품명 = 값(줄, 상);
-      b.appendChild(document.createElement("strong")).textContent = 상품명 || "(상품명 없음)";
+      const 이름 = b.appendChild(document.createElement("strong"));
+      이름.textContent = 상품명 || "(상품명 없음)";
+      if (상품명) { 이름.dataset.vp이름 = 상품명; 상품칸채우기(이름, 상품명, "상품"); 상품칸들.push([이름, 상품명, "상품"]); }
       const 사람 = [값(줄, 받), 값(줄, 시) && 값(줄, 시) !== 값(줄, 받) ? "주문자 " + 값(줄, 시) : ""].filter(Boolean).join(" · ");
       const 번호들 = [...new Set(전.map((i) => 값(줄, i)).filter(Boolean))].join(" / ");
       const 가 = b.appendChild(document.createElement("small"));
@@ -641,11 +694,16 @@
         t.textContent = (접수.열림 ? (접수.종류 || "접수") + " 접수중 · " : "") + "상담 " + (접수.수 || 0);
         if (접수.열림) b.classList.add("vp-열림");
       }
-      b.addEventListener("click", () => {
+      const 열기 = () => {
         if (!주문) return;
         CS판닫기();
         상담판열기(주문, 상품명, 줄, 머리);
+      };
+      b.addEventListener("click", (e) => {
+        if (e.target.closest && e.target.closest(".vp-goods-list")) return;   // 이름 단추 = 상품 상세만
+        열기();
       });
+      b.addEventListener("keydown", (e) => { if (e.target === b && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); 열기(); } });
       return b;
     });
     const 머릿글 = document.createElement("p");
@@ -671,6 +729,7 @@
     덮개.addEventListener("mousedown", (e) => { if (e.target === 덮개) CS판닫기(); });
     document.getElementById("vp-root")?.appendChild(덮개) || document.body.appendChild(덮개);
     CS판 = 덮개;
+    끌수있게(덮개);
 
     const 칸 = 덮개.querySelector(".vp-cs찾기 input");
     const 결과칸 = 덮개.querySelector(".vp-cs결과");
@@ -805,6 +864,7 @@
     덮개.addEventListener("mousedown", (e) => { if (e.target === 덮개) 상담판닫기(); });
     document.getElementById("vp-root")?.appendChild(덮개) || document.body.appendChild(덮개);
     상담판 = 덮개;
+    끌수있게(덮개);
 
     const 목록 = 덮개.querySelector(".vp-상담목록");
     const 접수칸 = 덮개.querySelector(".vp-상담접수");
@@ -977,23 +1037,44 @@
   /* 상품명 칸들을 적어 둔다 — 목록이 늦게 와도 그때 단추로 바꿔 끼운다 */
   let 상품칸들 = [];
   let 상품칸자리 = -1;
+  let 단품칸자리 = -1;
   let 단추된것 = 0;
-  function 상품칸채우기(td, 이름) {
-    const 만들기 = window.VP상품단추;
+  /* 10-24 사장님: 「목록의 상품명/단품명 단품관리/상품관리에 있는 동일한 기능의 해당 명칭 버튼이 나타나게」
+     상품명 칸 = 상품관리의 그 이름 단추, 단품명 칸 = 단품관리의 그 이름 단추 (`goods.js` 가 만들어 준다 — 상세를 두 벌로 만들지 않는다).
+     단추는 단품관리·상품관리 표 첫 칸과 **같은 통** `div.vp-goods-list` 에 담아 같은 꼴(누르는 글자 + 아래 연동 점)이 된다.
+     누르면 그 화면에서 누른 것처럼 상세가 열리고, **상담은 안 열린다**(단추가 누름을 가로챈다).
+     ⚠ 이미 단추가 든 칸은 다시 안 채운다(`vp상품단추준비`·`vp단품단추준비` 가 늦게 와도 같은 단추를 두 번 만들지 않는다). */
+  function 이름칸채우기(td, 이름, 종류) {
+    if (td.querySelector(".vp-goods-list")) return false;
+    const 만들기 = 종류 === "단품" ? window.VP단품단추 : window.VP상품단추;
     const b = 만들기 ? 만들기(이름) : null;
-    if (!b) { td.textContent = 이름; return false; }   // 상품관리에 없는 이름 → 글자 그대로
-    td.replaceChildren(b);
+    if (!b) { td.textContent = 이름; return false; }   // 단품관리·상품관리에 없는 이름 → 글자 그대로
+    const 통 = document.createElement("div");
+    통.className = "vp-goods-list";
+    통.appendChild(b);
+    td.replaceChildren(통);
     단추된것++;
     return true;
   }
+  const 상품칸채우기 = (td, 이름, 종류 = "상품") => 이름칸채우기(td, 이름, 종류);
   /* ⚠ 까닭 적기 — **그려 놓고 보니** 몇 칸이 단추가 됐나. 이것이 ⑤ 를 가른다:
        칸이 0개면 상품명 칸을 못 찾은 것, 칸은 있고 단추가 0개면 **이름이 하나도 안 맞은** 것. */
   const 상품칸셈적기 = () => window.VP말?.(
     "상품칸:" + 상품칸들.length + "개중 단추" + 단추된것 + "개");
-  window.addEventListener("vp상품단추준비", () => {
+  function 늦게채우기(종류) {
     let 바뀐것 = 0;
-    for (const [td, 이름] of 상품칸들) if (상품칸채우기(td, 이름)) 바뀐것++;
+    for (const [td, 이름, 칸종류] of 상품칸들) if (칸종류 === 종류 && td.isConnected !== false && 상품칸채우기(td, 이름, 종류)) 바뀐것++;
+    return 바뀐것;
+  }
+  window.addEventListener("vp상품단추준비", () => {
+    const 바뀐것 = 늦게채우기("상품");
     window.VP말?.("상품단추:준비 상품" + (window.VP상품목록몇개?.() ?? "?")
+      + "가지 · 늦게바꾼칸 " + 바뀐것 + "개");
+    상품칸셈적기();
+  });
+  window.addEventListener("vp단품단추준비", () => {
+    const 바뀐것 = 늦게채우기("단품");
+    window.VP말?.("단품단추:준비 단품" + (window.VP단품목록몇개?.() ?? "?")
       + "가지 · 늦게바꾼칸 " + 바뀐것 + "개");
     상품칸셈적기();
   });
@@ -1024,6 +1105,7 @@
     if (찾은것 !== cs칸) { cs칸 = 찾은것; 알약그리기(); }
     /* ④ 상품명 칸이 몇 번째인가 — 그 칸만 단추로 바꾼다 */
     상품칸자리 = heads.indexOf("상품명");
+    단품칸자리 = heads.indexOf("단품명");
     /* 상담 이력 — 열쇠는 **주문번호** 하나뿐이다(사람 칸은 안 쓴다).
        ⚠ 사장님 화면에는 「주문번호」 가 **두 칸** 있다. 앞엣것을 쓴다 — `indexOf` 가 그렇게 집는다. */
     주문칸자리 = heads.indexOf("주문번호");
@@ -1052,34 +1134,23 @@
     }
     for (const row of rows) {
       const tr = tbody.insertRow();
+      const 주문 = 주문칸자리 >= 0 ? String(row[주문칸자리] == null ? "" : row[주문칸자리]).trim() : "";
       그린머리.forEach((c, i) => {
         const td = tr.insertCell();
         const 값 = row[i] === undefined ? "" : row[i];
-        if (CS전용 && i === 상품칸자리 && String(값).trim()) {
-          /* CS등록 화면: 상품명을 누르면 그 주문의 상담 판(이력 + 교환·반품·AS 접수 + 고객정보)이 열린다 */
-          td.className = "vp-상품칸" + (i === 0 ? " vp-first" : "");
-          const 주문 = 주문칸자리 >= 0 ? String(row[주문칸자리] == null ? "" : row[주문칸자리]).trim() : "";
-          const b = document.createElement("button");
-          b.type = "button"; b.className = "vp-cs상품"; b.textContent = 값;
-          b.title = "상담 이력 · 교환 · 반품 · AS 접수";
-          b.addEventListener("click", () => { if (주문) 상담판열기(주문, String(값).trim(), row, 그린머리); });
-          td.appendChild(b);
-          return;
-        }
-        if (i === 상품칸자리 && String(값).trim()) {
-          td.className = "vp-상품칸" + (i === 0 ? " vp-first" : "");
-          상품칸들.push([td, 값]);
-          상품칸채우기(td, 값);
-          /* ⚠⚠ 10-16 사장님 (이 칸을 짚어 보내신 말씀, 그대로):
-               「상품명이 여전히 상품관리의 상품버튼이 아니네요」(장부 a1792133856)
-               「상품명 버튼을 누르면 상담버튼과 동일한팝업이 나타납니다.
-                 **이는 잘못된 작동 입니다**」(장부 a1792133915)
-             10-15 에 「상품명 클릭하면 상담을 남길수있도록」 하셔서 이 칸의 누름을
-             **잡는 결(capture)로 가로채** 상담 판을 같이 열었다. 그런데 상담 판은 덮개다 —
-             상품 상세를 **덮어 버려** 사장님께는 「상품버튼이 아니다」 로 보였다.
-             ⚠ 그래서 **가로채기를 걷었다.** 상품명은 상품관리의 그 단추 그대로
-               (눌러서 상품 상세), **상담은 주문번호 칸의 「상담」 단추로만** 연다.
-             ⚠ 상담·이력·교환/반품/AS 접수는 **그대로다** — 들어가는 길만 하나로 모았다. */
+        if ((i === 상품칸자리 || i === 단품칸자리) && String(값).trim()) {
+          /* ⚠⚠ 10-24 사장님(한 글자도 안 고침): 「배송관리와 cs관리 등 벤더피아의 데이터 목록을 불러올때 목록의 상품명/단품명
+               단품관리/상품관리에 있는 동일한 기능의 해당 명칭 버튼이 나타나게 해주세요. 목록의 줄 자체를 클릭했을때는 현재의 상담
+               버튼 과 동일한 정보가 나타나야 하며 목록의 상품명/단품명 클릭시에는 단품관리/상품관리/재고관리의 해당 상품/단품명
+               처럼 작동해야 합니다.」
+             → 상품명 칸 = 상품관리의 그 이름 단추, 단품명 칸 = 단품관리의 그 이름 단추(누르면 그 상세). 상담은 **줄의 다른 곳**을
+               누를 때(아래 `tr` 누름) — 이름 단추는 누름을 가로채 상담이 안 열린다.
+             (옛 기록: 10-15 에 상품명 누름을 잡는 결로 가로채 상담 판을 같이 열었다가 상세를 덮어 「잘못된 작동」 이라 하셨다.
+              지금은 같은 일이 안 생긴다 — 단추가 `stopPropagation` 하고, 줄의 누름은 단추·링크 위에서는 건너뛴다.) */
+          const 종류 = i === 상품칸자리 ? "상품" : "단품";
+          td.className = "vp-상품칸" + (종류 === "단품" ? " vp-단품칸" : "") + (i === 0 ? " vp-first" : "");
+          상품칸들.push([td, 값, 종류]);
+          상품칸채우기(td, 값, 종류);
           return;
         }
         td.textContent = 값;
@@ -1093,6 +1164,17 @@
                    row, 그린머리);
         }
       });
+      /* 10-24 줄 자체를 누르면 「상담」 단추와 **같은 판**(고객정보·이력·교환·반품·AS 접수)이 열린다.
+         이름 단추·상담 단추·링크 위의 누름은 그것들이 따로 처리한다. 글자를 끌어 고르던 중이면 안 연다(복사하실 때). */
+      if (주문) {
+        tr.classList.add("vp-줄상담");
+        tr.title = "줄을 누르면 상담 이력 · 교환 · 반품 · AS 접수";
+        tr.addEventListener("click", (e) => {
+          if (e.target.closest && e.target.closest("button, a, input, select, textarea, label")) return;
+          if (String(window.getSelection ? window.getSelection() : "").trim()) return;
+          상담판열기(주문, 상품칸자리 >= 0 ? String(row[상품칸자리] == null ? "" : row[상품칸자리]).trim() : "", row, 그린머리);
+        });
+      }
     }
     상품칸셈적기();
   }
@@ -1105,7 +1187,7 @@
     const { filters, variants, local } = plan(bar.q.value);
     const dates = { dcStartDt: bar.from.value, dcEndDt: bar.to.value };
 
-    tbody = null; 그린머리 = null; 상품칸들 = []; 상품칸자리 = -1; 단추된것 = 0; 머리본것 = null;
+    tbody = null; 그린머리 = null; 상품칸들 = []; 상품칸자리 = -1; 단품칸자리 = -1; 단추된것 = 0; 머리본것 = null;
     상담칸들.length = 0; 주문칸자리 = -1; 상담판닫기();
     table.replaceChildren();
     const seen = new Set();

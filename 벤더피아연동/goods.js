@@ -1,7 +1,10 @@
 // 단품관리·상품관리·재고조회 화면을 VIVIVIC 디자인의 표로 바꾼다 (10-21: 이름 버튼이 첫 칸인 표. 서류관리 제품표 꼴).
 // 목록은 벤더피아에서 받아 저장해 두고(새로고침·새 로그인 전까지), 필터는 받아온 목록에서 바로 적용한다.
 // 버튼을 누르면 그 항목의 데이터를 보여준다.
+/* 10-24 — 한 벌 = 이 화면 글 전체. 배송관리·CS등록에서는 **두 벌**을 곁다리로 돌린다(상품관리 한 벌 + 단품관리 한 벌).
+   그래서 상세(`show`·`detailFields`·수입정보·부속보기 …)를 두 벌로 베끼지 않고 **같은 글을 두 번 돌린다**. */
 (() => {
+const 한벌돌리기 = (단품곁다리) => {
   const { PAGES, list: fetchList, ymd } = VP_DATA;
   /* ④ **곁다리 모드** — 사장님 10-15: 「이곳에 도착하는 상품명을 상품관리와 동일한
        상품버튼으로 변경해 주세요. 이버튼으로 나타나는 동작은 상품관리의 상품버튼과 동일 합니다.」
@@ -13,25 +16,30 @@
      ⚠ 곁다리일 때는 제 화면(검색칸·목록)을 **그리지 않는다** — 상세 판과 창만 쓴다
        (`search.css` 의 `.vp-곁다리` 가 몸통을 감춘다). */
   const 곁다리길 = "/System/Master/salesGoods.aspx";
+  const 단품길 = "/System/Master/goods.aspx";
   /* 곁다리로 부른 표 둘 — 어느 쪽이든 받는다.
      ㄱ) `search.js` 가 세운 `window.VP상품단추요청` (뒷길로 불렀을 때)
      ㄴ) **배송관리 길 그 자체** — 10-15 부터 `불러오기.js` 가 이 글을 거기에도 보낸다.
          차례에 안 기대려고 길도 본다(search.js 가 먼저 안 돌아도 선다). */
   const 배송관리인가 = /firmdvlist\.aspx/i.test(location.pathname);
+  const 곁다리부름 = !PAGES[location.pathname] && (window.VP상품단추요청 || 배송관리인가);
+  if (단품곁다리 && !곁다리부름) return;      // 단품 한 벌은 곁다리로 부를 때만
   const page = PAGES[location.pathname]
-    || ((window.VP상품단추요청 || 배송관리인가) ? PAGES[곁다리길] : null);
+    || (곁다리부름 ? PAGES[단품곁다리 ? 단품길 : 곁다리길] : null);
   if (!page) return;
   /* ⚠⚠ **두 번 돌지 않는다.** 10-15 부터 이 글이 배송관리에 **두 길로** 올 수 있다 —
      `불러오기.js` 가 보내는 것과 `search.js` 의 뒷길. 두 번 돌면 곁다리 통이 둘이 되고
      벤더피아에 같은 조회를 두 번 보낸다. 여기서 한 번만 돌게 막는다. */
-  if (window.__vp굿즈돌았나) return;
-  window.__vp굿즈돌았나 = true;
+  const 돌았다열쇠 = 단품곁다리 ? "__vp단품돌았나" : "__vp굿즈돌았나";
+  if (window[돌았다열쇠]) return;
+  window[돌았다열쇠] = true;
   const 곁다리 = !PAGES[location.pathname];
-  const 내길 = 곁다리 ? 곁다리길 : location.pathname;
+  const 내길 = 곁다리 ? (단품곁다리 ? 단품길 : 곁다리길) : location.pathname;
 
   const startDt = document.getElementById("dcStartDt");
   const endDt = document.getElementById("dcEndDt");
-  if (!document.forms[0] || !document.getElementById("btnSearch") || !document.getElementById("divGrid")) return;
+  /* 곁다리는 이 화면(배송관리·주문관리)의 폼을 안 쓴다 — 목록은 늘 그 화면을 새로 열어 받는다(아래 `load`) */
+  if (!곁다리 && (!document.forms[0] || !document.getElementById("btnSearch") || !document.getElementById("divGrid"))) return;
 
   // 연결된 화면의 목록을 단품코드로 묶어 둔다
   //  상품관리 → 단품관리: 단품코드 → 단품 줄
@@ -845,8 +853,11 @@
 
   function labelGroup(name, group) {
     const codes = group.items.map((r) => r[col(page.codeCol)]);
-    labelButton(group.b, name, codes, stockQty(group.items));
-    if (page.nameCol === "단품명") markJohon(group.b, codes);
+    /* `외` = 곁다리로 배송관리·CS등록 표 칸에 건네준 이름 단추들 — 점이 목록 단추와 늘 같이 바뀐다 */
+    for (const x of [group.b, ...(group.외 || [])]) {
+      labelButton(x, name, codes, stockQty(group.items));
+      if (page.nameCol === "단품명") markJohon(x, codes);
+    }
     fillRow(group);
   }
 
@@ -966,7 +977,12 @@
     return 줄;
   }
 
+  /* 곁다리 두 벌(상품·단품)의 상세 창이 한 자리에 겹쳐 뜨지 않게 — 하나가 열리면 다른 벌의 것은 닫는다 */
+  addEventListener("vp상세열림", (e) => {
+    if (e.detail !== panel && !panel.hidden) { panel.hidden = true; delete panel.dataset.name; }
+  });
   function show(name, h, items) {
+    dispatchEvent(new CustomEvent("vp상세열림", { detail: panel }));
     panel.dataset.name = name;
     panel._args = [h, items];
     panelTitle.textContent = name;
@@ -1249,7 +1265,7 @@
       else if (줄여서.has(b)) 거의++;                 // 겹쳐서 못 거는 것 — 세기는 센다
     }
     /* ③ 링크가 걸린 상품 단추 **한 단에 붉은색 마킹** (조혼가구 붉은 줄과 같은 색·같은 꼴) */
-    for (const [n, g] of groups) { g.b.classList.toggle("vp-ing", ing맞은것.has(n)); fillRow(g); }   // 표의 「상품정보」 칸도 채운다
+    for (const [n, g] of groups) { for (const x of [g.b, ...(g.외 || [])]) x.classList.toggle("vp-ing", ing맞은것.has(n)); fillRow(g); }   // 표의 「상품정보」 칸도 채운다
     if (panel.dataset.name) show(panel.dataset.name, ...panel._args);   // 열려 있으면 상세도 새로
     적기(`inghome 맞춰보기 — 우리 상품 ${이름들.length}개 · inghome ${목록.length}개 · `
        + `이름이 그대로 맞는 것 ${딱}개 · 거의 맞는 것 ${거의}개`
@@ -1274,7 +1290,7 @@
         addRows(rows);
         apply();
         note.textContent = `목록 불러오는 중… ${got.toLocaleString()} / ${total.toLocaleString()}`;
-      }, () => id === loadId, document);
+      }, () => id === loadId, 곁다리 ? null : document);
       if (id !== loadId) return;
       loading = false;
       cached.textContent = got1.cachedAt
@@ -1322,9 +1338,9 @@
     apply();
     /* ④ 목록이 들어왔다고 알린다 — 배송관리가 이미 그려 둔 상품명 칸을 그때 단추로 바꾼다.
        ⚠ `load()` 를 또 부르지 않는다. 이미 있는 이 차례에 얹는다. */
-    if (곁다리) window.dispatchEvent(new Event("vp상품단추준비"));
+    if (곁다리) window.dispatchEvent(new Event(단품곁다리 ? "vp단품단추준비" : "vp상품단추준비"));
     // 첫 목록을 다 받은 뒤에 연결된 화면의 목록을 받는다 (벤더피아가 요청을 하나씩 처리해서, 동시에 받으면 첫 목록이 늦어진다)
-    (page.top ? loadTop().catch(() => { top = null; apply(); }) : Promise.resolve())
+    (page.top && !단품곁다리 ? loadTop().catch(() => { top = null; apply(); }) : Promise.resolve())
       .then(() => (page.stock === "link" || page.stock === "parts") && loadStock().catch(() => {}))
       .then(() => page.link && loadLinked().catch(() => { linked = { heads: [], byCode: new Map() }; }))
       /* ② 단품관리에서만 — 서류관리 자료를 뒤에서 조용히 받는다.
@@ -1350,28 +1366,43 @@
       .then(() => VP_DATA.prefetch());
   });
 
-  /* ④ 곁다리 — 배송관리가 쓸 **상품 단추 한 개**를 만들어 준다.
+  /* ④ 곁다리 — 배송관리·CS등록이 쓸 **이름 단추 한 개**를 만들어 준다.
      ⚠ 없는 이름에는 **`null`** 을 돌려준다. 사장님 분부대로 그 칸은 **글자 그대로** 둔다 —
-       가짜 단추를 만들지 않는다. */
+       가짜 단추를 만들지 않는다.
+     10-24 — 상품명 칸은 상품관리 한 벌(`window.VP상품단추`), 단품명 칸은 단품관리 한 벌(`window.VP단품단추`).
+       단추 꼴(누르는 글자 + 연동 점)과 누른 뒤(`show`)는 단품관리·상품관리 목록과 **같은 것을 부른다**. */
   if (곁다리) {
-    window.VP상품단추 = (이름) => {
+    const 단추 = (이름) => {
       const 이것 = groups.get(String(이름 == null ? "" : 이름).trim());
       if (!이것) return null;
       const b = document.createElement("button");
       b.type = "button";
-      /* 상품관리의 `labelGroup` 이 하는 것과 **같은 것을 부른다** */
-      labelButton(b, 이름, 이것.items.map((r) => r[col(page.codeCol)]), stockQty(이것.items));
+      (이것.외 ||= []).push(b);
+      /* 목록의 `labelGroup` 이 하는 것과 **같은 것을 부른다** (점 넷 — 재고·조혼가구·카탈로그·서류) */
+      const codes = 이것.items.map((r) => r[col(page.codeCol)]);
+      labelButton(b, 이름, codes, stockQty(이것.items));
+      if (page.nameCol === "단품명") markJohon(b, codes);
+      b.classList.toggle("vp-ing", ing맞은것.has(String(이름).trim()));
       b.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
-        /* 누른 단추만 검게 — 상품관리와 같은 결 */
+        /* 누른 단추만 굵게 — 목록과 같은 결 */
         document.querySelectorAll("#vp-root .vp-상품칸 button.on").forEach((x) => x.classList.remove("on"));
         b.classList.add("on");
-        show(이름, heads, 이것.items);        // ← 상품관리가 쓰는 **그 상세**를 그대로 연다
+        show(이름, heads, 이것.items);        // ← 단품관리·상품관리가 쓰는 **그 상세**를 그대로 연다
       });
       return b;
     };
-    window.VP상품목록몇개 = () => groups.size;
-    window.VP말?.("곁다리:섬");                      // ⚠ 까닭 적기 (10-15)
+    if (단품곁다리) {
+      window.VP단품단추 = 단추;
+      window.VP단품목록몇개 = () => groups.size;
+    } else {
+      window.VP상품단추 = 단추;
+      window.VP상품목록몇개 = () => groups.size;
+    }
+    window.VP말?.(단품곁다리 ? "곁다리:단품섬" : "곁다리:섬");                      // ⚠ 까닭 적기 (10-15)
   }
+};
+한벌돌리기(false);
+한벌돌리기(true);
 })();

@@ -173,11 +173,21 @@ const 본다 = () => {
 
     /* ★ 10-16 사장님: 「상품명 버튼을 누르면 상담버튼과 동일한팝업이 나타납니다.
          **이는 잘못된 작동 입니다**」(장부 a1792133915) — 상품명을 눌러도 **안 떠야** 한다 */
-    await page.click('tbody tr:nth-child(2) td.vp-상품칸');
-    await page.waitForTimeout(400);
-    const 눌러봄 = await page.evaluate(본다);
-    console.log('    ★ **상품명을 눌렀을 때 상담 판이 안 뜨나** ' + !눌러봄.판떴나 + ' '
-      + 못(!눌러봄.판떴나));
+    /* 10-24: 이름 **단추**를 누르면 상세만(상담 안 뜸). 단추가 아닌 글자 칸이나 줄의 다른 곳은 줄 누름 = 상담 판. */
+    if (await page.$('tbody tr:nth-child(2) td.vp-상품칸 button')) {
+      await page.click('tbody tr:nth-child(2) td.vp-상품칸 button');
+      await page.waitForTimeout(400);
+      const 눌러봄 = await page.evaluate(본다);
+      console.log('    ★ **이름 단추를 눌렀을 때 상담 판이 안 뜨나** ' + !눌러봄.판떴나 + ' '
+        + 못(!눌러봄.판떴나));
+    }
+    await page.click('tbody tr:nth-child(2) td:last-child');
+    await page.waitForTimeout(500);
+    const 줄눌러봄 = await page.evaluate(본다);
+    console.log('    ★ **줄의 다른 곳을 누르면 상담 판이 뜨나** ' + 줄눌러봄.판떴나 + ' · 제목 「' + 줄눌러봄.판제목 + '」 '
+      + 못(줄눌러봄.판떴나 && 줄눌러봄.판제목 === '토리블리 2단 와이드 교구장'));
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(250);
 
     /* 판을 열고 한 줄 남긴다 — **상담 단추로만** 연다 (10-16) */
     await page.click('tbody tr:nth-child(2) .vp-상담알');
