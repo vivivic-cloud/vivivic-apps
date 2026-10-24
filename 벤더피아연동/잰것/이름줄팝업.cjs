@@ -230,31 +230,7 @@ const 자리 = (고르개) => { const e = document.querySelector(고르개); if 
     await ctx.close();
   }
 
-  /* ㄱ·ㄴ·ㄷ — CS등록 화면(주문관리)은 확장이 goods.js 를 안 보낸다 → search.js 가 깃허브 글로 직접 부른다(덮어쓰기 필요 없음) */
-  console.log('\n■ CS등록 화면(주문관리) · 확장은 search.js 만 보낸다 (goods.js 는 search.js 가 형제로 부름)');
-  {
-    const { ctx, page } = await 세우기(1280, false);
-    await page.goto('https://vendorpia.com/System/Sales/orderMst.aspx#vgCS');
-    await 글넣기(page, true, { 꾸밈: ['login.css', 'search.css'], 글: ['vp-data.js', 'login.js', 'search.js'] });
-    await page.waitForTimeout(600);
-    await page.click('.vp-bar button[type=submit]');
-    await page.waitForTimeout(4000);
-    const 것 = await page.evaluate(표값);
-    console.log('  머리 ' + 것.머리.join(','));
-    console.log('  ★ ㄱ 상품명 단추 ' + 것.상품.filter((x) => x.단추).length + '/2 · 단품명 단추 ' + 것.단품.filter((x) => x.단추).length + '/2 · 모르는 이름은 글자 그대로 '
-      + 못(것.상품.filter((x) => x.단추).length === 2 && 것.단품.filter((x) => x.단추).length === 2 && !것.상품[2].단추 && !것.단품[2].단추));
-    await page.click('.vp-table tbody tr:nth-child(1) td.vp-단품칸 button');
-    await page.waitForTimeout(500);
-    let 판 = await page.evaluate(열린판);
-    console.log('  ★ ㄴ 단품명 단추 → 단품 상세 ' + JSON.stringify(판.상세) + ' · 상담 ' + 판.상담 + ' ' + 못(판.상세.length === 1 && 판.상세[0] === '비스켓 800 몸통' && !판.상담));
-    await page.keyboard.press('Escape'); await page.waitForTimeout(200);
-    await page.click('.vp-table tbody tr:nth-child(2) td:last-child');
-    await page.waitForTimeout(600);
-    판 = await page.evaluate(열린판);
-    console.log('  ★ ㄷ 줄의 다른 곳 → 상담 판 「' + 판.상담 + '」 ' + 못(판.상담 === '비스켓 1200 주방수납장'));
-    await page.screenshot({ path: path.join(그림칸, '이름줄-CS등록-1280.png') });
-    await ctx.close();
-  }
+  /* CS등록 화면(주문관리)은 10-24 에 목록만 보이는 것으로 다시 시작 — 이름 단추·줄 클릭 상담을 일부러 안 건다(`주문관리CS.cjs` 가 잰다) */
 
   console.log('\n  쪽 오류 ' + 탈.length + '건 ' + 못(탈.length === 0) + (탈.length ? ' ' + JSON.stringify(탈.slice(0, 3)) : ''));
   await b.close();

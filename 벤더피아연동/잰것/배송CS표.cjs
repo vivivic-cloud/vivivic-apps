@@ -52,8 +52,8 @@ const VP흉내 = `window.VP저장 = { get: async function(){return {};}, set: as
       await 쪽.addScriptTag({ content: VP흉내 });
       await 쪽.addScriptTag({ content: fs.readFileSync(path.join(확장, 'search.js'), 'utf8') });
       await 쪽.waitForTimeout(1000);
-      await 쪽.click('.vp-bar button[type=submit]');
-      await 쪽.waitForTimeout(1500);
+      if (화면 === '배송관리') await 쪽.click('.vp-bar button[type=submit]');   // CS등록은 조회창이 없다 — 주문관리 목록을 스스로 읽는다(10-24)
+      await 쪽.waitForTimeout(화면 === '배송관리' ? 1500 : 3500);
       /* 재기 자는 서류관리 표의 첫 칸 이름(vp-main)으로 첫 칸을 집는다 — 우리 첫 칸에 그 이름표만 붙여 재게 한다(꼴엔 안 걸린다) */
       await 쪽.evaluate(() => document.querySelectorAll('.vp-table th.vp-first, .vp-table td.vp-first').forEach((e) => e.classList.add('vp-main')));
       const 우리 = await 재기(쪽, '.vp-table table');

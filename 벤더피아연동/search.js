@@ -1,14 +1,14 @@
 // 배송관리(배송목록조회) 화면을 기간 + 검색창 하나로 바꾼다.
 // 조회는 원래 화면의 검색 폼을 그대로 벤더피아에 보내고, 받은 결과에서 목록만 뽑아 보여준다.
 (() => {
-  /* ⚠⚠ 10-22 사장님 (바로잡음, 한 글자도 안 고침): 「내가 말을 잘못전달했네 CS등록 메뉴 입장시 이런 벤더피아
-       화면 그대로가 아니라 현재 프로그램의 배송관리와 같은 화면이 나오고 대신 그 검색 데이터가
-       -판매관리의 주문관리의 데이터에서 검색될어져야 한다는거였어」
-     → 주문관리(`/System/Sales/orderMst.aspx`) 쪽 위에서 **배송관리와 같은 꼴**(기간 + 검색창 + 결과 표 +
-       줄마다 「상담」 단추)을 그린다. 다른 것은 **자료의 출처뿐** — 주문관리 조회에서 온다.
-       (10-21 0.34.39 는 이것을 「원래 화면 위에 CS 판만」 으로 잘못 읽었다.)
-     ⚠ 주문관리 폼의 칸 이름은 저장소에 없다 — **페이지에서 읽어 맞춘다**(`주문관리조회`). 못 맞추면
-       배송목록 조회(`배송틀받기`)로 돌아가며, 그때는 화면에 작게 그렇다고 적는다(`.vp-출처`). */
+  /* ⚠⚠ 10-24 사장님 (CS등록 다시 시작, 한 글자도 안 고침): 「배송관리의 모습이 보여지면 안되는곳이야 정확히 주문관리의 화면을
+       보여줘야하는곳이야 일단 cs등록 들어갔을때 벤더피아의 주문관리 현재 목록이 그대로 보이게 해줘 여기서부터 다시 시작해야 겠다 -
+       목록의 디자인 일관성을 유지해줘」
+     → 주문관리(`/System/Sales/orderMst.aspx`)에서는 **그 페이지에 이미 그려진 주문관리 결과 표를 DOM 에서 그대로 읽어**
+       우리 표 꼴로 다시 그린다(칸 이름·차례·값 모두 주문관리 것). 화면에는 「CS등록」 제목·← 메인·목록뿐이다.
+     ⚠ 목록이 비어 있으면(조회를 눌러야 뜨는 화면) 그 페이지의 조회 단추와 **같은 기본값 그대로** 한 번만 조회한다(조회만).
+     ⚠ 못 읽으면 빈 표 + 까닭 한 줄. **배송관리 모습(기간+검색창)·배송목록 대신 쓰기·검색·상담·이름 단추·줄 클릭은 여기 없다.**
+       (10-22 0.34.39~0.34.46 의 「배송관리와 같은 화면 + 주문관리 조회」 길은 걷었다. 상담 판·이름 단추 코드는 배송관리가 쓴다.) */
   const CS전용 = /\/system\/sales\/ordermst\.aspx/i.test(location.pathname);
   const form = document.forms[0];
   const searchBtn = document.getElementById("btnSearch");
@@ -99,134 +99,75 @@
     return res.text();
   }
 
-  /* ── 주문관리(`orderMst.aspx`) 조회 ─────────────────────────
-     칸 이름을 **짐작해 박지 않는다.** 이 쪽의 폼을 읽어서 맞춘다 —
-       · 기간  : 날짜 꼴(2026-10-21 · 2026/10/21 · 2026.10.21) 값이 든 글칸 둘 (앞이 시작, 뒤가 끝)
-       · 그 밖 : 폼 안 머리글(th·td·label)이 「주문번호」「수취인」… 인 곳 바로 옆 칸
-       · 조회 단추 : 폼 안의 이미지·제출 단추 가운데 이름·값이 search·조회·검색 인 것(없으면 제출 단추가 하나뿐일 때 그것)
-     ⚠ 하나라도 못 맞추면 `null` — 그때는 배송목록 조회를 쓴다(아래 `fetchList`).
-     ⚠ 받은 결과의 머리줄에 「주문번호」「상품명」이 없어도 `null` — CS 판이 읽는 칸이다. */
-  const 칸이름표 = { tbSOrderNo: "주문번호", tbRecipient: "수취인", tbOrderer: "주문자",
-    tbAddr0: "주소", tbSGoodsNm: "상품명", tbInvoiceNo: "송장번호", tbGoodsCd: "단품코드" };
-  const 깎 = (t) => String(t || "").replace(/[\s:：*]/g, "");
-  const 쓸칸 = (e) => e && /^(INPUT|SELECT|TEXTAREA)$/.test(e.tagName)
-    && !/^(hidden|image|submit|button|checkbox|radio)$/i.test(e.type || "") && e.name;
-  function 머리글옆칸(글) {
-    for (const c of form.querySelectorAll("th,td,label")) {
-      if (깎(c.textContent) !== 글) continue;
-      if (c.tagName === "LABEL" && c.htmlFor && 쓸칸(document.getElementById(c.htmlFor)))
-        return document.getElementById(c.htmlFor);
-      const 옆 = c.nextElementSibling;
-      const 칸 = 옆 && (쓸칸(옆) ? 옆 : [...옆.querySelectorAll("input,select,textarea")].find(쓸칸));
-      if (칸) return 칸;
+  /* ── CS등록: 주문관리 목록을 페이지에서 그대로 읽는다 (10-24) ──────────────
+     ASP.NET GridView 는 th 머리줄일 수도 td 머리줄일 수도 있고 표가 여럿(겉틀·쪽 넘김 표)일 수 있다 → **너그럽게** 고른다:
+       · 줄 안에 또 표가 든 줄(겉틀)은 세지 않는다
+       · 칸 수가 같은 줄이 가장 많은 표 = 목록(줄 수 같으면 칸이 많은 쪽)
+       · 머리줄 = 칸 수가 맞는 줄 가운데 th 가 든 첫 줄, 없으면 칸 수가 맞는 첫 줄 */
+  const 칸글 = (c) => {
+    let t = (c.textContent || "").replace(/\s+/g, " ").trim();
+    if (!t) { const i = c.querySelector("input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=image]):not([type=submit]):not([type=button])");
+      if (i) t = String(i.value || "").trim(); }
+    return t;
+  };
+  function 표현황(docs) {
+    const out = [];
+    for (const doc of docs) for (const t of doc.querySelectorAll("table")) {
+      if (t.closest && t.closest("#vp-root")) continue;
+      const trs = [...t.rows]; if (!trs.length) continue;
+      const 첫 = trs[0];
+      out.push([trs.length, trs.length + "줄/" + 첫.cells.length + "칸[" + 칸글(첫).slice(0, 60) + "]"]);
     }
-    return null;
+    return out.sort((a, z) => z[0] - a[0]).slice(0, 5).map((x) => x[1]);
   }
-  let 주문틀 = undefined;
-  function 주문틀읽기() {
-    if (주문틀 !== undefined) return 주문틀;
-    주문틀 = null;
-    const 날 = [...form.elements].filter((e) => e.tagName === "INPUT" && 쓸칸(e)
-      && /^\d{4}([-/.])\d{2}\1\d{2}$/.test((e.value || "").trim()));
+  function 목록고르기(doc) {
+    let 최고 = null;
+    for (const t of doc.querySelectorAll("table")) {
+      if (t.closest && t.closest("#vp-root")) continue;
+      const 줄들 = [...t.rows].filter((tr) => tr.cells.length >= 2 && !tr.querySelector("table"));
+      if (!줄들.length) continue;
+      const 셈 = {};
+      for (const tr of 줄들) 셈[tr.cells.length] = (셈[tr.cells.length] || 0) + 1;
+      const 칸수 = Number(Object.entries(셈).sort((a, z) => z[1] - a[1] || z[0] - a[0])[0][0]);
+      const 맞는 = 줄들.filter((tr) => tr.cells.length === 칸수);
+      const 점 = 맞는.length;
+      /* 검색 조건 칸(글칸·고르는 칸이 줄 수보다 많은 표)은 목록이 아니다 — 폼 배치용 표를 목록으로 읽지 않는다 */
+      if (t.querySelectorAll("input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=image]):not([type=submit]):not([type=button]),select,textarea").length > 점) continue;
+      if (!최고 || 점 > 최고.점 || (점 === 최고.점 && 칸수 > 최고.칸수)) 최고 = { 점, 칸수, 맞는 };
+    }
+    if (!최고) return null;
+    const 머리줄 = 최고.맞는.find((tr) => tr.querySelector("th")) || 최고.맞는[0];
+    const heads = [...머리줄.cells].map(칸글);
+    const rows = 최고.맞는.filter((tr) => tr !== 머리줄 && !tr.querySelector("th"))
+      .map((tr) => [...tr.cells].map(칸글)).filter((r) => r.some(Boolean));
+    return { heads, rows };
+  }
+  /* 지금 페이지(와 같은 출처 iframe)에서 읽는다 */
+  function 쪽에서읽기() {
+    const docs = [document];
+    for (const f of document.querySelectorAll("iframe,frame")) { try { if (f.contentDocument) docs.push(f.contentDocument); } catch (_) {} }
+    let 낫 = null;
+    for (const d of docs) { const r = 목록고르기(d); if (r && (!낫 || r.rows.length > 낫.rows.length)) 낫 = r; }
+    return { r: 낫, docs };
+  }
+  /* 목록이 비어 있으면: 이 페이지의 조회 단추가 하는 것과 **같은 기본값 그대로** 한 번 조회(조회만) */
+  async function 기본값조회() {
     const 단추들 = [...form.querySelectorAll("input[type=image],input[type=submit],button[type=submit]")];
     const 버튼 = 단추들.find((e) => /search|srch|조회|검색/i.test((e.name || "") + (e.id || "") + (e.value || "") + (e.alt || "")))
-      || (단추들.length === 1 ? 단추들[0] : null);        // 이름으로 못 알아도 폼에 제출 단추가 하나뿐이면 그것
-    if (날.length < 2 || !버튼) { window.VP말?.("주문관리:폼못맞춤 날짜" + 날.length + " 단추" + (버튼 ? 1 : 0));
-      진단적기("주문관리 폼못맞춤: 폼" + document.forms.length + "개(첫 폼 칸 " + form.elements.length + "개) 날짜꼴 칸 " + 날.length + "개["
-        + 날.slice(0, 3).map((e) => e.name.split("$").pop() + "=" + e.value).join(",") + "] 제출단추 " + 단추들.length + "개["
-        + 단추들.slice(0, 3).map((e) => (e.name || e.id || e.tagName).split("$").pop()).join(",") + "] 창 " + (window === window.top ? "맨위" : "틀안") + " " + location.pathname.split("/").pop());
-      return null; }
-    const 칸 = { dcStartDt: 날[0], dcEndDt: 날[1] };
-    for (const [id, 글] of Object.entries(칸이름표)) { const e = 머리글옆칸(글); if (e) 칸[id] = e; }
-    /* ⚠ 10-23 사장님 화면: 주문관리 폼에 「송장번호」「단품코드」 칸이 없었다(찾은 칸 = 주문번호·수취인·주문자·주소·상품명).
-       예전엔 **한 칸이라도 없으면 통째로 배송목록**으로 갔는데, 그 길이 막혀 있어 조회가 다 비었다.
-       이제 **있는 칸으로 주문관리를 조회**한다. 없는 칸으로 묻는 검색(송장번호·단품코드)만 주문관리에 그 칸이 없다고 알리고 비운다 — 지어내지 않는다. */
-    const 빠진 = Object.keys(칸이름표).filter((id) => !칸[id]);
-    const 행수 = [...form.elements].find((e) => e.tagName === "SELECT" && /rowcnt|pagesize|pagecnt|listcnt/i.test(e.name + e.id));
-    주문틀 = { form, 버튼, 칸, 행수칸: 행수 ? 행수.name : "" };
-    window.VP말?.("주문관리:폼읽음 칸 " + Object.keys(칸).join(","));
-    진단적기("주문관리 폼읽음: " + Object.entries(칸).map(([k, e]) => (칸이름표[k] || k) + "=" + e.name.split("$").pop()).join(" ")
-      + " 단추 " + (버튼.name || 버튼.id).split("$").pop() + "(" + 버튼.type + ")"
-      + (빠진.length ? " · 폼에 없는 칸(그 칸 검색은 못 함): " + 빠진.map((id) => 칸이름표[id]).join(",") : ""));
-    return 주문틀;
-  }
-  const 날모양 = (본, ymd) => { const m = /^\d{4}([-/.])\d{2}\1\d{2}$/.exec((본 || "").trim());
-    return m ? ymd.replace(/-/g, m[1]) : ""; };
-  async function 주문관리조회(fields, rowCnt) {
-    const t = 주문틀읽기();
-    if (!t) return null;
-    const 몫 = {};
-    for (const [id, v] of Object.entries(fields)) {
-      const e = t.칸[id];
-      if (!e) { window.VP말?.("주문관리:칸없음 " + id);
-        진단적기("주문관리에는 「" + (칸이름표[id] || id) + "」 칸이 없어 그 검색은 못 합니다");
-        return { count: "0", heads: [], rows: [], 몸: { 길이: 0, 로그인칸: false, 틀: 0, 표수: 0, 칸수들: "", 제목: "" }, 칸없음: true }; }   // 맞는 칸이 없으면 지어내지 않는다
-      const 값 = /^dc(Start|End)Dt$/.test(id) ? 날모양(e.value, v) : v;
-      if (!값) return null;
-      몫[e.name] = 값;
-    }
-    const 글 = await 보내기(t, (n) => n, 몫, rowCnt);
-    const r = 표뽑기(글, (doc) => [...doc.querySelectorAll("tr")]
-      .filter((tr) => tr.querySelectorAll("th").length >= 5)
-      .sort((a, z) => z.querySelectorAll("th").length - a.querySelectorAll("th").length)[0]?.querySelector("th"));
-    진단적기(응답말("주문관리", r));
-    if (!r.heads.includes("주문번호") || !r.heads.includes("상품명")) {
-      window.VP말?.("주문관리:머리줄이 CS 판이 읽는 꼴이 아님 → 배송목록으로");
-      진단적기("주문관리 머리줄에 「주문번호」「상품명」 이 없어 배송목록으로 돌아감"); return null; }
-    return r;
+      || (단추들.length === 1 ? 단추들[0] : null);
+    if (!버튼) return { 까닭: "조회 단추를 못 찾음(제출 단추 " + 단추들.length + "개" + (단추들.length ? "[" + 단추들.slice(0, 3).map((e) => (e.name || e.id || e.tagName).split("$").pop()).join(",") + "]" : "") + ") — __doPostBack 단추일 수 있음" };
+    const 글 = await 보내기({ form, 버튼, 행수칸: "" }, (n) => n, {}, "");
+    const doc = new DOMParser().parseFromString(글, "text/html");
+    const r = 목록고르기(doc);
+    return { r, doc, 까닭: "기본값 조회 HTTP" + (마지막응답 ? 마지막응답.상태 + (마지막응답.넘어옴 ? " 넘어옴→" + 마지막응답.주소 : "") : "?")
+      + " 길이" + 글.length + (doc.querySelector("input[type=password]") ? " 로그인칸있음" : "") + " 표" + doc.querySelectorAll("table").length };
   }
 
-  /* 주문관리에서는 배송목록 폼이 쪽에 없다 — 배송목록 쪽을 **한 번 받아서** 그 폼으로 묻는다(조회만) */
-  let 배송틀캐시 = null;
-  async function 배송틀받기() {
-    if (!CS전용) return { form, 버튼: searchBtn, 행수칸: fullName("ddlRowCnt") };
-    if (!배송틀캐시) 배송틀캐시 = (async () => {
-      const res = await fetch("/System/Delivery/firmDvList.aspx", { credentials: "include" });
-      const doc = new DOMParser().parseFromString(await res.text(), "text/html");
-      const f = doc.forms[0], b = doc.getElementById("btnSearch");
-      if (!f || !b) throw new Error("배송목록 폼 없음");
-      const 이름들 = [...new FormData(f).keys()];
-      /* ⚠ 10-23 사장님 화면: 배송목록 응답 HTTP404. 폼의 action 은 배송목록 쪽 기준 상대 주소라
-         (예 `firmDvList.aspx`) **지금 쪽(/System/Sales/)** 기준으로 풀면 틀린 곳(/System/Sales/firmDvList.aspx)이 된다. 받아 온 그 주소 기준으로 푼다. */
-      f.action = new URL(f.getAttribute("action") || "firmDvList.aspx", res.url || new URL("/System/Delivery/firmDvList.aspx", location.href).href).href;
-      return { form: f, 버튼: b, 행수칸: 이름들.find((n) => n === "ddlRowCnt" || n.endsWith("$ddlRowCnt")) || "ddlRowCnt", 이름들 };
-    })();
-    return 배송틀캐시;
-  }
-
-  /* 지금 자료가 어디서 오는지 화면에 작게 적는다 (CS등록 화면만) — 배송목록으로 돌면 사장님이 알아채시게 */
-  let 출처칸 = null, 진단칸 = null;
-  const 진단줄 = []; let 폼줄 = "";
-  /* 화면에 작게 까닭을 적는다(CS등록 화면만) — 사장님이 그대로 알려 주시면 된다. 최근 세 줄만. */
-  function 진단적기(줄) {
-    window.VP말?.("진단:" + 줄.slice(0, 80));
-    /* 폼 읽은 줄(`주문관리 폼…`)은 늘 맨 위에 붙여 두고, 응답 줄은 최근 둘만 */
-    if (/^주문관리 폼/.test(줄)) 폼줄 = 줄; else { 진단줄.push(줄); while (진단줄.length > 2) 진단줄.shift(); }
-    if (진단칸) 진단칸.textContent = [폼줄, ...진단줄].filter(Boolean).join("\n");
-  }
-  const 응답말 = (이름, r) => 이름 + " 응답 " + (마지막응답 ? "HTTP" + 마지막응답.상태 + (마지막응답.넘어옴 ? " 넘어옴→" + 마지막응답.주소 : "") + " 보냄[" + 마지막응답.보낸 + "] " : "")
-    + "길이" + r.몸.길이 + (r.몸.로그인칸 ? " 로그인칸있음" : "") + " 제목[" + r.몸.제목 + "] 표" + r.몸.표수 + " 틀" + r.몸.틀
-    + " 머리" + r.heads.length + "칸[" + r.heads.slice(0, 8).join(",") + "] 줄" + r.rows.length + " 건수" + r.count + " 줄칸수[" + r.몸.칸수들 + "]";
-  function 출처적기(어디) {
-    if (!출처칸) return;
-    const 주문 = 어디 === "주문관리";
-    출처칸.textContent = 주문 ? "자료: 주문관리 조회"
-      : "자료: 배송목록 조회 — 주문관리 폼을 못 맞춰 대신 씀 (벤더피아 판매관리→주문관리 폼 칸을 확인해야 합니다)";
-    출처칸.classList.toggle("vp-출처-대신", !주문);
-  }
+  /* 배송관리: 이 화면의 폼으로 바로 묻는다 (CS등록은 이 길을 안 쓴다) */
   async function fetchList(fields, rowCnt) {
-    if (CS전용) {
-      const r = await 주문관리조회(fields, rowCnt);
-      if (r) { 출처적기("주문관리"); return r; }
-      출처적기("배송목록");
-    }
-    const 틀 = await 배송틀받기();
-    const 이름들 = 틀.이름들 || fieldNames;
-    const 이름 = (id) => 이름들.find((n) => n === id || n.endsWith("$" + id)) || id;
-    const 글 = await 보내기(틀, 이름, fields, rowCnt);
-    const r = 표뽑기(글, (doc) => [...doc.querySelectorAll("th")].find((c) => c.textContent.trim() === "수취인"));
-    if (CS전용) 진단적기(응답말("배송목록", r));
-    return r;
+    const 틀 = { form, 버튼: searchBtn, 행수칸: fullName("ddlRowCnt") };
+    const 글 = await 보내기(틀, fullName, fields, rowCnt);
+    return 표뽑기(글, (doc) => [...doc.querySelectorAll("th")].find((c) => c.textContent.trim() === "수취인"));
   }
 
   /* ⚠⚠ 10-15 사장님 (배송관리를 짚으시고, 그대로):
@@ -237,31 +178,43 @@
      → 이제 **벤더피아가 준 머리줄(`heads`)을 그대로** 그린다. 이름도 차례도 벤더피아 것이다.
      칸을 줄이지도 합치지도 않는다. 넘치면 **가로로 민다**(10-14 에 깐 그대로). */
 
+  /* 화면에 작게 까닭을 적는다(CS등록만) — 사장님이 그대로 복사해 알려 주시면 된다 */
+  let 진단칸 = null;
+  function 진단적기(줄) {
+    window.VP말?.("진단:" + 줄.slice(0, 80));
+    if (진단칸) 진단칸.textContent = 줄;
+  }
+
   const root = document.createElement("div");
   root.id = "vp-root";
   root.className = "vp-wide";
-  root.innerHTML = `
+  root.innerHTML = CS전용 ? `
     <div class="vp-search">
       <a class="vp-home" href="/index.aspx">← 메인</a>
-      <h1>${CS전용 ? "CS등록" : "배송관리"}</h1>
+      <h1>CS등록</h1>
+      <div class="vp-note"></div>
+      <pre class="vp-진단"></pre>
+      <div class="vp-table"></div>
+    </div>` : `
+    <div class="vp-search">
+      <a class="vp-home" href="/index.aspx">← 메인</a>
+      <h1>배송관리</h1>
       <form class="vp-bar">
         <input type="date" name="from" required>
         <span>~</span>
         <input type="date" name="to" required>
-        <input name="q" class="vp-q" placeholder="${CS전용 ? "주문번호, 이름, 상품명, 주소, 전화번호…" : "송장번호, 주문번호, 이름, 상품명, 주소, 전화번호, 배송상태…"}">
+        <input name="q" class="vp-q" placeholder="송장번호, 주문번호, 이름, 상품명, 주소, 전화번호, 배송상태…">
         <button type="submit">조회</button>
       </form>
       <div class="vp-pills"></div>
-      ${CS전용 ? '<div class="vp-출처">자료: 주문관리 폼을 읽는 중…</div><pre class="vp-진단"></pre>' : ""}
       <div class="vp-note"></div>
       <div class="vp-table"></div>
     </div>`;
   document.body.appendChild(root);
   document.documentElement.classList.add("vp-clean");
-  출처칸 = root.querySelector(".vp-출처");
   진단칸 = root.querySelector(".vp-진단");
 
-  const bar = root.querySelector(".vp-bar");
+  const bar = root.querySelector(".vp-bar");        // CS등록에는 없다
   const note = root.querySelector(".vp-note");
   const table = root.querySelector(".vp-table");
   const 알약칸 = root.querySelector(".vp-pills");
@@ -306,6 +259,7 @@
 
   let 펼친것 = null;                                   // 지금 펼쳐 둔 갈래 (하나만 펼친다)
   function 알약그리기() {
+    if (CS전용) return;                                // CS등록에는 거르개가 없다
     알약칸.replaceChildren();
     for (const [id, 이름, 제보기] of 거르개들) {
       let 보기;
@@ -382,16 +336,8 @@
   if (!CS전용) {
     bar.from.value = startDt.value;
     bar.to.value = endDt.value;
-  } else {
-    /* 기간 첫값 = 주문관리 폼이 보여 주는 기간. 폼을 못 읽으면 최근 30일 */
-    const 틀 = 주문틀읽기();
-    const ymd = (d) => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
-    const 오늘 = new Date();
-    bar.from.value = 틀 ? 틀.칸.dcStartDt.value.trim().replace(/[/.]/g, "-") : ymd(new Date(오늘.getTime() - 30 * 86400000));
-    bar.to.value = 틀 ? 틀.칸.dcEndDt.value.trim().replace(/[/.]/g, "-") : ymd(오늘);
-    출처적기(틀 ? "주문관리" : "배송목록");
+    bar.q.focus();
   }
-  bar.q.focus();
 
   /* ④ **상품명 칸을 상품관리의 그 상품버튼으로** — 사장님 10-15:
        「이곳에 도착하는 상품명을 상품관리와 동일한 상품버튼으로 변경해 주세요.
@@ -410,6 +356,7 @@
   })();
   const 형제 = (이름) => 내주소 && 내주소.replace(/search\.js(?=\?|$)/, 이름);
   function 상품단추불러오기() {
+    if (CS전용) return;                                // CS등록은 목록만 — 이름 단추를 더하지 않는다(10-24)
     /* ⚠⚠ 이것은 **뒷길**이다. 10-15 부터는 `불러오기.js`(확장)가 배송관리에도
        `goods.js`·`goods.css` 를 **제대로 보낸다.** 이 길은 확장이 옛 판인 분을 위해 남겨 둔다.
        ⚠ 확장이 이미 보냈으면 **또 넣지 않는다** — 넣으면 같은 글을 두 번 받는다.
@@ -420,7 +367,6 @@
          찾아봐도 **아직 없다** — 그 검사는 영영 안 맞는다(재서 확인).
        그러니 **기다렸다가** 본다. 확장이 보냈으면 그동안 `goods.js` 가 돌아
          `__vp굿즈돌았나` 가 서니, 뒷길은 **아예 안 나선다**. 옛 판을 쓰시는 분 화면에서만 나선다. */
-    if (CS전용) { 뒷길로부르기(); return; }            // 주문관리에는 확장이 goods.js 를 안 보낸다 — 기다릴 일이 없다
     setTimeout(() => {
       if (window.__vp굿즈돌았나 || window.VP상품단추) return;   // 확장이 이미 보냈다
       뒷길로부르기();
@@ -445,8 +391,7 @@
       + (window.VP상품단추 ? "/셈있음" : "/**셈없음**")));
     document.head.appendChild(sc);
   }
-  /* 10-24 — CS등록 화면(주문관리)도 이름 단추를 쓴다. `불러오기.js`(확장 안)는 그 주소에 `goods.js` 를 안 보내므로
-     (고치면 덮어쓰기) 여기서 **깃허브 글 쪽으로** 형제 `goods.js`·`goods.css` 를 바로 부른다(뒷길, 기다림 없이). */
+  /* 10-24 CS등록(주문관리)은 목록만 보이는 것부터 다시 시작 — 이름 단추를 안 부른다(`상품단추불러오기` 가 CS전용이면 바로 돌아섬). */
   상품단추불러오기();
 
   /* ── 상담 이력 ──────────────────────────────────────────
@@ -1181,7 +1126,7 @@
 
   // 벤더피아에 매번 직접 조회한다 (항상 최신 상태).
   // 50줄을 먼저 받아 바로 보여주고, 더 있으면 600줄까지 이어서 받는다. 결과는 도착하는 대로 덧붙인다.
-  bar.addEventListener("submit", async (e) => {
+  if (bar) bar.addEventListener("submit", async (e) => {
     e.preventDefault();
     const searchId = ++currentSearch;
     const { filters, variants, local } = plan(bar.q.value);
@@ -1240,7 +1185,64 @@
       if (!shown) table.textContent = "결과가 없습니다.";
     } catch (err) {
       if (searchId === currentSearch) note.textContent = "조회에 실패했습니다. 다시 로그인한 뒤 시도해 주세요.";
-      if (CS전용) 진단적기("조회 실패(터짐): " + (err && err.message ? err.message : err));
     }
   });
+
+  /* ── CS등록 = 주문관리 목록 그대로 (10-24) ──────────────────────────
+     1) 페이지에 이미 그려진 주문관리 표를 읽는다. AJAX·UpdatePanel 로 늦게 올 수 있어 0·1·2초에 본다.
+     2) 끝내 비면 이 페이지 조회 단추와 같은 기본값으로 한 번만 조회(조회만).
+     3) 그래도 못 읽으면 빈 표 + 까닭 한 줄(표 수·각 표 줄/칸·첫 줄 글·iframe 수). 배송목록으로 대신하지 않는다. */
+  function CS목록그리기(heads, rows) {
+    const t = document.createElement("table");
+    const head = t.createTHead().insertRow();
+    heads.forEach((c, i) => {
+      const th = head.appendChild(document.createElement("th"));
+      th.textContent = c;
+      if (i === 0) th.className = "vp-first";
+    });
+    const body = t.createTBody();
+    for (const row of rows) {
+      const tr = body.insertRow();
+      heads.forEach((_, i) => {
+        const td = tr.insertCell();
+        td.textContent = row[i] === undefined ? "" : row[i];
+        if (i === 0) td.className = "vp-first";
+      });
+    }
+    table.replaceChildren(t);
+  }
+  async function CS목록보이기() {
+    const 기다림 = (ms) => new Promise((r) => setTimeout(r, ms));
+    const 모양 = (docs) => "표 " + docs.reduce((n, d) => n + d.querySelectorAll("table").length, 0) + "개 "
+      + JSON.stringify(표현황(docs)) + " · iframe " + document.querySelectorAll("iframe,frame").length + "개";
+    let 읽음 = null, 쪽 = null;
+    try {
+      for (const ms of [0, 1000, 1000]) {
+        if (ms) await 기다림(ms);
+        쪽 = 쪽에서읽기();
+        if (쪽.r && 쪽.r.rows.length) { 읽음 = 쪽.r; break; }
+      }
+      let 까닭 = "";
+      if (읽음) {
+        window.VP말?.("CS등록:쪽 표 읽음 칸" + 읽음.heads.length + " 줄" + 읽음.rows.length);
+      } else {
+        window.VP말?.("CS등록:쪽 표 비어 기본값 조회");
+        const q = await 기본값조회();
+        if (q.r && q.r.rows.length) 읽음 = q.r;
+        else {
+          읽음 = (q.r && q.r.heads.length ? q.r : null) || (쪽.r && 쪽.r.heads.length ? 쪽.r : null);
+          까닭 = (q.까닭 || "") + " · 지금 쪽 " + 모양(쪽.docs) + (q.doc ? " · 조회 응답 " + 모양([q.doc]) : "");
+        }
+      }
+      if (읽음) CS목록그리기(읽음.heads, 읽음.rows);
+      if (!읽음 || !읽음.rows.length) {
+        note.textContent = 읽음 ? "주문관리 목록에 줄이 없습니다." : "주문관리 목록을 읽지 못했습니다.";
+        진단적기(까닭 || "");
+      }
+    } catch (err) {
+      note.textContent = "주문관리 목록을 읽지 못했습니다.";
+      진단적기("터짐: " + (err && err.message ? err.message : err) + (쪽 ? " · 지금 쪽 " + 모양(쪽.docs) : ""));
+    }
+  }
+  if (CS전용) CS목록보이기();
 })();
