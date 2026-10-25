@@ -349,11 +349,12 @@
     const me = document.currentScript
       || [...document.querySelectorAll("script[src]")].reverse()
            .find((x) => /search\.js(\?|$)/.test(x.src));
-    return me ? me.src : null;
+    if (me && me.src) return me.src;
+    /* 10-25 0.34.53 부터 화면 글은 배경 글이 MAIN 에 **인라인**으로 넣어 `currentScript` 가 src 없는 인라인 글이다 → 깃 주소 + 캐시표로 짓는다(0.34.50 이 이 길에서 못 불렀다). */
+    return "https://vivivic-cloud.github.io/vivivic-apps/%EB%B2%A4%EB%8D%94%ED%94%BC%EC%95%84%EC%97%B0%EB%8F%99/search.js?t=" + Math.floor(Date.now() / 60000);
   })();
   const 형제 = (이름) => 내주소 && 내주소.replace(/search\.js(?=\?|$)/, 이름);
   function 상품단추불러오기() {
-    if (CS전용) return;                                // CS등록은 목록만 — 이름 단추를 더하지 않는다(10-24)
     /* ⚠⚠ 이것은 **뒷길**이다. 10-15 부터는 `불러오기.js`(확장)가 배송관리에도
        `goods.js`·`goods.css` 를 **제대로 보낸다.** 이 길은 확장이 옛 판인 분을 위해 남겨 둔다.
        ⚠ 확장이 이미 보냈으면 **또 넣지 않는다** — 넣으면 같은 글을 두 번 받는다.
@@ -364,6 +365,7 @@
          찾아봐도 **아직 없다** — 그 검사는 영영 안 맞는다(재서 확인).
        그러니 **기다렸다가** 본다. 확장이 보냈으면 그동안 `goods.js` 가 돌아
          `__vp굿즈돌았나` 가 서니, 뒷길은 **아예 안 나선다**. 옛 판을 쓰시는 분 화면에서만 나선다. */
+    if (CS전용) { 뒷길로부르기(); return; }            // 주문관리에는 확장이 goods.js 를 안 보낸다 — 기다릴 일이 없다
     setTimeout(() => {
       if (window.__vp굿즈돌았나 || window.VP상품단추) return;   // 확장이 이미 보냈다
       뒷길로부르기();
@@ -388,7 +390,7 @@
       + (window.VP상품단추 ? "/셈있음" : "/**셈없음**")));
     document.head.appendChild(sc);
   }
-  /* 10-24 CS등록(주문관리)은 목록만 보이는 것부터 다시 시작 — 이름 단추를 안 부른다(`상품단추불러오기` 가 CS전용이면 바로 돌아섬). */
+  /* 10-25 CS등록(주문관리)도 이름 단추 — 확장(불러오기.js)은 주문관리에 goods.js 를 안 보내므로(덮어쓰기 필요) 여기서 바로 부른다. */
   상품단추불러오기();
 
   /* ── 상담 이력 ──────────────────────────────────────────
@@ -1002,7 +1004,8 @@
   /* ⚠ 까닭 적기 — **그려 놓고 보니** 몇 칸이 단추가 됐나. 이것이 ⑤ 를 가른다:
        칸이 0개면 상품명 칸을 못 찾은 것, 칸은 있고 단추가 0개면 **이름이 하나도 안 맞은** 것. */
   const 상품칸셈적기 = () => window.VP말?.(
-    "상품칸:" + 상품칸들.length + "개중 단추" + 단추된것 + "개");
+    "상품칸:" + 상품칸들.length + "개중 단추" + 단추된것 + "개 · 줄클릭 " + document.querySelectorAll("#vp-root tr.vp-줄상담").length + "줄"
+    + (window.VP상품단추 ? "" : " · 이름단추:goods 못 불러옴"));
   function 늦게채우기(종류) {
     let 바뀐것 = 0;
     for (const [td, 이름, 칸종류] of 상품칸들) if (칸종류 === 종류 && td.isConnected !== false && 상품칸채우기(td, 이름, 종류)) 바뀐것++;
@@ -1190,23 +1193,11 @@
      2) 끝내 비면 이 페이지 조회 단추와 같은 기본값으로 한 번만 조회(조회만).
      3) 그래도 못 읽으면 빈 표 + 까닭 한 줄(표 수·각 표 줄/칸·첫 줄 글·iframe 수). 배송목록으로 대신하지 않는다. */
   function CS목록그리기(heads, rows) {
-    const t = document.createElement("table");
-    const head = t.createTHead().insertRow();
-    heads.forEach((c, i) => {
-      const th = head.appendChild(document.createElement("th"));
-      th.textContent = c;
-      if (i === 0) th.className = "vp-first";
-    });
-    const body = t.createTBody();
-    for (const row of rows) {
-      const tr = body.insertRow();
-      heads.forEach((_, i) => {
-        const td = tr.insertCell();
-        td.textContent = row[i] === undefined ? "" : row[i];
-        if (i === 0) td.className = "vp-first";
-      });
-    }
-    table.replaceChildren(t);
+    /* 10-25 사장님 「이미 34.53 이야」: 이름 단추·줄 클릭 상담·끌기가 CS등록에서도 되게 — 배송관리와 **같은 그리는 길**(`머리알기`+`addRows`)을 쓴다.
+       (0.34.51 이 목록만 그리느라 이 길을 걷어 냈었다. 칸 이름·차례·값은 여전히 주문관리 것 그대로.) */
+    tbody = null; 그린머리 = null; 상품칸들 = []; 단추된것 = 0; 머리본것 = null; 상담칸들.length = 0;
+    머리알기(heads);
+    addRows(heads, rows);
   }
   async function CS목록보이기() {
     const 기다림 = (ms) => new Promise((r) => setTimeout(r, ms));

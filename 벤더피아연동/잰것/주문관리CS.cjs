@@ -73,7 +73,7 @@ const 경우 = [
       const 통 = document.querySelector('#vp-root .vp-table');
       return { 청소: document.documentElement.classList.contains('vp-clean'), 원래: 보임(document.getElementById('f')), 제목: (document.querySelector('#vp-root h1') || {}).textContent,
         메인: !!document.querySelector('#vp-root a.vp-home'),
-        머리: th.map((x) => x.textContent), 줄: t ? [...t.querySelectorAll('tbody tr')].map((tr) => [...tr.cells].map((x) => x.textContent)) : [],
+        머리: th.map((x) => x.textContent), 줄: t ? [...t.querySelectorAll('tbody tr')].map((tr) => [...tr.cells].map((x) => { const c = x.cloneNode(true); c.querySelectorAll('button').forEach((b) => b.remove()); return c.textContent; })) : [],
         한줄: th.every((x) => getComputedStyle(x).whiteSpace === 'nowrap'),
         배송꼴: !!document.querySelector('#vp-root .vp-bar, #vp-root input[type=date], #vp-root .vp-pills, #vp-root .vp-출처, .vp-cs판'),
         단추: document.querySelectorAll('#vp-root .vp-goods-list, #vp-root .vp-상담알, #vp-root tr.vp-줄상담').length,
@@ -84,8 +84,8 @@ const 경우 = [
     console.log('\n  ◆ ' + c.이름 + ' · ' + (해시 || '(#vgCS 없이)') + ' · 창 ' + 너비);
     console.log('    제목 ' + 화면.제목 + ' · 칸 ' + 화면.머리.length + ' · 줄 ' + 화면.줄.length + ' · 글 "' + 화면.글 + '"' + (화면.까닭 ? '\n    까닭: ' + 화면.까닭.slice(0, 260) : ''));
     console.log('    ★ 제목 CS등록 · ← 메인 · 주문관리 원래 화면 가림 ' + 못(화면.제목 === 'CS등록' && 화면.메인 && 화면.청소 && !화면.원래));
-    console.log('    ★ 배송관리 모습(기간·검색창·거르개·출처·CS판)이 없다 · 이름 단추·상담 단추·줄 클릭 없음 ' + 못(!화면.배송꼴 && 화면.단추 === 0));
-    console.log('    ★ 배송목록·goods 를 안 불렀다 ' + 못(!부름.some((x) => /firmDvList|goods|salesGoods|StockList/i.test(x))));
+    console.log('    ★ 배송관리 모습(기간·검색창·거르개·출처·CS판)이 없다 ' + 못(!화면.배송꼴));
+    console.log('    ★ 배송목록을 안 불렀다(10-25: 이름 단추·줄 클릭은 되살림 — 이름줄길 시험이 잰다) ' + 못(!부름.some((x) => /firmDvList/i.test(x))));
     if (c.읽는곳 === '못읽음') {
       console.log('    ★ 빈 표 + 까닭 한 줄(#oGrid 없음) · 달력을 목록으로 안 집음 ' + 못(화면.머리.length === 0 && /읽지 못/.test(화면.글) && /#oGrid 없음/.test(화면.까닭) && !화면.머리.includes('월')));
     } else {
