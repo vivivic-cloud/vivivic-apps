@@ -993,7 +993,7 @@
     if (td.querySelector(".vp-goods-list")) return false;
     const 만들기 = 종류 === "단품" ? window.VP단품단추 : window.VP상품단추;
     const b = 만들기 ? 만들기(이름, 코드) : null;
-    if (!b) { td.textContent = 이름; return false; }   // 단품관리·상품관리에 없는 이름 → 글자 그대로
+    if (!b) { if (td.textContent !== 이름) td.textContent = 이름; return false; }   // 단품관리·상품관리에 없는 이름 → 글자 그대로
     const 통 = document.createElement("div");
     통.className = "vp-goods-list";
     통.appendChild(b);
@@ -1021,17 +1021,53 @@
     for (const [td, 이름, 칸종류, 코드] of 상품칸들) if (칸종류 === 종류 && td.isConnected !== false && 상품칸채우기(td, 이름, 종류, 코드)) 바뀐것++;
     return 바뀐것;
   }
-  window.addEventListener("vp상품단추준비", () => {
-    const 바뀐것 = 늦게채우기("상품");
-    window.VP말?.("상품단추:준비 상품" + (window.VP상품목록몇개?.() ?? "?")
-      + "가지 · 늦게바꾼칸 " + 바뀐것 + "개");
+  /* 10-25 [새 지시 이름단추 느림] — 칸을 **쪼개서** 채운다: 한 번에 25ms 만 쓰고 쉰다(1,200칸을 한꺼번에 바꾸면 화면이 멈춘다).
+     이름표(goods.js)가 아직 모자라면 칸은 글자 그대로 두고, 이름표가 늘 때마다(`vp상품단추준비`·`vp단품단추준비`) 처음부터 다시 훑는다.
+     이름표가 다 모였는데도 안 붙는 이름은 **목록에 나온 것만** 그 이름·코드로 하나씩 찾아(`VP상품찾기`·`VP단품찾기`) 붙인다. */
+  let 채울자리 = 0, 채우는중 = false, 채울종류 = new Set(), 바뀐셈 = { 상품: 0, 단품: 0 };
+  const 찾아본것 = new Set();
+  function 칸채우기예약(종류) {
+    if (종류) 채울종류.add(종류); else { 채울종류.add("상품"); 채울종류.add("단품"); }
+    채울자리 = 0;
+    if (!채우는중) { 채우는중 = true; setTimeout(칸조각채우기, 0); }
+  }
+  function 칸조각채우기() {
+    const 시작 = performance.now();
+    while (채울자리 < 상품칸들.length) {
+      const [td, 이름, 종류, 코드] = 상품칸들[채울자리++];
+      if (채울종류.has(종류) && td.isConnected !== false && !td.querySelector(".vp-goods-list") && 상품칸채우기(td, 이름, 종류, 코드)) 바뀐셈[종류]++;
+      if (performance.now() - 시작 > 25) { setTimeout(칸조각채우기, 0); return; }
+    }
+    채우는중 = false;
+    const 종류들 = [...채울종류]; 채울종류 = new Set();
+    for (const 종류 of 종류들) 모자란것찾기(종류);
     상품칸셈적기();
+  }
+  async function 모자란것찾기(종류) {
+    const 끝 = 종류 === "단품" ? window.VP단품표끝 : window.VP상품표끝;
+    const 찾기 = 종류 === "단품" ? window.VP단품찾기 : window.VP상품찾기;
+    if (!끝 || !끝() || !찾기) return;
+    const 모음 = new Map();
+    for (const [td, 이름, 칸종류, 코드] of 상품칸들) {
+      if (칸종류 !== 종류 || td.isConnected === false || td.querySelector(".vp-goods-list") || !String(이름).trim()) continue;
+      const 열쇠 = 종류 + "\u0001" + 이름 + "\u0001" + 코드;
+      if (찾아본것.has(열쇠) || 모음.has(열쇠)) continue;
+      모음.set(열쇠, { 이름, 코드 });
+    }
+    if (!모음.size) return;
+    for (const 열쇠 of 모음.keys()) 찾아본것.add(열쇠);
+    let 늘 = 0;
+    try { 늘 = await 찾기([...모음.values()]); } catch (e) { /* 못 찾으면 글자 그대로 */ }
+    window.VP말?.("이름찾기:" + 종류 + " " + 모음.size + "가지 물음 · 이름표에 " + 늘 + "가지 더함");
+    if (늘) 칸채우기예약(종류);
+  }
+  window.addEventListener("vp상품단추준비", () => {
+    window.VP말?.("상품단추:준비 상품" + (window.VP상품목록몇개?.() ?? "?") + "가지");
+    칸채우기예약("상품");
   });
   window.addEventListener("vp단품단추준비", () => {
-    const 바뀐것 = 늦게채우기("단품");
-    window.VP말?.("단품단추:준비 단품" + (window.VP단품목록몇개?.() ?? "?")
-      + "가지 · 늦게바꾼칸 " + 바뀐것 + "개");
-    상품칸셈적기();
+    window.VP말?.("단품단추:준비 단품" + (window.VP단품목록몇개?.() ?? "?") + "가지");
+    칸채우기예약("단품");
   });
 
   let 그린머리 = null;                                 // 지금 그려 둔 머리줄 (벤더피아가 준 그대로)
@@ -1109,7 +1145,8 @@
           const 코드자리 = 종류 === "단품" ? 단품코드자리 : 상품코드자리;
           const 코드 = 코드자리 >= 0 && row[코드자리] != null ? String(row[코드자리]).trim() : "";
           상품칸들.push([td, 값, 종류, 코드]);
-          상품칸채우기(td, 값, 종류, 코드);
+          // 칸은 줄을 다 그린 뒤 쪼개서 채운다 (`칸채우기예약`)
+          td.textContent = 값;
           return;
         }
         td.textContent = 값;
@@ -1135,6 +1172,7 @@
         });
       }
     }
+    if (상품칸들.length) 칸채우기예약();
     상품칸셈적기();
   }
 
@@ -1146,7 +1184,7 @@
     const { filters, variants, local } = plan(bar.q.value);
     const dates = { dcStartDt: bar.from.value, dcEndDt: bar.to.value };
 
-    tbody = null; 그린머리 = null; 상품칸들 = []; 상품칸자리 = -1; 단품칸자리 = -1; 단추된것 = 0; 머리본것 = null;
+    tbody = null; 그린머리 = null; 상품칸들 = []; 채울자리 = 0; 상품칸자리 = -1; 단품칸자리 = -1; 단추된것 = 0; 머리본것 = null;
     상담칸들.length = 0; 주문칸자리 = -1; 상담판닫기();
     table.replaceChildren();
     const seen = new Set();
@@ -1209,7 +1247,7 @@
   function CS목록그리기(heads, rows) {
     /* 10-25 사장님 「이미 34.53 이야」: 이름 단추·줄 클릭 상담·끌기가 CS등록에서도 되게 — 배송관리와 **같은 그리는 길**(`머리알기`+`addRows`)을 쓴다.
        (0.34.51 이 목록만 그리느라 이 길을 걷어 냈었다. 칸 이름·차례·값은 여전히 주문관리 것 그대로.) */
-    tbody = null; 그린머리 = null; 상품칸들 = []; 단추된것 = 0; 머리본것 = null; 상담칸들.length = 0;
+    tbody = null; 그린머리 = null; 상품칸들 = []; 채울자리 = 0; 단추된것 = 0; 머리본것 = null; 상담칸들.length = 0;
     머리알기(heads);
     addRows(heads, rows);
   }

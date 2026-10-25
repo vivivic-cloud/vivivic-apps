@@ -85,7 +85,7 @@ const 한벌돌리기 = (단품곁다리) => {
     johonCards = vpJohon.cards || {};
     johonOld = (vpJohon.v || 1) < 3;
     johonJundo = vpJohon.jundo || [];
-    for (const [name, group] of groups) labelGroup(name, group);
+    전부다시칠하기();
     if (panel.dataset.name) show(panel.dataset.name, ...panel._args);
   });
   function markJohon(b, codes) {
@@ -159,7 +159,7 @@ const 한벌돌리기 = (단품곁다리) => {
       }
     });
     stockByCode = byCode;
-    for (const [name, group] of groups) labelGroup(name, group);
+    전부다시칠하기();
     if (panel.dataset.name) show(panel.dataset.name, ...panel._args);
   }
 
@@ -862,6 +862,11 @@ const 한벌돌리기 = (단품곁다리) => {
     }
     fillRow(group);
   }
+  /* 10-25 — 점(재고·조혼가구·서류·카탈로그)이 바뀔 때 단추를 다시 칠한다. 곁다리는 줄(group)이 없고 건네준 단추(`낱단추`)만 있다. */
+  function 전부다시칠하기() {
+    if (곁다리) { 곁다리다시칠하기(); return; }
+    for (const [name, group] of groups) labelGroup(name, group);
+  }
 
   const chipBox = () => Object.assign(document.createElement("div"), { className: "vp-chips" });
   const chip = (box, text, codes, onClick, qty, isPart) => {
@@ -1257,7 +1262,7 @@ const 한벌돌리기 = (단품곁다리) => {
       if (a && !그대로줄.has(a)) 그대로줄.set(a, o);
       if (b) { if (줄인줄.has(b)) 줄인겹침.add(b); else 줄인줄.set(b, o); }
     }
-    const 이름들 = [...groups.keys()];
+    const 이름들 = 곁다리 ? [...곁다리표.이름.keys()] : [...groups.keys()];
     let 딱 = 0, 거의 = 0;
     ing맞은것.clear();
     for (const n of 이름들) {
@@ -1267,6 +1272,7 @@ const 한벌돌리기 = (단품곁다리) => {
       else if (줄여서.has(b)) 거의++;                 // 겹쳐서 못 거는 것 — 세기는 센다
     }
     /* ③ 링크가 걸린 상품 단추 **한 단에 붉은색 마킹** (조혼가구 붉은 줄과 같은 색·같은 꼴) */
+    if (곁다리) 곁다리다시칠하기();
     for (const [n, g] of groups) { for (const x of [g.b, ...(g.외 || [])]) x.classList.toggle("vp-ing", ing맞은것.has(n)); fillRow(g); }   // 표의 「상품정보」 칸도 채운다
     if (panel.dataset.name) show(panel.dataset.name, ...panel._args);   // 열려 있으면 상세도 새로
     적기(`inghome 맞춰보기 — 우리 상품 ${이름들.length}개 · inghome ${목록.length}개 · `
@@ -1335,12 +1341,12 @@ const 한벌돌리기 = (단품곁다리) => {
 
   filters.addEventListener("input", apply);
   filters.addEventListener("change", apply);
-  load().then(() => {
+  (곁다리 ? Promise.resolve() : load()).then(() => {
+    if (곁다리) return;   // 곁다리는 아래 `곁다리시작` 이 따로 돈다 (전체 목록을 받지 않는다)
     for (const [s, v] of firstValues) if (v && [...s.options].some((o) => o.value === v)) s.value = v;
     apply();
     /* ④ 목록이 들어왔다고 알린다 — 배송관리가 이미 그려 둔 상품명 칸을 그때 단추로 바꾼다.
        ⚠ `load()` 를 또 부르지 않는다. 이미 있는 이 차례에 얹는다. */
-    if (곁다리) window.dispatchEvent(new Event(단품곁다리 ? "vp단품단추준비" : "vp상품단추준비"));
     // 첫 목록을 다 받은 뒤에 연결된 화면의 목록을 받는다 (벤더피아가 요청을 하나씩 처리해서, 동시에 받으면 첫 목록이 늦어진다)
     (page.top && !단품곁다리 ? loadTop().catch(() => { top = null; apply(); }) : Promise.resolve())
       .then(() => (page.stock === "link" || page.stock === "parts") && loadStock().catch(() => {}))
@@ -1351,7 +1357,7 @@ const 한벌돌리기 = (단품곁다리) => {
            못 받아도 화면은 그대로 돈다. 그때는 아무것도 주황이 안 될 뿐이다. */
       .then(() => (page.nameCol === "단품명"
         ? 수량받기()
-            .then(() => { for (const [name, group] of groups) labelGroup(name, group); })
+            .then(() => 전부다시칠하기())
             .catch(() => {})
         : Promise.resolve()))
       .then(() => (page.nameCol === "단품명"
@@ -1368,58 +1374,228 @@ const 한벌돌리기 = (단품곁다리) => {
       .then(() => VP_DATA.prefetch());
   });
 
-  /* ④ 곁다리 — 배송관리·CS등록이 쓸 **이름 단추 한 개**를 만들어 준다.
-     ⚠ 없는 이름에는 **`null`** 을 돌려준다. 사장님 분부대로 그 칸은 **글자 그대로** 둔다 —
-       가짜 단추를 만들지 않는다.
+  /* ④ 곁다리 — 배송관리·CS등록이 쓸 **이름 단추**를 만들어 준다.
+     ⚠ 없는 이름에는 **`null`** 을 돌려준다. 사장님 분부대로 그 칸은 **글자 그대로** 둔다 — 가짜 단추를 만들지 않는다.
      10-24 — 상품명 칸은 상품관리 한 벌(`window.VP상품단추`), 단품명 칸은 단품관리 한 벌(`window.VP단품단추`).
-       단추 꼴(누르는 글자 + 연동 점)과 누른 뒤(`show`)는 단품관리·상품관리 목록과 **같은 것을 부른다**. */
-  if (곁다리) {
-    /* 10-25 이름이 안 맞으면 ① 빈칸·대소문자를 뭉갠 이름 ② 코드(단품코드·상품코드)로 찾는다. */
-    const 뭉갬 = (t) => String(t == null ? "" : t).replace(/\s+/g, "").toLowerCase();
-    let 뭉갠표 = null, 코드표 = null, 표크기 = -1;
-    const 표만들기 = () => {
-      if (표크기 === groups.size) return;
-      표크기 = groups.size; 뭉갠표 = new Map(); 코드표 = new Map();
-      for (const [n, g] of groups) {
-        if (!뭉갠표.has(뭉갬(n))) 뭉갠표.set(뭉갬(n), g);
-        for (const r of g.items) { const k = codeKey(r[col(page.codeCol)] || ""); if (k && !코드표.has(k)) 코드표.set(k, g); }
+       단추 꼴(누르는 글자 + 연동 점)과 누른 뒤(`show`)는 단품관리·상품관리 목록과 **같은 것을 부른다**.
+     10-25 [새 지시 이름단추 느림] — **전체 목록(상품 1만 2천 줄)을 더는 받지 않는다.** 곁다리는 **이름표**(이름·코드 두 칸뿐)만 들고 있다:
+       ① 이름표는 확장 저장소 `vpName:상품`·`vpName:단품` 에 둔다 — **새로고침(F5)에도 지우지 않는다**(`vpCache:` 만 지운다). 금액·사람 칸은 담지 않는다.
+          있으면 바로 쓰고, 새로 등록된 것만 뒤에서 더한다(마지막으로 확인한 날 하루 전부터). 없거나 7일이 넘었으면 처음부터 이름·코드만 다시 모은다(쪽마다 단추가 늘어난다).
+       ② 이름표에 없는 이름은 **목록에 실제로 나온 것만** 그 이름·코드로 하나씩 찾아 이름표에 더한다(`VP상품찾기`).
+       ③ 상세에 필요한 줄 전체는 **단추를 누를 때** 그 이름으로 받는다(`줄받기`). 연결 단품 목록·재고조회도 처음 누를 때 받는다. */
+  const 곁다리표 = { 이름: new Map(), 코드: new Map(), 뭉갠: new Map(), 다됨: false, 실패: "" };
+  const 표뭉갬 = (t) => String(t == null ? "" : t).replace(/\s+/g, "").toLowerCase();
+  function 표넣기(쌍들, 표 = 곁다리표) {
+    let 늘 = 0;
+    for (const [n0, c0] of 쌍들) {
+      const n = String(n0 == null ? "" : n0).trim();
+      if (!n) continue;
+      const c = String(c0 == null ? "" : c0).trim();
+      let 코드들 = 표.이름.get(n);
+      if (!코드들) {
+        코드들 = new Set(); 표.이름.set(n, 코드들); 늘++;
+        const m = 표뭉갬(n);
+        if (!표.뭉갠.has(m)) 표.뭉갠.set(m, n);
       }
+      if (c && !코드들.has(c)) {
+        코드들.add(c);
+        const k = codeKey(c);
+        if (!표.코드.has(k)) 표.코드.set(k, n);
+      }
+    }
+    return 늘;
+  }
+  const 표열쇠 = "vpName:" + (단품곁다리 ? "단품" : "상품");
+  const 표날열쇠 = 표열쇠 + ":날";
+  const 이름표일수 = 7;     // 이만큼 지나면 처음부터 다시 모은다(이름이 바뀌거나 없어진 것을 걸러 내려고)
+  const 오늘글 = () => ymd(new Date());
+  const 하루전 = (글) => new Date(Date.parse(String(글).slice(0, 10) + "T00:00:00Z") - 864e5).toISOString().slice(0, 10);
+  const 쌍으로 = (표) => { const 납작 = []; for (const [n, cs] of 표.이름) { if (!cs.size) 납작.push(n, ""); for (const c of cs) 납작.push(n, c); } return 납작; };
+  async function 표읽기() {
+    if (!창고) return null;
+    const 받음 = await 창고.get([표열쇠, 표날열쇠]);
+    const v = 받음 && 받음[표열쇠];
+    if (!v || v.v !== 1 || !Array.isArray(v.쌍) || !v.완) return null;
+    const 쌍들 = [];
+    for (let i = 0; i + 1 < v.쌍.length; i += 2) 쌍들.push([v.쌍[i], v.쌍[i + 1]]);
+    const 날칸 = 받음[표날열쇠] || {};
+    return { 처음: v.처음, 날: 날칸.날 || v.날 || v.처음, 없음: 날칸.오늘 === 오늘글() ? (날칸.없음 || []) : [], 쌍들 };
+  }
+  /* 날 칸(작은 칸) = 마지막으로 새 등록을 확인한 날 + 오늘 찾아봤는데 없던 이름들(같은 날 F5 마다 다시 묻지 않게). 이름·코드뿐이다. */
+  const 날쓰기 = () => 창고 && 창고.set({ [표날열쇠]: { 날: 오늘글(), 오늘: 오늘글(), 없음: [...시도한것] } });
+  async function 표쓰기(표, 처음) {
+    if (!창고) return;
+    await 창고.set({ [표열쇠]: { v: 1, 완: true, 처음, 쌍: 쌍으로(표) }, [표날열쇠]: { 날: 오늘글(), 오늘: 오늘글(), 없음: [...시도한것] } });
+  }
+  const 곁다리줄캐시 = new Map();    // 이름 → { heads, rows } (하나찾기·누를 때 받은 것)
+  let 낱단추 = [];                    // { b, name, codes } — 배송관리·CS등록 칸에 건네준 단추
+  const 재고수 = (codes) => {
+    if (page.stock === "link" && stockByCode) {
+      const found = codes.map((c) => stockByCode.get(codeKey(c))).filter((q) => q !== undefined);
+      return found.length ? found.reduce((a, b) => a + b, 0) : undefined;
+    }
+    return undefined;
+  };
+  function 낱칠하기(x) {
+    labelButton(x.b, x.name, x.codes, 재고수(x.codes));          // 목록의 `labelGroup` 이 하는 것과 같은 것 (점 넷 — 재고·조혼가구·카탈로그·서류)
+    if (page.nameCol === "단품명") markJohon(x.b, x.codes);
+    x.b.classList.toggle("vp-ing", ing맞은것.has(x.name));
+  }
+  function 곁다리다시칠하기() {
+    낱단추 = 낱단추.filter((x) => x.b.isConnected);
+    for (const x of 낱단추) 낱칠하기(x);
+  }
+  const 표에서찾기 = (이름, 코드) => {
+    const 글 = String(이름 == null ? "" : 이름).trim();
+    const 코드들 = 곁다리표.이름.get(글);
+    if (코드들) return { name: 글, codes: [...코드들] };
+    /* 이름이 안 맞으면 ① 코드(단품코드·상품코드) ② 빈칸·대소문자를 뭉갠 이름 */
+    const n = (코드 && 곁다리표.코드.get(codeKey(String(코드)))) || 곁다리표.뭉갠.get(표뭉갬(글));
+    return n ? { name: n, codes: [...곁다리표.이름.get(n)] } : null;
+  };
+  const 서버값 = () => (page.serverSelect ? "전체" : "");
+  let 연결받음 = false;
+  function 연결받기() {       // 상세에 쓰는 연결 목록 — 처음 누를 때 한 번 (재고조회·연결 화면 목록)
+    if (연결받음) return;
+    연결받음 = true;
+    if (!stockByCode && page.stock) loadStock().catch(() => {});
+    if (page.link) loadLinked().catch(() => { linked = { heads: [], byCode: new Map() }; });
+  }
+  async function 줄받기(이름, 코드들) {
+    const 있는 = 곁다리줄캐시.get(이름);
+    if (있는) return 있는;
+    const 답 = await VP_DATA.하나찾기(page, 내길, 서버값(), { name: 이름, code: 코드들[0] || "", 먼저: "name" });
+    if (답) 곁다리줄캐시.set(이름, 답);
+    return 답;
+  }
+  const 곁다리단추 = (이름0, 코드) => {
+    const 찾은 = 표에서찾기(이름0, 코드);
+    if (!찾은) return null;
+    const { name: 이름, codes } = 찾은;
+    const b = document.createElement("button");
+    b.type = "button";
+    const x = { b, name: 이름, codes };
+    낱단추.push(x);
+    낱칠하기(x);
+    b.addEventListener("click", async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      /* 누른 단추만 굵게 — 목록과 같은 결 */
+      document.querySelectorAll("#vp-root .vp-상품칸 button.on").forEach((y) => y.classList.remove("on"));
+      b.classList.add("on");
+      let 답 = null;
+      try { 답 = await 줄받기(이름, codes); } catch (err) { 답 = null; }
+      if (!답) { alert(`${page.title}에서 ${이름} 을(를) 찾지 못했습니다.`); return; }
+      heads = 답.heads;
+      show(이름, 답.heads, 답.rows);        // ← 단품관리·상품관리가 쓰는 **그 상세**를 그대로 연다
+      연결받기();
+    });
+    return b;
+  };
+  /* 이름표에 없는 것을 **하나씩 찾는다** — 목록에 실제로 나온 이름만 (search.js 가 부른다). 찾은 줄은 이름표에 더하고 저장한다. */
+  let 찾는중 = 0, 마지막일 = Date.now();
+  const 시도한것 = new Set();
+  async function 곁다리찾기(목록) {
+    const 일 = [];
+    for (const x of 목록 || []) {
+      const 열쇠 = (x.이름 || "") + "\u0001" + (x.코드 || "");
+      if (!x.이름 || 시도한것.has(열쇠) || 표에서찾기(x.이름, x.코드)) continue;
+      시도한것.add(열쇠); 일.push(x);
+      if (일.length >= 150) break;       // 한 번에 150가지까지만 (벤더피아를 오래 붙들지 않는다)
+    }
+    if (!일.length) return 0;
+    찾는중++;
+    let 늘 = 0;
+    try {
+      const 차례 = [...일];
+      const 일꾼 = async () => {
+        while (차례.length) {
+          const x = 차례.shift();
+          마지막일 = Date.now();
+          try {
+            const 답 = await VP_DATA.하나찾기(page, 내길, 서버값(), { name: x.이름, code: x.코드 || "" });
+            if (!답) continue;
+            const ni = 답.heads.indexOf(page.nameCol), ci = 답.heads.indexOf(page.codeCol);
+            const 쌍들 = 답.rows.map((r) => [r[ni], ci >= 0 ? r[ci] : ""]);
+            늘 += 표넣기(쌍들);
+            const 이름 = String(답.rows[0][ni] || "").trim();
+            if (이름 && !곁다리줄캐시.has(이름)) 곁다리줄캐시.set(이름, 답);
+          } catch (e) { /* 하나가 안 돼도 다음 것을 찾는다 */ }
+        }
+      };
+      await Promise.all([일꾼(), 일꾼()]);
+      if (늘) 표쓰기(곁다리표, 곁다리표.처음 || 오늘글()).catch(() => {});
+      else 날쓰기();
+    } finally { 찾는중--; 마지막일 = Date.now(); }
+    return 늘;
+  }
+  if (곁다리) {
+    const 알림 = () => window.dispatchEvent(new Event(단품곁다리 ? "vp단품단추준비" : "vp상품단추준비"));
+    let 알릴예약 = 0;
+    const 곧알림 = () => { if (!알릴예약) 알릴예약 = setTimeout(() => { 알릴예약 = 0; 알림(); }, 120); };
+    const 조용해지면 = (일) => {
+      const 재 = () => { if (곁다리표.다됨 && !찾는중 && Date.now() - 마지막일 > 1500) 일(); else setTimeout(재, 400); };
+      setTimeout(재, 400);
     };
-    const 찾기 = (이름, 코드) => {
-      const 글 = String(이름 == null ? "" : 이름).trim();
-      if (groups.has(글)) return [groups.get(글), 글];
-      표만들기();
-      const g = (코드 && 코드표.get(codeKey(String(코드)))) || 뭉갠표.get(뭉갬(글));
-      return g ? [g, g.name] : [null, 글];
-    };
-    window[단품곁다리 ? "VP단품있나" : "VP상품있나"] = (이름, 코드) => !!찾기(이름, 코드)[0];
-    const 단추 = (이름0, 코드) => {
-      const [이것, 이름] = 찾기(이름0, 코드);
-      if (!이것) return null;
-      const b = document.createElement("button");
-      b.type = "button";
-      (이것.외 ||= []).push(b);
-      /* 목록의 `labelGroup` 이 하는 것과 **같은 것을 부른다** (점 넷 — 재고·조혼가구·카탈로그·서류) */
-      const codes = 이것.items.map((r) => r[col(page.codeCol)]);
-      labelButton(b, 이름, codes, stockQty(이것.items));
-      if (page.nameCol === "단품명") markJohon(b, codes);
-      b.classList.toggle("vp-ing", ing맞은것.has(String(이름).trim()));
-      b.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        /* 누른 단추만 굵게 — 목록과 같은 결 */
-        document.querySelectorAll("#vp-root .vp-상품칸 button.on").forEach((x) => x.classList.remove("on"));
-        b.classList.add("on");
-        show(이름, heads, 이것.items);        // ← 단품관리·상품관리가 쓰는 **그 상세**를 그대로 연다
-      });
-      return b;
-    };
+    (async () => {
+      let 옛 = null;
+      try { 옛 = await 표읽기(); } catch (e) { 옛 = null; }
+      const 지난날 = 옛 ? Math.round((Date.now() - new Date(옛.처음 || 0).getTime()) / 864e5) : 9e9;
+      let 대상 = 곁다리표, 새로 = false, 늘 = 0, 요청수 = 0;
+      let 처음 = 오늘글();
+      if (옛) for (const k of 옛.없음) 시도한것.add(k);
+      if (옛 && 지난날 <= 이름표일수) {
+        표넣기(옛.쌍들);
+        곁다리표.처음 = 처음 = 옛.처음 || 처음;
+        곁다리표.다됨 = true;
+        알림();
+      } else {
+        새로 = true;
+        if (옛) { 표넣기(옛.쌍들); 알림(); }      // 묵었어도 새 표가 모이기 전까지는 쓴다
+        곁다리표.처음 = 처음;
+      }
+      const 시작날 = 새로 ? "2000-01-01" : 하루전(옛.날);
+      const 새표 = 새로 && 옛 ? { 이름: new Map(), 코드: new Map(), 뭉갠: new Map() } : 곁다리표;
+      try {
+        const 끝 = await VP_DATA.이름받기(page, 내길, 서버값(), 시작날, (쌍들) => {
+          늘 += 표넣기(쌍들, 새표);
+          if (새표 === 곁다리표 && 늘) 곧알림();
+        });
+        요청수 = 끝.요청;
+        if (새표 !== 곁다리표) {         // 새로 모은 표로 바꿔 끼운다
+          곁다리표.이름 = 새표.이름; 곁다리표.코드 = 새표.코드; 곁다리표.뭉갠 = 새표.뭉갠;
+        }
+        곁다리표.다됨 = true;
+        if (새로 || 늘) await 표쓰기(곁다리표, 처음).catch(() => {});
+        else 날쓰기();
+        window.VP말?.((단품곁다리 ? "단품" : "상품") + "이름표:" + 곁다리표.이름.size + "가지 " + (새로 ? "처음부터" : "새것 " + 늘) + " 요청" + 요청수);
+      } catch (e) {
+        곁다리표.실패 = String(e && e.message || e);
+        window.VP말?.((단품곁다리 ? "단품" : "상품") + "이름표:못받음 " + 곁다리표.실패.slice(0, 60));
+        if (곁다리표.이름.size) 곁다리표.다됨 = true;      // 옛 표라도 있으면 그것으로 하나씩 찾는다
+      }
+      알림();
+      ing맞춰보기().catch(() => {});
+      /* 뒤에서 조용히 — 단품 한 벌만: 재고조회(초록 점)·서류관리 차수·수입. 화면의 이름이 다 붙고 벤더피아가 한가해진 뒤. */
+      if (단품곁다리) {
+        수량받기().then(() => 곁다리다시칠하기()).catch(() => {});
+        수입받기().then(() => window.VP말?.("수입정보:코드" + (수입 ? 수입.size : 0) + "가지/" + 어느길))
+          .catch((e) => { 수입 = null; window.VP말?.("수입정보:못받음 " + (e && e.message ? e.message : e) + " · 길" + (어느길 || (window.VP밖에 ? "다리있음" : "다리없음"))); });
+        조용해지면(() => { if (!stockByCode) loadStock().catch(() => {}); });
+      }
+    })();
     if (단품곁다리) {
-      window.VP단품단추 = 단추;
-      window.VP단품목록몇개 = () => groups.size;
+      window.VP단품단추 = 곁다리단추;
+      window.VP단품목록몇개 = () => 곁다리표.이름.size;
+      window.VP단품표끝 = () => 곁다리표.다됨;
+      window.VP단품찾기 = 곁다리찾기;
+      window.VP단품있나 = (이름, 코드) => !!표에서찾기(이름, 코드);
     } else {
-      window.VP상품단추 = 단추;
-      window.VP상품목록몇개 = () => groups.size;
+      window.VP상품단추 = 곁다리단추;
+      window.VP상품목록몇개 = () => 곁다리표.이름.size;
+      window.VP상품표끝 = () => 곁다리표.다됨;
+      window.VP상품찾기 = 곁다리찾기;
+      window.VP상품있나 = (이름, 코드) => !!표에서찾기(이름, 코드);
     }
     window.VP말?.(단품곁다리 ? "곁다리:단품섬" : "곁다리:섬");                      // ⚠ 까닭 적기 (10-15)
   }
