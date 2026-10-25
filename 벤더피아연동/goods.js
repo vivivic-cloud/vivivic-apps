@@ -266,8 +266,10 @@ const 한벌돌리기 = (단품곁다리) => {
   const panel = root.querySelector(".vp-goods-panel");
   const panelTitle = panel.querySelector("strong");
   const panelBody = panel.querySelector(".vp-goods-panel-body");
-  from.value = startDt?.value || "";
-  to.value = endDt?.value || "";
+  /* 10-25 — 곁다리(배송관리·주문관리에서 부른 것)는 **그 화면의 기간 칸을 물려받지 않는다.**
+     물려받으면 상품관리 등록기간이 배송 조회 기간(몇 주)으로 줄어 이름표가 96가지뿐이었다(사장님 크롬 재서 확인). 곁다리는 전체 기간. */
+  from.value = 곁다리 ? "" : (startDt?.value || "");
+  to.value = 곁다리 ? "" : (endDt?.value || "");
   panel.querySelector("button").addEventListener("click", () => { panel.hidden = true; delete panel.dataset.name; });
 
   const modal = root.querySelector(".vp-modal");
@@ -1173,7 +1175,7 @@ const 한벌돌리기 = (단품곁다리) => {
     for (const row of rows) {
       const name = row[col(page.nameCol)];
       if (!row[col(page.codeCol)]?.trim()) continue;  // 합계 줄 (코드 없음)
-      if (page.nameCol === "단품명" && unused(name)) continue;
+      if (page.nameCol === "단품명" && unused(name) && !곁다리) continue;   // 곁다리는 목록을 안 그리니 (사용안함)도 이름표에 넣는다
       if (groups.has(name)) {
         const group = groups.get(name);
         group.items.push(row);
@@ -1307,7 +1309,7 @@ const 한벌돌리기 = (단품곁다리) => {
   if (serverSel) {
     /* ⚠ 곁다리로 돌 때는 이 화면(배송관리)에 `ddlStatus` 같은 칸이 **없다.**
        없으면 그냥 넘긴다 — 여기서 터지면 상품 단추가 아예 안 온다. */
-    const src = document.getElementById(page.serverSelect[1]);
+    const src = 곁다리 ? null : document.getElementById(page.serverSelect[1]);   // 곁다리: 그 화면의 판매상태 칸을 안 따른다(전체)
     if (src) {
       for (const o of [...src.options].filter((o) => o.value !== "전체")) serverSel.add(new Option(o.text, o.value));
       serverSel.value = src.value === "전체" ? "" : src.value;
@@ -1372,8 +1374,27 @@ const 한벌돌리기 = (단품곁다리) => {
      10-24 — 상품명 칸은 상품관리 한 벌(`window.VP상품단추`), 단품명 칸은 단품관리 한 벌(`window.VP단품단추`).
        단추 꼴(누르는 글자 + 연동 점)과 누른 뒤(`show`)는 단품관리·상품관리 목록과 **같은 것을 부른다**. */
   if (곁다리) {
-    const 단추 = (이름) => {
-      const 이것 = groups.get(String(이름 == null ? "" : 이름).trim());
+    /* 10-25 이름이 안 맞으면 ① 빈칸·대소문자를 뭉갠 이름 ② 코드(단품코드·상품코드)로 찾는다. */
+    const 뭉갬 = (t) => String(t == null ? "" : t).replace(/\s+/g, "").toLowerCase();
+    let 뭉갠표 = null, 코드표 = null, 표크기 = -1;
+    const 표만들기 = () => {
+      if (표크기 === groups.size) return;
+      표크기 = groups.size; 뭉갠표 = new Map(); 코드표 = new Map();
+      for (const [n, g] of groups) {
+        if (!뭉갠표.has(뭉갬(n))) 뭉갠표.set(뭉갬(n), g);
+        for (const r of g.items) { const k = codeKey(r[col(page.codeCol)] || ""); if (k && !코드표.has(k)) 코드표.set(k, g); }
+      }
+    };
+    const 찾기 = (이름, 코드) => {
+      const 글 = String(이름 == null ? "" : 이름).trim();
+      if (groups.has(글)) return [groups.get(글), 글];
+      표만들기();
+      const g = (코드 && 코드표.get(codeKey(String(코드)))) || 뭉갠표.get(뭉갬(글));
+      return g ? [g, g.name] : [null, 글];
+    };
+    window[단품곁다리 ? "VP단품있나" : "VP상품있나"] = (이름, 코드) => !!찾기(이름, 코드)[0];
+    const 단추 = (이름0, 코드) => {
+      const [이것, 이름] = 찾기(이름0, 코드);
       if (!이것) return null;
       const b = document.createElement("button");
       b.type = "button";

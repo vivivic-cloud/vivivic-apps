@@ -981,6 +981,7 @@
   /* 상품명 칸들을 적어 둔다 — 목록이 늦게 와도 그때 단추로 바꿔 끼운다 */
   let 상품칸들 = [];
   let 상품칸자리 = -1;
+  let 상품코드자리 = -1, 단품코드자리 = -1;
   let 단품칸자리 = -1;
   let 단추된것 = 0;
   /* 10-24 사장님: 「목록의 상품명/단품명 단품관리/상품관리에 있는 동일한 기능의 해당 명칭 버튼이 나타나게」
@@ -988,10 +989,10 @@
      단추는 단품관리·상품관리 표 첫 칸과 **같은 통** `div.vp-goods-list` 에 담아 같은 꼴(누르는 글자 + 아래 연동 점)이 된다.
      누르면 그 화면에서 누른 것처럼 상세가 열리고, **상담은 안 열린다**(단추가 누름을 가로챈다).
      ⚠ 이미 단추가 든 칸은 다시 안 채운다(`vp상품단추준비`·`vp단품단추준비` 가 늦게 와도 같은 단추를 두 번 만들지 않는다). */
-  function 이름칸채우기(td, 이름, 종류) {
+  function 이름칸채우기(td, 이름, 종류, 코드) {
     if (td.querySelector(".vp-goods-list")) return false;
     const 만들기 = 종류 === "단품" ? window.VP단품단추 : window.VP상품단추;
-    const b = 만들기 ? 만들기(이름) : null;
+    const b = 만들기 ? 만들기(이름, 코드) : null;
     if (!b) { td.textContent = 이름; return false; }   // 단품관리·상품관리에 없는 이름 → 글자 그대로
     const 통 = document.createElement("div");
     통.className = "vp-goods-list";
@@ -1000,15 +1001,24 @@
     단추된것++;
     return true;
   }
-  const 상품칸채우기 = (td, 이름, 종류 = "상품") => 이름칸채우기(td, 이름, 종류);
+  const 상품칸채우기 = (td, 이름, 종류 = "상품", 코드 = "") => 이름칸채우기(td, 이름, 종류, 코드);
   /* ⚠ 까닭 적기 — **그려 놓고 보니** 몇 칸이 단추가 됐나. 이것이 ⑤ 를 가른다:
        칸이 0개면 상품명 칸을 못 찾은 것, 칸은 있고 단추가 0개면 **이름이 하나도 안 맞은** 것. */
   const 상품칸셈적기 = () => window.VP말?.(
     "상품칸:" + 상품칸들.length + "개중 단추" + 단추된것 + "개 · 줄클릭 " + document.querySelectorAll("#vp-root tr.vp-줄상담").length + "줄"
-    + (window.VP상품단추 ? "" : " · 이름단추:goods 못 불러옴"));
+    + (window.VP상품단추 ? "" : " · 이름단추:goods 못 불러옴")
+    + 맨글자말());
+  /* 10-25 단추가 안 된 칸(맨 글자)을 센다 — 상세가 정말 없는 것만 남아야 한다. 사용안함 이름은 따로 센다. */
+  function 맨글자말() {
+    if (!상품칸들.length || !(window.VP상품단추 && window.VP단품단추)) return "";
+    const 맨 = 상품칸들.filter(([td]) => td.isConnected !== false && !td.querySelector(".vp-goods-list"));
+    const 이름 = (종류) => new Set(맨.filter((x) => x[2] === 종류).map((x) => x[1]));
+    const 안씀 = [...이름("단품"), ...이름("상품")].filter((n) => /\(\s*사용\s*안\s*함\s*\)/.test(n)).length;
+    return " · 맨글자 " + 맨.length + "칸(상품" + 이름("상품").size + "가지·단품" + 이름("단품").size + "가지, 그중 사용안함 " + 안씀 + ")";
+  }
   function 늦게채우기(종류) {
     let 바뀐것 = 0;
-    for (const [td, 이름, 칸종류] of 상품칸들) if (칸종류 === 종류 && td.isConnected !== false && 상품칸채우기(td, 이름, 종류)) 바뀐것++;
+    for (const [td, 이름, 칸종류, 코드] of 상품칸들) if (칸종류 === 종류 && td.isConnected !== false && 상품칸채우기(td, 이름, 종류, 코드)) 바뀐것++;
     return 바뀐것;
   }
   window.addEventListener("vp상품단추준비", () => {
@@ -1051,6 +1061,8 @@
     /* ④ 상품명 칸이 몇 번째인가 — 그 칸만 단추로 바꾼다 */
     상품칸자리 = heads.indexOf("상품명");
     단품칸자리 = heads.indexOf("단품명");
+    상품코드자리 = heads.indexOf("상품코드");
+    단품코드자리 = heads.indexOf("단품코드");
     /* 상담 이력 — 열쇠는 **주문번호** 하나뿐이다(사람 칸은 안 쓴다).
        ⚠ 사장님 화면에는 「주문번호」 가 **두 칸** 있다. 앞엣것을 쓴다 — `indexOf` 가 그렇게 집는다. */
     주문칸자리 = heads.indexOf("주문번호");
@@ -1094,8 +1106,10 @@
               지금은 같은 일이 안 생긴다 — 단추가 `stopPropagation` 하고, 줄의 누름은 단추·링크 위에서는 건너뛴다.) */
           const 종류 = i === 상품칸자리 ? "상품" : "단품";
           td.className = "vp-상품칸" + (종류 === "단품" ? " vp-단품칸" : "") + (i === 0 ? " vp-first" : "");
-          상품칸들.push([td, 값, 종류]);
-          상품칸채우기(td, 값, 종류);
+          const 코드자리 = 종류 === "단품" ? 단품코드자리 : 상품코드자리;
+          const 코드 = 코드자리 >= 0 && row[코드자리] != null ? String(row[코드자리]).trim() : "";
+          상품칸들.push([td, 값, 종류, 코드]);
+          상품칸채우기(td, 값, 종류, 코드);
           return;
         }
         td.textContent = 값;

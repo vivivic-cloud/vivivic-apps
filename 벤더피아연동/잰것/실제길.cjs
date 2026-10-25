@@ -4,15 +4,30 @@ const { chromium } = require('playwright');
 const fs = require('fs'), os = require('os'), path = require('path'), https = require('https'), { execSync } = require('child_process');
 const 확장 = path.join(__dirname, '..');
 const EXE = ['/opt/pw-browsers/chromium-1194/chrome-linux/chrome', '/opt/pw-browsers/chromium-1243/chrome-linux64/chrome'].find((p) => fs.existsSync(p));
-let 초록 = 0, 빨강 = 0;
+let 초록 = 0, 빨강 = 0; const POST기록 = [];
 const 맞나 = (이름, 참, 덧 = '') => { console.log((참 ? '  🟩 ' : '  🟥 ') + 이름 + (덧 ? '  ' + 덧 : '')); 참 ? 초록++ : 빨강++; };
 const 표 = (머리, 줄) => `<html><body><span>총 ${줄.length} 건</span><table><tr>${머리.map(h=>`<th>${h}</th>`).join('')}</tr>${줄.map(r=>`<tr>${r.map(v=>`<td>${v}</td>`).join('')}</tr>`).join('')}</table></body></html>`;
 const 상품머리 = ["상품명","상품코드","매출처명","매입처명","배송사명","판매상태","단품명","단품코드","모델번호","매출처상품명","옵션상품유무","등록일"];
-const 상품들 = [["비스켓 800 주방수납장","KLS-800","가매출처","가매입처","경동택배(포천)","판매중","비스켓 800 몸통","bis800_b","M-800","비스켓800","N","2026-01-05"]];
+/* 10-25: 상품관리 목록(등록 2026-01·03·08 — 배송 조회 기간 07-15~10-15 밖이 많다)이 배송목록의 상품보다 **더 많다** → 서버가 등록기간을 지켜 거른다 */
+const 상품들 = [["비스켓 800 주방수납장","KLS-800","가매출처","가매입처","경동택배(포천)","판매중","비스켓 800 몸통","bis800_b","M-800","비스켓800","N","2026-01-05"],
+  ["카비 3단 와이드 서랍장_블랙","CAB-3B","가매출처","가매입처","경동택배(포천)","판매중","카비 서랍 몸통","cab_body","M-C","카비","N","2026-03-02"],
+  ["오래된 협탁 화이트","OLD-T","가매출처","가매입처","경동택배(포천)","판매중","협탁 몸통","old_t","M-O","협탁","N","2026-01-20"],
+  ["신상 책장 5단","NEW-B5","가매출처","가매입처","경동택배(포천)","판매중","책장 몸통","new_b","M-N","책장","N","2026-08-10"],
+  ["한글 테스트 상품 A","KT-A","가매출처","가매입처","경동택배(포천)","판매중","단품 가","dj_ga","M-K","가","N","2026-02-02"]];
 const 단품머리 = ["단품명","단품코드","단품분류","매입처명","재고유형","발주유형","판매상태","바코드","등록일"];
-const 단품들 = [["비스켓 800 몸통","bis800_b","수납장","가매입처","재고","정상","판매중","880001","2026-01-05"]];
-const 배송머리 = ["주문번호","상품명","단품명","수취인","수량","배송사","송장번호","배송상태","CS구분","매출처"];
-const 배송줄 = [["20261015-1","비스켓 800 주방수납장","비스켓 800 몸통","가나다","1","경동택배(포천)","640001","배송완료","","가매출처"]];
+const 단품들 = [["비스켓 800 몸통","bis800_b","수납장","가매입처","재고","정상","판매중","880001","2026-01-05"],
+  ["카비 서랍 몸통","cab_body","서랍장","가매입처","재고","정상","판매중","880002","2026-03-02"],
+  ["보상 선불 정산용","bosang_01","기타","가매입처","재고","정상","판매중","880003","2026-03-03"],
+  ["협탁 몸통","old_t","협탁","가매입처","재고","정상","판매중","880004","2026-01-20"],
+  ["책장 몸통","new_b","책장","가매입처","재고","정상","판매중","880005","2026-08-10"],
+  ["옛 다리 (사용안함)","old_leg","다리","가매입처","재고","정상","판매중","880006","2025-02-02"]];
+const 배송머리 = ["주문번호","상품명","단품명","단품코드","수취인","수량","배송사","송장번호","배송상태","CS구분","매출처"];
+/* 둘째 줄: 상품명이 상품관리엔 3월 등록(기간 밖) · 단품명이 단품관리와 다르게 적혔지만 단품코드는 맞음 · 셋째: 둘 다 상품관리에 없는 이름 */
+const 배송줄 = [["20261015-1","비스켓 800 주방수납장","비스켓 800 몸통","bis800_b","가나다","1","경동택배(포천)","640001","배송완료","","가매출처"],
+  ["20261015-2","카비 3단 와이드 서랍장_블랙","보상 선불 정산용","bosang_01","라마바","1","경동택배(포천)","640002","배송완료","","가매출처"],
+  ["20261015-3","오래된  협탁 화이트","협탁  몸통 (코드만 맞음)","old_t","사아자","1","경동택배(포천)","640003","배송완료","","가매출처"],
+  ["20261015-4","신상 책장 5단","옛 다리 (사용안함)","old_leg","차카타","1","경동택배(포천)","640004","배송완료","","가매출처"],
+  ["20261015-5","없는 상품 Z","없는 단품 Z","zzz_none","파하갸","1","경동택배(포천)","640005","배송완료","","가매출처"]];
 const 보임 = ["주문번호","상품명","단품명","수취인","수량"];
 const 머리69 = Array.from({ length: 66 }, (_, i) => i < 5 ? 보임[i] : '숨김' + i);
 const 주문그리드 = `<div id="oGrid"><table><tr>${머리69.map((h, i) => `<th class="igg_HeaderCaption"${i < 5 ? '' : ' style="display:none"'}>${h}</th>`).join('')}</tr></table><table><tr><th><div><table><tbody>
@@ -27,7 +42,15 @@ const 쪽 = (제목, 액션, 칸들) => `<html><head><meta charset="utf-8"><titl
   const 서버 = https.createServer({ key: fs.readFileSync(d0 + '/k.pem'), cert: fs.readFileSync(d0 + '/c.pem') }, (q, r) => {
     const 길 = q.url.split('?')[0]; r.setHeader('content-type', 'text/html; charset=utf-8');
     if (q.method === 'POST' && 길.includes('orderMst')) { q.resume(); return r.end('<html><body>' + 주문그리드 + '</body></html>'); }
-    if (q.method === 'POST') { q.resume(); return r.end(길.includes('salesGoods') ? 표(상품머리, 상품들) : 길.includes('/Master/goods') ? 표(단품머리, 단품들) : 표(배송머리, 배송줄)); }
+    if (q.method === 'POST') {
+      let 몸 = ''; q.on('data', (c) => { 몸 += c; }); q.on('end', () => {
+        const 값 = (n) => (몸.match(new RegExp('name="' + n + '"\\r\\n\\r\\n([^\\r]*)')) || [])[1] || '';
+        const 부터 = 값('dcStartDt') || '0000', 까지 = 값('dcEndDt') || '9999';
+        POST기록.push(길.split('/').pop() + ' ' + 부터 + '~' + 까지);
+        const 거름 = (줄들, i) => 줄들.filter((x) => x[i] >= 부터 && x[i] <= 까지);
+        r.end(길.includes('salesGoods') ? 표(상품머리, 거름(상품들, 11)) : 길.includes('/Master/goods') ? 표(단품머리, 단품들) : 표(배송머리, 배송줄));
+      }); return;
+    }
     if (길.includes('orderMst')) return r.end(주문쪽);
     if (길.includes('salesGoods')) return r.end(쪽('상품관리', '/System/Master/salesGoods.aspx', 행수 + '<input name="tbSGoodsCd"><input name="tbGoodsNm">'));
     if (길.includes('/Master/goods')) return r.end(쪽('단품관리', '/System/Master/goods.aspx', 행수 + '<input name="tbGoodsCd"><input name="tbGoodsNm">'));
@@ -61,7 +84,10 @@ const 쪽 = (제목, 액션, 칸들) => `<html><head><meta charset="utf-8"><titl
   const 본 = await p.evaluate(() => ({ 상품단추: !!window.VP상품단추, 단품단추: !!window.VP단품단추, 굿즈: !!window.__vp굿즈돌았나, 글: document.documentElement.getAttribute('data-vp-글'),
     이름단추: document.querySelectorAll('.vp-table .vp-goods-list button').length, 줄표: document.querySelectorAll('.vp-table tbody tr.vp-줄상담').length, 줄: document.querySelectorAll('.vp-table tbody tr').length }));
   console.log('  ', JSON.stringify(본));
-  맞나('이름 단추(상품+단품) 2개', 본.이름단추 === 2);
+  맞나('배송 5줄: 이름 단추 8개(상품명 4 · 단품명 4 — 기간 밖 등록·빈칸 다른 이름·코드만 맞는 단품·사용안함 포함), 맨 글자는 목록에 없는 이름 둘뿐', 본.이름단추 === 8, '단추 ' + 본.이름단추);
+  const 딱 = await p.evaluate(() => (document.getElementById('vp-판') || {}).textContent);
+  맞나('딱지에 맨글자 2칸(상품1가지·단품1가지, 사용안함 0)', /맨글자 2칸\(상품1가지·단품1가지, 그중 사용안함 0\)/.test(딱));
+  맞나('곁다리가 상품관리를 전체 기간(2000-01-01~)으로 받음', POST기록.some((x) => /salesGoods/.test(x) && /2000-01-01/.test(x)), JSON.stringify(POST기록));
   맞나('줄 누름 표', 본.줄표 === 본.줄 && 본.줄 > 0);
   await p.click('.vp-table tbody tr td:last-child'); await p.waitForTimeout(600);
   맞나('줄 누름 → 상담 판', await p.evaluate(() => !!document.querySelector('.vp-상담판')));
