@@ -103,8 +103,18 @@
     (document.head || document.documentElement).appendChild(s);
   });
   (async () => {
-    if (await 넣기("https://vivivic-cloud.github.io/vivivic-apps/shared/viggle.js")) { window.__vp손잡이붙음 = true; return; }
-    if (await 넣기(chrome.runtime.getURL("손잡이.js"))) { window.__vp손잡이붙음 = true; return; }
+    /* ⚠ 10-25 — 여기서 박는 `<script src=깃허브>` 도 확장 CSP 에 막힌다(불러오기.js 머리말). 배경 글(bg.js)이 받아 MAIN 에 넣는다. */
+    const 상태 = await new Promise((풀) => {
+      const 끝 = setTimeout(() => 풀(null), 15000);
+      try {
+        chrome.runtime.sendMessage({ __vp: "깃글", 목록: [{ 이름: "viggle.js",
+          주소: "https://vivivic-cloud.github.io/vivivic-apps/shared/viggle.js?t=" + Math.floor(Date.now() / 60000) }] },
+          (r) => { clearTimeout(끝); 풀(chrome.runtime.lastError ? null : (r && r.결과 && r.결과["viggle.js"])); });
+      } catch (e) { clearTimeout(끝); 풀(null); }
+    });
+    if (상태 === "돌림" || 상태 === "이미") { window.__vp손잡이붙음 = true; return; }
+    if ((document.documentElement.getAttribute("data-vp-글") || "").split("|").includes("viggle.js")) { window.__vp손잡이붙음 = true; return; }
+    if (await 넣기(chrome.runtime.getURL("손잡이.js"))) { window.__vp손잡이붙음 = true; document.documentElement.setAttribute("data-vp-글", ((document.documentElement.getAttribute("data-vp-글") || "") + "|viggle.js")); return; }
     console.error("[벤더피아 보기] 짚어서 지시하기 손잡이를 못 불렀습니다");
     if (innerWidth < 320 || innerHeight < 240) return;        // 작은 틀에는 안 적는다
     const 줄 = document.createElement("div");

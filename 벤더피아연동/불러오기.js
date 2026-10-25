@@ -152,14 +152,40 @@
   });
   /* ──밖에다리끝── */
 
+  /* ⚠⚠ 10-25 「GitHub 코드를 못 받는 문제」 — 까닭을 **찾았다.**
+     content script(따로인 세상)가 문서에 박는 `<script>` 는 **확장의 CSP 로 검사**받는다:
+       `script-src 'self' 'wasm-unsafe-eval' … chrome-extension://…` → 깃허브 주소는 **요청이 나가기도 전에** 막히고(onerror),
+       인라인 글도 막힌다("Executing inline script violates the following Content Security Policy"). 벤더피아 쪽 CSP 와 무관하다.
+       (페이지 쪽 MAIN 에서 박으면 되던 것도, 쿠키·CDN 이 멀정했던 것도 이것으로 설명된다.) 시험으로 그대로 재현했다(잰것/깃글.cjs).
+     → 고침: **배경 글(`bg.js`)이 `fetch` 로 받아** `chrome.scripting.executeScript({world:"MAIN"})` 로 **페이지 세상에 넣는다**
+       (페이지 CSP 로 검사받는다 — 벤더피아에는 없다). 이 글은 부탁만 한다.
+     두 층 —  ① 배경 글이 깃허브에서 받아 MAIN 에 넣음  ② 안 되면 확장 안의 것(뒷길). 딱지에 어느 쪽인지·까닭을 적는다.
+     ⚠ 두 벌 방지: 문서 뿌리 `data-vp-글` 에 **돌린 파일 이름**을 적는다 — 배경 글(MAIN)도 이 글(②)도 **돌리기 전에 보고**,
+       이미 있으면 안 돌린다. 어느 쪽이 먼저든 한 벌만 돈다. */
+  const 돌린글 = () => (document.documentElement.getAttribute("data-vp-글") || "").split("|");
+  const 돌렸다고적기 = (f) => document.documentElement.setAttribute("data-vp-글", 돌린글().concat(f).join("|"));
   const 넣기 = (주소) => new Promise((풀) => {
     const s = document.createElement("script");
     s.src = 주소; s.async = false;
     s.onload = () => 풀(true); s.onerror = () => 풀(false);
     (document.head || document.documentElement).appendChild(s);
   });
-  const 꾸미기 = (주소) => { const l = document.createElement("link");
-    l.rel = "stylesheet"; l.href = 주소; (document.head || document.documentElement).appendChild(l); };
+  /* 배경 글에 「이 파일들을 깃허브에서 받아 이 틀의 페이지 세상에 차례대로 넣어 달라」 부탁한다.
+     답 = { 결과: { "파일이름": "돌림" | "이미" | "탈:까닭" } } — 답이 없으면(15초) null. */
+  const 깃부탁 = (목록) => new Promise((풀) => {
+    let 끝 = false;
+    const 마무리 = (v) => { if (!끝) { 끝 = true; 풀(v); } };
+    setTimeout(() => 마무리({ 탈: "배경 글이 15초 안에 답 없음" }), 15000);
+    try {
+      chrome.runtime.sendMessage({ __vp: "깃글", 목록 }, (r) => {
+        if (chrome.runtime.lastError) return 마무리({ 탈: "배경 글 못 부름: " + chrome.runtime.lastError.message });
+        마무리(r || { 탈: "배경 글 빈 답" });
+      });
+    } catch (e) { 마무리({ 탈: "배경 글 못 부름: " + (e && e.message || e) }); }
+  });
+  const 꾸미기 = (주소, 낙) => { const l = document.createElement("link");
+    l.rel = "stylesheet"; l.href = 주소; if (낙) l.onerror = 낙;
+    (document.head || document.documentElement).appendChild(l); };
 
   /* 판번호 딱지 — 사장님 10-13: 「수정된건 프로그램에 버전표시해줘」.
      무엇이 돌고 있는지 **화면에서 바로** 보이게 한다. 적는 것 —
@@ -196,15 +222,25 @@
   if (!document.body || document.body.tagName === "FRAMESET") return;   // 틀 문서엔 아무것도 안 그려진다
 
   (async () => {
-    for (const f of 꾸밈) 꾸미기(깃 + encodeURIComponent(f) + 캐시표());
+    if (document.readyState === "loading")
+      await new Promise((풀) => document.addEventListener("DOMContentLoaded", 풀, { once: true }));
     const 판 = chrome.runtime.getManifest().version;
+    /* 깃에서 못 받은 까닭을 모은다 — 딱지에 그대로 적는다(「깃 못받음: 파일=까닭」) */
+    const 까닭들 = [];
+    const 꾸밈낙 = (f) => () => { 까닭들.push(f + "=꾸밈 못받음"); 꾸미기(chrome.runtime.getURL(f)); };
+    for (const f of 꾸밈) 꾸미기(깃 + encodeURIComponent(f) + 캐시표(), 꾸밈낙(f));
     딱지("벤더피아 보기 " + 판 + " · 부르는 중…");
     let 못온것 = [], 깃에서 = 0, 확장에서 = 0;
-    for (const f of 글) {
-      // 다리는 늘 확장 안의 것 — 인터넷이 끊겨도 길이 살아 있어야 한다
-      if (f === "저장다리.js") { await 넣기(chrome.runtime.getURL(f)); continue; }
-      if (await 넣기(깃 + encodeURIComponent(f) + 캐시표())) { 깃에서++; continue; }
-      if (await 넣기(chrome.runtime.getURL(f))) { 확장에서++; continue; }   // 바깥이 막히면 확장 안의 것
+    // 다리는 늘 확장 안의 것 — 인터넷이 끊겨도 길이 살아 있어야 한다. 먼저 넣는다.
+    if (글.includes("저장다리.js")) await 넣기(chrome.runtime.getURL("저장다리.js"));
+    const 부탁 = 글.filter((f) => f !== "저장다리.js");
+    const 답 = await 깃부탁(부탁.map((f) => ({ 이름: f, 주소: 깃 + encodeURIComponent(f) + 캐시표() })));
+    for (const f of 부탁) {
+      const 상태 = 답 && 답.결과 && 답.결과[f];
+      if (상태 === "돌림" || 상태 === "이미") { 깃에서++; continue; }
+      if (돌린글().includes(f)) { 깃에서++; continue; }                      // 늦게라도 이미 돌았다 — 두 벌 금지
+      까닭들.push(f + "=" + (상태 ? String(상태).replace(/^탈:/, "") : (답 && 답.탈) || "답 없음"));
+      if (await 넣기(chrome.runtime.getURL(f))) { 돌렸다고적기(f); 확장에서++; continue; }   // 뒷길: 확장 안의 것
       못온것.push(f);
     }
     /* ⚠⚠ 10-14 — 전에는 `.vg-hint` 가 **있나**만 보고 「짚기 ✓」 를 찍었다. 그것이 **거짓 초록**이었다.
@@ -229,11 +265,13 @@
       return 굵기 > 0;
     } catch (e) { return false; } };
     const 그리기 = () => {
-      const 어디 = 확장에서 ? (깃에서 ? "깃+확장" : "확장") : "깃";
+      const 어디 = 확장에서 ? (깃에서 ? "깃/확장" : "확장") : "깃";
       const 못 = [["짚개", !!window.__vp짚개], ["기억", 기억적혔나()],
                   ["손잡이", !!window.__vp손잡이붙음], ["꾸밈", 꾸밈먹었나()]];
-      딱지("벤더피아 보기 " + 판 + " · " + 어디 + " · " + 못.map(([n, 참]) => n + (참 ? "✓" : "✗")).join(" "),
-           !!못온것.length || 못.some(([, 참]) => !참));
+      딱지("벤더피아 보기 " + 판 + " · " + 어디 + " · "
+           + 못.map(([n, 참]) => n + (참 ? "✓" : "✗")).join(" ")
+           + (까닭들.length ? " ‖ 깃 못받음: " + 까닭들.join(" · ") : ""),
+           !!못온것.length || !!까닭들.length || 못.some(([, 참]) => !참));
     };
     setTimeout(그리기, 1500);
     /* 손잡이는 깃허브에서 온다 — 느리면 1.5초에 ✗ 가 찍힌다. 그것도 거짓이다. 한 번 더 고쳐 적는다. */
