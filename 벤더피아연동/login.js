@@ -29,7 +29,7 @@
      이 고침은 **새로고침만으로** 먹어야 한다. 그게 핵심이다. */
 /* ⚠⚠ 화면글 판은 **여기 한 군데서만** 적는다. `manifest.json` 의 version 과 **늘 같이** 올려라
    (배포 차례에 적어 두었다). 두 군데서 적으면 반드시 어긋난다. */
-const VP_화면글판 = "0.34.54";   // ⚠ manifest.json 의 version 과 **같은 값**
+const VP_화면글판 = "0.34.55";   // ⚠ manifest.json 의 version 과 **같은 값**
 
 /* ⚠⚠ 10-22 「벤더피아」 단추가 여는 **새 창 오리지널**의 표식을 보는 물음. 새 창(`window.name === "vp원본"`)과 그 안 모든 frame 에서는
    우리 글이 **하나도 돌지 않아야** 한다. 1차로 `불러오기.js`·`짚개.js`(확장 안)가 막고, 이 물음은 login.js 가 한 번 더 막는 안전망이다.
@@ -253,6 +253,44 @@ window.VP원본창 = () => {
     });
     봄.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
     setTimeout(() => 봄.disconnect(), 20000);                  // 끝내 안 뜨면 그만 본다
+  }
+})();
+
+/* ⚠⚠ 10-25 사장님: 「그냥 좌측상단에 현재버전 표시되게 해줘」 (앞: 「버전변경 안되잖아」 · 「벤더피아 연동화면에는 버전정보가 안나타나」).
+   판 번호 딱지(#vp-판)는 10-15 에 숨겼다(`login.css`) — 그건 그대로 두고, **버전만** 좌측 상단에 작게 늘 보인다(#vp-버전).
+   · 보이는 번호 = **지금 도는 화면글 판(`VP_화면글판`)** — 깃에서 새 글이 오면 바뀐다. 확장(깔림) 판이 다르면 `(확장 0.34.53)` 을 더한다.
+     확장 안 글로 돌 때(깃에서 못 받음)는 `· 확장 안 글` 을 더한다 — 깔림 판은 딱지 글(`불러오기.js` 가 적음)에서 읽는다(안 건드림).
+   · 우리 화면(`vp-clean`)이 뜬 틀에만, 아주 작은 틀은 뺀다. 새 창 오리지널(`VP원본창`)에는 없다. 자리 = 쪽 위 빈 띠 왼쪽(오른쪽은 「벤더피아」 단추). 뿌리에 단다(몸에 달면 vp-clean 이 감춘다). */
+(() => {
+  if (window.VP원본창?.()) return;
+  let 칩 = null;
+  const 글 = () => {
+    let 말 = "v" + VP_화면글판;
+    const 딱 = (document.getElementById("vp-판") || {}).textContent || "";
+    const m = /벤더피아 보기 (?:깔림 )?(\d+(?:\.\d+)+)/.exec(딱);
+    if (m && m[1] !== VP_화면글판) 말 += " (확장 " + m[1] + ")";
+    const 어디 = /벤더피아 보기 [\d.]+(?: · 화면글 [\d.]+)? · ([^ ]+)/.exec(딱);
+    if (어디 && 어디[1] === "확장") 말 += " · 확장 안 글";
+    return 말;
+  };
+  const 새로 = () => { if (칩) { const g = 글(); if (칩.textContent !== g) 칩.textContent = g; } };
+  function 달기() {
+    if (칩 || innerWidth < 200 || innerHeight < 80) return;
+    칩 = document.createElement("div");
+    칩.id = "vp-버전";
+    칩.title = "지금 도는 화면 글 판";
+    칩.textContent = 글();
+    document.documentElement.appendChild(칩);
+    /* 딱지는 1.5초·4초에 다시 쓰인다 — 그때마다 확장 판·출처를 다시 읽는다 */
+    [1600, 4200, 8000].forEach((ms) => setTimeout(새로, ms));
+  }
+  if (document.documentElement.classList.contains("vp-clean")) 달기();
+  else {
+    const 봄 = new MutationObserver(() => {
+      if (document.documentElement.classList.contains("vp-clean")) { 달기(); 봄.disconnect(); }
+    });
+    봄.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    setTimeout(() => 봄.disconnect(), 20000);
   }
 })();
 
