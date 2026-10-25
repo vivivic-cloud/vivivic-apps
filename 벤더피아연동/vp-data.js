@@ -330,7 +330,7 @@ const VP_DATA = (() => {
 
   // ── 이름표 (10-25 [새 지시 이름단추 느림]) ───────────────────────────
   // 배송관리·CS등록의 이름 단추는 상품·단품의 **이름과 코드만** 있으면 된다. 전체 목록(수십 번 요청·큰 HTML·저장)을 받는 대신
-  //  ① 이름·코드 두 칸만 뽑아 따로 모으고(`이름받기`) ② 표에 없는 것은 그 이름·코드로 하나만 찾는다(`하나찾기`).
+  //  화면에 보인 이름만 그 이름·코드로 하나씩 찾는다(`하나찾기`) — 전체 이름 모으기(`이름받기`)는 10-25 [새 지시 보인 이름만] 에 없앴다.
   // ⚠ 큰 HTML 읽기(DOMParser)는 한 번에 한 쪽씩, 쪽 사이에 쉰다(`쉬기`) — 화면이 한꺼번에 오래 멈추지 않게.
   // ⚠ 여기서 받은 줄은 이름·코드 두 칸만 남기고 버린다(금액·사람 칸을 담지 않는다). 저장하는 쪽(goods.js)도 두 칸만 저장한다.
   const 쉬기 = () => new Promise((r) => setTimeout(r, 0));
@@ -372,59 +372,6 @@ const VP_DATA = (() => {
     };
     return { query, fewRows, manyRows: cfg.rowCnt || "700" };
   }
-  const 이름코드 = (cfg, res) => {
-    const n = res.heads.indexOf(cfg.nameCol), c = res.heads.indexOf(cfg.codeCol);
-    if (n < 0) return [];
-    const out = [];
-    for (const row of res.rows) {
-      const name = (row[n] || "").trim(), code = c >= 0 ? (row[c] || "").trim() : "";
-      if (name && name !== "합계" && (c < 0 || code)) out.push([name, code]);
-    }
-    return out;
-  };
-  // cfg 화면(url)의 등록일 from~오늘 사이 **이름·코드만** 모두 받아 쪽마다 onPart([[이름, 코드], …]) 를 부른다.
-  // 먼저 가벼운 조회(줄 10)로 건수를 세고, 건수에 맞춰 기간을 같은 길이로 잘라 700줄 안에 들게 받는다.
-  // 어느 조각이 700건을 넘으면(등록일이 몰린 날) 그 조각만 반으로 가른다. 한 날이 700건을 넘으면 그 날은 700줄까지만 —
-  // 빠진 이름은 `하나찾기` 가 채운다(이름표는 틀려도 빠져도 되는 길잡이다).
-  // 반환: { total, 요청 }  / 못 받으면 던진다
-  async function 이름받기(cfg, url, serverValue, from, onPart, isCurrent = () => true, 동시 = 2) {
-    foreground++;
-    try {
-      const src = await 처음문서(url);
-      const 틀 = 질문틀(cfg, url, src, serverValue);
-      const to = ymd(new Date());
-      if (dayNum(from) > dayNum(to)) from = to;
-      const 센것 = await 틀.query({ from, to, sel: {} }, 틀.fewRows);
-      const total = 센것.total;
-      let 요청 = 1;
-      if (!total || !isCurrent()) return { total, 요청 };
-      const limit = Number(틀.manyRows);
-      const 날수 = dayNum(to) - dayNum(from) + 1;
-      const 조각수 = Math.max(1, Math.min(날수, Math.ceil(total / Math.floor(limit * 0.8))));
-      const 줄 = [];
-      for (let i = 0; i < 조각수; i++) {
-        const a = dayNum(from) + Math.floor(날수 * i / 조각수), b = dayNum(from) + Math.floor(날수 * (i + 1) / 조각수) - 1;
-        if (a <= b) 줄.push({ from: dayStr(a), to: dayStr(b) });
-      }
-      const 일꾼 = async () => {
-        while (줄.length && isCurrent()) {
-          const 조각 = 줄.shift();
-          const res = await 틀.query({ from: 조각.from, to: 조각.to, sel: {} }, 틀.manyRows);
-          요청++;
-          onPart(이름코드(cfg, res));
-          if (res.total > limit && 조각.from !== 조각.to) {
-            const mid = Math.floor((dayNum(조각.from) + dayNum(조각.to)) / 2);
-            줄.unshift({ from: 조각.from, to: dayStr(mid) }, { from: dayStr(mid + 1), to: 조각.to });
-          }
-          await 쉬기();
-        }
-      };
-      await Promise.all(Array.from({ length: 동시 }, 일꾼));
-      return { total, 요청 };
-    } finally {
-      foreground--;
-    }
-  }
   // 이름·코드로 **하나만** 찾는다 (조회만). 코드가 있으면 코드로, 못 찾으면 이름으로. 맞는 줄(전체 칸)들을 돌려준다 — 상세를 열 때 쓴다.
   async function 하나찾기(cfg, url, serverValue, { name, code, 먼저 }) {
     foreground++;
@@ -435,12 +382,16 @@ const VP_DATA = (() => {
       const 열쇠 = (t) => String(t || "").trim().toLowerCase();
       const 시도 = [];
       if (code && L.code) 시도.push([{ [L.code]: code }, "code"]);
-      if (name && L.name) 시도.push([{ [L.name]: name }, "name"]);
+      const 공백 = (t) => String(t || "").replace(/\s+/g, " ").trim();
+      if (name && L.name) {
+        시도.push([{ [L.name]: name }, "name"]);
+        if (공백(name) !== name) 시도.push([{ [L.name]: 공백(name) }, "name"]);   // 목록에 빈칸이 겹쳐 적힌 이름 — 한 칸으로 줄여 다시
+      }
       if (먼저 === "name") 시도.reverse();   // 상세를 열 때: 같은 이름의 줄을 모두 받으려고 이름 먼저
       for (const [texts, 종류] of 시도) {
         const res = await 틀.query({ from: "2000-01-01", to: ymd(new Date()), sel: {} }, 틀.manyRows, texts);
         const n = res.heads.indexOf(cfg.nameCol), c = res.heads.indexOf(cfg.codeCol);
-        const rows = res.rows.filter((r) => (종류 === "code" ? c >= 0 && 열쇠(r[c]) === 열쇠(code) : n >= 0 && (r[n] || "").trim() === name));
+        const rows = res.rows.filter((r) => (종류 === "code" ? c >= 0 && 열쇠(r[c]) === 열쇠(code) : n >= 0 && 공백(r[n]) === 공백(name)));
         if (rows.length) return { heads: res.heads, rows };
       }
       return null;
@@ -449,5 +400,5 @@ const VP_DATA = (() => {
     }
   }
 
-  return { PAGES: PAGES_, list, ymd, prefetch, clearCache, 이름받기, 하나찾기 };
+  return { PAGES: PAGES_, list, ymd, prefetch, clearCache, 하나찾기 };
 })();

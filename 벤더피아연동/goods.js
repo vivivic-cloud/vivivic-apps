@@ -1407,9 +1407,7 @@ const 한벌돌리기 = (단품곁다리) => {
   }
   const 표열쇠 = "vpName:" + (단품곁다리 ? "단품" : "상품");
   const 표날열쇠 = 표열쇠 + ":날";
-  const 이름표일수 = 7;     // 이만큼 지나면 처음부터 다시 모은다(이름이 바뀌거나 없어진 것을 걸러 내려고)
   const 오늘글 = () => ymd(new Date());
-  const 하루전 = (글) => new Date(Date.parse(String(글).slice(0, 10) + "T00:00:00Z") - 864e5).toISOString().slice(0, 10);
   const 쌍으로 = (표) => { const 납작 = []; for (const [n, cs] of 표.이름) { if (!cs.size) 납작.push(n, ""); for (const c of cs) 납작.push(n, c); } return 납작; };
   async function 표읽기() {
     if (!창고) return null;
@@ -1468,6 +1466,14 @@ const 한벌돌리기 = (단품곁다리) => {
     if (답) 곁다리줄캐시.set(이름, 답);
     return 답;
   }
+  function 모음에서빼기(이름, codes) {
+    곁다리표.이름.delete(이름);
+    for (const [k, n] of [...곁다리표.코드]) if (n === 이름) 곁다리표.코드.delete(k);
+    for (const [k, n] of [...곁다리표.뭉갠]) if (n === 이름) 곁다리표.뭉갠.delete(k);
+    곁다리줄캐시.delete(이름);
+    낱단추 = 낱단추.filter((x) => x.name !== 이름);
+    표쓰기(곁다리표, 곁다리표.처음 || 오늘글()).catch(() => {});
+  }
   const 곁다리단추 = (이름0, 코드) => {
     const 찾은 = 표에서찾기(이름0, 코드);
     if (!찾은) return null;
@@ -1485,7 +1491,12 @@ const 한벌돌리기 = (단품곁다리) => {
       b.classList.add("on");
       let 답 = null;
       try { 답 = await 줄받기(이름, codes); } catch (err) { 답 = null; }
-      if (!답) { alert(`${page.title}에서 ${이름} 을(를) 찾지 못했습니다.`); return; }
+      if (!답) {
+        /* 이름이 바뀌었거나 없어진 것 — 찾은 것 모음에서 뺀다(다음 조회에서 목록의 새 이름으로 다시 찾는다) */
+        모음에서빼기(이름, codes);
+        alert(`${page.title}에서 ${이름} 을(를) 찾지 못했습니다.`);
+        return;
+      }
       heads = 답.heads;
       show(이름, 답.heads, 답.rows);        // ← 단품관리·상품관리가 쓰는 **그 상세**를 그대로 연다
       연결받기();
@@ -1494,6 +1505,8 @@ const 한벌돌리기 = (단품곁다리) => {
   };
   /* 이름표에 없는 것을 **하나씩 찾는다** — 목록에 실제로 나온 이름만 (search.js 가 부른다). 찾은 줄은 이름표에 더하고 저장한다. */
   let 찾는중 = 0, 마지막일 = Date.now();
+  const 찾기동시 = 3;
+  let 알림훅 = () => {};
   const 시도한것 = new Set();
   async function 곁다리찾기(목록) {
     const 일 = [];
@@ -1501,7 +1514,7 @@ const 한벌돌리기 = (단품곁다리) => {
       const 열쇠 = (x.이름 || "") + "\u0001" + (x.코드 || "");
       if (!x.이름 || 시도한것.has(열쇠) || 표에서찾기(x.이름, x.코드)) continue;
       시도한것.add(열쇠); 일.push(x);
-      if (일.length >= 150) break;       // 한 번에 150가지까지만 (벤더피아를 오래 붙들지 않는다)
+      if (일.length >= 1500) break;      // 화면에 보인 것만이라 보통 수백 가지(600줄이면 각 160가지쯤)
     }
     if (!일.length) return 0;
     찾는중++;
@@ -1517,13 +1530,15 @@ const 한벌돌리기 = (단품곁다리) => {
             if (!답) continue;
             const ni = 답.heads.indexOf(page.nameCol), ci = 답.heads.indexOf(page.codeCol);
             const 쌍들 = 답.rows.map((r) => [r[ni], ci >= 0 ? r[ci] : ""]);
-            늘 += 표넣기(쌍들);
+            const 더 = 표넣기(쌍들);
+            늘 += 더;
+            if (더) 알림훅();                // 찾는 대로 단추가 붙게(120ms 모아서)
             const 이름 = String(답.rows[0][ni] || "").trim();
             if (이름 && !곁다리줄캐시.has(이름)) 곁다리줄캐시.set(이름, 답);
           } catch (e) { /* 하나가 안 돼도 다음 것을 찾는다 */ }
         }
       };
-      await Promise.all([일꾼(), 일꾼()]);
+      await Promise.all(Array.from({ length: 찾기동시 }, 일꾼));
       if (늘) 표쓰기(곁다리표, 곁다리표.처음 || 오늘글()).catch(() => {});
       else 날쓰기();
     } finally { 찾는중--; 마지막일 = Date.now(); }
@@ -1533,47 +1548,22 @@ const 한벌돌리기 = (단품곁다리) => {
     const 알림 = () => window.dispatchEvent(new Event(단품곁다리 ? "vp단품단추준비" : "vp상품단추준비"));
     let 알릴예약 = 0;
     const 곧알림 = () => { if (!알릴예약) 알릴예약 = setTimeout(() => { 알릴예약 = 0; 알림(); }, 120); };
+    알림훅 = 곧알림;
     const 조용해지면 = (일) => {
       const 재 = () => { if (곁다리표.다됨 && !찾는중 && Date.now() - 마지막일 > 1500) 일(); else setTimeout(재, 400); };
       setTimeout(재, 400);
     };
     (async () => {
+      /* 10-25 [새 지시 보인 이름만] — 전체 이름표 모으기·7일 처음부터·새 등록 더하기를 없앴다. 저장된 「찾은 것 모음」만 읽는다. */
       let 옛 = null;
       try { 옛 = await 표읽기(); } catch (e) { 옛 = null; }
-      const 지난날 = 옛 ? Math.round((Date.now() - new Date(옛.처음 || 0).getTime()) / 864e5) : 9e9;
-      let 대상 = 곁다리표, 새로 = false, 늘 = 0, 요청수 = 0;
-      let 처음 = 오늘글();
-      if (옛) for (const k of 옛.없음) 시도한것.add(k);
-      if (옛 && 지난날 <= 이름표일수) {
+      if (옛) {
+        for (const k of 옛.없음) 시도한것.add(k);
         표넣기(옛.쌍들);
-        곁다리표.처음 = 처음 = 옛.처음 || 처음;
-        곁다리표.다됨 = true;
-        알림();
-      } else {
-        새로 = true;
-        if (옛) { 표넣기(옛.쌍들); 알림(); }      // 묵었어도 새 표가 모이기 전까지는 쓴다
-        곁다리표.처음 = 처음;
-      }
-      const 시작날 = 새로 ? "2000-01-01" : 하루전(옛.날);
-      const 새표 = 새로 && 옛 ? { 이름: new Map(), 코드: new Map(), 뭉갠: new Map() } : 곁다리표;
-      try {
-        const 끝 = await VP_DATA.이름받기(page, 내길, 서버값(), 시작날, (쌍들) => {
-          늘 += 표넣기(쌍들, 새표);
-          if (새표 === 곁다리표 && 늘) 곧알림();
-        });
-        요청수 = 끝.요청;
-        if (새표 !== 곁다리표) {         // 새로 모은 표로 바꿔 끼운다
-          곁다리표.이름 = 새표.이름; 곁다리표.코드 = 새표.코드; 곁다리표.뭉갠 = 새표.뭉갠;
-        }
-        곁다리표.다됨 = true;
-        if (새로 || 늘) await 표쓰기(곁다리표, 처음).catch(() => {});
-        else 날쓰기();
-        window.VP말?.((단품곁다리 ? "단품" : "상품") + "이름표:" + 곁다리표.이름.size + "가지 " + (새로 ? "처음부터" : "새것 " + 늘) + " 요청" + 요청수);
-      } catch (e) {
-        곁다리표.실패 = String(e && e.message || e);
-        window.VP말?.((단품곁다리 ? "단품" : "상품") + "이름표:못받음 " + 곁다리표.실패.slice(0, 60));
-        if (곁다리표.이름.size) 곁다리표.다됨 = true;      // 옛 표라도 있으면 그것으로 하나씩 찾는다
-      }
+        곁다리표.처음 = 옛.처음 || 오늘글();
+      } else 곁다리표.처음 = 오늘글();
+      곁다리표.다됨 = true;
+      window.VP말?.((단품곁다리 ? "단품" : "상품") + "찾은것모음:" + 곁다리표.이름.size + "가지(저장에서)");
       알림();
       ing맞춰보기().catch(() => {});
       /* 뒤에서 조용히 — 단품 한 벌만: 재고조회(초록 점)·서류관리 차수·수입. 화면의 이름이 다 붙고 벤더피아가 한가해진 뒤. */

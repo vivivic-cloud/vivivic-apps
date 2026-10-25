@@ -115,8 +115,8 @@ const 기록 = (q, 덧) => 요청.push(q.method + ' ' + q.url.split('?')[0].spli
     await p.click('.vp-bar button[type=submit]');
     let 끝 = false;
     for (let i = 0; i < 400 && !끝; i++) { await p.waitForTimeout(250); try { 끝 = await p.evaluate(() => !!window.__다붙음, null); } catch (e) {} }
-    /* 뒤에서 조용히 받는 이름표가 끝나길(최대 90초) 기다린다 — 다음 F5 가 저장된 이름표를 쓰게 */
-    for (let i = 0; i < 360; i++) { const 딱 = await p.evaluate(() => (document.getElementById('vp-판') || {}).textContent || '').catch(() => ''); if (/상품이름표:/.test(딱) && /단품이름표:/.test(딱)) break; await p.waitForTimeout(250); }
+    /* 뒤에서 조용히 찾아 저장하길(최대 90초) 기다린다 — 다음 F5 가 저장된 찾은 것 모음을 쓰게. 모음이 비지 않은 F5 는 찾을 게 없어 「이름찾기」 딱지가 안 뜰 수 있어 시간 제한까지 간다 */
+    await p.waitForTimeout(느림 ? 5000 : 1500);
     await p.waitForTimeout(느림 ? 3000 : 800);
     const 값 = await p.evaluate(() => ({ 줄: Math.round(window.__줄다옴 - window.__조회0), 붙음: window.__다붙음 ? Math.round(window.__다붙음 - window.__조회0) : -1,
       긴일: window.__긴일.filter((x) => x[0] >= window.__조회0 - 50), 가장긴: Math.max(0, ...window.__긴일.filter((x) => x[0] >= window.__조회0 - 50).map((x) => x[1])),
