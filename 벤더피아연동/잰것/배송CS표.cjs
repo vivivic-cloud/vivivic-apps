@@ -21,8 +21,13 @@ const 주문폼 = `<form name="f" method="post" action="/System/Sales/orderMst.a
 <tr><th>주문번호</th><td><input type="text" name="ctl00$txtOrdNo"></td><th>수취인</th><td><input type="text" name="ctl00$txtRcv"></td></tr>
 <tr><th>주문자</th><td><input type="text" name="ctl00$txtOrd"></td><th>주소</th><td><input type="text" name="ctl00$txtAd"></td></tr>
 <tr><th>상품명</th><td><input type="text" name="ctl00$txtGn"></td></tr></table><input type="image" name="ctl00$btnSrch" id="btnSrch" src="s.gif"></form>`;
-const 주문머리 = ["선택", "주문번호", "상품명", "수취인", "주문자", "휴대전화", "주소", "주문일"];
+const 주문머리 = ["선택칸", "주문번호", "상품명", "수취인", "주문자", "휴대전화", "주소", "주문일"];
 const 주문줄 = [0, 1, 2].map((i) => ["", "20261023-20" + i, "토리블리 책상", "가나다", "라마바", "010-1111-2222", "서울 ○○구", "2026-10-23"]);
+/* 진짜 주문관리 꼴: #oGrid 머리 table 과 몸 table 이 따로, 60칸 이상 중 일부 th 가 display:none (10-25) */
+const 오그리드 = (() => { const 전부 = [...주문머리, ...Array.from({ length: 54 }, (_, i) => '숨김' + i)];
+  const th = 전부.map((h, i) => `<th class="igg_HeaderCaption nowrap${i < 8 ? '' : ' ig9a6376x'}"${i < 8 ? ' style="width: 80px;"' : ''}>${h}</th>`).join('');
+  const 몸 = 주문줄.map((r) => `<tr>${전부.map((_, i) => `<td class="${i < 8 ? '' : 'ig9a6376x'}">${i < 8 ? r[i] : 'x'}</td>`).join('')}</tr>`).join('');
+  return `<style>.ig9a6376x{display:none}</style><div id="oGrid"><table><tr>${th}</tr></table><table><tr><th><div><table><tbody>${몸}</tbody></table></div></th></tr></table></div>`; })();
 const VP흉내 = `window.VP저장 = { get: async function(){return {};}, set: async function(){}, remove: async function(){} };`;
 
 (async () => {
@@ -40,7 +45,7 @@ const VP흉내 = `window.VP저장 = { get: async function(){return {};}, set: as
       await ctx.route('**://vendorpia.com/**', (r) => {
         const u = new URL(r.request().url()), m = r.request().method();
         const 화 = (t) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: t });
-        if (/orderMst/.test(u.pathname)) return m === 'POST' ? 화(표(주문머리, 주문줄)) : 화(`<html><head><meta charset="utf-8"></head><body id="body">${주문폼}</body></html>`);
+        if (/orderMst/.test(u.pathname)) return m === 'POST' ? 화(`<html><body>${오그리드}</body></html>`) : 화(`<html><head><meta charset="utf-8"></head><body id="body">${주문폼}${오그리드}</body></html>`);
         if (/firmDvList/.test(u.pathname)) return m === 'POST' ? 화(표(칸23, [0, 1, 2].map(줄))) : 화(`<html><head><meta charset="utf-8"></head><body id="body">${폼}</body></html>`);
         return r.fulfill({ status: 200, contentType: 'text/javascript', body: '' });
       });

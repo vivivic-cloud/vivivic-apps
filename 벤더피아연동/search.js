@@ -110,37 +110,34 @@
       if (i) t = String(i.value || "").trim(); }
     return t;
   };
-  function 표현황(docs) {
-    const out = [];
-    for (const doc of docs) for (const t of doc.querySelectorAll("table")) {
-      if (t.closest && t.closest("#vp-root")) continue;
-      const trs = [...t.rows]; if (!trs.length) continue;
-      const 첫 = trs[0];
-      out.push([trs.length, trs.length + "줄/" + 첫.cells.length + "칸[" + 칸글(첫).slice(0, 60) + "]"]);
-    }
-    return out.sort((a, z) => z[0] - a[0]).slice(0, 5).map((x) => x[1]);
-  }
+  /* 주문관리(orderMst.aspx) 진짜 구조 (10-25, 사장님 크롬에서 잼): 목록 = Infragistics WebDataGrid `div#oGrid`.
+     머리줄·몸줄이 **서로 다른 table** 에 있다 → 표 하나를 고르지 않고 #oGrid 안 tr 을 칸 수로 가른다:
+       머리줄 = 칸이 60개 이상인 첫 tr(th 69칸) · 몸줄 = 그 뒤 같은 칸 수의 tr
+     보이는 칸 = 머리 th 의 computed display 가 none 이 아닌 것(숨긴 th 는 class 에 생성 이름이 붙고 display:none, 칸 이름은 안 박음).
+     ⚠ 같은 쪽의 날짜 달력 표(`igmc_Control` 9×7)는 목록이 아니다 — 「가장 큰 표 고르기」 는 0.34.51 에서 달력을 집었다. */
   function 목록고르기(doc) {
-    let 최고 = null;
-    for (const t of doc.querySelectorAll("table")) {
-      if (t.closest && t.closest("#vp-root")) continue;
-      const 줄들 = [...t.rows].filter((tr) => tr.cells.length >= 2 && !tr.querySelector("table"));
-      if (!줄들.length) continue;
-      const 셈 = {};
-      for (const tr of 줄들) 셈[tr.cells.length] = (셈[tr.cells.length] || 0) + 1;
-      const 칸수 = Number(Object.entries(셈).sort((a, z) => z[1] - a[1] || z[0] - a[0])[0][0]);
-      const 맞는 = 줄들.filter((tr) => tr.cells.length === 칸수);
-      const 점 = 맞는.length;
-      /* 검색 조건 칸(글칸·고르는 칸이 줄 수보다 많은 표)은 목록이 아니다 — 폼 배치용 표를 목록으로 읽지 않는다 */
-      if (t.querySelectorAll("input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=image]):not([type=submit]):not([type=button]),select,textarea").length > 점) continue;
-      if (!최고 || 점 > 최고.점 || (점 === 최고.점 && 칸수 > 최고.칸수)) 최고 = { 점, 칸수, 맞는 };
+    const g = doc.getElementById("oGrid");
+    if (!g) return null;
+    const 전체 = [...g.querySelectorAll("tr")];
+    const 머리줄 = 전체.find((tr) => tr.cells.length >= 60);
+    if (!머리줄) return { heads: [], rows: [], 합계: "", 까닭: "#oGrid 는 있으나 칸 60개 이상인 머리줄이 없음(tr " + 전체.length + "줄)" };
+    const n = 머리줄.cells.length;
+    const win = doc.defaultView;
+    const 보임 = (th) => win && win.getComputedStyle ? win.getComputedStyle(th).display !== "none" : !!(th.getAttribute("style") || "").match(/width/);
+    const 칸들 = [...머리줄.cells].map((th, i) => ({ i, 이름: 칸글(th), 보임: 보임(th) })).filter((c) => c.보임);
+    const 몸 = 전체.filter((tr) => tr !== 머리줄 && tr.cells.length === n && !tr.querySelector("tr") && !tr.querySelector("th.igg_HeaderCaption"));
+    /* 체크 칸(머리 글 없고 몸 칸에 체크상자)은 뺀다 */
+    const 체크 = (c) => !c.이름 && 몸.length && 몸.every((tr) => tr.cells[c.i].querySelector("input[type=checkbox]"));
+    const 쓸 = 칸들.filter((c) => !체크(c));
+    const heads = 쓸.map((c) => c.이름);
+    const rows = 몸.map((tr) => 쓸.map((c) => 칸글(tr.cells[c.i])));
+    let 합계 = "";
+    for (const e of doc.querySelectorAll("span,div,td,font,b,label")) {
+      if (e.children.length || (e.closest && e.closest("#vp-root"))) continue;
+      const t = (e.textContent || "").replace(/\s+/g, " ").trim();
+      if (/주문수량\s*:/.test(t) && t.length < 150) { 합계 = t; break; }
     }
-    if (!최고) return null;
-    const 머리줄 = 최고.맞는.find((tr) => tr.querySelector("th")) || 최고.맞는[0];
-    const heads = [...머리줄.cells].map(칸글);
-    const rows = 최고.맞는.filter((tr) => tr !== 머리줄 && !tr.querySelector("th"))
-      .map((tr) => [...tr.cells].map(칸글)).filter((r) => r.some(Boolean));
-    return { heads, rows };
+    return { heads, rows, 합계, 까닭: "머리 " + n + "칸 중 보임 " + 칸들.length + " · 몸줄 " + 몸.length };
   }
   /* 지금 페이지(와 같은 출처 iframe)에서 읽는다 */
   function 쪽에서읽기() {
@@ -1214,7 +1211,7 @@
   async function CS목록보이기() {
     const 기다림 = (ms) => new Promise((r) => setTimeout(r, ms));
     const 모양 = (docs) => "표 " + docs.reduce((n, d) => n + d.querySelectorAll("table").length, 0) + "개 "
-      + JSON.stringify(표현황(docs)) + " · iframe " + document.querySelectorAll("iframe,frame").length + "개";
+      + (docs.some((d) => d.getElementById("oGrid")) ? "#oGrid 있음" : "#oGrid 없음") + " · iframe " + document.querySelectorAll("iframe,frame").length + "개";
     let 읽음 = null, 쪽 = null;
     try {
       for (const ms of [0, 1000, 1000]) {
@@ -1231,12 +1228,13 @@
         if (q.r && q.r.rows.length) 읽음 = q.r;
         else {
           읽음 = (q.r && q.r.heads.length ? q.r : null) || (쪽.r && 쪽.r.heads.length ? 쪽.r : null);
-          까닭 = (q.까닭 || "") + " · 지금 쪽 " + 모양(쪽.docs) + (q.doc ? " · 조회 응답 " + 모양([q.doc]) : "");
+          까닭 = ((읽음 && 읽음.까닭) || "") + " " + (q.까닭 || "") + " · 지금 쪽 " + 모양(쪽.docs) + (q.doc ? " · 조회 응답 " + 모양([q.doc]) : "");
         }
       }
       if (읽음) CS목록그리기(읽음.heads, 읽음.rows);
+      if (읽음 && 읽음.합계) note.textContent = 읽음.합계;      // 벤더피아 합계 글 그대로(주문수량 / 행수 / 매입금액)
       if (!읽음 || !읽음.rows.length) {
-        note.textContent = 읽음 ? "주문관리 목록에 줄이 없습니다." : "주문관리 목록을 읽지 못했습니다.";
+        note.textContent = (읽음 && 읽음.합계) || (읽음 ? "주문관리 목록에 줄이 없습니다." : "주문관리 목록을 읽지 못했습니다.");
         진단적기(까닭 || "");
       }
     } catch (err) {

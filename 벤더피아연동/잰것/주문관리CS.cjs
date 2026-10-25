@@ -9,29 +9,35 @@ const { chromium } = require('playwright');
 const fs = require('fs'), path = require('path');
 const 확장 = path.join(__dirname, '..');
 const 그림칸 = path.join(__dirname, '그림'); fs.mkdirSync(그림칸, { recursive: true });
-const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
-const 머리 = ["선택", "주문번호", "상품명", "수취인", "주문자", "휴대전화", "주소", "주문일", "배송상태", "택배사", "메모"];
-const 줄들 = [0, 1, 2].map((i) => ["", "20261024-77" + i, "토리블리 책상 " + i, "가나다", "라마바", "010-1111-2222", "서울 ○○구 아주 긴 주소 123-4", "2026-10-2" + i, "배송중", "경동", "메모" + i]);
-const 폼 = `<table id="조건"><tr><th>주문기간</th><td><input type="text" name="ctl00$txtFrom" value="2026/09/24"> ~ <input type="text" name="ctl00$txtTo" value="2026/10/24"></td></tr>
-<tr><th>주문번호</th><td><input type="text" name="ctl00$txtOrdNo"></td><th>수취인</th><td><input type="text" name="ctl00$txtRcv"></td></tr></table>
-<input type="image" name="ctl00$btnSrch" id="btnSrch" src="s.gif">`;
-const 표 = (모양, 줄) => {
-  const 본 = 줄.map((r) => `<tr>${r.map((v) => `<td>${v}</td>`).join('')}</tr>`).join('');
-  if (모양 === 'td') return `<table id="grid"><tr>${머리.map((h) => `<td>${h}</td>`).join('')}</tr>${본}</table>`;
-  return `<table id="grid"><thead><tr>${머리.map((h) => `<th>${h}</th>`).join('')}</tr></thead><tbody>${본}</tbody><tfoot><tr><td colspan="11"><table><tr><td>1</td><td>2</td></tr></table></td></tr></tfoot></table>`;
-};
-const 쪽모양 = (내용) => `<html><head><meta charset="utf-8"></head><body id="body"><form name="f" method="post" action="/System/Sales/orderMst.aspx" id="f"><input type="hidden" name="__VIEWSTATE" value="x">
-<div><table><tr><td>${폼}</td></tr><tr><td>${내용}</td></tr></table></div></form><p id="원래글">주문관리 원래 화면</p></body></html>`;
-const 응답 = (모양) => `<html><body><span>총 3 건</span>${표(모양, 줄들)}</body></html>`;
+const EXE = '/opt/pw-browsers/chromium-1243/chrome-linux64/chrome';
+const 전체머리 = "(체크)·Page·CS·CS주문번호·IMG·주문번호·블랙번호·매출처코드·단품분류·매출처·생산처·몰·계정·주문번호·상품코드·상품명·매출처상품명·단품구성·주문옵션·수량·가용수량·박스수량·판매금액·공급금액·매입처·매입금액·매출이익·마진%·판매단가·공급단가·수취인·선불비·착불비·제품비·전화·핸드폰·알림·상태·우편번호·주소·배송메세지·물류메모·배송메모·본사메모·배송사·배송상태·송장번호·등록일·입고일·지사출발·지사도착·출발일·완료일·실판매가·배송예정일·등록자·옵션상품여부·색강조·수정이력·알림·전화·핸드폰·주문전달·알림·알림·발송여부·발송구분·LastTimeStamp·colorRGB".split("·").map((x) => x === "(체크)" ? "" : x);
+const 보일이름 = "CS·IMG·매출처·몰·주문번호·상품코드·주문옵션·수량·가용수량·박스수량·판매금액·수취인·선불비·착불비·알림·주소·배송메세지·물류메모·배송메모·본사메모·배송사·배송상태·송장번호·등록일·입고일·지사출발·지사도착·출발일·완료일·등록자·수정이력".split("·");
+const 머리 = ["", ...보일이름];     // 체크 칸은 빼도 된다 — 우리는 뺀다
+function 보임찾기(이름들) { const 쓴 = new Set(); return 전체머리.map((h, i) => { if (i === 0) return true; if (이름들.includes(h) && !쓴.has(h)) { 쓴.add(h); return true; } return false; }); }
+const 줄수 = 5;
+const 가짜 = (r, c) => c === 0 ? '<input type="checkbox">' : (전체머리[c] === 'IMG' ? '<img src="x.gif" width="1" height="1">' : '가짜' + r + '_' + c);
+/* 진짜 꼴: #oGrid > 머리 틀(table, 69 th) , 몸 틀(th > div > table > tbody, 줄 69 td). 숨긴 th 는 class 에 생성 이름 + display:none */
+function 그리드(보임) {
+  const th = 전체머리.map((h, i) => `<th class="igg_HeaderCaption nowrap${보임[i] ? '' : ' ig9a6376x'}"${보임[i] ? ' style="width: 80px;"' : ''}>${h}</th>`).join('');
+  const 몸 = Array.from({ length: 줄수 }, (_, r) => `<tr class="${r % 2 ? 'ig_Alt igg_Alt back-Thistle' : 'back-LightGray'}">${전체머리.map((_, c) => `<td class="${보임[c] ? '' : 'ig9a6376x'}">${가짜(r, c)}</td>`).join('')}</tr>`).join('');
+  return `<div id="divGrid" class="col-sm-12"><div id="oGrid" class="ig_Control igg_Control"><table class="igg_Header"><tr class="igg_Header">${th}</tr></table><div><table class="igc"><tr><th><div><table><tbody>${몸}</tbody></table></div></th></tr></table></div><table class="pg"><tr><td id="Pager1">1</td><td>2</td></tr></table></div></div>`;
+}
+const 달력 = '<table id="ctl00__ig_def_dp_cal" class="igmc_Control"><tr>' + ['일','월','화','수','목','금','토'].map((d) => `<th>${d}</th>`).join('') + '</tr>' + Array.from({ length: 8 }, (_, r) => '<tr>' + Array.from({ length: 7 }, (_, c) => `<td>${r * 7 + c + 1}</td>`).join('') + '</tr>').join('') + '</table>';
+const 합계글 = '<span id="sum">주문수량: 11,029 / 행수: 10,758건 / 매입금액: 281,897,937원</span>';
+const 폼 = `<input type="text" name="ctl00$Contents$dcStartDt" value="2026-09-25"><input type="text" name="ctl00$Contents$dcEndDt" value="2026-10-25"><select name="ctl00$Contents$ddlRowCnt"><option>50</option></select>
+<input type="image" name="ctl00$Contents$btnSearch" id="btnSearch" src="s.gif">`;
+const 쪽모양 = (내용) => `<html><head><meta charset="utf-8"><style>.ig9a6376x{display:none}</style></head><body id="body"><form name="f" method="post" action="/System/Sales/orderMst.aspx" id="f"><input type="hidden" name="__VIEWSTATE" value="x">
+<div>${폼}${달력}${합계글}${내용}</div></form><p id="원래글">주문관리 원래 화면</p></body></html>`;
+const 응답 = () => `<html><body>${합계글}${그리드(보임찾기(보일이름))}</body></html>`;
+const 기대머리 = 보일이름;
+const 기대줄 = Array.from({ length: 줄수 }, (_, r) => 보일이름.map((h) => { const c = 전체머리.findIndex((x, i) => x === h && 보임찾기(보일이름)[i]); return 전체머리[c] === 'IMG' ? '' : '가짜' + r + '_' + c; }));
 const VP흉내 = `window.VP저장 = { get: async function(){return {};}, set: async function(){}, remove: async function(){} };`;
 
-/* 모양: th / td = 페이지에 목록이 이미 있음, 비어있음 = 헤더만(조회 필요), 늦게 = 1.2초 뒤 AJAX 로 옴, 없음 = 표가 하나도 안 옴(조회도 빈 글) */
 const 경우 = [
-  { 이름: '머리줄이 th 인 목록', 쪽: () => 쪽모양(표('th', 줄들)), 읽는곳: '쪽', 기대칸: 11 },
-  { 이름: '머리줄이 td 인 목록', 쪽: () => 쪽모양(표('td', 줄들)), 읽는곳: '쪽', 기대칸: 11 },
-  { 이름: '목록이 비어 있음(머리만) → 같은 기본값으로 한 번 조회', 쪽: () => 쪽모양(표('th', [])), 읽는곳: '조회', 기대칸: 11 },
-  { 이름: '목록이 늦게(AJAX) 옴', 쪽: () => 쪽모양('<div id="늦게"></div>') + `<script>setTimeout(function(){document.getElementById('늦게').innerHTML=${JSON.stringify(표('th', 줄들))};},1200)</script>`, 읽는곳: '쪽', 기대칸: 11 },
-  { 이름: '못 읽음(표 없음, 조회 응답도 표 없음)', 쪽: () => 쪽모양('<div>데이터 없음</div>'), 읽는곳: '못읽음', 응답글: '<html><body>없음</body></html>' },
+  { 이름: '진짜 구조(#oGrid 머리·몸 다른 table, 69칸 중 32 보임, 달력 표 함께)', 쪽: () => 쪽모양(그리드(보임찾기(보일이름))), 읽는곳: '쪽' },
+  { 이름: '사장님이 칸 설정을 바꿈(보이는 칸이 다름 — 칸 이름을 박지 않았나)', 쪽: () => 쪽모양(그리드(보임찾기(["주문번호", "상품코드", "수취인", "송장번호", "상태", "상품명"]))), 읽는곳: '쪽', 다른칸: ["주문번호", "상품코드", "수취인", "송장번호", "상태", "상품명"] },
+  { 이름: '#oGrid 가 늦게(AJAX) 옴', 쪽: () => 쪽모양('<div id="늦게"></div>') + `<script>setTimeout(function(){document.getElementById('늦게').innerHTML=${JSON.stringify(그리드(보임찾기(보일이름)))};},1200)</script>`, 읽는곳: '쪽' },
+  { 이름: '#oGrid 못 찾음(달력만) — 빈 표 + 까닭, 배송목록 안 부름', 쪽: () => 쪽모양(''), 읽는곳: '못읽음', 응답글: '<html><body>없음</body></html>' },
 ];
 
 (async () => {
@@ -40,7 +46,7 @@ const 경우 = [
   const 못 = (참) => { if (참) { 초록++; return '✓'; } 빨강++; return '✗'; };
   console.log('\n■ CS등록 = 주문관리 목록 그대로 (10-24 다시 시작)');
   for (const 너비 of [1280, 375]) for (const 해시 of ['#vgCS', '']) for (const c of 경우) {
-    if (해시 === '' && c !== 경우[0]) continue;      // 해시가 있든 없든 같다 — 한 경우만
+    if (해시 === '' && c !== 경우[0]) continue;
     const ctx = await b.newContext({ viewport: { width: 너비, height: 900 } });
     await ctx.route('**://identitytoolkit.googleapis.com/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{"idToken":"x"}' }));
     await ctx.route('**://firestore.googleapis.com/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' }));
@@ -49,7 +55,7 @@ const 경우 = [
       const u = new URL(r.request().url()), m = r.request().method();
       부름.push(m + ' ' + u.pathname);
       const 화 = (t) => r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: t });
-      if (/orderMst/.test(u.pathname)) return m === 'POST' ? 화(c.응답글 || 응답('th')) : 화(c.쪽());
+      if (/orderMst/.test(u.pathname)) return m === 'POST' ? 화(c.응답글 || 응답()) : 화(c.쪽());
       return r.fulfill({ status: 200, contentType: 'text/javascript', body: '' });
     });
     const 쪽 = await ctx.newPage();
@@ -81,15 +87,20 @@ const 경우 = [
     console.log('    ★ 배송관리 모습(기간·검색창·거르개·출처·CS판)이 없다 · 이름 단추·상담 단추·줄 클릭 없음 ' + 못(!화면.배송꼴 && 화면.단추 === 0));
     console.log('    ★ 배송목록·goods 를 안 불렀다 ' + 못(!부름.some((x) => /firmDvList|goods|salesGoods|StockList/i.test(x))));
     if (c.읽는곳 === '못읽음') {
-      console.log('    ★ 빈 표 + 까닭 한 줄(표 수·줄/칸·첫 줄 글·iframe) ' + 못(화면.머리.length === 0 && /읽지 못/.test(화면.글) && /표 \d+개/.test(화면.까닭) && /iframe 0개/.test(화면.까닭) && /\d+줄\/\d+칸\[/.test(화면.까닭)));
+      console.log('    ★ 빈 표 + 까닭 한 줄(#oGrid 없음) · 달력을 목록으로 안 집음 ' + 못(화면.머리.length === 0 && /읽지 못/.test(화면.글) && /#oGrid 없음/.test(화면.까닭) && !화면.머리.includes('월')));
     } else {
-      console.log('    ★ 칸 이름·차례 = 주문관리 것 ' + 못(JSON.stringify(화면.머리) === JSON.stringify(머리)));
-      console.log('    ★ 값·줄 = 주문관리 것 (3줄, 값 그대로) ' + 못(JSON.stringify(화면.줄) === JSON.stringify(줄들)));
-      console.log('    ★ 자료를 읽은 곳 = ' + c.읽는곳 + ' — 주문관리 조회(POST) ' + (부름.filter((x) => /^POST/.test(x)).length) + '번 ' + 못(c.읽는곳 === '쪽' ? !부름.some((x) => /^POST/.test(x)) : 부름.filter((x) => /^POST \/System\/Sales\/orderMst/.test(x)).length === 1));
+      const 내머리 = c.다른칸 || 기대머리, 보인 = 보임찾기(내머리);
+      const 내줄 = Array.from({ length: 줄수 }, (_, r) => 내머리.map((h) => { const k = 전체머리.findIndex((x, i) => x === h && 보인[i]); return 전체머리[k] === 'IMG' ? '' : '가짜' + r + '_' + k; }));
+      const 내보임 = 전체머리.filter((h, i) => 보인[i] && i !== 0);
+      console.log('    ★ 달력(일 월 화 …)을 목록으로 안 집음 ' + 못(!화면.머리.includes('월') && !화면.머리.includes('토')));
+      console.log('    ★ 보이는 칸만·같은 차례(숨긴 칸 안 나옴, 체크 칸 뺌) ' + 못(JSON.stringify(화면.머리) === JSON.stringify(내보임)) + ' (' + 화면.머리.length + '칸)');
+      console.log('    ★ 줄 수 = 몸줄 수(' + 줄수 + ') · 값 그대로 ' + 못(화면.줄.length === 줄수 && JSON.stringify(화면.줄) === JSON.stringify(내줄.map((_, r) => 내보임.map((h) => { const k = 전체머리.findIndex((x, i) => x === h && 보인[i]); return 전체머리[k] === 'IMG' ? '' : '가짜' + r + '_' + k; })))));
+      console.log('    ★ 합계 글 그대로 ' + 못(화면.글 === '주문수량: 11,029 / 행수: 10,758건 / 매입금액: 281,897,937원'));
+      console.log('    ★ 자료를 읽은 곳 = 쪽(조회 안 누름) ' + 못(!부름.some((x) => /^POST/.test(x))));
       console.log('    ★ 머리글 전부 한 줄(nowrap) · 쪽 전체는 안 밀림 ' + 못(화면.한줄 && !화면.쪽가로) + ' · 표 통 가로 스크롤 ' + 화면.가로);
     }
     console.log('    ★ 쪽 오류 ' + 탈.length + ' ' + 못(탈.length === 0));
-    if (해시 === '#vgCS') await 쪽.screenshot({ path: path.join(그림칸, '주문관리CS-' + (c === 경우[0] ? 'th' : c === 경우[1] ? 'td' : c === 경우[2] ? '비어서조회' : c === 경우[3] ? '늦게' : '못읽음') + '-' + 너비 + '.png') });
+    if (해시 === '#vgCS') await 쪽.screenshot({ path: path.join(그림칸, '주문관리CS-' + (c === 경우[0] ? '진짜구조' : c === 경우[1] ? '칸바뀜' : c === 경우[2] ? '늦게' : '못읽음') + '-' + 너비 + '.png') });
     await ctx.close();
   }
   await b.close();
