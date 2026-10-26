@@ -1,4 +1,5 @@
-/* 폴더쪽 — 보링·엣지·납품·실제청구명세서 네 쪽이 같이 쓰는 한 벌 (v6.2.0).
+/* 폴더쪽 — 보링·엣지·납품·실제청구명세서 네 쪽이 같이 쓰는 한 벌 (v6.2.1).
+   v6.2.1(10-26): 화면 전체 막대 없앰 — #표틀 을 flex 로 켜서 표 상자가 남은 높이를 채운다(꼴은 쪽 html <style>).
    v6.2.0(10-22) 사장님: 「각 명세표를 보여줄때 지금같은 파일명이 아닌 작은 월별 버튼으로 해당 자료가 나타나게 해줘」
    → 파일 이름 목록을 걷고 **작은 월 버튼**을 둔다. 줄은 창고 줄의 **「달」 칸**으로 가른다
      (납품 엑셀은 거래처별이라 한 파일에 1~10월이 섞여 있다 — 파일 이름으로는 달을 못 가른다).
@@ -97,7 +98,7 @@ function 목록그리기(){
 
 function 표그리기(){
   const 틀 = document.getElementById('표틀');
-  틀.style.display = 'block';
+  틀.style.display = 'flex';   /* v6.2.1: flex — 표 상자가 화면 남은 높이를 채운다 */
   const 이달 = 목.map(f => ({f, 줄: f.줄.filter(r => String(r.달) === 고른)}));
   const 것 = 이달.flatMap(x => x.줄);
   /* 그 달 파일 — 줄 있는 것은 줄 수, 줄 없는 것(이름이 그 달)은 까닭을 작게. */
@@ -135,7 +136,7 @@ document.addEventListener('click', e=>{
   const p = e.target.closest('#달목 .chip'); if(!p || 줄들===null) return;
   고른 = p.dataset.m;
   목록그리기();
-  document.getElementById('표틀').scrollIntoView({behavior:'smooth', block:'start'});
+  /* v6.2.1: 표로 굴리지 않는다 — 쪽은 화면 높이에 서 있고 표는 이미 남은 자리에 보인다. 굴리면 머리(월 버튼)가 화면 밖으로 나간다. */
 });
 
 목록그리기();
