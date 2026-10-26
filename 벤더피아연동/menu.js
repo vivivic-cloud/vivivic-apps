@@ -21,6 +21,9 @@
     { name: "CS등록", url: (주문관리주소 || "/System/Delivery/firmDvList.aspx") + "#vgCS" },
   ];
 
+  /* 10-26 [새 지시 새창] 사장님: 「현재 페이지에서 어떤방식으로든 단품관리 상품관리등 링크를 타고 넘어갈때 화면 전환이 아닌 새페이지로 나타나게 해줘」
+     → 메뉴 단추는 `target="_blank"` 로 **새 탭**에 연다 (이 메뉴 화면은 그대로 남는다). */
+
   // 로그인된 화면(원래 메뉴에 배송관리가 있는 화면)에서만 바꾼다
   const loggedIn = [...document.querySelectorAll("a")].some((a) => a.textContent.trim() === "배송관리");
   if (!loggedIn) return;
@@ -30,7 +33,7 @@
   root.innerHTML = `
     <div class="box">
       <h1>벤더피아</h1>
-      ${PAGES.map((p) => `<a class="vp-btn" href="${p.url}">${p.name}</a>`).join("")}
+      ${PAGES.map((p) => `<a class="vp-btn" href="${p.url}" target="_blank" rel="noopener">${p.name}</a>`).join("")}
     </div>`;
   document.body.appendChild(root);
   document.documentElement.classList.add("vp-clean");

@@ -289,7 +289,7 @@ const 한벌돌리기 = (단품곁다리) => {
         <div class="vp-modal-card">
           <div class="vp-goods-panel-head"><strong></strong><button type="button" aria-label="닫기">×</button></div>
           <div class="vp-modal-body"></div>
-          <div class="vp-modal-foot"><a class="vp-goto"></a></div>
+          <div class="vp-modal-foot"><a class="vp-goto" target="_blank" rel="noopener"></a></div>
         </div>
       </div>
     </div>`;
