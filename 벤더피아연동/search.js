@@ -930,10 +930,12 @@
       }));
     };
 
-    async function 남기기({ 글, 종류, 상태 }) {
+    async function 남기기({ 글, 종류, 상태, 올리기 }) {
       const 단추 = 적기.querySelector("button[type=submit]");
+      if (단추.disabled) return;                       // 두 번 눌러 두 번 가지 않게
       단추.disabled = true;
       알림.textContent = "남기는 중…";
+      let 남김 = false;
       try {
         const 온것 = await 상담쓰기(열쇠, 주문, { 글, 종류, 상태, 앞것: 쌓인것, 앞접수: 지금접수 });
         쌓인것 = 온것.log;
@@ -946,13 +948,27 @@
         단추.textContent = "남기기";
         알림.textContent = "남겼습니다";
         그리기();
+        남김 = true;
       } catch (err) {
         /* ⚠ **조용히 지나가지 않는다.** 사장님께 글로 알리고 까닭도 적는다. */
         알림.textContent = "못 남겼습니다 — " + (err && err.message ? err.message : err);
         window.VP말?.("상담:못남김 " + (err && err.message ? err.message : err));
-      } finally {
-        단추.disabled = false;
       }
+      /* 우리 저장이 된 뒤에만 벤더피아 고객문의에도 올린다. 실패해도 우리 저장은 남는다. */
+      const 열쇠글 = 열쇠 + "\n" + 글;
+      if (남김 && 올리기 && !올린글.has(열쇠글)) {
+        올린글.add(열쇠글);
+        알림.textContent = "남겼습니다 · 벤더피아 등록 중…";
+        try {
+          await 벤더피아올리기(주문, { 글, 종류, 상태 });
+          알림.textContent = "남겼습니다 · 벤더피아 등록됨";
+        } catch (err) {
+          알림.textContent = "남겼습니다 · 벤더피아 등록 실패(" + (err && err.message ? err.message : err) + ")";
+          if (!(err && err.보냄)) 올린글.delete(열쇠글);   // 저장을 안 보냈으면 다시 눌러 올릴 수 있다
+          window.VP말?.("고객문의:실패 " + (err && err.message ? err.message : err));
+        }
+      }
+      단추.disabled = false;
     }
 
     try {
@@ -976,7 +992,7 @@
       /* 종류를 고르셨으면 **접수**다 — 그래도 **이력 줄로 같이 쌓인다**
          (사장님 10-15: 「이력을 남기면서 **동시에**」). */
       남기기({ 글: 글 || (고른종류 + " 접수"), 종류: 고른종류,
-               상태: 고른종류 ? "접수" : "" });
+               상태: 고른종류 ? "접수" : "", 올리기: true });
     });
     글칸.focus();
   }
@@ -1025,6 +1041,91 @@
     window.VP말?.("상담:남김 " + 쌓기.length + "줄/" + 길
       + (열림 ? " · " + 접수.k + " " + 접수.st : ""));
     return { log: 쌓기, req: 접수, open: 열림 };
+  }
+
+  /* ── 벤더피아 고객문의 올리기 (10-26 [새 지시 CS업로드]) ─────────────
+     사장님: 「만들어. 시험 등록할 주문은 내가 정해줄게」 — ⚠ **「벤더피아에서는 조회만」 의 예외는 이 기능 하나뿐.**
+     길: `System/CS/csDetl.aspx` GET → 원주문 숨은 칸(`hOrderNo`)·주문번호 칸(`tbSOrderNo`)을 채워 `btnReflash` 다시 보냄
+         → 응답에 주문 정보(주문자·상품명·매출처)가 **차야** 이어진 것 → 문의자·제목·문의내용을 채워 `btnSaveInsert.x/.y` 로 POST.
+     ⚠ 원주문이 안 이어지면 **저장 POST 를 보내지 않는다**(빈·엉뚱한 주문으로 올라가지 않게).
+     ⚠ 진짜 「원주문 검색」 팝업(`OpenOrderList`)이 넣는 값은 못 읽었다 — 첫 실제 시험에서 확정. */
+  const 고객문의주소 = "/System/CS/csDetl.aspx?previousPage=inquiry";
+  const 올린글 = new Set();                            // 주문+글 — 같은 글을 두 번 올리지 않는다
+  const 문의값 = (doc, id) => { const el = doc.getElementById(id); return el ? String(el.value || "").trim() : ""; };
+  function 문의폼값(form) {
+    const fd = new FormData();
+    for (const el of form.elements) {
+      if (!el.name || el.disabled) continue;
+      const t = String(el.type || "").toLowerCase();
+      if (["image", "submit", "button", "reset", "file"].includes(t)) continue;
+      if ((t === "checkbox" || t === "radio") && !el.checked) continue;
+      if (el.tagName === "SELECT") { const o = el.options[el.selectedIndex] || el.options[0]; if (o) fd.append(el.name, o.value); continue; }
+      fd.append(el.name, el.value || "");
+    }
+    return fd;
+  }
+  async function 문의보내기(doc, 단추id, 채움) {
+    const form = doc.getElementById("aspnetForm") || doc.forms[0];
+    const 단추 = doc.getElementById(단추id);
+    if (!form || !단추 || !단추.name) throw new Error(단추id + " 없음");
+    const fd = 문의폼값(form);
+    for (const [id, v] of Object.entries(채움)) {
+      const el = doc.getElementById(id);
+      if (el && el.name) fd.set(el.name, v);
+    }
+    if (String(단추.type).toLowerCase() === "image") { fd.append(단추.name + ".x", "5"); fd.append(단추.name + ".y", "5"); }
+    else fd.append(단추.name, 단추.value || "");
+    const 바탕 = new URL(고객문의주소, location.href);
+    const res = await fetch(new URL(form.getAttribute("action") || 바탕.href, 바탕).href,
+      { method: "POST", body: fd, credentials: "include" });
+    const 글 = await res.text();
+    return { res, 글, doc: new DOMParser().parseFromString(글, "text/html") };
+  }
+  /* 고르는 칸에서 글자가 같은 것을 고른다 — 없으면 그대로(벤더피아 기본값) */
+  function 고를값(doc, id, 글자) {
+    const el = doc.getElementById(id);
+    const o = el && 글자 && [...el.options].find((x) => x.textContent.trim() === 글자);
+    return o ? o.value : null;
+  }
+  async function 벤더피아올리기(주문, { 글, 종류, 상태 }) {
+    const 첫 = await fetch(고객문의주소, { credentials: "include" });
+    if (!첫.ok) throw new Error("등록 쪽 HTTP " + 첫.status);
+    let doc = new DOMParser().parseFromString(await 첫.text(), "text/html");
+    if (doc.querySelector("input[type=password]")) throw new Error("로그인 필요");
+    if (!doc.getElementById("tbContent") || !doc.getElementById("btnSaveInsert")) throw new Error("등록 쪽 모양이 다름");
+    /* ① 원주문 잇기 */
+    const 잇기 = await 문의보내기(doc, "btnReflash", { hOrderNo: 주문, tbSOrderNo: 주문 });
+    doc = 잇기.doc;
+    const 이음 = { 주문번호: 문의값(doc, "tbSOrderNo"), 주문자: 문의값(doc, "tbOrderer"),
+                  상품: 문의값(doc, "tbSGoodsNm"), 매출처: 문의값(doc, "tbStoreNm"), 숨은: 문의값(doc, "hOrderNo") };
+    window.VP말?.("고객문의:잇기 HTTP" + 잇기.res.status + " " + JSON.stringify(이음).slice(0, 160));
+    if (!잇기.res.ok || !doc.getElementById("btnSaveInsert")) throw new Error("원주문 잇기 HTTP " + 잇기.res.status);
+    if (이음.주문번호 !== String(주문).trim() || !(이음.주문자 || 이음.상품 || 이음.매출처))
+      throw new Error("원주문을 못 이음");
+    /* ② 문의 채워 저장 */
+    const 첫줄 = 글.split(/\n/)[0].trim();
+    const 채움 = { tbInquirer: 이음.주문자 || 적은이() || "상담",
+                  tbTitle: ((종류 ? "[" + 종류 + "] " : "") + 첫줄).slice(0, 50),
+                  tbContent: 글 };
+    const 유형 = 고를값(doc, "ddlInqType", 종류);
+    if (유형 !== null) 채움.ddlInqType = 유형;
+    const 끝남 = 고를값(doc, "ddlCallEndGb", 상태 === "끝" ? "처리완료" : "");
+    if (끝남 !== null) 채움.ddlCallEndGb = 끝남;
+    /* 저장 POST 를 보낸 뒤의 탈은 「보냄」 — 그 글은 다시 안 올린다(이미 들어갔을 수 있다) */
+    const 탈 = (m) => Object.assign(new Error(m), { 보냄: true });
+    let 저장;
+    try { 저장 = await 문의보내기(doc, "btnSaveInsert", 채움); }
+    catch (e) { throw 탈("저장 응답 못 받음 — 고객문의 목록에서 확인"); }
+    /* ③ 성공·실패 가르기 — 목록으로 넘어갔거나 「저장/등록 … 되었습니다·완료」 알림이면 됨 */
+    const 알림들 = [...저장.글.matchAll(/alert\(\s*['"]([^'"]{1,120})['"]/g)].map((m) => m[1]);
+    window.VP말?.("고객문의:저장 HTTP" + 저장.res.status + " " + (저장.res.url || "").replace(/^https?:\/\/[^/]+/, "").slice(0, 50)
+      + " 알림" + JSON.stringify(알림들).slice(0, 120));
+    if (!저장.res.ok) throw 탈("저장 HTTP " + 저장.res.status);
+    if (저장.doc.querySelector("input[type=password]")) throw 탈("로그인 필요");
+    const 나쁜말 = 알림들.find((a) => /실패|오류|에러|입력해|없습니다|확인해|못/.test(a));
+    if (나쁜말) throw 탈(나쁜말);
+    if (/inquiryList\.aspx/i.test(저장.res.url || "") || 알림들.some((a) => /(저장|등록).*(되었|완료|했)|완료/.test(a))) return;
+    throw 탈("응답에 등록 표시 없음 — 고객문의 목록에서 확인");
   }
 
   let tbody = null;
