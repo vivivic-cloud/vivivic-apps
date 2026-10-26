@@ -4,6 +4,34 @@
 /* 10-24 — 한 벌 = 이 화면 글 전체. 배송관리·CS등록에서는 **두 벌**을 곁다리로 돌린다(상품관리 한 벌 + 단품관리 한 벌).
    그래서 상세(`show`·`detailFields`·수입정보·부속보기 …)를 두 벌로 베끼지 않고 **같은 글을 두 번 돌린다**. */
 (() => {
+/* 10-26 [새 지시 점 안내 모든 쪽] 사장님: 「시에스등록등 상품/단품버튼이 나타나는 페이지에는 항상 색상별 점 표시에 대한 안내가 나타나도록 해줘」
+   점 안내는 **여기 한 곳에서만** 만든다(색은 goods.css `--점-*`). 단품·상품·재고 쪽은 아래 `root.innerHTML` 에서,
+   배송관리·CS등록(`search.js` 가 쪽 머리를 그린다)은 `점안내붙이기` 가 제목 밑에 같은 글을 붙인다.
+   ⚠ 새 쪽에 상품/단품 단추를 넣으면 거기에도 이 안내를 붙여라. */
+const 점안내글 = () => '<div class="vp-legend"><span class="g">재고조회 목록에 있음</span><span class="r">조혼가구와 일치</span><span class="o">카탈로그(inghome)와 맞음</span><span class="b">서류관리 연결</span></div>';
+const 점안내붙이기 = () => {
+  if (VP_DATA.PAGES[location.pathname]) return;          // 단품·상품·재고는 제 머리에서 이미 그린다
+  const 붙이기 = () => {
+    const 쪽 = document.querySelector("#vp-root > .vp-search");
+    if (!쪽) return null;
+    if (!쪽.querySelector(":scope > .vp-legend")) {
+      const h1 = 쪽.querySelector(":scope > h1");
+      if (!h1) return null;
+      h1.insertAdjacentHTML("afterend", 점안내글());
+    }
+    return 쪽;
+  };
+  const 쪽 = 붙이기();
+  /* 쪽 머리가 다시 그려져도 사라지지 않게 — 직계 자식 바뀜만 본다(표 칸 수천 개는 안 본다) */
+  const 지킴 = new MutationObserver(() => { 붙이기(); });
+  const 찾기 = new MutationObserver(() => {
+    const 이쪽 = 붙이기();
+    if (이쪽) { 찾기.disconnect(); 지킴.observe(이쪽, { childList: true }); }
+  });
+  if (쪽) 지킴.observe(쪽, { childList: true });
+  else 찾기.observe(document.body || document.documentElement, { childList: true, subtree: true });
+};
+if (!window.__vp점안내돌았나) { window.__vp점안내돌았나 = true; try { 점안내붙이기(); } catch (e) {} }
 const 한벌돌리기 = (단품곁다리) => {
   const { PAGES, list: fetchList, ymd } = VP_DATA;
   /* ④ **곁다리 모드** — 사장님 10-15: 「이곳에 도착하는 상품명을 상품관리와 동일한
@@ -170,7 +198,7 @@ const 한벌돌리기 = (단품곁다리) => {
     <div class="vp-goods">
       <a class="vp-home" href="/index.aspx">← 메인</a>
       <h1>${page.title}</h1>
-      <div class="vp-legend"><span class="g">재고조회 목록에 있음</span><span class="r">조혼가구와 일치</span><span class="o">카탈로그(inghome)와 맞음</span><span class="b">서류관리 연결</span></div>
+      ${곁다리 ? "" : 점안내글()}
       <div class="vp-filters">
         <input name="q" class="vp-q" placeholder="${page.search.join(", ")}…">
         ${page.selects.map(([col, label, src]) =>
