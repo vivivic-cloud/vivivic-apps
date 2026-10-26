@@ -791,8 +791,24 @@ const 한벌돌리기 = (단품곁다리) => {
   }
 
   // 부속 박스를 누르면: 에이엠티 엣지공정지시서의 부속카드(도면 포함)를 팝업으로
+  /* 10-26 [새 지시 조혼부속] 배송관리·CS등록(곁다리)에는 확장이 `amt-draw.js` 를 안 보낸다 → 단품 단추 상세의 부속카드를
+     눌러도 `VP_AMT` 가 없어 아무것도 안 떴다. 누를 때 한 번만 깃허브에서 불러온다(열 때 요청 0 그대로). */
+  let amt약속 = null;
+  const amt불러오기 = () => amt약속 || (amt약속 = new Promise((풀) => {
+    const sc = document.createElement("script");
+    sc.src = "https://vivivic-cloud.github.io/vivivic-apps/%EB%B2%A4%EB%8D%94%ED%94%BC%EC%95%84%EC%97%B0%EB%8F%99/amt-draw.js?t=" + Math.floor(Date.now() / 60000);
+    sc.onload = 풀;
+    sc.onerror = () => { amt약속 = null; 풀(); };
+    document.head.appendChild(sc);
+  }));
   function edgePopup(productName, part) {
-    if (typeof VP_AMT === "undefined") return;
+    if (typeof VP_AMT === "undefined") {
+      amt불러오기().then(() => {
+        if (typeof VP_AMT === "undefined") notice("부속 도면 글을 불러오지 못했습니다. 새로고침 뒤 다시 눌러 주세요.");
+        else edgePopup(productName, part);
+      });
+      return;
+    }
     if (johonOld || part.wEdge === undefined) {
       notice("엣지·재단 도면 정보가 없는 예전 자료입니다. 크롬에서 조혼가구 프로그램을 한 번 열어 주세요.");
       return;
