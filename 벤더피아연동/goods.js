@@ -32,6 +32,69 @@ const 점안내붙이기 = () => {
   else 찾기.observe(document.body || document.documentElement, { childList: true, subtree: true });
 };
 if (!window.__vp점안내돌았나) { window.__vp점안내돌았나 = true; try { 점안내붙이기(); } catch (e) {} }
+/* 10-26 [새 지시 한번에] 사장님: 「되도록 불러온 정보의 상태과 그 작동은 한번에 되게 해줘」
+   배송관리·CS등록(곁다리 두 벌)의 이름 단추는 **네 점·양품 수량이 다 갖춰진 뒤에 한꺼번에** 붙는다 — 단추 먼저, 점은 누른 뒤에 — 이렇게 나뉘지 않게.
+   갖출 것: 단품 벌 = 재고조회(초록 점·양품)·조혼가구(빨강)·서류관리 차수(파랑) / 상품 벌 = 카탈로그(주황). 모두 되면(`다됨`) 두 벌이 함께 칸을 채운다.
+   재고조회 전체는 **열 때 받지 않는다**(0.34.60 그대로). 조회 목록이 다 온 뒤(`VP조회중` 꺼짐) 한 번 받고, 받는 동안 이름 찾기는 쉰다(벤더피아는 요청을 하나씩 처리한다).
+   받은 재고는 `vpStock`(단품코드·양품수 두 칸뿐, 금액·사람 칸 없음)에 **10분** 둔다 — 10분 안의 F5·다시 열기는 요청 0 으로 바로 다 붙는다. 10분이 넘으면 다시 받는다.
+   ⚠ `vpCache:`(F5 에 지움) 가 아닌 따로 칸이다: 목록 화면(단품·상품·재고조회)은 그대로 F5 마다 새로 받는다. 이 칸은 단추 점·수량에만 쓴다. */
+const 한번에 = (() => {
+  const STOCK = "/System/Stock/StockList.aspx";
+  const 저장칸 = "vpStock", 살날 = 10 * 60 * 1000;
+  const 창고0 = window.VP저장 || (typeof chrome !== "undefined" ? chrome.storage?.local : null);
+  const 열쇠 = (c) => String(c == null ? "" : c).trim().toLowerCase();
+  const s = { 재고: null, 재고됨: false, 재고약속: null, 준비: { 상품: false, 단품: false }, 다됨: false, 들을것: [], 누름중: 0 };
+  const 알리기 = () => { for (const f of s.들을것) { try { f(); } catch (e) {} } };
+  const 살피기 = () => {
+    if (s.다됨 || !s.준비.상품 || !s.준비.단품 || !s.재고됨) return;
+    s.다됨 = true;
+    window.VP말?.("한번에:다됨 재고" + (s.재고 ? s.재고.size : "없음"));
+    알리기();
+  };
+  /* 열 때: 저장된 재고가 10분 안이면 그것을 쓴다(요청 0). 아니면 조회 뒤 `재고시작` 을 기다린다. */
+  const 읽음 = Promise.resolve(창고0 && 창고0.get(저장칸)).then((받음) => {
+    const v = 받음 && 받음[저장칸];
+    if (!v || v.v !== 1 || !Array.isArray(v.쌍) || !(Date.now() - v.at < 살날)) return;
+    const m = new Map();
+    for (let i = 0; i + 1 < v.쌍.length; i += 2) m.set(v.쌍[i], v.쌍[i + 1]);
+    s.재고 = m; s.재고됨 = true;
+    window.VP말?.("재고:저장 " + m.size + "가지 · " + Math.round((Date.now() - v.at) / 60000) + "분 전");
+  }).catch(() => {});
+  async function 받기() {
+    await 읽음;
+    if (s.재고됨) return;
+    while (window.VP조회중) await new Promise((r) => setTimeout(r, 150));     // 조회 목록과 겹치지 않게 — 목록이 다 온 뒤
+    const t0 = Date.now();
+    const m = new Map();
+    await VP_DATA.list({ ...VP_DATA.PAGES[STOCK], fixed: { ddlSearchType: "ALL" } }, STOCK, "전체", {}, (h, rows) => {
+      const c = h.indexOf("단품코드"), q = h.indexOf("양품수");
+      for (const row of rows) {
+        const k = 열쇠(row[c]);
+        if (k) m.set(k, (m.get(k) || 0) + (Number(String(row[q]).replace(/,/g, "")) || 0));
+      }
+    });
+    s.재고 = m;
+    window.VP말?.("재고:받음 " + m.size + "가지 " + (Date.now() - t0) + "ms");
+    const 쌍 = [];
+    for (const [k, n] of m) 쌍.push(k, n);
+    if (창고0) 창고0.set({ [저장칸]: { v: 1, at: Date.now(), 쌍 } }).catch?.(() => {});
+  }
+  /* 조회 목록을 그려 이름 칸을 채우려 할 때(첫 `곁다리단추`) 부른다. 한 번만 받는다. 못 받으면 초록 점 없이 붙인다. */
+  function 재고시작() {
+    if (s.재고약속) return s.재고약속;
+    s.재고약속 = 받기().catch((e) => { window.VP말?.("재고:못받음 " + (e && e.message ? e.message : e)); })
+      .then(() => { const 늦음 = s.다됨; s.재고됨 = true; 살피기(); if (늦음) 알리기(); });
+    /* 벤더피아가 끝내 답이 없을 때 단추를 한없이 붙들지 않는다 — 30초 뒤엔 초록 점 없이 붙이고, 재고가 오면 그때 칠한다 */
+    setTimeout(() => { if (!s.재고됨) { s.재고됨 = true; 살피기(); } }, 30000);
+    return s.재고약속;
+  }
+  /* 이름 찾기(하나찾기 10줄)는 재고를 받는 동안·단추 상세를 받는 동안 쉰다 — 그것들이 먼저 간다 */
+  async function 비켜서기() {
+    if (s.재고약속 && !s.재고됨) await s.재고약속;
+    while (s.누름중) await new Promise((r) => setTimeout(r, 100));
+  }
+  return { s, 열쇠, 살피기, 재고시작, 비켜서기, 들을것: (f) => s.들을것.push(f) };
+})();
 const 한벌돌리기 = (단품곁다리) => {
   const { PAGES, list: fetchList, ymd } = VP_DATA;
   /* ④ **곁다리 모드** — 사장님 10-15: 「이곳에 도착하는 상품명을 상품관리와 동일한
@@ -106,7 +169,7 @@ const 한벌돌리기 = (단품곁다리) => {
   setJohon(typeof VP_JOHON_PARTS === "undefined" ? [] : VP_JOHON_PARTS);
   // 깃허브에서 온 글은 확장 저장소에 바로 못 닿는다 — 다리(VP저장)를 먼저 본다.
   const 창고 = window.VP저장 || (typeof chrome !== 'undefined' ? chrome.storage?.local : null);
-  Promise.resolve(창고 && 창고.get("vpJohon")).then((받은 = {}) => {
+  const johon읽기 = Promise.resolve(창고 && 창고.get("vpJohon")).then((받은 = {}) => {
     const vpJohon = 받은 && 받은.vpJohon;
     if (!vpJohon?.parts?.length) return;  // 비어 있는 자료면 johon.js 목록을 그대로 쓴다
     setJohon(vpJohon.parts);
@@ -1264,6 +1327,15 @@ const 한벌돌리기 = (단품곁다리) => {
   /* 맞은 것만 담는다 — 상품명 → { u(그 상품 페이지 주소), t(inghome 이름), 꼴("그대로"/"거의") }
      ⚠ 남의 회사 **그림은 안 가져온다.** 주소(링크)만 쓴다. */
   const ing맞은것 = new Map();
+  /* 10-26 [새 지시 한번에] 곁다리는 이름을 조회 뒤에야 하나씩 찾아 더한다 — 맞춰보기 뒤에 더해진 이름도 주황 점이 붙게, 받은 목록(`ing표`)을 들고 그때그때 맞춘다(같은 잣대) */
+  let ing표 = null;
+  function ing한이름(n) {
+    if (!ing표 || ing맞은것.has(n)) return ing맞은것.has(n);
+    const a = 맞춤(n), b = 바짝(n);
+    if (ing표.그대로줄.has(a)) ing맞은것.set(n, { ...ing표.그대로줄.get(a), 꼴: "그대로" });
+    else if (ing표.줄인줄.has(b) && !ing표.줄인겹침.has(b)) ing맞은것.set(n, { ...ing표.줄인줄.get(b), 꼴: "거의" });
+    return ing맞은것.has(n);
+  }
   const 맞춤 = (t) => String(t || "").trim().toLowerCase();        // 이 집의 비교 방식
   const 바짝 = (t) => String(t || "").toLowerCase()
     .replace(/\([^)]*\)/g, " ")                                   // 괄호 꼬리말 (색상 따위)
@@ -1290,6 +1362,7 @@ const 한벌돌리기 = (단품곁다리) => {
       if (a && !그대로줄.has(a)) 그대로줄.set(a, o);
       if (b) { if (줄인줄.has(b)) 줄인겹침.add(b); else 줄인줄.set(b, o); }
     }
+    ing표 = { 그대로줄, 줄인줄, 줄인겹침 };
     const 이름들 = 곁다리 ? [...곁다리표.이름.keys()] : [...groups.keys()];
     let 딱 = 0, 거의 = 0;
     ing맞은것.clear();
@@ -1410,7 +1483,8 @@ const 한벌돌리기 = (단품곁다리) => {
        ① 이름표는 확장 저장소 `vpName:상품`·`vpName:단품` 에 둔다 — **새로고침(F5)에도 지우지 않는다**(`vpCache:` 만 지운다). 금액·사람 칸은 담지 않는다.
           있으면 바로 쓰고, 새로 등록된 것만 뒤에서 더한다(마지막으로 확인한 날 하루 전부터). 없거나 7일이 넘었으면 처음부터 이름·코드만 다시 모은다(쪽마다 단추가 늘어난다).
        ② 이름표에 없는 이름은 **목록에 실제로 나온 것만** 그 이름·코드로 하나씩 찾아 이름표에 더한다(`VP상품찾기`).
-       ③ 상세에 필요한 줄 전체는 **단추를 누를 때** 그 이름으로 받는다(`줄받기`). 연결 단품 목록·재고조회도 처음 누를 때 받는다. */
+       ③ 상세에 필요한 줄 전체는 **단추를 누를 때** 그 이름으로 받는다(`줄받기`). 연결 단품 목록도 처음 누를 때 받는다.
+          재고조회는 10-26 [새 지시 한번에] 부터 조회 목록이 온 뒤 받는다(맨 위 `한번에`) — 단추는 점·수량과 함께 붙는다. */
   const 곁다리표 = { 이름: new Map(), 코드: new Map(), 뭉갠: new Map(), 다됨: false, 실패: "" };
   const 표뭉갬 = (t) => String(t == null ? "" : t).replace(/\s+/g, "").toLowerCase();
   function 표넣기(쌍들, 표 = 곁다리표) {
@@ -1457,7 +1531,7 @@ const 한벌돌리기 = (단품곁다리) => {
   let 낱단추 = [];                    // { b, name, codes } — 배송관리·CS등록 칸에 건네준 단추
   const 재고수 = (codes) => {
     if (page.stock === "link" && stockByCode) {
-      const found = codes.map((c) => stockByCode.get(codeKey(c))).filter((q) => q !== undefined);
+      const found = codes.map((c) => stockByCode.get(한번에.열쇠(c))).filter((q) => q !== undefined);
       return found.length ? found.reduce((a, b) => a + b, 0) : undefined;
     }
     return undefined;
@@ -1465,7 +1539,7 @@ const 한벌돌리기 = (단품곁다리) => {
   function 낱칠하기(x) {
     labelButton(x.b, x.name, x.codes, 재고수(x.codes));          // 목록의 `labelGroup` 이 하는 것과 같은 것 (점 넷 — 재고·조혼가구·카탈로그·서류)
     if (page.nameCol === "단품명") markJohon(x.b, x.codes);
-    x.b.classList.toggle("vp-ing", ing맞은것.has(x.name));
+    x.b.classList.toggle("vp-ing", ing한이름(x.name));
   }
   function 곁다리다시칠하기() {
     낱단추 = 낱단추.filter((x) => x.b.isConnected);
@@ -1486,14 +1560,17 @@ const 한벌돌리기 = (단품곁다리) => {
     연결받음 = true;
     /* 10-26 — 1.5초 뒤에 시작한다: 이어서 누르는 다른 단추의 상세(하나찾기)가 이 큰 목록 받기에 막히지 않게(벤더피아는 요청을 하나씩 처리한다). */
     setTimeout(() => {
-      if (!stockByCode && page.stock) loadStock().catch(() => {});
+      if (page.stock) 한번에.재고시작();      // 10-26 [새 지시 한번에] 재고는 두 벌이 함께 쓰는 한 벌(`한번에`) — 보통 이미 받아 있다
       if (page.link) loadLinked().catch(() => { linked = { heads: [], byCode: new Map() }; });
     }, 1500);
   }
   async function 줄받기(이름, 코드들) {
     const 있는 = 곁다리줄캐시.get(이름);
     if (있는) return 있는;
-    const 답 = await VP_DATA.하나찾기(page, 내길, 서버값(), { name: 이름, code: 코드들[0] || "", 먼저: "name" });
+    한번에.s.누름중++;                 // 누른 단추의 상세가 이름 찾기보다 먼저 간다(찾기가 비켜선다)
+    let 답;
+    try { 답 = await VP_DATA.하나찾기(page, 내길, 서버값(), { name: 이름, code: 코드들[0] || "", 먼저: "name" }); }
+    finally { 한번에.s.누름중--; }
     if (답) 곁다리줄캐시.set(이름, 답);
     return 답;
   }
@@ -1506,6 +1583,9 @@ const 한벌돌리기 = (단품곁다리) => {
     표쓰기(곁다리표, 곁다리표.처음 || 오늘글()).catch(() => {});
   }
   const 곁다리단추 = (이름0, 코드) => {
+    /* 10-26 [새 지시 한번에] 점·수량 자료가 다 갖춰지기 전엔 단추를 안 만든다(칸은 글자 그대로) — 갖춰지면 두 벌이 알려(`vp상품단추준비`·`vp단품단추준비`) 한꺼번에 붙는다.
+       처음 부르는 때 = 조회 목록이 그려진 때 → 그때 재고를 받기 시작한다(저장된 것이 10분 안이면 받지 않는다). */
+    if (!한번에.s.다됨) { 한번에.재고시작(); return null; }
     const 찾은 = 표에서찾기(이름0, 코드);
     if (!찾은) return null;
     const { name: 이름, codes } = 찾은;
@@ -1554,7 +1634,9 @@ const 한벌돌리기 = (단품곁다리) => {
       const 차례 = [...일];
       const 일꾼 = async () => {
         while (차례.length) {
+          await 한번에.비켜서기();      // 10-26 재고 받기·누른 단추 상세가 먼저
           const x = 차례.shift();
+          if (!x) break;
           마지막일 = Date.now();
           try {
             const 답 = await VP_DATA.하나찾기(page, 내길, 서버값(), { name: x.이름, code: x.코드 || "", 가볍게: true });
@@ -1595,15 +1677,27 @@ const 한벌돌리기 = (단품곁다리) => {
       } else 곁다리표.처음 = 오늘글();
       곁다리표.다됨 = true;
       window.VP말?.((단품곁다리 ? "단품" : "상품") + "찾은것모음:" + 곁다리표.이름.size + "가지(저장에서)");
-      알림();
-      ing맞춰보기().catch(() => {});
+      /* 10-26 [새 지시 한번에] 이 벌의 점 자료(벤더피아 아님 — 확장 저장·Firestore·깃허브)를 열 때 받아 둔다. 다 되면 `한번에` 에 알린다.
+         단품 = 조혼가구(저장)·서류관리 차수(Firestore) / 상품 = 카탈로그 목록(깃허브). 재고는 `한번에` 가 조회 뒤에 받는다. */
+      한번에.들을것(() => {
+        if (한번에.s.재고) stockByCode = 한번에.s.재고;
+        곁다리다시칠하기();
+        알림();
+        if (!panel.hidden && panel.dataset.name && panel._args) show(panel.dataset.name, ...panel._args);
+      });
+      const 내준비 = 단품곁다리
+        ? Promise.all([johon읽기.catch(() => {}), 수량받기().then(() => 곁다리다시칠하기()).catch(() => {})])
+        : ing맞춰보기().catch(() => {});
+      /* 벤더피아 아닌 자료가 끝내 늦으면(창고·깃허브가 답 없음) 단추를 한없이 붙들지 않는다 — 8초 뒤엔 그대로 준비로 치고, 늦게 오면 그때 칠한다(위 `곁다리다시칠하기`) */
+      Promise.race([내준비, new Promise((r) => setTimeout(r, 8000))])
+        .then(() => { 한번에.s.준비[단품곁다리 ? "단품" : "상품"] = true; 한번에.살피기(); });
+      알림();       // 이미 그려진 칸이 있으면(CS등록은 이 글보다 목록이 먼저 그려진다) 칸을 다시 훑게 → 그때 `곁다리단추` 가 재고 받기를 시작한다
       /* 뒤에서 조용히 — 단품 한 벌만: 재고조회(초록 점)·서류관리 차수·수입. 화면의 이름이 다 붙고 벤더피아가 한가해진 뒤. */
-      /* 10-26 [새 지시 뒤 요청·멈춤] — 열 때 뒤에서 벤더피아에 요청하지 않는다: 재고조회 전체(StockList 5~6번·7MB)는 더는 미리 받지 않는다.
-         단추를 누를 때(`연결받기`) 받는다 → 초록 점(재고조회에 있음)·양품 수량은 처음 단추를 누른 뒤에 붙는다.
-         서류 자료(Firestore, 벤더피아 아님)는 조회가 끝나고 한가해진 뒤에 받는다(큰 JSON 읽기가 조회 그리기와 겹치지 않게). */
+      /* 10-26 [새 지시 뒤 요청·멈춤] — 열 때 뒤에서 벤더피아에 요청하지 않는다: 재고조회 전체(StockList 5~6번·7MB)는 열 때 받지 않는다.
+         (10-26 [새 지시 한번에] 그 뒤: 재고는 조회 목록이 다 온 뒤 `한번에` 가 받는다 — 단추를 누르기 전에. 차수 수량은 위 `내준비` 에서 열 때 받는다.)
+         수입정보(Firestore, 상세에만 쓰임)는 조회가 끝나고 한가해진 뒤에 받는다(큰 JSON 읽기가 조회 그리기와 겹치지 않게). */
       if (단품곁다리) {
         조용해지면(() => {
-          수량받기().then(() => 곁다리다시칠하기()).catch(() => {});
           수입받기().then(() => window.VP말?.("수입정보:코드" + (수입 ? 수입.size : 0) + "가지/" + 어느길))
             .catch((e) => { 수입 = null; window.VP말?.("수입정보:못받음 " + (e && e.message ? e.message : e) + " · 길" + (어느길 || (window.VP밖에 ? "다리있음" : "다리없음"))); });
         });
