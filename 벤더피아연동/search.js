@@ -67,13 +67,16 @@
 
   /* 받은 글에서 머리줄(수취인 칸이 든 줄 — 주문관리는 칸이 가장 많은 머리줄)과 줄들을 뽑는다 */
   function 표뽑기(글, 머리찾기) {
-    const doc = new DOMParser().parseFromString(글, "text/html");
+    /* 10-26 [새 지시 뒤 요청·멈춤] — 읽는 데 필요 없는 것(숨은 입력칸 __VIEWSTATE 따위·스크립트·스타일)을 문자열에서 먼저 덜어 낸다.
+       1.3MB 응답의 DOMParser 한 번이 화면을 멈추는 큰 몫이었다(덜어 내면 같은 응답이 1/3 빨리 읽힌다). 표·머리줄·건수 글은 그대로다. */
+    const 가볍게 = 글.replace(/<script\b[\s\S]*?<\/script>/gi, "").replace(/<style\b[\s\S]*?<\/style>/gi, "").replace(/<input\b[^>]*\btype=["']?hidden["']?[^>]*>/gi, "");
+    const doc = new DOMParser().parseFromString(가볍게, "text/html");
     const count = (doc.body.textContent.match(/([\d,]+)\s*건/) || [])[1] || "0";
     const th = 머리찾기(doc);
     /* 까닭 적기 — 진짜 화면에서 왜 비는지 보이게(10-22): 응답 길이·로그인 칸·머리줄 칸 수·그 밖 줄 칸 수들 */
     const 칸수들 = {};
     for (const tr of doc.querySelectorAll("tr")) if (!tr.querySelector("th")) { const n = tr.children.length; 칸수들[n] = (칸수들[n] || 0) + 1; }
-    const 몸 = { 길이: 글.length, 로그인칸: !!doc.querySelector("input[type=password]"), 틀: doc.querySelectorAll("frame,iframe").length,
+    const 몸 = { 길이: 글.length, 덜어낸뒤: 가볍게.length, 로그인칸: !!doc.querySelector("input[type=password]"), 틀: doc.querySelectorAll("frame,iframe").length,
       표수: doc.querySelectorAll("table").length, 칸수들: Object.entries(칸수들).sort((a, z) => z[1] - a[1]).slice(0, 4).map(([n, c]) => n + "칸×" + c).join(" "),
       제목: ((doc.querySelector("title") || {}).textContent || "").trim().slice(0, 30) };
     if (!th) return { count, heads: [], rows: [], 몸 };
@@ -1111,7 +1114,7 @@
       window.VP말?.("머리줄:" + heads.slice(0, 12).join(","));
   }
 
-  function addRows(heads, rows) {
+  function addRows(heads, rows, 더있다 = false) {
     if (!rows.length) return;
     if (!tbody) {
       그린머리 = heads.slice();                        // ⚠ 벤더피아 칸을 **하나도 안 빼고** 그대로
@@ -1172,8 +1175,10 @@
         });
       }
     }
-    if (상품칸들.length) 칸채우기예약();
-    상품칸셈적기();
+    if (!더있다) {
+      if (상품칸들.length) 칸채우기예약();
+      상품칸셈적기();
+    }
   }
 
   // 벤더피아에 매번 직접 조회한다 (항상 최신 상태).
@@ -1191,7 +1196,7 @@
     let shown = 0;
     let cut = false;
 
-    const take = (r) => {
+    const take = async (r) => {
       /* ⚠ **거르기 전에** 머리줄부터 배운다 — 거른 뒤 하나도 안 남아도 거르개는 서야 한다 */
       머리알기(r.heads);
       if (!r.rows.length) window.VP말?.("조회:벤더피아가 0줄");
@@ -1208,10 +1213,21 @@
         const digits = text.replace(/\D/g, "");
         return local.every((w) => text.includes(w) || (/^[\d-]+$/.test(w) && digits.includes(w.replace(/-/g, ""))));
       });
-      addRows(r.heads, fresh);
-      shown += fresh.length;
+      /* 10-26 [새 지시 뒤 요청·멈춤] — 600줄을 한꺼번에 그리지 않는다: 80줄씩 그리고 쉰다(한 번 멈춤 0.2초 이하). 새 조회가 시작되면 멈춘다. */
+      /* 조각 사이에 브라우저가 반쯤 그린 표를 매번 다시 배치하면(600줄×30칸) 오히려 300ms 더 걸린다(재서 확인) → 줄이 많으면 표를 숨기고 그려 마지막에 한 번만 배치한다. */
+      const 숨김 = fresh.length > 160 && table.style.display !== "none";
+      if (숨김) table.style.display = "none";
+      try {
+        for (let i = 0; i < fresh.length; i += 150) {
+          if (searchId !== currentSearch) return;
+          addRows(r.heads, fresh.slice(i, i + 150), i + 150 < fresh.length);
+          shown += Math.min(150, fresh.length - i);
+          if (i + 150 < fresh.length) await new Promise((r) => setTimeout(r, 0));
+        }
+      } finally { if (숨김) table.style.display = ""; }
     };
     const status = (busy) => {
+      window.VP조회중 = !!busy;       // 10-26 — goods.js 가 뒤 일(서류 자료)을 조회가 끝난 뒤로 미루려고 본다
       note.textContent = `${shown.toLocaleString()}건` +
         (busy ? " · 더 찾는 중…" : cut ? " · 결과가 많아 일부만 받아왔습니다. 기간을 좁혀 보세요." : "");
     };
@@ -1222,21 +1238,21 @@
       for (const [, fields] of variants) {
         const r = await fetchList({ ...dates, ...알약값(), ...filters, ...fields }, "50");
         if (searchId !== currentSearch) return;
-        take(r);
+        await take(r);
         status(true);
         if (Number(r.count.replace(/,/g, "")) > r.rows.length) more.push(fields);
       }
       for (const fields of more) {
         const r = await fetchList({ ...dates, ...알약값(), ...filters, ...fields }, "600");
         if (searchId !== currentSearch) return;
-        take(r);
+        await take(r);
         if (Number(r.count.replace(/,/g, "")) > r.rows.length) cut = true;
         status(true);
       }
       status(false);
       if (!shown) table.textContent = "결과가 없습니다.";
     } catch (err) {
-      if (searchId === currentSearch) note.textContent = "조회에 실패했습니다. 다시 로그인한 뒤 시도해 주세요.";
+      if (searchId === currentSearch) { window.VP조회중 = false; note.textContent = "조회에 실패했습니다. 다시 로그인한 뒤 시도해 주세요."; }
     }
   });
 

@@ -142,7 +142,7 @@ const 한벌돌리기 = (단품곁다리) => {
           byCode.get(code).push(row);
         }
       }
-    });
+    }, () => true, null, !!곁다리);     // 곁다리(배송관리·CS등록)는 뒤에서 받기 — 사장님이 다른 단추를 누르거나 조회하면 그것이 먼저 간다
     linked = { heads, byCode };
     if (panel.dataset.name) show(panel.dataset.name, ...panel._args);
   }
@@ -185,7 +185,7 @@ const 한벌돌리기 = (단품곁다리) => {
         const key = codeKey(row[c]);
         byCode.set(key, (byCode.get(key) || 0) + toNumber(row[q]));
       }
-    });
+    }, () => true, null, !!곁다리);
     stockByCode = byCode;
     전부다시칠하기();
     if (panel.dataset.name) show(panel.dataset.name, ...panel._args);
@@ -1484,8 +1484,11 @@ const 한벌돌리기 = (단품곁다리) => {
   function 연결받기() {       // 상세에 쓰는 연결 목록 — 처음 누를 때 한 번 (재고조회·연결 화면 목록)
     if (연결받음) return;
     연결받음 = true;
-    if (!stockByCode && page.stock) loadStock().catch(() => {});
-    if (page.link) loadLinked().catch(() => { linked = { heads: [], byCode: new Map() }; });
+    /* 10-26 — 1.5초 뒤에 시작한다: 이어서 누르는 다른 단추의 상세(하나찾기)가 이 큰 목록 받기에 막히지 않게(벤더피아는 요청을 하나씩 처리한다). */
+    setTimeout(() => {
+      if (!stockByCode && page.stock) loadStock().catch(() => {});
+      if (page.link) loadLinked().catch(() => { linked = { heads: [], byCode: new Map() }; });
+    }, 1500);
   }
   async function 줄받기(이름, 코드들) {
     const 있는 = 곁다리줄캐시.get(이름);
@@ -1554,7 +1557,7 @@ const 한벌돌리기 = (단품곁다리) => {
           const x = 차례.shift();
           마지막일 = Date.now();
           try {
-            const 답 = await VP_DATA.하나찾기(page, 내길, 서버값(), { name: x.이름, code: x.코드 || "" });
+            const 답 = await VP_DATA.하나찾기(page, 내길, 서버값(), { name: x.이름, code: x.코드 || "", 가볍게: true });
             if (!답) continue;
             const ni = 답.heads.indexOf(page.nameCol), ci = 답.heads.indexOf(page.codeCol);
             const 쌍들 = 답.rows.map((r) => [r[ni], ci >= 0 ? r[ci] : ""]);
@@ -1562,7 +1565,7 @@ const 한벌돌리기 = (단품곁다리) => {
             늘 += 더;
             if (더) 알림훅();                // 찾는 대로 단추가 붙게(120ms 모아서)
             const 이름 = String(답.rows[0][ni] || "").trim();
-            if (이름 && !곁다리줄캐시.has(이름)) 곁다리줄캐시.set(이름, 답);
+            if (이름 && 답.전부 && !곁다리줄캐시.has(이름)) 곁다리줄캐시.set(이름, 답);   // 10줄만 받은 일부는 상세용으로 안 쓴다
           } catch (e) { /* 하나가 안 돼도 다음 것을 찾는다 */ }
         }
       };
@@ -1575,10 +1578,10 @@ const 한벌돌리기 = (단품곁다리) => {
   if (곁다리) {
     const 알림 = () => window.dispatchEvent(new Event(단품곁다리 ? "vp단품단추준비" : "vp상품단추준비"));
     let 알릴예약 = 0;
-    const 곧알림 = () => { if (!알릴예약) 알릴예약 = setTimeout(() => { 알릴예약 = 0; 알림(); }, 120); };
+    const 곧알림 = () => { if (!알릴예약) 알릴예약 = setTimeout(() => { 알릴예약 = 0; 알림(); }, 700); };
     알림훅 = 곧알림;
     const 조용해지면 = (일) => {
-      const 재 = () => { if (곁다리표.다됨 && !찾는중 && Date.now() - 마지막일 > 1500) 일(); else setTimeout(재, 400); };
+      const 재 = () => { if (곁다리표.다됨 && !찾는중 && !window.VP조회중 && Date.now() - 마지막일 > 1500) 일(); else setTimeout(재, 400); };
       setTimeout(재, 400);
     };
     (async () => {
@@ -1595,11 +1598,15 @@ const 한벌돌리기 = (단품곁다리) => {
       알림();
       ing맞춰보기().catch(() => {});
       /* 뒤에서 조용히 — 단품 한 벌만: 재고조회(초록 점)·서류관리 차수·수입. 화면의 이름이 다 붙고 벤더피아가 한가해진 뒤. */
+      /* 10-26 [새 지시 뒤 요청·멈춤] — 열 때 뒤에서 벤더피아에 요청하지 않는다: 재고조회 전체(StockList 5~6번·7MB)는 더는 미리 받지 않는다.
+         단추를 누를 때(`연결받기`) 받는다 → 초록 점(재고조회에 있음)·양품 수량은 처음 단추를 누른 뒤에 붙는다.
+         서류 자료(Firestore, 벤더피아 아님)는 조회가 끝나고 한가해진 뒤에 받는다(큰 JSON 읽기가 조회 그리기와 겹치지 않게). */
       if (단품곁다리) {
-        수량받기().then(() => 곁다리다시칠하기()).catch(() => {});
-        수입받기().then(() => window.VP말?.("수입정보:코드" + (수입 ? 수입.size : 0) + "가지/" + 어느길))
-          .catch((e) => { 수입 = null; window.VP말?.("수입정보:못받음 " + (e && e.message ? e.message : e) + " · 길" + (어느길 || (window.VP밖에 ? "다리있음" : "다리없음"))); });
-        조용해지면(() => { if (!stockByCode) loadStock().catch(() => {}); });
+        조용해지면(() => {
+          수량받기().then(() => 곁다리다시칠하기()).catch(() => {});
+          수입받기().then(() => window.VP말?.("수입정보:코드" + (수입 ? 수입.size : 0) + "가지/" + 어느길))
+            .catch((e) => { 수입 = null; window.VP말?.("수입정보:못받음 " + (e && e.message ? e.message : e) + " · 길" + (어느길 || (window.VP밖에 ? "다리있음" : "다리없음"))); });
+        });
       }
     })();
     if (단품곁다리) {

@@ -373,7 +373,7 @@ const VP_DATA = (() => {
     return { query, fewRows, manyRows: cfg.rowCnt || "700" };
   }
   // 이름·코드로 **하나만** 찾는다 (조회만). 코드가 있으면 코드로, 못 찾으면 이름으로. 맞는 줄(전체 칸)들을 돌려준다 — 상세를 열 때 쓴다.
-  async function 하나찾기(cfg, url, serverValue, { name, code, 먼저 }) {
+  async function 하나찾기(cfg, url, serverValue, { name, code, 먼저, 가볍게 }) {
     foreground++;
     try {
       const src = await 처음문서(url);
@@ -389,10 +389,20 @@ const VP_DATA = (() => {
       }
       if (먼저 === "name") 시도.reverse();   // 상세를 열 때: 같은 이름의 줄을 모두 받으려고 이름 먼저
       for (const [texts, 종류] of 시도) {
-        const res = await 틀.query({ from: "2000-01-01", to: ymd(new Date()), sel: {} }, 틀.manyRows, texts);
-        const n = res.heads.indexOf(cfg.nameCol), c = res.heads.indexOf(cfg.codeCol);
-        const rows = res.rows.filter((r) => (종류 === "code" ? c >= 0 && 열쇠(r[c]) === 열쇠(code) : n >= 0 && 공백(r[n]) === 공백(name)));
-        if (rows.length) return { heads: res.heads, rows };
+        /* 가볍게(10-26 [새 지시 뒤 요청·멈춤]): 이름 단추만 붙일 때는 맞는 줄 하나면 되니 10줄만 받는다(700줄 응답은 1~2초·수백 KB).
+           10줄에 없고 더 있으면 그때 700줄로 다시. 맞는 줄이 일부만 온 답(`전부:false`)은 상세용으로 쓰지 않는다. */
+        const 맞는줄 = (res) => {
+          const n = res.heads.indexOf(cfg.nameCol), c = res.heads.indexOf(cfg.codeCol);
+          return res.rows.filter((r) => (종류 === "code" ? c >= 0 && 열쇠(r[c]) === 열쇠(code) : n >= 0 && 공백(r[n]) === 공백(name)));
+        };
+        let res = await 틀.query({ from: "2000-01-01", to: ymd(new Date()), sel: {} }, 가볍게 ? 틀.fewRows : 틀.manyRows, texts);
+        let rows = 맞는줄(res);
+        let 전부 = true;
+        if (가볍게) {
+          전부 = res.total <= res.rows.length;
+          if (!rows.length && !전부) { res = await 틀.query({ from: "2000-01-01", to: ymd(new Date()), sel: {} }, 틀.manyRows, texts); rows = 맞는줄(res); 전부 = true; }
+        }
+        if (rows.length) return { heads: res.heads, rows, 전부 };
       }
       return null;
     } finally {
