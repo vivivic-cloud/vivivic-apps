@@ -24,12 +24,19 @@ function 그리드(보임) {
 }
 const 달력 = '<table id="ctl00__ig_def_dp_cal" class="igmc_Control"><tr>' + ['일','월','화','수','목','금','토'].map((d) => `<th>${d}</th>`).join('') + '</tr>' + Array.from({ length: 8 }, (_, r) => '<tr>' + Array.from({ length: 7 }, (_, c) => `<td>${r * 7 + c + 1}</td>`).join('') + '</tr>').join('') + '</table>';
 const 합계글 = '<span id="sum">주문수량: 11,029 / 행수: 10,758건 / 매입금액: 281,897,937원</span>';
-const 폼 = `<input type="text" name="ctl00$Contents$dcStartDt" value="2026-09-25"><input type="text" name="ctl00$Contents$dcEndDt" value="2026-10-25"><select name="ctl00$Contents$ddlRowCnt"><option>50</option></select>
+const 폼 = `<select name="ctl00$Contents$ltbCSType" id="ltbCSType"><option value="전체">전체</option><option value="반품">반품</option><option value="교환">교환</option></select><input type="text" name="ctl00$Contents$tbSOrderNo" id="tbSOrderNo"><input type="text" name="ctl00$Contents$tbSGoodsCd" id="tbSGoodsCd"><input type="text" name="ctl00$Contents$tbSGoodsNm" id="tbSGoodsNm"><input type="text" name="ctl00$Contents$tbAddr" id="tbAddr"><input type="text" name="ctl00$Contents$tbOrderer" id="tbOrderer"><input type="text" name="ctl00$Contents$tbOrdererMobile" id="tbOrdererMobile"><input type="text" name="ctl00$Contents$tbRecipient" id="tbRecipient"><input type="text" name="ctl00$Contents$tbRecipientMobile" id="tbRecipientMobile">
+<input type="text" name="ctl00$Contents$dcStartDt" id="dcStartDt" value="2026-09-25"><input type="text" name="ctl00$Contents$dcEndDt" id="dcEndDt" value="2026-10-25"><select name="ctl00$Contents$ddlRowCnt"><option>50</option><option>700</option></select>
 <input type="image" name="ctl00$Contents$btnSearch" id="btnSearch" src="s.gif">`;
 const 쪽모양 = (내용) => `<html><head><meta charset="utf-8"><style>.ig9a6376x{display:none}</style></head><body id="body"><form name="f" method="post" action="/System/Sales/orderMst.aspx" id="f"><input type="hidden" name="__VIEWSTATE" value="x">
 <div>${폼}${달력}${합계글}${내용}</div></form><p id="원래글">주문관리 원래 화면</p></body></html>`;
 const 응답 = () => `<html><body>${합계글}${그리드(보임찾기(보일이름))}</body></html>`;
 const 기대머리 = 보일이름;
+/* 10-26 [새 지시 주문관리검색] 검색 응답 흉내 — 진짜 응답(DOMParser)은 숨긴 칸 th 에도 인라인 width 가 붙어 온다(69칸 중 67, 사장님 크롬에서 잼).
+   값은 「찾음r_c」 로 달리해 응답에서 그렸는지 본다. 행수 3건(=받은 줄) → 더 받기 없음. */
+const 찾은그리드 = () => { const 보임 = 보임찾기(보일이름);
+  const th = 전체머리.map((h, i) => `<th class="igg_HeaderCaption nowrap${보임[i] ? '' : ' ig9a6376x'}" style="width: 80px;">${h}</th>`).join('');
+  const 몸 = Array.from({ length: 3 }, (_, r) => `<tr>${전체머리.map((_, c) => `<td>${c === 0 ? '<input type="checkbox">' : 전체머리[c] === 'IMG' ? '' : '찾음' + r + '_' + c}</td>`).join('')}</tr>`).join('');
+  return `<html><body><span>주문수량: 3 / 행수: 3건 / 매입금액: 0원</span><div id="oGrid"><table><tr>${th}</tr></table><table><tbody>${몸}</tbody></table></div></body></html>`; };
 const 기대줄 = Array.from({ length: 줄수 }, (_, r) => 보일이름.map((h) => { const c = 전체머리.findIndex((x, i) => x === h && 보임찾기(보일이름)[i]); return 전체머리[c] === 'IMG' ? '' : '가짜' + r + '_' + c; }));
 const VP흉내 = `window.VP저장 = { get: async function(){return {};}, set: async function(){}, remove: async function(){} };`;
 
@@ -75,7 +82,9 @@ const 경우 = [
         메인: !!document.querySelector('#vp-root a.vp-home'),
         머리: th.map((x) => x.textContent), 줄: t ? [...t.querySelectorAll('tbody tr')].map((tr) => [...tr.cells].map((x) => { const c = x.cloneNode(true); c.querySelectorAll('button').forEach((b) => b.remove()); return c.textContent; })) : [],
         한줄: th.every((x) => getComputedStyle(x).whiteSpace === 'nowrap'),
-        배송꼴: !!document.querySelector('#vp-root .vp-bar, #vp-root input[type=date], #vp-root .vp-pills, #vp-root .vp-출처, .vp-cs판'),
+        배송꼴: !!document.querySelector('#vp-root .vp-pills, #vp-root .vp-출처, .vp-cs판'),
+        검색창: !!document.querySelector('#vp-root form.vp-bar input.vp-q') && document.querySelectorAll('#vp-root form.vp-bar input[type=date]').length === 2
+          && document.querySelector('#vp-root form.vp-bar input[name=from]').value === '2026-09-25' && document.querySelector('#vp-root form.vp-bar input[name=to]').value === '2026-10-25',
         단추: document.querySelectorAll('#vp-root .vp-goods-list, #vp-root .vp-상담알, #vp-root tr.vp-줄상담').length,
         글: document.querySelector('#vp-root .vp-note').textContent, 까닭: document.querySelector('#vp-root .vp-진단').textContent,
         가로: 통 ? 통.scrollWidth > 통.clientWidth + 1 : false, 쪽가로: document.documentElement.scrollWidth > innerWidth + 1,
@@ -84,7 +93,7 @@ const 경우 = [
     console.log('\n  ◆ ' + c.이름 + ' · ' + (해시 || '(#vgCS 없이)') + ' · 창 ' + 너비);
     console.log('    제목 ' + 화면.제목 + ' · 칸 ' + 화면.머리.length + ' · 줄 ' + 화면.줄.length + ' · 글 "' + 화면.글 + '"' + (화면.까닭 ? '\n    까닭: ' + 화면.까닭.slice(0, 260) : ''));
     console.log('    ★ 제목 CS등록 · ← 메인 · 주문관리 원래 화면 가림 ' + 못(화면.제목 === 'CS등록' && 화면.메인 && 화면.청소 && !화면.원래));
-    console.log('    ★ 배송관리 모습(기간·검색창·거르개·출처·CS판)이 없다 ' + 못(!화면.배송꼴));
+    console.log('    ★ 기간+검색창은 있고(10-26 새 지시, 기간 = 주문관리 폼 값) 거르개·출처·CS판은 없다 ' + 못(화면.검색창 && !화면.배송꼴));
     console.log('    ★ 배송목록을 안 불렀다(10-25: 이름 단추·줄 클릭은 되살림 — 이름줄길 시험이 잰다) ' + 못(!부름.some((x) => /firmDvList/i.test(x))));
     if (c.읽는곳 === '못읽음') {
       console.log('    ★ 빈 표 + 까닭 한 줄(#oGrid 없음) · 달력을 목록으로 안 집음 ' + 못(화면.머리.length === 0 && /읽지 못/.test(화면.글) && /#oGrid 없음/.test(화면.까닭) && !화면.머리.includes('월')));
@@ -100,6 +109,41 @@ const 경우 = [
       console.log('    ★ 머리글 전부 한 줄(nowrap) · 쪽 전체는 안 밀림 ' + 못(화면.한줄 && !화면.쪽가로) + ' · 표 통 가로 스크롤 ' + 화면.가로);
     }
     console.log('    ★ 쪽 오류 ' + 탈.length + ' ' + 못(탈.length === 0));
+    if (c === 경우[0] && 해시 === '#vgCS') {
+      /* 멀티검색: 검색어 → 주문관리 폼 칸에 나눠 POST, 응답을 지금 쪽에서 보이는 칸으로 그림 */
+      const 보낸것 = [];
+      await ctx.unroute('**://vendorpia.com/**');
+      await ctx.route('**://vendorpia.com/**', (r) => {
+        const q = r.request();
+        if (q.method() === 'POST') { 보낸것.push(new URLSearchParams(String(q.postData() || '').replace(/\r?\n/g, '&')));
+          const 몸 = q.postData() || '', 칸 = {};
+          for (const m of 몸.matchAll(/name="ctl00\$Contents\$(\w+)"\r\n\r\n([^\r]*)/g)) 칸[m[1]] = m[2];
+          보낸것[보낸것.length - 1] = 칸;
+          return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: 찾은그리드() }); }
+        return r.fulfill({ status: 200, contentType: 'text/javascript', body: '' });
+      });
+      const 찾기 = async (말) => { 보낸것.length = 0; await 쪽.fill('#vp-root .vp-q', 말); await 쪽.click('#vp-root .vp-bar button[type=submit]'); await 쪽.waitForTimeout(1200); };
+      const 칸만 = (k) => 보낸것.map((f) => Object.entries(f).filter(([n, v]) => v && v !== '전체' && /^(tb|ltb)/.test(n)).map(([n, v]) => n + '=' + v).join('&'));
+      await 찾기('홍길동');
+      console.log('    ★ 검색 「홍길동」 → 수취인·주문자·주소·상품명 넷 · 기간·50줄 그대로 ' + 못(JSON.stringify(칸만()) === JSON.stringify(['tbRecipient=홍길동', 'tbOrderer=홍길동', 'tbAddr=홍길동', 'tbSGoodsNm=홍길동'])
+        && 보낸것.every((f) => f.dcStartDt === '2026-09-25' && f.dcEndDt === '2026-10-25' && f.ddlRowCnt === '50')) + ' ' + JSON.stringify(칸만()));
+      const 결과 = await 쪽.evaluate(() => { const t = document.querySelector('#vp-root .vp-table table'); return t ? { 머리: [...t.querySelectorAll('thead th')].map((x) => x.textContent),
+        줄: [...t.querySelectorAll('tbody tr')].map((tr) => { const c = tr.cells[4].cloneNode(true); c.querySelectorAll('button').forEach((b) => b.remove()); return c.textContent; }) } : null; });
+      const 내보임 = 전체머리.filter((h, i) => 보임찾기(보일이름)[i] && i !== 0);
+      console.log('    ★ 결과 = 응답 줄(겹친 줄 한 번) · 칸 = 쪽에서 보이는 칸(숨긴 칸 width 에 안 속음) ' + 못(결과 && 결과.줄.length === 3 && /^찾음0_/.test(결과.줄[0]) && JSON.stringify(결과.머리) === JSON.stringify(내보임)) + ' (' + (결과 ? 결과.머리.length + '칸 ' + 결과.줄.length + '줄' : '없음') + ')');
+      await 찾기('010-1234-5678');
+      console.log('    ★ 전화 → 수취인폰·주문자폰(줄표 꼴) ' + 못(JSON.stringify(칸만()) === JSON.stringify(['tbRecipientMobile=010-1234-5678', 'tbOrdererMobile=010-1234-5678'])));
+      await 찾기('01012345678');
+      console.log('    ★ 전화 숫자만 쳐도 줄표 넣어 보냄 ' + 못(JSON.stringify(칸만()) === JSON.stringify(['tbRecipientMobile=010-1234-5678', 'tbOrdererMobile=010-1234-5678'])));
+      await 찾기('140483765');
+      console.log('    ★ 긴 숫자 → 주문번호 ' + 못(JSON.stringify(칸만()) === JSON.stringify(['tbSOrderNo=140483765'])));
+      await 찾기('DARGW');
+      console.log('    ★ 영문 → 상품코드 ' + 못(JSON.stringify(칸만()) === JSON.stringify(['tbSGoodsCd=DARGW'])));
+      await 찾기('반품 홍길동');
+      console.log('    ★ 「반품」 = CS 고르는 칸 + 이름 넷 ' + 못(보낸것.length === 4 && 칸만().every((x) => x.startsWith('ltbCSType=반품&'))) + ' ' + JSON.stringify(칸만()[0]));
+      console.log('    ★ 검색 뒤 글 「3건」 ' + 못(await 쪽.evaluate(() => document.querySelector('#vp-root .vp-note').textContent) === '3건'));
+      await 쪽.screenshot({ path: path.join(그림칸, '주문관리CS-검색-' + 너비 + '.png') });
+    }
     if (해시 === '#vgCS') await 쪽.screenshot({ path: path.join(그림칸, '주문관리CS-' + (c === 경우[0] ? '진짜구조' : c === 경우[1] ? '칸바뀜' : c === 경우[2] ? '늦게' : '못읽음') + '-' + 너비 + '.png') });
     await ctx.close();
   }

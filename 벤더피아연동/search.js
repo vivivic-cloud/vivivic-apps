@@ -7,7 +7,10 @@
      → 주문관리(`/System/Sales/orderMst.aspx`)에서는 **그 페이지에 이미 그려진 주문관리 결과 표를 DOM 에서 그대로 읽어**
        우리 표 꼴로 다시 그린다(칸 이름·차례·값 모두 주문관리 것). 화면에는 「CS등록」 제목·← 메인·목록뿐이다.
      ⚠ 목록이 비어 있으면(조회를 눌러야 뜨는 화면) 그 페이지의 조회 단추와 **같은 기본값 그대로** 한 번만 조회한다(조회만).
-     ⚠ 못 읽으면 빈 표 + 까닭 한 줄. **배송관리 모습(기간+검색창)·배송목록 대신 쓰기·검색·상담·이름 단추·줄 클릭은 여기 없다.**
+     ⚠ 못 읽으면 빈 표 + 까닭 한 줄. 배송목록으로 대신하지 않는다.
+     ⚠ 10-26 [새 지시 주문관리검색] 사장님(그대로): 「벤더피아 오리지날 주문관리 화면을 잘 살펴보고 이 페이지에 맞는 검색창 기능을
+       배송관리의 검색창과 같은 멀티검색으로 만들어줘」 → 기간 + 검색창 하나(배송관리와 같은 꼴·같은 쓰임). 검색어를 주문관리 폼 칸
+       (주문번호·상품코드·수취인·주문자·주소·상품명·수취인폰·주문자폰, 고르는 칸 여덟)에 나눠 **주문관리에** 묻는다(`plan`·`fetchList`).
        (10-22 0.34.39~0.34.46 의 「배송관리와 같은 화면 + 주문관리 조회」 길은 걷었다. 상담 판·이름 단추 코드는 배송관리가 쓴다.) */
   const CS전용 = /\/system\/sales\/ordermst\.aspx/i.test(location.pathname);
   const form = document.forms[0];
@@ -16,17 +19,18 @@
   const endDt = document.getElementById("dcEndDt");
   if (CS전용 ? !form : (!form || !searchBtn || !startDt || !endDt)) return;
 
-  const fieldNames = CS전용 ? [] : [...new FormData(form).keys()];
+  const fieldNames = [...new FormData(form).keys()];
   const fullName = (id) => fieldNames.find((n) => n === id || n.endsWith("$" + id)) || id;
 
   // 검색어 한 단어가 목록 칸의 항목과 똑같으면 그 칸을 고른다 (앞에 있을수록 우선)
   const SELECTS = ["ddlDStatus", "ddlCSType", "ddlStoreGb", "ddlDeliveryCo", "ddlMall", "ddlStore",
     "ddlLoc", "ddl_RecallGb", "ddlStockType", "ddlInvoiceSendYn", "ddlSupplier"];
+  /* 10-26 [새 지시 주문관리검색] 주문관리(orderMst) 폼의 고르는 칸 — 사장님 크롬에서 잰 id(배송상태·CS·주문상태·배송사·매출처·몰·권역·매입처) */
+  const 주문SELECTS = ["ltbStatus", "ltbCSType", "ddlOrderStatus", "ddlDCo", "ddlStore", "ddlMall", "ddlLoc", "ddlSupplier"];
   const norm = (s) => s.replace(/^\d+\s+/, "").replace(/\s/g, "").toLowerCase();
 
   function matchSelect(token) {
-    if (CS전용) return null;     // 주문관리 화면의 고르는 칸은 배송목록 폼의 것이 아니다 — 섞어 보내지 않는다
-    for (const id of SELECTS) {
+    for (const id of CS전용 ? 주문SELECTS : SELECTS) {   // 주문관리 화면은 그 폼의 고르는 칸만 — 배송목록 칸과 섞지 않는다
       const sel = document.getElementById(id);
       if (!sel) continue;
       const opt = [...sel.options].find((o) => o.text !== "전체" && norm(o.text) === norm(token));
@@ -50,8 +54,24 @@
       const isPhone = isNumber && /^0\d{8,10}$/.test(digits);
       const isShortNumber = isNumber && digits.length <= 8;
 
+      /* 주문관리: 전화 칸이 화면에 숨어 있어 받은 줄에서 못 거른다 → 벤더피아 수취인폰·주문자폰 칸으로 묻는다.
+         벤더피아는 전화를 「010-1234-5678」 꼴로 두고 그 꼴로만 찾는다(숫자만 보내면 0건 — 재서 확인) → 줄표를 넣어 보낸다. */
+      if (CS전용 && !variants && isPhone) {
+        const 폰 = digits.replace(/^(02)(\d{3,4})(\d{4})$/, "$1-$2-$3").replace(/^(0\d{2})(\d{3,4})(\d{4})$/, "$1-$2-$3");
+        variants = [["수취인폰", { tbRecipientMobile: 폰 }], ["주문자폰", { tbOrdererMobile: 폰 }]];
+        continue;
+      }
       if (variants || isPhone || isShortNumber) { local.push(token); continue; }
 
+      if (CS전용) {
+        /* 주문관리 폼 칸(10-26 잼): 주문번호 tbSOrderNo(몰 주문번호, 뒤 「주문번호」 칸) · 상품코드 tbSGoodsCd(일부만 쳐도 찾음) ·
+           수취인 tbRecipient · 주문자 tbOrderer · 주소 tbAddr · 상품명 tbSGoodsNm. 송장번호·단품코드 칸은 없다. */
+        if (isNumber) variants = [["주문번호", { tbSOrderNo: token }]];
+        else if (/[A-Za-z]/.test(token) && !/[가-힣]/.test(token)) variants = [["상품코드", { tbSGoodsCd: token }]];
+        else variants = [["수취인", { tbRecipient: token }], ["주문자", { tbOrderer: token }],
+          ["주소", { tbAddr: token }], ["상품명", { tbSGoodsNm: token }]];
+        continue;
+      }
       if (isNumber) {
         variants = [["송장번호", { tbInvoiceNo: token }], ["주문번호", { tbSOrderNo: token }]];
       } else if (/[A-Za-z]/.test(token) && !/[가-힣]/.test(token)) {
@@ -127,7 +147,12 @@
     const n = 머리줄.cells.length;
     const win = doc.defaultView;
     const 보임 = (th) => win && win.getComputedStyle ? win.getComputedStyle(th).display !== "none" : !!(th.getAttribute("style") || "").match(/width/);
-    const 칸들 = [...머리줄.cells].map((th, i) => ({ i, 이름: 칸글(th), 보임: 보임(th) })).filter((c) => c.보임);
+    /* 10-26 조회 응답(DOMParser)은 숨긴 칸에도 인라인 width 가 붙어 온다(69칸 중 67 — 사장님 크롬에서 잼) →
+       머리 칸 이름이 지금 페이지와 같으면 **지금 페이지에서 보이는 칸**을 그대로 쓴다. */
+    const 이름들 = [...머리줄.cells].map(칸글);
+    const 쪽칸 = !win && 페이지보임칸();
+    const 같은꼴 = 쪽칸 && 쪽칸.이름들.length === n && 쪽칸.이름들.every((x, i) => x === 이름들[i]);
+    const 칸들 = [...머리줄.cells].map((th, i) => ({ i, 이름: 이름들[i], 보임: 같은꼴 ? 쪽칸.보임.has(i) : 보임(th) })).filter((c) => c.보임);
     const 몸 = 전체.filter((tr) => tr !== 머리줄 && tr.cells.length === n && !tr.querySelector("tr") && !tr.querySelector("th.igg_HeaderCaption"));
     /* 체크 칸(머리 글 없고 몸 칸에 체크상자)은 뺀다 */
     const 체크 = (c) => !c.이름 && 몸.length && 몸.every((tr) => tr.cells[c.i].querySelector("input[type=checkbox]"));
@@ -141,6 +166,15 @@
       if (/주문수량\s*:/.test(t) && t.length < 150) { 합계 = t; break; }
     }
     return { heads, rows, 합계, 까닭: "머리 " + n + "칸 중 보임 " + 칸들.length + " · 몸줄 " + 몸.length };
+  }
+  /* 지금 페이지 #oGrid 머리의 칸 이름 전부와 보이는 칸 자리 — 조회 응답을 같은 칸으로 그리려고 */
+  function 페이지보임칸() {
+    const g = document.getElementById("oGrid");
+    const 머리줄 = g && [...g.querySelectorAll("tr")].find((tr) => tr.cells.length >= 60);
+    if (!머리줄) return null;
+    const 보임 = new Set();
+    [...머리줄.cells].forEach((th, i) => { if (getComputedStyle(th).display !== "none") 보임.add(i); });
+    return { 이름들: [...머리줄.cells].map(칸글), 보임 };
   }
   /* 지금 페이지(와 같은 출처 iframe)에서 읽는다 */
   function 쪽에서읽기() {
@@ -163,10 +197,17 @@
       + " 길이" + 글.length + (doc.querySelector("input[type=password]") ? " 로그인칸있음" : "") + " 표" + doc.querySelectorAll("table").length };
   }
 
-  /* 배송관리: 이 화면의 폼으로 바로 묻는다 (CS등록은 이 길을 안 쓴다) */
+  /* 이 화면의 폼으로 바로 묻는다 — 배송관리는 배송목록, CS등록은 주문관리(10-26 [새 지시 주문관리검색]) */
   async function fetchList(fields, rowCnt) {
     const 틀 = { form, 버튼: searchBtn, 행수칸: fullName("ddlRowCnt") };
     const 글 = await 보내기(틀, fullName, fields, rowCnt);
+    if (CS전용) {
+      /* 주문관리 응답 = 같은 쪽 → `목록고르기`(#oGrid) 로 읽는다. 전체 수 = 합계 글의 「행수: N건」 */
+      const doc = new DOMParser().parseFromString(글.replace(/<script\b[\s\S]*?<\/script>/gi, ""), "text/html");
+      const r = 목록고르기(doc) || { heads: [], rows: [], 합계: "" };
+      const count = ((r.합계 || "").match(/행수\s*:\s*([\d,]+)/) || [])[1] || String(r.rows.length);
+      return { count, heads: r.heads, rows: r.rows, 합계: r.합계 };
+    }
     return 표뽑기(글, (doc) => [...doc.querySelectorAll("th")].find((c) => c.textContent.trim() === "수취인"));
   }
 
@@ -192,6 +233,13 @@
     <div class="vp-search">
       <a class="vp-home" href="/index.aspx">← 메인</a>
       <h1>CS등록</h1>
+      <form class="vp-bar">
+        <input type="date" name="from" required>
+        <span>~</span>
+        <input type="date" name="to" required>
+        <input name="q" class="vp-q" placeholder="주문번호, 이름, 상품명, 상품코드, 주소, 전화번호, 배송상태, CS…">
+        <button type="submit">조회</button>
+      </form>
       <div class="vp-note"></div>
       <pre class="vp-진단"></pre>
       <div class="vp-table"></div>
@@ -214,7 +262,7 @@
   document.documentElement.classList.add("vp-clean");
   진단칸 = root.querySelector(".vp-진단");
 
-  const bar = root.querySelector(".vp-bar");        // CS등록에는 없다
+  const bar = root.querySelector(".vp-bar");
   const note = root.querySelector(".vp-note");
   const table = root.querySelector(".vp-table");
   const 알약칸 = root.querySelector(".vp-pills");
@@ -333,11 +381,11 @@
   const 알약값 = () => Object.fromEntries(Object.entries(고른것)
     .filter(([k, v]) => v && !k.startsWith("__")));    // `__` 로 시작하는 것은 우리끼리 쓰는 것
   알약그리기();
-  if (!CS전용) {
+  if (startDt && endDt) {
     bar.from.value = startDt.value;
     bar.to.value = endDt.value;
-    bar.q.focus();
   }
+  bar.q.focus();
 
   /* ④ **상품명 칸을 상품관리의 그 상품버튼으로** — 사장님 10-15:
        「이곳에 도착하는 상품명을 상품관리와 동일한 상품버튼으로 변경해 주세요.
@@ -1243,7 +1291,7 @@
         if (Number(r.count.replace(/,/g, "")) > r.rows.length) more.push(fields);
       }
       for (const fields of more) {
-        const r = await fetchList({ ...dates, ...알약값(), ...filters, ...fields }, "600");
+        const r = await fetchList({ ...dates, ...알약값(), ...filters, ...fields }, CS전용 ? "700" : "600");   // 주문관리 보기 칸에는 600 이 없다(…500·700)
         if (searchId !== currentSearch) return;
         await take(r);
         if (Number(r.count.replace(/,/g, "")) > r.rows.length) cut = true;
@@ -1279,6 +1327,7 @@
         if (쪽.r && 쪽.r.rows.length) { 읽음 = 쪽.r; break; }
       }
       let 까닭 = "";
+      if (currentSearch) return;                         // 그사이 검색창으로 조회했으면 그 결과를 덮지 않는다
       if (읽음) {
         window.VP말?.("CS등록:쪽 표 읽음 칸" + 읽음.heads.length + " 줄" + 읽음.rows.length);
       } else {
@@ -1290,6 +1339,7 @@
           까닭 = ((읽음 && 읽음.까닭) || "") + " " + (q.까닭 || "") + " · 지금 쪽 " + 모양(쪽.docs) + (q.doc ? " · 조회 응답 " + 모양([q.doc]) : "");
         }
       }
+      if (currentSearch) return;
       if (읽음) CS목록그리기(읽음.heads, 읽음.rows);
       if (읽음 && 읽음.합계) note.textContent = 읽음.합계;      // 벤더피아 합계 글 그대로(주문수량 / 행수 / 매입금액)
       if (!읽음 || !읽음.rows.length) {
@@ -1297,6 +1347,7 @@
         진단적기(까닭 || "");
       }
     } catch (err) {
+      if (currentSearch) return;
       note.textContent = "주문관리 목록을 읽지 못했습니다.";
       진단적기("터짐: " + (err && err.message ? err.message : err) + (쪽 ? " · 지금 쪽 " + 모양(쪽.docs) : ""));
     }
