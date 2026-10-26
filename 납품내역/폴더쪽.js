@@ -1,4 +1,6 @@
-/* 폴더쪽 — 보링·엣지·납품·실제청구명세서 네 쪽이 같이 쓰는 한 벌 (v6.2.1).
+/* 폴더쪽 — 보링·엣지·납품·실제청구명세서 네 쪽이 같이 쓰는 한 벌 (v6.3.0).
+   v6.3.0(10-26) 사장님 「페이지 내에 이런 설명 문구들 다 삭제하고 선택한 데이터를 더 길게」 → 셈 칸·묶은 것·월 아래 파일 이름·줄셈을 걷었다.
+     줄이 하나도 없는 달만 표 자리에 「줄 없음 — 까닭」 한 줄. 설명 글을 다시 넣지 마라.
    v6.2.1(10-26): 화면 전체 막대 없앰 — #표틀 을 flex 로 켜서 표 상자가 남은 높이를 채운다(꼴은 쪽 html <style>).
    v6.2.0(10-22) 사장님: 「각 명세표를 보여줄때 지금같은 파일명이 아닌 작은 월별 버튼으로 해당 자료가 나타나게 해줘」
    → 파일 이름 목록을 걷고 **작은 월 버튼**을 둔다. 줄은 창고 줄의 **「달」 칸**으로 가른다
@@ -78,21 +80,9 @@ function 목록그리기(){
   const 달모 = new Set((줄들||[]).map(r => String(r.달)));
   for(const f of 목) if(!f.줄.length && 이름달(f.이름)) 달모.add(이름달(f.이름));
   달들 = [...달모].sort();
-  const 줄합 = 목.reduce((a,f)=>a+f.줄.length,0);
-  const 있는 = 목.filter(f=>f.줄.length).length;
-  document.getElementById('셈').innerHTML =
-    `<div class="c"><div class="k">파일</div><div class="v">${F.파일.length}<small>개</small></div></div>` +
-    `<div class="c"><div class="k">줄 있는 파일</div><div class="v">${받음?있는:'…'}<small>개</small></div></div>` +
-    `<div class="c"><div class="k">줄</div><div class="v">${받음?줄합.toLocaleString():'…'}<small>줄</small></div></div>`;
-  document.getElementById('묶은것').innerHTML =
-    `<b>달로 나눴습니다</b> — 창고 줄마다 적힌 <b>「달」</b> 칸으로 갈랐습니다. 그 달 줄이 나온 파일은 달을 누르면 위에 작게 나옵니다.` +
-    (F.묶음 ? `<br>이 폴더의 파일은 묶음 하나 <code>${씻(F.묶음)}</code> 입니다 — 그 <b>안의 엑셀 ${F.파일.length}개</b>에서 나온 줄입니다.` : '') +
-    (숨긴줄 ? `<br><span class="q">2026년이 아니라 안 보이는 줄 ${숨긴줄}개</span>` : '');
-
-  const 달없는 = 목.filter(f => !f.줄.length && !이름달(f.이름));
-  document.getElementById('달목').innerHTML = !받음 ? '<span class="mnote">달은 창고를 읽은 뒤 나옵니다…</span>'
-    : `<div class="months">` + 달들.map(m => `<button type="button" class="chip ${m===고른?'on':''}" data-m="${씻(m)}">${씻(달글(m))}</button>`).join('') + `</div>` +
-      (달없는.length ? `<div class="mnote">` + 달없는.map(f => `${씻(f.이름)} — 줄 없음 — ${씻(f.없음 || '창고에 이 파일에서 나온 줄이 없습니다')}`).join('<br>') + `</div>` : '');
+  /* v6.3.0: 셈 칸·묶은 것 안내·이름에 달 없는 파일 안내(.mnote)는 걷었다 — 월 버튼만. */
+  document.getElementById('달목').innerHTML = !받음 ? ''
+    : `<div class="months">` + 달들.map(m => `<button type="button" class="chip ${m===고른?'on':''}" data-m="${씻(m)}">${씻(달글(m))}</button>`).join('') + `</div>`;
   if(고른) 표그리기();
 }
 
@@ -101,17 +91,12 @@ function 표그리기(){
   틀.style.display = 'flex';   /* v6.2.1: flex — 표 상자가 화면 남은 높이를 채운다 */
   const 이달 = 목.map(f => ({f, 줄: f.줄.filter(r => String(r.달) === 고른)}));
   const 것 = 이달.flatMap(x => x.줄);
-  /* 그 달 파일 — 줄 있는 것은 줄 수, 줄 없는 것(이름이 그 달)은 까닭을 작게. */
-  const 파 = 이달.filter(x => x.줄.length).map(x =>
-      `${씻(x.f.이름)}${x.f.밖?' <span class="q">(폴더 목록에 없는 서류)</span>':''} · ${x.줄.length.toLocaleString()}줄`)
-    .concat(목.filter(f => !f.줄.length && 이름달(f.이름) === 고른).map(f =>
-      `<span class="q">${씻(f.이름)} — 줄 없음 — ${씻(f.없음 || '창고에 이 파일에서 나온 줄이 없습니다')}</span>`));
-  document.getElementById('줄셈').innerHTML = `<b>${씻(달글(고른))}</b> · <b>${것.length.toLocaleString()}</b>줄` +
-    (파.length ? `<div class="mfiles">${파.join('<br>')}</div>` : '');
+  /* v6.3.0: 표 위 그 달 파일 이름·줄 수(#줄셈)는 걷었다. 줄이 하나도 없는 달만 표 자리에 「줄 없음 — 까닭」 한 줄. */
   const C = 목칸[F.갈];
   if(!것.length){
+    const 빈 = 목.find(f => !f.줄.length && 이름달(f.이름) === 고른);
     document.getElementById('표').innerHTML =
-      `<tbody><tr><td class="dpr-none">이 달에 창고 줄이 없습니다.</td></tr></tbody>`;
+      `<tbody><tr><td class="dpr-none">줄 없음 — ${씻((빈 && 빈.없음) || '창고에 이 달 줄이 없습니다')}</td></tr></tbody>`;
     return;
   }
   것.sort((a,b)=> String(a.달||'').localeCompare(String(b.달||'')) || (a.일||0)-(b.일||0));
