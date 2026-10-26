@@ -1190,6 +1190,25 @@ const 한벌돌리기 = (단품곁다리) => {
     const sig = vals.map((v) => v + pillNames.get(v).size).join("|") + "#" + groups.size + "#" + pillPick;
     if (sig === pillSig) return;
     pillSig = sig;
+    // 10-26 사장님: 「현위치 필터링 버튼 저렇게 나열하지 말고 현위치 누르면 목록이 펼쳐져서 스크롤해서 드롭다운으로 고르게」
+    //   → page.pill.drop 이면 알약 대신 고르는칸 하나(단품관리 현위치). 거르는 길(pillPick)은 알약과 같다
+    if (page.pill.drop) {
+      let sel = pillsBox.querySelector("select.vp-fsel");
+      if (!sel) {
+        sel = pillsBox.appendChild(document.createElement("select"));
+        sel.className = "vp-fsel";
+        sel.setAttribute("aria-label", page.pill.label);
+        sel.addEventListener("change", () => {
+          pillPick = sel.value;
+          for (const g of groups.values()) fillRow(g);
+          apply();
+        });
+      }
+      sel.replaceChildren(...[["", "전체", groups.size], ...vals.map((v) => [v, v, pillNames.get(v).size])]
+        .map(([값, 글, 몇]) => new Option(`${글} (${몇.toLocaleString()})`, 값)));
+      sel.value = pillPick;
+      return;
+    }
     pillsBox.replaceChildren();
     for (const [값, 글, 몇] of [["", "전체", groups.size], ...vals.map((v) => [v, v, pillNames.get(v).size])]) {
       const b = pillsBox.appendChild(document.createElement("button"));

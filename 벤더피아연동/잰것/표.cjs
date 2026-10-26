@@ -83,6 +83,9 @@ const 표본다 = () => {
     보이는이름: 보이는.map((tr) => tr.querySelector('td button').firstChild.textContent),
     칸: 보이는.map((tr) => [...tr.children].slice(1).map((td) => td.textContent.trim())),
     알약: [...document.querySelectorAll('#vp-root .vp-pills .vp-fpill')].map((b) => b.firstChild.textContent),
+    // 10-26 단품관리 현위치는 알약 대신 고르는칸 하나 — 고를 것(글자의 「 (수)」 앞)과 고른 값
+    고르는칸: [...document.querySelectorAll('#vp-root .vp-pills select.vp-fsel option')].map((o) => o.textContent.replace(/ \(\S+\)$/, '')),
+    고른값: document.querySelector('#vp-root .vp-pills select.vp-fsel')?.selectedOptions[0]?.textContent,
     켜진알약: [...document.querySelectorAll('#vp-root .vp-pills .vp-fpill[aria-pressed="true"]')].map((b) => b.firstChild.textContent),
     알약줄제목: document.querySelector('#vp-root .vp-pillbar-t')?.textContent,
     알약줄보이나: !!document.querySelector('#vp-root .vp-pillbar') && !document.querySelector('#vp-root .vp-pillbar').hidden,
@@ -143,12 +146,17 @@ const 꼴본다 = () => {
       if (이름 === '단품관리') {
         봤다(v.줄수 === 3, '단품이 셋인데 줄이 ' + v.줄수 + ' (같은 단품 「사아자 선반」 이 매입처 둘이어도 한 줄)');
         봤다(v.칸.some((c) => c.includes('가매입처, 나매입처')), '그 한 줄의 현위치 칸에 둘 다 적힌다: ' + JSON.stringify(v.칸.find((c) => c.join().includes('가매입처, 나매입처'))));
-        봤다(JSON.stringify(v.알약) === JSON.stringify(['전체', '가매입처', '나매입처']) || v.알약.length === 3, '알약 ' + JSON.stringify(v.알약));
-        await 알약('나매입처');
+        // 10-26 현위치 = 알약 나열 말고 고르는칸 하나(누르면 목록이 펼쳐져 스크롤해 고른다)
+        봤다(v.알약.length === 0 && JSON.stringify(v.고르는칸) === JSON.stringify(['전체', '가매입처', '나매입처']), '현위치 고르는칸 ' + JSON.stringify(v.고르는칸) + ' · 알약 ' + v.알약.length);
+        const 고르기 = async (값) => { await page.selectOption('#vp-root .vp-pills select.vp-fsel', 값); await page.waitForTimeout(250); };
+        await 고르기('나매입처');
         v = await page.evaluate(표본다);
         봤다(v.보이는줄 === 2 && !v.보이는이름.includes('가나다 서랍장'), '「나매입처」 → ' + JSON.stringify(v.보이는이름));
         봤다(v.칸.every((c) => !c.join().includes('가매입처')), '고른 현위치만 칸에 적힌다');
-        await 알약('전체');
+        봤다(/^나매입처 \(/.test(v.고른값 || ''), '고른 값이 칸에 보인다: ' + v.고른값);
+        await 고르기('');
+        v = await page.evaluate(표본다);
+        봤다(v.보이는줄 === 3 && /^전체/.test(v.고른값 || ''), '「전체」로 풀린다: 줄 ' + v.보이는줄);
         await 누르기('가나다 서랍장');
         v = await page.evaluate(표본다);
         봤다(v.패널열림, '버튼을 누르면 상세가 열린다: ' + v.패널제목);
