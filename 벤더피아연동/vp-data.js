@@ -128,6 +128,16 @@ const VP_DATA = (() => {
   // 한 번에 받을 수 있는 줄 수(limit)를 넘으면 cfg.splits 기준으로 조건을 나눠 받는다. 몇 건인지는 가벼운 조회로 먼저 센다.
   // 지금 화면이 받는 중인 목록 수. 뒤에서 받기(미리 받기)는 이것이 0 일 때만 벤더피아에 요청한다
   // (벤더피아는 한 사람의 요청을 하나씩 처리해서, 같이 보내면 지금 화면이 그만큼 늦어진다).
+  /* ⚠ 10-27 [새 지시 오리지날느림] 사장님(그대로) 「오리지날 화면 보기 버튼도 한번 누르면 함흥차사야 - 이건그냥 벤더피아 화면 보여주는건데 왜이리 오래걸려」
+     까닭: 벤더피아(ASP.NET)는 한 사람 요청을 하나씩 처리하고, 기다리는 요청은 0.5초마다 다시 줄을 선다.
+       우리 화면이 뒤에서(이름 찾기·재고·미리 받기) 요청을 쉬지 않고 이어 보내면 새 창 오리지널의 요청이 계속 밀린다.
+     → 「벤더피아」 단추(login.js)가 `VP원본쉼()` 을 부르면 그때부터 15초 동안 **여기서 나가는 벤더피아 요청을 모두 세운다**.
+       localStorage 라 같은 벤더피아의 다른 우리 탭도 같이 쉰다. 이미 나간 요청은 그대로 끝난다. */
+  const 쉼열쇠 = "vp원본쉼", 쉬는동안 = 15000;
+  const 쉼끝 = () => { let t = 0; try { t = Number(localStorage.getItem(쉼열쇠)) || 0; } catch (e) {} return t + 쉬는동안; };
+  const 비켜 = async () => { for (let 남음; (남음 = 쉼끝() - Date.now()) > 0;) await new Promise((r) => setTimeout(r, Math.min(남음, 1000))); };
+  const 벤더피아받기 = async (url, opt) => (await 비켜(), fetch(url, opt));
+  window.VP원본쉼 = () => { try { localStorage.setItem(쉼열쇠, String(Date.now())); } catch (e) {} };
   let foreground = 0;
   const idle = async () => { while (foreground > 0) await new Promise((r) => setTimeout(r, 150)); };
 
@@ -136,7 +146,7 @@ const VP_DATA = (() => {
     const field = (id) => src.getElementById(id) || [...src.forms[0].elements].find((e) => e.name?.endsWith("$" + id));
     const nameOf = (id) => field(id)?.name || id;
     const post = async (fd) => (background && await idle(),
-      parse(await (await fetch(url, { method: "POST", body: fd, credentials: "include" })).text(), cfg.nameCol));
+      parse(await (await 벤더피아받기(url, { method: "POST", body: fd, credentials: "include" })).text(), cfg.nameCol));
     const btn = src.getElementById("btnSearch").name;
     const rowOptions = [...(field("ddlRowCnt")?.options || [])].map((o) => Number(o.value));
     const fewRows = String(Math.min(...rowOptions));
@@ -265,7 +275,7 @@ const VP_DATA = (() => {
     let 끝냄; 받는중.set(key, new Promise((r) => { 끝냄 = r; }));
     try {
       if (background) await idle();
-      src ||= new DOMParser().parseFromString(await (await fetch(url, { credentials: "include" })).text(), "text/html");
+      src ||= new DOMParser().parseFromString(await (await 벤더피아받기(url, { credentials: "include" })).text(), "text/html");
       let heads = [];
       const rows = [];
       let whole = true;
@@ -296,7 +306,7 @@ const VP_DATA = (() => {
     const start = new Date(today);
     start.setMonth(start.getMonth() - 3);
     const three = { from: ymd(start), to: ymd(today) };
-    const open = async (url) => (await idle(), new DOMParser().parseFromString(await (await fetch(url, { credentials: "include" })).text(), "text/html"));
+    const open = async (url) => (await idle(), new DOMParser().parseFromString(await (await 벤더피아받기(url, { credentials: "include" })).text(), "text/html"));
     const noop = () => {};
     const steps = [
       // 단품관리 (상품관리 상세의 단품 버튼도 이것을 쓴다)
@@ -337,7 +347,7 @@ const VP_DATA = (() => {
   const 처음문서들 = new Map();   // 주소 → 그 화면의 처음 문서(검색 폼) 약속. 쪽을 연 동안 한 번만 받는다
   function 처음문서(url) {
     if (!처음문서들.has(url)) {
-      const 약속 = fetch(url, { credentials: "include" }).then((r) => r.text())
+      const 약속 = 벤더피아받기(url, { credentials: "include" }).then((r) => r.text())
         .then(async (t) => (await 쉬기(), new DOMParser().parseFromString(t, "text/html")));
       처음문서들.set(url, 약속);
       약속.catch(() => 처음문서들.delete(url));
@@ -366,7 +376,7 @@ const VP_DATA = (() => {
       fd.set(nameOf("ddlRowCnt"), rowCnt);
       fd.append(btn + ".x", "5");
       fd.append(btn + ".y", "5");
-      const html = await (await fetch(url, { method: "POST", body: fd, credentials: "include" })).text();
+      const html = await (await 벤더피아받기(url, { method: "POST", body: fd, credentials: "include" })).text();
       await 쉬기();
       return parse(html, cfg.nameCol);
     };
