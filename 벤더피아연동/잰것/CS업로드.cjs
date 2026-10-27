@@ -7,7 +7,10 @@
      ㄹ) 원주문을 못 이으면 **저장 POST 를 안 보내고** 「등록 실패(…)」 · 우리 저장은 남나
      ㅁ) 벤더피아가 오류 알림을 주면 「등록 실패(그 말)」 인가
      ㅂ) 상태 단추(처리중·끝)로는 벤더피아에 안 가나
-   ⚠ 진짜 vendorpia.com 은 못 닿는다 — csDetl.aspx 를 **흉내**로 세운다(진짜 「원주문 검색」 팝업 값은 모른다). 자료는 전부 가짜. */
+     ㅅ) (10-27 [새 지시 원주문잇기]) 원주문 검색 팝업(`ordersPopup.aspx`)으로 몰 주문번호가 **똑같은** 줄을 찾아 그 **안 번호**를
+         `hOrderNo` 에 넣나 — 여럿이면 상담 판 줄과 같은 상품, 못 고르면 맨 위. 일부만 맞는 긴 번호는 안 집나
+     ㅇ) csDetl 쪽에 늘 박힌 alert(「문의자를 입력해주세요.」)를 실패로 읽지 않나
+   ⚠ 진짜 vendorpia.com 은 못 닿는다 — csDetl.aspx·ordersPopup.aspx 를 **흉내**로 세운다(꼴은 10-27 사장님 크롬에서 잰 것). 자료는 전부 가짜. */
 const { chromium } = require('playwright');
 const fs = require('fs'), path = require('path');
 const 확장 = path.join(__dirname, '..');
@@ -54,6 +57,27 @@ const 문의쪽 = (o = {}) => `<html><head><meta charset="utf-8"><title>CS</titl
 <input type="hidden" name="${C('hOrderNo')}" id="hOrderNo" value="${o.숨은 || ''}">
 <input type="hidden" name="${C('hdeliveryNo')}" id="hdeliveryNo" value="${o.배송 || ''}">
 <input type="submit" name="${C('btnReflash')}" id="btnReflash" value="">
+</form><script>function 검사(){ alert('문의자를 입력해주세요.'); alert('문의내용을 입력해주세요.'); }</script></body></html>`;
+/* ordersPopup.aspx 흉내 (10-27 잼): 폼 urlencoded, 칸 `tb_SOrderNo`(일부만 맞아도 걸림), 그림 단추 `btnSearch`,
+   #oGrid 머리 「주문번호(안 번호)…주문번호(몰)…상품코드·상품명」, 몸줄 data-rowkey=[안번호] */
+const 팝업자료 = [
+  { 안: '7770001', 몰: '20261015-1012', 코드: 'G1', 상품: '토리블리 2단 와이드 교구장' },   // 일부만 맞음 — 집으면 안 됨
+  { 안: '1230002', 몰: '20261015-101', 코드: 'G7', 상품: '다른 침대 프레임' },             // 맨 위지만 다른 상품
+  { 안: '1230001', 몰: '20261015-101', 코드: 'G1', 상품: '토리블리 2단 와이드 교구장' },   // ← 같은 상품
+  { 안: '1240009', 몰: '20261015-100', 코드: 'G8', 상품: '맨 위 상품' },                   // 같은 상품 없음 → 맨 위
+  { 안: '1240008', 몰: '20261015-100', 코드: 'G9', 상품: '둘째 상품' },
+];
+const 안번호주문 = Object.fromEntries(팝업자료.map(x => [x.안, x.몰]));
+const 팝업머리 = ['주문번호','CS','매출처','몰','','주문번호','배송사','상품코드','상품명','주문자'];
+const 팝업쪽 = (찾는것) => `<html><body><form name="aspnetForm" method="post" action="./ordersPopup.aspx" id="aspnetForm">
+<input type="hidden" name="__VIEWSTATE" value="PV"><input type="hidden" name="ctl00$hdKey" value="K">
+<select name="${C('ddlStore')}" id="ddlStore"><option value="전체">전체</option></select>
+<input name="${C('tb_SOrderNo')}" id="tb_SOrderNo" value="${찾는것 || ''}">
+<input name="${C('dcStartDt')}" id="dcStartDt" value="2025-10-28"><input name="${C('dcEndDt')}" id="dcEndDt" value="2026-10-27">
+<input type="image" name="${C('btnSearch')}" id="btnSearch" src="s.gif">
+<div id="oGrid"><table><tr>${팝업머리.map(h => `<th>${h}</th>`).join('')}</tr></table>
+<table>${찾는것 ? 팝업자료.filter(x => x.몰.includes(찾는것)).map(x => `<tr data-rowkey="[${x.안}]">${
+  [x.안, '', '가매출처', '몰', '', x.몰, '택배', x.코드, x.상품, '김가짜'].map(v => `<td>${v}</td>`).join('')}</tr>`).join('') : ''}</table></div>
 </form></body></html>`;
 /* multipart 몸 → {이름: 값} */
 const 풀기 = (몸) => { const o = {}; for (const m of String(몸 || '').matchAll(/name="([^"]+)"(?:; filename="[^"]*")?\r\n(?:Content-Type:[^\r]*\r\n)?\r\n([\s\S]*?)\r\n--/g)) o[m[1]] = m[2]; return o; };
@@ -72,7 +96,7 @@ window.VP저장 = { get: async function(){return {};}, set: async function(){}, 
 
   /* 경우: 줄 차례(2=…-101 이을 수 있음, 3=…-102 못 이음) · 저장 답 */
   async function 해보기(이름, { 줄 = 2, 저장답 = 'ok', 할일 }) {
-    const 일 = { 패치: 0, 잇기: [], 저장: [], 가져옴: 0, 벤더쓰기: [] };
+    const 일 = { 패치: 0, 잇기: [], 저장: [], 가져옴: 0, 벤더쓰기: [], 찾기: [] };
     const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
     await ctx.route('**://vivivic-cloud.github.io/**', r => r.abort('blockedbyclient'));
     await ctx.route('**://identitytoolkit.googleapis.com/**', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"idToken":"ascii-fake"}' }));
@@ -83,22 +107,28 @@ window.VP저장 = { get: async function(){return {};}, set: async function(){}, 
     });
     await ctx.route('**://vendorpia.com/**', async (r) => {
       const u = new URL(r.request().url()), 셈 = r.request().method();
+      if (/ordersPopup\.aspx$/i.test(u.pathname)) {
+        if (셈 === 'GET') return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: 팝업쪽('') });
+        const f = Object.fromEntries(new URLSearchParams(r.request().postData() || ''));
+        일.찾기.push(f);
+        if (!((C('btnSearch') + '.x') in f)) 일.벤더쓰기.push('POST ordersPopup 모르는 단추');
+        return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: 팝업쪽(f[C('tb_SOrderNo')]) });
+      }
       if (/csDetl\.aspx$/i.test(u.pathname)) {
         if (셈 === 'GET') { 일.가져옴++; return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: 문의쪽() }); }
         const f = 풀기(r.request().postData());
         if (C('btnReflash') in f) {
           일.잇기.push(f);
-          const 주문 = f[C('hOrderNo')];
-          const 앎 = 주문 === '20261015-101';
-          return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: 문의쪽(앎
-            ? { 판: 2, 주문, 숨은: 주문, 주문자: '김가짜', 상품: '토리블리 2단 와이드 교구장', 매출처: '가매출처', 배송: 'D9' }
+          const 안 = f[C('hOrderNo')], 몰 = 안번호주문[안];
+          return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: 문의쪽(몰
+            ? { 판: 2, 주문: `${몰} / ${안} / ${안}`, 숨은: 안, 주문자: '김가짜', 상품: '토리블리 2단 와이드 교구장', 매출처: '가매출처', 배송: 'D9' }
             : { 판: 2, 주문: '' }) });
         }
         if ((C('btnSaveInsert') + '.x') in f) {
           일.저장.push(f);
           await new Promise(z => setTimeout(z, 300));
           const 몸 = 저장답 === 'ok'
-            ? `<html><body><script>alert('저장되었습니다.'); location.href='inquiryList.aspx';</script></body></html>`
+            ? `<html><body><script>alert('저장되었습니다.'); location.href='inquiryList.aspx';</script>${문의쪽({ 판: 3 })}</body></html>`
             : `<html><body><script>alert('오류가 발생했습니다.');</script>${문의쪽({ 판: 3 })}</body></html>`;
           return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: 몸 });
         }
@@ -129,7 +159,7 @@ window.VP저장 = { get: async function(){return {};}, set: async function(){}, 
     const 알림 = await page.textContent('.vp-상담알림');
     await ctx.close();
     console.log('\n  ◆ ' + 이름 + ' — 알림 「' + 알림 + '」 · 창고PATCH ' + 일.패치 + ' · csDetl GET ' + 일.가져옴
-      + ' · 잇기 ' + 일.잇기.length + ' · 저장 ' + 일.저장.length);
+      + ' · 원주문검색 ' + 일.찾기.length + ' · 잇기 ' + 일.잇기.length + ' · 저장 ' + 일.저장.length);
     return { 일, 알림 };
   }
   const 쓰고접수 = (글, 종류) => async (page) => {
@@ -142,11 +172,12 @@ window.VP저장 = { get: async function(){return {};}, set: async function(){}, 
   let { 일, 알림 } = await 해보기('A 교환 접수(이을 수 있는 주문)', { 할일: 쓰고접수('문짝 흠. 교환 원하심\n다음 주 수요일 재배송', '교환') });
   console.log('    ★ 우리 창고에 남았나 ' + 못(일.패치 === 1));
   console.log('    ★ 알림 「벤더피아 등록됨」 ' + 못(/남겼습니다 · 벤더피아 등록됨/.test(알림)));
-  console.log('    원주문 잇기 먼저 — hOrderNo·tbSOrderNo = 주문번호 ' + 못(일.잇기.length === 1
-    && 일.잇기[0][C('hOrderNo')] === '20261015-101' && 일.잇기[0][C('tbSOrderNo')] === '20261015-101'));
+  console.log('    원주문 검색 = 몰 주문번호로 조회(그림 단추) ' + 못(일.찾기.length === 1 && 일.찾기[0][C('tb_SOrderNo')] === '20261015-101'));
+  console.log('    ★ 원주문 잇기 — hOrderNo = 같은 상품 줄의 안 번호 1230001(맨 위 1230002·일부만 맞는 7770001 아님) ' + 못(일.잇기.length === 1
+    && 일.잇기[0][C('hOrderNo')] === '1230001'));
   const s = 일.저장[0] || {};
   console.log('    저장 한 번 · 이어진 숨은 칸·새 VIEWSTATE 를 그대로 실음 ' + 못(일.저장.length === 1
-    && s[C('hOrderNo')] === '20261015-101' && s[C('hdeliveryNo')] === 'D9' && s.__VIEWSTATE === 'VS2'));
+    && s[C('hOrderNo')] === '1230001' && s[C('hdeliveryNo')] === 'D9' && s.__VIEWSTATE === 'VS2'));
   console.log('    문의자 「' + s[C('tbInquirer')] + '」 = 주문자 ' + 못(s[C('tbInquirer')] === '김가짜'));
   console.log('    제목 「' + s[C('tbTitle')] + '」 ' + 못(s[C('tbTitle')] === '[교환] 문짝 흠. 교환 원하심'));
   console.log('    문의내용 = 쓴 글 그대로 ' + 못(String(s[C('tbContent')]).replace(/\r\n/g, '\n') === '문짝 흠. 교환 원하심\n다음 주 수요일 재배송'));   // 폼은 줄바꿈을 \r\n 으로 보낸다(브라우저 규칙)
@@ -166,10 +197,16 @@ window.VP저장 = { get: async function(){return {};}, set: async function(){}, 
   console.log('    종류 없으면 문의유형은 기본값(I0) · 제목 = 글 ' + 못(일.저장[0] && 일.저장[0][C('ddlInqType')] === 'I0'
     && 일.저장[0][C('tbTitle')] === '배송 언제 오나요 문의'));
 
-  /* C — 원주문 못 이음 */
-  ({ 일, 알림 } = await 해보기('C 못 잇는 주문', { 줄: 3, 할일: 쓰고접수('반품 원함', '반품') }));
-  console.log('    ★ 저장 POST 안 보냄 ' + 못(일.잇기.length === 1 && 일.저장.length === 0));
-  console.log('    ★ 「등록 실패(원주문을 못 이음)」 · 우리 저장은 남음 ' + 못(/벤더피아 등록 실패\(원주문을 못 이음\)/.test(알림) && 일.패치 === 1));
+  /* C — 원주문 검색에 없음 */
+  ({ 일, 알림 } = await 해보기('C 원주문 검색에 없는 주문', { 줄: 3, 할일: 쓰고접수('반품 원함', '반품') }));
+  console.log('    기본 기간에 없으면 넓혀 한 번 더 찾음 ' + 못(일.찾기.length === 2 && 일.찾기[1][C('dcStartDt')] === '2000-01-01'));
+  console.log('    ★ 잇기·저장 POST 안 보냄 ' + 못(일.잇기.length === 0 && 일.저장.length === 0));
+  console.log('    ★ 「등록 실패(원주문을 못 찾음 …)」 · 우리 저장은 남음 ' + 못(/벤더피아 등록 실패\(원주문을 못 찾음/.test(알림) && 일.패치 === 1));
+
+  /* F — 같은 상품 없음 → 맨 위 줄 */
+  ({ 일, 알림 } = await 해보기('F 같은 상품 줄이 없는 주문', { 줄: 1, 할일: 쓰고접수('배송 문의') }));
+  console.log('    ★ 맨 위 줄 안 번호 1240009 로 이음 · 등록됨 ' + 못(일.잇기[0] && 일.잇기[0][C('hOrderNo')] === '1240009'
+    && 일.저장.length === 1 && /벤더피아 등록됨/.test(알림)));
 
   /* D — 벤더피아 오류 알림 */
   ({ 일, 알림 } = await 해보기('D 벤더피아가 오류', { 저장답: 'err', 할일: 쓰고접수('AS 요청', 'AS') }));

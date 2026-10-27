@@ -1095,6 +1095,9 @@
     const 적기 = 덮개.querySelector(".vp-상담적기");
     const 글칸 = 덮개.querySelector("textarea");
     let 쌓인것 = [], 지금접수 = null, 고른종류 = "";
+    /* 고객문의 원주문 고르기용 — 이 판을 연 줄의 상품 */
+    const 줄값 = (이름) => { const i = 받은머리 ? 받은머리.indexOf(이름) : -1; return i >= 0 && 받은줄 ? String(받은줄[i] == null ? "" : 받은줄[i]).trim() : ""; };
+    const 상품단서 = { 상품명: 상품명 || 줄값("상품명"), 상품코드: 줄값("상품코드") };
 
     /* 종류 단추 — 하나만 켜진다. 다시 누르면 꺼진다(그냥 상담만 남기실 때). */
     for (const b of 덮개.querySelectorAll(".vp-상담종류")) {
@@ -1179,7 +1182,7 @@
         올린글.add(열쇠글);
         알림.textContent = "남겼습니다 · 벤더피아 등록 중…";
         try {
-          await 벤더피아올리기(주문, { 글, 종류, 상태 });
+          await 벤더피아올리기(주문, { 글, 종류, 상태, 단서: 상품단서 });
           알림.textContent = "남겼습니다 · 벤더피아 등록됨";
         } catch (err) {
           알림.textContent = "남겼습니다 · 벤더피아 등록 실패(" + (err && err.message ? err.message : err) + ")";
@@ -1264,10 +1267,13 @@
 
   /* ── 벤더피아 고객문의 올리기 (10-26 [새 지시 CS업로드]) ─────────────
      사장님: 「만들어. 시험 등록할 주문은 내가 정해줄게」 — ⚠ **「벤더피아에서는 조회만」 의 예외는 이 기능 하나뿐.**
-     길: `System/CS/csDetl.aspx` GET → 원주문 숨은 칸(`hOrderNo`)·주문번호 칸(`tbSOrderNo`)을 채워 `btnReflash` 다시 보냄
+     길: `System/CS/csDetl.aspx` GET → 원주문 숨은 칸(`hOrderNo`)을 채워 `btnReflash` 다시 보냄
          → 응답에 주문 정보(주문자·상품명·매출처)가 **차야** 이어진 것 → 문의자·제목·문의내용을 채워 `btnSaveInsert.x/.y` 로 POST.
      ⚠ 원주문이 안 이어지면 **저장 POST 를 보내지 않는다**(빈·엉뚱한 주문으로 올라가지 않게).
-     ⚠ 진짜 「원주문 검색」 팝업(`OpenOrderList`)이 넣는 값은 못 읽었다 — 첫 실제 시험에서 확정. */
+     10-27 [새 지시 원주문잇기] 사장님 크롬에서 잼: 「원주문 검색」 팝업(`ordersPopup.aspx`)은 몰 주문번호(`tb_SOrderNo`, 일부만 맞아도 걸림)로
+     찾고, 고른 줄의 **벤더피아 안 번호**(7자리, 열 key `orderNo`)를 `getReturnValue` 가 `hOrderNo` 에 넣고 `btnReflash` 를 누른다.
+     → 우리도 팝업 조회(조회만)로 몰 주문번호가 **똑같은** 줄을 찾아 그 안 번호를 넣는다. 여럿이면 상담 판을 연 줄과 같은 상품, 못 고르면 맨 위 줄. */
+  const 원주문찾기주소 = "/System/CS/ordersPopup.aspx";
   const 고객문의주소 = "/System/CS/csDetl.aspx?previousPage=inquiry";
   const 올린글 = new Set();                            // 주문+글 — 같은 글을 두 번 올리지 않는다
   const 문의값 = (doc, id) => { const el = doc.getElementById(id); return el ? String(el.value || "").trim() : ""; };
@@ -1306,20 +1312,64 @@
     const o = el && 글자 && [...el.options].find((x) => x.textContent.trim() === 글자);
     return o ? o.value : null;
   }
-  async function 벤더피아올리기(주문, { 글, 종류, 상태 }) {
+  /* 몰 주문번호 → 벤더피아 안 번호. 사장님 10-27: 「상담 판을 연 그 줄(같은 상품)로 이어줘. 못 고르면 맨 위 줄로.」 */
+  async function 원주문찾기(주문, 단서 = {}) {
+    const 몰번호 = String(주문).trim();
+    const 첫 = await fetch(원주문찾기주소, { credentials: "include" });
+    if (!첫.ok) throw new Error("원주문 검색 HTTP " + 첫.status);
+    const doc = new DOMParser().parseFromString(await 첫.text(), "text/html");
+    const form = doc.getElementById("aspnetForm") || doc.forms[0];
+    const 칸 = (id) => doc.getElementById(id);
+    if (!form || !칸("tb_SOrderNo") || !칸("btnSearch")) throw new Error("원주문 검색 쪽 모양이 다름");
+    const 묻기 = async (시작일) => {
+      const body = new URLSearchParams();
+      for (const [k, v] of 문의폼값(form)) body.append(k, v);
+      body.set(칸("tb_SOrderNo").name, 몰번호);
+      if (시작일 && 칸("dcStartDt")) body.set(칸("dcStartDt").name, 시작일);
+      body.append(칸("btnSearch").name + ".x", "5"); body.append(칸("btnSearch").name + ".y", "5");
+      const res = await fetch(new URL(form.getAttribute("action") || 원주문찾기주소, new URL(원주문찾기주소, location.href)).href,
+        { method: "POST", body, credentials: "include" });
+      if (!res.ok) throw new Error("원주문 검색 HTTP " + res.status);
+      const d = new DOMParser().parseFromString(await res.text(), "text/html");
+      const 줄들 = [...d.querySelectorAll("#oGrid tr")];
+      const 머리줄 = 줄들.find((tr) => tr.querySelector("th") && tr.cells.length >= 5
+        && [...tr.cells].filter((c) => c.textContent.trim() === "주문번호").length >= 2);
+      if (!머리줄) return [];
+      const 머리 = [...머리줄.cells].map((c) => c.textContent.trim());
+      const 번호칸 = 머리.reduce((a, h, i) => (h === "주문번호" ? a.concat(i) : a), []);
+      const 자리 = (h) => 머리.indexOf(h);
+      return 줄들.filter((tr) => tr !== 머리줄 && tr.cells.length === 머리.length).map((tr) => {
+        const 값 = (i) => (i >= 0 && tr.cells[i] ? tr.cells[i].textContent.trim() : "");
+        const 키 = (tr.getAttribute("data-rowkey") || "").replace(/[^\d]/g, "");
+        return { 안번호: 키 || 값(번호칸[0]), 몰번호: 값(번호칸[1]), 상품코드: 값(자리("상품코드")), 상품명: 값(자리("상품명")) };
+      }).filter((x) => /^\d+$/.test(x.안번호) && x.몰번호 === 몰번호);
+    };
+    let 맞음 = await 묻기("");
+    if (!맞음.length) 맞음 = await 묻기("2000-01-01");          // 기본 기간(1년) 밖 주문
+    const 같은 = (a, b) => String(a || "").replace(/\s+/g, "").toLowerCase() === String(b || "").replace(/\s+/g, "").toLowerCase();
+    const 고름 = (단서.상품코드 && 맞음.find((x) => 같은(x.상품코드, 단서.상품코드)))
+      || (단서.상품명 && 맞음.find((x) => 같은(x.상품명, 단서.상품명))) || 맞음[0];
+    window.VP말?.("고객문의:원주문 " + 맞음.length + "줄 → " + (고름 ? 고름.안번호 + (고름 === 맞음[0] ? "(맨위)" : "(같은상품)") : "없음"));
+    return 고름 ? 고름.안번호 : "";
+  }
+  async function 벤더피아올리기(주문, { 글, 종류, 상태, 단서 }) {
     const 첫 = await fetch(고객문의주소, { credentials: "include" });
     if (!첫.ok) throw new Error("등록 쪽 HTTP " + 첫.status);
-    let doc = new DOMParser().parseFromString(await 첫.text(), "text/html");
+    const 첫글 = await 첫.text();
+    let doc = new DOMParser().parseFromString(첫글, "text/html");
     if (doc.querySelector("input[type=password]")) throw new Error("로그인 필요");
     if (!doc.getElementById("tbContent") || !doc.getElementById("btnSaveInsert")) throw new Error("등록 쪽 모양이 다름");
     /* ① 원주문 잇기 */
-    const 잇기 = await 문의보내기(doc, "btnReflash", { hOrderNo: 주문, tbSOrderNo: 주문 });
+    const 안번호 = await 원주문찾기(주문, 단서);
+    if (!안번호) throw new Error("원주문을 못 찾음 — 벤더피아 원주문 검색에 이 주문번호가 없습니다");
+    const 잇기 = await 문의보내기(doc, "btnReflash", { hOrderNo: 안번호 });
     doc = 잇기.doc;
     const 이음 = { 주문번호: 문의값(doc, "tbSOrderNo"), 주문자: 문의값(doc, "tbOrderer"),
                   상품: 문의값(doc, "tbSGoodsNm"), 매출처: 문의값(doc, "tbStoreNm"), 숨은: 문의값(doc, "hOrderNo") };
     window.VP말?.("고객문의:잇기 HTTP" + 잇기.res.status + " " + JSON.stringify(이음).slice(0, 160));
     if (!잇기.res.ok || !doc.getElementById("btnSaveInsert")) throw new Error("원주문 잇기 HTTP " + 잇기.res.status);
-    if (이음.주문번호 !== String(주문).trim() || !(이음.주문자 || 이음.상품 || 이음.매출처))
+    /* 잇기 뒤 `tbSOrderNo` = 「몰번호 / 안번호 / …」 꼴(10-27 잼) */
+    if (!이음.주문번호.split("/").map((x) => x.trim()).includes(String(주문).trim()) || !(이음.주문자 || 이음.상품 || 이음.매출처))
       throw new Error("원주문을 못 이음");
     /* ② 문의 채워 저장 */
     const 첫줄 = 글.split(/\n/)[0].trim();
@@ -1336,7 +1386,10 @@
     try { 저장 = await 문의보내기(doc, "btnSaveInsert", 채움); }
     catch (e) { throw 탈("저장 응답 못 받음 — 고객문의 목록에서 확인"); }
     /* ③ 성공·실패 가르기 — 목록으로 넘어갔거나 「저장/등록 … 되었습니다·완료」 알림이면 됨 */
-    const 알림들 = [...저장.글.matchAll(/alert\(\s*['"]([^'"]{1,120})['"]/g)].map((m) => m[1]);
+    /* ⚠ 10-27 잼: csDetl 쪽 글에는 「문의자를 입력해주세요.」 같은 alert 가 **늘** 박혀 있다 — 빈 쪽(GET)에도 있던 알림은 뺀다 */
+    const 알림뽑기 = (t) => [...t.matchAll(/alert\(\s*['"]([^'"]{1,120})['"]/g)].map((m) => m[1]);
+    const 늘있는알림 = new Set(알림뽑기(첫글));
+    const 알림들 = 알림뽑기(저장.글).filter((a) => !늘있는알림.has(a));
     window.VP말?.("고객문의:저장 HTTP" + 저장.res.status + " " + (저장.res.url || "").replace(/^https?:\/\/[^/]+/, "").slice(0, 50)
       + " 알림" + JSON.stringify(알림들).slice(0, 120));
     if (!저장.res.ok) throw 탈("저장 HTTP " + 저장.res.status);
