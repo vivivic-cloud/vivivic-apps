@@ -1276,7 +1276,9 @@
      찾고, 고른 줄의 **벤더피아 안 번호**(7자리, 열 key `orderNo`)를 `getReturnValue` 가 `hOrderNo` 에 넣고 `btnReflash` 를 누른다.
      → 우리도 팝업 조회(조회만)로 몰 주문번호가 **똑같은** 줄을 찾아 그 안 번호를 넣는다. 여럿이면 상담 판을 연 줄과 같은 상품, 못 고르면 맨 위 줄. */
   const 원주문찾기주소 = "/System/CS/ordersPopup.aspx";
-  const 고객문의주소 = "/System/CS/csDetl.aspx?previousPage=inquiry";
+  /* 10-27 [새 지시 사람길] 사람 길 그대로 — 벤더피아 머리 「CS등록」(`#lnkCSReg`)이 여는 「고객주문변경_접수」 쪽.
+     GET·잇기·저장 모두 이 주소(폼 action 도 `./csDetl.aspx?previousPage=first`) */
+  const 고객문의주소 = "/System/CS/csDetl.aspx?previousPage=first";
   const 올린글 = new Set();                            // 주문+글 — 같은 글을 두 번 올리지 않는다
   const 문의값 = (doc, id) => { const el = doc.getElementById(id); return el ? String(el.value || "").trim() : ""; };
   /* `빈파일`: 브라우저는 고른 파일이 없어도 파일 칸을 빈 칸(filename="")으로 **늘** 보낸다 — csDetl(multipart)에서만 똑같이 */
@@ -1407,15 +1409,16 @@
     window.VP말?.("고객문의:잇기 HTTP" + 잇기.res.status + " " + JSON.stringify(이음).slice(0, 160));
     if (!잇기.res.ok || !doc.getElementById("btnSaveInsert"))
       throw new Error("② 원주문 잇기 HTTP " + 잇기.res.status + (잇기.res.ok ? "" : " · " + 오류글(잇기.doc)));
+    /* 사람 길: 잇기 응답에서 서버가 탭을 「고객문의」(`hTab=INQUERY`)로 바꾸고 문의자를 채운다 — 아니면 저장하지 않는다 */
+    if (문의값(doc, "hTab") !== "INQUERY" || !이음.문의자)
+      throw new Error("② 잇기 뒤 고객문의 칸이 안 열림(탭 " + (문의값(doc, "hTab") || "없음") + (이음.문의자 ? "" : " · 문의자 빈칸") + ")");
     /* 잇기 뒤 `tbSOrderNo` = 「몰번호 / 안번호 / …」 꼴(10-27 잼) */
     if (!이음.주문번호.split("/").map((x) => x.trim()).includes(String(주문).trim()) || !(이음.주문자 || 이음.상품 || 이음.매출처))
       throw new Error("② 원주문을 못 이음");
-    /* ③ 문의 채워 저장 — 문의자는 잇기 때 벤더피아가 채운 값(=주문자) 그대로, 칸 길이(문의자 maxlength 10) 안으로.
-       제목은 25자까지(벤더피아 글 500건 제목이 가장 길어야 17자 — 칸 크기를 넘겨 서버가 막지 않게) */
-    const 첫줄 = 글.split(/\n/)[0].trim();
-    const 채움 = { tbInquirer: (이음.문의자 || 이음.주문자 || 적은이() || "상담").slice(0, 10),
-                  tbTitle: ((종류 ? "[" + 종류 + "] " : "") + 첫줄).slice(0, 25),
-                  tbContent: 글 };
+    /* ③ 문의 채워 저장 — 문의자는 잇기 때 벤더피아가 채운 값 그대로(maxlength 10).
+       사장님 10-27: 「제목에는 상담메세지에 남겼던 메세지의 앞 열글자 … 문의내용에 메세지에 남겼던 말」 — 제목 머리 「[종류]」 없음 */
+    const 제목 = [...String(글).replace(/\s+/g, " ").trim()].slice(0, 10).join("").trim();
+    const 채움 = { tbInquirer: 이음.문의자.slice(0, 10), tbTitle: 제목, tbContent: 글 };
     const 유형 = 고를값(doc, "ddlInqType", 종류);
     if (유형 !== null) 채움.ddlInqType = 유형;
     const 끝남 = 고를값(doc, "ddlCallEndGb", 상태 === "끝" ? "처리완료" : "");

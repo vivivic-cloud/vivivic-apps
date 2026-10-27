@@ -12,6 +12,8 @@
      ㅇ) csDetl 쪽에 늘 박힌 alert(「문의자를 입력해주세요.」)를 실패로 읽지 않나
      ㅈ) (10-27 [새 지시 저장경로]) 사람이 팝업에서 고를 때처럼 `hdStatusCd`(배송상태 **코드**)·`tbUsableQty`(가용수)도 넣나,
          빈 파일 칸(`fileUpload1`, filename="")을 브라우저처럼 보내나, 등록 여부를 **고객문의 목록 조회**로 확인하나
+     ㅊ) (10-27 [새 지시 사람길]) GET·잇기·저장이 모두 `csDetl.aspx?previousPage=first` 인가, 잇기 응답 탭이 `hTab=INQUERY` 가
+         아니면 저장 안 하나, 제목 = 글 앞 10글자(「[종류]」 없음, 공백·줄바꿈 정리)·문의내용 = 글 전체인가
    ⚠ 진짜 vendorpia.com 은 못 닿는다 — csDetl.aspx·ordersPopup.aspx 를 **흉내**로 세운다(꼴은 10-27 사장님 크롬에서 잰 것). 자료는 전부 가짜. */
 const { chromium } = require('playwright');
 const fs = require('fs'), path = require('path');
@@ -39,7 +41,7 @@ ${줄들.map(r=>`<tr>${r.map(v=>`<td>${v}</td>`).join('')}</tr>`).join('')}</tab
 /* csDetl.aspx 흉내 — 칸 이름은 조사(517d7fa)에서 잰 그대로(`ctl00$Contents$` + id) */
 const C = (id) => 'ctl00$Contents$' + id;
 const 문의쪽 = (o = {}) => `<html><head><meta charset="utf-8"><title>CS</title></head><body>
-<form name="aspnetForm" method="post" action="./csDetl.aspx?previousPage=inquiry" id="aspnetForm" enctype="multipart/form-data">
+<form name="aspnetForm" method="post" action="./csDetl.aspx?previousPage=first" id="aspnetForm" enctype="multipart/form-data">
 <input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="VS${o.판 || 1}">
 <input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="EV${o.판 || 1}">
 <input type="hidden" name="ctl00$hdKey" value="K">
@@ -59,6 +61,7 @@ const 문의쪽 = (o = {}) => `<html><head><meta charset="utf-8"><title>CS</titl
 <input type="hidden" name="${C('hOrderNo')}" id="hOrderNo" value="${o.숨은 || ''}">
 <input type="hidden" name="${C('hdeliveryNo')}" id="hdeliveryNo" value="${o.배송 || ''}">
 <input type="hidden" name="${C('hdStatusCd')}" id="hdStatusCd" value="${o.상태 || ''}">
+<input type="hidden" name="${C('hTab')}" id="hTab" value="${o.탭 || 'CS'}">
 <input name="${C('tbUsableQty')}" id="tbUsableQty" value="${o.가용 || ''}">
 <input type="submit" name="${C('btnReflash')}" id="btnReflash" value="">
 </form><script>function 검사(){ alert('문의자를 입력해주세요.'); alert('문의내용을 입력해주세요.'); }</script></body></html>`;
@@ -107,8 +110,8 @@ window.VP저장 = { get: async function(){return {};}, set: async function(){}, 
   const 못 = (참) => { if (참) { 초록++; return '✓'; } 빨강++; return '✗'; };
 
   /* 경우: 줄 차례(2=…-101 이을 수 있음, 3=…-102 못 이음) · 저장 답 */
-  async function 해보기(이름, { 줄 = 2, 저장답 = 'ok', 할일 }) {
-    const 일 = { 패치: 0, 잇기: [], 저장: [], 가져옴: 0, 벤더쓰기: [], 찾기: [], 목록: [], 확인: 0 };
+  async function 해보기(이름, { 줄 = 2, 저장답 = 'ok', 탭안바뀜 = false, 할일 }) {
+    const 일 = { 패치: 0, 잇기: [], 저장: [], 가져옴: 0, 벤더쓰기: [], 찾기: [], 목록: [], 확인: 0, 문의주소: [] };
     const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
     await ctx.route('**://vivivic-cloud.github.io/**', r => r.abort('blockedbyclient'));
     await ctx.route('**://identitytoolkit.googleapis.com/**', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{"idToken":"ascii-fake"}' }));
@@ -135,13 +138,14 @@ window.VP저장 = { get: async function(){return {};}, set: async function(){}, 
         return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: 목록쪽(일.목록.filter(x => x.내용.includes(찾))) });
       }
       if (/csDetl\.aspx$/i.test(u.pathname)) {
+        일.문의주소.push(셈 + ' ' + u.search);
         if (셈 === 'GET') { 일.가져옴++; return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: 문의쪽() }); }
         const f = 풀기(r.request().postData());
         if (C('btnReflash') in f) {
           일.잇기.push(f);
           const 안 = f[C('hOrderNo')], 몰 = 안번호주문[안];
           return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: 문의쪽(몰
-            ? { 판: 2, 주문: `${몰} / ${안} / ${안}`, 숨은: 안, 주문자: '김가짜', 문의자: '김가짜', 상품: '토리블리 2단 와이드 교구장', 매출처: '가매출처', 배송: 'D9',
+            ? { 판: 2, 탭: 탭안바뀜 ? 'CS' : 'INQUERY', 주문: `${몰} / ${안} / ${안}`, 숨은: 안, 주문자: '김가짜', 문의자: '김가짜', 상품: '토리블리 2단 와이드 교구장', 매출처: '가매출처', 배송: 'D9',
                 상태: f[C('hdStatusCd')], 가용: f[C('tbUsableQty')] }
             : { 판: 2, 주문: '' }) });
         }
@@ -208,7 +212,9 @@ window.VP저장 = { get: async function(){return {};}, set: async function(){}, 
   console.log('    저장 한 번 · 이어진 숨은 칸·새 VIEWSTATE 를 그대로 실음 ' + 못(일.저장.length === 1
     && s[C('hOrderNo')] === '1230001' && s[C('hdeliveryNo')] === 'D9' && s.__VIEWSTATE === 'VS2'));
   console.log('    문의자 「' + s[C('tbInquirer')] + '」 = 주문자 ' + 못(s[C('tbInquirer')] === '김가짜'));
-  console.log('    제목 「' + s[C('tbTitle')] + '」 ' + 못(s[C('tbTitle')] === '[교환] 문짝 흠. 교환 원하심'));
+  console.log('    ★ 제목 「' + s[C('tbTitle')] + '」 = 글 앞 10글자(「[교환]」 없음) ' + 못(s[C('tbTitle')] === '문짝 흠. 교환 원'));
+  console.log('    ★ GET·잇기·저장 모두 csDetl.aspx?previousPage=first ' + 못(일.문의주소.length === 3
+    && 일.문의주소.every(x => x.endsWith(' ?previousPage=first')) && 일.문의주소[0].startsWith('GET')));
   console.log('    문의내용 = 쓴 글 그대로 ' + 못(String(s[C('tbContent')]).replace(/\r\n/g, '\n') === '문짝 흠. 교환 원하심\n다음 주 수요일 재배송'));   // 폼은 줄바꿈을 \r\n 으로 보낸다(브라우저 규칙)
   console.log('    문의유형 = 교환(I2) ' + 못(s[C('ddlInqType')] === 'I2'));
   console.log('    ★ 빈 파일 칸은 브라우저처럼 실음 · 잇기 단추는 안 실음 ' + 못(!(C('btnReflash') in s) && s[C('fileUpload1')] === ''));
@@ -225,8 +231,8 @@ window.VP저장 = { get: async function(){return {};}, set: async function(){}, 
     await page.evaluate(() => document.querySelector('.vp-상담적기').requestSubmit());
   } }));
   console.log('    ★ 등록 한 번뿐 · 창고 한 번뿐 ' + 못(일.저장.length === 1 && 일.패치 === 1));
-  console.log('    종류 없으면 문의유형은 기본값(I0) · 제목 = 글 ' + 못(일.저장[0] && 일.저장[0][C('ddlInqType')] === 'I0'
-    && 일.저장[0][C('tbTitle')] === '배송 언제 오나요 문의'));
+  console.log('    종류 없으면 문의유형은 기본값(I0) · 제목 = 앞 10글자 끝 공백 정리 ' + 못(일.저장[0] && 일.저장[0][C('ddlInqType')] === 'I0'
+    && 일.저장[0][C('tbTitle')] === '배송 언제 오나요'));
 
   /* C — 원주문 검색에 없음 */
   ({ 일, 알림 } = await 해보기('C 원주문 검색에 없는 주문', { 줄: 3, 할일: 쓰고접수('반품 원함', '반품') }));
@@ -250,6 +256,16 @@ window.VP저장 = { get: async function(){return {};}, set: async function(){}, 
   /* H — 벤더피아 서버 오류(HTTP 500) */
   ({ 일, 알림 } = await 해보기('H 벤더피아 서버 오류 500', { 저장답: '500', 할일: 쓰고접수('반품 접수', '반품') }));
   console.log('    ★ 「등록 실패(③ 벤더피아가 저장 안 함 — 저장 HTTP 500 · 그 오류 글)」 ' + 못(/등록 실패\(③ 벤더피아가 저장 안 함 — 저장 HTTP 500 · 개체 참조가/.test(알림)));
+
+  /* I — 잇기 응답이 고객문의 탭으로 안 바뀜 → 저장 안 함 */
+  ({ 일, 알림 } = await 해보기('I 잇기 뒤 탭이 고객문의 아님', { 탭안바뀜: true, 할일: 쓰고접수('교환 문의', '교환') }));
+  console.log('    ★ 저장 POST 안 보냄 · 「등록 실패(② 잇기 뒤 고객문의 칸이 안 열림…)」 ' + 못(일.잇기.length === 1 && 일.저장.length === 0
+    && /등록 실패\(② 잇기 뒤 고객문의 칸이 안 열림/.test(알림)));
+
+  /* J — 앞뒤 공백·줄바꿈 정리 */
+  ({ 일, 알림 } = await 해보기('J 공백·줄바꿈 섞인 글', { 할일: 쓰고접수('  AS\n\n  다리 흔들림 고정 요청', 'AS') }));
+  console.log('    ★ 제목 「' + (일.저장[0] || {})[C('tbTitle')] + '」 = 「AS 다리 흔들림 」 앞 10글자 정리 ' + 못(일.저장[0]
+    && 일.저장[0][C('tbTitle')] === 'AS 다리 흔들림'));
 
   /* E — 상태 단추는 벤더피아로 안 감 */
   ({ 일, 알림 } = await 해보기('E 접수 뒤 상태 「처리중」', { 할일: async (page) => {
