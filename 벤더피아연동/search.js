@@ -226,13 +226,232 @@
     if (진단칸) 진단칸.textContent = 줄;
   }
 
+  /* ── 상담내용보기 = 벤더피아 CS→고객문의 목록 (10-27 [새 지시 상담내용보기]) ──────────────
+     사장님(그대로): 「시에등록 헤더에 상담내용보기 버튼을 만들어서 벤더피아 실재 페이지의 CS-고객문의 페이지를 현재 표 디자인에 맞게
+       보여주는 페이지가 나타나게 해줘」 「실재 벤더피아 페이지 확인하고 작업해」
+     CS등록 머리의 「상담내용보기」 = 새 탭 `orderMst.aspx#vgInq`(확장이 search.js 를 보내는 쪽이라 덮어쓰기 없이 된다) → 여기서 갈라
+     **`/System/CS/inquiryList.aspx` 를 조회만** 해 우리 표 꼴로 그린다. 요청·칸은 사장님 크롬에서 잰 것(CLAUDE.md 「고객문의 목록」).
+     · 처음 = GET(기본 기간 한 달·27줄). 조회 = 받은 폼 그대로 + `btnSearch.x/.y` POST. 쪽 넘김 = 받은 폼 + `__EVENTTARGET`(PageNum 링크) 또는 그림 단추 `.x/.y`.
+     · 숨은 칸(주문번호·ctCd·inquiryCd·매출처…주소·순번)은 표에 안 그리고, 줄을 누르면 판에 **모든 칸**(문의내용·답변내용 전문 포함)을 보인다.
+     ⚠ 등록·삭제·엑셀 단추는 안 보낸다(그림 단추라 폼값에 안 들어간다). 벤더피아에는 조회만. */
+  const 상담보기 = CS전용 && /(^|[#&])vgInq\b/i.test(location.hash || "");
+  if (상담보기) { 상담내용보기(); return; }
+  function 상담내용보기() {
+    const 주소 = "/System/CS/inquiryList.aspx";
+    const 숨은칸 = new Set(["", "주문번호", "ctCd", "inquiryCd", "매출처", "매출처주문번호", "매출처상품코드", "주문자", "주문자전화",
+      "주문자핸드폰", "수취인", "수취인전화", "수취인휴대폰", "우편번호", "주소", "순번"]);
+    const 긴칸 = new Set(["상품명", "제목", "문의내용", "답변내용"]);
+    const 고르는칸 = ["ddlInqType", "ddlCallEndGb", "ddlMall", "ddlSupplier", "ddlInboundYn"];
+    const 앞 = "ctl00$Contents$";
+    const r = document.createElement("div");
+    r.id = "vp-root";
+    r.className = "vp-wide";
+    r.innerHTML = `
+    <div class="vp-search">
+      <a class="vp-home" href="/index.aspx">← 메인</a>
+      <h1>상담내용보기</h1>
+      <form class="vp-bar">
+        <input type="date" name="from" required>
+        <span>~</span>
+        <input type="date" name="to" required>
+        <input name="q" class="vp-q" placeholder="문의자, 수취인, 주문자, 상품명, 제목, 문의내용, 매출처주문번호, 전화, 문의유형, 처리결과…">
+        <button type="submit">조회</button>
+      </form>
+      <div class="vp-note">불러오는 중…</div>
+      <div class="vp-table"></div>
+      <div class="vp-쪽넘김"></div>
+    </div>`;
+    document.body.appendChild(r);
+    document.documentElement.classList.add("vp-clean");
+    const 막대 = r.querySelector(".vp-bar"), 알림 = r.querySelector(".vp-note"), 통 = r.querySelector(".vp-table"), 쪽칸 = r.querySelector(".vp-쪽넘김");
+    let 처음문서 = null, 지금문서 = null, 차례 = 0;
+
+    const 읽기 = (글) => new DOMParser().parseFromString(글.replace(/<script\b[\s\S]*?<\/script>/gi, ""), "text/html");
+    /* 폼값 — 그림·제출 단추는 안 넣는다(등록·삭제가 섞여 갈 일이 없다) */
+    function 폼값(doc) {
+      const f = doc.forms[0], p = new URLSearchParams();
+      if (!f) return p;
+      for (const e of f.querySelectorAll("input[name],select[name],textarea[name]")) {
+        const t = (e.type || "").toLowerCase();
+        if (["image", "submit", "button", "file", "reset"].includes(t)) continue;
+        if ((t === "checkbox" || t === "radio") && !e.checked) continue;
+        if (e.tagName === "SELECT") { const o = e.querySelector("option[selected]") || e.options[0]; p.append(e.name, o ? o.value : ""); continue; }
+        p.append(e.name, e.value || "");
+      }
+      return p;
+    }
+    async function 묻기(p) {
+      const res = p ? await fetch(주소, { method: "POST", body: p, credentials: "include" }) : await fetch(주소, { credentials: "include" });
+      return 읽기(await res.text());
+    }
+    const 칸글 = (td) => { const c = td.cloneNode(true); c.querySelectorAll("br").forEach((b) => b.replaceWith("\n")); c.querySelectorAll("input,script,style").forEach((x) => x.remove());
+      const 글 = c.textContent.replace(/ /g, " ").trim(), 제목 = (td.getAttribute("title") || "").trim(); return 제목.length > 글.length ? 제목 : 글; };
+    function 목록(doc) {
+      const g = doc.getElementById("oGrid") || doc;
+      const trs = [...g.querySelectorAll("tr")];
+      const 머리줄 = trs.find((tr) => [...tr.cells].some((c) => c.textContent.trim() === "문의자"));
+      if (!머리줄) return { heads: [], rows: [] };
+      const n = 머리줄.cells.length;
+      return { heads: [...머리줄.cells].map((c) => c.textContent.trim()),
+        rows: trs.filter((tr) => tr !== 머리줄 && tr.cells.length === n && !tr.querySelector("tr") && !tr.querySelector("th")).map((tr) => [...tr.cells].map(칸글)) };
+    }
+    const 값 = (doc, 이름) => ((doc.querySelector(`[name="${앞}${이름}"]`) || {}).value || "");
+
+    function 그리기(heads, rows) {
+      통.replaceChildren();
+      if (!heads.length) return;
+      const 보일 = heads.map((h, i) => (숨은칸.has(h) ? -1 : i)).filter((i) => i >= 0);
+      const t = document.createElement("table");
+      const hr = t.createTHead().insertRow();
+      보일.forEach((i, k) => { const th = hr.appendChild(document.createElement("th")); th.textContent = heads[i]; if (!k) th.className = "vp-first"; });
+      const tb = t.createTBody();
+      for (const row of rows) {
+        const tr = tb.insertRow();
+        tr.className = "vp-줄상담";
+        보일.forEach((i, k) => { const td = tr.insertCell(); td.textContent = row[i] || ""; if (!k) td.className = "vp-first"; else if (긴칸.has(heads[i])) { td.className = "vp-긴글"; td.title = row[i] || ""; } });
+        tr.addEventListener("click", () => 판열기(heads, row));
+      }
+      통.appendChild(t);
+    }
+    /* 쪽 넘김 = 벤더피아가 준 그대로(번호 링크 + 처음·이전·다음·끝 그림 단추) */
+    function 쪽그리기(doc) {
+      쪽칸.replaceChildren();
+      if (!doc) return;
+      const 지금 = 값(doc, "Pager1$hdCurrentPage") || (doc.getElementById("hdCurrentPage") || {}).value || "";
+      const 글자 = { First: "«", Prev: "‹", Previous: "‹", Next: "›", Last: "»" };
+      const 단추 = (글, 일, 이번) => { const b = 쪽칸.appendChild(document.createElement("button")); b.type = "button"; b.textContent = 글; if (이번) b.setAttribute("aria-current", "page"); b.addEventListener("click", 일); };
+      const 그림 = [...doc.querySelectorAll("input[type=image]")].filter((e) => /Pager1\$/.test(e.name));
+      const 그림단추 = (e) => 단추(글자[e.alt] || e.alt || "…", () => 넘기기({ [e.name + ".x"]: "5", [e.name + ".y"]: "5" }));
+      그림.filter((e) => /^(First|Prev)/i.test(e.alt)).forEach(그림단추);
+      for (const a of doc.querySelectorAll("a.PageNum")) {
+        const m = (a.getAttribute("href") || "").match(/__doPostBack\('([^']+)'/);
+        if (m) 단추(a.textContent.trim(), () => 넘기기({ __EVENTTARGET: m[1], __EVENTARGUMENT: "" }), a.textContent.trim() === 지금);
+      }
+      그림.filter((e) => !/^(First|Prev)/i.test(e.alt)).forEach(그림단추);
+    }
+    function 보이기(doc) {
+      const { heads, rows } = 목록(doc);
+      지금문서 = doc;
+      그리기(heads, rows);
+      쪽그리기(doc);
+      const 전체 = 값(doc, "Pager1$ctl01"), 지금 = 값(doc, "Pager1$hdCurrentPage");
+      알림.textContent = !heads.length ? "고객문의 목록을 읽지 못했습니다." : !rows.length ? "고객문의가 없습니다."
+        : (전체 ? Number(전체).toLocaleString() + "건" : rows.length + "건") + (지금 ? " · " + 지금 + "쪽" : "");
+    }
+    async function 넘기기(더) {
+      if (!지금문서) return;
+      const 내차례 = ++차례;
+      const p = 폼값(지금문서);
+      p.set("__EVENTTARGET", ""); p.set("__EVENTARGUMENT", "");
+      for (const [k, v] of Object.entries(더)) p.set(k, v);
+      알림.textContent = "불러오는 중…";
+      try { const doc = await 묻기(p); if (내차례 === 차례) 보이기(doc); }
+      catch (e) { if (내차례 === 차례) 알림.textContent = "고객문의 목록을 읽지 못했습니다."; }
+    }
+
+    /* 검색어 나누기 — 고르는 칸 글자(문의유형·처리결과·몰·매입처·수발신) → 그 칸 / 전화·짧은 숫자 → 받은 줄에서 거름(숨은 전화 칸까지) /
+       9자리↑ 숫자 → 매출처주문번호 / 그 밖 글 → 문의자·수취인·주문자·상품명·제목·문의내용 여섯으로 따로 묻고 합침(같은 문의 한 번) */
+    function 나누기(말) {
+      const 고름 = {}, 거름 = [];
+      let 갈래 = null;
+      for (const 낱 of 말.trim().split(/\s+/).filter(Boolean)) {
+        let 맞음 = null;
+        for (const id of 고르는칸) {
+          const s = 처음문서 && 처음문서.querySelector(`select[name="${앞}${id}"]`);
+          const o = s && [...s.options].find((x) => x.text.trim() !== "전체" && norm(x.text) === norm(낱));
+          if (o) { 맞음 = [id, o.value]; break; }
+        }
+        if (맞음) { 고름[맞음[0]] = 맞음[1]; continue; }
+        const 숫 = 낱.replace(/-/g, ""), 숫자 = /^[\d-]+$/.test(낱);
+        if (갈래 || (숫자 && (/^0\d{8,10}$/.test(숫) || 숫.length <= 8))) { 거름.push(숫자 ? 숫 : 낱); continue; }
+        갈래 = 숫자 ? [{ tbStoreOrderNo: 낱 }]
+          : ["tbInquirer", "tbRecipient", "tbOrderer", "tbSGoodsNm", "tbTitle", "tbContent"].map((k) => ({ [k]: 낱 }));
+      }
+      return { 고름, 거름, 갈래 };
+    }
+    막대.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!처음문서) return;
+      const fd = new FormData(막대), 말 = String(fd.get("q") || "");
+      const { 고름, 거름, 갈래 } = 나누기(말);
+      const 내차례 = ++차례;
+      const 밑 = () => {
+        const p = 폼값(처음문서);
+        for (const k of [...p.keys()]) if (/\$tb\w+$/.test(k)) p.set(k, "");
+        for (const id of 고르는칸) if (p.has(앞 + id)) p.set(앞 + id, "전체");
+        p.set(앞 + "dcStartDt", fd.get("from")); p.set(앞 + "dcEndDt", fd.get("to"));
+        for (const [k, v] of Object.entries(고름)) p.set(앞 + k, v);
+        p.set("__EVENTTARGET", ""); p.set("__EVENTARGUMENT", "");
+        p.set(앞 + "btnSearch.x", "5"); p.set(앞 + "btnSearch.y", "5");
+        return p;
+      };
+      알림.textContent = "불러오는 중…";
+      try {
+        if (!갈래 && !거름.length) { const doc = await 묻기(밑()); if (내차례 === 차례) 보이기(doc); return; }
+        /* 여러 칸으로 묻거나 받은 줄에서 거를 때는 한 번에 500줄 받아 합친다(쪽 넘김 없음) */
+        const 묶음 = await Promise.all((갈래 || [{}]).map((k) => { const p = 밑(); p.set(앞 + "ddlRowCnt", "500");
+          for (const [n, v] of Object.entries(k)) p.set(앞 + n, v); return 묻기(p); }));
+        if (내차례 !== 차례) return;
+        let heads = [], 줄들 = [];
+        const 본 = new Set();
+        for (const doc of 묶음) {
+          const l = 목록(doc);
+          if (l.heads.length) heads = l.heads;
+          const 열쇠자리 = l.heads.indexOf("inquiryCd");
+          for (const row of l.rows) { const 열쇠 = 열쇠자리 >= 0 ? row[열쇠자리] : row.join("\t"); if (본.has(열쇠)) continue; 본.add(열쇠); 줄들.push(row); }
+        }
+        if (거름.length) 줄들 = 줄들.filter((row) => 거름.every((w) => row.some((v) => String(v).includes(w) || String(v).replace(/-/g, "").includes(w))));
+        지금문서 = null;
+        그리기(heads, 줄들);
+        쪽칸.replaceChildren();
+        알림.textContent = !heads.length ? "고객문의 목록을 읽지 못했습니다." : 줄들.length + "건";
+      } catch (err) { if (내차례 === 차례) 알림.textContent = "고객문의 목록을 읽지 못했습니다."; }
+    });
+
+    /* 줄 누름 = 그 문의의 모든 칸(문의내용·답변내용 전문) — 상담 판과 같은 꼴, 끌 수 있다. 보기만 한다. */
+    let 판 = null;
+    const 판닫기 = () => { if (판) { 판.remove(); 판 = null; } };
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") 판닫기(); });
+    function 판열기(heads, row) {
+      판닫기();
+      const 칸 = (n) => { const i = heads.indexOf(n); return i >= 0 ? row[i] || "" : ""; };
+      const 덮개 = document.createElement("div");
+      덮개.className = "vp-상담덮개";
+      덮개.innerHTML = `<div class="vp-상담판" role="dialog" aria-label="문의내용">
+        <div class="vp-상담머리"><strong></strong><small></small>
+          <button type="button" class="vp-상담닫기" aria-label="닫기">×</button></div>
+        <div class="vp-상담목록"><div class="vp-상담줄"><small>문의내용</small><p class="vp-문의글"></p></div>
+          <div class="vp-상담줄"><small>답변내용</small><p class="vp-답변글"></p></div>
+          <div class="vp-상담줄 vp-문의칸"></div></div></div>`;
+      덮개.querySelector("strong").textContent = 칸("제목") || "문의";
+      덮개.querySelector("small").textContent = [칸("문의자"), 칸("문의유형"), 칸("처리결과"), 칸("문의접수일")].filter(Boolean).join(" · ");
+      덮개.querySelector(".vp-문의글").textContent = 칸("문의내용") || "(없음)";
+      덮개.querySelector(".vp-답변글").textContent = 칸("답변내용") || "(없음)";
+      고객그리기(덮개.querySelector(".vp-문의칸"), row, heads.map((h) => (["ctCd", "inquiryCd", "순번", "제목", "문의내용", "답변내용"].includes(h) ? "" : h)));
+      덮개.addEventListener("click", (e) => { if (e.target === 덮개 || e.target.closest(".vp-상담닫기")) 판닫기(); });
+      r.appendChild(덮개);
+      판 = 덮개;
+      끌수있게(덮개);
+    }
+
+    (async () => {
+      try {
+        const doc = await 묻기(null);
+        처음문서 = doc;
+        막대.elements.from.value = 값(doc, "dcStartDt");
+        막대.elements.to.value = 값(doc, "dcEndDt");
+        if (!차례) 보이기(doc);
+      } catch (e) { 알림.textContent = "고객문의 목록을 읽지 못했습니다."; }
+    })();
+  }
+
   const root = document.createElement("div");
   root.id = "vp-root";
   root.className = "vp-wide";
   root.innerHTML = CS전용 ? `
     <div class="vp-search">
       <a class="vp-home" href="/index.aspx">← 메인</a>
-      <h1>CS등록</h1>
+      <div class="vp-머리줄"><h1>CS등록</h1><a class="vp-머리단추" href="/System/Sales/orderMst.aspx#vgInq" target="_blank" rel="noopener">상담내용보기</a></div>
       <form class="vp-bar">
         <input type="date" name="from" required>
         <span>~</span>
