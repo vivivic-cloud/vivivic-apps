@@ -133,11 +133,76 @@ const VP_DATA = (() => {
        우리 화면이 뒤에서(이름 찾기·재고·미리 받기) 요청을 쉬지 않고 이어 보내면 새 창 오리지널의 요청이 계속 밀린다.
      → 「벤더피아」 단추(login.js)가 `VP원본쉼()` 을 부르면 그때부터 15초 동안 **여기서 나가는 벤더피아 요청을 모두 세운다**.
        localStorage 라 같은 벤더피아의 다른 우리 탭도 같이 쉰다. 이미 나간 요청은 그대로 끝난다. */
-  const 쉼열쇠 = "vp원본쉼", 쉬는동안 = 15000;
-  const 쉼끝 = () => { let t = 0; try { t = Number(localStorage.getItem(쉼열쇠)) || 0; } catch (e) {} return t + 쉬는동안; };
-  const 비켜 = async () => { for (let 남음; (남음 = 쉼끝() - Date.now()) > 0;) await new Promise((r) => setTimeout(r, Math.min(남음, 1000))); };
-  const 벤더피아받기 = async (url, opt) => (await 비켜(), fetch(url, opt));
-  window.VP원본쉼 = () => { try { localStorage.setItem(쉼열쇠, String(Date.now())); } catch (e) {} };
+  /* ⚠⚠ 10-27 [새 지시 이동느림근본] 사장님(그대로) 「야 이거 상담내용 보거나 메인페이지로 가거나 아무튼 클릭으로 벤더피아의 다른 페이지 보여질때 너무 오래걸린다 뭔가 원론적인 문제가 있지 않을까?」
+     까닭(사장님 크롬에서 잼, 조회 GET 만): 벤더피아는 한 로그인의 aspx 요청을 **하나씩** 처리하고, 못 들어간 요청은 0.5초마다 다시 잡아 본다.
+       300ms 쪽 하나가 — 우리 뒤 요청이 하나라도 쉬지 않고 이어지면 4.5~8.5초, 둘이면 14.8초. 이어 보내는 우리 요청이 잠금을 늘 먼저 잡는다.
+       누를 때 새 요청만 멈추면 0.4~0.8초. 이미 나간 요청을 끊는 것(Abort)은 소용없다 — 서버는 끝까지 처리한다(6개 끊어도 0.8~1.9초).
+       뒤 요청 사이에 0.55초 틈을 두면 0.33초(혼자일 때와 같음), 0.3초 틈은 0.4~0.9초.
+     → **벤더피아로 가는 우리 요청은 모두 이 줄(`벤더피아받기`)로만** 간다(search.js 도 `VP_DATA.받기`). 규칙:
+       · 한 문서에서 한 번에 **하나만** 나간다(동시에 보내도 서버가 하나씩 하고 사이마다 놀아 더 늦다 — 4개 동시 1.8초 ↔ 차례로 1.0초).
+         차례: 보호(고객문의 등록) → 사람(누른 것·조회) → 뒤(이름 찾기·미리 받기).
+       · 이 쪽을 **떠날 때**(beforeunload) 보호 말고 새 요청을 세운다(15초 — 이동이 취소되면 그 뒤 다시 간다). pagehide 에 남은 것을 끊는다.
+         다른 우리 문서(탭·틀)에도 알린다(localStorage `vp쉼`) → 그쪽 뒤 요청이 쉰다. 새 쪽이 뜨면(그 쪽 vp-data.js) 1.5초 뒤 풀린다.
+       · 다른 쪽으로 가는 링크·벤더피아 제 단추를 **누르는 순간**(pointerdown·Enter) 2.5초 뒤 요청을 세운다 — 새 탭으로 열리는 것도 그 사이 잠금을 잡는다.
+         (우리 화면 `#vp-root` 의 단추 — 조회·이름 단추 — 는 안 세운다: 세우면 이름 단추·점이 2.5초 늦게 붙는다. 시험 `상품단추` 가 잡음)
+       · 화면에 **안 보이면** 뒤 요청은 멈추고, 안 보이거나 창이 딴 데 있으면(다른 창·오리지널 새 창) 사람 요청도 요청 사이 0.55초 틈을 둔다.
+       · 「벤더피아」 단추(`VP원본쉼`)는 전처럼 15초 — 다른 우리 탭에도.
+     ⚠ 새 벤더피아 요청 길을 만들면 **반드시 `벤더피아받기`/`VP_DATA.받기`** 를 쓴다. 맨 `fetch` 로 벤더피아에 묻지 마라. */
+  const 쉼열쇠 = "vp쉼", 틈 = 550, 떠남동안 = 15000, 누름동안 = 2500, 원본동안 = 15000;
+  const 나 = Math.random().toString(36).slice(2), 내탄생 = Date.now();
+  let 쉼끝 = 0, 떠남끝 = 0, 마지막끝 = 0, 나감 = 0, 번호 = 0, 깨움 = 0;
+  const 줄 = [], 나간것 = new Set(), 순위 = { 보호: 0, 사람: 1, 뒤: 2 };
+  const 쉼읽기 = () => { try { return JSON.parse(localStorage.getItem(쉼열쇠) || "null"); } catch (e) { return null; } };
+  const 쉼쓰기 = (v) => { try { localStorage.setItem(쉼열쇠, JSON.stringify(v)); } catch (e) {} };
+  const 남의쉼끝 = () => { const v = 쉼읽기(); return v && v.누구 !== 나 && v.at >= 내탄생 ? v.끝 : 0; };
+  const 보임 = () => !document.hidden;
+  const 눈앞 = () => { try { return 보임() && window.top.document.hasFocus(); } catch (e) { return 보임() && document.hasFocus(); } };
+  const 막힘 = (급, t) => {
+    if (급 === "보호") return false;
+    if (떠남끝 > t) return true;
+    const 남의 = 남의쉼끝() > t;
+    if (급 === "뒤" && (쉼끝 > t || 남의 || !보임())) return true;
+    return (남의 || !눈앞()) && t < 마지막끝 + 틈;        // 다른 데서 벤더피아를 쓸 수 있을 때 — 잠금을 잡을 틈을 둔다
+  };
+  function 돌리기() {
+    if (나감 || !줄.length) return;
+    const t = Date.now();
+    줄.sort((a, b) => 순위[a.급] - 순위[b.급] || a.n - b.n);
+    const i = 줄.findIndex((x) => !막힘(x.급, t));
+    if (i < 0) { if (!깨움) 깨움 = setTimeout(() => { 깨움 = 0; 돌리기(); }, 200); return; }
+    const x = 줄.splice(i, 1)[0];
+    나감++; 나간것.add(x);
+    fetch(x.url, x.opt).then(x.됨, x.안됨).finally(() => { 나감--; 나간것.delete(x); 마지막끝 = Date.now(); 돌리기(); });
+  }
+  const 벤더피아받기 = (url, opt = {}, 급 = "사람") => new Promise((됨, 안됨) => {
+    const 끊개 = new AbortController();
+    if (opt.signal) opt.signal.addEventListener("abort", () => 끊개.abort());
+    줄.push({ url, opt: { ...opt, signal: 끊개.signal }, 급, n: 번호++, 끊개, 됨, 안됨 });
+    돌리기();
+  });
+  const 올리기 = (url) => { for (const x of 줄) if (x.url === url && x.급 === "뒤") x.급 = "사람"; 돌리기(); };   // 누른 것이 기다리는 뒤 요청은 사람으로
+  const 끊기 = () => {
+    for (const x of 줄.splice(0)) { if (x.급 === "보호") 줄.push(x); else x.안됨(new DOMException("떠남", "AbortError")); }
+    for (const x of 나간것) if (x.급 !== "보호") x.끊개.abort();
+  };
+  window.VP원본쉼 = () => { 쉼끝 = Date.now() + 원본동안; 쉼쓰기({ at: Date.now(), 끝: Date.now() + 원본동안, 누구: 나 }); };
+  if (typeof addEventListener === "function") {          // (시험이 node 에서 이 글을 읽기만 할 때는 없다)
+  addEventListener("beforeunload", () => { const t = Date.now(); 떠남끝 = t + 떠남동안; 쉼쓰기({ at: t, 끝: t + 떠남동안, 누구: 나, 이동: 1 }); });
+  addEventListener("pagehide", (e) => { if (!e.persisted) 끊기(); });
+  addEventListener("pageshow", (e) => { if (e.persisted) { 떠남끝 = 0; 돌리기(); } });
+  const 누름 = (e) => {
+    if (e.type === "keydown" && e.key !== "Enter") return;
+    /* 다른 쪽으로 가는 것만 — 진짜 주소 링크(어디든)·벤더피아 제 단추. 우리 화면(#vp-root)의 단추(조회·이름 단추)는 제 요청이 「사람」 이라 먼저 가니 안 세운다 */
+    const 것 = e.target?.closest?.("a[href],area[href],button,input[type=submit],input[type=image],input[type=button],[onclick]");
+    if (!것) return;
+    const 링크 = 것.matches("a,area") && !/^(#|javascript:)/i.test(것.getAttribute("href") || "");
+    if (링크 || !것.closest("#vp-root")) 쉼끝 = Math.max(쉼끝, Date.now() + 누름동안);
+  };
+  addEventListener("pointerdown", 누름, true);
+  addEventListener("keydown", 누름, true);
+  for (const 일 of ["visibilitychange", "focus", "pageshow"]) addEventListener(일, () => 돌리기());
+  }
+  { const v = 쉼읽기(); if (v && v.이동 && v.누구 !== 나 && v.끝 > Date.now()) 쉼쓰기({ ...v, 끝: Math.min(v.끝, Date.now() + 1500) }); }   // 새 쪽이 떴다
   let foreground = 0;
   const idle = async () => { while (foreground > 0) await new Promise((r) => setTimeout(r, 150)); };
 
@@ -146,7 +211,7 @@ const VP_DATA = (() => {
     const field = (id) => src.getElementById(id) || [...src.forms[0].elements].find((e) => e.name?.endsWith("$" + id));
     const nameOf = (id) => field(id)?.name || id;
     const post = async (fd) => (background && await idle(),
-      parse(await (await 벤더피아받기(url, { method: "POST", body: fd, credentials: "include" })).text(), cfg.nameCol));
+      parse(await (await 벤더피아받기(url, { method: "POST", body: fd, credentials: "include" }, background ? "뒤" : "사람")).text(), cfg.nameCol));
     const btn = src.getElementById("btnSearch").name;
     const rowOptions = [...(field("ddlRowCnt")?.options || [])].map((o) => Number(o.value));
     const fewRows = String(Math.min(...rowOptions));
@@ -275,7 +340,7 @@ const VP_DATA = (() => {
     let 끝냄; 받는중.set(key, new Promise((r) => { 끝냄 = r; }));
     try {
       if (background) await idle();
-      src ||= new DOMParser().parseFromString(await (await 벤더피아받기(url, { credentials: "include" })).text(), "text/html");
+      src ||= new DOMParser().parseFromString(await (await 벤더피아받기(url, { credentials: "include" }, background ? "뒤" : "사람")).text(), "text/html");
       let heads = [];
       const rows = [];
       let whole = true;
@@ -306,7 +371,7 @@ const VP_DATA = (() => {
     const start = new Date(today);
     start.setMonth(start.getMonth() - 3);
     const three = { from: ymd(start), to: ymd(today) };
-    const open = async (url) => (await idle(), new DOMParser().parseFromString(await (await 벤더피아받기(url, { credentials: "include" })).text(), "text/html"));
+    const open = async (url) => (await idle(), new DOMParser().parseFromString(await (await 벤더피아받기(url, { credentials: "include" }, "뒤")).text(), "text/html"));
     const noop = () => {};
     const steps = [
       // 단품관리 (상품관리 상세의 단품 버튼도 이것을 쓴다)
@@ -345,17 +410,18 @@ const VP_DATA = (() => {
   // ⚠ 여기서 받은 줄은 이름·코드 두 칸만 남기고 버린다(금액·사람 칸을 담지 않는다). 저장하는 쪽(goods.js)도 두 칸만 저장한다.
   const 쉬기 = () => new Promise((r) => setTimeout(r, 0));
   const 처음문서들 = new Map();   // 주소 → 그 화면의 처음 문서(검색 폼) 약속. 쪽을 연 동안 한 번만 받는다
-  function 처음문서(url) {
+  function 처음문서(url, 급) {
     if (!처음문서들.has(url)) {
-      const 약속 = 벤더피아받기(url, { credentials: "include" }).then((r) => r.text())
+      const 약속 = 벤더피아받기(url, { credentials: "include" }, 급).then((r) => r.text())
         .then(async (t) => (await 쉬기(), new DOMParser().parseFromString(t, "text/html")));
       처음문서들.set(url, 약속);
       약속.catch(() => 처음문서들.delete(url));
     }
+    if (급 === "사람") 올리기(url);
     return 처음문서들.get(url);
   }
   // 벤더피아 검색 폼을 채워 한 번 묻는 틀 (fetchAll 의 query 와 같은 채움: 원래 검색칸 비우기 → 기간 → 고정값)
-  function 질문틀(cfg, url, src, serverValue) {
+  function 질문틀(cfg, url, src, serverValue, 급) {
     const field = (id) => src.getElementById(id) || [...src.forms[0].elements].find((e) => e.name?.endsWith("$" + id));
     const nameOf = (id) => field(id)?.name || id;
     const btn = src.getElementById("btnSearch").name;
@@ -376,7 +442,7 @@ const VP_DATA = (() => {
       fd.set(nameOf("ddlRowCnt"), rowCnt);
       fd.append(btn + ".x", "5");
       fd.append(btn + ".y", "5");
-      const html = await (await 벤더피아받기(url, { method: "POST", body: fd, credentials: "include" })).text();
+      const html = await (await 벤더피아받기(url, { method: "POST", body: fd, credentials: "include" }, 급)).text();
       await 쉬기();
       return parse(html, cfg.nameCol);
     };
@@ -386,8 +452,9 @@ const VP_DATA = (() => {
   async function 하나찾기(cfg, url, serverValue, { name, code, 먼저, 가볍게 }) {
     foreground++;
     try {
-      const src = await 처음문서(url);
-      const 틀 = 질문틀(cfg, url, src, serverValue);
+      const 급 = 가볍게 ? "뒤" : "사람";     // 이름 단추 붙이기 = 뒤, 누른 단추 상세 = 사람
+      const src = await 처음문서(url, 급);
+      const 틀 = 질문틀(cfg, url, src, serverValue, 급);
       const L = cfg.lookup || {};
       const 열쇠 = (t) => String(t || "").trim().toLowerCase();
       const 시도 = [];
@@ -420,5 +487,5 @@ const VP_DATA = (() => {
     }
   }
 
-  return { PAGES: PAGES_, list, ymd, prefetch, clearCache, 하나찾기 };
+  return { PAGES: PAGES_, list, ymd, prefetch, clearCache, 하나찾기, 받기: 벤더피아받기 };
 })();

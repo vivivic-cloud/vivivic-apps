@@ -1,6 +1,8 @@
 // 배송관리(배송목록조회) 화면을 기간 + 검색창 하나로 바꾼다.
 // 조회는 원래 화면의 검색 폼을 그대로 벤더피아에 보내고, 받은 결과에서 목록만 뽑아 보여준다.
 (() => {
+  /* 10-27 [새 지시 이동느림근본] 벤더피아 요청은 모두 공용 줄(vp-data.js `벤더피아받기`)로 — 하나씩·떠날 때 세움. 급: 사람(조회) · 보호(고객문의 등록 — 안 끊김) */
+  const 벤더피아 = (주소, 옵션, 급 = "사람") => (typeof VP_DATA !== "undefined" && VP_DATA.받기 ? VP_DATA.받기(주소, 옵션, 급) : fetch(주소, 옵션));
   /* ⚠⚠ 10-24 사장님 (CS등록 다시 시작, 한 글자도 안 고침): 「배송관리의 모습이 보여지면 안되는곳이야 정확히 주문관리의 화면을
        보여줘야하는곳이야 일단 cs등록 들어갔을때 벤더피아의 주문관리 현재 목록이 그대로 보이게 해줘 여기서부터 다시 시작해야 겠다 -
        목록의 디자인 일관성을 유지해줘」
@@ -116,7 +118,7 @@
     }
     if (틀.행수칸) fd.set(틀.행수칸, rowCnt);
     for (const [id, v] of Object.entries(몫)) fd.set(이름(id), v);
-    const res = await fetch(틀.form.action, { method: "POST", body: fd, credentials: "include" });
+    const res = await 벤더피아(틀.form.action, { method: "POST", body: fd, credentials: "include" });
     마지막응답 = { 상태: res.status, 넘어옴: res.redirected, 주소: (res.url || "").replace(/^https?:\/\/[^/]+/, "").slice(0, 60),
       보낸: [...fd.entries()].filter(([k, v]) => typeof v === "string" && v && !/^__|chkItem/.test(k)).map(([k, v]) => k.split("$").pop() + "=" + String(v).slice(0, 20)).slice(0, 8).join(" ") };
     return res.text();
@@ -281,7 +283,7 @@
       return p;
     }
     async function 묻기(p) {
-      const res = p ? await fetch(주소, { method: "POST", body: p, credentials: "include" }) : await fetch(주소, { credentials: "include" });
+      const res = p ? await 벤더피아(주소, { method: "POST", body: p, credentials: "include" }) : await 벤더피아(주소, { credentials: "include" });
       return 읽기(await res.text());
     }
     const 칸글 = (td) => { const c = td.cloneNode(true); c.querySelectorAll("br").forEach((b) => b.replaceWith("\n")); c.querySelectorAll("input,script,style").forEach((x) => x.remove());
@@ -1303,8 +1305,8 @@
     if (String(단추.type).toLowerCase() === "image") { fd.append(단추.name + ".x", "5"); fd.append(단추.name + ".y", "5"); }
     else fd.append(단추.name, 단추.value || "");
     const 바탕 = new URL(고객문의주소, location.href);
-    const res = await fetch(new URL(form.getAttribute("action") || 바탕.href, 바탕).href,
-      { method: "POST", body: fd, credentials: "include" });
+    const res = await 벤더피아(new URL(form.getAttribute("action") || 바탕.href, 바탕).href,
+      { method: "POST", body: fd, credentials: "include" }, "보호");
     const 글 = await res.text();
     return { res, 글, doc: new DOMParser().parseFromString(글, "text/html") };
   }
@@ -1317,7 +1319,7 @@
   /* 몰 주문번호 → 벤더피아 안 번호. 사장님 10-27: 「상담 판을 연 그 줄(같은 상품)로 이어줘. 못 고르면 맨 위 줄로.」 */
   async function 원주문찾기(주문, 단서 = {}) {
     const 몰번호 = String(주문).trim();
-    const 첫 = await fetch(원주문찾기주소, { credentials: "include" });
+    const 첫 = await 벤더피아(원주문찾기주소, { credentials: "include" }, "보호");
     if (!첫.ok) throw new Error("원주문 검색 HTTP " + 첫.status);
     const doc = new DOMParser().parseFromString(await 첫.text(), "text/html");
     const form = doc.getElementById("aspnetForm") || doc.forms[0];
@@ -1329,8 +1331,8 @@
       body.set(칸("tb_SOrderNo").name, 몰번호);
       if (시작일 && 칸("dcStartDt")) body.set(칸("dcStartDt").name, 시작일);
       body.append(칸("btnSearch").name + ".x", "5"); body.append(칸("btnSearch").name + ".y", "5");
-      const res = await fetch(new URL(form.getAttribute("action") || 원주문찾기주소, new URL(원주문찾기주소, location.href)).href,
-        { method: "POST", body, credentials: "include" });
+      const res = await 벤더피아(new URL(form.getAttribute("action") || 원주문찾기주소, new URL(원주문찾기주소, location.href)).href,
+        { method: "POST", body, credentials: "include" }, "보호");
       if (!res.ok) throw new Error("원주문 검색 HTTP " + res.status);
       const 글 = await res.text();
       const d = new DOMParser().parseFromString(글, "text/html");
@@ -1367,7 +1369,7 @@
     const 토막 = String(글).split(/[\r\n\[\]%_^'"]+/).map((x) => x.trim()).sort((a, b) => b.length - a.length)[0].slice(0, 20);
     if (!토막) return null;
     const 주소 = "/System/CS/inquiryList.aspx";
-    const 첫 = await fetch(주소, { credentials: "include" });
+    const 첫 = await 벤더피아(주소, { credentials: "include" }, "보호");
     if (!첫.ok) return null;
     const doc = new DOMParser().parseFromString(await 첫.text(), "text/html");
     const form = doc.getElementById("aspnetForm") || doc.forms[0];
@@ -1379,8 +1381,8 @@
     const 오늘 = new Date(), z = (n) => String(n).padStart(2, "0");
     if (칸("dcStartDt")) body.set(칸("dcStartDt").name, 오늘.getFullYear() + "-" + z(오늘.getMonth() + 1) + "-" + z(오늘.getDate()));
     body.append(칸("btnSearch").name + ".x", "5"); body.append(칸("btnSearch").name + ".y", "5");
-    const res = await fetch(new URL(form.getAttribute("action") || 주소, new URL(주소, location.href)).href,
-      { method: "POST", body, credentials: "include" });
+    const res = await 벤더피아(new URL(form.getAttribute("action") || 주소, new URL(주소, location.href)).href,
+      { method: "POST", body, credentials: "include" }, "보호");
     if (!res.ok) return null;
     const d = new DOMParser().parseFromString(await res.text(), "text/html");
     return [...d.querySelectorAll("#oGrid td")].some((td) => td.textContent.replace(/\s+/g, "").includes(토막.replace(/\s+/g, "")));
@@ -1388,7 +1390,7 @@
   /* ASP.NET 오류 쪽이면 그 까닭 한 줄(제목·h2) */
   const 오류글 = (doc) => ((doc.querySelector("h2 i") || doc.querySelector("h2") || doc.querySelector("title") || {}).textContent || "").trim().slice(0, 80);
   async function 벤더피아올리기(주문, { 글, 종류, 상태, 단서 }) {
-    const 첫 = await fetch(고객문의주소, { credentials: "include" });
+    const 첫 = await 벤더피아(고객문의주소, { credentials: "include" }, "보호");
     if (!첫.ok) throw new Error("등록 쪽 HTTP " + 첫.status);
     const 첫글 = await 첫.text();
     let doc = new DOMParser().parseFromString(첫글, "text/html");
