@@ -1277,12 +1277,14 @@
   const 고객문의주소 = "/System/CS/csDetl.aspx?previousPage=inquiry";
   const 올린글 = new Set();                            // 주문+글 — 같은 글을 두 번 올리지 않는다
   const 문의값 = (doc, id) => { const el = doc.getElementById(id); return el ? String(el.value || "").trim() : ""; };
-  function 문의폼값(form) {
+  /* `빈파일`: 브라우저는 고른 파일이 없어도 파일 칸을 빈 칸(filename="")으로 **늘** 보낸다 — csDetl(multipart)에서만 똑같이 */
+  function 문의폼값(form, 빈파일 = false) {
     const fd = new FormData();
     for (const el of form.elements) {
       if (!el.name || el.disabled) continue;
       const t = String(el.type || "").toLowerCase();
-      if (["image", "submit", "button", "reset", "file"].includes(t)) continue;
+      if (t === "file") { if (빈파일) fd.append(el.name, new File([], "", { type: "application/octet-stream" })); continue; }
+      if (["image", "submit", "button", "reset"].includes(t)) continue;
       if ((t === "checkbox" || t === "radio") && !el.checked) continue;
       if (el.tagName === "SELECT") { const o = el.options[el.selectedIndex] || el.options[0]; if (o) fd.append(el.name, o.value); continue; }
       fd.append(el.name, el.value || "");
@@ -1293,7 +1295,7 @@
     const form = doc.getElementById("aspnetForm") || doc.forms[0];
     const 단추 = doc.getElementById(단추id);
     if (!form || !단추 || !단추.name) throw new Error(단추id + " 없음");
-    const fd = 문의폼값(form);
+    const fd = 문의폼값(form, true);
     for (const [id, v] of Object.entries(채움)) {
       const el = doc.getElementById(id);
       if (el && el.name) fd.set(el.name, v);
@@ -1330,7 +1332,12 @@
       const res = await fetch(new URL(form.getAttribute("action") || 원주문찾기주소, new URL(원주문찾기주소, location.href)).href,
         { method: "POST", body, credentials: "include" });
       if (!res.ok) throw new Error("원주문 검색 HTTP " + res.status);
-      const d = new DOMParser().parseFromString(await res.text(), "text/html");
+      const 글 = await res.text();
+      const d = new DOMParser().parseFromString(글, "text/html");
+      /* 배송상태 칸은 글자로 보이지만 팝업이 넘기는 값(`dStatus`)은 코드다 — 그 칸 고르개(`oGrid_ddlStatus`)의 [글자, 코드] 목록에서 바꾼다 */
+      const 상태끝 = 글.indexOf('$get("oGrid_ddlStatus")');
+      const 상태표 = 상태끝 < 0 ? {} : Object.fromEntries([...글.slice(글.lastIndexOf("$create(", 상태끝), 상태끝)
+        .matchAll(/\[\[,,,,,"([^"]*)","([^"]*)"/g)].map((m) => [m[1].trim(), m[2]]));
       const 줄들 = [...d.querySelectorAll("#oGrid tr")];
       const 머리줄 = 줄들.find((tr) => tr.querySelector("th") && tr.cells.length >= 5
         && [...tr.cells].filter((c) => c.textContent.trim() === "주문번호").length >= 2);
@@ -1341,7 +1348,9 @@
       return 줄들.filter((tr) => tr !== 머리줄 && tr.cells.length === 머리.length).map((tr) => {
         const 값 = (i) => (i >= 0 && tr.cells[i] ? tr.cells[i].textContent.trim() : "");
         const 키 = (tr.getAttribute("data-rowkey") || "").replace(/[^\d]/g, "");
-        return { 안번호: 키 || 값(번호칸[0]), 몰번호: 값(번호칸[1]), 상품코드: 값(자리("상품코드")), 상품명: 값(자리("상품명")) };
+        const 상태글 = 값(자리("배송상태"));
+        return { 안번호: 키 || 값(번호칸[0]), 몰번호: 값(번호칸[1]), 상품코드: 값(자리("상품코드")), 상품명: 값(자리("상품명")),
+          상태코드: 상태글 ? (상태표[상태글] ?? "") : "", 가용수: 값(자리("가용수")).replace(/[^\d-]/g, "") };
       }).filter((x) => /^\d+$/.test(x.안번호) && x.몰번호 === 몰번호);
     };
     let 맞음 = await 묻기("");
@@ -1349,9 +1358,35 @@
     const 같은 = (a, b) => String(a || "").replace(/\s+/g, "").toLowerCase() === String(b || "").replace(/\s+/g, "").toLowerCase();
     const 고름 = (단서.상품코드 && 맞음.find((x) => 같은(x.상품코드, 단서.상품코드)))
       || (단서.상품명 && 맞음.find((x) => 같은(x.상품명, 단서.상품명))) || 맞음[0];
-    window.VP말?.("고객문의:원주문 " + 맞음.length + "줄 → " + (고름 ? 고름.안번호 + (고름 === 맞음[0] ? "(맨위)" : "(같은상품)") : "없음"));
-    return 고름 ? 고름.안번호 : "";
+    window.VP말?.("고객문의:원주문 " + 맞음.length + "줄 → " + (고름 ? 고름.안번호 + (고름 === 맞음[0] ? "(맨위)" : "(같은상품)")
+      + " 상태" + 고름.상태코드 + " 가용" + 고름.가용수 : "없음"));
+    return 고름 || null;
   }
+  /* 등록됐는지는 응답 꼴로 짐작하지 않고 **고객문의 목록을 조회해** 본다(조회만) — 오늘 접수 + 문의내용 한 토막 */
+  async function 등록확인(글) {
+    const 토막 = String(글).split(/[\r\n\[\]%_^'"]+/).map((x) => x.trim()).sort((a, b) => b.length - a.length)[0].slice(0, 20);
+    if (!토막) return null;
+    const 주소 = "/System/CS/inquiryList.aspx";
+    const 첫 = await fetch(주소, { credentials: "include" });
+    if (!첫.ok) return null;
+    const doc = new DOMParser().parseFromString(await 첫.text(), "text/html");
+    const form = doc.getElementById("aspnetForm") || doc.forms[0];
+    const 칸 = (id) => doc.getElementById(id);
+    if (!form || !칸("tbContent") || !칸("btnSearch")) return null;
+    const body = new URLSearchParams();
+    for (const [k, v] of 문의폼값(form)) body.append(k, v);
+    body.set(칸("tbContent").name, 토막);
+    const 오늘 = new Date(), z = (n) => String(n).padStart(2, "0");
+    if (칸("dcStartDt")) body.set(칸("dcStartDt").name, 오늘.getFullYear() + "-" + z(오늘.getMonth() + 1) + "-" + z(오늘.getDate()));
+    body.append(칸("btnSearch").name + ".x", "5"); body.append(칸("btnSearch").name + ".y", "5");
+    const res = await fetch(new URL(form.getAttribute("action") || 주소, new URL(주소, location.href)).href,
+      { method: "POST", body, credentials: "include" });
+    if (!res.ok) return null;
+    const d = new DOMParser().parseFromString(await res.text(), "text/html");
+    return [...d.querySelectorAll("#oGrid td")].some((td) => td.textContent.replace(/\s+/g, "").includes(토막.replace(/\s+/g, "")));
+  }
+  /* ASP.NET 오류 쪽이면 그 까닭 한 줄(제목·h2) */
+  const 오류글 = (doc) => ((doc.querySelector("h2 i") || doc.querySelector("h2") || doc.querySelector("title") || {}).textContent || "").trim().slice(0, 80);
   async function 벤더피아올리기(주문, { 글, 종류, 상태, 단서 }) {
     const 첫 = await fetch(고객문의주소, { credentials: "include" });
     if (!첫.ok) throw new Error("등록 쪽 HTTP " + 첫.status);
@@ -1359,45 +1394,56 @@
     let doc = new DOMParser().parseFromString(첫글, "text/html");
     if (doc.querySelector("input[type=password]")) throw new Error("로그인 필요");
     if (!doc.getElementById("tbContent") || !doc.getElementById("btnSaveInsert")) throw new Error("등록 쪽 모양이 다름");
-    /* ① 원주문 잇기 */
-    const 안번호 = await 원주문찾기(주문, 단서);
-    if (!안번호) throw new Error("원주문을 못 찾음 — 벤더피아 원주문 검색에 이 주문번호가 없습니다");
-    const 잇기 = await 문의보내기(doc, "btnReflash", { hOrderNo: 안번호 });
+    /* ① 원주문 잇기 — 사람이 팝업에서 줄을 고를 때(`getReturnValue`)와 똑같이 세 칸을 넣고 `btnReflash`
+       (10-27 [새 지시 저장경로] 잼: `hOrderNo`=안 번호 · `hdStatusCd`=배송상태 **코드** · `tbUsableQty`=가용수) */
+    const 고른줄 = await 원주문찾기(주문, 단서);
+    if (!고른줄) throw new Error("① 원주문을 못 찾음 — 벤더피아 원주문 검색에 이 주문번호가 없습니다");
+    const 잇기 = await 문의보내기(doc, "btnReflash", { hOrderNo: 고른줄.안번호, hdStatusCd: 고른줄.상태코드, tbUsableQty: 고른줄.가용수 });
     doc = 잇기.doc;
-    const 이음 = { 주문번호: 문의값(doc, "tbSOrderNo"), 주문자: 문의값(doc, "tbOrderer"),
+    const 이음 = { 주문번호: 문의값(doc, "tbSOrderNo"), 주문자: 문의값(doc, "tbOrderer"), 문의자: 문의값(doc, "tbInquirer"),
                   상품: 문의값(doc, "tbSGoodsNm"), 매출처: 문의값(doc, "tbStoreNm"), 숨은: 문의값(doc, "hOrderNo") };
     window.VP말?.("고객문의:잇기 HTTP" + 잇기.res.status + " " + JSON.stringify(이음).slice(0, 160));
-    if (!잇기.res.ok || !doc.getElementById("btnSaveInsert")) throw new Error("원주문 잇기 HTTP " + 잇기.res.status);
+    if (!잇기.res.ok || !doc.getElementById("btnSaveInsert"))
+      throw new Error("② 원주문 잇기 HTTP " + 잇기.res.status + (잇기.res.ok ? "" : " · " + 오류글(잇기.doc)));
     /* 잇기 뒤 `tbSOrderNo` = 「몰번호 / 안번호 / …」 꼴(10-27 잼) */
     if (!이음.주문번호.split("/").map((x) => x.trim()).includes(String(주문).trim()) || !(이음.주문자 || 이음.상품 || 이음.매출처))
-      throw new Error("원주문을 못 이음");
-    /* ② 문의 채워 저장 */
+      throw new Error("② 원주문을 못 이음");
+    /* ③ 문의 채워 저장 — 문의자는 잇기 때 벤더피아가 채운 값(=주문자) 그대로, 칸 길이(문의자 maxlength 10) 안으로.
+       제목은 25자까지(벤더피아 글 500건 제목이 가장 길어야 17자 — 칸 크기를 넘겨 서버가 막지 않게) */
     const 첫줄 = 글.split(/\n/)[0].trim();
-    const 채움 = { tbInquirer: 이음.주문자 || 적은이() || "상담",
-                  tbTitle: ((종류 ? "[" + 종류 + "] " : "") + 첫줄).slice(0, 50),
+    const 채움 = { tbInquirer: (이음.문의자 || 이음.주문자 || 적은이() || "상담").slice(0, 10),
+                  tbTitle: ((종류 ? "[" + 종류 + "] " : "") + 첫줄).slice(0, 25),
                   tbContent: 글 };
     const 유형 = 고를값(doc, "ddlInqType", 종류);
     if (유형 !== null) 채움.ddlInqType = 유형;
     const 끝남 = 고를값(doc, "ddlCallEndGb", 상태 === "끝" ? "처리완료" : "");
     if (끝남 !== null) 채움.ddlCallEndGb = 끝남;
-    /* 저장 POST 를 보낸 뒤의 탈은 「보냄」 — 그 글은 다시 안 올린다(이미 들어갔을 수 있다) */
-    const 탈 = (m) => Object.assign(new Error(m), { 보냄: true });
+    /* 저장 POST 를 보낸 뒤의 탈은 「보냄」 — 그 글은 다시 안 올린다(이미 들어갔을 수 있다). 목록에 없다고 확인되면 다시 올릴 수 있다 */
+    const 탈 = (m, 보냄 = true) => Object.assign(new Error(m), { 보냄 });
     let 저장;
     try { 저장 = await 문의보내기(doc, "btnSaveInsert", 채움); }
-    catch (e) { throw 탈("저장 응답 못 받음 — 고객문의 목록에서 확인"); }
-    /* ③ 성공·실패 가르기 — 목록으로 넘어갔거나 「저장/등록 … 되었습니다·완료」 알림이면 됨 */
+    catch (e) { throw 탈("③ 저장 응답 못 받음 — 고객문의 목록에서 확인"); }
     /* ⚠ 10-27 잼: csDetl 쪽 글에는 「문의자를 입력해주세요.」 같은 alert 가 **늘** 박혀 있다 — 빈 쪽(GET)에도 있던 알림은 뺀다 */
     const 알림뽑기 = (t) => [...t.matchAll(/alert\(\s*['"]([^'"]{1,120})['"]/g)].map((m) => m[1]);
     const 늘있는알림 = new Set(알림뽑기(첫글));
     const 알림들 = 알림뽑기(저장.글).filter((a) => !늘있는알림.has(a));
+    /* ④ 진짜 들어갔나 — 고객문의 목록을 조회해 본다(응답 꼴은 아직 한 번도 못 봤다) */
+    let 확인 = null;
+    try { 확인 = await 등록확인(글); } catch (e) { 확인 = null; }
     window.VP말?.("고객문의:저장 HTTP" + 저장.res.status + " " + (저장.res.url || "").replace(/^https?:\/\/[^/]+/, "").slice(0, 50)
-      + " 알림" + JSON.stringify(알림들).slice(0, 120));
-    if (!저장.res.ok) throw 탈("저장 HTTP " + 저장.res.status);
-    if (저장.doc.querySelector("input[type=password]")) throw 탈("로그인 필요");
-    const 나쁜말 = 알림들.find((a) => /실패|오류|에러|입력해|없습니다|확인해|못/.test(a));
-    if (나쁜말) throw 탈(나쁜말);
-    if (/inquiryList\.aspx/i.test(저장.res.url || "") || 알림들.some((a) => /(저장|등록).*(되었|완료|했)|완료/.test(a))) return;
-    throw 탈("응답에 등록 표시 없음 — 고객문의 목록에서 확인");
+      + " 알림" + JSON.stringify(알림들).slice(0, 120) + " 목록확인:" + (확인 === null ? "못봄" : 확인 ? "있음" : "없음")
+      + (저장.res.ok ? "" : " 오류[" + 오류글(저장.doc) + "]"));
+    if (확인 === true) return;
+    const 까닭 = !저장.res.ok ? "저장 HTTP " + 저장.res.status + (오류글(저장.doc) ? " · " + 오류글(저장.doc) : "")
+      : 저장.doc.querySelector("input[type=password]") ? "로그인 필요"
+      : 알림들.find((a) => /실패|오류|에러|입력해|없습니다|확인해|못/.test(a));
+    if (확인 === false) {
+      if (!까닭 && (/inquiryList\.aspx/i.test(저장.res.url || "") || 알림들.some((a) => /되었|완료|성공/.test(a)))) return;   // 됐다고 했으나 목록 조회에 안 걸림 — 됐다는 말을 믿는다
+      throw 탈("③ 벤더피아가 저장 안 함 — " + (까닭 || (알림들[0] ? "알림 「" + 알림들[0] + "」" : "응답에 알림 없음")), false);
+    }
+    if (까닭) throw 탈("③ " + 까닭);
+    if (/inquiryList\.aspx/i.test(저장.res.url || "") || 알림들.some((a) => /되었|완료|성공/.test(a))) return;
+    throw 탈("④ 응답에 등록 표시 없음 — 고객문의 목록에서 확인");
   }
 
   let tbody = null;
