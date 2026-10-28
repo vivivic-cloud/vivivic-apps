@@ -1119,32 +1119,59 @@
     const 고른것그리기 = () => {
       for (const x of CS칸.querySelectorAll(".vp-상담종류"))
         x.setAttribute("aria-pressed", x.dataset.k === CS고름.종류 ? "true" : "false");
-      for (const x of 단품칸.querySelectorAll("button"))
-        x.setAttribute("aria-pressed", CS고름.단품.some((d) => d.code === x.dataset.code) ? "true" : "false");
+      for (const x of 단품칸.querySelectorAll(".vp-goods-list > button")) {
+        const 고름 = CS고름.단품.some((d) => d.code === x.dataset.code);
+        x.setAttribute("aria-pressed", 고름 ? "true" : "false");
+        x.parentElement.classList.toggle("vp-고름", 고름);
+      }
       고른칸.hidden = !CS고름.종류;
       고른칸.textContent = !CS고름.종류 ? ""
         : CS고름.종류 + " · " + (CS고름.단품.length
           ? CS고름.단품.map((d) => d.name + (d.n > 1 ? " ×" + d.n : "")).join(", ")
           : "단품을 고르십시오");
     };
+    /* 10-28 [새 지시 CS단품단추] 단품 단추 = 배송관리 단품명 칸과 **같은 단추**(`VP단품단추` — 이름·코드·양품·네 점, 같은 통 `.vp-goods-list`).
+       동작만 다르다: 왼쪽 누름 = CS등록용 고름/풂, 오른쪽 누름 = 「상세보기」 메뉴 → 다른 쪽과 같은 상세(goods.js).
+       단품관리 이름표에 아직 없는 단품은 글자 단추(고름만)로 두고, 이름표가 늘면(`vp단품단추준비`·`VP단품찾기`) 다시 그린다. */
     const 단품그리기 = () => {
       단품칸.replaceChildren();
+      let 모자람 = [];
       for (const d of 단품목록) {
-        const b = 단품칸.appendChild(document.createElement("button"));
-        b.type = "button";
-        b.dataset.code = d.code;
-        b.textContent = d.name + (d.n > 1 ? " ×" + d.n : "");
-        b.title = d.code;
-        b.addEventListener("click", () => {
+        const 고르기 = () => {
           CS고름.단품 = CS고름.단품.some((x) => x.code === d.code)
             ? CS고름.단품.filter((x) => x.code !== d.code)
             : 단품목록.filter((x) => x.code === d.code || CS고름.단품.some((y) => y.code === x.code));
           고른것그리기();
-        });
+        };
+        const 통 = 단품칸.appendChild(document.createElement("div"));
+        통.className = "vp-goods-list";
+        let b = window.VP단품단추 ? window.VP단품단추(d.name, d.code, 고르기) : null;
+        if (!b) {
+          b = document.createElement("button");
+          b.type = "button";
+          b.textContent = d.name;
+          b.title = d.code;
+          b.addEventListener("click", (e) => { e.preventDefault(); 고르기(); });
+          모자람.push({ 이름: d.name, 코드: d.code });
+        }
+        b.dataset.code = d.code;
+        통.appendChild(b);
+        if (d.n > 1) 통.appendChild(Object.assign(document.createElement("small"), { className: "vp-cs개수", textContent: "×" + d.n }));
       }
       if (!단품목록.length) 단품칸.textContent = "이 상품의 단품 구성이 없습니다.";
       고른것그리기();
+      if (모자람.length && window.VP단품표끝?.() && window.VP단품찾기) {
+        모자람 = 모자람.filter((x) => !단품찾아봄.has(x.이름 + "\u0001" + x.코드));
+        for (const x of 모자람) 단품찾아봄.add(x.이름 + "\u0001" + x.코드);
+        if (모자람.length) window.VP단품찾기(모자람).then((늘) => { if (늘 && 덮개.isConnected) 단품그리기(); }).catch(() => {});
+      }
     };
+    const 단품찾아봄 = new Set();
+    const 단품단추준비 = () => {
+      if (!덮개.isConnected) { window.removeEventListener("vp단품단추준비", 단품단추준비); return; }
+      if (단품목록 && 단품칸.querySelector(".vp-goods-list > button:not(:has(.vp-점))")) 단품그리기();
+    };
+    window.addEventListener("vp단품단추준비", 단품단추준비);
     const 단품받기 = async () => {
       if (단품목록) return;
       if (단품받는중) return 단품받는중;

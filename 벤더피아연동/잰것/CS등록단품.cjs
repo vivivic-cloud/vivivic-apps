@@ -120,12 +120,15 @@ const 자리 = (고르개) => { const e = document.querySelector(고르개); if 
       CS라벨: c.querySelector('.vp-상담라벨')?.textContent,
       종류: [...c.querySelectorAll('.vp-상담종류')].map((b) => b.textContent + (b.getAttribute('aria-pressed') === 'true' ? '(켬)' : '')),
       단품칸숨음: c.querySelector('.vp-cs단품').hidden,
-      단품: [...c.querySelectorAll('.vp-cs단품 button')].map((b) => b.textContent + (b.getAttribute('aria-pressed') === 'true' ? '(켬)' : '')),
+      단품: [...c.querySelectorAll('.vp-cs단품 .vp-goods-list > button')].map((b) => b.firstChild.textContent + (b.getAttribute('aria-pressed') === 'true' ? '(켬)' : '')),
+      단추: [...c.querySelectorAll('.vp-cs단품 .vp-goods-list > button')].map((b) => ({ 점: b.querySelectorAll('.vp-점 i').length,
+        코드: b.querySelector('small.vp-code')?.textContent || '', 고름통: b.parentElement.classList.contains('vp-고름') })),
       단품글: c.querySelector('.vp-cs단품').textContent,
       고른것: c.querySelector('.vp-cs고른것').hidden ? '' : c.querySelector('.vp-cs고른것').textContent,
       상태: JSON.parse(JSON.stringify(덮.vpCS등록 || null)),
       꼴: (() => { const 보 = (e) => { if (!e) return null; const s = getComputedStyle(e); return [s.fontSize, s.fontWeight, s.borderRadius, s.paddingTop].join(' '); };
-        return [보(c.querySelector('.vp-cs단품 button')), 보(c.querySelector('.vp-상담종류[aria-pressed=false]'))]; })(),
+        const 글꼴 = (e) => { if (!e) return null; const s = getComputedStyle(e); return [s.fontSize, s.fontWeight, s.color, s.borderTopWidth, s.backgroundColor].join(' '); };
+        return [글꼴(c.querySelector('.vp-cs단품 .vp-goods-list > button')), 글꼴(document.querySelector('.vp-table td .vp-goods-list > button'))]; })(),
       넘침: 덮.querySelector('.vp-상담판').getBoundingClientRect().right > innerWidth + 1,
     };
   };
@@ -154,13 +157,32 @@ const 자리 = (고르개) => { const e = document.querySelector(고르개); if 
     console.log('  ★ ㄴ 교환 → 단품 ' + JSON.stringify(판.단품) + ' (상품 상세 단품 단추와 같음) ' + 못(!판.단품칸숨음
       && JSON.stringify(판.단품) === JSON.stringify(['비스켓 800 몸통', '비스켓 800 문'])));
     console.log('  ㄴ 고르기 전 「' + 판.고른것 + '」 ' + 못(판.고른것 === '교환 · 단품을 고르십시오'));
-    console.log('  ㄴ 단품 단추 꼴 = 종류 단추 꼴(글 크기·굵기·둥글기·안여백) ' + JSON.stringify(판.꼴) + ' ' + 못(판.꼴[0] && 판.꼴[0] === 판.꼴[1]));
-    await page.click('.vp-cs단품 button:nth-child(2)');
-    await page.click('.vp-cs단품 button:nth-child(1)');
+    /* 10-28 [새 지시 CS단품단추] 배송관리 단품 단추와 같은 단추 — 네 점·코드·글꼴 같음 */
+    console.log('  ★ ㅁ 단품 단추 = 배송관리 단품 단추(점 넷·코드) ' + JSON.stringify(판.단추) + ' ' + 못(판.단추.length === 2
+      && 판.단추.every((x) => x.점 === 4) && 판.단추[0].코드 === 'bis800_b' && 판.단추[1].코드 === 'bis800_d'));
+    console.log('  ㅁ 글꼴 = 배송관리 표 단품 단추(크기·굵기·색·테두리·바탕) ' + JSON.stringify(판.꼴) + ' ' + 못(판.꼴[0] && 판.꼴[0] === 판.꼴[1]));
+    const 단품 = (n) => '.vp-cs단품 .vp-goods-list:nth-child(' + n + ') > button';
+    await page.click(단품(2));
+    const 왼값 = await page.evaluate(열린판);
+    console.log('  ★ ㅁ 왼쪽 누름 = 고름(상세 안 열림) ' + JSON.stringify(왼값.상세) + ' ' + 못(!왼값.상세.length));
+    const 기본막음 = await page.evaluate((q) => { const b = document.querySelector(q); const r = b.getBoundingClientRect();
+      const e = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.left + 5, clientY: r.top + 5, button: 2 });
+      b.dispatchEvent(e); return e.defaultPrevented; }, 단품(1));
+    const 메뉴 = await page.evaluate(() => [...document.querySelectorAll('#vp-root .vp-우클릭 button')].map((b) => b.textContent));
+    console.log('  ★ ㅁ 오른쪽 누름 → 메뉴 ' + JSON.stringify(메뉴) + ' · 기본 메뉴 막음 ' + 못(기본막음 && JSON.stringify(메뉴) === '["상세보기"]'));
+    await page.click('#vp-root .vp-우클릭 button');
+    await page.waitForTimeout(1500);
+    const 상세값 = await page.evaluate(열린판);
+    const 고름뒤 = await page.evaluate(판값);
+    console.log('  ★ ㅁ 「상세보기」 → 상세 ' + JSON.stringify(상세값.상세) + ' · 고름은 그대로 ' + 못(상세값.상세.includes('비스켓 800 몸통')
+      && 상세값.상담 && !(await page.$('#vp-root .vp-우클릭')) && 고름뒤.상태.단품.map((d) => d.code).join() === 'bis800_d'));
+    await page.evaluate(() => document.querySelectorAll('.vp-goods-panel').forEach((p) => { p.hidden = true; }));
+    await page.click(단품(1));
     판 = await page.evaluate(판값);
     console.log('  ★ ㄴ 둘 고름 → 「' + 판.고른것 + '」 · 상태 ' + JSON.stringify(판.상태) + ' ' + 못(판.고른것 === '교환 · 비스켓 800 몸통, 비스켓 800 문'
       && 판.상태.종류 === '교환' && 판.상태.단품.map((d) => d.code).join() === 'bis800_b,bis800_d'));
-    await page.click('.vp-cs단품 button:nth-child(1)');
+    console.log('  ㅁ 고른 단품 눈에 띔 ' + JSON.stringify(판.단추.map((x) => x.고름통)) + ' ' + 못(판.단추.every((x) => x.고름통)));
+    await page.click(단품(1));
     await page.click('.vp-cs등록 [data-k="취소"]');
     판 = await page.evaluate(판값);
     console.log('  ★ ㄴ 하나 풀고 취소로 바꿈 → 「' + 판.고른것 + '」 ' + JSON.stringify(판.종류) + ' ' + 못(판.고른것 === '취소 · 비스켓 800 문'

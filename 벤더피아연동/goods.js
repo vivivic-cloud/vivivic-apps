@@ -1617,7 +1617,9 @@ const 한벌돌리기 = (단품곁다리) => {
     낱단추 = 낱단추.filter((x) => x.name !== 이름);
     표쓰기(곁다리표, 곁다리표.처음 || 오늘글()).catch(() => {});
   }
-  const 곁다리단추 = (이름0, 코드) => {
+  /* 10-28 [새 지시 CS단품단추] 셋째 값 `고르기`(함수)를 주면 — 상담 판 CS등록용: 왼쪽 누름 = `고르기()`(상세 안 엶),
+     오른쪽 누름 = 작은 메뉴 「상세보기」 → 아래 누름과 **같은 상세**. 안 주면(배송관리·CS등록 표) 전과 똑같다. */
+  const 곁다리단추 = (이름0, 코드, 고르기) => {
     /* 10-26 [새 지시 한번에] 점·수량 자료가 다 갖춰지기 전엔 단추를 안 만든다(칸은 글자 그대로) — 갖춰지면 두 벌이 알려(`vp상품단추준비`·`vp단품단추준비`) 한꺼번에 붙는다.
        처음 부르는 때 = 조회 목록이 그려진 때 → 그때 재고를 받기 시작한다(저장된 것이 10분 안이면 받지 않는다). */
     if (!한번에.s.다됨) { 한번에.재고시작(); return null; }
@@ -1629,12 +1631,10 @@ const 한벌돌리기 = (단품곁다리) => {
     const x = { b, name: 이름, codes };
     낱단추.push(x);
     낱칠하기(x);
-    b.addEventListener("click", async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
+    const 상세열기 = async () => {
       /* 누른 단추만 굵게 — 목록과 같은 결 */
       document.querySelectorAll("#vp-root .vp-상품칸 button.on").forEach((y) => y.classList.remove("on"));
-      b.classList.add("on");
+      if (!고르기) b.classList.add("on");
       let 답 = null;
       try { 답 = await 줄받기(이름, codes); } catch (err) { 답 = null; }
       if (!답) {
@@ -1646,8 +1646,41 @@ const 한벌돌리기 = (단품곁다리) => {
       heads = 답.heads;
       show(이름, 답.heads, 답.rows);        // ← 단품관리·상품관리가 쓰는 **그 상세**를 그대로 연다
       연결받기();
+    };
+    b.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (고르기) 고르기(); else 상세열기();
+    });
+    if (고르기) b.addEventListener("contextmenu", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      우클릭메뉴(e, 상세열기);
     });
     return b;
+  };
+  /* 우클릭 메뉴 — 「상세보기」 하나. 밖을 누르거나 Esc·스크롤이면 닫힌다. */
+  const 우클릭메뉴 = (e, 열기) => {
+    document.querySelectorAll("#vp-root .vp-우클릭").forEach((x) => x.remove());
+    const 메뉴 = document.createElement("div");
+    메뉴.className = "vp-우클릭";
+    메뉴.setAttribute("role", "menu");
+    const 항목 = 메뉴.appendChild(document.createElement("button"));
+    항목.type = "button";
+    항목.setAttribute("role", "menuitem");
+    항목.textContent = "상세보기";
+    (document.getElementById("vp-root") || document.body).appendChild(메뉴);
+    메뉴.style.left = Math.max(4, Math.min(e.clientX, innerWidth - 메뉴.offsetWidth - 4)) + "px";
+    메뉴.style.top = Math.max(4, Math.min(e.clientY, innerHeight - 메뉴.offsetHeight - 4)) + "px";
+    const 닫기 = () => {
+      메뉴.remove();
+      removeEventListener("pointerdown", 밖, true); removeEventListener("keydown", 키, true); removeEventListener("scroll", 닫기, true);
+    };
+    const 밖 = (x) => { if (!메뉴.contains(x.target)) 닫기(); };
+    const 키 = (x) => { if (x.key === "Escape") { x.stopPropagation(); 닫기(); } };
+    addEventListener("pointerdown", 밖, true); addEventListener("keydown", 키, true); addEventListener("scroll", 닫기, true);
+    항목.addEventListener("click", (x) => { x.preventDefault(); x.stopPropagation(); 닫기(); 열기(); });
+    항목.focus();
   };
   /* 이름표에 없는 것을 **하나씩 찾는다** — 목록에 실제로 나온 이름만 (search.js 가 부른다). 찾은 줄은 이름표에 더하고 저장한다. */
   let 찾는중 = 0, 마지막일 = Date.now();
