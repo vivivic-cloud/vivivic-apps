@@ -293,6 +293,9 @@ const 판값 = () => {
     await 기다림(page, () => /CS등록됨|실패/.test(document.querySelector('.vp-cs알림').textContent));
     const 판 = await page.evaluate(판값);
     console.log('  ★ ㅁ 저장 POST 0 · 「' + 판.알림.slice(0, 70) + '」 ' + 못(!일.저장.length && /^실패\(③ 주문 단품정보에 없는 단품: 비스켓 1200 몸통\(bis1200_b\)/.test(판.알림) && !판.저장꺼짐));
+    /* 10-28 [새 지시 CS단품검색] 실패 글에 단품 검색 안내 + 검색칸이 보임 */
+    console.log('  ★ ㅁ 실패 글에 「단품 검색」 안내 · 검색칸 보임 ' + 못(/단품 검색으로 주문된 단품을 고르십시오/.test(판.알림)
+      && await page.evaluate(() => !document.querySelector('.vp-cs단품검색').hidden)));
     await ctx.close();
   }
 

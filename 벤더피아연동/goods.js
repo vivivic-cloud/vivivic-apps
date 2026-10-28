@@ -1233,16 +1233,22 @@ const 한벌돌리기 = (단품곁다리) => {
     if (!same) tbody.append(...arr.map((g) => g.tr));
   }
 
+  /* 검색어 = 빈칸으로 나눈 낱말, 줄의 검색 칸(page.search)을 이은 글에 낱말이 다 들어 있으면 맞음(대소문자 무시).
+     10-28 [새 지시 CS단품검색] 상담 판 단품 검색(`VP단품검색`)도 이 둘을 그대로 쓴다. */
+  const 검색낱말 = (글) => String(글 == null ? "" : 글).trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const 낱말맞나 = (words, row, searchIdx) => {
+    const text = searchIdx.map((i) => row[i]).join(" ").toLowerCase();
+    return words.every((w) => text.includes(w));
+  };
   // 필터에 맞는 항목이 하나라도 있는 줄만 보여준다
   const apply = () => {
     renderPills();
-    const words = q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const words = 검색낱말(q.value);
     const searchIdx = page.search.map(col).filter((i) => i >= 0);
     const dateIdx = col("등록일");
     const picked = localSelects.filter((s) => s.value).map((s) => [col(s.dataset.col), s.value]);
     const matches = (row) => {
-      const text = searchIdx.map((i) => row[i]).join(" ").toLowerCase();
-      if (!words.every((w) => text.includes(w))) return false;
+      if (!낱말맞나(words, row, searchIdx)) return false;
       if (!picked.every(([i, v]) => row[i] === v)) return false;
       if (pillPick && pillOf(row) !== pillPick) return false;
       if (!page.serverDates && from.value && row[dateIdx] < from.value) return false;
@@ -1777,6 +1783,35 @@ const 한벌돌리기 = (단품곁다리) => {
       window.VP단품표끝 = () => 곁다리표.다됨;
       window.VP단품찾기 = 곁다리찾기;
       window.VP단품있나 = (이름, 코드) => !!표에서찾기(이름, 코드);
+      /* 10-28 [새 지시 CS단품검색] 상담 판 CS등록 — 단품관리의 **판매중** 단품을 글로 찾는다(조회만).
+         목록 = 단품관리 화면이 받는 것과 같은 목록(같은 저장 열쇠 — 단품관리를 열었거나 미리 받기가 끝났으면 바로, 없으면 공용 줄로 받음).
+         맞춤 = 단품관리 검색과 같은 함수(`검색낱말`·`낱말맞나`·`page.search` 칸) + 판매상태 「판매중」. 찾은 것은 이름표에 더해 `VP단품단추` 가 붙는다.
+         [{name, code}] — 목록 차례, 단품코드 하나에 하나. */
+      let 검색목록 = null;
+      window.VP단품검색 = async (글) => {
+        const words = 검색낱말(글);
+        if (!words.length) return [];
+        if (!검색목록) {
+          const 받음 = { heads: [], rows: [] };
+          검색목록 = fetchList(page, 내길, "", { from: "2000-01-01" }, (h, rows) => { 받음.heads = h; 받음.rows.push(...rows); })
+            .then(() => 받음);
+          검색목록.catch(() => { 검색목록 = null; });
+        }
+        const { heads: h, rows } = await 검색목록;
+        const searchIdx = page.search.map((n) => h.indexOf(n)).filter((i) => i >= 0);
+        const ni = h.indexOf(page.nameCol), ci = h.indexOf(page.codeCol), si = h.indexOf("판매상태");
+        const 답 = [], 본 = new Set();
+        for (const row of rows) {
+          if (si >= 0 && String(row[si] || "").trim() !== "판매중") continue;
+          if (!낱말맞나(words, row, searchIdx)) continue;
+          const name = String(row[ni] || "").trim(), code = String(row[ci] || "").trim();
+          if (!name || 본.has(code || name)) continue;
+          본.add(code || name);
+          답.push({ name, code });
+        }
+        표넣기(답.map((x) => [x.name, x.code]));
+        return 답;
+      };
     } else {
       window.VP상품단추 = 곁다리단추;
       window.VP상품목록몇개 = () => 곁다리표.이름.size;
