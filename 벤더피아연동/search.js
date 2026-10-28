@@ -1079,6 +1079,11 @@
         </div>
         <div class="vp-cs단품" hidden></div>
         <div class="vp-cs고른것" hidden></div>
+        <div class="vp-cs메시지" hidden>
+          <label class="vp-cs메시지켬"><input type="checkbox" checked> <span class="vp-상담라벨">출고 담당자에게 보낼 메시지</span></label>
+          <textarea rows="3" maxlength="500" placeholder="출고 담당자에게 전할 말 (없으면 체크를 끄십시오)"></textarea>
+          <div class="vp-상담발"><span class="vp-상담알림 vp-cs알림"></span><button type="button" class="vp-cs저장" disabled>CS등록 저장</button></div>
+        </div>
       </div></div>`;
     덮개.querySelector("strong").textContent = 상품명 || "상담";
     덮개.querySelector(".vp-상담머리 small").textContent = "주문 " + 주문;
@@ -1116,6 +1121,19 @@
     const CS고름 = { 종류: "", 단품: [] };
     덮개.vpCS등록 = CS고름;
     let 단품목록 = null, 단품받는중 = null;
+    /* 10-28 [새 지시 고객주문변경] 단품을 고르면 「출고 담당자에게 보낼 메시지」(직접 입력, 체크 끄면 비활성·안 보냄) + 「CS등록 저장」 */
+    const 메시지칸 = CS칸.querySelector(".vp-cs메시지");
+    const 메시지켬 = 메시지칸.querySelector("input[type=checkbox]");
+    const 메시지글 = 메시지칸.querySelector("textarea");
+    const CS알림 = 메시지칸.querySelector(".vp-cs알림");
+    const CS저장 = 메시지칸.querySelector(".vp-cs저장");
+    let CS저장중 = false;
+    const 저장단추그리기 = () => {
+      메시지칸.hidden = !(CS고름.종류 && CS고름.단품.length);
+      메시지글.disabled = !메시지켬.checked;
+      CS저장.disabled = CS저장중 || !CS고름.종류 || !CS고름.단품.length;
+    };
+    메시지켬.addEventListener("change", 저장단추그리기);
     const 고른것그리기 = () => {
       for (const x of CS칸.querySelectorAll(".vp-상담종류"))
         x.setAttribute("aria-pressed", x.dataset.k === CS고름.종류 ? "true" : "false");
@@ -1129,6 +1147,7 @@
         : CS고름.종류 + " · " + (CS고름.단품.length
           ? CS고름.단품.map((d) => d.name + (d.n > 1 ? " ×" + d.n : "")).join(", ")
           : "단품을 고르십시오");
+      저장단추그리기();
     };
     /* 10-28 [새 지시 CS단품단추] 단품 단추 = 배송관리 단품명 칸과 **같은 단추**(`VP단품단추` — 이름·코드·양품·네 점, 같은 통 `.vp-goods-list`).
        동작만 다르다: 왼쪽 누름 = CS등록용 고름/풂, 오른쪽 누름 = 「상세보기」 메뉴 → 다른 쪽과 같은 상세(goods.js).
@@ -1199,6 +1218,26 @@
         if (CS고름.종류) 단품받기();
       });
     }
+    /* 같은 주문·종류·단품·메시지는 한 번만 보낸다(두 번 눌러 두 번 저장되지 않게) — 저장 POST 를 안 보낸 실패만 다시 누를 수 있다 */
+    CS저장.addEventListener("click", async () => {
+      if (CS저장중 || !CS고름.종류 || !CS고름.단품.length) return;
+      const 메시지 = 메시지켬.checked ? 메시지글.value.trim() : "";
+      const 고름 = { 종류: CS고름.종류, 단품: CS고름.단품.map((d) => ({ ...d })) };
+      const 열쇠글 = 주문 + "\n" + 고름.종류 + "\n" + 고름.단품.map((d) => d.code).sort().join("+") + "\n" + 메시지;
+      if (올린변경.has(열쇠글)) { CS알림.textContent = "이미 보냈습니다 — 주문관리에서 확인하십시오"; return; }
+      올린변경.add(열쇠글);
+      CS저장중 = true; 저장단추그리기();
+      CS알림.textContent = "벤더피아 CS등록 중…";
+      try {
+        await 주문변경올리기(주문, { ...고름, 메시지, 단서: 상품단서 });
+        CS알림.textContent = "CS등록됨";
+      } catch (err) {
+        CS알림.textContent = "실패(" + (err && err.message ? err.message : err) + ")";
+        if (!(err && err.보냄)) 올린변경.delete(열쇠글);
+        window.VP말?.("고객주문변경:실패 " + (err && err.message ? err.message : err));
+      }
+      CS저장중 = false; 저장단추그리기();
+    });
 
     const 접수그리기 = () => {
       접수칸.replaceChildren();
@@ -1352,7 +1391,7 @@
   }
 
   /* ── 벤더피아 고객문의 올리기 (10-26 [새 지시 CS업로드]) ─────────────
-     사장님: 「만들어. 시험 등록할 주문은 내가 정해줄게」 — ⚠ **「벤더피아에서는 조회만」 의 예외는 이 기능 하나뿐.**
+     사장님: 「만들어. 시험 등록할 주문은 내가 정해줄게」 — ⚠ **「벤더피아에서는 조회만」 의 예외는 이것과 아래 고객주문변경 저장(10-28) 둘뿐.**
      길: `System/CS/csDetl.aspx` GET → 원주문 숨은 칸(`hOrderNo`)을 채워 `btnReflash` 다시 보냄
          → 응답에 주문 정보(주문자·상품명·매출처)가 **차야** 이어진 것 → 문의자·제목·문의내용을 채워 `btnSaveInsert.x/.y` 로 POST.
      ⚠ 원주문이 안 이어지면 **저장 POST 를 보내지 않는다**(빈·엉뚱한 주문으로 올라가지 않게).
@@ -1364,6 +1403,7 @@
      GET·잇기·저장 모두 이 주소(폼 action 도 `./csDetl.aspx?previousPage=first`) */
   const 고객문의주소 = "/System/CS/csDetl.aspx?previousPage=first";
   const 올린글 = new Set();                            // 주문+글 — 같은 글을 두 번 올리지 않는다
+  const 올린변경 = new Set();                          // 주문+종류+단품+메시지 — 같은 고객주문변경을 두 번 저장하지 않는다
   const 문의값 = (doc, id) => { const el = doc.getElementById(id); return el ? String(el.value || "").trim() : ""; };
   /* `빈파일`: 브라우저는 고른 파일이 없어도 파일 칸을 빈 칸(filename="")으로 **늘** 보낸다 — csDetl(multipart)에서만 똑같이 */
   function 문의폼값(form, 빈파일 = false) {
@@ -1533,6 +1573,154 @@
     if (까닭) throw 탈("③ " + 까닭);
     if (/inquiryList\.aspx/i.test(저장.res.url || "") || 알림들.some((a) => /되었|완료|성공/.test(a))) return;
     throw 탈("④ 응답에 등록 표시 없음 — 고객문의 목록에서 확인");
+  }
+
+  /* ── 벤더피아 고객주문변경 저장 (10-28 [새 지시 고객주문변경]) ─────────────
+     사장님이 이 지시로 허락한 **두 번째 쓰기** — 이 기능만. 사람 길 그대로:
+     머리 「CS등록」 → `csDetl.aspx?previousPage=first`(고객주문변경_접수) → 원주문 고름(`getReturnValue` → `btnReflash`)
+     → 「주문 단품정보」 단품표(`oGridOrderItem`)에서 고른 단품만 체크(`CHK`) → 「고객주문변경」 탭(`#li2`, `hTab=CS`)
+     → 유형(`ddlCsType` 1 취소·2 반품·3 교환·4 AS·5 설치) = 고른 종류 → 상세사유(`tbReasonDetl`, 500자) = 출고 메시지(없으면 빈칸) → 위쪽 「저장」(`btnSaveInsert`).
+     ⚠ 단품표는 Infragistics 그리드라 체크가 **그 쪽 JS(비동기 되보냄·clientState)** 로만 서버에 간다 → fetch 로 흉내 내지 않고
+       **숨은 같은 출처 틀**에 진짜 쪽을 열어 그 쪽 JS 로 사람처럼 누른다. 틀은 `sandbox`(allow-modals 없음)라 벤더피아 alert 가 화면에 안 뜬다
+       — 저장 전 alert 는 가로채 까닭으로 쓴다. 확인은 **주문관리 목록 조회**(맨 위 줄이 이 주문·이 종류인가). */
+  const 쉼 = (ms) => new Promise((r) => setTimeout(r, ms));
+  function 틀로드(틀, ms) {
+    return new Promise((됨, 안됨) => {
+      const 끝 = setTimeout(() => { 틀.removeEventListener("load", f); 안됨(new Error("시간 넘김")); }, ms);
+      const f = () => { clearTimeout(끝); 됨(); };
+      틀.addEventListener("load", f, { once: true });
+    });
+  }
+  /* 틀 안 쪽의 XHR(그리드 비동기 되보냄)이 다 끝날 때까지 */
+  function 틀바쁨(w) {
+    if (w.__vp바쁨) return w.__vp바쁨;
+    const s = { n: 0 }, X = w.XMLHttpRequest && w.XMLHttpRequest.prototype;
+    if (X) { const 보냄 = X.send; X.send = function (...a) { s.n++; this.addEventListener("loadend", () => { s.n--; }, { once: true }); return 보냄.apply(this, a); }; }
+    return (w.__vp바쁨 = s);
+  }
+  async function 틀잠잠(s, ms = 20000) {
+    const 끝 = Date.now() + ms;
+    await 쉼(300);
+    while (s.n > 0 && Date.now() < 끝) await 쉼(150);
+    await 쉼(200);
+  }
+  const 같은코드 = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+  const CS글자 = (x) => String(x || "").replace(/[\s/]/g, "").toUpperCase();
+  /* 저장 뒤 확인 — 판매관리→주문관리 목록(조회만) 맨 위 줄이 이 주문(몰 주문번호 = 뒤 「주문번호」 칸)·이 CS 인가 */
+  async function 주문변경확인(주문, 종류) {
+    const 주소 = "/System/Sales/orderMst.aspx";
+    const res = await 벤더피아(주소, { credentials: "include" }, "보호");
+    if (!res.ok) return { 맨위: false, 까닭: "주문관리 HTTP " + res.status };
+    const d = new DOMParser().parseFromString(await res.text(), "text/html");
+    const 줄들 = [...d.querySelectorAll("#oGrid tr")];
+    const 머리줄 = 줄들.find((tr) => tr.querySelector("th") && tr.cells.length >= 20 && [...tr.cells].some((c) => c.textContent.trim() === "CS"));
+    if (!머리줄) return { 맨위: false, 까닭: "주문관리 목록 못 읽음" };
+    const 머리 = [...머리줄.cells].map((c) => c.textContent.trim());
+    const 번호 = 머리.lastIndexOf("주문번호"), cs = 머리.indexOf("CS");
+    const 몸 = 줄들.filter((tr) => tr !== 머리줄 && tr.cells.length === 머리.length);
+    const 값 = (tr, i) => (i >= 0 && tr && tr.cells[i] ? tr.cells[i].textContent.trim() : "");
+    const 맞나 = (tr) => 값(tr, 번호) === String(주문).trim() && CS글자(값(tr, cs)).includes(CS글자(종류));
+    const 맨위 = !!몸[0] && 맞나(몸[0]);
+    return { 맨위, 까닭: 맨위 ? "" : 몸.some(맞나) ? "목록에 있으나 맨 위 아님" : "맨 위 「" + 값(몸[0], 번호) + " " + 값(몸[0], cs) + "」" };
+  }
+  async function 주문변경올리기(주문, { 종류, 단품, 메시지, 단서 }) {
+    const 말 = (m) => window.VP말?.("고객주문변경:" + m);
+    const 탈 = (m, 보냄 = false) => Object.assign(new Error(m), { 보냄 });
+    const 고른줄 = await 원주문찾기(주문, 단서);
+    if (!고른줄) throw 탈("① 원주문을 못 찾음 — 벤더피아 원주문 검색에 이 주문번호가 없습니다");
+    const 틀 = document.createElement("iframe");
+    틀.setAttribute("sandbox", "allow-same-origin allow-scripts allow-forms");
+    틀.setAttribute("aria-hidden", "true");
+    틀.tabIndex = -1;
+    틀.style.cssText = "position:fixed;left:-12000px;top:0;width:1280px;height:900px;border:0;visibility:hidden;pointer-events:none";
+    const 열림 = 틀로드(틀, 60000);
+    틀.src = new URL(고객문의주소, location.href).href;
+    document.body.appendChild(틀);
+    try {
+      await 열림;
+      let w = 틀.contentWindow, d = 틀.contentDocument;
+      if (!d || d.querySelector("input[type=password]")) throw 탈("로그인 필요");
+      if (typeof w.getReturnValue !== "function" || !d.getElementById("btnReflash")) throw 탈("① 고객주문변경_접수 쪽 모양이 다름");
+      /* ② 원주문 잇기 — 사람이 원주문 검색 팝업에서 줄을 고를 때와 똑같이 `getReturnValue` */
+      const 이어짐 = 틀로드(틀, 60000);
+      w.getReturnValue({ orderNo: 고른줄.안번호, dStatusCd: 고른줄.상태코드, csUsableQty: 고른줄.가용수 });
+      await 이어짐;
+      w = 틀.contentWindow; d = 틀.contentDocument;
+      const 이은번호 = (d.getElementById("tbSOrderNo") || {}).value || "";
+      말("잇기 " + 고른줄.안번호 + " 주문칸[" + 이은번호.slice(0, 40) + "] 탭" + ((d.getElementById("hTab") || {}).value || "없음"));
+      if (!이은번호.split("/").map((x) => x.trim()).includes(String(주문).trim())) throw 탈("② 원주문을 못 이음");
+      /* ③ 「주문 단품정보」 — 고른 단품만 체크. 하나라도 못 찾으면 저장하지 않는다 */
+      const 그리드 = w.$find && w.$find("oGridOrderItem");
+      if (!그리드) throw 탈("③ 주문 단품정보 표(oGridOrderItem)가 없음");
+      const 바쁨 = 틀바쁨(w);
+      const 줄수 = () => 그리드.get_rows().get_length();
+      const 줄 = (i) => 그리드.get_rows().get_row(i);
+      const 코드들 = [];
+      for (let i = 0; i < 줄수(); i++) 코드들.push(String(줄(i).get_cellByColumnKey("goodsCd").get_value() || "").trim());
+      const 없음 = 단품.filter((x) => !코드들.some((c) => 같은코드(c, x.code)));
+      말("단품표 " + JSON.stringify(코드들).slice(0, 160) + " 고름 " + 단품.map((x) => x.code).join("+"));
+      if (없음.length) throw 탈("③ 주문 단품정보에 없는 단품: " + 없음.map((x) => x.name + "(" + x.code + ")").join(", ") + " · 표에는 " + (코드들.join(", ") || "없음"));
+      for (let i = 0; i < 줄수(); i++) {
+        const 켤것 = 단품.some((x) => 같은코드(x.code, 코드들[i]));
+        const 칸 = () => 줄(i).get_cellByColumnKey("CHK");
+        if (!!칸().get_value() === 켤것) continue;
+        /* 사람처럼 그 칸의 체크 그림을 누른다 — 안 먹으면 그리드 API 로 */
+        const 그림 = 칸().get_element() && 칸().get_element().querySelector("img, input[type=checkbox]");
+        if (그림) for (const t of ["mousedown", "mouseup", "click"])
+          그림.dispatchEvent(new w.MouseEvent(t, { bubbles: true, cancelable: true, view: w, button: 0 }));
+        await 틀잠잠(바쁨);
+        if (!!칸().get_value() !== 켤것) { 칸().set_value(켤것); await 틀잠잠(바쁨); }
+        if (!!칸().get_value() !== 켤것) throw 탈("③ 단품 체크가 안 먹음(" + 코드들[i] + ")");
+      }
+      const 켠것 = [];
+      for (let i = 0; i < 줄수(); i++) if (줄(i).get_cellByColumnKey("CHK").get_value()) 켠것.push(코드들[i]);
+      말("체크 " + 켠것.join("+"));
+      /* ④ 「고객주문변경」 탭 — 사람이 탭을 누르면 `hTab` 이 CS 가 된다 */
+      d.getElementById("li2")?.click();
+      await 쉼(200);
+      if ((d.getElementById("hTab") || {}).value !== "CS") throw 탈("④ 고객주문변경 탭이 안 열림(탭 " + ((d.getElementById("hTab") || {}).value || "없음") + ")");
+      /* ⑤ 유형 = 고른 종류 */
+      const 유형칸 = d.getElementById("ddlCsType");
+      const 유형 = 유형칸 && [...유형칸.options].find((o) => CS글자(o.textContent) === CS글자(종류));
+      if (!유형) throw 탈("⑤ 유형에 「" + 종류 + "」 없음(" + (유형칸 ? [...유형칸.options].map((o) => o.textContent.trim()).join("·") : "칸 없음") + ")");
+      유형칸.value = 유형.value;
+      유형칸.dispatchEvent(new w.Event("change", { bubbles: true }));
+      /* ⑥ 상세사유 = 출고 메시지(체크 해제·빈칸이면 빈칸) */
+      const 사유칸 = d.getElementById("tbReasonDetl");
+      if (!사유칸) throw 탈("⑥ 상세사유 칸 없음");
+      사유칸.value = String(메시지 || "").slice(0, 500);
+      사유칸.dispatchEvent(new w.Event("change", { bubbles: true }));
+      /* ⑦ 위쪽 「저장」 — 저장 전 검사 alert 는 가로챈다(그러면 쪽이 안 넘어감 = 저장 안 보냄) */
+      const 알림들 = [];
+      w.alert = (m) => { 알림들.push(String(m)); };
+      w.confirm = (m) => { 알림들.push(String(m)); return false; };
+      let 떠남 = false;
+      w.addEventListener("pagehide", () => { 떠남 = true; });
+      w.addEventListener("beforeunload", () => { 떠남 = true; });
+      const 저장단추 = d.getElementById("btnSaveInsert");
+      if (!저장단추) throw 탈("⑦ 저장 단추 없음");
+      const 알림뽑기 = (t) => [...t.matchAll(/alert\(\s*['"]([^'"]{1,120})['"]/g)].map((m) => m[1]);
+      const 늘있는알림 = new Set(알림뽑기(d.documentElement.outerHTML));   // 쪽에 늘 박혀 있는 alert(검사 함수 안) — 뺀다
+      const 저장됨 = 틀로드(틀, 60000);
+      말("저장 누름 유형" + 유형.value + " 사유" + 사유칸.value.length + "자 탭" + d.getElementById("hTab").value);
+      저장단추.click();
+      for (let i = 0; i < 20 && !떠남; i++) await 쉼(100);
+      if (!떠남) { 저장됨.catch(() => {}); throw 탈("⑦ 저장 안 됨 — " + (알림들[0] ? "벤더피아 알림 「" + 알림들[0] + "」" : "저장 단추가 안 먹음")); }
+      try { await 저장됨; } catch (e) { throw 탈("⑦ 저장 응답 못 받음 — 주문관리에서 확인", true); }
+      const 뒤 = 틀.contentDocument;
+      const 뒤글 = 뒤 ? 뒤.documentElement.outerHTML : "";
+      const 응답알림 = 알림뽑기(뒤글).filter((a) => !늘있는알림.has(a));
+      말("저장 뒤 " + String(틀.contentWindow?.location?.pathname || "") + " 알림" + JSON.stringify(응답알림).slice(0, 120)
+        + (뒤 && 뒤.querySelector("input[type=password]") ? " 로그인쪽" : "") + " 오류[" + (뒤 ? 오류글(뒤) : "") + "]");
+      /* ⑧ 확인 — 주문관리 맨 위에 새 CS */
+      let 확인 = null;
+      try { 확인 = await 주문변경확인(주문, 종류); } catch (e) { 확인 = { 맨위: false, 까닭: "주문관리 조회 못함" }; }
+      말("주문관리 " + (확인.맨위 ? "맨위 있음" : 확인.까닭));
+      if (확인.맨위) return { 맨위: true };
+      throw 탈("⑧ 주문관리 맨 위에 안 보임 — " + (응답알림.find((a) => /실패|오류|에러|없습니다|확인해|못/.test(a)) || 확인.까닭), true);
+    } finally {
+      틀.remove();
+    }
   }
 
   let tbody = null;

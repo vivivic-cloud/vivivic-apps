@@ -176,7 +176,7 @@ const 자리 = (고르개) => { const e = document.querySelector(고르개); if 
     const 고름뒤 = await page.evaluate(판값);
     console.log('  ★ ㅁ 「상세보기」 → 상세 ' + JSON.stringify(상세값.상세) + ' · 고름은 그대로 ' + 못(상세값.상세.includes('비스켓 800 몸통')
       && 상세값.상담 && !(await page.$('#vp-root .vp-우클릭')) && 고름뒤.상태.단품.map((d) => d.code).join() === 'bis800_d'));
-    await page.evaluate(() => document.querySelectorAll('.vp-goods-panel').forEach((p) => { p.hidden = true; }));
+    await page.evaluate(() => document.querySelectorAll('.vp-goods-panel').forEach((p) => { p.hidden = true; p.style.display = 'none'; }));
     await page.click(단품(1));
     판 = await page.evaluate(판값);
     console.log('  ★ ㄴ 둘 고름 → 「' + 판.고른것 + '」 · 상태 ' + JSON.stringify(판.상태) + ' ' + 못(판.고른것 === '교환 · 비스켓 800 몸통, 비스켓 800 문'
