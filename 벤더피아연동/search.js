@@ -866,6 +866,7 @@
   }
 
   const 접수종류 = ["교환", "반품", "AS"];
+  const CS등록종류 = ["교환", "반품", "AS", "취소"];   // 10-28 [새 지시 CS등록단품] 「접수」 아래 CS등록 — 이번 단계는 단품 고르기까지
   const 접수상태 = ["접수", "처리중", "끝"];
 
   /* ── CS등록 (10-16) ──────────────────────────────────────
@@ -1067,13 +1068,18 @@
       <div class="vp-상담접수"></div>
       <div class="vp-상담목록">불러오는 중…</div>
       <form class="vp-상담적기">
-        <div class="vp-상담고르기">
-          <span class="vp-상담라벨">접수</span>
-          ${접수종류.map((k) => `<button type="button" class="vp-상담종류" data-k="${k}">${k}</button>`).join("")}
-        </div>
+        <div class="vp-상담고르기"><span class="vp-상담라벨">고객문의</span></div>
         <textarea rows="3" placeholder="오간 말을 적으십시오 (지울 수 없습니다 — 쌓입니다)"></textarea>
-        <div class="vp-상담발"><span class="vp-상담알림"></span><button type="submit">남기기</button></div>
-      </form></div>`;
+        <div class="vp-상담발"><span class="vp-상담알림"></span><button type="submit">접수</button></div>
+      </form>
+      <div class="vp-cs등록">
+        <div class="vp-상담고르기">
+          <span class="vp-상담라벨">CS등록</span>
+          ${CS등록종류.map((k) => `<button type="button" class="vp-상담종류" data-k="${k}">${k}</button>`).join("")}
+        </div>
+        <div class="vp-cs단품" hidden></div>
+        <div class="vp-cs고른것" hidden></div>
+      </div></div>`;
     덮개.querySelector("strong").textContent = 상품명 || "상담";
     덮개.querySelector(".vp-상담머리 small").textContent = "주문 " + 주문;
     덮개.querySelector(".vp-상담닫기").addEventListener("click", 상담판닫기);
@@ -1096,18 +1102,74 @@
     const 알림 = 덮개.querySelector(".vp-상담알림");
     const 적기 = 덮개.querySelector(".vp-상담적기");
     const 글칸 = 덮개.querySelector("textarea");
-    let 쌓인것 = [], 지금접수 = null, 고른종류 = "";
+    let 쌓인것 = [], 지금접수 = null;
     /* 고객문의 원주문 고르기용 — 이 판을 연 줄의 상품 */
     const 줄값 = (이름) => { const i = 받은머리 ? 받은머리.indexOf(이름) : -1; return i >= 0 && 받은줄 ? String(받은줄[i] == null ? "" : 받은줄[i]).trim() : ""; };
     const 상품단서 = { 상품명: 상품명 || 줄값("상품명"), 상품코드: 줄값("상품코드") };
 
-    /* 종류 단추 — 하나만 켜진다. 다시 누르면 꺼진다(그냥 상담만 남기실 때). */
-    for (const b of 덮개.querySelectorAll(".vp-상담종류")) {
+    /* 10-28 [새 지시 CS등록단품] CS등록 — 종류(교환·반품·AS·취소)를 누르면 이 주문 상품의 단품(상품명 상세의 단품 단추와 같은 것)을
+       보이고, 어느 단품에 대한 접수인지 고른다(여럿 고를 수 있음). **여기까지만** — 벤더피아·우리 창고에 안 쓴다.
+       고른 것은 `CS고름`(덮개.vpCS등록)에 들고 있다 — 다음 단계(실제 등록)가 쓴다. */
+    const CS칸 = 덮개.querySelector(".vp-cs등록");
+    const 단품칸 = CS칸.querySelector(".vp-cs단품");
+    const 고른칸 = CS칸.querySelector(".vp-cs고른것");
+    const CS고름 = { 종류: "", 단품: [] };
+    덮개.vpCS등록 = CS고름;
+    let 단품목록 = null, 단품받는중 = null;
+    const 고른것그리기 = () => {
+      for (const x of CS칸.querySelectorAll(".vp-상담종류"))
+        x.setAttribute("aria-pressed", x.dataset.k === CS고름.종류 ? "true" : "false");
+      for (const x of 단품칸.querySelectorAll("button"))
+        x.setAttribute("aria-pressed", CS고름.단품.some((d) => d.code === x.dataset.code) ? "true" : "false");
+      고른칸.hidden = !CS고름.종류;
+      고른칸.textContent = !CS고름.종류 ? ""
+        : CS고름.종류 + " · " + (CS고름.단품.length
+          ? CS고름.단품.map((d) => d.name + (d.n > 1 ? " ×" + d.n : "")).join(", ")
+          : "단품을 고르십시오");
+    };
+    const 단품그리기 = () => {
+      단품칸.replaceChildren();
+      for (const d of 단품목록) {
+        const b = 단품칸.appendChild(document.createElement("button"));
+        b.type = "button";
+        b.dataset.code = d.code;
+        b.textContent = d.name + (d.n > 1 ? " ×" + d.n : "");
+        b.title = d.code;
+        b.addEventListener("click", () => {
+          CS고름.단품 = CS고름.단품.some((x) => x.code === d.code)
+            ? CS고름.단품.filter((x) => x.code !== d.code)
+            : 단품목록.filter((x) => x.code === d.code || CS고름.단품.some((y) => y.code === x.code));
+          고른것그리기();
+        });
+      }
+      if (!단품목록.length) 단품칸.textContent = "이 상품의 단품 구성이 없습니다.";
+      고른것그리기();
+    };
+    const 단품받기 = async () => {
+      if (단품목록) return;
+      if (단품받는중) return 단품받는중;
+      단품칸.textContent = "단품 불러오는 중…";
+      단품받는중 = (async () => {
+        try {
+          for (let i = 0; !window.VP상품단품 && i < 50; i++) await new Promise((r) => setTimeout(r, 200));
+          if (!window.VP상품단품) throw new Error("상품 상세를 못 불러옴");
+          const 답 = await window.VP상품단품(상품단서.상품명, 상품단서.상품코드);
+          if (!답) { 단품칸.textContent = "상품관리에서 이 상품(" + (상품단서.상품명 || "?") + ")을 찾지 못했습니다."; return; }
+          단품목록 = 답;
+          단품그리기();
+        } catch (e) {
+          단품칸.textContent = "단품을 못 읽었습니다 — " + (e && e.message ? e.message : e);
+          window.VP말?.("CS등록:단품못읽음 " + (e && e.message ? e.message : e));
+        } finally { 단품받는중 = null; }
+      })();
+      return 단품받는중;
+    };
+    for (const b of CS칸.querySelectorAll(".vp-상담종류")) {
       b.addEventListener("click", () => {
-        고른종류 = 고른종류 === b.dataset.k ? "" : b.dataset.k;
-        for (const x of 덮개.querySelectorAll(".vp-상담종류"))
-          x.setAttribute("aria-pressed", x.dataset.k === 고른종류 ? "true" : "false");
-        적기.querySelector("button[type=submit]").textContent = 고른종류 ? 고른종류 + " 접수" : "남기기";
+        CS고름.종류 = CS고름.종류 === b.dataset.k ? "" : b.dataset.k;   // 다시 누르면 꺼진다
+        단품칸.hidden = !CS고름.종류;
+        고른것그리기();
+        if (CS고름.종류) 단품받기();
       });
     }
 
@@ -1167,9 +1229,6 @@
         상담셈.set(열쇠, { 수: 쌓인것.length, 열림: 온것.open, 종류: (온것.req && 온것.req.k) || "" });
         for (const [칸, 주] of 상담칸들) 상담점찍기(칸, 주);
         글칸.value = "";
-        고른종류 = "";
-        for (const x of 덮개.querySelectorAll(".vp-상담종류")) x.setAttribute("aria-pressed", "false");
-        단추.textContent = "남기기";
         알림.textContent = "남겼습니다";
         그리기();
         남김 = true;
@@ -1212,11 +1271,9 @@
     적기.addEventListener("submit", (e) => {
       e.preventDefault();
       const 글 = 글칸.value.trim();
-      if (!글 && !고른종류) return;
-      /* 종류를 고르셨으면 **접수**다 — 그래도 **이력 줄로 같이 쌓인다**
-         (사장님 10-15: 「이력을 남기면서 **동시에**」). */
-      남기기({ 글: 글 || (고른종류 + " 접수"), 종류: 고른종류,
-               상태: 고른종류 ? "접수" : "", 올리기: true });
+      if (!글) return;
+      /* 10-28 「접수」 = 고객문의 메시지 접수(우리 저장 + 벤더피아 고객문의 등록). 교환·반품·AS 는 아래 CS등록으로 옮겼다. */
+      남기기({ 글, 종류: "", 상태: "", 올리기: true });
     });
     글칸.focus();
   }

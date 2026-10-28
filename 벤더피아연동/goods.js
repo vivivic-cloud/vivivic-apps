@@ -1750,6 +1750,33 @@ const 한벌돌리기 = (단품곁다리) => {
       window.VP상품표끝 = () => 곁다리표.다됨;
       window.VP상품찾기 = 곁다리찾기;
       window.VP상품있나 = (이름, 코드) => !!표에서찾기(이름, 코드);
+      /* 10-28 [새 지시 CS등록단품] 상품 상세의 단품 단추(`partChips`)와 같은 단품 목록 — 상담 판 CS등록이 쓴다(조회만).
+         [{code, name, n}] — 같은 단품이 여럿이면 n, (사용안함) 단품은 뺀다. 상품을 못 찾으면 null. */
+      window.VP상품단품 = async (이름0, 코드) => {
+        const 찾은 = 표에서찾기(이름0, 코드);
+        const 이름 = 찾은 ? 찾은.name : String(이름0 || "").trim();
+        const 답 = await 줄받기(이름, 찾은 ? 찾은.codes : (코드 ? [코드] : []));
+        if (!답) return null;
+        const ci = 답.heads.indexOf("단품코드"), ni = 답.heads.indexOf("단품명");
+        if (ci < 0) return [];
+        const 단품 = new Map();
+        for (const row of 답.rows) {
+          const codes = splitCodes(String(row[ci] || ""));
+          const names = ni >= 0 ? String(row[ni] || "").split("+") : [];
+          const 셈 = new Map();
+          codes.forEach((code, i) => {
+            if (!셈.has(code)) 셈.set(code, { n: 0, name: names.length === codes.length ? names[i].trim() : code });
+            셈.get(code).n++;
+          });
+          for (const [code, x] of 셈) {
+            const part = linked?.byCode.get(code);
+            const name = part ? part[linked.heads.indexOf("단품명")] : x.name;
+            if (unused(name)) continue;
+            if (!단품.has(code) || 단품.get(code).n < x.n) 단품.set(code, { code, name, n: x.n });
+          }
+        }
+        return [...단품.values()];
+      };
     }
     window.VP말?.(단품곁다리 ? "곁다리:단품섬" : "곁다리:섬");                      // ⚠ 까닭 적기 (10-15)
   }

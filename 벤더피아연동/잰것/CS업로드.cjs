@@ -194,8 +194,7 @@ window.VP저장 = { get: async function(){return {};}, set: async function(){}, 
     return { 일, 알림 };
   }
   const 쓰고접수 = (글, 종류) => async (page) => {
-    await page.fill('.vp-상담적기 textarea', 글);
-    if (종류) await page.click(`.vp-상담종류[data-k="${종류}"]`);
+    await page.fill('.vp-상담적기 textarea', 글);   // 10-28 종류 단추는 「접수」 아래 CS등록으로 옮겨 — 「접수」 는 메시지만(종류 안 실음)
     await page.click('.vp-상담적기 button[type=submit]');
   };
 
@@ -216,7 +215,7 @@ window.VP저장 = { get: async function(){return {};}, set: async function(){}, 
   console.log('    ★ GET·잇기·저장 모두 csDetl.aspx?previousPage=first ' + 못(일.문의주소.length === 3
     && 일.문의주소.every(x => x.endsWith(' ?previousPage=first')) && 일.문의주소[0].startsWith('GET')));
   console.log('    문의내용 = 쓴 글 그대로 ' + 못(String(s[C('tbContent')]).replace(/\r\n/g, '\n') === '문짝 흠. 교환 원하심\n다음 주 수요일 재배송'));   // 폼은 줄바꿈을 \r\n 으로 보낸다(브라우저 규칙)
-  console.log('    문의유형 = 교환(I2) ' + 못(s[C('ddlInqType')] === 'I2'));
+  console.log('    문의유형 = 기본값(I0) — 「접수」 는 메시지만, 교환 등은 CS등록(10-28) ' + 못(s[C('ddlInqType')] === 'I0'));
   console.log('    ★ 빈 파일 칸은 브라우저처럼 실음 · 잇기 단추는 안 실음 ' + 못(!(C('btnReflash') in s) && s[C('fileUpload1')] === ''));
   console.log('    저장에도 상태 코드·가용수가 그대로 ' + 못(s[C('hdStatusCd')] === '4' && s[C('tbUsableQty')] === '2'));
   console.log('    ★ 저장 뒤 고객문의 목록 조회로 확인(조회만) ' + 못(일.확인 === 1));
@@ -267,13 +266,12 @@ window.VP저장 = { get: async function(){return {};}, set: async function(){}, 
   console.log('    ★ 제목 「' + (일.저장[0] || {})[C('tbTitle')] + '」 = 「AS 다리 흔들림 」 앞 10글자 정리 ' + 못(일.저장[0]
     && 일.저장[0][C('tbTitle')] === 'AS 다리 흔들림'));
 
-  /* E — 상태 단추는 벤더피아로 안 감 */
-  ({ 일, 알림 } = await 해보기('E 접수 뒤 상태 「처리중」', { 할일: async (page) => {
-    await 쓰고접수('교환 접수함', '교환')(page);
+  /* E — (10-28) CS등록 종류 단추는 벤더피아·창고로 안 감(단품 고르기까지만) */
+  ({ 일, 알림 } = await 해보기('E CS등록 「교환」 누름', { 할일: async (page) => {
+    await page.click('.vp-cs등록 .vp-상담종류[data-k="교환"]');
     await page.waitForTimeout(1500);
-    await page.click('.vp-상담상태 button:nth-child(2)');
   } }));
-  console.log('    ★ 상태 단추는 창고만(PATCH 2) · 벤더피아 등록은 처음 한 번뿐 ' + 못(일.패치 === 2 && 일.저장.length === 1 && 일.가져옴 === 1));
+  console.log('    ★ CS등록 단추는 창고·벤더피아 쓰기 0 ' + 못(일.패치 === 0 && 일.저장.length === 0 && 일.가져옴 === 0 && !일.벤더쓰기.length));
 
   await b.close();
   console.log('\n★ 초록 ' + 초록 + ' · 빨강 ' + 빨강);

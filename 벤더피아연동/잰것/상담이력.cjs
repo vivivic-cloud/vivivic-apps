@@ -196,32 +196,30 @@ const 본다 = () => {
     console.log('    ★ **상담 단추를 눌러** 판이 떴나 ' + 판.판떴나 + ' · 제목 「' + 판.판제목 + '」 '
       + 못(판.판떴나 && 판.판제목 === '토리블리 2단 와이드 교구장'));
     console.log('    앞서 쌓인 줄 ' + 판.판줄수 + '개 ' + 못(판.판줄수 === 1));
-    console.log('    접수 단추 ' + JSON.stringify(판.종류단추) + ' '
-      + 못(JSON.stringify(판.종류단추) === JSON.stringify(['교환','반품','AS'])));
+    /* 10-28 [새 지시 CS등록단품] 「남기기」 → 「접수」, 교환·반품·AS(+취소)는 「접수」 아래 CS등록으로 — 누르면 단품 고르기만(쓰기 없음) */
+    console.log('    CS등록 단추 ' + JSON.stringify(판.종류단추) + ' '
+      + 못(JSON.stringify(판.종류단추) === JSON.stringify(['교환','반품','AS','취소'])));
+    console.log('    CS등록이 「접수」 아래에 있나 ' + 못(await page.evaluate(() => {
+      const f = document.querySelector('.vp-상담적기'), c = document.querySelector('.vp-cs등록');
+      return !!(f && c && !f.querySelector('.vp-상담종류') && f.getBoundingClientRect().bottom <= c.getBoundingClientRect().top + 1); })));
     console.log('    ★ **지우는 단추가 없나** ' + 못(!판.지우기단추있나));
+    console.log('    단추 글 「접수」 '
+      + 못((await page.textContent('.vp-상담적기 button[type=submit]')) === '접수'));
+    const 패치전 = 창고로.filter(x => x.셈 === 'PATCH').length;
+    await page.click('.vp-cs등록 .vp-상담종류[data-k="교환"]');
+    await page.waitForTimeout(300);
+    console.log('    CS등록 「교환」 누름 — 켜짐 · 창고 쓰기 없음 ' + 못(await page.evaluate(() =>
+      document.querySelector('.vp-cs등록 [data-k="교환"]').getAttribute('aria-pressed') === 'true'
+      && !document.querySelector('.vp-cs단품').hidden) && 창고로.filter(x => x.셈 === 'PATCH').length === 패치전));
+    await page.click('.vp-cs등록 .vp-상담종류[data-k="교환"]');
     await page.fill('.vp-상담적기 textarea', '전화 상담: 문짝 흠 있어 교환 원하심. 다음 주 수요일 재배송 약속.');
-    await page.click('.vp-상담종류[data-k="교환"]');
-    await page.waitForTimeout(150);
-    console.log('    단추 글이 「교환 접수」 로 바뀌나 '
-      + 못((await page.textContent('.vp-상담적기 button[type=submit]')) === '교환 접수'));
     await page.click('.vp-상담적기 button[type=submit]');
     await page.waitForTimeout(900);
     판 = await page.evaluate(본다);
     console.log('    남긴 뒤 — 알림 「' + 판.알림 + '」 · 판 줄 ' + 판.판줄수 + '개 (쌓였나) '
       + 못(/남겼습니다/.test(판.알림 || '') && 판.판줄수 === 2));
-    console.log('    ★ **접수가 이력 줄로도 남나** · 접수줄 「' + 판.접수줄 + '」 '
-      + 못(/교환 접수/.test(판.접수줄 || '') && 판.접수열림));
-    console.log('    상태 단추 ' + JSON.stringify(판.상태단추) + ' '
-      + 못(JSON.stringify(판.상태단추) === JSON.stringify(['접수(켬)','처리중','끝'])));
-    /* 상태를 「끝」 으로 — **지우지 않고 새 줄로 쌓여야** 한다 */
-    await page.click('.vp-상담상태 button:nth-child(3)');
-    await page.waitForTimeout(800);
-    판 = await page.evaluate(본다);
-    console.log('    ★ 「끝」 으로 바꾸니 — 판 줄 ' + 판.판줄수 + '개(쌓였나) · 접수 열림 '
-      + 판.접수열림 + ' ' + 못(판.판줄수 === 3 && !판.접수열림));
-    console.log('    창고에 쌓인 접수 : ' + JSON.stringify(쓴접수 && {
-      k: 쓴접수.k.stringValue, st: 쓴접수.st.stringValue }) + ' '
-      + 못(!!쓴접수 && 쓴접수.k.stringValue === '교환' && 쓴접수.st.stringValue === '끝'));
+    console.log('    ★ 「접수」 는 메시지만 — 교환 접수를 열지 않음 · 접수줄 「' + 판.접수줄 + '」 '
+      + 못(!판.접수줄 && !판.접수열림));
     await page.screenshot({ path: path.join(그림칸, '상담-판-' + w + '.png'), fullPage: false });
     await page.keyboard.press('Escape'); await page.waitForTimeout(200);
     const 뒤 = await page.evaluate(본다);
@@ -365,7 +363,6 @@ const 본다 = () => {
     await page.click('.vp-bar button[type=submit]'); await page.waitForTimeout(1200);
     await page.click('tbody tr:nth-child(1) .vp-상담알'); await page.waitForTimeout(600);
     await page.fill('.vp-상담적기 textarea', '전화 상담 — 다리로 남깁니다');
-    await page.click('.vp-상담종류[data-k="반품"]');
     await page.click('.vp-상담적기 button[type=submit]'); await page.waitForTimeout(900);
     const 것 = await page.evaluate(() => ({
       알림: document.querySelector('.vp-상담알림')?.textContent || null,
