@@ -11,7 +11,7 @@
 const { chromium } = require('playwright');
 const fs = require('fs'), path = require('path');
 const 확장 = path.join(__dirname, '..');
-const EXE = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
+const EXE = process.env.VP_EXE || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const 깃 = 'https://vivivic-cloud.github.io/vivivic-apps/%EB%B2%A4%EB%8D%94%ED%94%BC%EC%95%84%EC%97%B0%EB%8F%99/';
 
 const 상품머리 = ["상품명","상품코드","매출처명","매입처명","배송사명","판매상태","단품명","단품코드","모델번호","매출처상품명","옵션상품유무","등록일"];
@@ -286,16 +286,41 @@ const 판값 = () => {
   {
     console.log('\n■ C 주문 단품정보에 고른 단품이 없음 — 1280px');
     const { ctx, page } = await 판열기(1280, 2);
+    await 말듣기(page);
     await page.click('.vp-cs등록 [data-k="AS"]');
     await page.waitForTimeout(2500);
     await page.click(단품(1));
-    await page.click('.vp-cs저장');
-    await 기다림(page, () => /CS등록됨|실패/.test(document.querySelector('.vp-cs알림').textContent));
+    const 실패보기 = async () => {
+      await page.click('.vp-cs저장');
+      await 기다림(page, () => /CS등록됨|실패|검색창/.test(document.querySelector('.vp-cs알림').textContent));
+      await page.waitForTimeout(600);
+    };
+    const 강조값 = () => page.evaluate(() => {
+      const 칸 = document.querySelector('.vp-cs단품검색'), 글 = 칸.querySelector('input'), cs = getComputedStyle(글), r = 글.getBoundingClientRect();
+      return { 켬: 칸.classList.contains('vp-안내'), 보임: !칸.hidden, 포커스: document.activeElement === 글, 테: cs.borderTopWidth + ' ' + cs.borderTopColor,
+        바탕: cs.backgroundColor, 깜빡: cs.animationName, 화면안: r.top >= 0 && r.bottom <= innerHeight };
+    });
+    await 실패보기();
     const 판 = await page.evaluate(판값);
-    console.log('  ★ ㅁ 저장 POST 0 · 「' + 판.알림.slice(0, 70) + '」 ' + 못(!일.저장.length && /^실패\(③ 주문 단품정보에 없는 단품: 비스켓 1200 몸통\(bis1200_b\)/.test(판.알림) && !판.저장꺼짐));
-    /* 10-28 [새 지시 CS단품검색] 실패 글에 단품 검색 안내 + 검색칸이 보임 */
-    console.log('  ★ ㅁ 실패 글에 「단품 검색」 안내 · 검색칸 보임 ' + 못(/단품 검색으로 주문된 단품을 고르십시오/.test(판.알림)
-      && await page.evaluate(() => !document.querySelector('.vp-cs단품검색').hidden)));
+    console.log('  ★ ㅁ 저장 POST 0 · 「' + 판.알림 + '」 ' + 못(!일.저장.length && 판.알림 === '검색창에 새로운 단품명을 고르세요' && !판.저장꺼짐));
+    /* 10-28 [새 지시 단품안내강조] 짧은 글 · 검색칸 강조(고른 통과 같은 꼴)·스크롤·포커스 · 까닭은 딱지에만 */
+    let 강 = await 강조값();
+    console.log('  ★ ㅁ 검색칸 강조 ' + JSON.stringify(강) + ' ' + 못(강.켬 && 강.보임 && 강.포커스 && 강.화면안 && 강.테 === '2px rgb(55, 53, 47)' && 강.바탕 === 'rgb(241, 241, 239)' && 강.깜빡 === 'vp-안내깜빡'));
+    const 말 = await page.evaluate(() => window.__말);
+    console.log('  ★ ㅁ 까닭은 화면에 없고 딱지에만 ' + 못(!/bis1200_b|표에는/.test(await page.evaluate(() => document.querySelector('.vp-cs등록').innerText.replace(/비스켓 1200 몸통[\s\S]*?bis1200_b/, '')))
+      && !/표에는|bis1200/.test(판.알림) && 말.some((m) => /^고객주문변경:실패 ③ 주문 단품정보에 없는 단품: 비스켓 1200 몸통\(bis1200_b\) · 표에는/.test(m))));
+    await page.fill('.vp-cs단품검색 input', '비스');
+    강 = await 강조값();
+    console.log('  ★ ㅁ 검색칸에 글 치면 강조 꺼짐 ' + 못(!강.켬 && 강.깜빡 === 'none'));
+    await page.fill('.vp-cs단품검색 input', '');
+    await page.waitForTimeout(400);   // 빈 글 → 목록 닫힘
+    await 실패보기();
+    강 = await 강조값();
+    await page.click(단품(1));   // 풂 — 강조 그대로
+    const 강1 = await 강조값();
+    await page.click(단품(1));   // 고름 — 강조 꺼짐
+    const 강2 = await 강조값();
+    console.log('  ★ ㅁ 다시 실패 → 강조, 풀면 그대로, 단품 고르면 꺼짐 ' + 못(강.켬 && 강1.켬 && !강2.켬));
     await ctx.close();
   }
 

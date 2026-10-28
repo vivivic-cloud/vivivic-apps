@@ -1163,6 +1163,7 @@
       const 남 = CS고름.단품.some((x) => x.code === d.code)
         ? CS고름.단품.filter((x) => x.code !== d.code)
         : [...CS고름.단품, d];
+      if (남.length > CS고름.단품.length) 검색안내끄기();   // 새 단품을 고르면 검색칸 강조를 끈다(10-28 [새 지시 단품안내강조])
       const 목록 = 단품목록 || [];
       CS고름.단품 = [...목록.filter((x) => 남.some((y) => y.code === x.code)), ...남.filter((y) => !목록.some((x) => x.code === y.code))];
       고른것그리기();
@@ -1206,6 +1207,15 @@
       검색고름칸.hidden = !더.length;
     }
     const 검색닫기 = () => { 검색목록.hidden = true; };
+    /* 10-28 [새 지시 단품안내강조] ③ 실패(주문 단품정보에 없는 단품) 때 검색칸을 강조해 유도 — 칸으로 스크롤·포커스.
+       글을 치거나 새 단품을 고르면 꺼진다. 까닭(어느 단품·표에 무엇)은 화면에 안 쓰고 VP말 딱지에만. */
+    function 검색안내켜기() {
+      검색칸.hidden = false;
+      검색칸.classList.add("vp-안내");
+      검색글.scrollIntoView({ block: "center", behavior: "smooth" });
+      검색글.focus({ preventScroll: true });
+    }
+    function 검색안내끄기() { 검색칸.classList.remove("vp-안내"); }
     const 검색하기 = async () => {
       const 차례 = ++검색차례;
       const 글 = 검색글.value;
@@ -1228,7 +1238,7 @@
         window.VP말?.("CS등록:단품검색못함 " + (e && e.message ? e.message : e));
       }
     };
-    검색글.addEventListener("input", () => { clearTimeout(검색예약); 검색예약 = setTimeout(검색하기, 250); });
+    검색글.addEventListener("input", () => { 검색안내끄기(); clearTimeout(검색예약); 검색예약 = setTimeout(검색하기, 250); });
     검색글.addEventListener("keydown", (e) => {
       if (e.key === "Enter") { e.preventDefault(); clearTimeout(검색예약); 검색하기(); }
       if (e.key === "Escape" && !검색목록.hidden) { e.stopPropagation(); 검색닫기(); }
@@ -1305,8 +1315,10 @@
         await 주문변경올리기(주문, { ...고름, 메시지, 단서: 상품단서 });
         CS알림.textContent = "CS등록됨";
       } catch (err) {
-        CS알림.textContent = "실패(" + (err && err.message ? err.message : err) + ")"
-          + (/^③ 주문 단품정보에 없는 단품/.test(err && err.message ? err.message : "") ? " — 위 단품 검색으로 주문된 단품을 고르십시오" : "");
+        if (/^③ 주문 단품정보에 없는 단품/.test(err && err.message ? err.message : "")) {
+          CS알림.textContent = "검색창에 새로운 단품명을 고르세요";
+          검색안내켜기();
+        } else CS알림.textContent = "실패(" + (err && err.message ? err.message : err) + ")";
         if (!(err && err.보냄)) 올린변경.delete(열쇠글);
         window.VP말?.("고객주문변경:실패 " + (err && err.message ? err.message : err));
       }
