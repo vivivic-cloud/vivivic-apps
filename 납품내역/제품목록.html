@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<!-- 납품내역 / 제품목록 — 재단 명세서 전부(4~9월, 날짜 시트 + 세부내역 시트)에서 모은 제품명별 품목 정보.
+     사장님 10-28: 「재단의 모든 명세서를 확인하여 제품명,품목,사이즈,원장종류,원장색상,원장모델명,원장출고처,출고예정일 …
+     제품명의 중복없는 목록만 보여주는 제품목록 페이지」. 발주와 상관없는 단순 제품 정보 — PO·수량·금액은 없다.
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v6.4.0
+
+     ⚠ 이 파일에는 업무 값이 없다. 목록은 창고 `납품내역_제품목록` 에 있고 이 쪽은 **읽기만** 한다.
+        창고에 담는 것은 `tools/제품목록모으기.py`(부를 때만 돈다). 자세한 것은 납품내역/CLAUDE.md 「제품목록 v6.4.0」.
+     ⚠ 설명 문구를 넣지 마라(v6.3.0). 화면 전체 막대 없음 — 표 상자 안에서만 민다(v6.2.1, 재단.html 과 같은 꼴). -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>제품목록 — 납품내역</title>
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+    const app = initializeApp({
+        apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
+        authDomain: "vivivic-4b7ef.firebaseapp.com",
+        projectId: "vivivic-4b7ef",
+        storageBucket: "vivivic-4b7ef.firebasestorage.app",
+        messagingSenderId: "830175660542",
+        appId: "1:830175660542:web:9054030480c8280af8d8af"
+    });
+    const auth = getAuth(app);
+    window.db = getFirestore(app);
+    window.fbRead = { collection, getDocs };
+    onAuthStateChanged(auth, (u) => {
+        if (!u) { signInAnonymously(auth).catch(e => window.목록못읽음('창고에 들어가지 못했습니다', (e&&(e.code||e.message))||'')); return; }
+        window.목록읽기();
+    });
+</script>
+
+<style>
+/* 흰 바탕 · 표는 서류관리(vivivic-docs index.html) 「제품관리」 표와 같은 꼴 — 납품내역/CLAUDE.md 「표 디자인」. 다크 금지.
+   겉꼴은 재단.html 에서 그대로 옮겼다. 값을 새로 짓지 마라. */
+:root{
+  --vg-bg:#fff; --vg-ink:#111110; --vg-body:#1A1A19;
+  --vg-muted:#9C9C98; --vg-edge:#E2E2DF; --vg-fill:#F4F4F2; --vg-red:#FF3B30;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--vg-bg);color:var(--vg-body);
+  font:15px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",system-ui,sans-serif;
+  -webkit-text-size-adjust:100%}
+.wrap{max-width:1100px;margin:0 auto;padding:0 16px}
+
+.back{display:inline-block;font-size:13px;font-weight:600;color:var(--vg-muted);text-decoration:none;padding:10px 0 0}
+.back:hover{color:var(--vg-ink)}
+header{padding:6px 0 2px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.logo{font-size:13px;color:var(--vg-muted)}
+.logo b{font-size:15px;font-weight:800;letter-spacing:3.2px;color:var(--vg-ink);margin-right:4px}
+.badge{font-size:11px;font-weight:800;letter-spacing:1.2px;color:var(--vg-ink);
+  border:1px solid var(--vg-ink);border-radius:999px;padding:3px 9px}
+h1{font-size:30px;line-height:1.1;letter-spacing:-1.2px;font-weight:700;color:var(--vg-ink);padding:4px 0 12px}
+/* 표 상자를 화면 높이로 묶어 가로 막대가 늘 보는 화면 아래에 오게 한다(납품내역/CLAUDE.md 「알아낸 것」 — 풀지 마라) */
+.표통{overflow:auto;max-height:calc(100vh - 24px);-webkit-overflow-scrolling:touch;background:var(--vg-bg)}
+/* 쪽은 화면 높이에 서고, 표 상자(.표통)가 남은 높이를 채워 그 안에서만 민다(v6.2.1 재단.html 과 같다). */
+html,body{height:100%;overflow:hidden}
+.wrap{height:100%;display:flex;flex-direction:column;overflow-y:auto;scrollbar-width:none;position:relative}
+.wrap::-webkit-scrollbar{display:none}
+.wrap>*{flex-shrink:0}
+.wrap>#속{flex:1 1 0;min-height:0;display:flex;flex-direction:column;margin-top:4px}
+#속>*{flex-shrink:0}
+#속>.표통{flex:1 1 auto;min-height:0}
+@media (max-width:600px),(max-height:600px){.wrap>#속{flex:1 0 auto} #속>.표통{flex:1 0 240px}}
+/* 표 — 서류관리 제품관리(.dpr-t)와 같은 꼴 */
+.dpr-t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.dpr-t th{font-size:13px;font-weight:800;color:var(--vg-ink);text-align:left;vertical-align:bottom;
+  padding:10px 12px;border-bottom:2px solid var(--vg-ink);background:var(--vg-bg);white-space:nowrap}
+.dpr-t td{font-size:14px;color:var(--vg-body);padding:13px 12px;
+  border-bottom:1px solid #D6D6D3;vertical-align:top;white-space:nowrap}
+.dpr-t td.d{color:var(--vg-muted)}
+.dpr-t .dpr-k{position:sticky;left:0;z-index:1;background:var(--vg-bg);font-weight:700;color:var(--vg-ink)}
+/* 제품명 = 제품관리의 묶음 머리(.dpr-gh / .dpr-gn 17px/700 · .dpr-gc 12px muted) 꼴 — 재단 날짜 가름줄과 같은 자리 */
+.dpr-t tr.dpr-gh td{padding:18px 2px 4px;border-bottom:0;background:var(--vg-bg)}
+.dpr-t tr.dpr-gh .dpr-g{display:inline-flex;align-items:baseline;gap:8px;position:sticky;left:2px}
+.dpr-t .dpr-gn{font-size:17px;font-weight:700;color:var(--vg-ink)}
+.dpr-t .dpr-gc{font-size:12px;color:var(--vg-muted)}
+.empty{font-size:12px;color:var(--vg-muted);padding:6px 2px}
+.state{background:var(--vg-fill);border-radius:14px;padding:22px 16px;text-align:center}
+.state .big{font-size:14px;font-weight:600;color:var(--vg-ink);padding-bottom:6px}
+.state .sub{font-size:12.5px;color:var(--vg-muted);line-height:1.85}
+.state .why{font-size:11.5px;color:var(--vg-red);padding-top:6px;font-family:ui-monospace,monospace}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<a class="back" href="납품내역.html">← 납품내역</a>
+<header>
+  <div class="logo"><b>VIVIVIC</b> — 제품목록</div>
+  <div class="badge">v6.4.0</div>
+</header>
+<h1>제품목록</h1>
+<div class="state" id="목상태"><div class="big">창고를 읽는 중입니다…</div></div>
+
+<div id="속"></div>
+</div>
+
+<!-- 짚어서 지시하는 손잡이 — 바이글 박스에서 열면 켜진다. 화면을 갈아엎을 때도 이 줄은 남긴다. -->
+<script src="../shared/viggle.js"></script>
+
+<script>/* ════ 값은 **창고에서 받는다.** 읽기만 한다. ════ */
+const 창고자리 = ['artifacts','vivivic-4b7ef','public','data','납품내역_제품목록'];
+const 칸 = ['품목','사이즈','원장종류','원장색상','원장모델명','원장출고처','출고예정일'];
+let 답했나 = false;
+
+const 글 = v => String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+function 목상태(큰,작,까닭){
+  const el=document.getElementById('목상태'); el.style.display='block';
+  el.innerHTML = `<div class="big">${큰}</div>` + (작?`<div class="sub">${작}</div>`:'') + (까닭?`<div class="why">${까닭}</div>`:'');
+}
+window.목록못읽음 = (큰,까닭) => { 답했나=true; 목상태(큰,'관리자에게 알려 주십시오.',까닭||''); };
+
+/* ⚠ 창고 꾸러미를 못 받아 오면 「읽는 중」 에서 영영 멈춘다 — 20초 안에 답이 없으면 그렇다고 적는다. */
+setTimeout(() => { if(!답했나) 목상태('창고에 닿지 못했습니다',
+  '인터넷이 끊겼거나 창고가 막혀 있습니다. 새로고침해 보십시오.'); }, 20000);
+
+window.목록읽기 = async function(){
+  try{
+    const { collection, getDocs } = window.fbRead;
+    const 눈 = await getDocs(collection(window.db, ...창고자리));
+    답했나 = true;
+    const 제품들 = [];
+    눈.forEach(d => { if(!d.id.startsWith('_')) 제품들.push(d.data()); });   /* _정보 = 모은때·셈(화면에 안 적는다) */
+    document.getElementById('목상태').style.display='none';
+    if(!제품들.length){ document.getElementById('속').innerHTML = '<div class="empty">줄 없음 — 창고에 제품목록이 아직 없습니다</div>'; return; }
+    제품들.sort((a,b) => (a.순번||0)-(b.순번||0));
+    그리기(제품들);
+  }catch(e){ 답했나=true; window.목록못읽음('창고를 읽지 못했습니다',(e&&(e.code||e.message))||''); }
+};
+
+function 그리기(제품들){
+  let t = '<div class="표통"><table class="dpr-t"><thead><tr>' + 칸.map((c,i)=>`<th class="${i?'':'dpr-k'}">${c}</th>`).join('') + '</tr></thead><tbody>';
+  for(const p of 제품들){
+    const 품목들 = p.품목들 || [];
+    t += `<tr class="dpr-gh"><td colspan="${칸.length}"><span class="dpr-g"><span class="dpr-gn">${글(p.제품명||'')}</span><span class="dpr-gc">${품목들.length}개</span></span></td></tr>`;
+    for(const q of 품목들){
+      t += '<tr>' + 칸.map((c,i)=>{
+        const v = (q[c]==null)?'':String(q[c]);
+        return `<td class="${i?'':'dpr-k '}${v===''?'d':''}">${v===''?'·':글(v)}</td>`;
+      }).join('') + '</tr>';
+    }
+  }
+  document.getElementById('속').innerHTML = t + '</tbody></table></div>';
+}
+</script>
+</body>
+</html>
