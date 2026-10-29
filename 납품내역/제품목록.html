@@ -2,8 +2,10 @@
 <!-- 납품내역 / 제품목록 — 재단 명세서 전부(4~9월, 날짜 시트 + 세부내역 시트)에서 모은 제품명별 품목 정보.
      사장님 10-28: 「재단의 모든 명세서를 확인하여 제품명,품목,사이즈,원장종류,원장색상,원장모델명,원장출고처,출고예정일 …
      제품명의 중복없는 목록만 보여주는 제품목록 페이지」. 발주와 상관없는 단순 제품 정보 — PO·수량·금액은 없다.
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v6.4.1
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v6.5.0
      v6.4.1(10-28): 제품명 묶음 머리를 걷고 품목 줄마다 제품명을 적은 한 표로 폈다. 머리 칸을 누르면 그 열로 오름 → 내림.
+     v6.5.0(10-29): 제품명 옆 「벤더피아 단품」 칸 — 단품을 검색해 고르면 제품명이 같은 모든 줄에 같이 붙는다.
+       단품 목록은 창고 `납품내역_단품목록`(벤더피아 단품관리 엑셀을 올려 채움), 고른 것은 `납품내역_단품연결`(문서 = 제품명).
 
      ⚠ 이 파일에는 업무 값이 없다. 목록은 창고 `납품내역_제품목록` 에 있고 이 쪽은 **읽기만** 한다.
         창고에 담는 것은 `tools/제품목록모으기.py`(부를 때만 돈다). 자세한 것은 납품내역/CLAUDE.md 「제품목록 v6.4.0」.
@@ -16,7 +18,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
-    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+    import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
     const app = initializeApp({
         apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
         authDomain: "vivivic-4b7ef.firebaseapp.com",
@@ -27,7 +29,7 @@
     });
     const auth = getAuth(app);
     window.db = getFirestore(app);
-    window.fbRead = { collection, getDocs };
+    window.fbRead = { collection, getDocs, doc, setDoc, deleteDoc };
     onAuthStateChanged(auth, (u) => {
         if (!u) { signInAnonymously(auth).catch(e => window.목록못읽음('창고에 들어가지 못했습니다', (e&&(e.code||e.message))||'')); return; }
         window.목록읽기();
@@ -84,6 +86,32 @@ html,body{height:100%;overflow:hidden}
 .state .big{font-size:14px;font-weight:600;color:var(--vg-ink);padding-bottom:6px}
 .state .sub{font-size:12.5px;color:var(--vg-muted);line-height:1.85}
 .state .why{font-size:11.5px;color:var(--vg-red);padding-top:6px;font-family:ui-monospace,monospace}
+/* 벤더피아 단품 칸 — 칸 전체가 누르는 단추(44px). 고른 것은 단품명 + 작은 코드, 없으면 흐린 「단품 검색」 */
+.dpr-t td.vpc{padding:0}
+.vpc button{display:block;width:100%;min-height:46px;padding:13px 12px;border:0;background:none;font:inherit;font-size:14px;
+  color:var(--vg-body);text-align:left;white-space:nowrap;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.vpc button.no{color:var(--vg-muted);font-size:13px}
+.vpc .cd,.vpp .cd{font-size:12px;color:var(--vg-muted);margin-left:6px}
+/* 단품 검색 판 — 화면에 붙어 서서(fixed) 표 상자 밖으로 잘리지 않는다 */
+.vpp{position:fixed;z-index:50;background:var(--vg-bg);border:1px solid var(--vg-edge);border-radius:14px;
+  box-shadow:0 8px 28px rgba(0,0,0,.14);display:flex;flex-direction:column;overflow:hidden}
+.vpp .hd{display:flex;align-items:center;gap:8px;padding:10px 10px 8px 14px}
+.vpp .pn{flex:1;min-width:0;font-size:13px;font-weight:800;color:var(--vg-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vpp .x{width:44px;height:36px;border:0;background:none;font-size:20px;color:var(--vg-muted);cursor:pointer}
+.vpp input[type=search]{margin:0 10px 8px;padding:10px 12px;font:inherit;font-size:16px;color:var(--vg-body);
+  border:1px solid var(--vg-edge);border-radius:10px;background:var(--vg-fill);outline:none;-webkit-appearance:none}
+.vpp input[type=search]:focus{border-color:var(--vg-ink);background:var(--vg-bg)}
+.vpp .ls{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;border-top:1px solid var(--vg-edge)}
+.vpp .ls button{display:block;width:100%;min-height:44px;padding:11px 14px;border:0;border-bottom:1px solid #D6D6D3;
+  background:none;font:inherit;font-size:14px;color:var(--vg-body);text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.vpp .ls button.on{font-weight:700;color:var(--vg-ink);background:var(--vg-fill)}
+.vpp .ls button.del{color:var(--vg-red)}
+.vpp .ls .st{font-size:11px;color:var(--vg-muted);margin-left:6px}
+.vpp .ft{display:flex;justify-content:flex-end;padding:6px 10px;border-top:1px solid var(--vg-edge)}
+.vpp .ft label{font-size:12px;font-weight:600;color:var(--vg-muted);padding:8px 6px;cursor:pointer}
+.vpp .ft input{display:none}
+.vpp .msg{font-size:12px;color:var(--vg-muted);padding:10px 14px}
+.vpp .msg.bad{color:var(--vg-red)}
 </style>
 </head>
 <body>
@@ -92,7 +120,7 @@ html,body{height:100%;overflow:hidden}
 <a class="back" href="납품내역.html">← 납품내역</a>
 <header>
   <div class="logo"><b>VIVIVIC</b> — 제품목록</div>
-  <div class="badge">v6.4.1</div>
+  <div class="badge">v6.5.0</div>
 </header>
 <h1>제품목록</h1>
 <div class="state" id="목상태"><div class="big">창고를 읽는 중입니다…</div></div>
@@ -105,7 +133,8 @@ html,body{height:100%;overflow:hidden}
 
 <script>/* ════ 값은 **창고에서 받는다.** 읽기만 한다. ════ */
 const 창고자리 = ['artifacts','vivivic-4b7ef','public','data','납품내역_제품목록'];
-const 칸 = ['제품명','품목','사이즈','원장종류','원장색상','원장모델명','원장출고처','출고예정일'];
+const 단품칸 = '벤더피아 단품';
+const 칸 = ['제품명',단품칸,'품목','사이즈','원장종류','원장색상','원장모델명','원장출고처','출고예정일'];
 let 줄들 = [];              /* 품목 줄마다 제품명을 붙인 한 줄 — 처음 차례(제품 순번 → 품목 차례)는 .차 */
 let 정렬 = null;            /* {칸, 오름:true|false} — 처음엔 null(처음 차례) */
 let 답했나 = false;
@@ -124,7 +153,7 @@ setTimeout(() => { if(!답했나) 목상태('창고에 닿지 못했습니다',
 window.목록읽기 = async function(){
   try{
     const { collection, getDocs } = window.fbRead;
-    const 눈 = await getDocs(collection(window.db, ...창고자리));
+    const [눈] = await Promise.all([getDocs(collection(window.db, ...창고자리)), 연결읽기().catch(()=>{})]);   /* 고른 단품을 못 읽어도 표는 선다 */
     답했나 = true;
     const 제품들 = [];
     눈.forEach(d => { if(!d.id.startsWith('_')) 제품들.push(d.data()); });   /* _정보 = 모은때·셈(화면에 안 적는다) */
@@ -139,7 +168,7 @@ window.목록읽기 = async function(){
 };
 
 /* 빈 칸은 오름·내림 어느 쪽이든 맨 아래. 숫자가 섞인 값(사이즈 등)은 숫자 순(numeric). 같으면 처음 차례. */
-const 값 = (r,c) => (r[c]==null)?'':String(r[c]).trim();
+const 값 = (r,c) => c===단품칸 ? ((연결[r.제품명]||{}).단품명||'') : (r[c]==null)?'':String(r[c]).trim();
 function 정렬하기(){
   if(!정렬) return 줄들.slice().sort((a,b)=>a.차-b.차);
   const c=정렬.칸, k=정렬.오름?1:-1;
@@ -158,6 +187,7 @@ function 그리기(){
   let t = '<div class="표통"><table class="dpr-t"><thead><tr>' + 머리 + '</tr></thead><tbody>';
   for(const r of 정렬하기()){
     t += '<tr>' + 칸.map((c,i)=>{
+      if(c===단품칸) return 단품칸글(r.제품명);
       const v = 값(r,c);
       return `<td class="${i?'':'dpr-k '}${v===''?'d':''}">${v===''?'·':글(v)}</td>`;
     }).join('') + '</tr>';
@@ -167,6 +197,152 @@ function 그리기(){
   속.innerHTML = t + '</tbody></table></div>';
   속.querySelector('.표통').scrollLeft = 옆;      /* 옆으로 민 자리는 지키고, 위아래는 맨 위로 */
 }
+
+/* ════ 벤더피아 단품 ════
+   단품 목록 = 창고 `납품내역_단품목록` 의 `단품_N` 문서들, 칸 `줄` = ["단품코드\t단품명\t판매상태", …] (판매중 먼저).
+     채우는 길: 벤더피아 단품관리 「엑셀」 로 받은 파일을 판 아래 「단품 목록 올리기」 로 올린다(벤더피아에는 묻지 않는다).
+   고른 것 = 창고 `납품내역_단품연결`, 문서 하나 = 제품명 하나 {제품명, 단품코드, 단품명, 고른때}.
+     제품명으로 붙이므로 같은 제품명의 모든 줄에 같이 보인다. ⚠ 칸·자리 이름에 `vp_` 를 쓰지 마라(사장님 uid 만 닿는다). */
+const 단품자리 = ['artifacts','vivivic-4b7ef','public','data','납품내역_단품목록'];
+const 연결자리 = ['artifacts','vivivic-4b7ef','public','data','납품내역_단품연결'];
+let 연결 = {};              /* 제품명 → {단품코드, 단품명} */
+let 단품들 = null;          /* [{코드, 이름, 상태, 찾글}] — 판을 처음 열 때 받는다 */
+const 문이름 = 제품명 => 제품명.replace(/\//g,'／') || '_빈이름';   /* 문서 이름에 / 는 못 쓴다 */
+
+async function 연결읽기(){
+  const { collection, getDocs } = window.fbRead;
+  const 눈 = await getDocs(collection(window.db, ...연결자리));
+  연결 = {};
+  눈.forEach(d => { const x=d.data(); if(x.제품명 && x.단품코드) 연결[x.제품명] = {단품코드:x.단품코드, 단품명:x.단품명||''}; });
+}
+async function 단품읽기(){
+  const { collection, getDocs } = window.fbRead;
+  const 눈 = await getDocs(collection(window.db, ...단품자리));
+  const 문들 = [];
+  눈.forEach(d => { if(/^단품_\d+$/.test(d.id)) 문들.push([Number(d.id.slice(3)), d.data().줄||[]]); });
+  문들.sort((a,b)=>a[0]-b[0]);
+  단품들 = [];
+  for(const [,줄] of 문들) for(const s of 줄){
+    const [코드='',이름='',상태=''] = String(s).split('\t');
+    if(코드) 단품들.push({코드, 이름, 상태, 찾글:(이름+' '+코드).toLowerCase().replace(/\s+/g,'')});
+  }
+}
+function 단품칸글(p){
+  const x = 연결[p], d = 글(p);
+  return x ? `<td class="vpc"><button type="button" data-p="${d}">${글(x.단품명||x.단품코드)}<span class="cd">${글(x.단품코드)}</span></button></td>`
+           : `<td class="vpc"><button type="button" class="no" data-p="${d}">단품 검색</button></td>`;
+}
+/* 고르거나 지우면 같은 제품명의 칸만 바꿔 그린다(표를 다시 그리지 않아 민 자리가 그대로) */
+function 같은칸바꾸기(p){
+  const 새 = 단품칸글(p);
+  document.querySelectorAll('#속 td.vpc button').forEach(b => { if(b.dataset.p===p) b.parentElement.outerHTML = 새; });
+}
+
+let 판 = null;
+function 판닫기(){ if(판){ 판.remove(); 판=null; } }
+function 판열기(p, 칸단추){
+  판닫기();
+  판 = document.createElement('div'); 판.className='vpp';
+  판.innerHTML = `<div class="hd"><div class="pn"></div><button type="button" class="x" aria-label="닫기">×</button></div>
+    <input type="search" placeholder="단품명 · 단품코드" autocomplete="off" enterkeyhint="search">
+    <div class="ls"></div>
+    <div class="ft"><label>단품 목록 올리기<input type="file" accept=".xlsx,.xls,.csv,.html,.htm"></label></div>`;
+  판.querySelector('.pn').textContent = p;
+  document.body.appendChild(판);
+  /* 자리: 폰(좁은 화면)은 화면 위(자판에 안 가림), 넓으면 그 칸 바로 아래 — 화면 밖으로 안 나가게 */
+  const 넓 = innerWidth > 600, 높 = Math.min(440, innerHeight - 16);
+  if(!넓){ Object.assign(판.style,{left:'8px',right:'8px',top:'8px',height:Math.min(높, innerHeight*0.62)+'px'}); }
+  else{
+    const r = 칸단추.getBoundingClientRect(), 폭 = Math.min(480, innerWidth-16);
+    const 왼 = Math.max(8, Math.min(r.left, innerWidth-폭-8));
+    let 위 = r.bottom + 4; if(위 + 높 > innerHeight - 8) 위 = Math.max(8, r.top - 높 - 4);
+    if(위 + 높 > innerHeight - 8) 위 = 8;
+    Object.assign(판.style,{left:왼+'px',top:위+'px',width:폭+'px',height:높+'px'});
+  }
+  const 칸글 = 판.querySelector('input[type=search]'), 목 = 판.querySelector('.ls');
+  판.dataset.p = p;
+  const 쓰기 = () => 목그리기(p, 칸글.value, 목);
+  칸글.addEventListener('input', 쓰기);
+  판.querySelector('.x').addEventListener('click', 판닫기);
+  판.querySelector('input[type=file]').addEventListener('change', e => 올리기(e.target.files[0], p, 목, 칸글));
+  목.addEventListener('click', e => {
+    const b = e.target.closest('button'); if(!b) return;
+    if(b.classList.contains('del')) 고르기(p, null, 목); else if(b.dataset.c) 고르기(p, {단품코드:b.dataset.c, 단품명:b.dataset.n}, 목);
+  });
+  if(!단품들){
+    목.innerHTML = '<div class="msg">단품 목록을 읽는 중…</div>';
+    단품읽기().then(쓰기, e => { 목.innerHTML = `<div class="msg bad">단품 목록을 읽지 못했습니다 ${글((e&&(e.code||e.message))||'')}</div>`; });
+  } else 쓰기();
+  if(넓) 칸글.focus();
+}
+/* 낱말을 띄어 쓰면 낱말마다 다 들어 있는 단품만(띄어쓰기·대소문자 무시). 판매중이 먼저(목록 차례). 100개까지. */
+function 목그리기(p, 물음, 목){
+  if(!단품들) return;
+  const x = 연결[p];
+  let t = x ? `<button type="button" class="del">고른 단품 지우기 — ${글(x.단품명||x.단품코드)}</button>` : '';
+  if(!단품들.length){ 목.innerHTML = t + '<div class="msg">단품 목록이 비어 있습니다</div>'; return; }
+  const 낱 = 물음.toLowerCase().split(/\s+/).filter(Boolean);
+  const 맞 = [];
+  for(const d of 단품들){ if(낱.every(w=>d.찾글.includes(w))){ 맞.push(d); if(맞.length>=100) break; } }
+  for(const d of 맞) t += `<button type="button" class="${x&&x.단품코드===d.코드?'on':''}" data-c="${글(d.코드)}" data-n="${글(d.이름)}">${글(d.이름)}<span class="cd">${글(d.코드)}</span>${d.상태&&d.상태!=='판매중'?`<span class="st">${글(d.상태)}</span>`:''}</button>`;
+  if(!맞.length) t += '<div class="msg">맞는 단품 없음</div>';
+  목.innerHTML = t;
+}
+async function 고르기(p, x, 목){
+  const { doc, setDoc, deleteDoc } = window.fbRead;
+  const 문 = doc(window.db, ...연결자리, 문이름(p));
+  try{
+    if(x) await setDoc(문, {제품명:p, 단품코드:x.단품코드, 단품명:x.단품명, 고른때:new Date().toISOString()});
+    else await deleteDoc(문);
+  }catch(e){ 목.insertAdjacentHTML('afterbegin', `<div class="msg bad">저장하지 못했습니다 ${글((e&&(e.code||e.message))||'')}</div>`); return; }
+  if(x) 연결[p] = x; else delete 연결[p];
+  같은칸바꾸기(p);
+  판닫기();
+}
+/* 벤더피아 단품관리 엑셀 → 단품코드·단품명·판매상태만 뽑아 `납품내역_단품목록` 을 통째로 갈아 끼운다(다른 칸은 안 담는다). */
+function 시트꾸러미(){
+  if(window.XLSX) return Promise.resolve();
+  return new Promise((ok,no)=>{ const s=document.createElement('script');
+    s.src='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js'; s.onload=ok; s.onerror=()=>no(new Error('엑셀 꾸러미를 받지 못했습니다'));
+    document.head.appendChild(s); });
+}
+async function 올리기(파일, p, 목, 칸글){
+  if(!파일) return;
+  목.innerHTML = '<div class="msg">올리는 중…</div>';
+  try{
+    await 시트꾸러미();
+    const 책 = XLSX.read(await 파일.arrayBuffer(), {type:'array'});
+    const m = new Map();
+    for(const 이름 of 책.SheetNames){
+      const 줄들 = XLSX.utils.sheet_to_json(책.Sheets[이름], {header:1, defval:'', raw:false});
+      const 머리자리 = 줄들.slice(0,30).findIndex(r => r.some(v=>String(v).trim()==='단품코드') && r.some(v=>String(v).trim()==='단품명'));
+      if(머리자리<0) continue;
+      const h = 줄들[머리자리].map(v=>String(v).trim());
+      const ci=h.indexOf('단품코드'), ni=h.indexOf('단품명'), si=h.indexOf('판매상태');
+      for(const r of 줄들.slice(머리자리+1)){
+        const c=String(r[ci]||'').trim(); if(!c) continue;
+        m.set(c, [c, String(r[ni]||'').trim().replace(/\t/g,' '), si<0?'':String(r[si]||'').trim()]);
+      }
+    }
+    if(!m.size) throw new Error('단품코드·단품명 칸을 찾지 못했습니다');
+    const 다 = [...m.values()].sort((a,b)=>(a[2]==='중지')-(b[2]==='중지') || a[1].localeCompare(b[1],'ko',{numeric:true}));
+    const { collection, getDocs, doc, setDoc, deleteDoc } = window.fbRead;
+    let n = 0;
+    for(let i=0;i<다.length;i+=1000){ n++; await setDoc(doc(window.db, ...단품자리, '단품_'+n), {줄: 다.slice(i,i+1000).map(a=>a.join('\t'))}); }
+    const 옛 = await getDocs(collection(window.db, ...단품자리));
+    for(const d of 옛.docs){ const k=/^단품_(\d+)$/.exec(d.id); if(k && Number(k[1])>n) await deleteDoc(d.ref); }
+    await setDoc(doc(window.db, ...단품자리, '_정보'), {올린때:new Date().toISOString(), 단품수:다.length, 문서수:n, 파일:파일.name});
+    await 단품읽기();
+    목그리기(p, 칸글.value, 목);
+  }catch(e){ 목.innerHTML = `<div class="msg bad">올리지 못했습니다 ${글((e&&(e.code||e.message))||'')}</div>`; }
+}
+document.getElementById('속').addEventListener('click', e => {
+  const b = e.target.closest('td.vpc button'); if(!b) return;
+  판열기(b.dataset.p, b);
+});
+document.addEventListener('pointerdown', e => { if(판 && !판.contains(e.target) && !e.target.closest('td.vpc')) 판닫기(); });
+document.addEventListener('keydown', e => { if(e.key==='Escape') 판닫기(); });
+document.getElementById('속').addEventListener('scroll', 판닫기, true);
 
 /* 머리 칸 누름: 다른 열 → 그 열 오름, 같은 열 → 오름 ↔ 내림 */
 document.getElementById('속').addEventListener('click', e => {
