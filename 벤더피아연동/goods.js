@@ -1066,7 +1066,7 @@ const 한벌돌리기 = (단품곁다리) => {
     b.addEventListener("click", onClick);
   };
 
-  // 상품관리: 단품명 칸 "a+a+b" → 단품 버튼 [a ×2] [b]
+  // 상품관리: 단품명 칸 "a+a+b" → 단품 버튼 [a] [a] [b] (10-29 [새 지시 단품수량단추] ×2 대신 수량만큼 같은 단추)
   function partChips(heads, row) {
     const codes = splitCodes(row[heads.indexOf("단품코드")]);
     const names = row[heads.indexOf("단품명")].split("+");
@@ -1081,7 +1081,7 @@ const 한벌돌리기 = (단품곁다리) => {
       const label = part ? part[linked.heads.indexOf("단품명")] : name;
       if (unused(label)) continue;
       const shownCode = part ? part[linked.heads.indexOf("단품코드")] : code;
-      chip(box, label + (n > 1 ? ` ×${n}` : ""), [shownCode], () => {
+      for (let k = 0; k < n; k++) chip(box, label, [shownCode], () => {
         const found = linked?.byCode.get(code);
         if (found) popup(found[linked.heads.indexOf("단품명")], linked.heads, [found], found[linked.heads.indexOf("단품코드")].trim());
         else alert(linked ? `단품관리에서 ${code}를 찾지 못했습니다.` : "단품 정보를 불러오는 중입니다. 잠시 뒤 다시 눌러 주세요.");
