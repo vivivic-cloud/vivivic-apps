@@ -274,7 +274,9 @@ const 확장쪽흉내 = `
     console.log('\n  ◆ ' + (판 === '바로' ? '① 제가 바로 받을 때'
       : 판 === '다리만' ? '② **바로받기가 막히고(CSP 흉내) 다리로만** 될 때'
       : '③ 아예 **못 받을 때**(403)'));
-    const 쓴것 = 보낸물음.filter((x) => /"writes"|:commit|setDoc/.test(x));
+    /* 0.34.78 부터 단품관리는 단품 목록을 `납품내역_단품목록` 에 올린다(그 자는 `단품목록올림.cjs`) — 그것만 빼고 센다 */
+    const 쓴것 = 보낸물음.filter((x) => /"writes"|:commit|setDoc/.test(x)
+      && !(/납품내역_단품목록/.test(x) && !/docs_files|docs_단품수량/.test(x)));
     console.log('    창고에 **쓴 적 있나** ' + (쓴것.length > 0) + ' ' + 못(쓴것.length === 0)
       + ' (읽기만 해야 한다)');
     /* ⚠ 이제 물음이 **둘**이다 — 서류(`docs_files`)와 차수 수량(`docs_단품수량`).

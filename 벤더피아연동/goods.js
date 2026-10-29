@@ -639,6 +639,85 @@ const 한벌돌리기 = (단품곁다리) => {
     return 수량받는중;
   }
 
+  /* ── 납품내역 제품목록에 단품 목록 올리기 (10-29, 0.34.78) ──────────────
+     사장님: 「제품목록에 나타나는 각 제품명 옆에 벤더피아연동 프로그램의 단품관리 의 단품을 검색 할 수 있게 해주세요. …」
+       → 채우는 길을 여쭈니 「확장이 자동으로」.
+     납품내역 `제품목록.html` 의 「벤더피아 단품」 칸이 읽는 창고 `납품내역_단품목록` 에 **같은 꼴로** 쓴다:
+       문서 `단품_1`·`단품_2`… 칸 `줄` = ["단품코드\t단품명\t판매상태", …] 1,000개씩(중지 아닌 것 먼저, 단품명 가나다)
+       · `_정보` = {올린때, 단품수, 문서수, 파일}. 제품목록의 엑셀 올리기(`올리기`)와 줄 꼴·차례가 같다.
+     ⚠ **세 칸만** 올린다 — 금액·매입처·사람 칸은 안 담는다. 창고는 누구나 읽는다(사장님이 알고 고르셨다).
+     ⚠ 단품관리 화면에서 목록을 다 받았을 때(열 때·새로 받을 때)만 한 번. 타이머·감시 없음. 벤더피아에는 안 쓴다.
+     ⚠ 바뀐 문서만 쓴다: 창고를 한 번 읽어(GET) 견주고, 다른 `단품_N`·남는 `단품_N` 지움·`_정보` 를 **`:commit` 한 번에** 묶는다.
+       같으면 쓰기 0.
+     ⚠ 쓰기는 화면 쪽에서 **바로** 보낸다 — 확장 다리(`불러오기.js` `허락한셈`)는 `:commit` 을 막아 두었고 넓히지 않는다
+       (넓히면 덮어쓰기). 벤더피아에는 CSP 가 없다(10-25 잼). 막히면 딱지에 까닭만 적는다.
+     ⚠ `납품내역_단품연결`(사장님이 고른 연결)은 건드리지 않는다. 자리 이름에 `vp_` 를 쓰지 않는다(익명이 못 읽는다). */
+  const 단품목록칸 = "납품내역_단품목록";
+  const 단품목록묶음 = 1000;
+  let 단품목록올리는중 = false;
+  /* 줄들 → 문서별 `줄` 배열들 (제품목록 `올리기` 와 같은 꼴·차례. 같은 이름이면 코드 차례로 굳힌다 — 견주기가 흔들리지 않게) */
+  function 단품목록짓기(머리, 줄들) {
+    const ci = 머리.indexOf("단품코드"), ni = 머리.indexOf("단품명"), si = 머리.indexOf("판매상태");
+    if (ci < 0 || ni < 0) return null;
+    const m = new Map();
+    for (const r of 줄들) {
+      const c = String(r[ci] == null ? "" : r[ci]).trim();
+      if (!c) continue;
+      m.set(c, [c, String(r[ni] == null ? "" : r[ni]).trim().replace(/\t/g, " "),
+        si < 0 ? "" : String(r[si] == null ? "" : r[si]).trim()]);
+    }
+    const 다 = [...m.values()].sort((a, b) => (a[2] === "중지") - (b[2] === "중지")
+      || a[1].localeCompare(b[1], "ko", { numeric: true }) || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+    const 문서들 = [];
+    for (let i = 0; i < 다.length; i += 단품목록묶음) 문서들.push(다.slice(i, i + 단품목록묶음).map((a) => a.join("\t")));
+    return { 수: 다.length, 문서들 };
+  }
+  async function 단품목록올리기(머리, 줄들) {
+    if (단품목록올리는중) return;
+    단품목록올리는중 = true;
+    try {
+      const 새 = 단품목록짓기(머리, 줄들);
+      if (!새 || !새.수) return window.VP말?.("단품목록:안올림 단품코드·단품명 칸 없음");
+      const tok = await 서류표();
+      const 뿌리 = `projects/${서류.PROJ}/databases/(default)/documents`;
+      const 자리 = `${뿌리}/artifacts/${서류.PROJ}/public/data/${단품목록칸}`;
+      const r = await 밖에서(`https://firestore.googleapis.com/v1/${뿌리}/artifacts/${서류.PROJ}/public/data/`
+        + `${encodeURIComponent(단품목록칸)}?pageSize=300`, { headers: { Authorization: "Bearer " + tok } });
+      if (!r.ok) throw new Error("읽기 " + r.status + (r.탈 ? "/" + r.탈 : ""));
+      const 옛 = new Map();                              // 문서 이름 → 칸
+      for (const d of (JSON.parse(r.글 || "{}").documents || [])) {
+        let 이름 = String(d.name || "").split("/").pop();
+        try { 이름 = decodeURIComponent(이름); } catch (e) {}
+        옛.set(이름, 풀기({ mapValue: { fields: d.fields || {} } }) || {});
+      }
+      /* 벤더피아가 반쪽만 준 목록으로 창고를 비우지 않는다 — 전보다 절반 아래로 줄면 안 올린다 */
+      const 옛수 = Number((옛.get("_정보") || {}).단품수) || 0;
+      if (옛수 && 새.수 < 옛수 / 2) return window.VP말?.(`단품목록:안올림 ${새.수}개(전 ${옛수}) — 너무 줄었음`);
+      const 쓰기 = [];
+      새.문서들.forEach((줄, i) => {
+        const 이름 = "단품_" + (i + 1), 전 = 옛.get(이름);
+        if (전 && JSON.stringify(전.줄 || []) === JSON.stringify(줄)) return;
+        쓰기.push({ update: { name: `${자리}/${이름}`,
+          fields: { 줄: { arrayValue: { values: 줄.map((s) => ({ stringValue: s })) } } } } });
+      });
+      for (const 이름 of 옛.keys()) {
+        const k = /^단품_(\d+)$/.exec(이름);
+        if (k && Number(k[1]) > 새.문서들.length) 쓰기.push({ delete: `${자리}/${이름}` });
+      }
+      if (!쓰기.length && 옛.has("_정보")) return window.VP말?.(`단품목록:같음 ${새.수}개 · 쓰기0`);
+      쓰기.push({ update: { name: `${자리}/_정보`, fields: {
+        올린때: { stringValue: new Date().toISOString() }, 단품수: { integerValue: String(새.수) },
+        문서수: { integerValue: String(새.문서들.length) }, 파일: { stringValue: "벤더피아연동 단품관리(자동)" } } } });
+      const w = await fetch(`https://firestore.googleapis.com/v1/${뿌리}:commit`, { method: "POST", credentials: "omit",
+        headers: { "Content-Type": "application/json", Authorization: "Bearer " + tok },
+        body: JSON.stringify({ writes: 쓰기 }) });
+      if (!w.ok) throw new Error("쓰기 " + w.status);
+      window.VP말?.(`단품목록:올림 ${새.수}개 · 문서${쓰기.length - 1}+정보`);
+    } catch (e) {
+      window.VP말?.("단품목록:못올림 " + (e && e.message ? e.message : e));
+    } finally { 단품목록올리는중 = false; }
+  }
+
   /* 이 단품(들)의 차수 줄 — 없으면 빈 배열. 같은 차수가 둘 오면 수량을 더한다. */
   function 차수찾기(코드들) {
     if (!수량) return [];
@@ -1433,9 +1512,11 @@ const 한벌돌리기 = (단품곁다리) => {
     note.textContent = "불러오는 중…";
     const serverValue = serverSel ? (serverSel.value || "전체") : "";
     const dates = page.serverDates ? { from: from.value || "2000-01-01", to: to.value } : { from: "2000-01-01" };
+    const 단품목록 = !곁다리 && page === PAGES[단품길] ? [] : null;   // 단품관리 화면만 — 다 받으면 제품목록 창고에 올린다
     try {
       const got1 = await fetchList(page, 내길, serverValue, dates, (h, rows, got, total) => {
         heads = h;
+        if (단품목록) 단품목록.push(...rows);
         fillSelects(rows);
         addRows(rows);
         apply();
@@ -1448,6 +1529,7 @@ const 한벌돌리기 = (단품곁다리) => {
       apply();
       /* 목록이 다 들어온 뒤에 한 번만 맞춰 본다 (상품관리에서만) */
       ing맞춰보기();
+      if (단품목록) 단품목록올리기(heads, 단품목록);   // 기다리지 않는다 — 못 올려도 화면은 그대로
     } catch (err) {
       if (id === loadId) { loading = false; note.textContent = "불러오지 못했습니다. 다시 로그인한 뒤 시도해 주세요."; }
     }
