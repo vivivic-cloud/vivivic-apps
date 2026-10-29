@@ -678,6 +678,9 @@ const 한벌돌리기 = (단품곁다리) => {
     try {
       const 새 = 단품목록짓기(머리, 줄들);
       if (!새 || !새.수) return window.VP말?.("단품목록:안올림 단품코드·단품명 칸 없음");
+      /* 진짜 단품관리는 5,000개 남짓(10-29). 100개 아래면 반쪽 목록이거나 시험 흉내 쪽이다 — 창고에 안 쓴다
+         (10-29 창고를 가로채지 않는 옛 시험이 가짜 단품 셋을 진짜 창고에 써 버렸다) */
+      if (새.수 < 100) return window.VP말?.(`단품목록:안올림 ${새.수}개 — 너무 적음`);
       const tok = await 서류표();
       const 뿌리 = `projects/${서류.PROJ}/databases/(default)/documents`;
       const 자리 = `${뿌리}/artifacts/${서류.PROJ}/public/data/${단품목록칸}`;
