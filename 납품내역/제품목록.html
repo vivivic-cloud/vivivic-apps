@@ -2,11 +2,12 @@
 <!-- 납품내역 / 제품목록 — 재단 명세서 전부(4~9월, 날짜 시트 + 세부내역 시트)에서 모은 제품명별 품목 정보.
      사장님 10-28: 「재단의 모든 명세서를 확인하여 제품명,품목,사이즈,원장종류,원장색상,원장모델명,원장출고처,출고예정일 …
      제품명의 중복없는 목록만 보여주는 제품목록 페이지」. 발주와 상관없는 단순 제품 정보 — PO·수량·금액은 없다.
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v6.6.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v6.6.1
      v6.4.1(10-28): 제품명 묶음 머리를 걷고 품목 줄마다 제품명을 적은 한 표로 폈다. 머리 칸을 누르면 그 열로 오름 → 내림.
      v6.5.0(10-29): 제품명 옆 「벤더피아 단품」 칸 — 단품을 검색해 고르면 제품명이 같은 모든 줄에 같이 붙는다.
        단품 목록은 창고 `납품내역_단품목록`(벤더피아 단품관리 엑셀을 올려 채움), 고른 것은 `납품내역_단품연결`(문서 = 제품명).
-     v6.6.0(10-29): 제품명을 누르면 그 제품이 든 가장 최근 발주서 한 장을 팝업으로 — 에이엠티 발주(창고 `confirmed_orders`, 읽기만).
+     v6.6.0(10-29): 제품명을 누르면 그 제품이 든 가장 최근 발주서 한 장을 팝업으로.
+     v6.6.1(10-29): 발주서를 에이엠티 발주에서 **납품내역 재단 줄**(창고 `납품내역`, 갈=재단, 읽기만)로 바꿨다 — 가장 최근 PO 의 재단 줄 전부.
 
      ⚠ 이 파일에는 업무 값이 없다. 목록은 창고 `납품내역_제품목록` 에 있고 이 쪽은 **읽기만** 한다.
         창고에 담는 것은 `tools/제품목록모으기.py`(부를 때만 돈다). 자세한 것은 납품내역/CLAUDE.md 「제품목록 v6.4.0」.
@@ -19,7 +20,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
-    import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+    import { getFirestore, collection, getDocs, doc, setDoc, deleteDoc, query, where } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
     const app = initializeApp({
         apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
         authDomain: "vivivic-4b7ef.firebaseapp.com",
@@ -30,7 +31,7 @@
     });
     const auth = getAuth(app);
     window.db = getFirestore(app);
-    window.fbRead = { collection, getDocs, doc, setDoc, deleteDoc };
+    window.fbRead = { collection, getDocs, doc, setDoc, deleteDoc, query, where };
     onAuthStateChanged(auth, (u) => {
         if (!u) { signInAnonymously(auth).catch(e => window.목록못읽음('창고에 들어가지 못했습니다', (e&&(e.code||e.message))||'')); return; }
         window.목록읽기();
@@ -119,15 +120,20 @@ html,body{height:100%;overflow:hidden}
   font-weight:700;color:var(--vg-ink);text-align:left;white-space:nowrap;cursor:pointer;-webkit-tap-highlight-color:transparent}
 /* 발주서 팝업 — 화면 위에 뜬다. 길면 팝업 안에서만 민다 */
 .pob{position:fixed;inset:0;z-index:60;background:rgba(17,17,16,.18)}
-.pop{position:fixed;z-index:61;left:50%;top:50%;transform:translate(-50%,-50%);width:min(860px,calc(100% - 16px));
+.pop{position:fixed;z-index:61;left:50%;top:50%;transform:translate(-50%,-50%);width:min(1100px,calc(100% - 16px));
   max-height:calc(100% - 16px);background:var(--vg-bg);border:1px solid var(--vg-edge);border-radius:14px;
   box-shadow:0 8px 28px rgba(0,0,0,.14);display:flex;flex-direction:column;overflow:hidden}
 .pop .hd{display:flex;align-items:center;gap:8px;padding:10px 10px 8px 14px;border-bottom:1px solid var(--vg-edge)}
-.pop .pn{flex:1;min-width:0;font-size:13px;font-weight:800;color:var(--vg-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pop .tt{flex:1;min-width:0}
+.pop .pn{font-size:13px;font-weight:800;color:var(--vg-ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pop .ps{font-size:12px;color:var(--vg-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pop .x{width:44px;height:36px;border:0;background:none;font-size:20px;color:var(--vg-muted);cursor:pointer}
 .pop .bd{flex:1 1 auto;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;padding:0 4px 8px}
-.pop .bd .dpr-t+.dpr-t{margin-top:14px}
 .pop .num{text-align:center}
+.pop th.num{min-width:84px}
+/* 날짜 가름줄 — 재단.html 과 같은 꼴 */
+.pop .dpr-t tr.daysep td{font-size:17px;font-weight:700;color:var(--vg-ink);padding:18px 2px 4px;border-bottom:0;background:var(--vg-bg)}
+.pop .dpr-t tr.daysep td .dpr-gn{display:inline-block;position:sticky;left:2px}
 .pop tr.hit td,.pop tr.hit td.dpr-k{background:var(--vg-fill);font-weight:700;color:var(--vg-ink)}
 .pop .msg{font-size:14px;color:var(--vg-muted);padding:18px 14px}
 .pop .msg.bad{color:var(--vg-red);font-size:12px}
@@ -139,7 +145,7 @@ html,body{height:100%;overflow:hidden}
 <a class="back" href="납품내역.html">← 납품내역</a>
 <header>
   <div class="logo"><b>VIVIVIC</b> — 제품목록</div>
-  <div class="badge">v6.6.0</div>
+  <div class="badge">v6.6.1</div>
 </header>
 <h1>제품목록</h1>
 <div class="state" id="목상태"><div class="big">창고를 읽는 중입니다…</div></div>
@@ -365,55 +371,66 @@ document.addEventListener('keydown', e => { if(e.key==='Escape') 판닫기(); })
 document.getElementById('속').addEventListener('scroll', 판닫기, true);
 
 /* ════ 발주서 팝업 ════
-   발주서 = 에이엠티 발주(창고 `confirmed_orders`, 문서 하나 = 발주 하나 = 제품 하나). **읽기만** 한다 — 에이엠티 업무 기록이다.
-   맞추기: 제품목록 이름에서 끝 괄호(색 꼬리 `(W)`·`(GIV)`)를 뗀 낱말들 → 발주 제품명(앞 괄호 딱지 `(EG)`·`(KRW)` 뗌, 띄어쓰기 뺌)이
-     첫 낱말로 **시작**하고 나머지 낱말을 다 품을 것. 그리고 제품의 가장 많은 원장색상이 발주 부속(AMT) 마감색 가운데 있을 것.
-   최근 = 발주의 `createdAt`(등록 시각)이 가장 늦은 것, 같으면 PO(orderCode) 가 큰 것.
-   ⚠ 보이는 칸은 아래에 적은 것만 — 금액·사람 칸은 담지 않는다(발주에 생겨도 안 보인다). */
-const 발주자리 = ['artifacts','vivivic-4b7ef','public','data','confirmed_orders'];
-let 발주들 = null;
-async function 발주읽기(){
-  const { collection, getDocs } = window.fbRead;
-  const 눈 = await getDocs(collection(window.db, ...발주자리));
-  발주들 = [];
-  눈.forEach(d => { const o=d.data(); if(!o.amtConfirmedCancel) 발주들.push(o); });
+   발주서 = 납품내역 **재단 줄**(창고 `납품내역`, `갈`='재단' — 재단.html 이 보이는 그 줄). **읽기만** 한다. 팝업을 처음 열 때 한 번 받는다.
+   맞추기: 제품명 열쇠 = 띄어쓰기·줄바꿈을 다 빼고 끝 조 수(`36조`)를 뗀 이름(제품목록모으기.py `제품열쇠` 와 같다).
+     열쇠가 같은 재단 줄이 없으면(엑셀 세부내역 시트에만 있는 이름) 끝 괄호를 뗀 이름으로 **시작**하는 재단 줄 가운데
+     그 제품의 품목·사이즈(·원장색상)가 같은 줄로 찾는다.
+   발주서 한 장 = 그 제품 줄 가운데 **PO 가 코드(`아인2605-26-07` 꼴)인 가장 최근 줄**(달 → 일 → 순번 → PO)의 PO 로 된 재단 줄 전부
+     (그 PO 가 여러 날에 걸치면 날마다 가름줄로 다 보인다). PO 가 코드인 줄이 없으면(빈 칸·샘플·과재고·당사포장출고 …)
+     그 제품의 가장 최근 날 줄만 보인다. 고른 제품의 줄은 tr.hit. */
+const 재단자리 = ['artifacts','vivivic-4b7ef','public','data','납품내역'];
+const 재단칸 = ['PO','순번','제품명','품목','사이즈','재단수량','원장수량','원장종류','원장색상','원장모델명','원장출고처','원장입고일','재단금액','출고예정일','비고'];   /* 재단.html 목칸['재단'] 과 같다 */
+const 수칸들 = new Set(['재단수량','원장수량','재단금액']);
+let 재단들 = null;
+async function 재단읽기(){
+  const { collection, getDocs, query, where } = window.fbRead;
+  const 눈 = await getDocs(query(collection(window.db, ...재단자리), where('갈','==','재단')));
+  재단들 = [];
+  눈.forEach(d => 재단들.push({...d.data(), _id:d.id}));
+  재단들.forEach(r => { r._키 = 열쇠(r.제품명); r._po = 붙(r.PO); });
 }
-const 붙 = s => String(s||'').normalize('NFC').replace(/\s+/g,'').toLowerCase();
-const 색 = s => 붙(s).replace(/^(네|내)(추|츄)럴/,'내추럴').replace('백색','화이트');
-const 부속들 = o => Object.entries(o.partInfoMap||{}).filter(([,v])=>v&&!v.isDeleted)
-  .sort((a,b)=>a[0].localeCompare(b[0],'en',{numeric:true})).map(([,v])=>v);
-function 맞는발주(p){
-  const 낱 = String(p).replace(/\s*\([^()]*\)\s*$/,'').trim().split(/\s+/).map(붙).filter(Boolean);
-  if(!낱.length) return null;
-  const 셈 = {};
-  for(const r of 줄들) if(r.제품명===p) for(const v of String(r.원장색상||'').split(' / ')){ const c=색(v); if(c) 셈[c]=(셈[c]||0)+1; }
-  const 주색 = Object.keys(셈).sort((a,b)=>셈[b]-셈[a])[0] || '';
-  let 답 = null;
-  for(const o of 발주들){
-    const 이름 = 붙(String(o.displayName||o.code||'').trim().replace(/^(\s*\([^()]*\)\s*)+/,''));
-    if(!이름.startsWith(낱[0]) || !낱.every(w=>이름.includes(w))) continue;
-    const 색들 = new Set(부속들(o).filter(v=>v.partSupplier==='AMT').map(v=>색(v.finishColor)).filter(Boolean));
-    if(주색 && 색들.size && !색들.has(주색)) continue;
-    const k = 때(o.createdAt), c = String(o.orderCode||'');
-    if(!답 || k > 답.k || (k === 답.k && c > 답.c)) 답 = {o, k, c};
+const 붙 = s => String(s==null?'':s).normalize('NFC').replace(/\s+/g,'');
+const 열쇠 = s => 붙(s).replace(/\d+조$/,'');
+const 코드 = po => /^[가-힣A-Za-z]+\d{4}-/.test(po);
+const 수 = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+const 늦은 = (a,b) => String(a.달||'').localeCompare(String(b.달||'')) || 수(a.일)-수(b.일) || 수(a.순번)-수(b.순번) || a._po.localeCompare(b._po);
+function 찾기(p){
+  const k = 열쇠(p);
+  let 맞 = 재단들.filter(r => r._키 === k);
+  if(!맞.length){
+    const 밑 = k.replace(/\([^()]*\)$/,''), 품 = 줄들.filter(r => r.제품명 === p);
+    const 같 = (r,q) => 붙(r.품목)===붙(q.품목) && String(q.사이즈||'').split(' / ').some(v=>붙(v)===붙(r.사이즈))
+      && (!q.원장색상 || String(q.원장색상).split(' / ').some(v=>붙(v)===붙(r.원장색상)));
+    if(밑) 맞 = 재단들.filter(r => r._키.startsWith(밑) && 품.some(q => 같(r,q)));
   }
-  return 답 && 답.o;
+  if(!맞.length) return null;
+  const 끝 = (줄) => 줄.reduce((x,r) => !x || 늦은(r,x) > 0 ? r : x, null);
+  const 코드줄 = 맞.filter(r => 코드(r._po));
+  if(코드줄.length){
+    const po = 끝(코드줄)._po;
+    return { po: 끝(코드줄).PO, 장: 재단들.filter(r => r._po === po), 맞: new Set(맞) };
+  }
+  const x = 끝(맞);
+  return { po: '', 장: 맞.filter(r => r.달===x.달 && 수(r.일)===수(x.일)), 맞: new Set(맞) };
 }
-/* createdAt 은 창고 Timestamp 로 온다(글로 오는 옛 것도 받는다) */
-const 때 = v => (v && typeof v.toMillis==='function') ? v.toMillis() : (Date.parse(v)||0);
-const 날 = v => { const d=new Date(때(v)); return !때(v) ? '' : `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
-const 칸글 = v => (v==null||String(v).trim()==='') ? '<td class="d">·</td>' : `<td>${글(v)}</td>`;
-const 수칸 = v => (v==null||String(v).trim()==='') ? '<td class="num d">·</td>' : `<td class="num">${글(v)}</td>`;
-function 발주서글(o){
-  let t = '<table class="dpr-t"><thead><tr><th class="dpr-k">PO</th><th>거래처</th><th>발주일</th><th>입고요청일</th><th>제품명</th><th class="num">수량</th></tr></thead><tbody>'
-    + `<tr class="hit"><td class="dpr-k">${글(o.orderCode||'·')}</td>${칸글(o.supplier)}${칸글(날(o.createdAt))}${칸글(o.deliveryDate)}${칸글(o.displayName||o.code)}${수칸(o.orderQty)}</tr></tbody></table>`;
-  const 부 = 부속들(o);
-  if(부.length){
-    t += '<table class="dpr-t"><thead><tr><th class="dpr-k">품목</th><th class="num">가로</th><th class="num">세로</th><th class="num">수량</th><th>원장</th><th>마감</th><th>색상</th><th>공급처</th></tr></thead><tbody>';
-    for(const v of 부) t += `<tr><td class="dpr-k">${글(v.partName||'·')}</td>${수칸(v.w)}${수칸(v.d)}${수칸(v.qty)}${칸글(v.plateName)}${칸글(v.finish)}${칸글(v.finishColor)}${칸글(v.partSupplier)}</tr>`;
-    t += '</tbody></table>';
+const 날글 = r => (r.달 ? +String(r.달).slice(5,7)+'월 ' : '') + (r.일||'?') + '일';
+function 발주서글(답){
+  const 장 = 답.장.slice().sort((a,b) => 늦은(a,b) || a._id.localeCompare(b._id));
+  let t = '<table class="dpr-t"><thead><tr>' + 재단칸.map((c,i)=>`<th class="${i?(수칸들.has(c)?'num':''):'dpr-k'}">${c}</th>`).join('') + '</tr></thead><tbody>';
+  let 앞 = null;
+  for(const r of 장){
+    const 때 = 날글(r);
+    if(때!==앞){ t += `<tr class="daysep"><td colspan="${재단칸.length}"><span class="dpr-gn">${때}</span></td></tr>`; 앞=때; }
+    t += `<tr${답.맞.has(r)?' class="hit"':''}>` + 재단칸.map((c,i)=>{
+      const v = (r[c]==null)?'':String(r[c]);
+      return `<td class="${i?'':'dpr-k '}${v===''?'d':(수칸들.has(c)?'num':'')}">${v===''?'·':글(v).replace(/\n/g,' ')}</td>`;
+    }).join('') + '</tr>';
   }
-  return t;
+  return t + '</tbody></table>';
+}
+function 머리글(답){
+  const 장 = 답.장.slice().sort(늦은), 날들 = [...new Set(장.map(날글))], 서류들 = [...new Set(장.map(r=>r.서류).filter(Boolean))];
+  return [답.po ? String(답.po).replace(/\s+/g,' ').trim() : 'PO 없음', 날들.join(', '), 서류들.join(', ')].filter(Boolean).map(글).join(' · ');
 }
 let 팝 = null;
 function 팝닫기(){ if(팝){ 팝.forEach(e=>e.remove()); 팝=null; } }
@@ -421,17 +438,19 @@ async function 팝열기(p){
   판닫기(); 팝닫기();
   const 뒤 = document.createElement('div'); 뒤.className='pob';
   const 창 = document.createElement('div'); 창.className='pop';
-  창.innerHTML = '<div class="hd"><div class="pn"></div><button type="button" class="x" aria-label="닫기">✕</button></div><div class="bd"><div class="msg">읽는 중…</div></div>';
+  창.innerHTML = '<div class="hd"><div class="tt"><div class="pn"></div><div class="ps"></div></div><button type="button" class="x" aria-label="닫기">✕</button></div><div class="bd"><div class="msg">읽는 중…</div></div>';
   창.querySelector('.pn').textContent = p;
   뒤.addEventListener('click', 팝닫기);
   창.querySelector('.x').addEventListener('click', 팝닫기);
   document.body.append(뒤, 창); 팝 = [뒤, 창];
   const 몸 = 창.querySelector('.bd');
-  try{ if(!발주들) await 발주읽기(); }
+  try{ if(!재단들) await 재단읽기(); }
   catch(e){ 몸.innerHTML = `<div class="msg bad">발주서를 읽지 못했습니다 ${글((e&&(e.code||e.message))||'')}</div>`; return; }
   if(!팝 || 팝[1]!==창) return;
-  const o = 맞는발주(p);
-  몸.innerHTML = o ? 발주서글(o) : '<div class="msg">발주서 없음</div>';
+  const 답 = 찾기(p);
+  if(!답){ 몸.innerHTML = '<div class="msg">발주서 없음</div>'; return; }
+  창.querySelector('.ps').innerHTML = 머리글(답);
+  몸.innerHTML = 발주서글(답);
 }
 document.getElementById('속').addEventListener('click', e => {
   const b = e.target.closest('td.pnc button'); if(!b) return;
