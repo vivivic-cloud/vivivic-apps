@@ -394,12 +394,14 @@ function 맞는발주(p){
     if(!이름.startsWith(낱[0]) || !낱.every(w=>이름.includes(w))) continue;
     const 색들 = new Set(부속들(o).filter(v=>v.partSupplier==='AMT').map(v=>색(v.finishColor)).filter(Boolean));
     if(주색 && 색들.size && !색들.has(주색)) continue;
-    const k = String(o.createdAt||'') + '|' + String(o.orderCode||'');
-    if(!답 || k > 답.k) 답 = {o, k};
+    const k = 때(o.createdAt), c = String(o.orderCode||'');
+    if(!답 || k > 답.k || (k === 답.k && c > 답.c)) 답 = {o, k, c};
   }
   return 답 && 답.o;
 }
-const 날 = v => { const d=new Date(v); return isNaN(d) ? String(v||'') : `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+/* createdAt 은 창고 Timestamp 로 온다(글로 오는 옛 것도 받는다) */
+const 때 = v => (v && typeof v.toMillis==='function') ? v.toMillis() : (Date.parse(v)||0);
+const 날 = v => { const d=new Date(때(v)); return !때(v) ? '' : `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 const 칸글 = v => (v==null||String(v).trim()==='') ? '<td class="d">·</td>' : `<td>${글(v)}</td>`;
 const 수칸 = v => (v==null||String(v).trim()==='') ? '<td class="num d">·</td>' : `<td class="num">${글(v)}</td>`;
 function 발주서글(o){
