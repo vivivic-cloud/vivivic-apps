@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v3 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v4 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -156,7 +156,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v3</span>
+    <span class="ver">v4</span>
   </div>
 </header>
 <div class="wrap">
@@ -590,14 +590,16 @@ function sheetCols(s){return s.fields.concat(s.rowFields||[]);}
 function downloadTemplate(s,say){
   loadXlsx().then(function(X){
     var cols=sheetCols(s);
-    var ws=X.utils.aoa_to_sheet([cols.map(function(f){return f.label;})]);
-    ws['!cols']=cols.map(function(f){return {wch:Math.max(12,f.label.length*2+4)};});
+    /* 필수 칸은 화면과 같이 이름 뒤에 * 를 붙인다(req·reqIf). 올릴 때 normHead 가 * 를 떼고 맞춘다. */
+    var labs=cols.map(function(f){return f.label+(f.req||f.reqIf?'*':'');});
+    var ws=X.utils.aoa_to_sheet([labs]);
+    ws['!cols']=labs.map(function(t){return {wch:Math.max(12,t.length*2+4)};});
     var wb=X.utils.book_new();X.utils.book_append_sheet(wb,ws,s.title);
     X.writeFile(wb,'외주입력_'+s.n+'_'+s.title+'_양식.xlsx');
     say('');
   }).catch(function(){say(XLSX_FAIL,true);});
 }
-function normHead(t){return String(t==null?'':t).replace(/\s+/g,'').replace(/\*+$/,'');}
+function normHead(t){return String(t==null?'':t).replace(/\s+/g,'').replace(/^\*+|\*+$/g,'');}
 function pad2(n){return (n<10?'0':'')+n;}
 /* 날짜 칸(시작일·종료일·적용시작일)은 엑셀이 날짜 숫자로 바꿔 두므로 yyyy-mm-dd 로 되돌린다 */
 function cellVal(X,f,v){
