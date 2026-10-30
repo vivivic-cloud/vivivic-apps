@@ -2,7 +2,7 @@
 <!-- 납품내역 / 제품목록 — 재단 명세서 전부(4~9월, 날짜 시트 + 세부내역 시트)에서 모은 제품명별 품목 정보.
      사장님 10-28: 「재단의 모든 명세서를 확인하여 제품명,품목,사이즈,원장종류,원장색상,원장모델명,원장출고처,출고예정일 …
      제품명의 중복없는 목록만 보여주는 제품목록 페이지」. 발주와 상관없는 단순 제품 정보 — PO·수량·금액은 없다.
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v6.7.1
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v6.8.0
      v6.4.1(10-28): 제품명 묶음 머리를 걷고 품목 줄마다 제품명을 적은 한 표로 폈다. 머리 칸을 누르면 그 열로 오름 → 내림.
      v6.5.0(10-29): 제품명 옆 「벤더피아 단품」 칸 — 단품을 검색해 고르면 제품명이 같은 모든 줄에 같이 붙는다.
        단품 목록은 창고 `납품내역_단품목록`(벤더피아 단품관리 엑셀을 올려 채움), 고른 것은 `납품내역_단품연결`(문서 = 제품명).
@@ -14,6 +14,8 @@
      v6.6.5(10-30): 폰(600px 이하)에서 붙어 선 제품명 칸을 140px 로 묶고 긴 이름은 줄을 접는다 — 원장색상이 가리지 않게. PC 는 그대로.
      v6.7.0(10-30): 단품 검색 목록 단품마다 오른쪽 「상세보기」 — 그 단품과 그 단품이 든 상품 단추(벤더피아연동 상품관리 꼴). 상품은 `납품내역_상품목록`(읽기만).
      v6.7.1(10-30): 상세의 상품 단추를 벤더피아연동 단품관리 상세 「관련 상품」 단추와 같게 — 꼴·글자·차례·판매중만·누르면 같은 팝업.
+     v6.8.0(10-30): 표 위 「제품명 중복 없이」 칩 — 켜면 제품명 하나에 한 줄(지금 정렬 차례의 첫 줄)만, 끄면 다 보인다. 화면에서만 거른다.
+       단품 연결은 전처럼 제품명으로 붙으므로 켜고 고르거나 지워도 같은 제품명의 모든 줄에 똑같이 걸린다.
 
      ⚠ 이 파일에는 업무 값이 없다. 목록은 창고 `납품내역_제품목록` 에 있고 이 쪽은 **읽기만** 한다.
         창고에 담는 것은 `tools/제품목록모으기.py`(부를 때만 돈다). 자세한 것은 납품내역/CLAUDE.md 「제품목록 v6.4.0」.
@@ -89,6 +91,12 @@ html,body{height:100%;overflow:hidden}
 .dpr-t th.srt button{display:block;width:100%;min-height:44px;padding:10px 12px;border:0;background:none;
   font:inherit;color:inherit;text-align:left;white-space:nowrap;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .dpr-t th.srt .ar{display:inline-block;width:10px;margin-left:4px;font-size:10px}
+/* v6.8.0 「제품명 중복 없이」 칩 — 재단.html 월 버튼과 같은 .chip 꼴(서류관리 .chip, 둥근 알 12px/600). 값을 새로 짓지 마라 */
+.months{display:flex;flex-wrap:wrap;gap:6px;padding-bottom:8px}
+.chip{border-radius:999px;font-family:inherit;font-size:12px;font-weight:600;line-height:1.45;padding:5px 12px;background:#fff;
+  border:1px solid var(--vg-edge);color:var(--vg-body);cursor:pointer;font-variant-numeric:tabular-nums;transition:all .12s}
+.chip:hover{background:var(--vg-fill)}
+.chip.on{background:var(--vg-ink);border-color:var(--vg-ink);color:#fff}
 .empty{font-size:12px;color:var(--vg-muted);padding:6px 2px}
 .state{background:var(--vg-fill);border-radius:14px;padding:22px 16px;text-align:center}
 .state .big{font-size:14px;font-weight:600;color:var(--vg-ink);padding-bottom:6px}
@@ -196,7 +204,7 @@ html,body{height:100%;overflow:hidden}
 <a class="back" href="납품내역.html">← 납품내역</a>
 <header>
   <div class="logo"><b>VIVIVIC</b> — 제품목록</div>
-  <div class="badge">v6.7.1</div>
+  <div class="badge">v6.8.0</div>
 </header>
 <h1>제품목록</h1>
 <div class="state" id="목상태"><div class="big">창고를 읽는 중입니다…</div></div>
@@ -213,6 +221,7 @@ const 단품칸 = '벤더피아 단품';
 const 칸 = ['제품명','원장색상',단품칸,'품목','사이즈','원장종류','원장모델명','원장출고처','출고예정일'];
 let 줄들 = [];              /* 품목 줄마다 제품명을 붙인 한 줄 — 처음 차례(제품 순번 → 품목 차례)는 .차 */
 let 정렬 = null;            /* {칸, 오름:true|false} — 처음엔 null(처음 차례) */
+let 한줄 = false;           /* 「제품명 중복 없이」 — 켜면 제품명마다 정렬 차례의 첫 줄만(v6.8.0, 화면에서만) */
 let 답했나 = false;
 
 const 글 = v => String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
@@ -262,8 +271,11 @@ function 그리기(){
     const ar = (정렬&&정렬.칸===c) ? (정렬.오름?'▲':'▼') : '';
     return `<th class="srt${i?'':' dpr-k'}"><button type="button" data-c="${c}">${c}<span class="ar">${ar}</span></button></th>`;
   }).join('');
-  let t = '<div class="표통"><table class="dpr-t"><thead><tr>' + 머리 + '</tr></thead><tbody>';
+  let t = `<div class="months"><button type="button" class="chip${한줄?' on':''}" data-f="한줄">제품명 중복 없이</button></div>`
+        + '<div class="표통"><table class="dpr-t"><thead><tr>' + 머리 + '</tr></thead><tbody>';
+  const 본 = new Set();
   for(const r of 정렬하기()){
+    if(한줄){ if(본.has(r.제품명)) continue; 본.add(r.제품명); }
     t += '<tr>' + 칸.map((c,i)=>{
       if(c===단품칸) return 단품칸글(r.제품명);
       const v = 값(r,c);
@@ -586,6 +598,12 @@ document.getElementById('속').addEventListener('click', e => {
   const b = e.target.closest('th.srt button'); if(!b) return;
   const c = b.dataset.c;
   정렬 = (정렬&&정렬.칸===c) ? {칸:c, 오름:!정렬.오름} : {칸:c, 오름:true};
+  그리기();
+});
+/* 「제품명 중복 없이」 칩: 켬 ↔ 끔. 연결은 제품명으로 붙으므로 켠 채 고르거나 지워도 끄면 같은 제품명 모든 줄에 같이 보인다 */
+document.getElementById('속').addEventListener('click', e => {
+  const b = e.target.closest('.chip[data-f="한줄"]'); if(!b) return;
+  한줄 = !한줄;
   그리기();
 });
 </script>
