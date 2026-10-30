@@ -2,7 +2,7 @@
 <!-- 납품내역 / 제품목록 — 재단 명세서 전부(4~9월, 날짜 시트 + 세부내역 시트)에서 모은 제품명별 품목 정보.
      사장님 10-28: 「재단의 모든 명세서를 확인하여 제품명,품목,사이즈,원장종류,원장색상,원장모델명,원장출고처,출고예정일 …
      제품명의 중복없는 목록만 보여주는 제품목록 페이지」. 발주와 상관없는 단순 제품 정보 — PO·수량·금액은 없다.
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v6.7.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v6.7.1
      v6.4.1(10-28): 제품명 묶음 머리를 걷고 품목 줄마다 제품명을 적은 한 표로 폈다. 머리 칸을 누르면 그 열로 오름 → 내림.
      v6.5.0(10-29): 제품명 옆 「벤더피아 단품」 칸 — 단품을 검색해 고르면 제품명이 같은 모든 줄에 같이 붙는다.
        단품 목록은 창고 `납품내역_단품목록`(벤더피아 단품관리 엑셀을 올려 채움), 고른 것은 `납품내역_단품연결`(문서 = 제품명).
@@ -13,6 +13,7 @@
      v6.6.4(10-30): 원장색상 열을 「벤더피아 단품」 칸 바로 앞(둘째 칸)으로 옮겼다. 다른 칸 차례는 그대로.
      v6.6.5(10-30): 폰(600px 이하)에서 붙어 선 제품명 칸을 140px 로 묶고 긴 이름은 줄을 접는다 — 원장색상이 가리지 않게. PC 는 그대로.
      v6.7.0(10-30): 단품 검색 목록 단품마다 오른쪽 「상세보기」 — 그 단품과 그 단품이 든 상품 단추(벤더피아연동 상품관리 꼴). 상품은 `납품내역_상품목록`(읽기만).
+     v6.7.1(10-30): 상세의 상품 단추를 벤더피아연동 단품관리 상세 「관련 상품」 단추와 같게 — 꼴·글자·차례·판매중만·누르면 같은 팝업.
 
      ⚠ 이 파일에는 업무 값이 없다. 목록은 창고 `납품내역_제품목록` 에 있고 이 쪽은 **읽기만** 한다.
         창고에 담는 것은 `tools/제품목록모으기.py`(부를 때만 돈다). 자세한 것은 납품내역/CLAUDE.md 「제품목록 v6.4.0」.
@@ -130,15 +131,33 @@ html,body{height:100%;overflow:hidden}
 .vpp .dd .ss{font-size:12px;color:var(--vg-muted);margin-top:2px}
 .vpp .dd .ss .jj{margin-left:0}
 .vpp .dh{font-size:13px;font-weight:800;color:var(--vg-ink);padding:12px 14px 4px}
-/* 상품 단추 — 벤더피아연동 상품관리 표 첫 칸의 상품 단추와 같은 꼴(goods.css `.vp-goods-list button` · `.vp-gt td.vp-main …`):
-   누르는 글자 #337ea9 · 14px/700 · 바탕·테두리 없음 · 올리면 밑줄 · 상품코드 11px/500 흐림 */
+/* 상품 단추 — 벤더피아연동 단품관리 상세 「관련 상품」 단추와 같은 것(v6.7.1, goods.js `productChips`·`labelButton` · goods.css `.vp-chips …` 값 그대로):
+   이름 + 작은 상품코드(같은 이름의 코드는 「, 」로) + 밑 점 줄 · 누르는 글자 #337ea9 12px/400 · 올리면 밑줄 · 사이 6px.
+   누르면 벤더피아 `popup` 과 같은 팝업(.vpm). 점 색도 goods.css 그대로 — 이 쪽에는 점 자료(재고·카탈로그·서류)가 없어 켜지는 점은 없다 */
 .vpp .pr{padding:6px 14px 8px;border-bottom:1px solid #D6D6D3}
-.vpp .ls .pr button.pb{display:inline-block;width:auto;min-height:0;margin:0;padding:4px 0;border:0;background:none;
-  color:#337ea9;font:inherit;font-size:14px;font-weight:700;text-align:left;cursor:pointer;text-decoration:none}
-.vpp .ls .pr button.pb:hover,.vpp .ls .pr button.pb.on{text-decoration:underline}
-.vpp .pr .pb .vp-code{margin-left:6px;font-size:11px;font-weight:500;color:var(--vg-muted)}
-.vpp .pp{padding:2px 0 2px 12px;border-left:2px solid var(--vg-fill);margin-top:4px}
-.vpp .pp div{font-size:13px;color:var(--vg-body);padding:3px 0}
+.vpp .vp-chips{display:flex;flex-wrap:wrap;gap:6px}
+.vpp .ls .vp-chips button{display:inline-block;width:auto;min-height:0;margin:0;padding:0;border:0;border-radius:0;background:none;
+  color:#337ea9;font:inherit;font-size:12px;font-weight:400;text-align:left;cursor:pointer;box-shadow:none;text-decoration:none}
+.vpp .ls .vp-chips button:hover{background:none;color:#337ea9;text-decoration:underline}
+.vpp .ls .vp-chips button.on{background:none;color:#337ea9;font-weight:700;text-decoration:underline}
+.vpp .vp-chips .vp-code{margin-left:6px;font-size:11px;font-weight:500;color:#787774}
+.vpp .vp-chips .vp-점{display:flex;gap:3px;min-height:6px;margin-top:2px;line-height:0}
+.vpp .vp-점 i{display:none;width:6px;height:6px;border-radius:50%}
+/* 상품 단추 팝업 — 벤더피아연동 `.vp-modal` 값 그대로 */
+.vpm{position:fixed;inset:0;z-index:2147483647;background:rgba(55,53,47,.35);display:flex;align-items:center;justify-content:center;padding:16px}
+.vpm-card{width:440px;max-width:100%;max-height:calc(100vh - 32px);display:flex;flex-direction:column;
+  background:#fff;border-radius:16px;box-shadow:0 16px 48px rgba(0,0,0,.2);color:#37352f}
+.vpm-head{display:flex;align-items:flex-start;gap:12px;padding:18px 20px;border-bottom:1px solid #ededeb}
+.vpm-head strong{flex:1;font-size:16px;font-weight:800}
+.vpm-head button{width:28px;height:28px;margin:0;padding:0;border:0;border-radius:999px;background:#f1f1ef;color:#37352f;
+  font:inherit;font-size:16px;line-height:1;cursor:pointer}
+.vpm-body{overflow-y:auto;padding:0 20px 8px}
+.vpm-body dl{display:grid;grid-template-columns:110px 1fr;gap:8px 12px;margin:12px 0 0;padding-bottom:12px;border-bottom:1px solid #ededeb;font-size:13px}
+.vpm-body dl:last-child{border-bottom:0}
+.vpm-body dt{color:#787774}
+.vpm-body dd{margin:0;word-break:break-all}
+.vpm-foot{padding:12px 20px 20px;border-top:1px solid #ededeb}
+.vpm-goto{display:block;padding:12px;border-radius:12px;background:#37352f;color:#fff;font-size:14px;font-weight:800;text-align:center;text-decoration:none}
 .vpp .ft{display:flex;justify-content:flex-end;padding:6px 10px;border-top:1px solid var(--vg-edge)}
 .vpp .ft label{font-size:12px;font-weight:600;color:var(--vg-muted);padding:8px 6px;cursor:pointer}
 .vpp .ft input{display:none}
@@ -177,7 +196,7 @@ html,body{height:100%;overflow:hidden}
 <a class="back" href="납품내역.html">← 납품내역</a>
 <header>
   <div class="logo"><b>VIVIVIC</b> — 제품목록</div>
-  <div class="badge">v6.7.0</div>
+  <div class="badge">v6.7.1</div>
 </header>
 <h1>제품목록</h1>
 <div class="state" id="목상태"><div class="big">창고를 읽는 중입니다…</div></div>
@@ -332,7 +351,7 @@ function 판열기(p, 칸단추){
     const b = e.target.closest('button'); if(!b) return;
     if(b.classList.contains('dt')) 상세그리기(b.dataset.d, 목);           /* 상세보기 = 고르지 않고 보기만 */
     else if(b.classList.contains('bk')) 쓰기();                          /* ← 목록 */
-    else if(b.classList.contains('pb')) 구성펴기(b);                     /* 상품 단추 = 구성 단품 펴고 접기 */
+    else if(b.classList.contains('pb')) 상품팝업(b.dataset.n);           /* 상품 단추 = 벤더피아연동처럼 팝업(조회만) */
     else if(b.classList.contains('del')) 고르기(p, null, 목); else if(b.dataset.c) 고르기(p, {단품코드:b.dataset.c, 단품명:b.dataset.n}, 목);
   });
   if(!단품들){
@@ -357,7 +376,8 @@ function 목그리기(p, 물음, 목){
 /* ════ 단품 상세보기 (v6.7.0) ════
    상품 목록 = 창고 `납품내역_상품목록` 의 `상품_N` 문서들, 칸 `줄` = ["상품코드\t상품명\t판매상태\t단품코드,단품코드,…", …]
      (벤더피아연동 확장이 상품관리를 열 때 올린다. 다섯째 칸부터는 안 본다). 상세보기를 **처음 누를 때 한 번** 받는다(읽기만).
-   상품 단추를 누르면 그 상품의 구성 단품을 펴고 접는다 — 조회만. 벤더피아로 저장·등록하는 길은 없다. */
+   상품 단추(v6.7.1) = 벤더피아연동 단품관리 상세 「관련 상품」 단추(`productChips`)와 같다: 판매중 상품만(벤더피아 연결 목록이 판매상태 1),
+     받은 차례 그대로, 같은 상품명은 한 단추(코드는 「, 」), 판매상태 딱지 없음. 누르면 벤더피아 `popup` 과 같은 팝업 — 조회만. */
 const 상품자리 = ['artifacts','vivivic-4b7ef','public','data','납품내역_상품목록'];
 let 상품받기 = null;        /* 받는 약속 — 단품코드(소문자) → [{코드, 이름, 상태, 단품들:[코드…]}] Map */
 const 코드열쇠 = c => String(c).trim().toLowerCase();
@@ -386,22 +406,34 @@ function 상세그리기(코드, 목){
   상품받기.then(m => {
     const pl = 목.querySelector('.pl'); if(!pl) return;                 /* 그사이 목록으로 돌아갔으면 그냥 둔다 */
     if(!m.size){ pl.innerHTML = '<div class="msg">상품 목록이 아직 없습니다</div>'; return; }
-    const 들 = (m.get(코드열쇠(코드))||[]).slice()
-      .sort((a,b)=>(a.상태==='중지')-(b.상태==='중지') || a.이름.localeCompare(b.이름,'ko',{numeric:true}));
-    let t = `<div class="dh">상품 ${들.length}</div>`;
-    for(const x of 들) t += `<div class="pr"><button type="button" class="pb" data-u="${글(x.단품들.join(','))}">${글(x.이름||x.코드)}<small class="vp-code">${글(x.코드)}</small></button>${x.상태==='중지'?중지딱지:''}</div>`;
-    pl.innerHTML = t;
+    상품묶음 = new Map();
+    for(const x of m.get(코드열쇠(코드))||[]){
+      if(x.상태 && x.상태!=='판매중') continue;
+      const n = x.이름||x.코드;
+      if(!상품묶음.has(n)) 상품묶음.set(n, []);
+      상품묶음.get(n).push(x);
+    }
+    let t = '';
+    for(const [n, 것] of 상품묶음) t += `<button type="button" class="pb" data-n="${글(n)}">${글(n)}<small class="vp-code">${글([...new Set(것.map(x=>x.코드.trim()).filter(Boolean))].join(', '))}</small><span class="vp-점"><i class="g"></i><i class="r"></i><i class="o"></i><i class="b"></i></span></button>`;
+    pl.innerHTML = `<div class="dh">상품 ${상품묶음.size}</div><div class="pr vp-chips">${t||'없음'}</div>`;
   }, e => { const pl = 목.querySelector('.pl'); if(pl) pl.innerHTML = `<div class="msg bad">상품 목록을 읽지 못했습니다 ${글((e&&(e.code||e.message))||'')}</div>`; });
 }
-/* 구성 단품 — 상품의 단품코드 차례 그대로(같은 단품이 둘이면 두 줄). 이름·판매중지는 단품 목록에서 찾는다 */
-function 구성펴기(b){
-  const pr = b.parentElement, 옛 = pr.querySelector('.pp');
-  if(옛){ 옛.remove(); b.classList.remove('on'); return; }
-  const 이름 = new Map(단품들.map(v => [코드열쇠(v.코드), v]));
-  const t = b.dataset.u.split(',').filter(Boolean).map(c => { const v = 이름.get(코드열쇠(c));
-    return `<div>${글(v&&v.이름||c)}<span class="cd">${글(c)}</span>${v&&v.상태==='중지'?중지딱지:''}</div>`; }).join('');
-  pr.insertAdjacentHTML('beforeend', `<div class="pp">${t||'<div>구성 단품 없음</div>'}</div>`);
-  b.classList.add('on');
+/* 상품 팝업 — 벤더피아연동 `popup(name, …)` 과 같은 꼴: 제목 = 상품명, 상품마다 값 있는 칸만 한 벌, 밑에 「상품관리로 가기」(벤더피아 상품관리를 이 이름으로 연다).
+   칸은 `납품내역_상품목록` 에 있는 것뿐(상품코드·상품명·판매상태·단품코드) + 단품명(단품 목록에서 찾음). 판(.vpp) 안에 붙여 판이 안 닫힌다 */
+let 상품묶음 = new Map();
+function 상품팝업닫기(){ const m = document.querySelector('.vpm'); if(m) m.remove(); }
+function 상품팝업(n){
+  const 것 = 상품묶음.get(n); if(!것 || !판) return;
+  상품팝업닫기();
+  const 이름 = new Map(단품들.map(v => [코드열쇠(v.코드), v.이름]));
+  const 벌 = x => [['상품코드',x.코드],['상품명',x.이름],['판매상태',x.상태],['단품코드',x.단품들.join('+')],
+    ['단품명',x.단품들.every(c=>이름.get(코드열쇠(c)))?x.단품들.map(c=>이름.get(코드열쇠(c))).join('+'):'']]
+    .filter(([,v])=>String(v).trim()).map(([k,v])=>`<dt>${k}</dt><dd>${글(v)}</dd>`).join('');
+  판.insertAdjacentHTML('beforeend', `<div class="vpm"><div class="vpm-card"><div class="vpm-head"><strong>${글(n)}</strong><button type="button" aria-label="닫기">×</button></div>
+    <div class="vpm-body">${것.map(x=>`<dl>${벌(x)}</dl>`).join('')}</div>
+    <div class="vpm-foot"><a class="vpm-goto" target="_blank" rel="noopener" href="https://vendorpia.com/System/Master/salesGoods.aspx#vp-q=${encodeURIComponent(n)}">상품관리로 가기</a></div></div></div>`);
+  const m = 판.querySelector('.vpm');
+  m.querySelector('.vpm-head button').addEventListener('click', 상품팝업닫기);
 }
 async function 고르기(p, x, 목){
   const { doc, setDoc, deleteDoc } = window.fbRead;
@@ -457,6 +489,7 @@ document.getElementById('속').addEventListener('click', e => {
   판열기(b.dataset.p, b);
 });
 document.addEventListener('pointerdown', e => { if(판 && !판.contains(e.target) && !e.target.closest('td.vpc')) 판닫기(); });
+window.addEventListener('keydown', e => { if(e.key==='Escape' && document.querySelector('.vpm')){ 상품팝업닫기(); e.stopImmediatePropagation(); } }, true);
 document.addEventListener('keydown', e => { if(e.key==='Escape') 판닫기(); });
 document.getElementById('속').addEventListener('scroll', 판닫기, true);
 
