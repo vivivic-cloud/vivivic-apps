@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>외주자료 입력폼</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: step rail on the left (dependency order), one form + its saved records on the right. */
+:root{
+  --bg:#f2f4f6; --surface:#ffffff; --ink:#18212b; --muted:#5a6876; --line:#d8dee5;
+  --accent:#0b6e6a; --accent-ink:#ffffff; --accent-soft:#dff0ee;
+  --req:#b3261e; --warn-bg:#fff3d6; --warn-ink:#6b4a00;
+  --st-wait:#e6ebf0; --st-wait-ink:#33414f;
+  --st-run:#ffe9b8; --st-run-ink:#6b4a00;
+  --st-ok:#d4efdc; --st-ok-ink:#17562c;
+  --st-err:#fbdad7; --st-err-ink:#8c1d17;
+  --input:#fbfcfd;
+  --sans:"Noto Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12171c; --surface:#1a2128; --ink:#e6ebf0; --muted:#98a5b2; --line:#2b3641;
+  --accent:#4fc9be; --accent-ink:#06211f; --accent-soft:#17323a;
+  --req:#ff8a80; --warn-bg:#3a2e12; --warn-ink:#f1d48a;
+  --st-wait:#2a343e; --st-wait-ink:#c9d3dc;
+  --st-run:#4a3a12; --st-run-ink:#f1d48a;
+  --st-ok:#173a26; --st-ok-ink:#a9e2bc;
+  --st-err:#4a1f1c; --st-err-ink:#ffb4ab;
+  --input:#141a20; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#12171c; --surface:#1a2128; --ink:#e6ebf0; --muted:#98a5b2; --line:#2b3641;
+  --accent:#4fc9be; --accent-ink:#06211f; --accent-soft:#17323a;
+  --req:#ff8a80; --warn-bg:#3a2e12; --warn-ink:#f1d48a;
+  --st-wait:#2a343e; --st-wait-ink:#c9d3dc;
+  --st-run:#4a3a12; --st-run-ink:#f1d48a;
+  --st-ok:#173a26; --st-ok-ink:#a9e2bc;
+  --st-err:#4a1f1c; --st-err-ink:#ffb4ab;
+  --input:#141a20; color-scheme:dark;}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{color-scheme:light}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 15px/1.55 var(--sans);padding-block:20px 56px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:1180px;margin:0 auto}
+h1{font-size:24px;line-height:1.25;margin:0 0 4px;font-weight:700;text-wrap:balance}
+.lead{color:var(--muted);margin:0;max-width:62ch}
+.sum{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 22px}
+.pill{font-size:13px;padding:3px 10px;border-radius:999px;background:var(--st-wait);color:var(--st-wait-ink);font-variant-numeric:tabular-nums}
+.pill.err{background:var(--st-err);color:var(--st-err-ink)}
+.pill.ok{background:var(--st-ok);color:var(--st-ok-ink)}
+.banner{background:var(--warn-bg);color:var(--warn-ink);padding:10px 14px;border-radius:8px;margin:0 0 16px;font-size:14px}
+.app{display:grid;grid-template-columns:268px minmax(0,1fr);gap:28px;align-items:start}
+nav{display:flex;flex-direction:column;gap:4px;position:sticky;top:12px}
+nav button{all:unset;box-sizing:border-box;cursor:pointer;display:grid;grid-template-columns:30px 1fr;gap:10px;align-items:center;
+  padding:10px 12px;border-radius:8px;color:var(--ink)}
+nav button:hover{background:var(--surface)}
+nav button[aria-current="step"]{background:var(--surface);box-shadow:0 0 0 1px var(--line)}
+nav button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font:500 13px var(--mono);background:var(--st-wait);color:var(--st-wait-ink)}
+nav button[aria-current="step"] .num{background:var(--accent);color:var(--accent-ink)}
+.nt{font-weight:500;line-height:1.25}
+.ns{font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px}
+.stephead h2{font-size:20px;margin:0 0 6px}
+.path{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px;color:var(--muted);margin:0 0 4px}
+.path code{font:500 12.5px var(--mono);background:var(--accent-soft);color:var(--ink);padding:2px 8px;border-radius:6px}
+.needs{font-size:13.5px;color:var(--muted);margin:10px 0 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.needs button{all:unset;cursor:pointer;color:var(--accent);text-decoration:underline;text-underline-offset:3px}
+.needs button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.stepnote{margin:12px 0 0;font-size:14px;background:var(--bg);border-radius:8px;padding:10px 12px}
+form{margin-top:18px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px 16px}
+.f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.f.wide{grid-column:1/-1}
+label,.lab{font-size:13.5px;font-weight:500}
+.req{color:var(--req);margin-left:2px}
+input[type=text],input[type=date],input[type=number],select,textarea{font:inherit;color:var(--ink);background:var(--input);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%;min-width:0}
+input.bad,select.bad{border-color:var(--req)}
+.hint{font-size:12.5px;color:var(--muted)}
+.hint.warn{background:var(--warn-bg);color:var(--warn-ink);padding:3px 8px;border-radius:6px}
+.err{font-size:12.5px;color:var(--req)}
+.checks{display:flex;flex-wrap:wrap;gap:6px 16px}
+.checks label{font-weight:400;display:flex;gap:6px;align-items:center}
+.sub{font-size:14px;font-weight:700;margin:22px 0 10px}
+.rowcard{border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:10px;background:var(--bg)}
+.rowtop{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font:500 12.5px var(--mono);color:var(--muted)}
+.btn{font:500 14px var(--sans);border-radius:8px;padding:9px 16px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.small{padding:4px 10px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:default}
+.actions{display:flex;gap:12px;align-items:center;margin-top:20px;flex-wrap:wrap}
+.msg{font-size:14px}
+.msg.bad{color:var(--req)}
+.list h3{font-size:16px;margin:28px 0 10px;display:flex;gap:8px;align-items:baseline}
+.list h3 span{font-weight:400;font-size:13px;color:var(--muted)}
+.empty{color:var(--muted);border:1px dashed var(--line);border-radius:10px;padding:18px;font-size:14px}
+details.rec{background:var(--surface);border:1px solid var(--line);border-radius:10px;margin-bottom:8px}
+details.rec>summary{list-style:none;cursor:pointer;padding:12px 14px;display:flex;gap:10px;align-items:center;justify-content:space-between}
+details.rec>summary::-webkit-details-marker{display:none}
+.rt{min-width:0}
+.rt b{display:block;font-weight:500;overflow-wrap:anywhere}
+.rt small{color:var(--muted);font-size:12.5px;overflow-wrap:anywhere}
+.chip{flex:none;font-size:12.5px;padding:2px 10px;border-radius:999px;font-weight:500}
+.chip.대기{background:var(--st-wait);color:var(--st-wait-ink)}
+.chip.진행중{background:var(--st-run);color:var(--st-run-ink)}
+.chip.완료{background:var(--st-ok);color:var(--st-ok-ink)}
+.chip.오류{background:var(--st-err);color:var(--st-err-ink)}
+.recbody{padding:2px 14px 14px;border-top:1px solid var(--line)}
+dl{display:grid;grid-template-columns:minmax(110px,max-content) 1fr;gap:4px 14px;margin:12px 0;font-size:14px}
+dt{color:var(--muted)}dd{margin:0;overflow-wrap:anywhere}
+.tw{overflow-x:auto;margin:8px 0}
+table{border-collapse:collapse;font-size:13px;min-width:100%}
+th,td{border:1px solid var(--line);padding:4px 8px;text-align:left;white-space:nowrap}
+th{background:var(--bg);font-weight:500}
+td.n{font-family:var(--mono);text-align:right}
+.agentnote{background:var(--st-err);color:var(--st-err-ink);padding:8px 10px;border-radius:8px;font-size:13.5px;margin:8px 0}
+.agentnote.ok{background:var(--st-ok);color:var(--st-ok-ink)}
+.recact{display:flex;gap:8px;flex-wrap:wrap}
+.contract{margin-top:32px}
+.contract summary{cursor:pointer;font-weight:500}
+.contract pre{font:400 12.5px/1.6 var(--mono);background:var(--bg);padding:12px;border-radius:8px;overflow-x:auto;margin:10px 0 0}
+@media (max-width:820px){
+  .app{grid-template-columns:minmax(0,1fr);gap:16px}
+  nav{flex-direction:row;overflow-x:auto;position:static;padding-bottom:4px}
+  nav button{flex:none;grid-template-columns:26px auto}
+  .num{width:26px;height:26px}
+  .card{padding:16px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>외주자료 입력폼</h1>
+    <p class="lead">영림원 ERP 테스트서버에 등록할 자료를 단계 순서대로 입력합니다. 저장한 항목은 에이전트가 ERP에 등록하고, 결과를 상태로 남깁니다.</p>
+    <div class="sum" id="sum" aria-live="polite"></div>
+  </header>
+  <div id="banner"></div>
+  <div class="app">
+    <nav id="nav" aria-label="등록 단계"></nav>
+    <main id="main"></main>
+  </div>
+  <section class="contract card">
+    <details>
+      <summary>에이전트용 데이터 규칙</summary>
+      <p class="hint" style="margin-top:10px">에이전트는 아래 컬렉션에서 상태가 대기인 문서를 단계 순서대로 읽어 ERP에 등록하고, 결과를 같은 문서에 기록합니다. 저장소는 파이어베이스 vivivic-4b7ef의 Firestore이고 컬렉션 이름은 erp_ 로 시작합니다. 전체 규격은 같은 폴더의 erp-spec.json 입니다.</p>
+      <pre id="contractPre"></pre>
+    </details>
+  </section>
+</div>
+
+<script>
+/* 저장소: 이 저장소의 다른 앱들과 같은 파이어베이스 프로젝트(vivivic-4b7ef), 익명 로그인.
+   컬렉션은 erp_ 로 시작하는 6개만 쓴다. 기존 업무 기록 컬렉션은 건드리지 않는다.
+   SDK 는 필요할 때 불러온다 — 못 불러와도 화면은 뜨고 안내 문구가 나온다. */
+var FB_CONFIG={apiKey:"AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",authDomain:"vivivic-4b7ef.firebaseapp.com",projectId:"vivivic-4b7ef",storageBucket:"vivivic-4b7ef.firebasestorage.app",messagingSenderId:"830175660542",appId:"1:830175660542:web:9054030480c8280af8d8af"};
+function connectDb(){
+  var V='https://www.gstatic.com/firebasejs/11.2.0/';
+  return Promise.all([import(V+'firebase-app.js'),import(V+'firebase-auth.js'),import(V+'firebase-firestore.js')]).then(function(m){
+    var app=m[0].initializeApp(FB_CONFIG,'erp-input'),auth=m[1].getAuth(app),F=m[2],fs=F.getFirestore(app);
+    return m[1].signInAnonymously(auth).then(function(){
+      /* 화면 코드가 쓰는 모양(collection/doc/add/update/delete/onSnapshot)만 맞춘 얇은 껍데기 */
+      return {collection:function(name){return {
+        onSnapshot:function(next,err){return F.onSnapshot(F.collection(fs,name),function(s){next({docs:s.docs.map(function(d){return {id:d.id,data:function(){return d.data();}};})});},err);},
+        add:function(data){return F.addDoc(F.collection(fs,name),data);},
+        doc:function(id){return {delete:function(){return F.deleteDoc(F.doc(fs,name,id));},update:function(o){return F.updateDoc(F.doc(fs,name,id),o);}};}
+      };}};
+    });
+  }).catch(function(e){console.warn('파이어베이스 연결 실패',e);return null;});
+}
+(function(){
+"use strict";
+var F=function(k,label,type,o){return Object.assign({k:k,label:label,type:type},o||{});};
+var KNOWN_WC=['아인가구','AMT','경기산업','조혼가구','럭스디자인','진아산업'];
+var KNOWN_PROC=['조립','가공'];
+
+var STEPS=[
+{key:'vendors',n:1,title:'거래처',screen:'거래처등록',
+ path:['기본','[기본] 거래처정보','거래처'],needs:[],
+ note:'외주처를 거래처로 먼저 등록합니다. 다음 단계의 워크센터가 이 거래처를 외주거래처로 선택합니다.',
+ fields:[
+  F('sangho','상호','text',{req:1}),
+  F('name','거래처명','text',{req:1,hint:'워크센터의 외주거래처에 표시되는 이름입니다.'}),
+  F('state','거래처상태','combo',{opts:['정상'],def:'정상'}),
+  F('region','국내외구분','select',{opts:['국내','해외'],def:'국내'}),
+  F('credit','신용등급','combo',{opts:['A'],def:'A'}),
+  F('corp','법인/개인','select',{opts:['법인','개인'],def:'법인'}),
+  F('bizno','사업자번호','text',{ph:'000-00-00000'}),
+  F('rep','대표자성명','text'),
+  F('tel','전화번호','text'),
+  F('biztype','업태','text'),
+  F('bizitem','종목','text'),
+  F('kinds','거래처종류','multi',{wide:1,opts:['국내매출거래처','수출매출거래처','국내매입거래처','해외매입거래처','외주가공거래처'],def:['외주가공거래처'],hint:'ERP 화면의 거래처종류 목록입니다. 외주처는 외주가공거래처에 체크합니다. 목록 아래쪽 항목은 화면에서 확인하지 못했습니다.'})
+ ],
+ recTitle:function(r){return r.name||r.sangho;},
+ subt:function(r){return [r.region,(r.kinds||[]).join(', ')].filter(Boolean).join(' · ');}},
+
+{key:'workcenters',n:2,title:'워크센터',screen:'워크센터등록',
+ path:['생산/외주','[생산] 기본정보','워크센터관리','워크센터'],needs:['vendors'],
+ note:'외주처는 워크센터로 등록하고, 외주거래처 칸에서 1단계 거래처와 연결합니다. 서버에 이미 있는 외주 워크센터는 목록 제안에 함께 나옵니다.',
+ fields:[
+  F('unit','사업단위','combo',{req:1,opts:['본사'],def:'본사'}),
+  F('name','워크센터','text',{req:1}),
+  F('dept','생산부서','combo',{req:1,opts:['기획'],def:'기획'}),
+  F('kind','워크센터구분','select',{req:1,opts:['사외외주','자체생산'],def:'사외외주'}),
+  F('vendor','외주거래처','combo',{dl:'dl-vendors',reqIf:function(v){return v.kind==='사외외주';},hint:'사외외주일 때 필수입니다. 1단계에서 입력한 거래처명을 고릅니다.'}),
+  F('capa','Capa산정구분','combo',{req:1,opts:['작업시간'],def:'작업시간'}),
+  F('start','시작일','date',{req:1,def:'2026-01-01'}),
+  F('end','종료일','text',{def:'9999-12-31'}),
+  F('whMat','자재출고창고','text'),
+  F('whProd','제상품출고창고','text'),
+  F('whDeliv','납품창고','text'),
+  F('whSite','현장창고','text',{hint:'서버에 있는 워크센터는 창고 이름이 워크센터 이름과 같게 잡혀 있습니다.'})
+ ],
+ recTitle:function(r){return r.name;},
+ subt:function(r){return [r.kind,r.vendor?'외주처 '+r.vendor:''].filter(Boolean).join(' · ');}},
+
+{key:'items',n:3,title:'품목',screen:'품목등록',
+ path:['기본','[기본] 품목정보','품목등록'],needs:[],
+ note:'외주 대상 제품과 투입 자재를 모두 등록합니다. 품목등록은 한 건씩 입력하는 화면이라 업로드가 없습니다.',
+ fields:[
+  F('name','품명','text',{req:1}),
+  F('code','품번','text',{req:1,mono:1}),
+  F('spec','규격','text'),
+  F('eng','영문명','text'),
+  F('asset','품목자산분류','combo',{req:1,opts:['상품'],def:'상품'}),
+  F('status','품목상태','combo',{opts:['사용'],def:'사용'}),
+  F('unit','기준단위','text',{req:1,ph:'예: EA'}),
+  F('small','품목소분류','text',{req:1}),
+  F('io','내외자구분','select',{opts:['내자','외자'],def:'내자'}),
+  F('imp','중요도','combo',{opts:['A등급'],def:'A등급'}),
+  F('rep','대표품목','check')
+ ],
+ recTitle:function(r){return r.name;},
+ subt:function(r){return [r.code,r.unit].filter(Boolean).join(' · ');}},
+
+{key:'processes',n:4,title:'공정',screen:'공정등록',
+ path:['생산/외주','[생산] 기본정보','공정관리','공정'],needs:[],
+ note:'서버에 이미 있는 공정은 조립, 가공입니다. 없는 공정만 추가합니다. 공정흐름유형과 품목별공정흐름유형 화면은 아직 열어 보지 않았습니다.',
+ fields:[
+  F('name','공정명','text',{req:1}),
+  F('memo','특이사항','text'),
+  F('inspect','공정검사여부','check')
+ ],
+ recTitle:function(r){return r.name;},
+ subt:function(r){return r.inspect?'공정검사 있음':'';}},
+
+{key:'boms',n:5,title:'BOM',screen:'BOM등록업로드',
+ path:['생산/외주','[생산] 기본정보','BOM관리','BOM업로드'],needs:['items','processes'],
+ note:'ERP의 BOM업로드는 엑셀 양식으로 올리는 화면입니다. 아래 행의 항목이 그 양식의 열입니다. 모품목 하나에 하위 품목을 여러 행으로 적습니다.',
+ fields:[
+  F('pname','모품목명','text',{req:1}),
+  F('pcode','모품목번호','text',{req:1,mono:1,dl:'dl-codes',xref:1}),
+  F('pspec','모품목규격','text'),
+  F('pver','모품목BOM차수','text',{req:1,ph:'예: 1'})
+ ],
+ rowTitle:'하위 품목',
+ rowFields:[
+  F('proc','공정','combo',{dl:'dl-proc'}),
+  F('order','표시순서','number'),
+  F('cname','하위품명','text',{req:1}),
+  F('ccode','하위품번','text',{req:1,mono:1,dl:'dl-codes',xref:1}),
+  F('cspec','하위규격','text'),
+  F('cver','하위BOM차수','text'),
+  F('inunit','투입단위','text',{req:1,ph:'예: EA'}),
+  F('qn','소요량(분자)','number',{req:1,step:'any'}),
+  F('qd','소요량(분모)','number',{req:1,step:'any',def:'1'}),
+  F('hasSub','하위유무','check')
+ ],
+ recTitle:function(r){return r.pname;},
+ subt:function(r){return [r.pcode,'하위 '+((r.rows||[]).length)+'건'].join(' · ');}},
+
+{key:'contracts',n:6,title:'외주계약',screen:'외주계약등록',
+ path:['생산/외주','[외주] 외주계약','외주계약등록'],needs:['workcenters','boms'],
+ note:'ERP는 외주거래처를 고른 뒤 미등록공정 가져오기로 공정 행을 불러오고, 행마다 통화, 정산기준, 외주단가, 적용시작일을 입력하는 구조입니다. 아래는 어느 공정에 어떤 단가를 줄지 적는 칸입니다. 소요자재는 BOM에서 가져오므로 입력하지 않습니다.',
+ fields:[
+  F('unit','사업단위','combo',{req:1,opts:['본사'],def:'본사'}),
+  F('vendor','외주거래처','combo',{req:1,dl:'dl-wc',hint:'2단계의 사외외주 워크센터 이름입니다.'})
+ ],
+ rowTitle:'공정별 계약',
+ rowFields:[
+  F('prod','제품명','text'),
+  F('pcode','제품번호','text',{mono:1,dl:'dl-codes',xref:1}),
+  F('seq','공정차수','number',{req:1}),
+  F('proc','공정','combo',{req:1,dl:'dl-proc'}),
+  F('oname','외주품명','text'),
+  F('ocode','외주품번','text',{mono:1}),
+  F('unit','단위','text'),
+  F('cur','통화','combo',{req:1,opts:['KRW','CNY','USD'],ph:'ERP 드롭다운 값'}),
+  F('basis','정산기준','text',{req:1,ph:'ERP 드롭다운 값'}),
+  F('vat','부가세포함여부','check'),
+  F('price','외주단가','number',{req:1,step:'any'}),
+  F('from','적용시작일','date',{req:1})
+ ],
+ recTitle:function(r){return r.vendor;},
+ subt:function(r){return ((r.rows||[]).length)+'건 · '+(r.unit||'');}}
+];
+var BYKEY={};STEPS.forEach(function(s){BYKEY[s.key]=s;});
+
+/* ---------- machine-readable ERP route, embedded in every saved record ---------- */
+var ROUTES={
+ vendors:{method:'화면 입력(건별)',how:['기본 > [기본] 거래처정보 화면에서 거래처 아이콘을 눌러 거래처등록을 엽니다.','조회로 같은 거래처명이 이미 있는지 확인합니다. 있으면 오류로 두고 사용자에게 알립니다.','신규를 누르고 상호, 거래처명 등 fieldMap 항목을 입력합니다.','우측 거래처종류 표에서 kinds에 있는 종류의 선택 칸에 체크합니다.','세무정보 영역에 사업자번호 등을 입력하고 저장합니다.'],unverified:['거래처종류 표의 아래쪽 항목','저장 동작과 필수 검증']},
+ workcenters:{method:'화면 입력(그리드 행)',how:['생산/외주 > [생산] 기본정보 맵에서 워크센터 아이콘을 눌러 워크센터등록을 엽니다.','사업단위를 확인하고 조회로 기존 워크센터를 불러옵니다. 같은 이름이 있으면 새로 만들지 않고 agentNote에 적습니다.','그리드의 첫 빈 행(A 표시)에 fieldMap 항목을 열 제목에 맞춰 입력합니다. 워크센터구분이 사외외주이면 외주거래처에 1단계 거래처를 선택합니다.','저장하고 조회로 확인합니다.'],requiredIf:{vendor:'kind가 사외외주일 때'},unverified:['저장 동작','그리드 오른쪽의 숨은 열']},
+ items:{method:'화면 입력(건별)',how:['기본 > [기본] 품목정보 맵에서 품목등록을 엽니다.','신규를 누르고 품명, 품번 등 fieldMap 항목을 입력합니다. 빨간 글씨 항목이 필수입니다.','저장하고 품목조회에서 확인합니다.'],unverified:['품목자산분류와 품목소분류의 선택지','저장 동작']},
+ processes:{method:'화면 입력(그리드 행)',how:['생산/외주 > [생산] 기본정보 맵의 공정관리에서 공정 아이콘을 눌러 공정등록을 엽니다.','조회로 기존 공정을 확인합니다. 같은 공정명이 있으면 새로 만들지 않고 agentNote에 적습니다.','빈 행에 공정명, 특이사항, 공정검사여부를 입력하고 저장합니다.'],unverified:['공정흐름유형과 품목별공정흐름유형 화면','저장 동작']},
+ boms:{method:'엑셀 업로드',how:['생산/외주 > [생산] 기본정보 맵의 BOM관리에서 BOM업로드를 엽니다.','양식다운로드로 엑셀 양식을 받습니다. 시트명은 BOM일괄업로드입니다.','문서의 상위 필드와 rows를 양식 열에 채웁니다. rows 한 개가 양식의 한 행입니다.','파일선택으로 파일을 고르고 데이터가져오기를 누른 뒤 빨간 필수 열이 모두 채워졌는지 확인하고 저장합니다.','BOMTree조회로 결과를 확인합니다.'],unverified:['엑셀 양식의 열 이름과 순서','자동으로 채워지는 열','품목이 미등록일 때의 오류 동작']},
+ contracts:{method:'화면 입력(그리드 행)',how:['생산/외주 > [외주] 외주계약 맵에서 외주계약등록을 엽니다.','사업단위를 고르고 외주거래처를 조회 조건에 지정해 조회합니다.','좌측 그리드에서 해당 외주거래처 행을 선택하고 미등록공정 가져오기를 누릅니다.','우측 그리드에서 rows의 제품번호와 공정에 맞는 행을 찾아 통화, 정산기준, 부가세포함여부, 외주단가, 적용시작일을 입력합니다.','저장하고 외주계약조회에서 확인합니다.'],unverified:['저장 동작','통화와 정산기준의 선택지','소요자재가져오기 동작']}
+};
+function specOf(s){
+  var r=ROUTES[s.key];
+  function m(a){var o={};a.forEach(function(f){o[f.k]=f.label;});return o;}
+  function rq(a){return a.filter(function(f){return f.req;}).map(function(f){return f.k;});}
+  return {step:s.n,key:s.key,collection:'erp_'+s.key,erpModule:s.path[0],menuPath:s.path,screen:s.screen,dependsOn:s.needs,method:r.method,how:r.how,
+    fieldMap:m(s.fields),required:rq(s.fields),requiredIf:r.requiredIf||null,
+    rowsField:s.rowFields?'rows':null,rowFieldMap:s.rowFields?m(s.rowFields):null,rowRequired:s.rowFields?rq(s.rowFields):null,
+    verifiedByScreen:'화면을 열어 입력 항목을 확인함',unverified:r.unverified};
+}
+function routeOf(s){var p=specOf(s);return {step:p.step,menuPath:p.menuPath,screen:p.screen,method:p.method,dependsOn:p.dependsOn,specRef:'erp-spec.json'};}
+var SPEC={version:1,system:'영림원 SystemCloud for (아이앤지퍼니처 TEST 테스트서버)',host:'inghometest.ksystemace.com',
+  order:STEPS.map(function(s){return s.key;}),statuses:['대기','진행중','완료','오류'],
+  login:'에이전트는 비밀번호를 입력하거나 저장하지 않습니다. 사용자가 로그인해 둔 브라우저 세션에서만 작업하고, 로그인 화면이 나오면 멈추고 사용자에게 알립니다.',
+  protocol:['status가 대기인 문서를 order의 단계 순서대로, 같은 단계에서는 createdAt 오름차순으로 읽습니다.','dependsOn 단계에 대기나 오류 문서가 남아 있으면 그 단계는 건너뛰고 agentNote에 이유를 적습니다. 서버에 이미 있는 데이터는 예외입니다.','처리를 시작하면 status를 진행중으로 바꿉니다.','menuPath 순서로 메뉴를 열고 how를 따릅니다. 저장한 뒤 조회 화면에서 등록 결과를 확인합니다.','성공하면 status를 완료로, 실패하면 오류로 바꾸고 agentNote에 화면에서 본 오류 문구를 적습니다.','파일 다운로드와 업로드, 삭제, 기존 데이터 덮어쓰기는 사용자에게 먼저 확인합니다.'],
+  steps:STEPS.map(specOf)};
+window.__erpSpec=SPEC;
+var STATUS=['대기','진행중','완료','오류'];
+var data={};STEPS.forEach(function(s){data[s.key]=null;});
+var db=null,cur=STEPS[0].key,form=null;
+
+function h(tag,props){
+  var e=document.createElement(tag);
+  props=props||{};
+  Object.keys(props).forEach(function(k){
+    var v=props[k];if(v==null||v===false)return;
+    if(k==='class')e.className=v;
+    else if(k==='text')e.textContent=v;
+    else if(k==='on'){Object.keys(v).forEach(function(ev){e.addEventListener(ev,v[ev]);});}
+    else if(k==='value'||k==='checked'||k==='disabled'||k==='hidden')e[k]=v;
+    else e.setAttribute(k,v===true?'':v);
+  });
+  for(var i=2;i<arguments.length;i++){
+    var c=arguments[i];
+    (Array.isArray(c)?c:[c]).forEach(function(x){if(x==null||x===false)return;e.append(x.nodeType?x:document.createTextNode(x));});
+  }
+  return e;
+}
+function show(v){
+  if(v===true)return '예';if(v===false)return '아니오';
+  if(Array.isArray(v))return v.join(', ');
+  return v==null?'':String(v);
+}
+
+/* ---------- field widgets ---------- */
+var uid=0;
+function makeField(f,scope){
+  var id='f'+(++uid);
+  var wrap=h('div',{class:'f'+(f.wide?' wide':'')});
+  var ctl,getter,setter,focusEl;
+  var lab=function(){return h('label',{for:id},f.label,f.req||f.reqIf?h('span',{class:'req','aria-hidden':'true'},'*'):null);};
+  if(f.type==='check'){
+    ctl=h('input',{type:'checkbox',id:id});
+    wrap.append(h('label',{for:id,style:'display:flex;gap:8px;align-items:center;font-weight:400;min-height:38px'},ctl,f.label));
+    getter=function(){return ctl.checked;};setter=function(v){ctl.checked=!!v;};focusEl=ctl;
+  }else if(f.type==='multi'){
+    var boxes=f.opts.map(function(o,i){var b=h('input',{type:'checkbox',id:id+'-'+i,value:o});return b;});
+    wrap.append(h('span',{class:'lab'},f.label),h('div',{class:'checks',role:'group','aria-label':f.label},boxes.map(function(b,i){return h('label',{for:id+'-'+i},b,f.opts[i]);})));
+    getter=function(){return boxes.filter(function(b){return b.checked;}).map(function(b){return b.value;});};
+    setter=function(v){boxes.forEach(function(b){b.checked=(v||[]).indexOf(b.value)>=0;});};focusEl=boxes[0];
+  }else if(f.type==='select'){
+    ctl=h('select',{id:id},f.opts.map(function(o){return h('option',{value:o},o);}));
+    wrap.append(lab(),ctl);
+    getter=function(){return ctl.value;};setter=function(v){ctl.value=v;};focusEl=ctl;
+  }else{
+    var attrs={id:id,type:f.type==='combo'?'text':f.type,autocomplete:'off'};
+    if(f.ph)attrs.placeholder=f.ph;if(f.step)attrs.step=f.step;
+    var listId=f.dl||(f.type==='combo'&&f.opts?'dlo-'+id:null);
+    if(listId)attrs.list=listId;
+    ctl=h('input',attrs);
+    if(f.mono)ctl.style.fontFamily='var(--mono)';
+    wrap.append(lab(),ctl);
+    if(f.type==='combo'&&f.opts&&!f.dl){wrap.append(h('datalist',{id:listId},f.opts.map(function(o){return h('option',{value:o});})));}
+    getter=function(){return ctl.value.trim();};setter=function(v){ctl.value=v==null?'':v;};focusEl=ctl;
+  }
+  var errEl=h('div',{class:'err',hidden:true,role:'alert'});
+  var warnEl=h('div',{class:'hint warn',hidden:true});
+  if(f.hint)wrap.append(h('div',{class:'hint'},f.hint));
+  wrap.append(warnEl,errEl);
+  if(f.xref&&ctl){
+    ctl.addEventListener('input',function(){
+      var v=getter();var codes=(data.items||[]).map(function(r){return r.code;});
+      var miss=v&&codes.indexOf(v)<0;
+      warnEl.hidden=!miss;
+      if(miss)warnEl.textContent='3단계 품목에 없는 품번입니다. 서버에 이미 있는 품번이면 그대로 진행합니다.';
+    });
+  }
+  var api={el:wrap,f:f,get:getter,set:setter,
+    setError:function(m){errEl.hidden=!m;errEl.textContent=m||'';if(ctl)ctl.classList.toggle('bad',!!m);},
+    reset:function(){setter(f.def!=null?f.def:(f.type==='check'?false:(f.type==='multi'?[]:'')));warnEl.hidden=true;api.setError('');},
+    focus:function(){if(focusEl)focusEl.focus();}};
+  api.reset();
+  return api;
+}
+function isEmpty(v){return v===''||v==null||(Array.isArray(v)&&!v.length);}
+
+function makeRow(step,idx,onRemove){
+  var fields=step.rowFields.map(function(f){return makeField(f);});
+  var removeBtn=h('button',{type:'button',class:'btn small',on:{click:function(){onRemove(row);}}},'행 삭제');
+  var label=h('span',{},'');
+  var el=h('div',{class:'rowcard'},h('div',{class:'rowtop'},label,removeBtn),h('div',{class:'grid'},fields.map(function(x){return x.el;})));
+  var row={el:el,fields:fields,removeBtn:removeBtn,label:label};
+  return row;
+}
+
+function buildForm(step){
+  var headFields=step.fields.map(function(f){return makeField(f);});
+  var rows=[];
+  var rowsBox=h('div',{});
+  var msg=h('span',{class:'msg','aria-live':'polite'});
+  var submit=h('button',{type:'submit',class:'btn primary'},'저장');
+  function relabel(){rows.forEach(function(r,i){r.label.textContent=step.rowTitle+' '+(i+1);r.removeBtn.hidden=rows.length<2;});}
+  function addRow(){
+    var r=makeRow(step,rows.length,function(x){rows.splice(rows.indexOf(x),1);x.el.remove();relabel();});
+    rows.push(r);rowsBox.append(r.el);relabel();return r;
+  }
+  var f=h('form',{novalidate:true},
+    h('div',{class:'grid'},headFields.map(function(x){return x.el;})),
+    step.rowFields?h('div',{},h('div',{class:'sub'},step.rowTitle),rowsBox,h('button',{type:'button',class:'btn small',on:{click:function(){addRow().fields[0].focus();}}},'+ 행 추가')):null,
+    h('div',{class:'actions'},submit,msg));
+  if(step.rowFields)addRow();
+  var api={el:f,msg:msg,submit:submit,
+    collect:function(){
+      var vals={};headFields.forEach(function(x){vals[x.f.k]=x.get();});
+      var bad=0,first=null;
+      headFields.forEach(function(x){
+        var need=x.f.req||(x.f.reqIf&&x.f.reqIf(vals));
+        var miss=need&&isEmpty(vals[x.f.k]);
+        x.setError(miss?'필수 항목입니다.':'');if(miss){bad++;first=first||x;}
+      });
+      var out=Object.assign({},vals);
+      if(step.rowFields){
+        var rv=[];
+        rows.forEach(function(r){
+          var o={};r.fields.forEach(function(x){o[x.f.k]=x.get();});
+          var touched=Object.keys(o).some(function(k){var d=r.fields.filter(function(x){return x.f.k===k;})[0].f.def;return !isEmpty(o[k])&&o[k]!==false&&o[k]!==d;});
+          if(!touched&&rows.length>1){r.fields.forEach(function(x){x.setError('');});return;}
+          r.fields.forEach(function(x){
+            var miss=x.f.req&&isEmpty(o[x.f.k]);
+            x.setError(miss?'필수 항목입니다.':'');if(miss){bad++;first=first||x;}
+          });
+          rv.push(o);
+        });
+        out.rows=rv;
+      }
+      if(bad){return {ok:false,first:first,count:bad};}
+      return {ok:true,value:out};
+    },
+    reset:function(){
+      headFields.forEach(function(x){x.reset();});
+      if(step.rowFields){rows.slice().forEach(function(r){r.el.remove();});rows=[];addRow();}
+    }};
+  return api;
+}
+
+/* ---------- views ---------- */
+var navEl=document.getElementById('nav'),mainEl=document.getElementById('main'),sumEl=document.getElementById('sum'),bannerEl=document.getElementById('banner');
+var listBox=null,msgTimer=null;
+
+function counts(key){
+  var a=data[key]||[];var c={total:a.length,'대기':0,'진행중':0,'완료':0,'오류':0};
+  a.forEach(function(r){if(c[r.status]!=null)c[r.status]++;});return c;
+}
+function renderNav(){
+  navEl.replaceChildren.apply(navEl,STEPS.map(function(s){
+    var c=counts(s.key);
+    var sub=data[s.key]==null?'불러오는 중':(c.total?('대기 '+c['대기']+' · 완료 '+c['완료']+(c['오류']?' · 오류 '+c['오류']:'')):'아직 없음');
+    return h('button',{type:'button',on:{click:function(){go(s.key);}},'aria-current':s.key===cur?'step':null},
+      h('span',{class:'num'},String(s.n)),h('span',{},h('div',{class:'nt'},s.title),h('div',{class:'ns'},sub)));
+  }));
+}
+function renderSum(){
+  var t={'대기':0,'진행중':0,'완료':0,'오류':0};
+  STEPS.forEach(function(s){var c=counts(s.key);STATUS.forEach(function(k){t[k]+=c[k];});});
+  sumEl.replaceChildren(
+    h('span',{class:'pill'},'대기 '+t['대기']),
+    h('span',{class:'pill'},'진행중 '+t['진행중']),
+    h('span',{class:'pill ok'},'완료 '+t['완료']),
+    h('span',{class:'pill'+(t['오류']?' err':'')},'오류 '+t['오류']));
+}
+function datalist(id,vals){
+  var el=document.getElementById(id);
+  if(!el){el=h('datalist',{id:id});document.body.append(el);}
+  var seen={};var u=vals.filter(function(v){if(!v||seen[v])return false;seen[v]=1;return true;});
+  el.replaceChildren.apply(el,u.map(function(v){return h('option',{value:v});}));
+}
+function refreshLists(){
+  var vend=(data.vendors||[]).map(function(r){return r.name;});
+  var wc=(data.workcenters||[]).filter(function(r){return r.kind==='사외외주';}).map(function(r){return r.name;});
+  datalist('dl-vendors',vend);
+  datalist('dl-wc',KNOWN_WC.concat(wc));
+  datalist('dl-proc',KNOWN_PROC.concat((data.processes||[]).map(function(r){return r.name;})));
+  datalist('dl-codes',(data.items||[]).map(function(r){return r.code;}));
+}
+function renderStep(){
+  var s=BYKEY[cur];
+  form=buildForm(s);
+  form.el.addEventListener('submit',function(e){e.preventDefault();save(s);});
+  var needs=s.needs.length?h('p',{class:'needs'},'먼저 필요한 단계',s.needs.map(function(k){return h('button',{type:'button',on:{click:function(){go(k);}}},BYKEY[k].n+'. '+BYKEY[k].title);})):null;
+  listBox=h('div',{class:'list'});
+  mainEl.replaceChildren(
+    h('section',{class:'card'},
+      h('div',{class:'stephead'},
+        h('p',{class:'path'},'ERP 경로',s.path.map(function(p,i){return h('code',{},p);}),h('span',{},'화면: '+s.screen)),
+        h('h2',{},s.n+'. '+s.title+' 입력'),
+        needs,h('p',{class:'stepnote'},s.note)),
+      form.el),
+    listBox);
+  renderList();
+}
+function recBody(s,r){
+  var dl=h('dl',{});
+  s.fields.forEach(function(f){if(!isEmpty(r[f.k])&&r[f.k]!==false){dl.append(h('dt',{},f.label),h('dd',{},show(r[f.k])));}});
+  var parts=[dl];
+  if(s.rowFields&&(r.rows||[]).length){
+    var th=h('tr',{},s.rowFields.map(function(f){return h('th',{},f.label);}));
+    var trs=r.rows.map(function(row){return h('tr',{},s.rowFields.map(function(f){return h('td',{class:f.type==='number'?'n':''},show(row[f.k]));}));});
+    parts.push(h('div',{class:'tw'},h('table',{},h('thead',{},th),h('tbody',{},trs))));
+  }
+  return parts;
+}
+function renderList(){
+  if(!listBox)return;
+  var s=BYKEY[cur];var a=data[cur];
+  var head=h('h3',{},'저장한 항목',h('span',{},a?a.length+'건':''));
+  if(a==null){listBox.replaceChildren(head,h('div',{class:'empty'},'불러오는 중입니다.'));return;}
+  if(!a.length){listBox.replaceChildren(head,h('div',{class:'empty'},'아직 저장한 '+s.title+' 항목이 없습니다. 위 폼에 입력하고 저장하면 여기에 쌓입니다.'));return;}
+  var sorted=a.slice().sort(function(x,y){return (y.createdAt||'')<(x.createdAt||'')?-1:1;});
+  var openIds={};
+  Array.prototype.forEach.call(listBox.querySelectorAll('details[data-id]'),function(d){if(d.open)openIds[d.getAttribute('data-id')]=1;});
+  var items=sorted.map(function(r){
+    var st=STATUS.indexOf(r.status)>=0?r.status:'대기';
+    var actions=h('div',{class:'recact'});
+    if(st==='오류')actions.append(h('button',{type:'button',class:'btn small',on:{click:function(){patch(s,r,{status:'대기',agentNote:''});}}},'대기로 되돌리기'));
+    if(st==='대기'||st==='오류')actions.append(delBtn(s,r));
+    var d=h('details',{class:'rec','data-id':r.id},
+      h('summary',{},h('div',{class:'rt'},h('b',{},s.recTitle(r)||'(이름 없음)'),h('small',{},s.subt(r))),h('span',{class:'chip '+st},st)),
+      h('div',{class:'recbody'},
+        r.agentNote?h('div',{class:'agentnote'+(st==='완료'?' ok':'')},'에이전트 메모: '+r.agentNote):null,
+        recBody(s,r),actions));
+    if(openIds[r.id])d.open=true;
+    return d;
+  });
+  listBox.replaceChildren.apply(listBox,[head].concat(items));
+}
+function delBtn(s,r){
+  var armed=false,t;
+  var b=h('button',{type:'button',class:'btn small',on:{click:function(){
+    if(!armed){armed=true;b.textContent='정말 삭제';clearTimeout(t);t=setTimeout(function(){armed=false;b.textContent='삭제';},3000);return;}
+    db.collection('erp_'+s.key).doc(r.id).delete().catch(function(e){flash('삭제하지 못했습니다. '+errText(e),true);});
+  }}},'삭제');
+  return b;
+}
+function errText(e){
+  var c=e&&e.code;
+  if(c==='invalid_argument'||c==='permission-denied'||c==='unauthenticated')return '저장 권한이 없습니다. 파이어베이스 규칙에서 erp_ 컬렉션을 허용해야 합니다.';
+  if(c==='quota_exceeded')return '저장 한도에 도달했습니다.';
+  return '잠시 뒤 다시 시도해 주세요.';
+}
+function flash(text,bad){
+  if(!form)return;
+  form.msg.textContent=text;form.msg.className='msg'+(bad?' bad':'');
+  clearTimeout(msgTimer);if(!bad)msgTimer=setTimeout(function(){form.msg.textContent='';},3500);
+}
+function patch(s,r,o){db.collection('erp_'+s.key).doc(r.id).update(o).catch(function(e){flash('변경하지 못했습니다. '+errText(e),true);});}
+function save(s){
+  if(!db){flash('저장소에 연결되지 않아 저장할 수 없습니다.',true);return;}
+  var res=form.collect();
+  if(!res.ok){flash('필수 항목 '+res.count+'곳이 비어 있습니다.',true);if(res.first)res.first.focus();return;}
+  var doc=Object.assign({},res.value,{status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(s)});
+  form.submit.disabled=true;
+  db.collection('erp_'+s.key).add(doc).then(function(){form.reset();flash('저장했습니다. 대기 상태로 쌓였습니다.');})
+   .catch(function(e){flash('저장하지 못했습니다. '+errText(e),true);})
+   .then(function(){form.submit.disabled=false;});
+}
+function go(k){cur=k;try{history.replaceState(null,'','#'+k);}catch(e){location.hash=k;}renderNav();renderStep();}
+function refreshAll(){renderNav();renderSum();renderList();refreshLists();}
+
+/* ---------- boot ---------- */
+document.getElementById('contractPre').textContent=JSON.stringify(SPEC,null,1)+'\n\n'+
+  STEPS.map(function(s){return 'erp_'+s.key+'   '+s.n+'단계 '+s.title+' ('+s.screen+')';}).join('\n')+
+  '\n\n문서 필드: 폼 항목, '+'status, agentNote, createdAt'+
+  '\nstatus 값: 대기 → 진행중 → 완료 | 오류'+
+  '\n행이 있는 단계(erp_boms, erp_contracts)는 rows 배열에 행을 담습니다.'+
+  '\n에이전트 처리: status가 대기인 문서를 createdAt 오름차순으로 읽고,'+
+  '\n단계 번호 순서대로 등록한 뒤 status와 agentNote를 갱신합니다.';
+
+var hash=location.hash.slice(1);if(BYKEY[hash])cur=hash;
+renderNav();renderSum();renderStep();refreshLists();
+
+connectDb().then(function(d){
+  db=d;
+  if(!db){
+    bannerEl.append(h('div',{class:'banner'},'파이어베이스에 연결하지 못했습니다. 인터넷 연결을 확인하고 다시 열어 주세요. 지금은 입력해도 저장되지 않습니다.'));
+    STEPS.forEach(function(s){data[s.key]=[];});refreshAll();return;
+  }
+  STEPS.forEach(function(s){
+    db.collection('erp_'+s.key).onSnapshot(function(snap){
+      data[s.key]=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});
+      refreshAll();
+    },function(){data[s.key]=data[s.key]||[];refreshAll();});
+  });
+});
+})();
+</script>
+</body>
+</html>
