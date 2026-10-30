@@ -2,13 +2,14 @@
 <!-- 납품내역 / 제품목록 — 재단 명세서 전부(4~9월, 날짜 시트 + 세부내역 시트)에서 모은 제품명별 품목 정보.
      사장님 10-28: 「재단의 모든 명세서를 확인하여 제품명,품목,사이즈,원장종류,원장색상,원장모델명,원장출고처,출고예정일 …
      제품명의 중복없는 목록만 보여주는 제품목록 페이지」. 발주와 상관없는 단순 제품 정보 — PO·수량·금액은 없다.
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v6.6.2
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v6.6.3
      v6.4.1(10-28): 제품명 묶음 머리를 걷고 품목 줄마다 제품명을 적은 한 표로 폈다. 머리 칸을 누르면 그 열로 오름 → 내림.
      v6.5.0(10-29): 제품명 옆 「벤더피아 단품」 칸 — 단품을 검색해 고르면 제품명이 같은 모든 줄에 같이 붙는다.
        단품 목록은 창고 `납품내역_단품목록`(벤더피아 단품관리 엑셀을 올려 채움), 고른 것은 `납품내역_단품연결`(문서 = 제품명).
      v6.6.0(10-29): 제품명을 누르면 그 제품이 든 가장 최근 발주서 한 장을 팝업으로.
      v6.6.1(10-29): 발주서를 에이엠티 발주에서 **납품내역 재단 줄**(창고 `납품내역`, 갈=재단, 읽기만)로 바꿨다 — 가장 최근 PO 의 재단 줄 전부.
      v6.6.2(10-30): 발주서 팝업에서 고른 제품 줄(tr.hit)을 바탕색 대신 **붉은 글씨**(--vg-red #FF3B30, 굵게)로.
+     v6.6.3(10-30): 판매상태가 「중지」인 벤더피아 단품에 붉은 테 「판매중지」 딱지 — 검색 판 목록과 표의 고른 단품 칸 둘 다.
 
      ⚠ 이 파일에는 업무 값이 없다. 목록은 창고 `납품내역_제품목록` 에 있고 이 쪽은 **읽기만** 한다.
         창고에 담는 것은 `tools/제품목록모으기.py`(부를 때만 돈다). 자세한 것은 납품내역/CLAUDE.md 「제품목록 v6.4.0」.
@@ -110,6 +111,9 @@ html,body{height:100%;overflow:hidden}
 .vpp .ls button.on{font-weight:700;color:var(--vg-ink);background:var(--vg-fill)}
 .vpp .ls button.del{color:var(--vg-red)}
 .vpp .ls .st{font-size:11px;color:var(--vg-muted);margin-left:6px}
+/* 판매상태 「중지」 단품 딱지 — 단품명(14px)보다 작게, 붉은 테 */
+.vpc .jj,.vpp .jj{display:inline-block;font-size:11px;font-weight:700;line-height:16px;color:var(--vg-red);
+  border:1px solid var(--vg-red);border-radius:4px;padding:0 4px;margin-left:6px;vertical-align:1px}
 .vpp .ft{display:flex;justify-content:flex-end;padding:6px 10px;border-top:1px solid var(--vg-edge)}
 .vpp .ft label{font-size:12px;font-weight:600;color:var(--vg-muted);padding:8px 6px;cursor:pointer}
 .vpp .ft input{display:none}
@@ -146,7 +150,7 @@ html,body{height:100%;overflow:hidden}
 <a class="back" href="납품내역.html">← 납품내역</a>
 <header>
   <div class="logo"><b>VIVIVIC</b> — 제품목록</div>
-  <div class="badge">v6.6.2</div>
+  <div class="badge">v6.6.3</div>
 </header>
 <h1>제품목록</h1>
 <div class="state" id="목상태"><div class="big">창고를 읽는 중입니다…</div></div>
@@ -190,6 +194,8 @@ window.목록읽기 = async function(){
     for(const p of 제품들) for(const q of (p.품목들||[])) 줄들.push({...q, 제품명:p.제품명||'', 차:줄들.length});
     정렬 = null;
     그리기();
+    단품받기 = 단품읽기().then(() => { for(const p in 연결) 같은칸바꾸기(p); });   /* 판매중지 딱지 — 못 읽어도 표는 그대로 */
+    단품받기.catch(() => { 단품받기 = null; });
   }catch(e){ 답했나=true; window.목록못읽음('창고를 읽지 못했습니다',(e&&(e.code||e.message))||''); }
 };
 
@@ -233,7 +239,10 @@ function 그리기(){
 const 단품자리 = ['artifacts','vivivic-4b7ef','public','data','납품내역_단품목록'];
 const 연결자리 = ['artifacts','vivivic-4b7ef','public','data','납품내역_단품연결'];
 let 연결 = {};              /* 제품명 → {단품코드, 단품명} */
-let 단품들 = null;          /* [{코드, 이름, 상태, 찾글}] — 판을 처음 열 때 받는다 */
+let 단품들 = null;          /* [{코드, 이름, 상태, 찾글}] — 표를 그린 뒤 한 번 받는다(고른 단품 칸의 판매중지 딱지) */
+let 단품상태 = new Map();   /* 단품코드 → 판매상태. 고른 연결에는 상태가 없어 여기서 찾는다 */
+let 단품받기 = null;        /* 받는 중인 약속 — 판도 같은 것을 기다린다 */
+const 중지딱지 = '<span class="jj">판매중지</span>';
 const 문이름 = 제품명 => 제품명.replace(/\//g,'／') || '_빈이름';   /* 문서 이름에 / 는 못 쓴다 */
 
 async function 연결읽기(){
@@ -248,15 +257,15 @@ async function 단품읽기(){
   const 문들 = [];
   눈.forEach(d => { if(/^단품_\d+$/.test(d.id)) 문들.push([Number(d.id.slice(3)), d.data().줄||[]]); });
   문들.sort((a,b)=>a[0]-b[0]);
-  단품들 = [];
+  단품들 = []; 단품상태 = new Map();
   for(const [,줄] of 문들) for(const s of 줄){
     const [코드='',이름='',상태=''] = String(s).split('\t');
-    if(코드) 단품들.push({코드, 이름, 상태, 찾글:(이름+' '+코드).toLowerCase().replace(/\s+/g,'')});
+    if(코드){ 단품들.push({코드, 이름, 상태, 찾글:(이름+' '+코드).toLowerCase().replace(/\s+/g,'')}); 단품상태.set(코드, 상태); }
   }
 }
 function 단품칸글(p){
   const x = 연결[p], d = 글(p);
-  return x ? `<td class="vpc"><button type="button" data-p="${d}">${글(x.단품명||x.단품코드)}<span class="cd">${글(x.단품코드)}</span></button></td>`
+  return x ? `<td class="vpc"><button type="button" data-p="${d}">${글(x.단품명||x.단품코드)}<span class="cd">${글(x.단품코드)}</span>${단품상태.get(x.단품코드)==='중지'?중지딱지:''}</button></td>`
            : `<td class="vpc"><button type="button" class="no" data-p="${d}">단품 검색</button></td>`;
 }
 /* 고르거나 지우면 같은 제품명의 칸만 바꿔 그린다(표를 다시 그리지 않아 민 자리가 그대로) */
@@ -298,7 +307,7 @@ function 판열기(p, 칸단추){
   });
   if(!단품들){
     목.innerHTML = '<div class="msg">단품 목록을 읽는 중…</div>';
-    단품읽기().then(쓰기, e => { 목.innerHTML = `<div class="msg bad">단품 목록을 읽지 못했습니다 ${글((e&&(e.code||e.message))||'')}</div>`; });
+    (단품받기||단품읽기()).then(쓰기, e => { 목.innerHTML = `<div class="msg bad">단품 목록을 읽지 못했습니다 ${글((e&&(e.code||e.message))||'')}</div>`; });
   } else 쓰기();
   if(넓) 칸글.focus();
 }
@@ -311,7 +320,7 @@ function 목그리기(p, 물음, 목){
   const 낱 = 물음.toLowerCase().split(/\s+/).filter(Boolean);
   const 맞 = [];
   for(const d of 단품들){ if(낱.every(w=>d.찾글.includes(w))){ 맞.push(d); if(맞.length>=100) break; } }
-  for(const d of 맞) t += `<button type="button" class="${x&&x.단품코드===d.코드?'on':''}" data-c="${글(d.코드)}" data-n="${글(d.이름)}">${글(d.이름)}<span class="cd">${글(d.코드)}</span>${d.상태&&d.상태!=='판매중'?`<span class="st">${글(d.상태)}</span>`:''}</button>`;
+  for(const d of 맞) t += `<button type="button" class="${x&&x.단품코드===d.코드?'on':''}" data-c="${글(d.코드)}" data-n="${글(d.이름)}">${글(d.이름)}<span class="cd">${글(d.코드)}</span>${d.상태==='중지'?중지딱지:d.상태&&d.상태!=='판매중'?`<span class="st">${글(d.상태)}</span>`:''}</button>`;
   if(!맞.length) t += '<div class="msg">맞는 단품 없음</div>';
   목.innerHTML = t;
 }
@@ -360,6 +369,7 @@ async function 올리기(파일, p, 목, 칸글){
     for(const d of 옛.docs){ const k=/^단품_(\d+)$/.exec(d.id); if(k && Number(k[1])>n) await deleteDoc(d.ref); }
     await setDoc(doc(window.db, ...단품자리, '_정보'), {올린때:new Date().toISOString(), 단품수:다.length, 문서수:n, 파일:파일.name});
     await 단품읽기();
+    for(const q in 연결) 같은칸바꾸기(q);
     목그리기(p, 칸글.value, 목);
   }catch(e){ 목.innerHTML = `<div class="msg bad">올리지 못했습니다 ${글((e&&(e.code||e.message))||'')}</div>`; }
 }
