@@ -458,6 +458,15 @@ function buildForm(step){
     reset:function(){
       headFields.forEach(function(x){x.reset();});
       if(step.rowFields){rows.slice().forEach(function(r){r.el.remove();});rows=[];addRow();}
+    },
+    /* 엑셀에서 읽은 값으로 칸을 채운다. head 는 머리 칸, rowVals 는 행 목록(값이 있는 키만 들어 있다). */
+    fill:function(head,rowVals){
+      headFields.forEach(function(x){if(x.f.k in head)x.set(head[x.f.k]);x.setError('');});
+      if(step.rowFields&&rowVals.length){
+        rows.slice().forEach(function(r){r.el.remove();});rows=[];
+        rowVals.forEach(function(o){var r=addRow();r.fields.forEach(function(x){if(x.f.k in o)x.set(o[x.f.k]);});});
+      }
+      Array.prototype.forEach.call(f.querySelectorAll('input'),function(i){i.dispatchEvent(new Event('input'));});
     }};
   return api;
 }
@@ -507,15 +516,105 @@ function renderStep(){
   form.el.addEventListener('submit',function(e){e.preventDefault();save(s);});
   var needs=s.needs.length?h('p',{class:'needs'},'먼저 필요한 단계',s.needs.map(function(k){return h('button',{type:'button',on:{click:function(){go(k);}}},BYKEY[k].n+'. '+BYKEY[k].title);})):null;
   listBox=h('div',{class:'list'});
+  var xlMsg=h('span',{class:'msg','aria-live':'polite'});
+  var say=function(t,bad){xlMsg.textContent=t;xlMsg.className='msg'+(bad?' bad':'');};
+  var fileIn=h('input',{type:'file',accept:'.xlsx,.xls,.csv',hidden:true,on:{change:function(){
+    var file=fileIn.files[0];fileIn.value='';if(file)uploadSheet(s,file,say);}}});
+  var xlBar=h('div',{class:'actions'},
+    h('button',{type:'button',class:'btn',on:{click:function(){downloadTemplate(s,say);}}},'양식 다운로드'),
+    h('button',{type:'button',class:'btn',on:{click:function(){fileIn.click();}}},'엑셀 업로드'),
+    fileIn,xlMsg);
   mainEl.replaceChildren(
     h('section',{class:'card'},
       h('div',{class:'stephead'},
         h('p',{class:'path'},'ERP 경로',s.path.map(function(p,i){return h('code',{},p);}),h('span',{},'화면: '+s.screen)),
         h('h2',{},s.n+'. '+s.title+' 입력'),
         needs,h('p',{class:'stepnote'},s.note)),
+      xlBar,
       form.el),
     listBox);
   renderList();
+}
+/* ---------- 엑셀 양식 받기 · 올리기 (SheetJS, 브라우저 안에서만. 누를 때 불러온다) ----------
+   양식 열 = 단계의 머리 칸 + 행 칸, 열 이름 = 화면 칸 이름. 행이 있는 단계는 엑셀 한 줄이 행 하나다. */
+var XLSX_URL='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js',xlsxP=null;
+function loadXlsx(){
+  if(window.XLSX)return Promise.resolve(window.XLSX);
+  if(!xlsxP)xlsxP=new Promise(function(ok,no){
+    var sc=h('script',{src:XLSX_URL});
+    sc.onload=function(){ok(window.XLSX);};sc.onerror=function(){xlsxP=null;sc.remove();no(new Error('xlsx'));};
+    document.head.append(sc);
+  });
+  return xlsxP;
+}
+var XLSX_FAIL='엑셀 도구를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.';
+function sheetCols(s){return s.fields.concat(s.rowFields||[]);}
+function downloadTemplate(s,say){
+  loadXlsx().then(function(X){
+    var cols=sheetCols(s);
+    var ws=X.utils.aoa_to_sheet([cols.map(function(f){return f.label;})]);
+    ws['!cols']=cols.map(function(f){return {wch:Math.max(12,f.label.length*2+4)};});
+    var wb=X.utils.book_new();X.utils.book_append_sheet(wb,ws,s.title);
+    X.writeFile(wb,'외주입력_'+s.n+'_'+s.title+'_양식.xlsx');
+    say('');
+  }).catch(function(){say(XLSX_FAIL,true);});
+}
+function normHead(t){return String(t==null?'':t).replace(/\s+/g,'').replace(/\*+$/,'');}
+function pad2(n){return (n<10?'0':'')+n;}
+/* 날짜 칸(시작일·종료일·적용시작일)은 엑셀이 날짜 숫자로 바꿔 두므로 yyyy-mm-dd 로 되돌린다 */
+function cellVal(X,f,v){
+  var isDate=f.type==='date'||/일$/.test(f.label);
+  if(isDate&&typeof v==='number'){var d=X.SSF.parse_date_code(v);if(d)return d.y+'-'+pad2(d.m)+'-'+pad2(d.d);}
+  var t=v==null?'':String(v).trim();
+  if(isDate){var m=t.match(/^(\d{4})[.\/-]\s*(\d{1,2})[.\/-]\s*(\d{1,2})\.?$/);if(m)t=m[1]+'-'+pad2(+m[2])+'-'+pad2(+m[3]);}
+  if(f.type==='check')return /^(o|v|y|yes|예|true|1|○|●|✓|✔)$/i.test(t);
+  if(f.type==='multi')return t.split(/\s*[,，\n]\s*/).filter(Boolean);
+  return t;
+}
+function readBook(X,file){
+  return file.arrayBuffer().then(function(buf){
+    if(/\.csv$/i.test(file.name)){
+      /* 구글 스프레드시트 CSV 는 UTF-8, 한글 엑셀이 저장한 CSV 는 EUC-KR 인 경우가 있다 */
+      var t=new TextDecoder('utf-8').decode(buf);
+      if(t.indexOf('�')>=0){try{t=new TextDecoder('euc-kr').decode(buf);}catch(e){}}
+      return X.read(t.replace(/^﻿/,''),{type:'string',raw:true});
+    }
+    return X.read(buf,{type:'array'});
+  });
+}
+function uploadSheet(s,file,say){
+  say('읽는 중입니다.');
+  loadXlsx().then(function(X){return readBook(X,file).then(function(wb){
+    var ws=wb.Sheets[s.title]||wb.Sheets[wb.SheetNames[0]];
+    var aoa=ws?X.utils.sheet_to_json(ws,{header:1,raw:true,defval:''}):[];
+    var cols=sheetCols(s),byLabel={};cols.forEach(function(f){byLabel[normHead(f.label)]=f;});
+    var hi=-1,map=[];
+    for(var i=0;i<Math.min(aoa.length,10)&&hi<0;i++){
+      var m=aoa[i].map(function(c){return byLabel[normHead(c)]||null;});
+      if(m.some(Boolean)){hi=i;map=m;}
+    }
+    if(hi<0){say('이 단계 양식의 열 이름을 찾지 못했습니다. 양식 다운로드로 받은 파일에 입력해 올려 주세요.',true);return;}
+    /* 머리 칸과 행 칸이 같은 키를 쓰는 단계가 있다(외주계약: 사업단위·단위 모두 unit) — 키가 아니라 칸으로 가른다 */
+    var rowFs=s.rowFields||[];
+    var head={},rowVals=[],lines=0;
+    aoa.slice(hi+1).forEach(function(line){
+      var o={},hasRow=false,any=false;
+      map.forEach(function(f,c){
+        if(!f)return;var raw=line[c];if(raw===''||raw==null)return;
+        var v=cellVal(X,f,raw);any=true;
+        if(rowFs.indexOf(f)>=0){o[f.k]=v;hasRow=true;}
+        else if(!(f.k in head)&&(!s.rowFields?lines===0:true))head[f.k]=v;
+      });
+      if(!any)return;
+      lines++;
+      if(hasRow)rowVals.push(o);
+    });
+    if(!lines){say('양식에 입력한 줄이 없습니다.',true);return;}
+    if(BYKEY[cur]!==s)return;
+    form.fill(head,rowVals);
+    if(s.rowFields)say('엑셀에서 '+rowVals.length+'행을 읽어 칸에 채웠습니다. 확인하고 저장을 누르세요.');
+    else say(lines>1?'파일의 '+lines+'줄 중 첫 줄을 칸에 채웠습니다. 확인하고 저장을 누르세요.':'엑셀 값을 칸에 채웠습니다. 확인하고 저장을 누르세요.');
+  });},function(){say(XLSX_FAIL,true);}).catch(function(){say('파일을 읽지 못했습니다. xlsx · xls · csv 파일인지 확인해 주세요.',true);});
 }
 function recBody(s,r){
   var dl=h('dl',{});
