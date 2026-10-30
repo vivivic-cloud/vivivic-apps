@@ -195,8 +195,11 @@ const 한벌돌리기 = (단품곁다리) => {
     const cfg = PAGES[url];
     const byCode = new Map();
     let heads = [];
+    /* 10-30 [새 지시 단품상세보기] 단품관리 화면에서 받는 이 목록(상품관리 전체 기간)을 다 받으면 납품내역 `납품내역_상품목록` 에 한 번 올린다 — 새 요청 없음 */
+    const 상품목록 = !곁다리 && page === PAGES[단품길] ? [] : null;
     await fetchList(cfg, url, status, { from: "2000-01-01" }, (h, rows) => {
       heads = h;
+      if (상품목록) 상품목록.push(...rows);
       const i = h.indexOf("단품코드");
       for (const row of rows) {
         if (cfg.nameCol === "단품명") { byCode.set(codeKey(row[i]), row); continue; }
@@ -208,6 +211,7 @@ const 한벌돌리기 = (단품곁다리) => {
     }, () => true, null, !!곁다리);     // 곁다리(배송관리·CS등록)는 뒤에서 받기 — 사장님이 다른 단추를 누르거나 조회하면 그것이 먼저 간다
     linked = { heads, byCode };
     if (panel.dataset.name) show(panel.dataset.name, ...panel._args);
+    if (상품목록) 상품목록올리기(heads, 상품목록);   // 기다리지 않는다 — 못 올려도 화면은 그대로
   }
 
   // 최근 3개월 배송수량이 많은 순서의 이름 목록 (undefined: 불러오는 중, null: 실패)
@@ -675,17 +679,23 @@ const 한벌돌리기 = (단품곁다리) => {
   async function 단품목록올리기(머리, 줄들) {
     if (단품목록올리는중) return;
     단품목록올리는중 = true;
+    try { await 창고목록올리기(단품목록짓기(머리, 줄들),
+      { 칸: 단품목록칸, 앞: "단품_", 수칸: "단품수", 파일: "벤더피아연동 단품관리(자동)", 딱: "단품목록", 없음: "단품코드·단품명 칸 없음" }); }
+    finally { 단품목록올리는중 = false; }
+  }
+  /* 창고 한 자리에 `{앞}N`(1,000줄씩) + `_정보` 로 올린다 — 단품목록·상품목록이 같이 쓴다(0.34.80 에 단품목록올리기에서 떼어 냄, 하는 일은 그대로).
+     새 = {수, 문서들} · 딱지 = `{딱}:올림/같음/안올림/못올림 …` */
+  async function 창고목록올리기(새, { 칸, 앞, 수칸, 파일, 딱, 없음 }) {
     try {
-      const 새 = 단품목록짓기(머리, 줄들);
-      if (!새 || !새.수) return window.VP말?.("단품목록:안올림 단품코드·단품명 칸 없음");
+      if (!새 || !새.수) return window.VP말?.(`${딱}:안올림 ${없음}`);
       /* 진짜 단품관리는 5,000개 남짓(10-29). 100개 아래면 반쪽 목록이거나 시험 흉내 쪽이다 — 창고에 안 쓴다
          (10-29 창고를 가로채지 않는 옛 시험이 가짜 단품 셋을 진짜 창고에 써 버렸다) */
-      if (새.수 < 100) return window.VP말?.(`단품목록:안올림 ${새.수}개 — 너무 적음`);
+      if (새.수 < 100) return window.VP말?.(`${딱}:안올림 ${새.수}개 — 너무 적음`);
       const tok = await 서류표();
       const 뿌리 = `projects/${서류.PROJ}/databases/(default)/documents`;
-      const 자리 = `${뿌리}/artifacts/${서류.PROJ}/public/data/${단품목록칸}`;
+      const 자리 = `${뿌리}/artifacts/${서류.PROJ}/public/data/${칸}`;
       const r = await 밖에서(`https://firestore.googleapis.com/v1/${뿌리}/artifacts/${서류.PROJ}/public/data/`
-        + `${encodeURIComponent(단품목록칸)}?pageSize=300`, { headers: { Authorization: "Bearer " + tok } });
+        + `${encodeURIComponent(칸)}?pageSize=300`, { headers: { Authorization: "Bearer " + tok } });
       if (!r.ok) throw new Error("읽기 " + r.status + (r.탈 ? "/" + r.탈 : ""));
       const 옛 = new Map();                              // 문서 이름 → 칸
       for (const d of (JSON.parse(r.글 || "{}").documents || [])) {
@@ -694,31 +704,72 @@ const 한벌돌리기 = (단품곁다리) => {
         옛.set(이름, 풀기({ mapValue: { fields: d.fields || {} } }) || {});
       }
       /* 벤더피아가 반쪽만 준 목록으로 창고를 비우지 않는다 — 전보다 절반 아래로 줄면 안 올린다 */
-      const 옛수 = Number((옛.get("_정보") || {}).단품수) || 0;
-      if (옛수 && 새.수 < 옛수 / 2) return window.VP말?.(`단품목록:안올림 ${새.수}개(전 ${옛수}) — 너무 줄었음`);
+      const 옛수 = Number((옛.get("_정보") || {})[수칸]) || 0;
+      if (옛수 && 새.수 < 옛수 / 2) return window.VP말?.(`${딱}:안올림 ${새.수}개(전 ${옛수}) — 너무 줄었음`);
       const 쓰기 = [];
       새.문서들.forEach((줄, i) => {
-        const 이름 = "단품_" + (i + 1), 전 = 옛.get(이름);
+        const 이름 = 앞 + (i + 1), 전 = 옛.get(이름);
         if (전 && JSON.stringify(전.줄 || []) === JSON.stringify(줄)) return;
         쓰기.push({ update: { name: `${자리}/${이름}`,
           fields: { 줄: { arrayValue: { values: 줄.map((s) => ({ stringValue: s })) } } } } });
       });
+      const 번호꼴 = new RegExp("^" + 앞 + "(\\d+)$");
       for (const 이름 of 옛.keys()) {
-        const k = /^단품_(\d+)$/.exec(이름);
+        const k = 번호꼴.exec(이름);
         if (k && Number(k[1]) > 새.문서들.length) 쓰기.push({ delete: `${자리}/${이름}` });
       }
-      if (!쓰기.length && 옛.has("_정보")) return window.VP말?.(`단품목록:같음 ${새.수}개 · 쓰기0`);
+      if (!쓰기.length && 옛.has("_정보")) return window.VP말?.(`${딱}:같음 ${새.수}개 · 쓰기0`);
       쓰기.push({ update: { name: `${자리}/_정보`, fields: {
-        올린때: { stringValue: new Date().toISOString() }, 단품수: { integerValue: String(새.수) },
-        문서수: { integerValue: String(새.문서들.length) }, 파일: { stringValue: "벤더피아연동 단품관리(자동)" } } } });
+        올린때: { stringValue: new Date().toISOString() }, [수칸]: { integerValue: String(새.수) },
+        문서수: { integerValue: String(새.문서들.length) }, 파일: { stringValue: 파일 } } } });
       const w = await fetch(`https://firestore.googleapis.com/v1/${뿌리}:commit`, { method: "POST", credentials: "omit",
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + tok },
         body: JSON.stringify({ writes: 쓰기 }) });
       if (!w.ok) throw new Error("쓰기 " + w.status);
-      window.VP말?.(`단품목록:올림 ${새.수}개 · 문서${쓰기.length - 1}+정보`);
+      window.VP말?.(`${딱}:올림 ${새.수}개 · 문서${쓰기.length - 1}+정보`);
     } catch (e) {
-      window.VP말?.("단품목록:못올림 " + (e && e.message ? e.message : e));
-    } finally { 단품목록올리는중 = false; }
+      window.VP말?.(`${딱}:못올림 ` + (e && e.message ? e.message : e));
+    }
+  }
+
+  /* ── 납품내역 제품목록에 상품 ↔ 구성 단품 올리기 (10-30, 0.34.80) ──────────────
+     사장님: 「제품목록 단품검색에서 검색시 목록에 나타나는 단품에 상세보기 버튼을 만들어 해당단품과 벤더피아연동에서 연관된  상품관리와 동일한 상품버튼들이 나타나게 해주세요.」
+       → 관리자가 둘로 나눔: 화면(`납품내역/제품목록.html`, 다른 작업자) · 자료(여기).
+     **새 요청 없음**: 단품관리 화면은 목록을 다 받은 뒤 원래부터 「연결 목록」(`loadLinked` — 상품관리, 판매상태 `link.status`,
+       2000-01-01~ 전체 기간)을 받는다. 단품 상세의 「관련 상품」 단추(`productChips`)가 쓰는 바로 그 목록이다. 다 받으면 그것을 한 번 올린다.
+     자리 `납품내역_상품목록` · 문서 `상품_N`(1,000개씩) 칸 `줄` = ["상품코드\t상품명\t판매상태\t단품코드,단품코드,…", …]
+       · `_정보` = {올린때, 상품수, 문서수, 파일:"벤더피아연동 상품관리(자동)"}.
+     ⚠ 네 칸만 — 금액·매입처·매출처·사람 칸은 안 담는다. 단품코드는 벤더피아 글 그대로(대소문자 안 바꿈), 「a+a+b」 는 「a,a,b」(수량 그대로).
+     ⚠ 매출처마다 한 줄인 같은 상품코드는 하나로(단품코드는 첫 줄 것, 판매상태는 중지 아닌 것이 있으면 그것). */
+  const 상품목록칸 = "납품내역_상품목록";
+  let 상품목록올리는중 = false;
+  function 상품목록짓기(머리, 줄들) {
+    const ci = 머리.indexOf("상품코드"), ni = 머리.indexOf("상품명"), si = 머리.indexOf("판매상태"), di = 머리.indexOf("단품코드");
+    if (ci < 0 || ni < 0 || di < 0) return null;
+    const 글 = (v) => String(v == null ? "" : v).trim();
+    const m = new Map();
+    for (const r of 줄들) {
+      const c = 글(r[ci]).replace(/\t/g, " ");
+      if (!c) continue;
+      const 상태 = si < 0 ? "" : 글(r[si]);
+      const 단품 = 글(r[di]).split("+").map((x) => x.trim().replace(/[\t,]/g, " ")).filter(Boolean).join(",");
+      const 전 = m.get(c);
+      if (!전) { m.set(c, [c, 글(r[ni]).replace(/\t/g, " "), 상태, 단품]); continue; }
+      if (전[2] === "중지" && 상태 && 상태 !== "중지") 전[2] = 상태;
+      if (!전[3] && 단품) 전[3] = 단품;
+    }
+    const 다 = [...m.values()].sort((a, b) => (a[2] === "중지") - (b[2] === "중지")
+      || a[1].localeCompare(b[1], "ko", { numeric: true }) || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+    const 문서들 = [];
+    for (let i = 0; i < 다.length; i += 단품목록묶음) 문서들.push(다.slice(i, i + 단품목록묶음).map((a) => a.join("\t")));
+    return { 수: 다.length, 문서들 };
+  }
+  async function 상품목록올리기(머리, 줄들) {
+    if (상품목록올리는중) return;
+    상품목록올리는중 = true;
+    try { await 창고목록올리기(상품목록짓기(머리, 줄들),
+      { 칸: 상품목록칸, 앞: "상품_", 수칸: "상품수", 파일: "벤더피아연동 상품관리(자동)", 딱: "상품목록", 없음: "상품코드·상품명·단품코드 칸 없음" }); }
+    finally { 상품목록올리는중 = false; }
   }
 
   /* 이 단품(들)의 차수 줄 — 없으면 빈 배열. 같은 차수가 둘 오면 수량을 더한다. */
