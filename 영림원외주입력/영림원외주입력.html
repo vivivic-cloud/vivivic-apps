@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v12 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v13 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -112,6 +112,10 @@ input.bad,select.bad{border-color:var(--red)}
 .msg.bad{color:var(--red)}
 .list h3{font-size:15px;font-weight:900;margin:28px 0 10px;display:flex;gap:8px;align-items:baseline;letter-spacing:-0.02em}
 .list h3 span{font-weight:700;font-size:11px;color:var(--muted)}
+.list h3{flex-wrap:wrap}   /* v13 대기·오류 지우기 — 단추는 기존 .btn.small 모양, 목록 제목 줄 오른쪽 */
+.delbar{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;letter-spacing:0}
+details.rec>summary .rt{flex:1}
+details.rec>summary input.pk{flex:none;margin:0}
 .empty{color:var(--muted);border:1px dashed var(--line2);border-radius:12px;padding:18px;font-size:13px;background:var(--fill4)}
 details.rec{background:#fff;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;overflow:hidden}
 details.rec[open]{border-color:var(--line2)}
@@ -172,7 +176,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v12</span>
+    <span class="ver">v13</span>
   </div>
 </header>
 <div class="wrap">
@@ -209,7 +213,9 @@ function connectDb(){
       return {collection:function(name){return {
         onSnapshot:function(next,err){return F.onSnapshot(F.collection(fs,name),function(s){next({docs:s.docs.map(function(d){return {id:d.id,data:function(){return d.data();}};})});},err);},
         add:function(data){return F.addDoc(F.collection(fs,name),data);},
-        doc:function(id){return {delete:function(){return F.deleteDoc(F.doc(fs,name,id));},update:function(o){return F.updateDoc(F.doc(fs,name,id),o);}};}
+        doc:function(id){return {delete:function(){return F.deleteDoc(F.doc(fs,name,id));},update:function(o){return F.updateDoc(F.doc(fs,name,id),o);},
+          /* v13: 지우기 직전 문서를 다시 읽어 ok(문서)일 때만 지운다(트랜잭션) — 그 사이 입력 작업자가 진행중으로 바꾼 건은 남는다. true = 지움 */
+          deleteIf:function(ok){var ref=F.doc(fs,name,id);return F.runTransaction(fs,function(t){return t.get(ref).then(function(d){if(!d.exists()||!ok(d.data()))return false;t.delete(ref);return true;});});}};}
       };}};
     });
   }).catch(function(e){console.warn('파이어베이스 연결 실패',e);return null;});
@@ -1122,10 +1128,37 @@ function recBody(s,r){
   }
   return parts;
 }
+/* v13 대기·오류 건 고르기·지우기. 진행중·완료는 영림원에 들어갔거나 들어가는 중이라 대상이 아니다. */
+var picked={};   /* 문서 id → 1. renderList 가 지금 단계의 대기·오류 건만 남긴다 */
+function canDel(r){return r.status==='대기'||r.status==='오류';}
+function delMany(s,rows){
+  if(!db){flash('저장소에 연결되지 않아 지울 수 없습니다.',true);return;}
+  if(!rows.length)return;
+  if(!confirm(s.title+' '+rows.length+'건을 지웁니다. 되돌릴 수 없습니다.'))return;
+  Array.prototype.forEach.call(listBox.querySelectorAll('.delbar .btn'),function(b){b.disabled=true;});
+  Promise.all(rows.map(function(r){
+    return db.collection('erp_'+s.key).doc(r.id).deleteIf(canDel).catch(function(e){console.warn('삭제 실패',e);return null;});
+  })).then(function(res){
+    var done=res.filter(function(x){return x===true;}).length,kept=res.filter(function(x){return x===false;}).length,fail=res.filter(function(x){return x==null;}).length;
+    picked={};
+    if(data[s.key])data[s.key]=data[s.key].filter(function(r){return !rows.some(function(x,i){return x.id===r.id&&res[i]===true;});});
+    renderList();renderNav();renderSum();
+    flash(done+'건을 지웠습니다.'+(kept?' '+kept+'건은 그 사이 진행중·완료로 바뀌어 남겼습니다.':'')+(fail?' '+fail+'건은 지우지 못했습니다. 잠시 뒤 다시 시도해 주세요.':''),!!fail);
+  });
+}
 function renderList(){
   if(!listBox)return;
   var s=BYKEY[cur];var a=data[cur];
   var head=h('h3',{},'저장한 항목',h('span',{},a?a.length+'건':''));
+  var dels=(a||[]).filter(canDel),keep={};
+  dels.forEach(function(r){if(picked[r.id])keep[r.id]=1;});picked=keep;
+  var pickedRows=function(){return dels.filter(function(r){return picked[r.id];});};
+  if(dels.length){
+    var selBtn=h('button',{type:'button',class:'btn small',on:{click:function(){delMany(s,pickedRows());}}});
+    var drawSel=function(){var n=pickedRows().length;selBtn.hidden=!n;selBtn.textContent='선택 삭제 '+n+'건';};
+    drawSel();
+    head.append(h('div',{class:'delbar'},selBtn,h('button',{type:'button',class:'btn small',on:{click:function(){delMany(s,dels);}}},'대기·오류 모두 삭제')));
+  }
   if(a==null){listBox.replaceChildren(head,h('div',{class:'empty'},'불러오는 중입니다.'));return;}
   if(!a.length){listBox.replaceChildren(head,h('div',{class:'empty'},'아직 저장한 '+s.title+' 항목이 없습니다. 위 폼에 입력하고 저장하면 여기에 쌓입니다.'));return;}
   var sorted=a.slice().sort(function(x,y){return (y.createdAt||'')<(x.createdAt||'')?-1:1;});
@@ -1136,8 +1169,10 @@ function renderList(){
     var actions=h('div',{class:'recact'});
     if(st==='오류')actions.append(h('button',{type:'button',class:'btn small',on:{click:function(){patch(s,r,{status:'대기',agentNote:''});}}},'대기로 되돌리기'));
     if(st==='대기'||st==='오류')actions.append(delBtn(s,r));
+    var pk=canDel(r)?h('input',{type:'checkbox',class:'pk','aria-label':'선택',on:{click:function(e){e.stopPropagation();},change:function(){if(pk.checked)picked[r.id]=1;else delete picked[r.id];drawSel();}}}):null;
+    if(pk)pk.checked=!!picked[r.id];
     var d=h('details',{class:'rec','data-id':r.id},
-      h('summary',{},h('div',{class:'rt'},h('b',{},s.recTitle(r)||'(이름 없음)'),h('small',{},s.subt(r))),h('span',{class:'chip '+st},st)),
+      h('summary',{},pk,h('div',{class:'rt'},h('b',{},s.recTitle(r)||'(이름 없음)'),h('small',{},s.subt(r))),h('span',{class:'chip '+st},st)),
       h('div',{class:'recbody'},
         r.agentNote?h('div',{class:'agentnote'+(st==='완료'?' ok':'')},'에이전트 메모: '+r.agentNote):null,
         recBody(s,r),actions));
