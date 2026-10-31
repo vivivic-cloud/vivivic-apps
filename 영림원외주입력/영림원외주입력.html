@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v5 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v6 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -157,7 +157,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v5</span>
+    <span class="ver">v6</span>
   </div>
 </header>
 <div class="wrap">
@@ -393,6 +393,8 @@ function show(v){
 
 /* ---------- field widgets ---------- */
 var uid=0;
+/* 앞 단계 자료에서 만든 고르기 목록(dl-vendors·dl-wc·dl-proc·dl-codes)과, 그 목록을 쓰는 화면 칸들 */
+var LISTS={},LIVE=[],DIRECT='\u0000직접';
 function makeField(f,scope){
   var id='f'+(++uid);
   var wrap=h('div',{class:'f'+(f.wide?' wide':'')});
@@ -411,15 +413,34 @@ function makeField(f,scope){
     ctl=h('select',{id:id},f.opts.map(function(o){return h('option',{value:o},o);}));
     wrap.append(lab(),ctl);
     getter=function(){return ctl.value;};setter=function(v){ctl.value=v;};focusEl=ctl;
+  }else if(f.type==='combo'||f.dl){
+    /* 목록에서 고르는 칸(v6): 드롭다운으로 고르고, 목록에 없는 값은 「직접 입력」을 골라 아래 칸에 적는다.
+       목록 = 칸의 opts 또는 앞 단계 자료에서 만든 LISTS[f.dl](refreshLists 가 바뀔 때마다 다시 채운다). */
+    ctl=h('select',{id:id});
+    var other=h('input',{type:'text',autocomplete:'off',hidden:true,'aria-label':f.label+' 직접 입력',placeholder:f.ph||'직접 입력',style:'margin-top:6px'});
+    if(f.mono){ctl.style.fontFamily='var(--mono)';other.style.fontFamily='var(--mono)';}
+    var list=function(){return f.dl?(LISTS[f.dl]||[]):f.opts;};
+    var fillOpts=function(keep){
+      ctl.replaceChildren.apply(ctl,[h('option',{value:''},'선택')].concat(list().map(function(o){return h('option',{value:o},o);}),[h('option',{value:DIRECT},'직접 입력')]));
+      setter(keep);
+    };
+    getter=function(){return ctl.value===DIRECT?other.value.trim():ctl.value;};
+    setter=function(v){
+      v=v==null?'':String(v).trim();
+      var known=v===''||list().indexOf(v)>=0;
+      ctl.value=known?v:DIRECT;other.hidden=known;other.value=known?'':v;
+    };
+    ctl.addEventListener('change',function(){other.hidden=ctl.value!==DIRECT;if(!other.hidden)other.focus();});
+    wrap.append(lab(),ctl,other);
+    fillOpts('');
+    if(f.dl)LIVE.push({el:wrap,redo:function(){fillOpts(getter());}});
+    focusEl=ctl;
   }else{
-    var attrs={id:id,type:f.type==='combo'?'text':f.type,autocomplete:'off'};
+    var attrs={id:id,type:f.type,autocomplete:'off'};
     if(f.ph)attrs.placeholder=f.ph;if(f.step)attrs.step=f.step;
-    var listId=f.dl||(f.type==='combo'&&f.opts?'dlo-'+id:null);
-    if(listId)attrs.list=listId;
     ctl=h('input',attrs);
     if(f.mono)ctl.style.fontFamily='var(--mono)';
     wrap.append(lab(),ctl);
-    if(f.type==='combo'&&f.opts&&!f.dl){wrap.append(h('datalist',{id:listId},f.opts.map(function(o){return h('option',{value:o});})));}
     getter=function(){return ctl.value.trim();};setter=function(v){ctl.value=v==null?'':v;};focusEl=ctl;
   }
   var errEl=h('div',{class:'err',hidden:true,role:'alert'});
@@ -427,7 +448,7 @@ function makeField(f,scope){
   if(f.hint)wrap.append(h('div',{class:'hint'},f.hint));
   wrap.append(warnEl,errEl);
   if(f.xref&&ctl){
-    ctl.addEventListener('input',function(){
+    wrap.addEventListener('input',function(){
       var v=getter();var codes=(data.items||[]).map(function(r){return r.code;});
       var miss=v&&codes.indexOf(v)<0;
       warnEl.hidden=!miss;
@@ -506,7 +527,7 @@ function buildForm(step){
         rows.slice().forEach(function(r){r.el.remove();});rows=[];
         rowVals.forEach(function(o){var r=addRow();r.fields.forEach(function(x){if(x.f.k in o)x.set(o[x.f.k]);});});
       }
-      Array.prototype.forEach.call(f.querySelectorAll('input'),function(i){i.dispatchEvent(new Event('input'));});
+      Array.prototype.forEach.call(f.querySelectorAll('input,select'),function(i){i.dispatchEvent(new Event('input',{bubbles:true}));});
     }};
   return api;
 }
@@ -537,10 +558,7 @@ function renderSum(){
     h('span',{class:'pill'+(t['오류']?' err':'')},'오류 '+t['오류']));
 }
 function datalist(id,vals){
-  var el=document.getElementById(id);
-  if(!el){el=h('datalist',{id:id});document.body.append(el);}
-  var seen={};var u=vals.filter(function(v){if(!v||seen[v])return false;seen[v]=1;return true;});
-  el.replaceChildren.apply(el,u.map(function(v){return h('option',{value:v});}));
+  var seen={};LISTS[id]=vals.filter(function(v){if(!v||seen[v])return false;seen[v]=1;return true;});
 }
 function refreshLists(){
   var vend=(data.vendors||[]).map(function(r){return r.name;});
@@ -549,6 +567,8 @@ function refreshLists(){
   datalist('dl-wc',KNOWN_WC.concat(wc));
   datalist('dl-proc',KNOWN_PROC.concat((data.processes||[]).map(function(r){return r.name;})));
   datalist('dl-codes',(data.items||[]).map(function(r){return r.code;}));
+  LIVE=LIVE.filter(function(x){return x.el.isConnected;});
+  LIVE.forEach(function(x){x.redo();});
 }
 function renderStep(){
   var s=BYKEY[cur];
@@ -603,9 +623,57 @@ function downloadTemplate(s,say){
     var ws=X.utils.aoa_to_sheet([labs]);
     ws['!cols']=labs.map(function(t){return {wch:Math.max(12,t.length*2+4)};});
     var wb=X.utils.book_new();X.utils.book_append_sheet(wb,ws,s.title);
-    X.writeFile(wb,'외주입력_'+s.n+'_'+s.title+'_양식.xlsx');
+    /* 목록에서 고르는 칸(v6)은 엑셀에서도 드롭다운(데이터 유효성 검사)으로 고른다.
+       목록 값은 숨긴 시트 「목록」에 열마다 적고, 양식 칸이 그 범위를 가리킨다(값에 쉼표가 있어도 된다). */
+    var dv=[],lists=[];
+    cols.forEach(function(f,c){
+      var l=pickList(f);if(!l||!l.length)return;
+      lists.push(l);
+      dv.push({col:X.utils.encode_col(c),src:X.utils.encode_col(lists.length-1),n:l.length,strict:f.type==='select',f:f});
+    });
+    if(dv.length){
+      var rows=[];lists.forEach(function(l,c){l.forEach(function(v,r){(rows[r]=rows[r]||[])[c]=v;});});
+      X.utils.book_append_sheet(wb,X.utils.aoa_to_sheet(rows),'목록');
+      wb.Workbook={Sheets:[{Hidden:0},{Hidden:1}]};
+    }
+    var bytes=X.write(wb,{bookType:'xlsx',type:'array'});
+    if(dv.length)bytes=addValidation(X,bytes,dv);
+    saveFile(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'외주입력_'+s.n+'_'+s.title+'_양식.xlsx');
     say('');
   }).catch(function(){say(XLSX_FAIL,true);});
+}
+/* 칸의 고르기 목록: 정해진 목록(opts) · 앞 단계 자료 목록(LISTS) · 체크 칸은 O/X(올릴 때 O 면 체크) */
+function pickList(f){
+  if(f.type==='check')return ['O','X'];
+  if(f.dl)return LISTS[f.dl]||[];
+  return f.opts||null;
+}
+var VMAX=1000;  /* 드롭다운을 거는 줄 수(2~1000행) */
+function xmlEsc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+/* SheetJS 무료판은 데이터 유효성 검사를 쓰지 못한다 → 만든 xlsx(zip)의 첫 시트 XML 에 dataValidations 를 직접 넣는다(SheetJS 안의 CFB 로 zip 을 열고 닫는다). */
+function addValidation(X,bytes,dv){
+  var zip=X.CFB.read(new Uint8Array(bytes),{type:'array'});
+  var ent=X.CFB.find(zip,'/xl/worksheets/sheet1.xml');
+  var xml=new TextDecoder('utf-8').decode(ent.content);
+  var body=dv.map(function(d){
+    var multi=d.f.type==='multi';
+    return '<dataValidation type="list" allowBlank="1" showInputMessage="1" showErrorMessage="'+(d.strict?1:0)+'"'+
+      (d.strict?' errorTitle="'+xmlEsc(d.f.label)+'" error="목록에서 고르세요."':'')+
+      (multi?' promptTitle="'+xmlEsc(d.f.label)+'" prompt="여럿이면 쉼표로 이어 적습니다. 예: 국내매입거래처, 외주가공거래처"':'')+
+      ' sqref="'+d.col+'2:'+d.col+VMAX+'"><formula1>\'목록\'!$'+d.src+'$1:$'+d.src+'$'+d.n+'</formula1></dataValidation>';
+  }).join('');
+  var tag='<dataValidations count="'+dv.length+'">'+body+'</dataValidations>';
+  /* 시트 XML 은 순서가 정해져 있다(sheetData … dataValidations → hyperlinks … ignoredErrors …). 뒤에 와야 할 첫 태그 앞에 넣는다.
+     SheetJS 가 ignoredErrors 를 쓰므로 맨 뒤에 붙이면 엑셀이 「손상된 파일」로 본다. */
+  var after=/<(hyperlinks|printOptions|pageMargins|pageSetup|headerFooter|rowBreaks|colBreaks|customProperties|cellWatches|ignoredErrors|smartTags|drawing|legacyDrawing|legacyDrawingHF|picture|oleObjects|controls|webPublishItems|tableParts|extLst)[\s>\/]/.exec(xml);
+  xml=after?xml.slice(0,after.index)+tag+xml.slice(after.index):xml.replace('</worksheet>',tag+'</worksheet>');
+  ent.content=new TextEncoder().encode(xml);ent.size=ent.content.length;
+  return X.CFB.write(zip,{type:'array',fileType:'zip'});
+}
+function saveFile(blob,name){
+  var url=URL.createObjectURL(blob),a=h('a',{href:url,download:name,hidden:true});
+  document.body.append(a);a.click();a.remove();
+  setTimeout(function(){URL.revokeObjectURL(url);},4000);
 }
 function normHead(t){return String(t==null?'':t).replace(/\s+/g,'').replace(/^\*+|\*+$/g,'');}
 function pad2(n){return (n<10?'0':'')+n;}
