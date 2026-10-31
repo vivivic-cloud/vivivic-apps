@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v7 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v8 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -75,8 +75,8 @@ label,.lab{font-size:11px;font-weight:700;color:var(--muted)}
 .checks label,.f>label:has(input[type=checkbox]){color:var(--ink);font-size:13px;font-weight:500}
 .req{color:var(--red);margin-left:2px}
 /* 입력칸 — 로그인 입력칸(border #ededeb, rounded-lg, 초점 #37352f) */
-input[type=text],input[type=date],input[type=number],select,textarea{font:inherit;font-size:13px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:8px;padding:9px 12px;width:100%;min-width:0;min-height:40px}
-input[type=text]:focus,input[type=date]:focus,input[type=number]:focus,select:focus,textarea:focus{outline:none;border-color:var(--ink)}
+input[type=text],input[type=url],input[type=date],input[type=number],select,textarea{font:inherit;font-size:13px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:8px;padding:9px 12px;width:100%;min-width:0;min-height:40px}
+input[type=text]:focus,input[type=url]:focus,input[type=date]:focus,input[type=number]:focus,select:focus,textarea:focus{outline:none;border-color:var(--ink)}
 input[type=checkbox]{accent-color:var(--ink);width:16px;height:16px}
 input.bad,select.bad{border-color:var(--red)}
 .hint{font-size:11px;color:var(--muted)}
@@ -99,6 +99,8 @@ input.bad,select.bad{border-color:var(--red)}
 .btn:disabled{opacity:.5;cursor:default;transform:none}
 .actions{display:flex;gap:8px;align-items:center;margin-top:20px;flex-wrap:wrap}
 .card>.actions{margin-top:16px}
+.gsrow{display:flex;gap:8px;align-items:center;flex-basis:100%}   /* 구글시트 링크 붙여넣는 줄 (v8) */
+.gsrow[hidden]{display:none}
 .msg{font-size:12px;font-weight:700;color:var(--muted)}
 .msg.bad{color:var(--red)}
 .list h3{font-size:15px;font-weight:900;margin:28px 0 10px;display:flex;gap:8px;align-items:baseline;letter-spacing:-0.02em}
@@ -152,8 +154,9 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 @media (max-width:480px){
   .btn{min-height:44px}
   .btn.small{min-height:36px}
-  .card>.actions .btn{flex:1 1 0}
-  .card>.actions .btn.cert{flex-basis:100%}   /* 거래처 단계 셋째 단추(사업자등록증)는 아랫줄 한 줄 */
+  .card>.actions .btn{flex:1 1 calc(50% - 4px)}   /* 단추 넷(엑셀 둘·구글시트 둘)은 두 줄로 반씩 (v8) */
+  .card>.actions .btn.cert{flex-basis:100%}   /* 거래처 단계 다섯째 단추(사업자등록증)는 아랫줄 한 줄 */
+  .gsrow .btn{flex:none!important}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -162,7 +165,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v7</span>
+    <span class="ver">v8</span>
   </div>
 </header>
 <div class="wrap">
@@ -383,6 +386,8 @@ function h(tag,props){
 var ICONS={download:['M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4','m7 10 5 5 5-5','M12 15V3'],
   fileup:['M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z','M14 2v6h6','M12 18v-6','m9 15 3-3 3 3'],
   plus:['M5 12h14','M12 5v14'],
+  sheet:['M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z','M3 9h18','M3 15h18','M9 3v18','M15 3v18'],
+  link:['M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71','M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71'],
   scan:['M3 7V5a2 2 0 0 1 2-2h2','M17 3h2a2 2 0 0 1 2 2v2','M21 17v2a2 2 0 0 1-2 2h-2','M7 21H5a2 2 0 0 1-2-2v-2','M7 8h8','M7 12h10','M7 16h6']};
 function ico(n){
   var NS='http://www.w3.org/2000/svg',v=document.createElementNS(NS,'svg');
@@ -591,12 +596,19 @@ function renderStep(){
     h('button',{type:'button',class:'btn',on:{click:function(){downloadTemplate(s,say);}}},ico('download'),'양식 다운로드'),
     h('button',{type:'button',class:'btn',on:{click:function(){fileIn.click();}}},ico('fileup'),'엑셀 업로드'),
     fileIn);
+  /* 구글 스프레드시트 (v8) — 받기는 드라이브의 단계별 양식을 「사본 만들기」로 열고, 올리기는 붙여 넣은 시트 링크를 CSV 로 읽는다 */
+  var gsIn=h('input',{type:'url',placeholder:'구글시트 링크를 붙여 넣으세요',autocomplete:'off',on:{keydown:function(e){if(e.key==='Enter'){e.preventDefault();gsGo();}}}});
+  var gsGo=function(){var u=gsIn.value.trim();if(u)uploadGsheet(s,u,say);else gsIn.focus();};
+  var gsRow=h('div',{class:'gsrow',hidden:true},gsIn,h('button',{type:'button',class:'btn',on:{click:gsGo}},'읽기'));
+  xlBar.append(
+    h('button',{type:'button',class:'btn',on:{click:function(){openGsTemplate(s,say);}}},ico('sheet'),'구글시트 양식'),
+    h('button',{type:'button',class:'btn',on:{click:function(){gsRow.hidden=!gsRow.hidden;if(!gsRow.hidden)gsIn.focus();}}},ico('link'),'구글시트 업로드'));
   if(s.key==='vendors'){
     var certIn=h('input',{type:'file',accept:'application/pdf,.pdf,image/*,.heic,.heif',hidden:true,on:{change:function(){
       var file=certIn.files[0];certIn.value='';if(file)uploadCert(s,file,say);}}});
     xlBar.append(h('button',{type:'button',class:'btn cert',on:{click:function(){certIn.click();}}},ico('scan'),'사업자등록증 업로드'),certIn);
   }
-  xlBar.append(xlMsg);
+  xlBar.append(gsRow,xlMsg);
   mainEl.replaceChildren(
     h('section',{class:'card'},
       h('div',{class:'stephead'},
@@ -852,6 +864,38 @@ function showBulk(s,recs,say){
   bulkDraw();
   var ready=b.items.filter(function(it){return bulkState(b,it).ok;}).length;
   say('엑셀에서 '+b.items.length+'건을 읽었습니다. 업로드 준비중 '+ready+'건'+(ready<b.items.length?', 확인할 것 '+(b.items.length-ready)+'건':'')+' — 아래 일괄 업로드 목록에서 버튼을 눌러 확인하세요.',ready<b.items.length);
+}
+/* ---------- 구글 스프레드시트 양식 받기 · 올리기 (v8, 키·로그인 없이) ----------
+   받기: 사장님 드라이브 「영림원외주입력 양식」 폴더의 단계별 양식(엑셀 양식을 구글시트로 바꾼 것 — 열·별표·드롭다운 같음)을 /copy 로 연다.
+   올리기: 붙여 넣은 시트 링크의 /export?format=csv 를 읽어(공유 「링크가 있는 모든 사용자」 필요) 엑셀 올리기와 같은 takeSheet 로 받는다. 탭은 링크의 gid, 없으면 첫 탭. */
+var GS_TEMPLATES={vendors:'1QDVq0L43FHaSc7-jaiDeyVNrhCUG7A9Xat-pSHfX1U8',workcenters:'1K1SrPDlGI67HGJeV0Xv0M-8YvtAGiUiEKc4BOT45Tqs',
+  items:'1BbEIlt7TfqWbFjT8cGu87vAGNU24KgArb16tYRURjqc',processes:'1R8wqicbuK5GiqFwDTKNBdI9XKty8t8CTQBJSN8jIZJE',
+  boms:'1EWi3ZDA03IDvIIy8Ke6VPaFA25bOpWQEJxRu5h9cBpg',contracts:'1B0kcKkmaCqofysIhit380gR0x3-STTcwmAIz2BOhR3A'};
+var GS_SHARE='시트를 읽지 못했습니다. 구글시트 오른쪽 위 「공유」 → 일반 액세스를 「링크가 있는 모든 사용자」로 바꾼 뒤 링크를 다시 붙여 넣어 주세요.';
+function openGsTemplate(s,say){
+  var id=GS_TEMPLATES[s.key];
+  if(!id){say('이 단계의 구글시트 양식이 아직 없습니다. 양식 다운로드(엑셀)를 써 주세요.',true);return;}
+  window.open('https://docs.google.com/spreadsheets/d/'+id+'/copy','_blank','noopener');
+  say('구글시트에서 「사본 만들기」를 누르고, 입력한 뒤 그 시트 링크를 「구글시트 업로드」에 붙여 넣으세요.');
+}
+function gsCsvUrl(u){
+  var m=String(u).match(/\/spreadsheets\/d\/([\w-]{20,})/);if(!m)return null;
+  var g=String(u).match(/[#?&]gid=(\d+)/);
+  return 'https://docs.google.com/spreadsheets/d/'+m[1]+'/export?format=csv'+(g?'&gid='+g[1]:'');
+}
+function uploadGsheet(s,u,say){
+  var url=gsCsvUrl(u);
+  if(!url){say('구글시트 링크가 아닙니다. 주소창의 docs.google.com/spreadsheets/d/… 링크를 붙여 넣어 주세요.',true);return;}
+  say('구글시트를 읽는 중입니다.');
+  loadXlsx().then(function(X){
+    return fetch(url,{credentials:'omit'}).then(function(r){return r.ok?r.text():Promise.reject(new Error('http'));},function(){return Promise.reject(new Error('share'));})
+      .then(function(t){
+        /* 공유가 안 된 시트는 CSV 대신 구글 로그인 화면(HTML)이 온다 */
+        if(/^\s*</.test(t))return Promise.reject(new Error('share'));
+        var wb=X.read(t.replace(/^\uFEFF/,''),{type:'string',raw:true}),ws=wb.Sheets[wb.SheetNames[0]];
+        takeSheet(X,s,ws?X.utils.sheet_to_json(ws,{header:1,raw:true,defval:''}):[],say);
+      });
+  },function(){return Promise.reject(new Error('xlsx'));}).catch(function(e){say(e&&e.message==='xlsx'?XLSX_FAIL:GS_SHARE,true);});
 }
 /* ---------- 사업자등록증 읽기 (1단계 거래처만. 브라우저 안에서만 읽고, 파일은 밖으로 안 나간다) ----------
    PDF 에 글자층이 있으면 pdf.js 로 글자를 그대로 꺼내고(정확), 사진·스캔 PDF 는 tesseract.js 한국어로 글자를 읽는다.
