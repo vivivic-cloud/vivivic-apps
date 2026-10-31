@@ -56,6 +56,12 @@ const 주문쪽 = '<html><body id="body"><form id="f" method="post" action="/Sys
       }
       return r.fulfill({ status: 200, contentType: 'text/javascript', body: '' });
     });
+    /* 11-01 문의 큰 팝업이 CS등록 단품 단추용으로 goods.js 를 뒷길(깃허브 주소)로 부른다 — 이 폴더 것으로 돌린다 */
+    await ctx.route('**://vivivic-cloud.github.io/**', (r) => {
+      const 이름 = decodeURIComponent(new URL(r.request().url()).pathname).split('/').pop();
+      if (!/\.(js|css)$/.test(이름) || !fs.existsSync(path.join(확장, 이름))) return r.fulfill({ status: 404, body: '' });
+      return r.fulfill({ status: 200, contentType: 이름.endsWith('.css') ? 'text/css' : 'text/javascript', body: fs.readFileSync(path.join(확장, 이름), 'utf8') });
+    });
     const 열기 = async (해시) => {
       const pg = await ctx.newPage();
       const 탈 = []; pg.on('pageerror', (e) => 탈.push(String(e && e.message).slice(0, 140)));
@@ -63,6 +69,7 @@ const 주문쪽 = '<html><body id="body"><form id="f" method="post" action="/Sys
       await pg.addScriptTag({ content: 'window.chrome=window.chrome||{};chrome.runtime={getManifest:()=>({version:"잰것"}),getURL:f=>"/"+f};' });
       await pg.addStyleTag({ content: ['login.css', 'search.css'].map((f) => fs.readFileSync(path.join(확장, f), 'utf8')).join('\n') });
       await pg.addScriptTag({ content: 'window.VP저장={get:async()=>({}),set:async()=>{},remove:async()=>{}};' });
+      await pg.addScriptTag({ content: fs.readFileSync(path.join(확장, 'vp-data.js'), 'utf8') });   // 진짜 쪽처럼 search.js 앞에(공용 팝업 부품 VP팝업)
       await pg.addScriptTag({ content: fs.readFileSync(path.join(확장, 'search.js'), 'utf8') });
       await pg.waitForTimeout(1500);
       return { pg, 탈 };

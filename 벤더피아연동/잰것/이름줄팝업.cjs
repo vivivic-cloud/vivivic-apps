@@ -142,6 +142,11 @@ const 자리 = (고르개) => { const e = document.querySelector(고르개); if 
     console.log('  ★ ㄴ 단품명 단추 누름 → 상세 ' + JSON.stringify(판.상세) + ' · 상담 ' + 판.상담 + ' ' + 못(판.상세.length === 1 && 판.상세[0] === '비스켓 800 몸통' && !판.상담 && 판.검은 === 1));
     const 단품상세줄 = await page.evaluate(() => [...document.querySelectorAll('.vp-goods-panel:not([hidden]) dl')].length);
     console.log('    단품 상세 줄 ' + 단품상세줄 + '개(단품관리 상세와 같은 `detailFields`) ' + 못(단품상세줄 >= 1));
+    /* 11-01 [새 지시 문의큰팝업] 상세 창도 공용 팝업 부품(VP팝업) — 머리 끌기 + 손잡이 다섯(크기) + 몸 스크롤 */
+    const 상세팝업 = await page.evaluate(() => { const p = document.querySelector('.vp-goods-panel:not([hidden])');
+      return p && p.classList.contains('vp-팝업') && p.querySelectorAll(':scope > .vp-팝업손').length === 5 && p.querySelector('.vp-goods-panel-head').classList.contains('vp-끌개')
+        && getComputedStyle(p.querySelector('.vp-goods-panel-body')).overflowY === 'auto'; });
+    console.log('  ★ 상세 창 = 공용 팝업(끌개·손잡이 5·몸 스크롤) ' + 못(상세팝업));
     await page.screenshot({ path: path.join(그림칸, '이름줄-단품상세-' + 폭 + '.png') });
     /* 상품 이름 단추 → 상품 상세, 단품 상세는 닫힘(겹쳐 안 뜸), 검은 단추 하나 */
     await page.keyboard.press('Escape'); await page.waitForTimeout(200);
@@ -172,6 +177,7 @@ const 자리 = (고르개) => { const e = document.querySelector(고르개); if 
     const 뒤 = await page.evaluate(자리, '.vp-상담판');
     const 움직인 = 폭 > 500 ? (Math.abs(뒤.x - 앞.x - 60) <= 2 && Math.abs(뒤.y - 앞.y - 70) <= 2) : (Math.abs(뒤.y - 앞.y - 70) <= 2 || 뒤.y > 앞.y);
     console.log('  ★ ㄹ 머리를 잡고 끌었다 (+60,+70) → 자리 (' + Math.round(앞.x) + ',' + Math.round(앞.y) + ') → (' + Math.round(뒤.x) + ',' + Math.round(뒤.y) + ') ' + 못(움직인) + ' · 위치 ' + 뒤.위치);
+    console.log('  ★ 상담 판 = 공용 팝업(손잡이 5) ' + 못(await page.evaluate(() => { const p = document.querySelector('.vp-상담판'); return p.classList.contains('vp-팝업') && p.querySelectorAll(':scope > .vp-팝업손').length === 5; })));
     /* 화면 밖으로 끌어 봐도 안 나감 */
     const 현재머리 = await page.evaluate(() => { const r = document.querySelector('.vp-상담판 .vp-상담머리 strong').getBoundingClientRect(); return { x: r.left + 4, y: r.top + r.height / 2 }; });
     for (const [dx, dy] of [[-3000, -3000], [3000, 3000], [3000, -3000]]) {

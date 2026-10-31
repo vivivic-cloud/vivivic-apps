@@ -489,3 +489,128 @@ const VP_DATA = (() => {
 
   return { PAGES: PAGES_, list, ymd, prefetch, clearCache, 하나찾기, 받기: 벤더피아받기 };
 })();
+
+/* ── 공용 팝업 부품 `VP팝업(판, {머리, 몸})` (11-01 [새 지시 문의큰팝업]) ──
+   사장님(그대로): 「…이팝업은 마우스 드레그 이동이 가능하게 해서 뒤 화면을 가리는것을 피해다닐 수 있게 해주고 백화면에 구애 받지 않고
+   크기가 조절 되게 해주고 내용이 길어지면 스크롤되게 해줘 이런유형의 모든 팝업이 이런 모습 적용해 줘」
+   ① 끌기: `머리`를 잡고 끌면 판이 `position: fixed` 로 움직인다(판 전체가 늘 화면 안). 머리 안 단추·입력은 끌기 아님.
+   ② 크기: 판 가장자리(왼쪽·오른쪽·아래)와 아래 두 모서리를 잡고 끈다 — 뒤 화면과 상관없이, 화면 안에서만.
+   ③ 스크롤: 머리 밖 내용은 `몸`(없으면 머리 밖 자식들을 `.vp-팝업몸` 으로 감싼다) 안에서 스크롤된다.
+   ⚠ 이 글(vp-data.js)은 모든 벤더피아 화면에 search.js·goods.js 보다 **먼저** 실린다 — 그래서 여기 한 곳에 둔다. 팝업을 새로 만들면 이것을 쓴다.
+   ⚠ 마우스·터치·펜 모두 포인터 이벤트 하나로. 꼴은 `<style id="vp-팝업꼴">` 한 벌(css 파일을 안 늘린다). */
+if (typeof window !== "undefined" && typeof document !== "undefined" && !window.VP팝업) {
+  window.VP팝업 = (() => {
+    const 꼴 = `
+.vp-팝업 > .vp-팝업몸 { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.vp-팝업 .vp-끌개 { cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
+.vp-팝업.vp-끄는중 .vp-끌개 { cursor: grabbing; }
+.vp-팝업.vp-끄는중, .vp-팝업.vp-크기중 { user-select: none; -webkit-user-select: none; }
+.vp-팝업 > .vp-팝업손 { position: absolute; z-index: 5; touch-action: none; }
+.vp-팝업 > .vp-팝업손[data-d=e] { top: 14px; bottom: 14px; right: 0; width: 8px; cursor: ew-resize; }
+.vp-팝업 > .vp-팝업손[data-d=w] { top: 14px; bottom: 14px; left: 0; width: 8px; cursor: ew-resize; }
+.vp-팝업 > .vp-팝업손[data-d=s] { left: 14px; right: 14px; bottom: 0; height: 8px; cursor: ns-resize; }
+.vp-팝업 > .vp-팝업손[data-d=se] { right: 0; bottom: 0; width: 18px; height: 18px; cursor: nwse-resize;
+  background: linear-gradient(135deg, transparent 52%, #c9c8c4 52%, #c9c8c4 58%, transparent 58%, transparent 68%, #c9c8c4 68%, #c9c8c4 74%, transparent 74%); }
+.vp-팝업 > .vp-팝업손[data-d=sw] { left: 0; bottom: 0; width: 18px; height: 18px; cursor: nesw-resize; }`;
+    const 최소 = { w: 260, h: 140 };
+    const 창 = () => [document.documentElement.clientWidth || window.innerWidth, window.innerHeight || document.documentElement.clientHeight];
+    const 꼴넣기 = () => {
+      if (document.getElementById("vp-팝업꼴")) return;
+      const st = document.createElement("style");
+      st.id = "vp-팝업꼴";
+      st.textContent = 꼴;
+      (document.head || document.documentElement).appendChild(st);
+    };
+    const 숫자 = (v) => parseFloat(v) || 0;
+    return function VP팝업(판, { 머리, 몸 } = {}) {
+      if (!판 || 판.dataset.vp팝업) return 판;
+      판.dataset.vp팝업 = "1";
+      꼴넣기();
+      판.classList.add("vp-팝업");
+      const cs0 = getComputedStyle(판);
+      if (cs0.position === "static") 판.style.position = "relative";
+      /* 손잡이는 판 안(가장자리)에 붙고 스크롤은 몸만 — 판 자신은 안 넘치게. 블록 판(부속 도면 카드)은 세로 flex 로 */
+      판.style.overflow = "hidden";
+      if (cs0.display === "block") Object.assign(판.style, { display: "flex", flexDirection: "column" });
+      머리 = 머리 || 판.firstElementChild;
+      if (!몸) {
+        몸 = document.createElement("div");
+        몸.className = "vp-팝업몸";
+        for (const n of [...판.childNodes]) if (n !== 머리 && !(n.nodeType === 1 && n.hasAttribute("data-팝업밖"))) 몸.appendChild(n);
+        판.appendChild(몸);
+      } else 몸.classList.add("vp-팝업몸");
+      if (머리) 머리.classList.add("vp-끌개");
+      /* 처음 잡을 때 지금 자리 그대로 `fixed` 로 — 튀지 않는다. 아래·오른쪽에 붙은 판(상세 창)은 높이도 지금 것으로 묶는다 */
+      const 띄우기 = (높이도) => {
+        const r = 판.getBoundingClientRect(), cs = getComputedStyle(판);
+        const 높이묶기 = 높이도 || (cs.position === "fixed" && cs.bottom !== "auto" && !판.style.height);
+        Object.assign(판.style, { position: "fixed", margin: "0", left: r.left + "px", top: r.top + "px", right: "auto", bottom: "auto",
+          width: r.width + "px", maxWidth: "none" });
+        if (높이묶기) Object.assign(판.style, { height: r.height + "px", maxHeight: "none" });
+        return r;
+      };
+      const 안으로 = () => {
+        if (판.style.position !== "fixed" || !판.isConnected) return;
+        const [vw, vh] = 창();
+        if (판.style.height && 숫자(판.style.height) > vh) 판.style.height = Math.max(최소.h, vh) + "px";
+        if (숫자(판.style.width) > vw) 판.style.width = vw + "px";
+        판.style.left = Math.min(Math.max(0, 숫자(판.style.left)), Math.max(0, vw - 판.offsetWidth)) + "px";
+        판.style.top = Math.min(Math.max(0, 숫자(판.style.top)), Math.max(0, vh - 판.offsetHeight)) + "px";
+      };
+      let 잡음 = null;
+      const 놓기 = (e) => { if (잡음 && e.pointerId === 잡음.id) { 잡음 = null; 판.classList.remove("vp-끄는중", "vp-크기중"); } };
+      const 듣기 = (el) => {
+        el.addEventListener("pointermove", (e) => {
+          if (!잡음 || e.pointerId !== 잡음.id) return;
+          const [vw, vh] = 창();
+          const dx = e.clientX - 잡음.x, dy = e.clientY - 잡음.y, r = 잡음.r, d = 잡음.d;
+          if (!d) {                                                   // 끌기
+            판.style.left = Math.min(Math.max(0, r.left + dx), Math.max(0, vw - 판.offsetWidth)) + "px";
+            판.style.top = Math.min(Math.max(0, r.top + dy), Math.max(0, vh - 판.offsetHeight)) + "px";
+            return;
+          }
+          if (d.includes("e")) 판.style.width = Math.min(Math.max(최소.w, r.width + dx), vw - r.left) + "px";
+          if (d.includes("w")) {
+            const 왼 = Math.min(Math.max(0, r.left + dx), r.right - 최소.w);
+            판.style.left = 왼 + "px"; 판.style.width = (r.right - 왼) + "px";
+          }
+          if (d.includes("s")) 판.style.height = Math.min(Math.max(최소.h, r.height + dy), vh - r.top) + "px";
+        });
+        el.addEventListener("pointerup", 놓기);
+        el.addEventListener("pointercancel", 놓기);
+        el.addEventListener("lostpointercapture", 놓기);
+      };
+      const 잡기 = (e, el, d) => {
+        if (e.pointerType === "mouse" && e.button !== 0) return;
+        const r = 띄우기(!!d);
+        잡음 = { id: e.pointerId, x: e.clientX, y: e.clientY, r: 판.getBoundingClientRect(), d };
+        if (!d) 잡음.r = { left: 숫자(판.style.left), top: 숫자(판.style.top) };
+        판.classList.add(d ? "vp-크기중" : "vp-끄는중");
+        try { el.setPointerCapture(e.pointerId); } catch (x) {}
+        e.preventDefault();
+        e.stopPropagation();
+        return r;
+      };
+      if (머리) {
+        머리.addEventListener("pointerdown", (e) => {
+          if (e.target.closest && e.target.closest("button, input, a, select, textarea, label, .vp-goods-list")) return;
+          잡기(e, 머리, "");
+        });
+        듣기(머리);
+      }
+      for (const d of ["e", "w", "s", "se", "sw"]) {
+        const 손 = 판.appendChild(document.createElement("div"));
+        손.className = "vp-팝업손";
+        손.dataset.d = d;
+        손.setAttribute("aria-hidden", "true");
+        손.addEventListener("pointerdown", (e) => 잡기(e, 손, d));
+        손.addEventListener("click", (e) => e.stopPropagation());
+        듣기(손);
+      }
+      const 창바뀜 = () => { if (!판.isConnected) { window.removeEventListener("resize", 창바뀜); return; } 안으로(); };
+      window.addEventListener("resize", 창바뀜);
+      if (window.ResizeObserver) new ResizeObserver(() => 안으로()).observe(판);
+      return 판;
+    };
+  })();
+}

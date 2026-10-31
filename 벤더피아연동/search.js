@@ -236,6 +236,30 @@
      · 처음 = GET(기본 기간 한 달·27줄). 조회 = 받은 폼 그대로 + `btnSearch.x/.y` POST. 쪽 넘김 = 받은 폼 + `__EVENTTARGET`(PageNum 링크) 또는 그림 단추 `.x/.y`.
      · 숨은 칸(주문번호·ctCd·inquiryCd·매출처…주소·순번)은 표에 안 그리고, 줄을 누르면 판에 **모든 칸**(문의내용·답변내용 전문 포함)을 보인다.
      ⚠ 등록·삭제·엑셀 단추는 안 보낸다(그림 단추라 폼값에 안 들어간다). 벤더피아에는 조회만. */
+  /* 11-01 [새 지시 문의큰팝업] 상담내용보기(`#vgInq`)는 아래에서 일찍 돌아간다 — 그 쪽 문의 판도 CS등록(`CS등록붙이기`·`주문변경올리기`)과
+     goods.js 뒷길(`뒷길로부르기`)을 쓰므로, 그 길들이 쓰는 값들을 여기(돌아가기 전)로 올려 둔다. 값·뜻은 그대로. */
+  const 내주소 = (() => {
+    const me = document.currentScript
+      || [...document.querySelectorAll("script[src]")].reverse()
+           .find((x) => /search\.js(\?|$)/.test(x.src));
+    if (me && me.src) return me.src;
+    /* 10-25 0.34.53 부터 화면 글은 배경 글이 MAIN 에 **인라인**으로 넣어 `currentScript` 가 src 없는 인라인 글이다 → 깃 주소 + 캐시표로 짓는다(0.34.50 이 이 길에서 못 불렀다). */
+    return "https://vivivic-cloud.github.io/vivivic-apps/%EB%B2%A4%EB%8D%94%ED%94%BC%EC%95%84%EC%97%B0%EB%8F%99/search.js?t=" + Math.floor(Date.now() / 60000);
+  })();
+  const 형제 = (이름) => 내주소 && 내주소.replace(/search\.js(?=\?|$)/, 이름);
+  const CS등록종류 = ["교환", "반품", "AS", "취소"];   // 10-28 [새 지시 CS등록단품] 「접수」 아래 CS등록 — 이번 단계는 단품 고르기까지
+  const 원주문찾기주소 = "/System/CS/ordersPopup.aspx";
+  /* 10-27 [새 지시 사람길] 사람 길 그대로 — 벤더피아 머리 「CS등록」(`#lnkCSReg`)이 여는 「고객주문변경_접수」 쪽.
+     GET·잇기·저장 모두 이 주소(폼 action 도 `./csDetl.aspx?previousPage=first`) */
+  const 고객문의주소 = "/System/CS/csDetl.aspx?previousPage=first";
+  const 올린글 = new Set();                            // 주문+글 — 같은 글을 두 번 올리지 않는다
+  const 올린변경 = new Set();                          // 주문+종류+단품+메시지 — 같은 고객주문변경을 두 번 저장하지 않는다
+  const 문의값 = (doc, id) => { const el = doc.getElementById(id); return el ? String(el.value || "").trim() : ""; };
+  /* ASP.NET 오류 쪽이면 그 까닭 한 줄(제목·h2) */
+  const 오류글 = (doc) => ((doc.querySelector("h2 i") || doc.querySelector("h2") || doc.querySelector("title") || {}).textContent || "").trim().slice(0, 80);
+  const 쉼 = (ms) => new Promise((r) => setTimeout(r, ms));
+  const 같은코드 = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
+  const CS글자 = (x) => String(x || "").replace(/[\s/]/g, "").toUpperCase();
   const 상담보기 = CS전용 && /(^|[#&])vgInq\b/i.test(location.hash || "");
   if (상담보기) { 상담내용보기(); return; }
   function 상담내용보기() {
@@ -410,30 +434,44 @@
       } catch (err) { if (내차례 === 차례) 알림.textContent = "고객문의 목록을 읽지 못했습니다."; }
     });
 
-    /* 줄 누름 = 그 문의의 모든 칸(문의내용·답변내용 전문) — 상담 판과 같은 꼴, 끌 수 있다. 보기만 한다. */
-    let 판 = null;
+    /* 줄 누름 = 그 문의의 **큰 팝업**(11-01 [새 지시 문의큰팝업]). 사장님(그대로): 「상담내용보기 에서 문의 내용 클릭시 등록된 문의내용 전문이
+       보이는 큰 팝업을 만들어 주고 큰팝업 안에는 문의내용이 주체가 되는 해당 고객의 전화번호 상품명등 기본 정보도 상단에 함께 나타나 주어야해
+       이 문의 내용 하단에는 현재 CS관리 의 상담팝업과 동일한  취소 교환 반품등 등록 로직이 동일하게 적용되게 해줘 …」
+       · 위 = 기본 정보(목록 칸 이름 그대로, 빈 칸은 안 보임) · 가운데 = 문의내용 전문(주체) · 답변내용 · 아래 = CS등록(`CS등록붙이기` — 상담 판과 한 벌).
+       · 문의 ↔ 주문: 목록 「주문번호」 = 벤더피아 **안 번호**(7자리), 「매출처주문번호」 = **몰 주문번호**(주문관리 뒤 「주문번호」·원주문 검색 `tb_SOrderNo` 와 같은 것,
+         11-01 사장님 크롬에서 잼). CS등록은 상담 판처럼 몰 주문번호로 간다. 몰 주문번호가 없으면 CS등록 대신 안내 한 줄.
+       · 끌기·크기·스크롤 = 공용 팝업 부품(`끌수있게` → `VP팝업`). 문의를 읽는 데는 벤더피아 요청 0(목록 칸에 전문이 있다). */
+    let 판 = null, 굿즈부름 = false;
     const 판닫기 = () => { if (판) { 판.remove(); 판 = null; } };
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") 판닫기(); });
+    const 기본칸 = ["문의자", "주문자", "주문자핸드폰", "주문자전화", "수취인", "수취인휴대폰", "수취인전화", "상품명", "매출처주문번호", "주문번호",
+      "몰", "매출처", "배송상태", "주소", "고객약속일", "접수자", "답변자"];
     function 판열기(heads, row) {
       판닫기();
-      const 칸 = (n) => { const i = heads.indexOf(n); return i >= 0 ? row[i] || "" : ""; };
+      const 칸 = (n) => { const i = heads.indexOf(n); return i >= 0 ? String(row[i] == null ? "" : row[i]).trim() : ""; };
+      const 몰주문 = 칸("매출처주문번호");
       const 덮개 = document.createElement("div");
-      덮개.className = "vp-상담덮개";
-      덮개.innerHTML = `<div class="vp-상담판" role="dialog" aria-label="문의내용">
+      덮개.className = "vp-상담덮개 vp-문의덮개";
+      덮개.innerHTML = `<div class="vp-상담판 vp-문의판" role="dialog" aria-label="문의내용">
         <div class="vp-상담머리"><strong></strong><small></small>
           <button type="button" class="vp-상담닫기" aria-label="닫기">×</button></div>
-        <div class="vp-상담목록"><div class="vp-상담줄"><small>문의내용</small><p class="vp-문의글"></p></div>
-          <div class="vp-상담줄"><small>답변내용</small><p class="vp-답변글"></p></div>
-          <div class="vp-상담줄 vp-문의칸"></div></div></div>`;
+        <div class="vp-고객정보 vp-문의정보"></div>
+        <div class="vp-문의본문"><span class="vp-상담라벨">문의내용</span><p class="vp-문의글"></p></div>
+        <div class="vp-상담목록"><div class="vp-상담줄"><small>답변내용</small><p class="vp-답변글"></p></div></div>
+        ${몰주문 ? CS등록틀() : `<p class="vp-문의안내">이 문의에 매출처주문번호가 없어 CS등록을 할 수 없습니다.</p>`}</div>`;
       덮개.querySelector("strong").textContent = 칸("제목") || "문의";
-      덮개.querySelector("small").textContent = [칸("문의자"), 칸("문의유형"), 칸("처리결과"), 칸("문의접수일")].filter(Boolean).join(" · ");
+      덮개.querySelector(".vp-상담머리 small").textContent = [칸("문의유형"), 칸("처리결과"), 칸("문의접수일")].filter(Boolean).join(" · ");
       덮개.querySelector(".vp-문의글").textContent = 칸("문의내용") || "(없음)";
       덮개.querySelector(".vp-답변글").textContent = 칸("답변내용") || "(없음)";
-      고객그리기(덮개.querySelector(".vp-문의칸"), row, heads.map((h) => (["ctCd", "inquiryCd", "순번", "제목", "문의내용", "답변내용"].includes(h) ? "" : h)));
+      고객그리기(덮개.querySelector(".vp-문의정보"), 기본칸.map(칸), 기본칸);
       덮개.addEventListener("click", (e) => { if (e.target === 덮개 || e.target.closest(".vp-상담닫기")) 판닫기(); });
       r.appendChild(덮개);
       판 = 덮개;
       끌수있게(덮개);
+      if (몰주문) {
+        if (!굿즈부름) { 굿즈부름 = true; 상품단추불러오기(); }   // 단품 단추·단품 검색(goods.js) — 처음 열 때 한 번만(깃허브, 벤더피아 요청 아님)
+        CS등록붙이기(덮개, 몰주문, { 상품명: 칸("상품명"), 상품코드: "" });
+      }
     }
 
     (async () => {
@@ -617,15 +655,6 @@
        사장님이 **덮어쓰셔야** 한다. 그래서 **이 글이 온 그 주소**에서 형제 파일을 불러온다 —
        깃이든 확장이든, 캐시표(`?v=…&t=…`)까지 그대로 따라온다.
      ⚠ 상품관리에 **없는 이름**은 글자 그대로 둔다. 가짜 단추를 만들지 않는다. */
-  const 내주소 = (() => {
-    const me = document.currentScript
-      || [...document.querySelectorAll("script[src]")].reverse()
-           .find((x) => /search\.js(\?|$)/.test(x.src));
-    if (me && me.src) return me.src;
-    /* 10-25 0.34.53 부터 화면 글은 배경 글이 MAIN 에 **인라인**으로 넣어 `currentScript` 가 src 없는 인라인 글이다 → 깃 주소 + 캐시표로 짓는다(0.34.50 이 이 길에서 못 불렀다). */
-    return "https://vivivic-cloud.github.io/vivivic-apps/%EB%B2%A4%EB%8D%94%ED%94%BC%EC%95%84%EC%97%B0%EB%8F%99/search.js?t=" + Math.floor(Date.now() / 60000);
-  })();
-  const 형제 = (이름) => 내주소 && 내주소.replace(/search\.js(?=\?|$)/, 이름);
   function 상품단추불러오기() {
     /* ⚠⚠ 이것은 **뒷길**이다. 10-15 부터는 `불러오기.js`(확장)가 배송관리에도
        `goods.js`·`goods.css` 를 **제대로 보낸다.** 이 길은 확장이 옛 판인 분을 위해 남겨 둔다.
@@ -825,48 +854,13 @@
      ⚠ 화면 밖으로 안 나간다(가로·세로 모두 판 전체가 안에 든다) — 창을 줄이거나 판 안이 길어져도 다시 안으로 당긴다.
      ⚠ 마우스·터치·펜 모두 포인터 이벤트 하나로(머리의 `touch-action: none`). 머리 안의 단추(닫기)는 끌기가 아니다.
      ⚠ 처음 잡을 때만 판을 `position: fixed` 로 바꾼다 — 잡기 전 자리(왼쪽/가운데)는 그대로라 튀지 않는다. */
+  /* 11-01 [새 지시 문의큰팝업] 끌기 + 크기 조절 + 안에서 스크롤 = 공용 팝업 부품 `VP팝업`(vp-data.js) 하나로. 여기서는 판·머리만 건넨다. */
   function 끌수있게(덮개) {
     const 판 = 덮개.querySelector(".vp-상담판"), 머리 = 덮개.querySelector(".vp-상담머리");
-    if (!판 || !머리) return;
-    머리.classList.add("vp-끌개");
-    let 잡음 = null;
-    const 안으로 = (x, y) => {
-      const vw = document.documentElement.clientWidth || window.innerWidth;
-      const vh = window.innerHeight || document.documentElement.clientHeight;
-      return [Math.min(Math.max(0, x), Math.max(0, vw - 판.offsetWidth)),
-              Math.min(Math.max(0, y), Math.max(0, vh - 판.offsetHeight))];
-    };
-    const 놓기 = (e) => { if (잡음 && e.pointerId === 잡음.id) { 잡음 = null; 판.classList.remove("vp-끄는중"); } };
-    머리.addEventListener("pointerdown", (e) => {
-      if (e.pointerType === "mouse" && e.button !== 0) return;
-      if (e.target.closest && e.target.closest("button, input, a, select, textarea")) return;
-      const r = 판.getBoundingClientRect();
-      잡음 = { id: e.pointerId, dx: e.clientX - r.left, dy: e.clientY - r.top };
-      Object.assign(판.style, { position: "fixed", margin: "0", left: r.left + "px", top: r.top + "px", width: r.width + "px" });
-      판.classList.add("vp-끄는중");
-      try { 머리.setPointerCapture(e.pointerId); } catch (x) {}
-      e.preventDefault();
-    });
-    머리.addEventListener("pointermove", (e) => {
-      if (!잡음 || e.pointerId !== 잡음.id) return;
-      const [x, y] = 안으로(e.clientX - 잡음.dx, e.clientY - 잡음.dy);
-      판.style.left = x + "px"; 판.style.top = y + "px";
-    });
-    머리.addEventListener("pointerup", 놓기);
-    머리.addEventListener("pointercancel", 놓기);
-    머리.addEventListener("lostpointercapture", 놓기);
-    const 다시안으로 = () => {
-      if (!판.isConnected) { window.removeEventListener("resize", 다시안으로); return; }
-      if (판.style.position !== "fixed") return;
-      const [x, y] = 안으로(parseFloat(판.style.left) || 0, parseFloat(판.style.top) || 0);
-      판.style.left = x + "px"; 판.style.top = y + "px";
-    };
-    window.addEventListener("resize", 다시안으로);
-    if (window.ResizeObserver) new ResizeObserver(다시안으로).observe(판);
+    if (판 && 머리 && window.VP팝업) window.VP팝업(판, { 머리 });
   }
 
   const 접수종류 = ["교환", "반품", "AS"];
-  const CS등록종류 = ["교환", "반품", "AS", "취소"];   // 10-28 [새 지시 CS등록단품] 「접수」 아래 CS등록 — 이번 단계는 단품 고르기까지
   const 접수상태 = ["접수", "처리중", "끝"];
 
   /* ── CS등록 (10-16) ──────────────────────────────────────
@@ -1055,24 +1049,11 @@
     if (!틀.children.length) 칸.textContent = "고객정보가 비어 있습니다.";
   }
 
-  async function 상담판열기(주문, 상품명, 받은줄, 받은머리) {
-    상담판닫기();
-    const 열쇠 = 상담열쇠(주문);
-    if (!열쇠) return;
-    const 덮개 = document.createElement("div");
-    덮개.className = "vp-상담덮개";
-    덮개.innerHTML = `<div class="vp-상담판" role="dialog" aria-label="상담 이력과 접수">
-      <div class="vp-상담머리"><strong></strong><small></small>
-        <button type="button" class="vp-상담닫기" aria-label="닫기">×</button></div>
-      <div class="vp-고객정보">고객정보 불러오는 중…</div>
-      <div class="vp-상담접수"></div>
-      <div class="vp-상담목록">불러오는 중…</div>
-      <form class="vp-상담적기">
-        <div class="vp-상담고르기"><span class="vp-상담라벨">고객문의</span></div>
-        <textarea rows="3" placeholder="오간 말을 적으십시오 (지울 수 없습니다 — 쌓입니다)"></textarea>
-        <div class="vp-상담발"><span class="vp-상담알림"></span><button type="submit">접수</button></div>
-      </form>
-      <div class="vp-cs등록">
+  /* 11-01 [새 지시 문의큰팝업] CS등록(종류·단품 단추·단품 검색·출고 메시지·「CS등록 저장」)을 상담 판에서 떼어 낸 **한 벌** —
+     상담 판(`상담판열기`)과 상담내용보기 문의 판(`상담내용보기` › `판열기`)이 같이 쓴다. 동작·저장 길(`주문변경올리기`)은 0.34.77 그대로.
+     `덮개` = 판 덮개(`.vp-cs등록` 이 들어 있다) · `주문` = 몰 주문번호 · `상품단서` = {상품명, 상품코드}. */
+  function CS등록틀() {
+    return `<div class="vp-cs등록">
         <div class="vp-상담고르기">
           <span class="vp-상담라벨">CS등록</span>
           ${CS등록종류.map((k) => `<button type="button" class="vp-상담종류" data-k="${k}">${k}</button>`).join("")}
@@ -1089,34 +1070,9 @@
           <textarea rows="3" maxlength="500" placeholder="출고 담당자에게 전할 말 (없으면 체크를 끄십시오)"></textarea>
           <div class="vp-상담발"><span class="vp-상담알림 vp-cs알림"></span><button type="button" class="vp-cs저장" disabled>CS등록 저장</button></div>
         </div>
-      </div></div>`;
-    덮개.querySelector("strong").textContent = 상품명 || "상담";
-    덮개.querySelector(".vp-상담머리 small").textContent = "주문 " + 주문;
-    덮개.querySelector(".vp-상담닫기").addEventListener("click", 상담판닫기);
-    덮개.addEventListener("mousedown", (e) => { if (e.target === 덮개) 상담판닫기(); });
-    document.getElementById("vp-root")?.appendChild(덮개) || document.body.appendChild(덮개);
-    상담판 = 덮개;
-    끌수있게(덮개);
-
-    const 목록 = 덮개.querySelector(".vp-상담목록");
-    const 접수칸 = 덮개.querySelector(".vp-상담접수");
-    const 고객칸 = 덮개.querySelector(".vp-고객정보");
-    if (받은줄 && 받은머리) 고객그리기(고객칸, 받은줄, 받은머리);
-    else 고객줄받기(주문).then((답) => {
-      if (답) 고객그리기(고객칸, 답.줄, 답.머리);
-      else 고객칸.textContent = "벤더피아 배송목록에서 이 주문을 찾지 못했습니다.";
-    }).catch((e) => {
-      고객칸.textContent = "고객정보를 못 읽었습니다. 다시 로그인한 뒤 시도해 주세요.";
-      window.VP말?.("고객정보:못읽음 " + (e && e.message ? e.message : e));
-    });
-    const 알림 = 덮개.querySelector(".vp-상담알림");
-    const 적기 = 덮개.querySelector(".vp-상담적기");
-    const 글칸 = 덮개.querySelector("textarea");
-    let 쌓인것 = [], 지금접수 = null;
-    /* 고객문의 원주문 고르기용 — 이 판을 연 줄의 상품 */
-    const 줄값 = (이름) => { const i = 받은머리 ? 받은머리.indexOf(이름) : -1; return i >= 0 && 받은줄 ? String(받은줄[i] == null ? "" : 받은줄[i]).trim() : ""; };
-    const 상품단서 = { 상품명: 상품명 || 줄값("상품명"), 상품코드: 줄값("상품코드") };
-
+      </div>`;
+  }
+  function CS등록붙이기(덮개, 주문, 상품단서) {
     /* 10-28 [새 지시 CS등록단품] CS등록 — 종류(교환·반품·AS·취소)를 누르면 이 주문 상품의 단품(상품명 상세의 단품 단추와 같은 것)을
        보이고, 어느 단품에 대한 접수인지 고른다(여럿 고를 수 있음). **여기까지만** — 벤더피아·우리 창고에 안 쓴다.
        고른 것은 `CS고름`(덮개.vpCS등록)에 들고 있다 — 다음 단계(실제 등록)가 쓴다. */
@@ -1324,6 +1280,54 @@
       }
       CS저장중 = false; 저장단추그리기();
     });
+  }
+
+  async function 상담판열기(주문, 상품명, 받은줄, 받은머리) {
+    상담판닫기();
+    const 열쇠 = 상담열쇠(주문);
+    if (!열쇠) return;
+    const 덮개 = document.createElement("div");
+    덮개.className = "vp-상담덮개";
+    덮개.innerHTML = `<div class="vp-상담판" role="dialog" aria-label="상담 이력과 접수">
+      <div class="vp-상담머리"><strong></strong><small></small>
+        <button type="button" class="vp-상담닫기" aria-label="닫기">×</button></div>
+      <div class="vp-고객정보">고객정보 불러오는 중…</div>
+      <div class="vp-상담접수"></div>
+      <div class="vp-상담목록">불러오는 중…</div>
+      <form class="vp-상담적기">
+        <div class="vp-상담고르기"><span class="vp-상담라벨">고객문의</span></div>
+        <textarea rows="3" placeholder="오간 말을 적으십시오 (지울 수 없습니다 — 쌓입니다)"></textarea>
+        <div class="vp-상담발"><span class="vp-상담알림"></span><button type="submit">접수</button></div>
+      </form>
+      ${CS등록틀()}</div>`;
+    덮개.querySelector("strong").textContent = 상품명 || "상담";
+    덮개.querySelector(".vp-상담머리 small").textContent = "주문 " + 주문;
+    덮개.querySelector(".vp-상담닫기").addEventListener("click", 상담판닫기);
+    덮개.addEventListener("mousedown", (e) => { if (e.target === 덮개) 상담판닫기(); });
+    document.getElementById("vp-root")?.appendChild(덮개) || document.body.appendChild(덮개);
+    상담판 = 덮개;
+    끌수있게(덮개);
+
+    const 목록 = 덮개.querySelector(".vp-상담목록");
+    const 접수칸 = 덮개.querySelector(".vp-상담접수");
+    const 고객칸 = 덮개.querySelector(".vp-고객정보");
+    if (받은줄 && 받은머리) 고객그리기(고객칸, 받은줄, 받은머리);
+    else 고객줄받기(주문).then((답) => {
+      if (답) 고객그리기(고객칸, 답.줄, 답.머리);
+      else 고객칸.textContent = "벤더피아 배송목록에서 이 주문을 찾지 못했습니다.";
+    }).catch((e) => {
+      고객칸.textContent = "고객정보를 못 읽었습니다. 다시 로그인한 뒤 시도해 주세요.";
+      window.VP말?.("고객정보:못읽음 " + (e && e.message ? e.message : e));
+    });
+    const 알림 = 덮개.querySelector(".vp-상담알림");
+    const 적기 = 덮개.querySelector(".vp-상담적기");
+    const 글칸 = 덮개.querySelector("textarea");
+    let 쌓인것 = [], 지금접수 = null;
+    /* 고객문의 원주문 고르기용 — 이 판을 연 줄의 상품 */
+    const 줄값 = (이름) => { const i = 받은머리 ? 받은머리.indexOf(이름) : -1; return i >= 0 && 받은줄 ? String(받은줄[i] == null ? "" : 받은줄[i]).trim() : ""; };
+    const 상품단서 = { 상품명: 상품명 || 줄값("상품명"), 상품코드: 줄값("상품코드") };
+
+    CS등록붙이기(덮개, 주문, 상품단서);
 
     const 접수그리기 = () => {
       접수칸.replaceChildren();
@@ -1484,13 +1488,6 @@
      10-27 [새 지시 원주문잇기] 사장님 크롬에서 잼: 「원주문 검색」 팝업(`ordersPopup.aspx`)은 몰 주문번호(`tb_SOrderNo`, 일부만 맞아도 걸림)로
      찾고, 고른 줄의 **벤더피아 안 번호**(7자리, 열 key `orderNo`)를 `getReturnValue` 가 `hOrderNo` 에 넣고 `btnReflash` 를 누른다.
      → 우리도 팝업 조회(조회만)로 몰 주문번호가 **똑같은** 줄을 찾아 그 안 번호를 넣는다. 여럿이면 상담 판을 연 줄과 같은 상품, 못 고르면 맨 위 줄. */
-  const 원주문찾기주소 = "/System/CS/ordersPopup.aspx";
-  /* 10-27 [새 지시 사람길] 사람 길 그대로 — 벤더피아 머리 「CS등록」(`#lnkCSReg`)이 여는 「고객주문변경_접수」 쪽.
-     GET·잇기·저장 모두 이 주소(폼 action 도 `./csDetl.aspx?previousPage=first`) */
-  const 고객문의주소 = "/System/CS/csDetl.aspx?previousPage=first";
-  const 올린글 = new Set();                            // 주문+글 — 같은 글을 두 번 올리지 않는다
-  const 올린변경 = new Set();                          // 주문+종류+단품+메시지 — 같은 고객주문변경을 두 번 저장하지 않는다
-  const 문의값 = (doc, id) => { const el = doc.getElementById(id); return el ? String(el.value || "").trim() : ""; };
   /* `빈파일`: 브라우저는 고른 파일이 없어도 파일 칸을 빈 칸(filename="")으로 **늘** 보낸다 — csDetl(multipart)에서만 똑같이 */
   function 문의폼값(form, 빈파일 = false) {
     const fd = new FormData();
@@ -1599,8 +1596,6 @@
     const d = new DOMParser().parseFromString(await res.text(), "text/html");
     return [...d.querySelectorAll("#oGrid td")].some((td) => td.textContent.replace(/\s+/g, "").includes(토막.replace(/\s+/g, "")));
   }
-  /* ASP.NET 오류 쪽이면 그 까닭 한 줄(제목·h2) */
-  const 오류글 = (doc) => ((doc.querySelector("h2 i") || doc.querySelector("h2") || doc.querySelector("title") || {}).textContent || "").trim().slice(0, 80);
   async function 벤더피아올리기(주문, { 글, 종류, 상태, 단서 }) {
     const 첫 = await 벤더피아(고객문의주소, { credentials: "include" }, "보호");
     if (!첫.ok) throw new Error("등록 쪽 HTTP " + 첫.status);
@@ -1669,7 +1664,6 @@
      ⚠ 단품표는 Infragistics 그리드라 체크가 **그 쪽 JS(비동기 되보냄·clientState)** 로만 서버에 간다 → fetch 로 흉내 내지 않고
        **숨은 같은 출처 틀**에 진짜 쪽을 열어 그 쪽 JS 로 사람처럼 누른다. 틀은 `sandbox`(allow-modals 없음)라 벤더피아 alert 가 화면에 안 뜬다
        — 저장 전 alert 는 가로채 까닭으로 쓴다. 확인은 **주문관리 목록 조회**(맨 위 줄이 이 주문·이 종류인가). */
-  const 쉼 = (ms) => new Promise((r) => setTimeout(r, ms));
   function 틀로드(틀, ms) {
     return new Promise((됨, 안됨) => {
       const 끝 = setTimeout(() => { 틀.removeEventListener("load", f); 안됨(new Error("시간 넘김")); }, ms);
@@ -1690,8 +1684,6 @@
     while (s.n > 0 && Date.now() < 끝) await 쉼(150);
     await 쉼(200);
   }
-  const 같은코드 = (a, b) => String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase();
-  const CS글자 = (x) => String(x || "").replace(/[\s/]/g, "").toUpperCase();
   /* 저장 뒤 확인 — 판매관리→주문관리 목록(조회만) 맨 위 줄이 이 주문(몰 주문번호 = 뒤 「주문번호」 칸)·이 CS 인가 */
   async function 주문변경확인(주문, 종류) {
     const 주소 = "/System/Sales/orderMst.aspx";

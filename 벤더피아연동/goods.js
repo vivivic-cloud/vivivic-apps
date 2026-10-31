@@ -366,12 +366,15 @@ const 한벌돌리기 = (단품곁다리) => {
   from.value = 곁다리 ? "" : (startDt?.value || "");
   to.value = 곁다리 ? "" : (endDt?.value || "");
   panel.querySelector("button").addEventListener("click", () => { panel.hidden = true; delete panel.dataset.name; });
+  /* 11-01 [새 지시 문의큰팝업] 「이런유형의 모든 팝업」 — 상세 창·연결 항목 창도 공용 팝업 부품(vp-data.js `VP팝업`): 머리 끌기·가장자리 크기·안에서 스크롤 */
+  window.VP팝업?.(panel, { 머리: panel.querySelector(".vp-goods-panel-head"), 몸: panelBody });
 
   const modal = root.querySelector(".vp-modal");
   const modalTitle = modal.querySelector("strong");
   const modalBody = modal.querySelector(".vp-modal-body");
   const modalGoto = modal.querySelector(".vp-goto");
   modal.querySelector("button").addEventListener("click", () => { modal.hidden = true; });
+  window.VP팝업?.(modal.querySelector(".vp-modal-card"), { 머리: modal.querySelector(".vp-goods-panel-head"), 몸: modalBody });
   modal.addEventListener("click", (e) => { if (e.target === modal) modal.hidden = true; });
 
   /* ⚠⚠ 10-14 사장님 (단품 상세 팝업을 짚으시고): 「상세팝업 외부바탕화면 클릭시 상세팝업 닫히게 해줘」
@@ -948,8 +951,9 @@ const 한벌돌리기 = (단품곁다리) => {
     }
     const overlay = document.createElement("div");
     overlay.className = "vp-notice vp-edge-pop";
-    overlay.innerHTML = `<div class="vp-edge-card"><button type="button" class="vp-edge-close" aria-label="닫기">×</button></div>`;
+    overlay.innerHTML = `<div class="vp-edge-card"><button type="button" class="vp-edge-close" aria-label="닫기" data-팝업밖>×</button></div>`;
     overlay.firstChild.insertAdjacentHTML("beforeend", VP_AMT.partDetailHtml(productName, part, johonJundo));
+    window.VP팝업?.(overlay.firstChild, { 머리: overlay.firstChild });   // 부속 도면 카드 — 카드 어디든 잡고 끌기(단추 빼고)·크기·스크롤
     const close = () => overlay.remove();
     overlay.querySelector(".vp-edge-close").addEventListener("click", close);
     overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
