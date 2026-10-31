@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v17 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v18 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -176,7 +176,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v17</span>
+    <span class="ver">v18</span>
   </div>
 </header>
 <div class="wrap">
@@ -709,11 +709,14 @@ function downloadTemplate(s,say){
     /* 필수 칸은 화면과 같이 이름 뒤에 * 를 붙인다(req·reqIf). 올릴 때 normHead 가 * 를 떼고 맞춘다.
        여럿 고르는 칸은 첫 열(거래처종류1)에만 * — 네 열 중 하나 이상이면 채워진 것이다. */
     sheetCols(s).forEach(function(f){
-      if(f.type==='multi')multiLabs(f).forEach(function(l,i){cols.push({f:f,lab:l+(i===0&&(f.req||f.reqIf)?'*':'')});});
+      if(f.type==='multi')multiLabs(f).forEach(function(l,i){cols.push({f:f,mi:i,lab:l+(i===0&&(f.req||f.reqIf)?'*':'')});});
       else cols.push({f:f,lab:f.label+(f.req||(f.reqIf&&!f.noTplStar)?'*':'')});   /* noTplStar: 조건부 필수라 머리엔 * 없음(v12 사업자번호) */
     });
     var labs=cols.map(function(c){return c.lab;});
     var ws=X.utils.aoa_to_sheet([labs]);
+    /* v18: 머리 칸마다 설명 메모(마우스를 올리면 보임). 셀 메모라 표 값이 아니어서 올리기(takeSheet)는 그대로 읽는다. */
+    var notes={};
+    cols.forEach(function(cc,c){var t=colNote(cc.f,cc.mi);notes[c]=t;var a=ws[X.utils.encode_cell({r:0,c:c})];a.c=[{a:'설명',t:t}];a.c.hidden=true;});
     ws['!cols']=labs.map(function(t){return {wch:Math.max(12,t.length*2+4)};});
     var wb=X.utils.book_new();X.utils.book_append_sheet(wb,ws,s.title);
     /* 목록에서 고르는 칸(v6)은 엑셀에서도 드롭다운(데이터 유효성 검사)으로 고른다.
@@ -731,6 +734,7 @@ function downloadTemplate(s,say){
     }
     var bytes=X.write(wb,{bookType:'xlsx',type:'array'});
     if(dv.length)bytes=addValidation(X,bytes,dv);
+    bytes=sizeNotes(X,bytes,notes);
     saveFile(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'외주입력_'+s.n+'_'+s.title+'_양식.xlsx');
     /* 머리에 * 없는 조건부 필수 칸(noTplStar)은 받을 때 안내 문구로 알린다(v12) */
     say(sheetCols(s).filter(function(f){return f.noTplStar;}).map(function(f){return f.hint?f.label+': '+f.hint:'';}).join(' '));
@@ -741,6 +745,38 @@ function pickList(f){
   if(f.type==='check')return ['O','X'];
   if(f.dl)return LISTS[f.dl]||[];
   return f.opts||null;
+}
+/* 양식 머리 칸 설명(v18) — 사장님 「업로드 양식 다운되면 각 입력부 명칭쪽에 해당 입력부가 무엇인지 설명이 나타나게…」
+   칸 정의(req·reqIf·type·opts·dl·ph·hint)와 목록 출처(refreshLists)에서만 만든다. 영림원 화면에서 확인 안 된 뜻은 넣지 않는다. */
+var DL_SRC={'dl-vendors':'1단계 거래처 중 영림원 등록이 끝난(완료) 외주가공 거래처','dl-wc':'서버의 외주 워크센터 + 2단계 워크센터','dl-proc':'서버의 공정(조립·가공) + 4단계 공정','dl-codes':'3단계 품목의 품번'};
+function colNote(f,mi){
+  var t=[];
+  if(f.type==='multi')t.push(f.req?'필수 — '+f.label+'1~'+MULTI_N+' 중 하나 이상 채웁니다.':'선택 입력');
+  else t.push(f.req?'필수':f.reqIf?'조건부 필수(아래 설명)':'선택 입력(비워도 됩니다)');
+  if(f.type==='multi')t.push('한 칸에 하나씩 고릅니다. 여럿이면 '+f.label+'1~'+MULTI_N+' 에 나눠 고릅니다.');
+  if(f.type==='check')t.push('O = 체크함, X 또는 빈 칸 = 체크 안 함.');
+  else if(f.dl)t.push((pickList(f).length?(f.listOnly?'드롭다운 목록에 있는 것만 넣을 수 있습니다.':'드롭다운에서 고르거나 직접 적습니다.'):'양식을 받을 때 목록이 비어 있어 드롭다운이 없습니다. 직접 적습니다.')+' 목록: '+DL_SRC[f.dl]+'.');
+  else if(f.opts)t.push((f.type==='select'?'목록에서만 고릅니다: ':'드롭다운에서 고르거나 직접 적습니다. 목록: ')+f.opts.join(' / '));
+  if(f.type==='date')t.push('날짜 꼴: 2026-01-01 (연-월-일).');
+  if(f.type==='number')t.push('숫자로 적습니다.');
+  if(f.ph)t.push(/^예:/.test(f.ph)?'입력 '+f.ph:'칸 안내: '+f.ph);
+  if(f.hint)t.push(f.hint);
+  return t.join('\n');
+}
+/* SheetJS 메모 상자는 작아서(2칸×4줄) 긴 설명이 잘린다 → 그림 VML 의 상자 자리(Anchor)를 넓히고 설명 길이만큼 늘린다 */
+function sizeNotes(X,bytes,notes){
+  var zip=X.CFB.read(new Uint8Array(bytes),{type:'array'});
+  var ent=X.CFB.find(zip,'/xl/drawings/vmlDrawing1.vml');if(!ent)return bytes;
+  var xml=new TextDecoder('utf-8').decode(ent.content);
+  xml=xml.replace(/<v:shape [\s\S]*?<\/v:shape>/g,function(sh){
+    var c=+((/<x:Column>(\d+)/.exec(sh)||[])[1]),t=notes[c]||'';
+    var lines=t.split('\n').reduce(function(n,l){return n+Math.max(1,Math.ceil(l.length/16));},0);
+    var h=Math.min(30,lines+3);
+    return sh.replace(/<x:Anchor>[^<]*/,'<x:Anchor>'+(c+1)+',10,0,10,'+(c+4)+',0,'+h+',0')
+             .replace(/width:[\d.]+pt;height:[\d.]+pt/,'width:260pt;height:'+(h*15)+'pt');
+  });
+  ent.content=new TextEncoder().encode(xml);ent.size=ent.content.length;
+  return X.CFB.write(zip,{type:'array',fileType:'zip'});
 }
 var VMAX=1000;  /* 드롭다운을 거는 줄 수(2~1000행) */
 function xmlEsc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
