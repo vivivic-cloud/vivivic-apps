@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v18 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v19 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -176,7 +176,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v18</span>
+    <span class="ver">v19</span>
   </div>
 </header>
 <div class="wrap">
@@ -201,7 +201,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 
 <script>
 /* 저장소: 이 저장소의 다른 앱들과 같은 파이어베이스 프로젝트(vivivic-4b7ef), 익명 로그인.
-   컬렉션은 erp_ 로 시작하는 6개만 쓴다. 기존 업무 기록 컬렉션은 건드리지 않는다.
+   컬렉션은 erp_ 로 시작하는 7개만 쓴다. 기존 업무 기록 컬렉션은 건드리지 않는다.
    SDK 는 필요할 때 불러온다 — 못 불러와도 화면은 뜨고 안내 문구가 나온다. */
 var FB_CONFIG={apiKey:"AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",authDomain:"vivivic-4b7ef.firebaseapp.com",projectId:"vivivic-4b7ef",storageBucket:"vivivic-4b7ef.firebasestorage.app",messagingSenderId:"830175660542",appId:"1:830175660542:web:9054030480c8280af8d8af"};
 function connectDb(){
@@ -239,6 +239,17 @@ function vendorErr(v){
   if(isEmpty(v))return '';
   return (LISTS['dl-vendors']||[]).indexOf(String(v).trim())>=0?'':'영림원에 등록된(완료) 외주가공 거래처만 고를 수 있습니다. 「'+v+'」 은(는) 목록에 없습니다.';
 }
+/* 공정흐름유형 공정(v19): 영림원에 등록된 공정만 흐름에 넣을 수 있다 → 4단계 공정 중 status 완료인 것만 목록(dl-procok). */
+function procErr(v){
+  if(isEmpty(v))return '';
+  return (LISTS['dl-procok']||[]).indexOf(String(v).trim())>=0?'':'영림원에 등록된(완료) 공정만 고를 수 있습니다. 「'+v+'」 은(는) 목록에 없습니다.';
+}
+/* 공정흐름유형의 공정순서·후속공정순서·최종공정여부는 고른 순서로 폼이 채운다(v19) — 1,2,3… / 다음 번호, 마지막 줄은 자기 번호 + 최종 ✓ */
+function flowRows(rows){
+  var a=(rows||[]).filter(function(r){return r&&!isEmpty(r.proc);});
+  return a.map(function(r,i){var last=i===a.length-1;return {seq:i+1,proc:String(r.proc).trim(),next:last?i+1:i+2,last:last};});
+}
+var FLOW_N=10;   /* 엑셀 양식의 공정 열 수(공정1~공정10) — 한 줄 = 흐름 하나 */
 var KNOWN_WC=['아인가구','AMT','경기산업','조혼가구','럭스디자인','진아산업'];
 var KNOWN_PROC=['조립','가공'];
 
@@ -307,7 +318,7 @@ var STEPS=[
 
 {key:'processes',n:4,title:'공정',screen:'공정등록',
  path:['생산/외주','[생산] 기본정보','공정관리','공정'],needs:[],
- note:'서버에 이미 있는 공정은 조립, 가공입니다. 없는 공정만 추가합니다. 공정흐름유형과 품목별공정흐름유형 화면은 아직 열어 보지 않았습니다.',
+ note:'서버에 이미 있는 공정은 조립, 가공입니다. 없는 공정만 추가합니다. 품목별공정흐름유형은 아직 이 폼에 없습니다.',
  fields:[
   F('name','공정명','text',{req:1}),
   F('memo','특이사항','text'),
@@ -316,7 +327,30 @@ var STEPS=[
  recTitle:function(r){return r.name;},
  subt:function(r){return r.inspect?'공정검사 있음':'';}},
 
-{key:'boms',n:5,title:'BOM',screen:'BOM등록업로드',
+{key:'flows',n:5,title:'공정흐름유형',screen:'공정흐름유형등록',
+ path:['생산/외주','[생산] 기본정보','공정관리','공정흐름유형'],needs:['processes'],
+ note:'공정을 거치는 순서(흐름)에 이름을 붙여 등록합니다. 공정을 순서대로 고르면 공정순서·후속공정순서·최종공정여부는 폼이 채웁니다. 같은 공정을 두 번 골라도 됩니다.',
+ fields:[
+  F('name','공정흐름유형','text',{req:1,hint:'흐름 이름입니다. 예: 재단-엣지-보링'}),
+  F('memo','특이사항','text')
+ ],
+ rowTitle:'공정',flowCols:1,
+ rowFields:[
+  F('seq','공정순서','number',{req:1,auto:1}),
+  F('proc','공정','combo',{req:1,dl:'dl-procok',listOnly:1,valid:procErr,hint:'4단계 공정 중 영림원 등록이 끝난(완료) 공정만 목록에 나옵니다.'}),
+  F('next','후속공정순서','number',{req:1,auto:1}),
+  F('last','최종공정여부','check',{auto:1})
+ ],
+ check:function(r){
+  var a=(r.rows||[]).filter(function(x){return x&&!isEmpty(x.proc);});
+  if(!a.length)return '공정이 하나도 없습니다';
+  var bad=a.filter(function(x){return procErr(x.proc);}).map(function(x){return x.proc;});
+  return bad.length?'미등록 공정: '+bad.join(', '):'';
+ },
+ recTitle:function(r){return r.name;},
+ subt:function(r){return (r.rows||[]).map(function(x){return x.proc;}).join(' → ');}},
+
+{key:'boms',n:6,title:'BOM',screen:'BOM등록업로드',
  path:['생산/외주','[생산] 기본정보','BOM관리','BOM업로드'],needs:['items','processes'],
  note:'ERP의 BOM업로드는 엑셀 양식으로 올리는 화면입니다. 아래 행의 항목이 그 양식의 열입니다. 모품목 하나에 하위 품목을 여러 행으로 적습니다.',
  fields:[
@@ -341,7 +375,7 @@ var STEPS=[
  recTitle:function(r){return r.pname;},
  subt:function(r){return [r.pcode,'하위 '+((r.rows||[]).length)+'건'].join(' · ');}},
 
-{key:'contracts',n:6,title:'외주계약',screen:'외주계약등록',
+{key:'contracts',n:7,title:'외주계약',screen:'외주계약등록',
  path:['생산/외주','[외주] 외주계약','외주계약등록'],needs:['workcenters','boms'],
  note:'ERP는 외주거래처를 고른 뒤 미등록공정 가져오기로 공정 행을 불러오고, 행마다 통화, 정산기준, 외주단가, 적용시작일을 입력하는 구조입니다. 아래는 어느 공정에 어떤 단가를 줄지 적는 칸입니다. 소요자재는 BOM에서 가져오므로 입력하지 않습니다.',
  fields:[
@@ -373,7 +407,10 @@ var ROUTES={
  vendors:{method:'화면 입력(건별)',requiredIf:{bizno:'kinds에 외주가공거래처·국내매입거래처·국내매출거래처가 하나라도 있을 때 (숫자 10자리, 000-00-00000 꼴로 저장)'},how:['기본 > [기본] 거래처정보 화면에서 거래처 아이콘을 눌러 거래처등록을 엽니다.','조회로 같은 거래처명이 이미 있는지 확인합니다. 있으면 오류로 두고 사용자에게 알립니다.','신규를 누르고 상호, 거래처명 등 fieldMap 항목을 입력합니다.','우측 거래처종류 표에서 kinds에 있는 종류의 선택 칸에 체크합니다.','세무정보 영역에 사업자번호 등을 입력하고 저장합니다.'],unverified:['거래처종류 표의 아래쪽 항목','저장 동작과 필수 검증']},
  workcenters:{method:'화면 입력(그리드 행)',how:['생산/외주 > [생산] 기본정보 맵에서 워크센터 아이콘을 눌러 워크센터등록을 엽니다.','사업단위를 확인하고 조회로 기존 워크센터를 불러옵니다. 같은 이름이 있으면 새로 만들지 않고 agentNote에 적습니다.','그리드의 첫 빈 행(A 표시)에 fieldMap 항목을 열 제목에 맞춰 입력합니다. 워크센터구분이 사외외주이면 외주거래처에 1단계 거래처를 선택합니다.','저장하고 조회로 확인합니다.'],requiredIf:{vendor:'kind가 사외외주일 때'},unverified:['저장 동작']},
  items:{method:'화면 입력(건별)',how:['기본 > [기본] 품목정보 맵에서 품목등록을 엽니다.','신규를 누르고 품명, 품번 등 fieldMap 항목을 입력합니다. 빨간 글씨 항목이 필수입니다.','저장하고 품목조회에서 확인합니다.'],unverified:['품목자산분류와 품목소분류의 선택지','저장 동작']},
- processes:{method:'화면 입력(그리드 행)',how:['생산/외주 > [생산] 기본정보 맵의 공정관리에서 공정 아이콘을 눌러 공정등록을 엽니다.','조회로 기존 공정을 확인합니다. 같은 공정명이 있으면 새로 만들지 않고 agentNote에 적습니다.','빈 행에 공정명, 특이사항, 공정검사여부를 입력하고 저장합니다.'],unverified:['공정흐름유형과 품목별공정흐름유형 화면','저장 동작']},
+ processes:{method:'화면 입력(그리드 행)',how:['생산/외주 > [생산] 기본정보 맵의 공정관리에서 공정 아이콘을 눌러 공정등록을 엽니다.','조회로 기존 공정을 확인합니다. 같은 공정명이 있으면 새로 만들지 않고 agentNote에 적습니다.','빈 행에 공정명, 특이사항, 공정검사여부를 입력하고 저장합니다.'],unverified:['품목별공정흐름유형 화면','저장 동작']},
+ flows:{method:'화면 입력(머리 행 + 상세 행)',how:['생산/외주 > [생산] 기본정보 맵의 공정관리에서 공정흐름유형 아이콘을 눌러 공정흐름유형등록을 엽니다.','조회로 같은 공정흐름유형이 이미 있는지 확인합니다. 있으면 새로 만들지 않고 agentNote에 적습니다.','왼쪽 표의 빈 행 공정흐름유형 칸에 name, 특이사항 칸에 memo를 넣고 저장합니다. 새 유형은 저장해야 오른쪽 상세 행이 생깁니다.','저장한 행의 행 번호를 더블클릭해 오른쪽 상세를 엽니다(한 번 누르면 안 열림).','상세 빈 행의 공정순서 칸을 누르고 rows 한 개마다 공정순서(seq), 공정(proc, 공정명), 후속공정순서(next)를 탭으로 이어 붙여 넣습니다. 공정은 이름으로 코드가 잡힙니다.','last가 true인 줄(마지막 줄)은 최종공정여부 체크를 켭니다. 공정검사여부는 회색이라 넣지 않습니다(공정등록 값 표시).','저장 전에 모든 줄·칸을 문서 값과 대조하고 저장한 뒤, 조회 후 행 번호를 더블클릭해 다시 대조합니다.'],
+  rowsNote:'seq·next·last는 폼이 고른 순서로 채운다: seq 1,2,3… · next = 다음 seq, 마지막 줄은 자기 seq · 마지막 줄만 last true. 같은 공정이 두 번 나와도 된다(11-01 저장 시험 T중복시험).',
+  unverified:['공정순서가 겹칠 때의 오류 문구(시험 안 함)','병렬공정(후속공정순서를 같게) — 폼은 일렬 흐름만 만든다']},
  boms:{method:'엑셀 업로드',how:['생산/외주 > [생산] 기본정보 맵의 BOM관리에서 BOM업로드를 엽니다.','양식다운로드로 엑셀 양식을 받습니다. 시트명은 BOM일괄업로드입니다.','문서의 상위 필드와 rows를 양식 열에 채웁니다. rows 한 개가 양식의 한 행입니다.','파일선택으로 파일을 고르고 데이터가져오기를 누른 뒤 빨간 필수 열이 모두 채워졌는지 확인하고 저장합니다.','BOMTree조회로 결과를 확인합니다.'],unverified:['엑셀 양식의 열 이름과 순서','자동으로 채워지는 열','품목이 미등록일 때의 오류 동작']},
  contracts:{method:'화면 입력(그리드 행)',how:['생산/외주 > [외주] 외주계약 맵에서 외주계약등록을 엽니다.','사업단위를 고르고 외주거래처를 조회 조건에 지정해 조회합니다.','좌측 그리드에서 해당 외주거래처 행을 선택하고 미등록공정 가져오기를 누릅니다.','우측 그리드에서 rows의 제품번호와 공정에 맞는 행을 찾아 통화, 정산기준, 부가세포함여부, 외주단가, 적용시작일을 입력합니다.','저장하고 외주계약조회에서 확인합니다.'],unverified:['저장 동작','통화와 정산기준의 선택지','소요자재가져오기 동작']}
 };
@@ -381,10 +418,12 @@ function specOf(s){
   var r=ROUTES[s.key];
   function m(a){var o={};a.forEach(function(f){o[f.k]=f.label;});return o;}
   function rq(a){return a.filter(function(f){return f.req;}).map(function(f){return f.k;});}
-  return {step:s.n,key:s.key,collection:'erp_'+s.key,erpModule:s.path[0],menuPath:s.path,screen:s.screen,dependsOn:s.needs,method:r.method,how:r.how,
+  var o={step:s.n,key:s.key,collection:'erp_'+s.key,erpModule:s.path[0],menuPath:s.path,screen:s.screen,dependsOn:s.needs,method:r.method,how:r.how,
     fieldMap:m(s.fields),required:rq(s.fields),requiredIf:r.requiredIf||null,
     rowsField:s.rowFields?'rows':null,rowFieldMap:s.rowFields?m(s.rowFields):null,rowRequired:s.rowFields?rq(s.rowFields):null,
     verifiedByScreen:'화면을 열어 입력 항목을 확인함',unverified:r.unverified};
+  if(r.rowsNote)o.rowsNote=r.rowsNote;   /* v19 공정흐름유형: 폼이 채우는 행 칸 설명 */
+  return o;
 }
 function routeOf(s){var p=specOf(s);return {step:p.step,menuPath:p.menuPath,screen:p.screen,method:p.method,dependsOn:p.dependsOn,specRef:'erp-spec.json'};}
 var SPEC={version:1,system:'영림원 SystemCloud for (아이앤지퍼니처 TEST 테스트서버)',host:'inghometest.ksystemace.com',
@@ -515,7 +554,7 @@ function makeField(f,scope){
 function isEmpty(v){return v===''||v==null||(Array.isArray(v)&&!v.length);}
 
 function makeRow(step,idx,onRemove){
-  var fields=step.rowFields.map(function(f){return makeField(f);});
+  var fields=step.rowFields.filter(function(f){return !f.auto;}).map(function(f){return makeField(f);});  /* auto(v19 공정흐름유형 공정순서 등)는 폼이 채우니 칸이 없다 */
   var removeBtn=h('button',{type:'button',class:'btn small',on:{click:function(){onRemove(row);}}},'행 삭제');
   var label=h('span',{},'');
   var el=h('div',{class:'rowcard'},h('div',{class:'rowtop'},label,removeBtn),h('div',{class:'grid'},fields.map(function(x){return x.el;})));
@@ -529,7 +568,7 @@ function buildForm(step){
   var rowsBox=h('div',{});
   var msg=h('span',{class:'msg','aria-live':'polite'});
   var submit=h('button',{type:'submit',class:'btn primary'},'저장');
-  function relabel(){rows.forEach(function(r,i){r.label.textContent=step.rowTitle+' '+(i+1);r.removeBtn.hidden=rows.length<2;});}
+  function relabel(){rows.forEach(function(r,i){r.label.textContent=step.rowTitle+' '+(i+1)+(step.flowCols?' · 공정순서 '+(i+1)+' → 후속공정순서 '+(i===rows.length-1?(i+1)+' (최종)':i+2):'');r.removeBtn.hidden=rows.length<2;});}
   function addRow(){
     var r=makeRow(step,rows.length,function(x){rows.splice(rows.indexOf(x),1);x.el.remove();relabel();});
     rows.push(r);rowsBox.append(r.el);relabel();return r;
@@ -558,16 +597,19 @@ function buildForm(step){
           if(!touched&&rows.length>1){r.fields.forEach(function(x){x.setError('');});return;}
           r.fields.forEach(function(x){
             var miss=x.f.req&&isEmpty(o[x.f.k]);
-            x.setError(miss?'필수 항목입니다.':'');if(miss){bad++;first=first||x;}
+            var wrong=!miss&&x.f.valid?x.f.valid(o[x.f.k]):'';   /* v19 공정흐름유형 공정: 등록된 것만 */
+            x.setError(miss?'필수 항목입니다.':wrong);if(miss||wrong){bad++;first=first||x;if(!miss)fmt=fmt||wrong;}
           });
           rv.push(o);
         });
-        out.rows=rv;
+        out.rows=step.flowCols?flowRows(rv):rv;
       }
       if(bad){return {ok:false,first:first,count:bad,fmt:fmt};}
       return {ok:true,value:out};
     },
-    values:function(){var o={};headFields.forEach(function(x){o[x.f.k]=x.get();});return o;},  /* 검사 없이 지금 칸 값(v7 일괄 목록) */
+    values:function(){var o={};headFields.forEach(function(x){o[x.f.k]=x.get();});
+      if(step.flowCols)o.rows=rows.map(function(r){var v={};r.fields.forEach(function(x){v[x.f.k]=x.get();});return v;});   /* v19: 공정흐름유형은 일괄 목록에 행도 담는다 */
+      return o;},  /* 검사 없이 지금 칸 값(v7 일괄 목록) */
     reset:function(){
       headFields.forEach(function(x){x.reset();});
       if(step.rowFields){rows.slice().forEach(function(r){r.el.remove();});rows=[];addRow();}
@@ -617,6 +659,7 @@ function refreshLists(){
   var wc=(data.workcenters||[]).filter(function(r){return r.kind==='사외외주';}).map(function(r){return r.name;});
   datalist('dl-vendors',vend);
   datalist('dl-wc',KNOWN_WC.concat(wc));
+  datalist('dl-procok',(data.processes||[]).filter(function(r){return r.status==='완료';}).map(function(r){return String(r.name||'').trim();}));
   datalist('dl-proc',KNOWN_PROC.concat((data.processes||[]).map(function(r){return r.name;})));
   datalist('dl-codes',(data.items||[]).map(function(r){return r.code;}));
   LIVE=LIVE.filter(function(x){return x.el.isConnected;});
@@ -699,7 +742,16 @@ function loadXlsx(){
   return xlsxP;
 }
 var XLSX_FAIL='엑셀 도구를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.';
-function sheetCols(s){return s.fields.concat(s.rowFields||[]);}
+function sheetCols(s){
+  /* v19 공정흐름유형: 한 줄 = 흐름 하나. 공정1~공정10 열에 공정을 순서대로 적는다(공정순서 등은 폼이 채우니 열 없음) */
+  if(s.flowCols){
+    var pf=s.rowFields.filter(function(f){return f.k==='proc';})[0],a=[];
+    for(var i=1;i<=FLOW_N;i++)a.push(Object.assign({},pf,{label:'공정'+i,req:i===1?1:0,flowPos:i-1,
+      hint:i===1?'흐름의 공정을 순서대로 공정1, 공정2… 에 하나씩 적습니다(빈 칸 없이 왼쪽부터). 같은 공정을 두 번 적어도 됩니다. 공정순서·후속공정순서·최종공정여부는 폼이 채웁니다.':null}));   /* 목록 출처는 colNote 가 DL_SRC 로 적으니 hint 에 되풀이하지 않는다 */
+    return s.fields.concat(a);
+  }
+  return s.fields.concat(s.rowFields||[]);
+}
 /* 여럿 고르는 칸(거래처종류)은 엑셀에서 「거래처종류1」~「거래처종류4」 네 열로 나눈다(v9). 올리면 네 열 값을 모두 합친다. */
 var MULTI_N=4;
 function multiLabs(f){var a=[];for(var i=1;i<=MULTI_N;i++)a.push(f.label+i);return a;}
@@ -748,7 +800,7 @@ function pickList(f){
 }
 /* 양식 머리 칸 설명(v18) — 사장님 「업로드 양식 다운되면 각 입력부 명칭쪽에 해당 입력부가 무엇인지 설명이 나타나게…」
    칸 정의(req·reqIf·type·opts·dl·ph·hint)와 목록 출처(refreshLists)에서만 만든다. 영림원 화면에서 확인 안 된 뜻은 넣지 않는다. */
-var DL_SRC={'dl-vendors':'1단계 거래처 중 영림원 등록이 끝난(완료) 외주가공 거래처','dl-wc':'서버의 외주 워크센터 + 2단계 워크센터','dl-proc':'서버의 공정(조립·가공) + 4단계 공정','dl-codes':'3단계 품목의 품번'};
+var DL_SRC={'dl-vendors':'1단계 거래처 중 영림원 등록이 끝난(완료) 외주가공 거래처','dl-wc':'서버의 외주 워크센터 + 2단계 워크센터','dl-proc':'서버의 공정(조립·가공) + 4단계 공정','dl-codes':'3단계 품목의 품번','dl-procok':'4단계 공정 중 영림원 등록이 끝난(완료) 공정'};
 function colNote(f,mi){
   var t=[];
   if(f.type==='multi')t.push(f.req?'필수 — '+f.label+'1~'+MULTI_N+' 중 하나 이상 채웁니다.':'선택 입력');
@@ -858,20 +910,22 @@ function takeSheet(X,s,aoa,say){
         var v=cellVal(X,f,raw);any=true;
         /* 여럿 고르는 칸: 거래처종류1~4(또는 예전 쉼표 한 열) 값을 모두 합친다. 겹치는 값은 한 번만. */
         if(f.type==='multi'){var prev=rowFs.indexOf(f)>=0?o[f.k]:one[f.k];v=(prev||[]).concat(v.filter(function(x){return (prev||[]).indexOf(x)<0;}));v=v.filter(function(x,i){return v.indexOf(x)===i;});if(!v.length)return;}
-        if(rowFs.indexOf(f)>=0){o[f.k]=v;hasRow=true;}
+        if(f.flowPos!=null){(one.rows=one.rows||[])[f.flowPos]={proc:v};}   /* v19 공정흐름유형 공정1~10 → 그 건의 행 */
+        else if(rowFs.indexOf(f)>=0){o[f.k]=v;hasRow=true;}
         else{one[f.k]=v;if(!(f.k in head))head[f.k]=v;}
       });
       if(!any)return;
       lines++;
       if(hasRow)rowVals.push(o);
+      if(one.rows)one.rows=one.rows.filter(Boolean);
       recs.push({line:hi+2+li,vals:one});  /* line = 엑셀 줄 번호(머리 줄 다음부터) */
     });
     if(!lines){say('양식에 입력한 줄이 없습니다.',true);return;}
     if(BYKEY[cur]!==s)return;
-    if(!s.rowFields&&lines>1){showBulk(s,recs,say);return;}
-    if(!s.rowFields)head=recs[0].vals;
+    if((!s.rowFields||s.flowCols)&&lines>1){showBulk(s,recs,say);return;}
+    if(!s.rowFields||s.flowCols){head=recs[0].vals;if(s.flowCols)rowVals=head.rows||[];}
     form.fill(head,rowVals);
-    if(s.rowFields)say('엑셀에서 '+rowVals.length+'행을 읽어 칸에 채웠습니다. 확인하고 저장을 누르세요.');
+    if(s.rowFields&&!s.flowCols)say('엑셀에서 '+rowVals.length+'행을 읽어 칸에 채웠습니다. 확인하고 저장을 누르세요.');
     else say('엑셀 값을 칸에 채웠습니다. 확인하고 저장을 누르세요.');
 }
 /* ---------- 일괄 업로드 목록 (행 없는 단계에 여러 줄을 올렸을 때, v7) ----------
@@ -904,6 +958,8 @@ function bulkState(b,it){
       if(prev)dup='엑셀 '+prev.line+'행과 '+b.nameLab+'이 겹칩니다';}
   }
   if(miss.length)return {label:'필수 빠짐',cls:'오류',why:'필수 빠짐: '+miss.map(function(f){return f.label;}).join('·'),bad:1};
+  var ck=b.s.check?b.s.check(it.vals):'';   /* v19 공정흐름유형: 공정 없음·미등록 공정 */
+  if(ck)return {label:'공정 확인',cls:'오류',why:ck,bad:1};
   var fmt=recBadFmt(b.s,it.vals);
   if(fmt.length){var bf=b.s.fields.filter(function(f){return f.valid&&f.valid(it.vals[f.k]);})[0];
     return {label:bf.badLab||'번호 틀림',cls:'오류',why:fmt.join(' '),bad:1};}
@@ -927,7 +983,7 @@ function bulkDraw(){
 function bulkPick(it){
   var b=bulk;if(!b||it.saved)return;
   if(b.cur)b.cur.vals=form.values();
-  b.cur=it;form.reset();form.fill(it.vals,[]);form.el.hidden=false;
+  b.cur=it;form.reset();form.fill(it.vals,it.vals.rows||[]);form.el.hidden=false;
   b.editing.textContent='엑셀 '+it.line+'행 · '+(b.s.recTitle(it.vals)||'(이름 없음)')+' 을(를) 아래 칸에서 고치고 저장하세요.';b.editing.hidden=false;
   bulkDraw();
   form.collect();  /* 빠진 필수 칸에 「필수 항목입니다」를 바로 보인다 */
@@ -937,7 +993,7 @@ function bulkPick(it){
 function bulkBlock(){
   var b=bulk;if(!b||!b.cur)return '';
   b.cur.vals=form.values();var st=bulkState(b,b.cur);
-  return st.cls==='오류'&&!recNeedMiss(b.s,b.cur.vals).length&&!recBadFmt(b.s,b.cur.vals).length?st.why+' — 저장하지 않았습니다.':'';
+  return st.cls==='오류'&&!recNeedMiss(b.s,b.cur.vals).length&&!recBadFmt(b.s,b.cur.vals).length&&!(b.s.check&&b.s.check(b.cur.vals))?st.why+' — 저장하지 않았습니다.':'';
 }
 function bulkSaved(){
   var b=bulk;if(!b||!b.cur)return;
@@ -948,6 +1004,7 @@ function showBulk(s,recs,say){
   var b={s:s,cur:null,busy:false,nameLab:nameF.label};
   b.items=recs.map(function(r){
     var v={};s.fields.forEach(function(f){v[f.k]=f.k in r.vals?r.vals[f.k]:fieldDef(f);});
+    if(s.flowCols)v.rows=r.vals.rows||[];
     var it={line:r.line,vals:v,saved:false,name:h('b',{}),why:h('small',{}),chip:h('span',{class:'chip'})};
     it.btn=h('button',{type:'button',class:'btn bulkbtn',on:{click:function(){bulkPick(it);}}},h('span',{class:'rt'},it.name,it.why),it.chip);
     return it;
@@ -959,7 +1016,7 @@ function showBulk(s,recs,say){
   var closeBtn=h('button',{type:'button',class:'btn',on:{click:close}},'목록 닫기');
   b.box=h('div',{class:'bulk'},
     h('div',{class:'sub'},'일괄 업로드 목록 ',b.cnt),
-    h('p',{class:'hint',style:'margin:0 0 10px'},'업체마다 버튼 하나입니다. 버튼을 누르면 아래 입력 칸에 그 업체 값이 채워집니다. 고치고 저장하면 「저장됨」으로 바뀝니다. 필수 칸이 빠졌거나 사업자번호가 10자리가 아니거나 외주거래처가 미등록이거나 이름이 겹치는 건은 저장하지 않습니다.'),
+    h('p',{class:'hint',style:'margin:0 0 10px'},'업체마다 버튼 하나입니다. 버튼을 누르면 아래 입력 칸에 그 업체 값이 채워집니다. 고치고 저장하면 「저장됨」으로 바뀝니다. 필수 칸이 빠졌거나 사업자번호가 10자리가 아니거나 외주거래처·공정이 미등록이거나 이름이 겹치는 건은 저장하지 않습니다.'),
     h('div',{class:'bulklist'},b.items.map(function(it){return it.btn;})),
     h('div',{class:'actions'},b.allBtn,closeBtn,bmsg),b.editing);
   function close(){b.box.remove();if(bulk===b)bulk=null;form.reset();form.el.hidden=false;}
@@ -972,7 +1029,8 @@ function showBulk(s,recs,say){
     var done=0,err='';
     /* 파일 순서대로 하나씩 저장한다(createdAt 순서 = 에이전트 처리 순서) */
     todo.reduce(function(p,it){return p.then(function(){
-      var doc=Object.assign(normVals(s,it.vals),{status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(s)});
+      var nv=normVals(s,it.vals);if(s.flowCols)nv.rows=flowRows(nv.rows);
+      var doc=Object.assign(nv,{status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(s)});
       return db.collection('erp_'+s.key).add(doc).then(function(){
         done++;it.saved=true;
         if(b.cur===it){b.cur=null;b.editing.hidden=true;form.reset();form.el.hidden=true;}
@@ -1272,7 +1330,7 @@ document.getElementById('contractPre').textContent=JSON.stringify(SPEC,null,1)+'
   STEPS.map(function(s){return 'erp_'+s.key+'   '+s.n+'단계 '+s.title+' ('+s.screen+')';}).join('\n')+
   '\n\n문서 필드: 폼 항목, '+'status, agentNote, createdAt'+
   '\nstatus 값: 대기 → 진행중 → 완료 | 오류'+
-  '\n행이 있는 단계(erp_boms, erp_contracts)는 rows 배열에 행을 담습니다.'+
+  '\n행이 있는 단계(erp_flows, erp_boms, erp_contracts)는 rows 배열에 행을 담습니다.'+
   '\n에이전트 처리: status가 대기인 문서를 createdAt 오름차순으로 읽고,'+
   '\n단계 번호 순서대로 등록한 뒤 status와 agentNote를 갱신합니다.';
 
