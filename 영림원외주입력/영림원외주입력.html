@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v14 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v15 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -176,7 +176,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v14</span>
+    <span class="ver">v15</span>
   </div>
 </header>
 <div class="wrap">
@@ -279,7 +279,10 @@ var STEPS=[
   F('whMat','자재출고창고','text'),
   F('whProd','제상품출고창고','text'),
   F('whDeliv','납품창고','text'),
-  F('whSite','현장창고','text',{hint:'서버에 있는 워크센터는 창고 이름이 워크센터 이름과 같게 잡혀 있습니다.'})
+  F('whSite','현장창고','text',{hint:'서버에 있는 워크센터는 창고 이름이 워크센터 이름과 같게 잡혀 있습니다.'}),
+  F('whIn','생산입고창고','text'),
+  F('whSemi','반제품입고창고','text'),
+  F('costCenter','원가센터','text')
  ],
  recTitle:function(r){return r.name;},
  subt:function(r){return [r.kind,r.vendor?'외주처 '+r.vendor:''].filter(Boolean).join(' · ');}},
@@ -369,7 +372,7 @@ var BYKEY={};STEPS.forEach(function(s){BYKEY[s.key]=s;});
 /* ---------- machine-readable ERP route, embedded in every saved record ---------- */
 var ROUTES={
  vendors:{method:'화면 입력(건별)',requiredIf:{bizno:'kinds에 외주가공거래처·국내매입거래처·국내매출거래처가 하나라도 있을 때 (숫자 10자리, 000-00-00000 꼴로 저장)'},how:['기본 > [기본] 거래처정보 화면에서 거래처 아이콘을 눌러 거래처등록을 엽니다.','조회로 같은 거래처명이 이미 있는지 확인합니다. 있으면 오류로 두고 사용자에게 알립니다.','신규를 누르고 상호, 거래처명 등 fieldMap 항목을 입력합니다.','우측 거래처종류 표에서 kinds에 있는 종류의 선택 칸에 체크합니다.','세무정보 영역에 사업자번호 등을 입력하고 저장합니다.'],unverified:['거래처종류 표의 아래쪽 항목','저장 동작과 필수 검증']},
- workcenters:{method:'화면 입력(그리드 행)',how:['생산/외주 > [생산] 기본정보 맵에서 워크센터 아이콘을 눌러 워크센터등록을 엽니다.','사업단위를 확인하고 조회로 기존 워크센터를 불러옵니다. 같은 이름이 있으면 새로 만들지 않고 agentNote에 적습니다.','그리드의 첫 빈 행(A 표시)에 fieldMap 항목을 열 제목에 맞춰 입력합니다. 워크센터구분이 사외외주이면 외주거래처에 1단계 거래처를 선택합니다.','저장하고 조회로 확인합니다.'],requiredIf:{vendor:'kind가 사외외주일 때'},unverified:['저장 동작','그리드 오른쪽의 숨은 열']},
+ workcenters:{method:'화면 입력(그리드 행)',how:['생산/외주 > [생산] 기본정보 맵에서 워크센터 아이콘을 눌러 워크센터등록을 엽니다.','사업단위를 확인하고 조회로 기존 워크센터를 불러옵니다. 같은 이름이 있으면 새로 만들지 않고 agentNote에 적습니다.','그리드의 첫 빈 행(A 표시)에 fieldMap 항목을 열 제목에 맞춰 입력합니다. 워크센터구분이 사외외주이면 외주거래처에 1단계 거래처를 선택합니다.','저장하고 조회로 확인합니다.'],requiredIf:{vendor:'kind가 사외외주일 때'},unverified:['저장 동작']},
  items:{method:'화면 입력(건별)',how:['기본 > [기본] 품목정보 맵에서 품목등록을 엽니다.','신규를 누르고 품명, 품번 등 fieldMap 항목을 입력합니다. 빨간 글씨 항목이 필수입니다.','저장하고 품목조회에서 확인합니다.'],unverified:['품목자산분류와 품목소분류의 선택지','저장 동작']},
  processes:{method:'화면 입력(그리드 행)',how:['생산/외주 > [생산] 기본정보 맵의 공정관리에서 공정 아이콘을 눌러 공정등록을 엽니다.','조회로 기존 공정을 확인합니다. 같은 공정명이 있으면 새로 만들지 않고 agentNote에 적습니다.','빈 행에 공정명, 특이사항, 공정검사여부를 입력하고 저장합니다.'],unverified:['공정흐름유형과 품목별공정흐름유형 화면','저장 동작']},
  boms:{method:'엑셀 업로드',how:['생산/외주 > [생산] 기본정보 맵의 BOM관리에서 BOM업로드를 엽니다.','양식다운로드로 엑셀 양식을 받습니다. 시트명은 BOM일괄업로드입니다.','문서의 상위 필드와 rows를 양식 열에 채웁니다. rows 한 개가 양식의 한 행입니다.','파일선택으로 파일을 고르고 데이터가져오기를 누른 뒤 빨간 필수 열이 모두 채워졌는지 확인하고 저장합니다.','BOMTree조회로 결과를 확인합니다.'],unverified:['엑셀 양식의 열 이름과 순서','자동으로 채워지는 열','품목이 미등록일 때의 오류 동작']},
@@ -957,7 +960,7 @@ function showBulk(s,recs,say){
 /* ---------- 구글 스프레드시트 양식 받기 · 올리기 (v8, 키·로그인 없이) ----------
    받기: 사장님 드라이브 「영림원외주입력 양식」 폴더의 단계별 양식(엑셀 양식을 구글시트로 바꾼 것 — 열·별표·드롭다운 같음)을 /copy 로 연다.
    올리기: 붙여 넣은 시트 링크의 /export?format=csv 를 읽어(공유 「링크가 있는 모든 사용자」 필요) 엑셀 올리기와 같은 takeSheet 로 받는다. 탭은 링크의 gid, 없으면 첫 탭. */
-var GS_TEMPLATES={vendors:'1qQNyvzOlabG8njo2rKXW0v-uo8Xp3fLXWtjRcghkQDU',workcenters:'12vwuN4YgtbP1-jglUCwVqNGhcCY-_05gpiPYG0xxnP0',
+var GS_TEMPLATES={vendors:'1qQNyvzOlabG8njo2rKXW0v-uo8Xp3fLXWtjRcghkQDU',workcenters:'1tHugsWAxYSPQMbJxlttrSkIp8RUZUHDk9FH15DUxQJE',
   items:'1beTB9B_2nlpMZ4tQCvGl6gMDj8FDgNUrEsLAfIcl3UI',processes:'1R8wqicbuK5GiqFwDTKNBdI9XKty8t8CTQBJSN8jIZJE',
   boms:'1EWi3ZDA03IDvIIy8Ke6VPaFA25bOpWQEJxRu5h9cBpg',contracts:'1VsMmf5VfC-O1qx_4veugLdFJLbjhZKMiF8gNuzldg8U'};
 var GS_SHARE='시트를 읽지 못했습니다. 구글시트 오른쪽 위 「공유」 → 일반 액세스를 「링크가 있는 모든 사용자」로 바꾼 뒤 링크를 다시 붙여 넣어 주세요.';
