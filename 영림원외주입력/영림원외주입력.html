@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v9 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v10 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -101,6 +101,12 @@ input.bad,select.bad{border-color:var(--red)}
 .card>.actions{margin-top:16px}
 .gsrow{display:flex;gap:8px;align-items:center;flex-basis:100%}   /* 구글시트 링크 붙여넣는 줄 (v8) */
 .gsrow[hidden]{display:none}
+.pick{position:relative;display:inline-flex}   /* 단추 둘(양식 다운로드·일괄 업로드) → 누르면 엑셀/구글 고르는 작은 창 (v10) */
+.pick>.btn{width:100%}
+.pickmenu{position:absolute;top:calc(100% + 4px);left:0;z-index:20;min-width:100%;display:flex;flex-direction:column;gap:2px;padding:4px;
+  background:#fff;border:1px solid var(--line2);border-radius:10px;box-shadow:0 8px 24px rgba(15,15,15,.08)}
+.pickmenu[hidden]{display:none}
+.pickmenu .btn{border-color:transparent;justify-content:flex-start;white-space:nowrap;font-weight:600}
 .msg{font-size:12px;font-weight:700;color:var(--muted)}
 .msg.bad{color:var(--red)}
 .list h3{font-size:15px;font-weight:900;margin:28px 0 10px;display:flex;gap:8px;align-items:baseline;letter-spacing:-0.02em}
@@ -154,8 +160,8 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 @media (max-width:480px){
   .btn{min-height:44px}
   .btn.small{min-height:36px}
-  .card>.actions .btn{flex:1 1 calc(50% - 4px)}   /* 단추 넷(엑셀 둘·구글시트 둘)은 두 줄로 반씩 (v8) */
-  .card>.actions .btn.cert{flex-basis:100%}   /* 거래처 단계 다섯째 단추(사업자등록증)는 아랫줄 한 줄 */
+  .card>.actions>.pick{flex:1 1 calc(50% - 4px)}   /* 단추 둘(양식 다운로드·일괄 업로드)은 한 줄에 반씩 (v10) */
+  .card>.actions .btn.cert{flex-basis:100%}   /* 거래처 단계 셋째 단추(사업자등록증)는 아랫줄 한 줄 */
   .gsrow .btn{flex:none!important}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
@@ -165,7 +171,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v9</span>
+    <span class="ver">v10</span>
   </div>
 </header>
 <div class="wrap">
@@ -581,6 +587,20 @@ function refreshLists(){
   LIVE=LIVE.filter(function(x){return x.el.isConnected;});
   LIVE.forEach(function(x){x.redo();});
 }
+/* 단추 하나 + 고르는 작은 창(엑셀/구글 스프레드시트). 바깥을 누르거나 Esc 면 닫힌다 (v10) */
+var pickOpen=null;
+function pickClose(){if(pickOpen){pickOpen.menu.hidden=true;pickOpen.btn.setAttribute('aria-expanded','false');pickOpen=null;}}
+document.addEventListener('click',function(e){if(pickOpen&&!pickOpen.box.contains(e.target))pickClose();});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&pickOpen){var b=pickOpen.btn;pickClose();b.focus();}});
+function pick(icon,label,choices){
+  var menu=h('div',{class:'pickmenu',role:'menu',hidden:true},choices.map(function(c){
+    return h('button',{type:'button',class:'btn',role:'menuitem',on:{click:function(){pickClose();c[1]();}}},c[0]);}));
+  var btn=h('button',{type:'button',class:'btn','aria-haspopup':'menu','aria-expanded':'false',on:{click:function(){
+    var was=pickOpen&&pickOpen.menu===menu;pickClose();
+    if(!was){menu.hidden=false;btn.setAttribute('aria-expanded','true');pickOpen={box:box,menu:menu,btn:btn};menu.firstChild.focus();}}}},icon,label);
+  var box=h('div',{class:'pick'},btn,menu);
+  return box;
+}
 function renderStep(){
   var s=BYKEY[cur];bulk=null;
   form=buildForm(s);
@@ -592,17 +612,19 @@ function renderStep(){
   var say=function(t,bad){xlMsg.textContent=t;xlMsg.className='msg'+(bad?' bad':'');};
   var fileIn=h('input',{type:'file',accept:'.xlsx,.xls,.csv',hidden:true,on:{change:function(){
     var file=fileIn.files[0];fileIn.value='';if(file)uploadSheet(s,file,say);}}});
-  var xlBar=h('div',{class:'actions'},
-    h('button',{type:'button',class:'btn',on:{click:function(){downloadTemplate(s,say);}}},ico('download'),'양식 다운로드'),
-    h('button',{type:'button',class:'btn',on:{click:function(){fileIn.click();}}},ico('fileup'),'엑셀 업로드'),
-    fileIn);
   /* 구글 스프레드시트 (v8) — 받기는 드라이브의 단계별 양식을 「사본 만들기」로 열고, 올리기는 붙여 넣은 시트 링크를 CSV 로 읽는다 */
   var gsIn=h('input',{type:'url',placeholder:'구글시트 링크를 붙여 넣으세요',autocomplete:'off',on:{keydown:function(e){if(e.key==='Enter'){e.preventDefault();gsGo();}}}});
   var gsGo=function(){var u=gsIn.value.trim();if(u)uploadGsheet(s,u,say);else gsIn.focus();};
   var gsRow=h('div',{class:'gsrow',hidden:true},gsIn,h('button',{type:'button',class:'btn',on:{click:gsGo}},'읽기'));
-  xlBar.append(
-    h('button',{type:'button',class:'btn',on:{click:function(){openGsTemplate(s,say);}}},ico('sheet'),'구글시트 양식'),
-    h('button',{type:'button',class:'btn',on:{click:function(){gsRow.hidden=!gsRow.hidden;if(!gsRow.hidden)gsIn.focus();}}},ico('link'),'구글시트 업로드'));
+  /* 단추 둘 (v10) — 누르면 엑셀 / 구글 스프레드시트 를 고른다. 고른 뒤 동작은 v2(엑셀)·v8(구글시트) 그대로 */
+  var xlBar=h('div',{class:'actions'},
+    pick(ico('download'),'양식 다운로드',[
+      ['엑셀',function(){downloadTemplate(s,say);}],
+      ['구글 스프레드시트',function(){openGsTemplate(s,say);}]]),
+    pick(ico('fileup'),'일괄 업로드',[
+      ['엑셀',function(){fileIn.click();}],
+      ['구글 스프레드시트',function(){gsRow.hidden=false;gsIn.focus();}]]),
+    fileIn);
   if(s.key==='vendors'){
     var certIn=h('input',{type:'file',accept:'application/pdf,.pdf,image/*,.heic,.heif',hidden:true,on:{change:function(){
       var file=certIn.files[0];certIn.value='';if(file)uploadCert(s,file,say);}}});
@@ -887,7 +909,7 @@ function openGsTemplate(s,say){
   var id=GS_TEMPLATES[s.key];
   if(!id){say('이 단계의 구글시트 양식이 아직 없습니다. 양식 다운로드(엑셀)를 써 주세요.',true);return;}
   window.open('https://docs.google.com/spreadsheets/d/'+id+'/copy','_blank','noopener');
-  say('구글시트에서 「사본 만들기」를 누르고, 입력한 뒤 그 시트 링크를 「구글시트 업로드」에 붙여 넣으세요.');
+  say('구글시트에서 「사본 만들기」를 누르고, 입력한 뒤 그 시트 링크를 「일괄 업로드 → 구글 스프레드시트」에 붙여 넣으세요.');
 }
 function gsCsvUrl(u){
   var m=String(u).match(/\/spreadsheets\/d\/([\w-]{20,})/);if(!m)return null;
