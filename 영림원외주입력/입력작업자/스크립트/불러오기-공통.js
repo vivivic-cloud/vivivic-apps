@@ -109,7 +109,7 @@
     const form = await I.list(spec.coll), byKey = {};
     form.forEach((d) => { const k = spec.key(d); if (k && !byKey[k]) byKey[k] = d; });
     const res = { 읽음: got.rows.length, 폼에없음: 0, 같음: 0, 다름: 0, 넣음: 0, 다른것: [] };
-    const now = new Date().toISOString(), day = now.slice(5, 10);
+    const now = new Date().toISOString(), t0 = new Date(), day = String(t0.getMonth() + 1).padStart(2, '0') + '-' + String(t0.getDate()).padStart(2, '0');   // 이 컴퓨터 날짜(ISO 는 세계시라 한국 새벽이면 전날로 찍힌다)
     for (const e of got.rows) {
       const k = spec.key(e), f = byKey[k];
       if (!f) {
