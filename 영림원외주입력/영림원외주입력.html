@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v10 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v11 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -103,10 +103,11 @@ input.bad,select.bad{border-color:var(--red)}
 .gsrow[hidden]{display:none}
 .pick{position:relative;display:inline-flex}   /* 단추 둘(양식 다운로드·일괄 업로드) → 누르면 엑셀/구글 고르는 작은 창 (v10) */
 .pick>.btn{width:100%}
-.pickmenu{position:absolute;top:calc(100% + 4px);left:0;z-index:20;min-width:100%;display:flex;flex-direction:column;gap:2px;padding:4px;
+.pickmenu{position:absolute;top:calc(100% + 4px);left:0;z-index:20;display:flex;gap:4px;padding:4px;
   background:#fff;border:1px solid var(--line2);border-radius:10px;box-shadow:0 8px 24px rgba(15,15,15,.08)}
 .pickmenu[hidden]{display:none}
-.pickmenu .btn{border-color:transparent;justify-content:flex-start;white-space:nowrap;font-weight:600}
+.pickmenu .btn{border-color:transparent;justify-content:center;width:52px;height:52px;padding:0}   /* 글자 없이 로고만 (v11) */
+.pickmenu .btn svg{width:32px;height:32px}
 .msg{font-size:12px;font-weight:700;color:var(--muted)}
 .msg.bad{color:var(--red)}
 .list h3{font-size:15px;font-weight:900;margin:28px 0 10px;display:flex;gap:8px;align-items:baseline;letter-spacing:-0.02em}
@@ -171,7 +172,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v10</span>
+    <span class="ver">v11</span>
   </div>
 </header>
 <div class="wrap">
@@ -592,9 +593,18 @@ var pickOpen=null;
 function pickClose(){if(pickOpen){pickOpen.menu.hidden=true;pickOpen.btn.setAttribute('aria-expanded','false');pickOpen=null;}}
 document.addEventListener('click',function(e){if(pickOpen&&!pickOpen.box.contains(e.target))pickClose();});
 document.addEventListener('keydown',function(e){if(e.key==='Escape'&&pickOpen){var b=pickOpen.btn;pickClose();b.focus();}});
+/* 고르는 창의 프로그램 로고 — 글자 대신 (v11). 이름(엑셀·구글 스프레드시트)은 title·aria-label 로만 남긴다 */
+var LOGOS={
+  '엑셀':'<rect x="2" y="2" width="28" height="28" rx="5" fill="#107C41"/><path d="M10 9h4.2l2 4 2-4H22.4l-4 7 4 7h-4.2l-2.2-4.1-2.2 4.1H9.6l4-7z" fill="#fff"/>',
+  '구글 스프레드시트':'<path d="M8 2h11l8 8v17a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V5a3 3 0 0 1 3-3z" fill="#0F9D58"/><path d="M19 2v6a2 2 0 0 0 2 2h6z" fill="#87CEAC"/><path d="M10 14h12v10H10zm2 2v2h3v-2zm5 0v2h3v-2zm-5 4v2h3v-2zm5 0v2h3v-2z" fill="#fff" fill-rule="evenodd"/>'};
+function logo(n){
+  var v=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  v.setAttribute('viewBox','0 0 32 32');v.setAttribute('aria-hidden','true');v.innerHTML=LOGOS[n];
+  return v;
+}
 function pick(icon,label,choices){
   var menu=h('div',{class:'pickmenu',role:'menu',hidden:true},choices.map(function(c){
-    return h('button',{type:'button',class:'btn',role:'menuitem',on:{click:function(){pickClose();c[1]();}}},c[0]);}));
+    return h('button',{type:'button',class:'btn',role:'menuitem',title:c[0],'aria-label':c[0],on:{click:function(){pickClose();c[1]();}}},logo(c[0]));}));
   var btn=h('button',{type:'button',class:'btn','aria-haspopup':'menu','aria-expanded':'false',on:{click:function(){
     var was=pickOpen&&pickOpen.menu===menu;pickClose();
     if(!was){menu.hidden=false;btn.setAttribute('aria-expanded','true');pickOpen={box:box,menu:menu,btn:btn};menu.firstChild.focus();}}}},icon,label);
