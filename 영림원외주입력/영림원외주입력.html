@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v15 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v16 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -176,7 +176,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v15</span>
+    <span class="ver">v16</span>
   </div>
 </header>
 <div class="wrap">
@@ -281,8 +281,7 @@ var STEPS=[
   F('whDeliv','납품창고','text'),
   F('whSite','현장창고','text',{hint:'서버에 있는 워크센터는 창고 이름이 워크센터 이름과 같게 잡혀 있습니다.'}),
   F('whIn','생산입고창고','text'),
-  F('whSemi','반제품입고창고','text'),
-  F('costCenter','원가센터','text')
+  F('whSemi','생산입고창고(반제품)','text',{alias:['반제품입고창고']})   /* v16: 영림원 화면 글자 그대로. alias = v15 양식 열 이름(올리기에서 계속 받음). 원가센터 칸은 화면에 없어 뺐다 */
  ],
  recTitle:function(r){return r.name;},
  subt:function(r){return [r.kind,r.vendor?'외주처 '+r.vendor:''].filter(Boolean).join(' · ');}},
@@ -806,7 +805,7 @@ function uploadSheet(s,file,say){
    행 없는 단계(거래처·워크센터·품목·공정)는 한 줄이면 폼을 채우고, 여러 줄이면 줄마다 한 건씩 「여러 건 확인」 목록(showBulk)으로 받는다. */
 function takeSheet(X,s,aoa,say){
     var cols=sheetCols(s),byLabel={};
-    cols.forEach(function(f){byLabel[normHead(f.label)]=f;if(f.type==='multi')multiLabs(f).forEach(function(l){byLabel[normHead(l)]=f;});});
+    cols.forEach(function(f){byLabel[normHead(f.label)]=f;(f.alias||[]).forEach(function(l){byLabel[normHead(l)]=f;});if(f.type==='multi')multiLabs(f).forEach(function(l){byLabel[normHead(l)]=f;});});
     var hi=-1,map=[];
     for(var i=0;i<Math.min(aoa.length,10)&&hi<0;i++){
       var m=aoa[i].map(function(c){return byLabel[normHead(c)]||null;});
@@ -960,7 +959,7 @@ function showBulk(s,recs,say){
 /* ---------- 구글 스프레드시트 양식 받기 · 올리기 (v8, 키·로그인 없이) ----------
    받기: 사장님 드라이브 「영림원외주입력 양식」 폴더의 단계별 양식(엑셀 양식을 구글시트로 바꾼 것 — 열·별표·드롭다운 같음)을 /copy 로 연다.
    올리기: 붙여 넣은 시트 링크의 /export?format=csv 를 읽어(공유 「링크가 있는 모든 사용자」 필요) 엑셀 올리기와 같은 takeSheet 로 받는다. 탭은 링크의 gid, 없으면 첫 탭. */
-var GS_TEMPLATES={vendors:'1qQNyvzOlabG8njo2rKXW0v-uo8Xp3fLXWtjRcghkQDU',workcenters:'1tHugsWAxYSPQMbJxlttrSkIp8RUZUHDk9FH15DUxQJE',
+var GS_TEMPLATES={vendors:'1qQNyvzOlabG8njo2rKXW0v-uo8Xp3fLXWtjRcghkQDU',workcenters:'1nMVNO1KAlVJOHohlk0-_sACs6LhX1u9iPydQGXMCf_s',
   items:'1beTB9B_2nlpMZ4tQCvGl6gMDj8FDgNUrEsLAfIcl3UI',processes:'1R8wqicbuK5GiqFwDTKNBdI9XKty8t8CTQBJSN8jIZJE',
   boms:'1EWi3ZDA03IDvIIy8Ke6VPaFA25bOpWQEJxRu5h9cBpg',contracts:'1VsMmf5VfC-O1qx_4veugLdFJLbjhZKMiF8gNuzldg8U'};
 var GS_SHARE='시트를 읽지 못했습니다. 구글시트 오른쪽 위 「공유」 → 일반 액세스를 「링크가 있는 모든 사용자」로 바꾼 뒤 링크를 다시 붙여 넣어 주세요.';
