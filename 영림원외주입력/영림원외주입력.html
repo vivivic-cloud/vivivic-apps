@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v8 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v9 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -165,7 +165,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v8</span>
+    <span class="ver">v9</span>
   </div>
 </header>
 <div class="wrap">
@@ -220,16 +220,16 @@ var STEPS=[
  fields:[
   F('sangho','상호','text',{req:1}),
   F('name','거래처명','text',{req:1,hint:'워크센터의 외주거래처에 표시되는 이름입니다.'}),
-  F('state','거래처상태','combo',{opts:['정상'],def:'정상'}),
-  F('region','국내외구분','select',{opts:['국내','해외'],def:'국내'}),
-  F('credit','신용등급','combo',{opts:['A'],def:'A'}),
-  F('corp','법인/개인','select',{opts:['법인','개인'],def:'법인'}),
+  F('state','거래처상태','combo',{req:1,opts:['정상'],def:'정상'}),
+  F('region','국내외구분','select',{req:1,opts:['국내','해외'],def:'국내'}),
+  F('credit','신용등급','combo',{req:1,opts:['A'],def:'A'}),
+  F('corp','법인/개인','select',{req:1,opts:['법인','개인'],def:'법인'}),
   F('bizno','사업자번호','text',{ph:'000-00-00000'}),
   F('rep','대표자성명','text'),
   F('tel','전화번호','text'),
   F('biztype','업태','text'),
   F('bizitem','종목','text'),
-  F('kinds','거래처종류','multi',{wide:1,opts:['국내매출거래처','수출매출거래처','국내매입거래처','해외매입거래처','외주가공거래처'],def:['외주가공거래처'],hint:'ERP 화면의 거래처종류 목록입니다. 외주처는 외주가공거래처에 체크합니다. 목록 아래쪽 항목은 화면에서 확인하지 못했습니다.'})
+  F('kinds','거래처종류','multi',{req:1,wide:1,opts:['국내매출거래처','수출매출거래처','국내매입거래처','해외매입거래처','외주가공거래처'],def:['외주가공거래처'],hint:'ERP 화면의 거래처종류 목록입니다. 외주처는 외주가공거래처에 체크합니다. 목록 아래쪽 항목은 화면에서 확인하지 못했습니다.'})
  ],
  recTitle:function(r){return r.name||r.sangho;},
  subt:function(r){return [r.region,(r.kinds||[]).join(', ')].filter(Boolean).join(' · ');}},
@@ -263,11 +263,11 @@ var STEPS=[
   F('spec','규격','text'),
   F('eng','영문명','text'),
   F('asset','품목자산분류','combo',{req:1,opts:['상품'],def:'상품'}),
-  F('status','품목상태','combo',{opts:['사용'],def:'사용'}),
+  F('status','품목상태','combo',{req:1,opts:['사용'],def:'사용'}),
   F('unit','기준단위','text',{req:1,ph:'예: EA'}),
   F('small','품목소분류','text',{req:1}),
-  F('io','내외자구분','select',{opts:['내자','외자'],def:'내자'}),
-  F('imp','중요도','combo',{opts:['A등급'],def:'A등급'}),
+  F('io','내외자구분','select',{req:1,opts:['내자','외자'],def:'내자'}),
+  F('imp','중요도','combo',{req:1,opts:['A등급'],def:'A등급'}),
   F('rep','대표품목','check')
  ],
  recTitle:function(r){return r.name;},
@@ -295,7 +295,7 @@ var STEPS=[
  ],
  rowTitle:'하위 품목',
  rowFields:[
-  F('proc','공정','combo',{dl:'dl-proc'}),
+  F('proc','공정','combo',{req:1,dl:'dl-proc'}),
   F('order','표시순서','number'),
   F('cname','하위품명','text',{req:1}),
   F('ccode','하위품번','text',{req:1,mono:1,dl:'dl-codes',xref:1}),
@@ -319,7 +319,7 @@ var STEPS=[
  rowTitle:'공정별 계약',
  rowFields:[
   F('prod','제품명','text'),
-  F('pcode','제품번호','text',{mono:1,dl:'dl-codes',xref:1}),
+  F('pcode','제품번호','text',{req:1,mono:1,dl:'dl-codes',xref:1}),
   F('seq','공정차수','number',{req:1}),
   F('proc','공정','combo',{req:1,dl:'dl-proc'}),
   F('oname','외주품명','text'),
@@ -416,7 +416,7 @@ function makeField(f,scope){
     getter=function(){return ctl.checked;};setter=function(v){ctl.checked=!!v;};focusEl=ctl;
   }else if(f.type==='multi'){
     var boxes=f.opts.map(function(o,i){var b=h('input',{type:'checkbox',id:id+'-'+i,value:o});return b;});
-    wrap.append(h('span',{class:'lab'},f.label),h('div',{class:'checks',role:'group','aria-label':f.label},boxes.map(function(b,i){return h('label',{for:id+'-'+i},b,f.opts[i]);})));
+    wrap.append(h('span',{class:'lab'},f.label,f.req||f.reqIf?h('span',{class:'req','aria-hidden':'true'},'*'):null),h('div',{class:'checks',role:'group','aria-label':f.label},boxes.map(function(b,i){return h('label',{for:id+'-'+i},b,f.opts[i]);})));
     getter=function(){return boxes.filter(function(b){return b.checked;}).map(function(b){return b.value;});};
     setter=function(v){boxes.forEach(function(b){b.checked=(v||[]).indexOf(b.value)>=0;});};focusEl=boxes[0];
   }else if(f.type==='select'){
@@ -634,19 +634,27 @@ function loadXlsx(){
 }
 var XLSX_FAIL='엑셀 도구를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.';
 function sheetCols(s){return s.fields.concat(s.rowFields||[]);}
+/* 여럿 고르는 칸(거래처종류)은 엑셀에서 「거래처종류1」~「거래처종류4」 네 열로 나눈다(v9). 올리면 네 열 값을 모두 합친다. */
+var MULTI_N=4;
+function multiLabs(f){var a=[];for(var i=1;i<=MULTI_N;i++)a.push(f.label+i);return a;}
 function downloadTemplate(s,say){
   loadXlsx().then(function(X){
-    var cols=sheetCols(s);
-    /* 필수 칸은 화면과 같이 이름 뒤에 * 를 붙인다(req·reqIf). 올릴 때 normHead 가 * 를 떼고 맞춘다. */
-    var labs=cols.map(function(f){return f.label+(f.req||f.reqIf?'*':'');});
+    var cols=[];
+    /* 필수 칸은 화면과 같이 이름 뒤에 * 를 붙인다(req·reqIf). 올릴 때 normHead 가 * 를 떼고 맞춘다.
+       여럿 고르는 칸은 첫 열(거래처종류1)에만 * — 네 열 중 하나 이상이면 채워진 것이다. */
+    sheetCols(s).forEach(function(f){
+      if(f.type==='multi')multiLabs(f).forEach(function(l,i){cols.push({f:f,lab:l+(i===0&&(f.req||f.reqIf)?'*':'')});});
+      else cols.push({f:f,lab:f.label+(f.req||f.reqIf?'*':'')});
+    });
+    var labs=cols.map(function(c){return c.lab;});
     var ws=X.utils.aoa_to_sheet([labs]);
     ws['!cols']=labs.map(function(t){return {wch:Math.max(12,t.length*2+4)};});
     var wb=X.utils.book_new();X.utils.book_append_sheet(wb,ws,s.title);
     /* 목록에서 고르는 칸(v6)은 엑셀에서도 드롭다운(데이터 유효성 검사)으로 고른다.
        목록 값은 숨긴 시트 「목록」에 열마다 적고, 양식 칸이 그 범위를 가리킨다(값에 쉼표가 있어도 된다). */
     var dv=[],lists=[];
-    cols.forEach(function(f,c){
-      var l=pickList(f);if(!l||!l.length)return;
+    cols.forEach(function(cc,c){
+      var f=cc.f,l=pickList(f);if(!l||!l.length)return;
       lists.push(l);
       dv.push({col:X.utils.encode_col(c),src:X.utils.encode_col(lists.length-1),n:l.length,strict:f.type==='select',f:f});
     });
@@ -678,7 +686,7 @@ function addValidation(X,bytes,dv){
     var multi=d.f.type==='multi';
     return '<dataValidation type="list" allowBlank="1" showInputMessage="1" showErrorMessage="'+(d.strict?1:0)+'"'+
       (d.strict?' errorTitle="'+xmlEsc(d.f.label)+'" error="목록에서 고르세요."':'')+
-      (multi?' promptTitle="'+xmlEsc(d.f.label)+'" prompt="여럿이면 쉼표로 이어 적습니다. 예: 국내매입거래처, 외주가공거래처"':'')+
+      (multi?' promptTitle="'+xmlEsc(d.f.label)+'" prompt="한 칸에 하나씩 고릅니다. 여럿이면 '+xmlEsc(d.f.label)+'1~'+MULTI_N+' 에 나눠 고릅니다."':'')+
       ' sqref="'+d.col+'2:'+d.col+VMAX+'"><formula1>\'목록\'!$'+d.src+'$1:$'+d.src+'$'+d.n+'</formula1></dataValidation>';
   }).join('');
   var tag='<dataValidations count="'+dv.length+'">'+body+'</dataValidations>';
@@ -729,7 +737,8 @@ function uploadSheet(s,file,say){
    행 있는 단계(BOM·외주계약)는 엑셀 한 줄 = 행 하나로 폼을 채운다.
    행 없는 단계(거래처·워크센터·품목·공정)는 한 줄이면 폼을 채우고, 여러 줄이면 줄마다 한 건씩 「여러 건 확인」 목록(showBulk)으로 받는다. */
 function takeSheet(X,s,aoa,say){
-    var cols=sheetCols(s),byLabel={};cols.forEach(function(f){byLabel[normHead(f.label)]=f;});
+    var cols=sheetCols(s),byLabel={};
+    cols.forEach(function(f){byLabel[normHead(f.label)]=f;if(f.type==='multi')multiLabs(f).forEach(function(l){byLabel[normHead(l)]=f;});});
     var hi=-1,map=[];
     for(var i=0;i<Math.min(aoa.length,10)&&hi<0;i++){
       var m=aoa[i].map(function(c){return byLabel[normHead(c)]||null;});
@@ -744,6 +753,8 @@ function takeSheet(X,s,aoa,say){
       map.forEach(function(f,c){
         if(!f)return;var raw=line[c];if(raw===''||raw==null)return;
         var v=cellVal(X,f,raw);any=true;
+        /* 여럿 고르는 칸: 거래처종류1~4(또는 예전 쉼표 한 열) 값을 모두 합친다. 겹치는 값은 한 번만. */
+        if(f.type==='multi'){var prev=rowFs.indexOf(f)>=0?o[f.k]:one[f.k];v=(prev||[]).concat(v.filter(function(x){return (prev||[]).indexOf(x)<0;}));v=v.filter(function(x,i){return v.indexOf(x)===i;});if(!v.length)return;}
         if(rowFs.indexOf(f)>=0){o[f.k]=v;hasRow=true;}
         else{one[f.k]=v;if(!(f.k in head))head[f.k]=v;}
       });
@@ -868,9 +879,9 @@ function showBulk(s,recs,say){
 /* ---------- 구글 스프레드시트 양식 받기 · 올리기 (v8, 키·로그인 없이) ----------
    받기: 사장님 드라이브 「영림원외주입력 양식」 폴더의 단계별 양식(엑셀 양식을 구글시트로 바꾼 것 — 열·별표·드롭다운 같음)을 /copy 로 연다.
    올리기: 붙여 넣은 시트 링크의 /export?format=csv 를 읽어(공유 「링크가 있는 모든 사용자」 필요) 엑셀 올리기와 같은 takeSheet 로 받는다. 탭은 링크의 gid, 없으면 첫 탭. */
-var GS_TEMPLATES={vendors:'1QDVq0L43FHaSc7-jaiDeyVNrhCUG7A9Xat-pSHfX1U8',workcenters:'1K1SrPDlGI67HGJeV0Xv0M-8YvtAGiUiEKc4BOT45Tqs',
-  items:'1BbEIlt7TfqWbFjT8cGu87vAGNU24KgArb16tYRURjqc',processes:'1R8wqicbuK5GiqFwDTKNBdI9XKty8t8CTQBJSN8jIZJE',
-  boms:'1EWi3ZDA03IDvIIy8Ke6VPaFA25bOpWQEJxRu5h9cBpg',contracts:'1B0kcKkmaCqofysIhit380gR0x3-STTcwmAIz2BOhR3A'};
+var GS_TEMPLATES={vendors:'1qQNyvzOlabG8njo2rKXW0v-uo8Xp3fLXWtjRcghkQDU',workcenters:'1K1SrPDlGI67HGJeV0Xv0M-8YvtAGiUiEKc4BOT45Tqs',
+  items:'1beTB9B_2nlpMZ4tQCvGl6gMDj8FDgNUrEsLAfIcl3UI',processes:'1R8wqicbuK5GiqFwDTKNBdI9XKty8t8CTQBJSN8jIZJE',
+  boms:'1EWi3ZDA03IDvIIy8Ke6VPaFA25bOpWQEJxRu5h9cBpg',contracts:'1VsMmf5VfC-O1qx_4veugLdFJLbjhZKMiF8gNuzldg8U'};
 var GS_SHARE='시트를 읽지 못했습니다. 구글시트 오른쪽 위 「공유」 → 일반 액세스를 「링크가 있는 모든 사용자」로 바꾼 뒤 링크를 다시 붙여 넣어 주세요.';
 function openGsTemplate(s,say){
   var id=GS_TEMPLATES[s.key];
