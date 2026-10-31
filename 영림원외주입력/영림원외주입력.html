@@ -63,7 +63,11 @@ nav button[aria-current="step"] .num{background:var(--ink);color:#fff;border-col
 .needs button:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 .stepnote{margin:12px 0 0;font-size:13px;color:var(--ink);background:var(--fill4);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
 form{margin-top:18px}
-.bulk{margin-top:18px}   /* v7 여러 건 확인 목록 */
+.bulk{margin-top:18px}   /* v7 일괄 업로드 목록 — 버튼은 기존 .btn 모양 */
+.bulklist{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:8px}
+.btn.bulkbtn{justify-content:space-between;text-align:left;gap:10px;padding:10px 12px;min-height:52px;font-weight:500}
+.btn.bulkbtn[aria-pressed="true"]{background:var(--fill);box-shadow:inset 0 0 0 1px var(--ink)}
+.bulkbtn .rt small{display:block}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px 16px}
 .f{display:flex;flex-direction:column;gap:4px;min-width:0}
 .f.wide{grid-column:1/-1}
@@ -517,6 +521,7 @@ function buildForm(step){
       if(bad){return {ok:false,first:first,count:bad};}
       return {ok:true,value:out};
     },
+    values:function(){var o={};headFields.forEach(function(x){o[x.f.k]=x.get();});return o;},  /* 검사 없이 지금 칸 값(v7 일괄 목록) */
     reset:function(){
       headFields.forEach(function(x){x.reset();});
       if(step.rowFields){rows.slice().forEach(function(r){r.el.remove();});rows=[];addRow();}
@@ -572,9 +577,10 @@ function refreshLists(){
   LIVE.forEach(function(x){x.redo();});
 }
 function renderStep(){
-  var s=BYKEY[cur];
+  var s=BYKEY[cur];bulk=null;
   form=buildForm(s);
   form.el.addEventListener('submit',function(e){e.preventDefault();save(s);});
+  var bsync=function(){if(bulk&&bulk.cur){bulk.cur.vals=form.values();bulkDraw();}};form.el.addEventListener('input',bsync);form.el.addEventListener('change',bsync);
   var needs=s.needs.length?h('p',{class:'needs'},'먼저 필요한 단계',s.needs.map(function(k){return h('button',{type:'button',on:{click:function(){go(k);}}},BYKEY[k].n+'. '+BYKEY[k].title);})):null;
   listBox=h('div',{class:'list'});
   var xlMsg=h('span',{class:'msg','aria-live':'polite'});
@@ -742,87 +748,110 @@ function takeSheet(X,s,aoa,say){
     if(s.rowFields)say('엑셀에서 '+rowVals.length+'행을 읽어 칸에 채웠습니다. 확인하고 저장을 누르세요.');
     else say('엑셀 값을 칸에 채웠습니다. 확인하고 저장을 누르세요.');
 }
-/* ---------- 여러 건 확인 (행 없는 단계에 여러 줄을 올렸을 때) ----------
-   줄마다 칸 묶음 하나(makeField). 필수 빠짐·이름 겹침(저장한 항목 또는 파일 안 앞줄)을 표시하고,
-   「모두 저장」은 문제 없는 건만 파일 순서대로 저장한다. 저장 안 된 건은 목록에 남아 고친 뒤 다시 누른다. 덮어쓰지 않는다. */
-var bulkBox=null;
+/* ---------- 일괄 업로드 목록 (행 없는 단계에 여러 줄을 올렸을 때, v7) ----------
+   줄마다 버튼 하나(이름 + 상태: 업로드 준비중 · 필수 빠짐 · 이름 겹침 · 저장됨). 버튼을 누르면 그 건의 값이
+   지금의 한 건 입력 칸(form)에 채워지고, 거기서 고쳐 「저장」하면 그 버튼이 「저장됨」이 된다.
+   「모두 저장」은 업로드 준비중인 건만 파일 순서대로 저장하는 보조. 필수 빠짐·이름 겹침은 저장하지 않는다(덮어쓰기 없음). */
+var bulk=null;  /* {s,items,cur,box,...} — 단계를 옮기면 renderStep 이 버린다 */
 function recNeedMiss(s,vals){
   return s.fields.filter(function(f){return (f.req||(f.reqIf&&f.reqIf(vals)))&&isEmpty(vals[f.k]);});
 }
+function fieldDef(f){return f.def!=null?f.def:(f.type==='check'?false:(f.type==='multi'?[]:''));}
+function nameOf(v){return String(v.name||'').trim();}
+/* 건의 상태: saved · miss(빠진 칸) · dup(겹침 이유) */
+function bulkState(b,it){
+  if(it.saved)return {label:'저장됨',cls:'완료'};
+  var miss=recNeedMiss(b.s,it.vals),nm=nameOf(it.vals),dup='';
+  if(nm){
+    if((data[b.s.key]||[]).some(function(r){return String(r.name||'').trim()===nm;}))dup='이미 저장된 '+b.nameLab+'입니다';
+    else{var prev=b.items.slice(0,b.items.indexOf(it)).filter(function(o){return !o.saved&&nameOf(o.vals)===nm;})[0];
+      if(prev)dup='엑셀 '+prev.line+'행과 '+b.nameLab+'이 겹칩니다';}
+  }
+  if(miss.length)return {label:'필수 빠짐',cls:'오류',why:'필수 빠짐: '+miss.map(function(f){return f.label;}).join('·'),bad:1};
+  if(dup)return {label:'이름 겹침',cls:'오류',why:dup,bad:1};
+  return {label:'업로드 준비중',cls:'대기',ok:1};
+}
+function bulkDraw(){
+  var b=bulk;if(!b)return;
+  var ready=0,saved=0;
+  b.items.forEach(function(it){
+    var st=bulkState(b,it);if(st.ok)ready++;if(it.saved)saved++;
+    it.name.textContent='엑셀 '+it.line+'행 · '+(b.s.recTitle(it.vals)||'(이름 없음)');
+    it.why.textContent=st.why||'';it.why.hidden=!st.why;
+    it.chip.className='chip '+st.cls;it.chip.textContent=st.label;
+    it.btn.setAttribute('aria-pressed',b.cur===it?'true':'false');it.btn.disabled=it.saved;
+  });
+  b.cnt.textContent=b.items.length+'건 · 업로드 준비중 '+ready+' · 저장됨 '+saved;
+  b.allBtn.textContent='모두 저장 ('+ready+'건)';b.allBtn.disabled=!ready||b.busy;
+}
+/* 버튼을 누르면 그 건을 한 건 입력 칸에 연다. 지금 열린 건의 고친 값은 먼저 그 건에 담아 둔다. */
+function bulkPick(it){
+  var b=bulk;if(!b||it.saved)return;
+  if(b.cur)b.cur.vals=form.values();
+  b.cur=it;form.reset();form.fill(it.vals,[]);form.el.hidden=false;
+  b.editing.textContent='엑셀 '+it.line+'행 · '+(b.s.recTitle(it.vals)||'(이름 없음)')+' 을(를) 아래 칸에서 고치고 저장하세요.';b.editing.hidden=false;
+  bulkDraw();
+  form.collect();  /* 빠진 필수 칸에 「필수 항목입니다」를 바로 보인다 */
+  form.el.scrollIntoView({block:'start',behavior:'smooth'});
+}
+/* 한 건 칸에서 저장하려 할 때: 겹치는 이름이면 막는다(덮어쓰기 없음) */
+function bulkBlock(){
+  var b=bulk;if(!b||!b.cur)return '';
+  b.cur.vals=form.values();var st=bulkState(b,b.cur);
+  return st.cls==='오류'&&!recNeedMiss(b.s,b.cur.vals).length?st.why+' — 저장하지 않았습니다.':'';
+}
+function bulkSaved(){
+  var b=bulk;if(!b||!b.cur)return;
+  b.cur.saved=true;b.cur=null;b.editing.hidden=true;form.el.hidden=true;bulkDraw();
+}
 function showBulk(s,recs,say){
   var nameF=s.fields.filter(function(f){return f.k==='name';})[0];
-  var items=recs.map(function(r){
-    var fields=s.fields.map(function(f){var x=makeField(f);if(f.k in r.vals)x.set(r.vals[f.k]);return x;});
-    var title=h('b',{}),sub=h('small',{}),chip=h('span',{class:'chip'});
-    var body=h('div',{class:'recbody'},h('div',{class:'grid',style:'margin-top:12px'},fields.map(function(x){return x.el;})));
-    var d=h('details',{class:'rec'},h('summary',{},h('div',{class:'rt'},title,sub),chip),body);
-    var it={line:r.line,fields:fields,el:d,title:title,sub:sub,chip:chip};
-    body.addEventListener('input',check);body.addEventListener('change',check);
+  var b={s:s,cur:null,busy:false,nameLab:nameF.label};
+  b.items=recs.map(function(r){
+    var v={};s.fields.forEach(function(f){v[f.k]=f.k in r.vals?r.vals[f.k]:fieldDef(f);});
+    var it={line:r.line,vals:v,saved:false,name:h('b',{}),why:h('small',{}),chip:h('span',{class:'chip'})};
+    it.btn=h('button',{type:'button',class:'btn bulkbtn',on:{click:function(){bulkPick(it);}}},h('span',{class:'rt'},it.name,it.why),it.chip);
     return it;
   });
-  function vals(it){var o={};it.fields.forEach(function(x){o[x.f.k]=x.get();});return o;}
-  /* 건마다 문제를 찾는다: 필수 빠짐 · 이미 저장된 이름 · 파일 안 앞줄과 같은 이름 */
-  function issues(it){
-    var v=vals(it),miss=recNeedMiss(s,v),nm=String(v.name||'').trim(),dup='';
-    it.fields.forEach(function(x){x.setError(miss.indexOf(x.f)>=0?'필수 항목입니다.':'');});
-    if(nm){
-      if((data[s.key]||[]).some(function(r){return String(r.name||'').trim()===nm;}))dup='이미 저장된 '+nameF.label+'입니다';
-      else{var prev=items.slice(0,items.indexOf(it)).filter(function(o){return String(vals(o).name||'').trim()===nm;})[0];
-        if(prev)dup='엑셀 '+prev.line+'행과 '+nameF.label+'이 겹칩니다';}
-    }
-    return {v:v,miss:miss,dup:dup};
-  }
-  function check(){
-    var okN=0;
-    items.forEach(function(it){
-      var p=issues(it),bad=p.miss.length||p.dup;
-      it.title.textContent='엑셀 '+it.line+'행 · '+(s.recTitle(p.v)||'(이름 없음)');
-      it.sub.textContent=p.miss.length?'필수 빠짐: '+p.miss.map(function(f){return f.label;}).join('·'):(p.dup||s.subt(p.v));
-      it.chip.className='chip '+(bad?'오류':'대기');it.chip.textContent=p.miss.length?'필수 빠짐':(p.dup?'이름 겹침':'저장 가능');
-      if(!bad)okN++;
-    });
-    cnt.textContent=items.length+'건 중 저장 가능 '+okN+'건';
-    saveBtn.textContent='모두 저장 ('+okN+'건)';saveBtn.disabled=!okN;
-    return okN;
-  }
-  var cnt=h('span',{}),bmsg=h('span',{class:'msg','aria-live':'polite'});
-  var saveBtn=h('button',{type:'button',class:'btn primary',on:{click:saveAll}});
-  var closeBtn=h('button',{type:'button',class:'btn',on:{click:close}},'닫기');
-  var listEl=h('div',{});
-  var box=h('div',{class:'bulk'},h('div',{class:'sub'},'엑셀에서 읽은 '+s.title+' ',cnt),
-    h('p',{class:'hint',style:'margin:0 0 10px'},'줄마다 한 건입니다. 눌러 펼치면 칸을 고칠 수 있습니다. 필수 칸이 빠졌거나 이름이 겹치는 건은 저장하지 않습니다.'),
-    listEl,h('div',{class:'actions'},saveBtn,closeBtn,bmsg));
-  function close(){box.remove();if(bulkBox===box)bulkBox=null;form.el.hidden=false;}
+  b.cnt=h('span',{class:'lab'});
+  b.editing=h('p',{class:'stepnote',hidden:true});
+  var bmsg=h('span',{class:'msg','aria-live':'polite'});
+  b.allBtn=h('button',{type:'button',class:'btn primary',on:{click:saveAll}});
+  var closeBtn=h('button',{type:'button',class:'btn',on:{click:close}},'목록 닫기');
+  b.box=h('div',{class:'bulk'},
+    h('div',{class:'sub'},'일괄 업로드 목록 ',b.cnt),
+    h('p',{class:'hint',style:'margin:0 0 10px'},'업체마다 버튼 하나입니다. 버튼을 누르면 아래 입력 칸에 그 업체 값이 채워집니다. 고치고 저장하면 「저장됨」으로 바뀝니다. 필수 칸이 빠졌거나 이름이 겹치는 건은 저장하지 않습니다.'),
+    h('div',{class:'bulklist'},b.items.map(function(it){return it.btn;})),
+    h('div',{class:'actions'},b.allBtn,closeBtn,bmsg),b.editing);
+  function close(){b.box.remove();if(bulk===b)bulk=null;form.reset();form.el.hidden=false;}
   function saveAll(){
     if(!db){bmsg.textContent='저장소에 연결되지 않아 저장할 수 없습니다.';bmsg.className='msg bad';return;}
-    check();
-    var todo=items.filter(function(it){var p=issues(it);return !p.miss.length&&!p.dup;});
+    if(b.cur)b.cur.vals=form.values();
+    var todo=b.items.filter(function(it){return bulkState(b,it).ok;});
     if(!todo.length)return;
-    saveBtn.disabled=closeBtn.disabled=true;bmsg.textContent='저장하는 중입니다.';bmsg.className='msg';
-    var done=0,fail=0;
+    b.busy=true;bulkDraw();bmsg.textContent='저장하는 중입니다.';bmsg.className='msg';
+    var done=0,err='';
     /* 파일 순서대로 하나씩 저장한다(createdAt 순서 = 에이전트 처리 순서) */
     todo.reduce(function(p,it){return p.then(function(){
-      var doc=Object.assign(vals(it),{status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(s)});
+      var doc=Object.assign({},it.vals,{status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(s)});
       return db.collection('erp_'+s.key).add(doc).then(function(){
-        done++;it.el.remove();items.splice(items.indexOf(it),1);
+        done++;it.saved=true;
+        if(b.cur===it){b.cur=null;b.editing.hidden=true;form.reset();form.el.hidden=true;}
         /* 방금 저장한 이름은 스냅샷이 오기 전에도 겹침으로 잡히게 바로 넣어 둔다 */
         if(data[s.key])data[s.key].push(doc);
-      },function(e){fail++;bmsg.dataset.err=errText(e);});
+      },function(e){err=errText(e);});
     });},Promise.resolve()).then(function(){
-      closeBtn.disabled=false;
-      if(!items.length){close();say(done+'건을 저장했습니다. 대기 상태로 쌓였습니다.');return;}
-      check();
-      var left=items.map(function(it){var p=issues(it);
-        return '엑셀 '+it.line+'행('+(p.miss.length?'필수 빠짐: '+p.miss.map(function(f){return f.label;}).join('·'):(p.dup||'저장 실패'))+')';});
-      bmsg.textContent=done+'건 저장했습니다. 저장 안 한 '+items.length+'건: '+left.join(', ')+(fail?' — '+bmsg.dataset.err:'')+'. 고친 뒤 다시 누르세요.';
-      bmsg.className='msg'+(items.length?' bad':'');
+      b.busy=false;bulkDraw();
+      var left=b.items.filter(function(it){return !it.saved;}).map(function(it){return '엑셀 '+it.line+'행('+(bulkState(b,it).why||'저장 실패')+')';});
+      bmsg.textContent=done+'건 저장했습니다.'+(left.length?' 남은 '+left.length+'건: '+left.join(', ')+(err?' — '+err:'')+'. 버튼을 눌러 고친 뒤 저장하세요.':'');
+      bmsg.className='msg'+(left.length?' bad':'');
     });
   }
-  listEl.append.apply(listEl,items.map(function(it){return it.el;}));
-  if(bulkBox)bulkBox.remove();
-  bulkBox=box;form.el.hidden=true;form.el.before(box);
-  var okN=check();
-  say('엑셀에서 '+items.length+'건을 읽었습니다. 저장 가능 '+okN+'건'+(okN<items.length?', 확인할 것 '+(items.length-okN)+'건':'')+' — 아래 목록을 확인하고 「모두 저장」을 누르세요.',okN<items.length);
+  if(bulk)bulk.box.remove();
+  bulk=b;form.reset();form.el.hidden=true;form.el.before(b.box);
+  bulkDraw();
+  var ready=b.items.filter(function(it){return bulkState(b,it).ok;}).length;
+  say('엑셀에서 '+b.items.length+'건을 읽었습니다. 업로드 준비중 '+ready+'건'+(ready<b.items.length?', 확인할 것 '+(b.items.length-ready)+'건':'')+' — 아래 일괄 업로드 목록에서 버튼을 눌러 확인하세요.',ready<b.items.length);
 }
 /* ---------- 사업자등록증 읽기 (1단계 거래처만. 브라우저 안에서만 읽고, 파일은 밖으로 안 나간다) ----------
    PDF 에 글자층이 있으면 pdf.js 로 글자를 그대로 꺼내고(정확), 사진·스캔 PDF 는 tesseract.js 한국어로 글자를 읽는다.
@@ -1027,9 +1056,10 @@ function save(s){
   if(!db){flash('저장소에 연결되지 않아 저장할 수 없습니다.',true);return;}
   var res=form.collect();
   if(!res.ok){flash('필수 항목 '+res.count+'곳이 비어 있습니다.',true);if(res.first)res.first.focus();return;}
+  var blk=bulkBlock();if(blk){flash(blk,true);return;}
   var doc=Object.assign({},res.value,{status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(s)});
   form.submit.disabled=true;
-  db.collection('erp_'+s.key).add(doc).then(function(){form.reset();flash('저장했습니다. 대기 상태로 쌓였습니다.');})
+  db.collection('erp_'+s.key).add(doc).then(function(){var fromBulk=bulk&&bulk.cur;if(fromBulk&&data[s.key])data[s.key].push(doc);bulkSaved();form.reset();flash(fromBulk?'저장했습니다. 일괄 업로드 목록에서 「저장됨」으로 바뀌었습니다.':'저장했습니다. 대기 상태로 쌓였습니다.');})
    .catch(function(e){flash('저장하지 못했습니다. '+errText(e),true);})
    .then(function(){form.submit.disabled=false;});
 }
