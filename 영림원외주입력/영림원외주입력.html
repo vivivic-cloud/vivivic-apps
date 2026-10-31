@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v11 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v12 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -172,7 +172,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v11</span>
+    <span class="ver">v12</span>
   </div>
 </header>
 <div class="wrap">
@@ -217,6 +217,16 @@ function connectDb(){
 (function(){
 "use strict";
 var F=function(k,label,type,o){return Object.assign({k:k,label:label,type:type},o||{});};
+/* 사업자번호(v12): 숫자 10자리(하이픈은 있어도 없어도 됨) → 저장은 000-00-00000 꼴. 검증숫자가 틀리면 경고만(저장은 됨).
+   거래처종류에 BIZ_KINDS 가 하나라도 있으면 필수 — 영림원 거래처등록이 이 종류에 사업자번호를 요구한다(입력작업자/화면별-요령.md). */
+var BIZ_KINDS=['외주가공거래처','국내매입거래처','국내매출거래처'];
+function bizDigits(v){return String(v==null?'':v).replace(/[\s\-–—]/g,'');}
+function bizErr(v){
+  if(isEmpty(v))return '';var d=bizDigits(v);
+  return /^\d{10}$/.test(d)?'':'사업자번호는 숫자 10자리입니다'+(/^\d+$/.test(d)?'(지금 '+d.length+'자리).':'.');
+}
+function bizNorm(v){var d=bizDigits(v);return /^\d{10}$/.test(d)?d.substr(0,3)+'-'+d.substr(3,2)+'-'+d.substr(5):v;}
+function bizWarn(v){var d=bizDigits(v);return /^\d{10}$/.test(d)&&!bizCheck(d.split('').map(Number))?'검증숫자가 맞지 않는 번호입니다. 한 번 더 확인하세요(저장은 됩니다).':'';}
 var KNOWN_WC=['아인가구','AMT','경기산업','조혼가구','럭스디자인','진아산업'];
 var KNOWN_PROC=['조립','가공'];
 
@@ -231,7 +241,8 @@ var STEPS=[
   F('region','국내외구분','select',{req:1,opts:['국내','해외'],def:'국내'}),
   F('credit','신용등급','combo',{req:1,opts:['A'],def:'A'}),
   F('corp','법인/개인','select',{req:1,opts:['법인','개인'],def:'법인'}),
-  F('bizno','사업자번호','text',{ph:'000-00-00000'}),
+  F('bizno','사업자번호','text',{ph:'000-00-00000',reqIf:function(v){return (v.kinds||[]).some(function(k){return BIZ_KINDS.indexOf(k)>=0;});},
+    noTplStar:1,valid:bizErr,norm:bizNorm,warn:bizWarn,hint:'숫자 10자리(하이픈은 넣어도 빼도 됩니다). 거래처종류가 외주가공·국내매입·국내매출이면 필수입니다.'}),
   F('rep','대표자성명','text'),
   F('tel','전화번호','text'),
   F('biztype','업태','text'),
@@ -345,7 +356,7 @@ var BYKEY={};STEPS.forEach(function(s){BYKEY[s.key]=s;});
 
 /* ---------- machine-readable ERP route, embedded in every saved record ---------- */
 var ROUTES={
- vendors:{method:'화면 입력(건별)',how:['기본 > [기본] 거래처정보 화면에서 거래처 아이콘을 눌러 거래처등록을 엽니다.','조회로 같은 거래처명이 이미 있는지 확인합니다. 있으면 오류로 두고 사용자에게 알립니다.','신규를 누르고 상호, 거래처명 등 fieldMap 항목을 입력합니다.','우측 거래처종류 표에서 kinds에 있는 종류의 선택 칸에 체크합니다.','세무정보 영역에 사업자번호 등을 입력하고 저장합니다.'],unverified:['거래처종류 표의 아래쪽 항목','저장 동작과 필수 검증']},
+ vendors:{method:'화면 입력(건별)',requiredIf:{bizno:'kinds에 외주가공거래처·국내매입거래처·국내매출거래처가 하나라도 있을 때 (숫자 10자리, 000-00-00000 꼴로 저장)'},how:['기본 > [기본] 거래처정보 화면에서 거래처 아이콘을 눌러 거래처등록을 엽니다.','조회로 같은 거래처명이 이미 있는지 확인합니다. 있으면 오류로 두고 사용자에게 알립니다.','신규를 누르고 상호, 거래처명 등 fieldMap 항목을 입력합니다.','우측 거래처종류 표에서 kinds에 있는 종류의 선택 칸에 체크합니다.','세무정보 영역에 사업자번호 등을 입력하고 저장합니다.'],unverified:['거래처종류 표의 아래쪽 항목','저장 동작과 필수 검증']},
  workcenters:{method:'화면 입력(그리드 행)',how:['생산/외주 > [생산] 기본정보 맵에서 워크센터 아이콘을 눌러 워크센터등록을 엽니다.','사업단위를 확인하고 조회로 기존 워크센터를 불러옵니다. 같은 이름이 있으면 새로 만들지 않고 agentNote에 적습니다.','그리드의 첫 빈 행(A 표시)에 fieldMap 항목을 열 제목에 맞춰 입력합니다. 워크센터구분이 사외외주이면 외주거래처에 1단계 거래처를 선택합니다.','저장하고 조회로 확인합니다.'],requiredIf:{vendor:'kind가 사외외주일 때'},unverified:['저장 동작','그리드 오른쪽의 숨은 열']},
  items:{method:'화면 입력(건별)',how:['기본 > [기본] 품목정보 맵에서 품목등록을 엽니다.','신규를 누르고 품명, 품번 등 fieldMap 항목을 입력합니다. 빨간 글씨 항목이 필수입니다.','저장하고 품목조회에서 확인합니다.'],unverified:['품목자산분류와 품목소분류의 선택지','저장 동작']},
  processes:{method:'화면 입력(그리드 행)',how:['생산/외주 > [생산] 기본정보 맵의 공정관리에서 공정 아이콘을 눌러 공정등록을 엽니다.','조회로 기존 공정을 확인합니다. 같은 공정명이 있으면 새로 만들지 않고 agentNote에 적습니다.','빈 행에 공정명, 특이사항, 공정검사여부를 입력하고 저장합니다.'],unverified:['공정흐름유형과 품목별공정흐름유형 화면','저장 동작']},
@@ -464,6 +475,7 @@ function makeField(f,scope){
   var warnEl=h('div',{class:'hint warn',hidden:true});
   if(f.hint)wrap.append(h('div',{class:'hint'},f.hint));
   wrap.append(warnEl,errEl);
+  if(f.warn)wrap.addEventListener('input',function(){var m=f.warn(getter());warnEl.hidden=!m;warnEl.textContent=m||'';});
   if(f.xref&&ctl){
     wrap.addEventListener('input',function(){
       var v=getter();var codes=(data.items||[]).map(function(r){return r.code;});
@@ -509,13 +521,14 @@ function buildForm(step){
   var api={el:f,msg:msg,submit:submit,
     collect:function(){
       var vals={};headFields.forEach(function(x){vals[x.f.k]=x.get();});
-      var bad=0,first=null;
+      var bad=0,first=null,fmt='';
       headFields.forEach(function(x){
         var need=x.f.req||(x.f.reqIf&&x.f.reqIf(vals));
         var miss=need&&isEmpty(vals[x.f.k]);
-        x.setError(miss?'필수 항목입니다.':'');if(miss){bad++;first=first||x;}
+        var wrong=!miss&&x.f.valid?x.f.valid(vals[x.f.k]):'';   /* 모양 검사(v12 사업자번호) */
+        x.setError(miss?'필수 항목입니다.':wrong);if(miss||wrong){bad++;first=first||x;if(!miss)fmt=fmt||wrong;}
       });
-      var out=Object.assign({},vals);
+      var out=normVals(step,vals);
       if(step.rowFields){
         var rv=[];
         rows.forEach(function(r){
@@ -530,7 +543,7 @@ function buildForm(step){
         });
         out.rows=rv;
       }
-      if(bad){return {ok:false,first:first,count:bad};}
+      if(bad){return {ok:false,first:first,count:bad,fmt:fmt};}
       return {ok:true,value:out};
     },
     values:function(){var o={};headFields.forEach(function(x){o[x.f.k]=x.get();});return o;},  /* 검사 없이 지금 칸 값(v7 일괄 목록) */
@@ -676,7 +689,7 @@ function downloadTemplate(s,say){
        여럿 고르는 칸은 첫 열(거래처종류1)에만 * — 네 열 중 하나 이상이면 채워진 것이다. */
     sheetCols(s).forEach(function(f){
       if(f.type==='multi')multiLabs(f).forEach(function(l,i){cols.push({f:f,lab:l+(i===0&&(f.req||f.reqIf)?'*':'')});});
-      else cols.push({f:f,lab:f.label+(f.req||f.reqIf?'*':'')});
+      else cols.push({f:f,lab:f.label+(f.req||(f.reqIf&&!f.noTplStar)?'*':'')});   /* noTplStar: 조건부 필수라 머리엔 * 없음(v12 사업자번호) */
     });
     var labs=cols.map(function(c){return c.lab;});
     var ws=X.utils.aoa_to_sheet([labs]);
@@ -698,7 +711,8 @@ function downloadTemplate(s,say){
     var bytes=X.write(wb,{bookType:'xlsx',type:'array'});
     if(dv.length)bytes=addValidation(X,bytes,dv);
     saveFile(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'외주입력_'+s.n+'_'+s.title+'_양식.xlsx');
-    say('');
+    /* 머리에 * 없는 조건부 필수 칸(noTplStar)은 받을 때 안내 문구로 알린다(v12) */
+    say(sheetCols(s).filter(function(f){return f.noTplStar;}).map(function(f){return f.hint?f.label+': '+f.hint:'';}).join(' '));
   }).catch(function(){say(XLSX_FAIL,true);});
 }
 /* 칸의 고르기 목록: 정해진 목록(opts) · 앞 단계 자료 목록(LISTS) · 체크 칸은 O/X(올릴 때 O 면 체크) */
@@ -811,6 +825,16 @@ var bulk=null;  /* {s,items,cur,box,...} — 단계를 옮기면 renderStep 이 
 function recNeedMiss(s,vals){
   return s.fields.filter(function(f){return (f.req||(f.reqIf&&f.reqIf(vals)))&&isEmpty(vals[f.k]);});
 }
+/* 모양이 틀린 칸(v12 사업자번호 10자리) — 비어 있으면 검사 안 함(필수는 recNeedMiss 가 본다) */
+function recBadFmt(s,vals){
+  return s.fields.filter(function(f){return f.valid&&f.valid(vals[f.k]);}).map(function(f){return f.valid(vals[f.k]);});
+}
+/* 저장할 때 칸 모양을 맞춘다(v12 사업자번호 → 000-00-00000) */
+function normVals(s,vals){
+  var o=Object.assign({},vals);
+  s.fields.forEach(function(f){if(f.norm&&!isEmpty(o[f.k]))o[f.k]=f.norm(o[f.k]);});
+  return o;
+}
 function fieldDef(f){return f.def!=null?f.def:(f.type==='check'?false:(f.type==='multi'?[]:''));}
 function nameOf(v){return String(v.name||'').trim();}
 /* 건의 상태: saved · miss(빠진 칸) · dup(겹침 이유) */
@@ -823,6 +847,8 @@ function bulkState(b,it){
       if(prev)dup='엑셀 '+prev.line+'행과 '+b.nameLab+'이 겹칩니다';}
   }
   if(miss.length)return {label:'필수 빠짐',cls:'오류',why:'필수 빠짐: '+miss.map(function(f){return f.label;}).join('·'),bad:1};
+  var fmt=recBadFmt(b.s,it.vals);
+  if(fmt.length)return {label:'번호 틀림',cls:'오류',why:fmt.join(' '),bad:1};
   if(dup)return {label:'이름 겹침',cls:'오류',why:dup,bad:1};
   return {label:'업로드 준비중',cls:'대기',ok:1};
 }
@@ -853,7 +879,7 @@ function bulkPick(it){
 function bulkBlock(){
   var b=bulk;if(!b||!b.cur)return '';
   b.cur.vals=form.values();var st=bulkState(b,b.cur);
-  return st.cls==='오류'&&!recNeedMiss(b.s,b.cur.vals).length?st.why+' — 저장하지 않았습니다.':'';
+  return st.cls==='오류'&&!recNeedMiss(b.s,b.cur.vals).length&&!recBadFmt(b.s,b.cur.vals).length?st.why+' — 저장하지 않았습니다.':'';
 }
 function bulkSaved(){
   var b=bulk;if(!b||!b.cur)return;
@@ -875,7 +901,7 @@ function showBulk(s,recs,say){
   var closeBtn=h('button',{type:'button',class:'btn',on:{click:close}},'목록 닫기');
   b.box=h('div',{class:'bulk'},
     h('div',{class:'sub'},'일괄 업로드 목록 ',b.cnt),
-    h('p',{class:'hint',style:'margin:0 0 10px'},'업체마다 버튼 하나입니다. 버튼을 누르면 아래 입력 칸에 그 업체 값이 채워집니다. 고치고 저장하면 「저장됨」으로 바뀝니다. 필수 칸이 빠졌거나 이름이 겹치는 건은 저장하지 않습니다.'),
+    h('p',{class:'hint',style:'margin:0 0 10px'},'업체마다 버튼 하나입니다. 버튼을 누르면 아래 입력 칸에 그 업체 값이 채워집니다. 고치고 저장하면 「저장됨」으로 바뀝니다. 필수 칸이 빠졌거나 사업자번호가 10자리가 아니거나 이름이 겹치는 건은 저장하지 않습니다.'),
     h('div',{class:'bulklist'},b.items.map(function(it){return it.btn;})),
     h('div',{class:'actions'},b.allBtn,closeBtn,bmsg),b.editing);
   function close(){b.box.remove();if(bulk===b)bulk=null;form.reset();form.el.hidden=false;}
@@ -888,7 +914,7 @@ function showBulk(s,recs,say){
     var done=0,err='';
     /* 파일 순서대로 하나씩 저장한다(createdAt 순서 = 에이전트 처리 순서) */
     todo.reduce(function(p,it){return p.then(function(){
-      var doc=Object.assign({},it.vals,{status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(s)});
+      var doc=Object.assign(normVals(s,it.vals),{status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(s)});
       return db.collection('erp_'+s.key).add(doc).then(function(){
         done++;it.saved=true;
         if(b.cur===it){b.cur=null;b.editing.hidden=true;form.reset();form.el.hidden=true;}
@@ -1078,7 +1104,8 @@ function uploadCert(s,file,say){
     var hit=keys.filter(function(k){return got[k];}),miss=keys.filter(function(k){return !got[k];});
     if(!hit.length){say('사업자등록증 내용을 읽지 못했습니다. 더 밝고 반듯하게 찍은 사진이나 PDF 로 다시 올려 주세요.',true);return;}
     form.fill(got,[]);
-    say('사업자등록증에서 '+hit.map(lab).join('·')+' 칸을 채웠습니다.'+(pc.bizBad?' 사업자번호가 틀린 번호로 읽혔습니다 — 꼭 고쳐 주세요.':'')+(miss.length?' 못 읽은 칸('+miss.map(lab).join('·')+')은 직접 입력하세요.':'')+' 잘못 읽은 글자가 있을 수 있으니 확인하고 저장을 누르세요.');
+    var bizE=got.bizno?bizErr(got.bizno):'';   /* 읽은 번호도 손으로 넣은 번호와 같은 검사(v12) */
+    say('사업자등록증에서 '+hit.map(lab).join('·')+' 칸을 채웠습니다.'+(bizE?' '+bizE+' 고쳐 주세요.':'')+(pc.bizBad?' 사업자번호가 틀린 번호로 읽혔습니다 — 꼭 고쳐 주세요.':'')+(miss.length?' 못 읽은 칸('+miss.map(lab).join('·')+')은 직접 입력하세요.':'')+' 잘못 읽은 글자가 있을 수 있으니 확인하고 저장을 누르세요.');
   }).catch(function(e){
     console.warn('사업자등록증 읽기 실패',e);
     say(e&&e.message==='script'?'읽기 도구를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.':'파일을 읽지 못했습니다. PDF 나 사진(jpg · png · heic) 파일인지 확인해 주세요.',true);
@@ -1142,7 +1169,7 @@ function patch(s,r,o){db.collection('erp_'+s.key).doc(r.id).update(o).catch(func
 function save(s){
   if(!db){flash('저장소에 연결되지 않아 저장할 수 없습니다.',true);return;}
   var res=form.collect();
-  if(!res.ok){flash('필수 항목 '+res.count+'곳이 비어 있습니다.',true);if(res.first)res.first.focus();return;}
+  if(!res.ok){flash(res.fmt&&res.first&&res.first.f.valid?res.fmt:'필수 항목 '+res.count+'곳이 비어 있습니다.',true);if(res.first)res.first.focus();return;}
   var blk=bulkBlock();if(blk){flash(blk,true);return;}
   var doc=Object.assign({},res.value,{status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(s)});
   form.submit.disabled=true;
