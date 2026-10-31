@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v13 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v14 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -176,7 +176,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v13</span>
+    <span class="ver">v14</span>
   </div>
 </header>
 <div class="wrap">
@@ -233,6 +233,12 @@ function bizErr(v){
 }
 function bizNorm(v){var d=bizDigits(v);return /^\d{10}$/.test(d)?d.substr(0,3)+'-'+d.substr(3,2)+'-'+d.substr(5):v;}
 function bizWarn(v){var d=bizDigits(v);return /^\d{10}$/.test(d)&&!bizCheck(d.split('').map(Number))?'검증숫자가 맞지 않는 번호입니다. 한 번 더 확인하세요(저장은 됩니다).':'';}
+/* 워크센터 외주거래처(v14): 영림원은 등록된 외주거래처만 워크센터에 걸 수 있다 → 1단계 거래처 중
+   거래처종류에 외주가공이 있고 영림원 등록이 끝난(status 완료) 것만 목록(dl-vendors). 대기·진행중·오류는 아직 영림원에 없어 뺀다. */
+function vendorErr(v){
+  if(isEmpty(v))return '';
+  return (LISTS['dl-vendors']||[]).indexOf(String(v).trim())>=0?'':'영림원에 등록된(완료) 외주가공 거래처만 고를 수 있습니다. 「'+v+'」 은(는) 목록에 없습니다.';
+}
 var KNOWN_WC=['아인가구','AMT','경기산업','조혼가구','럭스디자인','진아산업'];
 var KNOWN_PROC=['조립','가공'];
 
@@ -266,7 +272,7 @@ var STEPS=[
   F('name','워크센터','text',{req:1}),
   F('dept','생산부서','combo',{req:1,opts:['기획'],def:'기획'}),
   F('kind','워크센터구분','select',{req:1,opts:['사외외주','자체생산'],def:'사외외주'}),
-  F('vendor','외주거래처','combo',{dl:'dl-vendors',reqIf:function(v){return v.kind==='사외외주';},hint:'사외외주일 때 필수입니다. 1단계에서 입력한 거래처명을 고릅니다.'}),
+  F('vendor','외주거래처','combo',{dl:'dl-vendors',listOnly:1,valid:vendorErr,badLab:'외주거래처 미등록',reqIf:function(v){return v.kind==='사외외주';},hint:'사외외주일 때 필수입니다. 1단계 거래처 중 영림원 등록이 끝난(완료) 외주가공 거래처만 목록에 나옵니다.'}),
   F('capa','Capa산정구분','combo',{req:1,opts:['작업시간'],def:'작업시간'}),
   F('start','시작일','date',{req:1,def:'2026-01-01'}),
   F('end','종료일','text',{def:'9999-12-31'}),
@@ -455,13 +461,20 @@ function makeField(f,scope){
     if(f.mono){ctl.style.fontFamily='var(--mono)';other.style.fontFamily='var(--mono)';}
     var list=function(){return f.dl?(LISTS[f.dl]||[]):f.opts;};
     var fillOpts=function(keep){
-      ctl.replaceChildren.apply(ctl,[h('option',{value:''},'선택')].concat(list().map(function(o){return h('option',{value:o},o);}),[h('option',{value:DIRECT},'직접 입력')]));
+      ctl.replaceChildren.apply(ctl,[h('option',{value:''},'선택')].concat(list().map(function(o){return h('option',{value:o},o);}),f.listOnly?[]:[h('option',{value:DIRECT},'직접 입력')]));
       setter(keep);
     };
     getter=function(){return ctl.value===DIRECT?other.value.trim():ctl.value;};
+    if(f.listOnly)ctl.addEventListener('change',function(){Array.prototype.slice.call(ctl.querySelectorAll('option[data-bad]')).forEach(function(o){if(!o.selected)o.remove();});});
     setter=function(v){
       v=v==null?'':String(v).trim();
       var known=v===''||list().indexOf(v)>=0;
+      /* listOnly(v14 워크센터 외주거래처): 「직접 입력」 없음. 목록 밖 값(엑셀·예전 값)은 「(미등록)」 항목으로 보이고 저장은 valid 가 막는다 */
+      if(f.listOnly){
+        Array.prototype.slice.call(ctl.querySelectorAll('option[data-bad]')).forEach(function(o){o.remove();});
+        if(!known)ctl.append(h('option',{value:v,'data-bad':'1'},v+' (미등록)'));
+        ctl.value=v;return;
+      }
       ctl.value=known?v:DIRECT;other.hidden=known;other.value=known?'':v;
     };
     ctl.addEventListener('change',function(){other.hidden=ctl.value!==DIRECT;if(!other.hidden)other.focus();});
@@ -598,7 +611,7 @@ function datalist(id,vals){
   var seen={};LISTS[id]=vals.filter(function(v){if(!v||seen[v])return false;seen[v]=1;return true;});
 }
 function refreshLists(){
-  var vend=(data.vendors||[]).map(function(r){return r.name;});
+  var vend=(data.vendors||[]).filter(function(r){return r.status==='완료'&&(r.kinds||[]).indexOf('외주가공거래처')>=0;}).map(function(r){return String(r.name||'').trim();});
   var wc=(data.workcenters||[]).filter(function(r){return r.kind==='사외외주';}).map(function(r){return r.name;});
   datalist('dl-vendors',vend);
   datalist('dl-wc',KNOWN_WC.concat(wc));
@@ -707,7 +720,7 @@ function downloadTemplate(s,say){
     cols.forEach(function(cc,c){
       var f=cc.f,l=pickList(f);if(!l||!l.length)return;
       lists.push(l);
-      dv.push({col:X.utils.encode_col(c),src:X.utils.encode_col(lists.length-1),n:l.length,strict:f.type==='select',f:f});
+      dv.push({col:X.utils.encode_col(c),src:X.utils.encode_col(lists.length-1),n:l.length,strict:f.type==='select'||!!f.listOnly,f:f});
     });
     if(dv.length){
       var rows=[];lists.forEach(function(l,c){l.forEach(function(v,r){(rows[r]=rows[r]||[])[c]=v;});});
@@ -854,7 +867,8 @@ function bulkState(b,it){
   }
   if(miss.length)return {label:'필수 빠짐',cls:'오류',why:'필수 빠짐: '+miss.map(function(f){return f.label;}).join('·'),bad:1};
   var fmt=recBadFmt(b.s,it.vals);
-  if(fmt.length)return {label:'번호 틀림',cls:'오류',why:fmt.join(' '),bad:1};
+  if(fmt.length){var bf=b.s.fields.filter(function(f){return f.valid&&f.valid(it.vals[f.k]);})[0];
+    return {label:bf.badLab||'번호 틀림',cls:'오류',why:fmt.join(' '),bad:1};}
   if(dup)return {label:'이름 겹침',cls:'오류',why:dup,bad:1};
   return {label:'업로드 준비중',cls:'대기',ok:1};
 }
@@ -907,7 +921,7 @@ function showBulk(s,recs,say){
   var closeBtn=h('button',{type:'button',class:'btn',on:{click:close}},'목록 닫기');
   b.box=h('div',{class:'bulk'},
     h('div',{class:'sub'},'일괄 업로드 목록 ',b.cnt),
-    h('p',{class:'hint',style:'margin:0 0 10px'},'업체마다 버튼 하나입니다. 버튼을 누르면 아래 입력 칸에 그 업체 값이 채워집니다. 고치고 저장하면 「저장됨」으로 바뀝니다. 필수 칸이 빠졌거나 사업자번호가 10자리가 아니거나 이름이 겹치는 건은 저장하지 않습니다.'),
+    h('p',{class:'hint',style:'margin:0 0 10px'},'업체마다 버튼 하나입니다. 버튼을 누르면 아래 입력 칸에 그 업체 값이 채워집니다. 고치고 저장하면 「저장됨」으로 바뀝니다. 필수 칸이 빠졌거나 사업자번호가 10자리가 아니거나 외주거래처가 미등록이거나 이름이 겹치는 건은 저장하지 않습니다.'),
     h('div',{class:'bulklist'},b.items.map(function(it){return it.btn;})),
     h('div',{class:'actions'},b.allBtn,closeBtn,bmsg),b.editing);
   function close(){b.box.remove();if(bulk===b)bulk=null;form.reset();form.el.hidden=false;}
@@ -943,7 +957,7 @@ function showBulk(s,recs,say){
 /* ---------- 구글 스프레드시트 양식 받기 · 올리기 (v8, 키·로그인 없이) ----------
    받기: 사장님 드라이브 「영림원외주입력 양식」 폴더의 단계별 양식(엑셀 양식을 구글시트로 바꾼 것 — 열·별표·드롭다운 같음)을 /copy 로 연다.
    올리기: 붙여 넣은 시트 링크의 /export?format=csv 를 읽어(공유 「링크가 있는 모든 사용자」 필요) 엑셀 올리기와 같은 takeSheet 로 받는다. 탭은 링크의 gid, 없으면 첫 탭. */
-var GS_TEMPLATES={vendors:'1qQNyvzOlabG8njo2rKXW0v-uo8Xp3fLXWtjRcghkQDU',workcenters:'1K1SrPDlGI67HGJeV0Xv0M-8YvtAGiUiEKc4BOT45Tqs',
+var GS_TEMPLATES={vendors:'1qQNyvzOlabG8njo2rKXW0v-uo8Xp3fLXWtjRcghkQDU',workcenters:'12vwuN4YgtbP1-jglUCwVqNGhcCY-_05gpiPYG0xxnP0',
   items:'1beTB9B_2nlpMZ4tQCvGl6gMDj8FDgNUrEsLAfIcl3UI',processes:'1R8wqicbuK5GiqFwDTKNBdI9XKty8t8CTQBJSN8jIZJE',
   boms:'1EWi3ZDA03IDvIIy8Ke6VPaFA25bOpWQEJxRu5h9cBpg',contracts:'1VsMmf5VfC-O1qx_4veugLdFJLbjhZKMiF8gNuzldg8U'};
 var GS_SHARE='시트를 읽지 못했습니다. 구글시트 오른쪽 위 「공유」 → 일반 액세스를 「링크가 있는 모든 사용자」로 바꾼 뒤 링크를 다시 붙여 넣어 주세요.';
