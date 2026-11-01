@@ -11,6 +11,7 @@
 | 워크센터등록(500226) | `워크센터등록-채우기.js` | `erp_workcenters` 배열 | `ylw.wc.fill` · `ylw.wc.verify` | 예 | 11-01 저장 없이 2줄(사외외주·자체생산) |
 | 공정등록(500173) | `공정등록-채우기.js` | `erp_processes` 배열 `{name, memo, inspect}` | `ylw.process.fill` · `ylw.process.verify` | 예 | 11-01 저장 없이 2줄 |
 | 공정흐름유형등록(500228) | `공정흐름유형등록-채우기.js` | `erp_flows` 배열 `{name, memo, rows:[{seq,proc,next,last}]}` | 머리 `ylw.flow.fillHeads`·`verifyHeads` → 상세 `ylw.flow.fillRows(흐름)`·`verifyRows(흐름)` | 머리는 예, 상세는 흐름 하나씩 | 11-01 실제 12흐름 저장(머리·상세 모두 대조 맞음) |
+| 품목등록(500215) | `품목등록-채우기.js` | `erp_items` 한 건 | `ylw.item.fill1(v)` → Enter → `fill2(v)` → Enter → `check(v)` · `verify(목록)`(품목조회 500260) | 아니오(한 화면 한 건, 건당 약 15초) | 11-01 실제 15건 저장 · 사장님: 일괄은 **품목등록업로드** 로 |
 | 품목대중소분류정의(502365) | `분류정의-읽기.js` | (읽기) → 폼 `erp_classes` 꼴 `{kind, big, mid, name, use, ylwCode}` — 소분류 하나 = 문서 하나 | `ylw.read.classes(only)` (제상품·자재 둘 다, 라디오·조회까지 스크립트) | 324줄 약 2분 30초 | 11-01 불러오기 요청 처리(읽기만) |
 | **(읽기)** 불러오기 공통 | `불러오기-공통.js` | — | `ylw.read.cols`·`ylw.read.need` · 폼 저장소 `ylw.imp.list/add/patch` · `ylw.imp.apply(단계, 읽은것, 요청, 'count'|'import')` · `ylw.imp.pending()`·`ylw.imp.run(요청)` | — | 11-01 |
 | (읽기) 거래처조회(500373) | `거래처조회-읽기.js` | → `erp_vendors` 꼴 | `ylw.read.vendors('all'|'T')` | 예 | 11-01 정상 184·T 9 |
