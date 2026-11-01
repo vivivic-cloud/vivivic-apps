@@ -41,3 +41,11 @@
 
 ### 알아낸 것
 - (11-01) 제품 발주의 상품검색·고르기·부속 논리(`handleSearch`·`addOrderedProduct` 직접검색·`renderOrderParts`)를 `shared/발주상품검색.js` 로 **베꼈다** — 영림원외주입력 v28 「발주 상품검색」이 쓴다. 이 집은 아직 그 파일을 안 부른다(이 집 코드는 한 줄도 안 바꿈). **여기 검색 규칙을 고치면 그 파일도 같이 고쳐라.**
+- (11-01, v1.9.5) **공용 부품 — 한 곳 고치면 둘 다 바뀜.** 제품 발주의 상품검색 세 방법(상품검색·ING단품명·카테고리)과 부속카드를 영림원외주입력과 같이 쓴다(사장님 「조혼가구의 이부분을 갖다 쓰는 형태로」).
+  옮긴 곳(**한 글자도 안 고치고** 옮김): ① `<style>` 한 벌 → `shared/조혼가구모양.css`(그 자리에 `<link>`) ② `#filter-container` 안 마크업 → `shared/발주상품고르기.js` 의 `검색칸글`(그 자리 `<script>발주상품고르기.검색칸(document.currentScript,{발주:true})</script>` 가 파싱 중에 채움)
+  ③ 검색칸 함수(resetSelect·onSupplierChange·ING 드롭다운·onCodeChange·onL1~4Change·resetCategorySelects·resetSearchLabel·selectSearchMethod·입력 유도·handleSearch·부속만 발주 팝오버·selectSearchResult·johonPickTick) → 같은 파일(전역 함수 그대로) ④ renderOrderParts 의 카드 글 → `부속카드`·`특별카드`·`부속묶음`.
+  조혼가구 전용(세트발주 `addOrderedProduct`·발주확정·renderRegisteredOrderParts·박스판·깜빡임 johonBlinkTick)은 그대로 이 집에 있다. 공용 파일은 `<head>` 에서 먼저 싣는다(본 스크립트보다 앞).
+  ⚠ 이 집 `<style>` 은 이제 없다 — 모양을 고치려면 `shared/조혼가구모양.css` 를 고친다(영림원외주입력 「발주 상품검색」도 같이 바뀜). 검색칸 마크업·함수도 공용 파일에서 고친다. 시험 테일윈드는 그 js 도 읽는다(`tests/도구/터.mjs`).
+  전후 대조(11-01, 진짜 원장 읽기만·쓰기 요청 막음·발주확정 안 누름, 375·1280): 처음 → 상품검색 「알렉스」·키보드 고름 → 세트발주 → 펼침 → ING단품명 → 부속만 발주(팝오버·목록·칩) → 담음 → 카테고리 4단 → 세트발주 → 발주처 바꿈, 13 상태 × 마크업·계산모양·자리·담은 값 **278/278 같음**,
+  5 발주처 × 9 검색어 결과 45/45 같음. 캡처 52장 중 다른 점은 머리띠 판 번호 배지(v1.9.4→v1.9.5)와 1단계(256 중 1) 렌더 잡음뿐. 깜빡임(0.56초 타이머)은 두 판 똑같이 멈추고 쟀다.
+  `shared/발주상품검색.js`(논리 사본)는 여전히 이 집이 안 부른다 — 영림원외주입력의 원장 읽기·고르기용.

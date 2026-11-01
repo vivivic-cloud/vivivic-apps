@@ -54,6 +54,8 @@ export async function 테일윈드(){
     }
     fs.writeFileSync(path.join(자재칸, 'tw.config.js'),
         'module.exports = { content: [' + JSON.stringify(path.join(_뿌리, '조혼가구/조혼가구.html')) +
+        // (11-01) 검색칸·부속카드 마크업이 공용 부품으로 옮겨 갔다 — 그 글도 같이 본다
+        ', ' + JSON.stringify(path.join(_뿌리, 'shared/발주상품고르기.js')) +
         '], theme:{extend:{}}, plugins:[] };\n');
     fs.writeFileSync(path.join(자재칸, 'tw.in.css'),
         '@tailwind base;\n@tailwind components;\n@tailwind utilities;\n');
