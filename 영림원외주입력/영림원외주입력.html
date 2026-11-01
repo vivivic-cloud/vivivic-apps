@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v30 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v31 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -195,7 +195,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v30</span>
+    <span class="ver">v31</span>
   </div>
 </header>
 <div class="wrap">
@@ -219,6 +219,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 </div>
 
 <script src="../shared/발주상품검색.js"></script>   <!-- v28 발주 상품검색: 조혼가구 제품 발주의 상품 찾기·고르기·부속 논리 -->
+<script src="../shared/원장재단수량.js"></script>   <!-- v31 BOM 소요량: 원장당 재단 수량 — 에이엠티 재단 편집과 같은 한 벌 -->
 <script>
 /* 저장소: 이 저장소의 다른 앱들과 같은 파이어베이스 프로젝트(vivivic-4b7ef), 익명 로그인.
    컬렉션은 erp_ 로 시작하는 7개만 쓴다. 기존 업무 기록 컬렉션은 건드리지 않는다.
@@ -692,15 +693,71 @@ function makeRow(step,idx,onRemove){
   return row;
 }
 
+/* v31 BOM 소요량 = 원장당 재단 수량. 계산은 shared/원장재단수량.js(에이엠티 재단 편집과 같은 한 벌 — 여기 베끼지 않는다).
+   하위품번이 5단계 자재인 줄만: 원장 크기 = 자재 규격(2440*1220), 부속 크기 = 모품목(4단계 품목) 규격(W*D),
+   결보호 = 원장 엑셀(PS.data)에서 재단W·D 가 같은 줄(모르거나 섞이면 돌리지 않음) → 소요량(분자) 1 · 소요량(분모) n.
+   사람이 고친 값은 덮어쓰지 않는다. 계산이 안 되면(자동으로 넣었던 값만) 비우고 이유를 보인다. 저장 문서 모양은 그대로. */
+function bomGrain(p){
+  if(!PS.data||!PS.data.length)return {v:null,src:PS.loading?'원장 엑셀 읽는 중':'원장 엑셀 못 읽음'};
+  var hd=PS.data[0],iW=hd.indexOf('재단W'),iD=hd.indexOf('재단D'),iG=hd.indexOf('결보호'),vs=[];
+  if(iW<0||iD<0||iG<0)return {v:null,src:'원장 엑셀에 결보호 칸 없음'};
+  for(var i=1;i<PS.data.length;i++){var r=PS.data[i];if(!r)continue;
+    if(parseFloat(r[iW])===p.w&&parseFloat(r[iD])===p.d){var g=String(r[iG]==null?'':r[iG]).trim();if(vs.indexOf(g)<0)vs.push(g);}}
+  if(!vs.length)return {v:null,src:'원장 엑셀에 '+p.w+'×'+p.d+' 없음'};
+  return vs.length===1?{v:vs[0],src:'원장 엑셀'}:{v:'',src:'원장 엑셀 값이 섞임('+vs.join('·')+')'};
+}
+function bomCalc(pcode,ccode){
+  var R=window.원장재단수량;
+  var mat=ccode?(data.materials||[]).filter(function(x){return x.code===ccode;})[0]:null;
+  if(!mat)return null;   /* 원장(자재) 줄이 아님 — 아무것도 안 함 */
+  if(!R)return {why:'계산 부품(shared/원장재단수량.js)을 불러오지 못했습니다. 새로 고침해 주세요.'};
+  var b=R.크기읽기(mat.spec);
+  if(!b)return {why:'자재 「'+(mat.name||ccode)+'」 규격에 원장 크기(예: 2440*1220)가 없습니다.'};
+  var it=pcode?(data.items||[]).filter(function(x){return x.code===pcode;})[0]:null;
+  if(!it)return {why:'모품목번호가 4단계 품목에 없어 부속 크기를 모릅니다.'};
+  var p=R.크기읽기(it.spec);
+  if(!p)return {why:'모품목 「'+(it.name||pcode)+'」 규격에 부속 크기(W*D, 예: 784*396)가 없습니다.'};
+  var g=bomGrain(p),r=R.소요량({부속:p,원장:b,결보호:g.v});
+  if(!r.n)return {why:r.이유};
+  r.글=r.근거+' · 부속 '+p.w+'×'+p.d+'(모품목 규격) · 결보호 '+(g.v==='X'?'X(돌림 가능)':(g.v?g.v+'(돌리지 않음)':'모름(돌리지 않음)'))+' — '+g.src;
+  return r;
+}
+function bomRowHook(r,pF){
+  var by=function(k){return r.fields.filter(function(x){return x.f.k===k;})[0];};
+  var cc=by('ccode'),qn=by('qn'),qd=by('qd'),auto=null;
+  var note=h('div',{class:'hint',hidden:true});r.el.append(note);
+  function redo(refill){
+    var res=bomCalc(pF?pF.get():'',cc.get()),a=qn.get(),b=qd.get();
+    var mine=!!auto&&a===auto.qn&&b===auto.qd,blank=a===''&&(b===''||b==='1');
+    if(!res||res.why){
+      if(mine){qn.set('');qd.set(res?'':'1');}auto=null;
+      note.hidden=!res;note.className='hint'+(res?' warn':'');note.textContent=res?'소요량 자동 계산 안 됨: '+res.why:'';return;
+    }
+    note.hidden=false;note.className='hint';
+    if(mine||(refill&&blank)){qn.set('1');qd.set(String(res.n));auto={qn:'1',qd:String(res.n)};note.textContent='소요량 자동: '+res.글;}
+    else note.textContent='자동 계산 '+res.글+' — 지금 값('+(a||'빈 칸')+'/'+(b||'빈 칸')+')은 그대로 둡니다.';
+  }
+  var onEv=function(e){redo(cc.el.contains(e.target));};
+  r.el.addEventListener('input',onEv);r.el.addEventListener('change',onEv);
+  LIVE.push({el:r.el,redo:function(){redo(true);}});   /* 품목·자재 자료가 늦게 오거나 바뀌면 다시 */
+  r.bomRedo=redo;
+  return r;
+}
+
 function buildForm(step){
   var headFields=step.fields.map(function(f){return makeField(f);});
   var rows=[];
   var rowsBox=h('div',{});
+  var bomPF=step.key==='boms'?headFields.filter(function(x){return x.f.k==='pcode';})[0]:null;   /* v31 모품목번호 → 부속 크기 */
+  if(bomPF){var bomAll=function(){rows.forEach(function(r){r.bomRedo(true);});};
+    bomPF.el.addEventListener('input',bomAll);bomPF.el.addEventListener('change',bomAll);
+    psLoad().then(bomAll);}   /* 결보호는 원장 엑셀에서(발주 상품검색과 같은 원장, 읽기만) */
   var msg=h('span',{class:'msg','aria-live':'polite'});
   var submit=h('button',{type:'submit',class:'btn primary'},'저장');
   function relabel(){rows.forEach(function(r,i){r.label.textContent=step.rowTitle+' '+(i+1)+(step.flowCols?' · 공정순서 '+(i+1)+' → 후속공정순서 '+(i===rows.length-1?(i+1)+' (최종)':i+2):'');r.removeBtn.hidden=rows.length<2;});}
   function addRow(){
     var r=makeRow(step,rows.length,function(x){rows.splice(rows.indexOf(x),1);x.el.remove();relabel();syncName();});
+    if(step.key==='boms')bomRowHook(r,bomPF);   /* v31 소요량 자동(원장당 재단 수량) */
     rows.push(r);rowsBox.append(r.el);relabel();return r;
   }
   /* v22 공정·공정흐름: 이름 ⇄ 공정 칸. 이름을 치면 공정 칸을 다시 만들고(목록 밖 조각 = 미등록), 공정 칸을 바꾸면 이름을 「-」로 다시 잇는다 */
