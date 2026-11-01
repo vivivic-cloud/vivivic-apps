@@ -17,11 +17,11 @@
     const all = Y.rows(sh);
     if (!all.length) throw new Error('품목조회에 줄이 없음 — 화면 「조회」를 먼저');
     const rows = all.filter((r) => only !== 'T' || R.isT(r.ItemName)).map((r) => ({
-      name: R.s(r.ItemName), code: R.s(r.ItemNo), spec: R.s(r.Spec), eng: R.s(r.ItemEngName), asset: R.s(r.AssetName), status: R.s(r.SMStatusName),
+      name: R.s(r.ItemName), code: R.s(r.ItemNo), spec: R.s(r.Spec), eng: R.s(r.ItemEngName), asset: R.s(r.AssetName), state: R.s(r.SMStatusName),
       unit: R.s(r.UnitName), small: R.s(r.ItemClassSName), io: R.s(r.SMInOutKindName), imp: R.s(r.SMABCName), rep: R.bool(r.IsSTDItem),
     }));
     return { rows, 읽음: rows.length, 화면전체: all.length, 확인못함: [], screen: '품목조회',
-      labels: { name: '품명', code: '품번', spec: '규격', eng: '영문명', asset: '품목자산분류', status: '품목상태', unit: '기준단위', small: '품목소분류', io: '내외자구분', imp: '중요도', rep: '대표품목' } };
+      labels: { name: '품명', code: '품번', spec: '규격', eng: '영문명', asset: '품목자산분류', state: '품목상태', unit: '기준단위', small: '품목소분류', io: '내외자구분', imp: '중요도', rep: '대표품목' } };
   };
   return '품목조회 읽기 준비됨';
 })();
