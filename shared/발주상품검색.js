@@ -14,7 +14,7 @@
          카테고리 initializeCategoryFilters 3088 · onL1Change 2718 · onL2Change 2748 · onL3Change 2774 · onL4Change 2796
            + addOrderedProduct(category) 3423·3434·3453
      **조혼가구는 아직 이 파일을 부르지 않는다**(조혼가구 동작을 하나도 안 바꾸려고 베꼈다).
-     둘 중 하나의 검색 규칙을 고치면 다른 쪽도 같이 고친다. 영림원외주입력(v28~) 이 이 파일을 쓴다.
+     둘 중 하나의 검색 규칙을 고치면 다른 쪽도 같이 고친다. 영림원외주입력(v28~)·에이엠티 「원장 확정」(v1.63.0~) 이 이 파일을 쓴다.
 
    데이터 원천 — 조혼가구와 같다:
      파이어스토어 `artifacts/<appId>/public/data/excel_metadata` 중 timestamp 가 가장 늦은 문서의

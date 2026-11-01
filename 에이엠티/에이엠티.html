@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.62.0 (2026-10-17) — 거래명세표를 그 장에서 손수 보낸다
+     버전: v1.63.0 (2026-11-01) — 원장 확정 메뉴: 조혼가구와 같은 상품 검색
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2504,6 +2504,75 @@
         }
         #amt-defect-back button:active{ background:#F4F4F2; }
 
+        /* ══ 원장 확정 (v1.63.0) ══════════════════════════════════════
+           원장을 현실 업무에 맞게 제품별로 확정해 가는 작업공간(11-01 지시).
+           이번 판은 조혼가구와 같은 상품 검색까지만 — 읽기만 한다.
+           판 모양은 불량보고 판과 같은 토큰·같은 크기, 칩은 .amtb-chip 그대로. */
+        #amt-ledger{
+            --vg-bg:#fff; --vg-ink:#111110; --vg-body:#1A1A19; --vg-soft:#6E6E6A;
+            --vg-muted:#9C9C98; --vg-line:#EDEDEB; --vg-edge:#E2E2DF; --vg-fill:#F4F4F2;
+            position:fixed; left:0; right:0; bottom:0; z-index:8200;
+            top:var(--amth-top, 64px);
+            display:none; background:var(--vg-bg); color:var(--vg-body);
+            font:15px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",system-ui,sans-serif;
+            overflow-y:auto; -webkit-overflow-scrolling:touch;
+        }
+        html[data-amtledger="1"] #amt-ledger{ display:block; }
+        #amt-ledger *{ box-sizing:border-box; }
+        #amt-ledger .aml-wrap{ max-width:560px; margin:0 auto;
+            padding:14px 20px calc(86px + env(safe-area-inset-bottom)); }
+        #amt-ledger .aml-head{ display:flex; align-items:baseline; gap:9px; margin:0 0 4px; }
+        #amt-ledger .aml-head b{ font-size:22px; font-weight:700; letter-spacing:-.6px; color:var(--vg-ink); }
+        #amt-ledger .aml-head span{ font-size:12px; color:var(--vg-muted); }
+        #amt-ledger .amtb-chip{ position:relative; }
+        #amt-ledger .amtb-chip::after{ content:''; position:absolute; left:0; right:0; top:-5px; bottom:-5px; }
+        #amt-ledger .amtb-chip em{ font-style:normal; font-size:10px; font-weight:800; margin-left:4px; opacity:.6; }
+        #amt-ledger .aml-mode{ position:relative; margin:12px 0 0; }
+        #amt-ledger .aml-mode[hidden]{ display:none; }
+        #amt-ledger .aml-fld{
+            width:100%; min-height:44px; border:1px solid var(--vg-edge); border-radius:12px;
+            padding:11px 14px; font:inherit; font-size:14px; color:var(--vg-body);
+            background:#fff; outline:none; margin:0 0 8px;
+        }
+        #amt-ledger .aml-fld:focus{ border-color:var(--vg-ink); }
+        #amt-ledger .aml-fld:disabled{ color:var(--vg-muted); background:var(--vg-fill); }
+        #amt-ledger .aml-res{
+            position:absolute; left:0; right:0; top:48px; z-index:2; max-height:50vh; overflow-y:auto;
+            background:#fff; border:1px solid var(--vg-edge); border-radius:12px;
+            box-shadow:0 12px 28px -16px rgba(0,0,0,.45);
+        }
+        #amt-ledger .aml-res[hidden]{ display:none; }
+        #amt-ledger .aml-res button{
+            display:block; width:100%; min-height:44px; text-align:left; border:0; background:#fff;
+            border-bottom:1px solid var(--vg-line); padding:9px 14px; font:inherit; font-size:14px;
+            font-weight:700; color:var(--vg-ink); cursor:pointer;
+        }
+        #amt-ledger .aml-res button:last-child{ border-bottom:0; }
+        #amt-ledger .aml-res button[aria-selected="true"], #amt-ledger .aml-res button:active{ background:var(--vg-fill); }
+        #amt-ledger .aml-res small{ display:block; font-size:11.5px; font-weight:600; color:var(--vg-muted); }
+        #amt-ledger .aml-catres{ font-size:14px; font-weight:800; color:var(--vg-ink); margin:0 0 4px; }
+        #amt-ledger .aml-고름{ border:1px solid var(--vg-line); border-radius:12px; padding:11px 13px; margin:14px 0 10px; }
+        #amt-ledger .aml-이름{ font-size:16px; font-weight:800; color:var(--vg-ink); line-height:1.35; word-break:break-word; }
+        #amt-ledger .aml-딱지{ display:inline-block; font-size:11px; font-weight:800; color:var(--vg-soft);
+            background:var(--vg-fill); border-radius:7px; padding:3px 8px; margin:5px 5px 0 0; }
+        #amt-ledger .aml-tw{ overflow-x:auto; -webkit-overflow-scrolling:touch; border:1px solid var(--vg-line); border-radius:12px; }
+        #amt-ledger .aml-tw table{ border-collapse:collapse; font-size:12.5px; white-space:nowrap; min-width:100%; }
+        #amt-ledger .aml-tw th{ background:var(--vg-fill); font-weight:800; color:var(--vg-soft); text-align:left; padding:8px 10px; }
+        #amt-ledger .aml-tw td{ border-top:1px solid var(--vg-line); padding:8px 10px; color:var(--vg-body); }
+        #amt-ledger .aml-tw td.n{ text-align:right; font-variant-numeric:tabular-nums; }
+        #amt-ledger-back{
+            display:none; position:fixed; z-index:8300; left:12px;
+            bottom:calc(16px + env(safe-area-inset-bottom));
+        }
+        html[data-amtledger="1"] #amt-ledger-back{ display:block; }
+        #amt-ledger-back button{
+            display:inline-flex; align-items:center; gap:7px; background:#fff;
+            border:1px solid #E2E2DF; border-radius:999px; padding:9px 15px;
+            font:inherit; font-size:13px; font-weight:700; color:#6E6E6A; cursor:pointer;
+            box-shadow:0 8px 22px -14px rgba(0,0,0,.55);
+        }
+        #amt-ledger-back button:active{ background:#F4F4F2; }
+
         /* 보고 창 — 집중 창(2147483000)보다 위에 뜬다. 뒤 작업 창은 그대로 산다. */
         #_불량판{
             position:fixed; inset:0; z-index:2147483500; background:rgba(0,0,0,.62);
@@ -2646,7 +2715,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.62.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.63.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2748,7 +2817,7 @@
 
             </div>
 
-            <div class="amth-sec"><b>나머지</b><span>3</span></div>
+            <div class="amth-sec"><b>나머지</b><span>4</span></div>
             <div class="amth-list">
 
                 <button type="button" class="amth-row" onclick="amtOpenBox('process')">
@@ -2765,6 +2834,13 @@
                     <span class="amth-t">불량보고<i id="amth-c-defect">사진·글로 보고</i></span>
                 </button>
 
+                <button type="button" class="amth-row" onclick="amtOpenLedger()">
+                    <span class="amth-ico">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#111110" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/><path d="M9 10l2 2 4-4"/></svg>
+                    </span>
+                    <span class="amth-t">원장 확정<i>상품 검색</i></span>
+                </button>
+
                 <button type="button" class="amth-row" onclick="amtOpenBox('accounts')">
                     <span class="amth-ico">
                         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#111110" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -2779,7 +2855,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.62.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.63.0</b></p>
         </div>
     </div>
 
@@ -2830,6 +2906,36 @@
         </div>
     </div>
     <div id="amt-defect-back"><button type="button" onclick="amtCloseDefect()">← 박스판</button></div>
+
+    <!-- 원장 확정 — 원장을 현실 업무에 맞게 제품별로 확정해 가는 작업공간 (v1.63.0)
+         이번 판은 조혼가구와 같은 상품 검색까지만. 읽기만 한다. -->
+    <div id="amt-ledger">
+        <div class="aml-wrap">
+            <div class="aml-head"><b>원장 확정</b><span id="aml-sub">—</span></div>
+            <div class="amtb-chips" id="aml-sup"></div>
+            <div class="amtb-chips" id="aml-way">
+                <button type="button" class="amtb-chip" data-mode="direct">상품검색</button>
+                <button type="button" class="amtb-chip" data-mode="ing">ING단품명<em>추천</em></button>
+                <button type="button" class="amtb-chip" data-mode="category">카테고리</button>
+            </div>
+            <div class="aml-mode" id="aml-m-direct" hidden>
+                <input class="aml-fld" id="aml-q" type="text" placeholder="상품명을 입력하세요..." autocomplete="off">
+                <div class="aml-res" id="aml-res" role="listbox" hidden></div>
+            </div>
+            <div class="aml-mode" id="aml-m-ing" hidden>
+                <select class="aml-fld" id="aml-ing" aria-label="ING단품명"></select>
+            </div>
+            <div class="aml-mode" id="aml-m-category" hidden>
+                <select class="aml-fld aml-cat" aria-label="대분류"></select>
+                <select class="aml-fld aml-cat" aria-label="중분류"></select>
+                <select class="aml-fld aml-cat" aria-label="소분류"></select>
+                <select class="aml-fld aml-cat" aria-label="색상"></select>
+                <div class="aml-catres" id="aml-catres" hidden></div>
+            </div>
+            <div id="aml-picked"></div>
+        </div>
+    </div>
+    <div id="amt-ledger-back"><button type="button" onclick="amtCloseLedger()">← 박스판</button></div>
 
     <!-- 박스추가 — 박스가 보이는 화면에서만 뜬다 -->
     <button type="button" id="amtb-fab" aria-label="새 박스" title="새 박스">
@@ -17570,6 +17676,192 @@
         };
         window.amtCloseDefect = function(){
             document.documentElement.removeAttribute('data-amtdefect');
+            if (typeof amtGoHome === 'function') amtGoHome();
+        };
+    })();
+    </script>
+
+    <!-- ══ 원장 확정 (v1.63.0) ═══════════════════════════════════════════════
+         사장님 지시(11-01): 「조혼가구 에이엠티에서 사용하는 화이어베이스 원장 정보를
+         현실 업무에 맞게 수정해야 할때가 왔다 … 제품을 하나씩 완성확정하면서 화베에
+         업로드 되는 원본정보도 확정마다 새롭게 업로드 하는 작업공간이 필요해 …
+         일단 새로운 페이지에는 조혼가구와 동일하게 상품을 검색할 수 있는 폼이 필요해」
+
+         이번 판은 검색까지만 — 읽기만 한다. 파이어베이스에 쓰지 않는다.
+         원장 = 이 집이 이미 받아 둔 `currentFullData`
+           (initCloudDataSync: excel_metadata 의 timestamp 가장 늦은 원장 엑셀 → 첫 시트 header:1
+            — 조혼가구 initCloudDataSync·loadCloudExcelData 와 같은 길). 따로 또 받지 않는다.
+         찾기·고르기 = shared/발주상품검색.js (조혼가구 handleSearch·addOrderedProduct·
+           onSupplierChange·onL1~4Change 를 베낀 한 벌. 영림원외주입력도 같은 파일을 쓴다).
+         금액 칸은 꺼내지 않는다. ══════════════════════════════════════════════ -->
+    <script src="../shared/발주상품검색.js"></script>
+    <script>
+    (function(){
+        const P = window.발주상품검색;
+        const $ = id => document.getElementById(id);
+        const _e = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+        // 조혼가구 머리 탭 순서 그대로(조혼가구 · 아인가구 · ING · 럭스디자인 · 유한가구)
+        const S = { data:null, sup:'조혼가구', mode:'', res:[], sel:-1, ing:'', cat:[], picked:null };
+
+        function 원장(){
+            try { return (Array.isArray(currentFullData) && currentFullData.length > 1) ? currentFullData : null; }
+            catch (e) { return null; }
+        }
+        function 열림(){ return document.documentElement.getAttribute('data-amtledger') === '1'; }
+
+        /* 발주처를 바꾸면 검색 방법부터 다시 고른다(조혼가구 switchSupplier → resetSearchLabel) */
+        function 비우기(){ S.picked = null; S.res = []; S.sel = -1; S.ing = ''; S.cat = []; const q = $('aml-q'); if (q) q.value = ''; }
+
+        function 머리(){
+            $('aml-sub').textContent = !P ? '검색 부품을 못 불러옴' : (S.data ? '원장 ' + (S.data.length - 1) + '줄' : '원장 불러오는 중…');
+            $('aml-sup').innerHTML = (P ? P.SUPPLIERS : []).map(x =>
+                '<button type="button" class="amtb-chip' + (S.sup === x[1] ? ' on' : '') + '" data-sup="' + _e(x[1]) + '">' + _e(x[0]) + '</button>').join('');
+            document.querySelectorAll('#aml-way .amtb-chip').forEach(b => b.classList.toggle('on', b.getAttribute('data-mode') === S.mode));
+            ['direct', 'ing', 'category'].forEach(m => { $('aml-m-' + m).hidden = S.mode !== m; });
+        }
+
+        /* ① 상품검색 — handleSearch: 대+중+소-색상 이름에 검색어 · ing발주처 = 발주처 */
+        function 찾기(){
+            const q = $('aml-q').value;
+            S.sel = -1;
+            S.res = (P && S.data && q.trim()) ? P.search(S.data, S.sup, q) : [];
+            결과();
+        }
+        function 결과(){
+            const box = $('aml-res');
+            box.hidden = !S.res.length;
+            const nv = P ? P.normalizeValue : (v => v);
+            box.innerHTML = S.res.map((r, i) =>
+                '<button type="button" role="option" data-i="' + i + '" aria-selected="' + (i === S.sel) + '">' + _e(r.code) +
+                '<small>' + _e(P.buildDisplayName(nv(r.v1), nv(r.v2), nv(r.v3), nv(r.v4))) + '</small></button>').join('');
+            const b = box.children[S.sel]; if (b && b.scrollIntoView) b.scrollIntoView({ block:'nearest' });
+        }
+        function 고르기(r){
+            $('aml-q').value = String(r.code == null ? '' : r.code);
+            S.res = []; S.sel = -1; 결과();
+            S.picked = P.pick(S.data, S.sup, P.normalizeValue(r.code));
+            고른것();
+        }
+
+        /* ② ING단품명 — onSupplierChange 목록 → 고르면 직접검색과 같은 pick */
+        function ING(){
+            const s = $('aml-ing');
+            const list = (P && S.data) ? P.ingCodes(S.data, S.sup) : [];
+            s.innerHTML = '<option value="">' + (S.data ? '제품 고르기' : '원장 불러오는 중…') + '</option>' +
+                list.map(c => '<option value="' + _e(c) + '">' + _e(c) + '</option>').join('');
+            s.disabled = !S.data; s.value = S.ing;
+        }
+
+        /* ③ 카테고리 — 대분류 → 중분류 → 소분류 → 색상 (onL1~4Change). 선택지가 하나면 저절로 */
+        function 카테고리(){
+            const sels = document.querySelectorAll('#aml-m-category .aml-cat');
+            sels.forEach((s, i) => {
+                const ok = !!(P && S.data) && i <= S.cat.length;
+                const opts = ok ? P.catOptions(S.data, S.sup, S.cat.slice(0, i)) : [];
+                s.innerHTML = '<option value="">' + _e(P ? P.CAT_PLACEHOLDERS[i] : '') + '</option>' +
+                    opts.map(v => '<option value="' + _e(v) + '">' + _e(v) + '</option>').join('');
+                s.disabled = !ok; s.value = S.cat[i] || '';
+            });
+            const name = S.cat.length === 4 ? P.catName(S.data, S.sup, S.cat) : '';
+            $('aml-catres').hidden = !name; $('aml-catres').textContent = name;
+        }
+
+        /* 고른 상품 — 그 상품의 원장 줄(부속)을 그대로 보여 준다. 금액 칸은 없다. */
+        function 고른것(){
+            const box = $('aml-picked');
+            const k = S.picked;
+            if (!k) { box.innerHTML = ''; return; }
+            const nv = v => v === '선택없음' ? '' : v;
+            const parts = k.rowIndexes.map(i => P.part(S.data, i)).filter(Boolean);
+            const cols = [['부속명','부속명'],['공급처','공급처'],['원장명','원장명'],['마감','마감'],['마감색상','마감색상'],
+                ['재단W','w'],['재단D','d'],['수량','수량'],['W엣지면','W엣지면'],['D엣지면','D엣지면'],['보링수량','보링수량'],['NC유무','NC유무']];
+            const 칸 = v => (v == null || (typeof v === 'number' && isNaN(v))) ? '' : String(v);
+            box.innerHTML =
+                '<div class="aml-고름">' +
+                    '<div class="aml-이름">' + _e(k.code) + '</div>' +
+                    '<span class="aml-딱지">' + _e(k.supplier) + '</span>' +
+                    (k.ingCode ? '<span class="aml-딱지">' + _e(k.ingCode) + '</span>' : '') +
+                    '<span class="aml-딱지">' + _e(k.criteria.map(nv).filter(Boolean).join(' / ')) + '</span>' +
+                    '<span class="aml-딱지">부속 ' + parts.length + '줄</span>' +
+                '</div>' +
+                '<div class="aml-tw"><table><thead><tr>' + cols.map(c => '<th>' + c[0] + '</th>').join('') + '</tr></thead><tbody>' +
+                parts.map(p => '<tr>' + cols.map(c => '<td' + (typeof p[c[1]] === 'number' ? ' class="n"' : '') + '>' + _e(칸(p[c[1]])) + '</td>').join('') + '</tr>').join('') +
+                '</tbody></table></div>';
+        }
+
+        function 그리기(){
+            const d = 원장();
+            if (d !== S.data) {            // 원장이 새로 왔다(또는 새로 올라왔다) — 고른 것을 그 원장으로 다시 찾는다
+                S.data = d;
+                if (S.picked && d) S.picked = S.mode === 'category' ? P.pickCategory(d, S.sup, S.picked.criteria) : P.pick(d, S.sup, S.picked.code);
+            }
+            머리();
+            if (S.mode === 'direct' && $('aml-q').value && !S.picked) 찾기();
+            if (S.mode === 'ing') ING();
+            if (S.mode === 'category') 카테고리();
+            고른것();
+        }
+
+        $('aml-sup').addEventListener('click', e => {
+            const b = e.target.closest('[data-sup]'); if (!b) return;
+            S.sup = b.getAttribute('data-sup'); S.mode = ''; 비우기(); 결과(); 그리기();
+        });
+        /* selectSearchMethod: 고른 방법 칸만 열고, 고른 상품·카테고리는 비운다 */
+        $('aml-way').addEventListener('click', e => {
+            const b = e.target.closest('[data-mode]'); if (!b) return;
+            S.mode = b.getAttribute('data-mode'); 비우기(); 결과(); 그리기();
+            if (S.mode === 'direct') $('aml-q').focus();
+        });
+        $('aml-q').addEventListener('input', () => { S.picked = null; 찾기(); 고른것(); });
+        $('aml-q').addEventListener('blur', () => { $('aml-res').hidden = true; });
+        $('aml-q').addEventListener('focus', () => { if (S.res.length) $('aml-res').hidden = false; });
+        $('aml-q').addEventListener('keydown', e => {      // 조혼가구 handleSearchKeydown 과 같은 키
+            if ($('aml-res').hidden || !S.res.length) return;
+            if (e.key === 'ArrowDown') { e.preventDefault(); S.sel = Math.min(S.sel + 1, S.res.length - 1); 결과(); }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); S.sel = Math.max(S.sel - 1, -1); 결과(); }
+            else if (e.key === 'Enter') { e.preventDefault(); if (S.sel >= 0) 고르기(S.res[S.sel]); }
+            else if (e.key === 'Escape') { S.res = []; S.sel = -1; 결과(); }
+        });
+        $('aml-res').addEventListener('mousedown', e => e.preventDefault());   // 고르기 전에 칸이 닫히지 않게
+        $('aml-res').addEventListener('click', e => {
+            const b = e.target.closest('[data-i]'); if (!b) return;
+            고르기(S.res[+b.getAttribute('data-i')]);
+        });
+        $('aml-ing').addEventListener('change', e => {
+            S.ing = e.target.value;
+            S.picked = S.ing ? P.pick(S.data, S.sup, S.ing) : null;
+            고른것();
+        });
+        document.querySelectorAll('#aml-m-category .aml-cat').forEach((s, i) => {
+            s.addEventListener('change', () => {
+                S.cat = S.cat.slice(0, i); if (s.value) S.cat.push(s.value);
+                while (s.value && S.cat.length < 4) {
+                    const nx = P.catOptions(S.data, S.sup, S.cat); if (nx.length !== 1) break; S.cat.push(nx[0]);
+                }
+                S.picked = S.cat.length === 4 ? P.pickCategory(S.data, S.sup, S.cat) : null;
+                카테고리(); 고른것();
+            });
+        });
+
+        // 원장이 페이지를 연 뒤에 도착해도 그린다 — 원래 하던 일은 그대로 먼저 한다
+        const 옛왔다 = window._자료왔다;
+        if (typeof 옛왔다 === 'function') {
+            window._자료왔다 = function (무엇) {
+                const r = 옛왔다.apply(this, arguments);
+                if (무엇 === '원장' && 열림()) 그리기();
+                return r;
+            };
+        }
+
+        window.amtOpenLedger = function(){
+            if (typeof amtFitTop === 'function') amtFitTop();
+            document.documentElement.removeAttribute('data-amthome');
+            document.documentElement.setAttribute('data-amtledger', '1');
+            그리기();
+            window.scrollTo(0, 0);
+        };
+        window.amtCloseLedger = function(){
+            document.documentElement.removeAttribute('data-amtledger');
             if (typeof amtGoHome === 'function') amtGoHome();
         };
     })();
