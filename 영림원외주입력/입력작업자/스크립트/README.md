@@ -11,6 +11,7 @@
 | 워크센터등록(500226) | `워크센터등록-채우기.js` | `erp_workcenters` 배열 | `ylw.wc.fill` · `ylw.wc.verify` | 예 | 11-01 저장 없이 2줄(사외외주·자체생산) |
 | 공정등록(500173) | `공정등록-채우기.js` | `erp_processes` 배열 `{name, memo, inspect}` | `ylw.process.fill` · `ylw.process.verify` | 예 | 11-01 저장 없이 2줄 |
 | 공정흐름유형등록(500228) | `공정흐름유형등록-채우기.js` | `erp_flows` 배열 `{name, memo, rows:[{seq,proc,next,last}]}` | 머리 `ylw.flow.fillHeads`·`verifyHeads` → 상세 `ylw.flow.fillRows(흐름)`·`verifyRows(흐름)` | 머리는 예, 상세는 흐름 하나씩 | 11-01 실제 12흐름 저장(머리·상세 모두 대조 맞음) |
+| 품목대중소분류정의(502365) | `분류정의-읽기.js` | (읽기) → 폼 `erp_classes` 꼴 `{kind, big, mid, name, use, ylwCode}` — 소분류 하나 = 문서 하나 | `ylw.read.classes(only)` (제상품·자재 둘 다, 라디오·조회까지 스크립트) | 324줄 약 2분 30초 | 11-01 불러오기 요청 처리(읽기만) |
 | **(읽기)** 불러오기 공통 | `불러오기-공통.js` | — | `ylw.read.cols`·`ylw.read.need` · 폼 저장소 `ylw.imp.list/add/patch` · `ylw.imp.apply(단계, 읽은것, 요청, 'count'|'import')` · `ylw.imp.pending()`·`ylw.imp.run(요청)` | — | 11-01 |
 | (읽기) 거래처조회(500373) | `거래처조회-읽기.js` | → `erp_vendors` 꼴 | `ylw.read.vendors('all'|'T')` | 예 | 11-01 정상 184·T 9 |
 | (읽기) 워크센터등록(500226) | `워크센터등록-읽기.js` | → `erp_workcenters` 꼴 | `ylw.read.workcenters(…)` | 예 | 11-01 17줄·T 9 |
@@ -65,3 +66,10 @@
 - 새 스크립트는 저장하지 않고 시험한다: 채우고 대조표 확인 → 「조회」로 버림.
 - 비밀번호·계정·실제 거래 자료(사업자번호 등)를 스크립트에 넣지 않는다. 로그인된 브라우저에서만 돈다.
 - 만들면 이 표 · `../AGENTS.md` 파일 표 · `../작업일지.md` 에 적는다.
+
+## 분류 읽기(`분류정의-읽기.js`, 11-01)
+- 더블클릭 대신 시트의 `kevent_dblclick` 를 부른다: `SetActiveCell(행0,'이름열')` → `m_DblClickRow = ClickRow = 행0` → `kevent_dblclick({row:행0, col:0})` → 아래 시트가 조회된다(위 칸 `txtItemClassLName_txt`·`txtItemClassMName_txt` 값으로 열렸는지 기다림).
+  - `m_DblClickRow` 를 안 넣으면 SS3(소분류)이 안 열린다. `col` 에 없는 번호(예 6)를 주면 「Cannot read properties of undefined (reading 'DataField')」 알림이 뜬다(확인으로 닫음, 자료 변화 없음).
+  - 다른 화면(공정흐름유형 500228 등)의 상세 열기에도 같은 꼴이 쓰일 수 있다(확인 안 함).
+- 324줄 읽는 데 2분 넘게 걸려 도구 한 번(45초)에 안 끝난다 → 결과를 `window.GOT` 에 두고 기다렸다 읽는다. 반영도 `I.apply` 를 백그라운드로(`window.IMPRES`).
+- `불러오기-공통.js` `I.STEPS.classes`: 열쇠 = 품목구분>대>중>소, 비교 칸 = kind·big·mid·name·use.

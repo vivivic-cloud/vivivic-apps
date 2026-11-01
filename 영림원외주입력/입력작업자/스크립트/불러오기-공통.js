@@ -76,6 +76,7 @@
   I.STEPS = {
     vendors: { coll: 'erp_vendors', title: '거래처', key: (d) => R.s(d.name), fields: ['sangho', 'name', 'state', 'credit', 'bizno', 'rep', 'tel', 'biztype', 'bizitem', 'kinds'] },
     workcenters: { coll: 'erp_workcenters', title: '워크센터', key: (d) => R.s(d.name), fields: ['name', 'dept', 'kind', 'vendor', 'capa', 'start', 'end', 'whMat', 'whProd', 'whDeliv', 'whSite', 'whIn', 'whSemi'] },
+    classes: { coll: 'erp_classes', title: '분류', key: (d) => [d.kind, d.big, d.mid, d.name].map(R.s).join('>'), fields: ['kind', 'big', 'mid', 'name', 'use'] },
     items: { coll: 'erp_items', title: '품목', key: (d) => R.s(d.code), fields: ['name', 'code', 'spec', 'eng', 'asset', 'state', 'unit', 'small', 'io', 'imp', 'rep'] },
     processes: { coll: 'erp_processes', title: '공정', key: (d) => R.s(d.name), fields: ['name', 'memo', 'inspect'] },
     flows: { coll: 'erp_flows', title: '공정흐름', key: (d) => R.s(d.name), fields: ['name', 'memo'], rows: ['seq', 'proc', 'next', 'last'] },
