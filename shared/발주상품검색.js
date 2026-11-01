@@ -9,6 +9,10 @@
        normalizeValue 2277 · buildDisplayName 2278 · IDENTITY_HEADERS·pageToSupplierMap 2266
        데이터 원천 initCloudDataSync 2401 · loadCloudExcelData 2413
        검색 handleSearch 3254 · 고르기 addOrderedProduct(직접검색) 3383 · 부속 카드 renderOrderParts 4783
+       (11-01 v29 더함) 검색 방법 셋 = 머리 칩 2054~2060 「상품검색」·「ING단품명(추천)」·「카테고리」, selectSearchMethod 2942
+         ING단품명 목록 onSupplierChange 2557 · 고르기 onCodeChange 2683 + addOrderedProduct(ing) 3413
+         카테고리 initializeCategoryFilters 3088 · onL1Change 2718 · onL2Change 2748 · onL3Change 2774 · onL4Change 2796
+           + addOrderedProduct(category) 3423·3434·3453
      **조혼가구는 아직 이 파일을 부르지 않는다**(조혼가구 동작을 하나도 안 바꾸려고 베꼈다).
      둘 중 하나의 검색 규칙을 고치면 다른 쪽도 같이 고친다. 영림원외주입력(v28~) 이 이 파일을 쓴다.
 
@@ -113,8 +117,63 @@
     return idx;
   }
 
+  /* ── v29: 검색 방법 ② ING단품명 — onSupplierChange(2557): 그 발주처 줄의 ing단품명(normalize) 을 한 번씩, 정렬.
+     고르면 직접검색과 같은 길(addOrderedProduct 의 ing 갈래가 direct 갈래와 똑같다) → pick(). */
+  function ingCodes(data, supplier) {
+    if (!data || data.length < 2) return [];
+    var seen = {}, out = [];
+    data.slice(1).forEach(function (r) { if (!r || normalizeValue(cell(data[0], r, 'ing발주처')) !== supplier) return; var c = normalizeValue(r[0]); if (!seen[c]) { seen[c] = 1; out.push(c); } });
+    return out.sort();
+  }
+
+  /* ── v29: 검색 방법 ③ 카테고리 — 대분류 → 중분류 → 소분류 → 색상.
+     catOptions(data, 발주처, [고른 값들]) = 다음 단계 선택지(initializeCategoryFilters 3088 · onL1~3Change 2718·2748·2774).
+     조혼가구는 선택지가 하나면 저절로 고르고 다음 단계로 간다 — 그건 화면 쪽이 한다. */
+  var CAT_LEVELS = ['대분류', '중분류', '소분류', '상품색상'];
+  var CAT_PLACEHOLDERS = ['대분류 선택', '중분류 선택', '소분류 선택', '색상 선택'];
+  function catOptions(data, supplier, chosen) {
+    if (!data || data.length < 2) return [];
+    var h = data[0], n = (chosen || []).length; if (n >= CAT_LEVELS.length) return [];
+    var seen = {}, out = [];
+    data.slice(1).forEach(function (r) {
+      if (!r || normalizeValue(cell(h, r, 'ing발주처')) !== supplier) return;
+      for (var i = 0; i < n; i++) if (normalizeValue(cell(h, r, CAT_LEVELS[i])) !== chosen[i]) return;
+      var v = normalizeValue(cell(h, r, CAT_LEVELS[n])); if (!seen[v]) { seen[v] = 1; out.push(v); }
+    });
+    return out.sort();
+  }
+  /* onL4Change(2796) 의 「category-result-name」: 넷이 꼭 같은(색상까지 같은) 첫 줄의 ing단품명 */
+  function catName(data, supplier, crit) {
+    if (!data || data.length < 2) return '';
+    var h = data[0];
+    for (var i = 1; i < data.length; i++) {
+      var r = data[i]; if (!r || normalizeValue(cell(h, r, 'ing발주처')) !== supplier) continue;
+      var ok = true; for (var j = 0; j < 4; j++) if (normalizeValue(cell(h, r, CAT_LEVELS[j])) !== crit[j]) { ok = false; break; }
+      if (ok) return normalizeValue(r[0]);
+    }
+    return '';
+  }
+  /* addOrderedProduct(category 갈래, 3423·3434·3453) — ⚠ 직접검색과 다르다: ing단품명으로 거르지 않는다.
+     발주처·대·중·소 같고 (상품색상 같거나 마감색상 any) 인 줄 모두가 부속. 상품 이름(code) = 그 줄들 중 첫 줄의 ing단품명. */
+  function pickCategory(data, supplier, crit) {
+    if (!data || data.length < 2 || !crit || !(crit[0] || crit[1] || crit[2] || crit[3])) return null;
+    var h = data[0], v1 = crit[0], v2 = crit[1], v3 = crit[2], v4 = crit[3], rows = [];
+    data.forEach(function (r, i) {
+      if (i === 0 || !r) return;
+      var ok = normalizeValue(cell(h, r, 'ing발주처')) === supplier &&
+        normalizeValue(cell(h, r, '대분류')) === v1 && normalizeValue(cell(h, r, '중분류')) === v2 && normalizeValue(cell(h, r, '소분류')) === v3 &&
+        (normalizeValue(cell(h, r, '상품색상')) === v4 || normalizeValue(cell(h, r, '마감색상')).toLowerCase() === 'any');
+      if (ok) rows.push(i);
+    });
+    if (!rows.length) return null;
+    var first = data[rows[0]], code = normalizeValue(first[0]);
+    return { code: code, ingCode: String(cell(h, first, 'ing단품코드') || ''), supplier: supplier, criteria: [v1, v2, v3, v4],
+      displayName: buildDisplayName(v1, v2, v3, v4), rowIndexes: rows };
+  }
+
   g.발주상품검색 = { IDENTITY_HEADERS: IDENTITY_HEADERS, SUPPLIERS: SUPPLIERS, SAME7: SAME7,
     normalizeValue: normalizeValue, buildDisplayName: buildDisplayName,
     metaPath: metaPath, latestMeta: latestMeta, readSheet: readSheet,
-    search: search, pick: pick, part: part, same7Index: same7Index };
+    search: search, pick: pick, part: part, same7Index: same7Index,
+    ingCodes: ingCodes, CAT_LEVELS: CAT_LEVELS, CAT_PLACEHOLDERS: CAT_PLACEHOLDERS, catOptions: catOptions, catName: catName, pickCategory: pickCategory };
 })(window);
