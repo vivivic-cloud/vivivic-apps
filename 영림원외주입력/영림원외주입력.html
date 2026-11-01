@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v27 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v28 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -181,6 +181,26 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
   .card>.actions .btn.imp{flex-basis:100%}   /* v23 「영림원에서 불러오기」도 아랫줄 한 줄 */
   .gsrow .btn{flex:none!important}
 }
+/* v28 발주 상품검색(4 품목) — 조혼가구 제품 발주와 같은 원장·같은 검색. 모양은 이 집 카드·입력칸·칩 그대로 */
+.ps{margin-top:16px}
+.ps h3{font-size:15px;font-weight:900;margin:0 0 6px;letter-spacing:-0.02em}
+.psbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.psbar select{width:auto;flex:none}
+.psq{position:relative;flex:1 1 220px;min-width:0}
+.psres{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:30;max-height:280px;overflow:auto;background:#fff;border:1px solid var(--line2);border-radius:10px;box-shadow:0 8px 24px rgba(15,15,15,.08)}
+.psres button{all:unset;box-sizing:border-box;display:block;width:100%;cursor:pointer;padding:9px 12px;border-bottom:1px solid var(--rowline);font-size:12.5px;font-weight:700;overflow-wrap:anywhere}
+.psres button:last-child{border-bottom:0}
+.psres button small{display:block;font-weight:500;color:var(--muted);font-size:11px}
+.psres button:hover,.psres button[aria-selected="true"]{background:var(--fill)}
+.psgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin:6px 0 12px}
+.pscard{border:1px solid var(--line);border-radius:8px;padding:8px;background:#fff;display:flex;flex-direction:column;gap:1px;font-size:11px;color:var(--muted);overflow-wrap:anywhere;min-width:0}
+.pscard b{font-size:12px;color:var(--ink);font-weight:800}
+.pscard .q{font:800 11px var(--mono);color:#1d4ed8}
+.pscard.out{background:var(--amber-bg);border-color:#fde68a;color:var(--amber)}
+.pscard.out b{color:var(--amber)}
+.pscard .chip{align-self:flex-start;margin-top:3px}
+.pslab{font-size:11px;font-weight:800;color:var(--muted);margin:12px 0 0}
+.pscodes summary{cursor:pointer;font-size:12px;font-weight:800;min-height:32px;display:flex;align-items:center}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -188,7 +208,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v27</span>
+    <span class="ver">v28</span>
   </div>
 </header>
 <div class="wrap">
@@ -211,6 +231,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
   </section>
 </div>
 
+<script src="../shared/발주상품검색.js"></script>   <!-- v28 발주 상품검색: 조혼가구 제품 발주의 상품 찾기·고르기·부속 논리 -->
 <script>
 /* 저장소: 이 저장소의 다른 앱들과 같은 파이어베이스 프로젝트(vivivic-4b7ef), 익명 로그인.
    컬렉션은 erp_ 로 시작하는 7개만 쓴다. 기존 업무 기록 컬렉션은 건드리지 않는다.
@@ -537,7 +558,7 @@ var SPEC={version:1,system:'영림원 SystemCloud for (아이앤지퍼니처 TES
 window.__erpSpec=SPEC;
 var STATUS=['대기','진행중','완료','오류'];
 var data={};STEPS.forEach(function(s){data[s.key]=null;});
-var db=null,cur=STEPS[0].key,form=null;
+var db=null,dbP=null,cur=STEPS[0].key,form=null;
 
 function h(tag,props){
   var e=document.createElement(tag);
@@ -896,6 +917,123 @@ function impBox(s){
   impDraw=draw;draw();
   return box;
 }
+/* ---------- v28 발주 상품검색 (4 품목) ----------
+   사장님 11-01: 조혼가구 제품 발주의 상품선택 논리와 부속 정보를 같은 루트로 쓰게.
+   원장 = 조혼가구와 같은 것(파이어스토어 excel_metadata 의 가장 늦은 원장 엑셀), 찾기·고르기·부속 = shared/발주상품검색.js
+   (원본은 조혼가구.html — 그 파일 머리 주석). 지금은 보기만 한다: 품목 칸에 채우지 않고, 아무것도 저장하지 않는다. */
+var PS={data:null,idx:null,file:'',loading:null,err:'',sup:'조혼가구',q:'',res:[],sel:-1,picked:null,draw:null};
+function psLoad(){
+  var P=window.발주상품검색;
+  if(PS.data)return Promise.resolve();
+  if(PS.loading)return PS.loading;
+  if(!P){PS.err='검색 부품(shared/발주상품검색.js)을 불러오지 못했습니다. 새로 고침해 주세요.';return Promise.resolve();}
+  PS.err='';
+  PS.loading=(dbP||Promise.resolve(null)).then(function(d){
+    if(!d)throw new Error('파이어베이스에 연결하지 못해 원장을 읽지 못했습니다.');
+    return new Promise(function(ok,no){
+      var un=null,done=false;
+      un=d.collection(P.metaPath()).onSnapshot(function(snap){
+        if(done)return;done=true;setTimeout(function(){if(un)un();},0);
+        ok(snap.docs.map(function(x){return x.data();}));
+      },function(e){if(!done){done=true;no(e);}});
+    });
+  }).then(function(docs){
+    var m=P.latestMeta(docs);
+    if(!m||!m.downloadURL)throw new Error('올라온 원장 엑셀이 없습니다(조혼가구 원장 올리기 기록 0건).');
+    PS.file=m.fileName||'';
+    return Promise.all([fetch(m.downloadURL).then(function(r){if(!r.ok)throw new Error('원장 엑셀을 받지 못했습니다('+r.status+').');return r.arrayBuffer();}),loadXlsx()]);
+  }).then(function(a){
+    PS.data=P.readSheet(a[1],a[0]);PS.idx=P.same7Index(PS.data);
+  }).catch(function(e){PS.err=(e&&e.message)||'원장을 읽지 못했습니다.';PS.loading=null;})
+    .then(function(){if(PS.draw)PS.draw();});
+  return PS.loading;
+}
+function psBox(){
+  var P=window.발주상품검색;
+  var stat=h('span',{class:'msg','aria-live':'polite'});
+  var sup=h('select',{'aria-label':'발주처'},(P?P.SUPPLIERS:[]).map(function(x){return h('option',{value:x[1]},x[0]);}));
+  sup.value=PS.sup;
+  var q=h('input',{type:'text',placeholder:'상품명 (대분류+중분류+소분류-색상, 예: 알렉스)',autocomplete:'off','aria-label':'상품 검색',value:PS.q});
+  var res=h('div',{class:'psres',role:'listbox',hidden:true});
+  var out=h('div',{});
+  function find(){
+    PS.q=q.value;PS.sel=-1;
+    PS.res=(P&&PS.data&&PS.q.trim())?P.search(PS.data,PS.sup,PS.q):[];
+    drawRes();
+  }
+  function drawRes(){
+    res.hidden=!PS.res.length;
+    res.replaceChildren.apply(res,PS.res.map(function(r,i){
+      var nv=P.normalizeValue;
+      return h('button',{type:'button',role:'option','aria-selected':i===PS.sel?'true':'false',on:{mousedown:function(e){e.preventDefault();},click:function(){choose(r);}}},
+        String(r.code==null?'':r.code),h('small',{},P.buildDisplayName(nv(r.v1),nv(r.v2),nv(r.v3),nv(r.v4))));
+    }));
+    var b=res.children[PS.sel];if(b&&b.scrollIntoView)b.scrollIntoView({block:'nearest'});
+  }
+  function choose(r){
+    q.value=String(r.code==null?'':r.code);PS.q=q.value;PS.res=[];PS.sel=-1;drawRes();
+    PS.picked=P.pick(PS.data,PS.sup,P.normalizeValue(r.code));drawPicked();
+  }
+  q.addEventListener('input',find);
+  q.addEventListener('focus',function(){psLoad();});
+  q.addEventListener('blur',function(){res.hidden=true;});
+  q.addEventListener('keydown',function(e){   /* 조혼가구 handleSearchKeydown 과 같은 키 */
+    if(res.hidden||!PS.res.length)return;
+    if(e.key==='ArrowDown'){e.preventDefault();PS.sel=Math.min(PS.sel+1,PS.res.length-1);drawRes();}
+    else if(e.key==='ArrowUp'){e.preventDefault();PS.sel=Math.max(PS.sel-1,-1);drawRes();}
+    else if(e.key==='Enter'){e.preventDefault();if(PS.sel>=0)choose(PS.res[PS.sel]);}
+    else if(e.key==='Escape'){PS.res=[];PS.sel=-1;drawRes();}
+  });
+  sup.addEventListener('change',function(){PS.sup=sup.value;PS.picked=null;drawPicked();find();});
+  function card(p){
+    var who=(PS.idx&&PS.idx[p.same7])||[];
+    return h('div',{class:'pscard'+(p.isAmt?'':' out')},
+      h('b',{},p.부속명),
+      h('span',{},p.원장명+(p.마감색상?' · '+p.마감색상:'')),
+      h('span',{},p.마감),
+      h('span',{},p.w+' X '+p.d),
+      h('span',{class:'q'},'수량 '+p.수량),
+      who.length>1?h('span',{class:'chip src',title:'7항목(원장명·마감·마감색상·재단W·재단D·W엣지면·D엣지면)이 같은 부속을 쓰는 상품: '+who.join(', ')},'같은 부속 '+who.length+'개 상품'):null);
+  }
+  function drawPicked(){
+    var k=PS.picked;
+    if(!k){out.replaceChildren();return;}
+    var parts=k.rowIndexes.map(function(i){return P.part(PS.data,i);}).filter(Boolean);
+    var basic=parts.filter(function(p){return p.isAmt;}),other=parts.filter(function(p){return !p.isAmt;});
+    var nv=function(v){return v==='선택없음'?'':v;};
+    var cols=[['부속명','부속명'],['공급처','공급처'],['수량','수량'],['재단W','w'],['재단D','d'],['W엣지면','W엣지면'],['D엣지면','D엣지면'],['보링수량','보링수량'],['NC유무','NC유무'],['부속코드2','부속코드2'],['재단부속코드','재단부속코드'],['엣지부속코드','엣지부속코드'],['보링부속코드','보링부속코드'],['NC부속코드','NC부속코드'],['조립부속코드','조립부속코드']];
+    out.replaceChildren(
+      h('dl',{},
+        h('dt',{},'ING단품명'),h('dd',{},k.code),
+        h('dt',{},'ing단품코드'),h('dd',{},k.ingCode||'—'),
+        h('dt',{},'발주처'),h('dd',{},k.supplier),
+        h('dt',{},'대·중·소·색상'),h('dd',{},k.criteria.map(nv).filter(Boolean).join(' / ')),
+        h('dt',{},'부속'),h('dd',{},parts.length+'줄 (기본 발주 '+basic.length+' · AMT 외 공급처 '+other.length+')')),
+      h('p',{class:'pslab'},'기본 발주 부속'),
+      basic.length?h('div',{class:'psgrid'},basic.map(card)):h('p',{class:'hint'},'없음'),
+      other.length?h('p',{class:'pslab'},'AMT 외 공급처 부속'):null,
+      other.length?h('div',{class:'psgrid'},other.map(card)):null,
+      h('details',{class:'pscodes'},h('summary',{},'부속 코드 · 엣지 · 보링 보기'),
+        h('div',{class:'tw'},h('table',{},
+          h('thead',{},h('tr',{},cols.map(function(c){return h('th',{},c[0]);}).concat([h('th',{},'같은 부속 상품 수')]))),
+          h('tbody',{},parts.map(function(p){
+            return h('tr',{},cols.map(function(c){var v=p[c[1]];return h('td',{class:typeof v==='number'?'n':null},v==null||(typeof v==='number'&&isNaN(v))?'':String(v));})
+              .concat([h('td',{class:'n'},String(((PS.idx&&PS.idx[p.same7])||[]).length))]));
+          }))))));
+  }
+  PS.draw=function(){
+    stat.textContent=PS.err?PS.err:(PS.data?'원장 「'+PS.file+'」 · '+(PS.data.length-1)+'줄':'원장 불러오는 중…');
+    stat.className='msg'+(PS.err?' bad':'');
+    if(PS.data&&PS.q&&!PS.picked)find();
+  };
+  PS.draw();drawPicked();
+  psLoad();
+  return h('section',{class:'card ps'},
+    h('h3',{},'발주 상품검색'),
+    h('p',{class:'stepnote'},'조혼가구 제품 발주와 같은 원장·같은 검색입니다. 발주처를 고르고 상품명으로 찾아 고르면 그 상품의 부속이 조혼가구처럼 나옵니다. 지금은 보기만 합니다(품목 칸에 채우지 않고 저장하지 않습니다). 금액 칸은 보여 주지 않습니다.'),
+    h('div',{class:'psbar'},sup,h('div',{class:'psq'},q,res)),
+    stat,out);
+}
 function renderStep(){
   var s=BYKEY[cur];bulk=null;
   form=buildForm(s);
@@ -938,6 +1076,7 @@ function renderStep(){
         needs,h('p',{class:'stepnote'},s.note)),
       xlBar,
       form.el),
+    s.key==='items'?psBox():'',   /* v28 발주 상품검색 */
     listBox,listBox2||'');   /* v24: 「저장한 공정」 목록이 없는 단계에서 「null」 글자가 찍히던 것 */
   renderList();
 }
@@ -1610,9 +1749,10 @@ document.getElementById('contractPre').textContent=JSON.stringify(SPEC,null,1)+'
   '\n단계 번호 순서대로 등록한 뒤 status와 agentNote를 갱신합니다.';
 
 var hash=location.hash.slice(1);if(BYKEY[hash])cur=BYKEY[hash].shownIn||hash;
+dbP=connectDb();   /* v28: 발주 상품검색이 첫 화면부터 기다릴 수 있게 먼저 */
 renderNav();renderSum();renderStep();refreshLists();
 
-connectDb().then(function(d){
+dbP.then(function(d){
   db=d;
   if(!db){
     bannerEl.append(h('div',{class:'banner'},'파이어베이스에 연결하지 못했습니다. 인터넷 연결을 확인하고 다시 열어 주세요. 지금은 입력해도 저장되지 않습니다.'));
