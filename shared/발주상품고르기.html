@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<!-- 발주상품고르기 — 조혼가구 「제품 발주」의 상품검색 세 방법 + 부속카드를 **보기 전용**으로 띄우는 자리.
+     영림원외주입력(v30~) 이 iframe 으로 띄운다. 모양·마크업·검색칸 함수는 조혼가구와 **같은 파일**을 부른다:
+       shared/조혼가구모양.css (조혼가구 CSS 한 벌) · shared/발주상품고르기.js (검색칸·부속카드·검색 함수) · 테일윈드 CDN(조혼가구와 같음)
+     ⚠ 공용 — 그 두 파일을 고치면 조혼가구와 여기가 같이 바뀐다. 여기서 따로 디자인하지 않는다.
+     ⚠ 쓰지 않는다. 파이어베이스도 안 부른다 — 원장은 부르는 쪽(영림원외주입력 psLoad)이 읽어 넘긴다.
+     iframe 이라 영림원외주입력 CSS 와 부딪히지 않는다(이름 앞붙이 없이 조혼가구 모양 그대로). -->
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>발주 상품고르기</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="발주상품검색.js"></script>
+    <script src="발주상품고르기.js"></script>
+    <link rel="stylesheet" href="조혼가구모양.css">
+    <style>
+        /* 이 자리만의 것 — iframe 높이가 화면 높이에 따라 늘지 않게(조혼가구 body 의 min-h-screen 은 안 씀) */
+        html, body { background: transparent; }
+    </style>
+</head>
+<body>
+    <div id="page-발주하기" class="relative space-y-6">
+        <div id="filter-container" class="notion-card p-6 bg-[#fbfbfa] space-y-6"><script>발주상품고르기.검색칸(document.currentScript, { 발주: false });</script></div>
+
+        <!-- 고른 상품의 부속 — 조혼가구 「발주상품목록」 카드와 같은 틀, 펼친 부속은 같은 부속카드 -->
+        <div id="product-name-container">
+            <div class="notion-card overflow-hidden border-2 shadow-sm">
+                <div class="p-4 border-b border-[#f1f1ef] bg-[#fbfbfa]">
+                    <div class="flex items-center gap-2 font-bold text-[#787774] fluid-text-mini">고른 상품 부속</div>
+                </div>
+                <div id="identity-list-container" class="min-h-[100px] flex flex-col"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /* 부품이 기대는 전역(조혼가구에서는 본 스크립트에 있는 것) — 보기 전용으로 갖춘다 */
+        let currentFullData = [];
+        let 고른발주처 = '조혼가구';
+        function getCurrentSupplier() { return 고른발주처; }
+        function normalizeValue(v) { return 발주상품검색.normalizeValue(v); }
+        function buildDisplayName(a, b, c, d) { return 발주상품검색.buildDisplayName(a, b, c, d); }
+        function dismissTutorial() {}
+
+        const 빈목록 = '<div id="list-placeholder" class="p-8 text-center font-bold tracking-tight fluid-text-body italic text-gray-400">없음</div>';
+        function 부속지움() { document.getElementById('identity-list-container').innerHTML = 빈목록; }
+        const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+        /* 고른 상품 → 조혼가구 addOrderedProduct(부속만 발주 아님) 가 담는 그대로 보여 준다:
+           공급처 AMT = 「기본 발주 부속」(수량 = 세트별소모량 × 1), 그 밖 = 「AMT 외 공급처 부속」. 손대는 단추는 없다(보기 전용). */
+        function 부속그림(mode) {
+            const P = 발주상품검색, sup = getCurrentSupplier(), d = currentFullData;
+            let k = null;
+            if (mode === 'direct') k = P.pick(d, sup, document.getElementById('product-search').value);
+            else if (mode === 'ing') k = P.pick(d, sup, document.getElementById('sel-ing-code').value);
+            else k = P.pickCategory(d, sup, ['sel-l1', 'sel-l2', 'sel-l3', 'sel-l4'].map(id => document.getElementById(id).value));
+            if (!k) { 부속지움(); return; }
+            const h = d[0];
+            let basicHtml = '', specialHtml = '';
+            k.rowIndexes.forEach(i => {
+                const row = d[i], p = P.part(d, i);
+                const finishColor = row[h.indexOf("마감색상")] || "";
+                const 카드 = { isAmt: p.isAmt, 부속명: esc(row[h.indexOf("부속명")]), plateName: esc(p.원장명), finishColor: esc(finishColor), finish: esc(p.마감), w: p.w, d: p.d };
+                if (p.isAmt) basicHtml += 발주상품고르기.부속카드(Object.assign(카드, { deleteBtn: '', cardKey: 'view-' + i, qty: p.수량, actionsHtml: '' }));
+                else specialHtml += 발주상품고르기.특별카드(Object.assign(카드, { 단추: '' }));
+            });
+            document.getElementById('identity-list-container').innerHTML =
+                /* 조혼가구 renderID0508 의 한 줄과 같은 틀·이름(조혼가구모양.css 의 [id^="details-"]·.ordered-item 규칙이 걸리게) — 날짜·수량·지우기 단추만 뺐다 */
+                `<div id="order-item-view" class="ordered-item border-b border-[#f1f1ef] last:border-none">
+                    <div class="px-4 py-2 flex items-center gap-3">
+                        <div class="flex items-center gap-2 overflow-hidden flex-1">
+                            <span class="card-hint-wrap font-bold text-[12px] truncate text-[#37352f]">${esc(k.code)}</span>
+                        </div>
+                    </div>
+                    <div id="details-container-view" class="flex flex-col gap-3 px-4 pb-3">
+                        <div id="details-view" class="flex flex-col gap-4">${발주상품고르기.부속묶음(basicHtml, specialHtml)}</div>
+                    </div>
+                </div>`;
+        }
+        /* 부품의 「부속만 발주」 단추 자리(showPartBtn) = 상품을 골랐다는 때, hidePartAll = 고른 것이 풀린 때 */
+        const _showPartBtn = showPartBtn, _hidePartAll = hidePartAll;
+        showPartBtn = function (mode) { _showPartBtn(mode); 부속그림(mode); };
+        hidePartAll = function (mode) { _hidePartAll(mode); 부속지움(); };
+
+        /* 부르는 쪽이 원장·발주처를 넘긴다 — 조혼가구 switchSupplier 처럼 resetSearchLabel → onSupplierChange */
+        window.발주상품고르기보기 = {
+            열기(data, supplier) {
+                currentFullData = data || [];
+                고른발주처 = supplier || '조혼가구';
+                resetSearchLabel();
+                onSupplierChange();
+                부속지움();
+            }
+        };
+        부속지움();
+        setInterval(() => { try { johonPickTick(); } catch (e) {} }, 40);   // 조혼가구와 같은 박자
+
+        /* iframe 높이 = 내용 높이(검색 목록이 펼쳐지면 그만큼 더) */
+        (function 높이() {
+            let 전 = 0;
+            setInterval(() => {
+                const fe = window.frameElement; if (!fe) return;
+                const r = document.getElementById('search-results');
+                let hgt = document.getElementById('page-발주하기').getBoundingClientRect().bottom + 2;
+                if (r && !r.classList.contains('hidden')) hgt = Math.max(hgt, r.getBoundingClientRect().bottom + 8);
+                hgt = Math.ceil(hgt);
+                if (hgt !== 전) { 전 = hgt; fe.style.height = hgt + 'px'; }
+            }, 150);
+        })();
+    </script>
+</body>
+</html>
