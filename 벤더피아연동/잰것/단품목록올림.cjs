@@ -33,6 +33,9 @@ var VP_DATA = { PAGES: ${JSON.stringify(PAGES)},
     if (String(url).indexOf("/System/Master/goods.aspx") >= 0) {
       var 줄 = ${JSON.stringify(줄)};
       for (var i = 0; i < 줄.length; i += 700) cb(${JSON.stringify(머리)}, 줄.slice(i, i + 700), Math.min(i + 700, 줄.length), 줄.length);
+    } else if (String(url).indexOf("/System/Stock/StockList.aspx") >= 0) {
+      /* 0.34.82 재고조회 흉내 — T00002 는 창고 두 줄(합 12), T00004 는 0, 나머지는 재고조회에 없음 */
+      cb(["단품코드","단품명","창고","양품수"], [["T00002","","가","5"],["t00002","","나","7"],["T00004","","가","0"],["T00006","","가","1,234"]], 4, 4);
     } else cb(["단품코드","단품명"], [], 0, 0);
     return { cachedAt: null }; },
   prefetch: function(){}, clearCache: async function(){} };
@@ -108,9 +111,13 @@ async function 한번(b, 줄, 제목) {
   못(['단품_1', '단품_2', '단품_3', '_정보'].every((k) => 창고.has(k)) && 창고.size === 4, `문서 ${[...창고.keys()].join(',')}`);
   const 다 = ['단품_1', '단품_2', '단품_3'].flatMap((k) => 풀기(창고.get(k)).줄);
   못(다.length === 2500 && 풀기(창고.get('단품_1')).줄.length === 1000, `줄 ${다.length} (단품_1 ${풀기(창고.get('단품_1')).줄.length})`);
-  못(다.every((s) => s.split('\t').length === 3), '줄 꼴 = 코드\\t이름\\t상태 (세 칸)');
-  const 첫중지 = 다.findIndex((s) => s.endsWith('\t중지'));
-  못(첫중지 > 0 && 다.slice(첫중지).every((s) => s.endsWith('\t중지')), `중지는 뒤로 (첫 중지 ${첫중지})`);
+  못(다.every((s) => s.split('\t').length === 4), '줄 꼴 = 코드\\t이름\\t상태\\t양품수 (네 칸)');
+  const 양품 = new Map(다.map((s) => s.split('\t')).map((a) => [a[0], a[3]]));
+  못(양품.get('T00002') === '12' && 양품.get('T00004') === '0' && 양품.get('T00006') === '1234' && 양품.get('T00001') === '',
+    `양품수 = 재고조회 단품별 합 (T00002 ${양품.get('T00002')} · T00004 ${양품.get('T00004')} · T00006 ${양품.get('T00006')} · 없음 「${양품.get('T00001')}」)`);
+  const 중지인가 = (s) => s.split('\t')[2] === '중지';
+  const 첫중지 = 다.findIndex(중지인가);
+  못(첫중지 > 0 && 다.slice(첫중지).every(중지인가), `중지는 뒤로 (첫 중지 ${첫중지})`);
   const 판매 = 다.slice(0, 첫중지).map((s) => s.split('\t')[1]);
   못(판매.every((x, i) => !i || 판매[i - 1].localeCompare(x, 'ko', { numeric: true }) <= 0), '판매중 안은 단품명 가나다');
   const 정보 = 풀기(창고.get('_정보'));
@@ -134,7 +141,7 @@ async function 한번(b, 줄, 제목) {
   const 쓴 = w.map((x) => (x.update ? '쓰기 ' + x.update.name : '지움 ' + x.delete).split('/').pop() + (x.delete ? '(지움)' : ''));
   못(커.length === 1, `:commit 한 번 (${커.length}) — ${쓴.join(', ')}`);
   못(!창고.has('단품_3') && 창고.has('단품_2') && 풀기(창고.get('_정보')).단품수 === 1800, `단품_3 지움 · _정보 1800 (${[...창고.keys()].join(',')})`);
-  못(풀기(창고.get('단품_1')).줄[0] === 'T00001\t가가가 맨앞 단품\t판매중', `맨 앞 ${JSON.stringify(풀기(창고.get('단품_1')).줄[0])}`);
+  못(풀기(창고.get('단품_1')).줄[0] === 'T00001\t가가가 맨앞 단품\t판매중\t', `맨 앞 ${JSON.stringify(풀기(창고.get('단품_1')).줄[0])}`);
 
   /* 단품_1 만 바뀌는 경우 — 끝쪽 중지 하나만 이름이 바뀌면 단품_2 만 */
   const 셋째 = 줄짓기(1800, { T00001: "가가가 맨앞 단품", T01797: "힣힣 끝 중지" });
