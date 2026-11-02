@@ -69,3 +69,69 @@ chrome.runtime.onMessage.addListener((m, 보낸이, 답) => {
   })();
   return true;
 });
+
+/* ── 서류관리에 「벤더피아 로그인돼 있나 · 누구인가」 알려 주기 (11-02 [새 지시 서류관리로그인]) ──────────
+   사장님: 「프로그램이 시작되면 벤더피아연동의 로그인이 되어야 서류관리 화면이 열리게 … 벤더피아아이디로 로그인이 되면
+            해당 연동프로그램은 화면에 보이지 않지만 로그인이 유지된체로 백에서 작동 합니다」.
+   · 묻는 쪽 = `서류다리.js`(서류관리 페이지의 content script)뿐. sender 가 이 확장 + 서류관리 주소일 때만 답한다.
+   · 벤더피아 `/index.aspx` 를 **사장님 크롬의 벤더피아 쿠키를 실어** GET 한다(조회만). 틀이면 안쪽 frame 쪽도 차례로(4개까지).
+       로그인 칸(`txtID`)이 보이면 → 안 됨 · 메뉴 「배송관리」 나 틀(로그인 칸 없음)이 보이면 → 됨 · 둘 다 아니면 → 모름(null).
+     이 GET 이 벤더피아 세션을 늘려 준다 — 서류관리가 열려 있는 동안 5분마다 물으니 그동안 로그인이 안 끊긴다.
+   · 아이디 = login.js 가 우리 로그인 칸에서 **아이디만** 적어 둔 `vpWho`(chrome.storage.local). 비밀번호는 어디에도 안 적는다.
+     이름 = 벤더피아 쪽 글에서 「OOO님」 을 찾으면(못 찾으면 빈칸 — 11-02 진짜 화면에서 자리를 못 봄).
+   ⚠ 쿠키·벤더피아 글은 서류관리로 **안 넘긴다** — 답은 { 로그인, 아이디, 이름, 까닭, 판 } 뿐. */
+const 서류집 = "https://vivivic-cloud.github.io/vivivic-docs/";
+const 벤더피아집 = "https://vendorpia.com";
+let 누구중 = null, 누구때 = 0, 누구답 = null;
+
+const 벤더피아받기 = async (주소) => {
+  const 끊개 = new AbortController();
+  const 시계 = setTimeout(() => 끊개.abort(), 8000);
+  try {
+    const r = await fetch(주소, { signal: 끊개.signal, credentials: "include", cache: "no-store", redirect: "follow" });
+    return { 주소: r.url, 글: (await r.text()).slice(0, 400000), ok: r.ok, status: r.status };
+  } finally { clearTimeout(시계); }
+};
+const 로그인칸 = (글) => /\bid\s*=\s*["']?txtID\b/i.test(글) || /\bid\s*=\s*["']?frmSign\b/i.test(글);
+const 메뉴있나 = (글) => />\s*배송관리\s*</.test(글);
+const 틀주소들 = (글, 바탕) => [...글.matchAll(/<i?frame\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/gi)]
+  .map((m) => { try { return new URL(m[1].replace(/&amp;/g, "&"), 바탕).href; } catch (e) { return ""; } })
+  .filter((u) => u.startsWith(벤더피아집 + "/") || u.startsWith("https://www.vendorpia.com/"));
+const 이름찾기 = (글) => {
+  const 맨글 = 글.replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&nbsp;/g, " ");
+  for (const m of 맨글.matchAll(/([가-힣]{2,5}|[A-Za-z][\w.]{1,19})\s*님/g))
+    if (!/^(고객|회원|사용자|관리자|담당자|사장|선생)$/.test(m[1])) return m[1];
+  return "";
+};
+
+async function 벤더피아누구() {
+  const 판 = chrome.runtime.getManifest().version;
+  let 누구 = {};
+  try { 누구 = (await chrome.storage.local.get("vpWho")).vpWho || {}; } catch (e) {}
+  const 아이디 = typeof 누구.id === "string" ? 누구.id.slice(0, 40) : "";
+  try {
+    const 첫 = await 벤더피아받기(벤더피아집 + "/index.aspx");
+    const 쪽들 = [첫];
+    for (const u of 틀주소들(첫.글, 첫.주소).slice(0, 4)) {
+      try { 쪽들.push(await 벤더피아받기(u)); } catch (e) {}
+    }
+    if (쪽들.some((x) => 로그인칸(x.글))) return { 로그인: false, 아이디, 이름: "", 까닭: "로그인 화면", 판 };
+    const 됨 = 쪽들.some((x) => 메뉴있나(x.글)) || 쪽들.length > 1;
+    let 이름 = "";
+    for (const x of 쪽들) if ((이름 = 이름찾기(x.글))) break;
+    if (됨) return { 로그인: true, 아이디, 이름, 까닭: "", 판 };
+    return { 로그인: null, 아이디, 이름, 까닭: "모름 " + 첫.status, 판 };
+  } catch (e) {
+    return { 로그인: null, 아이디, 이름: "", 까닭: "못 닿음 " + String(e && e.message || e).slice(0, 40), 판 };
+  }
+}
+
+chrome.runtime.onMessage.addListener((m, 보낸이, 답) => {
+  if (!m || m.__vp !== "벤더피아누구" || 보낸이.id !== chrome.runtime.id) return;
+  if (!String(보낸이.url || 보낸이.origin || "").startsWith(서류집)) return;
+  // 3초 안에 다시 물으면 같은 답(탭 여럿·겹쳐 물음). 「다시」 는 그 3초를 건너뛴다.
+  if (!m.다시 && 누구답 && Date.now() - 누구때 < 3000) { 답(누구답); return; }
+  if (!누구중) 누구중 = 벤더피아누구().then((r) => { 누구답 = r; 누구때 = Date.now(); 누구중 = null; return r; });
+  누구중.then(답);
+  return true;
+});
