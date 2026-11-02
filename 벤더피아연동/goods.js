@@ -668,14 +668,14 @@ const 한벌돌리기 = (단품곁다리) => {
   const 단품목록묶음 = 1000;
   let 단품목록올리는중 = false;
   /* 줄들 → 문서별 `줄` 배열들 (제품목록 `올리기` 와 같은 꼴·차례. 같은 이름이면 코드 차례로 굳힌다 — 견주기가 흔들리지 않게) */
-  function 단품목록짓기(머리, 줄들, 재고) {
+  function 단품목록짓기(머리, 줄들, 재고, 옛양품) {
     const ci = 머리.indexOf("단품코드"), ni = 머리.indexOf("단품명"), si = 머리.indexOf("판매상태");
     if (ci < 0 || ni < 0) return null;
     const m = new Map();
     for (const r of 줄들) {
       const c = String(r[ci] == null ? "" : r[ci]).trim();
       if (!c) continue;
-      const 양품 = 재고 ? 재고.get(codeKey(c)) : undefined;
+      const 양품 = 재고 ? 재고.get(codeKey(c)) : 옛양품 ? 옛양품.get(c) : undefined;   // 재고를 아직 못 받았으면 창고에 있던 값을 지킨다
       m.set(c, [c, String(r[ni] == null ? "" : r[ni]).trim().replace(/\t/g, " "),
         si < 0 ? "" : String(r[si] == null ? "" : r[si]).trim(), 양품 === undefined ? "" : String(양품)]);
     }
@@ -685,33 +685,50 @@ const 한벌돌리기 = (단품곁다리) => {
     for (let i = 0; i < 다.length; i += 단품목록묶음) 문서들.push(다.slice(i, i + 단품목록묶음).map((a) => a.join("\t")));
     return { 수: 다.length, 문서들 };
   }
+  /* 0.34.83 — 목록을 다 받으면 **바로** 한 번(재고 전이면 창고의 옛 양품수를 지킴), 재고를 받으면 한 번 더 부른다.
+     도는 중에 또 불리면 끝난 뒤 한 번 더(`단품목록또`) — 두 번째는 재고가 든 줄이라 버리면 안 된다. */
+  let 단품목록또 = null;
+  const 옛양품읽기 = (옛) => {
+    const m = new Map();
+    for (const [이름, d] of 옛) if (/^단품_\d+$/.test(이름))
+      for (const s of d.줄 || []) { const [c, , , q] = String(s).split("\t"); if (c && q) m.set(c, q); }
+    return m;
+  };
   async function 단품목록올리기(머리, 줄들) {
-    if (단품목록올리는중) return;
+    if (단품목록올리는중) { 단품목록또 = [머리, 줄들]; return; }
     단품목록올리는중 = true;
-    try { await 창고목록올리기(단품목록짓기(머리, 줄들, stockByCode),
+    try { await 창고목록올리기((옛) => 단품목록짓기(머리, 줄들, stockByCode, stockByCode ? null : 옛양품읽기(옛)),
       { 칸: 단품목록칸, 앞: "단품_", 수칸: "단품수", 파일: "벤더피아연동 단품관리(자동)", 딱: "단품목록", 없음: "단품코드·단품명 칸 없음" }); }
     finally { 단품목록올리는중 = false; }
+    if (단품목록또) { const [h, 줄] = 단품목록또; 단품목록또 = null; 단품목록올리기(h, 줄); }
   }
   /* 창고 한 자리에 `{앞}N`(1,000줄씩) + `_정보` 로 올린다 — 단품목록·상품목록이 같이 쓴다(0.34.80 에 단품목록올리기에서 떼어 냄, 하는 일은 그대로).
-     새 = {수, 문서들} · 딱지 = `{딱}:올림/같음/안올림/못올림 …` */
+     새 = {수, 문서들} 또는 (옛 → {수, 문서들}) · 딱지 = `{딱}:올림/같음/안올림/못올림 …`
+     0.34.83 한 화면에서 같은 칸을 두 번 올리면(단품목록: 목록 뒤·재고 뒤) 두 번째는 창고를 다시 안 읽고 처음 읽은 것(+쓴 것)과 견준다 — 읽기 +0 */
+  const 창고옛 = new Map();                            // 칸 → (문서 이름 → 칸)
   async function 창고목록올리기(새, { 칸, 앞, 수칸, 파일, 딱, 없음 }) {
     try {
+      const tok = await 서류표();
+      const 뿌리 = `projects/${서류.PROJ}/databases/(default)/documents`;
+      const 자리 = `${뿌리}/artifacts/${서류.PROJ}/public/data/${칸}`;
+      let 옛 = 창고옛.get(칸);
+      if (!옛) {
+        const r = await 밖에서(`https://firestore.googleapis.com/v1/${뿌리}/artifacts/${서류.PROJ}/public/data/`
+          + `${encodeURIComponent(칸)}?pageSize=300`, { headers: { Authorization: "Bearer " + tok } });
+        if (!r.ok) throw new Error("읽기 " + r.status + (r.탈 ? "/" + r.탈 : ""));
+        옛 = new Map();                                  // 문서 이름 → 칸
+        for (const d of (JSON.parse(r.글 || "{}").documents || [])) {
+          let 이름 = String(d.name || "").split("/").pop();
+          try { 이름 = decodeURIComponent(이름); } catch (e) {}
+          옛.set(이름, 풀기({ mapValue: { fields: d.fields || {} } }) || {});
+        }
+        창고옛.set(칸, 옛);
+      }
+      if (typeof 새 === "function") 새 = 새(옛);
       if (!새 || !새.수) return window.VP말?.(`${딱}:안올림 ${없음}`);
       /* 진짜 단품관리는 5,000개 남짓(10-29). 100개 아래면 반쪽 목록이거나 시험 흉내 쪽이다 — 창고에 안 쓴다
          (10-29 창고를 가로채지 않는 옛 시험이 가짜 단품 셋을 진짜 창고에 써 버렸다) */
       if (새.수 < 100) return window.VP말?.(`${딱}:안올림 ${새.수}개 — 너무 적음`);
-      const tok = await 서류표();
-      const 뿌리 = `projects/${서류.PROJ}/databases/(default)/documents`;
-      const 자리 = `${뿌리}/artifacts/${서류.PROJ}/public/data/${칸}`;
-      const r = await 밖에서(`https://firestore.googleapis.com/v1/${뿌리}/artifacts/${서류.PROJ}/public/data/`
-        + `${encodeURIComponent(칸)}?pageSize=300`, { headers: { Authorization: "Bearer " + tok } });
-      if (!r.ok) throw new Error("읽기 " + r.status + (r.탈 ? "/" + r.탈 : ""));
-      const 옛 = new Map();                              // 문서 이름 → 칸
-      for (const d of (JSON.parse(r.글 || "{}").documents || [])) {
-        let 이름 = String(d.name || "").split("/").pop();
-        try { 이름 = decodeURIComponent(이름); } catch (e) {}
-        옛.set(이름, 풀기({ mapValue: { fields: d.fields || {} } }) || {});
-      }
       /* 벤더피아가 반쪽만 준 목록으로 창고를 비우지 않는다 — 전보다 절반 아래로 줄면 안 올린다 */
       const 옛수 = Number((옛.get("_정보") || {})[수칸]) || 0;
       if (옛수 && 새.수 < 옛수 / 2) return window.VP말?.(`${딱}:안올림 ${새.수}개(전 ${옛수}) — 너무 줄었음`);
@@ -735,6 +752,9 @@ const 한벌돌리기 = (단품곁다리) => {
         headers: { "Content-Type": "application/json", Authorization: "Bearer " + tok },
         body: JSON.stringify({ writes: 쓰기 }) });
       if (!w.ok) throw new Error("쓰기 " + w.status);
+      새.문서들.forEach((줄, i) => 옛.set(앞 + (i + 1), { 줄 }));   // 다음 견주기는 쓴 것과
+      for (const 이름 of [...옛.keys()]) { const k = 번호꼴.exec(이름); if (k && Number(k[1]) > 새.문서들.length) 옛.delete(이름); }
+      옛.set("_정보", { ...(옛.get("_정보") || {}), [수칸]: 새.수 });
       window.VP말?.(`${딱}:올림 ${새.수}개 · 문서${쓰기.length - 1}+정보`);
     } catch (e) {
       window.VP말?.(`${딱}:못올림 ` + (e && e.message ? e.message : e));
@@ -1566,9 +1586,10 @@ const 한벌돌리기 = (단품곁다리) => {
        + ` · 링크를 건 것 ${ing맞은것.size}개 — 그 이름 밑에 주황 점이 찍힙니다`);
   }
 
-  /* 0.34.82 단품목록은 재고(양품수)를 받은 뒤에 올린다 — 목록과 재고 중 늦게 끝난 쪽이 보낸다 */
-  let 올릴단품목록 = null, 재고받기끝 = false;
-  const 단품목록보내기 = () => { if (!올릴단품목록) return; const [h, 줄] = 올릴단품목록; 올릴단품목록 = null; 단품목록올리기(h, 줄); };
+  /* 0.34.83 단품목록은 목록을 다 받으면 바로 한 번, 재고(양품수)를 받으면 한 번 더 올린다.
+     ⚠ 0.34.82 는 「3개월 출고순 + 재고조회 전체(5~6번·약 7MB)」 가 끝날 때까지 기다렸다가 한 번만 올려서,
+       그 전에 화면을 떠나면 아무것도 안 올라갔다(11-02 사장님 「연결된 단품 양품수가 안보이는데」 — 창고는 11:43 세 칸 그대로). */
+  let 받은단품목록 = null;
   async function load() {
     const id = ++loadId;
     groups.clear();
@@ -1596,7 +1617,7 @@ const 한벌돌리기 = (단품곁다리) => {
       apply();
       /* 목록이 다 들어온 뒤에 한 번만 맞춰 본다 (상품관리에서만) */
       ing맞춰보기();
-      if (단품목록) { 올릴단품목록 = [heads, 단품목록]; if (재고받기끝) 단품목록보내기(); }   // 양품수 때문에 재고 뒤에 — 기다리지 않는다, 못 올려도 화면은 그대로
+      if (단품목록) { 받은단품목록 = [heads, 단품목록]; 단품목록올리기(heads, 단품목록); }   // 기다리지 않는다 — 못 올려도 화면은 그대로
     } catch (err) {
       if (id === loadId) { loading = false; note.textContent = "불러오지 못했습니다. 다시 로그인한 뒤 시도해 주세요."; }
     }
@@ -1641,7 +1662,7 @@ const 한벌돌리기 = (단품곁다리) => {
     // 첫 목록을 다 받은 뒤에 연결된 화면의 목록을 받는다 (벤더피아가 요청을 하나씩 처리해서, 동시에 받으면 첫 목록이 늦어진다)
     (page.top && !단품곁다리 ? loadTop().catch(() => { top = null; apply(); }) : Promise.resolve())
       .then(() => (page.stock === "link" || page.stock === "parts") && loadStock().catch(() => {}))
-      .then(() => { 재고받기끝 = true; 단품목록보내기(); })
+      .then(() => { if (받은단품목록 && stockByCode) 단품목록올리기(...받은단품목록); })   // 양품수를 얹어 한 번 더
       .then(() => page.link && loadLinked().catch(() => { linked = { heads: [], byCode: new Map() }; }))
       /* ② 단품관리에서만 — 서류관리 자료를 뒤에서 조용히 받는다.
          ⚠ 못 받아도 화면은 그대로 돌아야 한다. 그때는 단추가 안 생길 뿐이다. */

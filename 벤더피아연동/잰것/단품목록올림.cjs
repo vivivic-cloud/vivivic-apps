@@ -34,6 +34,8 @@ var VP_DATA = { PAGES: ${JSON.stringify(PAGES)},
       var 줄 = ${JSON.stringify(줄)};
       for (var i = 0; i < 줄.length; i += 700) cb(${JSON.stringify(머리)}, 줄.slice(i, i + 700), Math.min(i + 700, 줄.length), 줄.length);
     } else if (String(url).indexOf("/System/Stock/StockList.aspx") >= 0) {
+      /* 0.34.83 재고조회가 안 끝나는 경우(화면을 일찍 떠남) — 영영 안 돌아온다 */
+      if (window.__재고멈춤) return new Promise(function () {});
       /* 0.34.82 재고조회 흉내 — T00002 는 창고 두 줄(합 12), T00004 는 0, 나머지는 재고조회에 없음 */
       cb(["단품코드","단품명","창고","양품수"], [["T00002","","가","5"],["t00002","","나","7"],["T00004","","가","0"],["T00006","","가","1,234"]], 4, 4);
     } else cb(["단품코드","단품명"], [], 0, 0);
@@ -53,7 +55,7 @@ const 풀기 = (f) => {
   return o;
 };
 
-async function 한번(b, 줄, 제목) {
+async function 한번(b, 줄, 제목, 재고멈춤 = false) {
   기록 = [];
   const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
   await ctx.route('**://vivivic-cloud.github.io/**', (r) => r.abort('blockedbyclient'));
@@ -86,10 +88,12 @@ async function 한번(b, 줄, 제목) {
   await page.goto('https://vendorpia.com/System/Master/goods.aspx');
   await page.addScriptTag({ content: 'window.chrome=window.chrome||{};chrome.runtime={getManifest:()=>({version:"잰것"}),getURL:f=>"/"+f};'
     + 'window.__말=[];window.VP말=function(t){window.__말.push(t);};' });
+  if (재고멈춤) await page.addScriptTag({ content: 'window.__재고멈춤=true;' });
   await page.addScriptTag({ content: VP흉내(줄) });
   for (const f of ['johon.js', 'amt-draw.js', 'goods.js'])
     await page.addScriptTag({ content: fs.readFileSync(path.join(확장, f), 'utf8') }).catch((e) => 탈.push(f + ' ' + String(e).slice(0, 200)));
   await page.waitForFunction(() => window.__말.some((t) => /^단품목록:/.test(t)), null, { timeout: 15000 }).catch(() => {});
+  await page.waitForTimeout(1500);   // 0.34.83 재고 뒤 두 번째 올림까지
   const 말 = (await page.evaluate(() => window.__말)).filter((t) => /^단품목록:/.test(t));
   await ctx.close();
   console.log(`\n  ◆ ${제목} — 딱지 ${JSON.stringify(말)}${탈.length ? ' · 탈 ' + 탈.join(' / ') : ''}`);
@@ -107,7 +111,8 @@ async function 한번(b, 줄, 제목) {
   const 첫줄 = 줄짓기(2500);
   let 잰 = await 한번(b, 첫줄, 'ㄱ 빈 창고 · 2,500개');
   let 커 = 커밋들();
-  못(커.length === 1, `:commit 한 번 (${커.length})`);
+  못(커.length >= 1 && 커.length <= 2, `:commit 한두 번 — 목록 뒤·재고 뒤 (${커.length})`);
+  못(기록.filter((x) => x.셈 === 'GET' && x.길.endsWith('/납품내역_단품목록')).length === 1, '창고 읽기 한 번 — 두 번째 올림은 다시 안 읽음');
   못(['단품_1', '단품_2', '단품_3', '_정보'].every((k) => 창고.has(k)) && 창고.size === 4, `문서 ${[...창고.keys()].join(',')}`);
   const 다 = ['단품_1', '단품_2', '단품_3'].flatMap((k) => 풀기(창고.get(k)).줄);
   못(다.length === 2500 && 풀기(창고.get('단품_1')).줄.length === 1000, `줄 ${다.length} (단품_1 ${풀기(창고.get('단품_1')).줄.length})`);
@@ -153,6 +158,23 @@ async function 한번(b, 줄, 제목) {
   /* ㅁ 절반 아래 */
   잰 = await 한번(b, 줄짓기(300), 'ㅁ 300개(절반 아래)');
   못(커밋들().length === 0 && 창고.has('단품_2'), '안 올림 · 창고 그대로');
+
+  /* ㅅ 0.34.83 재고조회가 안 끝나도(화면을 일찍 떠남) 목록 뒤에 바로 올리고, 창고에 있던 양품수는 지킨다 */
+  {
+    창고.clear();
+    await 한번(b, 첫줄, 'ㅅ-준비 재고 받은 채로 채움');
+    const 넷째 = 줄짓기(2500, { T00001: "가가가 맨앞 단품" });
+    await 한번(b, 넷째, 'ㅅ 재고조회 안 끝남 · 이름 하나 바뀜', true);
+    const 커2 = 커밋들();
+    const 줄2 = ['단품_1', '단품_2', '단품_3'].flatMap((k) => 풀기(창고.get(k)).줄);
+    const 양2 = new Map(줄2.map((s) => s.split('\t')).map((a) => [a[0], a]));
+    못(커2.length === 1, `재고 없이도 올림 :commit 한 번 (${커2.length})`);
+    못(양2.get('T00001')[1] === '가가가 맨앞 단품' && 양2.get('T00002')[3] === '12' && 양2.get('T00006')[3] === '1234' && 양2.get('T00004')[3] === '0',
+      `옛 양품수 지킴 (T00002 ${양2.get('T00002')[3]} · T00006 ${양2.get('T00006')[3]} · T00004 ${양2.get('T00004')[3]})`);
+    창고.clear();
+    await 한번(b, 첫줄, 'ㅅ-2 빈 창고 · 재고조회 안 끝남', true);
+    못(창고.has('단품_1') && 풀기(창고.get('_정보')).단품수 === 2500, '빈 창고에도 목록은 올림(양품 빈칸)');
+  }
 
   /* ㅂ 100개 아래(시험 흉내 쪽·반쪽 목록) — 빈 창고여도 안 쓴다 */
   창고.clear();
