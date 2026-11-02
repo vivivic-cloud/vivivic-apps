@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v36 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v37 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -124,6 +124,10 @@ input.bad,select.bad{border-color:var(--red)}
 .list h3{font-size:15px;font-weight:900;margin:28px 0 10px;display:flex;gap:8px;align-items:baseline;letter-spacing:-0.02em}
 .list h3 span{font-weight:700;font-size:11px;color:var(--muted)}
 .list h3{flex-wrap:wrap}   /* v13 대기·오류 지우기 — 단추는 기존 .btn.small 모양, 목록 제목 줄 오른쪽 */
+.lsearch{display:flex;margin:0 0 8px}
+.lsearch>input{flex:1 1 auto;max-width:420px}   /* v37 4 품목 저장한 항목 검색 */
+.lsinfo{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted);font-weight:700;margin:0 0 10px}
+.lsinfo .lscnt.need{color:var(--amber)}
 .delbar{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;letter-spacing:0}
 details.rec>summary .rt{flex:1}
 details.rec>summary input.pk{flex:none;margin:0}
@@ -232,7 +236,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v36</span>
+    <span class="ver">v37</span>
   </div>
 </header>
 <div class="wrap">
@@ -1813,6 +1817,8 @@ function renderListIn(s,listBox,title){
   if(a==null){listBox.replaceChildren(head,h('div',{class:'empty'},'불러오는 중입니다.'));return;}
   if(!a.length){listBox.replaceChildren(head,h('div',{class:'empty'},'아직 저장한 '+s.title+' 항목이 없습니다. 위 폼에 입력하고 저장하면 여기에 쌓입니다.'));return;}
   var sorted=a.slice().sort(function(x,y){return (y.createdAt||'')<(x.createdAt||'')?-1:1;});
+  var sq=SEARCH_STEPS[s.key]?String(LISTQ[s.key]||'').trim().toLowerCase():null;   /* v37: 4 품목은 검색어에 맞는 기록만 */
+  if(sq!=null)sorted=sorted.filter(function(r){return EDITING[s.key+'/'+r.id]||(sq&&['name','code','spec'].some(function(k){return String(r[k]==null?'':r[k]).toLowerCase().indexOf(sq)>=0;}));});
   var openIds={};
   Array.prototype.forEach.call(listBox.querySelectorAll('details[data-id]'),function(d){if(d.open)openIds[d.getAttribute('data-id')]=1;});
   var items=sorted.map(function(r){
@@ -1839,7 +1845,31 @@ function renderListIn(s,listBox,title){
     if(openIds[r.id]||fm)d.open=true;
     return d;
   });
+  if(sq!=null){listSearch(s,listBox,head,a,sq,items);return;}
   listBox.replaceChildren.apply(listBox,[head].concat(items));
+}
+/* ---------- v37 4 품목 저장한 항목 = 검색으로만 보기 ----------
+   사장님 말씀: 「일단 품목 입력 페이지에 저장한 항목을 펼쳐놓지말고 검색으로 해당 목록만 보이게 해줘」.
+   검색어(품명·품번·규격, 대소문자 무시)가 비면 기록은 안 그리고 안내 + 상태별 건수만. 맞는 기록 카드는 전과 같은 단추(수정·수정 취소·삭제 등).
+   검색칸은 목록을 다시 그려도(onSnapshot) 같은 칸을 두어 친 글자·초점이 남는다. 열린 수정 폼이 있는 기록은 검색과 상관없이 보인다. */
+var SEARCH_STEPS={items:1};
+var LISTQ={};   /* 단계 키 → 검색어 (단계를 옮겨 다녀도 남음, 새로 열면 빈칸) */
+function listSearch(s,listBox,head,a,sq,items){
+  var sb=listBox._sb;
+  if(!sb){
+    var q=h('input',{type:'text',autocomplete:'off',placeholder:'품명·품번·규격 검색 (예: T-al, 도어, 784)','aria-label':'저장한 품목 검색',value:LISTQ[s.key]||'',
+      on:{input:function(){LISTQ[s.key]=q.value;renderList();},keydown:function(e){if(e.key==='Escape'&&q.value){q.value='';LISTQ[s.key]='';renderList();}}}});
+    sb=listBox._sb={row:h('div',{class:'lsearch'},q),info:h('div',{class:'lsinfo','aria-live':'polite'}),out:h('div',{})};
+  }
+  var c=counts(s.key);
+  var cnt='대기 '+c['대기']+' · 진행중 '+c['진행중']+' · 수정대기 '+c['수정대기']+' · 오류 '+c['오류']+' · 완료 '+c['완료'];
+  var need=c['대기']+c['오류']+c['수정대기'];
+  sb.info.replaceChildren(
+    h('span',{},sq?('맞는 품목 '+items.length+'건 / 전체 '+a.length+'건'):('검색어를 넣으면 저장된 품목이 보입니다 (전체 '+a.length+'건)')),
+    h('span',{class:'lscnt'+(need?' need':'')},cnt));
+  sb.out.replaceChildren.apply(sb.out,sq&&!items.length?[h('div',{class:'empty'},'「'+String(LISTQ[s.key]).trim()+'」에 맞는 저장한 품목이 없습니다.')]:items);
+  if(sb.row.parentNode===listBox&&listBox.firstChild!==sb.row){listBox.firstChild.replaceWith(head);}   /* 검색칸을 떼지 않아야 초점·커서가 남는다 */
+  else listBox.replaceChildren(head,sb.row,sb.info,sb.out);
 }
 /* ---------- v34 4 품목 수정 — 영림원에 이미 있는(완료) 품목을 폼으로 고친다 ----------
    「수정」 → 그 기록 안에 칸이 열림(품번 잠금 — 영림원이 품번으로 찾는다) → 「수정 저장」: 바뀐 칸만 edit{changed,before,after} 에 담고 status 「수정대기」.
