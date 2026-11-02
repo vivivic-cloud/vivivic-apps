@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v38 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v39 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -251,7 +251,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v38</span>
+    <span class="ver">v39</span>
   </div>
 </header>
 <div class="wrap">
@@ -1986,8 +1986,8 @@ function renderListIn(s,listBox,title){
   if(a==null){listBox.replaceChildren(head,h('div',{class:'empty'},'불러오는 중입니다.'));return;}
   if(!a.length){listBox.replaceChildren(head,h('div',{class:'empty'},'아직 저장한 '+s.title+' 항목이 없습니다. 위 폼에 입력하고 저장하면 여기에 쌓입니다.'));return;}
   var sorted=a.slice().sort(function(x,y){return (y.createdAt||'')<(x.createdAt||'')?-1:1;});
-  var sq=SEARCH_STEPS[s.key]?String(LISTQ[s.key]||'').trim().toLowerCase():null;   /* v37: 4 품목은 검색어에 맞는 기록만 */
-  if(sq!=null)sorted=sorted.filter(function(r){return EDITING[s.key+'/'+r.id]||(sq&&['name','code','spec'].some(function(k){return String(r[k]==null?'':r[k]).toLowerCase().indexOf(sq)>=0;}));});
+  var ss=SEARCH_STEPS[s.key],sq=ss?String(LISTQ[s.key]||'').trim().toLowerCase():null;   /* v37: 4 품목(v39: 3 분류도)은 검색어에 맞는 기록만 */
+  if(sq!=null)sorted=sorted.filter(function(r){return EDITING[s.key+'/'+r.id]||(sq&&ss.keys.some(function(k){return String(r[k]==null?'':r[k]).toLowerCase().indexOf(sq)>=0;}));});
   var openIds={};
   Array.prototype.forEach.call(listBox.querySelectorAll('details[data-id]'),function(d){if(d.open)openIds[d.getAttribute('data-id')]=1;});
   var items=sorted.map(function(r){
@@ -2021,12 +2021,14 @@ function renderListIn(s,listBox,title){
    사장님 말씀: 「일단 품목 입력 페이지에 저장한 항목을 펼쳐놓지말고 검색으로 해당 목록만 보이게 해줘」.
    검색어(품명·품번·규격, 대소문자 무시)가 비면 기록은 안 그리고 안내 + 상태별 건수만. 맞는 기록 카드는 전과 같은 단추(수정·수정 취소·삭제 등).
    검색칸은 목록을 다시 그려도(onSnapshot) 같은 칸을 두어 친 글자·초점이 남는다. 열린 수정 폼이 있는 기록은 검색과 상관없이 보인다. */
-var SEARCH_STEPS={items:1};
+var SEARCH_STEPS={   /* 단계 키 → 검색할 칸 · 검색칸 안내 · 이름(「저장된 품목」) */
+  items:{keys:['name','code','spec'],ph:'품명·품번·규격 검색 (예: T-al, 도어, 784)',noun:'품목',ga:'이'},
+  classes:{keys:['kind','big','mid','name'],ph:'품목구분·대·중·소분류 검색 (예: T반자재, 리빙룸, 자재)',noun:'분류',ga:'가'}};   /* v39 3 분류: 「분류입력에 저잘한 항목 검색으로만 보이게 해줘」 */
 var LISTQ={};   /* 단계 키 → 검색어 (단계를 옮겨 다녀도 남음, 새로 열면 빈칸) */
 function listSearch(s,listBox,head,a,sq,items){
-  var sb=listBox._sb;
+  var sb=listBox._sb,ss=SEARCH_STEPS[s.key];
   if(!sb){
-    var q=h('input',{type:'text',autocomplete:'off',placeholder:'품명·품번·규격 검색 (예: T-al, 도어, 784)','aria-label':'저장한 품목 검색',value:LISTQ[s.key]||'',
+    var q=h('input',{type:'text',autocomplete:'off',placeholder:ss.ph,'aria-label':'저장한 '+ss.noun+' 검색',value:LISTQ[s.key]||'',
       on:{input:function(){LISTQ[s.key]=q.value;renderList();},keydown:function(e){if(e.key==='Escape'&&q.value){q.value='';LISTQ[s.key]='';renderList();}}}});
     sb=listBox._sb={row:h('div',{class:'lsearch'},q),info:h('div',{class:'lsinfo','aria-live':'polite'}),out:h('div',{})};
   }
@@ -2034,9 +2036,9 @@ function listSearch(s,listBox,head,a,sq,items){
   var cnt='대기 '+c['대기']+' · 진행중 '+c['진행중']+' · 수정대기 '+c['수정대기']+' · 오류 '+c['오류']+' · 완료 '+c['완료'];
   var need=c['대기']+c['오류']+c['수정대기'];
   sb.info.replaceChildren(
-    h('span',{},sq?('맞는 품목 '+items.length+'건 / 전체 '+a.length+'건'):('검색어를 넣으면 저장된 품목이 보입니다 (전체 '+a.length+'건)')),
+    h('span',{},sq?('맞는 '+ss.noun+' '+items.length+'건 / 전체 '+a.length+'건'):('검색어를 넣으면 저장된 '+ss.noun+ss.ga+' 보입니다 (전체 '+a.length+'건)')),
     h('span',{class:'lscnt'+(need?' need':'')},cnt));
-  sb.out.replaceChildren.apply(sb.out,sq&&!items.length?[h('div',{class:'empty'},'「'+String(LISTQ[s.key]).trim()+'」에 맞는 저장한 품목이 없습니다.')]:items);
+  sb.out.replaceChildren.apply(sb.out,sq&&!items.length?[h('div',{class:'empty'},'「'+String(LISTQ[s.key]).trim()+'」에 맞는 저장한 '+ss.noun+ss.ga+' 없습니다.')]:items);
   if(sb.row.parentNode===listBox&&listBox.firstChild!==sb.row){listBox.firstChild.replaceWith(head);}   /* 검색칸을 떼지 않아야 초점·커서가 남는다 */
   else listBox.replaceChildren(head,sb.row,sb.info,sb.out);
 }
