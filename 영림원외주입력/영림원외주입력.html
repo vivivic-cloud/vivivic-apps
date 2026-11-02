@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v31 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v32 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -188,6 +188,12 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 .psbar select{width:auto;flex:none}
 .psbar .msg{align-self:center}
 .psframe{display:block;width:100%;height:420px;border:0;margin-top:12px;background:transparent}   /* v30 조혼가구 부품 자리 — 높이는 안에서 맞춘다 */
+/* v32 BOM 모품목 고르기 — 영림원 품목과 못 이은 줄은 빨갛게(사람이 하위품번을 고른다) */
+.ps.inform{margin:0 0 16px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--fill4)}
+.rowcard.unlinked{border-color:var(--red-line);background:var(--red-bg)}
+.rowcard .linknote{font-size:12px;color:var(--red);font-weight:700;margin-top:8px}
+.pslink{font-size:12px;margin-top:8px;white-space:pre-line}
+.pslink.bad{color:var(--red);font-weight:700}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -195,7 +201,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v31</span>
+    <span class="ver">v32</span>
   </div>
 </header>
 <div class="wrap">
@@ -788,6 +794,7 @@ function buildForm(step){
     h('div',{class:'actions'},submit,msg));
   if(step.rowFields)addRow();
   var api={el:f,msg:msg,submit:submit,
+    rowsNow:function(){return rows;},   /* v32 BOM 모품목 고르기가 채운 줄에 빨간 표시를 단다 */
     collect:function(){
       var vals={};headFields.forEach(function(x){vals[x.f.k]=x.get();});
       var bad=0,first=null,fmt='';
@@ -992,7 +999,7 @@ function psLoad(){
     .then(function(){if(PS.draw)PS.draw();});
   return PS.loading;
 }
-function psBox(){
+function psBox(onPick){
   /* v30: 화면은 조혼가구 것을 그대로 — 공용 부품 shared/발주상품고르기.html(조혼가구와 같은 검색칸·부속카드·CSS) 을 iframe 으로 띄운다.
      여기서 따로 그리지 않는다(사장님 11-01 「따로 디자인하지말고 … 조혼가구의 이부분을 갖다 쓰는 형태로」). 원장 읽기는 psLoad 한 곳. */
   var P=window.발주상품검색;
@@ -1004,6 +1011,7 @@ function psBox(){
   function push(){
     var w=fr.contentWindow;
     if(!ready||!PS.data||!w||!w.발주상품고르기보기)return;
+    if(onPick&&w.발주상품고르기보기.고르면)w.발주상품고르기보기.고르면(onPick);   /* v32 BOM: 고른 상품 → 줄 채우기 */
     w.발주상품고르기보기.열기(PS.data,PS.sup);
   }
   fr.addEventListener('load',function(){ready=true;push();});
@@ -1015,11 +1023,80 @@ function psBox(){
   };
   PS.draw();
   psLoad();
+  if(onPick)return h('section',{class:'ps inform'},
+    h('h3',{},'모품목 고르기 — 조혼가구 상품검색'),
+    h('p',{class:'stepnote'},'조혼가구 제품 발주와 같은 상품검색(상품검색 · ING단품명 · 카테고리)으로 상품을 고르면, 그 상품의 부속(부속카드와 같은 것)으로 아래 하위 품목 줄을 채웁니다. 7항목이 같은 부속은 한 줄로 더합니다. 4단계 품목과 이어지지 않은 줄은 빨갛게 — 하위품번을 직접 고르세요. 저장 전에 모든 칸을 고칠 수 있습니다.'),
+    h('div',{class:'psbar'},sup,stat),
+    onPick.out,
+    fr);
   return h('section',{class:'card ps'},
     h('h3',{},'발주 상품검색'),
     h('p',{class:'stepnote'},'조혼가구 제품 발주의 상품검색·부속카드를 그대로 가져다 씁니다(같은 원장·같은 화면 부품). 발주처를 고르고, 검색 방법 셋(상품검색 · ING단품명 · 카테고리) 중 하나로 상품을 고르면 그 상품의 부속이 나옵니다. 보기만 합니다(발주 단추 없음, 품목 칸에 채우지 않고 저장하지 않습니다). 금액 칸은 보여 주지 않습니다.'),
     h('div',{class:'psbar'},sup,stat),
     fr);
+}
+/* ---------- v32 BOM 모품목 고르기 = 조혼가구 상품검색 → 부속 줄 채우기 ----------
+   사장님 11-02: 「이 입력의 모품명 검색에 품목의 조혼가구의 상품검색방식이 동일하게 나타나게 … 모품목명이 결정되면 조혼가구 논리에 따른 해당 부속이 나타나면」
+   고르기 = 4 품목과 같은 공용 부품(shared/발주상품고르기.html 의 고르면 알림). 부속 = 그 pick 결과의 원장 줄(부속카드와 같은 줄)·세트별소모량.
+   ⚠ 원장 상품·부속과 4단계 품목을 잇는 열쇠가 아직 없다 — 아래 규칙으로 「딱 하나」일 때만 잇고, 아니면 빨간 줄(짐작으로 채우지 않음).
+     제품: 원장 단품명(맨 앞 「(KRW) 」 같은 괄호 묶음 뗌) = 품목 품명(맨 앞 T 뗌), 띄어쓰기 하나로 맞춰 비교.
+     부속: 품목 규격이 정확히 W*D 이고 원장 재단W·D 와 같음 + 품명 낱말(띄어쓰기·「·」로 나눔, 두 글자 이상) 중 하나가 원장 부속명을 담거나 부속명에 담김
+           (예: 「이동선반L」 ⊃ 「이동선반」, 「상판·지판」 ⊃ 「상판」·「지판」). */
+function bomSpec2(v){var m=/^\s*(\d+(?:\.\d+)?)\s*[*xX×]\s*(\d+(?:\.\d+)?)\s*$/.exec(String(v==null?'':v));return m?{w:parseFloat(m[1]),d:parseFloat(m[2])}:null;}
+function bomNorm(v){return String(v==null?'':v).replace(/\s+/g,' ').trim();}
+function bomFromPick(k){
+  var P=window.발주상품검색,d=PS.data;
+  var items=(data.items||[]).filter(function(r){return r.status!=='오류';});
+  var pn=bomNorm(String(k.code).replace(/^\s*\([^)]*\)\s*/,''));
+  var prods=items.filter(function(it){return bomNorm(String(it.name||'').replace(/^\s*T/,''))===pn;});
+  var groups=[],byKey={};
+  k.rowIndexes.forEach(function(i){
+    var p=P.part(d,i),g=byKey[p.same7];
+    if(!g){g=byKey[p.same7]={names:[],w:p.w,d:p.d,qty:0};groups.push(g);}
+    if(p.부속명&&g.names.indexOf(p.부속명)<0)g.names.push(p.부속명);
+    g.qty+=p.수량;
+  });
+  groups.forEach(function(g){
+    if(!(g.w>0&&g.d>0)){g.cands=[];g.why='원장에 재단W·D 가 없어 규격으로 찾을 수 없습니다';return;}
+    g.cands=items.filter(function(it){
+      var sp=bomSpec2(it.spec);if(!sp||sp.w!==g.w||sp.d!==g.d)return false;
+      var toks=String(it.name||'').split(/[\s·]+/).filter(function(t){return t.length>=2;});
+      return g.names.some(function(n){return toks.some(function(t){return t.indexOf(n)>=0||n.indexOf(t)>=0;});});
+    });
+    g.why=g.cands.length===1?'':(g.cands.length?'후보 '+g.cands.length+'개('+g.cands.map(function(x){return x.code;}).join(', ')+') — 하나로 정할 수 없습니다':'규격('+g.w+'*'+g.d+')과 이름이 함께 맞는 4단계 품목이 없습니다');
+  });
+  return {prod:prods.length===1?prods[0]:null,prodWhy:prods.length===1?'':(prods.length?'같은 품명 품목이 '+prods.length+'개 — 하나로 정할 수 없습니다':'4단계 품목에 「T'+pn+'」 이(가) 없습니다'),groups:groups};
+}
+function bomPickFn(){
+  var out=h('div',{class:'pslink','aria-live':'polite'}),last='';
+  var fn=function(k){
+    if(!k){last='';return;}
+    var key=JSON.stringify([k.code,k.criteria,k.rowIndexes]);if(key===last)return;last=key;   /* 같은 고르기 알림이 겹쳐 와도 한 번만(사람이 고친 값을 덮지 않게) */
+    if(!PS.data||!form||cur!=='boms')return;
+    var L=bomFromPick(k),pr=L.prod,qs=function(n){return String(Math.round(n*1e6)/1e6);};
+    var pverNow=(form.values().pver||'').trim();
+    form.fill({pname:pr?pr.name:'',pcode:pr?pr.code:'',pspec:pr?(pr.spec||''):'',pver:pverNow||'1'},
+      L.groups.map(function(g,i){var it=g.cands.length===1?g.cands[0]:null;
+        return {proc:'T조립',order:String(i+1),cname:it?it.name:'',ccode:it?it.code:'',cspec:it?(it.spec||''):'',cver:'',inunit:'EA',qn:qs(g.qty),qd:'1',hasSub:false};}));
+    var rows=form.rowsNow(),bad=0;
+    L.groups.forEach(function(g,i){
+      var r=rows[i];if(!r)return;
+      var cc=r.fields.filter(function(x){return x.f.k==='ccode';})[0],by=function(kk){return r.fields.filter(function(x){return x.f.k===kk;})[0];};
+      var note=h('div',{class:'linknote',hidden:!g.why},'영림원 품목과 못 이음 — 원장 부속 「'+g.names.join('·')+'」 '+g.w+'×'+g.d+' · '+g.why+'. 아래 하위품번을 직접 고르세요.');
+      r.el.querySelector('.rowtop').after(note);
+      if(g.why){bad++;r.el.classList.add('unlinked');}
+      /* 사람이 하위품번을 고르면 그 품목의 품명·규격을 채우고 빨간 표시를 뗀다(이 고르기로 채운 줄만) */
+      cc.el.addEventListener('change',function(){
+        var it=(data.items||[]).concat(data.materials||[]).filter(function(x){return x.code===cc.get();})[0];
+        if(!it)return;by('cname').set(it.name||'');by('cspec').set(it.spec||'');r.el.classList.remove('unlinked');note.hidden=true;
+      });
+    });
+    out.className='pslink'+(L.prodWhy||bad?' bad':'');
+    out.textContent='고른 상품 「'+k.code+'」 → '+(pr?'모품목 '+pr.code+' '+pr.name:'모품목 못 이음: '+L.prodWhy+'. 모품목명·모품목번호를 직접 고르세요')+
+      '\n부속 '+k.rowIndexes.length+'줄 → 하위 품목 '+L.groups.length+'줄(7항목 같은 부속 더함) · 이음 '+(L.groups.length-bad)+(bad?' · 못 이음 '+bad+'(빨간 줄)':'')+' · 저장 전에 확인하세요.';
+  };
+  fn.out=out;
+  return fn;
 }
 function renderStep(){
   var s=BYKEY[cur];bulk=null;
@@ -1062,6 +1139,7 @@ function renderStep(){
         h('h2',{},s.n+'. '+s.title+' 입력'),
         needs,h('p',{class:'stepnote'},s.note)),
       xlBar,
+      s.key==='boms'?psBox(bomPickFn()):'',   /* v32 모품목 고르기 = 조혼가구 상품검색 → 부속 줄 채우기 */
       form.el),
     s.key==='items'?psBox():'',   /* v28 발주 상품검색 */
     listBox,listBox2||'');   /* v24: 「저장한 공정」 목록이 없는 단계에서 「null」 글자가 찍히던 것 */

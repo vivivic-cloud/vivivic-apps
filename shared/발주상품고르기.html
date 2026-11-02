@@ -3,6 +3,7 @@
      영림원외주입력(v30~) 이 iframe 으로 띄운다. 모양·마크업·검색칸 함수는 조혼가구와 **같은 파일**을 부른다:
        shared/조혼가구모양.css (조혼가구 CSS 한 벌) · shared/발주상품고르기.js (검색칸·부속카드·검색 함수) · 테일윈드 CDN(조혼가구와 같음)
      ⚠ 공용 — 그 두 파일을 고치면 조혼가구와 여기가 같이 바뀐다. 여기서 따로 디자인하지 않는다.
+     (영림원외주입력 v32) 발주상품고르기보기.고르면(fn) — 고른 상품(pick 결과)을 부르는 쪽에 알린다(BOM 모품목 고르기). 화면은 그대로.
      ⚠ 쓰지 않는다. 파이어베이스도 안 부른다 — 원장은 부르는 쪽(영림원외주입력 psLoad)이 읽어 넘긴다.
      iframe 이라 영림원외주입력 CSS 와 부딪히지 않는다(이름 앞붙이 없이 조혼가구 모양 그대로). -->
 <html lang="ko">
@@ -44,7 +45,10 @@
         function dismissTutorial() {}
 
         const 빈목록 = '<div id="list-placeholder" class="p-8 text-center font-bold tracking-tight fluid-text-body italic text-gray-400">없음</div>';
-        function 부속지움() { document.getElementById('identity-list-container').innerHTML = 빈목록; }
+        /* (영림원외주입력 v32) 부르는 쪽이 「고른 상품」을 받는 자리 — 고르면 pick 결과(k), 풀리면 null. 안 걸면 아무 일 없음 */
+        let 고르면알림 = null;
+        function 알림(k) { if (고르면알림) try { 고르면알림(k); } catch (e) { console.warn(e); } }
+        function 부속지움() { document.getElementById('identity-list-container').innerHTML = 빈목록; 알림(null); }
         const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
         /* 고른 상품 → 조혼가구 addOrderedProduct(부속만 발주 아님) 가 담는 그대로 보여 준다:
@@ -56,6 +60,7 @@
             else if (mode === 'ing') k = P.pick(d, sup, document.getElementById('sel-ing-code').value);
             else k = P.pickCategory(d, sup, ['sel-l1', 'sel-l2', 'sel-l3', 'sel-l4'].map(id => document.getElementById(id).value));
             if (!k) { 부속지움(); return; }
+            알림(k);
             const h = d[0];
             let basicHtml = '', specialHtml = '';
             k.rowIndexes.forEach(i => {
@@ -91,7 +96,8 @@
                 resetSearchLabel();
                 onSupplierChange();
                 부속지움();
-            }
+            },
+            고르면(fn) { 고르면알림 = typeof fn === 'function' ? fn : null; }
         };
         부속지움();
         setInterval(() => { try { johonPickTick(); } catch (e) {} }, 40);   // 조혼가구와 같은 박자
