@@ -1,6 +1,6 @@
 /* 10-26 [새 지시 새창] 사장님 말씀 (한 글자도 안 고침):
    「현재 페이지에서 어떤방식으로든 단품관리 상품관리등 링크를 타고 넘어갈때 화면 전환이 아닌 새페이지로 나타나게 해줘」
-   보는 것: 메뉴 단추 다섯(배송관리·단품관리·상품관리·재고조회·CS등록)을 누르면 **새 탭**이 뜨고 메뉴 화면은 그대로인가.
+   보는 것: 메뉴 단추 여섯(배송관리·단품관리·상품관리·재고조회·구매입고·CS등록)을 누르면 **새 탭**이 뜨고 메뉴 화면은 그대로인가.
             goods.js 팝업의 「…로 가기」(.vp-goto) 가 새 탭으로 열리는 꼴인가.
    ⚠ 진짜 vendorpia.com 은 못 닿는다. 흉내로 세운다. */
 const { chromium } = require('playwright');
@@ -29,7 +29,7 @@ window.VP저장 = { get: async function(){return {};}, set: async function(){}, 
   await 쪽.addScriptTag({ content: VP흉내 });
   await 쪽.addScriptTag({ content: fs.readFileSync(path.join(확장, 'menu.js'), 'utf8') });
   const 이름들 = await 쪽.$$eval('#vp-root .vp-btn', (a) => a.map((x) => x.textContent.trim()));
-  console.log('\n■ 새창 — 메뉴 단추 ' + 이름들.length + '개 ' + 못(이름들.length === 5));
+  console.log('\n■ 새창 — 메뉴 단추 ' + 이름들.length + '개 ' + 못(이름들.length === 6));
   for (const 이름 of 이름들) {
     const [새] = await Promise.all([ctx.waitForEvent('page', { timeout: 5000 }).catch(() => null),
       쪽.click(`#vp-root .vp-btn:text-is("${이름}")`)]);

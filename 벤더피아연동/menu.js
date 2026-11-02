@@ -12,6 +12,10 @@
     { name: "단품관리", url: "/System/Master/goods.aspx" },
     { name: "상품관리", url: "/System/Master/salesGoods.aspx" },
     { name: "재고조회", url: "/System/Stock/StockList.aspx" },
+    /* 11-02 [새 지시 구매입고메뉴] 「메인에 벤더피아 기능의 재고관리-입고관리의 구매입고 현재 페이지나 나타나는 구매입고 메뉴를 만들어줘」
+       벤더피아 원래 메뉴 재고관리→입고관리→구매입고 = `GoUrl('System/Stock/POWList.aspx', 'menu1_10_004')` (실제 화면에서 확인).
+       확장이 이 주소엔 글을 안 보내므로 벤더피아 화면 **그대로** 뜬다. */
+    { name: "구매입고", url: "/System/Stock/POWList.aspx" },
     /* ⚠⚠ 10-16 사장님 (이 메뉴 화면을 짚어 보내신 말씀, 그대로): 「**cs등록 항목을 만들어줘**」
          (장부 a1792145842)
        속은 이미 있다 — 배송관리 줄마다 「상담」 단추로 여는 그 판(상담 이력 + 교환·반품·AS 접수).

@@ -146,7 +146,7 @@ const CS본다 = () => {
     await 쪽.waitForTimeout(600);
     const 메뉴 = await 쪽.evaluate(메뉴본다);
     console.log('\n  ◆ ' + w + '×' + h + ' — 메뉴 화면');
-    console.log('    ★ 메뉴 단추 **' + 메뉴.수 + '개** (전 4개) ' + 못(메뉴.수 === 5));
+    console.log('    ★ 메뉴 단추 **' + 메뉴.수 + '개** (CS등록 더해 5 → 구매입고 더해 6) ' + 못(메뉴.수 === 6));
     console.log('      ' + JSON.stringify(메뉴.것.map((x) => x.글)));
     const CS단추 = 메뉴.것.find((x) => x.글 === 'CS등록');
     const 딴넷 = 메뉴.것.filter((x) => x.글 !== 'CS등록');
