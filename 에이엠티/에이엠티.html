@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.64.0 (2026-11-01) — 원장당 재단 수량 계산을 shared/원장재단수량.js 한 벌로(영림원외주입력과 같이 씀)
+     버전: v1.65.0 (2026-11-02) — 부속카드마다 「원장당 N개」(재단 편집 기본규칙, shared/원장재단수량.js 원장당)
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2718,7 +2718,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.64.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.65.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2858,7 +2858,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.64.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.65.0</b></p>
         </div>
     </div>
 
@@ -5851,6 +5851,8 @@
                 // 마감색상(원장 색상) — 조혼가구에서 발주 확정 시 저장해둔 값을 우선
                 // 신뢰하고, 없으면(예전 발주) 원본 데이터에서 다시 조회
                 const finishColor = pData.finishColor || row[h.indexOf("마감색상")] || "";
+                // 원장 1장당 생산량 — 재단 편집 기본규칙(shared/원장재단수량.js 원장당)
+                const 원장당 = 원장재단수량.원장당(w, d, row[h.indexOf("결보호")]);
 
                 const partDiffs = {};
                 const partUnitCons = parseFloat(row[h.indexOf("세트별소모량")]) || 1;
@@ -5867,13 +5869,14 @@
                 const procDotsHtml = procDots ? `<div style="display:flex;gap:3px;align-items:center;flex-wrap:wrap;margin-top:2px;">${procDots}</div>` : '';
 
                 const cardHtml = `
-                    <div class="pt-card p-2 rounded-lg shadow-sm flex flex-col gap-1 relative group/card border border-[#ededeb]">
+                    <div class="pt-card p-2 rounded-lg shadow-sm flex flex-col gap-1 relative group/card border border-[#ededeb]" data-per-sheet="${원장당}">
                         <div class="flex justify-between items-start gap-1">
                             <div class="flex flex-col min-w-0 flex-1" style="word-break:break-all;overflow-wrap:anywhere">
                                 <span class="pt-name text-[10px] font-bold text-[#37352f]">${row[h.indexOf("부속명")]}</span>
                                 <span class="pt-sub text-[9px] text-[#787774]">${plateName}${finishColor ? ` · ${finishColor}` : ''}</span>
                                 <span class="pt-sub text-[9px] text-[#787774]">${finish}</span>
                                 <span class="pt-size text-[9px] text-[#787774] font-medium">${w} X ${d}</span>
+                                ${원장당 > 0 ? `<span class="pt-sub text-[9px] text-[#787774]">원장당 ${원장당}개</span>` : ''}
                                 ${procDotsHtml}
                             </div>
                             <div class="flex flex-col items-end gap-0.5 flex-shrink-0">
@@ -5885,7 +5888,7 @@
                 if (isAmt) { if (!pData.isDeleted) basicHtml += cardHtml; }
                 else {
                     if (pData.isDeleted) {
-                        specialHtml += `<div class="pt-card p-2 rounded-lg border border-dashed border-[#ededeb] bg-[#f7f6f3]/30 flex flex-col gap-1"><div class="flex justify-between items-start gap-1"><div class="flex flex-col min-w-0 flex-1" style="word-break:break-all;overflow-wrap:anywhere"><span class="pt-name text-[10px] font-bold text-[#37352f]">${row[h.indexOf("부속명")]}</span><span class="pt-sub text-[9px] text-[#787774]">${plateName}${finishColor ? ` · ${finishColor}` : ''}</span><span class="pt-size text-[9px] text-[#787774] font-medium">${w} X ${d}</span></div></div></div>`;
+                        specialHtml += `<div class="pt-card p-2 rounded-lg border border-dashed border-[#ededeb] bg-[#f7f6f3]/30 flex flex-col gap-1" data-per-sheet="${원장당}"><div class="flex justify-between items-start gap-1"><div class="flex flex-col min-w-0 flex-1" style="word-break:break-all;overflow-wrap:anywhere"><span class="pt-name text-[10px] font-bold text-[#37352f]">${row[h.indexOf("부속명")]}</span><span class="pt-sub text-[9px] text-[#787774]">${plateName}${finishColor ? ` · ${finishColor}` : ''}</span><span class="pt-size text-[9px] text-[#787774] font-medium">${w} X ${d}</span>${원장당 > 0 ? `<span class="pt-sub text-[9px] text-[#787774]">원장당 ${원장당}개</span>` : ''}</div></div></div>`;
                     } else { basicHtml += cardHtml; }
                 }
             });
@@ -15667,6 +15670,8 @@
                 // 마감색상(원장 색상) — 조혼가구에서 발주 확정 시 저장해둔 값을 우선
                 // 신뢰하고, 없으면(예전 발주) 원본 데이터에서 다시 조회
                 const finishColor = pData.finishColor || row[h.indexOf("마감색상")] || "";
+                // 원장 1장당 생산량 — 재단 편집 기본규칙(shared/원장재단수량.js 원장당)
+                const 원장당 = 원장재단수량.원장당(w, d, row[h.indexOf("결보호")]);
 
                 // 부속별 공정 원형 뱃지 (호버 시 작업시간 툴팁)
                 const partDiffs = {};
@@ -15684,13 +15689,14 @@
                 const procDotsHtml = procDots ? `<div style="display:flex;gap:3px;align-items:center;flex-wrap:wrap;margin-top:2px;">${procDots}</div>` : '';
 
                 const cardHtml = `
-                    <div class="pt-card p-2 rounded-lg shadow-sm flex flex-col gap-1 relative group/card border border-[#ededeb]">
+                    <div class="pt-card p-2 rounded-lg shadow-sm flex flex-col gap-1 relative group/card border border-[#ededeb]" data-per-sheet="${원장당}">
                         <div class="flex justify-between items-start gap-1">
                             <div class="flex flex-col min-w-0 flex-1" style="word-break:break-all;overflow-wrap:anywhere">
                                 <span class="pt-name text-[10px] font-bold text-[#37352f]">${row[h.indexOf("부속명")]}</span>
                                 <span class="pt-sub text-[9px] text-[#787774]">${plateName}${finishColor ? ` · ${finishColor}` : ''}</span>
                                 <span class="pt-sub text-[9px] text-[#787774]">${finish}</span>
                                 <span class="pt-size text-[9px] text-[#787774] font-medium">${w} X ${d}</span>
+                                ${원장당 > 0 ? `<span class="pt-sub text-[9px] text-[#787774]">원장당 ${원장당}개</span>` : ''}
                                 ${procDotsHtml}
                             </div>
                             <div class="flex flex-col items-end gap-0.5 flex-shrink-0">
@@ -15702,7 +15708,7 @@
                 if (isAmt) { if (!pData.isDeleted) basicHtml += cardHtml; }
                 else {
                     if (pData.isDeleted) {
-                        specialHtml += `<div class="pt-card p-2 rounded-lg border border-dashed border-[#ededeb] bg-[#f7f6f3]/30 flex flex-col gap-1"><div class="flex justify-between items-start gap-1"><div class="flex flex-col min-w-0 flex-1" style="word-break:break-all;overflow-wrap:anywhere"><span class="pt-name text-[10px] font-bold text-[#37352f]">${row[h.indexOf("부속명")]}</span><span class="pt-sub text-[9px] text-[#787774]">${plateName}${finishColor ? ` · ${finishColor}` : ''}</span><span class="pt-size text-[9px] text-[#787774] font-medium">${w} X ${d}</span></div></div></div>`;
+                        specialHtml += `<div class="pt-card p-2 rounded-lg border border-dashed border-[#ededeb] bg-[#f7f6f3]/30 flex flex-col gap-1" data-per-sheet="${원장당}"><div class="flex justify-between items-start gap-1"><div class="flex flex-col min-w-0 flex-1" style="word-break:break-all;overflow-wrap:anywhere"><span class="pt-name text-[10px] font-bold text-[#37352f]">${row[h.indexOf("부속명")]}</span><span class="pt-sub text-[9px] text-[#787774]">${plateName}${finishColor ? ` · ${finishColor}` : ''}</span><span class="pt-size text-[9px] text-[#787774] font-medium">${w} X ${d}</span>${원장당 > 0 ? `<span class="pt-sub text-[9px] text-[#787774]">원장당 ${원장당}개</span>` : ''}</div></div></div>`;
                     } else { basicHtml += cardHtml; }
                 }
             });
@@ -15810,18 +15816,21 @@
                 // 마감색상(원장 색상) — 조혼가구에서 발주 확정 시 저장해둔 값을 우선
                 // 신뢰하고, 없으면(예전 발주) 원본 데이터에서 다시 조회
                 const finishColor = pData.finishColor || row[h.indexOf("마감색상")] || "";
+                // 원장 1장당 생산량 — 재단 편집 기본규칙(shared/원장재단수량.js 원장당)
+                const 원장당 = 원장재단수량.원장당(w, d, row[h.indexOf("결보호")]);
                 const plateNameWithColor = `${row[h.indexOf("원장명")] || ''}${finishColor ? ` · ${finishColor}` : ''}`;
 
                 // 수정 가능 여부 확인
                 const canEdit = isID0508 || pendingOrdersMap[appMode];
 
-                const cardHtml = `<div class="pt-card p-2 rounded-lg shadow-sm flex flex-col gap-1 relative group/card border border-[#ededeb]">
+                const cardHtml = `<div class="pt-card p-2 rounded-lg shadow-sm flex flex-col gap-1 relative group/card border border-[#ededeb]" data-per-sheet="${원장당}">
                     ${isAmt && canEdit ? `<button onclick="event.stopPropagation(); deleteSubPart(${idNum}, '${cardKey}')" class="absolute -top-1 -right-1 sub-part-action-btn bg-white border border-[#ededeb] text-[#d3d1cb] hover:text-red-50 opacity-0 group-hover/card:opacity-100 shadow-sm"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>` : ''}
                     <div class="flex justify-between items-start gap-1">
                         <div class="flex flex-col min-w-0 flex-1" style="word-break:break-all;overflow-wrap:anywhere">
                             <span class="text-[10px] font-bold text-[#37352f]" onclick="copyID(this.textContent, this)">${row[h.indexOf("부속명")]}</span>
                             <span class="text-[9px] text-[#787774]">${plateNameWithColor}</span>
                             <span class="text-[9px] text-[#787774] font-medium" onclick="copyID('${w} X ${d}', this)">${w} X ${d}</span>
+                            ${원장당 > 0 ? `<span class="text-[9px] text-[#787774]">원장당 ${원장당}개</span>` : ''}
                         </div>
                         <div class="flex flex-col items-end gap-0.5 flex-shrink-0" onclick="event.stopPropagation()">
                             <input id="input-${cardKey}" type="number" value="${(pData.qty > 0) ? pData.qty : Math.round((parseFloat(row[h.indexOf("세트별소모량")]) || 1) * (item.orderQty || 1))}" class="notion-input !w-10 !p-0 !text-[9px] !text-center font-black text-[#37352f] bg-[#f7f6f3] border-none disabled:opacity-70" disabled>
@@ -15835,12 +15844,13 @@
                     if (!pData.isDeleted) basicHtml += cardHtml;
                 } else {
                     if (pData.isDeleted) {
-                        specialHtml += `<div class="p-2 rounded-lg border border-dashed border-[#ededeb] bg-[#f7f6f3]/30 flex flex-col gap-1 group/special relative">
+                        specialHtml += `<div class="p-2 rounded-lg border border-dashed border-[#ededeb] bg-[#f7f6f3]/30 flex flex-col gap-1 group/special relative" data-per-sheet="${원장당}">
                             <div class="flex justify-between items-start gap-1">
                                 <div class="flex flex-col min-w-0 flex-1" style="word-break:break-all;overflow-wrap:anywhere">
                                     <span class="pt-name text-[10px] font-bold text-[#37352f]">${row[h.indexOf("부속명")]}</span>
                                     <span class="text-[9px] text-[#787774]">${plateNameWithColor}</span>
                                     <span class="pt-size text-[9px] text-[#787774] font-medium">${w} X ${d}</span>
+                                    ${원장당 > 0 ? `<span class="text-[9px] text-[#787774]">원장당 ${원장당}개</span>` : ''}
                                 </div>
                                 <div class="flex flex-col items-end gap-0.5 flex-shrink-0">
                                     <button onclick="addSpecialPart(${idNum}, '${cardKey}')" class="px-1 py-0.5 bg-white border border-[#ededeb] text-[#37352f] rounded text-[9px] font-black hover:bg-[#f7f6f3] shadow-sm transition-all active:scale-95">추가</button>
@@ -16325,6 +16335,9 @@
             card.dataset.name = p.name;
             card.dataset.displayName = p.displayName;
             card.dataset.grain = p.grain;
+            // 원장 1장당 생산량 — 재단 편집 기본규칙(shared/원장재단수량.js 원장당). 재단회전으로 w·d 를 바꿔도 이 값은 그대로
+            const 원장당 = 원장재단수량.원장당(p.w, p.d, p.grain);
+            card.dataset.perSheet = 원장당;
             card.dataset.rowIndex = p.rowIndex;
             card.dataset.isCommon = p.isCommon;
             card.dataset.orderIds = (p.orderIds || []).join(',');
@@ -16348,7 +16361,7 @@
                 ).join('')}</div>`;
             }
 
-            card.innerHTML = `<div class="flex justify-between w-full"><span class="text-[9px] font-bold ${p.isCommon ? 'text-[#37352f]' : 'text-[#37352f]'} truncate">${p.displayName}</span><span class="text-[8px] ${qtyClass} text-white px-1.5 rounded-full font-bold qty-badge">${qtyDisplay}</span></div><div class="text-[10px] font-bold mt-1">${p.name}</div>${orderBadgeHtml}<div class="text-[9px] text-[#787774] font-bold dim-label">${p.w}X${p.d}</div>${rotateHtml}`;
+            card.innerHTML = `<div class="flex justify-between w-full"><span class="text-[9px] font-bold ${p.isCommon ? 'text-[#37352f]' : 'text-[#37352f]'} truncate">${p.displayName}</span><span class="text-[8px] ${qtyClass} text-white px-1.5 rounded-full font-bold qty-badge">${qtyDisplay}</span></div><div class="text-[10px] font-bold mt-1">${p.name}</div>${orderBadgeHtml}<div class="text-[9px] text-[#787774] font-bold dim-label">${p.w}X${p.d}</div>${원장당 > 0 ? `<div class="text-[9px] text-[#787774]">원장당 ${원장당}개</div>` : ''}${rotateHtml}`;
             container.appendChild(card);
         }
 

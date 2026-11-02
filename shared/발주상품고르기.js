@@ -181,7 +181,8 @@ var 발주상품고르기 = (function () {
     }
 
     /* 조혼가구 renderOrderParts 의 부속카드 한 장 — 글자 그대로.
-       o = { isAmt, deleteBtn, 부속명, plateName, finishColor, finish, w, d, cardKey, qty, actionsHtml } */
+       o = { isAmt, deleteBtn, 부속명, plateName, finishColor, finish, w, d, cardKey, qty, actionsHtml, 원장당 }
+       원장당 = 재단 편집 기본규칙의 원장 1장당 생산량(shared/원장재단수량.js 원장당). 안 주면 안 그린다(영림원외주입력). */
     function 부속카드(o) {
         const isAmt = o.isAmt, deleteBtn = o.deleteBtn, plateName = o.plateName, finishColor = o.finishColor, finish = o.finish,
               w = o.w, d = o.d, cardKey = o.cardKey, actionsHtml = o.actionsHtml;
@@ -189,7 +190,7 @@ var 발주상품고르기 = (function () {
         const cardBgClass = !isAmt ? 'bg-amber-50 border-amber-200' : 'bg-white border-[#ededeb]';
         const cardTextClass = !isAmt ? 'text-amber-700' : 'text-[#37352f]';
         return `
-                    <div class="p-2 rounded-lg shadow-sm flex flex-col gap-1 relative group/card border ${cardBgClass}">
+                    <div class="p-2 rounded-lg shadow-sm flex flex-col gap-1 relative group/card border ${cardBgClass}"${o.원장당 != null ? ` data-per-sheet="${o.원장당}"` : ''}>
                         ${deleteBtn}
                         <div class="flex justify-between items-start gap-1">
                             <div class="flex flex-col min-w-0 flex-1" style="word-break:break-all;overflow-wrap:anywhere">
@@ -197,6 +198,7 @@ var 발주상품고르기 = (function () {
                                 <span class="text-[9px] ${!isAmt ? 'text-amber-400' : 'text-gray-400'}">${plateName}${finishColor ? ` · ${finishColor}` : ''}</span>
                                 <span class="text-[9px] ${!isAmt ? 'text-amber-400' : 'text-gray-400'}">${finish}</span>
                                 <span class="text-[9px] ${!isAmt ? 'text-amber-600' : 'text-[#787774]'} font-medium">${w} X ${d}</span>
+                                ${o.원장당 > 0 ? `<span class="text-[9px] ${!isAmt ? 'text-amber-400' : 'text-gray-400'}">원장당 ${o.원장당}개</span>` : ''}
                             </div>
                             <div class="flex flex-col items-end gap-0.5 flex-shrink-0" onclick="event.stopPropagation()">
                                 <input id="input-${cardKey}" type="number" value="${o.qty}" class="notion-input !w-10 !p-0 !text-[9px] !text-center font-black ${!isAmt ? 'text-amber-600 bg-amber-50' : 'text-blue-600 bg-blue-50'} border-none disabled:opacity-70" disabled>
@@ -209,7 +211,7 @@ var 발주상품고르기 = (function () {
     /* 「AMT 외 공급처 부속」 카드 한 장 — 글자 그대로. o.단추 = 카드 끝 단추 글(없으면 '') */
     function 특별카드(o) {
         const plateName = o.plateName, finishColor = o.finishColor, finish = o.finish, w = o.w, d = o.d;
-        return `<div class="bg-blue-50/30 p-2 rounded-lg border border-dashed border-blue-200 flex flex-col gap-1 relative group/special"><div class="flex flex-col min-w-0" style="word-break:break-all;overflow-wrap:anywhere"><span class="text-[10px] font-bold text-blue-800">${o.부속명}</span><span class="text-[9px] text-blue-300">${plateName}${finishColor ? ` · ${finishColor}` : ''}</span><span class="text-[9px] text-blue-300">${finish}</span><span class="text-[9px] text-blue-400 font-medium">${w} X ${d}</span></div>${o.단추}</div>`;
+        return `<div class="bg-blue-50/30 p-2 rounded-lg border border-dashed border-blue-200 flex flex-col gap-1 relative group/special"${o.원장당 != null ? ` data-per-sheet="${o.원장당}"` : ''}><div class="flex flex-col min-w-0" style="word-break:break-all;overflow-wrap:anywhere"><span class="text-[10px] font-bold text-blue-800">${o.부속명}</span><span class="text-[9px] text-blue-300">${plateName}${finishColor ? ` · ${finishColor}` : ''}</span><span class="text-[9px] text-blue-300">${finish}</span><span class="text-[9px] text-blue-400 font-medium">${w} X ${d}</span>${o.원장당 > 0 ? `<span class="text-[9px] text-blue-300">원장당 ${o.원장당}개</span>` : ''}</div>${o.단추}</div>`;
     }
 
     /* 「기본 발주 부속」 + 「AMT 외 공급처 부속」 두 묶음 — 글자 그대로 */
