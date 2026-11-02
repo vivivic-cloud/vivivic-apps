@@ -78,6 +78,7 @@
     workcenters: { coll: 'erp_workcenters', title: '워크센터', key: (d) => R.s(d.name), fields: ['name', 'dept', 'kind', 'vendor', 'capa', 'start', 'end', 'whMat', 'whProd', 'whDeliv', 'whSite', 'whIn', 'whSemi'] },
     classes: { coll: 'erp_classes', title: '분류', key: (d) => [d.kind, d.big, d.mid, d.name].map(R.s).join('>'), fields: ['kind', 'big', 'mid', 'name', 'use'] },
     items: { coll: 'erp_items', title: '품목', key: (d) => R.s(d.code), fields: ['name', 'code', 'spec', 'eng', 'asset', 'state', 'unit', 'small', 'io', 'imp', 'rep'] },
+    materials: { coll: 'erp_materials', title: '자재', key: (d) => R.s(d.code), fields: ['name', 'code', 'spec', 'eng', 'asset', 'state', 'io', 'imp', 'unit', 'small'] },
     processes: { coll: 'erp_processes', title: '공정', key: (d) => R.s(d.name), fields: ['name', 'memo', 'inspect'] },
     flows: { coll: 'erp_flows', title: '공정흐름', key: (d) => R.s(d.name), fields: ['name', 'memo'], rows: ['seq', 'proc', 'next', 'last'] },
     boms: { coll: 'erp_boms', title: 'BOM', key: (d) => R.s(d.pcode) + '|' + R.s(d.pver), fields: ['pname', 'pcode', 'pspec', 'pver'], rows: ['proc', 'order', 'cname', 'ccode', 'cspec', 'cver', 'inunit', 'qn', 'qd', 'hasSub'] },
