@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v34 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v35 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -173,6 +173,26 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 .contract summary{cursor:pointer;font-weight:800;font-size:13px;min-height:24px}
 .contract pre{font:400 11.5px/1.6 var(--mono);background:var(--fill4);border:1px solid var(--line);padding:12px;border-radius:8px;overflow-x:auto;margin:10px 0 0;
   scrollbar-width:thin;scrollbar-color:var(--thumb) transparent}
+/* v35 4 품목 「완료 품목 불러오기」 셀 표 — 상자는 .impbox 모양, 표는 .tw(가로 넘침은 표 상자 안에서만) */
+.sheetbox{flex-basis:100%;min-width:0;border:1px solid var(--line2);border-radius:12px;padding:12px 14px;background:var(--fill4);display:flex;flex-direction:column;gap:10px}
+.sheetbox[hidden]{display:none}
+.sheetbox p{margin:0;font-size:12px;color:var(--muted);line-height:1.5}
+.sheetbox .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.sheetbox .row>input[type=text]{flex:1 1 220px;width:auto;max-width:360px}
+.sheetbox .tw{margin:0}
+table.sheet td{padding:0;border-left:1px solid var(--rowline)}
+table.sheet td:first-child{border-left:0}
+table.sheet td input[type=text],table.sheet td select{border:0;border-radius:0;min-height:34px;padding:6px 8px;font-size:12.5px;background:transparent}
+table.sheet td input[type=text]:focus,table.sheet td select:focus{outline:2px solid var(--ink);outline-offset:-2px}
+table.sheet td input[type=checkbox]{margin:0 10px}
+table.sheet td.lock{padding:6px 10px;color:var(--muted);background:var(--fill4)}
+table.sheet td.st{padding:4px 8px}
+table.sheet td.st .btn{margin-left:6px}
+table.sheet td.chg,table.sheet tr:hover td.chg{background:var(--amber-bg)}
+table.sheet td.chg input,table.sheet td.chg select{font-weight:800}
+table.sheet td.bad{box-shadow:inset 0 0 0 2px var(--red);background:var(--red-bg)}
+table.sheet td.empty0{padding:14px;color:var(--muted)}
+.sheetcnt{font-variant-numeric:tabular-nums}
 @media (max-width:820px){
   .app{grid-template-columns:minmax(0,1fr);gap:14px}
   nav{flex-direction:row;overflow-x:auto;position:static;padding-bottom:6px;scrollbar-width:thin;scrollbar-color:var(--thumb) transparent}
@@ -212,7 +232,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v34</span>
+    <span class="ver">v35</span>
   </div>
 </header>
 <div class="wrap">
@@ -1180,6 +1200,12 @@ function renderStep(){
   var imp=impBox(s);   /* v23 영림원에서 불러오기 */
   var impBtn=h('button',{type:'button',class:'btn imp','aria-expanded':'false',on:{click:function(){imp.hidden=!imp.hidden;impBtn.setAttribute('aria-expanded',String(!imp.hidden));}}},ico('import'),'영림원에서 불러오기');
   xlBar.append(impBtn,gsRow,xlMsg,imp);
+  sheetDraw=null;
+  if(EDIT_STEPS[s.key]){   /* v35 완료 품목 셀 표 */
+    var sb=sheetBox(s);
+    var sheetBtn=h('button',{type:'button',class:'btn imp','aria-expanded':String(SHEET.open),on:{click:function(){SHEET.open=sb.hidden;sb.hidden=!SHEET.open;sheetBtn.setAttribute('aria-expanded',String(SHEET.open));if(SHEET.open&&sheetDraw)sheetDraw();}}},ico('sheet'),'완료 품목 불러오기');
+    impBtn.after(sheetBtn);xlBar.append(sb);
+  }
   mainEl.replaceChildren(
     h('section',{class:'card'},
       h('div',{class:'stephead'},
@@ -1191,6 +1217,7 @@ function renderStep(){
       form.el),
     listBox,listBox2||'');   /* v24: 「저장한 공정」 목록이 없는 단계에서 「null」 글자가 찍히던 것 */
   if(s.key==='items')itemPicker();   /* v33 품명 = 조혼가구 상품검색 */
+  if(sheetDraw)sheetDraw();
   renderList();
 }
 /* ---------- 엑셀 양식 받기 · 올리기 (SheetJS, 브라우저 안에서만. 누를 때 불러온다) ----------
@@ -1851,6 +1878,18 @@ function editOpen(s,r){
   fm.el.addEventListener('submit',function(e){e.preventDefault();editSave(s,r.id,fm);});
   EDITING[key]=fm;renderList();
 }
+/* 수정 한 건(지금 문서 cur → 새 값 nv): 바뀐 칸만 edit·editLog 에 담아 수정대기로 고칠 값. 못 고치면 null + out.why. v35 셀 표 「수정 저장」도 같이 쓴다 */
+function editPatch(s,cur,nv,out){
+  if(cur.status!=='완료'||hasEdit(cur)){out.why='그 사이 상태가 바뀌어(지금 '+(cur.status||'')+') 저장하지 않았습니다.';return null;}
+  var changed=s.fields.filter(function(f){return f.k!=='code'&&!editSame(cur[f.k],nv[f.k]);}).map(function(f){return f.k;});
+  if(!changed.length){out.why='바뀐 칸이 없어 저장하지 않았습니다.';return null;}
+  var before={},after={},o={},at=new Date().toISOString();
+  changed.forEach(function(k){before[k]=cur[k]==null?'':cur[k];after[k]=nv[k]==null?'':nv[k];o[k]=after[k];});
+  o.status='수정대기';o.agentNote='';
+  o.edit={changed:changed,before:before,after:after,at:at,prevNote:cur.agentNote||''};
+  o.editLog=(cur.editLog||[]).concat([{at:at,kind:'요청',changed:changed,before:before,after:after}]);
+  out.n=changed.length;return o;
+}
 function editSave(s,id,fm){
   var say=function(t,bad){fm.msg.textContent=t;fm.msg.className='msg'+(bad?' bad':'');};
   if(!db){say('저장소에 연결되지 않아 저장할 수 없습니다.',true);return;}
@@ -1858,17 +1897,7 @@ function editSave(s,id,fm){
   if(!res.ok){say(res.fmt?res.fmt:'필수 항목 '+res.count+'곳이 비어 있습니다.',true);if(res.first)res.first.focus();return;}
   var nv=res.value,out={};
   fm.submit.disabled=true;
-  db.collection('erp_'+s.key).doc(id).updateIf(function(cur){
-    if(cur.status!=='완료'||hasEdit(cur)){out.why='그 사이 상태가 바뀌어(지금 '+(cur.status||'')+') 저장하지 않았습니다.';return null;}
-    var changed=s.fields.filter(function(f){return f.k!=='code'&&!editSame(cur[f.k],nv[f.k]);}).map(function(f){return f.k;});
-    if(!changed.length){out.why='바뀐 칸이 없어 저장하지 않았습니다.';return null;}
-    var before={},after={},o={},at=new Date().toISOString();
-    changed.forEach(function(k){before[k]=cur[k]==null?'':cur[k];after[k]=nv[k]==null?'':nv[k];o[k]=after[k];});
-    o.status='수정대기';o.agentNote='';
-    o.edit={changed:changed,before:before,after:after,at:at,prevNote:cur.agentNote||''};
-    o.editLog=(cur.editLog||[]).concat([{at:at,kind:'요청',changed:changed,before:before,after:after}]);
-    out.n=changed.length;return o;
-  }).then(function(ok){
+  db.collection('erp_'+s.key).doc(id).updateIf(function(cur){return editPatch(s,cur,nv,out);}).then(function(ok){
     fm.submit.disabled=false;
     if(!ok){say(out.why||'저장하지 못했습니다.',!/바뀐 칸이 없어/.test(out.why||''));return;}
     delete EDITING[s.key+'/'+id];renderList();flash('수정 대기로 저장했습니다. 바뀐 칸 '+out.n+'개.');
@@ -1885,6 +1914,146 @@ function editCancel(s,r){
     return o;
   }).then(function(ok){flash(ok?'수정을 취소했습니다. 원래 값으로 돌아갔습니다.':'그 사이 입력 작업자가 처리를 시작해 취소하지 못했습니다.',!ok);},
     function(e){flash('취소하지 못했습니다. '+errText(e),true);});
+}
+/* ---------- v35 4 품목 「완료 품목 불러오기」 — 완료 품목을 셀 표로 한 화면에 놓고 바로 고친다 ----------
+   줄 = 완료(「영림원」 불러온 것 포함) + 수정 중(수정대기·진행중·오류 — 잠금, 상태·「수정 취소」). 칸 = 4 품목 칸 그대로. 품번 잠금.
+   드롭다운 칸은 목록 안 값만(붙여넣기도 목록 밖이면 안 넣음). 엑셀·구글시트에서 여러 칸 복사 → 고른 칸부터 붙여넣기.
+   고친 칸 = 노란 바탕, 마우스를 올리면 원래 값. 「수정 저장」 = 바뀐 줄만 v34 와 같은 editPatch(수정대기·edit·editLog). 친 값(SHEET.draft)은 목록을 다시 그려도 남는다. */
+var SHEET={open:false,q:'',draft:{}},sheetDraw=null;   /* draft = 문서 id → {칸 키: 새 값} — 원래 값과 같아지면 지운다 */
+var SHEET_W={name:260,code:110,spec:120,eng:170,asset:96,state:96,io:84,imp:90,unit:80,small:280,rep:70};
+function sheetRows(s){return (data[s.key]||[]).filter(function(r){return r.status==='완료'||hasEdit(r);})
+  .sort(function(a,b){return String(a.code||'').localeCompare(String(b.code||''));});}
+function sheetLocked(r){return !(r.status==='완료'&&!hasEdit(r));}
+function sheetList(f){return f.dl?(LISTS[f.dl]||[]):(f.opts||[]);}
+function sheetIsList(f){return f.type==='select'||f.type==='combo'||!!f.dl;}
+function sheetVal(r,k){var d=SHEET.draft[r.id];return d&&(k in d)?d[k]:r[k];}
+function sheetBad(f,v){if((f.req)&&isEmpty(typeof v==='string'?v.trim():v))return '필수 칸입니다.';return f.valid?f.valid(v):'';}
+/* 붙여 넣은 글자 → 칸 값. 목록 칸은 목록 안 값만(아니면 null = 안 넣음) */
+function sheetParse(f,t){
+  t=String(t==null?'':t).trim();
+  if(f.type==='check')return /^(o|v|y|yes|예|true|1|○|●|✓|✔)$/i.test(t);
+  if(sheetIsList(f)){if(f.dl)t=t.replace(/\s*>\s*/g,CLS_SEP);return t===''||sheetList(f).indexOf(t)>=0?t:null;}
+  return t;
+}
+function sheetSet(r,k,v){
+  var d=SHEET.draft[r.id]||(SHEET.draft[r.id]={});
+  if(editSame(r[k],v))delete d[k];else d[k]=v;
+  if(!Object.keys(d).length)delete SHEET.draft[r.id];
+}
+/* 엑셀·구글시트가 클립보드에 주는 글(탭 = 칸, 줄바꿈 = 줄, 따옴표 묶음 안의 줄바꿈은 칸 안) */
+function parseTsv(t){
+  t=String(t).replace(/\r\n?/g,'\n');var rows=[],row=[],cell='',q=false;
+  for(var i=0;i<t.length;i++){var c=t[i];
+    if(q){if(c==='"'){if(t[i+1]==='"'){cell+='"';i++;}else q=false;}else cell+=c;continue;}
+    if(c==='"'&&cell===''){q=true;continue;}
+    if(c==='\t'){row.push(cell);cell='';}else if(c==='\n'){row.push(cell);rows.push(row);row=[];cell='';}else cell+=c;}
+  if(cell!==''||row.length){row.push(cell);rows.push(row);}
+  return rows;
+}
+function sheetCount(s){
+  var n=0,m=0;Object.keys(SHEET.draft).forEach(function(id){var c=Object.keys(SHEET.draft[id]).length;if(c){n++;m+=c;}});return {n:n,m:m};
+}
+function sheetBox(s){
+  var q=h('input',{type:'text',autocomplete:'off',placeholder:'품명·품번 검색 (예: T-al)','aria-label':'품명·품번 검색',value:SHEET.q,on:{input:function(){SHEET.q=q.value;draw();}}});
+  var info=h('span',{class:'msg'}),msg=h('span',{class:'msg','aria-live':'polite'});
+  var saveBtn=h('button',{type:'button',class:'btn small primary',on:{click:function(){sheetSave(s,say);}}},'수정 저장');
+  var cnt=h('span',{class:'msg sheetcnt'});
+  var tbody=h('tbody',{});
+  var table=h('table',{class:'sheet'},h('thead',{},h('tr',{},h('th',{},'상태'),s.fields.map(function(f){return h('th',{},f.label+(f.k==='code'?' (잠금)':''));}))),tbody);
+  var tw=h('div',{class:'tw'},table);
+  var box=h('div',{class:'sheetbox',hidden:!SHEET.open},
+    h('p',{},'완료된 품목(영림원에서 불러온 것 포함)을 표로 고칩니다. 엑셀·구글시트에서 여러 칸을 복사해 고른 칸에 붙여 넣을 수 있습니다. 고친 칸은 노란색이고, 마우스를 올리면 원래 값이 보입니다. 「수정 저장」을 누르면 바뀐 줄만 수정대기가 되어 입력 작업자가 영림원에서 고칩니다.'),
+    h('div',{class:'row'},q,info),tw,h('div',{class:'row'},saveBtn,cnt,msg));
+  var vis=[];
+  function say(t,bad){msg.textContent=t;msg.className='msg'+(bad?' bad':'');}
+  function drawCount(){var c=sheetCount(s);cnt.textContent=c.n?c.n+'줄 · '+c.m+'칸 바뀜':'바뀐 칸 없음';saveBtn.disabled=!c.n||!db;}
+  function mark(td,f,r){
+    var d=SHEET.draft[r.id],chg=!!d&&(f.k in d),bad=chg?sheetBad(f,d[f.k]):'';
+    td.classList.toggle('chg',chg);td.classList.toggle('bad',!!bad);
+    td.title=chg?'원래 값: '+editShow(r[f.k])+(bad?'\n'+bad:''):'';
+  }
+  function cell(r,f){
+    var td=h('td',{'data-k':f.k}),v=sheetVal(r,f.k),ctl;
+    if(sheetLocked(r)||f.k==='code'){td.classList.add('lock');td.append(h('span',{},f.type==='check'?(v?'예':''):show(v)));return td;}
+    if(f.type==='check')ctl=h('input',{type:'checkbox',checked:!!v,'aria-label':f.label});
+    else if(sheetIsList(f)){
+      var list=sheetList(f),cur=v==null?'':String(v).trim();
+      ctl=h('select',{'aria-label':f.label},h('option',{value:''},''),list.map(function(o){return h('option',{value:o},o);}),
+        cur&&list.indexOf(cur)<0?h('option',{value:cur},cur+' (미등록)'):null);
+      ctl.value=cur;
+    }else ctl=h('input',{type:'text',autocomplete:'off','aria-label':f.label,value:v==null?'':String(v)});
+    ctl.setAttribute('data-id',r.id);ctl.setAttribute('data-k',f.k);
+    ctl.style.width=(SHEET_W[f.k]||120)+'px';if(f.mono)ctl.style.fontFamily='var(--mono)';
+    var on=function(){sheetSet(r,f.k,f.type==='check'?ctl.checked:ctl.value);mark(td,f,r);drawCount();};
+    ctl.addEventListener('input',on);ctl.addEventListener('change',on);
+    if(ctl.type==='text')ctl.addEventListener('keydown',function(e){   /* Enter·↑↓ = 위아래 줄 같은 칸 */
+      var dir=e.key==='Enter'||e.key==='ArrowDown'?1:e.key==='ArrowUp'?-1:0;if(!dir||e.isComposing)return;
+      var i=vis.indexOf(r)+dir,nx=vis[i]&&tbody.querySelector('[data-id="'+vis[i].id+'"][data-k="'+f.k+'"]');
+      if(nx){e.preventDefault();nx.focus();if(nx.select)nx.select();}});
+    td.append(ctl);mark(td,f,r);return td;
+  }
+  function draw(){
+    if(!box.isConnected){sheetDraw=null;return;}
+    var a=data[s.key];
+    var ae=document.activeElement,fk=ae&&box.contains(ae)&&ae.getAttribute('data-k')?{id:ae.getAttribute('data-id'),k:ae.getAttribute('data-k'),a:ae.selectionStart,b:ae.selectionEnd}:null;
+    var all=a?sheetRows(s):[];
+    all.forEach(function(r){if(sheetLocked(r))delete SHEET.draft[r.id];});   /* 그 사이 수정 중이 된 줄은 친 값을 버린다 */
+    Object.keys(SHEET.draft).forEach(function(id){if(!all.some(function(r){return r.id===id;}))delete SHEET.draft[id];});
+    var qq=SHEET.q.trim().toLowerCase();
+    vis=all.filter(function(r){return !qq||String(r.name||'').toLowerCase().indexOf(qq)>=0||String(r.code||'').toLowerCase().indexOf(qq)>=0;});
+    info.textContent=a==null?'불러오는 중입니다.':(qq?vis.length+'줄 / 전체 '+all.length+'줄':all.length+'줄');
+    var span=s.fields.length+1;
+    tbody.replaceChildren.apply(tbody,!vis.length?[h('tr',{},h('td',{colspan:span,class:'empty0'},a==null?'불러오는 중입니다.':all.length?'찾는 품목이 없습니다.':'완료된 품목이 없습니다.'))]:
+      vis.map(function(r){
+        var st=STATUS.indexOf(r.status)>=0?r.status:'대기',lk=sheetLocked(r);
+        var stTd=h('td',{class:'st'},h('span',{class:'chip '+st},st),
+          lk&&(st==='수정대기'||st==='오류')?h('button',{type:'button',class:'btn small',on:{click:function(){editCancel(s,r);}}},'수정 취소'):null);
+        return h('tr',{class:lk?'locked':''},stTd,s.fields.map(function(f){return cell(r,f);}));
+      }));
+    if(fk){var el=tbody.querySelector('[data-id="'+fk.id+'"][data-k="'+fk.k+'"]');if(el){el.focus();try{if(fk.a!=null)el.setSelectionRange(fk.a,fk.b);}catch(e){}}}
+    drawCount();
+  }
+  box.addEventListener('paste',function(e){
+    var t=e.target,k=t&&t.getAttribute&&t.getAttribute('data-k'),id=t&&t.getAttribute&&t.getAttribute('data-id');if(!k||!id)return;
+    var txt=(e.clipboardData||window.clipboardData).getData('text/plain');if(txt==null)return;
+    var g=parseTsv(txt);if(!g.length)return;
+    if(g.length===1&&g[0].length===1&&t.type==='text')return;   /* 한 칸을 칸 안에 붙이면 보통 붙여넣기 */
+    e.preventDefault();
+    var r0=vis.map(function(r){return r.id;}).indexOf(id),c0=s.fields.map(function(f){return f.k;}).indexOf(k),put=0,lock=0,out=0,no=[];
+    g.forEach(function(line,i){line.forEach(function(v,j){
+      var r=vis[r0+i],f=s.fields[c0+j];
+      if(!r||!f){out++;return;}
+      if(sheetLocked(r)||f.k==='code'){lock++;return;}
+      var x=sheetParse(f,v);if(x===null){no.push(f.label+' 「'+String(v).trim()+'」');return;}
+      sheetSet(r,f.k,x);put++;
+    });});
+    draw();
+    say(put+'칸 붙여 넣었습니다.'+(no.length?' 목록 밖 값 '+no.length+'칸은 넣지 않았습니다: '+no.slice(0,3).join(', ')+(no.length>3?' 외':'')+'.':'')+(lock?' 잠긴 칸 '+lock+'칸은 건너뛰었습니다.':'')+(out?' 표 밖 '+out+'칸은 버렸습니다.':''),!!no.length);
+  });
+  sheetDraw=draw;   /* 화면에 붙인 뒤 renderStep 이 그린다 */
+  return box;
+}
+function sheetSave(s,say){
+  if(!db){say('저장소에 연결되지 않아 저장할 수 없습니다.',true);return;}
+  var rows=sheetRows(s),ids=Object.keys(SHEET.draft).filter(function(id){return rows.some(function(r){return r.id===id&&!sheetLocked(r);});});
+  if(!ids.length){say('바뀐 칸이 없어 저장하지 않았습니다.');return;}
+  var bad=0;
+  ids.forEach(function(id){var d=SHEET.draft[id];s.fields.forEach(function(f){if((f.k in d)&&sheetBad(f,d[f.k]))bad++;});});
+  if(bad){say('빨간 칸 '+bad+'곳을 고쳐 주세요(필수 칸이 비었거나 목록 밖 값).',true);return;}
+  var c=sheetCount(s);
+  if(!confirm(c.n+'줄 · '+c.m+'칸 바뀜\n바뀐 줄만 수정대기로 저장합니다. 입력 작업자가 영림원에서 고칩니다.'))return;
+  var res=[];
+  Promise.all(ids.map(function(id){
+    var d=SHEET.draft[id],out={};
+    return db.collection('erp_'+s.key).doc(id).updateIf(function(cur){
+      var nv={};s.fields.forEach(function(f){var v=(f.k in d)?d[f.k]:cur[f.k];nv[f.k]=typeof v==='string'?v.trim():v;});
+      return editPatch(s,cur,nv,out);
+    }).then(function(ok){if(ok)delete SHEET.draft[id];res.push(ok?'':out.why||'저장하지 못했습니다.');},function(e){res.push('저장하지 못했습니다. '+errText(e));});
+  })).then(function(){
+    var ok=res.filter(function(x){return !x;}).length,fail=res.filter(Boolean);
+    if(sheetDraw)sheetDraw();
+    say(ok+'줄을 수정 대기로 저장했습니다.'+(fail.length?' '+fail.length+'줄은 저장하지 못했습니다: '+fail[0]:''),!!fail.length);
+  });
 }
 function delBtn(s,r){
   var armed=false,t;
@@ -1932,7 +2101,7 @@ function addNewProcs(rows,memos){
   });},Promise.resolve()).then(function(){return todo;});
 }
 function go(k){if(BYKEY[k]&&BYKEY[k].shownIn)k=BYKEY[k].shownIn;cur=k;try{history.replaceState(null,'','#'+k);}catch(e){location.hash=k;}renderNav();renderStep();}
-function refreshAll(){renderNav();renderSum();renderList();refreshLists();if(impDraw)impDraw();}
+function refreshAll(){renderNav();renderSum();renderList();refreshLists();if(impDraw)impDraw();if(sheetDraw)sheetDraw();}
 
 /* ---------- boot ---------- */
 document.getElementById('contractPre').textContent=JSON.stringify(SPEC,null,1)+'\n\n'+
