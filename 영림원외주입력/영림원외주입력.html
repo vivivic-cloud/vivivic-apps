@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v32 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v33 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -181,8 +181,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
   .card>.actions .btn.imp{flex-basis:100%}   /* v23 「영림원에서 불러오기」도 아랫줄 한 줄 */
   .gsrow .btn{flex:none!important}
 }
-/* v28 발주 상품검색(4 품목) — 조혼가구 제품 발주와 같은 원장·같은 검색. 모양은 이 집 카드·입력칸·칩 그대로 */
-.ps{margin-top:16px}
+/* 조혼가구 상품검색 자리(v32 BOM 모품목 · v33 4 품목 품명) — 검색칸·부속카드는 iframe 공용 부품 */
 .ps h3{font-size:15px;font-weight:900;margin:0 0 6px;letter-spacing:-0.02em}
 .psbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .psbar select{width:auto;flex:none}
@@ -193,6 +192,10 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 .rowcard.unlinked{border-color:var(--red-line);background:var(--red-bg)}
 .rowcard .linknote{font-size:12px;color:var(--red);font-weight:700;margin-top:8px}
 .pslink{font-size:12px;margin-top:8px;white-space:pre-line}
+/* v33 4 품목 품명 칸 아래 「상품검색으로 고르기」 — 펼치면 품명 칸 바로 아래 한 줄 전체 */
+.grid>.ps.inform{grid-column:1/-1;margin:0}
+.pickbar{display:flex;gap:8px 12px;flex-wrap:wrap;align-items:center;margin-top:6px}
+.pickbar label{display:flex;gap:6px;align-items:center;font-weight:400;font-size:13px}
 .pslink.bad{color:var(--red);font-weight:700}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -201,7 +204,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v32</span>
+    <span class="ver">v33</span>
   </div>
 </header>
 <div class="wrap">
@@ -968,10 +971,10 @@ function impBox(s){
   impDraw=draw;draw();
   return box;
 }
-/* ---------- v28 발주 상품검색 (4 품목) ----------
+/* ---------- 조혼가구 상품검색 자리 (v28 에서 시작, v33 부터 BOM 모품목·4 품목 품명에서만 부름) ----------
    사장님 11-01: 조혼가구 제품 발주의 상품선택 논리와 부속 정보를 같은 루트로 쓰게.
    원장 = 조혼가구와 같은 것(파이어스토어 excel_metadata 의 가장 늦은 원장 엑셀), 찾기·고르기·부속 = shared/발주상품검색.js
-   (원본은 조혼가구.html — 그 파일 머리 주석). 지금은 보기만 한다: 품목 칸에 채우지 않고, 아무것도 저장하지 않는다. */
+   (원본은 조혼가구.html — 그 파일 머리 주석). 원장은 읽기만 한다. */
 var PS={data:null,idx:null,file:'',loading:null,err:'',sup:'조혼가구',draw:null};
 function psLoad(){
   var P=window.발주상품검색;
@@ -1000,7 +1003,8 @@ function psLoad(){
   return PS.loading;
 }
 function psBox(onPick){
-  /* v30: 화면은 조혼가구 것을 그대로 — 공용 부품 shared/발주상품고르기.html(조혼가구와 같은 검색칸·부속카드·CSS) 을 iframe 으로 띄운다.
+  /* onPick = 고르면 받는 함수(bomPickFn·itemPickFn) — .title·.note·.out 을 단다.
+     v30: 화면은 조혼가구 것을 그대로 — 공용 부품 shared/발주상품고르기.html(조혼가구와 같은 검색칸·부속카드·CSS) 을 iframe 으로 띄운다.
      여기서 따로 그리지 않는다(사장님 11-01 「따로 디자인하지말고 … 조혼가구의 이부분을 갖다 쓰는 형태로」). 원장 읽기는 psLoad 한 곳. */
   var P=window.발주상품검색;
   var stat=h('span',{class:'msg','aria-live':'polite'});
@@ -1023,16 +1027,11 @@ function psBox(onPick){
   };
   PS.draw();
   psLoad();
-  if(onPick)return h('section',{class:'ps inform'},
-    h('h3',{},'모품목 고르기 — 조혼가구 상품검색'),
-    h('p',{class:'stepnote'},'조혼가구 제품 발주와 같은 상품검색(상품검색 · ING단품명 · 카테고리)으로 상품을 고르면, 그 상품의 부속(부속카드와 같은 것)으로 아래 하위 품목 줄을 채웁니다. 7항목이 같은 부속은 한 줄로 더합니다. 4단계 품목과 이어지지 않은 줄은 빨갛게 — 하위품번을 직접 고르세요. 저장 전에 모든 칸을 고칠 수 있습니다.'),
+  return h('section',{class:'ps inform'},   /* v33: 4 품목 아래 따로 있던 「발주 상품검색」 카드는 지움 — 부르는 곳은 BOM 모품목·품목 품명 둘 */
+    h('h3',{},onPick.title),
+    h('p',{class:'stepnote'},onPick.note),
     h('div',{class:'psbar'},sup,stat),
     onPick.out,
-    fr);
-  return h('section',{class:'card ps'},
-    h('h3',{},'발주 상품검색'),
-    h('p',{class:'stepnote'},'조혼가구 제품 발주의 상품검색·부속카드를 그대로 가져다 씁니다(같은 원장·같은 화면 부품). 발주처를 고르고, 검색 방법 셋(상품검색 · ING단품명 · 카테고리) 중 하나로 상품을 고르면 그 상품의 부속이 나옵니다. 보기만 합니다(발주 단추 없음, 품목 칸에 채우지 않고 저장하지 않습니다). 금액 칸은 보여 주지 않습니다.'),
-    h('div',{class:'psbar'},sup,stat),
     fr);
 }
 /* ---------- v32 BOM 모품목 고르기 = 조혼가구 상품검색 → 부속 줄 채우기 ----------
@@ -1096,7 +1095,38 @@ function bomPickFn(){
       '\n부속 '+k.rowIndexes.length+'줄 → 하위 품목 '+L.groups.length+'줄(7항목 같은 부속 더함) · 이음 '+(L.groups.length-bad)+(bad?' · 못 이음 '+bad+'(빨간 줄)':'')+' · 저장 전에 확인하세요.';
   };
   fn.out=out;
+  fn.title='모품목 고르기 — 조혼가구 상품검색';
+  fn.note='조혼가구 제품 발주와 같은 상품검색(상품검색 · ING단품명 · 카테고리)으로 상품을 고르면, 그 상품의 부속(부속카드와 같은 것)으로 아래 하위 품목 줄을 채웁니다. 7항목이 같은 부속은 한 줄로 더합니다. 4단계 품목과 이어지지 않은 줄은 빨갛게 — 하위품번을 직접 고르세요. 저장 전에 모든 칸을 고칠 수 있습니다.';
   return fn;
+}
+/* ---------- v33 4 품목 품명 = 조혼가구 상품검색(발주상품검색) ----------
+   사장님 11-02: 「품목 입력의 품명도 발주상품검색의 기능으로 검색할 수 있게 해주고 하단의 발주상품검색은 삭제해줘」
+   고르기 = BOM 모품목과 같은 psBox(공용 부품 shared/발주상품고르기.html 의 고르면 알림). 채우는 칸 = 품명만(다른 칸은 사장님께 여쭌 뒤).
+   품명 = 원장 단품명에서 맨 앞 괄호 묶음(「(KRW) 」)을 뗀 것 + 「앞에 T 붙이기」(기본 켜짐, 테스트 품목 꼴 「T알렉스 …」 — v32 이어 붙이기 규칙과 같은 꼴). */
+function itemPickFn(tBox){
+  var out=h('div',{class:'pslink','aria-live':'polite'}),last='';
+  var fn=function(k){
+    if(!k){last='';return;}
+    var key=JSON.stringify([k.code,k.criteria,k.rowIndexes]);if(key===last)return;last=key;   /* 같은 알림이 겹쳐 와도 한 번만(사람이 고친 품명을 덮지 않게) */
+    if(!form||cur!=='items')return;
+    var nm=(tBox.checked?'T':'')+bomNorm(String(k.code).replace(/^\s*\([^)]*\)\s*/,''));
+    form.fill({name:nm},[]);
+    out.className='pslink';
+    out.textContent='고른 상품 「'+k.code+'」 → 품명 「'+nm+'」 · 다른 칸은 직접 채우세요. 저장 전에 고칠 수 있습니다.';
+  };
+  fn.out=out;
+  fn.title='품명 고르기 — 조혼가구 상품검색';
+  fn.note='조혼가구 제품 발주와 같은 상품검색(상품검색 · ING단품명 · 카테고리)으로 상품을 고르면 그 상품 이름이 품명 칸에 들어갑니다(원장 이름 앞 「(KRW) 」 같은 괄호 묶음은 뗌). 아래 부속카드는 보기만 합니다. 품명은 손으로 쳐도 됩니다.';
+  return fn;
+}
+function itemPicker(){
+  /* 품명 칸 아래: 「상품검색으로 고르기」 단추 + 「앞에 T 붙이기」, 펼치면 품명 칸 바로 아래에 psBox */
+  var tBox=h('input',{type:'checkbox',checked:true});
+  var box=null,btn=h('button',{type:'button',class:'btn small','aria-expanded':'false',on:{click:function(){
+    if(!box){box=psBox(itemPickFn(tBox));nameW.after(box);}else box.hidden=!box.hidden;
+    btn.setAttribute('aria-expanded',String(!box.hidden));btn.textContent=box.hidden?'상품검색으로 고르기':'상품검색 닫기';}}},'상품검색으로 고르기');
+  var nameW=form.el.querySelector('.grid').firstElementChild;   /* 품목 머리 칸 첫째 = 품명 */
+  nameW.append(h('div',{class:'pickbar'},btn,h('label',{},tBox,'앞에 T 붙이기')));
 }
 function renderStep(){
   var s=BYKEY[cur];bulk=null;
@@ -1141,8 +1171,8 @@ function renderStep(){
       xlBar,
       s.key==='boms'?psBox(bomPickFn()):'',   /* v32 모품목 고르기 = 조혼가구 상품검색 → 부속 줄 채우기 */
       form.el),
-    s.key==='items'?psBox():'',   /* v28 발주 상품검색 */
     listBox,listBox2||'');   /* v24: 「저장한 공정」 목록이 없는 단계에서 「null」 글자가 찍히던 것 */
+  if(s.key==='items')itemPicker();   /* v33 품명 = 조혼가구 상품검색 */
   renderList();
 }
 /* ---------- 엑셀 양식 받기 · 올리기 (SheetJS, 브라우저 안에서만. 누를 때 불러온다) ----------
