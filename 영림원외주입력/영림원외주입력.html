@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v42 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v43 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -80,6 +80,7 @@ input[type=text]:focus,input[type=url]:focus,input[type=date]:focus,input[type=n
 input[type=checkbox]{accent-color:var(--ink);width:16px;height:16px}
 input.bad,select.bad{border-color:var(--red)}
 .hint{font-size:11px;color:var(--muted)}
+.psparts{margin:6px 0 10px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}   /* v43 부속 BOM 한꺼번에 */
 .cls3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:2px 0 6px}   /* v42 자재소분류 대·중·소 세 칸 */
 .cls3 select{padding:9px 8px}
 .hint.warn{background:var(--amber-bg);color:var(--amber);padding:3px 8px;border-radius:6px;font-weight:700}
@@ -256,7 +257,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v42</span>
+    <span class="ver">v43</span>
   </div>
 </header>
 <div class="wrap">
@@ -552,6 +553,7 @@ var STEPS=[
   F('hasSub','하위유무','check')
  ],
  recTitle:function(r){return r.pname;},
+ nameK:'pcode',dupKey:function(r){return String(r.pcode||'').trim()+'|'+String(r.pver||'').trim();},   /* v43 여러 건 목록: 겹침 = 모품목번호·BOM차수가 같을 때 */
  subt:function(r){return [r.pcode,'하위 '+((r.rows||[]).length)+'건'].join(' · ');}},
 
 {key:'contracts',n:8,title:'외주계약',screen:'외주계약등록',
@@ -863,6 +865,13 @@ function bomCalc(pcode,ccode){
   r.글=r.근거+' · 부속 '+p.w+'×'+p.d+'(모품목 규격) · 결보호 '+(g.v==='X'?'X(돌림 가능)':(g.v?g.v+'(돌리지 않음)':'모름(돌리지 않음)'))+' — '+g.src;
   return r;
 }
+/* v43 목록에 담는 BOM 행(입력 칸을 안 거침): 소요량이 비었으면(분모 1 포함) 입력 칸과 같은 1/n 을 넣는다. 사람이 적은 값은 그대로 */
+function bomAutoQty(pcode,o){
+  var a=String(o.qn==null?'':o.qn).trim(),b=String(o.qd==null?'':o.qd).trim();
+  if(a!==''||(b!==''&&b!=='1'))return;
+  var res=bomCalc(String(pcode||'').trim(),String(o.ccode||'').trim());
+  if(res&&res.n){o.qn='1';o.qd=String(res.n);}
+}
 function bomRowHook(r,pF){
   var by=function(k){return r.fields.filter(function(x){return x.f.k===k;})[0];};
   var cc=by('ccode'),qn=by('qn'),qd=by('qd'),auto=null;
@@ -978,6 +987,7 @@ function buildForm(step){
     },
     values:function(){var o={};headFields.forEach(function(x){o[x.f.k]=x.get();});
       if(step.flowCols)o.rows=rows.map(function(r){var v={};r.fields.forEach(function(x){v[x.f.k]=x.get();if(x.isNew())v.isNew=true;});return v;});   /* v19: 공정흐름유형은 일괄 목록에 행도 담는다(v22 isNew = 「새 공정 추가」) */
+      else if(step.rowFields)o.rows=rows.map(function(r){var v={};r.fields.forEach(function(x){v[x.f.k]=x.get();});return v;});   /* v43 BOM 여러 건 목록도 행을 담는다 */
       return o;},  /* 검사 없이 지금 칸 값(v7 일괄 목록) */
     reset:function(){
       headFields.forEach(function(x){x.reset();});
@@ -1178,6 +1188,7 @@ function psBox(onPick){
     h('p',{class:'stepnote'},onPick.note),
     h('div',{class:'psbar'},sup,stat),
     onPick.out,
+    onPick.parts||'',   /* v43 BOM: 부속 BOM 한꺼번에 */
     onPick.guide||'',   /* v38 앞 단계 미등록 안내 */
     fr);
 }
@@ -1213,10 +1224,26 @@ function bomFromPick(k){
   });
   return {prod:prods.length===1?prods[0]:null,prodWhy:prods.length===1?'':(prods.length?'같은 품명 품목이 '+prods.length+'개 — 하나로 정할 수 없습니다':'4단계 품목에 「T'+pn+'」 이(가) 없습니다'),groups:groups};
 }
+/* v43 부속 BOM: 원장 엑셀 원장명(PB-18T)·마감색상 → 5 자재 하나(이름에서 앞 T·띄어쓰기 빼고 원장명을 담음 — v38 안내와 같은 기준, 여럿이면 색으로 좁힘) */
+function bomStock(g){
+  var sq=function(v){return String(v==null?'':v).replace(/\s+/g,'').toLowerCase();},sk=sq(g.stock);
+  if(!sk||sk==='원장정보없음')return {why:'원장 엑셀에 원장명이 없습니다'};
+  var ms=(data.materials||[]).filter(function(r){var a=sq(r.name).replace(/^t/,'');return r.status!=='오류'&&a&&a.indexOf(sk)>=0;});
+  if(ms.length>1&&g.color){var mc=ms.filter(function(r){return sq(r.name).indexOf(sq(g.color))>=0;});if(mc.length)ms=mc;}
+  return ms.length===1?{mat:ms[0]}:{why:ms.length?'원장 「'+g.stock+'」 자재가 '+ms.length+'개 — 하나로 정할 수 없습니다':'5 자재에 원장 「'+g.stock+'」 이(가) 없습니다'};
+}
+/* v43 이은 부속(빨간 줄 아닌 것)마다 부속 BOM 한 건 — 자재를 못 찾거나 1/n 이 안 되면 그 칸을 비워 둔다(목록에서 「필수 빠짐」) */
+function bomPartRecs(L){
+  return L.groups.filter(function(g){return g.cands.length===1;}).map(function(g,i){
+    var it=g.cands[0],mat=bomStock(g).mat,res=mat?bomCalc(it.code,mat.code):null,n=res&&res.n?String(res.n):'';
+    return {line:i+1,vals:{pname:it.name||'',pcode:it.code,pspec:it.spec||'',pver:'1',
+      rows:[{proc:'T재단',order:'1',cname:mat?mat.name||'':'',ccode:mat?mat.code:'',cspec:mat?mat.spec||'':'',cver:'',inunit:'EA',qn:n?'1':'',qd:n,hasSub:false}]}};
+  });
+}
 function bomPickFn(){
   var out=h('div',{class:'pslink','aria-live':'polite'}),last='';
   var fn=function(k){
-    if(!k){last='';return;}
+    if(!k){last='';fn.parts.hidden=true;return;}
     var key=JSON.stringify([k.code,k.criteria,k.rowIndexes]);if(key===last)return;last=key;   /* 같은 고르기 알림이 겹쳐 와도 한 번만(사람이 고친 값을 덮지 않게) */
     if(!PS.data||!form||cur!=='boms')return;
     var L=bomFromPick(k),pr=L.prod,qs=function(n){return String(Math.round(n*1e6)/1e6);};
@@ -1241,8 +1268,16 @@ function bomPickFn(){
     out.textContent='고른 상품 「'+k.code+'」 → '+(pr?'모품목 '+pr.code+' '+pr.name:'모품목 못 이음: '+L.prodWhy+'. 모품목명·모품목번호를 직접 고르세요')+
       '\n부속 '+k.rowIndexes.length+'줄 → 하위 품목 '+L.groups.length+'줄(7항목 같은 부속 더함) · 이음 '+(L.groups.length-bad)+(bad?' · 못 이음 '+bad+'(빨간 줄)':'')+' · 저장 전에 확인하세요.';
     guideDraw(fn.guide,{from:'boms',k:k,needs:guideBom(k,L)});   /* v38 */
+    /* v43 부속 BOM 한꺼번에: 이은 부속마다 BOM 하나(부속 → 원장 자재 · T재단 · 1/n) + 지금 칸의 제품 BOM 을 v7 여러 건 목록으로. 저장은 사람이 */
+    var pr=bomPartRecs(L),pmsg=h('span',{class:'msg','aria-live':'polite'}),skip=L.groups.length-pr.length;
+    var psay=function(t,bad){pmsg.textContent=t;pmsg.className='msg'+(bad?' bad':'');};
+    fn.parts.hidden=!pr.length;
+    fn.parts.replaceChildren(pr.length?h('button',{type:'button',class:'btn small primary',on:{click:function(){
+        if(!form||cur!=='boms')return;showBulk(BYKEY.boms,[{line:0,vals:form.values()}].concat(pr),psay,'parts');if(bulk)bulk.box.scrollIntoView({block:'start'});}}},
+      '부속 BOM '+pr.length+'개도 한꺼번에 만들기'):'',
+      h('span',{class:'hint'},' 제품 BOM 1 + 부속 BOM '+pr.length+'(부속 → 원장 · T재단 · 소요량 1/원장당 개수)을 목록으로 보여 줍니다'+(skip?' · 못 이은 부속 '+skip+'개는 빠집니다':'')+'.'),pmsg);
   };
-  fn.out=out;fn.guide=h('div',{class:'guide',hidden:true});
+  fn.out=out;fn.guide=h('div',{class:'guide',hidden:true});fn.parts=h('div',{class:'psparts',hidden:true});
   fn.title='모품목 고르기 — 조혼가구 상품검색';
   fn.note='조혼가구 제품 발주와 같은 상품검색(상품검색 · ING단품명 · 카테고리)으로 상품을 고르면, 그 상품의 부속(부속카드와 같은 것)으로 아래 하위 품목 줄을 채웁니다. 7항목이 같은 부속은 한 줄로 더합니다. 4단계 품목과 이어지지 않은 줄은 빨갛게 — 하위품번을 직접 고르세요. 저장 전에 모든 칸을 고칠 수 있습니다.';
   return fn;
@@ -1728,6 +1763,7 @@ function takeSheet(X,s,aoa,say){
     /* 머리 칸과 행 칸이 같은 키를 쓰는 단계가 있다(외주계약: 사업단위·단위 모두 unit) — 키가 아니라 칸으로 가른다 */
     var rowFs=s.rowFields||[];
     var head={},rowVals=[],recs=[],lines=0;
+    var bomSplit=s.key==='boms',grps=[],grp=null;   /* v43 BOM: 모품목번호(없으면 모품목명)가 바뀌면 새 BOM — 한 장에 여러 BOM */
     aoa.slice(hi+1).forEach(function(line,li){
       var o={},one={},hasRow=false,any=false,c3=['','',''],c3f=null;
       map.forEach(function(f,c){
@@ -1744,6 +1780,12 @@ function takeSheet(X,s,aoa,say){
       if(c3f&&c3[2]&&(isEmpty(one[c3f.k])||clsFind(c3f.clsKind,one[c3f.k]).length!==1)){one[c3f.k]=cls3Path(c3f.clsKind,c3);if(!(c3f.k in head))head[c3f.k]=one[c3f.k];}   /* v42: 세 칸을 다 골랐고 자재소분류가 비었거나(수식 값 없음) 한 곳으로 안 정해지면 세 칸으로 */
       s.fields.forEach(function(f){if(f.cls3&&!isEmpty(one[f.k])){one[f.k]=clsResolve(f.clsKind,one[f.k]);if(head[f.k]!=null)head[f.k]=clsResolve(f.clsKind,head[f.k]);}});   /* v42: 영림원 소분류 이름·짧은 이름·경로 → 경로 */
       lines++;
+      if(bomSplit){
+        var pc=String(one.pcode||'').trim(),pn=String(one.pname||'').trim();
+        if(!grp||(pc&&pc!==String(grp.vals.pcode||'').trim())||(!pc&&pn&&pn!==String(grp.vals.pname||'').trim())){grp={line:hi+2+li,vals:{rows:[]}};grps.push(grp);}
+        Object.keys(one).forEach(function(k){if(!(k in grp.vals))grp.vals[k]=one[k];});
+        if(hasRow)grp.vals.rows.push(o);
+      }
       if(hasRow)rowVals.push(o);
       if(one.rows)one.rows=one.rows.filter(Boolean);
       /* v22: 공정·공정흐름은 이름 기준 — 이름이 있으면 공정 칸(수식 값)은 보지 않고 이름을 「-」로 나눈다(수식 값이 비어 있어도 됨). 이름이 없으면 공정 칸 그대로 */
@@ -1752,6 +1794,9 @@ function takeSheet(X,s,aoa,say){
     });
     if(!lines){say('양식에 입력한 줄이 없습니다.',true);return;}
     if(BYKEY[cur]!==s)return;
+    if(bomSplit&&grps.length>1){   /* v43: 모품목이 여럿이면 BOM 마다 한 건(전에는 첫 줄 모품목 하나로 합쳐졌다) */
+      grps.forEach(function(g){g.vals.rows.forEach(function(o){bomAutoQty(g.vals.pcode,o);});});
+      showBulk(s,grps,say);return;}
     if((!s.rowFields||s.flowCols)&&lines>1){showBulk(s,recs,say);return;}
     if(!s.rowFields||s.flowCols){head=recs[0].vals;if(s.flowCols)rowVals=head.rows||[];}
     form.fill(head,rowVals);
@@ -1782,13 +1827,18 @@ function nameOf(v){return String(v.name||'').trim();}
 function bulkState(b,it){
   if(it.saved)return {label:'저장됨',cls:'완료'};
   var kf=b.s.dupKey||function(v){return nameOf(v);};   /* v26 분류: 대·중·소 경로로 겹침을 본다 */
-  var miss=recNeedMiss(b.s,it.vals),nm=nameOf(it.vals),dup='';
+  var miss=recNeedMiss(b.s,it.vals),nm=b.s.nameK?String(it.vals[b.s.nameK]||'').trim():nameOf(it.vals),dup='';   /* v43 BOM = 모품목번호 */
   if(nm){
     if((data[b.s.key]||[]).some(function(r){return kf(r)===kf(it.vals);}))dup='이미 저장된 '+b.nameLab+'입니다';
     else{var prev=b.items.slice(0,b.items.indexOf(it)).filter(function(o){return !o.saved&&kf(o.vals)===kf(it.vals);})[0];
       if(prev)dup=bulkLab(b,prev)+'과 '+b.nameLab+'이 겹칩니다';}
   }
   if(miss.length)return {label:'필수 빠짐',cls:'오류',why:'필수 빠짐: '+miss.map(function(f){return f.label;}).join('·'),bad:1};
+  if(b.s.rowFields&&!b.s.flowCols){   /* v43 BOM: 행 필수 칸도 본다(「모두 저장」은 입력 칸 검사를 안 거침) */
+    var rw=bulkRows(b.s,it.vals.rows),rm=[];
+    rw.forEach(function(o){b.s.rowFields.forEach(function(f){if(f.req&&isEmpty(o[f.k])&&rm.indexOf(f.label)<0)rm.push(f.label);});});
+    if(!rw.length||rm.length)return {label:'필수 빠짐',cls:'오류',why:'필수 빠짐: '+b.s.rowTitle+(rm.length?' '+rm.join('·'):' 없음'),bad:1};
+  }
   var ck=b.s.check?b.s.check(it.vals):'';   /* v19 공정흐름: 공정이 하나도 없음 */
   if(ck)return {label:'공정 확인',cls:'오류',why:ck,bad:1};
   var fmt=recBadFmt(b.s,it.vals);
@@ -1830,13 +1880,18 @@ function bulkSaved(){
   var b=bulk;if(!b||!b.cur)return;
   b.cur.saved=true;b.cur=null;b.editing.hidden=true;form.el.hidden=true;bulkDraw();
 }
-function bulkLab(b,it){return b.guide?'안내 '+it.line:'엑셀 '+it.line+'행';}   /* v38 미등록 안내로 채운 목록은 「안내 n」 */
+function bulkLab(b,it){return b.guide==='parts'?(it.line?'부속 '+it.line:'제품'):b.guide?'안내 '+it.line:'엑셀 '+it.line+'행';}   /* v43 부속 BOM 한꺼번에 = 「제품」·「부속 n」 */
+/* v43 행 단계(BOM): 값을 하나도 안 넣은 행은 뺀다(입력 칸 collect 와 같은 기준) */
+function bulkRows(s,rows){
+  return (rows||[]).filter(function(o){return s.rowFields.some(function(f){var v=o[f.k];return !isEmpty(v)&&v!==false&&v!==f.def;});});
+}   /* v38 미등록 안내로 채운 목록은 「안내 n」 */
 function showBulk(s,recs,say,guide){
-  var nameF=s.fields.filter(function(f){return f.k==='name';})[0];
-  var b={s:s,cur:null,busy:false,nameLab:nameF.label,guide:!!guide};
+  var nameF=s.fields.filter(function(f){return f.k===(s.nameK||'name');})[0];   /* v43 BOM = 모품목번호 */
+  var b={s:s,cur:null,busy:false,nameLab:nameF.label,guide:guide||false};
   b.items=recs.map(function(r){
     var v={};s.fields.forEach(function(f){v[f.k]=f.k in r.vals?r.vals[f.k]:fieldDef(f);});
     if(s.flowCols)v.rows=r.vals.rows||[];
+    else if(s.rowFields)v.rows=(r.vals.rows||[]).map(function(o){var x={};s.rowFields.forEach(function(f){x[f.k]=f.k in o?(f.type==='check'?!!o[f.k]:String(o[f.k]==null?'':o[f.k])):fieldDef(f);});return x;});   /* v43 BOM 행 = 입력 칸 저장과 같은 모양(10칸 · 글자 · 하위유무 참/거짓) */
     var it={line:r.line,vals:v,saved:false,name:h('b',{}),why:h('small',{}),chip:h('span',{class:'chip'})};
     it.btn=h('button',{type:'button',class:'btn bulkbtn',on:{click:function(){bulkPick(it);}}},h('span',{class:'rt'},it.name,it.why),it.chip);
     return it;
@@ -1847,8 +1902,10 @@ function showBulk(s,recs,say,guide){
   b.allBtn=h('button',{type:'button',class:'btn primary',on:{click:saveAll}});
   var closeBtn=h('button',{type:'button',class:'btn',on:{click:close}},'목록 닫기');
   b.box=h('div',{class:'bulk'},
-    h('div',{class:'sub'},guide?'등록할 목록 (안내로 채움) ':'일괄 업로드 목록 ',b.cnt),
+    h('div',{class:'sub'},guide==='parts'?'제품·부속 BOM 목록 ':guide?'등록할 목록 (안내로 채움) ':'일괄 업로드 목록 ',b.cnt),
+    guide==='parts'?h('p',{class:'hint',style:'margin:0 0 10px'},'고른 상품의 제품 BOM(제품 → 부속 · T조립)과 부속 BOM(부속 → 원장 · T재단 · 소요량 1/원장당 개수)입니다. 버튼을 누르면 아래 입력 칸에 채워집니다. 확인·고쳐 저장하거나 「모두 저장」을 누르세요. 필수 칸이 빠졌거나 같은 모품목번호·BOM차수가 이미 있는 건은 저장하지 않습니다.'):
     guide?h('p',{class:'hint',style:'margin:0 0 10px'},'빠진 것마다 버튼 하나입니다. 버튼을 누르면 아래 입력 칸에 상품검색에서 알 수 있는 값이 채워집니다. 빈 칸(품번 등)을 채우고 저장하면 「저장됨」으로 바뀝니다. 이미 저장된 이름은 다시 저장하지 않습니다.'):
+    s.key==='boms'?h('p',{class:'hint',style:'margin:0 0 10px'},'모품목(BOM)마다 버튼 하나입니다. 버튼을 누르면 아래 입력 칸에 그 BOM 이 채워집니다. 고치고 저장하면 「저장됨」으로 바뀝니다. 필수 칸이 빠졌거나 같은 모품목번호·BOM차수가 이미 있는 건은 저장하지 않습니다.'):
     h('p',{class:'hint',style:'margin:0 0 10px'},'업체마다 버튼 하나입니다. 버튼을 누르면 아래 입력 칸에 그 업체 값이 채워집니다. 고치고 저장하면 「저장됨」으로 바뀝니다. 필수 칸이 빠졌거나 사업자번호가 10자리가 아니거나 외주거래처가 미등록이거나 공정이 없거나 이름이 겹치는 건은 저장하지 않습니다.'),
     h('div',{class:'bulklist'},b.items.map(function(it){return it.btn;})),
     h('div',{class:'actions'},b.allBtn,closeBtn,bmsg),b.editing);
@@ -1862,7 +1919,7 @@ function showBulk(s,recs,say,guide){
     var done=0,err='';
     /* 파일 순서대로 하나씩 저장한다(createdAt 순서 = 에이전트 처리 순서) */
     todo.reduce(function(p,it){return p.then(function(){
-      var nv=normVals(s,it.vals),doc;if(s.flowCols)nv.rows=flowRows(nv.rows);
+      var nv=normVals(s,it.vals),doc;if(s.flowCols)nv.rows=flowRows(nv.rows);else if(s.rowFields)nv.rows=bulkRows(s,nv.rows);   /* v43 BOM: 빈 행 뺌 */
       return (s.flowCols?addNewProcs(nv.rows,{}):Promise.resolve()).then(function(){
       doc=Object.assign(nv,{status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(s)});
       return db.collection('erp_'+s.key).add(doc);}).then(function(){
@@ -1882,6 +1939,8 @@ function showBulk(s,recs,say,guide){
   bulk=b;form.reset();form.el.hidden=true;form.el.before(b.box);
   bulkDraw();
   var ready=b.items.filter(function(it){return bulkState(b,it).ok;}).length;
+  if(guide==='parts'){var had=b.items.filter(function(it){return /^이미 저장된/.test(bulkState(b,it).why||'');}).length,chk=b.items.length-ready-had;
+    say('제품 BOM 1건 + 부속 BOM '+(b.items.length-1)+'건을 목록에 담았습니다. 저장할 수 있는 것 '+ready+'건'+(had?' · 이미 저장된 것 '+had+'건(다른 제품과 같은 부속)':'')+(chk?' · 확인할 것 '+chk+'건':'')+'. 저장 전에는 아무것도 안 갑니다.',chk>0);return;}
   if(guide){say('안내로 '+b.items.length+'건을 채웠습니다. 아래 목록에서 버튼을 눌러 빈 칸을 채우고 저장하세요(저장 전 영림원·저장소에 아무것도 안 갑니다).');return;}
   say('엑셀에서 '+b.items.length+'건을 읽었습니다. 업로드 준비중 '+ready+'건'+(ready<b.items.length?', 확인할 것 '+(b.items.length-ready)+'건':'')+' — 아래 일괄 업로드 목록에서 버튼을 눌러 확인하세요.',ready<b.items.length);
 }
