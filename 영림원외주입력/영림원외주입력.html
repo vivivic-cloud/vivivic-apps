@@ -353,11 +353,16 @@ function cls3Rows(kind){
 /* v42 관리 방 정정(사장님 「영림원 소분류가 소분류 이름만 있는게 아니잖아」): 자재소분류 칸 = 영림원 소분류 이름 그대로 하나(md_27_bk · 이어 붙지 않은 것은 T201양면).
    받는 값: 영림원 소분류 이름 · 짧은 이름 · 「대 > 중 > 소」 경로 — 딱 한 경로면 그 경로로. 같은 이름이 여러 경로에 있으면 그대로 두어 clsErr 가 대·중을 고르라고 알린다.
    저장 문서 small 은 전처럼 경로(입력 작업자·v40 분류 수정·clsErr 가 경로를 쓴다). 화면·양식에 보이는 것만 소분류 이름. */
-function clsName(path){var a=String(path==null?'':path).split(CLS_SEP);return a.length===3?a[2]:String(path==null?'':path);}
+/* 영림원 소분류 이름 = 위 이름을 「_」 로 이어 붙인 꼴(관리 방 11-03 「T보드_T엘피엠_T201양면」). 영림원에서 불러온 기록은 이미 이어 붙어 있고(md > md_27 > md_27_bk),
+   폼에서 넣은 기록은 짧게 저장돼 있다(T보드 > T엘피엠 > T201양면) → 둘 다 같은 꼴로 만든다. (v41 「소분류 미등록」 버그: 칸이 경로 꼴만 받아 이어 붙인 이름을 못 찾음) */
+function clsName(path){var a=String(path==null?'':path).split(CLS_SEP);if(a.length!==3)return String(path==null?'':path);
+  var b=a[0],m=a[1],x=a[2],jm=m.indexOf(b+'_')===0?m:b+'_'+m;
+  return x.indexOf(m+'_')===0?jm+x.slice(m.length):(x.indexOf(jm+'_')===0?x:jm+'_'+x);}
 function clsFind(kind,v){v=String(v==null?'':v).trim();if(!v)return [];
   if(/>/.test(v)){v=v.replace(/\s*>\s*/g,CLS_SEP);return cls3Rows(kind).filter(function(r){return r.path===v;});}
   var R=cls3Rows(kind),m=R.filter(function(r){return clsName(r.path)===v;});
-  return m.length?m:R.filter(function(r){return r.s===v;});}   /* 영림원 소분류 이름이 먼저, 없으면 짧은 이름 */
+  if(!m.length)m=R.filter(function(r){return r.path.split(CLS_SEP)[2]===v;});   /* 저장된 소분류 이름 그대로 */
+  return m.length?m:R.filter(function(r){return r.s===v;});}   /* 이어 붙인 영림원 소분류 이름 → 저장된 이름 → 짧은 이름 */
 function clsResolve(kind,v){var m=clsFind(kind,v);return m.length===1?m[0].path:(/>/.test(String(v||''))?String(v).trim().replace(/\s*>\s*/g,CLS_SEP):String(v==null?'':v).trim());}
 /* 세 칸 값 → 경로. 없으면 「대 > 중 > 소」 글자 그대로(올리기에서 「소분류 미등록」으로 잡힘) */
 function cls3Path(kind,v){var r=cls3Rows(kind).filter(function(x){return x.b===v[0]&&x.m===v[1]&&x.s===v[2];})[0];return r?r.path:v.filter(Boolean).join(CLS_SEP);}
@@ -481,7 +486,7 @@ var STEPS=[
   F('io','내외자구분','select',{opts:['내자','외자'],def:'내자'}),
   F('imp','중요도','combo',{opts:['A등급','B등급','C등급'],def:'A등급',listOnly:1,valid:optsErr('중요도',['A등급','B등급','C등급']),badLab:'목록 밖 값'}),
   F('unit','기준단위','combo',{req:1,opts:UNITS,listOnly:1,valid:optsErr('기준단위',UNITS),badLab:'목록 밖 값'}),
-  F('small','자재소분류','combo',{req:1,dl:'dl-cls-mat',listOnly:1,clsKind:'자재',valid:clsErr('자재','dl-cls-mat'),badLab:function(v){return clsFind('자재',v).length>1?'소분류 여러 곳':'소분류 미등록';},cls3:1,optLab:function(p){var a=p.split(CLS_SEP);return a.length===3?a[2]+'   ('+a[0]+' > '+a[1]+')':p;},hint:'영림원 소분류 이름 하나만 고릅니다(대·중분류는 저절로 붙음). 대·중·소 세 칸으로 나눠 골라도 같은 값이 됩니다. 소분류 = 거래처 제품코드(대분류 보드 — 예: T보드 > T엘피엠 > T201양면).'})
+  F('small','자재소분류','combo',{req:1,dl:'dl-cls-mat',listOnly:1,clsKind:'자재',valid:clsErr('자재','dl-cls-mat'),badLab:function(v){return clsFind('자재',v).length>1?'소분류 여러 곳':'소분류 미등록';},cls3:1,optLab:function(p){var a=p.split(CLS_SEP);return a.length===3?clsName(p)+'   ('+a[0]+' > '+a[1]+')':p;},hint:'영림원 소분류 이름 하나만 고릅니다(대·중분류는 저절로 붙음). 대·중·소 세 칸으로 나눠 골라도 같은 값이 됩니다. 소분류 = 거래처 제품코드(대분류 보드 — 예: T보드 > T엘피엠 > T201양면).'})
  ],
  recTitle:function(r){return r.name;},
  subt:function(r){return [r.code,r.asset,r.unit].filter(Boolean).join(' · ');}},
