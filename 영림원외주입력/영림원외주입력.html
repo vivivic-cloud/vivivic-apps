@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v45 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v46 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -257,7 +257,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v45</span>
+    <span class="ver">v46</span>
   </div>
 </header>
 <div class="wrap">
@@ -537,7 +537,7 @@ var STEPS=[
   F('pname','모품목명','text',{req:1}),
   F('pcode','모품목번호','text',{req:1,mono:1,dl:'dl-codes',xref:1}),
   F('pspec','모품목규격','text'),
-  F('pver','모품목BOM차수','text',{req:1,ph:'예: 00',def:'00'})   /* v44 영림원 BOM차수 = 2자리, 기존 552개 모두 00 */
+  F('pver','모품목BOM차수','text',{req:1,ph:'예: 00',def:'00',ver:1,norm:verPad})   /* v44 영림원 BOM차수 = 2자리, 기존 552개 모두 00 */
  ],
  rowTitle:'하위 품목',
  rowFields:[
@@ -546,7 +546,7 @@ var STEPS=[
   F('cname','하위품명','text',{req:1}),
   F('ccode','하위품번','text',{req:1,mono:1,dl:'dl-codes',xref:1}),
   F('cspec','하위규격','text'),
-  F('cver','하위BOM차수','text'),
+  F('cver','하위BOM차수','text',{ver:1,norm:verPad}),   /* v46 엑셀·구글시트가 00 을 숫자 0 으로 바꿔도 00 */
   F('inunit','투입단위','text',{req:1,ph:'예: EA'}),
   F('qn','소요량(분자)','number',{req:1,step:'any'}),
   F('qd','소요량(분모)','number',{req:1,step:'any',def:'1'}),
@@ -554,7 +554,7 @@ var STEPS=[
   F('grain','결방향 있음','check',{noErp:1})   /* v45 원장 자재 줄만 보임 — 켜면 부속을 돌려 앉히지 않고 소요량(분모)를 셈. 폼 계산용, 영림원에 안 보냄(erp-spec 에서 뺌) */
  ],
  recTitle:function(r){return r.pname;},
- nameK:'pcode',dupKey:function(r){return String(r.pcode||'').trim()+'|'+String(r.pver||'').trim();},   /* v43 여러 건 목록: 겹침 = 모품목번호·BOM차수가 같을 때 */
+ nameK:'pcode',dupKey:function(r){return String(r.pcode||'').trim()+'|'+verPad(r.pver);},   /* v46 차수 0 = 00 */   /* v43 여러 건 목록: 겹침 = 모품목번호·BOM차수가 같을 때 */
  subt:function(r){return [r.pcode,'하위 '+((r.rows||[]).length)+'건'].join(' · ');}},
 
 {key:'contracts',n:8,title:'외주계약',screen:'외주계약등록',
@@ -991,7 +991,7 @@ function buildForm(step){
             if(!miss&&!wrong&&x.f.strictNew&&x.isNew()&&/-/.test(o[x.f.k]))wrong='공정 이름에 「-」를 쓸 수 없습니다.';
             x.setError(miss?'필수 항목입니다.':wrong);if(miss||wrong){bad++;first=first||x;if(!miss)fmt=fmt||wrong;}
           });
-          rv.push(o);
+          rv.push(normRow(step,o));
         });
         if(step.flowCols){var memos={};rows.forEach(function(r){r.fields.forEach(function(x){var m=x.memo&&x.memo();if(m)memos[x.get()]=m;});});
           out.rows=flowRows(rv);if(out.rows.length)out.name=out.rows.map(function(x){return x.proc;}).join('-');   /* v22: 이름 = 공정 이음(띄어쓰기·끝 「-」 정리) */
@@ -1482,6 +1482,13 @@ function renderStep(){
   var s=BYKEY[cur];bulk=null;
   form=buildForm(s);
   form.el.addEventListener('submit',function(e){e.preventDefault();save(s);});
+  /* v46 BOM: 엑셀·구글시트에서 여러 줄(탭)을 복사해 입력 칸에 붙이면 양식 올리기와 같은 길(takeSheet) — 모품목마다 한 건으로 나뉜다 */
+  if(s.key==='boms')form.el.addEventListener('paste',function(e){
+    var txt=(e.clipboardData||window.clipboardData).getData('text/plain')||'';
+    if(txt.indexOf('\t')<0||!/\n\s*\S/.test(txt.replace(/\s+$/,'')))return;   /* 한 줄·한 칸은 보통 붙여넣기 */
+    e.preventDefault();
+    loadXlsx().then(function(X){takeSheet(X,s,parseTsv(txt.replace(/\s+$/,'')),say);},function(){say(XLSX_FAIL,true);});
+  });
   var bsync=function(){if(bulk&&bulk.cur){bulk.cur.vals=form.values();bulkDraw();}};form.el.addEventListener('input',bsync);form.el.addEventListener('change',bsync);
   var nk=s.needs.map(function(k){return BYKEY[k].shownIn||k;}).filter(function(k,i,a){return k!==s.key&&a.indexOf(k)===i;});   /* v20: 숨은 단계(공정)는 보이는 단계로 */
   var needs=nk.length?h('p',{class:'needs'},'먼저 필요한 단계',nk.map(function(k){return h('button',{type:'button',on:{click:function(){go(k);}}},BYKEY[k].n+'. '+BYKEY[k].title);})):null;
@@ -1739,6 +1746,8 @@ function saveFile(blob,name){
 }
 function normHead(t){return String(t==null?'':t).replace(/\s+/g,'').replace(/^\*+|\*+$/g,'');}
 function pad2(n){return (n<10?'0':'')+n;}
+/* v46 BOM차수 = 2자리: 엑셀·구글시트에 00 을 붙이면 숫자 0 이 된다 → 「0」·「 0」·0 → 「00」, 「1」 → 「01」 */
+function verPad(v){var t=String(v==null?'':v).trim();return /^\d$/.test(t)?'0'+t:t;}
 /* 날짜 칸(시작일·종료일·적용시작일)은 엑셀이 날짜 숫자로 바꿔 두므로 yyyy-mm-dd 로 되돌린다 */
 function cellVal(X,f,v){
   var isDate=f.type==='date'||/일$/.test(f.label);
@@ -1747,6 +1756,7 @@ function cellVal(X,f,v){
   if(isDate){var m=t.match(/^(\d{4})[.\/-]\s*(\d{1,2})[.\/-]\s*(\d{1,2})\.?$/);if(m)t=m[1]+'-'+pad2(+m[2])+'-'+pad2(+m[3]);}
   if(f.type==='check')return /^(o|v|y|yes|예|true|1|○|●|✓|✔)$/i.test(t);
   if(f.type==='multi')return t.split(/\s*[,，\n]\s*/).filter(Boolean);
+  if(f.ver)return verPad(t);
   return t;
 }
 function readBook(X,file){
@@ -1779,7 +1789,9 @@ function takeSheet(X,s,aoa,say){
       var m=aoa[i].map(function(c){return byLabel[normHead(c)]||null;});
       if(m.some(Boolean)){hi=i;map=m;}
     }
-    if(hi<0){say('이 단계 양식의 열 이름을 찾지 못했습니다. 양식 다운로드로 받은 파일에 입력해 올려 주세요.',true);return;}
+    /* v46 BOM: 머리 줄 없이 붙인 글(양식 열 순서 14칸 — 모품목명·모품목번호·…·하위유무)도 받는다 */
+    if(hi<0&&s.key==='boms'&&aoa.some(function(l){return l.filter(function(c){return String(c).trim()!=='';}).length>=8&&l.length>=cols.length-1;})){map=cols.slice();hi=-1;}
+    else if(hi<0){say('이 단계 양식의 열 이름을 찾지 못했습니다. 양식 다운로드로 받은 파일에 입력해 올려 주세요.',true);return;}
     /* 머리 칸과 행 칸이 같은 키를 쓰는 단계가 있다(외주계약: 사업단위·단위 모두 unit) — 키가 아니라 칸으로 가른다 */
     var rowFs=s.rowFields||[];
     var head={},rowVals=[],recs=[],lines=0;
@@ -1839,8 +1851,10 @@ function recBadFmt(s,vals){
 function normVals(s,vals){
   var o=Object.assign({},vals);
   s.fields.forEach(function(f){if(f.norm&&!isEmpty(o[f.k]))o[f.k]=f.norm(o[f.k]);});
+  if(s.rowFields&&Array.isArray(o.rows))o.rows=o.rows.map(function(r){return normRow(s,r);});   /* v46 행 칸도(BOM 하위BOM차수) */
   return o;
 }
+function normRow(s,r){var o=Object.assign({},r);s.rowFields.forEach(function(f){if(f.norm&&!isEmpty(o[f.k]))o[f.k]=f.norm(o[f.k]);});return o;}
 function fieldDef(f){return f.def!=null?f.def:(f.type==='check'?false:(f.type==='multi'?[]:''));}
 function nameOf(v){return String(v.name||'').trim();}
 /* 건의 상태: saved · miss(빠진 칸) · dup(겹침 이유) */
@@ -1937,6 +1951,8 @@ function showBulk(s,recs,say,guide){
     if(!todo.length)return;
     b.busy=true;bulkDraw();bmsg.textContent='저장하는 중입니다.';bmsg.className='msg';
     var done=0,err='';
+    freshCheck().then(function(old){   /* v46 옛 판 화면이면 막음 */
+    if(old){b.busy=false;bulkDraw();bmsg.textContent=old;bmsg.className='msg bad';return;}
     /* 파일 순서대로 하나씩 저장한다(createdAt 순서 = 에이전트 처리 순서) */
     todo.reduce(function(p,it){return p.then(function(){
       var nv=normVals(s,it.vals),doc;if(s.flowCols)nv.rows=flowRows(nv.rows);else if(s.rowFields)nv.rows=bulkRows(s,nv.rows);   /* v43 BOM: 빈 행 뺌 */
@@ -1953,6 +1969,7 @@ function showBulk(s,recs,say,guide){
       var left=b.items.filter(function(it){return !it.saved;}).map(function(it){return bulkLab(b,it)+'('+(bulkState(b,it).why||'저장 실패')+')';});
       bmsg.textContent=done+'건 저장했습니다.'+(left.length?' 남은 '+left.length+'건: '+left.join(', ')+(err?' — '+err:'')+'. 버튼을 눌러 고친 뒤 저장하세요.':'');
       bmsg.className='msg'+(left.length?' bad':'');
+    });
     });
   }
   if(bulk)bulk.box.remove();
@@ -2618,8 +2635,21 @@ function flash(text,bad){
   clearTimeout(msgTimer);if(!bad)msgTimer=setTimeout(function(){form.msg.textContent='';},3500);
 }
 function patch(s,r,o){db.collection('erp_'+s.key).doc(r.id).update(o).catch(function(e){flash('변경하지 못했습니다. '+errText(e),true);});}
+/* v46 오래 열어 둔 화면(옛 판)으로 저장하지 않게: 저장 직전 배포판 판 번호를 읽어 더 새 판이면 막는다. 못 읽으면(오프라인·파일로 연 화면) 그냥 저장 */
+var VER=+(String((document.querySelector('.ver')||{}).textContent||'').match(/\d+/)||[0])[0];
+function freshCheck(){
+  if(!/^https?:/.test(location.protocol))return Promise.resolve('');
+  return fetch(location.href.split('#')[0],{cache:'no-store'}).then(function(r){return r.ok?r.text():'';}).then(function(t){
+    var m=String(t).slice(0,400).match(/올린다:\s*v(\d+)/);
+    return m&&+m[1]>VER?'새 판(v'+m[1]+')이 나왔습니다. 지금 화면은 v'+VER+' 입니다 — 새로고침(⌘R)한 뒤 다시 올려 주세요. 저장하지 않았습니다.':'';
+  },function(){return '';});
+}
 function save(s){
   if(!db){flash('저장소에 연결되지 않아 저장할 수 없습니다.',true);return;}
+  form.submit.disabled=true;
+  freshCheck().then(function(old){form.submit.disabled=false;if(old){flash(old,true);return;}save2(s);});
+}
+function save2(s){
   var res=form.collect();
   if(!res.ok){flash(res.fmt?res.fmt:'필수 항목 '+res.count+'곳이 비어 있습니다.',true);if(res.first)res.first.focus();return;}
   var blk=bulkBlock();if(blk){flash(blk,true);return;}
