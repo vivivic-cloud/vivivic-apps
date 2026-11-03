@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v44 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v45 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -257,7 +257,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v44</span>
+    <span class="ver">v45</span>
   </div>
 </header>
 <div class="wrap">
@@ -550,7 +550,8 @@ var STEPS=[
   F('inunit','투입단위','text',{req:1,ph:'예: EA'}),
   F('qn','소요량(분자)','number',{req:1,step:'any'}),
   F('qd','소요량(분모)','number',{req:1,step:'any',def:'1'}),
-  F('hasSub','하위유무','check')
+  F('hasSub','하위유무','check'),
+  F('grain','결방향 있음','check',{noErp:1})   /* v45 원장 자재 줄만 보임 — 켜면 부속을 돌려 앉히지 않고 소요량(분모)를 셈. 폼 계산용, 영림원에 안 보냄(erp-spec 에서 뺌) */
  ],
  recTitle:function(r){return r.pname;},
  nameK:'pcode',dupKey:function(r){return String(r.pcode||'').trim()+'|'+String(r.pver||'').trim();},   /* v43 여러 건 목록: 겹침 = 모품목번호·BOM차수가 같을 때 */
@@ -646,7 +647,7 @@ function specOf(s){
   function rq(a){return a.filter(function(f){return f.req;}).map(function(f){return f.k;});}
   var o={step:s.n,key:s.key,collection:'erp_'+s.key,erpModule:s.path[0],menuPath:s.path,screen:s.screen,dependsOn:s.needs,method:r.method,how:r.how,
     fieldMap:m(s.fields),required:rq(s.fields),requiredIf:r.requiredIf||null,
-    rowsField:s.rowFields?'rows':null,rowFieldMap:s.rowFields?m(s.rowFields):null,rowRequired:s.rowFields?rq(s.rowFields):null,
+    rowsField:s.rowFields?'rows':null,rowFieldMap:s.rowFields?m(s.rowFields.filter(function(f){return !f.noErp;})):null,rowRequired:s.rowFields?rq(s.rowFields):null,
     verifiedByScreen:'화면을 열어 입력 항목을 확인함',unverified:r.unverified};
   if(r.rowsNote)o.rowsNote=r.rowsNote;
   if(r.note)o.note=r.note;   /* v19 공정흐름유형: 폼이 채우는 행 칸 설명 */
@@ -838,7 +839,8 @@ function makeRow(step,idx,onRemove){
 
 /* v31 BOM 소요량 = 원장당 재단 수량. 계산은 shared/원장재단수량.js(에이엠티 재단 편집과 같은 한 벌 — 여기 베끼지 않는다).
    하위품번이 5단계 자재인 줄만: 원장 크기 = 자재 규격(2440*1220), 부속 크기 = 모품목(4단계 품목) 규격(W*D),
-   결보호 = 원장 엑셀(PS.data)에서 재단W·D 가 같은 줄(모르거나 섞이면 돌리지 않음) → 소요량(분자) 1 · 소요량(분모) n.
+   결보호 = 원장 엑셀(PS.data)에서 재단W·D 가 같은 줄 → 소요량(분자) 1 · 소요량(분모) n.
+   v45 줄의 「결방향 있음」 체크가 결보호를 정한다(켬 = 돌리지 않음 · 끔 = 더 많이 앉는 쪽으로 돌림). 기본값 = 원장 엑셀(X·모름 = 끔, O·섞임 = 켬).
    사람이 고친 값은 덮어쓰지 않는다. 계산이 안 되면(자동으로 넣었던 값만) 비우고 이유를 보인다. 저장 문서 모양은 그대로. */
 function bomGrain(p){
   if(!PS.data||!PS.data.length)return {v:null,src:PS.loading?'원장 엑셀 읽는 중':'원장 엑셀 못 읽음'};
@@ -849,7 +851,7 @@ function bomGrain(p){
   if(!vs.length)return {v:null,src:'원장 엑셀에 '+p.w+'×'+p.d+' 없음'};
   return vs.length===1?{v:vs[0],src:'원장 엑셀'}:{v:'',src:'원장 엑셀 값이 섞임('+vs.join('·')+')'};
 }
-function bomCalc(pcode,ccode){
+function bomCalc(pcode,ccode,grain){   /* grain = 결방향 있음(참/거짓) — 안 주면 원장 엑셀 기본값 */
   var R=window.원장재단수량;
   var mat=ccode?(data.materials||[]).filter(function(x){return x.code===ccode;})[0]:null;
   if(!mat)return null;   /* 원장(자재) 줄이 아님 — 아무것도 안 함 */
@@ -860,21 +862,26 @@ function bomCalc(pcode,ccode){
   if(!it)return {why:'모품목번호가 4단계 품목에 없어 부속 크기를 모릅니다.'};
   var p=R.크기읽기(it.spec);
   if(!p)return {why:'모품목 「'+(it.name||pcode)+'」 규격에 부속 크기(W*D, 예: 784*396)가 없습니다.'};
-  var g=bomGrain(p),r=R.소요량({부속:p,원장:b,결보호:g.v});
-  if(!r.n)return {why:r.이유};
-  r.글=r.근거+' · 부속 '+p.w+'×'+p.d+'(모품목 규격) · 결보호 '+(g.v==='X'?'X(돌림 가능)':(g.v?g.v+'(돌리지 않음)':'모름(돌리지 않음)'))+' — '+g.src;
+  var g=bomGrain(p),def=g.v!=null&&g.v!=='X',on=grain==null?def:!!grain;
+  var r=R.소요량({부속:p,원장:b,결보호:on?'O':'X'});
+  if(!r.n)return {why:r.이유,grainDef:def};
+  r.grain=on;r.grainDef=def;
+  r.글=r.근거+' · 부속 '+p.w+'×'+p.d+'(모품목 규격) · 결방향 '+(on?'있음(돌리지 않음)':'없음(돌림 가능)')+' · 원장 엑셀 결보호 '+(g.v==null?'모름':(g.v===''?'섞임':g.v))+' — '+g.src;
   return r;
 }
 /* v43 목록에 담는 BOM 행(입력 칸을 안 거침): 소요량이 비었으면(분모 1 포함) 입력 칸과 같은 1/n 을 넣는다. 사람이 적은 값은 그대로 */
 function bomAutoQty(pcode,o){
+  var res=bomCalc(String(pcode||'').trim(),String(o.ccode||'').trim(),'grain' in o?o.grain:null);
+  if(res&&!('grain' in o))o.grain=res.grain!=null?res.grain:res.grainDef;   /* v45 양식에 결방향 칸이 비었으면 원장 엑셀 기본값 */
   var a=String(o.qn==null?'':o.qn).trim(),b=String(o.qd==null?'':o.qd).trim();
   if(a!==''||(b!==''&&b!=='1'))return;
-  var res=bomCalc(String(pcode||'').trim(),String(o.ccode||'').trim());
   if(res&&res.n){o.qn='1';o.qd=String(res.n);}
 }
 function bomRowHook(r,pF){
   var by=function(k){return r.fields.filter(function(x){return x.f.k===k;})[0];};
-  var cc=by('ccode'),qn=by('qn'),qd=by('qd'),auto=null;
+  var cc=by('ccode'),qn=by('qn'),qd=by('qd'),gr=by('grain'),auto=null,grMine=false;   /* grMine = 사람이 고르거나 양식·저장 문서에서 온 결방향 — 기본값으로 덮지 않음 */
+  gr.el.hidden=true;
+  gr.el.addEventListener('click',function(){grMine=true;});   /* click — 체크가 바뀐 뒤 input 보다 먼저 온다(fill 이 보내는 input 으로는 안 켜짐) */
   var note=h('div',{class:'hint',hidden:true});r.el.append(note);
   /* v44 손으로 넣는 줄도: 하위품번을 고르면 품명·규격을 채우고, 부속(반제품)이면 하위BOM차수 00 · 하위유무 켬, 원장 자재면 비움·끔 */
   cc.el.addEventListener('change',function(){
@@ -883,8 +890,10 @@ function bomRowHook(r,pF){
     var sub=bomIsPart(code);by('cver').set(sub?'00':'');by('hasSub').set(sub);
   });
   function redo(refill){
-    var res=bomCalc(pF?pF.get():'',cc.get()),a=qn.get(),b=qd.get();
+    var res=bomCalc(pF?pF.get():'',cc.get(),grMine?gr.get():null),a=qn.get(),b=qd.get();
     var mine=!!auto&&a===auto.qn&&b===auto.qd,blank=a===''&&(b===''||b==='1');
+    gr.el.hidden=!res;   /* v45 원장 자재 줄에만 */
+    if(!res)gr.set(false);else if(!grMine)gr.set(res.grain!=null?res.grain:res.grainDef);   /* 원장 자재 줄이 아니면 끔(저장 문서에 거짓) */
     if(!res||res.why){
       if(mine){qn.set('');qd.set(res?'':'1');}auto=null;
       note.hidden=!res;note.className='hint'+(res?' warn':'');note.textContent=res?'소요량 자동 계산 안 됨: '+res.why:'';return;
@@ -897,6 +906,7 @@ function bomRowHook(r,pF){
   r.el.addEventListener('input',onEv);r.el.addEventListener('change',onEv);
   LIVE.push({el:r.el,redo:function(){redo(true);}});   /* 품목·자재 자료가 늦게 오거나 바뀌면 다시 */
   r.bomRedo=redo;
+  r.bomGiven=function(o){if('grain' in o)grMine=true;};   /* fill — 양식·저장 문서에 결방향이 있으면 그대로 */
   return r;
 }
 
@@ -1005,7 +1015,7 @@ function buildForm(step){
       headFields.forEach(function(x){if(x.f.k in head)x.set(head[x.f.k]);x.setError('');});
       if(step.rowFields&&rowVals.length){
         rows.slice().forEach(function(r){r.el.remove();});rows=[];
-        rowVals.forEach(function(o){var r=addRow();r.fields.forEach(function(x){if(x.f.k in o)x.set(o[x.f.k],o.isNew);});});
+        rowVals.forEach(function(o){var r=addRow();r.fields.forEach(function(x){if(x.f.k in o)x.set(o[x.f.k],o.isNew);});if(r.bomGiven)r.bomGiven(o);});
       }
       quiet=true;
       Array.prototype.forEach.call(f.querySelectorAll('input,select'),function(i){i.dispatchEvent(new Event('input',{bubbles:true}));});
@@ -1247,7 +1257,7 @@ function bomPartRecs(L){
   return L.groups.filter(function(g){return g.cands.length===1;}).map(function(g,i){
     var it=g.cands[0],mat=bomStock(g).mat,res=mat?bomCalc(it.code,mat.code):null,n=res&&res.n?String(res.n):'';
     return {line:i+1,vals:{pname:it.name||'',pcode:it.code,pspec:it.spec||'',pver:'00',
-      rows:[{proc:'T재단',order:'1',cname:mat?mat.name||'':'',ccode:mat?mat.code:'',cspec:mat?mat.spec||'':'',cver:'',inunit:'EA',qn:n?'1':'',qd:n,hasSub:false}]}};
+      rows:[{proc:'T재단',order:'1',cname:mat?mat.name||'':'',ccode:mat?mat.code:'',cspec:mat?mat.spec||'':'',cver:'',inunit:'EA',qn:n?'1':'',qd:n,hasSub:false,grain:!!(res&&(res.grain!=null?res.grain:res.grainDef))}]}};
   });
 }
 function bomPickFn(){
