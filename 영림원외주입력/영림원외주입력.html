@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v43 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v44 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -257,7 +257,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v43</span>
+    <span class="ver">v44</span>
   </div>
 </header>
 <div class="wrap">
@@ -537,7 +537,7 @@ var STEPS=[
   F('pname','모품목명','text',{req:1}),
   F('pcode','모품목번호','text',{req:1,mono:1,dl:'dl-codes',xref:1}),
   F('pspec','모품목규격','text'),
-  F('pver','모품목BOM차수','text',{req:1,ph:'예: 1'})
+  F('pver','모품목BOM차수','text',{req:1,ph:'예: 00',def:'00'})   /* v44 영림원 BOM차수 = 2자리, 기존 552개 모두 00 */
  ],
  rowTitle:'하위 품목',
  rowFields:[
@@ -876,6 +876,12 @@ function bomRowHook(r,pF){
   var by=function(k){return r.fields.filter(function(x){return x.f.k===k;})[0];};
   var cc=by('ccode'),qn=by('qn'),qd=by('qd'),auto=null;
   var note=h('div',{class:'hint',hidden:true});r.el.append(note);
+  /* v44 손으로 넣는 줄도: 하위품번을 고르면 품명·규격을 채우고, 부속(반제품)이면 하위BOM차수 00 · 하위유무 켬, 원장 자재면 비움·끔 */
+  cc.el.addEventListener('change',function(){
+    var code=cc.get(),it=(data.items||[]).concat(data.materials||[]).filter(function(x){return x.code===code;})[0];
+    if(!it)return;by('cname').set(it.name||'');by('cspec').set(it.spec||'');
+    var sub=bomIsPart(code);by('cver').set(sub?'00':'');by('hasSub').set(sub);
+  });
   function redo(refill){
     var res=bomCalc(pF?pF.get():'',cc.get()),a=qn.get(),b=qd.get();
     var mine=!!auto&&a===auto.qn&&b===auto.qd,blank=a===''&&(b===''||b==='1');
@@ -1209,7 +1215,7 @@ function bomFromPick(k){
   var groups=[],byKey={};
   k.rowIndexes.forEach(function(i){
     var p=P.part(d,i),g=byKey[p.same7];
-    if(!g){g=byKey[p.same7]={names:[],w:p.w,d:p.d,qty:0,color:p.마감색상,stock:p.원장명};groups.push(g);}   /* v38 color·stock = 미등록 안내(품명·원장) */
+    if(!g){g=byKey[p.same7]={names:[],w:p.w,d:p.d,qty:0,color:p.마감색상,stock:p.원장명,fin:p.마감};groups.push(g);}   /* v44 fin = 원장 자재 잇기 */   /* v38 color·stock = 미등록 안내(품명·원장) */
     if(p.부속명&&g.names.indexOf(p.부속명)<0)g.names.push(p.부속명);
     g.qty+=p.수량;
   });
@@ -1224,19 +1230,23 @@ function bomFromPick(k){
   });
   return {prod:prods.length===1?prods[0]:null,prodWhy:prods.length===1?'':(prods.length?'같은 품명 품목이 '+prods.length+'개 — 하나로 정할 수 없습니다':'4단계 품목에 「T'+pn+'」 이(가) 없습니다'),groups:groups};
 }
-/* v43 부속 BOM: 원장 엑셀 원장명(PB-18T)·마감색상 → 5 자재 하나(이름에서 앞 T·띄어쓰기 빼고 원장명을 담음 — v38 안내와 같은 기준, 여럿이면 색으로 좁힘) */
+/* v43·v44 부속 BOM: 원장 엑셀 원장명(PB-18T)·마감(LPM-양면)·마감색상(화이트)을 **모두** 이름에 담은 5 자재가 딱 하나일 때만 잇는다
+   (이름에서 띄어쓰기 빼고 비교 — 「TPB-18T LPM-양면 화이트」). 원장 엑셀에 없는 값(마감정보없음·any)은 안 본다. 아니면 비움 → 목록 「필수 빠짐」 */
 function bomStock(g){
   var sq=function(v){return String(v==null?'':v).replace(/\s+/g,'').toLowerCase();},sk=sq(g.stock);
   if(!sk||sk==='원장정보없음')return {why:'원장 엑셀에 원장명이 없습니다'};
-  var ms=(data.materials||[]).filter(function(r){var a=sq(r.name).replace(/^t/,'');return r.status!=='오류'&&a&&a.indexOf(sk)>=0;});
-  if(ms.length>1&&g.color){var mc=ms.filter(function(r){return sq(r.name).indexOf(sq(g.color))>=0;});if(mc.length)ms=mc;}
-  return ms.length===1?{mat:ms[0]}:{why:ms.length?'원장 「'+g.stock+'」 자재가 '+ms.length+'개 — 하나로 정할 수 없습니다':'5 자재에 원장 「'+g.stock+'」 이(가) 없습니다'};
+  var keys=[sk,sq(g.fin),sq(g.color)].filter(function(x){return x&&x!=='마감정보없음'&&x!=='any';});
+  var ms=(data.materials||[]).filter(function(r){var a=sq(r.name);return r.status!=='오류'&&a&&keys.every(function(x){return a.indexOf(x)>=0;});});
+  var lab=[g.stock,g.fin,g.color].filter(function(x){return x&&x!=='마감정보없음';}).join(' ');
+  return ms.length===1?{mat:ms[0]}:{why:ms.length?'원장 「'+lab+'」 자재가 '+ms.length+'개 — 하나로 정할 수 없습니다':'5 자재에 원장 「'+lab+'」 이(가) 없습니다'};
 }
+/* v44 하위가 부속(4 품목 반제품 — 자기 BOM 이 있음)이면 하위BOM차수 00 · 하위유무 켬. 영림원이 이것으로 하위 BOM 을 잇는지는 확인 못 함 */
+function bomIsPart(code){return (data.items||[]).some(function(x){return x.code===code&&x.status!=='오류'&&x.asset==='반제품';});}
 /* v43 이은 부속(빨간 줄 아닌 것)마다 부속 BOM 한 건 — 자재를 못 찾거나 1/n 이 안 되면 그 칸을 비워 둔다(목록에서 「필수 빠짐」) */
 function bomPartRecs(L){
   return L.groups.filter(function(g){return g.cands.length===1;}).map(function(g,i){
     var it=g.cands[0],mat=bomStock(g).mat,res=mat?bomCalc(it.code,mat.code):null,n=res&&res.n?String(res.n):'';
-    return {line:i+1,vals:{pname:it.name||'',pcode:it.code,pspec:it.spec||'',pver:'1',
+    return {line:i+1,vals:{pname:it.name||'',pcode:it.code,pspec:it.spec||'',pver:'00',
       rows:[{proc:'T재단',order:'1',cname:mat?mat.name||'':'',ccode:mat?mat.code:'',cspec:mat?mat.spec||'':'',cver:'',inunit:'EA',qn:n?'1':'',qd:n,hasSub:false}]}};
   });
 }
@@ -1248,9 +1258,9 @@ function bomPickFn(){
     if(!PS.data||!form||cur!=='boms')return;
     var L=bomFromPick(k),pr=L.prod,qs=function(n){return String(Math.round(n*1e6)/1e6);};
     var pverNow=(form.values().pver||'').trim();
-    form.fill({pname:pr?pr.name:'',pcode:pr?pr.code:'',pspec:pr?(pr.spec||''):'',pver:pverNow||'1'},
-      L.groups.map(function(g,i){var it=g.cands.length===1?g.cands[0]:null;
-        return {proc:'T조립',order:String(i+1),cname:it?it.name:'',ccode:it?it.code:'',cspec:it?(it.spec||''):'',cver:'',inunit:'EA',qn:qs(g.qty),qd:'1',hasSub:false};}));
+    form.fill({pname:pr?pr.name:'',pcode:pr?pr.code:'',pspec:pr?(pr.spec||''):'',pver:pverNow||'00'},
+      L.groups.map(function(g,i){var it=g.cands.length===1?g.cands[0]:null,sub=!!it&&bomIsPart(it.code);   /* v44 부속 = 하위BOM차수 00 · 하위유무 */
+        return {proc:'T조립',order:String(i+1),cname:it?it.name:'',ccode:it?it.code:'',cspec:it?(it.spec||''):'',cver:sub?'00':'',inunit:'EA',qn:qs(g.qty),qd:'1',hasSub:sub};}));
     var rows=form.rowsNow(),bad=0;
     L.groups.forEach(function(g,i){
       var r=rows[i];if(!r)return;
@@ -1258,10 +1268,10 @@ function bomPickFn(){
       var note=h('div',{class:'linknote',hidden:!g.why},'영림원 품목과 못 이음 — 원장 부속 「'+g.names.join('·')+'」 '+g.w+'×'+g.d+' · '+g.why+'. 아래 하위품번을 직접 고르세요.');
       r.el.querySelector('.rowtop').after(note);
       if(g.why){bad++;r.el.classList.add('unlinked');}
-      /* 사람이 하위품번을 고르면 그 품목의 품명·규격을 채우고 빨간 표시를 뗀다(이 고르기로 채운 줄만) */
+      /* 사람이 하위품번을 고르면 빨간 표시를 뗀다(품명·규격 채우기는 v44 부터 모든 줄 — bomRowHook) */
       cc.el.addEventListener('change',function(){
         var it=(data.items||[]).concat(data.materials||[]).filter(function(x){return x.code===cc.get();})[0];
-        if(!it)return;by('cname').set(it.name||'');by('cspec').set(it.spec||'');r.el.classList.remove('unlinked');note.hidden=true;
+        if(!it)return;r.el.classList.remove('unlinked');note.hidden=true;
       });
     });
     out.className='pslink'+(L.prodWhy||bad?' bad':'');
