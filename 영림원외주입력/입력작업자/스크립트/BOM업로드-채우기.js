@@ -1,8 +1,10 @@
-// BOM등록업로드(500302) 채우기 — 표 SSNew 에 BOM 을 붙여넣는다(엑셀 파일 받기·올리기 없음). 저장은 누르지 않는다. 먼저 공통.js 실행.
+// BOM등록업로드(500302) 채우기 — 저장은 누르지 않는다. 먼저 공통.js 실행(verify 는 불러오기-공통.js 도).
+// ★ 사장님 말씀(11-03) 「BOM 등록에 대량업로드가 있는데?」 → **엑셀 일괄업로드가 기본 길**: ylw.bomUp.upload(b64, 파일이름) → ylw.bomUp.subFix(목록) → check → 「저장」 → verify.
+//   엑셀은 `BOM업로드-엑셀만들기.py` 로 폼 대기 문서에서 만든다(공식 양식 꼴). 붙여넣기 fill 은 옛 길(11-03 부속 14건을 이 길로 넣었다가 사장님 지시로 지우고 다시 올림).
 // 메뉴: 생산/외주 › [생산] 기본정보 맵 › BOM관리 › 「BOM업로드」.
 // 받는 것: 폼 erp_boms 문서 배열 [{pname, pcode, pspec, pver, rows:[{proc, order, cname, ccode, cspec, cver, inunit, qn, qd, hasSub}]}].
 //   영림원 꼴 = 한 줄에 하위 하나 + 모품목 4칸을 줄마다 되풀이. 폼 문서 한 건 = rows 수만큼 줄.
-// 쓰는 법: 화면 열고 「신규」(빈 표) → await ylw.bomUp.fill(목록) → 대조표 모두맞음 → 「저장」 → ylw.bomUp.check(목록) 다시 → BOM등록(500145)·정전개로 확인.
+// (옛 길) 쓰는 법: 화면 열고 「신규」(빈 표) → await ylw.bomUp.fill(목록) → 대조표 모두맞음 → 「저장」 → ylw.bomUp.check(목록) 다시 → BOM등록(500145)·정전개로 확인.
 // 줄마다: 모품목번호 → 모품목BOM차수 → [공정, 표시순서] → 하위품번 → (하위BOM차수) → [투입단위, 분자, 분모] → [분자, 분모] 한 번 더 → 하위유무 체크(HaveChild, 붙여넣기로는 안 켜짐 → Y.setChk). 모품목단위·기준단위·품목자산분류는 영림원이 채움.
 // 대조: 보이는 칸 전부 — 폼 칸은 폼 값, 나머지(BOM조회용·Loss율·적용일·조립위치·비고…)는 빈칸/0. 자동 칸(모품목단위·기준단위·품목자산분류)은 값만 적어 보여 줌.
 (function () {
@@ -25,6 +27,25 @@
   const blank = (x) => x == null || x === '' || Number(x) === 0;
   const same = (a, b) => (/^-?\d+(\.\d+)?$/.test(a) && /^-?\d+(\.\d+)?$/.test(b) ? Number(a) === Number(b) : a === b);
   Y.bomUp = {
+    // 엑셀 일괄업로드: 「파일선택」은 브라우저 파일 창을 열어 손을 못 댄다 → 화면 프레임의 input.click 을 바꿔 file input(FrmWPDBOMMulti_FileDialog_file)을 잡고
+    //   DataTransfer 로 파일을 넣은 뒤 change → 파일명 칸에 들어감 → 「데이터가져오기」(btnGetData_btn) → 서버(File/UploadFileData)를 거쳐 표에 줄이 찬다.
+    //   b64 = 엑셀 파일 base64(로컬에서 `base64 -i 파일 | tr -d '\n'`). 표가 비어 있어야 한다(「신규」).
+    //   ⚠ 올린 직후 표의 공정코드(ProcSeq)·투입단위코드·모품목단위·품목자산분류는 0/빈칸이다 — 「저장」 때 영림원이 이름으로 채운다(11-03 BOM등록에서 공정·단위·원자재 확인).
+    async upload(b64, name) {
+      const W = Y.win(PAGE), d = W.document, sh = Y.sheet(PAGE, 'SSNew');
+      if (Y.rows(sh).length) throw new Error('표가 비어 있지 않음 — 「신규」로 비우고 다시');
+      const P = W.HTMLInputElement.prototype;
+      if (!P.__origClick) { P.__origClick = P.click; P.click = function () { if (this.type === 'file') { W.__fileInput = this; return; } return P.__origClick.call(this); }; }
+      W.__fileInput = null; d.getElementById('btnGetFile_btn').click(); await Y.sleep(800);
+      const inp = W.__fileInput; if (!inp) throw new Error('file input 못 잡음');
+      const dt = new W.DataTransfer(); dt.items.add(new W.File([Uint8Array.from(atob(b64), (c) => c.charCodeAt(0))], name, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
+      inp.files = dt.files; inp.dispatchEvent(new Event('change', { bubbles: true })); await Y.sleep(1200);
+      d.getElementById('btnGetData_btn').click();
+      let t = 0; while (!Y.rows(sh).length && t < 40) { await Y.sleep(500); t++; }
+      return { 파일명: d.getElementById('txtFileName_txt').value, 줄: Y.rows(sh).length };
+    },
+    // 공식 양식에는 하위유무(HaveChild) 칸이 없어(엑셀 끝에 붙여도 안 읽힘, 11-03) 표에서 켠다 — 폼 rows 순서 = 엑셀 줄 순서.
+    subFix(list) { const sh = Y.sheet(PAGE, 'SSNew'), L = lines(list); Y.rows(sh).forEach((r, i) => Y.setChk(sh, i, 'HaveChild', !!(L[i] && L[i].r.hasSub))); return this.check(list); },
     async fill(list) {
       const sh = Y.sheet(PAGE, 'SSNew');
       if (Y.rows(sh).length) throw new Error('표가 비어 있지 않음 — 「신규」로 비우고 다시');
@@ -57,7 +78,7 @@
           const ok = c.col === 'SubItemBomRevName' && !f[c.col] ? got === '' || got === '00' : c.col in f ? same(String(f[c.col]), got) : blank(got);
           if (!ok) table.push({ 행: i + 1, 칸: c.label, 폼: c.col in f ? String(f[c.col]) || '(빈칸)' : '(빈칸)', 화면: got });
         }
-        for (const k of ['ItemSeq', 'SubItemSeq', 'ProcSeq']) if (blank(r[k])) table.push({ 행: i + 1, 칸: k + '(코드)', 폼: '잡혀야 함', 화면: String(r[k]) });
+        for (const k of ['ItemSeq', 'SubItemSeq']) if (blank(r[k])) table.push({ 행: i + 1, 칸: k + '(코드)', 폼: '잡혀야 함', 화면: String(r[k]) });   // ProcSeq 는 업로드 길에서 저장 때 채워짐
       });
       return { 모두맞음: !table.length, 틀린칸: table, 줄: rows.length, 칸수: cols.length, 자동칸: [...new Set(auto)] };
     },

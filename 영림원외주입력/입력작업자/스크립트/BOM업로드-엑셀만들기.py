@@ -2,16 +2,23 @@
 # BOM등록업로드(500302) 「파일선택 → 데이터가져오기」용 엑셀을 폼 erp_boms 「대기」 문서로 만든다. 영림원·폼에 쓰지 않는다(읽기만).
 # 쓰는 법: python3 BOM업로드-엑셀만들기.py <나갈 파일.xlsx> [모품목번호 …]   — 번호를 주면 그 BOM 만, 안 주면 대기 전부.
 #   ⚠ 만든 엑셀은 업무 자료다 — git 밖(scratchpad 등)에 두고 커밋하지 않는다.
-# 꼴(11-03 실제 화면 SSNew 30칸 글자 그대로): 시트 이름 = 화면 「엑셀시트명」 BOM일괄업로드 · 1행 = 칸 이름 · 2행부터 하위품목 한 줄 = 한 행(모품목 4칸을 줄마다 되풀이).
-#   차수(모품목BOM차수·하위BOM차수)는 글자 「00」(숫자로 두면 0 이 됨) · 하위유무 = 1/0 · 폼에 없는 칸은 비움(모품목단위·기준단위·품목자산분류는 영림원이 채움).
+# 꼴: 시트 이름 = 화면 「엑셀시트명」 BOM일괄업로드 · 하위품목 한 줄 = 한 행(모품목 4칸을 줄마다 되풀이). 차수는 글자 「00」(하위BOM차수 빈칸 = 00 — 영림원도 00 을 넣음) ·
+#   하위유무 = 1/0 · 폼에 없는 칸은 비움(모품목단위·기준단위·품목자산분류는 영림원이 채움).
+#   ⚠ 1행만 칸 이름으로 만든 엑셀(11-03 첫 시도)은 서버에 올라가도 표에 아무 줄도 안 나왔다.
 import json, sys, urllib.request
 from openpyxl import Workbook
 
 KEY = 'AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs'
 DB = 'https://firestore.googleapis.com/v1/projects/vivivic-4b7ef/databases/(default)/documents/'
-COLS = ['모품목명', '모품목번호', '모품목규격', '모품목BOM차수', '모품목단위', '공정', '표시순서', '하위품명', '하위품번', '하위규격', '하위BOM차수', '투입단위',
-        '소요량(분자)', '소요량(분모)', '하위유무', 'BOM조회용', '하위공정소요자재포함', '사내Loss율', '사외Loss율', '적용시작일', '적용종료일', '조립위치',
-        '비고', '비고1', '비고2', '비고3', '비고4', '비고5', '기준단위', '품목자산분류']
+# 공식 양식(「양식다운로드」 RptWPDBOMMulti.xlsx, 11-03 받음) 시트 BOM일괄업로드 = 1행 필드 이름 · 2행 한글 칸 이름 · 3행부터 자료 · A열 순번.
+#   양식 37칸에는 하위유무(HaveChild)가 없다(「샘플」 시트에만 있음) → 맨 끝에 붙인다.
+COLS = [('IDX_NO', '순번'), ('ItemName', '모품목명'), ('ItemNo', '모품목번호'), ('ItemSpec', '모품목규격'), ('ItemBomRevName', '모품목BOM차수'), ('ItemUnitName', '모품목단위'),
+        ('ProcName', '공정'), ('UserSeq', '표시순서'), ('SubItemName', '하위품명'), ('SubItemNo', '하위품번'), ('SubItemSpec', '하위규격'), ('SubItemBomRevName', '하위BOM차수'),
+        ('SubUnitName', '투입단위'), ('NeedQtyNumerator', '소요량(분자)'), ('NeedQtyDenominator', '소요량(분모)'), ('IsBOMOnly', 'BOM조회용'), ('IsIncludeProcMat', '하위공정소요자재포함'),
+        ('InLossRate', '사내Loss율'), ('OutLossRate', '사외Loss율'), ('FrApplyDate', '적용시작일'), ('ToApplyDate', '적용종료일'), ('Location', '조립위치'),
+        ('Remark', '비고'), ('Remark1', '비고1'), ('Remark2', '비고2'), ('Remark3', '비고3'), ('Remark4', '비고4'), ('Remark5', '비고5'), ('Remark6', '비고6'), ('Remark7', '비고7'),
+        ('Remark8', '비고8'), ('Remark9', '비고9'), ('Remark10', '비고10'), ('StkUnitName', '기준단위'), ('AssetName', '품목자산분류'), ('GoodSeq', '제품코드'), ('GoodBomRev', '제품BOM차수'),
+        ('HaveChild', '하위유무')]
 
 
 def get(url, data=None, tok=None):
@@ -48,17 +55,19 @@ def main():
     boms = [b for b in boms if b.get('status') == '대기' and (not only or b.get('pcode') in only)]
     boms.sort(key=lambda b: b.get('createdAt', ''))
     wb = Workbook(); ws = wb.active; ws.title = 'BOM일괄업로드'
-    ws.append(COLS)
+    ws.append([c[0] for c in COLS])
+    ws.append([c[1] for c in COLS])
     n = 0
     for b in boms:
         for r in b.get('rows', []):
-            row = {'모품목명': b['pname'], '모품목번호': b['pcode'], '모품목규격': b.get('pspec') or None, '모품목BOM차수': b['pver'],
-                   '공정': r['proc'], '표시순서': num(r.get('order')), '하위품명': r['cname'], '하위품번': r['ccode'], '하위규격': r.get('cspec') or None,
-                   '하위BOM차수': r.get('cver') or None, '투입단위': r['inunit'], '소요량(분자)': num(r['qn']), '소요량(분모)': num(r['qd']), '하위유무': 1 if r.get('hasSub') else 0}
-            ws.append([row.get(c) for c in COLS])
             n += 1
-    for col in ('D', 'K'):   # 차수는 글자로
-        for c in ws[col][1:]:
+            row = {'IDX_NO': n, 'ItemName': b['pname'], 'ItemNo': b['pcode'], 'ItemSpec': b.get('pspec') or None, 'ItemBomRevName': b['pver'],
+                   'ProcName': r['proc'], 'UserSeq': num(r.get('order')), 'SubItemName': r['cname'], 'SubItemNo': r['ccode'], 'SubItemSpec': r.get('cspec') or None,
+                   'SubItemBomRevName': r.get('cver') or '00', 'SubUnitName': r['inunit'], 'NeedQtyNumerator': num(r['qn']), 'NeedQtyDenominator': num(r['qd']),
+                   'HaveChild': 1 if r.get('hasSub') else 0}
+            ws.append([row.get(c[0]) for c in COLS])
+    for col in ('E', 'L'):   # 차수는 글자로
+        for c in ws[col][2:]:
             c.number_format = '@'
     wb.save(out)
     print(json.dumps({'BOM': len(boms), '줄': n, '모품목': [b['pcode'] for b in boms]}, ensure_ascii=False))
