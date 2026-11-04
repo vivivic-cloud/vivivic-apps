@@ -131,8 +131,8 @@ const 자리 = (고르개) => { const e = document.querySelector(고르개); if 
       const 보 = (s) => { const b = document.querySelector(s); if (!b) return null; const c = getComputedStyle(b); return [c.color, c.backgroundColor, c.padding, c.borderRadius, c.fontSize, c.fontWeight]; };
       return { 상품: 보('.vp-table td.vp-상품칸:not(.vp-단품칸) .vp-goods-list button'), 단품: 보('.vp-table td.vp-단품칸 .vp-goods-list button') };
     });
-    console.log('  ★ 누르는 글자 꼴(단품관리 표 첫 칸과 같음: 글색 #337ea9·바탕 없음·안여백 0·14px·700) 상품 ' + JSON.stringify(꼴.상품) + ' 단품 ' + JSON.stringify(꼴.단품)
-      + ' ' + 못(JSON.stringify(꼴.상품) === JSON.stringify(꼴.단품) && 꼴.상품[0] === 'rgb(51, 126, 169)' && 꼴.상품[1] === 'rgba(0, 0, 0, 0)' && 꼴.상품[2] === '0px' && 꼴.상품[4] === '14px' && 꼴.상품[5] === '700'));
+    console.log('  ★ 누르는 글자 꼴(단품관리 표 첫 칸과 같음: 글색 #337ea9·바탕 없음·안여백 0·11px·700) 상품 ' + JSON.stringify(꼴.상품) + ' 단품 ' + JSON.stringify(꼴.단품)
+      + ' ' + 못(JSON.stringify(꼴.상품) === JSON.stringify(꼴.단품) && 꼴.상품[0] === 'rgb(51, 126, 169)' && 꼴.상품[1] === 'rgba(0, 0, 0, 0)' && 꼴.상품[2] === '0px' && 꼴.상품[4] === '11px' && 꼴.상품[5] === '700'));
     await page.screenshot({ path: path.join(그림칸, '이름줄-표-' + 폭 + '.png') });
 
     /* ㄴ 단품 이름 단추 → 단품 상세만 */
