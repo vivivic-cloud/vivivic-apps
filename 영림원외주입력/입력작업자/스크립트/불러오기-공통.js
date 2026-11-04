@@ -82,6 +82,7 @@
     processes: { coll: 'erp_processes', title: '공정', key: (d) => R.s(d.name), fields: ['name', 'memo', 'inspect'] },
     flows: { coll: 'erp_flows', title: '공정흐름', key: (d) => R.s(d.name), fields: ['name', 'memo'], rows: ['seq', 'proc', 'next', 'last'] },
     boms: { coll: 'erp_boms', title: 'BOM', key: (d) => R.s(d.pcode) + '|' + R.s(d.pver), fields: ['pname', 'pcode', 'pspec', 'pver'], rows: ['proc', 'order', 'cname', 'ccode', 'cspec', 'cver', 'inunit', 'qn', 'qd', 'hasSub'] },
+    itemflows: { coll: 'erp_itemflows', title: '품목별 공정흐름', key: (d) => R.s(d.code) + '|' + R.s(d.flow), fields: ['name', 'code', 'spec', 'flow'] },
     contracts: { coll: 'erp_contracts', title: '외주계약', key: (d) => R.s(d.vendor), fields: ['unit', 'vendor'], rows: ['prod', 'pcode', 'seq', 'proc', 'oname', 'ocode', 'cur', 'basis', 'price', 'from'] },
   };
   const nv = (v) => {
