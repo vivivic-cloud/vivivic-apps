@@ -120,7 +120,7 @@
     const spec = I.STEPS[step];
     const form = await I.list(spec.coll), byKey = {};
     form.forEach((d) => { const k = spec.key(d); if (k && !byKey[k]) byKey[k] = d; });
-    const res = { 읽음: got.rows.length, 폼에없음: 0, 같음: 0, 다름: 0, 넣음: 0, 다른것: [] };
+    const res = { 읽음: got.rows.length, 폼에없음: 0, 같음: 0, 다름: 0, 넣음: 0, 공정채움: 0, 다른것: [] };
     const now = new Date().toISOString(), t0 = new Date(), day = String(t0.getMonth() + 1).padStart(2, '0') + '-' + String(t0.getDate()).padStart(2, '0');   // 이 컴퓨터 날짜(ISO 는 세계시라 한국 새벽이면 전날로 찍힌다)
     for (const e of got.rows) {
       const k = spec.key(e), f = byKey[k];
@@ -135,6 +135,16 @@
           byKey[k] = e;
         }
         continue;
+      }
+      // 폼 v53: 불러온 흐름의 공정만 예외로 채운다 — 폼 rows 칸이 없거나(공정 모름), 비었는데 영림원 상세에 줄이 있을 때(사람이 영림원에서 채움). 덮어쓰기가 아니다(폼에 값이 없다).
+      //   이것이 없으면 빈 흐름이 「영림원과 다름」으로만 남아 8단계에서 영영 못 고른다. 폼이 만든 흐름·수정 중인 흐름은 안 건드린다.
+      if (step === 'flows' && f.source === '영림원' && f.status === '완료' && !(f.edit && f.edit.changed && f.edit.changed.length)) {
+        const had = Array.isArray(f.rows) ? f.rows.length : -1, has = (e.rows || []).length;
+        if (had < 0 || (had === 0 && has)) {
+          res.공정채움++;
+          if (mode === 'import') await I.patch(spec.coll, f.id, { rows: e.rows || [], agentNote: '영림원에서 공정 불러옴(' + day + ') · 상세 ' + has + '줄', ylwDiff: '', ylwCheckedAt: now });
+          continue;
+        }
       }
       const d = I.diff(spec, f, e, got.labels);
       if (!d.length) { res.같음++; if (mode === 'import' && f.ylwDiff) await I.patch(spec.coll, f.id, { ylwDiff: '', ylwCheckedAt: now }); continue; }
@@ -157,8 +167,8 @@
         if (!R[step]) throw new Error(step + '-읽기 스크립트를 먼저 실행');
         const got = await R[step](req.only);
         const r = await I.apply(step, got, req, req.mode);
-        result[step] = { 읽음: r.읽음, 폼에없음: r.폼에없음, 같음: r.같음, 다름: r.다름, 넣음: r.넣음 };
-        notes.push(I.STEPS[step].title + ': 영림원 ' + r.읽음 + '건 · 폼에 없음 ' + r.폼에없음 + (req.mode === 'import' ? '(넣음 ' + r.넣음 + ')' : '') + ' · 같음 ' + r.같음 + ' · 다름 ' + r.다름 +
+        result[step] = { 읽음: r.읽음, 폼에없음: r.폼에없음, 같음: r.같음, 다름: r.다름, 넣음: r.넣음, 공정채움: r.공정채움 };
+        notes.push(I.STEPS[step].title + ': 영림원 ' + r.읽음 + '건 · 폼에 없음 ' + r.폼에없음 + (req.mode === 'import' ? '(넣음 ' + r.넣음 + ')' : '') + (r.공정채움 ? ' · 공정 채움 ' + r.공정채움 : '') + ' · 같음 ' + r.같음 + ' · 다름 ' + r.다름 +
           (got.확인못함 && got.확인못함.length ? ' · 못 읽은 것(화면에 칸 없음·안 열림): ' + got.확인못함.join(', ') : '') +
           (r.다른것.length ? '\n  다름: ' + r.다른것.join('\n  ') : ''));
       }
