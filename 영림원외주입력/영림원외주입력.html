@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v62 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v63 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -209,7 +209,9 @@ nav .navck .num{background:var(--fill);color:var(--ink)}
 .gapnote{background:var(--red-bg);color:var(--red);border:1px solid var(--red-line);padding:8px 10px;border-radius:8px;font-size:12px;font-weight:700;margin:10px 0 8px}
 .ifbox .imats{min-width:210px;font-size:12px;line-height:1.45;white-space:normal}   /* v57 9단계 소요자재 칸 */
 .wcpicks{display:flex;flex-wrap:wrap;gap:4px;min-width:150px}   /* v56 9단계 업체 단추 — 여러 개 고름 */
-.ifbox .wcpicks .btn.small{margin-top:0}
+.ifbox .wcpicks .btn.small{margin-top:0;align-items:center;gap:5px}
+.wcrank{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:#fff;color:var(--ink);font-size:11px;font-weight:800;line-height:1}   /* v63 고른 업체의 우선순위 */
+.wcpick:disabled{opacity:.8}   /* v63 저장된 업체도 숫자가 보이게 */
 /* v48 8 품목별 공정흐름 — 상품검색으로 펼친 줄. 표는 .tw(가로 넘침은 표 상자 안에서만), 좁으면 줄마다 카드 */
 .ifbox{min-width:0}
 .edbox input.edqty{width:88px}   /* v58 엣지필름 줄 */
@@ -305,7 +307,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v62</span>
+    <span class="ver">v63</span>
   </div>
 </header>
 <div class="wrap">
@@ -1920,8 +1922,8 @@ function iwPickFn(){
       box.replaceChildren.apply(box,list.map(function(w){
         var d=sv.filter(function(x){return String(x.wc||'').trim()===w;})[0],i=r.wcs.indexOf(w),on=!!d||i>=0;
         var num=d?(d.rank||1):i>=0?topRank(r)+i+1:0;
-        return h('button',{type:'button',class:'btn small wcpick'+(on?' primary':''),disabled:!!d||r.saved||busy,'aria-pressed':on?'true':'false',title:num?'우선순위 '+num:'',
-          on:{click:function(){var k=r.wcs.indexOf(w);if(k>=0)r.wcs.splice(k,1);else r.wcs.push(w);r.mine=true;r.fail='';paint();drawSt();}}},(num?num+' ':'')+w);}));
+        return h('button',{type:'button',class:'btn small wcpick'+(on?' primary':''),disabled:!!d||r.saved||busy,'aria-pressed':on?'true':'false',title:num?'우선순위 '+num:'','aria-label':num?w+' 우선순위 '+num:w,
+          on:{click:function(){var k=r.wcs.indexOf(w);if(k>=0)r.wcs.splice(k,1);else r.wcs.push(w);r.mine=true;r.fail='';paint();drawSt();}}},num?h('span',{class:'wcrank'},String(num)):'',w);}));   /* v63 숫자 = 우선순위, 빼면 뒤 번호가 당겨짐 */
     }
     paint();return box;
   }
@@ -2022,7 +2024,7 @@ function iwPickFn(){
   fn.seen=h('div',{class:'ifseen',hidden:true},seenTxt,seenBtn);
   fn.table=h('div',{},
     h('div',{class:'sub',style:'margin-top:12px'},'제품별 공정별 워크센터 ',cnt),
-    h('p',{class:'hint',style:'margin:4px 0 0'},'공정은 8 품목별 공정흐름에서 가져옵니다. 원장 단서 칸 = 원장의 공급처(부속)·ing발주처(제품)입니다. 원장에 공정별 업체 칸은 없어 공급처가 AMT 인 부속은 AMT 가 하는 공정에만, 제품 조립은 발주처로 처음 값을 채웁니다. 나머지는 빈칸입니다. 업체 단추는 여러 개 누를 수 있고, 숫자가 우선순위입니다(1 = 기본). 시간단위 분 · 표준작업시간 1 로 저장됩니다(영림원 기존 552줄과 같음).'),
+    h('p',{class:'hint',style:'margin:4px 0 0'},'검은색 = 맡길 수 있는 업체로 등록 · 숫자 = 우선순위 · 실제 업체는 발주 때 고릅니다. 다시 누르면 빠지고 뒤 번호가 당겨집니다. 공정은 8 품목별 공정흐름에서 가져옵니다. 원장 단서 칸 = 원장의 공급처(부속)·ing발주처(제품)입니다. 원장에 공정별 업체 칸은 없어 공급처가 AMT 인 부속은 AMT 가 하는 공정에만, 제품 조립은 발주처로 처음 값을 채웁니다. 나머지는 빈칸입니다. 시간단위 분 · 표준작업시간 1 로 저장됩니다(영림원 기존 552줄과 같음).'),
     h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},['구분','품명','품번','순서','공정','워크센터 · 상태','원장 단서'].map(function(t){return h('th',{},t);}))),tb)),
     h('div',{class:'row'},allBtn,msg));
   fn.parts=h('div',{class:'ifbox',hidden:true},fn.seen,fn.table);
