@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v58 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v59 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -304,7 +304,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v58</span>
+    <span class="ver">v59</span>
   </div>
 </header>
 <div class="wrap">
@@ -553,7 +553,7 @@ var STEPS=[
 
 {key:'materials',n:5,title:'자재',screen:'자재등록',   /* v25: 원장·철물 등(영림원 자재등록 500251 — 품목등록과 같은 틀, 이름만 다름) */
  path:['기본','[기본] 품목정보','자재등록'],needs:['classes'],
- note:'원장·철물 같은 자재(원자재·부자재·재공품·저장품·소모품)를 등록합니다. 자재소분류는 3단계 분류에 저장된 자재 소분류에서 고르고, 대·중분류는 저절로 붙습니다. 자재등록은 한 건씩 입력하는 화면입니다. 엣지필름도 여기서 등록합니다 — 자재명에 「엣지필름」을 넣고 기준단위는 M 으로 합니다(7 BOM 필름 칸이 이 이름으로 찾습니다).',
+ note:'원장·철물 같은 자재(원자재·부자재·재공품·저장품·소모품)를 등록합니다. 자재소분류는 3단계 분류에 저장된 자재 소분류에서 고르고, 대·중분류는 저절로 붙습니다. 자재등록은 한 건씩 입력하는 화면입니다. 엣지필름도 여기서 테스트 자료로 새로 등록합니다 — 자재명은 T 로 시작하고 「엣지필름」을 넣으며, 기준단위는 M, 소분류는 3 분류에 새로 만든 T 분류를 고릅니다(7 BOM 필름 칸이 이 이름으로 찾습니다. 영림원 기존 엣지필름 자료는 쓰지 않습니다).',
  fields:[
   F('name','자재명','text',{req:1}),
   F('code','자재번호','text',{req:1,mono:1}),
@@ -1453,7 +1453,9 @@ function bomPartRecs(L){
    원장 엣지두께·엣지색상은 화면에 보여 주기만 하고, 필름은 5 자재(이름에 「엣지필름」)에서 사람이 고른다. 하나뿐이면 처음 값. 대상 = 원장 엣지부속코드가 있는 부속만. */
 var EDGE_PROC='T엣지';
 function edgeIsFilm(m){return !!m&&String(m.name||'').replace(/\s+/g,'').indexOf('엣지필름')>=0;}
-function edgeFilms(){return (data.materials||[]).filter(function(r){return r.status!=='오류'&&edgeIsFilm(r);});}
+/* v59 사장님 11-04: 「기존에 등록된 엣지필름 관련 영림원의 데이터를 사용하지 않을 예정」 — T 로 시작하고 폼에서 새로 넣은 것만(영림원에서 불러온 자재는 필름 칸에 안 나옴) */
+function edgeNew(r){return edgeIsFilm(r)&&/^\s*T/.test(String(r.name||''))&&r.source!=='영림원';}
+function edgeFilms(){return (data.materials||[]).filter(function(r){return r.status!=='오류'&&edgeNew(r);});}
 function edgeOf(i,n){var d=PS.data,j=d&&d[0]?d[0].indexOf(n):-1,v=j<0||!d[i]?'':d[i][j];return String(v==null?'':v).trim();}   /* 금액 칸은 읽지 않는다 */
 function edgeQs(n){return String(Math.round(n*1e6)/1e6);}
 function edgeInfo(g){   /* 엣지 부속이 아니면 null. why = 소요량을 못 셈 */
@@ -1490,7 +1492,7 @@ function edgeTable(){
     if(!d)return a.length?{label:'오류',cls:'오류',red:1,why:'BOM 이 오류입니다 — 아래 저장한 항목에서 처리하세요'}:{label:'BOM 없음',cls:'오류',red:1,why:'BOM 을 먼저 저장하세요(위 「부속 BOM 한꺼번에」)'};
     if(edgeDocHas(d))return {label:d.status==='완료'?'저장됨':(d.status||'대기'),cls:d.status==='완료'?'완료':'대기',why:(d.rows||[]).filter(function(x){return String(x.proc||'').trim()===EDGE_PROC;}).map(function(x){return x.ccode+' '+x.qn+' '+(x.inunit||'');}).join(', ')};
     if(d.status==='진행중'||hasEdit(d))return {label:'처리 중',cls:'대기',wait:1,why:'이 BOM 을 입력 작업자가 처리 중입니다 — 끝난 뒤 다시 고르세요'};
-    if(!edgeFilms().length)return {label:'필름 없음',cls:'오류',red:1,why:'5 자재에 엣지필름이 없습니다(자재명에 「엣지필름」)'};
+    if(!edgeFilms().length)return {label:'필름 없음',cls:'오류',red:1,why:'5 자재에 새 엣지필름이 없습니다(T 로 시작하고 자재명에 「엣지필름」)'};
     if(!r.film)return {label:'필름 고르기',cls:'대기',wait:1,why:'이 부속에 쓸 필름을 고르세요'};
     if(!(parseFloat(r.qty)>0))return {label:'소요량 확인',cls:'대기',wait:1,why:r.why||'소요량을 넣으세요'};
     if(r.fail)return {label:'저장 실패',cls:'오류',why:r.fail,ok:1};
@@ -2393,7 +2395,7 @@ function guideBom(k,L){
   });
   /* v58 엣지필름: 엣지 부속이 있는데 5 자재에 필름이 하나도 없을 때. 이름은 원장 값 그대로, 번호·소분류는 사람이 */
   if(!edgeFilms().length){var eks=[];L.groups.forEach(function(g){var e=edgeInfo(g);if(e)e.kinds.forEach(function(x){if(eks.indexOf(x)<0)eks.push(x);});});
-    eks.forEach(function(x){var nm='T엣지필름 '+x.replace(' · ',' ');needs.push({step:'materials',what:'엣지필름',name:nm,st:guideSt((data.materials||[]).filter(edgeIsFilm)),later:1,why:'부속 BOM T엣지 줄에 씀 · 원장 두께·색상 '+x,vals:{name:nm,unit:'M'}});});}
+    eks.forEach(function(x){var nm='T엣지필름 '+x.replace(' · ',' ');needs.push({step:'materials',what:'엣지필름',name:nm,st:guideSt((data.materials||[]).filter(edgeNew)),later:1,why:'부속 BOM T엣지 줄에 씀 · 원장 두께·색상 '+x,vals:{name:nm,unit:'M'}});});}
   return needs;
 }
 function guideItem(k,nm){   /* 4 품목 품명 고르기: 이미 같은 품목이 있는지 · 품목소분류(3 분류)가 있는지 */
