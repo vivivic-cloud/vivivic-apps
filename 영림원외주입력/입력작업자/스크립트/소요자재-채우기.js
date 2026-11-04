@@ -11,12 +11,9 @@
   const tool = (page, name) => { const w = Y.win(page), b = [...w.document.querySelectorAll('a')].find((e) => new RegExp('^\\s*' + name + '\\s*$').test(e.textContent)); if (!b) throw new Error(page + ' ' + name + ' 단추 없음'); mouse(w, b); };
   // 영림원 알림(화면 맨 위 문서) 글을 읽고 「확인」
   const alertOk = async () => {
-    let t = 0;
-    for (; t < 30; t++) {
-      for (const d of [document, Y.win('525162').document, Y.win('500299').document]) {
-        const ok = [...d.querySelectorAll('button,a')].find((e) => e.getClientRects().length && /^\s*확인\s*$/.test(e.textContent));   // 알림 창은 position:fixed — offsetParent 가 null
-        if (ok) { const box = ok.closest('[role=dialog],.modal,.modal-content') || ok.parentElement.parentElement; const msg = S(box.textContent).replace(/\s+/g, ' ').trim().slice(0, 80); mouse(d.defaultView, ok); await Y.sleep(600); return msg; }
-      }
+    for (let t = 0; t < 30; t++) {
+      const ok = document.getElementById('msgBtnOk');   // 맨 위 문서 #messagePopup · input 단추
+      if (ok && ok.getClientRects().length) { const box = document.getElementById('messageBoxInfo') || ok.parentElement.parentElement, msg = S(box.textContent).replace(/\s+/g, ' ').trim().slice(0, 80); ok.click(); await Y.sleep(600); return msg; }
       await Y.sleep(300);
     }
     return '';
