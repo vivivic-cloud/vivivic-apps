@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v57 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v58 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -212,6 +212,7 @@ nav .navck .num{background:var(--fill);color:var(--ink)}
 .ifbox .wcpicks .btn.small{margin-top:0}
 /* v48 8 품목별 공정흐름 — 상품검색으로 펼친 줄. 표는 .tw(가로 넘침은 표 상자 안에서만), 좁으면 줄마다 카드 */
 .ifbox{min-width:0}
+.edbox input.edqty{width:88px}   /* v58 엣지필름 줄 */
 .ifbox .ifseen{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:12px;font-size:13px;font-weight:700}   /* v54 뺀 저장 줄 알림 · 「저장된 줄 보기」 */
 .ifbox .tw{max-height:none}
 .ifbox td{vertical-align:middle}
@@ -303,7 +304,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v57</span>
+    <span class="ver">v58</span>
   </div>
 </header>
 <div class="wrap">
@@ -552,7 +553,7 @@ var STEPS=[
 
 {key:'materials',n:5,title:'자재',screen:'자재등록',   /* v25: 원장·철물 등(영림원 자재등록 500251 — 품목등록과 같은 틀, 이름만 다름) */
  path:['기본','[기본] 품목정보','자재등록'],needs:['classes'],
- note:'원장·철물 같은 자재(원자재·부자재·재공품·저장품·소모품)를 등록합니다. 자재소분류는 3단계 분류에 저장된 자재 소분류에서 고르고, 대·중분류는 저절로 붙습니다. 자재등록은 한 건씩 입력하는 화면입니다.',
+ note:'원장·철물 같은 자재(원자재·부자재·재공품·저장품·소모품)를 등록합니다. 자재소분류는 3단계 분류에 저장된 자재 소분류에서 고르고, 대·중분류는 저절로 붙습니다. 자재등록은 한 건씩 입력하는 화면입니다. 엣지필름도 여기서 등록합니다 — 자재명에 「엣지필름」을 넣고 기준단위는 M 으로 합니다(7 BOM 필름 칸이 이 이름으로 찾습니다).',
  fields:[
   F('name','자재명','text',{req:1}),
   F('code','자재번호','text',{req:1,mono:1}),
@@ -609,7 +610,7 @@ var STEPS=[
 
 {key:'boms',n:7,title:'BOM',screen:'BOM등록업로드',
  path:['생산/외주','[생산] 기본정보','BOM관리','BOM업로드'],needs:['items','materials','processes'],
- note:'ERP의 BOM업로드는 엑셀 양식으로 올리는 화면입니다. 아래 행의 항목이 그 양식의 열입니다. 모품목 하나에 하위 품목을 여러 행으로 적습니다.',
+ note:'ERP의 BOM업로드는 엑셀 양식으로 올리는 화면입니다. 아래 행의 항목이 그 양식의 열입니다. 모품목 하나에 하위 품목을 여러 행으로 적습니다. 상품검색으로 제품을 고르면 엣지 부속마다 빠진 엣지필름 줄(공정 T엣지)도 표로 나옵니다.',
  fields:[
   F('pname','모품목명','text',{req:1}),
   F('pcode','모품목번호','text',{req:1,mono:1,dl:'dl-codes',xref:1}),
@@ -631,7 +632,7 @@ var STEPS=[
   F('grain','결방향 있음','check',{noErp:1})   /* v45 원장 자재 줄만 보임 — 켜면 부속을 돌려 앉히지 않고 소요량(분모)를 셈. 폼 계산용, 영림원에 안 보냄(erp-spec 에서 뺌) */
  ],
  recTitle:function(r){return r.pname;},
- nameK:'pcode',dupKey:function(r){return String(r.pcode||'').trim()+'|'+verPad(r.pver);},   /* v46 차수 0 = 00 */   /* v43 여러 건 목록: 겹침 = 모품목번호·BOM차수가 같을 때 */
+ nameK:'pcode',editOnly:['rows'],dupKey:function(r){return String(r.pcode||'').trim()+'|'+verPad(r.pver);},   /* v46 차수 0 = 00 */   /* v43 여러 건 목록: 겹침 = 모품목번호·BOM차수가 같을 때 */
  subt:function(r){return [r.pcode,'하위 '+((r.rows||[]).length)+'건'].join(' · ');}},
 
 /* v48 품목별공정흐름유형등록(500272, 11-04 실제 화면 확인): 표 하나 = 품명*·품번·규격·공정흐름유형*, 한 줄 = 품목 + 흐름 하나. 일괄업로드·양식다운로드 없음(건별 입력).
@@ -748,9 +749,9 @@ var ROUTES={
  flows:{method:'화면 입력(머리 행 + 상세 행)',how:['rows의 proc 공정이 모두 영림원 공정등록에 있어야 합니다. 같은 화면에서 함께 쌓인 erp_processes 대기 문서를 먼저 넣습니다(order 가 processes → flows). 없으면 오류로 두고 agentNote에 적습니다.','생산/외주 > [생산] 기본정보 맵의 공정관리에서 공정흐름유형 아이콘을 눌러 공정흐름유형등록을 엽니다.','조회로 같은 공정흐름유형이 이미 있는지 확인합니다. 있으면 새로 만들지 않고 agentNote에 적습니다.','왼쪽 표의 빈 행 공정흐름유형 칸에 name, 특이사항 칸에 memo를 넣고 저장합니다. 새 유형은 저장해야 오른쪽 상세 행이 생깁니다.','저장한 행의 행 번호를 더블클릭해 오른쪽 상세를 엽니다(한 번 누르면 안 열림).','상세 빈 행의 공정순서 칸을 누르고 rows 한 개마다 공정순서(seq), 공정(proc, 공정명), 후속공정순서(next)를 탭으로 이어 붙여 넣습니다. 공정은 이름으로 코드가 잡힙니다.','last가 true인 줄(마지막 줄)은 최종공정여부 체크를 켭니다. 공정검사여부는 회색이라 넣지 않습니다(공정등록 값 표시).','저장 전에 모든 줄·칸을 문서 값과 대조하고 저장한 뒤, 조회 후 행 번호를 더블클릭해 다시 대조합니다.','수정(폼 v53): status 수정대기 = 영림원에 이름만 있고 상세가 0줄인 흐름에 공정을 채우라는 요청입니다. edit.changed는 rows뿐이고 name은 바뀌지 않습니다. 왼쪽에 새로 만들지 않고, 같은 name 행을 더블클릭해 상세가 비어 있는지 본 뒤(이미 줄이 있으면 고치지 말고 오류) rows를 위와 같이 넣습니다.'],
   rowsNote:'name은 rows의 proc를 「-」로 이은 것(폼 v22, 예: T재단-T엣지-T보링). seq·next·last는 폼이 고른 순서로 채운다: seq 1,2,3… · next = 다음 seq, 마지막 줄은 자기 seq · 마지막 줄만 last true. 같은 공정이 두 번 나와도 된다(11-01 저장 시험 T중복시험).',
   unverified:['공정순서가 겹칠 때의 오류 문구(시험 안 함)','병렬공정(후속공정순서를 같게) — 폼은 일렬 흐름만 만든다']},
- boms:{method:'엑셀 업로드',how:['생산/외주 > [생산] 기본정보 맵의 BOM관리에서 BOM업로드(BOM등록업로드 500302)를 엽니다.','대기 문서로 영림원 양식 파일을 만듭니다: 입력작업자/스크립트/BOM업로드-엑셀만들기.py. 꼴(폼 v47, 11-03 영림원 양식다운로드로 확인) = 시트 BOM일괄업로드 · 1행 영어 칸 코드(ItemName·ItemNo… 영림원이 이것으로 열을 찾음) · 2행 한글 칸 이름 · 3행부터 rows 한 개 = 한 행(모품목 칸을 줄마다 되풀이) · A열 IDX_NO 순번 1부터 · 차수는 글자 00.','파일선택으로 그 파일을 고르고(화면 엑셀시트명 BOM일괄업로드 그대로) 데이터가져오기 → 표에 줄 수가 rows 합과 같은지, 모품목·하위품목이 잡혔는지 확인하고, 하위유무를 맞춘 뒤 저장합니다.','BOM등록(500145)에서 모품목마다 결과를 확인합니다.'],
+ boms:{method:'엑셀 업로드',how:['생산/외주 > [생산] 기본정보 맵의 BOM관리에서 BOM업로드(BOM등록업로드 500302)를 엽니다.','대기 문서로 영림원 양식 파일을 만듭니다: 입력작업자/스크립트/BOM업로드-엑셀만들기.py. 꼴(폼 v47, 11-03 영림원 양식다운로드로 확인) = 시트 BOM일괄업로드 · 1행 영어 칸 코드(ItemName·ItemNo… 영림원이 이것으로 열을 찾음) · 2행 한글 칸 이름 · 3행부터 rows 한 개 = 한 행(모품목 칸을 줄마다 되풀이) · A열 IDX_NO 순번 1부터 · 차수는 글자 00.','파일선택으로 그 파일을 고르고(화면 엑셀시트명 BOM일괄업로드 그대로) 데이터가져오기 → 표에 줄 수가 rows 합과 같은지, 모품목·하위품목이 잡혔는지 확인하고, 하위유무를 맞춘 뒤 저장합니다.','BOM등록(500145)에서 모품목마다 결과를 확인합니다.','수정대기 BOM(폼 v58 엣지필름 줄 추가): edit.added 줄만 영림원에 더합니다. 이미 있는 줄은 건드리지 않습니다. 넣는 길은 아직 화면으로 확인하지 않았습니다 — 입력작업자/AGENTS.md 3-4-엣지 를 먼저 합니다.'],
   note:'영림원 양식에는 하위유무(HaveChild) 칸이 없습니다(끝에 붙여도 안 읽힘) — 데이터가져오기 뒤 rows.hasSub 가 참인 줄은 표에서 하위유무를 켭니다(입력작업자 ylw.bomUp.subFix). 공정·투입단위 코드는 올린 직후 0 이고 저장 때 영림원이 이름으로 채웁니다(11-03 18건). rows.grain(결방향)은 폼 계산용이라 영림원에 보내지 않습니다(폼 양식 맨 끝 FormGrain 열은 영림원이 읽지 않음).',
-  unverified:['품목이 미등록일 때의 오류 동작']},
+  unverified:['품목이 미등록일 때의 오류 동작','(폼 v58) 이미 등록된 BOM 에 줄을 더하는 길 — BOM등록(500145)에서 행 추가·저장, 또는 BOM등록업로드에 같은 모품목 줄만 올리기. 도움말은 「등록한 데이터는 변경할 수 없고 … [BOM등록]에서 변경」','(폼 v58) 500145 는 상위품목에 공정 칸 하나이고 하위 표에 공정 칸이 없다 — 한 BOM 에 T재단 줄과 T엣지 줄을 함께 둘 수 있는지, T엣지 공정이 어디에 남는지']},
  itemflows:{method:'화면 입력(그리드 행)',note:'한 문서 = 품목 하나 + 공정흐름 하나 = 영림원 표 한 줄(폼 v48). 한 품목에 흐름이 여러 개면 문서도 여러 개. 영림원 화면에 일괄업로드·양식다운로드가 없다(11-04 확인, 표 오른쪽 클릭은 엑셀로 내보내기만). 기본·대표·우선순위·적용일 칸이 없다. 어느 흐름을 쓸지는 제품별공정별소요자재의 공정차수로 나뉘는 것으로 보인다(도움말) — 이 화면에서 고르는 칸은 없다.',how:['code 품목(4단계)과 flow 공정흐름유형(6단계)이 영림원에 있어야 합니다. 없으면 오류로 두고 agentNote에 적습니다.','메뉴 검색 또는 Home.OpenPageSeq(500272)로 품목별공정흐름유형등록을 엽니다(생산/외주 > [생산] 기본정보, 도입 > STEP2 생산/원가 초기설정에도 있음).','품번 조회로 같은 품번 + 같은 공정흐름유형 줄이 이미 있는지 확인합니다. 있으면 새로 만들지 않고 agentNote에 적습니다(도움말: 같은 품목에 같은 흐름은 중복 등록 안 됨).','표의 빈 행 품명·공정흐름유형을 코드도움으로 고릅니다. 품번·규격은 품명을 고르면 잡히는지 확인합니다(코드는 시트 ItemSeq·ProcTypeSeq).','저장 전에 모든 줄의 모든 칸을 문서 값과 대조하고, 저장 뒤 조회로 다시 대조합니다.','(수정, 폼 v48) status 수정대기 문서: 새 줄을 만들지 않습니다. 품번으로 조회해 공정흐름유형이 edit.before.flow 인 줄을 찾고, 그 줄 공정흐름유형만 edit.after.flow 로 바꿔 저장합니다. 끝나면 protocol 의 수정 규칙대로 status 완료·edit null·editLog 를 적습니다.'],unverified:['표에 붙여넣기로 넣을 수 있는지(코드도움이 잡히는지) — 처음 넣을 때 화면별-요령.md 에 적습니다','저장 동작과 중복일 때 오류 문구','(수정) 이미 저장된 줄의 공정흐름유형을 바꿔 저장할 수 있는지(시트에 ProcTypeSeqOLD 칸이 있음)','자재(erp_materials)도 품명 코드도움에 나오는지 — 폼은 4단계 품목만 고릅니다']},
  itemmats:{method:'일괄등록 + 화면 확인',note:'한 문서 = 품목 하나 + 공정차수 하나(폼 v57). 공정차수는 MBOM 개정 차수로 이 등록에서 생기고, 제품별공정별워크센터등록(500865)·외주계약의 공정은 여기서 나온다. 폼 칸(name·code·spec·rev·bomRev·flow) 외에 폼이 앞 단계에서 만든 procs(공정 표: seq 공정순서·proc 공정·next 후속공정순서·last 최종공정여부)와 mats(소요자재 표: proc 투입공정·order 표시순서·cname 자재명·ccode 자재번호·cspec 규격·inunit 투입단위·qn 소요량(분자)·qd 소요량(분모)·supply 조달구분·srev 반제품공정차수)가 있다. 사람이 고친 값이 아니라 대조 기준이다. 저장 순서는 부속 → 제품(제품 소요자재의 반제품공정차수가 부속 공정차수를 가리킴). 기존 자료 예: 제품 A1-aw12a = 공정 조립 1줄·진아산업·분·1, 공정품 = 자기 자신, 소요자재 = 부속 14줄(제작·반제품·반제품공정차수 00·Loss 0). 기존 552품목은 공정이 품목마다 1개라 공정 여러 개짜리 예가 없다.',
   how:['code 품목·BOM·품목별 공정흐름이 영림원에 있어야 합니다. 없으면 오류로 두고 agentNote에 적습니다.',
@@ -1022,7 +1023,7 @@ function bomGrain(p){
 function bomCalc(pcode,ccode,grain){   /* grain = 결방향 있음(참/거짓) — 안 주면 원장 엑셀 기본값 */
   var R=window.원장재단수량;
   var mat=ccode?(data.materials||[]).filter(function(x){return x.code===ccode;})[0]:null;
-  if(!mat)return null;   /* 원장(자재) 줄이 아님 — 아무것도 안 함 */
+  if(!mat||edgeIsFilm(mat))return null;   /* 원장(자재) 줄이 아님 — 아무것도 안 함(v58 엣지필름 자재는 원장 크기가 없고 소요량은 M) */
   if(!R)return {why:'계산 부품(shared/원장재단수량.js)을 불러오지 못했습니다. 새로 고침해 주세요.'};
   var b=R.크기읽기(mat.spec);
   if(!b)return {why:'자재 「'+(mat.name||ccode)+'」 규격에 원장 크기(예: 2440*1220)가 없습니다.'};
@@ -1441,14 +1442,143 @@ function bomIsPart(code){return (data.items||[]).some(function(x){return x.code=
 function bomPartRecs(L){
   return L.groups.filter(function(g){return g.cands.length===1;}).map(function(g,i){
     var it=g.cands[0],mat=bomStock(g).mat,res=mat?bomCalc(it.code,mat.code):null,n=res&&res.n?String(res.n):'';
+    var e=edgeInfo(g),fl=edgeFilms(),er=e&&!e.why&&e.kinds.length===1&&fl.length===1?edgeRowOf(fl[0],e.qty,'2'):null;   /* v58 필름이 하나로 정해질 때만 — 아니면 BOM 저장 뒤 엣지필름 표에서 */
     return {line:i+1,vals:{pname:it.name||'',pcode:it.code,pspec:it.spec||'',pver:'00',
-      rows:[{proc:'T재단',order:'1',cname:mat?mat.name||'':'',ccode:mat?mat.code:'',cspec:mat?mat.spec||'':'',cver:'',inunit:'EA',qn:n?'1':'',qd:n,hasSub:false,grain:!!(res&&(res.grain!=null?res.grain:res.grainDef))}]}};
+      rows:[{proc:'T재단',order:'1',cname:mat?mat.name||'':'',ccode:mat?mat.code:'',cspec:mat?mat.spec||'':'',cver:'',inunit:'EA',qn:n?'1':'',qd:n,hasSub:false,grain:!!(res&&(res.grain!=null?res.grain:res.grainDef))}].concat(er?[er]:[])}};
   });
+}
+/* ---------- v58 엣지필름 줄 ----------
+   사장님 11-04: 엣지 공정에서 소모되는 엣지필름 줄이 부속 BOM 에 빠져 있다. 소요량 = (재단W × W엣지면 + 재단D × D엣지면) ÷ 1000 M, 여유 없음.
+   「부속마다 옵션이 다를 수 있음」 · 「테스트 자료를 입력하면서 논리를 찾을거니까 이전 작업의 논리를 참고하지마」 → 필름 종류를 정하는 규칙을 코드에 넣지 않는다.
+   원장 엣지두께·엣지색상은 화면에 보여 주기만 하고, 필름은 5 자재(이름에 「엣지필름」)에서 사람이 고른다. 하나뿐이면 처음 값. 대상 = 원장 엣지부속코드가 있는 부속만. */
+var EDGE_PROC='T엣지';
+function edgeIsFilm(m){return !!m&&String(m.name||'').replace(/\s+/g,'').indexOf('엣지필름')>=0;}
+function edgeFilms(){return (data.materials||[]).filter(function(r){return r.status!=='오류'&&edgeIsFilm(r);});}
+function edgeOf(i,n){var d=PS.data,j=d&&d[0]?d[0].indexOf(n):-1,v=j<0||!d[i]?'':d[i][j];return String(v==null?'':v).trim();}   /* 금액 칸은 읽지 않는다 */
+function edgeQs(n){return String(Math.round(n*1e6)/1e6);}
+function edgeInfo(g){   /* 엣지 부속이 아니면 null. why = 소요량을 못 셈 */
+  var has=(g.idx||[]).filter(function(i){return !!edgeOf(i,'엣지부속코드');});if(!has.length)return null;
+  var num=function(v){return /^\d+(\.\d+)?$/.test(v)?parseFloat(v):null;};
+  var kinds=uniq(has.map(function(i){return [edgeOf(i,'엣지두께'),edgeOf(i,'엣지색상')].filter(Boolean).join(' · ')||'원장에 없음';}));
+  var wn=num(edgeOf(has[0],'W엣지면')),dn=num(edgeOf(has[0],'D엣지면')),why='',qty='';
+  if(wn==null||dn==null)why='원장 엣지면 값이 숫자가 아닙니다('+(edgeOf(has[0],'W엣지면')||'빈칸')+' · '+(edgeOf(has[0],'D엣지면')||'빈칸')+') — 소요량을 직접 넣으세요';
+  else if(!(g.w>0&&g.d>0))why='원장에 재단W·D 가 없습니다 — 소요량을 직접 넣으세요';
+  else if(wn+dn<=0)why='원장 엣지면이 0 입니다 — 소요량을 직접 넣으세요';
+  else qty=edgeQs((g.w*wn+g.d*dn)/1000);
+  return {kinds:kinds,wn:wn,dn:dn,qty:qty,why:why};
+}
+function edgeRowOf(m,qty,order){return {proc:EDGE_PROC,order:String(order),cname:m.name||'',ccode:String(m.code||'').trim(),cspec:m.spec||'',cver:'',inunit:m.unit||'M',qn:String(qty),qd:'1',hasSub:false,grain:false};}
+function edgeDocHas(d){return (d&&d.rows||[]).some(function(x){return x&&String(x.proc||'').trim()===EDGE_PROC&&!isEmpty(x.ccode);});}
+function edgeBoms(code){return (data.boms||[]).filter(function(r){return String(r.pcode||'').trim()===code;});}
+function edgePatch(cur,row,out){   /* 줄 하나 더하기: 완료 BOM = 수정대기(v34 꼴, edit.added = 더한 줄) · 대기 BOM = 줄만 더함 · 처리 중 = 막음 */
+  if(edgeDocHas(cur)){out.why='이미 엣지필름 줄이 있습니다.';return null;}
+  var old=(cur.rows||[]).map(function(x){return Object.assign({},x);}),top=old.reduce(function(m,x){return Math.max(m,Number(x.order)||0);},0),nr=old.concat([Object.assign({},row,{order:String(top+1)})]);
+  if(cur.status==='대기'&&!hasEdit(cur))return {rows:nr};
+  var o=editPatch(BYKEY.boms,cur,Object.assign({},cur,{rows:nr}),out);if(o)o.edit.added=[nr[nr.length-1]];return o;
+}
+function edgeTable(){
+  var rows=[],vis=[],showSaved=false,kNow=null,busy=false,sig='';
+  var out=h('div',{class:'pslink','aria-live':'polite'}),tb=h('tbody',{}),cnt=h('span',{class:'lab'}),msg=h('span',{class:'msg','aria-live':'polite'});
+  var allBtn=h('button',{type:'button',class:'btn primary',on:{click:saveAll}});
+  var seenTxt=h('span',{}),seenBtn=h('button',{type:'button',class:'btn small',on:{click:function(){showSaved=!showSaved;draw();}}});
+  var seen=h('div',{class:'ifseen',hidden:true},seenTxt,seenBtn);
+  function docOf(r){return imBom(r.code);}
+  function gone(r){var d=docOf(r);return !r.saved&&!!d&&edgeDocHas(d);}
+  function st(r){
+    if(r.saved)return {label:'저장됨',cls:'완료'};
+    var d=docOf(r),a=edgeBoms(r.code);
+    if(!d)return a.length?{label:'오류',cls:'오류',red:1,why:'BOM 이 오류입니다 — 아래 저장한 항목에서 처리하세요'}:{label:'BOM 없음',cls:'오류',red:1,why:'BOM 을 먼저 저장하세요(위 「부속 BOM 한꺼번에」)'};
+    if(edgeDocHas(d))return {label:d.status==='완료'?'저장됨':(d.status||'대기'),cls:d.status==='완료'?'완료':'대기',why:(d.rows||[]).filter(function(x){return String(x.proc||'').trim()===EDGE_PROC;}).map(function(x){return x.ccode+' '+x.qn+' '+(x.inunit||'');}).join(', ')};
+    if(d.status==='진행중'||hasEdit(d))return {label:'처리 중',cls:'대기',wait:1,why:'이 BOM 을 입력 작업자가 처리 중입니다 — 끝난 뒤 다시 고르세요'};
+    if(!edgeFilms().length)return {label:'필름 없음',cls:'오류',red:1,why:'5 자재에 엣지필름이 없습니다(자재명에 「엣지필름」)'};
+    if(!r.film)return {label:'필름 고르기',cls:'대기',wait:1,why:'이 부속에 쓸 필름을 고르세요'};
+    if(!(parseFloat(r.qty)>0))return {label:'소요량 확인',cls:'대기',wait:1,why:r.why||'소요량을 넣으세요'};
+    if(r.fail)return {label:'저장 실패',cls:'오류',why:r.fail,ok:1};
+    return {label:'저장 준비',cls:'대기',ok:1};
+  }
+  function drawSt(){
+    var ready=0;
+    vis.forEach(function(r){var x=st(r);if(x.ok)ready++;r.chip.className='chip '+x.cls;r.chip.textContent=x.label;r.note.textContent=x.why||'';r.note.hidden=!x.why;r.note.className='ifwhy'+(x.red?' red':'');});
+    cnt.textContent=vis.length+'줄 · 저장 준비 '+ready+'건';
+    allBtn.textContent='모두 저장 ('+ready+'건)';allBtn.disabled=!ready||busy;
+  }
+  function filmCell(r){
+    var d=docOf(r),fl=edgeFilms();
+    if(r.saved||!d||edgeDocHas(d))return h('div',{},'—');
+    var sel=h('select',{'aria-label':r.lab+' 엣지필름',disabled:busy,on:{change:function(){r.film=sel.value;r.fail='';drawSt();}}},
+      h('option',{value:''},'선택'),fl.map(function(m){return h('option',{value:String(m.code||'').trim()},m.name+' ('+m.code+')');}));
+    sel.value=r.film||'';return sel;
+  }
+  function qtyCell(r){
+    var d=docOf(r);if(r.saved||!d||edgeDocHas(d))return '—';
+    return h('input',{type:'number',step:'any',min:'0',class:'edqty',value:r.qty||'','aria-label':r.lab+' 소요량',disabled:busy,on:{input:function(e){r.qty=e.target.value;r.fail='';drawSt();}}});
+  }
+  function draw(){
+    var off=rows.filter(gone).length,all=!!off&&off===rows.length;
+    if(!busy)vis=rows.filter(function(r){return showSaved||!gone(r);});
+    seenTxt.textContent=all?'이 상품 엣지 부속은 모두 엣지필름 줄이 있습니다':off?'이미 엣지필름 줄이 있는 '+off+'건은 뺐습니다':'';
+    seenBtn.textContent=showSaved?'저장된 줄 접기':'저장된 줄 보기';
+    seen.hidden=!off;table.hidden=!vis.length;fn.box.hidden=!rows.length;
+    tb.replaceChildren.apply(tb,vis.map(function(r){
+      r.chip=h('span',{class:'chip'});r.note=h('small',{class:'ifwhy',hidden:true});
+      var d=function(l,c,cls){return h('td',{'data-l':l,class:cls||null},c);};
+      return h('tr',{},[d('구분',r.lab),d('품명',r.name,'nm'),d('품번',r.code),d('재단',r.size),d('엣지면 W·D',r.sides),d('원장 두께·색상',r.kinds),d('엣지필름',filmCell(r)),d('소요량(M)',qtyCell(r)),d('상태',[r.chip,r.note])]);
+    }));
+    drawSt();
+  }
+  function makeSig(){return rows.map(function(r){var d=docOf(r);return [r.code,d?d.id+':'+(d.rows||[]).length+':'+d.status:'x'].join('|');}).join(',')+'/'+edgeFilms().map(function(m){return m.code;}).join(',');}
+  function build(k,L,keep){
+    var seenC={},old={},next=[];
+    rows.forEach(function(r){old[r.code]=r;});
+    L.groups.forEach(function(g,i){
+      var it=g.cands.length===1?g.cands[0]:null,e=it?edgeInfo(g):null,code=it?String(it.code||'').trim():'';
+      if(!e||seenC[code])return;seenC[code]=1;
+      var fl=edgeFilms(),o=old[code];
+      next.push({lab:'부속 '+(i+1),name:it.name,code:code,size:g.w+'×'+g.d,sides:(e.wn==null?'?':e.wn)+' · '+(e.dn==null?'?':e.dn),kinds:e.kinds.join(' / '),why:e.why,
+        qty:o&&o.qty!=null?o.qty:e.qty,film:o&&o.film?o.film:(fl.length===1?String(fl[0].code||'').trim():''),fail:o?o.fail:'',saved:o?o.saved:false});
+    });
+    rows=next;kNow=k;sig=makeSig();if(!keep)msg.textContent='';
+    out.className='pslink';out.textContent='';out.hidden=true;draw();
+  }
+  function clear(){rows=[];vis=[];kNow=null;showSaved=false;sig='';tb.replaceChildren();msg.textContent='';fn.box.hidden=true;}
+  function saveAll(){
+    if(!db){msg.textContent='저장소에 연결되지 않아 저장할 수 없습니다.';msg.className='msg bad';return;}
+    var todo=vis.filter(function(r){return st(r).ok;}),done=0;
+    if(!todo.length)return;
+    busy=true;draw();msg.textContent='저장하는 중입니다.';msg.className='msg';
+    freshCheck().then(function(old){
+      if(old){busy=false;draw();msg.textContent=old;msg.className='msg bad';return;}
+      todo.reduce(function(p,r){return p.then(function(){
+        r.fail='';
+        var d=docOf(r),m=edgeFilms().filter(function(x){return String(x.code||'').trim()===r.film;})[0],o={};
+        if(!d||!m){r.fail='BOM 또는 필름을 찾지 못했습니다.';return;}
+        return db.collection('erp_boms').doc(d.id).updateIf(function(cur){return edgePatch(cur,edgeRowOf(m,r.qty,0),o);}).then(function(ok){
+          if(ok){done++;r.saved=true;}else r.fail=o.why||'저장하지 못했습니다.';
+        },function(e){r.fail=errText(e);});
+      });},Promise.resolve()).then(function(){
+        var failed=rows.filter(function(r){return r.fail;}),left=vis.filter(function(r){return !r.saved&&!r.fail&&st(r).label!=='저장됨';}).length;
+        var skip=left?' 저장 안 한 줄 '+left+'개는 상품을 다시 고르면 나옵니다.':'';
+        busy=false;
+        if(failed.length){rows=failed;draw();msg.textContent=done+'건 저장했습니다. '+failed.length+'줄은 저장하지 못했습니다 — 이유를 보고 다시 저장하세요.'+skip;msg.className='msg bad';}
+        else{clear();if(fn.onDone)fn.onDone();out.className='pslink';out.hidden=false;out.textContent=done+'건 저장했습니다. 입력 작업자가 영림원 BOM 에 이 줄만 넣습니다.'+skip;fn.box.hidden=false;table.hidden=true;seen.hidden=true;}
+        renderList();renderNav();renderSum();
+      });
+    });
+  }
+  var table=h('div',{},
+    h('div',{class:'sub',style:'margin-top:12px'},'엣지필름 줄 추가 ',cnt),
+    h('p',{class:'hint',style:'margin:4px 0 0'},'원장 엣지부속코드가 있는 부속만 나옵니다. 공정은 T엣지, 소요량 = (재단W × W엣지면 + 재단D × D엣지면) ÷ 1000 M 입니다. 필름은 5 자재에서 부속마다 고르고, 소요량은 고칠 수 있습니다. 이미 영림원에 있는 BOM 은 이 줄만 수정 대기로 쌓입니다.'),
+    h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},['구분','품명','품번','재단','엣지면 W·D','원장 두께·색상','엣지필름','소요량(M)','상태'].map(function(t){return h('th',{},t);}))),tb)),
+    h('div',{class:'row'},allBtn,msg));
+  var fn={box:h('div',{class:'ifbox edbox',hidden:true},out,seen,table),show:function(k,L){if(kNow!==k)rows=[];showSaved=false;build(k,L);},clear:clear,
+    refresh:function(){if(!kNow||!rows.length||busy)return;if(fn.box.contains(document.activeElement)){drawSt();return;}if(sig!==makeSig())build(kNow,bomFromPick(kNow),true);else draw();}};
+  return fn;
 }
 function bomPickFn(){
   var out=h('div',{class:'pslink','aria-live':'polite'}),last='';
   var fn=function(k){
-    if(!k){last='';fn.parts.hidden=true;return;}
+    if(!k&&fn.opening)return;   /* 상품검색 틀이 막 열린 것 — 사람이 푼 것이 아님(v49 와 같음). v58 점검표·안내에서 돌아왔을 때 표가 사라지던 것 */
+    if(!k){last='';fn.parts.hidden=true;fn.edge.clear();return;}
     var key=JSON.stringify([k.code,k.criteria,k.rowIndexes]);if(key===last)return;last=key;   /* 같은 고르기 알림이 겹쳐 와도 한 번만(사람이 고친 값을 덮지 않게) */
     if(!PS.data||!form||cur!=='boms')return;
     var L=bomFromPick(k),pr=L.prod,qs=function(n){return String(Math.round(n*1e6)/1e6);};
@@ -1481,8 +1611,10 @@ function bomPickFn(){
         if(!form||cur!=='boms')return;showBulk(BYKEY.boms,[{line:0,vals:form.values()}].concat(pr),psay,'parts');if(bulk)bulk.box.scrollIntoView({block:'start'});}}},
       '부속 BOM '+pr.length+'개도 한꺼번에 만들기'):'',
       h('span',{class:'hint'},' 제품 BOM 1 + 부속 BOM '+pr.length+'(부속 → 원장 · T재단 · 소요량 1/원장당 개수)을 목록으로 보여 줍니다'+(skip?' · 못 이은 부속 '+skip+'개는 빠집니다':'')+'.'),pmsg);
+    fn.edge.show(k,L);   /* v58 빠진 엣지필름 줄 */
   };
   fn.out=out;fn.guide=h('div',{class:'guide',hidden:true});fn.parts=h('div',{class:'psparts',hidden:true});
+  fn.edge=edgeTable();fn.edge.onDone=function(){last='';};fn.refresh=fn.edge.refresh;
   fn.title='모품목 고르기 — 조혼가구 상품검색';
   fn.note='조혼가구 제품 발주와 같은 상품검색(상품검색 · ING단품명 · 카테고리)으로 상품을 고르면, 그 상품의 부속(부속카드와 같은 것)으로 아래 하위 품목 줄을 채웁니다. 7항목이 같은 부속은 한 줄로 더합니다. 4단계 품목과 이어지지 않은 줄은 빨갛게 — 하위품번을 직접 고르세요. 저장 전에 모든 칸을 고칠 수 있습니다.';
   return fn;
@@ -2102,7 +2234,7 @@ function imPickFn(){
    소요자재(v57): 9단계. 워크센터(v55): 10단계 — 그 품목 공정 줄이 다 찼으면 O, 빈 공정이 있으면 ✕(눌러 10단계로, 같은 상품 고른 채). 8단계 공정이 없으면 —. */
 var CHECK={key:'check',n:'',title:'제품 등록 점검표'};BYKEY.check=CHECK;
 var CHK={k:null};
-var CK_COLS=[['품목','item'],['BOM','bom'],['공정흐름','flow'],['흐름 안 공정','proc'],['소요자재','mat'],['워크센터','wc'],['외주계약','con']];
+var CK_COLS=[['품목','item'],['BOM','bom'],['엣지필름','edge'],['공정흐름','flow'],['흐름 안 공정','proc'],['소요자재','mat'],['워크센터','wc'],['외주계약','con']];
 function ckNone(t){return {v:'—',t:t||''};}
 function ckCell(st,t,go){var v={'등록됨':'O','등록 중':'대기','오류':'오류'}[st]||'✕';return {v:v,t:t||'',go:v==='✕'||v==='오류'?go:null};}
 function ckProc(names,ctx){   /* 흐름 안 공정 = 그 품목 흐름들 중 가장 나쁜 것 */
@@ -2123,10 +2255,12 @@ function ckProc(names,ctx){   /* 흐름 안 공정 = 그 품목 흐름들 중 �
   });
   return out||ckNone();
 }
-function ckRow(k,lab,name,code,auto,itemCell){
+function ckRow(k,lab,name,code,auto,itemCell,eg){
   var ctx={from:'check',k:k},pk={from:'check',k:k,pick:1},r={lab:lab,name:name,code:code,item:itemCell};
-  if(!code){r.bom=r.flow=r.proc=r.mat=r.wc=r.con=ckNone();return r;}
+  if(!code){r.bom=r.edge=r.flow=r.proc=r.mat=r.wc=r.con=ckNone();return r;}
   r.bom=ckCell(guideSt((data.boms||[]).filter(function(x){return String(x.pcode||'').trim()===code;})),'',function(){guideGo(pk,'boms',[]);});
+  var bds=edgeBoms(code);   /* v58 엣지 부속만 · BOM 이 있어야 볼 수 있음. 수정대기 = 대기 */
+  r.edge=!eg||!bds.length?ckNone():ckCell(guideSt(bds.filter(edgeDocHas)),'',function(){guideGo(pk,'boms',[]);});
   var had=ifHad(code),hn=uniq(had.map(function(x){return String(x.flow||'').trim();}));
   r.flow=ckCell(guideSt(had),hn.join(', ')||(auto?'원장: '+auto:''),function(){guideGo(pk,'itemflows',[]);});
   r.proc=ckProc(hn.length?hn:(auto?[auto]:[]),ctx);
@@ -2147,7 +2281,7 @@ function ckRows(k){
   out.push(ckRow(k,'제품',L.prod?L.prod.name:'T'+k.code,L.prod?String(L.prod.code).trim():'',ifAutoProd(k.rowIndexes).auto,ckCell(pst,L.prodWhy,function(){goItems(pn);})));
   L.groups.forEach(function(g,i){
     var it=g.cands.length===1?g.cands[0]:null,gn=guideBom(k,{prod:L.prod,prodWhy:L.prodWhy,groups:[g]}).filter(function(n){return n.what==='부속';});
-    out.push(ckRow(k,'부속 '+(i+1),it?it.name:(gn[0]?gn[0].name:g.names.join('·')),it?String(it.code).trim():'',ifAutoPart(g.idx).auto,ckCell(it?guideSt([it]):(gn[0]||{}).st,g.why,function(){goItems(gn);})));
+    out.push(ckRow(k,'부속 '+(i+1),it?it.name:(gn[0]?gn[0].name:g.names.join('·')),it?String(it.code).trim():'',ifAutoPart(g.idx).auto,ckCell(it?guideSt([it]):(gn[0]||{}).st,g.why,function(){goItems(gn);}),edgeInfo(g)));
   });
   return out;
 }
@@ -2257,6 +2391,9 @@ function guideBom(k,L){
     var st=guideSt((data.materials||[]).filter(function(r){var a=sq(r.name).replace(/^t/,'');return a&&(a===sq(sk)||a.indexOf(sq(sk))>=0);}));
     if(st!=='등록됨')needs.push({step:'materials',what:'원장',name:sk,st:st,later:1,why:'부속 BOM(부속 → 원장)에 씀',vals:{name:'T'+sk}});
   });
+  /* v58 엣지필름: 엣지 부속이 있는데 5 자재에 필름이 하나도 없을 때. 이름은 원장 값 그대로, 번호·소분류는 사람이 */
+  if(!edgeFilms().length){var eks=[];L.groups.forEach(function(g){var e=edgeInfo(g);if(e)e.kinds.forEach(function(x){if(eks.indexOf(x)<0)eks.push(x);});});
+    eks.forEach(function(x){var nm='T엣지필름 '+x.replace(' · ',' ');needs.push({step:'materials',what:'엣지필름',name:nm,st:guideSt((data.materials||[]).filter(edgeIsFilm)),later:1,why:'부속 BOM T엣지 줄에 씀 · 원장 두께·색상 '+x,vals:{name:nm,unit:'M'}});});}
   return needs;
 }
 function guideItem(k,nm){   /* 4 품목 품명 고르기: 이미 같은 품목이 있는지 · 품목소분류(3 분류)가 있는지 */
@@ -2390,7 +2527,7 @@ function renderStep(){
   var ifFn=s.key==='itemflows'?ifPickFn():null;   /* v48 */
   var iwFn=s.key==='itemwcs'?iwPickFn():null;   /* v55 */
   var imFn=s.key==='itemmats'?imPickFn():null;   /* v57 */
-  ifRefresh=ifFn?ifFn.refresh:iwFn?iwFn.refresh:imFn?imFn.refresh:null;
+  ifRefresh=ifFn?ifFn.refresh:iwFn?iwFn.refresh:imFn?imFn.refresh:bomFn?bomFn.refresh:null;
   if(ifFn){var ifCode=form.field('code');ifCode.el.addEventListener('change',function(){var it=ifItem(ifCode.get());if(it)form.fill({name:it.name||'',spec:it.spec||''},[]);});}   /* 사람이 품번을 고를 때만(fill 은 input 만 보냄) */
   if(imFn){var imCode=form.field('code');imCode.el.addEventListener('change',function(){var v={code:imCode.get()};imFill(v);form.fill({name:v.name||'',spec:v.spec||'',bomRev:v.bomRev,flow:v.flow||''},[]);});}   /* 사람이 고를 때만 */
   if(iwFn){var iwCode=form.field('code'),iwProc=form.field('proc');   /* 사람이 고를 때만 */
@@ -2411,7 +2548,8 @@ function renderStep(){
         h('h2',{},s.n+'. '+s.title+' 입력'),
         needs,h('p',{class:'stepnote'},s.note)),
       xlBar,
-      bomFn||ifFn||iwFn||imFn?psBox(bomFn||ifFn||iwFn||imFn):'',   /* v32 모품목 고르기 = 조혼가구 상품검색 → 부속 줄 채우기 · v48 제품 고르기 → 줄마다 흐름 */
+      bomFn||ifFn||iwFn||imFn?psBox(bomFn||ifFn||iwFn||imFn):'',
+      bomFn?bomFn.edge.box:'',   /* v32 모품목 고르기 = 조혼가구 상품검색 → 부속 줄 채우기 · v48 제품 고르기 → 줄마다 흐름 */
       form.el),
     listBox,listBox2||'');   /* v24: 「저장한 공정」 목록이 없는 단계에서 「null」 글자가 찍히던 것 */
   var ip=s.key==='items'?itemPicker():null;   /* v33 품명 = 조혼가구 상품검색 */
@@ -3227,7 +3365,8 @@ function editAt(iso){var d=new Date(iso);if(isNaN(d.getTime()))return '';var p=f
 function editBox(s,r,st){
   var head=st==='수정대기'?'수정 대기 — 입력 작업자가 영림원에서 이 칸만 고칩니다':st==='진행중'?'영림원에서 고치는 중':st==='오류'?'수정 오류 — 아직 고쳐지지 않았을 수 있습니다':'수정';
   return h('div',{class:'editbox'},h('div',{},head+(r.edit.at?' ('+editAt(r.edit.at)+' 요청)':'')),
-    r.edit.changed.map(function(k){return h('div',{},editLabs(s,[k])+': '+editShow(r.edit.before[k])+' → '+editShow(r.edit.after[k]));}),
+    r.edit.added?r.edit.added.map(function(x){return h('div',{},'줄 추가: 공정 '+x.proc+' · '+x.cname+' ('+x.ccode+') · 소요량 '+x.qn+'/'+x.qd+' '+(x.inunit||''));}):   /* v58 BOM 엣지필름 줄 */
+      r.edit.changed.map(function(k){return h('div',{},editLabs(s,[k])+': '+editShow(r.edit.before[k])+' → '+editShow(r.edit.after[k]));}),
     r.edit.tree?h('div',{},'함께 바뀐 기록: '+clsImpactText(r.edit.tree.n||{})):'');
 }
 function editLogBox(s,r){

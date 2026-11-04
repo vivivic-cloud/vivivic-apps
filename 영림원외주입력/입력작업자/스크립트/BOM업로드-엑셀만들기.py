@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # BOM등록업로드(500302) 「파일선택 → 데이터가져오기」용 엑셀을 폼 erp_boms 「대기」 문서로 만든다. 영림원·폼에 쓰지 않는다(읽기만).
 # 쓰는 법: python3 BOM업로드-엑셀만들기.py <나갈 파일.xlsx> [모품목번호 …]   — 번호를 주면 그 BOM 만, 안 주면 대기 전부.
+#   --추가 를 붙이면 수정대기 BOM 의 edit.added 줄만(폼 v58 엣지필름 줄). ⚠ 이 파일을 올려 줄이 더해지는지는 확인 못 함 — AGENTS.md 3-4-엣지 를 먼저 한다.
 #   ⚠ 만든 엑셀은 업무 자료다 — git 밖(scratchpad 등)에 두고 커밋하지 않는다.
 # 꼴: 시트 이름 = 화면 「엑셀시트명」 BOM일괄업로드 · 하위품목 한 줄 = 한 행(모품목 4칸을 줄마다 되풀이). 차수는 글자 「00」(하위BOM차수 빈칸 = 00 — 영림원도 00 을 넣음) ·
 #   하위유무 = 1/0 · 폼에 없는 칸은 비움(모품목단위·기준단위·품목자산분류는 영림원이 채움).
@@ -43,7 +44,9 @@ def num(x):
 
 
 def main():
-    out, only = sys.argv[1], set(sys.argv[2:])
+    args = [a for a in sys.argv[1:] if a != '--추가']
+    add = '--추가' in sys.argv
+    out, only = args[0], set(args[1:])
     tok = get('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + KEY, {'returnSecureToken': True})['idToken']
     docs, pt = [], ''
     while True:
@@ -52,7 +55,10 @@ def main():
         pt = r.get('nextPageToken')
         if not pt: break
     boms = [{k: val(v) for k, v in d['fields'].items()} for d in docs]
-    boms = [b for b in boms if b.get('status') == '대기' and (not only or b.get('pcode') in only)]
+    boms = [b for b in boms if b.get('status') == ('수정대기' if add else '대기') and (not only or b.get('pcode') in only)]
+    if add:
+        boms = [dict(b, rows=(b.get('edit') or {}).get('added') or []) for b in boms]
+        boms = [b for b in boms if b['rows']]
     boms.sort(key=lambda b: b.get('createdAt', ''))
     wb = Workbook(); ws = wb.active; ws.title = 'BOM일괄업로드'
     ws.append([c[0] for c in COLS])
