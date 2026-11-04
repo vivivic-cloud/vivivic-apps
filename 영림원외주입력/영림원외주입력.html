@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v50 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v51 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -201,7 +201,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 .ifbox tr.unlinked td{background:var(--red-bg)}
 .ifbox .ifwhy{display:block;min-width:150px;font-size:11px;color:var(--muted);white-space:normal;margin-top:2px}
 .ifbox .ifwhy.red{color:var(--red)}   /* v49 등록되지 않은 조합 */
-.ifbox td.ifled{white-space:normal;min-width:66px;max-width:90px;padding:6px;font-size:10.5px;line-height:1.35;overflow-wrap:anywhere}   /* v50 원장 코드 확인 칸 */
+.ifbox td.ifled{white-space:normal;min-width:96px;max-width:170px;font-size:12px;line-height:1.4;word-break:keep-all}   /* v51 원장 공정 칸(공정 이름만) */
 .ifbox .ifcode{display:block}
 .ifbox .ifcode.no{color:var(--muted)}
 .ifbox .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
@@ -213,7 +213,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
   .ifbox td{border:0;padding:3px 0;white-space:normal;overflow-wrap:anywhere}
   .ifbox td[data-l]::before{content:attr(data-l);display:block;font-size:10.5px;font-weight:800;color:var(--muted)}
   .ifbox select{min-width:0}
-  .ifbox td.ifled{max-width:none;font-size:11px}
+  .ifbox td.ifled{max-width:none}
 }
 table.sheet td{padding:0;border-left:1px solid var(--rowline)}
 table.sheet td:first-child{border-left:0}
@@ -282,7 +282,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v50</span>
+    <span class="ver">v51</span>
   </div>
 </header>
 <div class="wrap">
@@ -1409,13 +1409,16 @@ function ifAutoProd(idx){
   var P=window.발주상품검색;
   return {auto:idx.some(function(i){return String(P.part(PS.data,i).조립부속코드||'').trim();})?'T조립':''};
 }
-/* v50 사장님 11-04 「각 부속의 원본정보에 해당 코드가 있는지 유무도 … 원본이 잘못된건지 프로그램이 잘못 인식한건지 확인하게」 — 원장 줄 값 그대로 보인다(확인용 · 문서에 안 들어감 · 영림원으로 안 감).
-   없으면 X. 부속 하나가 원장 여러 줄이고 값이 다르면 줄마다 보인다(상판·지판). 제품은 원장에 자기 줄이 없어 —. */
+/* v50 사장님 11-04 「각 부속의 원본정보에 해당 코드가 있는지 유무도 … 원본이 잘못된건지 프로그램이 잘못 인식한건지 확인하게」.
+   v51 사장님 11-04 「코드 다 보여주지 말고 그냥 재단 엣지 보링 이렇게 명칭으로만」 — 코드가 있는 공정 이름만 공정 순서대로(확인용 · 문서에 안 들어감 · 영림원으로 안 감).
+   하나도 없으면 없음. 부속 하나가 원장 여러 줄이고 공정 이름 조합이 다를 때만 줄마다 보인다(상판·지판). 제품은 원장에 자기 줄이 없어 —. */
 function ifLedger(idx){var P=window.발주상품검색;return idx.map(function(i){return P.part(PS.data,i);});}
-function ifCodeCell(parts,col){
+function ifProcNames(p){return IF_PROCS.filter(function(x){return String(p[x[0]]==null?'':p[x[0]]).trim();}).map(function(x){return x[1].replace(/^T/,'');}).join(' ')||'없음';}
+function ifProcCell(parts){
   if(!parts||!parts.length)return h('span',{class:'ifcode no'},'—');
-  var vals=parts.map(function(p){return String(p[col]==null?'':p[col]);}),same=vals.every(function(v){return v===vals[0];});
-  return (same?vals.slice(0,1):vals).map(function(v,i){return h('span',{class:'ifcode'+(v.trim()?' mono':' no')},(same?'':parts[i].부속명+': ')+(v.trim()?v:'X'));});
+  var names=parts.map(ifProcNames),same=names.every(function(n){return n===names[0];});
+  var lines=same?[names[0]]:names.map(function(n,i){return parts[i].부속명+': '+n;});
+  return lines.filter(function(t,i){return lines.indexOf(t)===i;}).map(function(t){return h('span',{class:'ifcode'+(t==='없음'?' no':'')},t);});
 }
 function ifUnreg(r){return !!r.auto&&(LISTS['dl-flows']||[]).indexOf(r.auto)<0;}
 function ifNeeds(k,L,rows){
@@ -1468,7 +1471,7 @@ function ifPickFn(){
       r.chip=h('span',{class:'chip'});r.note=h('small',{class:'ifwhy',hidden:true});
       var more=r.code&&!r.saved?h('button',{type:'button',class:'btn small',on:{click:function(){rows.splice(rows.indexOf(r)+1,0,{lab:r.lab,name:r.name,code:r.code,spec:r.spec,flow:'',extra:1,ledger:r.ledger});draw();}}},'흐름 추가'):'';
       var d=function(l,c,cls){return h('td',{'data-l':l,class:cls||null},c);};
-      return h('tr',{class:r.hand&&!r.code?'unlinked':null},[d('구분',r.lab),d('품명',r.name||r.whyName||'',"nm"),d('품번',codeCell(r)),d('규격',r.spec||''),d('공정흐름유형 · 상태',[flowSel(r),more,r.chip,r.note])].concat(IF_PROCS.map(function(x){return d(x[0],ifCodeCell(r.ledger,x[0]),'ifled');})));   /* v50 상태를 흐름 칸 아래로 — 코드 네 칸을 넣고도 1280 폭 표 상자에 들어가게 */
+      return h('tr',{class:r.hand&&!r.code?'unlinked':null},[d('구분',r.lab),d('품명',r.name||r.whyName||'',"nm"),d('품번',codeCell(r)),d('규격',r.spec||''),d('공정흐름유형 · 상태',[flowSel(r),more,r.chip,r.note]),d('원장 공정',ifProcCell(r.ledger),'ifled')]);   /* v50 상태를 흐름 칸 아래로 · v51 코드 네 칸을 「원장 공정」 한 칸으로 */
     }));
     drawSt();
   }
@@ -1515,8 +1518,8 @@ function ifPickFn(){
   fn.out=out;fn.guide=h('div',{class:'guide',hidden:true});
   fn.parts=h('div',{class:'ifbox',hidden:true},
     h('div',{class:'sub',style:'margin-top:12px'},'품목별 공정흐름 ',cnt),
-    h('p',{class:'hint',style:'margin:4px 0 0'},'재단·엣지·보링·NC 코드 칸 = 원장의 재단부속코드·엣지부속코드·보링부속코드·NC부속코드 값 그대로입니다(없으면 X, 제품은 원장에 자기 줄이 없어 —). 확인용이며 저장되지 않습니다.'),
-    h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},['구분','품명','품번','규격','공정흐름유형 · 상태','재단코드','엣지코드','보링코드','NC코드'].map(function(t){return h('th',{},t);}))),tb)),
+    h('p',{class:'hint',style:'margin:4px 0 0'},'원장 공정 칸 = 원장에 코드가 있는 공정 이름입니다(하나도 없으면 없음, 제품은 원장에 자기 줄이 없어 —). 확인용이며 저장되지 않습니다.'),
+    h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},['구분','품명','품번','규격','공정흐름유형 · 상태','원장 공정'].map(function(t){return h('th',{},t);}))),tb)),
     h('div',{class:'row'},allBtn,addFlow,msg));
   fn.title='제품 고르기 — 조혼가구 상품검색';
   fn.note='조혼가구 제품 발주와 같은 상품검색(상품검색 · ING단품명 · 카테고리)으로 상품을 고르면, 그 제품과 부속 품목이 아래 줄로 펼쳐집니다. 4단계 품목과 잇는 규칙은 BOM 모품목 고르기와 같습니다. 다른 제품에서 이미 저장한 공통부속은 「저장됨」으로 보이고 다시 쌓이지 않습니다. 흐름은 원장 공정 코드(재단·엣지·보링·NC, 제품은 조립)로 처음 값을 채웁니다 — 드롭다운에서 바꿀 수 있습니다. 이미 저장된 줄은 저장된 흐름을 잠가 보입니다.';
