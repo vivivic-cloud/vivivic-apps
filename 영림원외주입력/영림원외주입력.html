@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v51 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v52 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -195,7 +195,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 .ifbox .tw{max-height:none}
 .ifbox td{vertical-align:middle}
 .ifbox td.nm{white-space:normal;min-width:120px}
-.ifbox select{min-width:150px;width:100%}
+.ifbox select{display:block;min-width:150px;width:100%}   /* v52 줄 전체 차지 — 「흐름 추가」 단추가 없는 줄에서 상태 칩이 옆으로 밀려 원장 공정 칸을 덮던 것 */
 .ifbox td .btn.small{display:flex;width:fit-content;margin-top:4px}   /* v50 드롭다운 아래 줄에 — 옆 칸을 덮지 않게 */
 .ifbox td .chip{margin-top:4px}
 .ifbox tr.unlinked td{background:var(--red-bg)}
@@ -282,7 +282,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v51</span>
+    <span class="ver">v52</span>
   </div>
 </header>
 <div class="wrap">
@@ -1247,6 +1247,17 @@ function psBox(onPick){
     if(onPick)onPick.opening=true;w.발주상품고르기보기.열기(PS.data,PS.sup);if(onPick)onPick.opening=false;   /* v49 열 때 나오는 「풀림」 알림 표시 — 돌아와 다시 고른 8단계 표가 사라지던 것 */
   }
   fr.addEventListener('load',function(){ready=true;push();});
+  /* v52 8단계 저장 뒤 = 검색을 처음 상태로, 쓰던 검색 방법은 그대로 두고 검색 칸에 초점 */
+  onPick.again=function(){
+    var w=fr.contentWindow,d=w&&w.document;if(!ready||!d)return;
+    var on=d.querySelector('.method-chip.on'),mode=on?on.dataset.mode:'direct';
+    push();
+    if(w.selectSearchMethod)w.selectSearchMethod(mode,{direct:'상품검색(직접입력)',ing:'ING단품명',category:'카테고리'}[mode]);
+    var ctl=d.getElementById({direct:'product-search',ing:'sel-ing-code',category:'sel-l1'}[mode]);
+    fr.focus();if(ctl)ctl.focus();
+    var top=document.querySelector('.topbar');
+    window.scrollTo(0,onPick.out.getBoundingClientRect().top+window.scrollY-(top?top.offsetHeight:0)-12);
+  };
   sup.addEventListener('change',function(){PS.sup=sup.value;push();if(onPick)onPick(null);});
   PS.draw=function(){
     stat.textContent=PS.err?PS.err:(PS.data?'원장 「'+PS.file+'」 · '+(PS.data.length-1)+'줄':'원장 불러오는 중…');
@@ -1444,6 +1455,7 @@ function ifPickFn(){
     if(ifFlowErr(r.flow))return {label:'흐름 미등록',cls:'오류',why:ifFlowErr(r.flow),bad:1};
     if(ifDup(r))return {label:'이미 저장',cls:'오류',why:'같은 품번에 같은 흐름이 이미 있습니다 — 저장 안 함',bad:1};
     if(rows.slice(0,rows.indexOf(r)).some(function(o){return ifKey(o)===ifKey(r);}))return {label:'줄 겹침',cls:'오류',why:'위 줄과 품번·흐름이 같습니다 — 저장 안 함',bad:1};
+    if(r.fail)return {label:'저장 실패',cls:'오류',why:r.fail,ok:1};   /* v52 다시 「모두 저장」하면 이 줄만 다시 간다 */
     return {label:'저장 준비',cls:'대기',ok:1};
   }
   function drawSt(){
@@ -1458,7 +1470,7 @@ function ifPickFn(){
     /* v50 이미 저장된 품목(공통부속 포함)은 드롭다운이 「선택」으로 비어 자동 적용이 안 된 것처럼 보였다 — 저장된 흐름을 잠가 보인다(상품 고른 순서와 상관없이 같은 값). 다른 흐름은 「흐름 추가」 */
     var had=r.flow||r.saved||r.extra||!r.code?[]:ifHad(r.code),now=r.flow||(had.filter(function(x){return x.flow===r.auto;})[0]||had[0]||{}).flow||'';
     var list=(LISTS['dl-flows']||[]).slice();if(now&&list.indexOf(now)<0)list.push(now);
-    return h('select',{'aria-label':r.lab+' 공정흐름유형',disabled:r.saved||!r.code||had.length>0,on:{change:function(e){r.flow=e.target.value;r.mine=true;drawSt();}}},
+    return h('select',{'aria-label':r.lab+' 공정흐름유형',disabled:r.saved||!r.code||had.length>0,on:{change:function(e){r.flow=e.target.value;r.mine=true;r.fail='';drawSt();}}},
       [h('option',{value:''},'선택')].concat(list.map(function(v){return h('option',{value:v,selected:v===now},v);})));
   }
   function codeCell(r){
@@ -1484,14 +1496,26 @@ function ifPickFn(){
       if(old){busy=false;drawSt();msg.textContent=old;msg.className='msg bad';return;}
       todo.reduce(function(p,r){return p.then(function(){   /* 줄 순서대로 하나씩(createdAt 순서 = 입력 작업자 처리 순서) */
         var doc=Object.assign(normVals(s,{name:r.name,code:r.code,spec:r.spec,flow:r.flow}),{status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(s)});
-        return db.collection('erp_itemflows').add(doc).then(function(){done++;r.saved=true;if(data.itemflows&&!ifDup(doc))data.itemflows.push(doc);},function(e){err=errText(e);});
+        r.fail='';
+        return db.collection('erp_itemflows').add(doc).then(function(){done++;r.saved=true;if(data.itemflows&&!ifDup(doc))data.itemflows.push(doc);},function(e){r.fail=errText(e);});
       });},Promise.resolve()).then(function(){
-        busy=false;draw();
-        msg.textContent=done+'건 저장했습니다. 대기 상태로 쌓였습니다.'+(err?' 저장 못 한 줄이 있습니다 — '+err:'');msg.className='msg'+(err?' bad':'');
+        var failed=rows.filter(function(r){return r.fail;}),left=rows.length-rows.filter(function(r){return r.saved||st(r).label==='저장됨';}).length-failed.length;
+        var skip=left?' 저장 안 한 줄 '+left+'개는 상품을 다시 고르면 나옵니다.':'';
+        busy=false;
+        if(failed.length){   /* v52 실패하면 비우지 않고 실패한 줄만 남긴다 — 이유는 줄의 상태 칸에 */
+          rows=failed;draw();
+          msg.textContent=done+'건 저장했습니다. '+failed.length+'줄은 저장하지 못했습니다 — 이유를 보고 다시 저장하세요.'+skip;msg.className='msg bad';
+          var bar=document.querySelector('.topbar');window.scrollTo(0,fn.parts.getBoundingClientRect().top+window.scrollY-(bar?bar.offsetHeight:0)-12);   /* 줄이 줄어 표가 화면 밖으로 나가지 않게 */
+        }else{   /* v52 사장님 11-04 「저장이 끝나면 이전 불러온 목록 깨끗이 비우고 다음 제품 선택할 수 있게」 */
+          clearAll();
+          out.className='pslink';out.textContent=done+'건 저장했습니다. 다음 상품을 고르세요.'+skip;
+          fn.again();
+        }
         renderList();renderNav();renderSum();
       });
     });
   }
+  function clearAll(){last='';kNow=null;rows=[];tb.replaceChildren();msg.textContent='';fn.parts.hidden=true;fn.guide.hidden=true;fn.guide.replaceChildren();}
   var fn=function(k){
     if(!k&&fn.opening)return;   /* v49 상품검색 틀이 막 열린 것 — 사람이 푼 것이 아님 */
     if(!k){last='';kNow=null;rows=[];fn.parts.hidden=true;return;}
