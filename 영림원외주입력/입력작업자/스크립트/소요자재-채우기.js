@@ -29,9 +29,11 @@
     Y.setChk(sh, i, 'Select', true); await Y.sleep(400);
     if (Y.rows(sh)[i].Select !== '1') throw new Error(code + ' 선택 안 됨');
     mouse(w, d.getElementById('btn_proc_btn')); await Y.sleep(1500);
-    const m = await alertOk();
-    if (!/완료/.test(m)) throw new Error(code + ' 일괄등록 알림: ' + m);
-    return m;
+    await alertOk();   // 글로 판정하지 않는다(#messageBoxInfo 는 숨은 시트 오류 틀 글도 담고 있다) — 다시 조회해 등록여부로 본다
+    tool('525162', '조회'); await Y.sleep(2500);
+    const after = Y.rows(sh).find((r) => r.ItemNo === code);
+    if (!after || after.IsReg !== '1') throw new Error(code + ' 일괄등록 뒤 등록여부 꺼짐');
+    return '일괄등록 됨';
   };
   const open = async (code, want) => {
     const w = Y.win('500299'), d = w.document;
