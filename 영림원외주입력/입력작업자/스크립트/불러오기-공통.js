@@ -36,6 +36,15 @@
     return Y.win(page);
   };
 
+  // 화면 「조회」를 다시 누른다 — ⚠ 이미 열린 탭의 표는 연 때의 값이다(11-04 T조립·T포장을 이렇게 놓침). click() 은 안 먹고 마우스 동작을 차례로 보내야 조회된다(11-04 500228 확인).
+  R.query = async (page, wait = 2500) => {
+    const w = Y.win(page), b = [...w.document.querySelectorAll('a,button')].find((e) => /^\s*조회\s*$/.test(e.textContent));
+    if (!b) throw new Error(page + ' 에 조회 단추 없음');
+    const r = b.getBoundingClientRect(), o = { bubbles: true, cancelable: true, view: w, clientX: r.x + 5, clientY: r.y + 5, button: 0 };
+    for (const t of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) b.dispatchEvent(new (t.startsWith('pointer') ? w.PointerEvent : w.MouseEvent)(t, o));
+    await Y.sleep(wait);
+  };
+
   const I = (Y.imp = Y.imp || {});
   const KEY = 'AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs';   // 입력폼 FB_CONFIG.apiKey (공개 웹 키)
   const BASE = 'https://firestore.googleapis.com/v1/projects/vivivic-4b7ef/databases/(default)/documents/';

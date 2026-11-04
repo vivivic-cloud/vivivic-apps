@@ -10,6 +10,7 @@
   R.processes = async (only) => {
     await R.open(PAGE);
     const sh = Y.sheet(PAGE, 'SS');
+    await R.query(PAGE);   // 열린 탭이면 표가 옛 값(11-04)
     R.need(sh, ['공정명', '특이사항', '공정검사여부']);
     const all = Y.rows(sh);
     if (!all.length) throw new Error('공정등록에 줄이 없음 — 화면 「조회」를 먼저');
