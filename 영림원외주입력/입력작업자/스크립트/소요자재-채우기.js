@@ -45,7 +45,8 @@
     ['keydown', 'keypress', 'keyup'].forEach((t) => el.dispatchEvent(new KeyboardEvent(t, ko)));
     let t = 0; while (!(d.getElementById('txtItemName_txt').value && Y.rows(d.getElementById('SS1')).length) && t < 40) { await Y.sleep(250); t++; }
     await Y.sleep(1200);
-    const c = d.getElementById('chkIsMatAll_input'); if (!c.checked) { c.click(); await Y.sleep(1500); }
+    // 소요자재전체보기: 조회 뒤에는 켜져 있어도 고른 공정 것만 보인다 — 꺼졌다 켜야 전체가 나온다(11-04)
+    const c = d.getElementById('chkIsMatAll_input'); if (c.checked) { c.click(); await Y.sleep(1000); } c.click(); await Y.sleep(1800);
     if (!c.checked) throw new Error('소요자재전체보기 안 켜짐');
   };
   // 폼 문서 ↔ 화면. proc = 투입공정까지 볼지
