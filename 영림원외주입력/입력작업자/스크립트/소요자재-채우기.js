@@ -14,7 +14,7 @@
     let t = 0;
     for (; t < 30; t++) {
       for (const d of [document, Y.win('525162').document, Y.win('500299').document]) {
-        const ok = [...d.querySelectorAll('button,a')].find((e) => e.offsetParent && /^\s*확인\s*$/.test(e.textContent));
+        const ok = [...d.querySelectorAll('button,a')].find((e) => e.getClientRects().length && /^\s*확인\s*$/.test(e.textContent));   // 알림 창은 position:fixed — offsetParent 가 null
         if (ok) { const box = ok.closest('[role=dialog],.modal,.modal-content') || ok.parentElement.parentElement; const msg = S(box.textContent).replace(/\s+/g, ' ').trim().slice(0, 80); mouse(d.defaultView, ok); await Y.sleep(600); return msg; }
       }
       await Y.sleep(300);
@@ -68,10 +68,10 @@
   };
   Y.im = {
     cmp, open,
-    async go(code) {
+    async go(code, again) {   // again = 진행중으로 멈춘 건 이어서(일괄등록이 이미 됐으면 건너뜀)
       const l = await Y.imp.list('erp_itemmats'), v = l.find((x) => x.code === code);
-      if (!v || v.status !== '대기') throw new Error(code + ' 대기 아님: ' + (v && v.status));
-      await Y.imp.patch('erp_itemmats', v.id, { status: '진행중' });
+      if (!v || !(v.status === '대기' || (again && v.status === '진행중'))) throw new Error(code + ' 대기 아님: ' + (v && v.status));
+      if (v.status === '대기') await Y.imp.patch('erp_itemmats', v.id, { status: '진행중' });
       const said = await reg(code);
       await open(code);
       const a = cmp(v, false);
@@ -94,9 +94,9 @@
       await Y.imp.patch('erp_itemmats', v.id, { status: '완료', agentNote: '일괄등록(525162)' + (wrong.length ? ' 뒤 500299 투입공정 ' + wrong.length + '줄 고침' : '') + ' · 공정·소요자재·공정차수 ' + v.rev + ' 대조 맞음(11-04) · 워크센터 빈칸(10단계)' });
       return { code, said, 고침: wrong.length, 일괄등록뒤: before, 대조뒤: c.자재, 공정: c.공정 };
     },
-    bg(list) {
+    bg(list, again) {
       window.__g = { 끝: false, 결과: [] };
-      (async () => { for (const c of list) { try { window.__g.결과.push(await Y.im.go(c)); } catch (e) { window.__g.오류 = String(e.message || e); break; } } window.__g.끝 = true; })();
+      (async () => { for (const c of list) { try { window.__g.결과.push(await Y.im.go(c, again)); } catch (e) { window.__g.오류 = String(e.message || e); break; } } window.__g.끝 = true; })();
       return '시작 ' + list.length + '건';
     },
   };
