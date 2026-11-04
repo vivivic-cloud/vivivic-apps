@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- 조혼가구 — 거래처 발주 화면.
-     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.9.6 -->
+     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.9.7 -->
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
@@ -184,7 +184,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.6</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.9.7</span>
                 </div>
                 <!-- 페이지 탭: 발주하기 / 작업중 -->
                 <div class="flex items-center gap-1 border border-[#ededeb] rounded-lg bg-[#f7f6f3] p-1 mr-2">
@@ -552,6 +552,23 @@
                 보링: hasBoring  ? +(perimeter * qty * PROCESS_BASE_RATES.보링 * mult('보링')).toFixed(3) : 0,
                 NC:   hasNC      ? +(perimeter * qty * PROCESS_BASE_RATES.NC   * mult('NC')).toFixed(3)   : 0,
             };
+        }
+
+        // 부속별 필요공정 점 — 에이엠티 부속카드(renderPendingOrderParts·renderTlConfParts)와 같은 판정·같은 모양.
+        // calcProcessTime 값이 0보다 큰 공정만 찍는다. 얹으면 공정명·분이 뜬다. 화이어베이스에는 안 쓴다.
+        function 부속공정점글(row, item, h) {
+            const partUnitCons = parseFloat(row[h.indexOf("세트별소모량")]) || 1;
+            const partQtyForTime = partUnitCons * (item.orderQty || 1);
+            const partT = calcProcessTime(row, partQtyForTime, {}, h);
+            const procDots = [
+                { key: '재단', color: '#37352f', time: partT.재단 },
+                { key: 'NC',   color: '#37352f', time: partT.NC   },
+                { key: '엣지', color: '#37352f', time: partT.엣지 },
+                { key: '보링', color: '#37352f', time: partT.보링 },
+            ].filter(p => p.time > 0)
+             .map(p => `<span class="card-hint-wrap" style="display:inline-flex;align-items:center;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};flex-shrink:0;cursor:default;" class="transition-transform hover:scale-150"></span><span class="card-hint" style="font-size:10px;white-space:nowrap;">${p.key} ${p.time.toFixed(1)}분</span></span>`)
+             .join('');
+            return procDots ? `<div style="display:flex;gap:3px;align-items:center;flex-wrap:wrap;margin-top:2px;">${procDots}</div>` : '';
         }
         let pendingOrdersMap = { '조혼가구': [], '아인가구': [], 'ing': [], '럭스디자인': [], '유한가구': [] };
         let confirmedOrders = [];
@@ -2007,7 +2024,7 @@
                                 <span class="text-[9px] text-gray-400">${plateName}${finishColor ? ` · ${finishColor}` : ''}</span>
                                 <span class="text-[9px] text-gray-400">${finish}</span>
                                 <span class="text-[9px] text-[#787774] font-medium">${w} X ${d}</span>
-                                ${원장당 > 0 ? `<span class="text-[9px] text-gray-400">원장당 ${원장당}개</span>` : ''}
+                                ${원장당 > 0 ? `<span class="text-[9px] text-gray-400">원장당 ${원장당}개</span>` : ''}${부속공정점글(row, item, h)}
                             </div>
                             <div class="flex-shrink-0">
                                 <span class="text-[9px] font-black text-blue-600 bg-blue-50 px-1 py-px rounded leading-none">${pData.qty}</span>
@@ -2359,7 +2376,7 @@
 
                 // 카드 글은 공용 부품(shared/발주상품고르기.js 부속카드) — 영림원외주입력과 한 벌
                 const cardHtml = 발주상품고르기.부속카드({ isAmt: isAmt, deleteBtn: deleteBtn, 부속명: row[h.indexOf("부속명")], plateName: plateName, finishColor: finishColor,
-                    finish: finish, w: w, d: d, cardKey: cardKey, qty: pData.qty, actionsHtml: actionsHtml, 원장당: 원장당 });
+                    finish: finish, w: w, d: d, cardKey: cardKey, qty: pData.qty, actionsHtml: actionsHtml, 원장당: 원장당, 공정점: 부속공정점글(row, item, h) });
 
                 // 부속카드 분류 로직
                 // 1. isDeleted = false 또는 targetPartName이 있으면 → "기본 발주 부속"

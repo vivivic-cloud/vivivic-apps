@@ -181,8 +181,9 @@ var 발주상품고르기 = (function () {
     }
 
     /* 조혼가구 renderOrderParts 의 부속카드 한 장 — 글자 그대로.
-       o = { isAmt, deleteBtn, 부속명, plateName, finishColor, finish, w, d, cardKey, qty, actionsHtml, 원장당 }
-       원장당 = 재단 편집 기본규칙의 원장 1장당 생산량(shared/원장재단수량.js 원장당). 안 주면 안 그린다(영림원외주입력). */
+       o = { isAmt, deleteBtn, 부속명, plateName, finishColor, finish, w, d, cardKey, qty, actionsHtml, 원장당, 공정점 }
+       원장당 = 재단 편집 기본규칙의 원장 1장당 생산량(shared/원장재단수량.js 원장당). 안 주면 안 그린다(영림원외주입력).
+       공정점 = 부속별 필요공정 점 글(조혼가구 부속공정점글). 안 주면 안 그린다(영림원외주입력). */
     function 부속카드(o) {
         const isAmt = o.isAmt, deleteBtn = o.deleteBtn, plateName = o.plateName, finishColor = o.finishColor, finish = o.finish,
               w = o.w, d = o.d, cardKey = o.cardKey, actionsHtml = o.actionsHtml;
@@ -198,7 +199,7 @@ var 발주상품고르기 = (function () {
                                 <span class="text-[9px] ${!isAmt ? 'text-amber-400' : 'text-gray-400'}">${plateName}${finishColor ? ` · ${finishColor}` : ''}</span>
                                 <span class="text-[9px] ${!isAmt ? 'text-amber-400' : 'text-gray-400'}">${finish}</span>
                                 <span class="text-[9px] ${!isAmt ? 'text-amber-600' : 'text-[#787774]'} font-medium">${w} X ${d}</span>
-                                ${o.원장당 > 0 ? `<span class="text-[9px] ${!isAmt ? 'text-amber-400' : 'text-gray-400'}">원장당 ${o.원장당}개</span>` : ''}
+                                ${o.원장당 > 0 ? `<span class="text-[9px] ${!isAmt ? 'text-amber-400' : 'text-gray-400'}">원장당 ${o.원장당}개</span>` : ''}${o.공정점 || ''}
                             </div>
                             <div class="flex flex-col items-end gap-0.5 flex-shrink-0" onclick="event.stopPropagation()">
                                 <input id="input-${cardKey}" type="number" value="${o.qty}" class="notion-input !w-10 !p-0 !text-[9px] !text-center font-black ${!isAmt ? 'text-amber-600 bg-amber-50' : 'text-blue-600 bg-blue-50'} border-none disabled:opacity-70" disabled>
