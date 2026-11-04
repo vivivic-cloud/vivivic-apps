@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v60 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v61 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -213,6 +213,7 @@ nav .navck .num{background:var(--fill);color:var(--ink)}
 /* v48 8 품목별 공정흐름 — 상품검색으로 펼친 줄. 표는 .tw(가로 넘침은 표 상자 안에서만), 좁으면 줄마다 카드 */
 .ifbox{min-width:0}
 .edbox input.edqty{width:88px}   /* v58 엣지필름 줄 */
+.edbox select.edneed{border-color:var(--amber);background-color:var(--amber-bg)}   /* v61 아직 안 고른 칸 */
 .ifbox .ifseen{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:12px;font-size:13px;font-weight:700}   /* v54 뺀 저장 줄 알림 · 「저장된 줄 보기」 */
 .ifbox .tw{max-height:none}
 .ifbox td{vertical-align:middle}
@@ -304,7 +305,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v60</span>
+    <span class="ver">v61</span>
   </div>
 </header>
 <div class="wrap">
@@ -1495,7 +1496,7 @@ function edgeTable(){
     if(edgeDocHas(d))return {label:d.status==='완료'?'저장됨':(d.status||'대기'),cls:d.status==='완료'?'완료':'대기',why:(d.rows||[]).filter(function(x){return String(x.proc||'').trim()===EDGE_PROC;}).map(function(x){return x.ccode+' '+x.qn+' '+(x.inunit||'');}).join(', ')};
     if(d.status==='진행중'||hasEdit(d))return {label:'처리 중',cls:'대기',wait:1,why:'이 BOM 을 입력 작업자가 처리 중입니다 — 끝난 뒤 다시 고르세요'};
     if(!edgeFilms().length)return {label:'필름 없음',cls:'오류',red:1,why:'5 자재에 엣지필름이 없습니다(자재소분류의 중분류 T엣지필름)'};
-    if(!r.film)return {label:'필름 고르기',cls:'대기',wait:1,why:'이 부속에 쓸 필름을 고르세요'};
+    if(!r.film)return {label:'필름 안 고름',cls:'진행중',wait:1,why:'엣지필름 칸을 눌러 고르세요'};   /* v61 회색 칩이 꺼진 단추로 보였다 — 칸은 살아 있었음 */
     if(!(parseFloat(r.qty)>0))return {label:'소요량 확인',cls:'대기',wait:1,why:r.why||'소요량을 넣으세요'};
     if(r.fail)return {label:'저장 실패',cls:'오류',why:r.fail,ok:1};
     return {label:'저장 준비',cls:'대기',ok:1};
@@ -1509,9 +1510,9 @@ function edgeTable(){
   function filmCell(r){
     var d=docOf(r),fl=edgeFilms();
     if(r.saved||!d||edgeDocHas(d))return h('div',{},'—');
-    var sel=h('select',{'aria-label':r.lab+' 엣지필름',disabled:busy,on:{change:function(){r.film=sel.value;r.mine=!!sel.value;r.fail='';drawSt();}}},
-      h('option',{value:''},'선택'),fl.map(function(m){return h('option',{value:String(m.code||'').trim()},m.name+' ('+m.code+')');}));
-    sel.value=r.film||'';return sel;
+    var sel=h('select',{'aria-label':r.lab+' 엣지필름',disabled:busy,on:{change:function(){r.film=sel.value;r.mine=!!sel.value;r.fail='';sel.classList.toggle('edneed',!r.film);drawSt();}}},
+      h('option',{value:''},'필름을 고르세요'),fl.map(function(m){return h('option',{value:String(m.code||'').trim()},m.name+' ('+m.code+')');}));
+    sel.value=r.film||'';sel.classList.toggle('edneed',!r.film);return sel;
   }
   function qtyCell(r){
     var d=docOf(r);if(r.saved||!d||edgeDocHas(d))return '—';
