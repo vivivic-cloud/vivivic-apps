@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v61 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v62 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -305,7 +305,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v61</span>
+    <span class="ver">v62</span>
   </div>
 </header>
 <div class="wrap">
@@ -1449,7 +1449,7 @@ function bomPartRecs(L){
   });
 }
 /* ---------- v58 엣지필름 줄 ----------
-   사장님 11-04: 엣지 공정에서 소모되는 엣지필름 줄이 부속 BOM 에 빠져 있다. 소요량 = (재단W × W엣지면 + 재단D × D엣지면) ÷ 1000 M, 여유 없음.
+   사장님 11-04: 엣지 공정에서 소모되는 엣지필름 줄이 부속 BOM 에 빠져 있다. 소요량(v62 부속당) = ((재단W × W엣지면 + 재단D × D엣지면) ÷ 1000 + 0.04) × 1.02 M.
    「부속마다 옵션이 다를 수 있음」 · 「테스트 자료를 입력하면서 논리를 찾을거니까 이전 작업의 논리를 참고하지마」 → 필름 종류를 정하는 규칙을 코드에 넣지 않는다.
    원장 엣지두께·엣지색상은 화면에 보여 주기만 하고, 필름은 5 자재(v60 자재소분류의 중분류 T엣지필름)에서 사람이 고른다. 하나뿐이면 처음 값. 대상 = 원장 엣지부속코드가 있는 부속만. */
 var EDGE_PROC='T엣지';
@@ -1469,7 +1469,7 @@ function edgeInfo(g){   /* 엣지 부속이 아니면 null. why = 소요량을 �
   if(wn==null||dn==null)why='원장 엣지면 값이 숫자가 아닙니다('+(edgeOf(has[0],'W엣지면')||'빈칸')+' · '+(edgeOf(has[0],'D엣지면')||'빈칸')+') — 소요량을 직접 넣으세요';
   else if(!(g.w>0&&g.d>0))why='원장에 재단W·D 가 없습니다 — 소요량을 직접 넣으세요';
   else if(wn+dn<=0)why='원장 엣지면이 0 입니다 — 소요량을 직접 넣으세요';
-  else qty=edgeQs((g.w*wn+g.d*dn)/1000);
+  else qty=edgeQs(((g.w*wn+g.d*dn)/1000+0.04)*1.02);   /* v62 사장님: (세팅으로 나온 값+40mm)*2% — 40mm 는 부속당 한 번, 2% 는 여유분 */
   return {kinds:kinds,wn:wn,dn:dn,qty:qty,why:why};
 }
 function edgeRowOf(m,qty,order){return {proc:EDGE_PROC,order:String(order),cname:m.name||'',ccode:String(m.code||'').trim(),cspec:m.spec||'',cver:'',inunit:m.unit||'M',qn:String(qty),qd:'1',hasSub:false,grain:false};}
@@ -1573,7 +1573,7 @@ function edgeTable(){
   }
   var table=h('div',{},
     h('div',{class:'sub',style:'margin-top:12px'},'엣지필름 줄 추가 ',cnt),
-    h('p',{class:'hint',style:'margin:4px 0 0'},'원장 엣지부속코드가 있는 부속만 나옵니다. 공정은 T엣지, 소요량 = (재단W × W엣지면 + 재단D × D엣지면) ÷ 1000 M 입니다. 필름은 5 자재에서 부속마다 고르고, 소요량은 고칠 수 있습니다. 이미 영림원에 있는 BOM 은 이 줄만 수정 대기로 쌓입니다.'),
+    h('p',{class:'hint',style:'margin:4px 0 0'},'원장 엣지부속코드가 있는 부속만 나옵니다. 공정은 T엣지, 소요량 = 부속당 ((재단W × W엣지면 + 재단D × D엣지면) ÷ 1000 + 0.04) × 1.02 M 입니다. 필름은 5 자재에서 부속마다 고르고, 소요량은 고칠 수 있습니다. 이미 영림원에 있는 BOM 은 이 줄만 수정 대기로 쌓입니다.'),
     h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},['구분','품명','품번','재단','엣지면 W·D','원장 두께·색상','엣지필름','소요량(M)','상태'].map(function(t){return h('th',{},t);}))),tb)),
     h('div',{class:'row'},allBtn,msg));
   var fn={box:h('div',{class:'ifbox edbox',hidden:true},out,seen,table),show:function(k,L){if(kNow!==k)rows=[];showSaved=false;build(k,L);},clear:clear,
