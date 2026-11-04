@@ -33,7 +33,7 @@
     if (!/완료/.test(m)) throw new Error(code + ' 일괄등록 알림: ' + m);
     return m;
   };
-  const open = async (code) => {
+  const open = async (code, want) => {
     const w = Y.win('500299'), d = w.document;
     w.confirm = () => false;
     tool('500299', '신규'); await Y.sleep(1500);
@@ -42,9 +42,9 @@
     ['keydown', 'keypress', 'keyup'].forEach((t) => el.dispatchEvent(new KeyboardEvent(t, ko)));
     let t = 0; while (!(d.getElementById('txtItemName_txt').value && Y.rows(d.getElementById('SS1')).length) && t < 40) { await Y.sleep(250); t++; }
     await Y.sleep(1200);
-    // 소요자재전체보기: 조회 뒤에는 켜져 있어도 고른 공정 것만 보인다 — 꺼졌다 켜야 전체가 나온다(11-04)
-    const c = d.getElementById('chkIsMatAll_input'); if (c.checked) { c.click(); await Y.sleep(1000); } c.click(); await Y.sleep(1800);
-    if (!c.checked) throw new Error('소요자재전체보기 안 켜짐');
+    // 소요자재전체보기: 조회 뒤에는 켜져 있어도 고른 공정 것만 보인다. 칸 click() 은 자료를 안 불러온다 — 라벨(chkIsMatAll_lbl)을 마우스로 눌러 자재 수가 폼과 같아질 때까지(11-04)
+    const lab = d.getElementById('chkIsMatAll_lbl'), s2 = d.getElementById('SS2');
+    for (let i = 0; i < 4 && Y.rows(s2).length !== want; i++) { mouse(w, lab); await Y.sleep(1500); }
   };
   // 폼 문서 ↔ 화면. proc = 투입공정까지 볼지
   const cmp = (v, withProc) => {
@@ -71,7 +71,7 @@
       if (!v || !(v.status === '대기' || (again && v.status === '진행중'))) throw new Error(code + ' 대기 아님: ' + (v && v.status));
       if (v.status === '대기') await Y.imp.patch('erp_itemmats', v.id, { status: '진행중' });
       const said = await reg(code);
-      await open(code);
+      await open(code, v.mats.length);
       const a = cmp(v, false);
       if (a.bad.length) throw new Error(code + ' 일괄등록 뒤 대조 틀림: ' + a.bad.join(' · '));
       const d = Y.win('500299').document, sh = d.getElementById('SS2'), wrong = [];
@@ -85,7 +85,7 @@
         tool('500299', '저장'); await Y.sleep(2500);
         if (Y.rows(sh).some((r) => r.WorkingTag)) throw new Error(code + ' 저장 안 됨');
         tool('500299', '조회'); await Y.sleep(2500);
-        await open(code);
+        await open(code, v.mats.length);
       }
       const c = cmp(v, true);
       if (c.bad.length) throw new Error(code + ' 저장 뒤 대조 틀림: ' + c.bad.join(' · '));
