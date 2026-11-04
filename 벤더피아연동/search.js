@@ -491,7 +491,7 @@
   root.innerHTML = CS전용 ? `
     <div class="vp-search">
       <a class="vp-home" href="/index.aspx">← 메인</a>
-      <div class="vp-머리줄"><h1>CS등록</h1><a class="vp-머리단추" href="/System/Sales/orderMst.aspx#vgInq" target="_blank" rel="noopener">상담내용보기</a></div>
+      <div class="vp-머리줄"><h1>CS등록</h1><a class="vp-머리단추" href="/System/Sales/orderMst.aspx#vgInq" target="_blank" rel="noopener">상담내용보기</a><button type="button" class="vp-머리단추 vp-모든랙단추">모든랙주문확인</button></div>
       <form class="vp-bar">
         <input type="date" name="from" required>
         <span>~</span>
@@ -2003,12 +2003,28 @@
     }
   }
 
+  /* 11-04 [새 지시 모든랙주문확인] 사장님(그대로): 「cs관리 상담내용보기 옆에 모든랙주문확인 버튼을 만들어 클릭시 해당페이지 보여지는
+       주문관리 목록에서 상품명 모든랙 으로 검색되는 목록만 보이게 해주세요」
+     → 단추 = 검색창에 「모든랙」을 넣고 아래 조회를 그대로 탄다(같은 기간·같은 50줄→700줄·같은 공용 줄). 다른 점은 하나 — `plan` 을 거치지 않고
+       상품명 칸(tbSGoodsNm)으로만 묻는다(그냥 치면 수취인·주문자·주소도 묻고, 같은 이름의 고르는 칸이 있으면 거기 걸린다).
+       검색창 글을 고치면 평소 멀티검색으로 돌아간다. 손으로 친 「모든랙」은 평소대로 네 칸. */
+  const 모든랙상품명 = "모든랙";
+  let 상품명만 = false;
+  if (CS전용 && bar) {
+    bar.q.addEventListener("input", () => { 상품명만 = false; });
+    root.querySelector(".vp-모든랙단추").addEventListener("click", () => {
+      bar.q.value = 모든랙상품명;
+      상품명만 = true;
+      bar.requestSubmit();
+    });
+  }
+
   // 벤더피아에 매번 직접 조회한다 (항상 최신 상태).
   // 50줄을 먼저 받아 바로 보여주고, 더 있으면 600줄까지 이어서 받는다. 결과는 도착하는 대로 덧붙인다.
   if (bar) bar.addEventListener("submit", async (e) => {
     e.preventDefault();
     const searchId = ++currentSearch;
-    const { filters, variants, local } = plan(bar.q.value);
+    const { filters, variants, local } = 상품명만 ? { filters: {}, variants: [["상품명", { tbSGoodsNm: 모든랙상품명 }]], local: [] } : plan(bar.q.value);
     const dates = { dcStartDt: bar.from.value, dcEndDt: bar.to.value };
 
     tbody = null; 그린머리 = null; 상품칸들 = []; 채울자리 = 0; 상품칸자리 = -1; 단품칸자리 = -1; 단추된것 = 0; 머리본것 = null;
