@@ -32,7 +32,7 @@
 더 볼 것: `../CLAUDE.md`(입력폼 설명) · `../erp-spec.json`(단계별 메뉴·칸 대응·필수) · `../../시스템클라우드보기/CLAUDE.md`(영림원 화면을 읽는 길).
 
 ## 3. 일하는 순서 (한 건마다)
-1. **대기 자료 읽기** — 파이어스토어(프로젝트 `vivivic-4b7ef`, 익명 로그인) 컬렉션 `erp_vendors` → `erp_workcenters` → `erp_classes`(폼 v25 분류) → `erp_items` → `erp_materials`(폼 v25 자재) → `erp_processes` → `erp_flows` → `erp_boms` → `erp_itemflows`(폼 v48) → `erp_contracts` 순서. 같은 단계 안에서는 `createdAt` 오름차순. `status` 가 `대기` 인 것만.
+1. **대기 자료 읽기** — 파이어스토어(프로젝트 `vivivic-4b7ef`, 익명 로그인) 컬렉션 `erp_vendors` → `erp_workcenters` → `erp_classes`(폼 v25 분류) → `erp_items` → `erp_materials`(폼 v25 자재) → `erp_processes` → `erp_flows` → `erp_boms` → `erp_itemflows`(폼 v48) → `erp_itemwcs`(폼 v55, ⚠ 공정차수 없는 품목은 넣지 말고 오류 — 화면별-요령 500865) → `erp_contracts` 순서. 같은 단계 안에서는 `createdAt` 오름차순. `status` 가 `대기` 인 것만.
    - 앞 단계에 대기·수정대기·오류가 남아 있으면 뒤 단계는 건너뛰고 `agentNote` 에 이유를 적는다(영림원에 이미 있는 자료는 예외).
    - 사장님이 채팅으로 직접 시키신 일(예: T 테스트)은 폼을 거치지 않을 수 있다. 그때도 아래 2~5 를 똑같이 한다.
 2. **진행중으로 바꾸기** — 시작하면 `status` = `진행중`.
