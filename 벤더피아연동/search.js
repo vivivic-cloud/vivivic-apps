@@ -2038,6 +2038,9 @@
     for (const row of rows) {
       const tr = tbody.insertRow();
       const 주문 = 주문칸자리 >= 0 ? String(row[주문칸자리] == null ? "" : row[주문칸자리]).trim() : "";
+      /* 11-04 [새 지시 취소줄색] 사장님(그대로): 「CS등록 목록에서 CS값이 취소 인 주문은 일반 주문과 구분되게 배경색 변경등을 적용해 주세요」
+         CS등록 목록만 · 칸 이름 정확히 「CS」 · 값 정확히 「취소」(꼴은 search.css `tr.vp-취소줄`). */
+      if (CS전용 && String(row[그린머리.indexOf("CS")] == null ? "" : row[그린머리.indexOf("CS")]).trim() === "취소") tr.classList.add("vp-취소줄");
       그린머리.forEach((c, i) => {
         const td = tr.insertCell();
         const 값 = row[i] === undefined ? "" : row[i];
