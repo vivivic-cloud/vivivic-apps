@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v70 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v71 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -309,7 +309,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v70</span>
+    <span class="ver">v71</span>
   </div>
 </header>
 <div class="wrap">
@@ -2204,6 +2204,23 @@ function conCut(c){
   if(!(fee>0))return {why:t+'T 재단비를 넣으세요'};
   return {t:t,fee:fee,n:qd,raw:Math.round(fee/qd*100)/100,price:Math.round(Math.round(fee/qd*1e6)/1e6)};   /* v70 사장님 「그럼 반올림으로 할까요?」 = 소수 첫째 자리에서 반올림한 원 단위(v68 10원 · v69 올림은 없앰). 먼저 6자리로 맞춰 .5 의 계산 오차를 막는다 */
 }
+/* ---------- v71 T엣지 자동 단가 = 500원/M × 그 부속 BOM 의 T엣지 필름 줄 소요량(M, 7단계에 저장된 값 그대로 — 다시 계산하지 않는다) ----------
+   EDGE_FEE = 처음 값. 고친 금액은 새로고침 전까지만 남는다(CUT_FEE 와 같음). 소수 첫째 자리까지: 먼저 6자리로 맞춘 뒤 둘째 자리에서 반올림(정수 계산). 못 정하면 {why} → 빈칸 + 까닭. */
+var EDGE_FEE=500;
+function conEdge(c){
+  if(c.proc!==EDGE_PROC)return null;
+  var ds=(data.boms||[]).filter(function(d){return d.status!=='오류'&&String(d.pcode||'').trim()===c.code;});
+  var d=ds.filter(function(x){return verPad(String(x.pver==null?'':x.pver).trim())===c.rev;})[0]||(ds.length===1?ds[0]:null);
+  if(!d)return {why:'7 BOM 이 없어 엣지 사용량을 모릅니다'};
+  var st=(d.rows||[]).filter(function(x){var cc=String(x.ccode||'').trim();return String(x.proc||'').trim()===EDGE_PROC&&(data.materials||[]).some(function(m){return String(m.code||'').trim()===cc&&m.status!=='오류'&&edgeIsFilm(m);});});
+  if(st.length!==1)return {why:st.length?'BOM 에 '+EDGE_PROC+' 필름 줄이 '+st.length+'개입니다':'BOM 에 '+EDGE_PROC+' 필름 줄이 없습니다'};
+  var qn=Number(st[0].qn),qd=Number(st[0].qd),m=qn/qd;
+  if(!(qn>0)||!(qd>0)||!isFinite(m))return {why:'엣지 사용량을 못 읽었습니다('+st[0].qn+'/'+st[0].qd+')'};
+  var fee=Number(EDGE_FEE);
+  if(!(fee>0))return {why:'엣지 단가(원/M)를 넣으세요'};
+  var raw=Math.round(fee*m*1e6)/1e6,u=Math.round(raw*1e6);
+  return {edge:1,n:1,fee:fee,m:Math.round(m*1e6)/1e6,raw:raw,price:Math.floor((u+50000)/100000)/10};
+}
 /* ---------- v66 11 외주계약 = 업체 고르기 → 그 업체 10단계 줄 → 줄마다 외주단가 → 모두 저장 ----------
    사장님 목표: 업체를 고르면 줄이 채워지고 단가만 넣는다. 영림원 사실 = 화면별-요령.md 「외주계약 1건 시험」.
    줄 = erp_itemwcs(오류 뺌). 적용시작일은 표 위 한 칸, 처음 값은 오늘. 문서 = 「모두 저장」 한 번 = 업체 + 단가 넣은 줄들(rows 는 옛 꼴 그대로, seq = 공정차수 · pseq = 공정순서를 더함).
@@ -2235,14 +2252,15 @@ function conPickFn(){
   function ready(){return !!(data.itemwcs&&data.contracts&&data.materials&&data.flows&&data.itemflows);}
   function gone(r){return conHad(r).length>0;}
   function mine(r){return Object.prototype.hasOwnProperty.call(mem,conKey(r));}   /* 손으로 고친 줄 — 지운 칸도 사람 뜻(빈 줄은 안 쌓음) */
-  function calcText(r){var c=r.cut;if(!c||!c.n)return '';return mine(r)?'손으로 고침 · 자동 값 '+c.price:c.t+'T '+c.fee+' ÷ '+c.n+' = '+c.raw+' → '+c.price;}
-  function auto(r){r.cut=conCut(r);if(!mine(r))r.price=r.cut&&r.cut.n?String(r.cut.price):'';}
+  function pw(r){return r.cut||r.edge;}   /* 자동 단가 결과 — 재단이면 cut, T엣지면 edge */
+  function calcText(r){var c=pw(r);if(!c||!c.n)return '';return mine(r)?'손으로 고침 · 자동 값 '+c.price:c.edge?'T엣지 '+c.fee+'원/M × '+c.m+'M = '+c.raw+' → '+c.price:c.t+'T '+c.fee+' ÷ '+c.n+' = '+c.raw+' → '+c.price;}
+  function auto(r){r.cut=conCut(r);r.edge=conEdge(r);if(!mine(r))r.price=pw(r)&&pw(r).n?String(pw(r).price):'';}
   function st(r){
     var a=conHad(r);
     if(a.length)return {label:guideSt(a)==='등록됨'?'완료':'저장됨',cls:guideSt(a)==='등록됨'?'완료':'대기',saved:1};
     if(r.w.mid&&!r.w.doc)return {label:'재공품 없음',cls:'오류',why:'5 자재에 재공품 '+wipCode(r.code,r.seq)+' 이(가) 없습니다',red:1};
     var t=String(r.price).trim();
-    if(!t)return {label:'단가 넣기',cls:'대기',wait:1,why:r.cut&&r.cut.why&&!mine(r)?r.cut.why:'',red:!!(r.cut&&r.cut.why&&!mine(r))};
+    if(!t)return {label:'단가 넣기',cls:'대기',wait:1,why:pw(r)&&pw(r).why&&!mine(r)?pw(r).why:'',red:!!(pw(r)&&pw(r).why&&!mine(r))};
     if(!/^\d+(\.\d{1,4})?$/.test(t)||!(Number(t)>0))return {label:'단가 확인',cls:'오류',why:'0보다 크고 소수 4자리까지입니다',red:1};
     if(!dateIn.value)return {label:'적용시작일 없음',cls:'오류',red:1};
     return {label:'저장 준비',cls:'대기',n:1};
@@ -2266,7 +2284,7 @@ function conPickFn(){
     if(!busy)vis=rows.filter(function(r){return showSaved||!gone(r);});
     seenTxt.textContent=all?'이 업체는 모두 저장되어 있습니다':off?'이미 저장 '+off+'줄은 뺐습니다':'';
     seenBtn.textContent=showSaved?'저장된 줄 접기':'저장된 줄 보기';
-    fn.seen.hidden=!off;fn.table.hidden=!vis.length;fn.date.hidden=!vendor;if(!vendor)fn.fees.hidden=true;
+    fn.seen.hidden=!off;fn.table.hidden=!vis.length;fn.date.hidden=!vendor;if(!vendor){fn.fees.hidden=true;fn.efee.hidden=true;}
     tb.replaceChildren.apply(tb,vis.map(function(r){
       r.chip=h('span',{class:'chip'});r.note=h('small',{class:'ifwhy',hidden:true});
       var d=function(l,c,cls){return h('td',{'data-l':l,class:cls||null},c);},a=conHad(r),row=a.length?conRowOf(a[0],r):null;
@@ -2278,7 +2296,7 @@ function conPickFn(){
   }
   function build(){
     rows=vendor?conLines(vendor).map(function(c){return Object.assign(c,{price:mem[conKey(c)]||'',w:conWip(c)});}):[];
-    rows.forEach(auto);fn.fees.hidden=!rows.some(function(r){return r.cut;});
+    rows.forEach(auto);fn.fees.hidden=!rows.some(function(r){return r.cut;});fn.efee.hidden=!rows.some(function(r){return r.edge;});
     fn.parts.hidden=!vendor;draw();
   }
   function pick(w){vendor=w===vendor?'':w;showSaved=false;msg.textContent='';out.textContent='';build();drawWho();}
@@ -2292,6 +2310,7 @@ function conPickFn(){
       var doc=Object.assign(normVals(s,{unit:'본사',vendor:vendor,rows:todo.map(function(r){var w=r.w.doc;
         var o={prod:r.name,pcode:r.code,seq:r.rev,pseq:r.seq,proc:r.proc,oname:w?w.name:r.name,ocode:w?w.code:r.code,unit:'',cur:'KRW',basis:'수량',vat:false,price:Number(r.price),from:from};
         if(r.cut&&r.cut.n&&!mine(r))o.calc=r.cut.t+'T '+r.cut.fee+'÷'+r.cut.n+'='+r.cut.raw+'→'+r.cut.price;
+        if(r.edge&&r.edge.n&&!mine(r))o.calc='T엣지 '+r.edge.fee+'원/M×'+r.edge.m+'M='+r.edge.raw+'→'+r.edge.price;
         return o;})}),{status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(s)});
       return db.collection('erp_contracts').add(doc).then(function(){
         todo.forEach(function(r){delete mem[conKey(r)];});
@@ -2314,13 +2333,14 @@ function conPickFn(){
   fn.date=h('div',{class:'condate',hidden:true},h('label',{for:'con-from'},'적용시작일 (모든 줄)'),dateIn);
   fn.fees=h('div',{class:'confees',hidden:true},Object.keys(CUT_FEE).sort(function(a,b){return b-a;}).map(function(t){var id='con-fee-'+t.replace('.','_');
     return h('div',{},h('label',{for:id},t+'T 재단비 (원장 한 장, 부가세 별도)'),h('input',{type:'number',id:id,min:'0',step:'any',inputmode:'decimal',value:String(CUT_FEE[t]),on:{input:function(e){CUT_FEE[t]=e.target.value;rows.forEach(auto);draw();}}}));}));
+  fn.efee=h('div',{class:'confees',hidden:true},h('div',{},h('label',{for:'con-fee-edge'},'T엣지 단가 (원/M, 부가세 별도)'),h('input',{type:'number',id:'con-fee-edge',min:'0',step:'any',inputmode:'decimal',value:String(EDGE_FEE),on:{input:function(e){EDGE_FEE=e.target.value;rows.forEach(auto);draw();}}})));
   fn.seen=h('div',{class:'ifseen',hidden:true},seenTxt,seenBtn);
   fn.table=h('div',{},
     h('div',{class:'sub',style:'margin-top:12px'},'공정별 단가 ',cnt),
     h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},['제품명','품번','공정차수','공정','공정품','외주단가','상태'].map(function(t){return h('th',{},t);}))),tb)),
     h('div',{class:'row'},allBtn,msg));
   fn.parts=h('div',{class:'ifbox',hidden:true},fn.seen,fn.table);
-  fn.box=h('section',{class:'ps inform conwho'},h('h3',{},'업체 고르기'),h('p',{class:'stepnote'},'숫자 = 아직 저장하지 않은 줄 수입니다.'),who,fn.none,out,fn.date,fn.fees,fn.parts);
+  fn.box=h('section',{class:'ps inform conwho'},h('h3',{},'업체 고르기'),h('p',{class:'stepnote'},'숫자 = 아직 저장하지 않은 줄 수입니다.'),who,fn.none,out,fn.date,fn.fees,fn.efee,fn.parts);
   return fn;
 }
 /* ---------- v57 9 제품별공정별소요자재 = 조혼가구 상품검색 → 제품 + 부속 한 줄씩 → 확인 → 모두 저장 ----------
