@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v71 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v72 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -309,7 +309,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v71</span>
+    <span class="ver">v72</span>
   </div>
 </header>
 <div class="wrap">
@@ -2204,8 +2204,9 @@ function conCut(c){
   if(!(fee>0))return {why:t+'T 재단비를 넣으세요'};
   return {t:t,fee:fee,n:qd,raw:Math.round(fee/qd*100)/100,price:Math.round(Math.round(fee/qd*1e6)/1e6)};   /* v70 사장님 「그럼 반올림으로 할까요?」 = 소수 첫째 자리에서 반올림한 원 단위(v68 10원 · v69 올림은 없앰). 먼저 6자리로 맞춰 .5 의 계산 오차를 막는다 */
 }
-/* ---------- v71 T엣지 자동 단가 = 500원/M × 그 부속 BOM 의 T엣지 필름 줄 소요량(M, 7단계에 저장된 값 그대로 — 다시 계산하지 않는다) ----------
-   EDGE_FEE = 처음 값. 고친 금액은 새로고침 전까지만 남는다(CUT_FEE 와 같음). 소수 첫째 자리까지: 먼저 6자리로 맞춘 뒤 둘째 자리에서 반올림(정수 계산). 못 정하면 {why} → 빈칸 + 까닭. */
+/* ---------- v71 T엣지 자동 단가 = 500원/M × 그 부속 BOM 의 T엣지 필름 줄 소요량(M, 7단계에 저장된 값 그대로 — 다시 계산하지 않는다), v72 사용량 반올림 ----------
+   사장님 11-05: 「엣지 사용량(소숫점 셋째자리에서 반올림값) 곱하기 500원 /미터당」. 사용량 M 을 먼저 소수 둘째 자리까지 반올림(6자리로 맞춘 뒤 정수 계산)하고 원/M 을 곱한다. 금액은 다시 반올림하지 않는다(부동소수 찌꺼기만 없앰).
+   EDGE_FEE = 처음 값. 고친 금액은 새로고침 전까지만 남는다(CUT_FEE 와 같음). 못 정하면 {why} → 빈칸 + 까닭. */
 var EDGE_FEE=500;
 function conEdge(c){
   if(c.proc!==EDGE_PROC)return null;
@@ -2218,8 +2219,8 @@ function conEdge(c){
   if(!(qn>0)||!(qd>0)||!isFinite(m))return {why:'엣지 사용량을 못 읽었습니다('+st[0].qn+'/'+st[0].qd+')'};
   var fee=Number(EDGE_FEE);
   if(!(fee>0))return {why:'엣지 단가(원/M)를 넣으세요'};
-  var raw=Math.round(fee*m*1e6)/1e6,u=Math.round(raw*1e6);
-  return {edge:1,n:1,fee:fee,m:Math.round(m*1e6)/1e6,raw:raw,price:Math.floor((u+50000)/100000)/10};
+  var c100=Math.floor((Math.round(m*1e6)+5000)/10000);   /* 반올림한 M × 100 */
+  return {edge:1,n:1,fee:fee,m:(c100/100).toFixed(2),price:Math.round(fee*c100/100*1e6)/1e6};
 }
 /* ---------- v66 11 외주계약 = 업체 고르기 → 그 업체 10단계 줄 → 줄마다 외주단가 → 모두 저장 ----------
    사장님 목표: 업체를 고르면 줄이 채워지고 단가만 넣는다. 영림원 사실 = 화면별-요령.md 「외주계약 1건 시험」.
@@ -2253,7 +2254,7 @@ function conPickFn(){
   function gone(r){return conHad(r).length>0;}
   function mine(r){return Object.prototype.hasOwnProperty.call(mem,conKey(r));}   /* 손으로 고친 줄 — 지운 칸도 사람 뜻(빈 줄은 안 쌓음) */
   function pw(r){return r.cut||r.edge;}   /* 자동 단가 결과 — 재단이면 cut, T엣지면 edge */
-  function calcText(r){var c=pw(r);if(!c||!c.n)return '';return mine(r)?'손으로 고침 · 자동 값 '+c.price:c.edge?'T엣지 '+c.fee+'원/M × '+c.m+'M = '+c.raw+' → '+c.price:c.t+'T '+c.fee+' ÷ '+c.n+' = '+c.raw+' → '+c.price;}
+  function calcText(r){var c=pw(r);if(!c||!c.n)return '';return mine(r)?'손으로 고침 · 자동 값 '+c.price:c.edge?'T엣지 '+c.fee+'원/M × '+c.m+'M = '+c.price:c.t+'T '+c.fee+' ÷ '+c.n+' = '+c.raw+' → '+c.price;}
   function auto(r){r.cut=conCut(r);r.edge=conEdge(r);if(!mine(r))r.price=pw(r)&&pw(r).n?String(pw(r).price):'';}
   function st(r){
     var a=conHad(r);
@@ -2310,7 +2311,7 @@ function conPickFn(){
       var doc=Object.assign(normVals(s,{unit:'본사',vendor:vendor,rows:todo.map(function(r){var w=r.w.doc;
         var o={prod:r.name,pcode:r.code,seq:r.rev,pseq:r.seq,proc:r.proc,oname:w?w.name:r.name,ocode:w?w.code:r.code,unit:'',cur:'KRW',basis:'수량',vat:false,price:Number(r.price),from:from};
         if(r.cut&&r.cut.n&&!mine(r))o.calc=r.cut.t+'T '+r.cut.fee+'÷'+r.cut.n+'='+r.cut.raw+'→'+r.cut.price;
-        if(r.edge&&r.edge.n&&!mine(r))o.calc='T엣지 '+r.edge.fee+'원/M×'+r.edge.m+'M='+r.edge.raw+'→'+r.edge.price;
+        if(r.edge&&r.edge.n&&!mine(r))o.calc='T엣지 '+r.edge.fee+'원/M×'+r.edge.m+'M='+r.edge.price;
         return o;})}),{status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(s)});
       return db.collection('erp_contracts').add(doc).then(function(){
         todo.forEach(function(r){delete mem[conKey(r)];});
