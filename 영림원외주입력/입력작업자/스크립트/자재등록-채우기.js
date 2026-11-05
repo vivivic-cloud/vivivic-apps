@@ -6,6 +6,7 @@
 //   품목자산분류 cmbAssetName_ul(원자재/부자재/재공품/저장품/소모품) · 자재상태 cmbSMStatusName_ul · 내외자구분 cmbSMInOutKindName_ul · 중요도 txtSMABCName_ul ·
 //   기준단위 txtUnitName_txt(코드도움) · 자재소분류 txtItemClassSName_txt(코드도움 → 중·대 txtItemClassMName_txt·txtItemClassLName_txt 저절로) · 대표자재 chkIsSTDItem_input.
 //   세트품목 칸은 없다. 오른쪽 구매정보 = 하위 화면 500252(시트 SS1 = 구매단가 표).
+// 한 번에: ylw.mat.bg([폼 문서 id…]) 뒤 window.__mat_g 를 읽는다(공통.js → 불러오기-공통.js → 이 파일, 한 건 약 15초, 11-05 재공품).
 // 코드도움: 값은 스크립트로 넣고 Enter 만 키로 누른다(한글 타자는 글이 겹침). 소분류는 경로 마지막 이름으로 찾는다.
 (function () {
   const Y = window.ylw;
@@ -18,6 +19,10 @@
   const put = (id, val) => { const e = doc().getElementById(id); e.focus(); e.value = val; e.dispatchEvent(new Event('input', { bubbles: true })); };
   const path = (v) => String(v.small || '').split(' > ');
   const S = (x) => String(x == null ? '' : x);
+  const mouse = (w, b) => { const r = b.getBoundingClientRect(), o = { bubbles: true, cancelable: true, view: w, clientX: r.x + 5, clientY: r.y + 5, button: 0 }; for (const t of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) b.dispatchEvent(new (t.startsWith('pointer') ? w.PointerEvent : w.MouseEvent)(t, o)); };
+  const tool = (name) => { const b = [...doc().querySelectorAll('a')].find((e) => new RegExp('^\\s*' + name + '\\s*$').test(e.textContent)); if (!b) throw new Error(name + ' 단추 없음'); mouse(Y.win(PAGE), b); };
+  const enter = () => { const el = doc().activeElement, ko = { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }; ['keydown', 'keypress', 'keyup'].forEach((t) => el.dispatchEvent(new KeyboardEvent(t, ko))); };
+  const popup = () => { const ok = document.getElementById('msgBtnOk'); if (!ok || !ok.getClientRects().length) return ''; const b = document.getElementById('messagePopup') || ok.parentElement.parentElement; return S(b.textContent).replace(/\s+/g, ' ').trim(); };
   Y.mat = {
     // 1단계: 글·목록 칸 + 기준단위 글자 넣고 초점 → Enter → fill2
     fill1(v) {
@@ -58,6 +63,37 @@
         table.push({ 자재번호: v.code, 칸: 'ItemSeq', 폼: '', 화면: S(r.ItemSeq), 맞음: true });
       }
       return Y.report(table);
+    },
+    // 폼 대기 한 건 끝까지(11-05): 같은 번호 확인 → 진행중 → 신규 → 채움 → 대조 → 저장 → 자재조회 대조 → 완료. 틀리면 throw(진행중으로 남음, 멈춰서 사람이 본다). 불러오기-공통.js 필요.
+    async go(id, again) {
+      const v = (await Y.imp.list('erp_materials')).find((x) => x.id === id);
+      if (!v) throw new Error(id + ' 문서 없음');
+      if (!(v.status === '대기' || (again && v.status === '진행중'))) return v.code + ' 건너뜀(' + v.status + ')';
+      await Y.read.query('500261'); await Y.sleep(2500);
+      if (Y.rows(Y.win('500261').SS1).some((r) => S(r.ItemNo) === v.code)) throw new Error(v.code + ' 자재조회에 이미 있음');
+      await Y.imp.patch('erp_materials', id, { status: '진행중' });
+      Home.OpenPageSeq(+PAGE); await Y.sleep(1500);
+      tool('신규'); await Y.sleep(1500);
+      if (doc().getElementById('fltItemSeq_flt').value !== '0' || get('txtItemName_txt')) throw new Error(v.code + ' 화면이 안 비었음');
+      this.fill1(v); enter(); await Y.sleep(1500);
+      this.fill2(v); enter(); await Y.sleep(1500);
+      const c = this.check(v);
+      if (!c.모두맞음) throw new Error(v.code + ' 저장 전 대조 틀림(저장 안 함): ' + JSON.stringify(c.틀린칸));
+      tool('저장'); await Y.sleep(2500);
+      const m = popup(); if (m) throw new Error(v.code + ' 알림: ' + m);
+      const c2 = this.check(v), seq = +S(c2.자재코드).replace(/,/g, '');
+      if (!c2.모두맞음 || !(seq > 0)) throw new Error(v.code + ' 저장 뒤 틀림: ' + JSON.stringify(c2.틀린칸) + ' 코드 ' + c2.자재코드);
+      await Y.read.query('500261'); await Y.sleep(2500);
+      const r = this.verify([v]);
+      if (!r.모두맞음) throw new Error(v.code + ' 자재조회 대조 틀림: ' + JSON.stringify(r.틀린칸));
+      await Y.imp.patch('erp_materials', id, { status: '완료', ylwCode: seq, agentNote: '영림원 등록: 자재등록 자재코드 ' + seq + ' · 자재조회 대조 맞음' });
+      return v.code + ' ' + seq;
+    },
+    // 도구 시간 제한 때문에 뒤에서 돌린다: ylw.mat.bg([id,…]) 뒤 window.__mat_g 를 읽는다. 첫 오류에서 멈춘다.
+    bg(ids, again) {
+      window.__mat_g = { 끝: false, 결과: [] };
+      (async () => { for (const i of ids) { try { window.__mat_g.결과.push(await Y.mat.go(i, again)); } catch (e) { window.__mat_g.오류 = String(e.message || e); break; } } window.__mat_g.끝 = true; })();
+      return '시작 ' + ids.length + '건';
     },
   };
   return '자재등록 준비됨';
