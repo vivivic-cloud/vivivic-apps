@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v77 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v78 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -188,6 +188,7 @@ td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 .sheetbox .row>input[type=text]{flex:1 1 220px;width:auto;max-width:360px}
 .sheetbox .tw{margin:0}
 /* v53 제품 등록 점검표 — 표는 .tw(가로 넘침은 표 상자 안에서만). 단계 줄 맨 위 단추 · 6단계 빈 흐름 */
+input[readonly]{background:var(--fill3)}   /* v78 */
 nav .navck{background:#fff;box-shadow:inset 0 0 0 1px var(--line2);margin-bottom:6px}
 nav .navck:hover{background:var(--fill3)}
 nav .navck .num{background:var(--fill);color:var(--ink)}
@@ -311,7 +312,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v77</span>
+    <span class="ver">v78</span>
   </div>
 </header>
 <div class="wrap">
@@ -403,6 +404,8 @@ function cls3Rows(kind){
    저장 문서 small 은 전처럼 경로(입력 작업자·v40 분류 수정·clsErr 가 경로를 쓴다). 화면·양식에 보이는 것만 소분류 이름. */
 /* 영림원 소분류 이름 = 위 이름을 「_」 로 이어 붙인 꼴(관리 방 11-03 「T보드_T엘피엠_T201양면」). 영림원에서 불러온 기록은 이미 이어 붙어 있고(md > md_27 > md_27_bk),
    폼에서 넣은 기록은 짧게 저장돼 있다(T보드 > T엘피엠 > T201양면) → 둘 다 같은 꼴로 만든다. (v41 「소분류 미등록」 버그: 칸이 경로 꼴만 받아 이어 붙인 이름을 못 찾음) */
+/* v41 대분류가 보드 = 원장 — 분류 안내와 v78 구매단가가 같은 판단을 쓴다 */
+function clsBoard(big){return /보드/.test(big);}
 function clsName(path){var a=String(path==null?'':path).split(CLS_SEP);if(a.length!==3)return String(path==null?'':path);
   var b=a[0],m=a[1],x=a[2],jm=m.indexOf(b+'_')===0?m:b+'_'+m;
   return x.indexOf(m+'_')===0?jm+x.slice(m.length):(x.indexOf(jm+'_')===0?x:jm+'_'+x);}
@@ -465,6 +468,8 @@ var KNOWN_PROC=['조립','가공'];
 
 /* v74 수입: 선택지는 수입BL 501067 화면 값(입력작업자/화면별-요령.md 「수입 업무 화면 조사」). 통화는 그 화면 기본 USD · 코드도움에서 본 CNY 만 */
 var IMP_TERMS=['EXW','FCA','FAS','FOB','CFR','CIF','CPT','CIP','DDP','DAT','DAP'],IMP_CURS=['USD','CNY'];
+/* v78 구매단가 선택지: 내외자구분 = 501868 화면 값(11-06 조사). 통화 = 501868 코드도움을 못 읽어 외주계약 코드도움 7개(erp-spec unverified) */
+var PUR_IOS=['내수','Local1(후LC)','Local2(선LC)','직수입'],PUR_CURS=['KRW','USD','JPY','EUR','GBP','CAD','CNY'];
 var STEPS=[
 {key:'vendors',n:1,title:'거래처',screen:'거래처등록',
  path:['기본','[기본] 거래처정보','거래처'],needs:[],
@@ -777,7 +782,32 @@ var STEPS=[
   F('qty','수량','number',{req:1,step:'any'})
  ],
  recTitle:function(r){return r.blno;},
- subt:function(r){return [r.vendor,r.indate,r.wh,(r.rows||[]).length+'줄'].filter(Boolean).join(' · ');}}
+ subt:function(r){return [r.vendor,r.indate,r.wh,(r.rows||[]).length+'줄'].filter(Boolean).join(' · ');}},
+
+/* v78 구매 페이지 = 1~11단계 흐름 밖(수입 페이지와 같은 page 틀). 앞으로 원장 구매 입력이 여기에 들어온다. 지금은 구매단가등록 501868 하나 — 구매요청 이후는 아직 만들지 않았다.
+   문서 하나 = 501868 표 한 줄. 같은 원장을 매입처마다 한 줄씩(문서 여러 개). 칸 = 입력작업자/화면별-요령.md 「구매단가등록 (501868)」 표 글자 그대로(잠긴 적용종료일은 저장 때 저절로라 없음), 별표도 화면 그대로(품번은 별표 없음 — 품번을 골라야 품명·단위가 채워진다). ro = 폼이 채우는 읽기 전용 칸, 양식 열 없음 */
+{key:'purprices',n:'구매1',page:'구매',title:'구매단가',screen:'구매단가등록',
+ path:['구매/수입','구매단가등록'],needs:['vendors','materials'],
+ note:'원장 단가를 매입처마다 한 줄씩 넣습니다. 구매거래처는 1 거래처에 국내매입거래처로 등록이 끝난(완료) 곳만, 품번은 5 자재에 등록이 끝난(완료) 원장(자재 대분류 보드)만 나옵니다. 품번을 고르면 품명·규격·단위가 자재 값으로 채워집니다. 같은 구매거래처·품번·적용시작일은 두 번 넣을 수 없습니다. 단가가 바뀌면 새 적용시작일로 한 줄 더 넣습니다. 저장하면 대기로 쌓입니다.',
+ fields:[
+  F('vendor','구매거래처','combo',{req:1,dl:'dl-purvendors',listOnly:1,valid:purVendorErr,badLab:'구매거래처 미등록',hint:'1 거래처에서 거래처종류 국내매입거래처로 등록이 끝난 거래처입니다.'}),
+  F('name','품명','text',{req:1,ro:1,hint:'품번을 고르면 저절로 채워집니다.'}),
+  F('code','품번','combo',{mono:1,dl:'dl-plates',listOnly:1,optLab:purPlateLab,valid:purPlateErr,badLab:'원장 아님',hint:'5 자재에 등록이 끝난 원장입니다.'}),
+  F('spec','규격','text',{ro:1}),
+  F('unit','단위','text',{req:1,ro:1}),
+  F('io','내외자구분','select',{req:1,opts:PUR_IOS,def:'내수',valid:optsErr('내외자구분',PUR_IOS),badLab:'내외자구분 확인'}),
+  F('cur','통화','select',{req:1,opts:PUR_CURS,def:'KRW',valid:optsErr('통화',PUR_CURS),badLab:'통화 확인'}),
+  F('price','단가','number',{req:1,step:'any',valid:impPosErr('단가'),badLab:'단가 확인'}),
+  F('minqty','구매최소수량','number',{step:'any',valid:purNumErr('구매최소수량'),badLab:'구매최소수량 확인'}),
+  F('stepqty','구매간격수량','number',{step:'any',valid:purNumErr('구매간격수량'),badLab:'구매간격수량 확인'}),
+  F('from','적용시작일','date',{req:1}),
+  F('memo','특이사항','text'),
+  F('maker','제조사','text'),
+  F('days','조달일수','number',{step:'any',valid:purNumErr('조달일수'),badLab:'조달일수 확인'})
+ ],
+ nameK:'code',dupLab:'구매거래처·품번·적용시작일',dupKey:purKey,saveCheck:purDup,fillDoc:purDoc,
+ recTitle:function(r){return [r.vendor,r.name].filter(Boolean).join(' · ');},
+ subt:function(r){return [r.code,[r.cur,r.price].join(' '),r.from].filter(Boolean).join(' · ');}}
 ];
 var BYKEY={};STEPS.forEach(function(s){BYKEY[s.key]=s;});
 
@@ -824,7 +854,10 @@ var ROUTES={
   unverified:['표 두 줄 이상 저장(시험은 1줄)','통화 CNY 로 저장(시험은 USD)','통화 코드도움 전체 목록','같은 B/L No.를 두 번 저장할 때 화면 동작','원가계산·전표·미착품대체·대금 처리 — 시험에서 누르지 않음']},
  impins:{method:'B/L 조회에서 넘겨 화면 입력',note:'폼 v74. 한 문서 = B/L 하나의 입고 한 번. blId = erp_impbls 문서 id. rows.blqty 는 폼 대조용이라 영림원 칸이 아닙니다. 수입처·가격조건·통화·환율·품번·단위·단가·담당자·부서는 B/L 에서 넘어옵니다(11-06 시험). 입고창고 wh 는 표 칸이라 모든 줄에 넣습니다.',
   how:['blId 의 erp_impbls 문서가 완료여야 합니다. 대기·진행중이면 건너뛰고, 없거나 오류면 오류로 두고 agentNote에 적습니다.','수입BL조회를 엽니다(Home.OpenPageSeq(501068)). blno 를 조회해 줄을 선택하고 「수입입고」를 누릅니다. 입고 화면(501071)에는 신규 단추가 없습니다.','수입입고입력에서 입고일 indate 를 넣고, 표 줄마다 수량 qty 와 입고창고 wh 를 넣습니다. 입고창고는 기본 본사로 넘어오므로 반드시 바꿉니다.','저장 전에 모든 줄의 모든 칸을 문서 값과 대조하고, 저장 뒤 조회로 다시 대조합니다.','창고별 재고조회(501179)에서 재고기준 실재고·자산재고의 wh 창고 수량을 확인합니다. 끝나면 status 완료·agentNote 에 수입입고번호.'],
-  unverified:['입고 수량을 B/L 수량과 다르게 저장(시험은 같은 수량)','B/L 하나를 나눠 입고','입고창고 코드도움 전체 목록','표 두 줄 이상 저장(시험은 1줄)','수입비용이 원가·전표에 필요한지 — 입고·재고에는 불필요']}
+  unverified:['입고 수량을 B/L 수량과 다르게 저장(시험은 같은 수량)','B/L 하나를 나눠 입고','입고창고 코드도움 전체 목록','표 두 줄 이상 저장(시험은 1줄)','수입비용이 원가·전표에 필요한지 — 입고·재고에는 불필요']},
+ purprices:{method:'화면 입력(그리드 행)',note:'폼 v78. 화면은 1~11단계와 분리된 구매 페이지입니다(order 끝). 한 문서 = 구매단가등록 표 한 줄. 같은 원장을 매입처마다 문서 하나씩 넣습니다. 폼은 같은 구매거래처·품번·적용시작일을 막습니다(오류 건 뺌). code 는 화면 별표가 없지만 폼에서는 골라야 품명·규격·단위가 채워집니다. name·spec·unit 은 저장 때 5 자재 값입니다. io·cur 처음 값은 내수·KRW 입니다. 화면의 내외자구분 처음 값은 빈칸이므로 꼭 io 를 고릅니다. 적용종료일은 잠긴 칸이라 넣지 않습니다(저장 때 저절로). 단가 변경은 기존 줄을 고치지 않고 새 적용시작일 문서로 들어옵니다. 원장 판단 = 자재소분류 대분류에 보드가 든 자재(엣지필름 뺌). 숫자 칸 price·minqty·stepqty·days 는 숫자로 저장하고, 빈 선택 칸은 빈 글자입니다.',
+  how:['vendor 가 영림원 거래처에(국내매입거래처), code 가 자재등록에 있어야 합니다. 없으면 오류로 두고 agentNote에 적습니다.','구매단가등록을 엽니다(Home.OpenPageSeq(501868)). 구매거래처·품번으로 조회해 같은 구매거래처·품번·적용시작일이 있는지 먼저 봅니다. 있으면 새로 만들지 않고 오류 + agentNote.','표 빈 줄에 구매거래처·품번(code)을 코드도움으로 넣습니다. 품명·규격·단위는 저절로 나오니 문서 값과 같은지 봅니다. 내외자구분·통화·단가·구매최소수량·구매간격수량·적용시작일·특이사항·제조사·조달일수를 넣습니다.','저장 전에 모든 줄의 모든 칸을 문서 값과 대조합니다. 문서에 없는 칸에 값이 있으면 저장하지 않습니다.','저장 뒤 조회로 다시 대조합니다. 끝나면 status 완료·agentNote.'],
+  unverified:['501868 저장 — 화면 조사만 했고 저장 시험은 안 했습니다','통화 코드도움 전체 목록 — 폼 값은 외주계약 코드도움 7개입니다','같은 품번 두 거래처 저장','같은 거래처·품목·시작일 겹침 처리','단가 0','소수 자리 — 표시는 소수 2','품의 기본단가가져오기 결과','대표단가여부(숨은 칸) · 우선 구매처','메뉴 경로 중간 단계 — OpenPageSeq 로 엽니다']}
 };
 /* v23 영림원에서 불러오기 — 규약(erp-spec.json 의 imports). 폼은 영림원에 접속할 수 없어 요청만 erp_imports 에 「대기」로 쌓고,
    입력 작업자가 영림원 조회 화면을 읽기 스크립트로 읽어 폼에 없는 것만 넣는다(입력작업자/AGENTS.md 「불러오기 요청 처리 순서」).
@@ -999,6 +1032,7 @@ function makeField(f,scope){
     var attrs={id:id,type:f.type,autocomplete:'off'};
     if(f.ph)attrs.placeholder=f.ph;if(f.step)attrs.step=f.step;
     ctl=h('input',attrs);
+    if(f.ro){ctl.readOnly=true;ctl.tabIndex=-1;}   /* v78 폼이 채우는 칸(구매단가 품명·규격·단위) */
     if(f.mono)ctl.style.fontFamily='var(--mono)';
     wrap.append(lab(),ctl);
     getter=function(){return ctl.value.trim();};setter=function(v){ctl.value=v==null?'':v;};focusEl=ctl;
@@ -1172,7 +1206,7 @@ function buildForm(step){
   /* v41 자재 분류 규칙(사장님 11-03): 대분류가 보드면 중분류 = 마감 · 소분류 = 그 마감 자재 거래처의 제품코드. 안내만 — 막지 않는다 */
   var midF=kindF?headFields.filter(function(x){return x.f.k==='mid';})[0]:null,smallF=kindF?headFields.filter(function(x){return x.f.k==='name';})[0]:null;
   function clsHint(){
-    if(!kindF)return;var k=kindF.get(),board=k==='자재'&&/보드/.test(bigF.get());
+    if(!kindF)return;var k=kindF.get(),board=k==='자재'&&clsBoard(bigF.get());
     if(k==='제상품'){kindF.setHint();bigF.setHint('예: T리빙룸');midF.setHint('예: T수납장');smallF.setHint('제품: 상품색상. 예: T올화이트');return;}
     if(k!=='자재'){kindF.setHint();bigF.setHint();midF.setHint();smallF.setHint();return;}
     kindF.setHint('자재 분류 규칙 — 대분류가 보드면 중분류 = 그 자재의 마감, 소분류 = 그 마감 자재 거래처가 쓰는 제품코드. 예: T보드 > T엘피엠 > T201양면');
@@ -1264,12 +1298,13 @@ function renderNav(){
   var ckBtn=h('button',{type:'button',class:'navck',on:{click:function(){go('check');}},'aria-current':cur==='check'?'step':null},
     h('span',{class:'num'},'✓'),h('span',{},h('div',{class:'nt'},CHECK.title),h('div',{class:'ns'},'품목마다 빠진 것 보기')));   /* v53 번호 없는 화면 — 단계 앞 맨 위 */
   var cntText=function(c){return c.total?('대기 '+c['대기']+' · 완료 '+c['완료']+(c['수정대기']?' · 수정대기 '+c['수정대기']:'')+(c['오류']?' · 오류 '+c['오류']:'')):'아직 없음';};
-  /* v75 수입 페이지 입구 하나 — 점검표처럼 번호 없는 단추, 폰에서도 맨 앞에 보이게 점검표 바로 다음 */
-  var impC={total:0,'대기':0,'완료':0,'수정대기':0,'오류':0},impS=STEPS.filter(function(s){return s.page==='수입';});
-  impS.forEach(function(s){var c=counts(s.key);Object.keys(impC).forEach(function(k){impC[k]+=c[k];});});
-  var impBtnNav=h('button',{type:'button',class:'navck',on:{click:function(){go(impS[0].key);}},'aria-current':(BYKEY[cur]||{}).page==='수입'?'step':null},
-    h('span',{class:'num'},ico('import')),h('span',{},h('div',{class:'nt'},'수입 관리'),h('div',{class:'ns'},impS.some(function(s){return data[s.key]==null;})?'불러오는 중':cntText(impC))));
-  navEl.replaceChildren.apply(navEl,[ckBtn,impBtnNav].concat(STEPS.filter(function(s){return !s.hidden&&!s.page;}).map(function(s){
+  /* v75 페이지 입구 하나 — 점검표처럼 번호 없는 단추, 폰에서도 맨 앞에 보이게 점검표 바로 다음(v78 구매 관리도 같은 틀) */
+  var pageBtn=function(pg,icon){
+    var c0={total:0,'대기':0,'완료':0,'수정대기':0,'오류':0},ss=STEPS.filter(function(s){return s.page===pg;});
+    ss.forEach(function(s){var c=counts(s.key);Object.keys(c0).forEach(function(k){c0[k]+=c[k];});});
+    return h('button',{type:'button',class:'navck',on:{click:function(){go(ss[0].key);}},'aria-current':(BYKEY[cur]||{}).page===pg?'step':null},
+      h('span',{class:'num'},ico(icon)),h('span',{},h('div',{class:'nt'},pg+' 관리'),h('div',{class:'ns'},ss.some(function(s){return data[s.key]==null;})?'불러오는 중':cntText(c0))));};
+  navEl.replaceChildren.apply(navEl,[ckBtn,pageBtn('수입','import'),pageBtn('구매','sheet')].concat(STEPS.filter(function(s){return !s.hidden&&!s.page;}).map(function(s){
     var c=counts(s.key);
     var sub=data[s.key]==null?'불러오는 중':cntText(c);
     return h('button',{type:'button',on:{click:function(){go(s.key);}},'aria-current':s.key===cur?'step':null},
@@ -1302,6 +1337,8 @@ function refreshLists(){
   datalist('dl-wcreg',(data.workcenters||[]).filter(function(r){return r.status!=='오류';}).map(function(r){return String(r.name||'').trim();}));   /* v55 */
   datalist('dl-impvendors',(data.vendors||[]).filter(function(r){return r.status==='완료'&&(r.kinds||[]).indexOf('해외매입거래처')>=0;}).map(function(r){return String(r.name||'').trim();}));   /* v74 수입처 */
   datalist('dl-films',edgeFilms().map(function(r){return String(r.code||'').trim();}));   /* v74 수입 필름 = 자재소분류 중분류 T엣지필름 */
+  datalist('dl-purvendors',(data.vendors||[]).filter(function(r){return r.status==='완료'&&(r.kinds||[]).indexOf('국내매입거래처')>=0;}).map(function(r){return String(r.name||'').trim();}));   /* v78 구매거래처 */
+  datalist('dl-plates',purPlates().map(function(r){return String(r.code||'').trim();}));   /* v78 완료 원장 */
   datalist('dl-flows',(data.flows||[]).filter(function(r){return r.status!=='오류';}).map(function(r){return String(r.name||'').trim();}));
   /* v25 분류: 소분류 목록(품목·자재), 대·중분류 목록은 지금 고른 품목구분·대분류 아래 것만(고르기 전이면 전체) */
   var cls=(data.classes||[]).filter(function(r){return r.status!=='오류';}),tr=function(v){return String(v==null?'':v).trim();};
@@ -2475,6 +2512,19 @@ function impblDoc(d){
   d.rate=Number(d.rate);
   d.rows=impblRows(d).map(function(o){var m=impFilm(o.ccode)||{};return {cname:m.name||'',ccode:String(o.ccode).trim(),cspec:m.spec||'',unit:m.unit||'',price:Number(o.price),qty:Number(o.qty)};});
 }
+/* v78 구매단가(501868). 원장 = 완료 자재 중 자재소분류 대분류가 보드(clsBoard)이고 엣지필름이 아닌 것. 문서 하나 = 표 한 줄, 열쇠 = 구매거래처|품번|적용시작일.
+   품명·규격·단위는 자재 값 — 품번을 고를 때 칸에 보이고 저장 때 purDoc 이 다시 채운다 */
+function purIsPlate(m){var a=String(m&&m.small!=null?m.small:'').split(CLS_SEP);return a.length===3&&clsBoard(a[0])&&!edgeIsFilm(m);}
+function purPlates(){return (data.materials||[]).filter(function(r){return r.status==='완료'&&purIsPlate(r);});}
+function purPlate(code){code=String(code==null?'':code).trim();return purPlates().filter(function(r){return String(r.code||'').trim()===code;})[0]||null;}
+function purPlateLab(code){var m=purPlate(code);return m?[m.name,code,m.spec,m.unit].filter(Boolean).join(' · '):code;}
+function purPlateErr(v){return isEmpty(v)||purPlate(v)?'':'5 자재에 등록이 끝난 원장만 고를 수 있습니다. 「'+v+'」 은(는) 목록에 없습니다.';}
+function purVendorErr(v){return isEmpty(v)||(LISTS['dl-purvendors']||[]).indexOf(String(v).trim())>=0?'':'영림원에 등록된(완료) 국내매입거래처만 고를 수 있습니다. 「'+v+'」 은(는) 목록에 없습니다.';}
+function purNumErr(label){return function(v){return isEmpty(v)||/^\d+(\.\d+)?$/.test(String(v).trim())?'':label+'은(는) 숫자입니다.';};}
+function purKey(r){return [r.vendor,r.code,r.from].map(function(x){return String(x==null?'':x).trim();}).join('|');}
+function purDup(v,id){return (data.purprices||[]).some(function(r){return r.id!==id&&r.status!=='오류'&&purKey(r)===purKey(v);})?'같은 구매거래처·품번·적용시작일이 이미 저장되어 있습니다 — 저장하지 않았습니다.':'';}
+function purFill(v){var m=purPlate(v.code)||{};v.name=m.name||'';v.spec=m.spec||'';v.unit=m.unit||'';}
+function purDoc(d){purFill(d);d.price=Number(d.price);['minqty','stepqty','days'].forEach(function(k){if(!isEmpty(d[k]))d[k]=Number(d[k]);});}
 function impinOf(bl){var no=String(bl.blno||'').trim();return (data.impins||[]).filter(function(r){return r.status!=='오류'&&(r.blId===bl.id||String(r.blno||'').trim()===no);});}
 function impblOpen(){return (data.impbls||[]).filter(function(r){return r.id&&r.status!=='오류'&&!impinOf(r).length;});}
 function impPickFn(){
@@ -2664,7 +2714,7 @@ function imWipBar(){
 function imNeeds(k,L,rows){
   var needs=guideBom(k,L).filter(function(n){return n.step==='items'||n.step==='classes';}),seen={};
   var b=rows.filter(function(r){return r.code&&!r.bom;}).map(function(r){return r.code;}),f=rows.filter(function(r){return r.code&&!r.fl.length;}).map(function(r){return r.code;});
-  var w=[];rows.forEach(function(r){if(r.code&&r.flow&&r.bom&&!imHad(r.code).length)w=w.concat(imWipPlan(r.code,r.flow,imMats(r.bom)).miss);});   /* v77 */
+  var w=[];rows.forEach(function(r){if(r.code&&r.flow&&r.bom&&!imHad(r.code).length)w=w.concat(imWipPlan(r.code,r.flow,imMats(r.bom)).miss);});   /* v78 */
   if(b.length)needs.push({step:'boms',what:'BOM',name:b.join(', '),st:'미등록',why:'소요자재를 가져올 BOM 이 7단계에 없습니다 — 같은 상품으로 BOM 화면이 열립니다',pick:1,vals:{}});
   if(w.length)needs.push({step:'materials',what:'재공품',name:w.join(', '),st:'미등록',why:'다음 공정 소요자재에 넣을 재공품이 5단계에 없습니다 — 같은 상품으로 5단계 화면이 열립니다',pick:1,vals:{}});
   if(f.length)needs.push({step:'itemflows',what:'품목별 공정흐름',name:f.join(', '),st:'미등록',why:'공정을 가져올 흐름이 8단계에 없습니다 — 같은 상품으로 8단계 화면이 열립니다',pick:1,vals:{}});
@@ -3125,6 +3175,7 @@ function renderStep(){
   if(iwFn){var iwCode=form.field('code'),iwProc=form.field('proc');   /* 사람이 고를 때만 */
     iwCode.el.addEventListener('change',function(){var it=ifItem(iwCode.get());if(it)form.fill({name:it.name||'',spec:it.spec||''},[]);});
     iwProc.el.addEventListener('change',function(){var v={code:iwCode.get(),proc:iwProc.get()};iwFill(v);if(!isEmpty(v.seq))form.fill({seq:v.seq},[]);});}
+  if(s.key==='purprices'){var puCode=form.field('code');puCode.el.addEventListener('change',function(){var v={code:puCode.get()};purFill(v);form.fill({name:v.name,spec:v.spec,unit:v.unit},[]);});}   /* v78 */
   var impBtn=h('button',{type:'button',class:'btn imp','aria-expanded':'false',on:{click:function(){imp.hidden=!imp.hidden;impBtn.setAttribute('aria-expanded',String(!imp.hidden));}}},ico('import'),'영림원에서 불러오기');
   xlBar.append(IMPORT_BTN[s.key]?impBtn:'',gsRow,xlMsg,IMPORT_BTN[s.key]?imp:'');   /* v74 수입 단계는 불러오기 없음 */
   sheetDraw=null;
@@ -3137,7 +3188,7 @@ function renderStep(){
     h('section',{class:'card'},
       h('div',{class:'stephead'},
         h('p',{class:'path'},'ERP 경로',s.path.map(function(p,i){return h('code',{},p);}),h('span',{},'화면: '+s.screen)),
-        s.page?h('div',{class:'wcpicks',role:'group','aria-label':'수입 관리'},STEPS.filter(function(x){return x.page===s.page;}).map(function(x){var on=x===s;   /* v75 수입 페이지 안 전환 */
+        s.page?h('div',{class:'wcpicks',role:'group','aria-label':s.page+' 관리'},STEPS.filter(function(x){return x.page===s.page;}).map(function(x){var on=x===s;   /* v75 페이지 안 전환 */
           return h('button',{type:'button',class:'btn small wcpick'+(on?' primary':''),'aria-pressed':on?'true':'false',on:{click:function(){if(!on)go(x.key);}}},x.title);})):'',
         h('h2',{},(s.page?'':s.n+'. ')+s.title+' 입력'),
         needs,h('p',{class:'stepnote'},s.note)),
@@ -3176,7 +3227,7 @@ function sheetCols(s){
       hint:'수식 칸 — 공정흐름유형 이름을 「-」로 나눠 저절로 채웁니다. 직접 적지 마세요(올릴 때는 이름 기준으로 읽습니다). 빨간 칸 = 저장된 공정 목록에 없는 이름 — 올리면 막힙니다. 새 공정은 입력폼의 「새 공정 추가」로 넣습니다. 공정 이름에는 「-」를 쓸 수 없습니다.'+(i===1?' 공정순서·후속공정순서·최종공정여부는 폼이 채웁니다.':'')}));   /* 목록 출처는 colNote 가 DL_SRC 로 적으니 hint 에 되풀이하지 않는다 */
     return s.fields.concat(a);
   }
-  var all=s.fields.concat((s.rowFields||[]).filter(function(f){return !f.auto;}));   /* v74 폼이 채우는 칸(수입BL 품명·규격·단위)은 양식 열 없음 */
+  var all=s.fields.filter(function(f){return !f.ro;}).concat((s.rowFields||[]).filter(function(f){return !f.auto;}));   /* v74 폼이 채우는 칸(수입BL 품명·규격·단위)은 양식 열 없음 */
   /* v42 자재: 맨 오른쪽에 대분류·중분류·소분류 세 열(이어지는 드롭다운, 자재소분류 칸은 수식으로 채움 — cls3Book). 올릴 때 자재소분류가 비었으면 세 열로 경로를 만든다(takeSheet) */
   all.filter(function(f){return f.cls3;}).forEach(function(f){
     ['대분류','중분류','소분류'].forEach(function(l,i){all.push({k:'_cls3',label:l,type:'text',cls3Of:f,cls3Pos:i,
@@ -3322,7 +3373,7 @@ function pickList(f){
 }
 /* 양식 머리 칸 설명(v18) — 사장님 「업로드 양식 다운되면 각 입력부 명칭쪽에 해당 입력부가 무엇인지 설명이 나타나게…」
    칸 정의(req·reqIf·type·opts·dl·ph·hint)와 목록 출처(refreshLists)에서만 만든다. 영림원 화면에서 확인 안 된 뜻은 넣지 않는다. */
-var DL_SRC={'dl-impvendors':'1단계 거래처 중 영림원 등록이 끝난(완료) 해외매입거래처','dl-films':'5단계 자재 중 자재소분류 중분류가 T엣지필름인 자재의 번호','dl-wcreg':'2단계 워크센터(오류 건 뺌)','dl-itemcodes':'4단계 품목의 품번(오류 건 뺌)','dl-flows':'6단계 공정흐름(오류 건 뺌)','dl-vendors':'1단계 거래처 중 영림원 등록이 끝난(완료) 외주가공 거래처','dl-wc':'서버의 외주 워크센터 + 2단계 워크센터','dl-proc':'서버의 공정(조립·가공) + 6단계 공정','dl-codes':'4단계 품목의 품번 + 5단계 자재의 자재번호','dl-cls-item':'3단계 분류에 저장된 제상품 소분류(오류 건 뺌)','dl-cls-mat':'3단계 분류에 저장된 자재 소분류(오류 건 뺌)','dl-cls-big':'이미 저장된 대분류','dl-cls-mid':'이미 저장된 중분류','dl-procs':'이미 저장된 공정(오류 건 뺌)'};
+var DL_SRC={'dl-purvendors':'1단계 거래처 중 영림원 등록이 끝난(완료) 국내매입거래처','dl-plates':'5단계 자재 중 등록이 끝난(완료) 원장(자재 대분류 보드)의 번호','dl-impvendors':'1단계 거래처 중 영림원 등록이 끝난(완료) 해외매입거래처','dl-films':'5단계 자재 중 자재소분류 중분류가 T엣지필름인 자재의 번호','dl-wcreg':'2단계 워크센터(오류 건 뺌)','dl-itemcodes':'4단계 품목의 품번(오류 건 뺌)','dl-flows':'6단계 공정흐름(오류 건 뺌)','dl-vendors':'1단계 거래처 중 영림원 등록이 끝난(완료) 외주가공 거래처','dl-wc':'서버의 외주 워크센터 + 2단계 워크센터','dl-proc':'서버의 공정(조립·가공) + 6단계 공정','dl-codes':'4단계 품목의 품번 + 5단계 자재의 자재번호','dl-cls-item':'3단계 분류에 저장된 제상품 소분류(오류 건 뺌)','dl-cls-mat':'3단계 분류에 저장된 자재 소분류(오류 건 뺌)','dl-cls-big':'이미 저장된 대분류','dl-cls-mid':'이미 저장된 중분류','dl-procs':'이미 저장된 공정(오류 건 뺌)'};
 function colNote(f,mi){
   if(f.aceOnly)return f.hint;   /* v47 영림원 BOM 양식의 폼에 없는 칸 */
   var t=[];
@@ -3465,6 +3516,7 @@ function takeSheet(X,s,aoa,say){
       s.fields.forEach(function(f){if(f.cls3&&!isEmpty(one[f.k])){one[f.k]=clsResolve(f.clsKind,one[f.k]);if(head[f.k]!=null)head[f.k]=clsResolve(f.clsKind,head[f.k]);}});   /* v42: 영림원 소분류 이름·짧은 이름·경로 → 경로 */
       if(s.key==='itemwcs'&&one.code)iwFill(one);   /* v55 */
       if(s.key==='itemmats'&&one.code)imFill(one);   /* v57 */
+      if(s.key==='purprices'&&one.code)purFill(one);   /* v78 */
       if(s.key==='itemflows'&&one.code){var ifIt=ifItem(one.code);if(ifIt){if(isEmpty(one.name))one.name=ifIt.name||'';if(isEmpty(one.spec))one.spec=ifIt.spec||'';}}   /* v48 품번만 적어도 품명·규격 채움 */
       lines++;
       if(bomSplit){
@@ -3912,7 +3964,7 @@ function renderListIn(s,listBox,title){
     return d;
   });
   if(sq!=null){listSearch(s,listBox,head,a,sq,items);return;}
-  var wb=s.key==='itemmats'?imWipBar():null;   /* v77 */
+  var wb=s.key==='itemmats'?imWipBar():null;   /* v78 */
   listBox.replaceChildren.apply(listBox,[head].concat(wb?[wb]:[],items));
 }
 /* ---------- v37 4 품목 저장한 항목 = 검색으로만 보기 ----------
@@ -4001,7 +4053,7 @@ function editPatch(s,cur,nv,out){
   changed.forEach(function(k){before[k]=cur[k]==null?'':cur[k];after[k]=nv[k]==null?'':nv[k];o[k]=after[k];});
   o.status='수정대기';o.agentNote='';
   o.edit={changed:changed,before:before,after:after,at:at,prevNote:cur.agentNote||''};
-  if(s.editMark)s.editMark(o.edit);   /* v77 */
+  if(s.editMark)s.editMark(o.edit);   /* v78 */
   o.editLog=(cur.editLog||[]).concat([{at:at,kind:'요청',changed:changed,before:before,after:after}]);
   out.n=changed.length;return o;
 }
