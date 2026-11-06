@@ -160,9 +160,9 @@
 - **이미 저장된 계약의 단가 변경(11-06)**: 저장된 줄 외주단가 칸을 눌러 숫자를 치고 Tab → 저장. 줄이 늘지 않고 ProcPrice 도 따라 바뀐다(`화면별-요령.md` 「외주단가 고치는 법」). 스크립트 SetText 로는 저장되지 않는다.
 - 불러오기(3-2)의 외주계약 열쇠는 `vendor` 하나다. 한 업체 문서가 여럿이면 비교가 어긋날 수 있다 — 덮어쓰지 말고 `pcode`·`seq`·`proc`·`from` 줄로 본다.
 
-### 3-8. 수입 (`erp_impbls` → `erp_impins`, 폼 v74 12·13단계)
+### 3-8. 수입 (`erp_impbls` → `erp_impins`, 폼 v74 · v75 부터 1~11단계와 분리된 수입 페이지)
 화면 칸·시험 기록 = `화면별-요령.md` 「수입 업무 화면 조사」·「수입 단계 생략 저장 시험」. 규격 = `../erp-spec.json` impbls·impins. 스크립트 없음(첫 처리 때 손으로 하고 만든다). 사장님 지시 = BL·입고만. Order·Payment·Invoice·신고필증·비용·자재이동·전표·원가계산은 하지 않는다.
-- 문서: `erp_impbls` 한 건 = B/L 하나(머리 `bldate` B/L Date · `blno` B/L No. · `shipdate` 선적일자 · `vendor` 수입처 · `term` 가격조건 · `cur` 통화 · `rate` 환율, `rows` = `cname` `ccode` `cspec` `unit` `price` `qty`). `erp_impins` 한 건 = B/L 하나의 입고 한 번(`blId` 12단계 문서 id · `blno` · `vendor` · `indate` 입고일 · `wh` 입고창고, `rows` = 품목 칸 + `blqty` 폼 대조용 + `qty` 입고 수량).
+- 문서: `erp_impbls` 한 건 = B/L 하나(머리 `bldate` B/L Date · `blno` B/L No. · `shipdate` 선적일자 · `vendor` 수입처 · `term` 가격조건 · `cur` 통화 · `rate` 환율, `rows` = `cname` `ccode` `cspec` `unit` `price` `qty`). `erp_impins` 한 건 = B/L 하나의 입고 한 번(`blId` `erp_impbls` 문서 id · `blno` · `vendor` · `indate` 입고일 · `wh` 입고창고, `rows` = 품목 칸 + `blqty` 폼 대조용 + `qty` 입고 수량).
 - 앞 단계: 수입처 = 영림원 해외매입거래처 · `ccode` = 자재등록. 해외 거래처는 1단계 `erp_vendors` 로 들어온다(`region` 해외, `kinds` 해외매입거래처, 사업자번호 없을 수 있음). ⚠ 거래처종류 체크는 표 칸을 진짜 클릭한다(`SetText` 는 저장 때 「선택된 거래처종류이(가) 없습니다.」).
 1. **BL 저장** — 501067 조회로 같은 B/L No. 를 먼저 보고, 있으면 오류 + agentNote. 신규 → 머리 칸 → 표 줄(품명 코드도움은 `ccode` 로, 단위·단가·수량) → 대조 → 저장. 폼에 없는 사업단위·수입구분·담당자·부서는 화면 기본값 그대로. ⚠ **번호 칸 주의**: B/L No. = `…RefNo_txt`(B/L 관리번호는 회색). 입력 뒤 칸 값이 문서 `blno` 와 같은지 본다. `erp_impbls` 완료.
 2. **501068 수입입고** — 입고 화면에는 신규가 없다. B/L 조회 501068 에서 `blno` 줄을 선택하고 「수입입고」. `blId` 문서가 완료가 아니면 시작하지 않는다(대기·진행중이면 건너뜀, 없거나 오류면 오류 + agentNote).
