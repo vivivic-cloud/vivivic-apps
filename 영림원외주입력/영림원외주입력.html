@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v86 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v87 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -321,7 +321,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v86</span>
+    <span class="ver">v87</span>
   </div>
 </header>
 <div class="wrap">
@@ -489,16 +489,16 @@ var STEPS=[
   F('sangho','상호','text',{req:1}),
   F('name','거래처명','text',{req:1,hint:'워크센터의 외주거래처에 표시되는 이름입니다.'}),
   F('state','거래처상태','combo',{req:1,opts:['정상'],def:'정상'}),
-  F('region','국내외구분','select',{req:1,opts:['국내','해외'],def:'국내'}),
+  F('region','국내외구분','select',{req:1,opts:['국내','해외'],def:'국내',valid:optsErr('국내외구분',['국내','해외']),badLab:'국내외구분 확인'}),
   F('credit','신용등급','combo',{req:1,opts:['A'],def:'A'}),
-  F('corp','법인/개인','select',{req:1,opts:['법인','개인'],def:'법인'}),
+  F('corp','법인/개인','select',{req:1,opts:['법인','개인'],def:'법인',valid:optsErr('법인/개인',['법인','개인']),badLab:'법인/개인 확인'}),
   F('bizno','사업자번호','text',{ph:'000-00-00000',reqIf:function(v){return (v.kinds||[]).some(function(k){return BIZ_KINDS.indexOf(k)>=0;});},
     noTplStar:1,valid:bizErr,norm:bizNorm,warn:bizWarn,hint:'숫자 10자리(하이픈은 넣어도 빼도 됩니다). 거래처종류가 외주가공·국내매입·국내매출이면 필수입니다.'}),
   F('rep','대표자성명','text'),
   F('tel','전화번호','text'),
   F('biztype','업태','text'),
   F('bizitem','종목','text'),
-  F('kinds','거래처종류','multi',{req:1,wide:1,opts:['국내매출거래처','수출매출거래처','국내매입거래처','해외매입거래처','외주가공거래처'],def:['외주가공거래처'],hint:'ERP 화면의 거래처종류 목록입니다. 외주처는 외주가공거래처에 체크합니다. 목록 아래쪽 항목은 화면에서 확인하지 못했습니다.'})
+  F('kinds','거래처종류','multi',{req:1,wide:1,valid:function(v){var o=['국내매출거래처','수출매출거래처','국내매입거래처','해외매입거래처','외주가공거래처'],x=(v||[]).filter(function(k){return o.indexOf(k)<0;});return x.length?'거래처종류 「'+x.join(', ')+'」 은(는) 목록에 없습니다.':'';},badLab:'거래처종류 확인',opts:['국내매출거래처','수출매출거래처','국내매입거래처','해외매입거래처','외주가공거래처'],def:['외주가공거래처'],hint:'ERP 화면의 거래처종류 목록입니다. 외주처는 외주가공거래처에 체크합니다. 목록 아래쪽 항목은 화면에서 확인하지 못했습니다.'})
  ],
  recTitle:function(r){return r.name||r.sangho;},
  subt:function(r){return [r.region,(r.kinds||[]).join(', ')].filter(Boolean).join(' · ');}},
@@ -510,7 +510,7 @@ var STEPS=[
   F('unit','사업단위','combo',{req:1,opts:['본사'],def:'본사'}),
   F('name','워크센터','text',{req:1}),
   F('dept','생산부서','combo',{req:1,opts:['기획'],def:'기획'}),
-  F('kind','워크센터구분','select',{req:1,opts:['사외외주','자체생산'],def:'사외외주'}),
+  F('kind','워크센터구분','select',{req:1,opts:['사외외주','자체생산'],valid:optsErr('워크센터구분',['사외외주','자체생산']),badLab:'워크센터구분 확인',def:'사외외주'}),
   F('vendor','외주거래처','combo',{dl:'dl-vendors',listOnly:1,valid:vendorErr,badLab:'외주거래처 미등록',reqIf:function(v){return v.kind==='사외외주';},hint:'사외외주일 때 필수입니다. 1단계 거래처 중 영림원 등록이 끝난(완료) 외주가공 거래처만 목록에 나옵니다.'}),
   F('capa','Capa산정구분','combo',{req:1,opts:['작업시간'],def:'작업시간'}),
   F('start','시작일','date',{req:1,def:'2026-01-01',hint:'입력 예시: 2026-01-01 (연-월-일). 영림원의 기존 워크센터 시작일은 모두 2026-01-01 입니다.'}),   /* v17: 사장님 「시작일 입력에 예시를 보여줘야…」 — 날짜 칸이라 placeholder 가 안 보여 칸 아래 안내 문구로 */
@@ -560,7 +560,7 @@ var STEPS=[
   F('eng','영문명','text'),
   F('asset','품목자산분류','combo',{req:1,opts:['상품','제품','반제품','세트품'],listOnly:1,valid:optsErr('품목자산분류',['상품','제품','반제품','세트품']),badLab:'목록 밖 값',hint:'제품 = 완제품, 반제품 = 부속.'}),
   F('state','품목상태','combo',{req:1,opts:['임시','사용','생산중지','거래중지','폐기'],def:'사용',listOnly:1,valid:optsErr('품목상태',['임시','사용','생산중지','거래중지','폐기']),badLab:'목록 밖 값'}),
-  F('io','내외자구분','select',{opts:['내자','외자'],def:'내자'}),
+  F('io','내외자구분','select',{opts:['내자','외자'],def:'내자',valid:optsErr('내외자구분',['내자','외자']),badLab:'내외자구분 확인'}),
   F('imp','중요도','combo',{opts:['A등급','B등급','C등급'],def:'A등급',listOnly:1,valid:optsErr('중요도',['A등급','B등급','C등급']),badLab:'목록 밖 값'}),
   F('unit','기준단위','combo',{req:1,opts:UNITS,listOnly:1,valid:optsErr('기준단위',UNITS),badLab:'목록 밖 값'}),
   F('small','품목소분류','combo',{req:1,dl:'dl-cls-item',listOnly:1,clsKind:'제상품',valid:clsErr('제상품','dl-cls-item'),badLab:'소분류 미등록',hint:'3단계 분류에 저장된 제상품 분류가 「대분류 > 중분류 > 소분류」로 나옵니다.'}),
@@ -579,7 +579,7 @@ var STEPS=[
   F('eng','영문명','text'),
   F('asset','품목자산분류','combo',{req:1,opts:['원자재','부자재','재공품','저장품','소모품'],def:'원자재',listOnly:1,valid:optsErr('품목자산분류',['원자재','부자재','재공품','저장품','소모품']),badLab:'목록 밖 값'}),
   F('state','자재상태','combo',{req:1,opts:['임시','사용','생산중지','거래중지','폐기'],def:'사용',listOnly:1,valid:optsErr('자재상태',['임시','사용','생산중지','거래중지','폐기']),badLab:'목록 밖 값'}),
-  F('io','내외자구분','select',{opts:['내자','외자'],def:'내자'}),
+  F('io','내외자구분','select',{opts:['내자','외자'],def:'내자',valid:optsErr('내외자구분',['내자','외자']),badLab:'내외자구분 확인'}),
   F('imp','중요도','combo',{opts:['A등급','B등급','C등급'],def:'A등급',listOnly:1,valid:optsErr('중요도',['A등급','B등급','C등급']),badLab:'목록 밖 값'}),
   F('unit','기준단위','combo',{req:1,opts:UNITS,listOnly:1,valid:optsErr('기준단위',UNITS),badLab:'목록 밖 값'}),
   F('small','자재소분류','combo',{req:1,dl:'dl-cls-mat',listOnly:1,clsKind:'자재',valid:clsErr('자재','dl-cls-mat'),badLab:function(v){return clsFind('자재',v).length>1?'소분류 여러 곳':'소분류 미등록';},cls3:1,optLab:function(p){var a=p.split(CLS_SEP);return a.length===3?clsName(p)+'   ('+a[0]+' > '+a[1]+')':p;},hint:'영림원 소분류 이름 하나만 고릅니다(대·중분류는 저절로 붙음). 대·중·소 세 칸으로 나눠 골라도 같은 값이 됩니다. 소분류 = 거래처 제품코드(대분류 보드 — 예: T보드 > T엘피엠 > T201양면).'})
@@ -1151,12 +1151,21 @@ function makeField(f,scope){
   }else if(f.type==='multi'){
     var boxes=f.opts.map(function(o,i){var b=h('input',{type:'checkbox',id:id+'-'+i,value:o});return b;});
     wrap.append(h('span',{class:'lab'},f.label,f.req||f.reqIf?h('span',{class:'req','aria-hidden':'true'},'*'):null),h('div',{class:'checks',role:'group','aria-label':f.label},boxes.map(function(b,i){return h('label',{for:id+'-'+i},b,f.opts[i]);})));
-    getter=function(){return boxes.filter(function(b){return b.checked;}).map(function(b){return b.value;});};
-    setter=function(v){boxes.forEach(function(b){b.checked=(v||[]).indexOf(b.value)>=0;});};focusEl=boxes[0];
+    var extraV=[],extraEl=h('p',{class:'hint',hidden:true});wrap.append(extraEl);   /* v87 목록 밖 값은 지우지 않고 보인다. 저장은 칸의 valid 가 막는다 */
+    getter=function(){return boxes.filter(function(b){return b.checked;}).map(function(b){return b.value;}).concat(extraV);};
+    setter=function(v){boxes.forEach(function(b){b.checked=(v||[]).indexOf(b.value)>=0;});extraV=(v||[]).filter(function(x){return f.opts.indexOf(x)<0;});extraEl.textContent=extraV.length?'미등록 값: '+extraV.join(', '):'';extraEl.hidden=!extraV.length;};focusEl=boxes[0];
   }else if(f.type==='select'){
     ctl=h('select',{id:id},f.opts.map(function(o){return h('option',{value:o},o);}));
     wrap.append(lab(),ctl);
-    getter=function(){return ctl.value;};setter=function(v){ctl.value=v;};focusEl=ctl;
+    getter=function(){return ctl.value;};focusEl=ctl;
+    /* v87 사장님 「드롭다운 목록에 없더라도 텍스트 입력 적용」: 양식에서 온 목록 밖 값을 지우지 않고 「(미등록)」 항목으로 보인다. 저장은 칸의 valid 가 막는다 */
+    ctl.addEventListener('change',function(){Array.prototype.slice.call(ctl.querySelectorAll('option[data-bad]')).forEach(function(o){if(!o.selected)o.remove();});});
+    setter=function(v){
+      Array.prototype.slice.call(ctl.querySelectorAll('option[data-bad]')).forEach(function(o){o.remove();});
+      var t=v==null?'':String(v).trim();
+      if(t!==''&&f.opts.indexOf(t)<0)ctl.append(h('option',{value:t,'data-bad':'1'},t+' (미등록)'));
+      ctl.value=t;
+    };
   }else if(f.type==='combo'||f.dl){
     /* 목록에서 고르는 칸(v6): 드롭다운으로 고르고, 목록에 없는 값은 「직접 입력」을 골라 아래 칸에 적는다.
        목록 = 칸의 opts 또는 앞 단계 자료에서 만든 LISTS[f.dl](refreshLists 가 바뀔 때마다 다시 채운다). */
@@ -4242,12 +4251,12 @@ function showBulk(s,recs,say,guide){
 /* ---------- 구글 스프레드시트 양식 받기 · 올리기 (v8, 키·로그인 없이) ----------
    받기: 사장님 드라이브 「영림원외주입력 양식」 폴더의 단계별 양식(엑셀 양식을 구글시트로 바꾼 것 — 열·별표·드롭다운 같음)을 /copy 로 연다.
    올리기: 붙여 넣은 시트 링크의 /export?format=csv 를 읽어(공유 「링크가 있는 모든 사용자」 필요) 엑셀 올리기와 같은 takeSheet 로 받는다. 탭은 링크의 gid, 없으면 첫 탭. */
-var GS_TEMPLATES={vendors:'1qQNyvzOlabG8njo2rKXW0v-uo8Xp3fLXWtjRcghkQDU',workcenters:'18njNtq1ATM1kxXuWLvWnaFz8Gv9WqtcIA7kLcAVS1sc',
-  items:'11XzR6BpvIOHXYfMXahIYF29iaHwbmzDfopUR1svSEtU',classes:'1ijqnzpOBJmFMUPLwRFgk8Sun272Ln7_HD_dEdEFkF2o',materials:'1LXg2rGzTkjlvT8zh2w3ZCYjsxSJWBxEG0IyAljtNJmI',   /* v83 13열(대·중·소 포함). 옛 v41 시트 14bATALj… 는 폴더에 남아 있음, 안 씀 */   /* v41: 분류·자재 양식 = 자재 보드 규칙 메모 */   /* v27: 분류·품목·자재 양식 (v26) — 드라이브 「영림원외주입력 양식」. 옛 품목 v9 시트 1beTB9B… 는 폴더에 남아 있음, 안 씀 */processes:'1R8wqicbuK5GiqFwDTKNBdI9XKty8t8CTQBJSN8jIZJE',
+var GS_TEMPLATES={vendors:'1DL96UvXbJ5o9tDevoK_1CSy2xVQJPgRlOGIyv5vd0XY',workcenters:'1i1rGtESn_KijgIjta4dK0Q9iLMcCt28iUdH29sudNjI',
+  items:'11XzR6BpvIOHXYfMXahIYF29iaHwbmzDfopUR1svSEtU',classes:'1l8xw2yiSXqBQ9YBwF00YhAxAgLj9DbjobZKfksIJbfU',materials:'1vKoH7f5Al8Ol-crN4iz1TrFVI7tiPmPjjw56xCanMNA',   /* v83 13열(대·중·소 포함). 옛 v41 시트 14bATALj… 는 폴더에 남아 있음, 안 씀 */   /* v41: 분류·자재 양식 = 자재 보드 규칙 메모 */   /* v27: 분류·품목·자재 양식 (v26) — 드라이브 「영림원외주입력 양식」. 옛 품목 v9 시트 1beTB9B… 는 폴더에 남아 있음, 안 씀 */processes:'1R8wqicbuK5GiqFwDTKNBdI9XKty8t8CTQBJSN8jIZJE',
   boms:'1PnHLfJf4j0aml-kBxdyd0jtPjkk4erOnBjDO_js_frM',   /* v83 영림원 38열 꼴. 옛 v31 시트 1FsSxQW… 는 폴더에 남아 있음, 안 씀 */
   contracts:'1TFZqAPx_ui5pkSxlJ9JPhSwR4cEVIqimPME4p2JaKog',   /* v82 외주계약 목록 새로(옛 시트 1VsMmf5… 는 폴더에 남아 있음, 안 씀) */
-  itemflows:'1Fz9LZ3KuBK8DZ2aJBMnd9reO-2DWCCUpqI2myaFPpp8',itemmats:'19Hz3fgEbeErfhGkwEkaHZwbXBa3z2YfRHBHDhgJAwjY',itemwcs:'1jTDPFgsGQMcDRh23Nnpg6yOWKD7VcA4l1jIuMG5lvGQ',   /* v82 8·9·10단계 */
-  impbls:'1GmsdXYNPWRluJqIsEE04hE55YbGMvSj80gDCmb2M8nc',purprices:'1OgiDKzPnLdfn4g7varuWCuIQdc4XQeLZlR3CsrhLZKI',   /* v82 수입BL·구매단가 */
+  itemflows:'14NdTQPmWJywnDtoVXtC-YitGWhBf_MnB3GOak968OHo',itemmats:'1svuS3s4e43vCEfwBLj6mgVZvJlXyOekE-3QrlPsXbZM',itemwcs:'1ArVwTEytskxcavpBq-NQXaiN01TL8y_6_qeKumZSoZU',   /* v82 8·9·10단계 */
+  impbls:'1Cdlj7io-2DRKWXHZGGbhS1cdVWX-IPZlcyZUHlh90VQ',purprices:'1gO7idBZnkNKm1yI-9NXwJZCrKsJj8Ii88AImFRxHhYo',   /* v82 수입BL·구매단가 */
   flows:'12wDwbQ3eXxd4vJYvC5iChWUDdvOEwUmaKNQ0uZqjZ9A'};   /* v22: 4단계 공정·공정흐름 양식(드라이브 「외주입력_4_공정·공정흐름_양식 (v22)」 — 공정1~10 수식·빨간 표시). v21 시트 1jr8iq… 는 폴더에 남아 있음, 안 씀 */
 var GS_SHARE='시트를 읽지 못했습니다. 구글시트 오른쪽 위 「공유」 → 일반 액세스를 「링크가 있는 모든 사용자」로 바꾼 뒤 링크를 다시 붙여 넣어 주세요.';
 function openGsTemplate(s,say){
