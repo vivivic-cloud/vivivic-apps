@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v90 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v91 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -321,7 +321,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v90</span>
+    <span class="ver">v91</span>
   </div>
 </header>
 <div class="wrap">
@@ -774,6 +774,7 @@ var STEPS=[
  subt:function(r){return [r.vendor,r.term,r.cur,(r.rows||[]).length+'줄'].filter(Boolean).join(' · ');}},
 
 {key:'impins',n:'수입2',page:'수입',title:'수입입고',screen:'수입입고입력',noForm:1,
+ xlCols:function(s){return [xlF(s,'blno',{type:'combo',dl:'dl-openbls'}),xlF(s,'indate'),xlF(s,'wh'),xlF(s,'ccode'),xlF(s,'qty')];},   /* 앞 문서 = B/L. 한 번호 = 한 건, 필름 줄은 품번으로 맞춘다 */
  path:['구매/수입','[수입] 수입관리','수입입고입력'],needs:['impbls'],
  note:'B/L 을 고르면 필름 줄이 나옵니다. 수량은 B/L 수량이 처음 값이고 고칠 수 있습니다. 저장하면 대기로 쌓입니다.',
  fields:[
@@ -845,6 +846,7 @@ var STEPS=[
  subt:function(r){return uniq((r.rows||[]).map(function(x){return x.vendor;})).concat(r.stage?[r.stage+'까지 등록']:[]).filter(Boolean).join(' · ');}},
 
 {key:'purdelvs',n:'구매3',page:'구매',title:'납품 입고',h2:'납품 입고',screen:'구매납품입력',noForm:1,
+ xlCols:function(s){return [xlF(s,'pono',{type:'combo',dl:'dl-openpos'}),xlF(s,'dlvdate'),xlF(s,'ccode'),xlF(s,'qty'),xlF(s,'wh',{type:'combo',opts:PUR_WHS})];},   /* 앞 문서 = 발주 */
  path:['구매/수입','[구매] 구매·입고','구매납품입력'],needs:['purchases'],
  note:'원장이 재단 업체에 실제로 도착한 날 넣습니다. 발주를 고르면 남은 수량이 나옵니다. 나눠서 들어오면 이번에 온 수량으로 고쳐 저장하고, 남은 수량은 다음에 넣습니다. 저장하면 대기로 쌓입니다.',
  fields:[
@@ -871,6 +873,7 @@ var STEPS=[
    새 생산 한 건 = 생산계획 ~ 전 공정 외주발주(입력 작업자가 한꺼번에). 납품 입력 한 건 = 공정 하나의 납품 한 번(나눠 납품은 문서 여러 개).
    재공품 이동(erp_prodmoves)은 발주·납품과 떼어, 재공품을 보내는 날 카드 단추로 쌓는다. 정산은 뺐다. 명세서 번호·금액은 폼 기록만 — 영림원 칸 확인 전. */
 {key:'prods',n:'생산1',page:'생산',title:'새 생산',h2:'새 생산',screen:'주간생산계획입력',noForm:1,
+ xlCols:function(s){return [xlF(s,'itemNo',{listOnly:0}),xlF(s,'qty'),xlF(s,'dueDate')];},   /* 한 줄 = 한 건. 공정별 업체는 화면의 우선순위 1 이 처음 값 */
  path:['생산/외주','메뉴 검색: 주간생산계획입력(500498)'],needs:['itemmats','itemwcs','contracts'],
  note:'제품이나 부속을 고르고 수량·완료일을 넣습니다. 공정 줄이 나오면 업체를 확인하고 저장합니다. 저장하면 입력 작업자가 생산계획부터 재단~조립 모든 공정의 외주발주까지 한꺼번에 넣습니다.',
  fields:[
@@ -896,7 +899,9 @@ var STEPS=[
  recTitle:function(r){return [r.itemNo,r.itemName].filter(Boolean).join(' · ');},
  subt:function(r){return [show(r.qty)+'개',r.dueDate,r.stage?r.stage+'까지 등록':''].filter(Boolean).join(' · ');}},
 
-{key:'proddlvs',n:'생산2',page:'생산',title:'진행 중',h2:'진행 중',screen:'외주납품입력',noForm:1,alsoList:'prodmoves',alsoTitle:'재공품·완성 부속 이동',
+{key:'proddlvs',n:'생산2',page:'생산',title:'진행 중',h2:'진행 중',screen:'외주납품입력',noForm:1,
+ xlCols:function(s){return [xlF(BYKEY.prods,'orderNo',{type:'combo',dl:'dl-prodorders'}),xlF(s,'itemNo'),xlF(s,'proc'),xlF(s,'wc'),xlF(s,'dlvQty'),xlF(s,'dlvDate'),xlF(s,'stmtNo'),xlF(s,'stmtAmt')];},   /* 앞 문서 = 외주발주. 번호가 아직 없으면 품번·공정·외주거래처로 찾는다 */
+ alsoList:'prodmoves',alsoTitle:'재공품·완성 부속 이동',
  path:['생산/외주','메뉴 검색: 외주발주조회(501610) → 외주납품입력(501613)'],needs:['prods'],
  note:'공정마다 [납품 입력]을 누르고 업체 명세서대로 넣습니다. 재공품을 다음 업체로 실제로 보내는 날 [재공품 보내기]를 누릅니다. 납품이 발주보다 적으면 남은 수량을 나중에 또 넣습니다.',
  fields:[
@@ -1518,6 +1523,9 @@ function refreshLists(){
   datalist('dl-films',edgeFilms().map(function(r){return String(r.code||'').trim();}));   /* v74 수입 필름 = 자재소분류 중분류 T엣지필름 */
   datalist('dl-purvendors',(data.vendors||[]).filter(function(r){return r.status==='완료'&&(r.kinds||[]).indexOf('국내매입거래처')>=0;}).map(function(r){return String(r.name||'').trim();}));   /* v78 구매거래처 */
   datalist('dl-plates',purPlates().map(function(r){return String(r.code||'').trim();}));   /* v78 완료 원장 */
+  datalist('dl-openbls',impblOpen().map(function(r){return String(r.blno||'').trim();}));   /* v91 앞 문서 번호(양식 드롭다운) */
+  datalist('dl-openpos',purOpen().map(function(r){return purTrim(r.pono);}));
+  datalist('dl-prodorders',[].concat.apply([],(data.prods||[]).filter(function(d){return !prodDone(d);}).map(function(d){return (d.rows||[]).map(function(r){return purTrim(r.orderNo);});})));
   datalist('dl-flows',(data.flows||[]).filter(function(r){return r.status!=='오류';}).map(function(r){return String(r.name||'').trim();}));
   /* v25 분류: 소분류 목록(품목·자재), 대·중분류 목록은 지금 고른 품목구분·대분류 아래 것만(고르기 전이면 전체) */
   var cls=(data.classes||[]).filter(function(r){return r.status!=='오류';}),tr=function(v){return String(v==null?'':v).trim();};
@@ -2789,7 +2797,7 @@ function purdPickFn(){
     tb.replaceChildren.apply(tb,rows.map(function(r){
       var d=function(l,c,cls){return h('td',{'data-l':l,class:cls||null},c);};
       var inp=h('input',{type:'number',class:'cprice',min:'0',step:'any',inputmode:'decimal','aria-label':r.cname+' 납품수량',value:String(r.qty),disabled:busy,on:{input:function(e){r.qty=e.target.value;msg.textContent='';}}});
-      var sel=h('select',{'aria-label':r.cname+' 창고',disabled:busy,on:{change:function(e){r.wh=e.target.value;msg.textContent='';}}},uniq(PUR_WHS.concat(r.wh?[r.wh]:[])).map(function(o){return h('option',{value:o},o);}));
+      var sel=h('select',{'aria-label':r.cname+' 창고',disabled:busy,on:{change:function(e){r.wh=e.target.value;msg.textContent='';}}},uniq(PUR_WHS.concat(r.wh?[r.wh]:[])).map(function(o){return h('option',{value:o},o+(PUR_WHS.indexOf(o)<0?' (미등록)':''));}));
       sel.value=r.wh;
       return h('tr',{},[d('품명',r.cname,'nm'),d('품번',r.ccode),d('규격',r.cspec),d('단위',r.unit),d('단가',show(r.price)),d('발주수량',show(r.poqty)),d('남은 수량',show(r.left)),d('납품수량',inp),d('창고',sel)]);
     }));
@@ -2805,6 +2813,7 @@ function purdPickFn(){
     var q=purTrim(r.qty);
     if(q===''||Number(q)===0)return r.cname+' 납품수량을 넣으세요. 이번에 안 온 줄을 빼는 것은 영림원 시험 전이라 아직 저장할 수 없습니다.';
     var e=purQtyErr('납품수량')(q);if(e)return r.cname+' '+e;
+    if(r.wh&&PUR_WHS.indexOf(r.wh)<0)return r.cname+' 창고 「'+r.wh+'」 은(는) 목록에 없습니다.';
     return Number(q)>left?r.cname+' 납품수량이 남은 수량 '+show(left)+' 보다 많습니다.':'';
   }
   function saveIt(){
@@ -2832,6 +2841,16 @@ function purdPickFn(){
     if(busy)return;
     if(po&&!purOpen().some(function(r){return r.id===po.id;}))pick(null);
     drawWho();
+  };
+  fn.take=function(recs,done){   /* v91 */
+    done(xlGroup(recs,'pono').map(function(g){
+      var a=purOpen().filter(function(r){return purTrim(r.pono)===g.no;})[0];
+      return {label:[g.no||'(발주번호 없음)',g.recs[0].dlvdate].concat(g.recs.map(function(r){return (r.ccode||'')+' '+show(r.qty);})).filter(Boolean).join(' · '),why:a?'':'없는 발주번호이거나 납품이 끝난 발주입니다',fill:a?function(){
+        pick(a);if(g.recs[0].dlvdate)fDate.set(g.recs[0].dlvdate);var miss=[];
+        g.recs.forEach(function(rc){if(!rc.ccode)return;var x=rows.filter(function(y){return y.ccode===purTrim(rc.ccode);})[0];if(!x){miss.push(rc.ccode);return;}if(!isEmpty(rc.qty))x.qty=rc.qty;if(rc.wh)x.wh=purTrim(rc.wh);});
+        draw();msg.textContent=miss.length?'이 발주에 없는 품번(미등록): '+miss.join(', '):'';msg.className='msg bad';
+      }:null};
+    }));
   };
   fn.box=h('section',{class:'ps inform conwho'},h('h3',{},'발주 고르기'),who,none,out,parts);
   return fn;
@@ -2939,6 +2958,15 @@ function prodPickFn(){
   }
   var fn={};
   fn.refresh=function(){if(busy)return;drawGap();if(!lines.length||fn.box.contains(document.activeElement))return;redo();};
+  fn.take=function(recs,done){   /* v91 한 줄 = 한 건. 목록 밖 품번은 칸에 「(미등록)」 */
+    done(recs.map(function(rc){
+      var c=purTrim(rc.itemNo),ok=(LISTS['dl-prods']||[]).indexOf(c)>=0;
+      return {label:[c||'(품번 없음)',show(rc.qty)+'개',rc.dueDate].filter(Boolean).join(' · '),why:ok?'':'앞 단계 등록이 끝나지 않았거나 없는 품번입니다',fill:function(){
+        mine={};msg.textContent='';out.textContent='';fld.itemNo.set(c);fld.qty.reset();fld.dueDate.reset();if(!isEmpty(rc.qty))fld.qty.set(rc.qty);if(rc.dueDate)fld.dueDate.set(rc.dueDate);
+        if(ok)redo();else{lines=[];parts.hidden=true;draw();}
+      }};
+    }));
+  };
   fn.box=h('section',{class:'ps inform conwho'},h('h3',{},'무엇을 만듭니까'),prodTemp(),h('div',{class:'grid prform'},fld.itemNo.el,fld.qty.el,fld.dueDate.el),none,gap,out,parts);
   return fn;
 }
@@ -2983,7 +3011,7 @@ function prodRunFn(){
     var key=d.id+'|'+r.itemNo+'|'+r.seq,F0=fieldsFor(),left=prodNum(r.qty-prodMade(d,r)),msg=h('span',{class:'msg','aria-live':'polite'}),warn=h('p',{class:'hint warn',hidden:true}),P={key:key,F:F0};
     F0.dlvQty.set(String(left));F0.dlvDate.set(conToday());
     function sayWarn(){var t=warnOf(d,r,F0.dlvQty.get());warn.textContent=t;warn.hidden=!t;}
-    F0.dlvQty.el.addEventListener('input',sayWarn);sayWarn();
+    F0.dlvQty.el.addEventListener('input',sayWarn);sayWarn();P.sayWarn=sayWarn;
     var save=h('button',{type:'button',class:'btn primary',on:{click:function(){saveDlv(d,r,P,msg,save);}}},'저장');
     var close=h('button',{type:'button',class:'btn',on:{click:function(){open=null;draw();}}},'닫기');
     P.el=h('div',{class:'prpanel'},h('div',{class:'grid'},F0.dlvQty.el,F0.dlvDate.el,F0.stmtNo.el,F0.stmtAmt.el),warn,h('div',{class:'row'},save,close,msg));
@@ -3071,6 +3099,20 @@ function prodRunFn(){
     if(open&&open.el.contains(document.activeElement)){pending=true;return;}   /* 치는 중에 다시 그리면 초점이 날아간다 */
     pending=false;draw();
   };
+  function find(rc){   /* v91 외주발주번호가 있으면 그것으로, 없으면 품번·공정·외주거래처로 남은 줄을 찾는다 */
+    var out0=null,no=purTrim(rc.orderNo),it=purTrim(rc.itemNo),pc=purTrim(rc.proc),wc=purTrim(rc.wc);
+    (data.prods||[]).forEach(function(d){if(out0||!d.id||prodDone(d))return;(d.rows||[]).forEach(function(r){if(out0)return;
+      if(no?purTrim(r.orderNo)===no:(!!it&&r.itemNo===it&&(!pc||r.proc===pc)&&(!wc||r.wc===wc)&&prodNum(r.qty-prodMade(d,r))>0))out0={d:d,r:r};});});
+    return out0;
+  }
+  fn.take=function(recs,done){
+    done(recs.map(function(rc){
+      var a=find(rc),can=a&&prodCanDlv(a.d,a.r);
+      return {label:[rc.orderNo,rc.itemNo,rc.proc,rc.wc,show(rc.dlvQty)+'개',rc.dlvDate].filter(Boolean).join(' · '),why:!a?'없는 외주발주이거나 찾지 못한 공정입니다':can?'':'아직 납품 입력 차례가 아닙니다',chip:a?'차례 아님':'',fill:can?function(){
+        var b=find(rc);if(!b)return;openPanel(b.d,b.r);var F0=open.F;if(!isEmpty(rc.dlvQty))F0.dlvQty.set(rc.dlvQty);if(rc.dlvDate)F0.dlvDate.set(rc.dlvDate);if(rc.stmtNo)F0.stmtNo.set(rc.stmtNo);if(!isEmpty(rc.stmtAmt))F0.stmtAmt.set(rc.stmtAmt);open.sayWarn();
+      }:null};
+    }));
+  };
   fn.box=h('section',{class:'ps inform conwho',on:{focusout:function(){setTimeout(function(){if(pending)fn.refresh();},0);}}},h('h3',{},'진행 중인 생산'),prodTemp(),none,out,box,done);
   return fn;
 }
@@ -3130,6 +3172,16 @@ function impPickFn(){
     if(busy)return;
     if(bl&&!impblOpen().some(function(r){return r.id===bl.id;}))pick(null);
     drawWho();
+  };
+  fn.take=function(recs,done){   /* v91 */
+    done(xlGroup(recs,'blno').map(function(g){
+      var a=impblOpen().filter(function(r){return purTrim(r.blno)===g.no;})[0],used=!a&&(data.impbls||[]).some(function(r){return purTrim(r.blno)===g.no;});
+      return {label:[g.no||'(B/L No. 없음)',g.recs[0].indate].concat(g.recs.map(function(r){return (r.ccode||'')+' '+show(r.qty);})).filter(Boolean).join(' · '),why:a?'':used?'이미 입고한 B/L 입니다':'없는 B/L No. 입니다',fill:a?function(){
+        pick(a);if(g.recs[0].indate)fDate.set(g.recs[0].indate);if(g.recs[0].wh)fWh.set(g.recs[0].wh);var miss=[];
+        g.recs.forEach(function(rc){if(!rc.ccode)return;var x=rows.filter(function(y){return y.ccode===purTrim(rc.ccode);})[0];if(!x){miss.push(rc.ccode);return;}if(!isEmpty(rc.qty))x.qty=rc.qty;});
+        draw();msg.textContent=miss.length?'이 B/L 에 없는 품번(미등록): '+miss.join(', '):'';msg.className='msg bad';
+      }:null};
+    }));
   };
   fn.box=h('section',{class:'ps inform conwho'},h('h3',{},'B/L 고르기'),who,none,out,parts);
   return fn;
@@ -3729,8 +3781,10 @@ function renderStep(){
     iwProc.el.addEventListener('change',function(){var v={code:iwCode.get(),proc:iwProc.get()};iwFill(v);if(!isEmpty(v.seq))form.fill({seq:v.seq},[]);});}
   if(s.key==='purprices'){var puCode=form.field('code');puCode.el.addEventListener('change',function(){var v={code:puCode.get()};purFill(v);form.fill({name:v.name,spec:v.spec,unit:v.unit},[]);});}   /* v78 */
   var impBtn=h('button',{type:'button',class:'btn imp','aria-expanded':'false',on:{click:function(){imp.hidden=!imp.hidden;impBtn.setAttribute('aria-expanded',String(!imp.hidden));}}},ico('import'),'영림원에서 불러오기');
-  var impBar=IMPORT_BTN[s.key]&&(s.noForm||s.noXl)?h('div',{class:'actions'},impBtn,imp):null;   /* v85 양식 단추 줄이 없는 메뉴는 불러오기만 한 줄 */
-  xlBar.append(IMPORT_BTN[s.key]&&!impBar?impBtn:'',gsRow,xlMsg,IMPORT_BTN[s.key]&&!impBar?imp:'');
+  var noBar=(s.noForm&&!s.xlCols)||s.noXl,xlQ=h('div',{class:'bulklist',style:'flex-basis:100%'});   /* v91 앞 문서를 고르는 메뉴: 양식 줄을 건별 단추로 */
+  var impBar=IMPORT_BTN[s.key]&&noBar?h('div',{class:'actions'},impBtn,imp):null;   /* v85 양식 단추 줄이 없는 메뉴는 불러오기만 한 줄 */
+  xlBar.append(IMPORT_BTN[s.key]&&!impBar?impBtn:'',gsRow,xlMsg,IMPORT_BTN[s.key]&&!impBar?imp:'',xlQ);
+  xlPick=s.xlCols?{fn:inFn||pdFn||prFn||pnFn,box:xlQ}:null;
   sheetDraw=null;
   if(SHEET_STEPS[s.key]){   /* v35 완료 품목 셀 표 */
     var sb=sheetBox(s);
@@ -3745,7 +3799,7 @@ function renderStep(){
           return h('button',{type:'button',class:'btn small wcpick'+(on?' primary':''),'aria-pressed':on?'true':'false',on:{click:function(){if(!on)go(x.key);}}},x.title);})):'',
         h('h2',{},s.h2||(s.page?'':s.n+'. ')+s.title+' 입력'),
         needs,h('p',{class:'stepnote'},s.note)),
-      s.noForm||s.noXl?(impBar||''):xlBar,
+      noBar?(impBar||''):xlBar,
       bomFn||ifFn||iwFn||imFn||wpFn?psBox(bomFn||ifFn||iwFn||imFn||wpFn):'',
       cnFn?cnFn.box:'',
       inFn?inFn.box:'',
@@ -3778,7 +3832,9 @@ function loadXlsx(){
   return xlsxP;
 }
 var XLSX_FAIL='엑셀 도구를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.';
+function xlF(step,k,o){return Object.assign({},step.fields.concat(step.rowFields||[]).filter(function(f){return f.k===k;})[0],o||{});}   /* v91 앞 문서를 고르는 메뉴의 양식 칸 — 폼 칸 그대로 */
 function sheetCols(s){
+  if(s.xlCols)return s.xlCols(s);
   /* v19 공정흐름유형: 한 줄 = 흐름 하나. 공정1~공정10 열에 공정을 순서대로 적는다(공정순서 등은 폼이 채우니 열 없음) */
   if(s.flowCols){
     var pf=s.rowFields.filter(function(f){return f.k==='proc';})[0],a=[];
@@ -3932,7 +3988,7 @@ function pickList(f){
 }
 /* 양식 머리 칸 설명(v18) — 사장님 「업로드 양식 다운되면 각 입력부 명칭쪽에 해당 입력부가 무엇인지 설명이 나타나게…」
    칸 정의(req·reqIf·type·opts·dl·ph·hint)와 목록 출처(refreshLists)에서만 만든다. 영림원 화면에서 확인 안 된 뜻은 넣지 않는다. */
-var DL_SRC={'dl-purvendors':'1단계 거래처 중 영림원 등록이 끝난(완료) 국내매입거래처','dl-plates':'5단계 자재 중 등록이 끝난(완료) 원장(자재 대분류 보드)의 번호','dl-impvendors':'1단계 거래처 중 영림원 등록이 끝난(완료) 해외매입거래처','dl-films':'5단계 자재 중 자재소분류 중분류가 T엣지필름인 자재의 번호','dl-wcreg':'2단계 워크센터(오류 건 뺌)','dl-itemcodes':'4단계 품목의 품번(오류 건 뺌)','dl-flows':'6단계 공정흐름(오류 건 뺌)','dl-vendors':'1단계 거래처 중 영림원 등록이 끝난(완료) 외주가공 거래처','dl-wc':'서버의 외주 워크센터 + 2단계 워크센터','dl-proc':'서버의 공정(조립·가공) + 6단계 공정','dl-codes':'4단계 품목의 품번 + 5단계 자재의 자재번호','dl-cls-item':'3단계 분류에 저장된 제상품 소분류(오류 건 뺌)','dl-cls-mat':'3단계 분류에 저장된 자재 소분류(오류 건 뺌)','dl-cls-big':'이미 저장된 대분류','dl-cls-mid':'이미 저장된 중분류','dl-procs':'이미 저장된 공정(오류 건 뺌)'};
+var DL_SRC={'dl-prods':'1~11단계 등록이 모두 끝난 제품·부속','dl-openbls':'입고가 없는 수입BL','dl-openpos':'납품이 남은 발주','dl-prodorders':'진행 중인 생산의 외주발주','dl-purvendors':'1단계 거래처 중 영림원 등록이 끝난(완료) 국내매입거래처','dl-plates':'5단계 자재 중 등록이 끝난(완료) 원장(자재 대분류 보드)의 번호','dl-impvendors':'1단계 거래처 중 영림원 등록이 끝난(완료) 해외매입거래처','dl-films':'5단계 자재 중 자재소분류 중분류가 T엣지필름인 자재의 번호','dl-wcreg':'2단계 워크센터(오류 건 뺌)','dl-itemcodes':'4단계 품목의 품번(오류 건 뺌)','dl-flows':'6단계 공정흐름(오류 건 뺌)','dl-vendors':'1단계 거래처 중 영림원 등록이 끝난(완료) 외주가공 거래처','dl-wc':'서버의 외주 워크센터 + 2단계 워크센터','dl-proc':'서버의 공정(조립·가공) + 6단계 공정','dl-codes':'4단계 품목의 품번 + 5단계 자재의 자재번호','dl-cls-item':'3단계 분류에 저장된 제상품 소분류(오류 건 뺌)','dl-cls-mat':'3단계 분류에 저장된 자재 소분류(오류 건 뺌)','dl-cls-big':'이미 저장된 대분류','dl-cls-mid':'이미 저장된 중분류','dl-procs':'이미 저장된 공정(오류 건 뺌)'};
 function colNote(f,mi){
   if(f.aceOnly)return f.hint;   /* v47 영림원 BOM 양식의 폼에 없는 칸 */
   var t=[];
@@ -4037,6 +4093,19 @@ function uploadSheet(s,file,say){
 /* 표(줄 × 칸 배열)를 단계 칸에 받는다 — 엑셀·CSV 올리기와 다른 경로(구글 스프레드시트 등)가 같이 쓴다.
    행 있는 단계(BOM·외주계약)는 엑셀 한 줄 = 행 하나로 폼을 채운다.
    행 없는 단계(거래처·워크센터·품목·공정)는 한 줄이면 폼을 채우고, 여러 줄이면 줄마다 한 건씩 「여러 건 확인」 목록(showBulk)으로 받는다. */
+/* v91 앞 문서를 고르는 메뉴: 양식 건마다 단추 하나. 누르면 화면 칸에 채운다(저장은 사람이). 없는 번호는 값 그대로 「미등록」. */
+var xlPick=null;
+function xlGroup(recs,k){var a=[],seen={};recs.forEach(function(r){var no=purTrim(r[k]);if(!(no in seen)){seen[no]={no:no,recs:[]};a.push(seen[no]);}seen[no].recs.push(r);});return a;}
+function xlQueue(box,say,items){
+  box.replaceChildren.apply(box,items.map(function(it){
+    var chip=h('span',{class:'chip '+(it.why?'오류':'대기')},it.why?(it.chip||'미등록'):'업로드 준비중');
+    it.go=function(){if(it.fill){it.fill();if(!it.why){chip.textContent='칸에 채움';}}if(it.why)say(it.label+': '+it.why,true);else say('값을 칸에 채웠습니다. 확인하고 저장을 누르세요.');};
+    return h('button',{type:'button',class:'btn bulkbtn',on:{click:it.go}},h('span',{class:'rt'},h('b',{},it.label),h('small',{},it.why||'')),chip);
+  }));
+  var bad=items.filter(function(x){return x.why;}).length;
+  if(items.length===1){items[0].go();if(!bad)box.replaceChildren();return;}
+  say('양식에서 '+items.length+'건을 읽었습니다. 업로드 준비중 '+(items.length-bad)+'건'+(bad?', 확인할 것 '+bad+'건':'')+' — 아래 단추를 눌러 칸에 채우고 저장하세요.',bad>0);
+}
 function takeSheet(X,s,aoa,say){
     var cols=sheetCols(s),byLabel={};
     cols.forEach(function(f){byLabel[normHead(f.label)]=f;(f.alias||[]).forEach(function(l){byLabel[normHead(l)]=f;});if(f.type==='multi')multiLabs(f).forEach(function(l){byLabel[normHead(l)]=f;});});
@@ -4058,6 +4127,12 @@ function takeSheet(X,s,aoa,say){
     var bomSplit=s.key==='boms'||s.key==='impbls'||s.key==='purchases',splitK=s.key==='boms'?'pcode':s.key==='purchases'?'reqdate':'blno',grps=[],grp=null;   /* v43 BOM: 모품목번호(없으면 모품목명)가 바뀌면 새 BOM — 한 장에 여러 BOM */
     var d0=hi+1;   /* 자료 첫 줄. v47 영림원 양식은 머리가 두 줄(코드 · 한글) — 다음 줄도 칸 이름이면 건너뜀 */
     if(hi>=0&&aoa[d0]&&aoa[d0].filter(function(c){return byLabel[normHead(c)];}).length>=3)d0++;
+    if(s.xlCols){   /* v91 앞 문서를 고르는 메뉴 */
+      var xr=[];aoa.slice(d0).forEach(function(line){var o={},any=false;map.forEach(function(f,c){if(!f||line[c]===''||line[c]==null)return;o[f.k]=cellVal(X,f,line[c]);any=true;});if(any)xr.push(o);});
+      if(!xr.length){say('양식에 입력한 줄이 없습니다.',true);return;}
+      if(BYKEY[cur]===s&&xlPick)xlPick.fn.take(xr,function(items){xlQueue(xlPick.box,say,items);});
+      return;
+    }
     aoa.slice(d0).forEach(function(line,li){
       var o={},one={},hasRow=false,any=false,c3=['','',''],c3f=null;
       map.forEach(function(f,c){
