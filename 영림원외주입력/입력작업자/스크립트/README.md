@@ -7,6 +7,7 @@
 |---|---|---|---|---|---|
 | (모든 표 화면) | `공통.js` | — | `ylw.paste`·`ylw.setChk`·`ylw.check`·`ylw.rows`·`ylw.fs` | — | 11-01 |
 | 거래처등록(500347) | `거래처등록-채우기.js` | `erp_vendors` 한 건 `{sangho,name,corp,rep,tel,biztype,bizitem,kinds,…}` | `ylwFill(v)` · `ylwKinds(종류들)` · `ylwRead()` · `ylwCheck(v)` | 아니오(한 화면 한 건) | 10-31 저장 8건 · 11-01 칸 id·종류 체크(저장 없음) |
+| 구매단가등록(501868) | `구매단가등록-채우기.js` | `erp_purprices` 배열 | `ylw.pp.fill` · `ylw.pp.verify` | 예(칸마다 붙임, 파일 그대로는 아직 안 돌림 — 11-06 2건은 같은 순서를 손 스크립트로) | 11-06 실제 2건 |
 | 창고등록(501081) | `창고등록-채우기.js` | `[{name, cust, type}]` (폼 단계 없음 — 업체 이름 = 창고명 = 외주거래처) | `ylw.wh.fill(목록)` · `ylw.wh.verify(목록)` | 예 | 11-01 저장 없이 2줄 |
 | 워크센터등록(500226) | `워크센터등록-채우기.js` | `erp_workcenters` 배열 | `ylw.wc.fill` · `ylw.wc.verify` | 예 | 11-01 저장 없이 2줄(사외외주·자체생산) |
 | 공정등록(500173) | `공정등록-채우기.js` | `erp_processes` 배열 `{name, memo, inspect}` | `ylw.process.fill` · `ylw.process.verify` | 예 | 11-01 저장 없이 2줄 |
