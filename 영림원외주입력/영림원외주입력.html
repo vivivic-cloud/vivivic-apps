@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v83 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v84 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -321,7 +321,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v83</span>
+    <span class="ver">v84</span>
   </div>
 </header>
 <div class="wrap">
@@ -896,7 +896,7 @@ var STEPS=[
  recTitle:function(r){return [r.itemNo,r.itemName].filter(Boolean).join(' · ');},
  subt:function(r){return [show(r.qty)+'개',r.dueDate,r.stage?r.stage+'까지 등록':''].filter(Boolean).join(' · ');}},
 
-{key:'proddlvs',n:'생산2',page:'생산',title:'진행 중',h2:'진행 중',screen:'외주납품입력',noForm:1,alsoList:'prodmoves',alsoTitle:'재공품 이동',
+{key:'proddlvs',n:'생산2',page:'생산',title:'진행 중',h2:'진행 중',screen:'외주납품입력',noForm:1,alsoList:'prodmoves',alsoTitle:'재공품·완성 부속 이동',
  path:['생산/외주','메뉴 검색: 외주발주조회(501610) → 외주납품입력(501613)'],needs:['prods'],
  note:'공정마다 [납품 입력]을 누르고 업체 명세서대로 넣습니다. 재공품을 다음 업체로 실제로 보내는 날 [재공품 보내기]를 누릅니다. 납품이 발주보다 적으면 남은 수량을 나중에 또 넣습니다.',
  fields:[
@@ -912,11 +912,12 @@ var STEPS=[
  recTitle:function(r){return [r.itemNo,r.proc].filter(Boolean).join(' · ');},
  subt:function(r){return [r.wc,r.dlvDate,show(r.dlvQty)+'개'].filter(Boolean).join(' · ');}},
 
-{key:'prodmoves',n:'생산3',page:'생산',hidden:1,shownIn:'proddlvs',title:'재공품 이동',screen:'자재출고입력',noForm:1,
+{key:'prodmoves',n:'생산3',page:'생산',hidden:1,shownIn:'proddlvs',title:'재공품·완성 부속 이동',screen:'자재출고입력',noForm:1,
  path:['생산/외주','메뉴 검색: 자재출고요청현황(500938) → 자재출고입력(500940)'],needs:['proddlvs'],
  note:'',
  fields:[
-  F('wipNo','재공품 품번','text',{req:1,mono:1}),
+  F('kind','구분','text'),
+  F('wipNo','품번','text',{req:1,mono:1}),
   F('fromWc','출고창고','text',{req:1}),
   F('toWc','입고창고','text',{req:1}),
   F('qty','금회출고수량','number',{req:1})
@@ -986,9 +987,9 @@ var ROUTES={
  proddlvs:{method:'외주발주 조회에서 넘겨 화면 입력',note:'폼 v81. 화면은 생산 페이지의 「진행 중」 탭입니다. 한 문서 = 공정 하나의 납품 한 번. 납품이 발주보다 적으면 문서가 여러 개입니다. prodId = erp_prods 문서 id. dlvQty 납품수량 · dlvDate 외주납품일 은 영림원 칸입니다. stmtNo · stmtAmt 는 명세서 번호·금액으로 폼 기록만입니다. 영림원 어느 칸인지 확인 전이니 넣지 않습니다. 입력 작업자가 쓰는 칸 = dlvNo · inNo · stock(재고 대조 글). 정산은 하지 않습니다.',
   how:['prodId 문서가 완료이고 앞 공정 납품이 입고완료여야 합니다. 아니면 건너뜁니다(문서가 없으면 오류). 501614 에서 같은 납품이 이미 있는지 봅니다.','외주발주조회 501610 줄 선택 + 외주납품 → 501613: 외주납품일·납품수량을 문서 값으로 넣고 대조 → 저장. 번호 칸으로 저장을 확인합니다. 시트 오류는 저장 전에 MutationObserver 를 걸어 모읍니다.','501614 입고완료 · 501621 투입 · 501186 재공품 · 501179 재고를 대조합니다. dlvNo · inNo · stock. 재공품 출고는 여기서 하지 않습니다(erp_prodmoves).','「현재고가 부족하여」 문구면 오류 + 문구 그대로. 필름 부족이면 사장님 임시 기준대로 옮긴 뒤 대기로 되돌립니다.'],
   unverified:['납품수량·외주납품일을 바꿔 저장 · 나눠 납품 — 시험 전','재공품을 안 옮기고 납품할 때 막히는지 · 앞 공정보다 많이 납품할 때 — 시험 전. 폼은 막지 않고 글만 보입니다','명세서 번호·금액이 들어갈 영림원 칸','납품부서 · 납품담당자 · 납품구분 값']},
- prodmoves:{method:'자재출고요청현황에서 넘겨 화면 입력',note:'폼 v81. 진행 중 카드의 [재공품 보내기] 한 번 = 문서 하나. 재공품을 실제로 보내는 날 사장님이 누릅니다. 외주발주·납품과 뗀 까닭 = 재공품은 다음 공정이 시작되기 전까지 현재 공정 창고에 보여야 합니다. fromWc = 앞 공정 업체 창고, toWc = 다음 공정 업체 창고, qty = 앞 공정 납품 합 - 이미 보낸 합, wipNo = 재공품 품번. 입력 작업자가 쓰는 칸 = outNo · stock. 임시: 재공품 이동은 자재출고로 합니다(자재이동 501125·이동입력 501096 에는 재공품이 안 잡힘).',
+ prodmoves:{method:'자재출고요청현황에서 넘겨 화면 입력',note:'폼 v81, v84 완성 부속. 진행 중 카드의 [재공품 보내기]·[완성 부속 보내기] 한 번 = 문서 하나. kind = 재공품(옛 문서는 칸 없음) · 완성 부속. wipNo = 보낼 품번(재공품 품번 또는 부속 품번). fromWc 와 toWc 가 같으면 폼은 문서를 만들지 않습니다. 재공품을 실제로 보내는 날 사장님이 누릅니다. 외주발주·납품과 뗀 까닭 = 재공품은 다음 공정이 시작되기 전까지 현재 공정 창고에 보여야 합니다. fromWc = 앞 공정 업체 창고, toWc = 다음 공정 업체 창고, qty = 앞 공정 납품 합 - 이미 보낸 합, wipNo = 재공품 품번. 입력 작업자가 쓰는 칸 = outNo · stock. 임시: 재공품 이동은 자재출고로 합니다(자재이동 501125·이동입력 501096 에는 재공품이 안 잡힘).',
   how:['같은 prodId·itemNo·seq 의 erp_proddlvs 완료 합이 이 문서까지의 출고 합 이상이어야 합니다. 아니면 건너뜁니다. 문서가 없으면 오류.','자재출고요청현황 500938: 작업지시번호 workNo 로 조회 → 다음 공정(nextProc) 줄 선택 + 출고처리 → 500940.','출고유형 외주출고 · 입고창고가 toWc 와 같은지 대조. 재공품 줄 출고창고를 fromWc 로 바꾸고 금회출고수량을 qty 로 맞춥니다. 다른 자재 줄은 요청수량 그대로 둡니다(0 은 안 됨).','저장 → outNo. 501186 에서 앞 업체 재공품이 줄고 다음 업체에 생겼는지 대조해 stock 에 적고 완료.'],
-  unverified:['fromWc 와 toWc 가 같은 때 출고가 필요한지 — 시험 전. 첫 건은 화면을 보고 결과를 화면별-요령.md 에 적습니다','금회출고수량을 요청수량과 다르게 저장(나눠 납품) — 시험 전','다음 공정 발주가 앞 공정 납품 전에 저장되어 있을 때 출고가 되는지 — 시험 전','재공품이 자재 표와 공정품 표 중 어디에 나오는지 · 출고일 · 출고담당자 · 출고구분 값']}
+  unverified:['kind 완성 부속 출고 — 시험 전. 조립 작업지시 workNo 로 500938 에서 나오는지, 출고창고를 fromWc 로 바꿀 수 있는지. 첫 건은 화면을 보고 결과를 화면별-요령.md 에 적습니다','금회출고수량을 요청수량과 다르게 저장(나눠 납품) — 시험 전','다음 공정 발주가 앞 공정 납품 전에 저장되어 있을 때 출고가 되는지 — 시험 전','재공품이 자재 표와 공정품 표 중 어디에 나오는지 · 출고일 · 출고담당자 · 출고구분 값']}
 };
 /* v23 영림원에서 불러오기 — 규약(erp-spec.json 의 imports). 폼은 영림원에 접속할 수 없어 요청만 erp_imports 에 「대기」로 쌓고,
    입력 작업자가 영림원 조회 화면을 읽기 스크립트로 읽어 폼에 없는 것만 넣는다(입력작업자/AGENTS.md 「불러오기 요청 처리 순서」).
@@ -2789,8 +2790,9 @@ function purdPickFn(){
    새 생산: 고를 수 있는 품목 = 앞 단계(품목·BOM·흐름·재공품·소요자재·워크센터·외주계약)가 모두 완료된 제품·부속. 제품이면 BOM 의 부속까지 다 봐야 한다.
    공정 줄 = 완료된 9단계 문서의 procs · 업체 = 완료된 10단계 줄 중 완료 계약이 있는 곳, 우선순위 순. 제품 = 부속 줄(BOM 수량 그대로, 재고로 줄이지 않음 — 임시) + 제품 줄(T조립).
    진행 중: 카드 = 생산 한 건. 앞 공정 납품이 있어야 다음 공정 [납품 입력]이 열린다. 재공품 안 보냄·앞 공정보다 많음은 시험 전이라 막지 않고 글만 보인다.
-   재공품 보내기 = 앞 공정 납품 합 - 이미 보낸 합(오류 뺌, 처리 전 문서 포함)을 문서 하나로. 같은 업체여도 단추는 보인다(출고가 필요한지 시험 전). */
-var PROD_TEMP=['공정 사이 재공품 이동은 자재출고로 합니다.','필름은 입력 작업자가 엣지 발주 때 필요한 양을 본사에서 옮깁니다.','부속 재고로 수량을 줄이지 않습니다. BOM 수량 그대로 만듭니다.','납품이 발주보다 적으면 남은 수량을 나중에 또 넣습니다.','같은 업체가 다음 공정도 맡을 때 재공품 출고가 필요한지는 시험 전입니다. 단추는 그대로 보입니다.','업체를 우선순위 1 이 아닌 곳으로 바꾸는 길, 전 공정 한꺼번에 발주는 시험 전입니다. 막히면 카드에 영림원 문구가 보입니다.'];
+   재공품 보내기 = 앞 공정 납품 합 - 이미 보낸 합(오류 뺌, 처리 전 문서 포함)을 문서 하나로. 다음 줄이 같은 업체면 단추·문서가 없다(v84 시험 확인: 그 업체 창고에 이미 있음).
+   v84 완성 부속 보내기 = 재공품 보내기와 같은 틀, 부속 마지막 공정 → 제품 첫 공정(조립) 업체. 문서 kind 로 가른다. 영림원 출고는 시험 전. */
+var PROD_TEMP=['공정 사이 재공품 이동은 자재출고로 합니다.','필름은 입력 작업자가 엣지 발주 때 필요한 양을 본사에서 옮깁니다.','부속 재고로 수량을 줄이지 않습니다. BOM 수량 그대로 만듭니다.','납품이 발주보다 적으면 남은 수량을 나중에 또 넣습니다.','같은 업체가 다음 공정도 맡으면 재공품을 보내지 않습니다. 필름 이동은 입력 작업자가 합니다.','완성 부속을 조립 업체로 보내는 출고는 영림원 시험 전입니다. 막히면 카드에 영림원 문구가 보입니다.'];
 function prodTemp(){return h('div',{class:'prtemp'},h('b',{},'임시 기준 — 쓰면서 고칩니다'),h('ul',{},PROD_TEMP.map(function(t){return h('li',{},t);})));}
 function prodNum(v){return Math.round(Number(v||0)*100)/100;}
 function prodProcs(code){var d=imHad(code).filter(function(r){return r.status==='완료';})[0];return d?(d.procs||[]).filter(function(p){return p&&!isEmpty(p.proc);}):[];}
@@ -2899,6 +2901,13 @@ function prodSib(d,r,step){   /* 같은 품목의 앞(-1)·뒤(1) 공정 줄 */
   var a=(d.rows||[]).filter(function(x){return x.itemNo===r.itemNo;}).sort(function(x,y){return Number(x.seq)-Number(y.seq);}),i=a.indexOf(r);
   return a[i+step]||null;
 }
+function prodNext(d,r){   /* 재공품·완성 부속이 갈 줄. 중간 공정 = 같은 품목 다음 공정 · 제품의 부속 마지막 공정 = 제품 첫 공정(조립) · 부속만 만들 때 마지막 공정 = 없음 */
+  if(!r.last)return prodSib(d,r,1);
+  if(d.kind!=='제품'||r.itemNo===d.itemNo)return null;
+  return (d.rows||[]).filter(function(x){return x.itemNo===d.itemNo;}).sort(function(x,y){return Number(x.seq)-Number(y.seq);})[0]||null;
+}
+function prodKind(r){return r.last?'완성 부속':'재공품';}
+function prodMoveNo(r){return r.last?r.itemNo:wipCode(r.itemNo,r.seq);}
 function prodCanDlv(d,r){   /* 차례: 앞 공정 납품이 있어야 한다. 제품 첫 공정(조립)은 부속 마지막 공정마다 납품이 있어야 한다 */
   if(d.status!=='완료'||prodNum(r.qty-prodMade(d,r))<=0)return false;
   var pv=prodSib(d,r,-1);if(pv)return prodMade(d,pv)>0;
@@ -2910,10 +2919,15 @@ function prodRunFn(){
   var s=BYKEY.proddlvs,M=BYKEY.prodmoves,busy=false,open=null,pending=false;
   var box=h('div',{}),done=h('details',{class:'prgap',hidden:true}),none=h('p',{class:'hint',hidden:true},'진행 중인 생산이 없습니다. 「새 생산」에서 넣으면 여기에 보입니다.'),out=h('p',{class:'pslink','aria-live':'polite'});
   function fieldsFor(){var o={};['dlvQty','dlvDate','stmtNo','stmtAmt'].forEach(function(k){o[k]=makeField(s.fields.filter(function(f){return f.k===k;})[0]);});return o;}
-  function warnOf(d,r,q){   /* 시험 전이라 막지 않는다 */
-    var pv=prodSib(d,r,-1);if(!pv)return '';
-    var room=prodNum(prodSent(d,pv)-prodMade(d,r));
-    return Number(q)>room?'앞 공정 재공품을 '+room+'개까지만 보냈습니다. 영림원에서 막힐 수 있습니다(시험 전).':'';
+  function warnOf(d,r,q){   /* 폼은 막지 않고 글만. 같은 업체면 보낼 일이 없으니 앞 공정 납품만 본다(v84) */
+    var pv=prodSib(d,r,-1);
+    if(pv){
+      var same=pv.wc===r.wc,room=prodNum((same?prodMade(d,pv):prodSent(d,pv))-prodMade(d,r));
+      return Number(q)<=room?'':same?'앞 공정 납품이 '+room+'개까지입니다. 영림원에서 막힐 수 있습니다.':'앞 공정 재공품을 '+room+'개까지만 보냈습니다. 영림원에서 납품이 막힙니다.';
+    }
+    if(d.kind!=='제품'||r.itemNo!==d.itemNo)return '';
+    var a=(d.rows||[]).filter(function(x){return x.itemNo!==d.itemNo&&x.last&&x.wc!==r.wc&&prodSent(d,x)<x.qty;}).map(function(x){return x.itemNo;});
+    return a.length?'완성 부속을 다 보내지 않았습니다: '+a.join(', ')+'. 영림원에서 납품이 막힙니다.':'';
   }
   function openPanel(d,r){
     var key=d.id+'|'+r.itemNo+'|'+r.seq,F0=fieldsFor(),left=prodNum(r.qty-prodMade(d,r)),msg=h('span',{class:'msg','aria-live':'polite'}),warn=h('p',{class:'hint warn',hidden:true}),P={key:key,F:F0};
@@ -2949,36 +2963,37 @@ function prodRunFn(){
   function sendWip(d,r,nx,btn){
     var q=prodNum(prodMade(d,r)-prodSent(d,r));if(q<=0||busy)return;
     if(!db){out.textContent='저장소에 연결되지 않아 저장할 수 없습니다.';return;}
-    if(!confirm(r.itemNo+' 재공품 '+show(q)+'개를 '+r.wc+' → '+nx.wc+' 로 보냅니다. 오늘 실제로 보낼 때 누르세요.'))return;
+    if(!confirm(r.itemNo+' '+prodKind(r)+' '+show(q)+'개를 '+r.wc+' → '+nx.wc+' 로 보냅니다. 오늘 실제로 보낼 때 누르세요.'))return;
     busy=true;btn.disabled=true;
     function stop(t){busy=false;btn.disabled=false;out.textContent=t;}
     freshCheck().then(function(old){
       if(old){stop(old);return;}
       var now=prodNum(prodMade(d,r)-prodSent(d,r));if(now<=0){stop('그 사이 이미 보냈습니다.');return;}
-      var doc={prodId:d.id,itemNo:r.itemNo,itemName:r.itemName||'',seq:r.seq,proc:r.proc,nextSeq:nx.seq,nextProc:nx.proc,workNo:nx.workNo||r.workNo||'',wipNo:wipCode(r.itemNo,r.seq),fromWc:r.wc,toWc:nx.wc,qty:now,
+      var doc={prodId:d.id,itemNo:r.itemNo,itemName:r.itemName||'',seq:r.seq,proc:r.proc,nextSeq:nx.seq,nextProc:nx.proc,workNo:nx.workNo||r.workNo||'',kind:prodKind(r),wipNo:prodMoveNo(r),fromWc:r.wc,toWc:nx.wc,qty:now,
         outNo:'',stock:'',status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(M)};
       return db.collection('erp_prodmoves').add(doc).then(function(){
-        busy=false;out.textContent=r.itemNo+' 재공품 이동을 저장했습니다. 대기로 쌓였습니다.';draw();
+        busy=false;out.textContent=r.itemNo+' '+prodKind(r)+' 이동을 저장했습니다. 대기로 쌓였습니다.';draw();
       },function(e){stop('저장하지 못했습니다. '+errText(e));});
     });
   }
   function noteOf(a){return a.filter(function(x){return x.status==='오류';}).map(function(x){return h('div',{class:'prbad'},'오류: '+(x.agentNote||'영림원 처리 실패'));});}
   function rowEl(d,r){
-    var key=d.id+'|'+r.itemNo+'|'+r.seq,made=prodMade(d,r),ds=prodDlvs(d,r),nx=r.last?null:prodSib(d,r,1);
+    var key=d.id+'|'+r.itemNo+'|'+r.seq,made=prodMade(d,r),ds=prodDlvs(d,r),nx=prodNext(d,r);
     var wait=ds.filter(function(x){return x.status==='대기'||x.status==='진행중';}).length;
     var kids=[h('div',{class:'prline'},h('b',{},r.seq+'. '+r.proc),h('span',{},r.wc),r.orderNo?h('small',{},'발주 '+r.orderNo):'',h('span',{},'납품 '+show(made)+' / '+show(r.qty)),wait?h('span',{class:'chip 대기'},'처리 대기 '+wait):'')];
     kids=kids.concat(noteOf(ds));
     if(prodCanDlv(d,r)&&!(open&&open.key===key))kids.push(h('button',{type:'button',class:'btn small',disabled:busy,on:{click:function(){openPanel(d,r);}}},'납품 입력'));
     if(open&&open.key===key)kids.push(open.el);
-    if(nx){
-      var sent=prodSent(d,r),here=prodNum(made-sent),ms=prodMoves(d,r),mw=ms.filter(function(x){return x.status==='대기'||x.status==='진행중';}).length;
-      if(made>0){
-        kids.push(h('div',{class:'prwip'},'재공품 '+wipCode(r.itemNo,r.seq)+': '+r.wc+' 창고 '+show(here)+' · '+nx.wc+'로 보냄 '+show(sent)+(mw?' (처리 대기 '+mw+')':'')));
+    if(nx&&made>0){
+      var lab=prodKind(r),no=prodMoveNo(r);
+      if(nx.wc===r.wc)kids.push(h('div',{class:'prwip'},lab+' '+no+': '+(r.last?'조립':'다음 공정')+'도 같은 업체('+r.wc+')라 보낼 일이 없습니다.'));
+      else{
+        var sent=prodSent(d,r),here=prodNum(made-sent),ms=prodMoves(d,r),mw=ms.filter(function(x){return x.status==='대기'||x.status==='진행중';}).length;
+        kids.push(h('div',{class:'prwip'},lab+' '+no+': '+r.wc+' 창고 '+show(here)+' · '+nx.wc+'로 보냄 '+show(sent)+(mw?' (처리 대기 '+mw+')':'')));
         kids=kids.concat(noteOf(ms));
-        if(nx.wc===r.wc)kids.push(h('div',{class:'hint warn'},'다음 공정도 같은 업체입니다. 재공품 출고가 필요한지 시험 전입니다(임시).'));
-        if(here>0)kids.push(h('button',{type:'button',class:'btn small',disabled:busy,on:{click:function(e){sendWip(d,r,nx,e.currentTarget);}}},'재공품 보내기 → '+nx.wc));
+        if(here>0)kids.push(h('button',{type:'button',class:'btn small',disabled:busy,on:{click:function(e){sendWip(d,r,nx,e.currentTarget);}}},lab+' 보내기 → '+nx.wc));
       }
-    }else if(d.kind==='제품'&&r.itemNo!==d.itemNo&&made>0)kids.push(h('div',{class:'hint'},'완성 부속을 조립 업체로 옮기는 화면은 시험 전입니다(임시).'));
+    }
     return h('div',{class:'prrow'},kids);
   }
   function cardEl(d){
