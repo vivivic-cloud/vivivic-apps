@@ -92,6 +92,7 @@
     flows: { coll: 'erp_flows', title: '공정흐름', key: (d) => R.s(d.name), fields: ['name', 'memo'], rows: ['seq', 'proc', 'next', 'last'] },
     boms: { coll: 'erp_boms', title: 'BOM', key: (d) => R.s(d.pcode) + '|' + R.s(d.pver), fields: ['pname', 'pcode', 'pspec', 'pver'], rows: ['proc', 'order', 'cname', 'ccode', 'cspec', 'cver', 'inunit', 'qn', 'qd', 'hasSub'] },
     itemflows: { coll: 'erp_itemflows', title: '품목별 공정흐름', key: (d) => R.s(d.code) + '|' + R.s(d.flow), fields: ['name', 'code', 'spec', 'flow'] },
+    itemmats: { coll: 'erp_itemmats', title: '제품별공정별소요자재', key: (d) => R.s(d.code) + '|' + R.s(d.rev), fields: ['name', 'code', 'spec', 'rev'] },
     contracts: { coll: 'erp_contracts', title: '외주계약', key: (d) => R.s(d.vendor), fields: ['unit', 'vendor'], rows: ['prod', 'pcode', 'seq', 'proc', 'oname', 'ocode', 'cur', 'basis', 'price', 'from'] },
   };
   const nv = (v) => {
@@ -104,8 +105,12 @@
   };
   const show = (v) => (Array.isArray(v) ? v.join(', ') : v === true ? '✓' : v === false ? '' : R.s(v)) || '(빈칸)';
   // 폼 문서와 영림원 값의 차이 → ['칸: 폼 X / 영림원 Y', …]. 폼에 없는 칸(undefined)도 영림원에 값이 있으면 차이.
-  I.diff = (spec, form, erp, label) => {
+  // 폼 small = 「대 > 중 > 소」 경로(v26), 영림원 품목소분류·자재소분류 = 소분류 이름 → 끝 토막끼리 본다(11-06, 품목 18건 가짜 차이).
+  const lastSeg = (v) => R.s(v).split('>').pop().trim();
+  I.diff = (spec, form0, erp0, label) => {
     const out = [], L = label || {};
+    const form = 'small' in form0 ? Object.assign({}, form0, { small: lastSeg(form0.small) }) : form0;
+    const erp = 'small' in erp0 ? Object.assign({}, erp0, { small: lastSeg(erp0.small) }) : erp0;
     for (const k of spec.fields) if (nv(form[k]) !== nv(erp[k])) out.push((L[k] || k) + ': 폼 ' + show(form[k]) + ' / 영림원 ' + show(erp[k]));
     if (spec.rows) {
       const a = form.rows || [], b = erp.rows || [];
