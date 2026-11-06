@@ -32,7 +32,7 @@
 더 볼 것: `../CLAUDE.md`(입력폼 설명) · `../erp-spec.json`(단계별 메뉴·칸 대응·필수) · `../../시스템클라우드보기/CLAUDE.md`(영림원 화면을 읽는 길).
 
 ## 3. 일하는 순서 (한 건마다)
-1. **대기 자료 읽기** — 파이어스토어(프로젝트 `vivivic-4b7ef`, 익명 로그인) 컬렉션 `erp_vendors` → `erp_workcenters` → `erp_classes`(폼 v25 분류) → `erp_items` → `erp_materials`(폼 v25 자재) → `erp_processes` → `erp_flows` → `erp_boms` → `erp_itemflows`(폼 v48) → `erp_itemmats`(폼 v57) → `erp_itemwcs`(폼 v55, ⚠ 공정차수 없는 품목은 넣지 말고 오류 — 화면별-요령 500865 · 중간 공정은 `erp_materials` 재공품 완료 뒤, 3-6) → `erp_contracts` → `erp_imporders` → `erp_impbls`(폼 v74 수입BL) → `erp_impins`(폼 v74 수입입고) → `erp_purprices`(폼 v78) → `erp_purchases` → `erp_purdelvs`(폼 v80 원장 구매, 3-10) → `erp_prods` → `erp_proddlvs` → `erp_prodmoves`(폼 v81 생산 관리, 3-11) 순서. 같은 단계 안에서는 `createdAt` 오름차순. `status` 가 `대기` 인 것만.
+1. **대기 자료 읽기** — 파이어스토어(프로젝트 `vivivic-4b7ef`, 익명 로그인) 컬렉션 `erp_vendors` → `erp_workcenters` → `erp_classes`(폼 v25 분류) → `erp_items` → `erp_materials`(폼 v25 자재) → `erp_processes` → `erp_flows` → `erp_boms` → `erp_itemflows`(폼 v48) → `erp_itemmats`(폼 v57) → `erp_itemwcs`(폼 v55, ⚠ 공정차수 없는 품목은 넣지 말고 오류 — 화면별-요령 500865 · 중간 공정은 `erp_materials` 재공품 완료 뒤, 3-6) → `erp_contracts` → `erp_imporders` → `erp_imppays` → `erp_impinvs` → `erp_impbls`(폼 v74 수입BL) → `erp_impins`(폼 v74 수입입고) → `erp_purprices`(폼 v78) → `erp_purchases` → `erp_purdelvs`(폼 v80 원장 구매, 3-10) → `erp_prods` → `erp_proddlvs` → `erp_prodmoves`(폼 v81 생산 관리, 3-11) 순서. 같은 단계 안에서는 `createdAt` 오름차순. `status` 가 `대기` 인 것만.
    - 앞 단계에 대기·수정대기·오류가 남아 있으면 뒤 단계는 건너뛰고 `agentNote` 에 이유를 적는다(영림원에 이미 있는 자료는 예외).
    - 사장님이 채팅으로 직접 시키신 일(예: T 테스트)은 폼을 거치지 않을 수 있다. 그때도 아래 2~5 를 똑같이 한다.
 2. **진행중으로 바꾸기** — 시작하면 `status` = `진행중`.
@@ -80,6 +80,8 @@
 | 메뉴(`stepKey`) | `steps` | 읽는 화면 | 열쇠 | T 범위 | 상태 |
 |---|---|---|---|---|---|
 | 수입Order `imporders` | imporders | 수입Order 조회(번호 확인 못 함) + 품목조회 501058 | `pono` | P/O No.·수입처 | ⏳ 화면 확인 필요 |
+| 수입Payment `imppays` | imporders → imppays | 수입Payment 조회(번호 확인 못 함) + 품목조회 501064 | `payno` | Payment No.·수입처 | ⏳ 화면 확인 필요 |
+| 수입Invoice `impinvs` | imporders → imppays → impinvs | 수입Invoice 조회(번호 확인 못 함) + 품목조회 501052 | `invno` | InvoiceNo.·수입처 | ⏳ 화면 확인 필요 |
 | 수입BL `impbls` | impbls | B/L 조회 501068 + B/L 품목조회 501077 | `blno` | B/L No.·수입처 | ⏳ 화면 확인 필요 |
 | 수입입고 `impins` | impbls → impins | 수입입고 품목조회 501073 | `blno` | B/L No.·수입처 | ⏳ 화면 확인 필요 |
 | 구매단가 `purprices` | purprices | 구매단가등록 501868 시트 SS | `vendor`+`code`+`from` | 구매거래처·품번 | 칸 기록 있음 |
@@ -89,6 +91,8 @@
 | 진행 중 `proddlvs` | prods → proddlvs → prodmoves | 외주납품품목조회 501631 SS + 외주입고품목조회 501624 SS · 이동은 아래 | `dlvNo` · 이동 `outNo` | 외주품번호 · 이동 품번 | 납품 칸 기록 있음 · 이동 ⏳ |
 
 **수입Order** — ⏳ 조회 화면 번호·시트·조회 조건이 기록에 없다. 기록으로 본 501058 칸은 `화면별-요령.md` 「엣지필름 수입 단계별 입력 분석」 표에 있다. 칸 이름은 입력 화면 501054(`imports.steps.imporders`)와 맞춰 본다. 기존 건은 501054 에서 안 열렸다.
+
+**수입Payment·수입Invoice** — ⏳ 조회 화면 번호·시트·조회 조건이 기록에 없다. 칸 이름은 입력 화면 501060·501065(`imports.steps`)와 맞춰 본다. 같은 `pono`·`payno` 문서 id 를 `poId`·`payId` 에 넣는다. Invoice 조회에 Payment 번호가 없으면 `화면별-요령.md` 에 적고 물어본다. 불러온 B/L 과 Invoice 를 어떻게 잇는지(폼 `invno`)도 화면을 보고 정한다.
 
 **수입BL** — ⏳ 시트·조회 조건이 기록에 없다. 기록으로 본 501077 칸은 B/L Date·B/L No.·선적일자뿐이다. 나머지는 입력 화면 501067 칸 이름(`imports.steps.impbls`)과 같은지 본다. 머리 칸이 501068·501077 중 어디 있는지 보고 B/L No. 로 묶는다.
 
@@ -232,21 +236,32 @@
 - **이미 저장된 계약의 단가 변경(11-06)**: 저장된 줄 외주단가 칸을 눌러 숫자를 치고 Tab → 저장. 줄이 늘지 않고 ProcPrice 도 따라 바뀐다(`화면별-요령.md` 「외주단가 고치는 법」). 스크립트 SetText 로는 저장되지 않는다.
 - 불러오기(3-2)의 외주계약 열쇠는 `vendor` 하나다. 한 업체 문서가 여럿이면 비교가 어긋날 수 있다 — 덮어쓰지 말고 `pcode`·`seq`·`proc`·`from` 줄로 본다.
 
-### 3-8. 수입 (`erp_imporders` · `erp_impbls` → `erp_impins`, 폼 v74 · v75 부터 1~11단계와 분리된 수입 페이지 · v93 수입Order 더함)
-화면 칸·시험 기록 = `화면별-요령.md` 「수입 업무 화면 조사」·「수입 단계 생략 저장 시험」. 규격 = `../erp-spec.json` imporders·impbls·impins. 스크립트 없음(첫 처리 때 손으로 하고 만든다). 사장님 지시 = Order·BL·입고. Payment·Invoice·신고필증·비용·자재이동·전표·원가계산은 하지 않는다.
+### 3-8. 수입 (`erp_imporders` → `erp_imppays` → `erp_impinvs` → `erp_impbls` → `erp_impins`, 폼 v74 · v75 부터 1~11단계와 분리된 수입 페이지 · v93 Order · v95 Payment·Invoice)
+화면 칸·시험 기록 = `화면별-요령.md` 「수입 업무 화면 조사」·「수입 단계 생략 저장 시험」·「수입Payment 501060 조사」. 규격 = `../erp-spec.json` imporders·imppays·impinvs·impbls·impins. 스크립트 없음(첫 처리 때 손으로 하고 만든다). 사장님 지시 = Order·Payment·Invoice·BL·입고. 신고필증·비용·자재이동·전표·대금·수입선급금처리·원가계산은 하지 않는다.
 - 문서: `erp_impbls` 한 건 = B/L 하나(머리 `bldate` B/L Date · `blno` B/L No. · `shipdate` 선적일자 · `vendor` 수입처 · `term` 가격조건 · `cur` 통화 · `rate` 환율, `rows` = `cname` `ccode` `cspec` `unit` `price` `qty`). `erp_impins` 한 건 = B/L 하나의 입고 한 번(`blId` `erp_impbls` 문서 id · `blno` · `vendor` · `indate` 입고일 · `wh` 입고창고, `rows` = 품목 칸 + `blqty` 폼 대조용 + `qty` 입고 수량).
 - 앞 단계: 수입처 = 영림원 해외매입거래처 · `ccode` = 자재등록. 해외 거래처는 1단계 `erp_vendors` 로 들어온다(`region` 해외, `kinds` 해외매입거래처, 사업자번호 없을 수 있음). ⚠ 거래처종류 체크는 표 칸을 진짜 클릭한다(`SetText` 는 저장 때 「선택된 거래처종류이(가) 없습니다.」).
 **수입Order (`erp_imporders`, 폼 v93 첫 판) — ⚠ 폼에서 들어온 첫 건은 화면을 보며 한 건만 넣고, 결과를 `화면별-요령.md` 에 적은 뒤 나머지를 진행한다.**
 - 문서: 한 건 = P/O 하나. 머리 `podate` P/O Date · `pono` P/O No. · `vendor` 수입처 · `term` 가격조건 · `cur` 통화 · `rate` 환율, `rows` = `cname` `ccode` `cspec` `unit` `price` `qty` + 값이 있을 때만 `maker` 제조사 · `shipdue` 선적예정일 · `memo` 특이사항.
-- ⚠ **임시: Order 는 BL 과 이어지지 않는다.** Order → B/L 단추는 수입Payment 를 거치는데 폼에 Payment 가 없다. **501054 의 「수입Payment」 단추는 누르지 않는다.** `erp_impbls` 는 Order 없이 아래 차례대로 저장한다.
+- 잇기: Order → (모든기능 「수입Payment」) → Payment → (모든기능 「수입Invoice」) → Invoice → (모든기능 「수입BL」) → BL → 501068 「수입입고」 → 입고. Payment 에서 BL 로 바로 가는 단추는 없다. 11-06 시험은 **저장 직후 이어서** 넘겼다. 저장해 둔 건을 나중에 여는 길은 확인 못 함(501054 로 기존 건을 못 열었다) — 첫 건에서 화면을 보고 `화면별-요령.md` 에 적는다.
 1. **앞 단계·겹침** — `vendor` = 영림원 해외매입거래처, `ccode` = 자재등록. 없으면 오류 + agentNote. 품목조회 501058 로 같은 P/O No. 를 보고, 있으면 오류 + agentNote.
 2. **저장** — `Home.OpenPageSeq(501054)` 신규 → P/O Date·수입처·가격조건·통화·환율 → 표 줄(품명 코드도움은 `ccode` 로, 단위·단가·수량, 값이 있으면 제조사·선적예정일·특이사항) → 대조 → 저장(「자료가 저장되었습니다.」) → 조회 대조. 폼에 없는 사업단위·수입구분·담당자·부서는 화면 기본값 그대로, 수입처번호·수입정보 24칸은 비운다. ⚠ **번호 칸 주의**: P/O No. = `…RefNo_txt`(P/O 관리번호는 회색, 저장 때 저절로 나온다. T시험-O1 = PUPO202611060001). 끝나면 `erp_imporders` 완료 + agentNote 에 P/O 관리번호.
 - ⚠ 시험은 T시험-O1 1줄 · USD · 제조사·선적예정일·특이사항 빈 칸이었다. 여러 줄 · CNY · 제조사(코드도움 칸인데 폼은 글자로 받는다) · 선적예정일 · 특이사항이 든 건은 처음이면 위 규칙대로 화면을 보며 한 건만 넣는다. 막히면 오류 + 화면 문구.
 
+**수입Payment (`erp_imppays`, 폼 v95 첫 판) — ⚠ 폼에서 들어온 첫 건은 화면을 보며 한 건만 넣고 `화면별-요령.md` 에 적은 뒤 나머지를 진행한다.**
+- 문서: 한 건 = P/O 하나의 Payment 한 번. `poId` `erp_imporders` 문서 id · `pono` · 머리 `paydate` Payment Date · `payno` Payment No. · `rate` 환율(폼에서 고칠 수 있음) · 대조용 `vendor` `term` `cur` · `rows` = Order 줄 그대로.
+1. `poId` 문서가 완료가 아니면 시작하지 않는다(대기·진행중이면 건너뜀, 없거나 오류면 오류 + agentNote).
+2. 그 Order 화면 모든기능 「수입Payment」 → 501060. Payment Date = `paydate` · Payment No.(`txtPaymentNo_txt`) = `payno` · ⚠ 환율 = `rate`(통화를 바꿔도 환율은 저절로 안 바뀐다. 기본 1.00 으로 남기지 않는다). 넘어온 수입처·가격조건·통화·P/O No.·품목·단가·수량·선적예정일을 문서와 대조 → 저장 → 조회 대조. 수입처번호·수입정보 24칸·Shipper 등 4칸은 비운다. 끝나면 `erp_imppays` 완료 + agentNote 에 Payment관리번호. 「수입선급금처리」는 누르지 않는다.
+
+**수입Invoice (`erp_impinvs`, 폼 v95 첫 판) — ⚠ 첫 건은 위와 같이 화면을 보며 한 건만.**
+- 문서: 한 건 = Payment 하나의 Invoice 한 번. `payId` `erp_imppays` 문서 id · `payno` · `pono` · 머리 `invdate` Invoice Date · `invno` InvoiceNo. · 대조용 `vendor` `term` `cur` `rate` · `rows` 그대로.
+1. `payId` 문서가 완료가 아니면 시작하지 않는다(같은 규칙).
+2. 그 Payment 화면 모든기능 「수입Invoice」 → 501065. Invoice Date = `invdate` · InvoiceNo.(`txtInvoiceRefNo_txt`) = `invno`. 넘어온 값 대조 → 저장 → 조회 대조. ⚠ 501065 툴바 저장 자리가 다르다(x 668 저장 · 625 조회였다). 누르기 전 본다. 끝나면 `erp_impinvs` 완료 + agentNote 에 Invoice관리번호.
+
 **수입BL → 수입입고 (`erp_impbls` → `erp_impins`)**
+- **`invId` 가 있는 BL 문서(폼 v95, 선택):** `invId` 의 `erp_impinvs` 문서가 완료가 아니면 시작하지 않는다. 그 Invoice 화면 모든기능 「수입BL」 → 501067. B/L Date·B/L No.(`txtBLRefNo_txt`)·선적일자(`datDelvDate_dat`, 오른쪽 밖)만 넣고 넘어온 값을 문서와 대조 → 저장. 아래 1번 신규는 하지 않는다. ⚠ 501067 툴바 저장 자리(x 630)를 누르기 전 본다. 첫 건은 화면을 보며 한 건만. `invId` 가 없는 문서는 전처럼 아래 1번이다.
 1. **BL 저장** — 501067 조회로 같은 B/L No. 를 먼저 보고, 있으면 오류 + agentNote. 신규 → 머리 칸 → 표 줄(품명 코드도움은 `ccode` 로, 단위·단가·수량) → 대조 → 저장. 폼에 없는 사업단위·수입구분·담당자·부서는 화면 기본값 그대로. ⚠ **번호 칸 주의**: B/L No. = `…RefNo_txt`(B/L 관리번호는 회색). 입력 뒤 칸 값이 문서 `blno` 와 같은지 본다. `erp_impbls` 완료.
 2. **501068 수입입고** — 입고 화면에는 신규가 없다. B/L 조회 501068 에서 `blno` 줄을 선택하고 「수입입고」. `blId` 문서가 완료가 아니면 시작하지 않는다(대기·진행중이면 건너뜀, 없거나 오류면 오류 + agentNote).
-3. **입고 저장** — 501071 입고일 `indate` · 표 줄마다 수량 `qty` · 입고창고 `wh`. ⚠ 입고창고는 기본 「본사」로 넘어온다. 그대로 두지 말고 `wh` 로 바꾼다. 번호(수입입고번호)는 회색이다. 저장 전 모든 줄 대조 → 저장 → 조회 대조.
+3. **입고 저장** — 501071 입고일 `indate` · 표 줄마다 수량 `qty` · 입고창고 `wh`. ⚠ 입고창고는 기본 「본사」(1)로 넘어온다. 그대로 두지 말고 `wh`(T본사 = 37)로 고친다. 번호(수입입고번호)는 회색이다. 저장 전 모든 줄 대조 → 저장 → 조회 대조.
 4. **501179 재고 확인** — 재고기준 실재고·자산재고에서 `wh` 창고 수량이 늘었는지 본다. 끝나면 `erp_impins` 완료 + agentNote 에 수입입고번호.
 - ⚠ 시험은 1줄 · USD · 같은 수량이었다. **여러 줄 · CNY · `qty` 가 `blqty` 와 다른 건은 처음이면 화면을 보며 한 건만 넣고 `화면별-요령.md` 에 적은 뒤 사장님께 보고**한다. 막히면 오류 + 화면 문구. 수량을 B/L 에 맞춰 고치지 않는다.
 
