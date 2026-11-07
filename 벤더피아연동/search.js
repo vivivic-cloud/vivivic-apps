@@ -262,6 +262,16 @@
   const CS글자 = (x) => String(x || "").replace(/[\s/]/g, "").toUpperCase();
   const 상담보기 = CS전용 && /(^|[#&])vgInq\b/i.test(location.hash || "");
   if (상담보기) { 상담내용보기(); return; }
+  /* 11-07 [새 지시 CS정산] 메인 메뉴 「CS정산」 = `orderMst.aspx#vgCal` — 화면 글은 형제 파일 `cs정산.js`(확장이 search.js 를 보내는 쪽이라 덮어쓰기 없이 된다).
+     단품 단추용 goods.js 는 표를 다 그린 뒤 저쪽이 부른다(조회 중 벤더피아 요청을 안 늘린다). */
+  if (CS전용 && /(^|[#&])vgCal\b/i.test(location.hash || "")) {
+    window.VP정산단품부르기 = () => { window.VP상품단추요청 = true; 뒷길로부르기(); };
+    const sc = document.createElement("script");
+    sc.src = 형제("cs정산.js");
+    sc.addEventListener("error", () => window.VP말?.("CS정산:글 못 받음"));
+    document.head.appendChild(sc);
+    return;
+  }
   function 상담내용보기() {
     const 주소 = "/System/CS/inquiryList.aspx";
     const 숨은칸 = new Set(["", "주문번호", "ctCd", "inquiryCd", "매출처", "매출처주문번호", "매출처상품코드", "주문자", "주문자전화",

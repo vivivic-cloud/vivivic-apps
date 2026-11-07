@@ -23,6 +23,8 @@
        그 화면이 **CS등록 판을 바로 열게** 한다(`search.js`).
        ⚠ 꼴은 다른 넷과 **같은 `vp-btn`** 하나다 — 두 벌로 만들지 않는다. */
     { name: "CS등록", url: (주문관리주소 || "/System/Delivery/firmDvList.aspx") + "#vgCS" },
+    /* 11-07 [새 지시 CS정산] 「벤더메인 메뉴에 cs정산 메뉴를 만들어 …」 — 주문관리 쪽 + `#vgCal` → search.js 가 cs정산.js 를 부른다 */
+    { name: "CS정산", url: "/System/Sales/orderMst.aspx#vgCal" },
   ];
 
   /* 10-26 [새 지시 새창] 사장님: 「현재 페이지에서 어떤방식으로든 단품관리 상품관리등 링크를 타고 넘어갈때 화면 전환이 아닌 새페이지로 나타나게 해줘」
