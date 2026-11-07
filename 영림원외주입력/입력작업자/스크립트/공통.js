@@ -17,6 +17,28 @@
     return f.contentWindow;
   };
   Y.open = async (page) => { Home.OpenPageSeq(page); await Y.sleep(2500); return Y.win(page); };
+  // 오늘 날짜(이 기기 시각). 2026-11-08 꼴.
+  Y.today = () => new Date().toLocaleDateString('sv-SE');
+  // 화면 탭을 닫고 다시 연다. 일자 기본값은 화면을 연 날 값이라 날짜가 지난 탭을 쓰면 안 된다(11-08).
+  // 고친 내용이 있으면 영림원이 확인 창을 띄운다 → 눌러 주지 않고 멈춘다.
+  Y.reopen = async (page) => {
+    const b = document.querySelector(`li[pgmseq="${page}"] a.devBtnCloseOpenPage`);
+    if (b) {
+      const r = b.getBoundingClientRect(), o = { bubbles: true, cancelable: true, view: window, clientX: r.x + 3, clientY: r.y + 3, button: 0 };
+      for (const t of ['mousedown', 'mouseup', 'click']) b.dispatchEvent(new MouseEvent(t, o));
+      await Y.sleep(1500);
+      if (document.getElementById(page + '_iframe')) throw new Error(page + ' 탭이 안 닫힘 — 확인 창을 보고 사람이 판단');
+    }
+    Home.OpenPageSeq(page); await Y.sleep(3500);
+    return Y.win(page);
+  };
+  // 저장 전 일자 칸이 오늘인지 본다. 아니면 멈춘다(사장님 11-08). 칸 값은 고치지 않는다.
+  Y.dateGuard = (page, inputId) => {
+    const i = Y.win(page).document.getElementById(inputId);
+    if (!i) throw new Error(page + ' 일자 칸 없음 ' + inputId);
+    if (i.value !== Y.today()) throw new Error(page + ' 일자 ' + i.value + ' ≠ 오늘 ' + Y.today() + ' — 저장하지 않음');
+    return i.value;
+  };
   Y.sheet = (page, name) => {
     const s = Y.win(page)[name];
     if (!s || typeof s.GetAllData !== 'function') throw new Error(page + ' 에 시트 ' + name + ' 없음');
