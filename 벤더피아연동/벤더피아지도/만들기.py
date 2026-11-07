@@ -19,7 +19,9 @@ for 이름 in ('목차.md', '공통.md'):
     if p.exists():
         글 = p.read_text(encoding='utf-8')
         문서.append({'f': 이름, 't': 첫머리(글) or 이름, 'g': '안내', 'b': 글})
-for p in sorted((여기 / '화면').glob('*.md')):
+목차글 = (여기 / '목차.md').read_text(encoding='utf-8') if (여기 / '목차.md').exists() else ''
+차례 = {이름: i for i, 이름 in enumerate(dict.fromkeys(re.findall(r'\]\(화면/([^)]+\.md)\)', 목차글)))}
+for p in sorted((여기 / '화면').glob('*.md'), key=lambda x: (차례.get(x.name, 99999), x.name)):
     글 = p.read_text(encoding='utf-8')
     제목 = 첫머리(글) or p.stem
     상태 = re.search(r'상태: \*\*(.+?)\*\*', 글)
