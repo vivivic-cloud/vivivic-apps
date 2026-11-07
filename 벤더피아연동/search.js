@@ -1044,9 +1044,29 @@
       const 값 = 줄[i] === undefined || 줄[i] === null ? "" : String(줄[i]).trim();
       if (!이름 || !값) return;
       틀.appendChild(document.createElement("dt")).textContent = 이름;
-      틀.appendChild(document.createElement("dd")).textContent = 값;
+      const 값칸 = 틀.appendChild(document.createElement("dd"));
+      if (이름 === "단품명" || 이름 === "단품구성") 상세단품그리기(값칸, 값, 줄[머리.indexOf("단품코드")]);
+      else 값칸.textContent = 값;
     });
     if (!틀.children.length) 칸.textContent = "고객정보가 비어 있습니다.";
+  }
+  /* 11-07 [새 지시 CS상세단품단추] 고객정보의 단품명·단품구성 = 글자 대신 표 단품명 칸과 **같은 단품 단추**(`상품칸채우기` · `상품칸들`).
+     「a + a + b」 는 상품관리처럼(0.34.79) 수량만큼 단추. 이름표에 없으면 찾아보고(`모자란것찾기`), 못 찾으면 글자 그대로.
+     ⚠ 상담내용보기(`#vgInq`) 문의 판은 `기본칸` 에 이 두 칸이 없어 여기 오지 않는다 — 그 쪽은 뒤쪽 `const`·`let`(`상품칸들` 등)이 초기화 전이라 머리 이름을 줄 안에서 바로 견준다. */
+  function 상세단품그리기(값칸, 값, 코드값) {
+    const 나눔 = (글) => String(글 == null ? "" : 글).split(/[+\n]/).map((x) => x.trim()).filter(Boolean);
+    const 이름들 = window.VP단품있나?.(값, 코드값) ? [값] : 나눔(값);   // 이름 안에 「+」 가 든 단품은 통째로
+    const 코드들 = 나눔(코드값);
+    값칸.classList.add("vp-상세단품");
+    이름들.forEach((이름, i) => {
+      const 칸 = 값칸.appendChild(document.createElement("div"));
+      칸.className = "vp-상품칸";
+      const 코드 = 코드들.length === 이름들.length ? 코드들[i] : "";
+      칸.textContent = 이름;
+      상품칸채우기(칸, 이름, "단품", 코드);
+      상품칸들.push([칸, 이름, "단품", 코드]);
+    });
+    모자란것찾기("단품");
   }
 
   /* 11-01 [새 지시 문의큰팝업] CS등록(종류·단품 단추·단품 검색·출고 메시지·「CS등록 저장」)을 상담 판에서 떼어 낸 **한 벌** —
