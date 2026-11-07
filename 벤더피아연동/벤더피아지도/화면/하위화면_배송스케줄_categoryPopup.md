@@ -15,7 +15,7 @@
 | 삭제 | `btnClose` | 이동 | `fnClose(); return false;` · JS만(제출 안 함) |
 |  | `oTreen0` | 미확인 |  |
 
-트리: `oTree`(ASP.NET TreeView). 마디를 누르면 `__doPostBack('ctl00$Contents$oTree', 경로)` 로 오른쪽 목록을 다시 조회한다. 마디 이름은 업무 자료라 적지 않았다.
+트리: `oTree`(ASP.NET TreeView). 마디 `a` 의 `title` = `분류코드|깊이`, 맨 위 「분류」 는 title 없음(11-07 잼, 단품 등록 쪽에서 연 것과 같은 팝업). 마디를 누르면 `__doPostBack('ctl00$Contents$oTree', 경로)` 로 오른쪽 목록을 다시 조회한다. 마디 이름은 업무 자료라 적지 않았다.
 
 ## 숨은 값 (이름만)
 

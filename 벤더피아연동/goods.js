@@ -1651,6 +1651,364 @@ const 한벌돌리기 = (단품곁다리) => {
     return [s, src?.options[src.selectedIndex]?.text];
   }));
 
+  /* ── 단품등록 (11-07 [새 지시 단품등록]) ─────────────
+     사장님이 이 지시로 허락한 **세 번째 쓰기** — 이 기능만. 단품관리 화면에서만 돈다(곁다리 아님).
+     읽기: `goodsDetl.aspx`(고르는 값·처음 값) · `categoryPopup.aspx`(단품분류, `#oTree a[title]` = "코드|깊이") — 공용 줄.
+     쓰기: **숨은 같은 출처 틀**에 진짜 `goodsDetl.aspx` 를 열어 그 쪽 JS 로 사람처럼 — 칸 채움 → `getReturnValue` 로 분류 → `btnExist`(중복체크)
+       → 주거래 동그라미 → 가격 칸 → `btnSave`(`isFieldValid` 가 쪽 안에서 검사). `oGrid` 가 Infragistics 라 fetch 로 흉내 내지 않는다.
+     확인: 저장 뒤 단품관리 목록을 코드로 조회(`하나찾기`). 저장 전에도 같은 조회 + 중복체크 — 두 번 눌러도, 새로고침 뒤 다시 눌러도 두 번 등록되지 않는다.
+     ⚠ 틀 쪽 읽기는 공용 줄을 못 탄다 → 틀을 열기 전·저장 전 `VP원본쉼` 으로 뒤 요청을 세운다. */
+  if (!곁다리 && page === PAGES[단품길]) (() => {
+    const 등록길 = "/System/Master/goodsDetl.aspx", 분류길 = "/System/Master/categoryPopup.aspx";
+    const 쉼 = (ms) => new Promise((r) => setTimeout(r, ms));
+    const 말 = (m) => window.VP말?.("단품등록:" + m);
+    const 칸표 = [
+      { id: "분류", 글: "단품분류명", 필수: 1, 꼴: "분류" },
+      { id: "tbGoodsCd", 글: "단품코드", 꼴: "코드" },
+      { id: "ddlWarehouseNm", 글: "창고명", 필수: 1 },
+      { id: "tbGoodsNm", 글: "단품명", 필수: 1 },
+      { id: "tbThankUgoods", 글: "사은품" }, { id: "tbModelNo", 글: "바코드" },
+      { id: "ddlBundleYn", 글: "합포장여부" }, { id: "tbPackUnit", 글: "포장단위", 필수: 1 }, { id: "ddlTaxYn", 글: "과세여부" },
+      { id: "ddlDCo", 글: "배송사명" }, { id: "ddlStockType", 글: "재고유형" }, { id: "ddlOrderingType", 글: "재고유형" },
+      { id: "ddlSalesStatus", 글: "판매상태" }, { id: "cbAddGoodsYn", 글: "추가단품여부" },
+      { id: "ddlDCostGb", 글: "배송료구분" }, { id: "tbBoxQty", 글: "박스수량" }, { id: "tbCellNm", 글: "생산셀명" }, { id: "tbBoxCd", 글: "포장박스코드" },
+      { id: "tbDeliveryCost", 글: "수도권 선불비" }, { id: "tbPostPayment", 글: "수도권 착불비" },
+      { id: "tbDeliveryCost2", 글: "수도권외곽 선불비" }, { id: "tbPostPayment2", 글: "수도권외곽 착불비" },
+      { id: "tbCountryDCost", 글: "지방 선불비" }, { id: "tbCountryPostPay", 글: "지방 착불비" },
+      { id: "tbCountryDCost2", 글: "지방외곽 선불비" }, { id: "tbCountryPostPay2", 글: "지방외곽 착불비" },
+      { id: "tbMemo", 글: "메모" },
+    ];
+    const 가격표 = [["salesPrice", "매장판매단가"], ["itemPrice", "자재원가"], ["itemCost", "비용"], ["purchaseAmt", "매입단가"]];
+
+    const 단추 = document.createElement("button");
+    단추.type = "button"; 단추.className = "vp-등록단추"; 단추.textContent = "단품등록";
+    filters.before(단추);
+    const 쪽 = document.createElement("div");
+    쪽.className = "vp-goods vp-등록쪽"; 쪽.hidden = true;
+    쪽.innerHTML = `
+      <button type="button" class="vp-등록뒤">← 단품관리</button>
+      <h1>단품등록</h1>
+      <div class="vp-등록몸">
+        <div class="vp-등록왼">
+          <div class="vp-등록칸들"><div class="vp-note">불러오는 중…</div></div>
+          <h2 class="vp-등록제목">가격정보</h2>
+          <div class="vp-등록칸들 vp-등록가격"></div>
+          <div class="vp-등록줄"><button type="button" class="vp-등록저장" disabled>저장</button><span class="vp-등록결과" role="status"></span></div>
+        </div>
+        <div class="vp-등록참고">
+          <h2 class="vp-등록제목">단품코드 참고</h2>
+          <input class="vp-등록찾기" placeholder="상품명, 단품명, 단품코드, 바코드, 단품분류, 매입처명…" aria-label="단품코드 참고 검색">
+          <div class="vp-등록찾은수"></div>
+          <div class="vp-등록찾은것"></div>
+        </div>
+      </div>`;
+    root.appendChild(쪽);
+    const 목록쪽 = root.querySelector(".vp-goods");
+    const 칸통 = 쪽.querySelector(".vp-등록칸들"), 가격통 = 쪽.querySelector(".vp-등록가격");
+    const 저장단추 = 쪽.querySelector(".vp-등록저장"), 결과칸 = 쪽.querySelector(".vp-등록결과");
+    const 찾기칸 = 쪽.querySelector(".vp-등록찾기"), 찾은수 = 쪽.querySelector(".vp-등록찾은수"), 찾은것 = 쪽.querySelector(".vp-등록찾은것");
+
+    const 보이기 = (등록) => { 목록쪽.hidden = 등록; 쪽.hidden = !등록; window.scrollTo?.(0, 0); };
+    단추.addEventListener("click", () => { 보이기(true); 칸세우기(); });
+    쪽.querySelector(".vp-등록뒤").addEventListener("click", () => 보이기(false));
+
+    const 결과 = (글, 종류) => { 결과칸.textContent = 글; 결과칸.dataset.종류 = 종류 || ""; };
+    const 칸 = (id) => 쪽.querySelector(`[data-칸="${id}"]`);
+    let 세움 = null, 확인된코드 = "", 보내는중 = false;
+    const 등록한코드 = new Set();
+    const 지금코드 = () => (칸("tbGoodsCd")?.value || "").trim();
+    const 저장가림 = () => { 저장단추.disabled = 보내는중 || !칸("tbGoodsCd") || 등록한코드.has(codeKey(지금코드())); };
+
+    async function 쪽받기(주소) {
+      const res = await VP_DATA.받기(주소, { credentials: "include" }, "사람");
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const d = new DOMParser().parseFromString(await res.text(), "text/html");
+      if (d.querySelector("input[type=password]")) throw new Error("로그인 필요");
+      return d;
+    }
+    function 칸세우기() {
+      if (세움) return 세움;
+      세움 = (async () => {
+        const [d, 분류쪽] = await Promise.all([쪽받기(등록길), 쪽받기(분류길)]);
+        const 없음 = 칸표.filter((x) => x.꼴 !== "분류" && !d.getElementById(x.id)).map((x) => x.id);
+        if (없음.length || !d.getElementById("btnSave") || !d.getElementById("btnExist")) throw new Error("등록 쪽 모양이 다름 " + 없음.join(","));
+        const 분류들 = [...분류쪽.querySelectorAll("#oTree a[title]")].map((a) => ({ 코드: a.getAttribute("title").split("|")[0], 이름: a.textContent.trim() })).filter((x) => x.코드 && x.이름);
+        if (!분류들.length) throw new Error("단품분류 목록을 못 읽음");
+        const 틀칸 = (x) => {
+          const 줄 = document.createElement("label");
+          줄.className = "vp-등록칸" + (x.id === "tbMemo" ? " vp-등록넓음" : "");
+          const 이름 = 줄.appendChild(document.createElement("span"));
+          이름.textContent = x.글;
+          if (x.필수) { const 별 = 이름.appendChild(document.createElement("b")); 별.textContent = "*"; }
+          return 줄;
+        };
+        칸통.replaceChildren();
+        for (const x of 칸표) {
+          const 줄 = 칸통.appendChild(틀칸(x));
+          const 원본 = d.getElementById(x.id);
+          let 입력;
+          if (x.꼴 === "분류") {
+            입력 = document.createElement("select");
+            입력.add(new Option("선택하세요", ""));
+            for (const c of 분류들) 입력.add(new Option(c.이름, c.코드));
+          } else if (원본.tagName === "SELECT") {
+            입력 = document.createElement("select");
+            for (const o of 원본.options) 입력.add(new Option(o.text, o.value));
+            입력.value = 원본.value;
+          } else if (원본.type === "checkbox") {
+            입력 = document.createElement("input"); 입력.type = "checkbox"; 입력.checked = 원본.checked;
+          } else {
+            입력 = document.createElement(원본.tagName === "TEXTAREA" ? "textarea" : "input");
+            입력.value = 원본.value || "";
+            if (원본.maxLength > 0) 입력.maxLength = 원본.maxLength;
+          }
+          입력.dataset.칸 = x.id;
+          if (x.꼴 === "코드") {
+            const 묶음 = 줄.appendChild(document.createElement("span"));
+            묶음.className = "vp-등록코드";
+            묶음.appendChild(입력);
+            const 검사 = 묶음.appendChild(document.createElement("button"));
+            검사.type = "button"; 검사.className = "vp-등록중복"; 검사.textContent = "중복체크";
+            검사.addEventListener("click", (e) => { e.preventDefault(); 중복체크(검사); });
+            입력.addEventListener("input", () => { 확인된코드 = ""; 결과(""); 저장가림(); });
+          } else 줄.appendChild(입력);
+        }
+        /* 매입처·시작일·종료일 = 벤더피아가 채워 둔 값 그대로(첫 판 — 임시). 줄은 1줄, 주거래여부는 그 줄 */
+        가격통.replaceChildren();
+        for (const [키, 글] of 가격표) {
+          const 줄 = 가격통.appendChild(틀칸({ 글 }));
+          const 입력 = 줄.appendChild(document.createElement("input"));
+          입력.inputMode = "numeric"; 입력.dataset.가격 = 키;
+        }
+        const 안내 = 가격통.appendChild(document.createElement("div"));
+        안내.className = "vp-note vp-등록넓음";
+        안내.textContent = "매입처·시작일·종료일은 벤더피아 처음 값 그대로 한 줄로 등록되고, 주거래여부는 그 줄에 표시됩니다.";
+        저장가림();
+      })();
+      세움.catch((e) => { 세움 = null; 칸통.replaceChildren(); 결과("실패 (" + e.message + ")", "실패"); 말("칸세우기 실패 " + e.message); });
+      return 세움;
+    }
+
+    /* ── 숨은 틀 (search.js 고객주문변경과 같은 꼴 — sandbox 에 allow-modals 없음 → 벤더피아 alert 가 화면에 안 뜸) ── */
+    const 틀로드 = (틀, ms) => new Promise((됨, 안됨) => {
+      const 끝 = setTimeout(() => { 틀.removeEventListener("load", f); 안됨(new Error("시간 넘김")); }, ms);
+      const f = () => { clearTimeout(끝); 됨(); };
+      틀.addEventListener("load", f, { once: true });
+    });
+    async function 틀열기() {
+      const 틀 = document.createElement("iframe");
+      틀.setAttribute("sandbox", "allow-same-origin allow-scripts allow-forms");
+      틀.setAttribute("aria-hidden", "true");
+      틀.tabIndex = -1;
+      틀.style.cssText = "position:fixed;left:-12000px;top:0;width:1280px;height:900px;border:0;visibility:hidden;pointer-events:none";
+      window.VP원본쉼?.();
+      const 열림 = 틀로드(틀, 60000);
+      틀.src = new URL(등록길, location.href).href;
+      document.body.appendChild(틀);
+      try {
+        await 열림;
+        const w = 틀.contentWindow, d = 틀.contentDocument;
+        if (!d || d.querySelector("input[type=password]")) throw new Error("로그인 필요");
+        if (typeof w.isFieldValid !== "function" || !d.getElementById("btnSave") || !d.getElementById("btnExist")) throw new Error("등록 쪽 모양이 다름");
+        const 알림들 = [];
+        w.alert = (m) => { 알림들.push(String(m)); };
+        w.confirm = (m) => { 알림들.push(String(m)); return false; };
+        return { 틀, w, d, 알림들 };
+      } catch (e) { 틀.remove(); throw e; }
+    }
+    /* 쪽의 「중복체크」 그대로 — 벤더피아가 `bGoodCdChecked` 를 true 로 해야만 저장이 된다 */
+    async function 틀중복체크({ d, 알림들 }, 코드) {
+      d.getElementById("tbGoodsCd").value = 코드;
+      알림들.length = 0;
+      d.getElementById("btnExist").click();
+      const 표식 = () => (d.getElementById("bGoodCdChecked") || {}).value === "true";
+      for (let i = 0; i < 100 && !표식() && !알림들.length; i++) await 쉼(150);
+      return { 됨: 표식(), 글: 알림들[0] || "" };
+    }
+    async function 목록에있나(코드) {
+      const 답 = await VP_DATA.하나찾기(page, 내길, 서버값(), { code: 코드 });
+      return !!(답 && 답.rows.length);
+    }
+    async function 중복체크(검사) {
+      const 코드 = 지금코드();
+      if (!코드) return 결과("단품코드가 입력되지 않았습니다.", "실패");
+      검사.disabled = true; 결과("중복체크 중…");
+      let 틀;
+      try {
+        const 열림 = await 틀열기(); 틀 = 열림.틀;
+        const 답 = await 틀중복체크(열림, 코드);
+        말("중복체크 " + 코드 + " " + (답.됨 ? "가능" : "안됨") + " " + 답.글);
+        if (지금코드() !== 코드) return;
+        확인된코드 = 답.됨 ? 코드 : "";
+        결과(답.글 || (답.됨 ? "사용가능한 단품코드 입니다." : "중복체크 응답 없음"), 답.됨 ? "됨" : "실패");
+      } catch (e) { 결과("실패 (" + e.message + ")", "실패"); }
+      finally { 틀?.remove(); 검사.disabled = false; }
+    }
+
+    function 값모으기() {
+      const 값 = { 칸: {}, 가격: {} };
+      for (const x of 칸표) {
+        if (x.꼴 === "분류") continue;
+        const e = 칸(x.id);
+        값.칸[x.id] = e.type === "checkbox" ? e.checked : e.value;
+      }
+      const 분류 = 칸("분류");
+      값.분류코드 = 분류.value; 값.분류이름 = 분류.value ? 분류.options[분류.selectedIndex].text : "";
+      for (const e of 쪽.querySelectorAll("[data-가격]")) { const v = e.value.replace(/[,\s]/g, ""); if (v) 값.가격[e.dataset.가격] = v; }
+      값.코드 = String(값.칸.tbGoodsCd).trim();
+      return 값;
+    }
+    /* 벤더피아 `isFieldValid` 와 같은 차례·같은 글 — 숨은 틀을 열기 전에 알려 준다(틀에서 쪽이 한 번 더 검사한다) */
+    function 빈칸검사(값) {
+      if (!값.분류코드) return ["분류", "단품분류를 선택해주세요."];
+      if (!값.코드) return ["tbGoodsCd", "단품코드를 선택해주세요."];
+      if (확인된코드 !== 지금코드()) return ["tbGoodsCd", "단품코드 중복여부를 체크해주세요."];
+      if (!String(값.칸.tbGoodsNm).trim()) return ["tbGoodsNm", "단품명을 선택해주세요."];
+      if (String(값.칸.ddlWarehouseNm).trim() === "선택하세요") return ["ddlWarehouseNm", "창고를 선택해주세요."];
+      if (!String(값.칸.tbPackUnit).trim()) return ["tbPackUnit", "포장단위을 입력해주세요."];
+      for (const [키, 글] of 가격표) if (값.가격[키] && !/^\d+(\.\d+)?$/.test(값.가격[키])) return [null, 글 + "에는 숫자만 넣어 주세요."];
+      return null;
+    }
+    async function 단품등록올리기(값) {
+      const 탈 = (m, 보냄 = false) => Object.assign(new Error(m), { 보냄 });
+      /* ① 저장 전 — 목록에 이미 있으면 보내지 않는다(앞서 응답을 못 받은 등록이 들어가 있을 수 있다) */
+      if (await 목록에있나(값.코드)) throw 탈("① 단품관리 목록에 이미 있는 단품코드입니다");
+      const 열림 = await 틀열기();
+      const { 틀, w, d, 알림들 } = 열림;
+      try {
+        /* ② 칸 — 숨김·읽기전용 분류 칸은 팝업이 돌아올 때처럼 `getReturnValue` */
+        for (const [id, v] of Object.entries(값.칸)) {
+          const e = d.getElementById(id);
+          if (!e) throw 탈("② 칸 없음 " + id);
+          if (e.type === "checkbox") { if (e.checked !== v) e.click(); } else e.value = v;
+          e.dispatchEvent(new w.Event("change", { bubbles: true }));
+        }
+        w.getReturnValue({ categoryCd: 값.분류코드, categoryNm: 값.분류이름 });
+        if ((d.getElementById("tbCategoryCd") || {}).value !== 값.분류코드) throw 탈("② 단품분류가 안 들어감");
+        /* ③ 중복체크 — 쪽의 것을 그대로 */
+        const 중복 = await 틀중복체크(열림, 값.코드);
+        말("중복체크 " + (중복.됨 ? "가능" : "안됨") + " " + 중복.글);
+        if (!중복.됨) throw 탈("③ " + (중복.글 || "중복체크 응답 없음"));
+        /* ④ 가격정보 첫 줄 — 주거래 동그라미, 가격 칸 */
+        const 표 = w.$find && w.$find("oGrid");
+        if (!표 || !표.get_rows().get_length()) throw 탈("④ 가격정보 표(oGrid)가 없음");
+        const 줄 = 표.get_rows().get_row(0);
+        const 동그라미 = 줄.get_cellByColumnKey("majorBizYn").get_element().querySelector("input[type=radio]");
+        if (!동그라미) throw 탈("④ 주거래여부 칸 없음");
+        for (const t of ["mousedown", "mouseup", "click"]) 동그라미.dispatchEvent(new w.MouseEvent(t, { bubbles: true, cancelable: true, view: w, button: 0 }));
+        await 쉼(200);
+        if (!동그라미.checked) throw 탈("④ 주거래여부가 안 눌림");
+        for (const [키, v] of Object.entries(값.가격)) {
+          const c = 줄.get_cellByColumnKey(키);
+          c.set_value(Number(v));
+          if (Number(c.get_value()) !== Number(v)) throw 탈("④ 가격 칸이 안 들어감(" + 키 + ")");
+        }
+        /* ⑤ 「저장」 — 쪽의 `isFieldValid` 가 멈추면 쪽이 안 넘어간다(= 저장 안 보냄) */
+        const 알림뽑기 = (t) => [...t.matchAll(/alert\(\s*['"]([^'"]{1,120})['"]/g)].map((m) => m[1]);
+        const 늘있는알림 = new Set(알림뽑기(d.documentElement.outerHTML));
+        let 떠남 = false;
+        d.forms[0].addEventListener("submit", () => { 떠남 = true; });
+        w.addEventListener("pagehide", () => { 떠남 = true; });
+        w.addEventListener("beforeunload", () => { 떠남 = true; });
+        알림들.length = 0;
+        window.VP원본쉼?.();
+        const 저장됨 = 틀로드(틀, 120000);
+        말("저장 누름 " + 값.코드);
+        d.getElementById("btnSave").click();
+        for (let i = 0; i < 20 && !떠남; i++) await 쉼(100);
+        if (!떠남) { 저장됨.catch(() => {}); throw 탈("⑤ 저장 안 됨 — " + (알림들[0] ? "벤더피아 알림 「" + 알림들[0] + "」" : "저장 단추가 안 먹음")); }
+        try { await 저장됨; } catch (e) { throw 탈("⑤ 저장 응답 못 받음 — 단품관리에서 확인", true); }
+        const 뒤 = 틀.contentDocument;
+        const 응답알림 = 뒤 ? 알림뽑기(뒤.documentElement.outerHTML).filter((a) => !늘있는알림.has(a)) : [];
+        말("저장 뒤 " + String(틀.contentWindow?.location?.pathname || "") + " 알림" + JSON.stringify(응답알림).slice(0, 120));
+        /* ⑥ 진짜 들어갔나 — 단품관리 목록 조회 */
+        let 있음 = null;
+        for (let i = 0; i < 2 && !있음; i++) {
+          if (i) await 쉼(1500);
+          try { 있음 = await 목록에있나(값.코드); } catch (e) { 있음 = null; }
+        }
+        말("목록확인 " + (있음 === null ? "못봄" : 있음 ? "있음" : "없음"));
+        if (있음) return;
+        throw 탈("⑥ 단품관리 목록에 " + (있음 === null ? "확인 못 함" : "없음") + (응답알림[0] ? " — 벤더피아 알림 「" + 응답알림[0] + "」" : ""), true);
+      } finally { 틀.remove(); }
+    }
+    저장단추.addEventListener("click", async () => {
+      if (보내는중) return;
+      const 값 = 값모으기();
+      const 빈칸 = 빈칸검사(값);
+      if (빈칸) { 결과(빈칸[1], "실패"); if (빈칸[0]) 칸(빈칸[0])?.focus(); return; }
+      보내는중 = true; 저장가림(); 결과("등록 중…");
+      try {
+        await 단품등록올리기(값);
+        등록한코드.add(codeKey(값.코드));
+        결과("등록됨 — " + 값.코드 + " (단품관리 목록은 새로고침하면 나옵니다)", "됨");
+      } catch (e) {
+        말("실패 " + e.message);
+        결과("실패 (" + e.message + ")", "실패");
+      } finally { 보내는중 = false; 저장가림(); }
+    });
+
+    /* ── 단품코드 참고 검색 — 단품관리 검색과 같은 함수(`검색낱말`·`낱말맞나`·`page.search`) + 상품명(상품관리 목록의 단품 연결) ── */
+    let 찾는번호 = 0, 찾기시계 = 0, 기다림 = 0;
+    async function 단품줄들() {
+      while (loading) await 쉼(200);
+      if (받은단품목록) return { heads: 받은단품목록[0], rows: 받은단품목록[1] };
+      const 받음 = { heads: [], rows: [] };
+      await fetchList(page, 내길, "", { from: "2000-01-01" }, (h, rows) => { 받음.heads = h; 받음.rows.push(...rows); });
+      받은단품목록 = [받음.heads, 받음.rows];
+      return 받음;
+    }
+    const 상품글 = (코드) => {
+      const 줄들 = linked?.byCode.get(코드), ni = linked ? linked.heads.indexOf("상품명") : -1;
+      return 줄들 && ni >= 0 ? [...new Set(줄들.map((r) => String(r[ni] || "").trim()).filter(Boolean))] : [];
+    };
+    async function 참고찾기() {
+      const 번호 = ++찾는번호, words = 검색낱말(찾기칸.value);
+      if (!words.length) { 찾은수.textContent = ""; 찾은것.replaceChildren(); return; }
+      찾은수.textContent = "찾는 중…";
+      let 목록;
+      try { 목록 = await 단품줄들(); } catch (e) { if (번호 === 찾는번호) 찾은수.textContent = "목록을 못 받았습니다"; return; }
+      if (번호 !== 찾는번호) return;
+      const { heads: h, rows } = 목록;
+      const searchIdx = page.search.map((n) => h.indexOf(n)).filter((i) => i >= 0);
+      const ni = h.indexOf(page.nameCol), ci = h.indexOf(page.codeCol), si = h.indexOf("판매상태"), gi = h.indexOf("단품분류");
+      const 답 = new Map();
+      for (const row of rows) {
+        const 코드 = String(row[ci] || "").trim(), 키 = codeKey(코드);
+        if (!코드 || 답.has(키)) continue;
+        const 상품들 = 상품글(키);
+        if (!낱말맞나(words, [...row, 상품들.join(" ")], [...searchIdx, row.length])) continue;
+        답.set(키, { 코드, 이름: String(row[ni] || "").trim(), 분류: gi >= 0 ? String(row[gi] || "").trim() : "", 상태: si >= 0 ? String(row[si] || "").trim() : "", 상품들 });
+      }
+      const 다 = [...답.values()].sort((a, b) => (a.상태 !== "판매중") - (b.상태 !== "판매중") || a.코드.localeCompare(b.코드, "ko", { numeric: true }));
+      찾은수.textContent = 다.length.toLocaleString() + "개" + (다.length > 300 ? " · 앞 300개만 보입니다" : "") + (linked ? "" : " · 상품명 연결을 받는 중");
+      찾은것.replaceChildren(...다.slice(0, 300).map((x) => {
+        const 줄 = document.createElement("div"); 줄.className = "vp-등록찾은줄";
+        const 복사 = 줄.appendChild(document.createElement("button"));
+        복사.type = "button"; 복사.className = "vp-등록복사"; 복사.textContent = x.코드; 복사.title = "누르면 복사됩니다";
+        복사.addEventListener("click", () => 코드복사(복사, x.코드));
+        const 글 = 줄.appendChild(document.createElement("div")); 글.className = "vp-등록찾은글";
+        const 이름 = 글.appendChild(document.createElement("strong")); 이름.textContent = x.이름;
+        const 밑 = 글.appendChild(document.createElement("span"));
+        밑.textContent = [x.분류, x.상태, x.상품들[0] ? x.상품들[0] + (x.상품들.length > 1 ? " 외 " + (x.상품들.length - 1) : "") : ""].filter(Boolean).join(" · ");
+        return 줄;
+      }));
+      /* 상품명 연결이 늦게 오면 한 번 더 찾는다 */
+      if (!linked && !기다림) 기다림 = setInterval(() => { if (linked) { clearInterval(기다림); 기다림 = 0; 참고찾기(); } }, 1000);
+    }
+    async function 코드복사(복사, 코드) {
+      try { await navigator.clipboard.writeText(코드); }
+      catch (e) {
+        const t = document.createElement("textarea"); t.value = 코드; 쪽.appendChild(t); t.select();
+        try { document.execCommand("copy"); } catch (x) {}
+        t.remove();
+      }
+      복사.textContent = "복사됨";
+      setTimeout(() => { 복사.textContent = 코드; }, 900);
+    }
+    찾기칸.addEventListener("input", () => { clearTimeout(찾기시계); 찾기시계 = setTimeout(참고찾기, 250); });
+  })();
+
   filters.addEventListener("input", apply);
   filters.addEventListener("change", apply);
   (곁다리 ? Promise.resolve() : load()).then(() => {

@@ -11,10 +11,10 @@
 
 | 글자 | id / name | 구분 | 동작 |
 |---|---|---|---|
-| 저장 | `btnSave` | 쓰기 | 폼 제출(서버 처리) |
+| 저장 | `btnSave` | 쓰기 | onclick `return isFieldValid();` 뒤 폼 제출(서버 처리, 그림 단추) |
 | 목록 | `btnClose` | 이동 | 폼 제출(서버 처리) |
-| 단품분류 | `btnCategory` | 미확인 | JS만(제출 안 함) |
-| 중복체크 | `btnExist` | 미확인 | JS만(제출 안 함) |
+| 단품분류 | `btnCategory` | 팝업 | `fnCategory` → `categoryPopup.aspx` · 돌아오면 `getReturnValue({categoryCd, categoryNm})` 가 두 칸을 채움 |
+| 중복체크 | `btnExist` | 조회 | `fnGetGoodsCd` → `WebService.asmx/GetGoodCdYN` · 되면 `bGoodCdChecked`=`true` + alert 「사용가능한 단품코드 입니다.」 |
 | 행추가 | `btnDAdd` | 화면만 | JS만(제출 안 함) |
 | 행삭제 | `btnDDel` | 화면만 | JS만(제출 안 함) |
 | 옵션관리 | `btnOptionPopup` | 팝업 | `fnOptionPopup();` |
@@ -27,25 +27,25 @@
 
 | 이름 | 화면 글자 | 종류 | 값 / 제한 |
 |---|---|---|---|
-| `tbCategoryCd` |  | 글 | 읽기전용 · 이벤트 keydown |
-| `tbCategoryNm` |  | 글 | 읽기전용 · 이벤트 keydown |
-| `tbGoodsCd` | 단품코드 | 글 | 최대 20 · 이벤트 keydown |
-| `ddlWarehouseNm` |  | 고르기 | 업무 자료 22개(적지 않음) |
-| `tbGoodsNm` |  | 글 | 이벤트 keydown |
+| `tbCategoryCd` | 단품분류명* (코드) | 글 | 읽기전용 · 이벤트 keydown |
+| `tbCategoryNm` | 단품분류명* (이름) | 글 | 읽기전용 · 이벤트 keydown |
+| `tbGoodsCd` | 단품코드 | 글 | 최대 20 · 처음 값 = 서버가 채운 숫자 8자리(시각으로 보임 — 짐작) · 이벤트 keydown |
+| `ddlWarehouseNm` | 창고명* | 고르기 | 업무 자료 22개(적지 않음) · 첫 값 `선택하세요`, 처음 고름 `100` |
+| `tbGoodsNm` | 단품명* | 글 | 이벤트 keydown |
 | `tbThankUgoods` | 사은품 | 글 | 최대 20 · 이벤트 keydown |
 | `tbModelNo` | 바코드 | 글 | 최대 30 · 이벤트 keydown |
 | `ddlBundleYn` | 합포장여부 | 고르기 | 1=가능 · 0=불가능 (기본 `1`) |
-| `tbPackUnit` |  | 글 | 최대 3 · 이벤트 keydown |
+| `tbPackUnit` | 포장단위* | 글 | 최대 3 · 처음 값 `0` · 이벤트 keydown |
 | `ddlTaxYn` | 과세여부 | 고르기 | 1=과세 · 0=면세 (기본 `1`) |
 | `ddlDCo` | 배송사명 | 고르기 | 업무 자료 17개(적지 않음) |
 | `ddlStockType` | 재고유형 | 고르기 | 1=자사 · 0=타사 (기본 `1`) |
 | `ddlOrderingType` | 재고유형 | 고르기 | 1=구매발주 · 0=생산발주 (기본 `1`) |
 | `ddlSalesStatus` | 판매상태 | 고르기 | 1=판매중 · 2=중지 · 3=품절 (기본 `1`) |
-| `cbAddGoodsYn` |  | 체크 | 이벤트 keydown |
+| `cbAddGoodsYn` | 추가단품여부 | 체크 | 이벤트 keydown |
 | `ddlDCostGb` | 배송료구분 | 고르기 | 업무 자료 3개(적지 않음) |
 | `tbBoxQty` | 박스수량 | 글 | 이벤트 keydown,keyup |
-| `tbCellNm` | 생산셀명 | 글 | 이벤트 keydown |
-| `tbBoxCd` | 포장박스코드 | 글 | 이벤트 keydown |
+| `tbCellNm` | 생산셀명 | 글 | 처음 값 `0` · 이벤트 keydown |
+| `tbBoxCd` | 포장박스코드 | 글 | 처음 값 `0` · 이벤트 keydown |
 | `tbDeliveryCost` | 수도권 선불비 | 글 | 이벤트 keydown,keyup |
 | `tbPostPayment` | 수도권 착불비 | 글 | 이벤트 keydown,keyup |
 | `tbDeliveryCost2` | 수도권외곽 선불비 | 글 | 이벤트 keydown,keyup |
@@ -77,10 +77,19 @@
 | `ctl00_Contents_ProductDescWebHtmlEditor_iged_f_mw` | Match whole word (숨김) | 체크 | 이벤트 keydown |
 | `ctl00_Contents_ProductDescWebHtmlEditor_iged_b_n` | Bookmark name: (숨김) | 글 | 이벤트 keydown |
 
+## 저장 검사 `isFieldValid` (11-07 사장님 크롬에서 잼)
+
+차례: 단품분류(`tbCategoryCd` 빈칸) → 단품코드(`tbGoodsCd` 빈칸) → 중복체크(`bGoodCdChecked` 가 `true` 아님) → 단품명 → 창고(`선택하세요`) → 포장단위 빈칸 → 주거래여부. 알림 글은 아래 「쪽 안 메시지」.
+함정: 주거래 동그라미 id 가 `rdbRadio` 라 쪽 코드가 넣는 `hdmajorBizYn` 은 사람이 눌러도 `NaN` 이다(벤더피아 동작 그대로). 동그라미를 누르고 나머지가 차면 `isFieldValid` 는 true.
+숨은 창(`sandbox="allow-same-origin allow-scripts allow-forms"`)에서 쪽 JS 가 그대로 돈다: 중복체크·동그라미 누름·`isFieldValid` 확인함(저장은 안 눌러 봄).
+
 ## 표(그리드)
 
 ### `oGrid` — Infragistics WebDataGrid · 열 10개(보임 10) · 불러온 줄 있음: 아니오
 - 기능: selection, activation, columnResizing, editingCore, clipboard, events
+
+- 처음에 1줄(매입처 처음 값 하나 · 시작일 오늘 · 종료일 2050-12-31). 칸 키는 괄호 안 이름. `set_value` 로 숫자가 들어가고 그때 XHR 없음(숨은 창에서 잼, `oGrid_clientState` 길이는 그때 안 바뀜 — 저장 때 실리는지는 미확인).
+- 매입처 칸 고르개 `oGrid_ddlDelivery`(WebDropDown)는 쪽을 열 때 항목 1개뿐 — 나머지를 어떻게 불러오는지 미확인.
 
 보이는 열: CHK · 순번(seq) · 매입처(supplierCd) · 주거래여부(majorBizYn) · 매장판매단가(salesPrice) · 자재원가(itemPrice) · 비용(itemCost) · 매입단가(purchaseAmt) · 시작일(startDt) · 종료일(endDt)
 
