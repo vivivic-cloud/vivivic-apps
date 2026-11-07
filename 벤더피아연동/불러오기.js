@@ -11,9 +11,29 @@
      ⚠ 틀 안쪽 frame 은 제 이름이 없어 `window.top.name` 으로 본다(같은 출처라 읽힌다). 새 페이지로 가도 창 이름은 그대로다.
      ⚠ 그 창의 sessionStorage 에도 표식을 적어 둔다 — 그 창에서 `window.open` 으로 열린 딴 창(이름 없음, sessionStorage 는 복사됨)도 오리지널로 남게.
        이 창(우리 화면)에는 표식이 **없다** — 이름이 맞을 때만 적는다. */
-  try { if (window.top.name === "vp원본") { try { sessionStorage.setItem("vp원본", "1"); } catch (e) {} return; } } catch (e) {}
-  try { if (sessionStorage.getItem("vp원본") === "1") return; } catch (e) {}
   const 깃 = "https://vivivic-cloud.github.io/vivivic-apps/%EB%B2%A4%EB%8D%94%ED%94%BC%EC%95%84%EC%97%B0%EB%8F%99/";
+  /* ⚠⚠ 11-07 [새 지시 돌아오는단추] 사장님: 「벤더피아 화면에서 다시 벤더피아연동 화면으로 돌아가는 버튼이 없어 되돌아올 길이 없습니다」
+     새 창 오리지널에서 예외로 **`login.js` 하나만, 맨 위 문서에만** 넣는다 — 그 글의 「벤더피아연동으로」 단추 말고는 다 `VP원본창` 으로 멈춘다.
+     팝업(`window.opener`)과 틀 안쪽에는 안 넣는다. 꼴·조건은 login.js 에서 고친다(이 줄은 덮어쓰기, 그쪽은 깃으로 바로). */
+  const 돌아가기글 = () => {
+    if (window.top !== window || window.opener) return;
+    if (!document.body || document.body.tagName === "FRAMESET") return;
+    const 확장안글 = () => {
+      const s = document.createElement("script");
+      s.src = chrome.runtime.getURL("login.js");
+      s.onload = s.onerror = () => s.remove();
+      (document.head || document.documentElement).appendChild(s);
+    };
+    try {
+      const 표 = "?v=" + encodeURIComponent(chrome.runtime.getManifest().version) + "&t=" + Math.floor(Date.now() / 60000);
+      chrome.runtime.sendMessage({ __vp: "깃글", 목록: [{ 이름: "login.js", 주소: 깃 + "login.js" + 표 }] }, (r) => {
+        const 상태 = !chrome.runtime.lastError && r && r.결과 && r.결과["login.js"];
+        if (상태 !== "돌림" && 상태 !== "이미") 확장안글();
+      });
+    } catch (e) { 확장안글(); }
+  };
+  try { if (window.top.name === "vp원본") { try { sessionStorage.setItem("vp원본", "1"); } catch (e) {} 돌아가기글(); return; } } catch (e) {}
+  try { if (sessionStorage.getItem("vp원본") === "1") { 돌아가기글(); return; } } catch (e) {}
   /* ⚠⚠ 10-15 사장님: 「이게 뭐야 … 드롭다운 목록으로 만들어 달라니까, 그리고, 송장전송필터링은
        필요없다고」 — **새 글은 올라가 있었는데 사장님 화면에는 옛 글이 돌고 있었다.**
      까닭: 여기서 깃허브 주소를 **아무 표 없이** 걸어 브라우저와 깃허브 CDN 이 **옛 글을 들고 있었다.**

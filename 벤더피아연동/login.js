@@ -29,7 +29,7 @@
      이 고침은 **새로고침만으로** 먹어야 한다. 그게 핵심이다. */
 /* ⚠⚠ 화면글 판은 **여기 한 군데서만** 적는다. `manifest.json` 의 version 과 **늘 같이** 올려라
    (배포 차례에 적어 두었다). 두 군데서 적으면 반드시 어긋난다. */
-const VP_화면글판 = "0.34.89";   // ⚠ manifest.json 의 version 과 **같은 값**
+const VP_화면글판 = "0.34.90";   // ⚠ manifest.json 의 version 과 **같은 값**
 
 /* ⚠⚠ 10-22 「벤더피아」 단추가 여는 **새 창 오리지널**의 표식을 보는 물음. 새 창(`window.name === "vp원본"`)과 그 안 모든 frame 에서는
    우리 글이 **하나도 돌지 않아야** 한다. 1차로 `불러오기.js`·`짚개.js`(확장 안)가 막고, 이 물음은 login.js 가 한 번 더 막는 안전망이다.
@@ -328,4 +328,34 @@ window.VP원본창 = () => {
     form.requestSubmit(loginBtn);
   });
   myForm.vpId.focus();
+})();
+
+/* ⚠⚠ 11-07 [새 지시 돌아오는단추] 사장님: 「벤더피아 화면에서 다시 벤더피아연동 화면으로 돌아가는 버튼이 없어 되돌아올 길이 없습니다」
+   벤더피아 **원래 화면**(「벤더피아」 단추로 연 새 창 · 구매입고처럼 우리 글이 안 덮는 쪽) 오른쪽 아래에 작은 「벤더피아연동으로」.
+   · 누르면 **새 탭에 벤더피아연동 메인**(`/index.aspx`) — 메뉴 단추와 같은 새 탭(10-26). 지금 화면은 그대로 둔다.
+     `rel=noopener` 라 새 탭에는 표식(`vp원본` 이름·sessionStorage)이 안 넘어가 우리 화면이 뜬다.
+   · 안 띄우는 곳: 틀 안쪽(숨은 창 포함) · 팝업(`window.opener`, 주소에 popup) · 작은 창 · 로그인 화면 · 우리 화면.
+   · 쪽 맨 위 띠(`vp-위여백`)를 안 만든다 — 원래 화면 자리를 밀지 않는다. 새 창에는 login.css 가 없어서 꼴을 여기 적는다(`#vp-바꾸기` 와 같은 꼴). */
+(() => {
+  if (window.top !== window || window.opener) return;
+  if (/popup/i.test(location.pathname) || innerWidth < 400 || innerHeight < 300) return;
+  if (!document.body || document.body.tagName === "FRAMESET" || document.getElementById("frmSign")) return;
+  /* 우리 글이 덮는 주소 — `불러오기.js` 의 화면 고르기와 같은 목록. 새 창 오리지널에서는 같은 주소도 원래 화면이다. */
+  if (!window.VP원본창() && /\/index\.aspx|firmdvlist\.aspx|\/system\/sales\/ordermst\.aspx|goods\.aspx|stocklist\.aspx/i.test(location.pathname)) return;
+  if (document.getElementById("vp-돌아가기")) return;
+  const 단추 = document.createElement("a");
+  단추.id = "vp-돌아가기";
+  단추.href = "/index.aspx";
+  단추.target = "_blank";
+  단추.rel = "noopener";
+  단추.textContent = "벤더피아연동으로";
+  단추.title = "벤더피아연동 메인을 새 탭에 열기 (지금 화면은 그대로)";
+  단추.style.cssText = "position:fixed;right:22px;bottom:8px;z-index:2147482000;box-sizing:border-box;height:20px;padding:0 9px;margin:0;"
+    + "border:1px solid rgba(55,53,47,.28);border-radius:999px;background:rgba(55,53,47,.72);color:#fff !important;"
+    + "font:600 11px/18px Inter,-apple-system,'Apple SD Gothic Neo',sans-serif;text-decoration:none !important;white-space:nowrap;cursor:pointer;opacity:.75";
+  const 또렷 = (참) => () => { 단추.style.opacity = 참 ? "1" : ".75"; 단추.style.background = 참 ? "rgba(55,53,47,.92)" : "rgba(55,53,47,.72)"; };
+  단추.addEventListener("mouseenter", 또렷(true));
+  단추.addEventListener("mouseleave", 또렷(false));
+  단추.addEventListener("click", (e) => e.stopPropagation());     // 벤더피아 쪽 클릭 처리에 안 닿게
+  document.documentElement.appendChild(단추);                     // 몸이 아니라 뿌리에 (`#vp-바꾸기` 와 같다)
 })();
