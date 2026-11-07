@@ -44,7 +44,7 @@
 | `tbToPurchaseAmt` | ~ | number |  |
 | `cbAddGoddsYn` |  | 체크 |  |
 | `ddlRowCnt` | 쪽당 줄 수 | 고르기 | 27 · 100 · 500 · 700 · onchange: `$('#btnSearch').click();` (기본 `27`) |
-| `ddlToStatus` | 총 4131건 | 고르기 | 1=판매중 · 2=중지 · 3=품절 (기본 `2`) |
+| `ddlToStatus` |  | 고르기 | 1=판매중 · 2=중지 · 3=품절 (기본 `2`) |
 
 ## 표(그리드)
 

@@ -15,15 +15,6 @@
 | 등록 | `btnInsert` | 쓰기 | 폼 제출(서버 처리) |
 | 수정 | `btnUpdate` | 쓰기 | 폼 제출(서버 처리) |
 | 삭제 | `btnDelete` | 쓰기 | 폼 제출(서버 처리) |
-| 분류 | `ctl00_Contents_oTreet0` | 미확인 | `TreeView_SelectNode(ctl00_Contents_oTree_Data, this,'ctl00_Contents_oT` · 포스트백 `oTree` |
-| 기타 | `ctl00_Contents_oTreet1` | 미확인 | `TreeView_SelectNode(ctl00_Contents_oTree_Data, this,'ctl00_Contents_oT` · 포스트백 `oTree` |
-| 다이닝룸 | `ctl00_Contents_oTreet2` | 미확인 | `TreeView_SelectNode(ctl00_Contents_oTree_Data, this,'ctl00_Contents_oT` · 포스트백 `oTree` |
-| 리빙룸 | `ctl00_Contents_oTreet3` | 미확인 | `TreeView_SelectNode(ctl00_Contents_oTree_Data, this,'ctl00_Contents_oT` · 포스트백 `oTree` |
-| 베드룸 | `ctl00_Contents_oTreet4` | 미확인 | `TreeView_SelectNode(ctl00_Contents_oTree_Data, this,'ctl00_Contents_oT` · 포스트백 `oTree` |
-| 상업용가구 | `ctl00_Contents_oTreet5` | 미확인 | `TreeView_SelectNode(ctl00_Contents_oTree_Data, this,'ctl00_Contents_oT` · 포스트백 `oTree` |
-| 키즈룸 | `ctl00_Contents_oTreet6` | 미확인 | `TreeView_SelectNode(ctl00_Contents_oTree_Data, this,'ctl00_Contents_oT` · 포스트백 `oTree` |
-| 홈오피스 | `ctl00_Contents_oTreet7` | 미확인 | `TreeView_SelectNode(ctl00_Contents_oTree_Data, this,'ctl00_Contents_oT` · 포스트백 `oTree` |
-| AS | `ctl00_Contents_oTreet8` | 미확인 | `TreeView_SelectNode(ctl00_Contents_oTree_Data, this,'ctl00_Contents_oT` · 포스트백 `oTree` |
 |  | `ctl00_Contents_oTreen0` | 미확인 |  |
 
 ## 입력 칸
@@ -41,6 +32,8 @@
 
 보이는 열: CHK · 상위분류명(preCategoryNm) · 분류코드(categoryCd) · 분류명(categoryNm) · 분류차수(depth)
 
+
+트리: `oTree`(ASP.NET TreeView). 마디를 누르면 `__doPostBack('ctl00$Contents$oTree', 경로)` 로 오른쪽 목록을 다시 조회한다. 마디 이름은 업무 자료라 적지 않았다.
 
 ## 숨은 값 (이름만)
 
