@@ -262,16 +262,10 @@
   const CS글자 = (x) => String(x || "").replace(/[\s/]/g, "").toUpperCase();
   const 상담보기 = CS전용 && /(^|[#&])vgInq\b/i.test(location.hash || "");
   if (상담보기) { 상담내용보기(); return; }
-  /* 11-07 [새 지시 CS정산] 메인 메뉴 「CS정산」 = `orderMst.aspx#vgCal` — 화면 글은 형제 파일 `cs정산.js`(확장이 search.js 를 보내는 쪽이라 덮어쓰기 없이 된다).
-     단품 단추용 goods.js 는 표를 다 그린 뒤 저쪽이 부른다(조회 중 벤더피아 요청을 안 늘린다). */
-  if (CS전용 && /(^|[#&])vgCal\b/i.test(location.hash || "")) {
-    window.VP정산단품부르기 = () => { window.VP상품단추요청 = true; 뒷길로부르기(); };
-    const sc = document.createElement("script");
-    sc.src = 형제("cs정산.js");
-    sc.addEventListener("error", () => window.VP말?.("CS정산:글 못 받음"));
-    document.head.appendChild(sc);
-    return;
-  }
+  /* 11-07 [새 지시 CS정산] 메인 메뉴 「CS정산」 = `orderMst.aspx#vgCal` — 올리기·대조는 형제 파일 `cs정산.js`(확장이 search.js 를 보내는 쪽이라 덮어쓰기 없이 된다).
+     [새 지시 CS정산목록] 사장님(그대로): 「일치하는 벤더피아의 주문관리 목록이 나타나야 함」
+     → 일찍 돌아가지 않고 이 글을 끝까지 돌려 **CS등록과 같은 표**(`머리알기`+`addRows`)를 세운다. 맨 끝 `VP정산표` 가 그 표를 cs정산.js 에 빌려준다. */
+  const 정산보기 = CS전용 && /(^|[#&])vgCal\b/i.test(location.hash || "");
   function 상담내용보기() {
     const 주소 = "/System/CS/inquiryList.aspx";
     const 숨은칸 = new Set(["", "주문번호", "ctCd", "inquiryCd", "매출처", "매출처주문번호", "매출처상품코드", "주문자", "주문자전화",
@@ -501,8 +495,8 @@
   root.innerHTML = CS전용 ? `
     <div class="vp-search">
       <a class="vp-home" href="/index.aspx">← 메인</a>
-      <div class="vp-머리줄"><h1>CS등록</h1><a class="vp-머리단추" href="/System/Sales/orderMst.aspx#vgInq" target="_blank" rel="noopener">상담내용보기</a><button type="button" class="vp-머리단추 vp-모든랙단추">모든랙주문확인</button></div>
-      <form class="vp-bar">
+      ${정산보기 ? "<h1>CS정산</h1>" : `<div class="vp-머리줄"><h1>CS등록</h1><a class="vp-머리단추" href="/System/Sales/orderMst.aspx#vgInq" target="_blank" rel="noopener">상담내용보기</a><button type="button" class="vp-머리단추 vp-모든랙단추">모든랙주문확인</button></div>`}
+      <form class="vp-bar"${정산보기 ? ' style="display:none"' : ""}>
         <input type="date" name="from" required>
         <span>~</span>
         <input type="date" name="to" required>
@@ -701,8 +695,9 @@
       + (window.VP상품단추 ? "/셈있음" : "/**셈없음**")));
     document.head.appendChild(sc);
   }
-  /* 10-25 CS등록(주문관리)도 이름 단추 — 확장(불러오기.js)은 주문관리에 goods.js 를 안 보내므로(덮어쓰기 필요) 여기서 바로 부른다. */
-  상품단추불러오기();
+  /* 10-25 CS등록(주문관리)도 이름 단추 — 확장(불러오기.js)은 주문관리에 goods.js 를 안 보내므로(덮어쓰기 필요) 여기서 바로 부른다.
+     CS정산은 표를 그린 뒤에 부른다(조회 중 벤더피아 요청을 안 늘린다, 맨 끝 `VP정산표`). */
+  if (!정산보기) 상품단추불러오기();
 
   /* ── 상담 이력 ──────────────────────────────────────────
      사장님 10-15: 「**상담할때 고객문의에 이력을 남기는데 이력남길수있게 해주세요**」
@@ -2140,7 +2135,7 @@
        검색창 글을 고치면 평소 멀티검색으로 돌아간다. 손으로 친 「모든랙」은 평소대로 네 칸. */
   const 모든랙상품명 = "모든랙";
   let 상품명만 = false;
-  if (CS전용 && bar) {
+  if (CS전용 && bar && !정산보기) {
     bar.q.addEventListener("input", () => { 상품명만 = false; });
     root.querySelector(".vp-모든랙단추").addEventListener("click", () => {
       bar.q.value = 모든랙상품명;
@@ -2272,5 +2267,35 @@
       진단적기("터짐: " + (err && err.message ? err.message : err) + (쪽 ? " · 지금 쪽 " + 모양(쪽.docs) : ""));
     }
   }
-  if (CS전용) CS목록보이기();
+  /* 11-07 [새 지시 CS정산목록] cs정산.js 가 쓰는 주문관리 표 — 읽는 법·그리는 법을 두 벌로 만들지 않는다.
+     칸·차례·값·취소 줄·이름 단추·줄 누름·열 끌기(열쇠 `vp열넓이:CS`)가 CS등록 목록과 같다. */
+  if (정산보기) {
+    let 굿즈부름 = false;
+    const 비우기 = () => {
+      상담판닫기();
+      tbody = null; 그린머리 = null; 상품칸들 = []; 채울자리 = 0; 단추된것 = 0; 머리본것 = null; 상담칸들.length = 0;
+      table.replaceChildren();
+    };
+    window.VP정산표 = {
+      읽기: 목록고르기,
+      비우기,
+      async 그리기(heads, rows) {
+        비우기();
+        머리알기(heads);
+        const 숨김 = rows.length > 160;
+        if (숨김) table.style.display = "none";
+        try {
+          for (let i = 0; i < rows.length; i += 150) {
+            addRows(heads, rows.slice(i, i + 150), i + 150 < rows.length);
+            if (i + 150 < rows.length) await 쉼(0);
+          }
+        } finally { if (숨김) table.style.display = ""; }
+        if (!굿즈부름) { 굿즈부름 = true; 상품단추불러오기(); }
+      },
+    };
+    const sc = document.createElement("script");
+    sc.src = 형제("cs정산.js");
+    sc.addEventListener("error", () => window.VP말?.("CS정산:글 못 받음"));
+    document.head.appendChild(sc);
+  } else if (CS전용) CS목록보이기();
 })();

@@ -1,7 +1,10 @@
 /* CS정산 — 11-07 [새 지시 CS정산] 사장님(그대로):
      「벤더메인 메뉴에 cs정산 메뉴를 만들어  구글시트 또는 엑셀을 업로드하면 업로드 파일의 수취인/옵션값/메모 열의 값이  벤더피아 주문관리의
       수취인/주문옵션/물류메모 일치하는 목록을 나타내줘 벤더피아 조회는 최근 1년이내 모두를 검색 해서 나타내줘」
-   화면 = `orderMst.aspx#vgCal`(메인 메뉴). `search.js` 가 이 해시를 보고 이 글을 부른다 — 확장 안 글은 그대로(덮어쓰기 불필요).
+   11-07 [새 지시 CS정산목록] 사장님(그대로): 「일치하는 벤더피아의 주문관리 목록이 나타나야 함」
+     → 결과 = 대조표가 아니라 **CS등록과 같은 주문관리 표**(`search.js` `VP정산표`) — 같은 칸·차례·값·이름 단추·줄 누름. 줄 차례 = 벤더피아 기본 차례(안 번호 큰 것 먼저).
+       못 찾은 업로드 줄은 표 위 접힌 칸(`.vp-정산못찾음`)에 건수와 함께 따로 둔다.
+   화면 = `orderMst.aspx#vgCal`(메인 메뉴). `search.js` 가 쪽 머리와 표를 세우고 이 글을 부른다 — 확장 안 글은 그대로(덮어쓰기 불필요).
    ⚠⚠ **읽기 전용.** 벤더피아에는 조회(주문관리 POST)만 간다. 업로드 파일·조회 결과는 이 브라우저 안에서만 쓰고 어디에도 보내지도 저장하지도 않는다.
    ⚠ 외부 라이브러리 없음 — .xlsx 는 브라우저의 DecompressionStream 으로 직접 푼다. 공유 링크 받기는 안 만들었다(CLAUDE.md 「CS정산」).
    ⚠ 요청은 공용 줄 `VP_DATA.받기(…, "뒤")` 로만 — 사람이 누른 요청이 먼저 가고, 다른 데를 누르거나 탭이 가려지면 쉰다.
@@ -140,7 +143,7 @@
     const { s, 줄: 제목줄, 자리 } = 제목찾기(시트들);
     const 값 = (줄, i) => String(줄.칸[자리[i]] == null ? "" : 줄.칸[자리[i]]).trim();
     const 줄들 = s.줄.filter((줄) => 줄.n > 제목줄.n)
-      .map((줄) => ({ n: 줄.n, 수취인: 값(줄, 0), 옵션값: 값(줄, 1), 메모: 값(줄, 2), 찾은: [] }))
+      .map((줄) => ({ n: 줄.n, 수취인: 값(줄, 0), 옵션값: 값(줄, 1), 메모: 값(줄, 2), 찾은: false }))
       .filter((줄) => 줄.수취인 || 줄.옵션값 || 줄.메모);
     if (!줄들.length) throw new 탈("제목 줄 아래에 값이 있는 줄이 없습니다.");
     return { 줄들, 시트: s.이름 };
@@ -191,15 +194,14 @@
     const 자리 = (이름) => 이름들.indexOf(이름);
     if (머리 && 필요칸.some((h) => 자리(h) < 0)) throw new 탈("주문관리 표에서 칸을 못 찾았습니다: " + 필요칸.filter((h) => 자리(h) < 0).join(", "));
     const 줄들 = 머리 ? 전체줄.filter((tr) => tr !== 머리 && tr.cells.length === 머리.cells.length && !tr.querySelector("tr") && !tr.querySelector("th.igg_HeaderCaption")) : [];
-    const 몰번호자리 = 이름들.lastIndexOf("주문번호");
+    const 표 = 머리 ? window.VP정산표.읽기(doc) : { heads: [], rows: [] };   // 주문관리 표에 그릴 칸 — CS등록과 같은 읽기(`목록고르기`), 줄 차례는 위 `줄들` 과 같다
+    if (표.rows.length !== 줄들.length) throw new 탈("주문관리 표 줄을 맞추지 못했습니다(" + 표.rows.length + " / " + 줄들.length + "). 주문관리 화면이 바뀌었는지 확인이 필요합니다.");
     return {
-      doc, 행수: 행수글 == null ? 줄들.length : Number(행수글.replace(/,/g, "")),
+      머리: 표.heads, doc, 행수: 행수글 == null ? 줄들.length : Number(행수글.replace(/,/g, "")),
       지금쪽: Number((doc.querySelector('[name$="hdCurrentPage"]') || {}).value) || 0,
-      줄들: 줄들.map((tr) => {
+      줄들: 줄들.map((tr, j) => {
         const 값 = (i) => (i >= 0 ? 칸글(tr.cells[i]) : "");
-        const 뽑 = (이름) => 값(자리(이름));
-        return { 안번호: 값(자리("주문번호")), 수취인: 뽑("수취인"), 주문옵션: 뽑("주문옵션"), 물류메모: 뽑("물류메모"), 등록일: 뽑("등록일"), 매출처: 뽑("매출처"), 몰: 뽑("몰"),
-          주문번호: 값(몰번호자리), 상품코드: 뽑("상품코드"), 상품명: 뽑("상품명"), 단품구성: 뽑("단품구성"), 수량: 뽑("수량"), CS: 뽑("CS"), 배송상태: 뽑("배송상태") };
+        return { 안번호: 값(자리("주문번호")), 수취인: 값(자리("수취인")), 주문옵션: 값(자리("주문옵션")), 물류메모: 값(자리("물류메모")), 상품코드: 값(자리("상품코드")), 표줄: 표.rows[j] };
       }),
     };
   }
@@ -211,7 +213,9 @@
       try {
         const res = await VP_DATA.받기(form.action, { method: "POST", body: fd, credentials: "include", cache: "no-store" }, "뒤");
         if (!res.ok) throw new Error("HTTP " + res.status);
-        return 쪽읽기(await res.text());
+        const 답 = 쪽읽기(await res.text());
+        if (!판.머리.length && 답.줄들.length) 판.머리 = 답.머리;
+        return 답;
       } catch (e) {
         if (e instanceof 탈 || (e && e.name === "AbortError") || 번 >= 2) throw e;
         await 쉼(3000);                               // 한 번만 다시
@@ -250,7 +254,8 @@
       if (본줄.has(열쇠)) return;
       본줄.add(열쇠);
       판.벤더피아건++;
-      for (const 줄 of 짝) 줄.찾은.push(o);
+      판.찾은줄.push(o);
+      for (const 줄 of 짝) 줄.찾은 = true;
     };
     const 이름들 = new Map();
     for (const 줄 of 업로드) if (맞춤값(줄.수취인) && !이름들.has(맞춤값(줄.수취인))) 이름들.set(맞춤값(줄.수취인), 줄.수취인);
@@ -276,28 +281,22 @@
     }
   }
 
-  /* ── 화면 ── */
-  const r = document.createElement("div");
-  r.id = "vp-root";
-  r.className = "vp-wide vp-촘촘쪽";
-  r.innerHTML = `
-    <div class="vp-search vp-정산">
-      <a class="vp-home" href="/index.aspx">← 메인</a>
-      <h1>CS정산</h1>
+  /* ── 화면 — 쪽 머리·알림·표 통은 `search.js` 가 세웠다. 여기는 올리기 줄·안내·못 찾은 칸만 ── */
+  const r = document.getElementById("vp-root");
+  const 쪽 = r.querySelector(".vp-search"), 알림 = r.querySelector(".vp-note");
+  쪽.classList.add("vp-정산");
+  r.querySelector(".vp-bar").insertAdjacentHTML("beforebegin", `
       <div class="vp-정산줄">
         <label class="vp-머리단추 vp-파일단추">파일 올리기<input type="file" accept=".xlsx,.csv" style="display:none"></label>
         <button type="button" class="vp-머리단추 vp-정산멈춤" style="display:none">멈추기</button>
         <span class="vp-파일이름"></span>
       </div>
       <div class="vp-정산안내">엑셀(.xlsx)·CSV 파일에 「수취인」「옵션값」「메모」 열이 있어야 합니다. 구글시트는 <b>파일 → 다운로드 → Microsoft Excel(.xlsx)</b> 로 받아서 올리세요.
-        벤더피아 주문관리 ${첫날} ~ ${끝날}(등록일) 전체에서 찾습니다. 파일은 이 브라우저 안에서만 읽고 어디에도 보내지 않습니다.</div>
-      <div class="vp-note"></div>
-      <div class="vp-table"></div>
-    </div>`;
-  document.body.appendChild(r);
-  document.documentElement.classList.add("vp-clean");
+        벤더피아 주문관리 ${첫날} ~ ${끝날}(등록일) 전체에서 찾습니다. 파일은 이 브라우저 안에서만 읽고 어디에도 보내지 않습니다.</div>`);
+  알림.insertAdjacentHTML("afterend", `<details class="vp-정산못찾음" hidden><summary></summary><div class="vp-table"></div></details>`);
   const 입력 = r.querySelector("input[type=file]"), 파일단추 = r.querySelector(".vp-파일단추"), 멈춤단추 = r.querySelector(".vp-정산멈춤");
-  const 파일이름 = r.querySelector(".vp-파일이름"), 알림 = r.querySelector(".vp-note"), 통 = r.querySelector(".vp-table");
+  const 파일이름 = r.querySelector(".vp-파일이름"), 못칸 = r.querySelector(".vp-정산못찾음"), 못통 = 못칸.querySelector(".vp-table");
+  const 목록통 = r.querySelector(":scope .vp-search > .vp-table");
 
   function 진행쓰기(글, 몫) {
     판.글 = 글; 판.몫 = 몫;
@@ -312,16 +311,10 @@
   }
   const 시간글 = (초) => (초 >= 60 ? Math.floor(초 / 60) + "분 " : "") + (초 % 60) + "초";
 
-  /* 표 — 벤더피아 꼴(`table.vp-촘촘`, search.css). 열 끌기는 `search.js` `넓이틀` 과 같은 쓰임, 저장 열쇠만 따로 */
+  /* 못 찾은 업로드 줄 표 — 벤더피아 꼴(`table.vp-촘촘`, search.css). 열 끌기는 `search.js` `넓이틀` 과 같은 쓰임, 저장 열쇠만 따로 */
   const 넓이열쇠 = "vp열넓이:CS정산", 최소넓이 = 16, 끝넓이 = 130, 긴칸끝 = 200;
-  const 칸들 = [
-    ["결과", (u) => u.결과], ["줄", (u) => String(u.n)],
-    ["업로드 수취인", (u) => u.수취인], ["업로드 옵션값", (u) => u.옵션값], ["업로드 메모", (u) => u.메모],
-    ["수취인", (u, o) => o.수취인], ["주문옵션", (u, o) => o.주문옵션], ["물류메모", (u, o) => o.물류메모],
-    ["등록일", (u, o) => o.등록일], ["매출처", (u, o) => o.매출처], ["몰", (u, o) => o.몰], ["주문번호", (u, o) => o.주문번호],
-    ["상품명", (u, o) => o.상품명], ["단품구성", (u, o) => o.단품구성], ["수량", (u, o) => o.수량], ["CS", (u, o) => o.CS], ["배송상태", (u, o) => o.배송상태],
-  ];
-  const 긴칸 = /옵션|메모|상품명|단품구성/;
+  const 칸들 = [["결과", (u) => u.결과], ["줄", (u) => String(u.n)], ["수취인", (u) => u.수취인], ["옵션값", (u) => u.옵션값], ["메모", (u) => u.메모]];
+  const 긴칸 = /옵션|메모/;
   let 재는판 = null;
   function 글너비(글, 굵게) {
     try {
@@ -378,50 +371,13 @@
     입히기();
   }
 
-  /* 단품구성 칸 = 단품 단추(`VP단품단추`). 이름표에 없으면 글자 그대로 — 표를 다 그린 뒤 goods.js 를 부른다(조회 중 벤더피아 요청을 안 늘린다) */
-  let 단품칸들 = [];
-  const 찾아본것 = new Set();
-  const 단품나눔 = (값) => (window.VP단품있나?.(값, "") ? [값] : String(값).split(/[+\n]/).map((x) => x.trim()).filter(Boolean));
-  function 단품칸채우기() {
-    if (!window.VP단품단추) return;
-    const 모자람 = new Map();
-    for (const td of 단품칸들) {
-      if (!td.isConnected || td.querySelector(".vp-goods-list")) continue;
-      const 값 = td.dataset.값, 이름들 = 단품나눔(값), 묶음 = document.createElement("div");
-      묶음.className = "vp-표단품들";
-      let 단추수 = 0;
-      for (const 이름 of 이름들) {
-        const 칸 = 묶음.appendChild(document.createElement("div"));
-        칸.className = "vp-상품칸";
-        const b = window.VP단품단추(이름, "");
-        if (b) {
-          const 판때기 = 칸.appendChild(document.createElement("div"));
-          판때기.className = "vp-goods-list";
-          판때기.appendChild(b);
-          단추수++;
-        } else {
-          칸.textContent = 이름;
-          if (!찾아본것.has(이름)) 모자람.set(이름, { 이름, 코드: "" });
-        }
-      }
-      if (단추수) td.replaceChildren(묶음);
-    }
-    if (모자람.size && window.VP단품표끝?.() && window.VP단품찾기) {
-      for (const k of 모자람.keys()) 찾아본것.add(k);
-      window.VP단품찾기([...모자람.values()]).then((늘) => { if (늘) 단품칸채우기(); }).catch(() => {});
-    }
-  }
-  window.addEventListener("vp단품단추준비", 단품칸채우기);
-
-  function 결과그리기(업로드) {
-    const 줄값들 = [], 줄표 = [];
-    for (const u of 업로드) {
-      if (u.찾은.length) for (const o of u.찾은) { const 값 = { ...u, 결과: "일치" }; 줄값들.push(칸들.map(([, 뽑]) => String(뽑(값, o) || ""))); 줄표.push(false); }
-      else {
-        const 값 = { ...u, 결과: 맞춤값(u.수취인) ? "못 찾음" : "수취인 없음" };
-        줄값들.push(칸들.map(([, 뽑]) => String(뽑(값, {}) || ""))); 줄표.push(true);
-      }
-    }
+  function 못찾음그리기(못) {
+    못칸.hidden = !못.length;
+    못칸.open = false;
+    못통.replaceChildren();
+    if (!못.length) return;
+    못칸.querySelector("summary").textContent = "못 찾은 업로드 줄 " + 못.length.toLocaleString() + "건";
+    const 줄값들 = 못.map((u) => 칸들.map(([, 뽑]) => String(뽑(u) || "")));
     const t = document.createElement("table");
     t.className = "vp-촘촘";
     const 머리 = t.createTHead().insertRow();
@@ -431,31 +387,33 @@
       if (i === 0) th.className = "vp-first";
     });
     const 몸 = t.createTBody();
-    const 단품자리 = 칸들.findIndex(([h]) => h === "단품구성");
-    단품칸들 = [];
-    찾아본것.clear();
-    줄값들.forEach((값들, j) => {
+    for (const 값들 of 줄값들) {
       const tr = 몸.insertRow();
-      if (줄표[j]) tr.classList.add("vp-못찾음줄");
+      tr.classList.add("vp-못찾음줄");
       값들.forEach((값, i) => {
         const td = tr.insertCell();
         td.textContent = 값;
         if (값) td.title = 값;
         if (i === 0) td.className = "vp-first";
-        if (i === 단품자리 && 값) { td.className = "vp-상품칸 vp-단품칸"; td.dataset.값 = 값; 단품칸들.push(td); }
       });
-    });
-    통.replaceChildren(t);
-    넓이틀(t, 줄값들);
-    if (단품칸들.length) {
-      if (window.VP단품단추) 단품칸채우기();
-      else window.VP정산단품부르기?.();
     }
+    못통.appendChild(t);
+    넓이틀(t, 줄값들);
+  }
+  /* 일치한 주문 = 주문관리 표(`VP정산표`, CS등록과 같은 표) · 줄 차례 = 벤더피아 기본 차례(안 번호 큰 것 먼저 — 11-07 500줄에서 잼) */
+  async function 결과그리기(업로드, p) {
+    못찾음그리기(업로드.filter((u) => !u.찾은).map((u) => ({ ...u, 결과: 맞춤값(u.수취인) ? "못 찾음" : "수취인 없음" })));
+    const 번호 = (o) => Number(o.안번호) || 0;
+    const 줄들 = p.찾은줄.slice().sort((a, b) => 번호(b) - 번호(a)).map((o) => o.표줄);
+    if (줄들.length) await window.VP정산표.그리기(p.머리, 줄들);
+    else 목록통.textContent = "일치한 주문이 없습니다.";
+    if (!줄들.length) 못칸.open = true;
   }
 
   async function 시작(파일) {
     파일이름.textContent = 파일.name;
-    통.replaceChildren();
+    window.VP정산표.비우기();
+    못칸.hidden = true;
     알림.textContent = "파일 읽는 중…";
     let 업로드;
     try { 업로드 = 업로드줄뽑기(await 파일읽기(파일)).줄들; }
@@ -464,7 +422,7 @@
       알림.textContent = e instanceof 탈 ? e.message : "파일을 읽지 못했습니다. 엑셀에서 .xlsx 로 다시 저장해 올려 주세요.";
       return;
     }
-    판 = { 시작: Date.now(), 요청: 0, 벤더피아건: 0, 전체: 0, 길: "", 글: "준비", 몫: 0, 멈춤: false, 표시: null };
+    판 = { 시작: Date.now(), 요청: 0, 벤더피아건: 0, 찾은줄: [], 머리: [], 전체: 0, 길: "", 글: "준비", 몫: 0, 멈춤: false, 표시: null };
     const 시계 = setInterval(진행그리기, 1000);
     파일단추.style.display = "none";
     멈춤단추.style.display = "";
@@ -480,11 +438,11 @@
     clearInterval(시계);
     const p = 판;
     판 = null;
-    결과그리기(업로드);
-    const 일치 = 업로드.filter((u) => u.찾은.length).length;
+    await 결과그리기(업로드, p);
+    const 일치 = 업로드.filter((u) => u.찾은).length;
     const 초 = Math.round((Date.now() - p.시작) / 1000);
     window.VP말?.(앞줄 + "끝 요청" + p.요청 + " " + 초 + "초 " + p.길);
-    알림.textContent = 끝말 + "업로드 " + 업로드.length.toLocaleString() + "줄 · 일치 " + 일치.toLocaleString() + "줄(벤더피아 " + p.벤더피아건.toLocaleString() + "건)"
+    알림.textContent = 끝말 + "일치 주문 " + p.벤더피아건.toLocaleString() + "건 · 업로드 " + 업로드.length.toLocaleString() + "줄 중 일치 " + 일치.toLocaleString() + "줄"
       + " · 못 찾음 " + (업로드.length - 일치).toLocaleString() + "줄 · 벤더피아 1년치 " + p.전체.toLocaleString() + "건 대상"
       + " · " + (p.길 === "전체" ? "전체 훑기" : "수취인별 조회") + " · 요청 " + p.요청 + "번 · " + 시간글(초);
     파일단추.style.display = "";
