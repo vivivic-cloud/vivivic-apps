@@ -1045,27 +1045,30 @@
       if (!이름 || !값) return;
       틀.appendChild(document.createElement("dt")).textContent = 이름;
       const 값칸 = 틀.appendChild(document.createElement("dd"));
-      if (이름 === "단품명" || 이름 === "단품구성") 상세단품그리기(값칸, 값, 줄[머리.indexOf("단품코드")]);
+      if (이름 === "단품명" || 이름 === "단품구성") 상세단품그리기(값칸, 값, 이름 === "단품명" ? 줄[머리.indexOf("단품코드")] : "");
       else 값칸.textContent = 값;
     });
     if (!틀.children.length) 칸.textContent = "고객정보가 비어 있습니다.";
   }
-  /* 11-07 [새 지시 CS상세단품단추] 고객정보의 단품명·단품구성 = 글자 대신 표 단품명 칸과 **같은 단품 단추**(`상품칸채우기` · `상품칸들`).
+  /* 11-07 [새 지시 CS상세단품단추] 고객정보·표의 단품명·단품구성 = 글자 대신 표 단품명 칸과 **같은 단품 단추**(`상품칸채우기` · `상품칸들`).
      「a + a + b」 는 상품관리처럼(0.34.79) 수량만큼 단추. 이름표에 없으면 찾아보고(`모자란것찾기`), 못 찾으면 글자 그대로.
      ⚠ 상담내용보기(`#vgInq`) 문의 판은 `기본칸` 에 이 두 칸이 없어 여기 오지 않는다 — 그 쪽은 뒤쪽 `const`·`let`(`상품칸들` 등)이 초기화 전이라 머리 이름을 줄 안에서 바로 견준다. */
-  function 상세단품그리기(값칸, 값, 코드값) {
+  function 단품조각들(통, 값, 코드값) {
     const 나눔 = (글) => String(글 == null ? "" : 글).split(/[+\n]/).map((x) => x.trim()).filter(Boolean);
-    const 이름들 = window.VP단품있나?.(값, 코드값) ? [값] : 나눔(값);   // 이름 안에 「+」 가 든 단품은 통째로
     const 코드들 = 나눔(코드값);
-    값칸.classList.add("vp-상세단품");
-    이름들.forEach((이름, i) => {
-      const 칸 = 값칸.appendChild(document.createElement("div"));
+    const 이름들 = 코드들.length === 1 || window.VP단품있나?.(값, 코드값) ? [값] : 나눔(값);   // 코드가 하나거나 이름표에 있으면 이름 안의 「+」 다
+    return 이름들.map((이름, i) => {
+      const 칸 = 통.appendChild(document.createElement("div"));
       칸.className = "vp-상품칸";
       const 코드 = 코드들.length === 이름들.length ? 코드들[i] : "";
       칸.textContent = 이름;
-      상품칸채우기(칸, 이름, "단품", 코드);
       상품칸들.push([칸, 이름, "단품", 코드]);
+      return [칸, 이름, 코드];
     });
+  }
+  function 상세단품그리기(값칸, 값, 코드값) {
+    값칸.classList.add("vp-상세단품");
+    for (const [칸, 이름, 코드] of 단품조각들(값칸, 값, 코드값)) 상품칸채우기(칸, 이름, "단품", 코드);
     모자란것찾기("단품");
   }
 
@@ -1827,7 +1830,7 @@
   let 상품칸들 = [];
   let 상품칸자리 = -1;
   let 상품코드자리 = -1, 단품코드자리 = -1;
-  let 단품칸자리 = -1;
+  let 단품칸자리 = -1, 단품구성자리 = -1;
   let 단추된것 = 0;
   /* 10-24 사장님: 「목록의 상품명/단품명 단품관리/상품관리에 있는 동일한 기능의 해당 명칭 버튼이 나타나게」
      상품명 칸 = 상품관리의 그 이름 단추, 단품명 칸 = 단품관리의 그 이름 단추 (`goods.js` 가 만들어 준다 — 상세를 두 벌로 만들지 않는다).
@@ -1942,6 +1945,7 @@
     /* ④ 상품명 칸이 몇 번째인가 — 그 칸만 단추로 바꾼다 */
     상품칸자리 = heads.indexOf("상품명");
     단품칸자리 = heads.indexOf("단품명");
+    단품구성자리 = heads.indexOf("단품구성");
     상품코드자리 = heads.indexOf("상품코드");
     단품코드자리 = heads.indexOf("단품코드");
     /* 상담 이력 — 열쇠는 **주문번호** 하나뿐이다(사람 칸은 안 쓴다).
@@ -2025,7 +2029,7 @@
   function 넓이맞춤(rows) {
     if (!넓이판) return;
     그린머리.forEach((h, i) => {
-      const 이름칸 = i === 상품칸자리 || i === 단품칸자리, 끝값 = 이름칸 ? 이름칸끝 : i === 주문칸자리 || 긴칸.test(h) ? 긴칸끝 : 끝넓이;
+      const 이름칸 = i === 상품칸자리 || i === 단품칸자리 || i === 단품구성자리, 끝값 = 이름칸 ? 이름칸끝 : i === 주문칸자리 || 긴칸.test(h) ? 긴칸끝 : 끝넓이;
       const 더함 = 여유 + (이름칸 ? 110 : i === 주문칸자리 ? 40 : 0);
       let w = 넓이판.자동[i];
       for (const row of rows) {
@@ -2064,6 +2068,14 @@
       그린머리.forEach((c, i) => {
         const td = tr.insertCell();
         const 값 = row[i] === undefined ? "" : row[i];
+        /* 11-07 [새 지시 CS상세단품단추] 단품구성 칸·「a + b」 인 단품명 칸 = 단추 여럿을 한 줄로(`.vp-표단품들`, 넘치면 칸 끌기) */
+        if ((i === 단품구성자리 || (i === 단품칸자리 && String(값).includes("+") && String(row[단품코드자리] == null ? "" : row[단품코드자리]).includes("+"))) && String(값).trim()) {
+          td.className = "vp-상품칸 vp-단품칸" + (i === 0 ? " vp-first" : "");
+          const 통 = td.appendChild(document.createElement("div"));
+          통.className = "vp-표단품들";
+          단품조각들(통, 값, i === 단품칸자리 ? row[단품코드자리] : "");
+          return;
+        }
         if ((i === 상품칸자리 || i === 단품칸자리) && String(값).trim()) {
           /* ⚠⚠ 10-24 사장님(한 글자도 안 고침): 「배송관리와 cs관리 등 벤더피아의 데이터 목록을 불러올때 목록의 상품명/단품명
                단품관리/상품관리에 있는 동일한 기능의 해당 명칭 버튼이 나타나게 해주세요. 목록의 줄 자체를 클릭했을때는 현재의 상담
@@ -2135,7 +2147,7 @@
     const { filters, variants, local } = 상품명만 ? { filters: {}, variants: [["상품명", { tbSGoodsNm: 모든랙상품명 }]], local: [] } : plan(bar.q.value);
     const dates = { dcStartDt: bar.from.value, dcEndDt: bar.to.value };
 
-    tbody = null; 그린머리 = null; 상품칸들 = []; 채울자리 = 0; 상품칸자리 = -1; 단품칸자리 = -1; 단추된것 = 0; 머리본것 = null;
+    tbody = null; 그린머리 = null; 상품칸들 = []; 채울자리 = 0; 상품칸자리 = -1; 단품칸자리 = -1; 단품구성자리 = -1; 단추된것 = 0; 머리본것 = null;
     상담칸들.length = 0; 주문칸자리 = -1; 상담판닫기();
     table.replaceChildren();
     const seen = new Set();

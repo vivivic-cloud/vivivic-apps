@@ -1070,6 +1070,7 @@ const 한벌돌리기 = (단품곁다리) => {
       dl.appendChild(document.createElement("dt")).textContent = h;
       const dd = dl.appendChild(document.createElement("dd"));
       if (linkCell && h === linkCell.col) dd.appendChild(linkCell.render(row));
+      else if ((h === "단품명" || h === "단품구성") && row[i].trim()) dd.appendChild(단품글칩(heads, row, i));
       else dd.textContent = row[i];
     });
     if (linkCell?.extra && !only) {
@@ -1168,6 +1169,46 @@ const 한벌돌리기 = (단품곁다리) => {
         else alert(linked ? `단품관리에서 ${code}를 찾지 못했습니다.` : "단품 정보를 불러오는 중입니다. 잠시 뒤 다시 눌러 주세요.");
       }, stockByCode?.get(code), true);
     }
+    return box;
+  }
+
+  /* 11-07 [새 지시 CS상세단품단추] 상세·연결 창·단품등록 참고에서 글자로 나오던 단품명 = 단품 단추. 「a + b」 는 나눠 단추 둘.
+     양품은 이미 받아 둔 값만(새로 안 받음). 누르면 단품관리·재고조회 쪽은 그 줄의 상세, 상품 쪽은 `partChips` 와 같은 연결 창. */
+  function 단품열기(코드, 이름) {
+    const 키 = codeKey(코드);
+    const 못찾음 = () => alert(`단품관리에서 ${코드 || 이름}를 찾지 못했습니다.`);
+    if (page.nameCol === "단품명") {
+      for (const [n, g] of groups) {
+        if (n !== 이름 && !(키 && g.items.some((r) => codeKey(r[col(page.codeCol)]) === 키))) continue;
+        modal.hidden = true;
+        show(n, heads, g.items);
+        return;
+      }
+      if (!곁다리) { 못찾음(); return; }
+      줄받기(이름, 코드 ? [코드] : []).then((답) => {
+        if (!답) { 못찾음(); return; }
+        modal.hidden = true;
+        show(이름, 답.heads, 답.rows);
+      }).catch(못찾음);
+      return;
+    }
+    if (!linked) { alert("단품 정보를 불러오는 중입니다. 잠시 뒤 다시 눌러 주세요."); return; }
+    const ni = linked.heads.indexOf("단품명"), ci = linked.heads.indexOf("단품코드");
+    const found = (키 && linked.byCode.get(키)) || [...linked.byCode.values()].find((r) => r[ni] === 이름);
+    if (found) popup(found[ni], linked.heads, [found], found[ci].trim());
+    else 못찾음();
+  }
+  function 단품글칩(heads, row, i) {
+    const 나눔 = (글) => String(글 == null ? "" : 글).split("+").map((x) => x.trim()).filter(Boolean);
+    const ci = heads.indexOf("단품코드"), 코드들 = ci >= 0 ? 나눔(row[ci]) : [];
+    let 이름들 = 나눔(row[i]);
+    if (이름들.length > 1 && 코드들.length === 1) 이름들 = [String(row[i]).trim()];   // 코드가 하나면 이름 안의 「+」 다
+    const box = chipBox();
+    이름들.forEach((이름, k) => {
+      const 이코드들 = 이름들.length === 1 ? 코드들 : 코드들.length === 이름들.length ? [코드들[k]] : [];
+      const 코드 = 이코드들[0] || "";
+      chip(box, 이름, 이코드들, () => 단품열기(코드, 이름), stockByCode?.get(codeKey(코드)), true);
+    });
     return box;
   }
 
@@ -1703,6 +1744,7 @@ const 한벌돌리기 = (단품곁다리) => {
         </div>
       </div>`;
     root.appendChild(쪽);
+    root.append(panel, modal);   // 11-07 목록 쪽을 숨겨도 등록 쪽 단품 단추의 상세가 뜨게
     const 목록쪽 = root.querySelector(".vp-goods");
     const 칸통 = 쪽.querySelector(".vp-등록칸들"), 가격통 = 쪽.querySelector(".vp-등록가격");
     const 저장단추 = 쪽.querySelector(".vp-등록저장"), 결과칸 = 쪽.querySelector(".vp-등록결과");
@@ -1988,7 +2030,7 @@ const 한벌돌리기 = (단품곁다리) => {
         복사.type = "button"; 복사.className = "vp-등록복사"; 복사.textContent = x.코드; 복사.title = "누르면 복사됩니다";
         복사.addEventListener("click", () => 코드복사(복사, x.코드));
         const 글 = 줄.appendChild(document.createElement("div")); 글.className = "vp-등록찾은글";
-        const 이름 = 글.appendChild(document.createElement("strong")); 이름.textContent = x.이름;
+        chip(글.appendChild(chipBox()), x.이름, [x.코드], () => 단품열기(x.코드, x.이름), stockByCode?.get(codeKey(x.코드)), true);
         const 밑 = 글.appendChild(document.createElement("span"));
         밑.textContent = [x.분류, x.상태, x.상품들[0] ? x.상품들[0] + (x.상품들.length > 1 ? " 외 " + (x.상품들.length - 1) : "") : ""].filter(Boolean).join(" · ");
         return 줄;

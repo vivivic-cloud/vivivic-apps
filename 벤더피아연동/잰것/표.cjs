@@ -186,6 +186,8 @@ const 꼴본다 = () => {
         const 탭 = await page.evaluate(() => ({ 켜진: document.querySelector('#vp-root .vp-goods-panel .vp-places .vp-chips button.on')?.textContent,
           탭수: document.querySelectorAll('#vp-root .vp-goods-panel .vp-places .vp-chips button').length }));
         봤다(탭.탭수 === 3 && 탭.켜진 === '가매입처', '상세의 현위치 탭은 그대로(' + 탭.탭수 + '개) · 거르개로 고른 「' + 탭.켜진 + '」 부터 열린다');
+        const 재고단품 = await page.evaluate(() => { const dt = [...document.querySelectorAll('#vp-root .vp-goods-panel-body dt')].find((x) => x.textContent === '단품명'); return dt ? dt.nextElementSibling.querySelectorAll('.vp-chips button').length : -1; });
+        봤다(재고단품 === 1, '재고 상세의 단품명 = 단품 단추(' + 재고단품 + '개)');
       }
       if (이름 === '상품관리') {
         봤다(v.줄수 === 2, '상품 둘인데 줄 ' + v.줄수 + ' (「가나다 세트」 는 매출처 셋이어도 한 줄)');

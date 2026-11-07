@@ -172,6 +172,38 @@ const 흉내 = (r) => {
     await ctx.close();
   }
 
+  /* 11-07 [새 지시 CS상세단품단추] 상세·연결 창·참고 목록의 단품명 = 단품 단추 */
+  console.log('\n■ 단품명 단추');
+  for (const 폭 of [1280, 375]) {
+    새판();
+    const { ctx, page } = await 세우기(폭);
+    await page.waitForSelector('.vp-gt tbody .vp-goods-list button', { state: 'attached' });
+    await page.$eval('.vp-gt tbody .vp-goods-list button', (x) => x.click());   // 흉내엔 출고 순위가 없어 줄이 숨어 있다
+    await page.waitForTimeout(2500);
+    const 값 = (고르개) => page.evaluate((q) => { const 판 = [...document.querySelectorAll(q)].find((x) => !x.hidden); const dt = 판 && [...판.querySelectorAll('dt')].find((x) => x.textContent === '단품명');
+      return dt ? [...dt.nextElementSibling.querySelectorAll('.vp-chips button small.vp-code')].map((x) => x.textContent) : null; }, 고르개);
+    const 자기 = await 값('.vp-goods-panel');
+    console.log(못(자기 && 자기.length === 1), '단품 상세의 단품명 = 단추 ' + JSON.stringify(자기));
+    await page.evaluate(() => [...document.querySelectorAll('.vp-goods-panel dt')].find((x) => x.textContent === '관련 상품').nextElementSibling.querySelector('button').click());
+    await page.waitForTimeout(400);
+    const 연결 = await 값('.vp-modal');
+    console.log(못(연결 && 연결.join() === 'bis800_b,bis800_d'), '연결 창 상품의 「a + b」 = 단추 둘 ' + JSON.stringify(연결));
+    await page.click('.vp-modal .vp-chips button:has(small.vp-code:text-is("bis800_d"))');
+    await page.waitForTimeout(400);
+    console.log(못(await page.textContent('.vp-goods-panel strong') === '비스켓 800 문' && await page.isHidden('.vp-modal')), '단추 누름 = 그 단품 상세');
+    await page.evaluate(() => document.querySelector('.vp-goods-panel-head button').click());
+    await 열기(page);
+    await page.fill('.vp-등록찾기', '비스켓');
+    await page.waitForSelector('.vp-등록찾은글 .vp-chips button');
+    const 참고 = await page.evaluate(() => { const 통 = document.querySelector('.vp-등록찾은것'); return { 수: 통.querySelectorAll('.vp-chips button').length, 점: 통.querySelectorAll('.vp-chips button .vp-점 i').length,
+      넘침: 통.scrollWidth > 통.clientWidth + 1, 강: 통.querySelectorAll('.vp-등록찾은글 strong').length }; });
+    console.log(못(참고.수 >= 2 && 참고.점 === 참고.수 * 4 && !참고.넘침 && !참고.강), '참고 목록 단품명 = 단추 ' + JSON.stringify(참고));
+    await page.click('.vp-등록찾은글 .vp-chips button');
+    await page.waitForTimeout(300);
+    console.log(못(await page.isVisible('.vp-goods-panel') && await page.isVisible('.vp-등록쪽')), '등록 쪽에서 눌러도 상세가 보임');
+    await ctx.close();
+  }
+
   console.log('\n■ 실패 길');
   새판();
   let s = await 세우기(1280);

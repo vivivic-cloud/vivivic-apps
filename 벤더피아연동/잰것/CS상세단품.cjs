@@ -27,7 +27,7 @@ const 배송줄 = [
   ["20261015-1","비스켓 800 주방수납장","비스켓 800 몸통 + 비스켓 800 몸통 + 비스켓 800 문","bis800_b + bis800_b + bis800_d","비스켓 800 몸통 + 비스켓 800 문","가나다","1","배송완료"],
   ["20261015-2","비스켓 1200 주방수납장","비스켓 1200 몸통","","비스켓 1200 몸통","가나다","2","배송중"],
   ["20261015-3","이름이 상품관리에 없는 물건","이름이 단품관리에 없는 단품","","비스켓 1200 몸통 + 없는 단품","가나다","1","배송완료"],
-  ["20261015-4","긴 물건","비스켓 + 문 세트",""," "+긴이름+" + "+긴이름+" + 비스켓 800 문","가나다","1","배송완료"],
+  ["20261015-4","긴 물건","비스켓 + 문 세트","bis_set"," "+긴이름+" + "+긴이름+" + 비스켓 800 문","가나다","1","배송완료"],
 ];
 
 const 표 = (머리, 줄) => `<html><body><span>총 ${줄.length} 건</span><table><tr>${머리.map(h=>`<th>${h}</th>`).join('')}</tr>
@@ -128,6 +128,16 @@ const 자리 = (고르개) => { const e = document.querySelector(고르개); if 
     await page.waitForTimeout(600);
     await page.click('.vp-bar button[type=submit]');
     await page.waitForTimeout(3500);
+    await page.waitForTimeout(1500);
+    const 표구성 = await page.evaluate(() => {
+      const 머리 = [...document.querySelectorAll('.vp-table thead th')].map((x) => x.textContent.trim());
+      const td = (n, 이름) => document.querySelector('.vp-table tbody tr:nth-child(' + n + ')').children[머리.indexOf(이름)];
+      return { 구성: [...td(1, '단품구성').querySelectorAll('.vp-goods-list small.vp-code')].map((x) => x.textContent),
+        단품명: [...td(1, '단품명').querySelectorAll('.vp-goods-list small.vp-code')].map((x) => x.textContent),
+        통째: td(4, '단품명').querySelector('.vp-goods-list small.vp-code')?.textContent, 줄높이: td(1, '단품구성').parentElement.getBoundingClientRect().height };
+    });
+    console.log('  ★ 표 단품구성 칸·「a + b」 단품명 칸 = 단추 ' + JSON.stringify(표구성) + ' ' + 못(표구성.구성.join() === 'bis800_b,bis800_d'
+      && 표구성.단품명.join() === 'bis800_b,bis800_b,bis800_d' && 표구성.통째 === 'bis_set' && 표구성.줄높이 <= 26));
     await 줄열기(page, 1);
     let v = await page.evaluate(칸값, '단품명');
     console.log('  ★ 수량만큼 단추 ' + JSON.stringify(v.단추) + ' ' + 못(v.단추.length === 3 && v.단추.every((x) => x.점 === 4)
