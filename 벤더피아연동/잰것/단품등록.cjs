@@ -26,7 +26,20 @@ const 단품쪽 = `<html><head><meta charset="utf-8"><title>단품관리</title>
 <select name="ddlOrderingType" id="ddlOrderingType"><option value="전체">전체</option></select><select name="ddlStatus" id="ddlStatus"><option value="전체">전체</option></select>${행수}
 <input name="tbGoodsCd" id="tbGoodsCd"><input name="tbGoodsNm" id="tbGoodsNm"><input type="image" name="btnSearch" id="btnSearch" src="s.gif"><div id="divGrid"></div></form></body></html>`;
 const 상품쪽 = 단품쪽.replace('/System/Master/goods.aspx', '/System/Master/salesGoods.aspx').replace('단품관리', '상품관리');
-const 분류쪽 = `<html><body><div id="oTree"><a id="oTreet0">분류</a><a id="oTreet1" title="2|1">리빙룸</a><a id="oTreet2" title="6|1">베드룸</a></div></body></html>`;
+const 처음분류 = [['2', '리빙룸'], ['6', '베드룸']];
+let 분류들 = 처음분류.slice();
+const 분류쪽 = () => `<html><body><div id="oTree"><a id="oTreet0">분류</a>${분류들.map(([c, n], i) => `<a id="oTreet${i + 1}" title="${c}|1">${n}</a>`).join('')}</div></body></html>`;
+/* 11-07 [새 지시 단품분류 등록] category.aspx·categoryDtl.aspx 흉내 — 꼴은 사장님 크롬에서 읽기만 해서 잰 것. 저장은 UpdatePanel 비동기(쪽 안 검사 없음), 진짜 응답 꼴은 못 잼 */
+const 분류관리쪽 = `<html><body><input type="hidden" id="ctl00_Contents_hNode" value="1"><input type="image" id="btnInsert" src="i.gif" onclick="return fnCategoryDtl(this);">
+<script>function fnCategoryDtl(s){window.open('categoryDtl.aspx?vendorCd=ZZZ&preCd=1&preNm=%EB%B6%84%EB%A5%98&depth=','popup','width=450px');return false}</script></body></html>`;
+const 분류등록쪽 = (o) => `<html><head><meta charset="utf-8"></head><body><form name="aspnetForm" method="post" action="./categoryDtl.aspx" id="aspnetForm"><input type="hidden" name="__VIEWSTATE" value="x">
+<input type="image" name="${P}btnSave" id="btnSave" src="s.gif" ${o.분류먹통 ? 'onclick="return false"' : ''}>
+<input name="${P}tbPreCategoryCd" id="ctl00_Contents_tbPreCategoryCd" value="1" readonly><input name="${P}tbPreCategoryNm" id="ctl00_Contents_tbPreCategoryNm" value="${o.분류소속 || '분류'}" readonly>
+<input name="${P}tbDepth" id="tbDepth" value="0" readonly><input name="${P}tbCategoryNm" id="tbCategoryNm"><input type="hidden" name="${P}hdCategoryCD" id="ctl00_Contents_hdCategoryCD"></form>
+<script>var 시작=[],끝=[];window.Sys={WebForms:{PageRequestManager:{getInstance:function(){return{add_beginRequest:function(f){시작.push(f)},add_endRequest:function(f){끝.push(f)}}}}}};
+${o.분류새로고침 ? '' : `document.getElementById('aspnetForm').addEventListener('submit',function(e){e.preventDefault();시작.forEach(function(f){f()});
+ fetch('./categoryDtl.aspx',{method:'POST',body:new URLSearchParams(new FormData(e.target))}).then(function(r){return r.text()}).then(function(t){if(t)alert(t);끝.forEach(function(f){f(null,{get_error:function(){return null}})})})});`}
+</script></body></html>`;
 const P = 'ctl00$Contents$';
 const 글칸 = (id, v = '', m = '') => `<input name="${P}${id}" id="${id}" value="${v}" ${m ? `maxlength="${m}"` : ''}>`;
 const 고칸 = (id, 값들, 기본) => `<select name="${P}${id}" id="${id}">${값들.map(([v, t]) => `<option value="${v}" ${v === 기본 ? 'selected' : ''}>${t}</option>`).join('')}</select>`;
@@ -64,12 +77,21 @@ const 흉내 = (r) => {
   const u = new URL(r.request().url()), 셈 = r.request().method();
   const html = (body) => (r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body }), true);
   if (/GetGoodCdYN/.test(u.pathname)) { 일.중복++; const c = (u.searchParams.get('c') || '').toLowerCase(); return (r.fulfill({ status: 200, body: 일.사용중.has(c) || 단품들.some((x) => x[1].toLowerCase() === c) ? 'Y' : 'N' }), true); }
-  if (/categoryPopup\.aspx$/i.test(u.pathname)) return html(분류쪽);
+  if (/categoryPopup\.aspx$/i.test(u.pathname)) return html(분류쪽());
+  if (/category\.aspx$/i.test(u.pathname)) return html(분류관리쪽);
+  if (/categoryDtl\.aspx$/i.test(u.pathname)) {
+    if (셈 === 'GET') { 일.분류주소 = u.search; return html(분류등록쪽(일)); }
+    const f = 풀기(r.request().postData());
+    일.분류저장.push(f);
+    if (!일.분류안들어감) 분류들 = [...분류들, [String(10 + 분류들.length), f.tbCategoryNm]];
+    if (일.분류새로고침) return html(분류등록쪽(일).replace('</body>', `<script>alert('등록되었습니다.')</script></body>`));
+    return html(일.분류알림 || '');
+  }
   if (/goodsDetl\.aspx$/i.test(u.pathname)) {
     if (셈 === 'GET') return html(등록쪽().replace('/*검사막기*/', 일.검사막기 ? 'window.__검사막기=true' : ''));
     const f = 풀기(r.request().postData());
     일.저장.push(f);
-    if (!일.안들어감) 단품들 = [...단품들, [f.tbGoodsNm, f.tbGoodsCd, '리빙룸', '기타', '자사', '구매발주', '판매중', '', '2026-11-07']];
+    if (!일.안들어감) 단품들 = [...단품들, [f.tbGoodsNm, f.tbGoodsCd, f.tbCategoryNm, '기타', '자사', '구매발주', '판매중', '', '2026-11-07']];
     return html(등록쪽());
   }
   return false;
@@ -124,7 +146,7 @@ const 흉내 = (r) => {
   };
   const 결과글 = (page) => page.textContent('.vp-등록결과');
   const 결과기다림 = (page, 글) => page.waitForFunction((g) => new RegExp(g).test(document.querySelector('.vp-등록결과').textContent), 글, { timeout: 15000 });
-  const 새판 = (o = {}) => { 단품들 = 처음단품.slice(); 일 = { 저장: [], 중복: 0, 창: 0, 사용중: new Set(), ...o }; };
+  const 새판 = (o = {}) => { 단품들 = 처음단품.slice(); 분류들 = 처음분류.slice(); 일 = { 저장: [], 분류저장: [], 중복: 0, 창: 0, 사용중: new Set(), ...o }; };
   const 잠깐 = (ms) => new Promise((r) => setTimeout(r, ms));
 
   for (const 폭 of [1280, 375]) {
@@ -231,6 +253,82 @@ const 흉내 = (r) => {
   await s.page.click('.vp-등록중복'); await 결과기다림(s.page, '사용가능');
   await s.page.click('.vp-등록저장'); await 결과기다림(s.page, '실패');
   console.log(못(/벤더피아 검사 막음/.test(await 결과글(s.page)) && 일.저장.length === 0 && 일.창 === 0), '쪽 검사 alert → 까닭으로, 저장 0');
+  await s.ctx.close();
+
+  console.log('\n■ 단품분류 등록 (쓰기 예외 네 번째)');
+  const 분류열기 = async (page) => { await page.click('.vp-분류등록단추'); await page.waitForSelector('.vp-분류창:not([hidden])'); };
+  const 분류결과글 = (page) => page.textContent('.vp-분류결과');
+  const 분류기다림 = (page, 글) => page.waitForFunction((g) => new RegExp(g).test(document.querySelector('.vp-분류결과').textContent), 글, { timeout: 15000 });
+  const 창닫힘 = (page) => page.waitForSelector('.vp-분류창', { state: 'hidden', timeout: 15000 });
+  for (const 폭 of [1280, 375]) {
+    새판();
+    const { ctx, page } = await 세우기(폭);
+    await 열기(page);
+    console.log(못(await page.isVisible('.vp-분류등록단추')), 폭 + ' 분류 칸 옆 「분류 등록」 단추');
+    await 분류열기(page);
+    console.log(못(await page.$eval('.vp-분류창 .vp-modal-card', (e) => e.classList.contains('vp-팝업'))), '공용 팝업 VP팝업');
+    const 넘침 = await page.evaluate(() => { const c = document.querySelector('.vp-분류창 .vp-modal-card').getBoundingClientRect(); return document.documentElement.scrollWidth > innerWidth + 1 || c.right > innerWidth || c.left < 0; });
+    console.log(못(!넘침), '가로 넘침 없음');
+    console.log(못(await page.inputValue('.vp-분류창 input[readonly]') === '분류'), '소속분류 = 읽기전용 「분류」');
+    await page.screenshot({ path: path.join(그림칸, `단품분류등록-${폭}.png`) });
+    await page.click('.vp-분류저장');
+    console.log(못(/분류명을 입력/.test(await 분류결과글(page)) && 일.분류저장.length === 0), '빈 이름 → 저장 0');
+    await page.fill('[data-분류이름]', '  서재  ');
+    await page.evaluate(() => { const b = document.querySelector('.vp-분류저장'); b.click(); b.click(); });
+    await 창닫힘(page);
+    const f = 일.분류저장[0] || {};
+    console.log(못(일.분류저장.length === 1), '두 번 눌러도 저장 POST ' + 일.분류저장.length);
+    console.log(못(f.tbCategoryNm === '서재' && f.tbPreCategoryCd === '1' && f.tbPreCategoryNm === '분류' && f.tbDepth === '0' && !f.hdCategoryCD), '보낸 칸 ' + JSON.stringify(f));
+    console.log(못(/preCd=1/.test(일.분류주소) && /vendorCd=ZZZ/.test(일.분류주소)), '쪽의 「등록」 이 만든 주소 그대로');
+    console.log(못(/단품분류 등록됨 — 「서재」/.test(await 결과글(page))), '결과 ' + await 결과글(page));
+    console.log(못(await page.inputValue('[data-칸="분류"]') === '12' && (await page.$$eval('[data-칸="분류"] option', (x) => x.map((o) => o.textContent))).join() === '선택하세요,리빙룸,베드룸,서재'), '분류 고르기 칸에 바로 나타나 골라짐');
+    console.log(못(일.창 === 0 && await page.evaluate(() => !document.querySelector('iframe') && 말들.some((m) => /분류 목록확인 있음/.test(m)))), '틀 치움·벤더피아 창 0·VP말');
+    /* 그 분류로 단품 저장까지 */
+    await page.fill('[data-칸="tbGoodsCd"]', 'new010'); await page.fill('[data-칸="tbGoodsNm"]', '서재 단품');
+    await page.click('.vp-등록중복'); await 결과기다림(page, '사용가능');
+    await page.click('.vp-등록저장'); await 결과기다림(page, '등록됨 — new010|실패');
+    const 단 = 일.저장[0] || {};
+    console.log(못(단.tbCategoryCd === '12' && 단.tbCategoryNm === '서재'), '새 분류로 단품 저장 ' + 단.tbCategoryCd + '/' + 단.tbCategoryNm);
+    /* 이미 있는 이름 */
+    await 분류열기(page);
+    await page.fill('[data-분류이름]', '리빙룸'); await page.press('[data-분류이름]', 'Enter');
+    await 창닫힘(page);
+    console.log(못(일.분류저장.length === 1 && await page.inputValue('[data-칸="분류"]') === '2' && /이미 있는/.test(await 결과글(page))), '이미 있는 이름 → 안 보내고 그것을 고름');
+    await 분류열기(page); await page.click('.vp-분류창 .vp-goods-panel-head button');
+    console.log(못(await page.isHidden('.vp-분류창')), '× 로 닫힘');
+    await 분류열기(page); await page.mouse.click(4, 4);
+    console.log(못(await page.isHidden('.vp-분류창')), '바깥 눌러 닫힘');
+    await ctx.close();
+  }
+  새판({ 분류안들어감: true, 분류알림: '중복된 분류명 입니다.' });
+  s = await 세우기(1280);
+  await 열기(s.page); await 분류열기(s.page); await s.page.fill('[data-분류이름]', '서재'); await s.page.click('.vp-분류저장');
+  await 분류기다림(s.page, '실패');
+  console.log(못(/④/.test(await 분류결과글(s.page)) && /중복된 분류명/.test(await 분류결과글(s.page)) && await s.page.isVisible('.vp-분류창') && 일.창 === 0), '저장 뒤 목록에 없음 → 벤더피아 글 그대로 · ' + await 분류결과글(s.page));
+  console.log(못((await s.page.$$eval('[data-칸="분류"] option', (x) => x.length)) === 3 && !await s.page.$('iframe')), '못 들어가면 고르기 칸에 안 넣음');
+  분류들 = [...분류들, ['20', '서재']];   // 응답을 못 받았는데 뒤늦게 들어간 경우
+  await s.page.click('.vp-분류저장'); await 창닫힘(s.page);
+  console.log(못(일.분류저장.length === 1 && await s.page.inputValue('[data-칸="분류"]') === '20'), '뒤늦게 들어간 이름 → 다시 눌러도 저장 안 감');
+  await s.ctx.close();
+  새판({ 분류새로고침: true });
+  s = await 세우기(1280);
+  await 열기(s.page); await 분류열기(s.page); await s.page.fill('[data-분류이름]', '서재'); await s.page.click('.vp-분류저장');
+  await 창닫힘(s.page);
+  console.log(못(일.분류저장.length === 1 && 일.창 === 0 && await s.page.inputValue('[data-칸="분류"]') === '12'), '틀이 새로 읽히는 응답이어도 됨');
+  await s.ctx.close();
+  새판({ 분류소속: '리빙룸' });
+  s = await 세우기(1280);
+  await 열기(s.page); await 분류열기(s.page); await s.page.fill('[data-분류이름]', '서재'); await s.page.click('.vp-분류저장');
+  await 분류기다림(s.page, '실패');
+  console.log(못(/②/.test(await 분류결과글(s.page)) && 일.분류저장.length === 0), '소속이 「분류」 아니면 안 보냄');
+  await s.ctx.close();
+  새판({ 분류먹통: true });
+  s = await 세우기(1280);
+  await 열기(s.page); await 분류열기(s.page); await s.page.fill('[data-분류이름]', '서재'); await s.page.click('.vp-분류저장');
+  await 분류기다림(s.page, '실패');
+  console.log(못(/③ 저장 안 됨/.test(await 분류결과글(s.page)) && 일.분류저장.length === 0), '저장 단추가 안 먹으면 말함 · ' + await 분류결과글(s.page));
+  await s.page.fill('[data-칸="tbGoodsCd"]', 'new011', { force: true }).catch(() => {});
+  console.log(못(await s.page.isEnabled('.vp-분류저장')), '실패 뒤 다시 누를 수 있음');
   await s.ctx.close();
 
   console.log('\n■ 코드 참고 검색');

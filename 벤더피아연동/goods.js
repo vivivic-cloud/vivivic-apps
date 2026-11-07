@@ -1698,9 +1698,15 @@ const 한벌돌리기 = (단품곁다리) => {
      쓰기: **숨은 같은 출처 틀**에 진짜 `goodsDetl.aspx` 를 열어 그 쪽 JS 로 사람처럼 — 칸 채움 → `getReturnValue` 로 분류 → `btnExist`(중복체크)
        → 주거래 동그라미 → 가격 칸 → `btnSave`(`isFieldValid` 가 쪽 안에서 검사). `oGrid` 가 Infragistics 라 fetch 로 흉내 내지 않는다.
      확인: 저장 뒤 단품관리 목록을 코드로 조회(`하나찾기`). 저장 전에도 같은 조회 + 중복체크 — 두 번 눌러도, 새로고침 뒤 다시 눌러도 두 번 등록되지 않는다.
-     ⚠ 틀 쪽 읽기는 공용 줄을 못 탄다 → 틀을 열기 전·저장 전 `VP원본쉼` 으로 뒤 요청을 세운다. */
+     ⚠ 틀 쪽 읽기는 공용 줄을 못 탄다 → 틀을 열기 전·저장 전 `VP원본쉼` 으로 뒤 요청을 세운다.
+
+     11-07 [새 지시 단품분류 등록] **네 번째 쓰기: 단품분류 등록**(이 기능만) — 사장님(그대로) 「단품분류명이 무엇인가 이것도 등록해야 한다면 단품등록화면에서 등록할 수 있게 해줘」.
+     단품분류 칸(`tbCategoryCd`)은 벤더피아에서 읽기전용 + 필수 — 없는 분류는 먼저 Master > 단품분류에 있어야 고를 수 있다.
+     길(사람 길 그대로): 숨은 틀에 `category.aspx`(처음 고른 마디 = 맨 위 「분류」) → 쪽의 `fnCategoryDtl(btnInsert)` 가 만드는 주소를 `window.open` 에서 받아 같은 틀로
+       → `categoryDtl.aspx` 칸 확인(소속 「분류」·차수 0) → `tbCategoryNm` → `btnSave`(UpdatePanel 비동기, 쪽 안 검사 없음) → `categoryPopup.aspx` 를 다시 읽어 확인. */
   if (!곁다리 && page === PAGES[단품길]) (() => {
     const 등록길 = "/System/Master/goodsDetl.aspx", 분류길 = "/System/Master/categoryPopup.aspx";
+    const 분류관리길 = "/System/Master/category.aspx", 분류등록길 = "/System/Master/categoryDtl.aspx";
     const 쉼 = (ms) => new Promise((r) => setTimeout(r, ms));
     const 말 = (m) => window.VP말?.("단품등록:" + m);
     const 칸표 = [
@@ -1744,7 +1750,21 @@ const 한벌돌리기 = (단품곁다리) => {
         </div>
       </div>`;
     root.appendChild(쪽);
-    root.append(panel, modal);   // 11-07 목록 쪽을 숨겨도 등록 쪽 단품 단추의 상세가 뜨게
+    /* 11-07 [새 지시 단품분류 등록] 벤더피아 단품분류등록 창의 칸 그대로(소속분류는 읽기전용, 지금 분류 8개가 다 맨 위 「분류」 아래) */
+    const 분류창 = document.createElement("div");
+    분류창.className = "vp-modal vp-분류창"; 분류창.hidden = true;
+    분류창.innerHTML = `
+      <div class="vp-modal-card">
+        <div class="vp-goods-panel-head"><strong>단품분류 등록</strong><button type="button" aria-label="닫기">×</button></div>
+        <div class="vp-modal-body">
+          <div class="vp-note">단품을 묶는 갈래입니다. 저장하면 벤더피아 단품분류에 바로 등록되고 이 단품의 단품분류로 골라집니다. 이름을 확인하고 저장해 주세요.</div>
+          <label class="vp-등록칸"><span>소속분류</span><input value="분류" readonly></label>
+          <label class="vp-등록칸"><span>분류명<b>*</b></span><input data-분류이름 autocomplete="off"></label>
+          <div class="vp-등록줄"><button type="button" class="vp-등록저장 vp-분류저장">저장</button><span class="vp-등록결과 vp-분류결과" role="status"></span></div>
+        </div>
+      </div>`;
+    root.append(panel, modal, 분류창);   // 11-07 목록 쪽을 숨겨도 등록 쪽 단품 단추의 상세가 뜨게
+    window.VP팝업?.(분류창.querySelector(".vp-modal-card"), { 머리: 분류창.querySelector(".vp-goods-panel-head"), 몸: 분류창.querySelector(".vp-modal-body") });
     const 목록쪽 = root.querySelector(".vp-goods");
     const 칸통 = 쪽.querySelector(".vp-등록칸들"), 가격통 = 쪽.querySelector(".vp-등록가격");
     const 저장단추 = 쪽.querySelector(".vp-등록저장"), 결과칸 = 쪽.querySelector(".vp-등록결과");
@@ -1762,19 +1782,20 @@ const 한벌돌리기 = (단품곁다리) => {
     const 저장가림 = () => { 저장단추.disabled = 보내는중 || !칸("tbGoodsCd") || 등록한코드.has(codeKey(지금코드())); };
 
     async function 쪽받기(주소) {
-      const res = await VP_DATA.받기(주소, { credentials: "include" }, "사람");
+      const res = await VP_DATA.받기(주소, { credentials: "include", cache: "no-store" }, "사람");
       if (!res.ok) throw new Error("HTTP " + res.status);
       const d = new DOMParser().parseFromString(await res.text(), "text/html");
       if (d.querySelector("input[type=password]")) throw new Error("로그인 필요");
       return d;
     }
+    const 분류뽑기 = (분류쪽) => [...분류쪽.querySelectorAll("#oTree a[title]")].map((a) => ({ 코드: a.getAttribute("title").split("|")[0], 이름: a.textContent.trim() })).filter((x) => x.코드 && x.이름);
     function 칸세우기() {
       if (세움) return 세움;
       세움 = (async () => {
         const [d, 분류쪽] = await Promise.all([쪽받기(등록길), 쪽받기(분류길)]);
         const 없음 = 칸표.filter((x) => x.꼴 !== "분류" && !d.getElementById(x.id)).map((x) => x.id);
         if (없음.length || !d.getElementById("btnSave") || !d.getElementById("btnExist")) throw new Error("등록 쪽 모양이 다름 " + 없음.join(","));
-        const 분류들 = [...분류쪽.querySelectorAll("#oTree a[title]")].map((a) => ({ 코드: a.getAttribute("title").split("|")[0], 이름: a.textContent.trim() })).filter((x) => x.코드 && x.이름);
+        const 분류들 = 분류뽑기(분류쪽);
         if (!분류들.length) throw new Error("단품분류 목록을 못 읽음");
         const 틀칸 = (x) => {
           const 줄 = document.createElement("label");
@@ -1813,6 +1834,13 @@ const 한벌돌리기 = (단품곁다리) => {
             검사.type = "button"; 검사.className = "vp-등록중복"; 검사.textContent = "중복체크";
             검사.addEventListener("click", (e) => { e.preventDefault(); 중복체크(검사); });
             입력.addEventListener("input", () => { 확인된코드 = ""; 결과(""); 저장가림(); });
+          } else if (x.꼴 === "분류") {
+            const 묶음 = 줄.appendChild(document.createElement("span"));
+            묶음.className = "vp-등록코드";
+            묶음.appendChild(입력);
+            const 등록 = 묶음.appendChild(document.createElement("button"));
+            등록.type = "button"; 등록.className = "vp-분류등록단추"; 등록.textContent = "분류 등록";
+            등록.addEventListener("click", (e) => { e.preventDefault(); 분류창열기(); });
           } else 줄.appendChild(입력);
         }
         /* 매입처·시작일·종료일 = 벤더피아가 채워 둔 값 그대로(첫 판 — 임시). 줄은 1줄, 주거래여부는 그 줄 */
@@ -1837,7 +1865,7 @@ const 한벌돌리기 = (단품곁다리) => {
       const f = () => { clearTimeout(끝); 됨(); };
       틀.addEventListener("load", f, { once: true });
     });
-    async function 틀열기() {
+    async function 틀열기(길 = 등록길) {
       const 틀 = document.createElement("iframe");
       틀.setAttribute("sandbox", "allow-same-origin allow-scripts allow-forms");
       틀.setAttribute("aria-hidden", "true");
@@ -1845,13 +1873,13 @@ const 한벌돌리기 = (단품곁다리) => {
       틀.style.cssText = "position:fixed;left:-12000px;top:0;width:1280px;height:900px;border:0;visibility:hidden;pointer-events:none";
       window.VP원본쉼?.();
       const 열림 = 틀로드(틀, 60000);
-      틀.src = new URL(등록길, location.href).href;
+      틀.src = new URL(길, location.href).href;
       document.body.appendChild(틀);
       try {
         await 열림;
         const w = 틀.contentWindow, d = 틀.contentDocument;
         if (!d || d.querySelector("input[type=password]")) throw new Error("로그인 필요");
-        if (typeof w.isFieldValid !== "function" || !d.getElementById("btnSave") || !d.getElementById("btnExist")) throw new Error("등록 쪽 모양이 다름");
+        if (길 === 등록길 && (typeof w.isFieldValid !== "function" || !d.getElementById("btnSave") || !d.getElementById("btnExist"))) throw new Error("등록 쪽 모양이 다름");
         const 알림들 = [];
         w.alert = (m) => { 알림들.push(String(m)); };
         w.confirm = (m) => { 알림들.push(String(m)); return false; };
@@ -1911,6 +1939,7 @@ const 한벌돌리기 = (단품곁다리) => {
       for (const [키, 글] of 가격표) if (값.가격[키] && !/^\d+(\.\d+)?$/.test(값.가격[키])) return [null, 글 + "에는 숫자만 넣어 주세요."];
       return null;
     }
+    const 알림뽑기 = (t) => [...t.matchAll(/alert\(\s*['"]([^'"]{1,120})['"]/g)].map((m) => m[1]);
     async function 단품등록올리기(값) {
       const 탈 = (m, 보냄 = false) => Object.assign(new Error(m), { 보냄 });
       /* ① 저장 전 — 목록에 이미 있으면 보내지 않는다(앞서 응답을 못 받은 등록이 들어가 있을 수 있다) */
@@ -1946,7 +1975,6 @@ const 한벌돌리기 = (단품곁다리) => {
           if (Number(c.get_value()) !== Number(v)) throw 탈("④ 가격 칸이 안 들어감(" + 키 + ")");
         }
         /* ⑤ 「저장」 — 쪽의 `isFieldValid` 가 멈추면 쪽이 안 넘어간다(= 저장 안 보냄) */
-        const 알림뽑기 = (t) => [...t.matchAll(/alert\(\s*['"]([^'"]{1,120})['"]/g)].map((m) => m[1]);
         const 늘있는알림 = new Set(알림뽑기(d.documentElement.outerHTML));
         let 떠남 = false;
         d.forms[0].addEventListener("submit", () => { 떠남 = true; });
@@ -1989,6 +2017,98 @@ const 한벌돌리기 = (단품곁다리) => {
         결과("실패 (" + e.message + ")", "실패");
       } finally { 보내는중 = false; 저장가림(); }
     });
+
+    /* ── 단품분류 등록 (11-07 [새 지시 단품분류 등록], 쓰기 예외 네 번째 — 머리 글 참고) ──
+       응답을 못 받았어도 다시 누르면 ① 에서 이름을 찾아 두 번 등록되지 않는다(이름 맞춤은 앞뒤 빈칸·대소문자 무시, 벤더피아 쪽 규칙은 못 잼). */
+    const 분류이름칸 = 분류창.querySelector("[data-분류이름]"), 분류저장 = 분류창.querySelector(".vp-분류저장"), 분류결과칸 = 분류창.querySelector(".vp-분류결과");
+    const 분류결과 = (글, 종류) => { 분류결과칸.textContent = 글; 분류결과칸.dataset.종류 = 종류 || ""; };
+    const 이름키 = (t) => String(t || "").trim().toLowerCase();
+    const 분류찾기 = async (이름) => 분류뽑기(await 쪽받기(분류길)).find((x) => 이름키(x.이름) === 이름키(이름));
+    let 분류보내는중 = false;
+    function 분류창열기() { 분류이름칸.value = ""; 분류결과(""); 분류창.hidden = false; 분류이름칸.focus(); }
+    const 분류닫기 = () => { if (!분류보내는중) 분류창.hidden = true; };
+    분류창.querySelector(".vp-goods-panel-head button").addEventListener("click", 분류닫기);
+    분류창.addEventListener("click", (e) => { if (e.target === 분류창) 분류닫기(); });
+    async function 분류등록올리기(이름) {
+      const 탈 = (m) => new Error(m);
+      /* ① 저장 전 — 이미 있으면 보내지 않고 그것을 고른다 */
+      const 있던 = await 분류찾기(이름);
+      if (있던) return { ...있던, 있던것: true };
+      /* ② 쪽의 「등록」 이 여는 주소를 그대로 받아 같은 틀로 */
+      const { 틀, w, d } = await 틀열기(분류관리길);
+      try {
+        if (typeof w.fnCategoryDtl !== "function" || !d.getElementById("btnInsert")) throw 탈("② 단품분류 화면 모양이 다름");
+        let 주소 = "";
+        const 기준 = w.location.href;
+        w.open = (u) => { 주소 = String(u); return { focus() {} }; };
+        w.fnCategoryDtl(d.getElementById("btnInsert"));
+        if (!주소 || new URL(주소, 기준).pathname !== 분류등록길) throw 탈("② 등록 창 주소를 못 받음");
+        window.VP원본쉼?.();
+        const 열림 = 틀로드(틀, 60000);
+        틀.src = new URL(주소, 기준).href;
+        await 열림;
+        const w2 = 틀.contentWindow, d2 = 틀.contentDocument;
+        if (!d2 || d2.querySelector("input[type=password]")) throw 탈("② 로그인 필요");
+        const 이름칸 = d2.getElementById("tbCategoryNm"), 저장 = d2.getElementById("btnSave");
+        const 값 = (id) => (d2.getElementById(id) || {}).value;
+        if (!이름칸 || !저장 || 값("ctl00_Contents_tbPreCategoryNm") !== "분류" || 값("tbDepth") !== "0" || 값("ctl00_Contents_hdCategoryCD")) throw 탈("② 분류 등록 창 모양이 다름");
+        const 알림들 = [];
+        w2.alert = (m) => { 알림들.push(String(m)); };
+        w2.confirm = (m) => { 알림들.push(String(m)); return false; };
+        이름칸.value = 이름;
+        /* ③ 「저장」 — UpdatePanel 비동기(틀이 안 넘어갈 수 있다). 비동기 끝 또는 틀 새로 읽힘, 먼저 온 것 */
+        const 늘있는알림 = new Set(알림뽑기(d2.documentElement.outerHTML));
+        const 판 = w2.Sys?.WebForms?.PageRequestManager?.getInstance?.();
+        let 떠남 = false;
+        d2.forms[0].addEventListener("submit", () => { 떠남 = true; });
+        w2.addEventListener("pagehide", () => { 떠남 = true; });
+        판?.add_beginRequest?.(() => { 떠남 = true; });
+        const 끝남 = new Promise((됨) => {
+          const 시계 = setTimeout(() => 됨("시간 넘김"), 120000);
+          const 끝 = (답) => { clearTimeout(시계); 됨(답); };
+          틀.addEventListener("load", () => 끝("새로 읽힘"), { once: true });
+          판?.add_endRequest?.((_, a) => { const 오류 = a?.get_error?.(); if (오류) a.set_errorHandled?.(true); 끝(오류 ? "오류" : "응답"); });
+        });
+        window.VP원본쉼?.();
+        말("분류 저장 누름 " + 이름);
+        저장.click();
+        for (let i = 0; i < 20 && !떠남; i++) await 쉼(100);
+        if (!떠남) throw 탈("③ 저장 안 됨 — " + (알림들[0] ? "벤더피아 알림 「" + 알림들[0] + "」" : "저장 단추가 안 먹음"));
+        const 끝 = await 끝남;
+        const 뒤 = 틀.contentDocument;
+        const 알림 = 알림들[0] || (뒤 ? 알림뽑기(뒤.documentElement.outerHTML).filter((a) => !늘있는알림.has(a))[0] : "");
+        말("분류 저장 뒤 " + 끝 + " 알림 " + String(알림 || "").slice(0, 120));
+        /* ④ 진짜 들어갔나 — 단품 등록 쪽이 고르는 그 분류 목록을 다시 읽는다 */
+        let 찾음 = null, 봄 = false;
+        for (let i = 0; i < 3 && !찾음; i++) {
+          if (i) await 쉼(1500);
+          try { 찾음 = await 분류찾기(이름); 봄 = true; } catch (e) { 말("분류 확인 못 읽음 " + e.message); }
+        }
+        말("분류 목록확인 " + (찾음 ? "있음" : 봄 ? "없음" : "못봄"));
+        if (찾음) return 찾음;
+        throw 탈("④ 단품분류 목록에 " + (봄 ? "없음" : "확인 못 함") + (알림 ? " — 벤더피아 알림 「" + 알림 + "」" : ""));
+      } finally { 틀.remove(); }
+    }
+    async function 분류저장누름() {
+      if (분류보내는중) return;
+      if (보내는중) return 분류결과("단품 저장이 끝난 뒤 눌러 주세요.", "실패");
+      const 이름 = 분류이름칸.value.trim();
+      if (!이름) { 분류결과("분류명을 입력해주세요.", "실패"); 분류이름칸.focus(); return; }
+      분류보내는중 = 보내는중 = true; 분류저장.disabled = true; 저장가림(); 분류결과("등록 중…");
+      try {
+        const 답 = await 분류등록올리기(이름);
+        const 고름 = 칸("분류");
+        if (![...고름.options].some((o) => o.value === 답.코드)) 고름.add(new Option(답.이름, 답.코드));
+        고름.value = 답.코드;
+        분류보내는중 = false; 분류닫기();
+        결과((답.있던것 ? "이미 있는 단품분류 — 「" : "단품분류 등록됨 — 「") + 답.이름 + "」 골랐습니다", "됨");
+      } catch (e) {
+        말("분류 실패 " + e.message);
+        분류결과("실패 (" + e.message + ")", "실패");
+      } finally { 분류보내는중 = 보내는중 = false; 분류저장.disabled = false; 저장가림(); }
+    }
+    분류저장.addEventListener("click", 분류저장누름);
+    분류이름칸.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); 분류저장누름(); } });
 
     /* ── 단품코드 참고 검색 — 단품관리 검색과 같은 함수(`검색낱말`·`낱말맞나`·`page.search`) + 상품명(상품관리 목록의 단품 연결) ── */
     let 찾는번호 = 0, 찾기시계 = 0, 기다림 = 0;
