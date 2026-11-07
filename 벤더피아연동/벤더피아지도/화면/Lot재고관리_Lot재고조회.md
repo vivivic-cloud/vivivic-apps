@@ -12,7 +12,7 @@
 | 글자 | id / name | 구분 | 동작 |
 |---|---|---|---|
 | 조회 | `btnSearch` | 조회 | 폼 제출(서버 처리) |
-| Button (숨김) | `btnLotDetailSearch` | 미확인 | 폼 제출(서버 처리) |
+| Button (숨김) | `btnLotDetailSearch` | 화면만 | 폼 제출(서버 처리) |
 
 ## 입력 칸
 

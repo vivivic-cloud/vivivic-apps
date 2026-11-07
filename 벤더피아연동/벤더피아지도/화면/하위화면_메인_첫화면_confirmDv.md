@@ -16,7 +16,7 @@
 | 배송출발 | `btnSave` | 쓰기 | 검사 「저장전 선택된 내용이 없습니다.」 |
 | 취소 | `btnCancel` | 이동 | JS만(제출 안 함) |
 | 일괄등록 | `btnInsertList` | 이동 | → `invoiceInsert.aspx` |
-| 배송준비중 | `btnStatus2` | 미확인 | 검사 「선택된 목록이 존재하지 않습니다.」 |
+| 배송준비중 | `btnStatus2` | 쓰기 | 검사 「선택된 목록이 존재하지 않습니다.」 |
 | Next | `Pager1$ctl32` | 조회 | 폼 제출(서버 처리) |
 | Last | `Pager1$ctl34` | 조회 | 폼 제출(서버 처리) |
 |  [그리드 안] | `chkALL` | 화면만 | `CheckAllChkItems(this);` |

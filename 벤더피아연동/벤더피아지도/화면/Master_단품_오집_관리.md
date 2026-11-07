@@ -17,8 +17,8 @@
 | 삭제 | `btnDelete` | 쓰기 | 폼 제출(서버 처리) |
 | 라벨송장 | `btnLabelInvoice` | 출력 | JS만(제출 안 함) |
 | 일괄출력 | `btnExcelPrintUpload` | 출력 | JS만(제출 안 함) |
-| (그림 icon_asubmit.gif) (숨김) | `btnExcelUploadRun` | 쓰기 | 폼 제출(서버 처리) |
-| (그림 icon_asubmit.gif) (숨김) | `btnExcelPrintUploadRun` | 출력 | 폼 제출(서버 처리) |
+| (그림 icon_asubmit.gif, 일괄등록로 보임) (숨김) | `btnExcelUploadRun` | 쓰기 | 폼 제출(서버 처리) |
+| (그림 icon_asubmit.gif, 일괄등록로 보임) (숨김) | `btnExcelPrintUploadRun` | 출력 | 폼 제출(서버 처리) |
 | Next | `Pager1$ctl32` | 조회 | 폼 제출(서버 처리) |
 | Last | `Pager1$ctl34` | 조회 | 폼 제출(서버 처리) |
 | 일괄등록샘플 | `` | 쓰기 | `forceDownload(event, '오늘의집바코드.xlsx')` |
@@ -70,7 +70,7 @@
 - 저장할 목록을 선택해 주십시오.
 - 선택된 데이터 중 'SKU 코드, 바코드' 값이 입력되지 않은 행이 있습니다. [
 - 삭제할 등록 데이터를 선택해 주십시오.
-- 확인창: 선택한 
+- 확인창: 선택한
 - 출력할 바코드를 선택해주세요! (저장된 바코드만 출력됩니다)
 - 매수를 1 이상 숫자로 입력해주세요.
 

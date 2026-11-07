@@ -13,7 +13,6 @@
 |---|---|---|---|
 | 저장 | `btnSave` | 쓰기 | 폼 제출(서버 처리) |
 | 목록 | `btnClose` | 이동 | `fnClose();` |
-|  (숨김) | `ctl00_btnNull / btnNull` | 미확인 | JS만(제출 안 함) |
 
 ## 입력 칸
 
@@ -27,8 +26,8 @@
 | `ddlShop` | 매장 | 고르기 | 업무 자료 4개(적지 않음) |
 | `lbDept` | 소속부서 | 글 | 이벤트 keydown |
 | `cbAnswerYn` |  | 체크 | 이벤트 keydown |
-| `tbTitle` |  | 글 | 최대 50 · 이벤트 keydown |
-| `tbContent` |  | 긴 글 |  |
+| `tbTitle` | 제목 | 글 | 최대 50 · 이벤트 keydown |
+| `tbContent` | 문의내용 | 긴 글 |  |
 | `FileUpload1` | 첨부파일1 | 파일 | 이벤트 keydown |
 | `FileUpload2` | 첨부파일2 | 파일 | 이벤트 keydown |
 | `FileUpload3` | 첨부파일3 | 파일 | 이벤트 keydown |

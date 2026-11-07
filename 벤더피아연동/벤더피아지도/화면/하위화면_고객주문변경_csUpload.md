@@ -12,8 +12,8 @@
 | 글자 | id / name | 구분 | 동작 |
 |---|---|---|---|
 | 조회 | `btnUpload` | 조회 | 폼 제출(서버 처리) |
-| (그림 icon_cancel.gif) | `btnClose` | 이동 | `fnClose(); return false;` · JS만(제출 안 함) |
-| Close | `` | 쓰기 |  |
+| (그림 icon_cancel.gif, 닫기/취소로 보임) | `btnClose` | 이동 | `fnClose(); return false;` · JS만(제출 안 함) |
+| Close | `` | 화면만 |  |
 
 ## 입력 칸
 

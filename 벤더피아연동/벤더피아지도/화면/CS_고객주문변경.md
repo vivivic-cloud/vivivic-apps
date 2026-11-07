@@ -15,12 +15,12 @@
 | 엑셀 | `btnExcel` | 내려받기 | 폼 제출(서버 처리) |
 | 등록 | `btnInsert` | 이동 | → `csDetl.aspx?previousPage=CS` |
 | 일괄등록 | `btnCsUpload` | 이동 | → `csUpload.aspx` |
-| (그림 icon_listdel.gif) | `btnDelete` | 쓰기 | 폼 제출(서버 처리) |
-| (그림 icon_collecompl.gif) | `btnCollect` | 미확인 | 검사 「회수지를 선택해 주십시오.」 |
-| (그림 icon_collecc.gif) | `btnCollectCancel` | 쓰기 | 폼 제출(서버 처리) |
+| (그림 icon_listdel.gif, 삭제로 보임) | `btnDelete` | 쓰기 | 폼 제출(서버 처리) |
+| (그림 icon_collecompl.gif, 회수완료로 보임) | `btnCollect` | 쓰기 | 검사 「회수지를 선택해 주십시오.」 |
+| (그림 icon_collecc.gif, 회수취소로 보임) | `btnCollectCancel` | 쓰기 | 폼 제출(서버 처리) |
 | Next | `Pager1$ctl32` | 조회 | 폼 제출(서버 처리) |
 | Last | `Pager1$ctl34` | 조회 | 폼 제출(서버 처리) |
-| 오늘 | `btnRecallToday` | 미확인 | JS만(제출 안 함) |
+| 오늘 | `btnRecallToday` | 화면만 | JS만(제출 안 함) |
 
 ## 입력 칸
 
@@ -69,7 +69,6 @@
 - 접수일 또는 회수일 기간을 입력해 주세요.
 - 종료일을 먼저 선택하세요.
 - 팝업 차단을 해제해주세요.
-- \
 
 ## 연결되는 화면
 

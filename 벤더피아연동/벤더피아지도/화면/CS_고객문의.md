@@ -15,7 +15,7 @@
 | 엑셀 | `btnExcel` | 내려받기 | 검사 「시작일과 종료일을 모두 선택해 주세요.」 · 검사 「1년 이상 값을 조회할 수 없습니다」 |
 | 등록 | `btnInsert` | 이동 | → `csDetl.aspx?previousPage=inquiry` |
 | 문의 일괄등록 | `btnInquiryUpload` | 이동 | → `inquiryUpload.aspx` |
-| (그림 icon_listdel.gif) | `btnDelete` | 쓰기 | 폼 제출(서버 처리) |
+| (그림 icon_listdel.gif, 삭제로 보임) | `btnDelete` | 쓰기 | 폼 제출(서버 처리) |
 | Next | `Pager1$ctl32` | 조회 | 폼 제출(서버 처리) |
 | Last | `Pager1$ctl34` | 조회 | 폼 제출(서버 처리) |
 
@@ -67,7 +67,6 @@
 - 시작일과 종료일을 모두 선택해 주세요.
 - 1년 이상 값을 조회할 수 없습니다
 - 종료일을 먼저 선택하세요.
-- \
 
 ## 연결되는 화면
 
