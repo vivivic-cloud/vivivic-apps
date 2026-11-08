@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v102 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v103 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -132,6 +132,7 @@ input.bad,select.bad{border-color:var(--red)}
 .lsearch>input{flex:1 1 auto;max-width:420px}   /* v37 4 품목 저장한 항목 검색 */
 .lsinfo{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted);font-weight:700;margin:0 0 10px}
 .lsinfo .lscnt.need{color:var(--amber)}
+.toast:not(:empty){position:fixed;left:16px;right:16px;bottom:16px;z-index:50;margin:0 auto;max-width:480px;padding:10px 14px;background:#fff;border:1px solid #e3e2e0;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.08)}
 .delbar{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;letter-spacing:0}
 details.rec>summary .rt{flex:1}
 details.rec>summary input.pk{flex:none;margin:0}
@@ -289,6 +290,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 }
 /* 조혼가구 상품검색 자리(v32 BOM 모품목 · v33 4 품목 품명) — 검색칸·부속카드는 iframe 공용 부품 */
 .ps h3{font-size:15px;font-weight:900;margin:0 0 6px;letter-spacing:-0.02em}
+.ps h3.deltitle,.impbox .deltitle{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px}   /* v103 제목 줄 오른쪽 지우기 단추 */
 .psbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .psbar select{width:auto;flex:none}
 .psbar .msg{align-self:center}
@@ -327,7 +329,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v102</span>
+    <span class="ver">v103</span>
   </div>
 </header>
 <div class="wrap">
@@ -1673,7 +1675,7 @@ var IMPORT_BTN={vendors:['vendors'],workcenters:['workcenters'],classes:['classe
 var IMPORT_CHECK={imporders:1,imppays:1,impinvs:1,impbls:1,impins:1,purchases:1,purdelvs:1,proddlvs:1};   /* v85 ⏳ 조회 칸이 기록에 다 없는 메뉴 */
 var IMPORT_BIG={items:'품목은 영림원에 1,500개가 넘습니다(11-01 사용 1,568개). 「건수 먼저 보기」로 센 뒤 고르세요.',
   boms:'BOM은 영림원에 모품목이 550개가 넘고, 모품목마다 화면을 열어 읽어 「전체」는 20분 넘게 걸립니다. 「건수 먼저 보기」로 센 뒤 고르세요.'};
-var IMPORTS=null,impDraw=null;
+var IMPORTS=null,impDraw=null,IMPS={key:'imports',title:'영림원에서 불러오기 요청'};   /* v103 IMPS = 요청 지우기(delMany)용 */
 function impLast(key){
   var a=(IMPORTS||[]).filter(function(r){return r.stepKey===key;});
   a.sort(function(x,y){return (y.createdAt||'')<(x.createdAt||'')?-1:1;});
@@ -1690,7 +1692,7 @@ function impBox(s){
   var only='all';
   var radio=function(v,label,on){return h('label',{},h('input',{type:'radio',name:'imp-only-'+s.key,value:v,checked:on,on:{change:function(){only=v;}}}),label);};
   var msg=h('span',{class:'msg','aria-live':'polite'});
-  var last=h('pre',{class:'last',hidden:true});
+  var last=h('pre',{class:'last',hidden:true}),delRow=h('div',{class:'deltitle'});   /* v103 대기·오류 요청 지우기 */
   var bCount=h('button',{type:'button',class:'btn small',on:{click:function(){ask('count');}}},'건수 먼저 보기');
   var bGo=h('button',{type:'button',class:'btn small primary',on:{click:function(){ask('import');}}},'불러오기 요청');
   var busy=function(){return impBusy(s.key);};
@@ -1705,6 +1707,7 @@ function impBox(s){
   function draw(){
     var l=impLast(s.key),b=busy();
     bCount.disabled=bGo.disabled=b||!db;
+    var kit=delKit(IMPS,(IMPORTS||[]).filter(function(r){return r.stepKey===s.key&&canDel(r);}));delRow.replaceChildren.apply(delRow,kit.bar?[kit.bar]:[]);
     if(IMPORTS==null){last.hidden=false;last.textContent='요청 기록을 불러오는 중입니다.';return;}
     if(!l){last.hidden=true;return;}
     last.hidden=false;last.textContent=impText(l,b);
@@ -1712,7 +1715,7 @@ function impBox(s){
   var box=h('div',{class:'impbox',hidden:true},
     h('div',{class:'opts',role:'radiogroup','aria-label':'불러올 범위'},radio('all','전체',true),radio('T','T로 시작하는 것만',false)),
     h('div',{class:'row'},bCount,bGo,msg),
-    last);
+    last,delRow);
   impDraw=draw;draw();
   return box;
 }
@@ -2055,6 +2058,8 @@ function fsSave(r,m,out){
     return res;
   });
 }
+/* v103 엣지필름 바꾸기 표에서 바로 「수정 취소」 — 묶음(함께 바뀐 BOM·소요자재) 통째로 되돌림 = fsCancel */
+function fsUndo(d){return hasEdit(d)&&d.edit.swap&&(d.status==='수정대기'||d.status==='오류')?h('button',{type:'button',class:'btn small',on:{click:function(){editCancel(BYKEY.boms,d);}}},'수정 취소'):null;}
 function fsCancel(s,r){
   var S=r.edit.swap,at=new Date().toISOString(),out={};
   db.updateAll(S.docs.map(function(x){return {c:x.c,id:x.id};}),function(curs){
@@ -2141,7 +2146,7 @@ function filmSwapBox(){
       r.chip=h('span',{class:'chip'});r.note=h('small',{class:'ifwhy',hidden:true});
       var d=function(l,c,cls){return h('td',{'data-l':l,class:cls||null},c);},ok=pickable(r);
       var cb=h('input',{type:'checkbox','aria-label':r.part+' 고르기',disabled:!ok||busy,on:{change:function(){if(cb.checked)picked[r.key]=1;else delete picked[r.key];r.fail='';msg.textContent='';drawSt();}}});cb.checked=ok&&!!picked[r.key];
-      return h('tr',{},[d('고르기',cb,'fspk'),d('품번',r.part),d('품명',r.name,'nm'),d('지금 필름',r.fname+' ('+r.from+')','nm'),d('소요량',r.qty),d('상태',[r.chip,r.note])]);
+      return h('tr',{},[d('고르기',cb,'fspk'),d('품번',r.part),d('품명',r.name,'nm'),d('지금 필름',r.fname+' ('+r.from+')','nm'),d('소요량',r.qty),d('상태',[r.chip,r.note,fsUndo(r.doc)])]);
     }));
     drawSt();
   }
@@ -3409,7 +3414,7 @@ function prodCanDlv(d,r){   /* 차례: 앞 공정 납품이 있어야 한다. �
 }
 function prodDone(d){return d.status==='완료'&&(d.rows||[]).every(function(r){return prodNum(r.qty-prodSum(prodDlvs(d,r).filter(function(x){return x.status==='완료';}),'dlvQty'))<=0;});}
 function prodRunFn(){
-  var s=BYKEY.proddlvs,M=BYKEY.prodmoves,busy=false,open=null,pending=false;
+  var s=BYKEY.proddlvs,M=BYKEY.prodmoves,busy=false,open=null,pending=false,kit=null,hd=h('h3',{class:'deltitle'});   /* v103 kit = 대기·오류 생산 지우기 */
   var box=h('div',{}),done=h('details',{class:'prgap',hidden:true}),none=h('p',{class:'hint',hidden:true},'진행 중인 생산이 없습니다. 「주간생산계획입력·외주발주입력」에서 넣으면 여기에 보입니다.'),out=h('p',{class:'pslink','aria-live':'polite'});
   function fieldsFor(){var o={};['dlvQty','dlvDate','stmtNo','stmtAmt'].forEach(function(k){o[k]=makeField(s.fields.filter(function(f){return f.k===k;})[0]);});return o;}
   function warnOf(d,r,q){   /* 폼은 막지 않고 글만. 같은 업체면 보낼 일이 없으니 앞 공정 납품만 본다(v84) */
@@ -3522,7 +3527,7 @@ function prodRunFn(){
   }
   function cardEl(d){
     var chip={'대기':'발주 대기','진행중':'발주 중','완료':'발주 끝','오류':'오류'}[d.status]||d.status,seen='',kids=[];
-    kids.push(h('div',{class:'prhead'},h('span',{},d.itemNo),h('span',{},show(d.qty)+'개'),h('span',{class:'chip '+d.status},chip)),
+    kids.push(h('div',{class:'prhead'},kit?kit.pk(d):null,h('span',{},d.itemNo),h('span',{},show(d.qty)+'개'),h('span',{class:'chip '+d.status},chip)),
       h('div',{class:'prsub'},[d.itemName,'생산계획완료일 '+d.dueDate,d.planNo?'생산계획 '+d.planNo:''].filter(Boolean).join(' · ')));
     if(d.agentNote&&d.status!=='완료')kids.push(h('div',{class:d.status==='오류'?'prbad':'prnote'},d.agentNote));   /* v100 대기·진행중 메모도 */
     if(d.dueEdit)kids.push(h('div',{class:'prnote'},'완료일 고침 '+d.dueEdit.before+' → '+d.dueEdit.after+'. 영림원 일자는 입력 작업자가 맞춥니다.'));
@@ -3539,6 +3544,8 @@ function prodRunFn(){
   function draw(){
     var a=(data.prods||[]).filter(function(d){return d.id;}).slice().sort(function(x,y){return String(y.createdAt||'')<String(x.createdAt||'')?-1:1;});
     var live=a.filter(function(d){return !prodDone(d);}),end=a.filter(prodDone);
+    kit=delKit(BYKEY.prods,a.filter(function(d){return delOk(BYKEY.prods,d);}));
+    hd.replaceChildren.apply(hd,[BYKEY.proddlvs.title].concat(kit.bar?[kit.bar]:[]));
     none.hidden=!!live.length||!data.prods;
     box.replaceChildren.apply(box,live.map(cardEl));
     done.hidden=!end.length;
@@ -3564,7 +3571,7 @@ function prodRunFn(){
       }:null};
     }));
   };
-  fn.box=h('section',{class:'ps inform conwho',on:{focusout:function(){setTimeout(function(){if(pending)fn.refresh();},0);}}},h('h3',{},BYKEY.proddlvs.title),none,out,box,done);
+  fn.box=h('section',{class:'ps inform conwho',on:{focusout:function(){setTimeout(function(){if(pending)fn.refresh();},0);}}},hd,none,out,box,done);
   return fn;
 }
 function impinOf(bl){var no=String(bl.blno||'').trim();return (data.impins||[]).filter(function(r){return r.status!=='오류'&&(r.blId===bl.id||String(r.blno||'').trim()===no);});}
@@ -5079,7 +5086,30 @@ function recBody(s,r){
 }
 /* v13 대기·오류 건 고르기·지우기. 진행중·완료는 영림원에 들어갔거나 들어가는 중이라 대상이 아니다. */
 var picked={};   /* 단계 키 → {문서 id → 1}. renderList 가 그 단계의 대기·오류 건만 남긴다 */
-function canDel(r){return (r.status==='대기'||r.status==='오류')&&!r.edit&&!r.stage;}   /* v80 stage 가 있는 구매 입력은 영림원에 일부 들어간 것 — 지우지 않는다 */   /* v34: 수정 중 오류(edit 있음)는 영림원에 이미 있는 품목 — 지우지 않는다 */
+function canDel(r){return (r.status==='대기'||r.status==='오류')&&!r.edit&&!r.stage&&!ylwNoOf(r);}   /* v80 stage 가 있는 구매 입력은 영림원에 일부 들어간 것 — 지우지 않는다 */   /* v34: 수정 중 오류(edit 있음)는 영림원에 이미 있는 품목 — 지우지 않는다 */
+/* v103 영림원이 준 번호가 하나라도 있으면 영림원에 일부 들어간 문서 — 지우지 않는다 */
+function ylwNoOf(r){return !!(r.planNo||r.reqno||r.apprno||(r.pos&&r.pos.length)||r.dlvno||r.dlvNo||r.inNo||r.outNo||(r.rows||[]).some(function(x){return x&&(x.workNo||x.orderNo);}));}
+/* v103 함께 만든 문서 묶음: 뒤 문서가 앞 문서를 가리키면 앞 문서는 못 지운다(뒤 문서 먼저) */
+var DEL_KIDS={imporders:[['imppays','poId']],imppays:[['impinvs','payId']],impinvs:[['impbls','invId']],impbls:[['impins','blId']],purchases:[['purdelvs','purId']],prods:[['proddlvs','prodId'],['prodmoves','prodId']]};
+function delOk(s,r){
+  if(!canDel(r))return false;
+  if((DEL_KIDS[s.key]||[]).some(function(k){return (data[k[0]]||[]).some(function(x){return x[k[1]]===r.id;});}))return false;
+  if(s.key==='materials'){var c=clsT(r.code);if(c&&['boms','itemmats'].some(function(k){return (data[k]||[]).some(function(x){return hasEdit(x)&&x.edit.swap&&x.edit.swap.to&&clsT(x.edit.swap.to.code)===c;});}))return false;}   /* v97 엣지필름 바꾸기가 기다리는 새 필름 */
+  return true;
+}
+/* v103 모든 등록 메뉴 공용: 「선택 삭제 N건」·「대기·오류 모두 삭제」 단추 줄 + 줄마다 체크 칸. dels = 지울 수 있는 문서 */
+function delKit(s,dels){
+  var keep={},pk0=picked[s.key]||{};
+  dels.forEach(function(r){if(pk0[r.id])keep[r.id]=1;});picked[s.key]=keep;
+  var sel=function(){return dels.filter(function(r){return keep[r.id];});};
+  var selBtn=h('button',{type:'button',class:'btn small',on:{click:function(){delMany(s,sel());}}});
+  var drawSel=function(){var n=sel().length;selBtn.hidden=!n;selBtn.textContent='선택 삭제 '+n+'건';};
+  drawSel();
+  return {bar:dels.length?h('div',{class:'delbar'},selBtn,h('button',{type:'button',class:'btn small',on:{click:function(){delMany(s,dels);}}},'대기·오류 모두 삭제')):null,
+    pk:function(r){if(dels.indexOf(r)<0)return null;
+      var c=h('input',{type:'checkbox',class:'pk','aria-label':'선택',on:{click:function(e){e.stopPropagation();},change:function(){if(c.checked)keep[r.id]=1;else delete keep[r.id];drawSel();}}});
+      c.checked=!!keep[r.id];return c;}};
+}
 function delMany(s,rows){
   if(!db){flash('저장소에 연결되지 않아 지울 수 없습니다.',true);return;}
   if(!rows.length)return;
@@ -5091,7 +5121,7 @@ function delMany(s,rows){
     var done=res.filter(function(x){return x===true;}).length,kept=res.filter(function(x){return x===false;}).length,fail=res.filter(function(x){return x==null;}).length;
     picked[s.key]={};
     if(data[s.key])data[s.key]=data[s.key].filter(function(r){return !rows.some(function(x,i){return x.id===r.id&&res[i]===true;});});
-    renderList();renderNav();renderSum();
+    renderList();renderNav();renderSum();if(impDraw)impDraw();if(ifRefresh)ifRefresh();   /* v103 불러오기 요청·생산 카드도 다시 그림 */
     flash(done+'건을 지웠습니다.'+(kept?' '+kept+'건은 그 사이 진행중·완료로 바뀌어 남겼습니다.':'')+(fail?' '+fail+'건은 지우지 못했습니다. 잠시 뒤 다시 시도해 주세요.':''),!!fail);
   });
 }
@@ -5104,15 +5134,8 @@ function renderList(){
 function renderListIn(s,listBox,title){
   var a=data[s.key];
   var head=h('h3',{},title,h('span',{},a?a.length+'건':''));
-  var dels=(a||[]).filter(canDel),keep={},pk0=picked[s.key]||{};
-  dels.forEach(function(r){if(pk0[r.id])keep[r.id]=1;});picked[s.key]=keep;
-  var pickedRows=function(){return dels.filter(function(r){return keep[r.id];});};
-  if(dels.length){
-    var selBtn=h('button',{type:'button',class:'btn small',on:{click:function(){delMany(s,pickedRows());}}});
-    var drawSel=function(){var n=pickedRows().length;selBtn.hidden=!n;selBtn.textContent='선택 삭제 '+n+'건';};
-    drawSel();
-    head.append(h('div',{class:'delbar'},selBtn,h('button',{type:'button',class:'btn small',on:{click:function(){delMany(s,dels);}}},'대기·오류 모두 삭제')));
-  }
+  var dels=(a||[]).filter(function(r){return delOk(s,r);}),kit=delKit(s,dels);
+  if(kit.bar)head.append(kit.bar);
   if(a==null){listBox.replaceChildren(head,h('div',{class:'empty'},'불러오는 중입니다.'));return;}
   if(!a.length){listBox.replaceChildren(head,h('div',{class:'empty'},'아직 저장한 '+s.title+' 항목이 없습니다. 위 폼에 입력하고 저장하면 여기에 쌓입니다.'));return;}
   var sorted=a.slice().sort(function(x,y){return (y.createdAt||'')<(x.createdAt||'')?-1:1;});
@@ -5128,10 +5151,9 @@ function renderListIn(s,listBox,title){
     if(st==='오류'&&ed)actions.append(h('button',{type:'button',class:'btn small',on:{click:function(){patch(s,r,{status:'수정대기',agentNote:''});}}},'수정 대기로 되돌리기'));   /* v34 */
     if(ed&&(st==='수정대기'||st==='오류'))actions.append(h('button',{type:'button',class:'btn small',on:{click:function(){editCancel(s,r);}}},'수정 취소'));
     if(canEdit(s,r))actions.append(h('button',{type:'button',class:'btn small',on:{click:function(){editOpen(s,r);}}},s.flowCols?'공정 채우기':'수정'));
-    if(canDel(r))actions.append(delBtn(s,r));
+    if(delOk(s,r))actions.append(delBtn(s,r));
     var fm=EDITING[s.key+'/'+r.id];if(fm&&!canEdit(s,r)){delete EDITING[s.key+'/'+r.id];fm=null;}   /* 그 사이 상태가 바뀌면 수정 칸을 닫는다 */
-    var pk=canDel(r)?h('input',{type:'checkbox',class:'pk','aria-label':'선택',on:{click:function(e){e.stopPropagation();},change:function(){if(pk.checked)keep[r.id]=1;else delete keep[r.id];drawSel();}}}):null;
-    if(pk)pk.checked=!!keep[r.id];
+    var pk=kit.pk(r);
     var gap=s.flowCols?flowGap(r):'';   /* v53 */
     var d=h('details',{class:'rec'+(gap?' gap':''),'data-id':r.id},
       h('summary',{},pk,h('div',{class:'rt'},h('b',{},s.recTitle(r)||'(이름 없음)'),h('small',{},s.subt(r)+(ed?' · 바뀐 칸: '+editLabs(s,r.edit.changed):''))),
@@ -5656,7 +5678,7 @@ function delBtn(s,r){
   var armed=false,t;
   var b=h('button',{type:'button',class:'btn small',on:{click:function(){
     if(!armed){armed=true;b.textContent='정말 삭제';clearTimeout(t);t=setTimeout(function(){armed=false;b.textContent='삭제';},3000);return;}
-    db.collection('erp_'+s.key).doc(r.id).delete().catch(function(e){flash('삭제하지 못했습니다. '+errText(e),true);});
+    db.collection('erp_'+s.key).doc(r.id).deleteIf(canDel).then(function(ok){if(!ok)flash('그 사이 진행중·완료로 바뀌어 남겼습니다.',true);},function(e){flash('삭제하지 못했습니다. '+errText(e),true);});   /* v103 지우기 직전 다시 읽음 */
   }}},'삭제');
   return b;
 }
@@ -5666,10 +5688,12 @@ function errText(e){
   if(c==='quota_exceeded')return '저장 한도에 도달했습니다.';
   return '잠시 뒤 다시 시도해 주세요.';
 }
+var toast=null;
 function flash(text,bad){
-  if(!form)return;
-  form.msg.textContent=text;form.msg.className='msg'+(bad?' bad':'');
-  clearTimeout(msgTimer);if(!bad)msgTimer=setTimeout(function(){form.msg.textContent='';},3500);
+  var el=form&&document.body.contains(form.msg)?form.msg:null;
+  if(!el){if(!toast){toast=h('div',{class:'msg toast',role:'status','aria-live':'polite'});document.body.append(toast);}el=toast;}   /* v103 입력 칸이 없는 화면(생산·불러오기 요청 등)의 알림 */
+  el.textContent=text;el.className='msg'+(bad?' bad':'')+(el===toast?' toast':'');
+  clearTimeout(msgTimer);if(!bad||el===toast)msgTimer=setTimeout(function(){el.textContent='';},bad?8000:3500);
 }
 function patch(s,r,o){db.collection('erp_'+s.key).doc(r.id).update(o).catch(function(e){flash('변경하지 못했습니다. '+errText(e),true);});}
 /* v46 오래 열어 둔 화면(옛 판)으로 저장하지 않게: 저장 직전 배포판 판 번호를 읽어 더 새 판이면 막는다. 못 읽으면(오프라인·파일로 연 화면) 그냥 저장 */
