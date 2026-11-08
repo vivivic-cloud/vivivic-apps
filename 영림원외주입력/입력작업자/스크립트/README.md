@@ -24,6 +24,7 @@
 | 제품별공정별워크센터(500865) | `워크센터등록-품목별-채우기.js` | `erp_itemwcs` 대기 | `ylw.iw.bg(['품번',…], 이어하기)` · `window.__iw_g`(소요자재-채우기.js 먼저) | 예(공정 3개 품목 약 90초) | 11-05 전체 85건 · 중간 공정 = 500299 공정품+워크센터 → 500865 나머지 |
 | 품목대중소분류정의(502365) | `분류정의-읽기.js` | (읽기) → 폼 `erp_classes` 꼴 `{kind, big, mid, name, use, ylwCode}` — 소분류 하나 = 문서 하나 | `ylw.read.classes(only)` (제상품·자재 둘 다, 라디오·조회까지 스크립트) | 324줄 약 2분 30초 | 11-01 불러오기 요청 처리(읽기만) |
 | **(읽기)** 불러오기 공통 | `불러오기-공통.js` | — | `ylw.read.cols`·`ylw.read.need` · 폼 저장소 `ylw.imp.list/add/patch` · `ylw.imp.apply(단계, 읽은것, 요청, 'count'|'import')` · `ylw.imp.pending()`·`ylw.imp.run(요청)` | — | 11-01 |
+| (읽기) 재고 501179 · 501187 · 501186 · 501181 | `재고-읽기.js` | (읽기) 화면에서 조건 넣고 조회한 표 | `ylw.stock.read(화면, {wh:true})` · `cols` · `whMap` | 예 | 11-08 열·창고 이름 확인 |
 | (읽기) 거래처조회(500373) | `거래처조회-읽기.js` | → `erp_vendors` 꼴 | `ylw.read.vendors('all'|'T')` | 예 | 11-01 정상 184·T 9 |
 | (읽기) 워크센터등록(500226) | `워크센터등록-읽기.js` | → `erp_workcenters` 꼴 | `ylw.read.workcenters(…)` | 예 | 11-01 17줄·T 9 |
 | (읽기) 품목조회(500260) | `품목조회-읽기.js` | → `erp_items` 꼴 | `ylw.read.items(…)` | 예 | 11-01 1,568개·T 0 |
