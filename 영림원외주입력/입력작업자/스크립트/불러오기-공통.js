@@ -159,7 +159,8 @@
         }
       }
       const d = I.diff(spec, f, e, got.labels);
-      if (!d.length) { res.같음++; if (mode === 'import' && f.ylwDiff) await I.patch(spec.coll, f.id, { ylwDiff: '', ylwCheckedAt: now }); continue; }
+      // 폼 v105: 같음도 ylwCheckedAt 을 적는다 — 폼이 「영림원에 있다고 확인된 거래처」를 드롭다운에 더하는 표시(거래처 외 단계도 같은 뜻).
+      if (!d.length) { res.같음++; if (mode === 'import') await I.patch(spec.coll, f.id, { ylwDiff: '', ylwCheckedAt: now }); continue; }
       res.다름++;
       res.다른것.push(k + (f.status !== '완료' ? '(폼 ' + f.status + ')' : '') + ' — ' + d.join(' · '));
       if (mode === 'import') await I.patch(spec.coll, f.id, { ylwDiff: d.join(' · '), ylwCheckedAt: now });
