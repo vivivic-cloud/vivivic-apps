@@ -1735,3 +1735,5 @@
 - 고침(`양식만들기.gs` v118): 「서비스」에 Drive API 가 있으면 `Drive.Files.create(meta, blob)`(고급 서비스, 같은 폴더·같은 변환)로 만들고, 없으면 전처럼 UrlFetch. 실패하면 `code`·`msg`(구글 오류 글 300자)를 함께 돌려준다 → 다음 실패는 원인이 보인다. 폼 쪽은 그대로(실패면 `GS_NOMAKER` 엑셀 안내만).
 - **사장님 할 일**: Drive API 서비스 추가 → 새 코드 붙여넣기·저장 → 「배포 관리 → 수정 → 새 버전」(주소 그대로). 그 뒤 작업자가 POST 시험 → 배포판 누름 확인.
 - ⚠ v115 부터 폼은 담당자 로그인이 있어야 열린다. 작업자는 담당자 계정 비밀번호를 넣지 않으므로 배포판 단추 누름은 사장님이 로그인한 화면에서 보거나, 같은 `tplBuild` 결과 파일을 웹앱에 직접 POST 해서 본다.
+- **11-09 두 번째**: 입력 작업자가 사장님 Chrome 에서 Drive API(v3) 서비스를 더하고 v118 코드로 배포 버전 2 를 올렸다. 다시 POST → `drive.files.create을(를) 호출할 수 있는 권한이 없습니다. 필요한 권한은 (…/auth/drive || …drive.appdata || …drive.file)`. **원인 = 승인된 권한이 드라이브 읽기뿐**: Apps Script 는 코드에 보이는 함수로 권한을 고르는데 `DriveApp.getFolderById`·`getName`(읽기)만 있어 `drive.readonly` 만 받았다. 고침 = 부르지 않는 함수 `needWriteScope_`(`createFile` 한 줄)를 넣어 쓰기 권한(`auth/drive`)을 요청하게 함. ⚠ 이 함수를 지우면 다시 막힌다. 다시 승인(사장님 직접) + 새 버전 배포 필요 — `사장님 할 일.md` 「한 번 더 — 쓰기 권한」.
+

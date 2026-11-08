@@ -1,5 +1,5 @@
 /**
- * 영림원외주입력 — 구글시트 양식 만들기 웹앱 (v118)
+ * 영림원외주입력 — 구글시트 양식 만들기 웹앱 (v118 · 11-09 쓰기 권한 고침)
  *
  * 하는 일: 폼에서 「양식 다운로드 → 구글 스프레드시트」를 누르면 폼이 그 순간의 엑셀 양식 파일
  *   (폼 칸·드롭다운 목록·머리 메모 그대로)을 보낸다. 이 스크립트는 그 파일을 드라이브
@@ -63,6 +63,13 @@ function doGet() {
 // 처음 한 번 권한 승인용(편집기에서 이 함수를 골라 「실행」). 폴더 이름만 읽는다.
 function checkAccess() {
   Logger.log('폴더 확인: ' + DriveApp.getFolderById(FOLDER_ID).getName());
+}
+
+// 부르지 않는 함수. Apps Script 는 코드에 보이는 함수로 권한을 정한다 — 읽기 함수만 있으면
+// 드라이브 「읽기」 권한만 받아 시트 만들기가 「권한이 없습니다」로 막힌다(11-09 실제로 막힘).
+// 이 줄이 있어야 드라이브 「쓰기」 권한을 요청한다. 지우지 말 것.
+function needWriteScope_() {
+  DriveApp.getFolderById(FOLDER_ID).createFile('x', 'x');
 }
 
 function out_(o) {
