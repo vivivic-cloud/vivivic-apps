@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v103 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v104 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -123,6 +123,8 @@ input.bad,select.bad{border-color:var(--red)}
 .impbox .last{font:500 12px/1.5 var(--sans);white-space:pre-wrap;word-break:break-word;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:0}
 .chip.src{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}
 .chip.diff{background:var(--amber-bg);color:var(--amber);border-color:#fde68a}
+.chip.gone{background:#f3f4f6;color:#6b7280;border-color:#d1d5db}
+details.gonebox{margin-top:10px;font-size:13px}details.gonebox>summary{cursor:pointer;font-weight:700;padding:6px 0;color:#6b7280}details.gonebox .delbar{margin:4px 0 8px}
 .ylwdiff{background:var(--amber-bg);color:var(--amber);border:1px solid #fde68a;padding:8px 10px;border-radius:8px;font-size:12px;font-weight:700;margin:10px 0 8px;word-break:break-word}
 .msg.bad{color:var(--red)}
 .list h3{font-size:15px;font-weight:900;margin:28px 0 10px;display:flex;gap:8px;align-items:baseline;letter-spacing:-0.02em}
@@ -329,7 +331,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v103</span>
+    <span class="ver">v104</span>
   </div>
 </header>
 <div class="wrap">
@@ -1086,11 +1088,12 @@ var ROUTES={
 var IMPORT_SPEC={collection:'erp_imports',statuses:['대기','진행중','완료','오류'],
   request:{stepKey:'폼 단계 키(버튼을 누른 단계)',stepTitle:'단계 이름',steps:'읽을 단계 키 배열(6단계는 processes, flows 둘)',only:'all = 전체(기본) | T = 이름이 T로 시작하는 것만',
     mode:'count = 건수 먼저 보기(폼에 아무것도 안 씀) | import = 불러오기',status:'대기 → 진행중 → 완료 | 오류',agentNote:'결과 요약(단계마다 영림원 n건 · 폼에 없음 · 같음 · 다름, 다른 점 목록)',
-    result:'{단계 키: {읽음, 폼에없음, 같음, 다름, 넣음}}',createdAt:'ISO 시각',doneAt:'ISO 시각'},
+    result:'{단계 키: {읽음, 폼에없음, 같음, 다름, 넣음, 영림원에없음, 다시있음}}',createdAt:'ISO 시각',doneAt:'ISO 시각'},
   imported:{status:'완료',source:'영림원',agentNote:'영림원에서 불러옴(MM-DD)',importedAt:'ISO 시각',importId:'요청 문서 id',createdAt:'ISO 시각',route:'{screen, specRef, from:「영림원 불러오기」}'},
   rules:['원천은 영림원에 실제 저장된 자료다(조회 화면에서 읽은 값). 영림원에는 아무것도 저장·삭제하지 않는다.',
     '폼에 같은 열쇠(match)가 없으면 영림원 값으로 새 문서를 넣는다(status 완료, source 영림원).',
     '같은 열쇠가 있으면 덮어쓰지 않는다. 값이 같으면 건너뛰고, 다르면 그 문서의 ylwDiff 칸에만 차이를 적는다(다른 칸·status·agentNote 는 그대로). 차이 목록은 요청 agentNote 에도 적는다.',
+    '(v104) 읽은 범위(steps 마다 그 단계 결과 · only · 읽기 스크립트의 기간) 안에서 폼에는 status 완료로 있는데 영림원 조회에 없는 문서는 지우지 않고 ylwGone(MM-DD)·ylwGoneAt·ylwGoneId 만 적는다. 폼은 그 문서를 저장 목록에서 빼고 접힌 「영림원에 없음 N건」에만 보이며 삭제를 허락한다. 다음 불러오기에서 다시 보이면 ylwGone 을 빈칸으로. 대기·진행중·오류·수정대기 문서는 대상이 아니다. count 는 세기만.',
     'noRead 칸은 읽지도 비교하지도 않는다(불러온 문서에 그 칸이 없다).',
     '같은 단계의 요청이 대기·진행중이면 폼이 새 요청을 막는다.',
     'steps 가 여럿이면 적힌 순서대로 읽는다. link 가 있는 단계는 앞 단계 문서를 찾아 그 값을 채운다. 앞 문서를 못 찾으면 넣지 않고 agentNote 에 적는다.',
@@ -1577,7 +1580,7 @@ var listBox=null,listBox2=null,msgTimer=null;
 
 function counts(key){
   var a=data[key]||[];var c={total:a.length,'대기':0,'진행중':0,'완료':0,'오류':0,'수정대기':0};
-  a.forEach(function(r){if(c[r.status]!=null)c[r.status]++;});return c;
+  a.forEach(function(r){if(ylwGone(r)){c.total--;return;}if(c[r.status]!=null)c[r.status]++;});return c;   /* v104 영림원에 없음은 안 셈 */
 }
 function renderNav(){
   var ckBtn=h('button',{type:'button',class:'navck',on:{click:function(){go('check');}},'aria-current':cur==='check'?'step':null},
@@ -3415,7 +3418,7 @@ function prodCanDlv(d,r){   /* 차례: 앞 공정 납품이 있어야 한다. �
 function prodDone(d){return d.status==='완료'&&(d.rows||[]).every(function(r){return prodNum(r.qty-prodSum(prodDlvs(d,r).filter(function(x){return x.status==='완료';}),'dlvQty'))<=0;});}
 function prodRunFn(){
   var s=BYKEY.proddlvs,M=BYKEY.prodmoves,busy=false,open=null,pending=false,kit=null,hd=h('h3',{class:'deltitle'});   /* v103 kit = 대기·오류 생산 지우기 */
-  var box=h('div',{}),done=h('details',{class:'prgap',hidden:true}),none=h('p',{class:'hint',hidden:true},'진행 중인 생산이 없습니다. 「주간생산계획입력·외주발주입력」에서 넣으면 여기에 보입니다.'),out=h('p',{class:'pslink','aria-live':'polite'});
+  var box=h('div',{}),done=h('details',{class:'prgap',hidden:true}),gone=h('details',{class:'gonebox',hidden:true}),none=h('p',{class:'hint',hidden:true},'진행 중인 생산이 없습니다. 「주간생산계획입력·외주발주입력」에서 넣으면 여기에 보입니다.'),out=h('p',{class:'pslink','aria-live':'polite'});
   function fieldsFor(){var o={};['dlvQty','dlvDate','stmtNo','stmtAmt'].forEach(function(k){o[k]=makeField(s.fields.filter(function(f){return f.k===k;})[0]);});return o;}
   function warnOf(d,r,q){   /* 폼은 막지 않고 글만. 같은 업체면 보낼 일이 없으니 앞 공정 납품만 본다(v84) */
     var pv=prodSib(d,r,-1);
@@ -3543,8 +3546,14 @@ function prodRunFn(){
   }
   function draw(){
     var a=(data.prods||[]).filter(function(d){return d.id;}).slice().sort(function(x,y){return String(y.createdAt||'')<String(x.createdAt||'')?-1:1;});
+    var ga=a.filter(ylwGone);a=a.filter(function(d){return !ylwGone(d);});   /* v104 영림원에 없음 생산은 카드에서 빼고 접힌 칸에만 */
     var live=a.filter(function(d){return !prodDone(d);}),end=a.filter(prodDone);
     kit=delKit(BYKEY.prods,a.filter(function(d){return delOk(BYKEY.prods,d);}));
+    var gk=delKit(BYKEY.prods,ga.filter(function(d){return delOk(BYKEY.prods,d);}),1);
+    gone.hidden=!ga.length;
+    gone.replaceChildren.apply(gone,[h('summary',{},'영림원에 없음 '+ga.length+'건')].concat(gk.bar?[gk.bar]:[],ga.map(function(d){   /* 납품·출고 단추 없이 머리만 */
+      return h('div',{class:'prcard'},h('div',{class:'prhead'},gk.pk(d),h('span',{},d.itemNo),h('span',{},show(d.qty)+'개'),h('span',{class:'chip gone'},'영림원에 없음')),
+        h('div',{class:'prsub'},[d.itemName,'생산계획완료일 '+d.dueDate,d.planNo?'생산계획 '+d.planNo:''].filter(Boolean).join(' · ')));})));
     hd.replaceChildren.apply(hd,[BYKEY.proddlvs.title].concat(kit.bar?[kit.bar]:[]));
     none.hidden=!!live.length||!data.prods;
     box.replaceChildren.apply(box,live.map(cardEl));
@@ -3571,7 +3580,7 @@ function prodRunFn(){
       }:null};
     }));
   };
-  fn.box=h('section',{class:'ps inform conwho',on:{focusout:function(){setTimeout(function(){if(pending)fn.refresh();},0);}}},hd,none,out,box,done);
+  fn.box=h('section',{class:'ps inform conwho',on:{focusout:function(){setTimeout(function(){if(pending)fn.refresh();},0);}}},hd,none,out,box,done,gone);
   return fn;
 }
 function impinOf(bl){var no=String(bl.blno||'').trim();return (data.impins||[]).filter(function(r){return r.status!=='오류'&&(r.blId===bl.id||String(r.blno||'').trim()===no);});}
@@ -5086,7 +5095,9 @@ function recBody(s,r){
 }
 /* v13 대기·오류 건 고르기·지우기. 진행중·완료는 영림원에 들어갔거나 들어가는 중이라 대상이 아니다. */
 var picked={};   /* 단계 키 → {문서 id → 1}. renderList 가 그 단계의 대기·오류 건만 남긴다 */
-function canDel(r){return (r.status==='대기'||r.status==='오류')&&!r.edit&&!r.stage&&!ylwNoOf(r);}   /* v80 stage 가 있는 구매 입력은 영림원에 일부 들어간 것 — 지우지 않는다 */   /* v34: 수정 중 오류(edit 있음)는 영림원에 이미 있는 품목 — 지우지 않는다 */
+function canDel(r){return ((r.status==='대기'||r.status==='오류')&&!r.edit&&!r.stage&&!ylwNoOf(r))||ylwGone(r);}   /* v104 영림원에 없음(완료인데 영림원 조회에 없음)도 지울 수 있다 */
+/* v104 불러오기 때 입력 작업자가 단 표시: 읽은 범위 안에서 폼에는 완료로 있는데 영림원 조회에 없음. 다음 불러오기에서 다시 보이면 작업자가 지운다 */
+function ylwGone(r){return !!(r&&r.ylwGone&&r.status==='완료');}   /* v80 stage 가 있는 구매 입력은 영림원에 일부 들어간 것 — 지우지 않는다 */   /* v34: 수정 중 오류(edit 있음)는 영림원에 이미 있는 품목 — 지우지 않는다 */
 /* v103 영림원이 준 번호가 하나라도 있으면 영림원에 일부 들어간 문서 — 지우지 않는다 */
 function ylwNoOf(r){return !!(r.planNo||r.reqno||r.apprno||(r.pos&&r.pos.length)||r.dlvno||r.dlvNo||r.inNo||r.outNo||(r.rows||[]).some(function(x){return x&&(x.workNo||x.orderNo);}));}
 /* v103 함께 만든 문서 묶음: 뒤 문서가 앞 문서를 가리키면 앞 문서는 못 지운다(뒤 문서 먼저) */
@@ -5098,14 +5109,14 @@ function delOk(s,r){
   return true;
 }
 /* v103 모든 등록 메뉴 공용: 「선택 삭제 N건」·「대기·오류 모두 삭제」 단추 줄 + 줄마다 체크 칸. dels = 지울 수 있는 문서 */
-function delKit(s,dels){
-  var keep={},pk0=picked[s.key]||{};
-  dels.forEach(function(r){if(pk0[r.id])keep[r.id]=1;});picked[s.key]=keep;
+function delKit(s,dels,gone){   /* v104 gone = 「영림원에 없음」 묶음용(따로 고르고 단추 글자만 다름) */
+  var pkk=s.key+(gone?'#gone':''),keep={},pk0=picked[pkk]||{};
+  dels.forEach(function(r){if(pk0[r.id])keep[r.id]=1;});picked[pkk]=keep;
   var sel=function(){return dels.filter(function(r){return keep[r.id];});};
   var selBtn=h('button',{type:'button',class:'btn small',on:{click:function(){delMany(s,sel());}}});
   var drawSel=function(){var n=sel().length;selBtn.hidden=!n;selBtn.textContent='선택 삭제 '+n+'건';};
   drawSel();
-  return {bar:dels.length?h('div',{class:'delbar'},selBtn,h('button',{type:'button',class:'btn small',on:{click:function(){delMany(s,dels);}}},'대기·오류 모두 삭제')):null,
+  return {bar:dels.length?h('div',{class:'delbar'},selBtn,h('button',{type:'button',class:'btn small',on:{click:function(){delMany(s,dels);}}},gone?'영림원에 없음 모두 삭제':'대기·오류 모두 삭제')):null,
     pk:function(r){if(dels.indexOf(r)<0)return null;
       var c=h('input',{type:'checkbox',class:'pk','aria-label':'선택',on:{click:function(e){e.stopPropagation();},change:function(){if(c.checked)keep[r.id]=1;else delete keep[r.id];drawSel();}}});
       c.checked=!!keep[r.id];return c;}};
@@ -5119,7 +5130,7 @@ function delMany(s,rows){
     return db.collection('erp_'+s.key).doc(r.id).deleteIf(canDel).catch(function(e){console.warn('삭제 실패',e);return null;});
   })).then(function(res){
     var done=res.filter(function(x){return x===true;}).length,kept=res.filter(function(x){return x===false;}).length,fail=res.filter(function(x){return x==null;}).length;
-    picked[s.key]={};
+    picked[s.key]={};picked[s.key+'#gone']={};
     if(data[s.key])data[s.key]=data[s.key].filter(function(r){return !rows.some(function(x,i){return x.id===r.id&&res[i]===true;});});
     renderList();renderNav();renderSum();if(impDraw)impDraw();if(ifRefresh)ifRefresh();   /* v103 불러오기 요청·생산 카드도 다시 그림 */
     flash(done+'건을 지웠습니다.'+(kept?' '+kept+'건은 그 사이 진행중·완료로 바뀌어 남겼습니다.':'')+(fail?' '+fail+'건은 지우지 못했습니다. 잠시 뒤 다시 시도해 주세요.':''),!!fail);
@@ -5132,19 +5143,30 @@ function renderList(){
   if(s.alsoList&&listBox2)renderListIn(BYKEY[s.alsoList],listBox2,s.alsoTitle||'저장한 공정');
 }
 function renderListIn(s,listBox,title){
-  var a=data[s.key];
+  var a0=data[s.key],a=a0&&a0.filter(function(r){return !ylwGone(r);}),gone=(a0||[]).filter(ylwGone);   /* v104 영림원에 없음은 목록에서 빼고 아래 접힌 칸에만 */
   var head=h('h3',{},title,h('span',{},a?a.length+'건':''));
   var dels=(a||[]).filter(function(r){return delOk(s,r);}),kit=delKit(s,dels);
+  var gkit=delKit(s,gone.filter(function(r){return delOk(s,r);}),1);
   if(kit.bar)head.append(kit.bar);
   if(a==null){listBox.replaceChildren(head,h('div',{class:'empty'},'불러오는 중입니다.'));return;}
-  if(!a.length){listBox.replaceChildren(head,h('div',{class:'empty'},'아직 저장한 '+s.title+' 항목이 없습니다. 위 폼에 입력하고 저장하면 여기에 쌓입니다.'));return;}
+  var openIds={};
+  Array.prototype.forEach.call(listBox.querySelectorAll('details[data-id]'),function(d){if(d.open)openIds[d.getAttribute('data-id')]=1;});
+  var gWas=listBox.querySelector('details.gonebox'),gOpen=gWas?gWas.open:false;
+  var gbox=gone.length?h('details',{class:'gonebox'},[h('summary',{},'영림원에 없음 '+gone.length+'건')].concat(gkit.bar?[gkit.bar]:[],
+    gone.slice().sort(function(x,y){return (y.createdAt||'')<(x.createdAt||'')?-1:1;}).map(function(r){return recCard(s,r,gkit,openIds);}))):null;
+  if(gbox)gbox.open=gOpen;
+  if(!a.length){listBox.replaceChildren.apply(listBox,[head,h('div',{class:'empty'},'아직 저장한 '+s.title+' 항목이 없습니다. 위 폼에 입력하고 저장하면 여기에 쌓입니다.')].concat(gbox?[gbox]:[]));return;}
   var sorted=a.slice().sort(function(x,y){return (y.createdAt||'')<(x.createdAt||'')?-1:1;});
   if(s.flowCols)sorted=sorted.filter(flowGap).concat(sorted.filter(function(r){return !flowGap(r);}));   /* v53 빈 흐름이 맨 위 */
   var ss=SEARCH_STEPS[s.key],sq=ss?String(LISTQ[s.key]||'').trim().toLowerCase():null;   /* v37: 4 품목(v39: 3 분류도)은 검색어에 맞는 기록만 */
   if(sq!=null)sorted=sorted.filter(function(r){return EDITING[s.key+'/'+r.id]||(sq&&ss.keys.some(function(k){return String(r[k]==null?'':r[k]).toLowerCase().indexOf(sq)>=0;}));});
-  var openIds={};
-  Array.prototype.forEach.call(listBox.querySelectorAll('details[data-id]'),function(d){if(d.open)openIds[d.getAttribute('data-id')]=1;});
-  var items=sorted.map(function(r){
+  var items=sorted.map(function(r){return recCard(s,r,kit,openIds);});
+  if(sq!=null){listSearch(s,listBox,head,a,sq,items,gbox);return;}
+  var wb=s.key==='itemmats'?imWipBar():null;   /* v78 */
+  listBox.replaceChildren.apply(listBox,[head].concat(wb?[wb]:[],items,gbox?[gbox]:[]));
+}
+/* 저장한 항목 카드 한 장(v104 renderListIn 에서 떼어 냄 — 「영림원에 없음」 칸도 같이 씀) */
+function recCard(s,r,kit,openIds){
     var st=STATUS.indexOf(r.status)>=0?r.status:'대기';
     var actions=h('div',{class:'recact'}),ed=hasEdit(r);
     if(st==='오류'&&!ed)actions.append(h('button',{type:'button',class:'btn small',on:{click:function(){patch(s,r,{status:'대기',agentNote:''});}}},'대기로 되돌리기'));
@@ -5160,6 +5182,7 @@ function renderListIn(s,listBox,title){
         gap?h('span',{class:'chip 오류',title:flowGapSay(r.name,gap)},gap==='공정 모름'?'공정 모름 — 불러오기 다시':gap):null,
         r.source==='영림원'?h('span',{class:'chip src',title:'영림원에서 불러온 자료'},'영림원'):null,   /* v23 */
         r.ylwDiff?h('span',{class:'chip diff',title:'영림원에 등록된 값과 다릅니다'},'영림원과 다름'):null,
+        ylwGone(r)?h('span',{class:'chip gone',title:'영림원 불러오기('+r.ylwGone+')에서 영림원에 없음'},'영림원에 없음'):null,   /* v104 */
         h('span',{class:'chip '+st},st)),
       h('div',{class:'recbody'},
         gap?h('div',{class:'gapnote'},gap==='공정 없음'?'안에 공정이 없어 8단계에서 고를 수 없습니다. 「공정 채우기」로 공정을 넣고 저장하면 입력 작업자가 영림원 상세를 채웁니다.':'공정을 읽지 못해 8단계에서 고를 수 없습니다. 위 「영림원에서 불러오기」를 다시 눌러 주세요.'):null,
@@ -5169,10 +5192,6 @@ function renderListIn(s,listBox,title){
         fm?fm.el:recBody(s,r),editLogBox(s,r),fm?null:actions));
     if(openIds[r.id]||fm)d.open=true;
     return d;
-  });
-  if(sq!=null){listSearch(s,listBox,head,a,sq,items);return;}
-  var wb=s.key==='itemmats'?imWipBar():null;   /* v78 */
-  listBox.replaceChildren.apply(listBox,[head].concat(wb?[wb]:[],items));
 }
 /* ---------- v37 4 품목 저장한 항목 = 검색으로만 보기 ----------
    사장님 말씀: 「일단 품목 입력 페이지에 저장한 항목을 펼쳐놓지말고 검색으로 해당 목록만 보이게 해줘」.
@@ -5182,7 +5201,7 @@ var SEARCH_STEPS={   /* 단계 키 → 검색할 칸 · 검색칸 안내 · 이�
   items:{keys:['name','code','spec'],ph:'품명·품번·규격 검색 (예: T-al, 도어, 784)',noun:'품목',ga:'이'},
   classes:{keys:['kind','big','mid','name'],ph:'품목구분·대·중·소분류 검색 (예: T반자재, 리빙룸, 자재)',noun:'분류',ga:'가'}};   /* v39 3 분류: 「분류입력에 저잘한 항목 검색으로만 보이게 해줘」 */
 var LISTQ={};   /* 단계 키 → 검색어 (단계를 옮겨 다녀도 남음, 새로 열면 빈칸) */
-function listSearch(s,listBox,head,a,sq,items){
+function listSearch(s,listBox,head,a,sq,items,gbox){
   var sb=listBox._sb,ss=SEARCH_STEPS[s.key];
   if(!sb){
     var q=h('input',{type:'text',autocomplete:'off',placeholder:ss.ph,'aria-label':'저장한 '+ss.noun+' 검색',value:LISTQ[s.key]||'',
@@ -5195,7 +5214,7 @@ function listSearch(s,listBox,head,a,sq,items){
   sb.info.replaceChildren(
     h('span',{},sq?('맞는 '+ss.noun+' '+items.length+'건 / 전체 '+a.length+'건'):('검색어를 넣으면 저장된 '+ss.noun+ss.ga+' 보입니다 (전체 '+a.length+'건)')),
     h('span',{class:'lscnt'+(need?' need':'')},cnt));
-  sb.out.replaceChildren.apply(sb.out,sq&&!items.length?[h('div',{class:'empty'},'「'+String(LISTQ[s.key]).trim()+'」에 맞는 저장한 '+ss.noun+ss.ga+' 없습니다.')]:items);
+  sb.out.replaceChildren.apply(sb.out,(sq&&!items.length?[h('div',{class:'empty'},'「'+String(LISTQ[s.key]).trim()+'」에 맞는 저장한 '+ss.noun+ss.ga+' 없습니다.')]:items).concat(gbox?[gbox]:[]));   /* v104 영림원에 없음 칸은 검색과 상관없이 끝에 */
   if(sb.row.parentNode===listBox&&listBox.firstChild!==sb.row){listBox.firstChild.replaceWith(head);}   /* 검색칸을 떼지 않아야 초점·커서가 남는다 */
   else listBox.replaceChildren(head,sb.row,sb.info,sb.out);
 }

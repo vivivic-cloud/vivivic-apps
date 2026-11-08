@@ -6,6 +6,7 @@
 //   - ylw.imp.* = 폼 저장소(파이어스토어 REST, 익명 로그인) 읽기·쓰기 + 폼과 비교 + 요청 처리
 //     · 폼에 없는 것만 status 「완료」 + source 「영림원」 으로 넣는다. 이미 같은 이름(열쇠)이 있으면 **덮어쓰지 않는다**:
 //       값이 같으면 건너뜀, 다르면 그 문서의 ylwDiff 칸에만 차이를 적는다(다른 칸·status·agentNote 는 안 건드림). 차이 목록은 요청 문서 agentNote 에도.
+//     · (폼 v104) 읽은 범위 안에서 폼에는 완료로 있는데 영림원 조회에 없는 문서 = ylwGone 표시(지우지 않음). 다시 나타나면 표시를 지운다.
 //     · 영림원에는 아무것도 저장하지 않는다(조회·읽기만). 영림원 단추(저장·삭제)는 누르지 않는다.
 // 요청: 폼의 「영림원에서 불러오기」 단추가 erp_imports 에 {steps, only('all'|'T'), mode('count'|'import'), status:'대기'} 를 쌓는다.
 //   처리 순서는 ../AGENTS.md 「불러오기 요청 처리 순서」. 화면별 읽기 함수 = ylw.read.<단계키>(only) → {rows:[폼 문서 꼴], 읽음, 확인못함:[칸]}.
@@ -81,20 +82,21 @@
   I.add = (coll, o) => call('POST', coll, { fields: Object.fromEntries(Object.entries(o).map(([k, v]) => [k, enc(v)])) });
   I.patch = (coll, id, o) => call('PATCH', coll + '/' + id + '?' + Object.keys(o).map((k) => 'updateMask.fieldPaths=' + k).join('&'), { fields: Object.fromEntries(Object.entries(o).map(([k, v]) => [k, enc(v)])) });
 
-  // 단계별: 컬렉션 · 열쇠(같은 것으로 보는 값) · 비교 칸(머리) · 비교 칸(행). 비교 칸 = 읽기 스크립트가 화면에서 읽는 칸만(확인 못 한 칸은 비교 안 함).
+  // 단계별: 컬렉션 · 열쇠(같은 것으로 보는 값) · t(폼 문서가 「T로 시작하는 것만」 범위인지 — 그 단계 *-읽기.js 의 T 거르기와 같은 칸) · 비교 칸(머리) · 비교 칸(행).
+  //   ⚠ 새 단계를 더하면 t 도 꼭 단다. t 가 없으면 T 요청에서 「영림원에 없음」을 못 가려 건너뛴다(I.apply). 비교 칸 = 읽기 스크립트가 화면에서 읽는 칸만(확인 못 한 칸은 비교 안 함).
   I.STEPS = {
-    vendors: { coll: 'erp_vendors', title: '거래처', key: (d) => R.s(d.name), fields: ['sangho', 'name', 'state', 'credit', 'bizno', 'rep', 'tel', 'biztype', 'bizitem', 'kinds'] },
-    workcenters: { coll: 'erp_workcenters', title: '워크센터', key: (d) => R.s(d.name), fields: ['name', 'dept', 'kind', 'vendor', 'capa', 'start', 'end', 'whMat', 'whProd', 'whDeliv', 'whSite', 'whIn', 'whSemi'] },
-    classes: { coll: 'erp_classes', title: '분류', key: (d) => [d.kind, d.big, d.mid, d.name].map(R.s).join('>'), fields: ['kind', 'big', 'mid', 'name', 'use'] },
-    items: { coll: 'erp_items', title: '품목', key: (d) => R.s(d.code), fields: ['name', 'code', 'spec', 'eng', 'asset', 'state', 'unit', 'small', 'io', 'imp', 'rep'] },
-    materials: { coll: 'erp_materials', title: '자재', key: (d) => R.s(d.code), fields: ['name', 'code', 'spec', 'eng', 'asset', 'state', 'io', 'imp', 'unit', 'small'] },
-    processes: { coll: 'erp_processes', title: '공정', key: (d) => R.s(d.name), fields: ['name', 'memo', 'inspect'] },
-    flows: { coll: 'erp_flows', title: '공정흐름', key: (d) => R.s(d.name), fields: ['name', 'memo'], rows: ['seq', 'proc', 'next', 'last'] },
-    boms: { coll: 'erp_boms', title: 'BOM', key: (d) => R.s(d.pcode) + '|' + R.s(d.pver), fields: ['pname', 'pcode', 'pspec', 'pver'], rows: ['proc', 'order', 'cname', 'ccode', 'cspec', 'cver', 'inunit', 'qn', 'qd', 'hasSub'] },
-    itemflows: { coll: 'erp_itemflows', title: '품목별 공정흐름', key: (d) => R.s(d.code) + '|' + R.s(d.flow), fields: ['name', 'code', 'spec', 'flow'] },
-    itemmats: { coll: 'erp_itemmats', title: '제품별공정별소요자재', key: (d) => R.s(d.code) + '|' + R.s(d.rev), fields: ['name', 'code', 'spec', 'rev'] },
-    purprices: { coll: 'erp_purprices', title: '구매단가', key: (d) => [R.s(d.vendor), R.s(d.code), R.s(d.from).replace(/\D/g, '')].join('|'), fields: ['vendor', 'name', 'code', 'spec', 'unit', 'io', 'cur', 'price', 'minqty', 'stepqty', 'from', 'memo', 'maker', 'days'] },
-    contracts: { coll: 'erp_contracts', title: '외주계약', key: (d) => R.s(d.vendor), fields: ['unit', 'vendor'], rows: ['prod', 'pcode', 'seq', 'proc', 'oname', 'ocode', 'cur', 'basis', 'price', 'from'] },
+    vendors: { coll: 'erp_vendors', title: '거래처', key: (d) => R.s(d.name), t: (d) => R.isT(d.name), fields: ['sangho', 'name', 'state', 'credit', 'bizno', 'rep', 'tel', 'biztype', 'bizitem', 'kinds'] },
+    workcenters: { coll: 'erp_workcenters', title: '워크센터', key: (d) => R.s(d.name), t: (d) => R.isT(d.name), fields: ['name', 'dept', 'kind', 'vendor', 'capa', 'start', 'end', 'whMat', 'whProd', 'whDeliv', 'whSite', 'whIn', 'whSemi'] },
+    classes: { coll: 'erp_classes', title: '분류', key: (d) => [d.kind, d.big, d.mid, d.name].map(R.s).join('>'), t: (d) => R.isT(d.big) || R.isT(d.mid) || R.isT(d.name), fields: ['kind', 'big', 'mid', 'name', 'use'] },
+    items: { coll: 'erp_items', title: '품목', key: (d) => R.s(d.code), t: (d) => R.isT(d.name), fields: ['name', 'code', 'spec', 'eng', 'asset', 'state', 'unit', 'small', 'io', 'imp', 'rep'] },
+    materials: { coll: 'erp_materials', title: '자재', key: (d) => R.s(d.code), t: (d) => R.isT(d.name) || R.isT(d.code), fields: ['name', 'code', 'spec', 'eng', 'asset', 'state', 'io', 'imp', 'unit', 'small'] },
+    processes: { coll: 'erp_processes', title: '공정', key: (d) => R.s(d.name), t: (d) => R.isT(d.name), fields: ['name', 'memo', 'inspect'] },
+    flows: { coll: 'erp_flows', title: '공정흐름', key: (d) => R.s(d.name), t: (d) => R.isT(d.name), fields: ['name', 'memo'], rows: ['seq', 'proc', 'next', 'last'] },
+    boms: { coll: 'erp_boms', title: 'BOM', key: (d) => R.s(d.pcode) + '|' + R.s(d.pver), t: (d) => R.isT(d.pname), fields: ['pname', 'pcode', 'pspec', 'pver'], rows: ['proc', 'order', 'cname', 'ccode', 'cspec', 'cver', 'inunit', 'qn', 'qd', 'hasSub'] },
+    itemflows: { coll: 'erp_itemflows', title: '품목별 공정흐름', key: (d) => R.s(d.code) + '|' + R.s(d.flow), t: (d) => R.isT(d.name) || R.isT(d.code), fields: ['name', 'code', 'spec', 'flow'] },
+    itemmats: { coll: 'erp_itemmats', title: '제품별공정별소요자재', key: (d) => R.s(d.code) + '|' + R.s(d.rev), t: (d) => R.isT(d.name) || R.isT(d.code), fields: ['name', 'code', 'spec', 'rev'] },
+    purprices: { coll: 'erp_purprices', title: '구매단가', key: (d) => [R.s(d.vendor), R.s(d.code), R.s(d.from).replace(/\D/g, '')].join('|'), t: (d) => R.isT(d.vendor) || R.isT(d.code), fields: ['vendor', 'name', 'code', 'spec', 'unit', 'io', 'cur', 'price', 'minqty', 'stepqty', 'from', 'memo', 'maker', 'days'] },
+    contracts: { coll: 'erp_contracts', title: '외주계약', key: (d) => R.s(d.vendor), t: (d) => R.isT(d.vendor), fields: ['unit', 'vendor'], rows: ['prod', 'pcode', 'seq', 'proc', 'oname', 'ocode', 'cur', 'basis', 'price', 'from'] },
   };
   const nv = (v) => {
     if (v === true || v === false) return v ? '1' : '0';
@@ -124,12 +126,16 @@
   // 한 단계 반영. got = 읽기 함수 결과. mode 'count' = 세기만(아무것도 안 씀). 돌려줌 {읽음, 폼에없음, 같음, 다름, 넣음, 다른것:[…]}
   I.apply = async (step, got, req, mode) => {
     const spec = I.STEPS[step];
-    const form = await I.list(spec.coll), byKey = {};
-    form.forEach((d) => { const k = spec.key(d); if (k && !byKey[k]) byKey[k] = d; });
-    const res = { 읽음: got.rows.length, 폼에없음: 0, 같음: 0, 다름: 0, 넣음: 0, 공정채움: 0, 다른것: [] };
+    const form = await I.list(spec.coll), byKey = {}, allByKey = {};
+    form.forEach((d) => { const k = spec.key(d); if (!k) return; if (!byKey[k]) byKey[k] = d; (allByKey[k] = allByKey[k] || []).push(d); });
+    const res = { 읽음: got.rows.length, 폼에없음: 0, 같음: 0, 다름: 0, 넣음: 0, 공정채움: 0, 영림원에없음: 0, 다시있음: 0, 다른것: [], 없는것: [] };
+    const seen = {};
     const now = new Date().toISOString(), t0 = new Date(), day = String(t0.getMonth() + 1).padStart(2, '0') + '-' + String(t0.getDate()).padStart(2, '0');   // 이 컴퓨터 날짜(ISO 는 세계시라 한국 새벽이면 전날로 찍힌다)
     for (const e of got.rows) {
       const k = spec.key(e), f = byKey[k];
+      seen[k] = 1;
+      // 폼 v104: 영림원에 다시 나타난 문서 → 「영림원에 없음」 표시를 지운다(목록에 돌아온다). 같은 열쇠 문서 모두.
+      for (const g of allByKey[k] || []) if (g.ylwGone) { res.다시있음++; if (mode === 'import') await I.patch(spec.coll, g.id, { ylwGone: '', ylwGoneAt: '', ylwGoneId: '' }); }
       if (!f) {
         res.폼에없음++;
         if (mode === 'import') {
@@ -158,6 +164,18 @@
       res.다른것.push(k + (f.status !== '완료' ? '(폼 ' + f.status + ')' : '') + ' — ' + d.join(' · '));
       if (mode === 'import') await I.patch(spec.coll, f.id, { ylwDiff: d.join(' · '), ylwCheckedAt: now });
     }
+    // 폼 v104 「영림원에 없음」: 이번에 읽은 범위(only T/전체 + 읽기 스크립트가 준 got.scope — 기간 등) 안에서 폼에 status 완료로 있는데 영림원 조회에 없는 문서.
+    //   문서는 지우지 않는다. ylwGone(MM-DD)·ylwGoneAt·ylwGoneId 만 적는다 → 폼 저장 목록에서 빠지고 접힌 「영림원에 없음 N건」에만 보이며, 사장님이 삭제 단추로 지울 수 있다.
+    //   대기·진행중·오류·수정대기(아직 영림원에 안 넣었거나 넣는 중)는 대상이 아니다. 화면을 다 못 읽은 읽기(got.noGone)·T 범위 함수(t)가 없는 단계의 T 요청은 건너뛴다.
+    const tOk = req && req.only === 'T' ? spec.t : () => true;
+    if (got.noGone || !tOk) res.없음못봄 = got.noGone ? '읽기 스크립트가 다 못 읽음' : 'T 범위 함수(t) 없음';
+    else for (const f of form) {
+      const k = spec.key(f);
+      if (f.status !== '완료' || !k || seen[k] || !tOk(f) || (got.scope && !got.scope(f))) continue;
+      res.영림원에없음++;
+      res.없는것.push(k);
+      if (mode === 'import' && !f.ylwGone) await I.patch(spec.coll, f.id, { ylwGone: day, ylwGoneAt: now, ylwGoneId: req ? req.id : '' });
+    }
     return res;
   };
   // 요청 목록(대기, 오래된 것부터)
@@ -173,10 +191,12 @@
         if (!R[step]) throw new Error(step + '-읽기 스크립트를 먼저 실행');
         const got = await R[step](req.only);
         const r = await I.apply(step, got, req, req.mode);
-        result[step] = { 읽음: r.읽음, 폼에없음: r.폼에없음, 같음: r.같음, 다름: r.다름, 넣음: r.넣음, 공정채움: r.공정채움 };
+        result[step] = { 읽음: r.읽음, 폼에없음: r.폼에없음, 같음: r.같음, 다름: r.다름, 넣음: r.넣음, 공정채움: r.공정채움, 영림원에없음: r.영림원에없음, 다시있음: r.다시있음 };
         notes.push(I.STEPS[step].title + ': 영림원 ' + r.읽음 + '건 · 폼에 없음 ' + r.폼에없음 + (req.mode === 'import' ? '(넣음 ' + r.넣음 + ')' : '') + (r.공정채움 ? ' · 공정 채움 ' + r.공정채움 : '') + ' · 같음 ' + r.같음 + ' · 다름 ' + r.다름 +
+          ' · 영림원에 없음 ' + (r.없음못봄 ? '못 봄(' + r.없음못봄 + ')' : r.영림원에없음) + (r.다시있음 ? ' · 다시 있음 ' + r.다시있음 : '') +
           (got.확인못함 && got.확인못함.length ? ' · 못 읽은 것(화면에 칸 없음·안 열림): ' + got.확인못함.join(', ') : '') +
-          (r.다른것.length ? '\n  다름: ' + r.다른것.join('\n  ') : ''));
+          (r.다른것.length ? '\n  다름: ' + r.다른것.join('\n  ') : '') +
+          (r.없는것.length ? '\n  영림원에 없음: ' + r.없는것.join(', ') : ''));
       }
       await I.patch('erp_imports', req.id, { status: '완료', agentNote: notes.join('\n'), result, doneAt: new Date().toISOString() });
       return { 완료: true, result, agentNote: notes.join('\n') };
