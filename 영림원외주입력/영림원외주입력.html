@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v111 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v112 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -331,7 +331,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v111</span>
+    <span class="ver">v112</span>
   </div>
 </header>
 <div class="wrap">
@@ -488,6 +488,7 @@ var KNOWN_PROC=['조립','가공'];
 function IMP_ROWS(){return [['cname','품명'],['ccode','품번'],['cspec','규격'],['unit','단위'],['price','단가'],['qty','수량'],['maker','제조사'],['shipdue','선적예정일'],['memo','특이사항']].map(function(x){return {k:x[0],label:x[1],type:'text'};});}   /* v95 Order 에서 넘어오는 필름 줄(표시만) */
 var IMP_TERMS=['EXW','FCA','FAS','FOB','CFR','CIF','CPT','CIP','DDP','DAT','DAP'],IMP_CURS=['USD','CNY'];
 /* v78 구매단가 선택지: 내외자구분 = 501868 화면 값(11-06 조사). v79 통화 = 501868 에서 본 값만(KRW). 코드도움 목록은 못 읽었다 — 다른 통화가 필요하면 화면을 보고 더한다 */
+var PUR_HINT='4 품목등록·5 자재등록에 등록이 끝난 상품·원자재·부자재·저장품·소모자재·수탁자재입니다.';   /* v112 구매 품번 칸 hint(엑셀 머리 메모) */
 var PUR_IOS=['내수','Local1(후LC)','Local2(선LC)','직수입'],PUR_CURS=['KRW'];
 /* v80 원장 구매 창고 = 재단 업체 창고(사장님 11-06 「원장은 각 재단업체에 입고」). 11-06 저장 시험에서 본 테스트 창고 셋. 실제 운영 때 실제 창고 이름으로 바꾼다 */
 var PUR_WHS=['T에이엠티','T경기','T조혼'];
@@ -880,7 +881,7 @@ var STEPS=[
  fields:[
   F('vendor','구매거래처','combo',{req:1,dl:'dl-purvendors',listOnly:1,valid:purVendorErr,badLab:'구매거래처 미등록',hint:'1 거래처등록에서 거래처종류 국내매입거래처·해외매입거래처로 등록이 끝난 거래처입니다.'}),
   F('name','품명','text',{req:1,ro:1,hint:'품번을 고르면 저절로 채워집니다.'}),
-  F('code','품번','combo',{mono:1,dl:'dl-plates',listOnly:1,valid:purPlateErr,badLab:'원장 아님',hint:'5 자재등록에 등록이 끝난 원장입니다.'}),
+  F('code','품번','combo',{mono:1,dl:'dl-plates',listOnly:1,valid:purPlateErr,hint:PUR_HINT}),
   F('spec','규격','text',{ro:1}),
   F('unit','단위','text',{req:1,ro:1}),
   F('io','내외자구분','select',{req:1,opts:PUR_IOS,def:'내수',valid:optsErr('내외자구분',PUR_IOS),badLab:'내외자구분 확인'}),
@@ -907,7 +908,7 @@ var STEPS=[
  ],
  rowTitle:'원장',
  rowFields:[
-  F('ccode','품번','combo',{req:1,mono:1,dl:'dl-plates',listOnly:1,valid:purPlateErr,hint:'5 자재등록에 등록이 끝난 원장입니다.'}),
+  F('ccode','품번','combo',{req:1,mono:1,dl:'dl-plates',listOnly:1,valid:purPlateErr,hint:PUR_HINT}),
   F('cname','품명','text',{auto:1}),
   F('cspec','규격','text',{auto:1}),
   F('unit','단위','text',{auto:1}),
@@ -1678,7 +1679,7 @@ function refreshLists(){
   datalist('dl-prods',prodReady().map(function(r){return r.code;}));   /* v81 */
   datalist('dl-films',edgeFilms().map(function(r){return String(r.code||'').trim();}));   /* v74 수입 필름 = 자재소분류 중분류 T엣지필름 */
   datalist('dl-purvendors',(data.vendors||[]).filter(function(r){return r.status==='완료'&&!ylwGone(r)&&(r.kinds||[]).some(function(k){return k==='국내매입거래처'||k==='해외매입거래처';});}).map(function(r){return String(r.name||'').trim();}));   /* v108 구매거래처 = 501868 코드도움 기준(국내매입·해외매입, 입력작업자/화면별-요령.md 39465c4). v105 더하기는 안 씀 */
-  datalist('dl-plates',purPlates().map(function(r){return String(r.code||'').trim();}));   /* v78 완료 원장 */
+  datalist('dl-plates',uniq(purPlates().map(function(r){return String(r.code||'').trim();}).filter(Boolean)));   /* v112 구매 품번 = 영림원 「구매 품번」 코드도움 자산(PUR_ASSETS) · 완료 · 영림원에 없음 뺌 */
   datalist('dl-impopenpos',impChainOpen('imppays').map(function(r){return String(r.pono||'').trim();}));   /* v95 */
   datalist('dl-impopenpays',impChainOpen('impinvs').map(function(r){return String(r.payno||'').trim();}));
   datalist('dl-openbls',impblOpen().map(function(r){return String(r.blno||'').trim();}));   /* v91 앞 문서 번호(양식 드롭다운) */
@@ -3170,11 +3171,14 @@ function impordDoc(d){
 }
 /* v78 구매단가(501868). 원장 = 완료 자재 중 자재소분류 대분류가 보드(clsBoard)이고 엣지필름이 아닌 것. 문서 하나 = 표 한 줄, 열쇠 = 구매거래처|품번|적용시작일.
    품명·규격·단위는 자재 값 — 품번을 고를 때 칸에 보이고 저장 때 purDoc 이 다시 채운다 */
-function purIsPlate(m){var a=String(m&&m.small!=null?m.small:'').split(CLS_SEP);return a.length===3&&clsBoard(a[0])&&!edgeIsFilm(m);}
-function purPlates(){return (data.materials||[]).filter(function(r){return r.status==='완료'&&purIsPlate(r);});}
+/* v112 구매 품번(사장님 「이곳 구매 입력에는 영림원 규칙에 맞다면 모든 구매 입력이 가능해야 할것 같습니다」) = 영림원 「구매 품번」 코드도움 거르기 자산(입력작업자/화면별-요령.md 687ca58)
+   4 품목·5 자재 문서의 품목자산분류 글자로 거른다. 반제품·제품·재공품·세트품은 안 잡힌다. 「소모품」 = 5 자재등록 화면 글자(코드도움에는 「소모자재」) — 둘 다 받는다. 함수 이름 purPlate* 는 옛 「원장만」 때 이름 그대로 둠 */
+var PUR_ASSETS=['상품','원자재','부자재','저장품','소모자재','소모품','수탁자재'];
+function purIsBuy(m){return !!m&&PUR_ASSETS.indexOf(purTrim(m.asset))>=0;}
+function purPlates(){return (data.materials||[]).concat(data.items||[]).filter(function(r){return r.status==='완료'&&!ylwGone(r)&&purIsBuy(r);});}
 function purPlate(code){code=String(code==null?'':code).trim();return purPlates().filter(function(r){return String(r.code||'').trim()===code;})[0]||null;}
 function purPlateLab(code){var m=purPlate(code);return m?[m.name,code,m.spec,m.unit].filter(Boolean).join(' · '):code;}
-function purPlateErr(v){return isEmpty(v)||purPlate(v)?'':'5 자재등록에 등록이 끝난 원장만 고를 수 있습니다. 「'+v+'」 은(는) 목록에 없습니다.';}
+function purPlateErr(v){return isEmpty(v)||purPlate(v)?'':'4 품목등록·5 자재등록에 등록이 끝난 상품·원자재·부자재·저장품·소모자재·수탁자재만 고를 수 있습니다. 「'+v+'」 은(는) 목록에 없습니다.';}
 function purVendorErr(v){return isEmpty(v)||(LISTS['dl-purvendors']||[]).indexOf(String(v).trim())>=0?'':'영림원에 등록된 거래처만 고를 수 있습니다. 「'+v+'」 은(는) 목록에 없습니다.';}
 function purNumErr(label){return function(v){return isEmpty(v)||/^\d+(\.\d+)?$/.test(String(v).trim())?'':label+'은(는) 숫자입니다.';};}
 function purKey(r){return [r.vendor,r.code,r.from].map(function(x){return String(x==null?'':x).trim();}).join('|');}
@@ -4610,7 +4614,7 @@ function pickList(f){
    칸 정의(req·reqIf·type·opts·dl·ph·hint)와 목록 출처(refreshLists)에서만 만든다. 영림원 화면에서 확인 안 된 뜻은 넣지 않는다. */
 var DL_SRC={'dl-impopenpos':'Payment 가 없는 수입Order','dl-impopenpays':'Invoice 가 없는 수입Payment','dl-prods':'1~11단계 등록이 모두 끝난 제품·부속','dl-openbls':'입고가 없는 수입BL','dl-openpos':'납품이 남은 발주','dl-prodorders':'진행 중인 생산의 외주발주',
   'dl-purvendors':'1단계 거래처등록 중 영림원 등록이 끝난 국내매입거래처·해외매입거래처',   /* v109 목록 글 = 폼 목록 조건 그대로(v105~v108), 괄호 없음 */
-  'dl-plates':'5단계 자재등록 중 등록이 끝난 원장 번호, 자재 대분류 보드','dl-impvendors':'1단계 거래처등록 중 영림원 등록이 끝난 해외매입거래처 + 영림원 불러오기로 확인된 거래처',
+  'dl-plates':'4단계 품목등록·5단계 자재등록 중 등록이 끝난 품번, 품목자산분류 상품·원자재·부자재·저장품·소모자재·수탁자재','dl-impvendors':'1단계 거래처등록 중 영림원 등록이 끝난 해외매입거래처 + 영림원 불러오기로 확인된 거래처',
   'dl-films':'5단계 자재등록 중 자재소분류 중분류가 T엣지필름인 자재의 번호','dl-wcreg':'2단계 워크센터등록, 오류 건 뺌 + 영림원에서 불러온 외주계약·생산의 워크센터',
   'dl-itemcodes':'4단계 품목등록의 품번, 오류 건 뺌','dl-flows':'6단계 공정흐름, 오류 건 뺌','dl-vendors':'1단계 거래처등록 중 영림원 등록이 끝난 외주가공거래처 + 영림원 불러오기로 확인된 거래처',
   'dl-wc':'서버의 외주 워크센터 + 2단계 사외외주 워크센터 + 영림원에서 불러온 외주계약·생산의 업체','dl-proc':'서버의 공정 조립·가공 + 6단계 공정 + 영림원에서 불러온 BOM·공정흐름·외주계약·소요자재·생산의 공정',
