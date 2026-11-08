@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v114 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v115 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -77,8 +77,8 @@ label,.lab{font-size:11px;font-weight:700;color:var(--muted)}
 .checks label,.f>label:has(input[type=checkbox]){color:var(--ink);font-size:13px;font-weight:500}
 .req{color:var(--red);margin-left:2px}
 /* 입력칸 — 로그인 입력칸(border #ededeb, rounded-lg, 초점 #37352f) */
-input[type=text],input[type=url],input[type=date],input[type=number],select,textarea{font:inherit;font-size:13px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:8px;padding:9px 12px;width:100%;min-width:0;min-height:40px}
-input[type=text]:focus,input[type=url]:focus,input[type=date]:focus,input[type=number]:focus,select:focus,textarea:focus{outline:none;border-color:var(--ink)}
+input[type=text],input[type=url],input[type=date],input[type=number],input[type=password],input[type=email],select,textarea{font:inherit;font-size:13px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:8px;padding:9px 12px;width:100%;min-width:0;min-height:40px}
+input[type=text]:focus,input[type=url]:focus,input[type=date]:focus,input[type=number]:focus,input[type=password]:focus,input[type=email]:focus,select:focus,textarea:focus{outline:none;border-color:var(--ink)}
 input[type=checkbox]{accent-color:var(--ink);width:16px;height:16px}
 input.bad,select.bad{border-color:var(--red)}
 .hint{font-size:11px;color:var(--muted)}
@@ -325,6 +325,16 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 .guideback>span{flex:1 1 240px}
 .stkbar{display:flex;flex-wrap:wrap;gap:8px 14px;margin:14px 0 10px}.stkbar label{display:flex;align-items:center;gap:6px}.stkbar select{width:auto;min-width:120px}   /* v102 재고 */
 .stktabs{margin:0 0 10px}.stkbox th{height:28px}.stkbox thead tr+tr th{top:28px}.stkbox th[colspan]{text-align:center}
+/* v115 담당자 로그인·담당자 관리 */
+#erp-login{position:fixed;inset:0;z-index:300;background:#fff;display:grid;place-items:center;padding:16px}
+#erp-login form{width:min(360px,100%);display:grid;gap:10px}#erp-login h2{margin:0 0 4px;font-size:18px;font-weight:900;letter-spacing:-0.02em}
+.who{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);font-weight:700;min-width:0}
+.who span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.staffbox h3{font-size:14px;font-weight:900;margin:22px 0 6px}.staffbox h3:first-child{margin-top:4px}
+.staffbox td.c,.staffbox th.c{text-align:center}.staffbox tr.sel td{background:var(--fill)}
+.staffbox .tw{max-height:none}.staffbox td.w{white-space:normal;min-width:180px;max-width:420px}
+.staffbar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin:8px 0}
+.staffbar label{display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px}.staffbar input[type=text]{width:180px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
@@ -332,7 +342,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v114</span>
+    <span class="ver">v115</span>
   </div>
 </header>
 <div class="wrap">
@@ -354,25 +364,72 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
    컬렉션은 erp_ 로 시작하는 7개만 쓴다. 기존 업무 기록 컬렉션은 건드리지 않는다.
    SDK 는 필요할 때 불러온다 — 못 불러와도 화면은 뜨고 안내 문구가 나온다. */
 var FB_CONFIG={apiKey:"AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",authDomain:"vivivic-4b7ef.firebaseapp.com",projectId:"vivivic-4b7ef",storageBucket:"vivivic-4b7ef.firebasestorage.app",messagingSenderId:"830175660542",appId:"1:830175660542:web:9054030480c8280af8d8af"};
+/* v115 담당자 로그인 — 벤더피아연동(확장 login.js)이 벤더피아 로그인에 성공하면 같은 아이디·비밀번호로 이 프로젝트에 계정을 만든다(accounts:signUp).
+   이 폼은 그 계정으로 로그인한다. 비밀번호는 어디에도 저장하지 않고, 파이어베이스에는 PBKDF2 로 바꾼 값만 간다. 바꾸는 식은 login.js 「ERP계정」 과 글자까지 같아야 한다.
+   아이디 → 메일 = vp-<아이디 소문자 UTF-8 16진>@vp.vivivic-4b7ef.firebaseapp.com (보내는 메일 없음, 이름표일 뿐) */
+var ERP_ID={salt:'vivivic-erp|',iter:100000,dom:'@vp.vivivic-4b7ef.firebaseapp.com'},ERP_USER=null;
+function erpIdNorm(id){return String(id==null?'':id).trim().toLowerCase();}
+function erpMail(id){var b=new TextEncoder().encode(erpIdNorm(id)),x='';for(var i=0;i<b.length;i++)x+=('0'+b[i].toString(16)).slice(-2);return 'vp-'+x+ERP_ID.dom;}
+function erpIdOf(mail){var m=/^vp-([0-9a-f]+)@/.exec(mail||'');if(!m||m[1].length%2)return '';var a=new Uint8Array(m[1].length/2);for(var i=0;i<a.length;i++)a[i]=parseInt(m[1].substr(i*2,2),16);try{return new TextDecoder().decode(a);}catch(e){return '';}}
+function erpKey(id,pw){var E=new TextEncoder();
+  return crypto.subtle.importKey('raw',E.encode(String(pw)),'PBKDF2',false,['deriveBits']).then(function(k){
+    return crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:E.encode(ERP_ID.salt+erpIdNorm(id)),iterations:ERP_ID.iter},k,256);
+  }).then(function(b){var t='',u=new Uint8Array(b);for(var i=0;i<u.length;i++)t+=String.fromCharCode(u[i]);return btoa(t).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');});}
+function erpLoginErr(e){var c=e&&e.code||'';
+  if(/invalid-credential|wrong-password|user-not-found|invalid-email|invalid-login/.test(c))return '아이디 또는 비밀번호가 맞지 않습니다. 벤더피아연동에서 한 번 이상 로그인한 아이디만 쓸 수 있습니다.';
+  if(/too-many-requests/.test(c))return '여러 번 틀려 잠시 막혔습니다. 잠시 뒤 다시 하세요.';
+  if(/network/.test(c))return '인터넷 연결을 확인하세요.';
+  return '로그인하지 못했습니다. ('+(c||'알 수 없음')+')';}
+function erpLoginUI(go){
+  var box=document.getElementById('erp-login');if(box){box.hidden=false;return;}
+  box=document.createElement('div');box.id='erp-login';
+  box.innerHTML='<form class="card"><h2>벤더피아 로그인</h2><input type="text" name="vpid" placeholder="아이디" autocomplete="username" autocapitalize="off" required><input type="password" name="vppw" placeholder="비밀번호" autocomplete="current-password" required><button class="btn primary" type="submit">로그인</button><p class="msg bad" aria-live="polite"></p></form>';
+  document.body.append(box);
+  var fm=box.querySelector('form'),msg=box.querySelector('.msg'),bt=box.querySelector('button'),idIn=fm.elements.vpid,pwIn=fm.elements.vppw;
+  fm.addEventListener('submit',function(e){e.preventDefault();msg.textContent='';bt.disabled=true;
+    go(idIn.value,pwIn.value).then(function(){box.hidden=true;pwIn.value='';},function(err){msg.textContent=erpLoginErr(err);})
+      .then(function(){bt.disabled=false;});});
+  idIn.focus();
+}
+/* 로그인될 때까지 기다린다. 예전 익명 로그인이 남아 있으면 끊고 로그인 칸을 띄운다. */
+function erpSignIn(A,auth){return new Promise(function(res){var done=false;
+  A.onAuthStateChanged(auth,function(u){
+    if(done)return;
+    if(u&&!u.isAnonymous){done=true;var b=document.getElementById('erp-login');if(b)b.hidden=true;res(u);return;}
+    if(u){A.signOut(auth);return;}
+    erpLoginUI(function(id,pw){return erpKey(id,pw).then(function(p){return A.signInWithEmailAndPassword(auth,erpMail(id),p);});});
+  });});}
+/* 화면 쪽 권한 막음 — 저장소 규칙이 배포되기 전에도 폼 안에서는 막힌다. ERP_CAN 은 아래 화면 코드가 채운다. */
+function erpPermErr(){var e=new Error('권한이 없습니다.');e.code='erp-perm';return e;}
+function erpGuard(name,op){return window.ERP_CAN&&!window.ERP_CAN(name,op)?Promise.reject(erpPermErr()):null;}
 function connectDb(){
   var V='https://www.gstatic.com/firebasejs/11.2.0/';
   return Promise.all([import(V+'firebase-app.js'),import(V+'firebase-auth.js'),import(V+'firebase-firestore.js')]).then(function(m){
     var app=m[0].initializeApp(FB_CONFIG,'erp-input'),auth=m[1].getAuth(app),F=m[2],fs=F.getFirestore(app);
-    return m[1].signInAnonymously(auth).then(function(){
+    return erpSignIn(m[1],auth).then(function(user){
+      ERP_USER={uid:user.uid,mail:user.email||'',id:erpIdOf(user.email)};
+      window.erpOut=function(){return m[1].signOut(auth).then(function(){location.reload();});};
+      var staffRef=function(uid){return F.doc(fs,'erp_staff',uid);};
       /* 화면 코드가 쓰는 모양(collection/doc/add/update/delete/onSnapshot)만 맞춘 얇은 껍데기 */
       return {collection:function(name){return {
         onSnapshot:function(next,err){return F.onSnapshot(F.collection(fs,name),function(s){next({docs:s.docs.map(function(d){return {id:d.id,data:function(){return d.data();}};})});},err);},
-        add:function(data){return F.addDoc(F.collection(fs,name),data);},
-        doc:function(id){return {delete:function(){return F.deleteDoc(F.doc(fs,name,id));},update:function(o){return F.updateDoc(F.doc(fs,name,id),o);},
+        add:function(data){return erpGuard(name,'w')||F.addDoc(F.collection(fs,name),data);},
+        doc:function(id){return {delete:function(){return erpGuard(name,'d')||F.deleteDoc(F.doc(fs,name,id));},update:function(o){return erpGuard(name,'w')||F.updateDoc(F.doc(fs,name,id),o);},
           /* v13: 지우기 직전 문서를 다시 읽어 ok(문서)일 때만 지운다(트랜잭션) — 그 사이 입력 작업자가 진행중으로 바꾼 건은 남는다. true = 지움 */
-          deleteIf:function(ok){var ref=F.doc(fs,name,id);return F.runTransaction(fs,function(t){return t.get(ref).then(function(d){if(!d.exists()||!ok(d.data()))return false;t.delete(ref);return true;});});},
+          deleteIf:function(ok){var g=erpGuard(name,'d');if(g)return g;var ref=F.doc(fs,name,id);return F.runTransaction(fs,function(t){return t.get(ref).then(function(d){if(!d.exists()||!ok(d.data()))return false;t.delete(ref);return true;});});},
           /* v34 수정: 문서를 다시 읽어 make(문서)가 고칠 값을 주면 고친다(트랜잭션) — 그 사이 입력 작업자가 상태를 바꿨으면 null 을 주어 안 고침. true = 고침 */
-          updateIf:function(make){var ref=F.doc(fs,name,id);return F.runTransaction(fs,function(t){return t.get(ref).then(function(d){var o=d.exists()?make(d.data()):null;if(!o)return false;t.update(ref,o);return true;});});}};}
+          updateIf:function(make){var g=erpGuard(name,'w');if(g)return g;var ref=F.doc(fs,name,id);return F.runTransaction(fs,function(t){return t.get(ref).then(function(d){var o=d.exists()?make(d.data()):null;if(!o)return false;t.update(ref,o);return true;});});}};}
       };},
       /* v40 분류 수정: 여러 문서를 한 트랜잭션으로. list = [{c:컬렉션, id}], decide(지금 문서 배열 — 없으면 null) → 문서마다 고칠 값(null = 안 고침) 배열, 또는 null = 모두 안 고침. true = 고침 */
-      updateAll:function(list,decide){var refs=list.map(function(x){return F.doc(fs,x.c,x.id);});return F.runTransaction(fs,function(t){
+      /* v115 담당자 — 내 문서·전체 목록(관리자)·고치기. 저장소 규칙(제안)이 같은 칸만 허락한다 */
+      staffMe:function(next,err){return F.onSnapshot(staffRef(user.uid),function(d){next(d.exists()?d.data():null);},err);},
+      staffAll:function(next,err){return F.onSnapshot(F.collection(fs,'erp_staff'),function(s){next(s.docs.map(function(d){return Object.assign({uid:d.id},d.data());}));},err);},
+      staffSet:function(uid,o){return F.setDoc(staffRef(uid),o,{merge:true});},
+      staffSeen:function(){var r=staffRef(user.uid),now=new Date().toISOString();
+        return F.getDoc(r).then(function(d){return d.exists()?F.updateDoc(r,{lastAt:now}):F.setDoc(r,{vpId:ERP_USER.id,email:ERP_USER.mail,firstAt:now,lastAt:now});});},
+      updateAll:function(list,decide){for(var gi=0;gi<list.length;gi++){var g=erpGuard(list[gi].c,'w');if(g)return g;}var refs=list.map(function(x){return F.doc(fs,x.c,x.id);});return F.runTransaction(fs,function(t){
         return Promise.all(refs.map(function(r){return t.get(r);})).then(function(ds){var o=decide(ds.map(function(d){return d.exists()?d.data():null;}));if(!o)return false;
-          o.forEach(function(p,i){if(!p)return;if(p.$delete)t.delete(refs[i]);else if(p.$set)t.set(refs[i],p.$set);else t.update(refs[i],p);});return true;});});}};   /* v96 $delete·$set = 5 자재 합치기·되돌리기 */
+          o.forEach(function(p,i){if(p&&p.$delete&&window.ERP_CAN&&!window.ERP_CAN(list[i].c,'d'))throw erpPermErr();});o.forEach(function(p,i){if(!p)return;if(p.$delete)t.delete(refs[i]);else if(p.$set)t.set(refs[i],p.$set);else t.update(refs[i],p);});return true;});});}};   /* v96 $delete·$set = 5 자재 합치기·되돌리기 */
     });
   }).catch(function(e){console.warn('파이어베이스 연결 실패',e);return null;});
 }
@@ -1230,6 +1287,7 @@ function h(tag,props){
 var ICONS={download:['M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4','m7 10 5 5 5-5','M12 15V3'],
   fileup:['M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z','M14 2v6h6','M12 18v-6','m9 15 3-3 3 3'],
   plus:['M5 12h14','M12 5v14'],
+  users:['M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2','M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0','M22 21v-2a4 4 0 0 0-3-3.87','M16 3.13a4 4 0 0 1 0 7.75'],   /* v115 담당자 관리 */
   box:['M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z','m3.3 7 8.7 5 8.7-5','M12 22V12'],   /* v102 재고 */
   layers:['m12 2 10 5-10 5L2 7z','m2 17 10 5 10-5','m2 12 10 5 10-5'],
   sheet:['M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2z','M3 9h18','M3 15h18','M9 3v18','M15 3v18'],
@@ -1605,15 +1663,19 @@ function renderNav(){
       h('span',{class:'num'},ico(icon)),h('span',{},h('div',{class:'nt'},PAGE_NAMES[pg]),h('div',{class:'ns'},ss.some(function(s){return data[s.key]==null;})?'불러오는 중':cntText(c0))));};
   var last=STOCKS?stkLast():'',stkBtn=h('button',{type:'button',class:'navck',on:{click:function(){go('stocks');}},'aria-current':cur==='stocks'?'step':null},   /* v102 */
     h('span',{class:'num'},ico('box')),h('span',{},h('div',{class:'nt'},'물류 · [물류] 재고현황'),h('div',{class:'ns'},STOCKS==null?'불러오는 중':last?stkTime(last):'아직 없음')));
-  navEl.replaceChildren.apply(navEl,[ckBtn,pageBtn('수입','import'),pageBtn('구매','sheet'),pageBtn('생산','layers'),stkBtn].concat(STEPS.filter(function(s){return !s.hidden&&!s.page;}).map(function(s){
+  /* v115 보기 권한이 있는 메뉴만. 관리자는 맨 끝에 「담당자 관리」 */
+  var ok=function(k,b){return canMenu(k,'r')?b:null;};
+  var stfBtn=ME&&ME.admin?h('button',{type:'button',class:'navck',on:{click:function(){go('staff');}},'aria-current':cur==='staff'?'step':null},
+    h('span',{class:'num'},ico('users')),h('span',{},h('div',{class:'nt'},'담당자 관리'),h('div',{class:'ns'},STAFF?STAFF.length+'명':'불러오는 중'))):null;
+  navEl.replaceChildren.apply(navEl,[ok('check',ckBtn),ok('p:수입',pageBtn('수입','import')),ok('p:구매',pageBtn('구매','sheet')),ok('p:생산',pageBtn('생산','layers')),ok('stocks',stkBtn)].concat(STEPS.filter(function(s){return !s.hidden&&!s.page&&canMenu(s.key,'r');}).map(function(s){
     var c=counts(s.key);
     var sub=data[s.key]==null?'불러오는 중':cntText(c);
     return h('button',{type:'button',on:{click:function(){go(s.key);}},'aria-current':s.key===cur?'step':null},
       h('span',{class:'num'},String(s.n)),h('span',{},h('div',{class:'nt'},s.title),h('div',{class:'ns'},sub)));
-  })));
+  })).concat([stfBtn]).filter(Boolean));
 }
 function renderSum(){
-  if(cur==='stocks'){sumEl.replaceChildren();return;}   /* v102 재고 조회는 대기·완료 문서가 없다 */
+  if(cur==='stocks'||cur==='staff'||!canMenu(menuOf(cur),'r')){sumEl.replaceChildren();return;}   /* v115 담당자 관리도 */   /* v102 재고 조회는 대기·완료 문서가 없다 */
   var t={'대기':0,'진행중':0,'완료':0,'오류':0,'수정대기':0};
   var pg=(BYKEY[cur]||{}).page||'';   /* v75 맨 위 요약 = 지금 페이지 것만(1~11단계에 수입을 섞지 않음) */
   STEPS.filter(function(s){return (s.page||'')===pg;}).forEach(function(s){var c=counts(s.key);STATUS.forEach(function(k){t[k]+=c[k];});});
@@ -4348,6 +4410,9 @@ function guideStep(s,say,fn,ip){
   else if(vs.length){form.fill(vs[0],vs[0].rows||[]);say('안내로 칸을 채웠습니다. 빈 칸을 채우고 저장을 누르세요(자동 저장 안 함).');}
 }
 function renderStep(){
+  if(cur==='staff'){renderStaff();return;}   /* v115 */
+  if(!ME){erpWait();return;}
+  if(!canMenu(menuOf(cur),'r')){renderNoPerm();return;}
   if(cur==='check'){renderCheck();return;}
   if(cur==='stocks'){renderStock();return;}   /* v102 */
   var s=BYKEY[cur];bulk=null;
@@ -4423,7 +4488,7 @@ function renderStep(){
         s.page?h('div',{class:'wcpicks',role:'group','aria-label':PAGE_NAMES[s.page]},STEPS.filter(function(x){return x.page===s.page&&!x.hidden;}).map(function(x){var on=x===s;   /* v75 페이지 안 전환 */
           return h('button',{type:'button',class:'btn small wcpick'+(on?' primary':''),'aria-pressed':on?'true':'false',on:{click:function(){if(!on)go(x.key);}}},x.title);})):'',
         h('h2',{},(s.page?'':s.n+'. ')+s.title),
-        s.lead?h('p',{class:'lead'},s.lead):'',   /* v114 사장님이 넣으라고 하신 한 줄만(v101 예외) */
+        s.lead?h('p',{class:'lead'},s.lead):'',   /* v115 사장님이 넣으라고 하신 한 줄만(v101 예외) */
         needs),
       noBar?(impBar||''):xlBar,
       bomFn||ifFn||iwFn||imFn||wpFn?psBox(bomFn||ifFn||iwFn||imFn||wpFn):'',
@@ -5203,6 +5268,7 @@ function delOk(s,r){
 }
 /* v103 모든 등록 메뉴 공용: 「선택 삭제 N건」·「대기·오류 모두 삭제」 단추 줄 + 줄마다 체크 칸. dels = 지울 수 있는 문서 */
 function delKit(s,dels,gone){   /* v104 gone = 「영림원에 없음」 묶음용(따로 고르고 단추 글자만 다름) */
+  if(!canCol('erp_'+s.key,'d'))dels=[];   /* v115 삭제 권한 없으면 단추·체크 칸 없음 */
   var pkk=s.key+(gone?'#gone':''),keep={},pk0=picked[pkk]||{};
   dels.forEach(function(r){if(pk0[r.id])keep[r.id]=1;});picked[pkk]=keep;
   var sel=function(){return dels.filter(function(r){return keep[r.id];});};
@@ -5267,7 +5333,7 @@ function recCard(s,r,kit,openIds){
     if(ed&&(st==='수정대기'||st==='오류'))actions.append(h('button',{type:'button',class:'btn small',on:{click:function(){editCancel(s,r);}}},'수정 취소'));
     if(canEdit(s,r))actions.append(h('button',{type:'button',class:'btn small',on:{click:function(){editOpen(s,r);}}},s.flowCols?'공정 채우기':'수정'));
     var cp=copyItem(s,r);if(cp)actions.append(h('button',{type:'button',class:'btn small',on:{click:function(){copyGo(s,r);}}},'복사등록'));   /* v109 */
-    if(delOk(s,r))actions.append(delBtn(s,r));
+    if(delOk(s,r)&&canCol('erp_'+s.key,'d'))actions.append(delBtn(s,r));   /* v115 */
     var fm=EDITING[s.key+'/'+r.id];if(fm&&!canEdit(s,r)){delete EDITING[s.key+'/'+r.id];fm=null;}   /* 그 사이 상태가 바뀌면 수정 칸을 닫는다 */
     var pk=kit.pk(r);
     var gap=s.flowCols?flowGap(r):'';   /* v53 */
@@ -5836,7 +5902,7 @@ function delBtn(s,r){
 }
 function errText(e){
   var c=e&&e.code;
-  if(c==='invalid_argument'||c==='permission-denied'||c==='unauthenticated')return '저장 권한이 없습니다. 파이어베이스 규칙에서 erp_ 컬렉션을 허용해야 합니다.';
+  if(c==='erp-perm'||c==='invalid_argument'||c==='permission-denied'||c==='unauthenticated')return '권한이 없습니다. 담당자 관리에서 이 메뉴의 권한을 받아야 합니다.';   /* v115 */
   if(c==='quota_exceeded')return '저장 한도에 도달했습니다.';
   return '잠시 뒤 다시 시도해 주세요.';
 }
@@ -5920,6 +5986,162 @@ function addNewProcs(rows,memos){
     return db.collection('erp_processes').add(d).then(function(){if(data.processes&&!data.processes.some(function(r){return r.name===d.name&&r.status!=='오류';}))data.processes.push(d);refreshLists();});   /* v53 스냅샷이 먼저 오면 같은 줄이 둘로 보였다 */
   });},Promise.resolve()).then(function(){return todo;});
 }
+/* ---------- v115 담당자 로그인 · 권한 · 담당자 관리 ----------
+   내 권한 = erp_staff/<내 uid> 문서(ME). 관리자(admin)는 모든 메뉴. 메뉴마다 보기(r)·저장(w)·삭제(d).
+   화면: 보기 없는 메뉴는 단계 줄에서 빠지고, 저장·삭제는 connectDb 껍데기(erpGuard)가 막는다.
+   저장소 규칙(제안 = firestore-rules-제안.rules, 배포 전): 저장·삭제는 컬렉션마다(cols) 막고, 보기는 담당자 전체 허용(드롭다운이 다른 메뉴 자료를 씀). */
+var ME=null,STAFF=null,STAFF_ERR=false,staffDraw=null,STAFF_SEL=null,STAFF_DRAFT=null,STAFF_MSG=null;
+var ERP_RULES_ON=false;   /* 저장소 규칙을 배포하면 true 로 */
+BYKEY.staff={key:'staff',n:'',title:'담당자 관리'};
+function erpMenus(){
+  var out=[{k:'check',t:CHECK.title,cols:[]}];
+  ['수입','구매','생산'].forEach(function(pg){out.push({k:'p:'+pg,t:PAGE_NAMES[pg],cols:STEPS.filter(function(s){return s.page===pg;}).map(function(s){return 'erp_'+s.key;})});});
+  out.push({k:'stocks',t:'물류 · [물류] 재고현황',cols:['erp_stocks']});
+  STEPS.filter(function(s){return !s.hidden&&!s.page;}).forEach(function(s){
+    out.push({k:s.key,t:s.n+'. '+s.title,cols:['erp_'+s.key].concat(STEPS.filter(function(x){return x.shownIn===s.key&&!x.page;}).map(function(x){return 'erp_'+x.key;}))});});
+  return out;
+}
+var MENUS=erpMenus();
+function menuOf(k){if(k==='check'||k==='stocks'||k==='staff')return k;var s=BYKEY[k];if(!s)return k;if(s.page)return 'p:'+s.page;return s.shownIn||k;}
+function canMenu(k,op){if(!ME)return false;if(ME.admin===true)return true;var p=(ME.perms||{})[k];return !!(p&&p[op]);}
+/* 컬렉션 권한 = 그 컬렉션을 가진 메뉴 중 하나라도. erp_imports(불러오기 요청)는 어느 메뉴든 */
+function colPerms(perms){
+  var cols={},put=function(c,op){(cols[c]=cols[c]||{r:false,w:false,d:false})[op]=true;};
+  MENUS.forEach(function(m){var p=perms[m.k]||{};['r','w','d'].forEach(function(op){if(p[op]){m.cols.forEach(function(c){put(c,op);});put('erp_imports',op);}});});
+  return cols;
+}
+function canCol(col,op){if(!ME)return false;if(ME.admin===true)return true;var c=colPerms(ME.perms||{})[col];return !!(c&&c[op]);}
+window.ERP_CAN=canCol;
+function anyPerm(perms){return Object.keys(perms||{}).some(function(k){var p=perms[k]||{};return p.r||p.w||p.d;});}
+function erpClear(){bulk=null;listBox=null;listBox2=null;sheetDraw=null;impDraw=null;ifRefresh=null;stkDraw=null;}
+function erpWait(){erpClear();staffDraw=null;mainEl.replaceChildren(h('section',{class:'card'},h('p',{class:'msg'},'불러오는 중')));}
+/* 지금 메뉴를 못 보면 볼 수 있는 첫 메뉴로 */
+function erpFixCur(){
+  if(cur==='staff'?ME&&ME.admin:canMenu(menuOf(cur),'r'))return;
+  var m=MENUS.filter(function(x){return canMenu(x.k,'r');})[0];if(!m)return;
+  var k=m.k.indexOf('p:')===0?STEPS.filter(function(s){return s.page===m.k.slice(2);})[0].key:m.k;
+  cur=k;try{history.replaceState(null,'','#'+k);}catch(e){}
+}
+function renderNoPerm(){
+  erpClear();staffDraw=null;
+  var noAdmin=STAFF&&!STAFF.some(function(x){return x.admin===true;});
+  var msg=h('p',{class:'msg','aria-live':'polite'});
+  var boot=noAdmin?h('button',{type:'button',class:'btn primary',on:{click:function(){
+    if(!confirm('이 계정('+(ERP_USER&&ERP_USER.id||'')+')을 관리자로 지정합니다.'))return;
+    db.staffSet(ERP_USER.uid,{admin:true,permAt:new Date().toISOString(),permBy:ERP_USER.id}).then(function(){go('staff');},function(e){msg.textContent='지정하지 못했습니다. '+errText(e);msg.className='msg bad';});}}},'관리자로 지정'):'';
+  mainEl.replaceChildren(h('section',{class:'card'},h('div',{class:'stephead'},h('h2',{},'권한이 없습니다')),
+    h('p',{class:'msg bad'},'담당자 관리에서 권한을 받아야 합니다.'),h('div',{class:'actions'},boot,msg)));
+}
+/* 머리띠 오른쪽: 누구 · 로그아웃 */
+function erpTop(){
+  var bar=document.querySelector('.topbar-in');if(!bar||!ERP_USER)return;
+  var w=document.getElementById('erp-who');
+  if(!w){w=h('div',{id:'erp-who',class:'who'},h('span',{}),h('button',{type:'button',class:'btn small',on:{click:function(){if(window.erpOut)window.erpOut();}}},'로그아웃'));bar.append(w);}
+  w.firstChild.textContent=(ME&&ME.name?ME.name+' · ':'')+ERP_USER.id;
+}
+function staffTime(t){var d=new Date(t);return isNaN(d)?'—':pad2(d.getMonth()+1)+'-'+pad2(d.getDate())+' '+pad2(d.getHours())+':'+pad2(d.getMinutes());}
+function staffDraftOf(x){var p={};MENUS.forEach(function(m){var o=(x.perms||{})[m.k]||{};p[m.k]={r:!!o.r,w:!!o.w,d:!!o.d};});return {uid:x.uid,name:x.name||'',admin:x.admin===true,perms:p};}
+function renderStaff(){
+  erpClear();
+  if(!ME||ME.admin!==true){if(!ME)erpWait();else renderNoPerm();return;}
+  var box=h('div',{class:'staffbox'});
+  staffDraw=function(){if(cur!=='staff')return;box.replaceChildren.apply(box,staffParts());};
+  mainEl.replaceChildren(h('section',{class:'card'},h('div',{class:'stephead'},h('h2',{},'담당자 관리')),box));
+  staffDraw();
+}
+function staffParts(){
+  var list=(STAFF||[]).slice().sort(function(a,b){return String(a.firstAt||'').localeCompare(String(b.firstAt||''));});
+  if(STAFF_SEL&&!list.some(function(x){return x.uid===STAFF_SEL;})){STAFF_SEL=null;STAFF_DRAFT=null;}
+  var out=[h('h3',{},'담당자 '+list.length+'명')];
+  if(!STAFF)out.push(h('p',{class:'msg'+(STAFF_ERR?' bad':'')},STAFF_ERR?'담당자 목록을 읽지 못했습니다.':'불러오는 중'));
+  else out.push(h('div',{class:'tw'},h('table',{},
+    h('thead',{},h('tr',{},['이름','벤더피아 아이디','관리자','보기 메뉴','공유 폴더','첫 로그인','마지막 로그인',''].map(function(t,i){return h('th',{class:i===2||i===3?'c':null},t);}))),
+    h('tbody',{},list.map(function(x){
+      var nr=MENUS.filter(function(m){return ((x.perms||{})[m.k]||{}).r;}).length;
+      return h('tr',{class:x.uid===STAFF_SEL?'sel':null},
+        h('td',{},x.name||'—'),h('td',{},x.vpId||'—'),h('td',{class:'c'},x.admin===true?'관리자':'—'),
+        h('td',{class:'c'},x.admin===true?'전체':nr+' / '+MENUS.length),
+        h('td',{},h('button',{type:'button',class:'btn small',on:{click:function(){staffFolder(x);}}},ico('link'),x.folder&&x.folder.url?'지정됨':'공유 폴더')),
+        h('td',{},staffTime(x.firstAt)),h('td',{},staffTime(x.lastAt)),
+        h('td',{},h('button',{type:'button',class:'btn small'+(x.uid===STAFF_SEL?' primary':''),on:{click:function(){STAFF_SEL=x.uid;STAFF_DRAFT=staffDraftOf(x);STAFF_MSG=null;staffDraw();}}},'권한')));
+    })))));
+  if(STAFF_SEL&&STAFF_DRAFT)out=out.concat(staffEditor(list.filter(function(x){return x.uid===STAFF_SEL;})[0]));
+  return out.concat(staffRulesTable(),staffRepoTable());
+}
+function staffEditor(x){
+  var D=STAFF_DRAFT,self=ERP_USER&&x.uid===ERP_USER.uid,msg=h('span',{class:'msg','aria-live':'polite'});
+  var nameIn=h('input',{type:'text',value:D.name,'aria-label':'이름',on:{input:function(){D.name=nameIn.value;}}});
+  var adm=h('input',{type:'checkbox',checked:D.admin,disabled:self,on:{change:function(){D.admin=adm.checked;staffDraw();}}});
+  var OPS=[['r','보기'],['w','저장'],['d','삭제']];
+  var setOp=function(k,op,v){var p=D.perms[k];p[op]=v;if(op!=='r'&&v)p.r=true;if(op==='r'&&!v){p.w=false;p.d=false;}};
+  var allOn=function(op){return MENUS.every(function(m){return D.perms[m.k][op];});};
+  var head=h('tr',{},h('th',{},'메뉴'),OPS.map(function(o){
+    var c=h('input',{type:'checkbox',checked:allOn(o[0]),disabled:D.admin,'aria-label':o[1]+' 모두',on:{change:function(){MENUS.forEach(function(m){setOp(m.k,o[0],c.checked);});staffDraw();}}});
+    return h('th',{class:'c'},h('label',{},o[1]+' ',c));}));
+  var body=MENUS.map(function(m){return h('tr',{},h('td',{},m.t),OPS.map(function(o){
+    var c=h('input',{type:'checkbox',checked:D.admin||D.perms[m.k][o[0]],disabled:D.admin,'aria-label':m.t+' '+o[1],on:{change:function(){setOp(m.k,o[0],c.checked);staffDraw();}}});
+    return h('td',{class:'c'},c);}));});
+  var save=h('button',{type:'button',class:'btn primary',on:{click:function(){
+    var name=D.name.trim(),who=name||x.vpId||'';
+    if(!confirm(who+' 권한을 저장합니다.'))return;
+    save.disabled=true;
+    var perms=D.admin?{}:D.perms,o={name:name,admin:self?true:D.admin,perms:perms,cols:colPerms(perms),ok:D.admin||anyPerm(perms),permAt:new Date().toISOString(),permBy:ERP_USER?ERP_USER.id:''};
+    db.staffSet(x.uid,o).then(function(){STAFF_MSG=['저장했습니다.',''];},function(e){STAFF_MSG=['저장하지 못했습니다. '+errText(e),' bad'];})
+      .then(function(){save.disabled=false;staffDraw();});}}},'저장');
+  if(STAFF_MSG){msg.textContent=STAFF_MSG[0];msg.className='msg'+STAFF_MSG[1];}
+  var undo=h('button',{type:'button',class:'btn',on:{click:function(){STAFF_DRAFT=staffDraftOf(x);staffDraw();}}},'되돌리기');
+  return [h('h3',{},(x.name||x.vpId||'')+' 권한'),
+    h('div',{class:'staffbar'},h('label',{},'이름',nameIn),h('label',{},adm,'관리자')),
+    h('div',{class:'tw'},h('table',{},h('thead',{},head),h('tbody',{},body))),
+    h('div',{class:'actions'},save,undo,msg)];
+}
+/* 공유 폴더 — 지정(저장)만 된다. 실제 드라이브 공유는 폼이 사장님 구글 드라이브 권한을 갖지 않아 못 한다(단추만 둠, 쓸지는 나중에 판단) */
+function staffFolder(x){
+  var f=x.folder||{},msg=h('p',{class:'msg','aria-live':'polite'});
+  var url=h('input',{type:'url',value:f.url||'',placeholder:'https://drive.google.com/drive/folders/…'});
+  var mail=h('input',{type:'email',value:f.email||'',placeholder:'구글 계정',autocomplete:'off'});
+  var dlg=h('dialog',{class:'stepdlg','aria-label':'공유 폴더'});
+  var save=h('button',{type:'button',class:'btn primary',on:{click:function(){
+    var u=url.value.trim(),m=mail.value.trim();
+    if(u&&!/^https:\/\/drive\.google\.com\/(drive\/(u\/\d+\/)?folders\/|open\?id=)[\w-]+/.test(u)){msg.textContent='드라이브 폴더 링크가 아닙니다.';msg.className='msg bad';return;}
+    if(m&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(m)){msg.textContent='구글 계정 꼴이 아닙니다.';msg.className='msg bad';return;}
+    save.disabled=true;
+    db.staffSet(x.uid,{folder:u||m?{url:u,email:m,at:new Date().toISOString(),state:'공유 전'}:null}).then(function(){dlg.close();},function(e){save.disabled=false;msg.textContent='저장하지 못했습니다. '+errText(e);msg.className='msg bad';});}}},'저장');
+  var share=h('button',{type:'button',class:'btn',disabled:true},'공유하기');
+  dlg.append(h('h3',{},'공유 폴더 · '+(x.name||x.vpId||'')),
+    h('div',{class:'f'},h('label',{},'폴더 링크'),url),h('div',{class:'f'},h('label',{},'구글 계정'),mail),
+    h('div',{class:'actions'},save,share,h('button',{type:'button',class:'btn',on:{click:function(){dlg.close();}}},'닫기')),
+    h('p',{class:'msg bad'},'공유하기 불가: 폼에는 사장님 구글 드라이브 공유 권한이 없습니다(확인 못 함 · 차후 판단).'),msg);
+  dlg.addEventListener('close',function(){dlg.remove();});
+  document.body.append(dlg);dlg.showModal();
+}
+function staffTable(title,head,rows,pill){
+  return [h('h3',{},title,pill||''),h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},head.map(function(t){return h('th',{},t);}))),
+    h('tbody',{},rows.map(function(r){return h('tr',{},r.map(function(c,i){return h('td',{class:i?'w':null},c);}));}))))];
+}
+function staffRulesTable(){
+  return staffTable('저장소 규칙',['권한','화면','저장소 규칙(배포 뒤)'],[
+    ['로그인 안 함','폼 못 씀','erp_ 읽기·쓰기 막힘(익명 로그인 막힘)'],
+    ['보기','메뉴 숨김','막지 않음 — 권한 받은 담당자는 erp_ 모두 읽음(드롭다운이 다른 메뉴 자료를 씀)'],
+    ['저장','막힘','막힘 — 메뉴의 컬렉션마다'],
+    ['삭제','막힘','막힘 — 메뉴의 컬렉션마다'],
+    ['담당자 관리','관리자만','관리자만'],
+    ['입력 작업자(AI)','—','입력 작업자 계정 + 모든 메뉴 권한(배포 전에 만들 것)'],
+    ['다른 앱(조혼가구 등)','—','그대로(erp_ 밖은 안 바꿈)']],
+    h('span',{class:'pill'+(ERP_RULES_ON?' ok':' err'),style:'margin-left:8px'},ERP_RULES_ON?'배포됨':'배포 전 — 지금은 화면에서만 막힘'));
+}
+function staffRepoTable(){
+  return staffTable('비공개 저장소로 바꾸면',['항목','생기는 일','고칠 곳'],[
+    ['GitHub Pages 주소 (vivivic-cloud.github.io/vivivic-apps/…)','무료 계정이면 Pages 가 꺼져 이 폼·모든 앱 주소가 안 열림. 유료(Pro)면 열리지만 화면은 누구나 봄','요금제 확인 못 함 · Firebase Hosting(vivivic-4b7ef)으로 옮기면 주소가 바뀜'],
+    ['벤더피아연동 화면 글','확장이 github.io 에서 글을 받지 못해 확장 안 옛 글로 돎','벤더피아연동/불러오기.js 14줄 「깃」 · bg.js 깃글'],
+    ['벤더피아연동 설치 안내','안 열림','벤더피아연동/index.html 주소'],
+    ['확장이 붙는 주소','조혼가구 읽기·설치 표시가 vivivic-apps 주소에만 붙어, 주소가 바뀌면 끊김','벤더피아연동/manifest.json matches (덮어쓰기 필요)'],
+    ['짚어서 지시하기','조혼가구·작업지시서 등이 ../shared/viggle.js 를 Pages 에서 받아 같이 안 뜸','shared/viggle.js · 각 앱 <script src>'],
+    ['입력 작업자 git pull','이 맥은 됨(GitHub 로그인). 클라우드·다른 컴퓨터는 GitHub 권한이 있어야 함','작업자 세션 GitHub 연결'],
+    ['다른 저장소·바깥 링크 (vivivic-docs, 북마크, 시트 안 링크)','확인 못 함','—'],
+    ['구글시트 양식 웹앱(Apps Script)','영향 없음(드라이브만 씀)','—'],
+    ['자료 보호','늘지 않음 — 파이어베이스 키는 원래 공개 값, 자료는 저장소 규칙이 지킴','저장소 규칙 배포(위)']]);
+}
 function go(k){if(BYKEY[k]&&BYKEY[k].shownIn)k=BYKEY[k].shownIn;cur=k;try{history.replaceState(null,'','#'+k);}catch(e){location.hash=k;}renderNav();renderSum();renderStep();}
 function refreshAll(){renderNav();renderSum();renderList();refreshLists();if(impDraw)impDraw();if(sheetDraw)sheetDraw();if(ifRefresh)ifRefresh();if(stkDraw)stkDraw();}
 
@@ -5931,7 +6153,14 @@ renderNav();renderSum();renderStep();refreshLists();
 
 dbP.then(function(d){
   db=d;
-  if(!db){
+  if(db){   /* v115 내 권한 → 화면, 담당자 목록(관리자·첫 관리자 지정) */
+    db.staffSeen().catch(function(e){console.warn('담당자 기록 못 함',e);});
+    db.staffMe(function(me){var was=ME?JSON.stringify([ME.admin,ME.perms]):null;ME=me||{};erpTop();
+      if(was!==JSON.stringify([ME.admin,ME.perms])){erpFixCur();renderNav();renderSum();renderStep();}},function(e){console.warn('내 권한 못 읽음',e);ME={};erpTop();renderNav();renderStep();});
+    db.staffAll(function(list){STAFF=list;renderNav();if(cur==='staff'&&staffDraw)staffDraw();else if(ME&&!canMenu(menuOf(cur),'r'))renderStep();},function(){STAFF=null;STAFF_ERR=true;});
+  }
+  if(!db){ME={admin:true};   /* 연결 못 함 — 예전처럼 화면은 보이고 저장은 안 됨 */
+    renderNav();renderStep();
     bannerEl.append(h('div',{class:'banner'},'파이어베이스에 연결하지 못했습니다. 인터넷 연결을 확인하고 다시 열어 주세요. 지금은 입력해도 저장되지 않습니다.'));
     STEPS.forEach(function(s){data[s.key]=[];});IMPORTS=[];STOCKS=[];refreshAll();return;
   }

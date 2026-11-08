@@ -29,7 +29,7 @@
      이 고침은 **새로고침만으로** 먹어야 한다. 그게 핵심이다. */
 /* ⚠⚠ 화면글 판은 **여기 한 군데서만** 적는다. `manifest.json` 의 version 과 **늘 같이** 올려라
    (배포 차례에 적어 두었다). 두 군데서 적으면 반드시 어긋난다. */
-const VP_화면글판 = "0.34.96";   // ⚠ manifest.json 의 version 과 **같은 값**
+const VP_화면글판 = "0.34.97";   // ⚠ manifest.json 의 version 과 **같은 값**
 
 /* ⚠⚠ 10-22 「벤더피아」 단추가 여는 **새 창 오리지널**의 표식을 보는 물음. 새 창(`window.name === "vp원본"`)과 그 안 모든 frame 에서는
    우리 글이 **하나도 돌지 않아야** 한다. 1차로 `불러오기.js`·`짚개.js`(확장 안)가 막고, 이 물음은 login.js 가 한 번 더 막는 안전망이다.
@@ -295,6 +295,40 @@ window.VP원본창 = () => {
   }
 })();
 
+/* ⚠⚠ 11-08 [영림원외주입력 담당자 로그인] 사장님(그대로): 「로그인 기능을 벤더피아 연동으로 해당 아이디 비번으로 벤더피아 연동 로그인 완료시 사용할 수 있게 해주세요.
+     단 이때 사용자에게 벤더피아 관련 화면이 보여질 필요는 없습니다. 즉 이 연동을 한번이라도 사용해본 사용자라면 로그인이 하겠습니다.」
+   · 여기서 벤더피아 로그인에 **성공하면** 같은 아이디·비밀번호로 파이어베이스(vivivic-4b7ef) 이메일 계정을 만든다(`accounts:signUp` — 밖에다리가 이미 허락한 길, 덮어쓰기 필요 없음).
+     영림원외주입력 폼은 그 계정으로 로그인한다(폼 `erpMail`·`erpKey` 와 **글자까지 같은 식**이어야 한다 — 하나를 고치면 둘 다).
+   · 비밀번호는 보내지도 적지도 않는다. PBKDF2-SHA256(10만 번, 소금 = "vivivic-erp|" + 아이디 소문자)으로 바꾼 값만 보낸다.
+   · 실패한 로그인(로그인 칸이 다시 뜸)에는 계정을 안 만든다. 이미 있으면(EMAIL_EXISTS) 그대로 둔다 — 벤더피아 비밀번호를 바꾸면 옛 계정을 콘솔에서 지워야 한다(영림원외주입력/CLAUDE.md). */
+const ERP계정 = (() => {
+  const 소금 = "vivivic-erp|", 집 = "@vp.vivivic-4b7ef.firebaseapp.com";
+  const 고름 = (id) => String(id == null ? "" : id).trim().toLowerCase();
+  const 메일 = (id) => "vp-" + [...new TextEncoder().encode(고름(id))].map((b) => b.toString(16).padStart(2, "0")).join("") + 집;
+  const 열쇠 = async (id, pw) => {
+    const E = new TextEncoder();
+    const k = await crypto.subtle.importKey("raw", E.encode(String(pw)), "PBKDF2", false, ["deriveBits"]);
+    const b = new Uint8Array(await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: E.encode(소금 + 고름(id)), iterations: 100000 }, k, 256));
+    return btoa(String.fromCharCode(...b)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  };
+  return { 메일, 열쇠 };
+})();
+(async () => {
+  if (window.VP원본창()) return;
+  let 대기 = null;
+  try { 대기 = JSON.parse(sessionStorage.getItem("vp.erp") || "null"); } catch (e) {}
+  if (!대기) return;
+  try { sessionStorage.removeItem("vp.erp"); } catch (e) {}           // 틀 여럿 중 하나만 한다
+  if (document.getElementById("frmSign") || Date.now() - (대기.때 || 0) > 120000 || !대기.메일 || !대기.열쇠) return;   // 로그인 실패·묵은 것
+  const 주소 = "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs";
+  const 옵션 = { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: 대기.메일, password: 대기.열쇠, returnSecureToken: false }) };
+  let r = null;
+  try { r = window.VP밖에 ? await window.VP밖에(주소, 옵션) : null; } catch (e) {}
+  if (!r || !r.status) { try { const f = await fetch(주소, { ...옵션, credentials: "omit" }); r = { ok: f.ok, status: f.status, 글: await f.text() }; } catch (e) {} }
+  const 말 = !r ? "못 닿음" : r.ok ? "만듦" : /EMAIL_EXISTS/.test(r.글 || "") ? "있음" : "안 됨 " + r.status;
+  try { window.VP말?.("ERP계정:" + 말); } catch (e) {}
+})();
+
 (() => {
   if (window.VP원본창()) return;                      // 새 창 오리지널에서는 로그인 화면도 벤더피아 그대로
   const form = document.getElementById("frmSign");
@@ -325,6 +359,8 @@ window.VP원본창 = () => {
     /* 11-02 [새 지시 서류관리로그인] — 서류관리 헤더·작업 기록에 쓸 **아이디만** 적는다(비밀번호는 안 적음).
        bg.js `벤더피아누구` 가 읽어 서류관리(서류다리.js)에 건넨다. */
     try { await window.VP저장?.set({ vpWho: { id: idInput.value.slice(0, 40), at: Date.now() } }); } catch (err) {}
+    /* 11-08 [영림원외주입력 담당자 로그인] — 바꾼 값(비밀번호 아님)만 이 탭에 잠깐 둔다. 로그인이 되면 아래 덩어리가 계정을 만들고 지운다. */
+    try { sessionStorage.setItem("vp.erp", JSON.stringify({ 메일: ERP계정.메일(idInput.value), 열쇠: await ERP계정.열쇠(idInput.value, pwInput.value), 때: Date.now() })); } catch (err) {}
     form.requestSubmit(loginBtn);
   });
   myForm.vpId.focus();
