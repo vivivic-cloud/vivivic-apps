@@ -93,7 +93,7 @@
 | 수입Invoice입력 `impinvs` | imporders → imppays → impinvs | 수입Invoice 조회(번호 확인 못 함) + 품목조회 501052 | `invno` | InvoiceNo.·수입처 | ⏳ 화면 확인 필요 |
 | 수입BL입력 `impbls` | impbls | B/L 조회 501068 + B/L 품목조회 501077 | `blno` | B/L No.·수입처 | ⏳ 화면 확인 필요 |
 | 수입입고입력 `impins` | impbls → impins | 수입입고 품목조회 501073 | `blno` | B/L No.·수입처 | ⏳ 화면 확인 필요 |
-| 구매단가등록 `purprices` | purprices | 구매단가등록 501868 시트 SS | `vendor`+`code`+`from` | 구매거래처·품번 | 칸 기록 있음 |
+| 구매단가등록 `purprices` | purprices | 구매단가등록 501868 시트 SS | `vendor`+`code`+`from` | 구매거래처·품번 | ✅ `구매단가등록-읽기.js`(11-08) — 「최종단가만조회」 끄고 |
 | 구매요청입력·구매품의입력·구매발주입력 `purchases` | purchases | 구매요청품목 501565 + 구매품의조회 501569 + 구매발주조회 501578 | `reqno` | 품번 | ⏳ 화면 확인 필요 |
 | 구매납품입력 `purdelvs` | purchases → purdelvs | 납품조회 501585 | `dlvno` | 품번 | ⏳ 화면 확인 필요 |
 | 주간생산계획입력·외주발주입력 `prods` | prods | 주간생산계획조회 500499 SS + 작업지시조회 500880 SSWorkOrder + 외주발주품목조회 501611 SS | `planNo` | 품번 | 칸 기록 있음 |
