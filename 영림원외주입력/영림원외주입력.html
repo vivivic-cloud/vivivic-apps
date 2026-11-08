@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v119 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v120 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -200,6 +200,11 @@ input[readonly]{background:var(--fill3)}   /* v78 */
 nav .navck{background:#fff;box-shadow:inset 0 0 0 1px var(--line2);margin-bottom:6px}
 nav .navck:hover{background:var(--fill3)}
 nav .navck .num{background:var(--fill);color:var(--ink)}
+/* v120 메뉴 박스 — 박스 단추(.navbox) 아래 펼친 목록(.navlist) */
+nav button.navbox{grid-template-columns:28px 1fr auto;margin-bottom:0}
+nav button.navbox.here{box-shadow:inset 0 0 0 1px var(--ink)}
+nav .navarr{font-size:11px;color:var(--muted)}
+nav .navlist{display:flex;flex-direction:column;gap:2px;margin:2px 0 8px 12px;padding-left:8px;border-left:2px solid var(--line)}
 .ckbox{min-width:0;margin-top:12px}
 .ckbox td{vertical-align:top;white-space:normal}
 .ckbox td:nth-child(1),.ckbox td:nth-child(3){white-space:nowrap}
@@ -282,6 +287,9 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
   .app{grid-template-columns:minmax(0,1fr);gap:14px}
   nav{flex-direction:row;overflow-x:auto;position:static;padding-bottom:6px;scrollbar-width:thin;scrollbar-color:var(--thumb) transparent}
   nav button{flex:none;grid-template-columns:24px auto;padding:8px 12px}
+  nav{flex-wrap:wrap;overflow-x:visible;gap:6px}   /* v120 박스는 줄바꿈, 펼친 목록은 아래 한 줄 가로 밀기 */
+  nav button.navbox{grid-template-columns:24px auto auto;max-width:100%}
+  nav .navlist{order:9;flex-basis:100%;min-width:0;flex-direction:row;overflow-x:auto;margin:0;padding:0 0 6px;border-left:0;scrollbar-width:thin;scrollbar-color:var(--thumb) transparent}
   .num{width:24px;height:24px;font-size:11px}
   .card{padding:16px}
   .wrap{padding-top:16px}
@@ -345,7 +353,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v119</span>
+    <span class="ver">v120</span>
   </div>
 </header>
 <div class="wrap">
@@ -1674,28 +1682,39 @@ function counts(key){
   var a=data[key]||[];var c={total:a.length,'대기':0,'진행중':0,'완료':0,'오류':0,'수정대기':0};
   a.forEach(function(r){if(ylwGone(r)){c.total--;return;}if(c[r.status]!=null)c[r.status]++;});return c;   /* v104 영림원에 없음은 안 셈 */
 }
+/* v120 맨 위 메뉴 = 박스. 사장님 말씀 「현재 입력폼 12345678~11 로 연결나눠진 기본입력 들을 기본입력 박스안에 순서대로 정렬 되게 해줘 나머지 박스도 영림원 의 입력 흐름에 맞는 순서를 정해서 박스 클릭시 해당 입력의 나열이 보이도록 해줘」
+   박스 순서 = NAV_BOXES. 박스를 누르면 목록이 펼쳐짐(한 번에 하나) · 지금 메뉴의 박스는 열림(navOpen=null) · 보이는 메뉴 없는 박스는 숨김(v115 권한) */
+var NAV_BOXES=[
+  {id:'base',title:'기본입력',icon:'layers',items:function(){return ['check'].concat(STEPS.filter(function(s){return !s.hidden&&!s.page;}).map(function(s){return s.key;}));}},
+  {id:'구매',title:PAGE_NAMES['구매'],icon:'sheet',items:function(){return ['purprices','purchases','purdelvs'];}},
+  {id:'수입',title:PAGE_NAMES['수입'],icon:'import',items:function(){return ['imporders','imppays','impinvs','impbls','impins'];}},
+  {id:'생산',title:PAGE_NAMES['생산'],icon:'layers',items:function(){return ['prods','proddlvs'];}},
+  {id:'물류',title:'물류 · [물류] 재고현황',icon:'box',items:function(){return ['stocks'];}},
+  {id:'staff',title:'담당자 관리',icon:'users',items:function(){return ['staff'];}}];
+var navOpen=null;   /* null = 지금 메뉴의 박스 · '' = 모두 닫음 · 박스 id */
+function navBoxOf(k){for(var i=0;i<NAV_BOXES.length;i++)if(NAV_BOXES[i].items().indexOf(k)>=0)return NAV_BOXES[i].id;return '';}
 function renderNav(){
-  var ckBtn=h('button',{type:'button',class:'navck',on:{click:function(){go('check');}},'aria-current':cur==='check'?'step':null},
-    h('span',{class:'num'},'✓'),h('span',{},h('div',{class:'nt'},CHECK.title),h('div',{class:'ns'},'품목마다 빠진 것 보기')));   /* v53 번호 없는 화면 — 단계 앞 맨 위 */
   var cntText=function(c){return c.total?('대기 '+c['대기']+' · 완료 '+c['완료']+(c['수정대기']?' · 수정대기 '+c['수정대기']:'')+(c['오류']?' · 오류 '+c['오류']:'')):'아직 없음';};
-  /* v75 페이지 입구 하나 — 점검표처럼 번호 없는 단추, 폰에서도 맨 앞에 보이게 점검표 바로 다음(v78 구매 관리도 같은 틀) */
-  var pageBtn=function(pg,icon){
-    var c0={total:0,'대기':0,'완료':0,'수정대기':0,'오류':0},ss=STEPS.filter(function(s){return s.page===pg;});
-    ss.forEach(function(s){var c=counts(s.key);Object.keys(c0).forEach(function(k){c0[k]+=c[k];});});
-    return h('button',{type:'button',class:'navck',on:{click:function(){go(ss[0].key);}},'aria-current':(BYKEY[cur]||{}).page===pg?'step':null},
-      h('span',{class:'num'},ico(icon)),h('span',{},h('div',{class:'nt'},PAGE_NAMES[pg]),h('div',{class:'ns'},ss.some(function(s){return data[s.key]==null;})?'불러오는 중':cntText(c0))));};
-  var last=STOCKS?stkLast():'',stkBtn=h('button',{type:'button',class:'navck',on:{click:function(){go('stocks');}},'aria-current':cur==='stocks'?'step':null},   /* v102 */
-    h('span',{class:'num'},ico('box')),h('span',{},h('div',{class:'nt'},'물류 · [물류] 재고현황'),h('div',{class:'ns'},STOCKS==null?'불러오는 중':last?stkTime(last):'아직 없음')));
-  /* v115 보기 권한이 있는 메뉴만. 관리자는 맨 끝에 「담당자 관리」 */
-  var ok=function(k,b){return canMenu(k,'r')?b:null;};
-  var stfBtn=ME&&ME.admin?h('button',{type:'button',class:'navck',on:{click:function(){go('staff');}},'aria-current':cur==='staff'?'step':null},
-    h('span',{class:'num'},ico('users')),h('span',{},h('div',{class:'nt'},'담당자 관리'),h('div',{class:'ns'},STAFF?STAFF.length+'명':'불러오는 중'))):null;
-  navEl.replaceChildren.apply(navEl,[ok('check',ckBtn),ok('p:수입',pageBtn('수입','import')),ok('p:구매',pageBtn('구매','sheet')),ok('p:생산',pageBtn('생산','layers')),ok('stocks',stkBtn)].concat(STEPS.filter(function(s){return !s.hidden&&!s.page&&canMenu(s.key,'r');}).map(function(s){
-    var c=counts(s.key);
-    var sub=data[s.key]==null?'불러오는 중':cntText(c);
-    return h('button',{type:'button',on:{click:function(){go(s.key);}},'aria-current':s.key===cur?'step':null},
-      h('span',{class:'num'},String(s.n)),h('span',{},h('div',{class:'nt'},s.title),h('div',{class:'ns'},sub)));
-  })).concat([stfBtn]).filter(Boolean));
+  var last=STOCKS?stkLast():'';
+  var seeK=function(k){return k==='staff'?!!(ME&&ME.admin):canMenu(menuOf(k),'r');};   /* v115 보기 권한 · 담당자 관리는 관리자만 */
+  var item=function(k,i){
+    var s=BYKEY[k]||{},num,title=s.title,sub;
+    if(k==='check'){num='✓';title=CHECK.title;sub='품목마다 빠진 것 보기';}
+    else if(k==='stocks'){num=ico('box');title='물류 · [물류] 재고현황';sub=STOCKS==null?'불러오는 중':last?stkTime(last):'아직 없음';}
+    else if(k==='staff'){num=ico('users');title='담당자 관리';sub=STAFF?STAFF.length+'명':'불러오는 중';}
+    else{num=s.page?String(i):String(s.n);sub=data[k]==null?'불러오는 중':cntText(counts(k));}
+    return h('button',{type:'button',on:{click:function(){go(k);}},'aria-current':k===cur?'step':null},
+      h('span',{class:'num'},num),h('span',{},h('div',{class:'nt'},title),h('div',{class:'ns'},sub)));};
+  var curBox=navBoxOf(cur),open=navOpen==null?curBox:navOpen,out=[];
+  NAV_BOXES.forEach(function(b){
+    var ks=b.items().filter(seeK);if(!ks.length)return;
+    var isOpen=open===b.id,n=0;
+    out.push(h('button',{type:'button',class:'navck navbox'+(b.id===curBox?' here':''),'aria-expanded':isOpen?'true':'false',
+      on:{click:function(){navOpen=isOpen?'':b.id;renderNav();}}},
+      h('span',{class:'num'},ico(b.icon)),h('span',{},h('div',{class:'nt'},b.title)),h('span',{class:'navarr','aria-hidden':'true'},isOpen?'▾':'▸')));
+    if(isOpen)out.push(h('div',{class:'navlist'},ks.map(function(k){if(k!=='check')n++;return item(k,n);})));
+  });
+  navEl.replaceChildren.apply(navEl,out);
 }
 function renderSum(){
   if(cur==='stocks'||cur==='staff'||!canMenu(menuOf(cur),'r')){sumEl.replaceChildren();return;}   /* v115 담당자 관리도 */   /* v102 재고 조회는 대기·완료 문서가 없다 */
@@ -6180,7 +6199,7 @@ function staffRepoTable(){
     ['구글시트 양식 웹앱(Apps Script)','영향 없음(드라이브만 씀)','—'],
     ['자료 보호','늘지 않음 — 파이어베이스 키는 원래 공개 값, 자료는 저장소 규칙이 지킴','저장소 규칙 배포(위)']]);
 }
-function go(k){if(BYKEY[k]&&BYKEY[k].shownIn)k=BYKEY[k].shownIn;cur=k;try{history.replaceState(null,'','#'+k);}catch(e){location.hash=k;}renderNav();renderSum();renderStep();}
+function go(k){if(BYKEY[k]&&BYKEY[k].shownIn)k=BYKEY[k].shownIn;cur=k;navOpen=null;try{history.replaceState(null,'','#'+k);}catch(e){location.hash=k;}renderNav();renderSum();renderStep();}
 function refreshAll(){renderNav();renderSum();renderList();refreshLists();if(impDraw)impDraw();if(sheetDraw)sheetDraw();if(ifRefresh)ifRefresh();if(stkDraw)stkDraw();}
 
 /* ---------- boot ---------- */
