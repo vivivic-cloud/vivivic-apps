@@ -10,7 +10,7 @@
   const Y = window.ylw;
   if (!Y || !Y.read || !Y.read.cols) throw new Error('먼저 공통.js → 불러오기-공통.js');
   const R = Y.read, PAGE = '501868';
-  const n = (v) => { const s = R.s(v).replace(/,/g, ''); return s === '' ? '' : String(+s); };
+  const n = (v) => { const s = R.s(v).replace(/,/g, ''); return s === '' || +s === 0 ? '' : String(+s); };   // 영림원은 빈 칸을 0 으로 준다(11-08, 폼 빈칸과 가짜 차이)
   const d = (v) => { const s = R.s(v).replace(/\D/g, ''); return s.length === 8 ? s.slice(0, 4) + '-' + s.slice(4, 6) + '-' + s.slice(6) : R.s(v); };
   R.purprices = async (only) => {
     await R.open(PAGE);
@@ -22,7 +22,7 @@
     const all = Y.rows(sh).filter((r) => r.ItemNo);
     const rows = all.filter((r) => only !== 'T' || R.isT(r.CustName) || R.isT(r.ItemNo)).map((r) => ({
       vendor: R.s(r.CustName), name: R.s(r.ItemName), code: R.s(r.ItemNo), spec: R.s(r.Spec), unit: R.s(r.UnitName),
-      io: R.s(r.ImpTypeName), cur: R.s(r.CurrName), price: n(r.Price), minqty: n(r.MinQty), stepqty: n(r.StepQty),
+      io: R.s(r.ImpTypeName), cur: R.s(r.CurrName), price: R.s(r.Price) === '' ? '' : String(+R.s(r.Price).replace(/,/g, '')), minqty: n(r.MinQty), stepqty: n(r.StepQty),
       from: d(r.StartDate), memo: R.s(r.Remark), maker: R.s(r.MakerName), days: n(r.LeadTime),
     }));
     return { rows, 읽음: rows.length, 화면전체: all.length, 확인못함: [], screen: '구매단가등록',
