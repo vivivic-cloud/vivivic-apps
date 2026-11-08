@@ -26,6 +26,36 @@
         return x;
       });
     },
+    // 폼 v102 「물류 · [물류] 재고현황」 불러오기 요청 처리(불러오기-공통.js 먼저). 501179 를 요청 basis·date 로 조회해 둔 뒤
+    //   await ylw.stock.run(요청)   → erp_stocks 문서 9개(id = 재고기준_품목자산분류)를 통째로 덮어쓴다. 줄 없는 분류는 빈 rows.
+    // count 요청은 세기만 한다. 영림원에는 아무것도 저장하지 않는다.
+    CLS: ['상품', '제품', '반제품', '원자재', '부자재', '재공품', '저장품', '세트품', '소모품'],
+    run: async (req) => {
+      const I = Y.imp; if (!I || !I.patch) throw new Error('불러오기-공통.js 먼저');
+      const basis = req.basis || '실재고', now = new Date().toISOString();
+      await I.patch('erp_imports', req.id, { status: '진행중', agentNote: '' });
+      try {
+        let rows = Y.stock.read(501179, { wh: true });
+        if (req.only === 'T') rows = rows.filter((r) => String(r['품번'] || '').startsWith('T'));
+        const map = Y.stock.whMap(501179), whs = Object.values(map);
+        const by = {}; for (const c of Y.stock.CLS) by[c] = [];
+        const other = [];
+        for (const r of rows) { delete r['창고코드']; (by[r['품목자산분류']] || other).push(r); }
+        const cnt = Y.stock.CLS.map((c) => c + ' ' + by[c].length).join(' · ');
+        if (req.mode === 'import') {
+          for (const c of Y.stock.CLS) {
+            const w = whs.filter((x) => by[c].some((r) => r['창고'] === x));
+            await I.patch('erp_stocks', encodeURIComponent(basis + '_' + c), { basis, cls: c, date: req.date || '', whs: w, rows: by[c], only: req.only || 'all', importedAt: now, importId: req.id });
+          }
+        }
+        const note = '창고별 재고조회 ' + basis + (req.date ? ' · 기준일 ' + req.date : '') + ': ' + rows.length + '줄 (' + cnt + ')' + (other.length ? ' · 분류 밖 ' + other.length + '줄 안 넣음' : '') + (req.mode === 'import' ? ' · 넣음' : ' · 세기만');
+        await I.patch('erp_imports', req.id, { status: '완료', agentNote: note, result: { stocks: { 읽음: rows.length } }, doneAt: new Date().toISOString() });
+        return note;
+      } catch (e) {
+        await I.patch('erp_imports', req.id, { status: '오류', agentNote: String(e.message || e) });
+        return { 오류: String(e.message || e) };
+      }
+    },
     // 창고코드 → 창고 이름. 501179 는 화면 머리(DynamicHeader), 그 밖은 표의 창고코드·창고 칸.
     whMap: (p = 501179) => {
       const dh = (sheet(p).Data.DynamicHeader || [])[0];
