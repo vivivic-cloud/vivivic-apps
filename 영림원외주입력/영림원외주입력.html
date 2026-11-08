@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v116 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v117 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -124,6 +124,9 @@ input.bad,select.bad{border-color:var(--red)}
 .impbox .last{font:500 12px/1.5 var(--sans);white-space:pre-wrap;word-break:break-word;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:0}
 .chip.src{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}
 .chip.diff{background:var(--amber-bg);color:var(--amber);border-color:#fde68a}
+.unreg{font-size:11px;color:#b45309;font-weight:700}
+.chip.unreg{background:#fff7ed;color:#b45309;border-color:#fed7aa}
+td.unreg>input,td.unreg>select{border-color:#f59e0b}
 .chip.gone{background:#f3f4f6;color:#6b7280;border-color:#d1d5db}
 details.gonebox{margin-top:10px;font-size:13px}details.gonebox>summary{cursor:pointer;font-weight:700;padding:6px 0;color:#6b7280}details.gonebox .delbar{margin:4px 0 8px}
 .ylwdiff{background:var(--amber-bg);color:var(--amber);border:1px solid #fde68a;padding:8px 10px;border-radius:8px;font-size:12px;font-weight:700;margin:10px 0 8px;word-break:break-word}
@@ -342,7 +345,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v116</span>
+    <span class="ver">v117</span>
   </div>
 </header>
 <div class="wrap">
@@ -450,15 +453,15 @@ function bizWarn(v){var d=bizDigits(v);return /^\d{10}$/.test(d)&&!bizCheck(d.sp
    거래처종류에 외주가공이 있고 영림원 등록이 끝난(status 완료) 것만 목록(dl-vendors). 대기·진행중·오류는 아직 영림원에 없어 뺀다. */
 function vendorErr(v){
   if(isEmpty(v))return '';
-  return (LISTS['dl-vendors']||[]).indexOf(String(v).trim())>=0?'':'영림원에 등록된 거래처만 고를 수 있습니다. 「'+v+'」 은(는) 목록에 없습니다.';
+  return '';   /* v117 목록 밖 값은 막지 않는다(칸 옆 「미등록」, unregF) */
 }
 /* v25 품목·자재: 영림원 드롭다운·코드도움 칸은 화면 선택지에서만(입력작업자/화면별-요령.md 「품목등록 (500215) · 자재등록 (500251)」 11-01 실제 화면) */
 var UNITS=['M','EA','SET','KG','TON','G','BOX','L','ml'];   /* 기준단위 코드도움 9개 */
-function optsErr(label,opts){return function(v){if(isEmpty(v))return '';return optVals({opts:opts}).indexOf(String(v).trim())>=0?'':label+'은(는) 목록('+opts.join('·')+')에서만 고릅니다. 「'+v+'」 은(는) 없습니다.';};}
+function optsErr(label,opts){return function(v){return '';};}   /* v117 목록 밖 값도 받는다 — 막지 않고 「미등록」 표시(unregF). 부르는 곳은 그대로 둠 */
 /* 품목·자재 소분류 = 3단계 분류에 저장된(오류 건 뺌) 그 품목구분의 소분류만 — 영림원은 품목대중소분류정의에 있는 소분류만 고를 수 있다 */
 function clsErr(kind,dl){return function(v){if(isEmpty(v))return '';if((LISTS[dl]||[]).indexOf(String(v).trim())>=0)return '';
   var mm=/>/.test(String(v))?[]:clsFind(kind,v);if(mm.length>1)return '소분류 「'+v+'」 이(가) '+mm.length+'곳에 있습니다('+mm.map(function(r){return r.path;}).join(' · ')+'). 대·중·소 세 칸으로 골라 주세요.';   /* v42 */
-  return '3단계 품목대중소분류정의에 저장된 '+kind+' 소분류만 고를 수 있습니다(대분류 > 중분류 > 소분류 꼴). 「'+v+'」 은(는) 목록에 없습니다.';};}
+  return '';};}   /* v117 목록 밖 소분류는 막지 않음(「미등록」). 여러 곳에 있는 이름만 위에서 막음 */
 /* v26: 같은 소분류 이름(T올화이트)이 여러 중분류 밑에 생긴다 → 품목·자재 소분류 값 = 「대분류 > 중분류 > 소분류」 경로 */
 var CLS_SEP=' > ';
 function clsPath(r){return [r.big,r.mid,r.name].map(function(v){return String(v==null?'':v).trim();}).join(CLS_SEP);}
@@ -510,7 +513,7 @@ function flowRows(rows){
 }
 var FLOW_N=10;   /* 엑셀 양식의 공정 열 수(공정1~공정10) — 한 줄 = 흐름 하나 */
 /* v48 8 품목별 공정흐름: 품번·흐름은 4·6단계에 저장된 것만(오류 건 뺌). 열쇠 = 품번|흐름 — 영림원이 같은 품목에 같은 흐름을 막는다 */
-function ifCodeErr(v){if(isEmpty(v))return '';return (LISTS['dl-itemcodes']||[]).indexOf(String(v).trim())>=0?'':'「'+v+'」 은(는) 4 품목등록에 없는 품번입니다. 4 품목등록에 먼저 등록하세요.';}
+function ifCodeErr(v){return '';}   /* v117 목록 밖 품번도 받는다(「미등록」) */
 /* v53 빈 흐름: 영림원에 이름만 있고 상세 공정이 0줄인 흐름(11-04 T조립·T포장)은 500272 저장이 막힌다. rows 로 가른다.
    rows 가 빈 배열 = 공정 없음(6단계 「공정 채우기」) · rows 칸이 아예 없는 불러온 문서 = 공정 모름(불러오기 다시) · 폼에서 만든 흐름은 저장 때 공정을 검사하므로 그대로 통과 */
 function flowGap(r){
@@ -521,7 +524,7 @@ function flowGap(r){
 function flowDocs(name){name=String(name==null?'':name).trim();return (data.flows||[]).filter(function(r){return r.status!=='오류'&&String(r.name||'').trim()===name;});}
 function flowGapName(name){var a=flowDocs(name);return !a.length||a.some(function(r){return !flowGap(r);})?'':flowGap(a[0]);}
 function flowGapSay(name,g){return g==='공정 없음'?'「'+name+'」 흐름 안에 공정이 없습니다(영림원이 저장을 거부합니다) — 6 공정등록·공정흐름유형등록에서 공정을 채우세요':'「'+name+'」 흐름의 공정을 모릅니다 — 6 공정등록·공정흐름유형등록에서 영림원 불러오기를 다시 하세요';}
-function ifFlowErr(v){if(isEmpty(v))return '';var t=String(v).trim();if((LISTS['dl-flows']||[]).indexOf(t)<0)return '「'+v+'」 은(는) 6 공정등록·공정흐름유형등록에 없는 흐름입니다. 먼저 등록하세요.';var g=flowGapName(t);return g?flowGapSay(t,g)+'.':'';}
+function ifFlowErr(v){if(isEmpty(v))return '';var t=String(v).trim();if((LISTS['dl-flows']||[]).indexOf(t)<0)return '';   /* v117 목록 밖 흐름은 막지 않음(「미등록」) · 공정 없는 흐름은 그대로 막음 */var g=flowGapName(t);return g?flowGapSay(t,g)+'.':'';}
 function ifFlowLab(v){return flowGapName(v)||'흐름 미등록';}
 function ifKey(r){return String(r.code==null?'':r.code).trim()+'|'+String(r.flow==null?'':r.flow).trim();}
 function ifDup(v,id){return (data.itemflows||[]).some(function(r){return r.id!==id&&ifKey(r)===ifKey(v);})?'같은 품번에 같은 공정흐름이 이미 저장되어 있습니다(영림원이 막습니다). 저장하지 않았습니다.':'';}
@@ -567,7 +570,7 @@ var STEPS=[
   F('tel','전화번호','text'),
   F('biztype','업태','text'),
   F('bizitem','종목','text'),
-  F('kinds','거래처종류','multi',{req:1,wide:1,valid:function(v){var o=['국내매출거래처','수출매출거래처','국내매입거래처','해외매입거래처','외주가공거래처'],x=(v||[]).filter(function(k){return o.indexOf(k)<0;});return x.length?'거래처종류 「'+x.join(', ')+'」 은(는) 목록에 없습니다.':'';},badLab:'거래처종류 확인',opts:['국내매출거래처','수출매출거래처','국내매입거래처','해외매입거래처','외주가공거래처'],def:['외주가공거래처'],hint:'ERP 화면의 거래처종류 목록입니다. 외주처는 외주가공거래처에 체크합니다. 목록 아래쪽 항목은 화면에서 확인하지 못했습니다.'})
+  F('kinds','거래처종류','multi',{req:1,wide:1,valid:function(v){return '';},badLab:'거래처종류 확인',opts:['국내매출거래처','수출매출거래처','국내매입거래처','해외매입거래처','외주가공거래처'],def:['외주가공거래처'],hint:'ERP 화면의 거래처종류 목록입니다. 외주처는 외주가공거래처에 체크합니다. 목록 아래쪽 항목은 화면에서 확인하지 못했습니다.'})
  ],
  recTitle:function(r){return r.name||r.sangho;},
  subt:function(r){return [r.region,(r.kinds||[]).join(', ')].filter(Boolean).join(' · ');}},
@@ -1324,8 +1327,8 @@ function makeField(f,scope){
     wrap.append(h('span',{class:'lab'},f.label,f.req||f.reqIf?h('span',{class:'req','aria-hidden':'true'},'*'):null),h('div',{class:'checks',role:'group','aria-label':f.label},boxes.map(function(b,i){return h('label',{for:id+'-'+i},b,f.opts[i]);})));
     var extraV=[],extraEl=h('p',{class:'hint',hidden:true});wrap.append(extraEl);   /* v87 목록 밖 값은 지우지 않고 보인다. 저장은 칸의 valid 가 막는다 */
     getter=function(){return boxes.filter(function(b){return b.checked;}).map(function(b){return b.value;}).concat(extraV);};
-    setter=function(v){boxes.forEach(function(b){b.checked=(v||[]).indexOf(b.value)>=0;});extraV=(v||[]).filter(function(x){return f.opts.indexOf(x)<0;});extraEl.textContent=extraV.length?'미등록 값: '+extraV.join(', '):'';extraEl.hidden=!extraV.length;};focusEl=boxes[0];
-  }else if(f.type==='select'){
+    setter=function(v){boxes.forEach(function(b){b.checked=(v||[]).indexOf(b.value)>=0;});extraV=(v||[]).filter(function(x){return f.opts.indexOf(x)<0;});extraEl.textContent=extraV.length?'미등록: '+extraV.join(', '):'';extraEl.hidden=!extraV.length;};focusEl=boxes[0];
+  }else if(false){   /* v117 select 칸도 아래 combo 갈래(「직접 입력」)로 — 옛 갈래는 안 씀 */
     ctl=h('select',{id:id},optVals(f).map(function(o){return h('option',{value:o},o);}));   /* v106 영림원 확인 값도 */
     wrap.append(lab(),ctl);
     getter=function(){return ctl.value;};focusEl=ctl;
@@ -1339,7 +1342,7 @@ function makeField(f,scope){
     };
     LIVE.push({el:wrap,redo:function(){var v=getter(),now=optVals(f);if(now.length===ctl.querySelectorAll('option:not([data-bad])').length)return;
       ctl.replaceChildren.apply(ctl,now.map(function(o){return h('option',{value:o},o);}));setter(v);}});   /* v106 */
-  }else if(f.type==='combo'||f.dl){
+  }else if(f.type==='combo'||f.type==='select'||f.dl){
     /* 목록에서 고르는 칸(v6): 드롭다운으로 고르고, 목록에 없는 값은 「직접 입력」을 골라 아래 칸에 적는다.
        목록 = 칸의 opts 또는 앞 단계 자료에서 만든 LISTS[f.dl](refreshLists 가 바뀔 때마다 다시 채운다). */
     ctl=h('select',{id:id});
@@ -1349,20 +1352,16 @@ function makeField(f,scope){
     if(f.mono){ctl.style.fontFamily='var(--mono)';other.style.fontFamily='var(--mono)';}
     var list=function(){return f.dl?(LISTS[f.dl]||[]):optVals(f);};   /* v106 */
     var fillOpts=function(keep,isNew){
-      ctl.replaceChildren.apply(ctl,[h('option',{value:''},'선택')].concat(list().map(function(o){return h('option',{value:o},f.cls3?clsName(o):o);})   /* v107 목록 글자 = 영림원 글자 그대로(소분류 경로 칸은 소분류 이름) — 폼이 만든 붙임 글자 없음 */,   /* v42 optLab: 자재소분류 = 소분류 이름 (대 > 중) */f.listOnly?[]:[h('option',{value:DIRECT},f.newLab||'직접 입력')]));
+      ctl.replaceChildren.apply(ctl,[h('option',{value:''},'선택')].concat(list().map(function(o){return h('option',{value:o},f.cls3?clsName(o):o);})   /* v107 목록 글자 = 영림원 글자 그대로(소분류 경로 칸은 소분류 이름) — 폼이 만든 붙임 글자 없음 */,   /* v42 optLab: 자재소분류 = 소분류 이름 (대 > 중) */[h('option',{value:DIRECT},f.newLab||'직접 입력')]));   /* v117 모든 드롭다운에 「직접 입력」(listOnly 도) */
       setter(keep,isNew);
     };
     getter=function(){return ctl.value===DIRECT?other.value.trim():ctl.value;};
-    if(f.listOnly||f.strictNew)ctl.addEventListener('change',function(){Array.prototype.slice.call(ctl.querySelectorAll('option[data-bad]')).forEach(function(o){if(!o.selected)o.remove();});});
+    if(f.strictNew)ctl.addEventListener('change',function(){Array.prototype.slice.call(ctl.querySelectorAll('option[data-bad]')).forEach(function(o){if(!o.selected)o.remove();});});
     setter=function(v,isNew){
       v=v==null?'':String(v).trim();
       var known=v===''||list().indexOf(v)>=0;
       /* listOnly(v14 워크센터 외주거래처): 「직접 입력」 없음. 목록 밖 값(엑셀·예전 값)은 「(미등록)」 항목으로 보이고 저장은 valid 가 막는다 */
-      if(f.listOnly){
-        Array.prototype.slice.call(ctl.querySelectorAll('option[data-bad]')).forEach(function(o){o.remove();});
-        if(!known)ctl.append(h('option',{value:v,'data-bad':'1'},f.cls3?clsName(v):v));
-        ctl.value=v;return;
-      }
+      /* v117 listOnly 도 목록 밖 값 = 「직접 입력」 + 글 칸(전엔 「(미등록)」 항목 · 저장 막음). 표시는 칸 아래 「미등록」(unregF) */
       /* strictNew(v22 공정·공정흐름 공정): 목록 밖 값은 「새 공정 추가」로 넘기지 않고 「(미등록)」 항목 — 사람이 「새 공정 추가」를 고른 것(isNew)만 새 공정 */
       if(f.strictNew){
         Array.prototype.slice.call(ctl.querySelectorAll('option[data-bad]')).forEach(function(o){o.remove();});
@@ -1398,11 +1397,14 @@ function makeField(f,scope){
       if(miss)warnEl.textContent='4단계 품목등록·5단계 자재등록에 없는 번호입니다. 서버에 이미 있는 번호면 그대로 진행합니다.';
     });
   }
-  if(ctl&&ctl.tagName==='SELECT'){   /* v107 목록 밖 값 표시 = 칸 밖 글(전엔 값 뒤 「(미등록)」) */
-    var badEl=h('div',{class:'err',hidden:true});wrap.append(badEl);
-    var badShow=function(){var o=ctl.selectedOptions&&ctl.selectedOptions[0],bad=!!o&&o.hasAttribute('data-bad');badEl.hidden=!bad;
-      badEl.textContent=bad?((typeof f.badLab==='function'?f.badLab(ctl.value):f.badLab)||(f.cls3&&clsFind(f.clsKind,ctl.value).length>1?'대·중분류를 고르세요':'목록에 없는 값')):'';};
+  if(ctl&&ctl.tagName==='SELECT'){   /* v117 목록 밖 값 = 칸 아래 「미등록」(값 글자는 그대로). strictNew 의 data-bad(공정 이름 조각)는 v107 글 그대로 */
+    var badEl=h('div',{class:'unreg',hidden:true});wrap.append(badEl);
+    var badShow=function(){var o=ctl.selectedOptions&&ctl.selectedOptions[0],bad=!!o&&o.hasAttribute('data-bad'),un=!bad&&unregF(f,getter());badEl.hidden=!bad&&!un;
+      badEl.className=bad?'err':'unreg';
+      badEl.textContent=bad?((typeof f.badLab==='function'?f.badLab(ctl.value):f.badLab)||'목록에 없는 값'):un?(f.cls3&&clsFind(f.clsKind,getter()).length>1?'미등록 · 대·중분류를 고르세요':'미등록'):'';};
     var setB=setter;setter=function(v,x){setB(v,x);badShow();};ctl.addEventListener('change',badShow);
+    if(other){other.addEventListener('input',badShow);other.addEventListener('change',badShow);}
+    LIVE.push({el:wrap,redo:badShow});
   }
   if(f.clsKind){   /* v25 품목·자재 소분류: 고른 소분류의 대·중분류를 칸 아래에 보인다(영림원도 소분류만 고르면 저절로) */
     var clsEl=h('div',{class:'hint',hidden:true});wrap.append(clsEl);
@@ -1443,6 +1445,20 @@ function makeField(f,scope){
   return api;
 }
 function isEmpty(v){return v===''||v==null||(Array.isArray(v)&&!v.length);}
+/* v117 「미등록」 = 드롭다운 목록이 있는 칸의 값이 목록에 없음. 막지 않고 칸 아래·카드·일괄 목록에 표시만(사장님 「다른 드롭다운목록도 텍스트 입력 가능하게 해줘」).
+   「새 공정 추가」 같은 새 이름 칸(newLab)·체크 칸은 안 봄. 목록이 아직 안 왔으면(빈 목록) 안 봄 */
+function listOfF(f){if(f.dl)return LISTS[f.dl]||[];if(f.opts&&f.type!=='multi')return optVals(f);if(f.type==='multi')return f.opts;return null;}
+function unregF(f,v){
+  if(!f||f.type==='check'||f.newLab||isEmpty(v))return false;var L=listOfF(f);if(!L||!L.length)return false;
+  if(f.type==='multi')return (v||[]).some(function(x){return L.indexOf(x)<0;});
+  return L.indexOf(String(v).trim())<0;
+}
+function unregLabs(s,r){   /* 문서(또는 일괄 건 값) 안 「미등록」 칸 이름 */
+  var out=[];if(!s||!r)return out;
+  (s.fields||[]).forEach(function(f){if(unregF(f,r[f.k])&&out.indexOf(f.label)<0)out.push(f.label);});
+  if(s.rowFields&&Array.isArray(r.rows))r.rows.forEach(function(x){(s.rowFields||[]).forEach(function(f){if(x&&unregF(f,x[f.k])&&out.indexOf(f.label)<0)out.push(f.label);});});
+  return out;
+}
 
 function makeRow(step,idx,onRemove){
   var fields=step.rowFields.filter(function(f){return !f.auto;}).map(function(f){return makeField(f);});  /* auto(v19 공정흐름유형 공정순서 등)는 폼이 채우니 칸이 없다 */
@@ -2555,7 +2571,7 @@ function iwSteps(code){   /* 그 품목의 공정 줄 = 8단계 흐름들의 공
 }
 function iwWcErr(v,proc){
   if(isEmpty(v))return '';var t=String(v).trim();
-  if((LISTS['dl-wcreg']||[]).indexOf(t)<0)return '「'+v+'」 은(는) 2 워크센터등록에 없습니다. 먼저 등록하세요.';
+  if((LISTS['dl-wcreg']||[]).indexOf(t)<0)return '';   /* v117 목록 밖 워크센터는 막지 않음(「미등록」) · 공정 규칙은 목록 안 업체만 봄 */
   if(proc&&iwOptions(proc).indexOf(t)<0)return '「'+t+'」 은(는) '+proc+' 공정을 하는 업체가 아닙니다(사장님 규칙).';
   return '';
 }
@@ -3105,10 +3121,10 @@ function conPickFn(){
    수입입고: 입력 폼 없이 B/L 을 골라 입고일·입고창고·수량만 넣는다(impPickFn). B/L 하나에 입고 문서 하나 — 나눠 입고는 시험 전이라 만들지 않았다. */
 function impNum(v){var t=String(v==null?'':v).trim();return /^\d+(\.\d+)?$/.test(t)&&Number(t)>0;}
 function impPosErr(label){return function(v){return isEmpty(v)||impNum(v)?'':label+'은(는) 0보다 큰 숫자입니다.';};}
-function impVendorErr(v){return isEmpty(v)||(LISTS['dl-impvendors']||[]).indexOf(String(v).trim())>=0?'':'영림원에 등록된 거래처만 고를 수 있습니다. 「'+v+'」 은(는) 목록에 없습니다.';}
+function impVendorErr(v){return '';}   /* v117 */
 function impFilm(code){code=String(code==null?'':code).trim();return edgeFilms().filter(function(r){return String(r.code||'').trim()===code;})[0]||null;}
 function impFilmLab(code){var m=impFilm(code);return m?[m.name,code,m.unit].filter(Boolean).join(' · '):code;}
-function impFilmErr(v){return isEmpty(v)||impFilm(v)?'':'자재분류 중분류가 '+EDGE_MID+' 인 자재만 고를 수 있습니다. 「'+v+'」 은(는) 목록에 없습니다.';}
+function impFilmErr(v){return '';}   /* v117 목록 밖 품번도 받는다(「미등록」) */
 function impblRows(v){return (v.rows||[]).filter(function(o){return !isEmpty(o.ccode)||!isEmpty(o.qty)||!isEmpty(o.price);});}
 function impblCheck(v){   /* 일괄 목록 「모두 저장」은 입력 칸 검사를 안 거친다 */
   return impblRows(v).map(function(o){return impFilmErr(o.ccode)||impPosErr('단가')(o.price)||impPosErr('수량')(o.qty);}).filter(Boolean)[0]||'';
@@ -3242,13 +3258,13 @@ function purIsBuy(m){return !!m&&PUR_ASSETS.indexOf(purTrim(m.asset))>=0;}
 function purPlates(){return (data.materials||[]).concat(data.items||[]).filter(function(r){return r.status==='완료'&&!ylwGone(r)&&purIsBuy(r);});}
 function purPlate(code){code=String(code==null?'':code).trim();return purPlates().filter(function(r){return String(r.code||'').trim()===code;})[0]||null;}
 function purPlateLab(code){var m=purPlate(code);return m?[m.name,code,m.spec,m.unit].filter(Boolean).join(' · '):code;}
-function purPlateErr(v){return isEmpty(v)||purPlate(v)?'':'4 품목등록·5 자재등록에 등록이 끝난 상품·원자재·부자재·저장품·소모자재·수탁자재만 고를 수 있습니다. 「'+v+'」 은(는) 목록에 없습니다.';}
-function purVendorErr(v){return isEmpty(v)||(LISTS['dl-purvendors']||[]).indexOf(String(v).trim())>=0?'':'영림원에 등록된 거래처만 고를 수 있습니다. 「'+v+'」 은(는) 목록에 없습니다.';}
+function purPlateErr(v){return '';}   /* v117 목록 밖 품번도 받는다(「미등록」) */
+function purVendorErr(v){return '';}   /* v117 */
 function purNumErr(label){return function(v){return isEmpty(v)||/^\d+(\.\d+)?$/.test(String(v).trim())?'':label+'은(는) 숫자입니다.';};}
 function purKey(r){return [r.vendor,r.code,r.from].map(function(x){return String(x==null?'':x).trim();}).join('|');}
 function purDup(v,id){return (data.purprices||[]).some(function(r){return r.id!==id&&r.status!=='오류'&&purKey(r)===purKey(v);})?'같은 구매거래처·품번·적용시작일이 이미 저장되어 있습니다 — 저장하지 않았습니다.':'';}
-function purFill(v){var m=purPlate(v.code)||{};v.name=m.name||'';v.spec=m.spec||'';v.unit=m.unit||'';}
-function purDoc(d){purFill(d);d.price=Number(d.price);['minqty','stepqty','days'].forEach(function(k){if(!isEmpty(d[k]))d[k]=Number(d[k]);});}
+function purFill(v,keep){var m=purPlate(v.code);if(!m&&keep)return;m=m||{};v.name=m.name||'';v.spec=m.spec||'';v.unit=m.unit||'';}   /* v117 keep = 목록 밖 품번이면 사람이 친 품명·규격·단위를 둠 */
+function purDoc(d){purFill(d,1);d.price=Number(d.price);['minqty','stepqty','days'].forEach(function(k){if(!isEmpty(d[k]))d[k]=Number(d[k]);});}
 /* v80 원장 구매. 구매 입력 = 보통 입력 폼 + 줄. 품번 목록 = 구매단가와 같은 purPlates. 품명·규격·단위는 저장 때 5 자재에서 채운다(purchDoc). 수량 소수 자리는 영림원 구매/자재 2자리에 맞춘다.
    같은 구매거래처·품번을 한 문서에 두 줄 두면 납품 남은 수량(발주·품번 기준)이 갈리지 않아 막는다 — 창고가 다르면 문서를 나눠 저장한다.
    단가 저절로(사장님 결정 5번): erp_purprices 문서 값을 그대로 보여 줄 뿐이다. 영림원 501868 등록·품의 기본단가와 잇지 않았다(저장 시험 전).
@@ -3333,8 +3349,10 @@ function purdPickFn(){
     tb.replaceChildren.apply(tb,rows.map(function(r){
       var d=function(l,c,cls){return h('td',{'data-l':l,class:cls||null},c);};
       var inp=h('input',{type:'number',class:'cprice',min:'0',step:'any',inputmode:'decimal','aria-label':r.cname+' 납품수량',value:String(r.qty),disabled:busy,on:{input:function(e){r.qty=e.target.value;msg.textContent='';}}});
-      var sel=h('select',{'aria-label':r.cname+' 창고',disabled:busy,on:{change:function(e){r.wh=e.target.value;msg.textContent='';}}},uniq(PUR_WHS.concat(r.wh?[r.wh]:[])).map(function(o){return h('option',{value:o},o);}));   /* v107 */
-      sel.value=r.wh;if(r.wh&&PUR_WHS.indexOf(r.wh)<0)sel.classList.add('bad');
+      var whF=makeField(Object.assign({},BYKEY.purdelvs.rowFields.filter(function(f){return f.k==='wh';})[0],{type:'combo',opts:PUR_WHS,req:0,def:null})),sel=whF.el;   /* v117 목록 밖 창고도 「직접 입력」 · 칸 옆 「미등록」 */
+      var wl=sel.querySelector('label');if(wl)wl.remove();whF.set(r.wh);
+      var whOn=function(){r.wh=whF.get();msg.textContent='';};sel.addEventListener('change',whOn);sel.addEventListener('input',whOn);
+      if(busy)Array.prototype.forEach.call(sel.querySelectorAll('select,input'),function(x){x.disabled=true;});
       return h('tr',{},[d('품명',r.cname,'nm'),d('품번',r.ccode),d('규격',r.cspec),d('단위',r.unit),d('단가',show(r.price)),d('발주수량',show(r.poqty)),d('남은 수량',show(r.left)),d('납품수량',inp),d('창고',sel)]);
     }));
     btn.disabled=busy;
@@ -3349,7 +3367,6 @@ function purdPickFn(){
     var q=purTrim(r.qty);
     if(q===''||Number(q)===0)return r.cname+' 납품수량을 넣으세요. 이번에 안 온 줄을 빼는 것은 영림원 시험 전이라 아직 저장할 수 없습니다.';
     var e=purQtyErr('납품수량')(q);if(e)return r.cname+' '+e;
-    if(r.wh&&PUR_WHS.indexOf(r.wh)<0)return r.cname+' 창고 「'+r.wh+'」 은(는) 목록에 없습니다.';
     return Number(q)>left?r.cname+' 납품수량이 남은 수량 '+show(left)+' 보다 많습니다.':'';
   }
   function saveIt(){
@@ -4473,7 +4490,8 @@ function renderStep(){
   if(iwFn){var iwCode=form.field('code'),iwProc=form.field('proc');   /* 사람이 고를 때만 */
     iwCode.el.addEventListener('change',function(){var it=ifItem(iwCode.get());if(it)form.fill({name:it.name||'',spec:it.spec||''},[]);});
     iwProc.el.addEventListener('change',function(){var v={code:iwCode.get(),proc:iwProc.get()};iwFill(v);if(!isEmpty(v.seq))form.fill({seq:v.seq},[]);});}
-  if(s.key==='purprices'){var puCode=form.field('code');puCode.el.addEventListener('change',function(){var v={code:puCode.get()};purFill(v);form.fill({name:v.name,spec:v.spec,unit:v.unit},[]);});}   /* v78 */
+  if(s.key==='purprices'){var puCode=form.field('code');var puRo=function(){var m=!!purPlate(puCode.get());['name','spec','unit'].forEach(function(k){var i=form.field(k).el.querySelector('input');if(i){i.readOnly=m;i.tabIndex=m?-1:0;}});};   /* v117 목록 밖 품번 = 품명·규격·단위를 직접 */
+    puCode.el.addEventListener('change',function(){var v={code:puCode.get()};purFill(v);puRo();if(purPlate(v.code)||!isEmpty(v.code))form.fill({name:v.name,spec:v.spec,unit:v.unit},[]);});puCode.el.addEventListener('input',puRo);}   /* v78 */
   var impBtn=h('button',{type:'button',class:'btn imp','aria-expanded':'false',on:{click:function(){imp.hidden=!imp.hidden;impBtn.setAttribute('aria-expanded',String(!imp.hidden));}}},ico('import'),'영림원에서 불러오기');
   var noBar=(s.noForm&&!s.xlCols)||s.noXl,xlQ=h('div',{class:'bulklist',style:'flex-basis:100%'});   /* v91 앞 문서를 고르는 메뉴: 양식 줄을 건별 단추로 */
   var impBar=IMPORT_BTN[s.key]&&noBar?h('div',{class:'actions'},impBtn,imp):null;   /* v85 양식 단추 줄이 없는 메뉴는 불러오기만 한 줄 */
@@ -4600,7 +4618,7 @@ function tplBuild(X,s){
     cols.forEach(function(cc,c){
       var f=cc.f,l=pickList(f);if(!l||!l.length)return;
       lists.push(l);
-      dv.push({col:X.utils.encode_col(c),src:X.utils.encode_col(lists.length-1),n:l.length,strict:f.type==='select'||!!f.listOnly,f:f,sqref:r0>1?X.utils.encode_col(c)+(r0+1)+':'+X.utils.encode_col(c)+VMAX:null});
+      dv.push({col:X.utils.encode_col(c),src:X.utils.encode_col(lists.length-1),n:l.length,strict:false,f:f,   /* v117 모든 드롭다운 목록 밖 입력 허용 */sqref:r0>1?X.utils.encode_col(c)+(r0+1)+':'+X.utils.encode_col(c)+VMAX:null});
     });
     var c3i=cols.map(function(c){return c.f.cls3Pos;}).indexOf(0),c3ws=c3i>=0?cls3Book(X,s,ws,cols,c3i,lists,dv):null;   /* v42 자재 대·중·소 */
     if(dv.length){
@@ -4643,7 +4661,7 @@ function cls3Book(X,s,ws,cols,c0,lists,dv){
   var E=X.utils.encode_col,J=E(cols.map(function(c){return c.f;}).indexOf(f)),B=E(c0),M=E(c0+1),S=E(c0+2),Q="'"+s.title+"'!",N=CLS3_ROWS+1;
   var col=function(a){lists.push(a);var c=E(lists.length-1);return "'목록'!$"+c+'$1:$'+c+'$'+a.length;};
   var bs=uniq(R.map(function(r){return r.b;})),t1=uniq(R.map(function(r){return r.b+'|'+r.m;})).map(function(k){return R.filter(function(r){return r.b+'|'+r.m===k;})[0];});
-  lists.push(bs);dv.push({col:B,src:E(lists.length-1),n:bs.length,strict:true,f:cols[c0].f,sqref:B+'2:'+B+N});
+  lists.push(bs);dv.push({col:B,src:E(lists.length-1),n:bs.length,strict:false,f:cols[c0].f,sqref:B+'2:'+B+N});
   var T1b=col(t1.map(function(r){return r.b;})),T1m=col(t1.map(function(r){return r.m;})),
       T2k=col(R.map(function(r){return r.b+'|'+r.m;})),T2s=col(R.map(function(r){return r.s;})),
       T3k=col(R.map(function(r){return r.b+'|'+r.m+'|'+r.s;})),T3p=col(R.map(function(r){return clsName(r.path);}));   /* 경로 대신 영림원 소분류 이름 */
@@ -4655,8 +4673,8 @@ function cls3Book(X,s,ws,cols,c0,lists,dv){
     for(var k=1;k<=Km;k++)hs[X.utils.encode_cell({r:r-1,c:k-1})]={t:'s',v:'',f:'IF('+b+'="","",IF(COUNTIF('+T1b+','+b+')<'+k+',"",INDEX('+T1m+',MATCH('+b+','+T1b+',0)+'+(k-1)+')))'};
     for(k=1;k<=Ks;k++)hs[X.utils.encode_cell({r:r-1,c:Km+k-1})]={t:'s',v:'',f:'IF('+Q+'$'+M+r+'="","",IF(COUNTIF('+T2k+','+bm+')<'+k+',"",INDEX('+T2s+',MATCH('+bm+','+T2k+',0)+'+(k-1)+')))'};
     ws[J+r]={t:'s',v:'',f:'IF($'+S+r+'="","",IFERROR(INDEX('+T3p+',MATCH($'+B+r+'&"|"&$'+M+r+'&"|"&$'+S+r+','+T3k+',0)),""))'};
-    dv.push({sqref:M+r,formula:"'고르기'!$A$"+r+':$'+E(Km-1)+'$'+r,strict:true,f:{label:'중분류'}});
-    dv.push({sqref:S+r,formula:"'고르기'!$"+E(Km)+'$'+r+':$'+E(Km+Ks-1)+'$'+r,strict:true,f:{label:'소분류'}});
+    dv.push({sqref:M+r,formula:"'고르기'!$A$"+r+':$'+E(Km-1)+'$'+r,strict:false,f:{label:'중분류'}});
+    dv.push({sqref:S+r,formula:"'고르기'!$"+E(Km)+'$'+r+':$'+E(Km+Ks-1)+'$'+r,strict:false,f:{label:'소분류'}});
   }
   hs['A1']={t:'s',v:''};hs['!ref']=X.utils.encode_range({s:{r:0,c:0},e:{r:N-1,c:Km+Ks-1}});
   ws['!ref']=X.utils.encode_range({s:{r:0,c:0},e:{r:N-1,c:cols.length-1}});
@@ -4707,8 +4725,8 @@ function colNote(f,mi){
   else t.push(f.req?'필수':f.reqIf?'조건부 필수(아래 설명)':'선택 입력(비워도 됩니다)');
   if(f.type==='multi')t.push('한 칸에 하나씩 고릅니다. 여럿이면 '+f.label+'1~'+MULTI_N+' 에 나눠 고릅니다.');
   if(f.type==='check')t.push('O = 체크함, X 또는 빈 칸 = 체크 안 함.');
-  else if(f.dl)t.push((pickList(f).length?(f.listOnly?'드롭다운 목록에 있는 것만 넣을 수 있습니다.':'드롭다운에서 고르거나 직접 적습니다.'):'양식을 받을 때 목록이 비어 있어 드롭다운이 없습니다. 직접 적습니다.')+' 목록: '+DL_SRC[f.dl]+'.');
-  else if(f.opts)t.push((f.type==='select'||f.listOnly?'목록에서만 고릅니다: ':'드롭다운에서 고르거나 직접 적습니다. 목록: ')+optVals(f).join(' / '));   /* v109 드롭다운과 같은 목록 */
+  else if(f.dl)t.push((pickList(f).length?'드롭다운에서 고르거나 직접 적습니다.':'양식을 받을 때 목록이 비어 있어 드롭다운이 없습니다. 직접 적습니다.')+' 목록: '+DL_SRC[f.dl]+'.');
+  else if(f.opts)t.push('드롭다운에서 고르거나 직접 적습니다. 목록: '+optVals(f).join(' / '));   /* v109 드롭다운과 같은 목록 */
   if(f.type==='date')t.push('날짜 꼴: 2026-01-01 (연-월-일).');
   if(f.type==='number')t.push('숫자로 적습니다.');
   if(f.ph)t.push(/^예:/.test(f.ph)?'입력 '+f.ph:'칸 안내: '+f.ph);
@@ -4860,7 +4878,7 @@ function takeSheet(X,s,aoa,say){
       s.fields.forEach(function(f){if(f.cls3&&!isEmpty(one[f.k])){one[f.k]=clsResolve(f.clsKind,one[f.k]);if(head[f.k]!=null)head[f.k]=clsResolve(f.clsKind,head[f.k]);}});   /* v42: 영림원 소분류 이름·짧은 이름·경로 → 경로 */
       if(s.key==='itemwcs'&&one.code)iwFill(one);   /* v55 */
       if(s.key==='itemmats'&&one.code)imFill(one);   /* v57 */
-      if(s.key==='purprices'&&one.code)purFill(one);   /* v78 */
+      if(s.key==='purprices'&&one.code)purFill(one,1);   /* v78 · v117 목록 밖 품번이면 양식 품명 그대로 */
       if(s.key==='itemflows'&&one.code){var ifIt=ifItem(one.code);if(ifIt){if(isEmpty(one.name))one.name=ifIt.name||'';if(isEmpty(one.spec))one.spec=ifIt.spec||'';}}   /* v48 품번만 적어도 품명·규격 채움 */
       lines++;
       if(bomSplit){
@@ -4932,7 +4950,8 @@ function bulkState(b,it){
   if(fmt.length){var bf=b.s.fields.filter(function(f){return f.valid&&f.valid(it.vals[f.k]);})[0];
     return {label:(typeof bf.badLab==='function'?bf.badLab(it.vals[bf.k]):bf.badLab)||'번호 틀림',cls:'오류',why:fmt.join(' '),bad:1};}   /* v42 badLab 함수 = 값 따라(소분류 여러 곳) */
   if(dup)return {label:'이름 겹침',cls:'오류',why:dup,bad:1};
-  return {label:'업로드 준비중',cls:'대기',ok:1};
+  var un=unregLabs(b.s,it.vals);   /* v117 목록 밖 값은 막지 않고 알림만 */
+  return {label:'업로드 준비중',cls:'대기',ok:1,why:un.length?'미등록: '+un.join('·'):''};
 }
 function bulkDraw(){
   var b=bulk;if(!b)return;
@@ -5346,6 +5365,7 @@ function recCard(s,r,kit,openIds){
         gap?h('span',{class:'chip 오류',title:flowGapSay(r.name,gap)},gap==='공정 모름'?'공정 모름 — 불러오기 다시':gap):null,
         r.source==='영림원'?h('span',{class:'chip src',title:'영림원에서 불러온 자료'},'영림원'):null,   /* v23 */
         r.ylwDiff?h('span',{class:'chip diff',title:'영림원에 등록된 값과 다릅니다'},'영림원과 다름'):null,
+        (function(){var u=st!=='완료'?unregLabs(s,r):[];return u.length?h('span',{class:'chip unreg',title:'미등록: '+u.join('·')},'미등록'):null;})(),   /* v117 목록 밖 값 */
         ylwGone(r)?h('span',{class:'chip gone',title:'영림원 불러오기('+r.ylwGone+')에서 영림원에 없음'},'영림원에 없음'):null,   /* v104 */
         h('span',{class:'chip '+st},st)),
       h('div',{class:'recbody'},
@@ -5774,7 +5794,7 @@ function sheetBad(f,v){if((f.req)&&isEmpty(typeof v==='string'?v.trim():v))retur
 function sheetParse(f,t){
   t=String(t==null?'':t).trim();
   if(f.type==='check')return /^(o|v|y|yes|예|true|1|○|●|✓|✔)$/i.test(t);
-  if(sheetIsList(f)){if(f.dl)t=t.replace(/\s*>\s*/g,CLS_SEP);return t===''||sheetList(f).indexOf(t)>=0?t:null;}
+  if(sheetIsList(f)){if(f.dl)t=t.replace(/\s*>\s*/g,CLS_SEP);return t;}   /* v117 목록 밖 값도 넣음(칸 노란 테두리 · 「미등록」) */
   return t;
 }
 function sheetSet(r,k,v){
@@ -5810,8 +5830,9 @@ function sheetBox(s){
   function drawCount(){var c=sheetCount(s);cnt.textContent=c.n?c.n+'줄 · '+c.m+'칸 바뀜':'바뀐 칸 없음';saveBtn.disabled=!c.n||!db;}
   function mark(td,f,r){
     var d=SHEET.draft[r.id],chg=!!d&&(f.k in d),bad=chg?sheetBad(f,d[f.k]):'';
-    td.classList.toggle('chg',chg);td.classList.toggle('bad',!!bad);
-    td.title=chg?'원래 값: '+editShow(r[f.k])+(bad?'\n'+bad:''):'';
+    var un=sheetIsList(f)&&unregF(f,sheetVal(r,f.k));   /* v117 */
+    td.classList.toggle('chg',chg);td.classList.toggle('bad',!!bad);td.classList.toggle('unreg',un);
+    td.title=(chg?'원래 값: '+editShow(r[f.k])+(bad?'\n'+bad:''):'')+(un?(chg?'\n':'')+'미등록':'');
   }
   function cell(r,f){
     var td=h('td',{'data-k':f.k}),v=sheetVal(r,f.k),ctl;
@@ -5819,9 +5840,9 @@ function sheetBox(s){
     if(f.type==='check')ctl=h('input',{type:'checkbox',checked:!!v,'aria-label':f.label});
     else if(sheetIsList(f)){
       var list=sheetList(f),cur=v==null?'':String(v).trim();
-      ctl=h('select',{'aria-label':f.label},h('option',{value:''},''),list.map(function(o){return h('option',{value:o},o);}),
-        cur&&list.indexOf(cur)<0?h('option',{value:cur},cur):null);
-      ctl.value=cur;if(cur&&list.indexOf(cur)<0)ctl.classList.add('bad');   /* v107 목록 밖 값 = 칸 빨간 테두리(값 뒤 글 없음) */
+      var dlId='sheetdl-'+f.k;if(!document.getElementById(dlId))document.body.append(h('datalist',{id:dlId}));
+      document.getElementById(dlId).replaceChildren.apply(document.getElementById(dlId),list.map(function(o){return h('option',{value:o});}));
+      ctl=h('input',{type:'text',autocomplete:'off',list:dlId,'aria-label':f.label,value:cur});   /* v117 목록에서 고르거나 직접 적음 */
     }else ctl=h('input',{type:'text',autocomplete:'off','aria-label':f.label,value:v==null?'':String(v)});
     ctl.setAttribute('data-id',r.id);ctl.setAttribute('data-k',f.k);
     ctl.style.width=(SHEET_W[f.k]||120)+'px';if(f.mono)ctl.style.fontFamily='var(--mono)';
