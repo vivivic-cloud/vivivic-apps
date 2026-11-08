@@ -93,6 +93,7 @@
     boms: { coll: 'erp_boms', title: 'BOM', key: (d) => R.s(d.pcode) + '|' + R.s(d.pver), fields: ['pname', 'pcode', 'pspec', 'pver'], rows: ['proc', 'order', 'cname', 'ccode', 'cspec', 'cver', 'inunit', 'qn', 'qd', 'hasSub'] },
     itemflows: { coll: 'erp_itemflows', title: '품목별 공정흐름', key: (d) => R.s(d.code) + '|' + R.s(d.flow), fields: ['name', 'code', 'spec', 'flow'] },
     itemmats: { coll: 'erp_itemmats', title: '제품별공정별소요자재', key: (d) => R.s(d.code) + '|' + R.s(d.rev), fields: ['name', 'code', 'spec', 'rev'] },
+    purprices: { coll: 'erp_purprices', title: '구매단가', key: (d) => [R.s(d.vendor), R.s(d.code), R.s(d.from).replace(/\D/g, '')].join('|'), fields: ['vendor', 'name', 'code', 'spec', 'unit', 'io', 'cur', 'price', 'minqty', 'stepqty', 'from', 'memo', 'maker', 'days'] },
     contracts: { coll: 'erp_contracts', title: '외주계약', key: (d) => R.s(d.vendor), fields: ['unit', 'vendor'], rows: ['prod', 'pcode', 'seq', 'proc', 'oname', 'ocode', 'cur', 'basis', 'price', 'from'] },
   };
   const nv = (v) => {
