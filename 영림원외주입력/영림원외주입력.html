@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v112 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v113 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -331,7 +331,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v112</span>
+    <span class="ver">v113</span>
   </div>
 </header>
 <div class="wrap">
@@ -4367,7 +4367,7 @@ function renderStep(){
   var say=function(t,bad){xlMsg.textContent=t;xlMsg.className='msg'+(bad?' bad':'');};
   var fileIn=h('input',{type:'file',accept:'.xlsx,.xls,.csv',hidden:true,on:{change:function(){
     var file=fileIn.files[0];fileIn.value='';if(file)uploadSheet(s,file,say);}}});
-  /* 구글 스프레드시트 (v8) — 받기는 드라이브의 단계별 양식을 「사본 만들기」로 열고, 올리기는 붙여 넣은 시트 링크를 CSV 로 읽는다 */
+  /* 구글 스프레드시트 — 받기는 누를 때 새 시트를 만들어 열고(v113 openGsTemplate), 올리기는 붙여 넣은 시트 링크를 CSV 로 읽는다(v8) */
   var gsIn=h('input',{type:'url',placeholder:'구글시트 링크를 붙여 넣으세요',autocomplete:'off',on:{keydown:function(e){if(e.key==='Enter'){e.preventDefault();gsGo();}}}});
   var gsGo=function(){var u=gsIn.value.trim();if(u)uploadGsheet(s,u,say);else gsIn.focus();};
   var gsRow=h('div',{class:'gsrow',hidden:true},gsIn,h('button',{type:'button',class:'btn',on:{click:gsGo}},'읽기'));
@@ -4496,8 +4496,15 @@ function aceCols(s){
     return {f:f||{k:'_ace',label:a[1],type:'text',aceOnly:1,hint:a[0]==='IDX_NO'?'영림원 데이터가져오기 정렬 기준 — 1부터 차례로 적습니다(비워도 폼은 받습니다).':'영림원 칸 — 폼에는 없어 올려도 읽지 않습니다. 비워 두면 영림원이 기본값을 씁니다.'},code:a[0],lab:a[1]};
   });
 }
+/* v113: 양식 만들기(tplBuild)와 받기를 나눴다 — 구글시트 양식(gsMake)도 같은 파일을 쓴다 */
 function downloadTemplate(s,say){
   loadXlsx().then(function(X){
+    var t=tplBuild(X,s);
+    saveFile(new Blob([t.bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),t.name+'.xlsx');
+    say(t.msg);
+  }).catch(function(){say(XLSX_FAIL,true);});
+}
+function tplBuild(X,s){
     var cols=[],ace=s.key==='boms';
     /* 필수 칸은 화면과 같이 이름 뒤에 * 를 붙인다(req·reqIf). 올릴 때 normHead 가 * 를 떼고 맞춘다.
        여럿 고르는 칸은 첫 열(거래처종류1)에만 * — 네 열 중 하나 이상이면 채워진 것이다. */
@@ -4550,10 +4557,9 @@ function downloadTemplate(s,say){
     bytes=sizeNotes(X,bytes,notes);
     if(txc.length)bytes=aceTextCols(X,bytes,txc);
     if(c3ws)bytes=X.CFB.write(X.CFB.read(new Uint8Array(bytes),{type:'array'}),{type:'array',fileType:'zip',compression:true});   /* v42 대·중·소 수식이 많아 압축(1.5MB → 작게) */
-    saveFile(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),'외주입력_'+s.n+'_'+s.title+'_양식.xlsx');
     /* 머리에 * 없는 조건부 필수 칸(noTplStar)은 받을 때 안내 문구로 알린다(v12) */
-    say(sheetCols(s).filter(function(f){return f.noTplStar;}).map(function(f){return f.hint?f.label+': '+f.hint:'';}).join(' '));
-  }).catch(function(){say(XLSX_FAIL,true);});
+    return {bytes:bytes,name:'외주입력_'+s.n+'_'+s.title+'_양식',
+      msg:sheetCols(s).filter(function(f){return f.noTplStar;}).map(function(f){return f.hint?f.label+': '+f.hint:'';}).join(' ')};
 }
 /* v42 자재 대·중·소 이어지는 드롭다운(엑셀·구글시트 둘 다 되는 옛 함수만 — INDEX·MATCH·COUNTIF, 동적 배열·INDIRECT 이름 없음).
    「목록」 시트 열 더함: 대분류 목록 · 표1(대분류, 중분류 — 대분류끼리 붙음) · 표2(대|중, 소분류) · 표3(대|중|소, 경로).
@@ -4952,38 +4958,44 @@ function showBulk(s,recs,say,guide){
   if(guide){say('안내로 '+b.items.length+'건을 채웠습니다. 아래 목록에서 버튼을 눌러 빈 칸을 채우고 저장하세요(저장 전 영림원·저장소에 아무것도 안 갑니다).');return;}
   say('엑셀에서 '+b.items.length+'건을 읽었습니다. 업로드 준비중 '+ready+'건'+(ready<b.items.length?', 확인할 것 '+(b.items.length-ready)+'건':'')+' — 아래 일괄 업로드 목록에서 버튼을 눌러 확인하세요.',ready<b.items.length);
 }
-/* ---------- 구글 스프레드시트 양식 받기 · 올리기 (v8, 키·로그인 없이) ----------
-   받기: 사장님 드라이브 「영림원외주입력 양식」 폴더의 단계별 양식(엑셀 양식을 구글시트로 바꾼 것 — 열·별표·드롭다운 같음)을 /copy 로 연다.
-   올리기: 붙여 넣은 시트 링크의 /export?format=csv 를 읽어(공유 「링크가 있는 모든 사용자」 필요) 엑셀 올리기와 같은 takeSheet 로 받는다. 탭은 링크의 gid, 없으면 첫 탭. */
-var GS_TEMPLATES={   /* v111 22장 모두 지금 폼 목록으로 다시 만듦(「… (v110)」, 목록 밖 입력 허용). 옛 시트는 폴더에 남김 · 다시 만드는 법 = CLAUDE.md 「양식 목록 = 폼 목록 (v110)」 */
-  vendors:'1l08-m9UPqRG8MnNAFea66mU5qQKtHc2XmOXIEpoxG9c',
-  workcenters:'1mH3xLwS4NVgibZUYav5dzWjtrKvPzSeHrzuaazw92K8',
-  classes:'1aW2DRFDsVqu2gQOxc6EU-cc5KTr5einCai6DKcPg_c0',
-  items:'1_U0uAkNn-bJwZ5tqyLC7reJ90vlkaIX7j-b7iYskK-s',
-  materials:'1goA_tG3abIdxjGBx5Hnl8_AMcaRDZ4OkyrwcRyd7usg',
-  processes:'1Du1lN-6HX72Pa2ypeb_suOuEEWo0g0IupHq69KN_GYk',
-  flows:'1g0rst-oIbaBYV0h-yawVvWF96W2Ek37E6_w-YZCuxPQ',
-  boms:'1g42nF_-fVRN72OHCmkinS-S9ErZm7VOn7NBKV4S3_TM',
-  itemflows:'11SBd3v-iED7tyvWMX_4GB0HDo77o-_LaojgUTOY2E5w',
-  itemmats:'1Ygq-M8DLE_7wyKDj97nxQ3W7pZFE_sMMDMUtdlltn-M',
-  itemwcs:'1OYmsITE_qnhuuFr7ZLP7eBkeEg9VAfotCMmjSJFFkwo',
-  contracts:'1unG4pTxzuRL7fR73FV5j_Xnmci-BknsVQbVtr25P13U',
-  imporders:'1A-6BeXcFqOKsOjf-UfmTOAQyp6KnyuFkpaaOF0NMCts',
-  imppays:'1Y6m6FsUM6EEkRDCUHppwjzihQZPLjqwYDn77JXEMP38',
-  impinvs:'1V6dm-_c8-qribgsSIymMorWkgDgTDkiuhrlX8yDRL28',
-  impbls:'1I02mgHzYjOSkHg8gcB8IynW6yV8VzA6PAhWe0wDnCso',
-  impins:'1KVszKFT3JtoJyZ4-VV5VkACagCkQ7hfvT6S75Jm4IHo',
-  purprices:'1wkRgQ4KFjYRDFK48TeFua93_4DRsVEh6UGEjpnSrZzc',
-  purchases:'1jbgBFPyqtPbH-V03869zcSGWixD5KlIwIUmJHgSS4p8',
-  purdelvs:'1GoXzxP1iLiOIstSC8WU5gsTFz-v9-GOncqV5zTDvwT0',
-  prods:'1YKY8tAdRP5CIM1ApUWi3BjN7oZuI4r-NHs844ywuvcU',
-  proddlvs:'1JZrcCyYv3LfHAeZa45Go9WFBKz6TwGThR6gIiR97RSo'};   /* v22: 4단계 공정·공정흐름 양식(드라이브 「외주입력_4_공정·공정흐름_양식 (v22)」 — 공정1~10 수식·빨간 표시). v21 시트 1jr8iq… 는 폴더에 남아 있음, 안 씀 */
+/* ---------- 구글 스프레드시트 양식 받기 · 올리기 ----------
+   받기(v113): 누를 때 엑셀 양식과 같은 파일(tplBuild — 폼 칸·드롭다운 목록·머리 메모 그대로)을 만들어
+     사장님 구글 계정의 Apps Script 웹앱(GS_MAKER, 코드 = 구글시트양식/양식만들기.gs)에 보내면, 웹앱이 드라이브 「영림원외주입력 양식」 폴더에
+     구글시트로 바꿔 만들고 주소를 돌려준다 → 그 시트를 연다. 옛 고정 시트(GS_TEMPLATES, v8~v112)는 더 안 쓴다(드라이브에는 남아 있음).
+   올리기(v8 그대로): 붙여 넣은 시트 링크의 /export?format=csv 를 읽어(공유 「링크가 있는 모든 사용자」 필요) 엑셀 올리기와 같은 takeSheet 로 받는다. 탭은 링크의 gid, 없으면 첫 탭. */
+var GS_MAKER='';   /* 사장님이 배포한 웹앱 주소(https://script.google.com/macros/s/…/exec). 비어 있으면 연결 전 → 엑셀 안내만 보인다 */
+var GS_NOMAKER='구글시트 양식을 만들지 못했습니다. 「양식 다운로드 → 엑셀」로 받아 주세요.';
 var GS_SHARE='시트를 읽지 못했습니다. 구글시트 오른쪽 위 「공유」 → 일반 액세스를 「링크가 있는 모든 사용자」로 바꾼 뒤 링크를 다시 붙여 넣어 주세요.';
+/* 구글 변환용 정리(v8·v87): 테마·docProps·metadata 를 빼고(빼지 않으면 첫 시트가 빈 채로 바뀐 적 있음) 드롭다운은 목록 밖 입력 허용 */
+function gsClean(X,bytes){
+  var zip=X.CFB.read(new Uint8Array(bytes),{type:'array'}),dec=new TextDecoder('utf-8'),enc=new TextEncoder();
+  var drop=/^(docProps\/|xl\/theme\/|xl\/metadata\.xml$)/;
+  zip.FullPaths.slice().forEach(function(fp){var rel=fp.replace(/^[^\/]*\//,'');if(drop.test(rel))X.CFB.utils.cfb_del(zip,fp);});
+  var edit=function(path,fn){var e=X.CFB.find(zip,path);if(!e||!e.content)return;e.content=enc.encode(fn(dec.decode(e.content)));e.size=e.content.length;};
+  edit('/[Content_Types].xml',function(x){return x.replace(/<Override [^>]*PartName="\/(docProps\/[^"]*|xl\/theme\/[^"]*|xl\/metadata\.xml)"[^>]*\/>/g,'');});
+  edit('/_rels/.rels',function(x){return x.replace(/<Relationship [^>]*Target="\/?docProps\/[^"]*"[^>]*\/>/g,'');});
+  edit('/xl/_rels/workbook.xml.rels',function(x){return x.replace(/<Relationship [^>]*Target="[^"]*(theme\/[^"]*|metadata\.xml)"[^>]*\/>/g,'');});
+  zip.FullPaths.forEach(function(fp){if(/\/xl\/worksheets\/[^\/]+\.xml$/.test('/'+fp.replace(/^[^\/]*\//,'')))edit('/'+fp.replace(/^[^\/]*\//,''),function(x){return x.replace(/showErrorMessage="1"/g,'showErrorMessage="0"');});});
+  return X.CFB.write(zip,{type:'array',fileType:'zip',compression:true});
+}
+function b64(bytes){var u=new Uint8Array(bytes),t='';for(var i=0;i<u.length;i+=0x8000)t+=String.fromCharCode.apply(null,u.subarray(i,i+0x8000));return btoa(t);}
 function openGsTemplate(s,say){
-  var id=GS_TEMPLATES[s.key];
-  if(!id){say('이 단계의 구글시트 양식이 아직 없습니다. 양식 다운로드(엑셀)를 써 주세요.',true);return;}
-  window.open('https://docs.google.com/spreadsheets/d/'+id+'/copy','_blank','noopener');
-  say('구글시트에서 「사본 만들기」를 누르고, 입력한 뒤 그 시트 링크를 「일괄 업로드 → 구글 스프레드시트」에 붙여 넣으세요.');
+  if(!GS_MAKER){say(GS_NOMAKER,true);return;}
+  /* 누른 순간 빈 창을 연다 — 다 만든 뒤에 열면 폰 브라우저가 팝업으로 막는다 */
+  var w=window.open('','_blank');
+  if(w){try{w.opener=null;w.document.title='구글시트 양식';w.document.body.textContent='구글시트 양식을 만드는 중입니다.';}catch(e){}}
+  var fail=function(){if(w&&!w.closed)w.close();say(GS_NOMAKER,true);};
+  say('구글시트 양식을 만드는 중입니다.');
+  loadXlsx().then(function(X){
+    var t=tplBuild(X,s);
+    return fetch(GS_MAKER,{method:'POST',body:JSON.stringify({name:t.name,data:b64(gsClean(X,t.bytes))}),credentials:'omit'})
+      .then(function(r){return r.ok?r.json():Promise.reject(new Error('http'));})
+      .then(function(j){
+        if(!j||!j.ok||!/^https:\/\/docs\.google\.com\/spreadsheets\/d\/[\w-]{20,}/.test(j.url||''))return Promise.reject(new Error('maker'));
+        if(w&&!w.closed)w.location.href=j.url;else window.open(j.url,'_blank','noopener');
+        say('구글시트 양식을 새로 만들어 열었습니다. 입력한 뒤 그 시트 링크를 「일괄 업로드 → 구글 스프레드시트」에 붙여 넣으세요.'+(t.msg?' '+t.msg:''));
+      });
+  }).catch(fail);
 }
 function gsCsvUrl(u){
   var m=String(u).match(/\/spreadsheets\/d\/([\w-]{20,})/);if(!m)return null;
