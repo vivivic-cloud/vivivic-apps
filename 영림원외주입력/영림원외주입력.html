@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v115 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v116 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -342,7 +342,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v115</span>
+    <span class="ver">v116</span>
   </div>
 </header>
 <div class="wrap">
@@ -549,7 +549,7 @@ var IMP_TERMS=['EXW','FCA','FAS','FOB','CFR','CIF','CPT','CIP','DDP','DAT','DAP'
 var PUR_HINT='4 품목등록·5 자재등록에 등록이 끝난 상품·원자재·부자재·저장품·소모자재·수탁자재입니다.';   /* v112 구매 품번 칸 hint(엑셀 머리 메모) */
 var PUR_IOS=['내수','Local1(후LC)','Local2(선LC)','직수입'],PUR_CURS=['KRW'];
 /* v80 원장 구매 창고 = 재단 업체 창고(사장님 11-06 「원장은 각 재단업체에 입고」). 11-06 저장 시험에서 본 테스트 창고 셋. 실제 운영 때 실제 창고 이름으로 바꾼다 */
-var PUR_WHS=['T에이엠티','T경기','T조혼'];
+var PUR_WHS=['T에이엠티','T경기','T조혼','T본사'],PUR_FILM_WH='T본사';   /* v116 T본사(501583 창고 코드 37) · 엣지필름 품번 창고 처음 값 */
 var STEPS=[
 {key:'vendors',n:1,title:'거래처등록',screen:'거래처등록',
  path:['기본','[기본] 거래처정보','거래처'],needs:[],
@@ -3263,6 +3263,10 @@ function purPriceOf(vendor,code,date){
 function purRowHook(r,dateF){
   var by=function(k){return r.fields.filter(function(x){return x.f.k===k;})[0];};
   var cc=by('ccode'),vd=by('vendor'),pr=by('price'),auto=null;
+  var wh=by('wh'),whAuto=null;   /* v116 엣지필름 품번이면 창고 처음 값 T본사 — 비었거나 저절로 넣은 값일 때만, 사람이 고친 값은 그대로 */
+  function whRedo(){var now=wh.get(),mine=whAuto!=null&&now===whAuto;if(now!==''&&!mine)return;
+    if(edgeIsFilm(purPlate(cc.get()))){if(now!==PUR_FILM_WH)wh.set(PUR_FILM_WH);whAuto=PUR_FILM_WH;}else if(mine){wh.set('');whAuto=null;}}
+  cc.el.addEventListener('change',whRedo);cc.el.addEventListener('input',whRedo);
   var note=h('div',{class:'hint',hidden:true});pr.el.append(note);
   function redo(){
     var p=purPriceOf(vd.get(),cc.get(),dateF.get()),now=pr.get(),mine=auto!=null&&now===auto;
