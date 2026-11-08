@@ -1736,4 +1736,5 @@
 - **사장님 할 일**: Drive API 서비스 추가 → 새 코드 붙여넣기·저장 → 「배포 관리 → 수정 → 새 버전」(주소 그대로). 그 뒤 작업자가 POST 시험 → 배포판 누름 확인.
 - ⚠ v115 부터 폼은 담당자 로그인이 있어야 열린다. 작업자는 담당자 계정 비밀번호를 넣지 않으므로 배포판 단추 누름은 사장님이 로그인한 화면에서 보거나, 같은 `tplBuild` 결과 파일을 웹앱에 직접 POST 해서 본다.
 - **11-09 두 번째**: 입력 작업자가 사장님 Chrome 에서 Drive API(v3) 서비스를 더하고 v118 코드로 배포 버전 2 를 올렸다. 다시 POST → `drive.files.create을(를) 호출할 수 있는 권한이 없습니다. 필요한 권한은 (…/auth/drive || …drive.appdata || …drive.file)`. **원인 = 승인된 권한이 드라이브 읽기뿐**: Apps Script 는 코드에 보이는 함수로 권한을 고르는데 `DriveApp.getFolderById`·`getName`(읽기)만 있어 `drive.readonly` 만 받았다. 고침 = 부르지 않는 함수 `needWriteScope_`(`createFile` 한 줄)를 넣어 쓰기 권한(`auth/drive`)을 요청하게 함. ⚠ 이 함수를 지우면 다시 막힌다. 다시 승인(사장님 직접) + 새 버전 배포 필요 — `사장님 할 일.md` 「한 번 더 — 쓰기 권한」.
+- **11-09 세 번째**: 쓰기 함수를 넣은 코드로 배포 버전 3 — `checkAccess` 실행 때 **승인 창이 안 떴고** POST 는 같은 권한 오류. 판단 = 프로젝트 매니페스트에 `oauthScopes` 가 직접 적혀 있어(읽기 범위만) 코드를 보고 권한을 고르지 않음(승인 창 없음 = 적힌 범위는 이미 다 승인됨). 고침 = 매니페스트 원본을 저장소에 둠 `구글시트양식/appsscript.json`(oauthScopes = `auth/drive`·`script.external_request`, Drive v3 고급 서비스, webapp 실행 계정 나·익명 접근). 순서 = `사장님 할 일.md` 「세 번째 — 권한 목록 파일 바꾸기」. ⚠ 기존 매니페스트의 `oauthScopes` 값은 못 봤다 — 바꾸기 전 값을 받아 여기 적을 것.
 
