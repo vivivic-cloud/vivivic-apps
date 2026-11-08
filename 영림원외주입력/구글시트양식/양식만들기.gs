@@ -1,5 +1,5 @@
 /**
- * 영림원외주입력 — 구글시트 양식 만들기 웹앱 (v113)
+ * 영림원외주입력 — 구글시트 양식 만들기 웹앱 (v118)
  *
  * 하는 일: 폼에서 「양식 다운로드 → 구글 스프레드시트」를 누르면 폼이 그 순간의 엑셀 양식 파일
  *   (폼 칸·드롭다운 목록·머리 메모 그대로)을 보낸다. 이 스크립트는 그 파일을 드라이브
@@ -25,22 +25,33 @@ function doPost(e) {
     DriveApp.getFolderById(FOLDER_ID);   // 폴더가 있는지(없으면 오류)
     var title = name + ' (' + Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd HH:mm') + ')';
     var meta = { name: title, mimeType: 'application/vnd.google-apps.spreadsheet', parents: [FOLDER_ID] };
-    var b = 'ylw' + Date.now();
-    var head = Utilities.newBlob('--' + b + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(meta) +
-      '\r\n--' + b + '\r\nContent-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n').getBytes();
-    var tail = Utilities.newBlob('\r\n--' + b + '--').getBytes();
-    var res = UrlFetchApp.fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
-      method: 'post',
-      contentType: 'multipart/related; boundary=' + b,
-      payload: head.concat(bytes, tail),
-      headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
-      muteHttpExceptions: true
-    });
-    if (res.getResponseCode() !== 200) return out_({ ok: false, err: 'drive' });
-    var id = JSON.parse(res.getContentText()).id;
+    var XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    var id;
+    if (typeof Drive !== 'undefined' && Drive.Files && Drive.Files.create) {
+      // 편집기 「서비스」에 Drive API 를 더하면 이 길(구글이 API 를 저절로 켠다)
+      try {
+        id = Drive.Files.create(meta, Utilities.newBlob(bytes, XLSX, title + '.xlsx')).id;
+      } catch (de) {
+        return out_({ ok: false, err: 'drive', msg: String(de && de.message || de).slice(0, 300) });
+      }
+    } else {
+      var b = 'ylw' + Date.now();
+      var head = Utilities.newBlob('--' + b + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(meta) +
+        '\r\n--' + b + '\r\nContent-Type: ' + XLSX + '\r\n\r\n').getBytes();
+      var tail = Utilities.newBlob('\r\n--' + b + '--').getBytes();
+      var res = UrlFetchApp.fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id', {
+        method: 'post',
+        contentType: 'multipart/related; boundary=' + b,
+        payload: head.concat(bytes, tail),
+        headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
+        muteHttpExceptions: true
+      });
+      if (res.getResponseCode() !== 200) return out_({ ok: false, err: 'drive', code: res.getResponseCode(), msg: res.getContentText().slice(0, 300) });
+      id = JSON.parse(res.getContentText()).id;
+    }
     return out_({ ok: true, url: 'https://docs.google.com/spreadsheets/d/' + id + '/edit' });
   } catch (err) {
-    return out_({ ok: false, err: 'error' });
+    return out_({ ok: false, err: 'error', msg: String(err && err.message || err).slice(0, 300) });
   }
 }
 
