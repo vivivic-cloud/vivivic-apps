@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v108 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v109 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -331,7 +331,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v108</span>
+    <span class="ver">v109</span>
   </div>
 </header>
 <div class="wrap">
@@ -3438,6 +3438,11 @@ function prodPickFn(){
       }};
     }));
   };
+  fn.copy=function(d){   /* v109 복사등록: 품번·수량·완료일 + 공정별 업체(목록에 있을 때만) */
+    mine={};msg.textContent='';out.textContent='';fld.itemNo.set(purTrim(d.itemNo));fld.qty.reset();fld.dueDate.reset();
+    if(!isEmpty(d.qty))fld.qty.set(d.qty);if(d.dueDate)fld.dueDate.set(d.dueDate);
+    (d.rows||[]).forEach(function(x){if(x&&x.wc)mine[x.itemNo+'|'+x.seq]=x.wc;});redo();sayDue();
+  };
   fn.box=h('section',{class:'ps inform conwho'},h('h3',{},'무엇을 만듭니까'),h('div',{class:'grid prform'},fld.itemNo.el,fld.qty.el,fld.dueDate.el),dueWarn,none,gap,out,parts);
   return fn;
 }
@@ -5221,6 +5226,7 @@ function recCard(s,r,kit,openIds){
     if(st==='오류'&&ed)actions.append(h('button',{type:'button',class:'btn small',on:{click:function(){patch(s,r,{status:'수정대기',agentNote:''});}}},'수정 대기로 되돌리기'));   /* v34 */
     if(ed&&(st==='수정대기'||st==='오류'))actions.append(h('button',{type:'button',class:'btn small',on:{click:function(){editCancel(s,r);}}},'수정 취소'));
     if(canEdit(s,r))actions.append(h('button',{type:'button',class:'btn small',on:{click:function(){editOpen(s,r);}}},s.flowCols?'공정 채우기':'수정'));
+    var cp=copyItem(s,r);if(cp)actions.append(h('button',{type:'button',class:'btn small',on:{click:function(){copyGo(s,r);}}},'복사등록'));   /* v109 */
     if(delOk(s,r))actions.append(delBtn(s,r));
     var fm=EDITING[s.key+'/'+r.id];if(fm&&!canEdit(s,r)){delete EDITING[s.key+'/'+r.id];fm=null;}   /* 그 사이 상태가 바뀌면 수정 칸을 닫는다 */
     var pk=kit.pk(r);
@@ -5240,6 +5246,45 @@ function recCard(s,r,kit,openIds){
         fm?fm.el:recBody(s,r),editLogBox(s,r),fm?null:actions));
     if(openIds[r.id]||fm)d.open=true;
     return d;
+}
+/* ---------- v109 복사등록 ----------
+   사장님 말씀: 「모든 등록건 저장 완료된 목록에서 복사등록이 가능하게 해주세요. 복사등옥의 개념은 다른 품목 이지만 입력 내용의 미세한 부분을 수정후 복사등록 하는것 입니다」.
+   입력 칸이 있는 메뉴 = 그 건의 칸 값(머리 fields · 줄 rowFields)만 위 입력 칸에 채운다 → 고친 뒤 「저장」 = 보통 저장 길(saveCheck 겹침 검사 · 대기).
+   칸이 아닌 것(id·status·stage·planNo·reqno·pos·dlvno·agentNote·editLog·source·ylw*·createdAt·줄의 workNo/orderNo)은 칸에 없어 안 넘어간다.
+   앞 문서를 고르는 메뉴(xlCols) = 양식 올리기와 같은 fn.take 로 채운다 — 이어 받을 앞 문서가 없으면(이미 이어짐 등) 단추를 안 보인다. 생산 = fn.copy(공정별 업체까지).
+   COPY_SKIP = 자기 입력 칸이 없는 목록(공정 = 공정흐름 화면 아래 목록 · 자재출고 = 카드 단추로만 생김). 원본 문서는 안 건드린다. */
+var COPY_SKIP={processes:1,prodmoves:1};
+function copyVal(v){return Array.isArray(v)?v.slice():v;}
+function copyRecs(s,r){   /* xlCols 메뉴: 문서 → 양식 줄 꼴(줄 칸이 있으면 줄마다 한 줄) */
+  var ks=s.xlCols(s).map(function(f){return f.k;}),rk=(s.rowFields||[]).map(function(f){return f.k;}).filter(function(k){return ks.indexOf(k)>=0;});
+  var hd={};ks.forEach(function(k){if(rk.indexOf(k)<0&&r[k]!=null&&r[k]!=='')hd[k]=r[k];});
+  if(!rk.length||!(r.rows||[]).length)return [hd];
+  return r.rows.map(function(x){var o=Object.assign({},hd);rk.forEach(function(k){if(x&&x[k]!=null&&x[k]!=='')o[k]=x[k];});return o;});
+}
+function copyItem(s,r){
+  if(COPY_SKIP[s.key]||ylwGone(r)||BYKEY[cur]!==s)return null;
+  if(s.xlCols){
+    if(!xlPick||!xlPick.fn||!xlPick.fn.take)return null;
+    var got=null;xlPick.fn.take(copyRecs(s,r),function(items){got=items[0]||null;});
+    if(!got||got.why||!got.fill)return null;
+    if(xlPick.fn.copy){var fn=xlPick.fn;return {fill:function(){fn.copy(r);},box:fn.box};}
+    return {fill:got.fill,box:xlPick.fn.box};
+  }
+  if(s.noForm||!form)return null;
+  return {fill:function(){copyFill(s,r);},box:form.el};
+}
+function copyFill(s,r){
+  if(bulk&&bulk.cur){bulk.cur.vals=form.values();bulk.cur=null;if(bulk.editing)bulk.editing.hidden=true;}
+  form.reset();
+  var head={};s.fields.forEach(function(f){if(r[f.k]!=null)head[f.k]=copyVal(r[f.k]);});
+  var rows=s.rowFields?(r.rows||[]).map(function(x){var o={};s.rowFields.forEach(function(f){if(x&&x[f.k]!=null)o[f.k]=copyVal(x[f.k]);});return o;}):[];
+  form.fill(head,rows);form.el.hidden=false;if(bulk)bulkDraw();
+}
+function copyGo(s,r){
+  var cp=copyItem(s,r);if(!cp){flash('복사할 수 없습니다.',true);return;}
+  cp.fill();
+  if(cp.box&&cp.box.scrollIntoView)cp.box.scrollIntoView({block:'start'});
+  flash('값을 칸에 채웠습니다. 확인하고 저장을 누르세요.');
 }
 /* ---------- v37 4 품목 저장한 항목 = 검색으로만 보기 ----------
    사장님 말씀: 「일단 품목 입력 페이지에 저장한 항목을 펼쳐놓지말고 검색으로 해당 목록만 보이게 해줘」.
