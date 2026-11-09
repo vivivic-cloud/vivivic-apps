@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v140 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v141 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -371,7 +371,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v140</span>
+    <span class="ver">v141</span>
   </div>
 </header>
 <div class="wrap">
@@ -4600,7 +4600,7 @@ function podSrc(){   /* 완료 발주 → 발주서 문서 꼴 */
         var no=purTrim(p&&p.pono),vd=purTrim(p&&p.vendor);if(!no||seen[no])return;seen[no]=1;
         out.push({pono:no,podate:kc[0]==='purords'?purTrim(d.podate):purTrim(d.reqdate),vendor:vd,purCol:kc[1],purId:d.id,
           rows:(d.rows||[]).filter(function(x){return x&&purTrim(x.vendor)===vd;}).map(function(x){
-            return {ccode:purTrim(x.ccode),cname:show(x.cname),cspec:show(x.cspec),unit:show(x.unit),qty:show(x.qty),price:show(x.price),duedate:show(x.duedate),wh:show(x.wh)};})});
+            return {ccode:purTrim(x.ccode),cname:show(x.cname),cspec:show(x.cspec),unit:show(x.unit),qty:show(x.qty),duedate:show(x.duedate),wh:show(x.wh)};})});   /* v141 단가 안 담음 */
       });
     });
   });
@@ -4620,6 +4620,12 @@ function podSync(){
     var doc=Object.assign({},d,{pubKey:podKey(),createdAt:new Date().toISOString(),createdBy:ERP_USER&&ERP_USER.id||''});   /* v128 공개 열쇠 */
     var ref=db.collection('erp_podocs').doc(d.pono);
     (ref.create?ref.create(doc):Promise.reject(new Error('create'))).catch(function(e){console.warn('발주서 못 만듦',d.pono,e);});
+  });
+  /* v141 사장님 「야 왜 아직도 발주관리 발주서들에서 가격이 나오냐」 — 이미 저장된 발주서 문서 줄의 단가(price)를 뺀다(없을 때만 안 씀) */
+  PODOCS.forEach(function(d){
+    if(!(d.rows||[]).some(function(x){return x&&Object.prototype.hasOwnProperty.call(x,'price');})||podBusy['np:'+d.id])return;podBusy['np:'+d.id]=1;
+    db.collection('erp_podocs').doc(d.id).updateIf(function(c){var rs=c.rows||[];if(!rs.some(function(x){return x&&Object.prototype.hasOwnProperty.call(x,'price');}))return null;
+      return {rows:rs.map(function(x){var o=Object.assign({},x);delete o.price;return o;})};}).catch(function(e){podBusy['np:'+d.id]=0;console.warn('발주서 단가 못 뺌',d.id,e);});
   });
   /* v128 열쇠 없는 옛 발주서에 열쇠 · 공개 문서 만들기·고치기(저장된 발주서의 열쇠로만 — 두 사람이 동시에 열어도 열쇠 하나) */
   PODOCS.forEach(function(d){
@@ -4679,13 +4685,13 @@ function podView(d){
     podKv([['발주번호',no,'mono'],['발주일',show(d.podate)],['구매거래처',show(d.vendor)],['발주확인',confOf(no)?confTime(confOf(no)):'발주확인 전']]),   /* v133 */
     rows.map(function(x){return h('div',{class:'podrow'},
       h('div',{class:'nt'},show(x.cname)),
-      podKv([['품번',show(x.ccode),'mono'],['규격',show(x.cspec)],['단위',show(x.unit)],['발주수량',podNum(x.qty),'n'],['단가',podNum(x.price),'n'],['납품예정일',show(x.duedate)],['창고',show(x.wh)]]));}),
+      podKv([['품번',show(x.ccode),'mono'],['규격',show(x.cspec)],['단위',show(x.unit)],['발주수량',podNum(x.qty),'n'],['납품예정일',show(x.duedate)],['창고',show(x.wh)]]));}),
     h('h3',{class:'podh'},'납품 상황'),
     h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},['품명','발주수량','납품수량'].map(function(t){return h('th',{},t);}))),
       h('tbody',{},rows.map(function(x){return h('tr',{},h('td',{},show(x.cname)),h('td',{class:'n'},podNum(x.qty)),h('td',{class:'n'},podNum(purDone(no,purTrim(x.ccode)))));})))));
 }
 /* v133 사장님 「현재 발주서 관리 메뉴의 발주서들이 각 출고처(구매거래처) / 입고처(입고창고) 별로 분리 되어 관리 되어야 합니다. 출고처 기준으로 각 구매처마다 해당 박스를 공유하여 사용하게 하고 이 출고처 발주서는 해당 거래처 별로 발주 생성시 발주를 확인했음을 발주확인 버튼으로 알려야 하고 이렇게 발주가 확인되는 순간 입고처(입고창고) 사용자에게 해당 발주가 구매처에서 발주가 확인되어 입고대기중인 목록이 나타나기 시작하면 됩니다.」
-   사장님 결정(11-09): 들어오는 길 = 박스별 공유 링크(로그인 없음) · 출고처 박스에 단가 보임(입고처 박스는 단가 없음).
+   사장님 결정(11-09): 들어오는 길 = 박스별 공유 링크(로그인 없음) · 단가는 어디에도 없음(v138 출고처 · v141 폼 발주서관리까지).
    박스 문서 erp_pobox/<무작위 열쇠> = {kind:'출고처'|'입고처', name(구매거래처|창고), ponos, pos, at, createdAt}. 출고처 = 그 거래처 발주서 모두(단가 포함) · 입고처 = 줄 창고가 그 창고인 발주서(그 창고 줄만, 단가 없음, 구매거래처 보임).
    발주확인 = 공유 페이지 발주박스.html 에서 erp_poconfirm/<발주번호> = {box, pono, at} 를 만든다(저장소 규칙이 「그 출고처 박스 열쇠 + 그 박스의 발주번호」만 허락). 입고처 페이지는 그 문서가 있는 발주만 「입고대기」로 보인다.
    박스 만들기·고치기 = 저장 권한 있는 담당자가 폼을 열 때(podBoxSync) — 새 발주서가 박스에 들어가는 때도 그때. */
