@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 발주박스 공유 페이지(v133 · v142 발주확인된 발주 카드에 QR(공개 발주서 주소)·바코드(발주번호)) — 영림원외주입력 「발주서관리」 출고처(구매거래처)·입고처(입고창고) 박스를 로그인 없이 보는 한 장. 폼과 별개 파일, 메뉴·폼으로 가는 길 없음.
+<!-- 발주박스 공유 페이지(v133 · v144 출고처 「배송기사 공유」(erp_poship·erp_poshipref) · 입고처 입고수량·「입고확인」(erp_poin·erp_poflow.inAt, 기사 스캔 뒤에만) · v142 발주확인된 발주 카드에 QR(공개 발주서 주소)·바코드(발주번호)) — 영림원외주입력 「발주서관리」 출고처(구매거래처)·입고처(입고창고) 박스를 로그인 없이 보는 한 장. 폼과 별개 파일, 메뉴·폼으로 가는 길 없음.
      주소 = 발주박스.html#<박스 열쇠>. 자료 = erp_pobox/<열쇠>(폼이 씀) · erp_poconfirm/<발주번호>(발주확인 — 출고처 박스에서만 만듦).
      출고처 = 그 거래처 발주 모두(v138 단가 안 보임 — 사장님 「발주관리 구매처 쪽에서도 단가는 안나타나게 해주세요」) + 「발주확인」 단추. 입고처 = 발주확인된 것만 「입고대기」(단가 없음).
      저장소 규칙(제안): erp_pobox get 누구나 · erp_poconfirm get 누구나, create 는 그 출고처 박스 열쇠 + 그 박스 발주번호만. 규칙 배포 전에는 막혀 익명 로그인 뒤 다시 시도. -->
@@ -35,6 +35,10 @@ dd.mono{font-family:var(--mono)}dd.n{font-variant-numeric:tabular-nums}
 .row .nt{font-weight:800;word-break:break-all;margin:0 0 4px}
 .codes{display:grid;justify-items:center;gap:6px;margin:4px 0 10px}.qr canvas{display:block;max-width:100%;image-rendering:pixelated}
 .bc{width:100%;max-width:360px}.bc svg{display:block;width:100%;height:auto}
+.ship{margin:10px 0 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}.ship button{margin-left:0}.note{font-size:13px;font-weight:700;color:var(--green)}
+.in{border-top:1px solid var(--rowline);margin:10px 0 0;padding:10px 0 0}.in .st2{font-size:13px;font-weight:800;color:var(--muted);margin:0 0 8px}.in .st2.on{color:var(--green)}
+.inq{display:flex;align-items:center;gap:8px;margin:0 0 8px}.inq span{flex:1 1 auto;min-width:0;font-weight:700;word-break:break-all;font-size:14px}.inq input{width:110px;flex:0 0 auto;font:inherit;text-align:right;border:1px solid var(--line);border-radius:10px;padding:8px 10px}.inq input:disabled{background:#f7f6f3;color:var(--muted)}
+.in button{width:100%;margin:0}
 .err{color:var(--red);font-weight:700;font-size:13px;margin:6px 0 0}
 </style>
 </head>
@@ -71,7 +75,12 @@ function call(path,opt){
     return fetch(BASE+path+(path.indexOf('?')<0?'?':'&')+'key='+KEY,o);};
   return go().then(function(r){return (r.status===401||r.status===403)&&!tok?anon().then(go):r;});
 }
-var BOX=null,CONF={},busy={},errs={};
+var BOX=null,CONF={},busy={},errs={},FLOW={},INB={},DRAFT={},NOTE={};
+function sv(x){return {stringValue:String(x)};}
+function rkey(){var a=new Uint8Array(24);crypto.getRandomValues(a);return btoa(String.fromCharCode.apply(null,a)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
+function commit(writes){return call(DOCS+':commit',{method:'POST',body:JSON.stringify({writes:writes})}).then(function(r){if(!r.ok){var e=new Error(r.status);e.status=r.status;throw e;}});}
+function batch(names){return call(DOCS+':batchGet',{method:'POST',body:JSON.stringify({documents:names.map(function(n){return DOCS+'/'+n;})})}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
+  .then(function(a){var o={};(a||[]).forEach(function(x){if(x.found)o[x.found.name.slice(DOCS.length+1)]=fieldsOf(x.found);});return o;});}
 function load(){
   return call(DOCS+'/erp_pobox/'+key).then(function(r){
     if(r.status===404||r.status===403){BOX=false;return;}
@@ -81,9 +90,55 @@ function load(){
       return call(DOCS+':batchGet',{method:'POST',body:JSON.stringify({documents:ponos.map(function(n){return DOCS+'/erp_poconfirm/'+n;})})}).then(function(r2){
         if(!r2.ok)throw new Error(r2.status);
         return r2.json().then(function(a){var c={};(a||[]).forEach(function(x){if(x.found){var f=fieldsOf(x.found);c[f.pono||x.found.name.split('/').pop()]=f;}});CONF=c;});
+      }).then(function(){   /* v144 입고처: 기사 스캔·입고확인·배송완료 표시(erp_poflow) + 내 입고 기록(erp_poin) */
+        if(BOX.kind!=='입고처')return;
+        var pos=(BOX.pos||[]).filter(function(p){return p&&/^[A-Za-z0-9_-]{32,64}$/.test(String(p.pubKey||''))&&/^[A-Za-z0-9_-]{1,100}$/.test(String(p.pono||''));});if(!pos.length)return;
+        var names=[];pos.forEach(function(p){names.push('erp_poflow/'+p.pubKey,'erp_poin/'+key+'_'+p.pono);});
+        return batch(names).then(function(o){var f={},n={};pos.forEach(function(p){f[p.pono]=o['erp_poflow/'+p.pubKey]||null;n[p.pono]=o['erp_poin/'+key+'_'+p.pono]||null;});FLOW=f;INB=n;});
       });
     });
   }).then(draw,function(){if(BOX==null)say('불러오지 못했습니다.',true);});
+}
+/* v144 출고처: 배송기사 링크 = erp_poship/<새 열쇠>(이 박스·발주) — 한 발주에 하나(erp_poshipref/<박스 열쇠>_<발주번호>) */
+function shipOf(p){
+  var ref='erp_poshipref/'+key+'_'+p.pono;
+  var get=function(){return batch([ref]).then(function(o){return o[ref]&&o[ref].ship||null;});};
+  return get().then(function(k){if(k)return k;k=rkey();var at=new Date().toISOString();
+    return commit([{update:{name:DOCS+'/erp_poship/'+k,fields:{box:sv(key),pono:sv(p.pono),pubKey:sv(p.pubKey),at:sv(at)}},currentDocument:{exists:false}},
+      {update:{name:DOCS+'/'+ref,fields:{ship:sv(k),box:sv(key),pono:sv(p.pono)}},currentDocument:{exists:false}}]).then(function(){return k;},function(e){return get().then(function(k2){if(k2)return k2;throw e;});});});
+}
+function shareShip(p){
+  if(busy['s'+p.pono])return;busy['s'+p.pono]=1;errs[p.pono]='';NOTE[p.pono]='';draw();
+  shipOf(p).then(function(k){busy['s'+p.pono]=0;draw();
+    var url=new URL('배송.html#'+k,location.href).href,text='INGHOME-'+show(BOX.name)+' - 발주서 '+p.pono+' 배송';
+    var copy=function(){return (navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(text+'\n'+url):Promise.reject()).then(function(){NOTE[p.pono]='링크를 복사했습니다.';draw();},function(){NOTE[p.pono]=url;draw();});};
+    if(navigator.share)return navigator.share({title:text,text:text,url:url}).catch(function(e){if(e&&e.name==='AbortError')return;return copy();});
+    return copy();
+  },function(){busy['s'+p.pono]=0;errs[p.pono]='배송기사 링크를 만들지 못했습니다.';draw();});
+}
+/* v144 입고처: 기사 스캔 뒤·배송완료 전에만 입고수량 고치기·「입고확인」 */
+function inQty(p,x){var d=DRAFT[p.pono]||{},i=INB[p.pono];if(d[x.ccode]!=null)return d[x.ccode];
+  var r=i&&(i.rows||[]).filter(function(y){return y&&y.ccode===x.ccode;})[0];return r?String(r.qty):String(x.qty==null?'':x.qty);}
+function saveIn(p){
+  var f=FLOW[p.pono]||{};if(busy['i'+p.pono]||!f.scanAt||f.doneAt)return;
+  var rows=(p.rows||[]).filter(Boolean).map(function(x){return {ccode:show(x.ccode),qty:String(inQty(p,x)).replace(/,/g,'').trim()};});
+  var bad=rows.filter(function(r){return r.qty===''||!isFinite(Number(r.qty))||Number(r.qty)<0||!/^\d+(\.\d{1,2})?$/.test(r.qty);})[0];
+  if(bad){errs[p.pono]='입고수량을 확인해 주세요.';draw();return;}
+  if(!confirm(p.pono+' 입고확인을 저장합니다.'))return;
+  busy['i'+p.pono]=1;errs[p.pono]='';draw();var at=new Date().toISOString();
+  commit([{update:{name:DOCS+'/erp_poin/'+key+'_'+p.pono,fields:{box:sv(key),pono:sv(p.pono),pubKey:sv(p.pubKey),at:sv(at),
+      rows:{arrayValue:{values:rows.map(function(r){return {mapValue:{fields:{ccode:sv(r.ccode),qty:{doubleValue:Number(r.qty)}}}};})}}}}},
+    {update:{name:DOCS+'/erp_poflow/'+p.pubKey,fields:{inAt:sv(at)}},updateMask:{fieldPaths:['inAt']},currentDocument:{exists:true}}])
+    .then(function(){busy['i'+p.pono]=0;delete DRAFT[p.pono];return load();},function(){busy['i'+p.pono]=0;errs[p.pono]='입고확인을 저장하지 못했습니다.';return load();});
+}
+function inBox(p){
+  var f=FLOW[p.pono]||{},i=INB[p.pono],on=!!f.scanAt&&!f.doneAt,rows=(p.rows||[]).filter(Boolean);
+  var st=f.doneAt?'배송완료 '+when(f.doneAt):i&&f.inAt?'입고확인 '+when(i.at):f.scanAt?'기사 스캔 '+when(f.scanAt):'기사 스캔 전';
+  var b=h('button','','입고확인');b.type='button';b.disabled=!on||!!busy['i'+p.pono];b.addEventListener('click',function(){saveIn(p);});
+  return h('div','in',h('p','st2'+(f.scanAt?' on':''),st),
+    rows.map(function(x){var q=h('input');q.type='text';q.inputMode='decimal';q.value=inQty(p,x);q.disabled=!on;q.setAttribute('aria-label','입고수량 '+show(x.cname));
+      q.addEventListener('input',function(){(DRAFT[p.pono]=DRAFT[p.pono]||{})[x.ccode]=q.value;});
+      return h('div','inq',h('span','','입고수량 · '+show(x.cname)),q);}),b);
 }
 function confirmPo(no){
   if(!confirm(no+' 발주를 확인합니다.'))return;
@@ -137,12 +192,14 @@ function draw(){
       rows.map(function(x){var f=[['품번',show(x.ccode),'mono'],['규격',show(x.cspec)],['단위',show(x.unit)],['발주수량',num(x.qty),'n']];
         f.push(['납품예정일',show(x.duedate)],['창고',show(x.wh)],['납품수량',num(x.dlv),'n']);
         return h('div','row',h('div','nt',show(x.cname)),kv(f));}),
+      out&&c?h('div','ship',(function(){var sb=h('button','','배송기사 공유');sb.type='button';sb.disabled=!!busy['s'+p.pono];sb.addEventListener('click',function(){shareShip(p);});return sb;})(),NOTE[p.pono]?h('span','note',NOTE[p.pono]):null):null,
+      !out?inBox(p):null,
       errs[p.pono]?h('p','err',errs[p.pono]):null);});
   mainEl.replaceChildren.apply(mainEl,[].concat(h('h1','',show(BOX.name)),h('p','sub',out?'출고처 · '+pos.length+'건':'입고처 · 입고대기 '+pos.length+'건'),
     cards.length?cards:h('p','msg',out?'발주서가 없습니다.':'입고대기 발주가 없습니다.')));
 }
 load();
-setInterval(function(){if(document.visibilityState==='visible'&&!Object.keys(busy).some(function(k){return busy[k];}))load();},60000);   /* 입고처는 발주확인이 들어오면 1분 안에 나타남 */
+setInterval(function(){if(document.visibilityState==='visible'&&!Object.keys(busy).some(function(k){return busy[k];})&&!Object.keys(DRAFT).length)load();},15000);   /* v144 15초 — 기사 스캔이 들어오면 입고확인이 곧 켜짐(고치는 중이면 안 다시 읽음) */
 document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')load();});
 })();
 </script>
