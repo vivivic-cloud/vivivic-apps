@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v134 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v135 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -338,7 +338,8 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 /* v126 발주서관리 — 폰 기준 */
 .podlist{display:grid;gap:8px}.podbtn{display:grid;gap:2px;text-align:left;width:100%;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font:inherit;color:inherit;cursor:pointer}
 .podbtn:hover{background:var(--fill4)}.podst{font-weight:800!important;color:var(--amber)!important}.podst.on{color:var(--green)!important}
-.podgrp{margin:14px 0;border:1px solid var(--line2);border-radius:14px;padding:10px;background:var(--fill4)}.podgh{display:flex;align-items:center;gap:4px 8px;flex-wrap:wrap;margin:0 0 8px;min-width:0}.podgh .nt{min-width:0;word-break:break-all}   /* v134 박스 테두리 안 머리 줄에 공유 */.podgh .nt{font-weight:900;font-size:15px}.podgh .ns{font-size:12px;color:var(--muted);font-weight:700}.podgh .podshare{margin:0 0 0 auto}
+.podgrp{margin:14px 0;border:1px solid var(--line2);border-radius:14px;padding:10px;background:var(--fill4)}.podgh{display:flex;align-items:center;gap:4px 8px;flex-wrap:wrap;margin:0 0 8px;min-width:0}.podgh .nt{min-width:0;word-break:break-all}
+.podgt{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:4px 8px;flex-wrap:wrap;background:none;border:0;padding:4px 0;font:inherit;color:inherit;text-align:left;cursor:pointer}.podgrp:not(.open) .podgh{margin:0}.podgt .navarr{color:var(--muted);width:12px}   /* v135 접고 펴기 */   /* v134 박스 테두리 안 머리 줄에 공유 */.podgh .nt{font-weight:900;font-size:15px}.podgh .ns{font-size:12px;color:var(--muted);font-weight:700}.podgh .podshare{margin:0 0 0 auto}
 .podli{display:flex;gap:8px;align-items:stretch}.podli .podbtn{flex:1 1 auto;min-width:0}.podli .podshare{flex:0 0 auto;margin:0;align-self:center}.podbtn .nt{font-weight:800;word-break:break-all}.podbtn .ns{font-size:12px;color:var(--muted);font-weight:600}
 .podcodes{display:grid;justify-items:center;gap:8px;margin:12px 0}.podqr canvas{display:block;max-width:100%;image-rendering:pixelated}
 .podbc{width:100%;max-width:360px}.podbc svg{display:block;width:100%;height:auto}
@@ -363,7 +364,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v134</span>
+    <span class="ver">v135</span>
   </div>
 </header>
 <div class="wrap">
@@ -4713,13 +4714,14 @@ function boxShareBtn(b){return h('button',{type:'button',class:'btn small podsha
   if(navigator.share)return navigator.share({title:text,text:text,url:url}).catch(function(e){if(e&&e.name==='AbortError')return;return podCopy(text+'\n'+url).then(function(){flash('링크를 복사했습니다.');});}).catch(function(){flash('공유하지 못했습니다.',true);});
   podCopy(text+'\n'+url).then(function(){flash('링크를 복사했습니다.');},function(){flash('복사하지 못했습니다.',true);});}}},'공유');}
 var podView2='출고처';   /* v133 목록 보기: 출고처 · 입고처 · 전체 */
+var podOpenGrp={};   /* v135 사장님 「업체별 발주서는 토글목록으로 해당업체 선택시만 펼쳐지게 해주세요 기본 모습은 모든 토글이 닫힌 상태입니다」 — 열린 묶음(보기:이름). 처음엔 모두 닫힘 */
 function renderPodocs(){
   bulk=null;listBox=null;listBox2=null;sheetDraw=null;ifRefresh=null;
   var box=h('div',{class:'podbox'}),lastKey='';
   function draw(){
     if(cur!=='podocs')return;
     if(PODOCS==null||data.purchases==null||data.purords==null){box.replaceChildren(h('p',{class:'msg'},'불러오는 중'));lastKey='';return;}
-    var all=podAll(),key=JSON.stringify([podSel,podView2,all,podSel?data.purdelvs:0,(PODPUB||[]).map(function(p){return p.id;}),(POBOX||[]).map(function(b){return [b.id,b.kind,b.name];}),POCONF]);if(key===lastKey)return;lastKey=key;   /* 같은 내용이면 다시 안 그림(QR 깜박임) */
+    var all=podAll(),key=JSON.stringify([podSel,podView2,podOpenGrp,all,podSel?data.purdelvs:0,(PODPUB||[]).map(function(p){return p.id;}),(POBOX||[]).map(function(b){return [b.id,b.kind,b.name];}),POCONF]);if(key===lastKey)return;lastKey=key;   /* 같은 내용이면 다시 안 그림(QR 깜박임) */
     if(podSel){var d=all.filter(function(x){return purTrim(x.pono||x.id)===podSel;})[0];
       box.replaceChildren.apply(box,d?podView(d):[h('div',{class:'actions'},h('button',{type:'button',class:'btn small',on:{click:function(){podGo('');}}},'목록')),h('p',{class:'msg bad'},'문서가 없습니다.')]);return;}
     if(!all.length){box.replaceChildren(h('p',{class:'msg'},'발주서가 없습니다.'));return;}
@@ -4740,8 +4742,12 @@ function renderPodocs(){
       body=names.length?names.map(function(name){
         var ds=boxDocs(podView2,name);if(podView2==='입고처')ds=ds.filter(function(d){return !!confOf(purTrim(d.pono||d.id));});
         var b=boxOf(podView2,name);
-        return h('div',{class:'podgrp'},h('div',{class:'podgh'},h('span',{class:'nt'},name),h('span',{class:'ns'},(podView2==='입고처'?'입고대기 ':'')+ds.length+'건'),b?boxShareBtn(b):null),
-          h('div',{class:'podlist'},ds.map(function(d){return line(d,podView2==='입고처'?{t:'입고대기 · 발주확인 '+confTime(confOf(purTrim(d.pono||d.id))),on:1}:cst(d));})));}):[h('p',{class:'msg'},'발주서가 없습니다.')];
+        var gk=podView2+':'+name,open=!!podOpenGrp[gk];   /* v135 머리 줄을 누르면 펼침·닫힘(공유 단추는 따로라 안 펼침) */
+        return h('div',{class:'podgrp'+(open?' open':'')},h('div',{class:'podgh'},
+            h('button',{type:'button',class:'podgt','aria-expanded':open?'true':'false',on:{click:function(){if(open)delete podOpenGrp[gk];else podOpenGrp[gk]=1;draw();}}},
+              h('span',{class:'navarr','aria-hidden':'true'},open?'▾':'▸'),h('span',{class:'nt'},name),h('span',{class:'ns'},(podView2==='입고처'?'입고대기 ':'')+ds.length+'건')),
+            b?boxShareBtn(b):null),
+          !open?null:h('div',{class:'podlist'},ds.map(function(d){return line(d,podView2==='입고처'?{t:'입고대기 · 발주확인 '+confTime(confOf(purTrim(d.pono||d.id))),on:1}:cst(d));})));}):[h('p',{class:'msg'},'발주서가 없습니다.')];
     }
     box.replaceChildren.apply(box,[tabs].concat(body));
   }
