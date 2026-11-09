@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v144 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v145 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -371,7 +371,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v144</span>
+    <span class="ver">v145</span>
   </div>
 </header>
 <div class="wrap">
@@ -4617,7 +4617,7 @@ function podSync(){
   var have={};PODOCS.forEach(function(d){have[d.id]=1;});
   podSrc().forEach(function(d){
     if(have[d.pono]||podBusy[d.pono]||!podIdOk(d.pono))return;podBusy[d.pono]=1;
-    var doc=Object.assign({},d,{pubKey:podKey(),createdAt:new Date().toISOString(),createdBy:ERP_USER&&ERP_USER.id||''});   /* v128 공개 열쇠 */
+    var doc=Object.assign({},d,{pubKey:podKey(),inTok:podKey(),createdAt:new Date().toISOString(),createdBy:ERP_USER&&ERP_USER.id||''});   /* v128 공개 열쇠 */
     var ref=db.collection('erp_podocs').doc(d.pono);
     (ref.create?ref.create(doc):Promise.reject(new Error('create'))).catch(function(e){console.warn('발주서 못 만듦',d.pono,e);});
   });
@@ -4629,6 +4629,8 @@ function podSync(){
   });
   /* v128 열쇠 없는 옛 발주서에 열쇠 · 공개 문서 만들기·고치기(저장된 발주서의 열쇠로만 — 두 사람이 동시에 열어도 열쇠 하나) */
   PODOCS.forEach(function(d){
+    if(!d.inTok&&d.pubKey&&!podBusy['i:'+d.id]){podBusy['i:'+d.id]=1;var it=podKey();   /* v145 입고열쇠 */
+      db.collection('erp_podocs').doc(d.id).updateIf(function(c){return c.inTok?null:{inTok:it};}).catch(function(e){podBusy['i:'+d.id]=0;console.warn('입고열쇠 못 넣음',d.id,e);});}
     if(!d.pubKey){if(podBusy['k:'+d.id])return;podBusy['k:'+d.id]=1;var k=podKey();
       db.collection('erp_podocs').doc(d.id).updateIf(function(c){return c.pubKey?null:{pubKey:k};}).catch(function(e){console.warn('열쇠 못 넣음',d.id,e);});return;}
     if(!podKeyOk(d.pubKey)||PODPUB==null||data.purdelvs==null||!canCol('erp_podocs_pub','w'))return;
@@ -4708,12 +4710,14 @@ function boxWant(kind,name){
     var rows=(d.rows||[]).filter(function(x){return kind==='출고처'||purTrim(x.wh)===name;}).map(function(x){
       var r={ccode:show(x.ccode),cname:show(x.cname),cspec:show(x.cspec),unit:show(x.unit),qty:show(x.qty),duedate:show(x.duedate),wh:show(x.wh),dlv:purDone(no,purTrim(x.ccode))};
       return r;});   /* v138 사장님 「발주관리 구매처 쪽에서도 단가는 안나타나게 해주세요」 — 출고처 박스에도 단가 안 넣음(옛 박스는 boxSig 가 price 를 보아 다음 저장 때 pos 통째로 바뀌며 빠짐) */
-    var o={pono:no,podate:show(d.podate),pubKey:show(d.pubKey),rows:rows};if(kind==='입고처')o.vendor=show(d.vendor);return o;});
+    var o={pono:no,podate:show(d.podate),pubKey:show(d.pubKey),rows:rows};
+    if(kind==='입고처'){o.vendor=show(d.vendor);o.inTok=show(d.inTok);var sh=shipFor(no);o.ship=sh?sh.id:'';}   /* v145 입고열쇠·배송 링크(입고처만 앎) */
+    return o;});
   return {kind:kind,name:name,ponos:pos.map(function(p){return p.pono;}),pos:pos};
 }
-function boxSig(b){return JSON.stringify([show(b.kind),show(b.name),(b.ponos||[]).map(show),(b.pos||[]).map(function(p){return [show(p.pono),show(p.podate),show(p.pubKey),show(p.vendor),(p.rows||[]).map(function(x){return [show(x.ccode),show(x.cname),show(x.cspec),show(x.unit),show(x.qty),show(x.price),show(x.duedate),show(x.wh),Number(x.dlv||0)];})];})]);}
+function boxSig(b){return JSON.stringify([show(b.kind),show(b.name),(b.ponos||[]).map(show),(b.pos||[]).map(function(p){return [show(p.pono),show(p.podate),show(p.pubKey),show(p.vendor),show(p.inTok),show(p.ship),(p.rows||[]).map(function(x){return [show(x.ccode),show(x.cname),show(x.cspec),show(x.unit),show(x.qty),show(x.price),show(x.duedate),show(x.wh),Number(x.dlv||0)];})];})]);}
 function podBoxSync(){
-  if(!db||!db.collection||PODOCS==null||POBOX==null||POCONF==null||data.purdelvs==null||!canCol('erp_pobox','w'))return;   /* v143 입고처는 발주확인 값을 읽은 뒤에만 */
+  if(!db||!db.collection||PODOCS==null||POBOX==null||POCONF==null||POSHIP==null||data.purdelvs==null||!canCol('erp_pobox','w'))return;   /* v145 배송 링크도 읽은 뒤 */   /* v143 입고처는 발주확인 값을 읽은 뒤에만 */
   ['출고처','입고처'].forEach(function(kind){var ns=boxNames(kind);
     if(kind==='입고처')(POBOX||[]).forEach(function(b){if(b.kind==='입고처'&&ns.indexOf(b.name)<0&&boxOf('입고처',b.name)===b)ns.push(b.name);});   /* 옛 박스(확인된 발주 없음)는 빈 목록으로 고침 */
     ns.forEach(function(name){
@@ -4731,41 +4735,61 @@ function boxShareBtn(b){return h('button',{type:'button',class:'btn small podsha
   var url=boxUrl(b.id),text=b.kind==='출고처'?'INGHOME-'+b.name+' - 발주서가 발행되었습니다. 발주를 확인해 주세요.':'발주서 · '+b.name+' ('+b.kind+')';   /* v137 사장님 「카톡으로 발주박스 공유시 카톡 메세지로 INGHOME-엘데코(출고거래처명) - 발주서가 발행되었습니다. 발주를 확인해 주세요. 이렇게 메세지 나타나게 해줘」 — 이름은 저장된 구매거래처 글자 그대로 */
   if(navigator.share)return navigator.share({title:text,text:text,url:url}).catch(function(e){if(e&&e.name==='AbortError')return;return podCopy(text+'\n'+url).then(function(){flash('링크를 복사했습니다.');});}).catch(function(){flash('공유하지 못했습니다.',true);});
   podCopy(text+'\n'+url).then(function(){flash('링크를 복사했습니다.');},function(){flash('복사하지 못했습니다.',true);});}}},'공유');}
-/* v144 사장님 「입고처는 배송기사에게 공유된 바코드 스캔시 발주서에서/ 입고수량 수정/ 입고확인이 가능하게 되어야 한다 - 배송기사의 발주서 스캔 전에는 이기능이 작동되면 안됩니다. 이렇게 입고처 입고확인되면 배송기사의 배송완료 버튼이 활성화 된다. 배송기사 배송완료시 입력폼 6 구매납품입력의 해당발주가 입력폼에 입력대기로 자동 저장된다. -이게 링크주소로 처리가 가능할까요?」
-   링크 셋: 출고처 발주박스 「배송기사 공유」 → 배송.html#<배송 열쇠>(스캔·배송완료) · 입고처 발주박스(입고수량·입고확인).
-   기록(로그인 없는 쓰기, 저장소 규칙이 열쇠·순서를 봄): erp_poship/<배송열쇠>{box,pono,pubKey,at} · erp_poshipref/<출고처박스열쇠>_<발주번호>{ship} · erp_poscan/<배송열쇠>{pono,at} · erp_poin/<입고처박스열쇠>_<발주번호>{box,pono,pubKey,rows[{ccode,qty}],at} · erp_podone/<배송열쇠>{pono,at} · erp_poflow/<공개열쇠>{pono,scanAt,inAt,doneAt} = 화면 표시용(열쇠 없음).
-   구매납품 대기는 로그인 없는 화면이 만들지 않는다 — 저장 권한자가 폼을 열 때 podFlowSync 가 기록이 맞는지(배송 열쇠·스캔·입고처 박스·때 순서) 보고 erp_purdelvs/flow_<배송열쇠> 를 「대기」로 만든다(문서 id 로 두 번 안 생김). */
-var POSHIP=null,POSCAN=null,POIN=null,PODONE=null;
+/* v145 사장님 확정 흐름(「이해한 내용이 맞으니 작업해 주세요」 + 보충 「스캔한 발주가 그 입고처 박스에 없는 발주면 오류」 · 「입고처 스캔 링크 발주서에 수정요청 단추」) — v144 기사 스캔 방식을 바꿈.
+   출고처 「발주확인」 → QR·바코드 · 「배송기사 공유」 = 배송.html#<배송열쇠>(erp_poship) → 기사 폰 QR = 입고.html#<배송열쇠> → 입고처가 찍음 →
+   입고.html: 그 입고처 박스에 있는 발주인지(박스 pos 의 inTok) → 사진(erp_podlvimg)·입고수량·「입고확인」 = erp_poin/<입고열쇠>_<배송열쇠>{tok,ship,pono,rows,at,rev,photos} + 표시 erp_podlv/<배송열쇠>{pono,rows,inAt,rev} →
+   기사 「납품완료」 = erp_podlv.doneAt·doneRev(=rev) → 폼(podFlowSync)이 erp_purdelvs/flow_<배송열쇠> 대기 만들기 · 수정요청 뒤 다시 입고확인(rev+1)·납품완료면 대기 문서 수량 고침(대기일 때만).
+   입고열쇠(inTok) = 발주서마다(erp_podocs.inTok), erp_pointok/<inTok>{pono} 로 규칙이 확인 · 입고처 박스 pos 에만 실림(기사·출고처는 모름).
+   잠금 = erp_purdelvs/flow_ 가 대기가 아니면(입력 작업자 처리 시작) 폼이 erp_podlv.locked=true, 규칙은 erp_purdelvs 상태를 직접 봄. */
+var POSHIP=null,POIN=null,PODLV=null,PTOK=null;
 function ymdOf(iso){var d=new Date(iso);if(isNaN(d))return conToday();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
-function flowOf(no){   /* 발주번호 → {ship,scan,in,done} 맞는 기록(폼이 다시 봄) */
-  var sh=(POSHIP||[]).filter(function(x){return purTrim(x.pono)===no&&podKeyOk(x.id);}),o={};
-  var ok=sh.filter(function(x){var b=(POBOX||[]).filter(function(y){return y.id===x.box;})[0];return b&&b.kind==='출고처'&&(b.ponos||[]).indexOf(no)>=0;});
-  o.ship=ok[0]||null;if(!o.ship)return o;
-  o.scan=(POSCAN||[]).filter(function(x){return x.id===o.ship.id&&purTrim(x.pono)===no;})[0]||null;
-  o.done=(PODONE||[]).filter(function(x){return x.id===o.ship.id&&purTrim(x.pono)===no;})[0]||null;
-  o.in=(POIN||[]).filter(function(x){var b=(POBOX||[]).filter(function(y){return y.id===x.box;})[0];return purTrim(x.pono)===no&&x.id===x.box+'_'+no&&b&&b.kind==='입고처'&&(b.ponos||[]).indexOf(no)>=0;})
-    .filter(function(x){return !o.done||String(x.at)<=String(o.done.at);}).sort(function(a,b){return String(a.at)<String(b.at)?1:-1;})[0]||null;
+function shipFor(no){   /* 그 발주의 배송 링크(출고처 박스 것, 먼저 만든 것) */
+  return (POSHIP||[]).filter(function(x){if(purTrim(x.pono)!==no||!podKeyOk(x.id))return false;var b=(POBOX||[]).filter(function(y){return y.id===x.box;})[0];return b&&b.kind==='출고처'&&(b.ponos||[]).indexOf(no)>=0;})
+    .sort(function(a,b){return String(a.at||'')<String(b.at||'')?-1:1;})[0]||null;}
+function flowOf(no){
+  var po=(PODOCS||[]).filter(function(d){return purTrim(d.pono||d.id)===no;})[0],sh=shipFor(no),o={ship:sh};if(!sh||!po)return o;
+  o.dlv=(PODLV||[]).filter(function(x){return x.id===sh.id&&purTrim(x.pono)===no;})[0]||null;
+  o.in=po.inTok?(POIN||[]).filter(function(x){return x.id===po.inTok+'_'+sh.id&&purTrim(x.pono)===no;})[0]||null:null;
   return o;
 }
 function podFlowSync(){
-  if(!db||!db.collection||PODOCS==null||POSHIP==null||POSCAN==null||POIN==null||PODONE==null||POBOX==null||data.purdelvs==null||data.purchases==null||data.purords==null||!canCol('erp_purdelvs','w'))return;
-  PODONE.forEach(function(dn){
-    var id='flow_'+dn.id;if(!podKeyOk(dn.id)||podBusy['f:'+id]||(data.purdelvs||[]).some(function(r){return r.id===id;}))return;
-    var no=purTrim(dn.pono),f=flowOf(no),po=(PODOCS||[]).filter(function(d){return purTrim(d.pono||d.id)===no;})[0];
-    if(!po||!f.ship||f.ship.id!==dn.id||!f.scan||!f.in||!f.done)return;
-    if(!(String(f.scan.at)<=String(f.in.at)&&String(f.in.at)<=String(f.done.at)))return;   /* 스캔 → 입고확인 → 배송완료 순서 */
+  if(!db||!db.collection||PODOCS==null||POSHIP==null||POIN==null||PODLV==null||POBOX==null||data.purdelvs==null||data.purchases==null||data.purords==null)return;
+  var canW=canCol('erp_purdelvs','w');
+  PODOCS.forEach(function(po){
+    var no=purTrim(po.pono||po.id),f=flowOf(no);if(!f.ship)return;
+    var id='flow_'+f.ship.id,pd=(data.purdelvs||[]).filter(function(r){return r.id===id;})[0];
+    /* 잠금 표시: 구매납품 문서가 대기가 아니면 링크 수정 막음 */
+    if(pd&&pd.status!=='대기'&&f.dlv&&f.dlv.locked!==true&&canCol('erp_podlv','w')&&podBusy['L:'+id]!==1){podBusy['L:'+id]=1;
+      db.collection('erp_podlv').doc(f.ship.id).update({locked:true}).catch(function(e){podBusy['L:'+id]=0;console.warn('잠금 표시 못 함',no,e);});}
+    if(!canW||!f.in||!f.dlv||!f.dlv.doneAt)return;
+    var rev=Number(f.in.rev||0);if(!(rev>0&&Number(f.dlv.doneRev)===rev&&String(f.in.at)<=String(f.dlv.doneAt)))return;   /* 이 입고확인에 대한 납품완료여야 */
     var src=(data[po.purCol==='erp_purords'?'purords':'purchases']||[]).filter(function(d){return d.id===po.purId;})[0];if(!src)return;
     var qty={};(f.in.rows||[]).forEach(function(r){if(r&&r.ccode!=null)qty[purTrim(r.ccode)]=Number(r.qty);});
     var rows=(src.rows||[]).filter(function(x){return x&&purTrim(x.vendor)===purTrim(po.vendor)&&qty[purTrim(x.ccode)]>0;}).map(function(x){var c=purTrim(x.ccode);
       return {cname:x.cname||'',ccode:c,cspec:x.cspec||'',unit:x.unit||'',poqty:Number(x.qty||0),qty:qty[c],price:x.price,wh:x.wh||''};});
     if(!rows.length)return;
-    var doc={purId:po.purId,purCol:po.purCol||'erp_purchases',pono:no,vendor:po.vendor,dlvdate:ymdOf(f.done.at),rows:rows,dlvno:'',status:'대기',agentNote:'',
-      createdAt:new Date().toISOString(),route:routeOf(BYKEY.purdelvs),flow:{ship:dn.id,scanAt:f.scan.at,inBox:f.in.box,inAt:f.in.at,doneAt:f.done.at}};
-    podBusy['f:'+id]=1;
-    db.collection('erp_purdelvs').doc(id).create(doc).catch(function(e){podBusy['f:'+id]=0;console.warn('배송완료 납품 못 만듦',no,e);});
+    var flow={ship:f.ship.id,inAt:f.in.at,rev:rev,doneAt:f.dlv.doneAt,photos:Number(f.in.photos||0)},bk='f:'+id+':'+rev;
+    if(podBusy[bk])return;
+    if(!pd){podBusy[bk]=1;
+      db.collection('erp_purdelvs').doc(id).create({purId:po.purId,purCol:po.purCol||'erp_purchases',pono:no,vendor:po.vendor,dlvdate:ymdOf(f.dlv.doneAt),rows:rows,dlvno:'',status:'대기',agentNote:'',
+        createdAt:new Date().toISOString(),route:routeOf(BYKEY.purdelvs),flow:flow}).catch(function(e){podBusy[bk]=0;console.warn('납품완료 납품 못 만듦',no,e);});
+    }else if(pd.status==='대기'&&Number(pd.flow&&pd.flow.rev||0)<rev){podBusy[bk]=1;   /* 수정요청 뒤 다시 납품완료 → 대기 문서 수량 고침(대기일 때만) */
+      db.collection('erp_purdelvs').doc(id).updateIf(function(c){return c.status==='대기'&&Number(c.flow&&c.flow.rev||0)<rev?{rows:rows,dlvdate:ymdOf(f.dlv.doneAt),flow:flow}:null;})
+        .catch(function(e){podBusy[bk]=0;console.warn('납품 수정 못 함',no,e);});
+    }
   });
 }
-function flowText(no){var f=flowOf(no);return f.done?'배송완료 '+confTime(f.done):f.in?'입고확인 '+confTime(f.in):f.scan?'기사 스캔 '+confTime(f.scan):f.ship?'기사 스캔 전':'';}
+function flowText(no){var f=flowOf(no),d=f.dlv;if(!f.ship)return '';
+  if(d&&d.locked)return '잠김';
+  if(d&&d.doneAt&&Number(d.doneRev||0)>=Number(d.rev||0)&&d.rev)return '납품완료 '+confTime({at:d.doneAt})+(Number(d.rev)>1?' (수정 '+(Number(d.rev)-1)+')':'');
+  if(f.in)return '입고확인 '+confTime(f.in)+(Number(f.in.rev)>1?' (수정 '+(Number(f.in.rev)-1)+')':'');
+  return '배송기사 공유됨';}
+/* 입고열쇠 문서(erp_pointok) — 폼이 만듦 */
+function podTokSync(){
+  if(!db||!db.collection||PODOCS==null||PTOK==null||!canCol('erp_pointok','w'))return;
+  PODOCS.forEach(function(d){if(!podKeyOk(d.inTok)||podBusy['t:'+d.inTok]||PTOK.some(function(t){return t.id===d.inTok;}))return;podBusy['t:'+d.inTok]=1;
+    db.collection('erp_pointok').doc(d.inTok).create({pono:purTrim(d.pono||d.id),at:new Date().toISOString()}).catch(function(e){podBusy['t:'+d.inTok]=0;console.warn('입고열쇠 못 만듦',d.id,e);});});
+}
 var podView2='출고처';   /* v133 목록 보기: 출고처 · 입고처 · 전체 */
 var podOpenGrp={};   /* v135 사장님 「업체별 발주서는 토글목록으로 해당업체 선택시만 펼쳐지게 해주세요 기본 모습은 모든 토글이 닫힌 상태입니다」 — 열린 묶음(보기:이름). 처음엔 모두 닫힘 */
 function renderPodocs(){
@@ -4774,7 +4798,7 @@ function renderPodocs(){
   function draw(){
     if(cur!=='podocs')return;
     if(PODOCS==null||data.purchases==null||data.purords==null){box.replaceChildren(h('p',{class:'msg'},'불러오는 중'));lastKey='';return;}
-    var all=podAll(),key=JSON.stringify([podSel,podView2,podOpenGrp,podSel?[POSHIP,POSCAN,POIN,PODONE]:0,all,podSel?data.purdelvs:0,(PODPUB||[]).map(function(p){return p.id;}),(POBOX||[]).map(function(b){return [b.id,b.kind,b.name];}),POCONF]);if(key===lastKey)return;lastKey=key;   /* 같은 내용이면 다시 안 그림(QR 깜박임) */
+    var all=podAll(),key=JSON.stringify([podSel,podView2,podOpenGrp,podSel?[POSHIP,POIN,PODLV]:0,all,podSel?data.purdelvs:0,(PODPUB||[]).map(function(p){return p.id;}),(POBOX||[]).map(function(b){return [b.id,b.kind,b.name];}),POCONF]);if(key===lastKey)return;lastKey=key;   /* 같은 내용이면 다시 안 그림(QR 깜박임) */
     if(podSel){var d=all.filter(function(x){return purTrim(x.pono||x.id)===podSel;})[0];
       box.replaceChildren.apply(box,d?podView(d):[h('div',{class:'actions'},h('button',{type:'button',class:'btn small',on:{click:function(){podGo('');}}},'목록')),h('p',{class:'msg bad'},'문서가 없습니다.')]);return;}
     if(!all.length){box.replaceChildren(h('p',{class:'msg'},'발주서가 없습니다.'));return;}
@@ -6559,7 +6583,7 @@ function erpMenus(){
   var out=[{k:'check',t:CHECK.title,cols:[]}];
   ['수입','구매','생산'].forEach(function(pg){
     if(PERM_SPLIT[pg]){STEPS.filter(function(s){return s.page===pg&&!s.hidden;}).forEach(function(s){out.push({k:s.key,t:PAGE_NAMES[pg]+' · '+s.title,cols:['erp_'+s.key]});});
-      if(pg==='구매')out.push({k:'podocs',t:PAGE_NAMES[pg]+' · '+PODOC.title,cols:['erp_podocs','erp_podocs_pub','erp_pobox','erp_poconfirm','erp_poship','erp_poshipref','erp_poscan','erp_poin','erp_podone','erp_poflow']});   /* v133 박스·발주확인 */   /* v128 공개 문서 */   /* v126 발주서관리만 줄 수 있게 */
+      if(pg==='구매')out.push({k:'podocs',t:PAGE_NAMES[pg]+' · '+PODOC.title,cols:['erp_podocs','erp_podocs_pub','erp_pobox','erp_poconfirm','erp_poship','erp_poshipref','erp_poin','erp_podlv','erp_podlvimg','erp_pointok']});   /* v133 박스·발주확인 */   /* v128 공개 문서 */   /* v126 발주서관리만 줄 수 있게 */
       return;}   /* v121 구매는 화면마다 권한 */
     out.push({k:'p:'+pg,t:PAGE_NAMES[pg],cols:STEPS.filter(function(s){return s.page===pg;}).map(function(s){return 'erp_'+s.key;})});});
   out.push({k:'stocks',t:'물류 · [물류] 재고현황',cols:['erp_stocks']});
@@ -6709,7 +6733,7 @@ function staffRepoTable(){
     ['자료 보호','늘지 않음 — 파이어베이스 키는 원래 공개 값, 자료는 저장소 규칙이 지킴','저장소 규칙 배포(위)']]);
 }
 function go(k){if(BYKEY[k]&&BYKEY[k].shownIn)k=BYKEY[k].shownIn;if(k!==cur||k==='podocs')podSel='';cur=k;navOpen=null;try{history.replaceState(null,'','#'+k);}catch(e){location.hash=k;}renderNav();renderSum();renderStep();}
-function refreshAll(){renderNav();renderSum();renderList();refreshLists();if(impDraw)impDraw();if(sheetDraw)sheetDraw();if(ifRefresh)ifRefresh();if(stkDraw)stkDraw();if(podDraw)podDraw();podSync();podBoxSync();podFlowSync();}
+function refreshAll(){renderNav();renderSum();renderList();refreshLists();if(impDraw)impDraw();if(sheetDraw)sheetDraw();if(ifRefresh)ifRefresh();if(stkDraw)stkDraw();if(podDraw)podDraw();podSync();podTokSync();podBoxSync();podFlowSync();}
 
 /* ---------- boot ---------- */
 
@@ -6751,9 +6775,9 @@ dbP.then(function(d){
   db.collection('erp_pobox').onSnapshot(function(snap){   /* v133 */
     POBOX=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});podBoxSync();if(podDraw)podDraw();
   },function(){POBOX=null;});
-  [['erp_poship','POSHIP'],['erp_poscan','POSCAN'],['erp_poin','POIN'],['erp_podone','PODONE']].forEach(function(c){   /* v144 배송 기록 */
+  [['erp_poship','POSHIP'],['erp_poin','POIN'],['erp_podlv','PODLV'],['erp_pointok','PTOK']].forEach(function(c){   /* v145 배송·입고 기록 */
     db.collection(c[0]).onSnapshot(function(snap){var a=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});
-      if(c[1]==='POSHIP')POSHIP=a;else if(c[1]==='POSCAN')POSCAN=a;else if(c[1]==='POIN')POIN=a;else PODONE=a;podFlowSync();if(podDraw)podDraw();},function(){});
+      if(c[1]==='POSHIP')POSHIP=a;else if(c[1]==='POIN')POIN=a;else if(c[1]==='PODLV')PODLV=a;else PTOK=a;podTokSync();podBoxSync();podFlowSync();if(podDraw)podDraw();},function(){if(c[1]==='POSHIP'&&POSHIP==null){POSHIP=[];podBoxSync();}});   /* 못 읽어도 박스는 고침(배송 링크 없이) */
   });
   db.collection('erp_poconfirm').onSnapshot(function(snap){
     POCONF=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});renderNav();if(podDraw)podDraw();podBoxSync();   /* v143 확인되면 입고처 박스에 넣음(폼이 열려 있을 때 바로) */

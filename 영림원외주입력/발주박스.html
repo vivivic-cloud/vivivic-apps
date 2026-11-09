@@ -1,8 +1,8 @@
 <!doctype html>
-<!-- 발주박스 공유 페이지(v133 · v144 출고처 「배송기사 공유」(erp_poship·erp_poshipref) · 입고처 입고수량·「입고확인」(erp_poin·erp_poflow.inAt, 기사 스캔 뒤에만) · v142 발주확인된 발주 카드에 QR(공개 발주서 주소)·바코드(발주번호)) — 영림원외주입력 「발주서관리」 출고처(구매거래처)·입고처(입고창고) 박스를 로그인 없이 보는 한 장. 폼과 별개 파일, 메뉴·폼으로 가는 길 없음.
-     주소 = 발주박스.html#<박스 열쇠>. 자료 = erp_pobox/<열쇠>(폼이 씀) · erp_poconfirm/<발주번호>(발주확인 — 출고처 박스에서만 만듦).
-     출고처 = 그 거래처 발주 모두(v138 단가 안 보임 — 사장님 「발주관리 구매처 쪽에서도 단가는 안나타나게 해주세요」) + 「발주확인」 단추. 입고처 = 발주확인된 것만 「입고대기」(단가 없음).
-     저장소 규칙(제안): erp_pobox get 누구나 · erp_poconfirm get 누구나, create 는 그 출고처 박스 열쇠 + 그 박스 발주번호만. 규칙 배포 전에는 막혀 익명 로그인 뒤 다시 시도. -->
+<!-- 발주박스 공유 페이지 — 로그인 없음, 폼과 별개. 주소 = 발주박스.html#<박스 열쇠>. 자료 = erp_pobox/<열쇠>(폼이 씀) · erp_poconfirm/<발주번호>.
+     v133 출고처·입고처 박스 · v138 단가 없음 · v142 QR·바코드 · v145(사장님 확정 흐름) 다시 짬:
+     출고처 = 그 거래처 발주 모두 + 「발주확인」 → 확인되면 QR(발주서.html#공개열쇠)·바코드(발주번호) + 「배송기사 공유」(배송.html#배송열쇠, 한 발주 한 링크).
+     입고처 = 발주확인된 발주만, QR·바코드 없음. 위에 「스캔」(기사 폰 발주서 QR)·발주번호 칸 → 입고.html(이 박스에 없는 발주면 멈춤). 카드마다 「입고」·진행 단계. -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -11,101 +11,40 @@
 <meta name="referrer" content="no-referrer">
 <title>발주서</title>
 <link rel="icon" href="data:,">
-<style>
-:root{--ink:#37352f;--muted:#787774;--line:#ededeb;--fill2:#f5f5f4;--rowline:#f0eeec;--red:#dc2626;--green:#166534;--amber:#92400e;
-  --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI",Helvetica,Arial,sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Monaco,monospace}
-*{box-sizing:border-box}
-html{color-scheme:light}
-body{margin:0;background:#fff;color:var(--ink);font:400 15px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
-main{max-width:560px;margin:0 auto;padding:20px 16px calc(32px + env(safe-area-inset-bottom,0px))}
-h1{font-size:20px;font-weight:900;letter-spacing:-0.02em;margin:0;word-break:break-all}
-.sub{color:var(--muted);font-weight:700;font-size:13px;margin:2px 0 14px}
-.msg{color:var(--muted);font-weight:700}.msg.bad{color:var(--red)}
-.po{border:1px solid var(--line);border-radius:14px;padding:12px;margin:12px 0}
-.po .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 8px}
-.po .no{font-family:var(--mono);font-weight:800;word-break:break-all}
-.st{font-size:12px;font-weight:800;color:var(--amber)}.st.on{color:var(--green)}
-button{font:inherit;font-weight:800;border-radius:10px;border:1px solid var(--ink);background:var(--ink);color:#fff;padding:9px 14px;min-height:40px;cursor:pointer;margin-left:auto}
-button:disabled{opacity:.5}
-dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:3px 12px;margin:0}
-dt{color:var(--muted);font-weight:700;font-size:13px;padding-top:1px}
-dd{margin:0;font-weight:600;word-break:break-all}
-dd.mono{font-family:var(--mono)}dd.n{font-variant-numeric:tabular-nums}
-.row{border-top:1px solid var(--rowline);padding:8px 0 0;margin:8px 0 0}
-.row .nt{font-weight:800;word-break:break-all;margin:0 0 4px}
-.codes{display:grid;justify-items:center;gap:6px;margin:4px 0 10px}.qr canvas{display:block;max-width:100%;image-rendering:pixelated}
-.bc{width:100%;max-width:360px}.bc svg{display:block;width:100%;height:auto}
-.ship{margin:10px 0 0;display:flex;gap:8px;align-items:center;flex-wrap:wrap}.ship button{margin-left:0}.note{font-size:13px;font-weight:700;color:var(--green)}
-.in{border-top:1px solid var(--rowline);margin:10px 0 0;padding:10px 0 0}.in .st2{font-size:13px;font-weight:800;color:var(--muted);margin:0 0 8px}.in .st2.on{color:var(--green)}
-.inq{display:flex;align-items:center;gap:8px;margin:0 0 8px}.inq span{flex:1 1 auto;min-width:0;font-weight:700;word-break:break-all;font-size:14px}.inq input{width:110px;flex:0 0 auto;font:inherit;text-align:right;border:1px solid var(--line);border-radius:10px;padding:8px 10px}.inq input:disabled{background:#f7f6f3;color:var(--muted)}
-.in button{width:100%;margin:0}
-.err{color:var(--red);font-weight:700;font-size:13px;margin:6px 0 0}
-</style>
+<link rel="stylesheet" href="발주공통.css">
 </head>
 <body>
 <main id="main"><p class="msg">불러오는 중</p></main>
+<script src="발주공통.js"></script>
 <script>
 (function(){
 "use strict";
-var KEY='AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs',PROJ='vivivic-4b7ef',DOCS='projects/'+PROJ+'/databases/(default)/documents';
-var BASE='https://firestore.googleapis.com/v1/';
-var mainEl=document.getElementById('main');
-function h(tag,cls){var e=document.createElement(tag);if(cls)e.className=cls;for(var i=2;i<arguments.length;i++){var c=arguments[i];(Array.isArray(c)?c:[c]).forEach(function(x){if(x==null||x===false)return;e.append(x.nodeType?x:document.createTextNode(String(x)));});}return e;}
-function show(v){return v==null?'':String(v);}
-function num(v){if(v==null||String(v).trim()==='')return '';var n=Number(v);return isFinite(n)?n.toLocaleString('ko-KR',{maximumFractionDigits:6}):String(v);}
+var P=window.PO,h=P.h,show=P.show,num=P.num,mainEl=document.getElementById('main');
 function say(t,bad){mainEl.replaceChildren(h('p','msg'+(bad?' bad':''),t));}
-function val(x){if(!x)return null;var k=Object.keys(x)[0],y=x[k];
-  if(k==='mapValue'){var o={};Object.keys(y.fields||{}).forEach(function(f){o[f]=val(y.fields[f]);});return o;}
-  if(k==='arrayValue')return (y.values||[]).map(val);
-  if(k==='integerValue')return Number(y);if(k==='nullValue')return null;return y;}
-function fieldsOf(j){var f={};Object.keys(j.fields||{}).forEach(function(k){f[k]=val(j.fields[k]);});return f;}
 function when(s){var t=new Date(s);if(!s||isNaN(t))return show(s);var p=function(n){return String(n).padStart(2,'0');};return t.getFullYear()+'-'+p(t.getMonth()+1)+'-'+p(t.getDate())+' '+p(t.getHours())+':'+p(t.getMinutes());}
 var key=(location.hash||'').slice(1);
-if(!/^[A-Za-z0-9_-]{32,64}$/.test(key)){say('발주서가 없습니다.',true);return;}
-/* 규칙 배포 전: 로그인 없는 요청이 막히면 익명 로그인 토큰(이 탭에서만)으로 다시 */
-var tok=null;
-function anon(){
-  try{var t=JSON.parse(sessionStorage.getItem('po.tok')||'null');if(t&&t.exp>Date.now())return Promise.resolve(tok=t.id);}catch(e){}
-  return fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key='+KEY,{method:'POST',headers:{'Content-Type':'application/json'},body:'{"returnSecureToken":true}'})
-    .then(function(r){return r.json();}).then(function(j){if(!j.idToken)throw new Error('anon');
-      try{sessionStorage.setItem('po.tok',JSON.stringify({id:j.idToken,exp:Date.now()+50*60*1000}));}catch(e){}return tok=j.idToken;});
-}
-function call(path,opt){
-  var go=function(){var o=Object.assign({cache:'no-store',referrerPolicy:'no-referrer'},opt||{});o.headers=Object.assign({'Content-Type':'application/json'},(opt&&opt.headers)||{},tok?{Authorization:'Bearer '+tok}:{});
-    return fetch(BASE+path+(path.indexOf('?')<0?'?':'&')+'key='+KEY,o);};
-  return go().then(function(r){return (r.status===401||r.status===403)&&!tok?anon().then(go):r;});
-}
-var BOX=null,CONF={},busy={},errs={},FLOW={},INB={},DRAFT={},NOTE={};
-function sv(x){return {stringValue:String(x)};}
-function rkey(){var a=new Uint8Array(24);crypto.getRandomValues(a);return btoa(String.fromCharCode.apply(null,a)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
-function commit(writes){return call(DOCS+':commit',{method:'POST',body:JSON.stringify({writes:writes})}).then(function(r){if(!r.ok){var e=new Error(r.status);e.status=r.status;throw e;}});}
-function batch(names){return call(DOCS+':batchGet',{method:'POST',body:JSON.stringify({documents:names.map(function(n){return DOCS+'/'+n;})})}).then(function(r){if(!r.ok)throw new Error(r.status);return r.json();})
-  .then(function(a){var o={};(a||[]).forEach(function(x){if(x.found)o[x.found.name.slice(DOCS.length+1)]=fieldsOf(x.found);});return o;});}
+if(!P.keyOk(key)){say('발주서가 없습니다.',true);return;}
+var BOX=null,CONF={},DLV={},busy={},errs={},NOTE={},CODES={},topErr='',stopCam=null,camEl=null;
 function load(){
-  return call(DOCS+'/erp_pobox/'+key).then(function(r){
-    if(r.status===404||r.status===403){BOX=false;return;}
-    if(!r.ok)throw new Error(r.status);
-    return r.json().then(function(j){BOX=fieldsOf(j);
-      var ponos=(BOX.ponos||[]).filter(Boolean);if(!ponos.length){CONF={};return;}
-      return call(DOCS+':batchGet',{method:'POST',body:JSON.stringify({documents:ponos.map(function(n){return DOCS+'/erp_poconfirm/'+n;})})}).then(function(r2){
-        if(!r2.ok)throw new Error(r2.status);
-        return r2.json().then(function(a){var c={};(a||[]).forEach(function(x){if(x.found){var f=fieldsOf(x.found);c[f.pono||x.found.name.split('/').pop()]=f;}});CONF=c;});
-      }).then(function(){   /* v144 입고처: 기사 스캔·입고확인·배송완료 표시(erp_poflow) + 내 입고 기록(erp_poin) */
-        if(BOX.kind!=='입고처')return;
-        var pos=(BOX.pos||[]).filter(function(p){return p&&/^[A-Za-z0-9_-]{32,64}$/.test(String(p.pubKey||''))&&/^[A-Za-z0-9_-]{1,100}$/.test(String(p.pono||''));});if(!pos.length)return;
-        var names=[];pos.forEach(function(p){names.push('erp_poflow/'+p.pubKey,'erp_poin/'+key+'_'+p.pono);});
-        return batch(names).then(function(o){var f={},n={};pos.forEach(function(p){f[p.pono]=o['erp_poflow/'+p.pubKey]||null;n[p.pono]=o['erp_poin/'+key+'_'+p.pono]||null;});FLOW=f;INB=n;});
-      });
-    });
+  return P.getOne('erp_pobox/'+key).then(function(b){
+    if(!b){BOX=false;return;}BOX=b;if(b.kind==='입고처')P.rememberInbox(key);
+    var pos=(b.pos||[]).filter(function(p){return p&&P.noOk(p.pono);}),names=pos.map(function(p){return 'erp_poconfirm/'+p.pono;});
+    if(b.kind==='입고처')pos.forEach(function(p){if(P.keyOk(p.ship))names.push('erp_podlv/'+p.ship);});
+    return P.getMany(names).then(function(o){var c={},d={};pos.forEach(function(p){if(o['erp_poconfirm/'+p.pono])c[p.pono]=o['erp_poconfirm/'+p.pono];if(P.keyOk(p.ship)&&o['erp_podlv/'+p.ship])d[p.pono]=o['erp_podlv/'+p.ship];});CONF=c;DLV=d;});
   }).then(draw,function(){if(BOX==null)say('불러오지 못했습니다.',true);});
 }
-/* v144 출고처: 배송기사 링크 = erp_poship/<새 열쇠>(이 박스·발주) — 한 발주에 하나(erp_poshipref/<박스 열쇠>_<발주번호>) */
+function confirmPo(no){
+  if(!confirm(no+' 발주를 확인합니다.'))return;
+  busy[no]=1;errs[no]='';draw();
+  P.commit([{name:'erp_poconfirm/'+no,fields:{box:key,pono:no,at:new Date().toISOString()},exists:false}])
+    .then(function(){busy[no]=0;return load();},function(){busy[no]=0;return load().then(function(){if(!CONF[no]){errs[no]='발주확인을 저장하지 못했습니다.';draw();}});});
+}
+/* 출고처: 배송기사 링크 = erp_poship/<새 열쇠> — 한 발주 하나(erp_poshipref/<박스 열쇠>_<발주번호>) */
 function shipOf(p){
-  var ref='erp_poshipref/'+key+'_'+p.pono;
-  var get=function(){return batch([ref]).then(function(o){return o[ref]&&o[ref].ship||null;});};
-  return get().then(function(k){if(k)return k;k=rkey();var at=new Date().toISOString();
-    return commit([{update:{name:DOCS+'/erp_poship/'+k,fields:{box:sv(key),pono:sv(p.pono),pubKey:sv(p.pubKey),at:sv(at)}},currentDocument:{exists:false}},
-      {update:{name:DOCS+'/'+ref,fields:{ship:sv(k),box:sv(key),pono:sv(p.pono)}},currentDocument:{exists:false}}]).then(function(){return k;},function(e){return get().then(function(k2){if(k2)return k2;throw e;});});});
+  var ref='erp_poshipref/'+key+'_'+p.pono,get=function(){return P.getOne(ref).then(function(r){return r&&r.ship||null;});};
+  return get().then(function(k){if(k)return k;k=P.rkey();
+    return P.commit([{name:'erp_poship/'+k,fields:{box:key,pono:p.pono,pubKey:p.pubKey,at:new Date().toISOString()},exists:false},
+      {name:ref,fields:{ship:k,box:key,pono:p.pono},exists:false}]).then(function(){return k;},function(e){return get().then(function(k2){if(k2)return k2;throw e;});});});
 }
 function shareShip(p){
   if(busy['s'+p.pono])return;busy['s'+p.pono]=1;errs[p.pono]='';NOTE[p.pono]='';draw();
@@ -116,65 +55,17 @@ function shareShip(p){
     return copy();
   },function(){busy['s'+p.pono]=0;errs[p.pono]='배송기사 링크를 만들지 못했습니다.';draw();});
 }
-/* v144 입고처: 기사 스캔 뒤·배송완료 전에만 입고수량 고치기·「입고확인」 */
-function inQty(p,x){var d=DRAFT[p.pono]||{},i=INB[p.pono];if(d[x.ccode]!=null)return d[x.ccode];
-  var r=i&&(i.rows||[]).filter(function(y){return y&&y.ccode===x.ccode;})[0];return r?String(r.qty):String(x.qty==null?'':x.qty);}
-function saveIn(p){
-  var f=FLOW[p.pono]||{};if(busy['i'+p.pono]||!f.scanAt||f.doneAt)return;
-  var rows=(p.rows||[]).filter(Boolean).map(function(x){return {ccode:show(x.ccode),qty:String(inQty(p,x)).replace(/,/g,'').trim()};});
-  var bad=rows.filter(function(r){return r.qty===''||!isFinite(Number(r.qty))||Number(r.qty)<0||!/^\d+(\.\d{1,2})?$/.test(r.qty);})[0];
-  if(bad){errs[p.pono]='입고수량을 확인해 주세요.';draw();return;}
-  if(!confirm(p.pono+' 입고확인을 저장합니다.'))return;
-  busy['i'+p.pono]=1;errs[p.pono]='';draw();var at=new Date().toISOString();
-  commit([{update:{name:DOCS+'/erp_poin/'+key+'_'+p.pono,fields:{box:sv(key),pono:sv(p.pono),pubKey:sv(p.pubKey),at:sv(at),
-      rows:{arrayValue:{values:rows.map(function(r){return {mapValue:{fields:{ccode:sv(r.ccode),qty:{doubleValue:Number(r.qty)}}}};})}}}}},
-    {update:{name:DOCS+'/erp_poflow/'+p.pubKey,fields:{inAt:sv(at)}},updateMask:{fieldPaths:['inAt']},currentDocument:{exists:true}}])
-    .then(function(){busy['i'+p.pono]=0;delete DRAFT[p.pono];return load();},function(){busy['i'+p.pono]=0;errs[p.pono]='입고확인을 저장하지 못했습니다.';return load();});
+/* 입고처: 기사 폰 발주서 QR(입고.html#배송열쇠) 또는 발주번호 → 이 박스의 그 발주 입고 페이지. 이 박스에 없으면 멈춤 */
+function goIn(txt){
+  var t=String(txt||'').trim(),i=t.indexOf('입고.html#'),j=t.indexOf('%EC%9E%85%EA%B3%A0.html#'),pos=(BOX.pos||[]).filter(Boolean),p=null,sk='';
+  if(i>=0||j>=0){sk=t.slice(i>=0?i+'입고.html#'.length:j+'%EC%9E%85%EA%B3%A0.html#'.length).split('&')[0];p=pos.filter(function(x){return x.ship===sk;})[0];
+    if(!p&&P.keyOk(sk)){location.href=new URL('입고.html#'+sk+'&b='+key,location.href).href;return;}}   /* 박스 문서에 배송 열쇠가 아직 없으면 입고.html 이 발주번호로 다시 봄(없으면 멈춤) */
+  else{p=pos.filter(function(x){return String(x.pono).toUpperCase()===t.toUpperCase();})[0];sk=p&&p.ship;}
+  if(!p||!CONF[p.pono]){topErr='이 입고처 박스에 없는 발주입니다.';draw();return;}
+  if(!P.keyOk(sk)){topErr='배송기사 링크가 아직 없는 발주입니다.';draw();return;}
+  location.href=new URL('입고.html#'+sk+'&b='+key,location.href).href;
 }
-function inBox(p){
-  var f=FLOW[p.pono]||{},i=INB[p.pono],on=!!f.scanAt&&!f.doneAt,rows=(p.rows||[]).filter(Boolean);
-  var st=f.doneAt?'배송완료 '+when(f.doneAt):i&&f.inAt?'입고확인 '+when(i.at):f.scanAt?'기사 스캔 '+when(f.scanAt):'기사 스캔 전';
-  var b=h('button','','입고확인');b.type='button';b.disabled=!on||!!busy['i'+p.pono];b.addEventListener('click',function(){saveIn(p);});
-  return h('div','in',h('p','st2'+(f.scanAt?' on':''),st),
-    rows.map(function(x){var q=h('input');q.type='text';q.inputMode='decimal';q.value=inQty(p,x);q.disabled=!on;q.setAttribute('aria-label','입고수량 '+show(x.cname));
-      q.addEventListener('input',function(){(DRAFT[p.pono]=DRAFT[p.pono]||{})[x.ccode]=q.value;});
-      return h('div','inq',h('span','','입고수량 · '+show(x.cname)),q);}),b);
-}
-function confirmPo(no){
-  if(!confirm(no+' 발주를 확인합니다.'))return;
-  busy[no]=1;errs[no]='';draw();
-  var at=new Date().toISOString();
-  call(DOCS+'/erp_poconfirm?documentId='+encodeURIComponent(no),{method:'POST',body:JSON.stringify({fields:{box:{stringValue:key},pono:{stringValue:no},at:{stringValue:at}}})})
-    .then(function(r){busy[no]=0;if(r.ok||r.status===409)return load();errs[no]='발주확인을 저장하지 못했습니다.';draw();},
-      function(){busy[no]=0;errs[no]='발주확인을 저장하지 못했습니다.';draw();});
-}
-/* v142 사장님 「발주확정된 입고처 발주서에는 큐알이랑 바코드도 안보이고」 — 발주확인된 카드에만 QR·바코드(v136 기준 그대로). 폼·발주서.html 과 같은 판·SRI·크기, cdnjs 못 받으면 같은 폴더 사본(v131) */
-var LIBS={qr:['https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js','sha384-mZT2gIty7ZDdOGkxfP6joZcYdMW1Jvj9dRlfpTmaJAKKXTqzygtB22k7FLe+KZC1','qrcode','라이브러리/qrcode.min.js'],
-  bc:['https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/barcodes/JsBarcode.code128.min.js','sha384-7XguhfRLAUmvSGmJn2K+BQDpX0gf5NMsj79jcgd7TVtV87euzdySNZqTjOQxgIiB','JsBarcode','라이브러리/JsBarcode.code128.min.js']},libP={};
-function lib(k){var L=LIBS[k];if(window[L[2]])return Promise.resolve(window[L[2]]);if(libP[k])return libP[k];
-  var one=function(src,sri){return new Promise(function(ok,no){var sc=document.createElement('script');sc.src=src;
-    if(sri){sc.integrity=sri;sc.crossOrigin='anonymous';sc.referrerPolicy='no-referrer';}
-    sc.onload=function(){window[L[2]]?ok(window[L[2]]):no(new Error(k));};sc.onerror=function(){sc.remove();no(new Error(k));};document.head.append(sc);});};
-  return libP[k]=one(L[0],L[1]).catch(function(){return one(L[3]);}).catch(function(e){libP[k]=null;throw e;});}
-var CODES={};   /* 같은 발주 카드는 다시 그리지 않고 붙여 둠(1분마다 다시 읽어도 안 깜박임) */
-function codes(no,pk){
-  var ck=no+'|'+pk;if(CODES[ck])return CODES[ck];
-  var qrBox=h('div','qr'),bcBox=h('div','bc'),err=h('p','err');err.hidden=true;
-  if(/^[A-Za-z0-9_-]{32,64}$/.test(pk))lib('qr').then(function(qrcode){
-    var q=qrcode(0,'M');q.addData(new URL('발주서.html#'+pk,location.href).href);q.make();
-    var n=q.getModuleCount(),cell=6,sz=(n+8)*cell,cv=document.createElement('canvas');
-    cv.width=sz;cv.height=sz;cv.style.width=sz/2+'px';cv.style.height=sz/2+'px';cv.setAttribute('role','img');cv.setAttribute('aria-label','QR코드 '+no);
-    var c=cv.getContext('2d');c.fillStyle='#fff';c.fillRect(0,0,sz,sz);c.fillStyle='#000';
-    for(var r=0;r<n;r++)for(var k=0;k<n;k++)if(q.isDark(r,k))c.fillRect((k+4)*cell,(r+4)*cell,cell,cell);
-    qrBox.replaceChildren(cv);
-  }).catch(function(){err.hidden=false;err.textContent='QR코드를 그리지 못했습니다.';});
-  if(no)lib('bc').then(function(JsBarcode){
-    var sv=document.createElementNS('http://www.w3.org/2000/svg','svg');sv.setAttribute('role','img');sv.setAttribute('aria-label','바코드 '+no);
-    JsBarcode(sv,no,{format:'CODE128',width:1.6,height:64,fontSize:14,margin:16,displayValue:true});
-    sv.removeAttribute('width');sv.removeAttribute('height');bcBox.replaceChildren(sv);
-  }).catch(function(){err.hidden=false;err.textContent='바코드를 그리지 못했습니다.';});
-  return CODES[ck]=h('div','codes',qrBox,bcBox,err);
-}
+function scanTop(){if(stopCam)stopCam();topErr='';camEl=h('div','cam');draw();stopCam=P.scanner(camEl,function(t){stopCam=null;camEl=null;goIn(t);},function(){camEl=null;topErr='카메라를 쓸 수 없습니다. 발주번호를 넣어 주세요.';draw();});}
 function kv(pairs){var d=h('dl');pairs.forEach(function(p){d.append(h('dt','',p[0]),h('dd',p[2]||'',p[1]));});return d;}
 function draw(){
   if(BOX===false){say('발주서가 없습니다.',true);return;}
@@ -183,24 +74,28 @@ function draw(){
   if(!out)pos=pos.filter(function(p){return !!CONF[p.pono];});   /* 입고처 = 발주확인된 것만 */
   document.title='발주서 '+show(BOX.name);
   var cards=pos.map(function(p){
-    var c=CONF[p.pono],rows=(p.rows||[]).filter(Boolean),top=h('div','top',h('span','no',show(p.pono)));
+    var c=CONF[p.pono],d=DLV[p.pono]||{},rows=(p.rows||[]).filter(Boolean),top=h('div','top',h('span','no',show(p.pono)));
     if(out){if(c)top.append(h('span','st on','발주확인 '+when(c.at)));
       else{top.append(h('span','st','발주확인 전'));var b=h('button','','발주확인');b.type='button';b.disabled=!!busy[p.pono];b.addEventListener('click',function(){confirmPo(p.pono);});top.append(b);}}
-    else top.append(h('span','st on','입고대기'));
+    else{var stt=d.locked?'잠김':d.doneAt&&Number(d.doneRev||0)>=Number(d.rev||0)&&d.rev?'납품완료 '+when(d.doneAt):d.inAt?'입고확인 '+when(d.inAt):'입고대기';
+      top.append(h('span','st on',stt));
+      if(P.keyOk(p.ship)){var ib=h('button','sec','입고');ib.type='button';ib.addEventListener('click',function(){location.href=new URL('입고.html#'+p.ship+'&b='+key,location.href).href;});top.append(ib);}}
+    var ck=p.pono+'|'+p.pubKey;if(out&&c&&!CODES[ck])CODES[ck]=P.codes(P.keyOk(p.pubKey)?new URL('발주서.html#'+p.pubKey,location.href).href:'',show(p.pono));
     var head=out?[['발주일',show(p.podate)]]:[['발주일',show(p.podate)],['구매거래처',show(p.vendor)],['발주확인',c?when(c.at):'']];
-    return h('div','po',top,c?codes(show(p.pono),show(p.pubKey)):null,kv(head),
-      rows.map(function(x){var f=[['품번',show(x.ccode),'mono'],['규격',show(x.cspec)],['단위',show(x.unit)],['발주수량',num(x.qty),'n']];
-        f.push(['납품예정일',show(x.duedate)],['창고',show(x.wh)],['납품수량',num(x.dlv),'n']);
-        return h('div','row',h('div','nt',show(x.cname)),kv(f));}),
+    return h('div','po',top,out&&c?CODES[ck]:null,kv(head),
+      rows.map(function(x){return h('div','row',h('div','nt',show(x.cname)),kv([['품번',show(x.ccode),'mono'],['규격',show(x.cspec)],['단위',show(x.unit)],['발주수량',num(x.qty),'n'],['납품예정일',show(x.duedate)],['창고',show(x.wh)],['납품수량',num(x.dlv),'n']]));}),
       out&&c?h('div','ship',(function(){var sb=h('button','','배송기사 공유');sb.type='button';sb.disabled=!!busy['s'+p.pono];sb.addEventListener('click',function(){shareShip(p);});return sb;})(),NOTE[p.pono]?h('span','note',NOTE[p.pono]):null):null,
-      !out?inBox(p):null,
       errs[p.pono]?h('p','err',errs[p.pono]):null);});
-  mainEl.replaceChildren.apply(mainEl,[].concat(h('h1','',show(BOX.name)),h('p','sub',out?'출고처 · '+pos.length+'건':'입고처 · 입고대기 '+pos.length+'건'),
+  var bar=null;
+  if(!out){var inp=h('input'),okb=h('button','sec','확인'),sc=h('button','wide','스캔');inp.placeholder='발주번호';inp.setAttribute('aria-label','발주번호');inp.autocomplete='off';okb.type='button';sc.type='button';
+    okb.addEventListener('click',function(){goIn(inp.value);});inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();goIn(inp.value);}});sc.addEventListener('click',scanTop);
+    bar=h('div','acts',sc,camEl,h('div','manual',inp,okb),topErr?h('p','err',topErr):null);}
+  PO.fill(mainEl,[].concat(h('h1','',show(BOX.name)),h('p','sub',out?'출고처 · '+pos.length+'건':'입고처 · 입고대기 '+pos.length+'건'),bar,
     cards.length?cards:h('p','msg',out?'발주서가 없습니다.':'입고대기 발주가 없습니다.')));
 }
 load();
-setInterval(function(){if(document.visibilityState==='visible'&&!Object.keys(busy).some(function(k){return busy[k];})&&!Object.keys(DRAFT).length)load();},15000);   /* v144 15초 — 기사 스캔이 들어오면 입고확인이 곧 켜짐(고치는 중이면 안 다시 읽음) */
-document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')load();});
+setInterval(function(){if(document.visibilityState==='visible'&&!camEl&&!Object.keys(busy).some(function(k){return busy[k];}))load();},30000);
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'&&!camEl)load();});
 })();
 </script>
 </body>
