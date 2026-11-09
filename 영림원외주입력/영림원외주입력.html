@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v145 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v147 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -347,6 +347,8 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 @media (prefers-reduced-motion:reduce){.podwarn::before{animation:none!important}}   /* 아래 * 규칙은 ::before 에 안 걸림 */   /* v139 사장님 「거래처 발주 확인이 안된 발주서가 있는 박스를 하이라이트 하여 발주확인이 안된 발주서가 있음을 알려 주세요」 — 경고 색 = 기존 --amber·--amber-bg·#fde68a(.guideback) */
 .podli.warn .podbtn{box-shadow:inset 3px 0 0 #fbbf24}   /* v140 펼친 줄은 깜박임 없이 띠만 */
 .podgt{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:4px 8px;flex-wrap:wrap;background:none;border:0;padding:4px 0;font:inherit;color:inherit;text-align:left;cursor:pointer}.podgrp:not(.open) .podgh{margin:0}.podgt .navarr{color:var(--muted);width:12px}   /* v135 접고 펴기 */   /* v134 박스 테두리 안 머리 줄에 공유 */.podgh .nt{font-weight:900;font-size:15px}.podgh .ns{font-size:12px;color:var(--muted);font-weight:700}.podgh .podshare{margin:0 0 0 auto}
+.dlvph{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px}.dlvth{padding:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff;cursor:zoom-in;width:72px;height:72px}.dlvth img{display:block;width:100%;height:100%;object-fit:cover}
+.imgbig{position:fixed;inset:0;z-index:400;background:rgba(15,15,15,.82);display:grid;place-items:center;padding:16px;cursor:zoom-out}.imgbig img{max-width:100%;max-height:100%;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.4)}   /* v147 납품 사진 */
 .podli{display:flex;gap:8px;align-items:stretch}.podli .podbtn{flex:1 1 auto;min-width:0}.podli .podshare{flex:0 0 auto;margin:0;align-self:center}.podbtn .nt{font-weight:800;word-break:break-all}.podbtn .ns{font-size:12px;color:var(--muted);font-weight:600}
 .podcodes{display:grid;justify-items:center;gap:8px;margin:12px 0}.podqr canvas{display:block;max-width:100%;image-rendering:pixelated}
 .podbc{width:100%;max-width:360px}.podbc svg{display:block;width:100%;height:auto}
@@ -371,7 +373,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v145</span>
+    <span class="ver">v147</span>
   </div>
 </header>
 <div class="wrap">
@@ -448,6 +450,7 @@ function connectDb(){
           deleteIf:function(ok){var g=erpGuard(name,'d');if(g)return g;var ref=F.doc(fs,name,id);return F.runTransaction(fs,function(t){return t.get(ref).then(function(d){if(!d.exists()||!ok(d.data()))return false;t.delete(ref);return true;});});},
           /* v34 수정: 문서를 다시 읽어 make(문서)가 고칠 값을 주면 고친다(트랜잭션) — 그 사이 입력 작업자가 상태를 바꿨으면 null 을 주어 안 고침. true = 고침 */
           /* v126 발주서: 없을 때만 만든다(트랜잭션, 문서 id 지정) — 있으면 그대로 두고 false */
+          get:function(){return F.getDoc(F.doc(fs,name,id)).then(function(d){return d.exists()?d.data():null;});},   /* v147 한 장 읽기(납품 사진) */
           create:function(o){var g=erpGuard(name,'w');if(g)return g;var ref=F.doc(fs,name,id);return F.runTransaction(fs,function(t){return t.get(ref).then(function(d){if(d.exists())return false;t.set(ref,o);return true;});});},
           updateIf:function(make){var g=erpGuard(name,'w');if(g)return g;var ref=F.doc(fs,name,id);return F.runTransaction(fs,function(t){return t.get(ref).then(function(d){var o=d.exists()?make(d.data()):null;if(!o)return false;t.update(ref,o);return true;});});}};}
       };},
@@ -5811,6 +5814,23 @@ function uploadCert(s,file,say){
     say(e&&e.message==='script'?'읽기 도구를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.':'파일을 읽지 못했습니다. PDF 나 사진(jpg · png · heic) 파일인지 확인해 주세요.',true);
   });
 }
+/* v147 사장님 「…폼 안에서 사진을 보는 화면은 아직 없습니다. - 해당 사진이 영림원 입력 대기중인 해당 발주 박스에 나타나게 해주세요」
+   구매납품입력 저장 목록 카드(납품 흐름으로 생긴 문서 r.flow)에 입고처 사진(erp_podlvimg/<입고열쇠>_<배송열쇠>_<0~5>) 작은 그림 · 누르면 크게. 상태와 상관없이(대기·진행중·완료) 보임. 사진 없으면 아무것도 없음. */
+var DLV_IMG={},dlvImgBusy={};
+function dlvPhotos(r){
+  var f=r&&r.flow;if(!f||!podKeyOk(f.ship)||!(Number(f.photos)>0))return null;
+  var po=(PODOCS||[]).filter(function(d){return purTrim(d.pono||d.id)===purTrim(r.pono);})[0],tok=po&&po.inTok;if(!podKeyOk(tok))return null;
+  var base=tok+'_'+f.ship,c=DLV_IMG[base];
+  if(!c){if(!dlvImgBusy[base]&&db&&db.collection){dlvImgBusy[base]=1;
+      Promise.all([0,1,2,3,4,5].map(function(i){var ref=db.collection('erp_podlvimg').doc(base+'_'+i);return ref.get?ref.get().catch(function(){return null;}):Promise.resolve(null);}))
+        .then(function(a){DLV_IMG[base]=a.filter(function(x){return x&&String(x.data||'').indexOf('data:image/jpeg;base64,')===0;}).map(function(x){return x.data;});renderList();},function(){dlvImgBusy[base]=0;});}
+    return null;}
+  if(!c.length)return null;
+  return h('div',{class:'dlvph'},c.map(function(d){var im=h('img',{alt:'입고 사진',src:d,loading:'lazy'});
+    return h('button',{type:'button',class:'dlvth','aria-label':'사진 크게 보기',on:{click:function(e){e.stopPropagation();imgBig(d);}}},im);}));
+}
+function imgBig(d){var ov=h('div',{class:'imgbig',role:'dialog','aria-label':'입고 사진',on:{click:function(){ov.remove();}}},h('img',{alt:'입고 사진',src:d}));
+  document.addEventListener('keydown',function k(e){if(e.key==='Escape'){ov.remove();document.removeEventListener('keydown',k);}});document.body.append(ov);}
 function recBody(s,r){
   var dl=h('dl',{});
   var chg=hasEdit(r)?r.edit.changed:[];   /* v34 수정대기: 바뀐 칸은 굵게 + 이전 값 줄긋기 */
@@ -5821,6 +5841,7 @@ function recBody(s,r){
   });
   if(s.recNos)s.recNos(r).forEach(function(x){if(!isEmpty(x[1]))dl.append(h('dt',{},x[0]),h('dd',{},show(x[1])));});   /* v80 영림원 번호 */
   var parts=[dl];
+  if(s.key==='purdelvs'){var ph=dlvPhotos(r);if(ph)parts.push(ph);}   /* v147 입고처 사진 */
   if(s.rowFields&&(r.rows||[]).length){
     var th=h('tr',{},s.rowFields.map(function(f){return h('th',{},f.label);}));
     var trs=r.rows.map(function(row){return h('tr',{},s.rowFields.map(function(f){return h('td',{class:f.type==='number'?'n':''},show(row[f.k]));}));});
