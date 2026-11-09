@@ -1904,6 +1904,7 @@
 - **되돌리는 법**: 빈 폴더에 `firestore-rules-되돌리기.rules` 를 `firestore.rules` 로 복사 + `firebase.json` = `{"firestore":{"rules":"firestore.rules"}}` → `firebase deploy --only firestore:rules --project vivivic-4b7ef`. 되돌리면 폼 `ERP_RULES_ON` 을 false 로.
 - 폼 `ERP_RULES_ON=true`(담당자 관리 표 「배포됨」). 배포 전 확인: 입력 작업자 두 줄(uid 끝 Ma83 터미널 · frj2 영림원 탭)에 지금 있는 erp_ 컬렉션 28개 + erp_stocks 모두 보기·저장·삭제 · 사장님 ing1234 관리자.
 - **배포 뒤 진짜 저장소 확인(11-09)**: 익명 erp_vendors 읽기·쓰기 403 · 로그인 없이 403 · 익명 다른 앱 `artifacts/…/excel_metadata`·`confirmed_orders` 읽기 200 · 입력 작업자(터미널) erp_vendors 읽기 200 · erp_imports 쓰기 200 → 지움 200(status 「시험」 한 건, 바로 지움) · 공개 발주서 목록 로그인 없이 403.
-- **확인 못 함**: 공개 발주서 한 장 읽기(erp_podocs_pub 0건) · 다른 앱 쓰기(규칙 글자 그대로라 안 해 봄) · 폼 로그인(사장님 비밀번호 — 사장님이 직접).
+- **확인 못 함**: 공개 발주서 한 장 읽기(erp_podocs_pub 0건) · 다른 앱 쓰기(규칙 글자 그대로라 안 해 봄).
+- 사장님 폰 폼 로그인 = 됨(11-09 사장님 「됩니다」).
 - 영림원 탭 입력 작업자(frj2) `ylw.imp.list('erp_vendors')` = 15건 읽힘(11-09 입력 작업자 방 확인, 새 익명 가입 없음).
 - ⚠ 앞으로 **새 erp_ 컬렉션**을 만들면 메뉴(`erpMenus` cols)에 들어가야 저장된다. 입력 작업자 두 줄·담당자들은 권한을 다시 저장해야 새 컬렉션 권한이 생긴다(`cols` 는 저장할 때 만들어짐).
