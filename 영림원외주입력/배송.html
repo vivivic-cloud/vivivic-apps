@@ -46,16 +46,17 @@ function draw(){
   var no=show(S.ship.pono),d=S.dlv||{},pub=S.pub||{},rows=(pub.rows||[]).filter(Boolean),inq={};
   (d.rows||[]).forEach(function(r){if(r)inq[show(r.ccode)]=r.qty;});
   document.title='발주서 '+no;
-  if(!CODE&&S.conf)CODE=P.codes(new URL('입고.html#'+key,location.href).href,no);   /* v148 발주확인 전에는 QR·바코드 대신 「발주확인 전」(v136) — 확인되면 같은 링크에 나타남 */
+  var fin=(S.pub&&S.pub.final===true)||(S.dlv&&S.dlv.final===true);   /* v155 영림원 입력완료 = 납품완료(QR·바코드·단추 없음) */
+  if(!CODE&&S.conf&&!fin)CODE=P.codes(new URL('입고.html#'+key,location.href).href,no);   /* v148 발주확인 전에는 QR·바코드 대신 「발주확인 전」(v136) — 확인되면 같은 링크에 나타남 */
   var done=d.doneAt&&Number(d.doneRev||0)>=Number(d.rev||0)&&d.rev;
   var step=function(t,on,at){return h('div','step'+(on?' on':''),h('span','',t),h('span','',at||''));};
   var btn=h('button','wide',done?'납품완료됨':'납품완료');btn.type='button';btn.disabled=busy||!canDone();btn.addEventListener('click',doDone);
   PO.fill(mainEl,[].concat(
     P.who((S.vname?S.vname+' ':'')+'배송기사님 공유 발주서','drv'),   /* v149 「{출고업체명} 배송기사님 공유 발주서」 */
     h('h1','mono',no),h('p','sub','발주서 · 발주일 '+show(pub.podate)),
-    S.conf?CODE:h('p','st','발주확인 전'),
-    h('div','steps',step('입고확인'+(Number(d.rev)>1?' (수정 '+(Number(d.rev)-1)+')':''),!!d.inAt,d.inAt?P.when(d.inAt):''),step('납품완료',!!done,done?P.when(d.doneAt):''),d.locked?step('잠김',true,''):null),
-    h('div','acts',btn),err?h('p','err',err):null,
+    fin?h('p','st on','납품완료'):S.conf?CODE:h('p','st','발주확인 전'),
+    h('div','steps',step('입고확인'+(Number(d.rev)>1?' (수정 '+(Number(d.rev)-1)+')':''),!!d.inAt,d.inAt?P.when(d.inAt):''),step('납품완료',!!done,done?P.when(d.doneAt):''),!fin&&d.locked?step('잠김',true,''):null),
+    fin?null:h('div','acts',btn),err?h('p','err',err):null,
     rows.length?h('div','po',rows.map(function(x){var c=show(x.ccode);return h('div','row',h('div','nt',show(x.cname)),
       kv([['품번',c,'mono'],['규격',show(x.cspec)],['단위',show(x.unit)],['발주수량',P.num(x.qty),'n'],['입고수량',inq[c]!=null?P.num(inq[c]):'','n'],['납품예정일',show(x.duedate)],['창고',show(x.wh)]]));})):null));
 }
