@@ -93,49 +93,62 @@ service cloud.firestore {
         && getAfter(/databases/$(database)/documents/erp_poship/$(request.resource.data.ship)).data.box == request.resource.data.box
         && getAfter(/databases/$(database)/documents/erp_poship/$(request.resource.data.ship)).data.pono == request.resource.data.pono;
     }
-    // 배송기사 스캔 기록(id = 배송 열쇠)
-    match /erp_poscan/{k} {
-      allow get: if true;
-      allow create: if request.resource.data.keys().hasOnly(['pono', 'at']) && request.resource.data.at is string
-        && exists(/databases/$(database)/documents/erp_poship/$(k))
-        && get(/databases/$(database)/documents/erp_poship/$(k)).data.pono == request.resource.data.pono;
+    // v145 납품 흐름(입고처가 기사 폰 QR 을 찍음) — v144 의 erp_poscan·erp_poflow·erp_podone 은 뺌.
+    // erp_purdelvs/flow_<배송열쇠> 가 대기가 아니면(영림원 입력 시작) 링크 쓰기가 모두 막힌다.
+    function unlocked(ship) {
+      return !exists(/databases/$(database)/documents/erp_purdelvs/$('flow_' + ship))
+        || get(/databases/$(database)/documents/erp_purdelvs/$('flow_' + ship)).data.status == '대기';
     }
-    // 화면 표시용 흐름(id = 공개열쇠) — 진짜 판단은 폼이 열쇠 기록으로 다시 한다
-    match /erp_poflow/{pk} {
+    function ptok(t) { return get(/databases/$(database)/documents/erp_pointok/$(t)).data; }
+    function pship(s) { return get(/databases/$(database)/documents/erp_poship/$(s)).data; }
+    // 입고열쇠 문서 — 폼(담당자)만 씀(아래 덩어리 can(col,'w')), 로그인 없이 get
+    match /erp_pointok/{t} {
       allow get: if true;
-      allow create: if request.resource.data.keys().hasOnly(['pono', 'scanAt']) && request.resource.data.scanAt is string
-        && exists(/databases/$(database)/documents/erp_podocs_pub/$(pk)) && ppub(pk).pono == request.resource.data.pono;
-      allow update: if request.resource.data.pono == resource.data.pono && (
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['inAt'])
-          && 'scanAt' in resource.data && !('doneAt' in resource.data) && request.resource.data.inAt is string)
-        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['doneAt'])
-          && 'inAt' in resource.data && !('doneAt' in resource.data) && request.resource.data.doneAt is string));
     }
-    // 입고처 입고확인·입고수량(id = 입고처 박스_발주번호) — 스캔 뒤·배송완료 전까지 다시 저장 됨
+    // 입고 기록 — id = <입고열쇠>_<배송열쇠>, rev 는 1 부터 하나씩
     match /erp_poin/{id} {
       allow get: if true;
-      allow create, update: if request.resource.data.keys().hasOnly(['box', 'pono', 'pubKey', 'rows', 'at'])
-        && request.resource.data.box is string && request.resource.data.pono is string
-        && request.resource.data.pubKey is string && request.resource.data.at is string
-        && request.resource.data.rows is list && request.resource.data.rows.size() <= 50
-        && id == request.resource.data.box + '_' + request.resource.data.pono
-        && exists(/databases/$(database)/documents/erp_pobox/$(request.resource.data.box))
-        && pbox(request.resource.data.box).kind == '입고처'
-        && request.resource.data.pono in pbox(request.resource.data.box).ponos
-        && exists(/databases/$(database)/documents/erp_podocs_pub/$(request.resource.data.pubKey))
-        && ppub(request.resource.data.pubKey).pono == request.resource.data.pono
-        && exists(/databases/$(database)/documents/erp_poflow/$(request.resource.data.pubKey))
-        && 'scanAt' in get(/databases/$(database)/documents/erp_poflow/$(request.resource.data.pubKey)).data
-        && !('doneAt' in get(/databases/$(database)/documents/erp_poflow/$(request.resource.data.pubKey)).data);
+      allow create, update: if request.resource.data.keys().hasOnly(['tok', 'ship', 'pono', 'rows', 'at', 'rev', 'photos'])
+        && request.resource.data.tok is string && request.resource.data.ship is string
+        && request.resource.data.pono is string && request.resource.data.at is string
+        && request.resource.data.rev is int && request.resource.data.rows is list && request.resource.data.rows.size() <= 50
+        && id == request.resource.data.tok + '_' + request.resource.data.ship
+        && exists(/databases/$(database)/documents/erp_pointok/$(request.resource.data.tok))
+        && ptok(request.resource.data.tok).pono == request.resource.data.pono
+        && exists(/databases/$(database)/documents/erp_poship/$(request.resource.data.ship))
+        && pship(request.resource.data.ship).pono == request.resource.data.pono
+        && (resource == null ? request.resource.data.rev == 1 : request.resource.data.rev == resource.data.rev + 1)
+        && unlocked(request.resource.data.ship);
     }
-    // 배송완료(id = 배송 열쇠) — 스캔 뒤·입고확인 뒤
-    match /erp_podone/{k} {
+    // 기사·입고처 화면 표시 — id = <배송열쇠>. 폼이 locked=true 를 걸면 끝.
+    match /erp_podlv/{s} {
       allow get: if true;
-      allow create: if request.resource.data.keys().hasOnly(['pono', 'at']) && request.resource.data.at is string
-        && exists(/databases/$(database)/documents/erp_poship/$(k))
-        && get(/databases/$(database)/documents/erp_poship/$(k)).data.pono == request.resource.data.pono
-        && exists(/databases/$(database)/documents/erp_poscan/$(k))
-        && 'inAt' in get(/databases/$(database)/documents/erp_poflow/$(get(/databases/$(database)/documents/erp_poship/$(k)).data.pubKey)).data;
+      allow create: if request.resource.data.keys().hasOnly(['pono', 'rows', 'inAt', 'rev'])
+        && request.resource.data.rev is int && request.resource.data.inAt is string
+        && exists(/databases/$(database)/documents/erp_poship/$(s)) && pship(s).pono == request.resource.data.pono
+        && unlocked(s);
+      allow update: if request.resource.data.pono == resource.data.pono
+        && resource.data.get('locked', false) != true && unlocked(s)
+        && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rows', 'inAt', 'rev'])
+              && request.resource.data.rev is int && request.resource.data.rev > resource.data.rev
+              && request.resource.data.inAt is string)
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['doneAt', 'doneRev'])
+              && 'inAt' in resource.data && request.resource.data.doneRev == resource.data.rev
+              && request.resource.data.doneAt is string));
+    }
+    // 사진 — id = <입고열쇠>_<배송열쇠>_<0~5>, JPEG data URL 한 장(1MB 문서 한도 안). 한 번만 만듦.
+    match /erp_podlvimg/{id} {
+      allow get: if true;
+      allow create: if request.resource.data.keys().hasOnly(['tok', 'ship', 'pono', 'data', 'at'])
+        && request.resource.data.tok is string && request.resource.data.ship is string
+        && id.matches(request.resource.data.tok + '_' + request.resource.data.ship + '_[0-5]')
+        && request.resource.data.data is string && request.resource.data.data.size() < 1000000
+        && request.resource.data.data.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$')
+        && exists(/databases/$(database)/documents/erp_pointok/$(request.resource.data.tok))
+        && ptok(request.resource.data.tok).pono == request.resource.data.pono
+        && exists(/databases/$(database)/documents/erp_poship/$(request.resource.data.ship))
+        && pship(request.resource.data.ship).pono == request.resource.data.pono
+        && unlocked(request.resource.data.ship);
     }
 
     // erp_ 업무 자료: 보기 = 권한 받은 담당자 모두(드롭다운이 다른 메뉴 자료를 읽음) · 저장·삭제 = 컬렉션마다
