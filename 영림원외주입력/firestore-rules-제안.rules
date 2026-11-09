@@ -32,8 +32,12 @@ service cloud.firestore {
     match /erp_staff/{uid} {
       allow read: if request.auth != null && (request.auth.uid == uid || isAdmin());
       allow create: if request.auth != null && request.auth.uid == uid
-        && request.auth.token.firebase.sign_in_provider == 'password'
-        && request.resource.data.keys().hasOnly(['vpId', 'email', 'firstAt', 'lastAt']);
+        && ((request.auth.token.firebase.sign_in_provider == 'password'
+             && request.resource.data.keys().hasOnly(['vpId', 'email', 'firstAt', 'lastAt']))
+          // v127 입력 작업자(AI) — 붙박은 익명 계정이 「입력 작업자」 줄만 만든다. 권한은 관리자가 담당자 관리에서 준다.
+          || (request.auth.token.firebase.sign_in_provider == 'anonymous'
+             && request.resource.data.keys().hasOnly(['agent', 'name', 'firstAt', 'lastAt'])
+             && request.resource.data.agent == true));
       allow update: if isAdmin()
         || (request.auth != null && request.auth.uid == uid
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastAt']));

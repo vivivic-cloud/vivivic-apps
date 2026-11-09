@@ -50,10 +50,32 @@
   const KEY = 'AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs';   // 입력폼 FB_CONFIG.apiKey (공개 웹 키)
   const BASE = 'https://firestore.googleapis.com/v1/projects/vivivic-4b7ef/databases/(default)/documents/';
   let tok = null, tokAt = 0;
+  /* 11-09 영림원외주입력 v127 — 저장소 규칙이 erp_ 를 담당자만 쓰게 한다. 입력 작업자 = 이 브라우저(영림원 탭 출처)에 붙박은 익명 계정 하나.
+     처음 한 번 익명 가입 → 갱신표(refresh token)를 이 출처 localStorage 「vivivic.erpAgent」 에 두고, erp_staff/<uid> 에 「입력 작업자」 줄을 만든다(권한 없음).
+     사장님이 폼 「담당자 관리」 에서 그 줄(uid 끝 4자리 = I.who())에 모든 메뉴 권한을 주셔야 읽고 쓴다. 비밀번호 없음 · 갱신표는 깃·대화에 안 남긴다(출력 금지).
+     갱신이 막히면 새로 만들지 않고 멈춘다(새 계정은 권한이 없어 조용히 틀린다). 다시 만들려면 localStorage 를 지우고 사장님께 권한을 다시 받는다. */
+  const AG = 'vivivic.erpAgent';
+  const agGet = () => { try { return JSON.parse(localStorage.getItem(AG) || 'null'); } catch (e) { return null; } };
+  I.who = () => { const s = agGet(); return s && s.uid ? '입력 작업자 uid 끝 ' + s.uid.slice(-4) : '아직 없음'; };
   I.token = async () => {
     if (tok && Date.now() - tokAt < 50 * 60 * 1000) return tok;
+    const s = agGet();
+    if (s && s.rt) {
+      const r = await fetch('https://securetoken.googleapis.com/v1/token?key=' + KEY, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(s.rt) });
+      const j = await r.json();
+      if (!r.ok || !j.id_token) throw new Error('입력 작업자 표 갱신 실패: ' + (j.error && j.error.message) + ' — 새로 만들지 않음(AGENTS 맨 위 「저장소 로그인」)');
+      if (j.refresh_token && j.refresh_token !== s.rt) localStorage.setItem(AG, JSON.stringify({ rt: j.refresh_token, uid: j.user_id || s.uid }));
+      tok = j.id_token; tokAt = Date.now();
+      return tok;
+    }
     const r = await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + KEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"returnSecureToken":true}' });
-    tok = (await r.json()).idToken; tokAt = Date.now();
+    const j = await r.json();
+    if (!j.idToken) throw new Error('입력 작업자 익명 가입 실패: ' + (j.error && j.error.message));
+    localStorage.setItem(AG, JSON.stringify({ rt: j.refreshToken, uid: j.localId }));
+    tok = j.idToken; tokAt = Date.now();
+    const now = new Date().toISOString();
+    await fetch(BASE + 'erp_staff?documentId=' + j.localId, { method: 'POST', headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields: { agent: { booleanValue: true }, name: { stringValue: '입력 작업자' }, firstAt: { stringValue: now }, lastAt: { stringValue: now } } }) });
     return tok;
   };
   const enc = (v) => {

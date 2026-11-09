@@ -6,7 +6,9 @@
 # 꼴: 시트 이름 = 화면 「엑셀시트명」 BOM일괄업로드 · 하위품목 한 줄 = 한 행(모품목 4칸을 줄마다 되풀이). 차수는 글자 「00」(하위BOM차수 빈칸 = 00 — 영림원도 00 을 넣음) ·
 #   하위유무 = 1/0 · 폼에 없는 칸은 비움(모품목단위·기준단위·품목자산분류는 영림원이 채움).
 #   ⚠ 1행만 칸 이름으로 만든 엑셀(11-03 첫 시도)은 서버에 올라가도 표에 아무 줄도 안 나왔다.
-import json, sys, urllib.request
+import json, sys, os, urllib.request
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import 작업자표
 from openpyxl import Workbook
 
 KEY = 'AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs'
@@ -47,7 +49,7 @@ def main():
     args = [a for a in sys.argv[1:] if a != '--추가']
     add = '--추가' in sys.argv
     out, only = args[0], set(args[1:])
-    tok = get('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=' + KEY, {'returnSecureToken': True})['idToken']
+    tok = 작업자표.token()   # v127 담당자 권한 있는 입력 작업자 계정(작업자표.py)
     docs, pt = [], ''
     while True:
         r = get(DB + 'erp_boms?pageSize=300' + ('&pageToken=' + pt if pt else ''), tok=tok)
