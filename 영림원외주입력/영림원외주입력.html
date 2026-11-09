@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v150 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v151 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -373,7 +373,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v150</span>
+    <span class="ver">v151</span>
   </div>
 </header>
 <div class="wrap">
@@ -4787,6 +4787,15 @@ function flowText(no){var f=flowOf(no),d=f.dlv;if(!f.ship)return '';
   if(d&&d.doneAt&&Number(d.doneRev||0)>=Number(d.rev||0)&&d.rev)return '납품완료 '+confTime({at:d.doneAt})+(Number(d.rev)>1?' (수정 '+(Number(d.rev)-1)+')':'');
   if(f.in)return '입고확인 '+confTime(f.in)+(Number(f.in.rev)>1?' (수정 '+(Number(f.in.rev)-1)+')':'');
   return '배송기사 공유됨';}
+/* v151 사장님 「일단 해당 보안은 차후에 보완하는것으로 하고 테스트 시점인 지금은 누가찍어도 열리는것ㅇ로 테스트를 빨리 마무리 합시다」
+   ⚠ 시험용: 배송 링크 문서(erp_poship, 누구나 get)에 그 발주의 입고처 박스 열쇠(inbox)를 폼이 적는다 → 기사 QR 을 누가 찍어도 그 입고처 박스가 열림. 실제 운영 전 보안 보완. */
+function podShipInSync(){
+  if(!db||!db.collection||POSHIP==null||POBOX==null||!canCol('erp_poship','w'))return;
+  POSHIP.forEach(function(x){if(!podKeyOk(x.id))return;var no=purTrim(x.pono);
+    var b=(POBOX||[]).filter(function(y){return y.kind==='입고처'&&podKeyOk(y.id)&&(y.ponos||[]).indexOf(no)>=0;}).sort(function(a,c){return String(a.createdAt||'')<String(c.createdAt||'')?-1:1;})[0];
+    var want=b?b.id:'';if(!want||x.inbox===want||podBusy['si:'+x.id]===want)return;podBusy['si:'+x.id]=want;
+    db.collection('erp_poship').doc(x.id).update({inbox:want}).catch(function(e){podBusy['si:'+x.id]='';console.warn('배송 링크에 입고처 못 적음',no,e);});});
+}
 /* 입고열쇠 문서(erp_pointok) — 폼이 만듦 */
 function podTokSync(){
   if(!db||!db.collection||PODOCS==null||PTOK==null||!canCol('erp_pointok','w'))return;
@@ -6754,7 +6763,7 @@ function staffRepoTable(){
     ['자료 보호','늘지 않음 — 파이어베이스 키는 원래 공개 값, 자료는 저장소 규칙이 지킴','저장소 규칙 배포(위)']]);
 }
 function go(k){if(BYKEY[k]&&BYKEY[k].shownIn)k=BYKEY[k].shownIn;if(k!==cur||k==='podocs')podSel='';cur=k;navOpen=null;try{history.replaceState(null,'','#'+k);}catch(e){location.hash=k;}renderNav();renderSum();renderStep();}
-function refreshAll(){renderNav();renderSum();renderList();refreshLists();if(impDraw)impDraw();if(sheetDraw)sheetDraw();if(ifRefresh)ifRefresh();if(stkDraw)stkDraw();if(podDraw)podDraw();podSync();podTokSync();podBoxSync();podFlowSync();}
+function refreshAll(){renderNav();renderSum();renderList();refreshLists();if(impDraw)impDraw();if(sheetDraw)sheetDraw();if(ifRefresh)ifRefresh();if(stkDraw)stkDraw();if(podDraw)podDraw();podSync();podTokSync();podBoxSync();podShipInSync();podFlowSync();}
 
 /* ---------- boot ---------- */
 
@@ -6798,7 +6807,7 @@ dbP.then(function(d){
   },function(){POBOX=null;});
   [['erp_poship','POSHIP'],['erp_poin','POIN'],['erp_podlv','PODLV'],['erp_pointok','PTOK']].forEach(function(c){   /* v145 배송·입고 기록 */
     db.collection(c[0]).onSnapshot(function(snap){var a=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});
-      if(c[1]==='POSHIP')POSHIP=a;else if(c[1]==='POIN')POIN=a;else if(c[1]==='PODLV')PODLV=a;else PTOK=a;podTokSync();podBoxSync();podFlowSync();if(podDraw)podDraw();},function(){if(c[1]==='POSHIP'&&POSHIP==null){POSHIP=[];podBoxSync();}});   /* 못 읽어도 박스는 고침(배송 링크 없이) */
+      if(c[1]==='POSHIP')POSHIP=a;else if(c[1]==='POIN')POIN=a;else if(c[1]==='PODLV')PODLV=a;else PTOK=a;podTokSync();podBoxSync();podShipInSync();podFlowSync();if(podDraw)podDraw();},function(){if(c[1]==='POSHIP'&&POSHIP==null){POSHIP=[];podBoxSync();}});   /* 못 읽어도 박스는 고침(배송 링크 없이) */
   });
   db.collection('erp_poconfirm').onSnapshot(function(snap){
     POCONF=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});renderNav();if(podDraw)podDraw();podBoxSync();   /* v143 확인되면 입고처 박스에 넣음(폼이 열려 있을 때 바로) */
