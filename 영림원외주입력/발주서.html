@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 발주서 공개 페이지(v128 · v130 위쪽 QR·바코드 — 폼 「발주서관리」와 같은 라이브러리·크기) — 영림원외주입력 「발주서관리」 QR 이 여는 보기 전용 한 장. 폼과 별개 파일, 로그인 없음, 메뉴·폼으로 가는 길 없음.
+<!-- 발주서 공개 페이지(v128 · v130 위쪽 QR·바코드 · v131 cdnjs 를 못 받으면 같은 폴더 라이브러리/ 사본 — 폼 「발주서관리」와 같은 라이브러리·크기) — 영림원외주입력 「발주서관리」 QR 이 여는 보기 전용 한 장. 폼과 별개 파일, 로그인 없음, 메뉴·폼으로 가는 길 없음.
      주소 = 발주서.html#<열쇠>. 자료 = 파이어스토어 erp_podocs_pub/<열쇠> 한 장(REST GET). 열쇠 없이는 못 연다(발주번호로 안 열림).
      보이는 칸은 임시(사장님이 쓰면서 고침): 발주번호·발주일·품번·품명·규격·단위·발주수량·납품예정일·창고·납품 상황. 단가·구매거래처 뺌.
      저장소 규칙 배포 전에는 로그인 없는 읽기가 막혀 익명 로그인 뒤 다시 읽는다. 규칙에 `match /erp_podocs_pub/{key} { allow get: if true; }` 가 들어가면 바로 읽힌다. -->
@@ -47,11 +47,13 @@ function h(tag,cls){var e=document.createElement(tag);if(cls)e.className=cls;for
 function show(v){return v==null?'':String(v);}
 function num(v){if(v==null||String(v).trim()==='')return '';var n=Number(v);return isFinite(n)?n.toLocaleString('ko-KR',{maximumFractionDigits:6}):String(v);}
 /* v130 사장님 「근데 발주서 스캔했을때 페이지에 바코드랑 큐알이 안보여 이게 보여야 하는데?」 — 폼 podLib·podCodes 와 같은 판·SRI·크기 */
-var LIBS={qr:['https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js','sha384-mZT2gIty7ZDdOGkxfP6joZcYdMW1Jvj9dRlfpTmaJAKKXTqzygtB22k7FLe+KZC1','qrcode'],
-  bc:['https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/barcodes/JsBarcode.code128.min.js','sha384-7XguhfRLAUmvSGmJn2K+BQDpX0gf5NMsj79jcgd7TVtV87euzdySNZqTjOQxgIiB','JsBarcode']};
+var LIBS={qr:['https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js','sha384-mZT2gIty7ZDdOGkxfP6joZcYdMW1Jvj9dRlfpTmaJAKKXTqzygtB22k7FLe+KZC1','qrcode','라이브러리/qrcode.min.js'],
+  bc:['https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/barcodes/JsBarcode.code128.min.js','sha384-7XguhfRLAUmvSGmJn2K+BQDpX0gf5NMsj79jcgd7TVtV87euzdySNZqTjOQxgIiB','JsBarcode','라이브러리/JsBarcode.code128.min.js']};
 function lib(k){var L=LIBS[k];if(window[L[2]])return Promise.resolve(window[L[2]]);
-  return new Promise(function(ok,no){var sc=document.createElement('script');sc.src=L[0];sc.integrity=L[1];sc.crossOrigin='anonymous';sc.referrerPolicy='no-referrer';
-    sc.onload=function(){window[L[2]]?ok(window[L[2]]):no(new Error(k));};sc.onerror=function(){no(new Error(k));};document.head.append(sc);});}
+  var one=function(src,sri){return new Promise(function(ok,no){var sc=document.createElement('script');sc.src=src;
+    if(sri){sc.integrity=sri;sc.crossOrigin='anonymous';sc.referrerPolicy='no-referrer';}
+    sc.onload=function(){window[L[2]]?ok(window[L[2]]):no(new Error(k));};sc.onerror=function(){sc.remove();no(new Error(k));};document.head.append(sc);});};
+  return one(L[0],L[1]).catch(function(){return one(L[3]);});}
 function codes(no){
   var qrBox=h('div','qr'),bcBox=h('div','bc'),err=h('p','msg bad');err.hidden=true;
   lib('qr').then(function(qrcode){

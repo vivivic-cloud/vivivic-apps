@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v129 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v131 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -361,7 +361,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v129</span>
+    <span class="ver">v131</span>
   </div>
 </header>
 <div class="wrap">
@@ -4569,15 +4569,15 @@ function podKeyOk(k){return /^[A-Za-z0-9_-]{32,64}$/.test(String(k||''));}
 function podPubUrl(k){return new URL('발주서.html#'+k,location.href).href;}
 function podPubOf(d){var no=purTrim(d.pono||d.id);return {pono:no,podate:show(d.podate),rows:(d.rows||[]).map(function(x){return {ccode:show(x.ccode),cname:show(x.cname),cspec:show(x.cspec),unit:show(x.unit),qty:show(x.qty),duedate:show(x.duedate),wh:show(x.wh),dlv:purDone(no,purTrim(x.ccode))};})};}
 function podPubSig(p){return JSON.stringify([show(p.pono),show(p.podate),(p.rows||[]).map(function(x){return [show(x.ccode),show(x.cname),show(x.cspec),show(x.unit),show(x.qty),show(x.duedate),show(x.wh),Number(x.dlv||0)];})]);}
-var POD_LIBS={qr:['https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js','sha384-mZT2gIty7ZDdOGkxfP6joZcYdMW1Jvj9dRlfpTmaJAKKXTqzygtB22k7FLe+KZC1','qrcode'],
-  bc:['https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/barcodes/JsBarcode.code128.min.js','sha384-7XguhfRLAUmvSGmJn2K+BQDpX0gf5NMsj79jcgd7TVtV87euzdySNZqTjOQxgIiB','JsBarcode']};
+var POD_LIBS={qr:['https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js','sha384-mZT2gIty7ZDdOGkxfP6joZcYdMW1Jvj9dRlfpTmaJAKKXTqzygtB22k7FLe+KZC1','qrcode','라이브러리/qrcode.min.js'],
+  bc:['https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/barcodes/JsBarcode.code128.min.js','sha384-7XguhfRLAUmvSGmJn2K+BQDpX0gf5NMsj79jcgd7TVtV87euzdySNZqTjOQxgIiB','JsBarcode','라이브러리/JsBarcode.code128.min.js']};   /* v131 cdnjs 를 못 받으면 같은 폴더 사본(글자 그대로) */
 function podLib(k){
   var L=POD_LIBS[k];if(window[L[2]])return Promise.resolve(window[L[2]]);
-  if(!podLibP[k])podLibP[k]=new Promise(function(ok,no){
-    var sc=h('script',{src:L[0],integrity:L[1],crossorigin:'anonymous',referrerpolicy:'no-referrer'});
-    sc.onload=function(){window[L[2]]?ok(window[L[2]]):no(new Error(k));};sc.onerror=function(){podLibP[k]=null;sc.remove();no(new Error(k));};
-    document.head.append(sc);
-  });
+  var one=function(src,sri){return new Promise(function(ok,no){
+    var sc=sri?h('script',{src:src,integrity:sri,crossorigin:'anonymous',referrerpolicy:'no-referrer'}):h('script',{src:src});
+    sc.onload=function(){window[L[2]]?ok(window[L[2]]):no(new Error(k));};sc.onerror=function(){sc.remove();no(new Error(k));};
+    document.head.append(sc);});};
+  if(!podLibP[k])podLibP[k]=one(L[0],L[1]).catch(function(){return one(L[3]);}).catch(function(e){podLibP[k]=null;throw e;});
   return podLibP[k];
 }
 function podIdOk(no){return /^[A-Za-z0-9_-]{1,100}$/.test(no);}
