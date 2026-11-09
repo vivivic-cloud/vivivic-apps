@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v123 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v124 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -353,7 +353,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v123</span>
+    <span class="ver">v124</span>
   </div>
 </header>
 <div class="wrap">
@@ -1661,9 +1661,9 @@ function buildForm(step){
     psLoad().then(bomAll);}   /* 결보호는 원장 엑셀에서(발주 상품검색과 같은 원장, 읽기만) */
   var purDF=step.key==='purchases'?headFields.filter(function(x){return x.f.k==='reqdate';})[0]:null;   /* v80 요청일 → 적용되는 구매단가 */
   if(purDF)purDF.el.addEventListener('change',function(){rows.forEach(function(r){r.purRedo();});});
-  var impHF=null;   /* v119 수입Order: 수입처·통화·P/O Date → 구매단가 */
-  if(step.key==='imporders'){var hb=function(k){return headFields.filter(function(x){return x.f.k===k;})[0];};
-    impHF={vendor:hb('vendor'),cur:hb('cur'),date:hb('podate')};
+  var impHF=null;   /* v119 수입Order: 수입처·통화·P/O Date → 구매단가 · v124 수입BL: B/L Date (사장님 「수입비엘 제품선택시 단가가 안나타나요.」) */
+  if(step.key==='imporders'||step.key==='impbls'){var hb=function(k){return headFields.filter(function(x){return x.f.k===k;})[0];};
+    impHF={vendor:hb('vendor'),cur:hb('cur'),date:hb(step.key==='impbls'?'bldate':'podate')};
     [impHF.vendor,impHF.cur,impHF.date].forEach(function(x){x.el.addEventListener('change',function(){rows.forEach(function(r){r.purRedo();});});});}
   var msg=h('span',{class:'msg','aria-live':'polite'});
   var submit=h('button',{type:'submit',class:'btn primary'},'저장');
@@ -5158,7 +5158,7 @@ function takeSheet(X,s,aoa,say){
     if(bomSplit&&grps.length>1){   /* v43: 모품목이 여럿이면 BOM 마다 한 건(전에는 첫 줄 모품목 하나로 합쳐졌다) */
       if(s.key==='boms')grps.forEach(function(g){g.vals.rows.forEach(function(o){bomAutoQty(g.vals.pcode,o);});});
       if(s.key==='purchases')grps.forEach(function(g){g.vals.rows.forEach(function(o){var p=purPriceOf(o.vendor,o.ccode,g.vals.reqdate);if(!p)return;if(isEmpty(o.price))o.price=String(p.price);['io','cur'].forEach(function(k){if(isEmpty(o[k])&&!isEmpty(p[k]))o[k]=purTrim(p[k]);});});});   /* v89 「모두 저장」은 입력 칸을 안 거친다 · v119 내외자구분·통화도 */
-      if(s.key==='imporders')grps.forEach(function(g){g.vals.rows.forEach(function(o){if(isEmpty(o.price)){var p=purPriceOf(g.vals.vendor,o.ccode,g.vals.podate,g.vals.cur);if(p)o.price=String(p.price);}});});   /* v119 */
+      if(s.key==='imporders'||s.key==='impbls')grps.forEach(function(g){g.vals.rows.forEach(function(o){if(isEmpty(o.price)){var p=purPriceOf(g.vals.vendor,o.ccode,s.key==='impbls'?g.vals.bldate:g.vals.podate,g.vals.cur);if(p)o.price=String(p.price);}});});   /* v119 */
       showBulk(s,grps,say);return;}
     if((!s.rowFields||s.flowCols)&&lines>1){showBulk(s,recs,say);return;}
     if(!s.rowFields||s.flowCols){head=recs[0].vals;if(s.flowCols)rowVals=head.rows||[];}
