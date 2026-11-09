@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v163 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v164 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -287,9 +287,11 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
   .app{grid-template-columns:minmax(0,1fr);gap:14px}
   nav{flex-direction:row;overflow-x:auto;position:static;padding-bottom:6px;scrollbar-width:thin;scrollbar-color:var(--thumb) transparent}
   nav button{flex:none;grid-template-columns:24px auto;padding:8px 12px}
-  nav{flex-wrap:wrap;overflow-x:visible;gap:6px}   /* v120 박스는 줄바꿈, 펼친 목록은 아래 한 줄 가로 밀기 */
-  nav button.navbox{grid-template-columns:24px auto auto;max-width:100%}
-  nav .navlist{order:9;flex-basis:100%;min-width:0;flex-direction:row;overflow-x:auto;margin:0;padding:0 0 6px;border-left:0;scrollbar-width:thin;scrollbar-color:var(--thumb) transparent}
+  nav{flex-direction:column;flex-wrap:nowrap;overflow-x:visible;gap:0;padding-bottom:0}   /* v164 폰: 메인 메뉴 한 줄씩 · 누르면 그 아래로 흐름이 펼쳐짐(아코디언) */
+  nav button{width:100%}
+  nav button.navbox{grid-template-columns:24px 1fr auto;max-width:100%;margin-bottom:6px}
+  nav .navlist{flex-direction:column;overflow:visible;margin:0 0 10px 12px;padding:0 0 0 8px;border-left:2px solid var(--line);gap:2px}
+  .stephead .path,.stephead>.wcpicks{display:none}   /* v164 겉 메뉴와 같은 흐름이라 폰에서는 뺌 */
   .num{width:24px;height:24px;font-size:11px}
   .card{padding:16px}
   .wrap{padding-top:16px}
@@ -376,7 +378,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v163</span>
+    <span class="ver">v164</span>
   </div>
 </header>
 <div class="wrap">
@@ -1846,7 +1848,8 @@ var NAV_BOXES=[
   {id:'생산',title:PAGE_NAMES['생산'],icon:'layers',items:function(){return ['prods','proddlvs'];}},
   {id:'물류',title:'물류 · [물류] 재고현황',icon:'box',items:function(){return ['stocks'];}},
   {id:'staff',title:'담당자 관리',icon:'users',items:function(){return ['staff'];}}];
-var navOpen=null;   /* null = 지금 메뉴의 박스 · '' = 모두 닫음 · 박스 id */
+var NARROW=function(){return !!(window.matchMedia&&matchMedia('(max-width:820px)').matches);};   /* v164 */
+var navOpen=NARROW()?'':null;   /* null = 지금 메뉴의 박스 · '' = 모두 닫음 · 박스 id */
 function navBoxOf(k){for(var i=0;i<NAV_BOXES.length;i++)if(NAV_BOXES[i].items().indexOf(k)>=0)return NAV_BOXES[i].id;return '';}
 function renderNav(){
   var cntText=function(c){return c.total?('대기 '+c['대기']+' · 완료 '+c['완료']+(c['수정대기']?' · 수정대기 '+c['수정대기']:'')+(c['오류']?' · 오류 '+c['오류']:'')):'아직 없음';};
@@ -1859,7 +1862,7 @@ function renderNav(){
     else if(k==='podocs'){num=String(i);sub=PODOCS==null||data.purchases==null||data.purords==null?'불러오는 중':podAll().length+'건';}   /* v126 */
     else if(k==='staff'){num=ico('users');title='담당자 관리';sub=STAFF?STAFF.length+'명':'불러오는 중';}
     else{num=s.page?String(i):String(s.n);sub=data[k]==null?'불러오는 중':cntText(counts(k));}
-    return h('button',{type:'button',on:{click:function(){go(k);}},'aria-current':k===cur?'step':null},
+    return h('button',{type:'button',on:{click:function(){go(k);if(NARROW()){navOpen='';renderNav();var m=document.getElementById('main');if(m)window.scrollTo(0,Math.max(0,m.getBoundingClientRect().top+window.pageYOffset-70));}}},'aria-current':k===cur?'step':null},
       h('span',{class:'num'},num),h('span',{},h('div',{class:'nt'},title),h('div',{class:'ns'},sub)));};
   var curBox=navBoxOf(cur),open=navOpen==null?curBox:navOpen,out=[];
   NAV_BOXES.forEach(function(b){
@@ -7000,7 +7003,7 @@ function staffRepoTable(){
     ['구글시트 양식 웹앱(Apps Script)','영향 없음(드라이브만 씀)','—'],
     ['자료 보호','늘지 않음 — 파이어베이스 키는 원래 공개 값, 자료는 저장소 규칙이 지킴','저장소 규칙 배포(위)']]);
 }
-function go(k){if(BYKEY[k]&&BYKEY[k].shownIn)k=BYKEY[k].shownIn;if(k!==cur||k==='podocs')podSel='';cur=k;navOpen=null;try{history.replaceState(null,'','#'+k);}catch(e){location.hash=k;}renderNav();renderSum();renderStep();}
+function go(k){if(BYKEY[k]&&BYKEY[k].shownIn)k=BYKEY[k].shownIn;if(k!==cur||k==='podocs')podSel='';cur=k;navOpen=NARROW()?'':null;try{history.replaceState(null,'','#'+k);}catch(e){location.hash=k;}renderNav();renderSum();renderStep();}
 function refreshAll(){renderNav();renderSum();renderList();refreshLists();if(impDraw)impDraw();if(sheetDraw)sheetDraw();if(ifRefresh)ifRefresh();if(stkDraw)stkDraw();if(podDraw)podDraw();podSync();podTokSync();podBoxSync();podShipInSync();podFlowSync();podModSync();}
 
 /* ---------- boot ---------- */
