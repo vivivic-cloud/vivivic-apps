@@ -93,9 +93,10 @@ function shareShip(p){
   shipOf(p).then(function(k){busy['s'+p.pono]=0;draw();
     /* v160 입구 파일 배송기사.html(카드 제목) · 상황별 글 · 글 한 덩어리(카톡이 url 만 보내지 않게) */
     var url=new URL('배송기사.html#'+k,location.href).href,text='INGHOME-'+show(BOX.name)+' - 발주서 '+p.pono+(p.part&&p.final!==true?' 부분납품 남은 '+num(p.part.left)+' 출고 발주서입니다.':' 출고 발주서입니다.'),msg=text+'\n'+url;
-    var copy=function(){return (navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(msg):Promise.reject()).then(function(){NOTE[p.pono]='링크를 복사했습니다.';draw();},function(){NOTE[p.pono]=url;draw();});};
-    if(navigator.share)return navigator.share({text:msg}).catch(function(e){if(e&&e.name==='AbortError')return;return copy();});
-    return copy();
+    var cp=function(){return (navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(msg):Promise.reject()).then(function(){return true;},function(){return false;});};   /* v162 */
+    var done=function(ok){NOTE[p.pono]=ok?'글과 링크를 복사했습니다. 카카오톡이 안 보이면 붙여넣으세요.':msg;draw();};
+    if(navigator.share)return navigator.share({text:msg}).then(function(){return cp();},function(e){return cp();}).then(done);
+    return cp().then(done);
   },function(){busy['s'+p.pono]=0;errs[p.pono]='배송기사 링크를 만들지 못했습니다.';draw();});
 }
 /* ---- 입고처: 연 발주서의 입고(사진·입고수량·입고확인·수정요청) ---- */

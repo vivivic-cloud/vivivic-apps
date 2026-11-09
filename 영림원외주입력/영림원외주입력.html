@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v161 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v162 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -375,7 +375,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v161</span>
+    <span class="ver">v162</span>
   </div>
 </header>
 <div class="wrap">
@@ -4868,9 +4868,11 @@ function boxShareText(b){
   return n+'입고처 발주목록입니다.';
 }
 /* v160 사장님 「출고처 박스 공유시에도 그냥 이렇게 발주서 라고만 하고 카톡이 도착해」 — 공유 창에 url 을 따로 주면 카톡이 링크만 보냄 → 글 한 덩어리(문구 + 줄바꿈 + 링크)로 */
-function shareMsg(text,url){var msg=text+'\n'+url;
-  if(navigator.share)return navigator.share({text:msg}).catch(function(e){if(e&&e.name==='AbortError')return;return podCopy(msg).then(function(){flash('링크를 복사했습니다.');});}).catch(function(){flash('공유하지 못했습니다.',true);});
-  return podCopy(msg).then(function(){flash('링크를 복사했습니다.');},function(){flash('복사하지 못했습니다.',true);});}
+function shareMsg(text,url){var msg=text+'\n'+url;   /* v162 누르는 순간 글+링크를 먼저 복사(공유 창에 카카오톡이 없거나 닫아도 붙여넣기 가능) → 공유 창 */
+  var cp=podCopy(msg).then(function(){return true;},function(){return false;});
+  var done=function(ok){flash(ok?'글과 링크를 복사했습니다. 카카오톡이 안 보이면 붙여넣으세요.':'복사하지 못했습니다. 글: '+msg,!ok);};
+  if(navigator.share)return navigator.share({text:msg}).then(function(){return cp;},function(e){return cp;}).then(done);
+  return cp.then(done);}
 function boxOf(kind,name){var a=(POBOX||[]).filter(function(b){return b.kind===kind&&b.name===name&&podKeyOk(b.id);}).sort(function(x,y){return String(x.createdAt||'')<String(y.createdAt||'')?-1:1;});return a[0]||null;}
 /* v143 사장님 「입고처 발주관리 박스에는 출고처에서 발주확인 안된건은 보이면 안된다니까」 · 바로잡음 「아 발주확인된건이 보이는게 아니라 발주확인건 1개 라는 표기를 입고처에 할 필요없어」
    입고처 = 발주확인된 발주서만(목록·건수·저장 문서 모두). 확인된 발주가 없는 창고는 묶음도 없음. 입고처 머리 줄에 「발주확인 전 N」·강조 없음(출고처는 그대로). */
