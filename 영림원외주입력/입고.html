@@ -28,7 +28,15 @@ P.getOne('erp_poship/'+ship).then(function(s){
   if(!s){say('발주서가 없습니다.',true);return;}
   /* ⚠ v151 시험용(사장님 11-09): 배송 링크 문서의 inbox(폼이 적은 입고처 박스) — 누가 찍어도 열림. 실제 운영 전 보안 보완 */
   /* v152 사장님 「…해당 입고처 발주관리 박스 페이지 이기 때문에 이논리는 성립되지 않습니다」 — 그 발주의 입고처 박스로 바로(없는 발주 확인 없음) */
-  if(P.keyOk(s.inbox)){location.replace(new URL('발주박스.html#'+s.inbox+'&s='+ship,location.href).href);return;}
+  /* v153 발주확인 전이면 「발주확인 전」(확인 뒤 같은 QR 로 열림). 입고처 박스 = 배송 링크 inbox(폼) → 공개 발주서 문서 inbox(폼이 발주 만들 때 적음, 폼이 안 열려도 있음) */
+  return P.getMany(['erp_poconfirm/'+s.pono,'erp_podocs_pub/'+s.pubKey]).then(function(o){
+    if(!o['erp_poconfirm/'+s.pono]){say('발주확인 전',true);return;}
+    var ib=P.keyOk(s.inbox)?s.inbox:o['erp_podocs_pub/'+s.pubKey]&&o['erp_podocs_pub/'+s.pubKey].inbox;
+    if(P.keyOk(ib)){location.replace(new URL('발주박스.html#'+ib+'&s='+ship,location.href).href);return;}
+    return fallback(s);
+  });
+}).catch(function(){say('불러오지 못했습니다.',true);});
+function fallback(s){
   var ks=P.keyOk(bq)?[bq]:P.inboxes();
   if(!ks.length){say('입고처 발주목록 박스가 아직 준비되지 않았습니다.',true);return;}   /* v150 이 폰에 입고처 박스 열쇠 없음(기사 본인 폰 포함) */
   return P.getMany(ks.map(function(k){return 'erp_pobox/'+k;})).then(function(m){
@@ -36,7 +44,7 @@ P.getOne('erp_poship/'+ship).then(function(s){
     if(!k){say('입고처 발주목록 박스가 아직 준비되지 않았습니다.',true);return;}   /* 폼이 한 번 열리면 inbox 가 적힘 */
     location.replace(new URL('발주박스.html#'+k+'&s='+ship,location.href).href);
   });
-}).catch(function(){say('불러오지 못했습니다.',true);});
+}
 })();
 </script>
 </body>
