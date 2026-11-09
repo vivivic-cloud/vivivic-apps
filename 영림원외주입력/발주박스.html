@@ -14,7 +14,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
 <meta name="referrer" content="no-referrer">
-<title>발주서</title>
+<title>INGHOME 발주목록</title>
+<meta name="description" content="발주목록 박스">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="INGHOME">
+<meta property="og:title" content="INGHOME 발주목록">
+<meta property="og:description" content="발주목록 박스">   <!-- v160 카톡 카드(옛 주소로 보낸 링크) -->
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="발주공통.css">
 <style>.po.act{border-color:var(--ink);box-shadow:0 0 0 2px rgba(55,53,47,.12)}.in{border-top:1px solid var(--rowline);margin:12px 0 0;padding:12px 0 0}.in .acts{margin:10px 0 0}</style>
@@ -86,9 +91,10 @@ function shipOf(p){
 function shareShip(p){
   if(busy['s'+p.pono])return;busy['s'+p.pono]=1;errs[p.pono]='';NOTE[p.pono]='';draw();
   shipOf(p).then(function(k){busy['s'+p.pono]=0;draw();
-    var url=new URL('배송.html#'+k,location.href).href,text='INGHOME-'+show(BOX.name)+' - 발주서 '+p.pono+' 배송';
-    var copy=function(){return (navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(text+'\n'+url):Promise.reject()).then(function(){NOTE[p.pono]='링크를 복사했습니다.';draw();},function(){NOTE[p.pono]=url;draw();});};
-    if(navigator.share)return navigator.share({title:text,text:text,url:url}).catch(function(e){if(e&&e.name==='AbortError')return;return copy();});
+    /* v160 입구 파일 배송기사.html(카드 제목) · 상황별 글 · 글 한 덩어리(카톡이 url 만 보내지 않게) */
+    var url=new URL('배송기사.html#'+k,location.href).href,text='INGHOME-'+show(BOX.name)+' - 발주서 '+p.pono+(p.part&&p.final!==true?' 부분납품 남은 '+num(p.part.left)+' 출고 발주서입니다.':' 출고 발주서입니다.'),msg=text+'\n'+url;
+    var copy=function(){return (navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(msg):Promise.reject()).then(function(){NOTE[p.pono]='링크를 복사했습니다.';draw();},function(){NOTE[p.pono]=url;draw();});};
+    if(navigator.share)return navigator.share({text:msg}).catch(function(e){if(e&&e.name==='AbortError')return;return copy();});
     return copy();
   },function(){busy['s'+p.pono]=0;errs[p.pono]='배송기사 링크를 만들지 못했습니다.';draw();});
 }
@@ -157,11 +163,11 @@ function draw(){
     if(fin)top.append(h('span','st on','납품완료'));
     else if(out){if(c)top.append(h('span','st on','발주확인 '+when(c.at)));
       else{top.append(h('span','st','발주확인 전'));var b=h('button','','발주확인');b.type='button';b.disabled=!!busy[p.pono];b.addEventListener('click',function(){confirmPo(p.pono);});top.append(b);}}
-    if(!fin&&Number(p.left)>0)top.append(h('span','st','남음 '+num(p.left)));   /* v159 부분납품 뒤 */
     if(fin){}else if(!out)top.append(h('span','st on',d.locked?'잠김':d.doneAt&&Number(d.doneRev||0)>=Number(d.rev||0)&&d.rev?'납품완료 '+when(d.doneAt):d.inAt?'입고확인 '+when(d.inAt):'입고대기'));
     var ck=p.pono+'|'+p.pubKey;if(out&&c&&!CODES[ck])CODES[ck]=P.codes(P.keyOk(p.pubKey)?new URL('발주서.html#'+p.pubKey,location.href).href:'',show(p.pono));
     var head=out?[['발주일',show(p.podate)]]:[['발주일',show(p.podate)],['구매거래처',show(p.vendor)],['발주확인',c?when(c.at):'']];
-    var el=h('div','po',top,out&&c&&!fin?CODES[ck]:null,kv(head),
+    var pl=!fin&&p.part?h('p','part',P.partText(p.part,out?'다음 출고 대기':'남음 '+num(p.part.left)+' 입고 예정')):null;   /* v160 부분납품 */
+    var el=h('div','po',top,pl,out&&c&&!fin?CODES[ck]:null,kv(head),
       rows.map(function(x){return h('div','row',h('div','nt',show(x.cname)),kv([['품번',show(x.ccode),'mono'],['규격',show(x.cspec)],['단위',show(x.unit)],['발주수량',num(x.qty),'n'],['납품예정일',show(x.duedate)],['창고',show(x.wh)],['납품수량',num(x.dlv),'n']]));}),
       out&&!fin?h('div','ship',(function(){var sb=h('button','','배송기사 공유');sb.type='button';sb.disabled=!!busy['s'+p.pono];sb.addEventListener('click',function(){shareShip(p);});return sb;})(),NOTE[p.pono]?h('span','note',NOTE[p.pono]):null):null,
       act?inPart(p):null,

@@ -107,5 +107,7 @@ function shipChain(k){
     return getOne('erp_poship/'+l.doc.next).then(function(d){if(!d)return acc;acc.push({id:l.doc.next,doc:d});return fwd(acc);});};
   return back(k,[]).then(fwd);
 }
-window.PO={shipChain:shipChain,who:who,fill:fill,h:h,show:show,num:num,when:when,getMany:getMany,getOne:getOne,commit:commit,rkey:rkey,keyOk:keyOk,noOk:noOk,lib:lib,codes:codes,scanner:scanner,shrink:shrink,inboxes:inboxes,rememberInbox:rememberInbox};
+/* v160 부분납품 표시: 「부분납품 · 납품 60 / 발주 100 · 남음 40」 + 상황 꼬리 */
+function partText(pt,tail){if(!pt)return '';return '부분납품 · 납품 '+num(pt.dlv)+' / 발주 '+num(pt.qty)+' · 남음 '+num(pt.left)+(tail?' · '+tail:'');}
+window.PO={partText:partText,shipChain:shipChain,who:who,fill:fill,h:h,show:show,num:num,when:when,getMany:getMany,getOne:getOne,commit:commit,rkey:rkey,keyOk:keyOk,noOk:noOk,lib:lib,codes:codes,scanner:scanner,shrink:shrink,inboxes:inboxes,rememberInbox:rememberInbox};
 })();
