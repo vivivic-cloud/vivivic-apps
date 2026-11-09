@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v155 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v156 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -349,6 +349,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 .podgt{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:4px 8px;flex-wrap:wrap;background:none;border:0;padding:4px 0;font:inherit;color:inherit;text-align:left;cursor:pointer}.podgrp:not(.open) .podgh{margin:0}.podgt .navarr{color:var(--muted);width:12px}   /* v135 접고 펴기 */   /* v134 박스 테두리 안 머리 줄에 공유 */.podgh .nt{font-weight:900;font-size:15px}.podgh .ns{font-size:12px;color:var(--muted);font-weight:700}.podgh .podshare{margin:0 0 0 auto}
 .dlvph{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px}.dlvth{padding:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff;cursor:zoom-in;width:72px;height:72px}.dlvth img{display:block;width:100%;height:100%;object-fit:cover}
 .imgbig{position:fixed;inset:0;z-index:400;background:rgba(15,15,15,.82);display:grid;place-items:center;padding:16px;cursor:zoom-out}.imgbig img{max-width:100%;max-height:100%;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.4)}   /* v147 납품 사진 */
+.podfin{display:grid;gap:4px}.podfin .podbtn{border:0;padding:0}.podkv2 .nt{font-weight:800;margin:6px 0 0}   /* v156 납품완료목록 */
 .podli{display:flex;gap:8px;align-items:stretch}.podli .podbtn{flex:1 1 auto;min-width:0}.podli .podshare{flex:0 0 auto;margin:0;align-self:center}.podbtn .nt{font-weight:800;word-break:break-all}.podbtn .ns{font-size:12px;color:var(--muted);font-weight:600}
 .podcodes{display:grid;justify-items:center;gap:8px;margin:12px 0}.podqr canvas{display:block;max-width:100%;image-rendering:pixelated}
 .podbc{width:100%;max-width:360px}.podbc svg{display:block;width:100%;height:auto}
@@ -373,7 +374,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v155</span>
+    <span class="ver">v156</span>
   </div>
 </header>
 <div class="wrap">
@@ -4807,6 +4808,24 @@ function podTokSync(){
   PODOCS.forEach(function(d){if(!podKeyOk(d.inTok)||podBusy['t:'+d.inTok]||PTOK.some(function(t){return t.id===d.inTok;}))return;podBusy['t:'+d.inTok]=1;
     db.collection('erp_pointok').doc(d.inTok).create({pono:purTrim(d.pono||d.id),at:new Date().toISOString()}).catch(function(e){podBusy['t:'+d.inTok]=0;console.warn('입고열쇠 못 만듦',d.id,e);});});
 }
+/* v156 사장님 「발주서 관리 납품완료 건은 납품완료목록에서 따로 관리 하게 해주세요」 — 영림원 입력완료(flow_ 구매납품 완료) 발주를 거래처별로, 납품일 늦은 것부터. 보기만 */
+function podDoneList(){
+  var recs=(data.purdelvs||[]).filter(function(r){return String(r.id||'').indexOf('flow_')===0&&r.status==='완료';});
+  if(!recs.length)return [h('p',{class:'msg'},'발주서가 없습니다.')];
+  var by={};recs.forEach(function(r){var v=purTrim(r.vendor);(by[v]=by[v]||[]).push(r);});
+  var latest=function(a){return a.reduce(function(m,r){return String(r.dlvdate||'')>m?String(r.dlvdate||''):m;},'');};
+  return [h('div',{class:'lsinfo'},h('span',{},recs.length+'건'))].concat(Object.keys(by).sort(function(a,b){return latest(by[a])<latest(by[b])?1:-1;}).map(function(v){
+    var rs=by[v].sort(function(a,b){return String(a.dlvdate||'')<String(b.dlvdate||'')?1:-1;}),gk='완료:'+v,open=!!podOpenGrp[gk];
+    return h('div',{class:'podgrp'+(open?' open':'')},h('div',{class:'podgh'},
+        h('button',{type:'button',class:'podgt','aria-expanded':open?'true':'false',on:{click:function(){if(open)delete podOpenGrp[gk];else podOpenGrp[gk]=1;podDraw&&podDraw();}}},
+          h('span',{class:'navarr','aria-hidden':'true'},open?'▾':'▸'),h('span',{class:'nt'},v),h('span',{class:'ns'},rs.length+'건'))),
+      !open?null:h('div',{class:'podlist'},rs.map(function(r){var no=purTrim(r.pono),po=(PODOCS||[]).filter(function(d){return purTrim(d.pono||d.id)===no;})[0]||{};
+        var rows=(r.rows||[]).map(function(x){var left=Math.round((Number(x.poqty||0)-purDone(no,purTrim(x.ccode)))*100)/100;
+          return h('div',{class:'podkv2'},h('div',{class:'nt'},show(x.cname)),podKv([['발주수량',podNum(x.poqty),'n'],['입고수량',podNum(x.qty),'n']].concat(left>0?[['남은 수량',podNum(left),'n']]:[])));});
+        return h('div',{class:'podrow podfin'},h('button',{type:'button',class:'podbtn',on:{click:function(){podGo(no);}}},h('span',{class:'mono nt'},no),
+            h('span',{class:'ns'},[show(r.vendor),show(r.dlvdate),show(po.podate)?'발주일 '+show(po.podate):''].filter(Boolean).join(' · ')),h('span',{class:'ns podst on'},'납품완료')),
+          podKv([['납품번호',show(r.dlvno),'mono']]),rows,dlvPhotos(r));}))); }));
+}
 var podView2='출고처';   /* v133 목록 보기: 출고처 · 입고처 · 전체 */
 var podOpenGrp={};   /* v135 사장님 「업체별 발주서는 토글목록으로 해당업체 선택시만 펼쳐지게 해주세요 기본 모습은 모든 토글이 닫힌 상태입니다」 — 열린 묶음(보기:이름). 처음엔 모두 닫힘 */
 function renderPodocs(){
@@ -4815,7 +4834,7 @@ function renderPodocs(){
   function draw(){
     if(cur!=='podocs')return;
     if(PODOCS==null||data.purchases==null||data.purords==null){box.replaceChildren(h('p',{class:'msg'},'불러오는 중'));lastKey='';return;}
-    var all=podAll(),key=JSON.stringify([podSel,podView2,podOpenGrp,(data.purdelvs||[]).filter(function(r){return String(r.id||'').indexOf('flow_')===0;}).map(function(r){return r.id+r.status;}),podSel?[POSHIP,POIN,PODLV]:0,all,podSel?data.purdelvs:0,(PODPUB||[]).map(function(p){return p.id;}),(POBOX||[]).map(function(b){return [b.id,b.kind,b.name];}),POCONF]);if(key===lastKey)return;lastKey=key;   /* 같은 내용이면 다시 안 그림(QR 깜박임) */
+    var all=podAll(),key=JSON.stringify([podSel,podView2,podOpenGrp,(data.purdelvs||[]).filter(function(r){return String(r.id||'').indexOf('flow_')===0;}).map(function(r){return r.id+r.status;}),Object.keys(DLV_IMG).length,podSel?[POSHIP,POIN,PODLV]:0,all,podSel?data.purdelvs:0,(PODPUB||[]).map(function(p){return p.id;}),(POBOX||[]).map(function(b){return [b.id,b.kind,b.name];}),POCONF]);if(key===lastKey)return;lastKey=key;   /* 같은 내용이면 다시 안 그림(QR 깜박임) */
     if(podSel){var d=all.filter(function(x){return purTrim(x.pono||x.id)===podSel;})[0];
       box.replaceChildren.apply(box,d?podView(d):[h('div',{class:'actions'},h('button',{type:'button',class:'btn small',on:{click:function(){podGo('');}}},'목록')),h('p',{class:'msg bad'},'문서가 없습니다.')]);return;}
     if(!all.length){box.replaceChildren(h('p',{class:'msg'},'발주서가 없습니다.'));return;}
@@ -4827,16 +4846,18 @@ function renderPodocs(){
         h('span',{class:'ns'},[show(d.vendor),show(d.podate)].filter(Boolean).join(' · ')),
         h('span',{class:'ns'},rs.length?show(rs[0].cname)+(rs.length>1?' 외 '+(rs.length-1)+'줄':''):''),
         st?h('span',{class:'ns podst'+(st.on?' on':'')},st.t):null));};   /* v134 줄마다 공유(v132) 없앰 — 공유는 박스 머리 줄 하나 · 발주서 한 장 화면 */
-    var tabs=h('div',{class:'wcpicks',role:'tablist','aria-label':'발주서 보기'},['출고처','입고처','전체'].map(function(v){var on=v===podView2;
+    var tabs=h('div',{class:'wcpicks',role:'tablist','aria-label':'발주서 보기'},['출고처','입고처','전체','납품완료목록'].map(function(v){var on=v===podView2;
       return h('button',{type:'button',role:'tab',class:'btn small wcpick'+(on?' primary':''),'aria-selected':on?'true':'false',on:{click:function(){if(!on){podView2=v;draw();}}}},v);}));
     var cst=function(d){var c=confOf(purTrim(d.pono||d.id));if(podFinal(purTrim(d.pono||d.id)))return {t:'납품완료',on:1};return c?{t:'발주확인 '+confTime(c),on:1}:{t:'발주확인 전'};};
     var body;
     if(podView2==='전체')body=[h('div',{class:'lsinfo'},h('span',{},all.length+'건')),h('div',{class:'podlist'},all.map(function(d){return line(d,cst(d));}))];
+    else if(podView2==='납품완료목록')body=podDoneList();   /* v156 */
     else{   /* v133 박스(거래처·창고)마다 — 입고처는 발주확인된 것만(입고대기) */
-      var names=boxNames(podView2);
-      if(podView2==='입고처')names=names.filter(function(n){return boxDocs('입고처',n).some(function(d){return !!confOf(purTrim(d.pono||d.id));});});   /* v153 확인된 발주가 있는 창고만(v143 화면 그대로) */
+      var notFin=function(d){return !podFinal(purTrim(d.pono||d.id));};   /* v156 납품완료는 납품완료목록에서만 */
+      var names=boxNames(podView2).filter(function(n){return boxDocs(podView2,n).some(notFin);});
+      if(podView2==='입고처')names=names.filter(function(n){return boxDocs('입고처',n).some(function(d){return notFin(d)&&!!confOf(purTrim(d.pono||d.id));});});   /* v153 확인된 발주가 있는 창고만(v143 화면 그대로) */
       body=names.length?names.map(function(name){
-        var ds=boxDocs(podView2,name),nUn=POCONF==null||podView2==='입고처'?0:ds.filter(function(d){return !confOf(purTrim(d.pono||d.id));}).length;   /* v139 발주확인 전 건수(입고처는 목록에 안 보이는 것까지) */
+        var ds=boxDocs(podView2,name).filter(notFin),nUn=POCONF==null||podView2==='입고처'?0:ds.filter(function(d){return !confOf(purTrim(d.pono||d.id));}).length;   /* v139 발주확인 전 건수(입고처는 목록에 안 보이는 것까지) */
         if(podView2==='입고처')ds=ds.filter(function(d){return !!confOf(purTrim(d.pono||d.id));});
         var b=boxOf(podView2,name);
         var gk=podView2+':'+name,open=!!podOpenGrp[gk];   /* v135 머리 줄을 누르면 펼침·닫힘(공유 단추는 따로라 안 펼침) */
@@ -5838,7 +5859,7 @@ function dlvPhotos(r){
   var base=tok+'_'+f.ship,c=DLV_IMG[base];
   if(!c){if(!dlvImgBusy[base]&&db&&db.collection){dlvImgBusy[base]=1;
       Promise.all([0,1,2,3,4,5].map(function(i){var ref=db.collection('erp_podlvimg').doc(base+'_'+i);return ref.get?ref.get().catch(function(){return null;}):Promise.resolve(null);}))
-        .then(function(a){DLV_IMG[base]=a.filter(function(x){return x&&String(x.data||'').indexOf('data:image/jpeg;base64,')===0;}).map(function(x){return x.data;});renderList();},function(){dlvImgBusy[base]=0;});}
+        .then(function(a){DLV_IMG[base]=a.filter(function(x){return x&&String(x.data||'').indexOf('data:image/jpeg;base64,')===0;}).map(function(x){return x.data;});renderList();if(podDraw)podDraw();},function(){dlvImgBusy[base]=0;});}
     return null;}
   if(!c.length)return null;
   return h('div',{class:'dlvph'},c.map(function(d){var im=h('img',{alt:'입고 사진',src:d,loading:'lazy'});
