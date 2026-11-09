@@ -65,6 +65,79 @@ service cloud.firestore {
         && pono in get(/databases/$(database)/documents/erp_pobox/$(request.resource.data.box)).data.ponos;
     }
 
+    // v144 배송기사·입고확인 링크 — 로그인 없는 화면은 기록 문서만 만든다(id 에 열쇠). 목록(list)은 안 엶.
+    // 구매납품(erp_purdelvs)은 폼(담당자)이 기록을 맞춰 보고 만든다. 고치기·지우기는 담당자만(아래 덩어리).
+    function pbox(k) { return get(/databases/$(database)/documents/erp_pobox/$(k)).data; }
+    function ppub(k) { return get(/databases/$(database)/documents/erp_podocs_pub/$(k)).data; }
+    // 배송 열쇠: 출고처 박스 열쇠 + 발주확인 된 그 박스 발주번호 + 그 발주 공개열쇠
+    match /erp_poship/{k} {
+      allow get: if true;
+      allow create: if k.size() >= 32
+        && request.resource.data.keys().hasOnly(['box', 'pono', 'pubKey', 'at'])
+        && request.resource.data.box is string && request.resource.data.pono is string
+        && request.resource.data.pubKey is string && request.resource.data.at is string
+        && exists(/databases/$(database)/documents/erp_pobox/$(request.resource.data.box))
+        && pbox(request.resource.data.box).kind == '출고처'
+        && request.resource.data.pono in pbox(request.resource.data.box).ponos
+        && exists(/databases/$(database)/documents/erp_poconfirm/$(request.resource.data.pono))
+        && exists(/databases/$(database)/documents/erp_podocs_pub/$(request.resource.data.pubKey))
+        && ppub(request.resource.data.pubKey).pono == request.resource.data.pono;
+    }
+    // 박스+발주 → 배송 열쇠(같은 commit 에서 erp_poship 와 함께)
+    match /erp_poshipref/{id} {
+      allow get: if true;
+      allow create: if request.resource.data.keys().hasOnly(['ship', 'box', 'pono'])
+        && request.resource.data.ship is string && request.resource.data.box is string && request.resource.data.pono is string
+        && id == request.resource.data.box + '_' + request.resource.data.pono
+        && existsAfter(/databases/$(database)/documents/erp_poship/$(request.resource.data.ship))
+        && getAfter(/databases/$(database)/documents/erp_poship/$(request.resource.data.ship)).data.box == request.resource.data.box
+        && getAfter(/databases/$(database)/documents/erp_poship/$(request.resource.data.ship)).data.pono == request.resource.data.pono;
+    }
+    // 배송기사 스캔 기록(id = 배송 열쇠)
+    match /erp_poscan/{k} {
+      allow get: if true;
+      allow create: if request.resource.data.keys().hasOnly(['pono', 'at']) && request.resource.data.at is string
+        && exists(/databases/$(database)/documents/erp_poship/$(k))
+        && get(/databases/$(database)/documents/erp_poship/$(k)).data.pono == request.resource.data.pono;
+    }
+    // 화면 표시용 흐름(id = 공개열쇠) — 진짜 판단은 폼이 열쇠 기록으로 다시 한다
+    match /erp_poflow/{pk} {
+      allow get: if true;
+      allow create: if request.resource.data.keys().hasOnly(['pono', 'scanAt']) && request.resource.data.scanAt is string
+        && exists(/databases/$(database)/documents/erp_podocs_pub/$(pk)) && ppub(pk).pono == request.resource.data.pono;
+      allow update: if request.resource.data.pono == resource.data.pono && (
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['inAt'])
+          && 'scanAt' in resource.data && !('doneAt' in resource.data) && request.resource.data.inAt is string)
+        || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['doneAt'])
+          && 'inAt' in resource.data && !('doneAt' in resource.data) && request.resource.data.doneAt is string));
+    }
+    // 입고처 입고확인·입고수량(id = 입고처 박스_발주번호) — 스캔 뒤·배송완료 전까지 다시 저장 됨
+    match /erp_poin/{id} {
+      allow get: if true;
+      allow create, update: if request.resource.data.keys().hasOnly(['box', 'pono', 'pubKey', 'rows', 'at'])
+        && request.resource.data.box is string && request.resource.data.pono is string
+        && request.resource.data.pubKey is string && request.resource.data.at is string
+        && request.resource.data.rows is list && request.resource.data.rows.size() <= 50
+        && id == request.resource.data.box + '_' + request.resource.data.pono
+        && exists(/databases/$(database)/documents/erp_pobox/$(request.resource.data.box))
+        && pbox(request.resource.data.box).kind == '입고처'
+        && request.resource.data.pono in pbox(request.resource.data.box).ponos
+        && exists(/databases/$(database)/documents/erp_podocs_pub/$(request.resource.data.pubKey))
+        && ppub(request.resource.data.pubKey).pono == request.resource.data.pono
+        && exists(/databases/$(database)/documents/erp_poflow/$(request.resource.data.pubKey))
+        && 'scanAt' in get(/databases/$(database)/documents/erp_poflow/$(request.resource.data.pubKey)).data
+        && !('doneAt' in get(/databases/$(database)/documents/erp_poflow/$(request.resource.data.pubKey)).data);
+    }
+    // 배송완료(id = 배송 열쇠) — 스캔 뒤·입고확인 뒤
+    match /erp_podone/{k} {
+      allow get: if true;
+      allow create: if request.resource.data.keys().hasOnly(['pono', 'at']) && request.resource.data.at is string
+        && exists(/databases/$(database)/documents/erp_poship/$(k))
+        && get(/databases/$(database)/documents/erp_poship/$(k)).data.pono == request.resource.data.pono
+        && exists(/databases/$(database)/documents/erp_poscan/$(k))
+        && 'inAt' in get(/databases/$(database)/documents/erp_poflow/$(get(/databases/$(database)/documents/erp_poship/$(k)).data.pubKey)).data;
+    }
+
     // erp_ 업무 자료: 보기 = 권한 받은 담당자 모두(드롭다운이 다른 메뉴 자료를 읽음) · 저장·삭제 = 컬렉션마다
     match /{col}/{id} {
       allow read: if col.matches('^erp_.*') && col != 'erp_staff' && isStaff();
