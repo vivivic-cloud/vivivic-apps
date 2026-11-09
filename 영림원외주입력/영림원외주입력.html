@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v158 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v159 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -375,7 +375,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v158</span>
+    <span class="ver">v159</span>
   </div>
 </header>
 <div class="wrap">
@@ -3527,8 +3527,38 @@ function dlvOver(r){
     if(over>0)out.push({x:x,base:base,over:over});});
   return out;
 }
-function dlvOverBox(s,r){   /* v158 「초과 N · 발주수정 대기」 + 「발주수정 보기」(문서는 저절로 생김) */
-  if(r.status!=='대기'&&r.status!=='오류')return null;var ov=dlvOver(r);if(!ov.length)return null;
+/* v159 사장님 「현재 수량이 적게 납품되어 발주가 남아있는경우로 납품완료된경우 납품완료 수량과 발주 수량을 비교하여 남은 발주서 삭제 버튼으로 두작업이 동시에 등록대기 되게 하는 경우도 적용해 줘야해」
+   (바뀐 지시) 기사 납품완료로 생긴(flow) 구매납품 대기가 남은 수량보다 적으면 「남음 N」 + 「발주수정」(같은 발주번호 발주수정 kind cut 대기, 새 발주수량 = 이미 납품 + 이번 납품 → 남은 0) · 「부분납품」(이 납품만 넘기고 같은 링크로 다음 회차).
+   고르기 전에는 구매납품 문서에 choose 「남음」 — 입력 작업자는 choose 가 있으면 넣지 않는다(대기 그대로). */
+function dlvUnder(r){
+  var no=purTrim(r.pono),out=[],src=(data[r.purCol==='erp_purords'?'purords':'purchases']||[]).filter(function(d){return d.id===r.purId;})[0];
+  (r.rows||[]).forEach(function(x){var c=purTrim(x.ccode),sx=src&&(src.rows||[]).filter(function(y){return y&&purTrim(y.ccode)===c&&purTrim(y.vendor)===purTrim(r.vendor);})[0];
+    var base=poQtyOf(no,c,sx?sx.qty:x.poqty),mine=r.status==='오류'?0:Number(x.qty||0),others=Math.round((purDone(no,c)-mine)*100)/100,left=Math.round((base-others-Number(x.qty||0))*100)/100;
+    if(left>0)out.push({x:x,base:base,left:left,qty:Math.round((others+Number(x.qty||0))*100)/100});});
+  return out;
+}
+function cutRows(un){return un.map(function(o){return {cname:o.x.cname||'',ccode:purTrim(o.x.ccode),cspec:o.x.cspec||'',unit:o.x.unit||'',curqty:o.base,qty:o.qty};});}
+function cutMake(r){
+  var no=purTrim(r.pono),id='mod_'+no+'_'+r.id,un=dlvUnder(r);if(!un.length||!/^[A-Za-z0-9_-]+$/.test(id))return;
+  if(!confirm(no+' 발주수량을 '+un.map(function(o){return podNum(o.qty);}).join(', ')+'(으)로 고치는 발주수정을 대기로 만듭니다.'))return;
+  db.collection('erp_pomods').doc(id).create({pono:no,vendor:r.vendor||'',rows:cutRows(un),status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(BYKEY.pomods),
+    kind:'cut',basis:dlvSig(r),dlvId:r.id,purId:r.purId||'',purCol:r.purCol||'erp_purchases'}).then(function(){return db.collection('erp_purdelvs').doc(r.id).update({choose:''});}).then(function(){flash('발주수정을 대기로 만들었습니다.');},function(e){flash('만들지 못했습니다. '+errText(e),true);});
+}
+function chooseBox(r,un){   /* v159 남은 발주: 「발주수정」·「부분납품」 */
+  un=un||dlvUnder(r);if(!un.length)return null;
+  var no0=purTrim(r.pono),m0=(data.pomods||[]).filter(function(d){return purTrim(d.pono)===no0&&(d.status==='대기'||d.status==='진행중');})[0],w=canCol('erp_pomods','w')&&canCol('erp_purdelvs','w');
+  var b=function(t,fn){return h('button',{type:'button',class:'btn small',on:{click:function(e){e.stopPropagation();fn();}}},t);};
+  var sh=(POSHIP||[]).filter(function(x){return x.id===(r.flow&&r.flow.ship);})[0],undec=!r.partial&&!(sh&&sh.next)&&(r.choose||r.status==='완료');   /* v159 이미 완료된 옛 납품(선택 칸 없던 때)도 고를 수 있게 */
+  var st=m0?' · 발주수정 '+m0.status:r.partial||(sh&&sh.next)?' · 부분납품':undec?' · 선택 전':'';
+  return h('div',{class:'dlvover'},h('span',{class:'podwarn'},'남음 '+un.map(function(o){return podNum(o.left);}).join(', ')+st),
+    m0?(canMenu(menuOf('pomods'),'r')?b('발주수정 보기',function(){go('pomods');}):null):undec&&w?[b('발주수정',function(){cutMake(r);}),b('부분납품',function(){partialGo(r);})]:null);
+}
+function dlvOverBox(s,r){   /* v158 「초과 N · 발주수정 대기」 + 「발주수정 보기」(문서는 저절로 생김) · v159 「남음 N」·「발주수정」·「부분납품」 */
+  if(r.status==='완료'&&r.flow&&!podFinal(purTrim(r.pono))){var u2=dlvUnder(r);return u2.length?chooseBox(r,u2):null;}   /* v159 완료됐지만 남은 수량 */
+  if(r.status!=='대기'&&r.status!=='오류')return null;var ov=dlvOver(r);
+  if(!ov.length){
+    if(r.status!=='대기'||!r.flow)return null;var un=dlvUnder(r);if(!un.length)return null;return chooseBox(r,un);
+  }
   var no=purTrim(r.pono),m=(data.pomods||[]).filter(function(d){return purTrim(d.pono)===no&&(d.status==='대기'||d.status==='진행중');})[0];
   return h('div',{class:'dlvover'},h('span',{class:'podwarn'},'초과 '+ov.map(function(o){return podNum(o.over);}).join(', ')+(m?' · 발주수정 '+m.status:'')),
     m&&canMenu(menuOf('pomods'),'r')?h('button',{type:'button',class:'btn small',on:{click:function(e){e.stopPropagation();go('pomods');}}},'발주수정 보기'):null);
@@ -3543,7 +3573,13 @@ function podModSync(){
   data.purdelvs.forEach(function(r){
     if(!r.id)return;var err=r.status==='오류'&&/초과/.test(String(r.agentNote||''));if(r.status!=='대기'&&!err)return;
     var no=purTrim(r.pono),ov=dlvOver(r),sig=dlvSig(r),id='mod_'+no+'_'+r.id;if(!/^[A-Za-z0-9_-]+$/.test(id))return;
-    var mine=data.pomods.filter(function(d){return d.id===id;})[0],other=data.pomods.filter(function(d){return d.id!==id&&purTrim(d.pono)===no&&(d.status==='대기'||d.status==='진행중');})[0];
+    var mine=data.pomods.filter(function(d){return d.id===id;})[0];
+    if(mine&&mine.kind==='cut'){   /* v159 남은 발주 삭제: 납품수량이 바뀌면 따라감, 남은 수량이 없어지면 지움(대기일 때만) */
+      if(mine.status!=='대기'||mine.basis===sig)return;var un=dlvUnder(r),bc='c:'+id,wc=JSON.stringify([cutRows(un),sig]);if(podBusy[bc]===wc)return;podBusy[bc]=wc;
+      if(un.length)db.collection('erp_pomods').doc(id).updateIf(function(c){return c.status==='대기'?{rows:cutRows(un),basis:sig}:null;}).catch(function(){podBusy[bc]='';});
+      else db.collection('erp_pomods').doc(id).deleteIf(function(c){return c.status==='대기';}).catch(function(){podBusy[bc]='';});
+      return;}
+    var other=data.pomods.filter(function(d){return d.id!==id&&purTrim(d.pono)===no&&(d.status==='대기'||d.status==='진행중');})[0];
     var rows=ov.map(function(o){return {cname:o.x.cname||'',ccode:purTrim(o.x.ccode),cspec:o.x.cspec||'',unit:o.x.unit||'',curqty:o.base,qty:Math.round((o.base+o.over)*100)/100};});
     var bk='m:'+id,want=JSON.stringify([rows,sig]);if(podBusy[bk]===want)return;
     if(!ov.length){if(mine&&mine.status==='대기'&&mine.auto){podBusy[bk]=want;db.collection('erp_pomods').doc(id).deleteIf(function(c){return c.status==='대기';}).catch(function(){podBusy[bk]='';});}return;}
@@ -4667,7 +4703,13 @@ function podPubUrl(k){return new URL('발주서.html#'+k,location.href).href;}
 function podInbox(d){var w=((d.rows||[]).filter(function(x){return x&&purTrim(x.wh);})[0]||{}).wh,b=w?boxOf('입고처',purTrim(w)):null;return b?b.id:'';}   /* v153 ⚠ 시험용 */
 /* v155 사장님 「…영림원 등록 대기에서 입력이 완료되어 입력완료로 변경된경우를 그렇게 처리해 줄 수 있을ㅅ까요?」 — 그 발주의 구매납품(flow_) 문서가 「완료」면 모든 곳에서 「납품완료」: 보기만, 단추 모두 꺼짐, QR·바코드 안 그림.
    링크 페이지는 erp_purdelvs 를 못 읽어 폼이 공개 문서·박스 pos·erp_podlv 에 final:true 를 적는다(폼이 열릴 때). 쓰기는 규칙이 이미 막음(erp_purdelvs 가 대기 아니면). */
-function podFinal(no){return (data.purdelvs||[]).some(function(r){return String(r.id||'').indexOf('flow_')===0&&purTrim(r.pono)===no&&r.status==='완료';});}
+function podFinal(no){   /* v159 발주가 닫힘 = 납품 흐름 완료가 있고, 원본 줄마다 「완료」 납품 합 ≥ 발주수량(완료된 발주수정 반영) */
+  var ds=(data.purdelvs||[]).filter(function(r){return purTrim(r.pono)===no&&r.status==='완료';});if(!ds.some(function(r){return String(r.id||'').indexOf('flow_')===0;}))return false;
+  var po=(PODOCS||[]).filter(function(d){return purTrim(d.pono||d.id)===no;})[0];if(!po)return false;
+  var src=(data[po.purCol==='erp_purords'?'purords':'purchases']||[]).filter(function(d){return d.id===po.purId;})[0],rows=(src&&src.rows||[]).filter(function(x){return x&&purTrim(x.vendor)===purTrim(po.vendor);});
+  if(!rows.length)return false;
+  return rows.every(function(x){var c=purTrim(x.ccode),sum=0;ds.forEach(function(r){(r.rows||[]).forEach(function(y){if(purTrim(y.ccode)===c)sum+=Number(y.qty||0);});});return sum+0.0001>=poQtyOf(no,c,x.qty);});
+}
 function podPubOf(d){var no=purTrim(d.pono||d.id);return {pono:no,podate:show(d.podate),inbox:podInbox(d),final:podFinal(no),rows:(d.rows||[]).map(function(x){return {ccode:show(x.ccode),cname:show(x.cname),cspec:show(x.cspec),unit:show(x.unit),qty:show(x.qty),duedate:show(x.duedate),wh:show(x.wh),dlv:purDone(no,purTrim(x.ccode))};})};}
 function podPubSig(p){return JSON.stringify([show(p.pono),show(p.podate),show(p.inbox),p.final===true,(p.rows||[]).map(function(x){return [show(x.ccode),show(x.cname),show(x.cspec),show(x.unit),show(x.qty),show(x.duedate),show(x.wh),Number(x.dlv||0)];})]);}
 var POD_LIBS={qr:['https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js','sha384-mZT2gIty7ZDdOGkxfP6joZcYdMW1Jvj9dRlfpTmaJAKKXTqzygtB22k7FLe+KZC1','qrcode','라이브러리/qrcode.min.js'],
@@ -4775,6 +4817,7 @@ function podView(d){
   return [].concat(
     h('div',{class:'actions'},h('button',{type:'button',class:'btn small',on:{click:function(){podGo('');}}},'목록'),podCanShare(d)&&!podFinal(no)?podShareBtn(d):null),
     podFinal(no)?h('p',{class:'podst on'},'납품완료'):POCONF==null?null:confOf(no)?podCodes(no,d.pubKey):h('p',{class:'podst'},'발주확인 전'),   /* v155 완료 = QR·바코드 없음 */   /* v136 사장님 「거래처 발주 확인전 까지는 발주서에 큐알 바코드 발행 안되게 해주세요」 */
+    podFinal(no)?null:(function(){var r=(data.purdelvs||[]).filter(function(x){return purTrim(x.pono)===no&&(x.status==='대기'||x.status==='완료')&&x.flow;}).sort(function(a,b){return String(a.createdAt||'')<String(b.createdAt||'')?1:-1;})[0];return r?chooseBox(r):null;})(),   /* v159 */
     podKv([['발주번호',no,'mono'],['발주일',show(d.podate)],['구매거래처',show(d.vendor)],['발주확인',confOf(no)?confTime(confOf(no)):'발주확인 전'],['배송',POSHIP==null?'':flowText(no)]]),   /* v144 */   /* v133 */
     rows.map(function(x){return h('div',{class:'podrow'},
       h('div',{class:'nt'},show(x.cname)),
@@ -4802,11 +4845,12 @@ function boxWant(kind,name){
       var r={ccode:show(x.ccode),cname:show(x.cname),cspec:show(x.cspec),unit:show(x.unit),qty:show(x.qty),duedate:show(x.duedate),wh:show(x.wh),dlv:purDone(no,purTrim(x.ccode))};
       return r;});   /* v138 사장님 「발주관리 구매처 쪽에서도 단가는 안나타나게 해주세요」 — 출고처 박스에도 단가 안 넣음(옛 박스는 boxSig 가 price 를 보아 다음 저장 때 pos 통째로 바뀌며 빠짐) */
     var o={pono:no,podate:show(d.podate),pubKey:show(d.pubKey),rows:rows,final:podFinal(no)};   /* v155 */
-    if(kind==='입고처'){o.vendor=show(d.vendor);o.inTok=show(d.inTok);var sh=shipFor(no);o.ship=sh?sh.id:'';}   /* v145 입고열쇠·배송 링크(입고처만 앎) */
+    if(kind==='입고처'){o.vendor=show(d.vendor);o.inTok=show(d.inTok);var sh=shipCur(no);o.ship=sh?sh.id:'';}   /* v159 지금 회차 */
+    var dl=0,lf=0;rows.forEach(function(x){dl+=Number(x.dlv||0);lf+=Math.max(0,Number(x.qty||0)-Number(x.dlv||0));});o.left=dl>0&&!o.final?Math.round(lf*100)/100:0;   /* v159 남음 */   /* v145 입고열쇠·배송 링크(입고처만 앎) */
     return o;});
   return {kind:kind,name:name,ponos:pos.map(function(p){return p.pono;}),pos:pos};
 }
-function boxSig(b){return JSON.stringify([show(b.kind),show(b.name),(b.ponos||[]).map(show),(b.pos||[]).map(function(p){return [show(p.pono),show(p.podate),show(p.pubKey),show(p.vendor),show(p.inTok),show(p.ship),p.final===true,(p.rows||[]).map(function(x){return [show(x.ccode),show(x.cname),show(x.cspec),show(x.unit),show(x.qty),show(x.price),show(x.duedate),show(x.wh),Number(x.dlv||0)];})];})]);}
+function boxSig(b){return JSON.stringify([show(b.kind),show(b.name),(b.ponos||[]).map(show),(b.pos||[]).map(function(p){return [show(p.pono),show(p.podate),show(p.pubKey),show(p.vendor),show(p.inTok),show(p.ship),p.final===true,Number(p.left||0),(p.rows||[]).map(function(x){return [show(x.ccode),show(x.cname),show(x.cspec),show(x.unit),show(x.qty),show(x.price),show(x.duedate),show(x.wh),Number(x.dlv||0)];})];})]);}
 function podBoxSync(){
   if(!db||!db.collection||PODOCS==null||POBOX==null||POCONF==null||POSHIP==null||data.purdelvs==null||!canCol('erp_pobox','w'))return;   /* v145 배송 링크도 읽은 뒤 */   /* v143 입고처는 발주확인 값을 읽은 뒤에만 */
   ['출고처','입고처'].forEach(function(kind){var ns=boxNames(kind);
@@ -4834,24 +4878,37 @@ function boxShareBtn(b){return h('button',{type:'button',class:'btn small podsha
    잠금 = erp_purdelvs/flow_ 가 대기가 아니면(입력 작업자 처리 시작) 폼이 erp_podlv.locked=true, 규칙은 erp_purdelvs 상태를 직접 봄. */
 var POSHIP=null,POIN=null,PODLV=null,PTOK=null;
 function ymdOf(iso){var d=new Date(iso);if(isNaN(d))return conToday();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
-function shipFor(no){   /* 그 발주의 배송 링크(출고처 박스 것, 먼저 만든 것) */
-  return (POSHIP||[]).filter(function(x){if(purTrim(x.pono)!==no||!podKeyOk(x.id))return false;var b=(POBOX||[]).filter(function(y){return y.id===x.box;})[0];return b&&b.kind==='출고처'&&(b.ponos||[]).indexOf(no)>=0;})
-    .sort(function(a,b){return String(a.at||'')<String(b.at||'')?-1:1;})[0]||null;}
-function flowOf(no){
-  var po=(PODOCS||[]).filter(function(d){return purTrim(d.pono||d.id)===no;})[0],sh=shipFor(no),o={ship:sh};if(!sh||!po)return o;
+/* v159 사장님 「그럼 발주가 남았을때 발주수정과 / 부분납품 버튼을 만들어 발주수정시 동시 수정되는 폼입력이 대기상태가 되고 부분납품시 남은 발주서를 계속 유지하도록 해야겠네 이로인해 현장납품 공유링크바코드스캔 관계도 해당 발주로 되살려 놔야 하고」
+   납품 회차: 같은 배송기사 링크(첫 배송 문서)에 회차마다 배송 문서를 잇는다 — erp_poship/<회차열쇠>{box,pono,pubKey,at,prev,inbox}, 앞 회차 next. 회차마다 표시(erp_podlv)·입고(erp_poin)·구매납품(flow_<회차열쇠>)이 따로라 규칙을 안 바꿈. */
+function shipValid(x,no){if(purTrim(x.pono)!==no||!podKeyOk(x.id))return false;var b=(POBOX||[]).filter(function(y){return y.id===x.box;})[0];return !!(b&&b.kind==='출고처'&&(b.ponos||[]).indexOf(no)>=0);}
+function shipFor(no){   /* 첫 회차(출고처 「배송기사 공유」 링크, 먼저 만든 것) */
+  return (POSHIP||[]).filter(function(x){return !x.prev&&shipValid(x,no);}).sort(function(a,b){return String(a.at||'')<String(b.at||'')?-1:1;})[0]||null;}
+function shipChain(no){var a=[],k=shipFor(no),seen={};while(k&&!seen[k.id]&&a.length<30){seen[k.id]=1;a.push(k);var nx=k.next;k=nx?(POSHIP||[]).filter(function(x){return x.id===nx&&purTrim(x.pono)===no;})[0]||null:null;}return a;}
+function shipCur(no){var a=shipChain(no);return a[a.length-1]||null;}
+function flowOfShip(no,sh){
+  var po=(PODOCS||[]).filter(function(d){return purTrim(d.pono||d.id)===no;})[0],o={ship:sh};if(!sh||!po)return o;
   o.dlv=(PODLV||[]).filter(function(x){return x.id===sh.id&&purTrim(x.pono)===no;})[0]||null;
   o.in=po.inTok?(POIN||[]).filter(function(x){return x.id===po.inTok+'_'+sh.id&&purTrim(x.pono)===no;})[0]||null:null;
   return o;
 }
+function flowOf(no){return flowOfShip(no,shipCur(no));}   /* 지금 회차 */
+/* 그 발주 원본 줄(그 거래처)마다 남은 수량 — pd 는 빼고 셈(오류 아닌 경우) */
+function poLeft(no,po,pd){
+  var src=(data[po.purCol==='erp_purords'?'purords':'purchases']||[]).filter(function(d){return d.id===po.purId;})[0],out=[];if(!src)return out;
+  (src.rows||[]).filter(function(x){return x&&purTrim(x.vendor)===purTrim(po.vendor);}).forEach(function(x){var c=purTrim(x.ccode),mine=0;
+    if(pd&&pd.status!=='오류')(pd.rows||[]).forEach(function(y){if(purTrim(y.ccode)===c)mine+=Number(y.qty||0);});
+    out.push({ccode:c,base:poQtyOf(no,c,x.qty),done:Math.round((purDone(no,c)-mine)*100)/100});});
+  return out;
+}
 function podFlowSync(){
   if(!db||!db.collection||PODOCS==null||POSHIP==null||POIN==null||PODLV==null||POBOX==null||data.purdelvs==null||data.purchases==null||data.purords==null)return;
   var canW=canCol('erp_purdelvs','w');
-  PODOCS.forEach(function(po){
-    var no=purTrim(po.pono||po.id),f=flowOf(no);if(!f.ship)return;
+  PODOCS.forEach(function(po){var no=purTrim(po.pono||po.id),FIN=podFinal(no);shipChain(no).forEach(function(sh){   /* v159 회차마다 */
+    var f=flowOfShip(no,sh);
     var id='flow_'+f.ship.id,pd=(data.purdelvs||[]).filter(function(r){return r.id===id;})[0];
     /* 잠금 표시: 구매납품 문서가 대기가 아니면 링크 수정 막음 */
-    var fin=!!(pd&&pd.status==='완료');   /* v155 */
-    if(pd&&pd.status!=='대기'&&f.dlv&&(f.dlv.locked!==true||(fin&&f.dlv.final!==true))&&canCol('erp_podlv','w')&&podBusy['L:'+id]!==(fin?2:1)){podBusy['L:'+id]=fin?2:1;
+    var fin=FIN;   /* v155 · v159 발주가 닫혔을 때만 납품완료 */
+    if(f.dlv&&((pd&&pd.status!=='대기'&&f.dlv.locked!==true)||(fin&&f.dlv.final!==true))&&canCol('erp_podlv','w')&&podBusy['L:'+id]!==(fin?2:1)){podBusy['L:'+id]=fin?2:1;
       db.collection('erp_podlv').doc(f.ship.id).update(fin?{locked:true,final:true}:{locked:true}).catch(function(e){podBusy['L:'+id]=0;console.warn('잠금 표시 못 함',no,e);});}
     if(!canW||!f.in||!f.dlv||!f.dlv.doneAt)return;
     var rev=Number(f.in.rev||0);if(!(rev>0&&Number(f.dlv.doneRev)===rev&&String(f.in.at)<=String(f.dlv.doneAt)))return;   /* 이 입고확인에 대한 납품완료여야 */
@@ -4860,16 +4917,29 @@ function podFlowSync(){
     var rows=(src.rows||[]).filter(function(x){return x&&purTrim(x.vendor)===purTrim(po.vendor)&&qty[purTrim(x.ccode)]>0;}).map(function(x){var c=purTrim(x.ccode);
       return {cname:x.cname||'',ccode:c,cspec:x.cspec||'',unit:x.unit||'',poqty:poQtyOf(no,c,x.qty),qty:qty[c],price:x.price,wh:x.wh||''};});
     if(!rows.length)return;
-    var flow={ship:f.ship.id,inAt:f.in.at,rev:rev,doneAt:f.dlv.doneAt,photos:Number(f.in.photos||0)},bk='f:'+id+':'+rev;
+    var flow={ship:f.ship.id,inAt:f.in.at,rev:rev,doneAt:f.dlv.doneAt,photos:Number(f.in.photos||0),rnd:shipChain(no).indexOf(sh)+1},bk='f:'+id+':'+rev;
+    var under=poLeft(no,po,pd).some(function(L){return L.base-L.done-(qty[L.ccode]||0)>0.0001;});   /* v159 남은 수량이 있으면 사장님 선택(발주수정·부분납품) 전까지 choose */
     if(podBusy[bk])return;
     if(!pd){podBusy[bk]=1;
       db.collection('erp_purdelvs').doc(id).create({purId:po.purId,purCol:po.purCol||'erp_purchases',pono:no,vendor:po.vendor,dlvdate:ymdOf(f.dlv.doneAt),rows:rows,dlvno:'',status:'대기',agentNote:'',
-        createdAt:new Date().toISOString(),route:routeOf(BYKEY.purdelvs),flow:flow}).catch(function(e){podBusy[bk]=0;console.warn('납품완료 납품 못 만듦',no,e);});
+        createdAt:new Date().toISOString(),route:routeOf(BYKEY.purdelvs),flow:flow,choose:under?'남음':''}).catch(function(e){podBusy[bk]=0;console.warn('납품완료 납품 못 만듦',no,e);});
     }else if(pd.status==='대기'&&Number(pd.flow&&pd.flow.rev||0)<rev){podBusy[bk]=1;   /* 수정요청 뒤 다시 납품완료 → 대기 문서 수량 고침(대기일 때만) */
-      db.collection('erp_purdelvs').doc(id).updateIf(function(c){return c.status==='대기'&&Number(c.flow&&c.flow.rev||0)<rev?{rows:rows,dlvdate:ymdOf(f.dlv.doneAt),flow:flow}:null;})
+      db.collection('erp_purdelvs').doc(id).updateIf(function(c){if(!(c.status==='대기'&&Number(c.flow&&c.flow.rev||0)<rev))return null;var o={rows:rows,dlvdate:ymdOf(f.dlv.doneAt),flow:flow};
+          if(!c.partial&&!(data.pomods||[]).some(function(m){return m.id==='mod_'+no+'_'+id&&m.kind==='cut';}))o.choose=under?'남음':'';return o;})
         .catch(function(e){podBusy[bk]=0;console.warn('납품 수정 못 함',no,e);});
     }
-  });
+  });});
+}
+/* v159 「부분납품」: 이 구매납품만 대기로 넘기고(choose 지움·partial) 같은 배송기사 링크에 다음 회차를 잇는다 */
+function partialGo(r){
+  var no=purTrim(r.pono),sh=(POSHIP||[]).filter(function(x){return x.id===(r.flow&&r.flow.ship);})[0];if(!sh)return;
+  if(!confirm(no+' 부분납품으로 넘기고 남은 발주를 계속 받습니다.'))return;
+  var go2=function(){return db.collection('erp_purdelvs').doc(r.id).update({choose:'',partial:true});};
+  if(sh.next)return go2().then(function(){flash('부분납품으로 넘겼습니다.');},function(e){flash('넘기지 못했습니다. '+errText(e),true);});
+  var k=podKey(),at=new Date().toISOString();
+  db.collection('erp_poship').doc(k).create({box:sh.box,pono:no,pubKey:sh.pubKey||'',at:at,prev:sh.id,inbox:sh.inbox||''})
+    .then(function(){return db.collection('erp_poship').doc(sh.id).update({next:k});}).then(go2)
+    .then(function(){flash('부분납품으로 넘겼습니다. 같은 배송기사 링크로 다음 납품을 받습니다.');},function(e){flash('넘기지 못했습니다. '+errText(e),true);});
 }
 function flowText(no){var f=flowOf(no),d=f.dlv;if(!f.ship)return '';
   if(d&&d.locked)return '잠김';
@@ -4893,7 +4963,7 @@ function podTokSync(){
 }
 /* v156 사장님 「발주서 관리 납품완료 건은 납품완료목록에서 따로 관리 하게 해주세요」 — 영림원 입력완료(flow_ 구매납품 완료) 발주를 거래처별로, 납품일 늦은 것부터. 보기만 */
 function podDoneList(){
-  var recs=(data.purdelvs||[]).filter(function(r){return String(r.id||'').indexOf('flow_')===0&&r.status==='완료';});
+  var recs=(data.purdelvs||[]).filter(function(r){return String(r.id||'').indexOf('flow_')===0&&r.status==='완료'&&podFinal(purTrim(r.pono));});   /* v159 닫힌 발주만(부분납품은 안 옮김) */
   if(!recs.length)return [h('p',{class:'msg'},'발주서가 없습니다.')];
   var by={};recs.forEach(function(r){var v=purTrim(r.vendor);(by[v]=by[v]||[]).push(r);});
   var latest=function(a){return a.reduce(function(m,r){return String(r.dlvdate||'')>m?String(r.dlvdate||''):m;},'');};

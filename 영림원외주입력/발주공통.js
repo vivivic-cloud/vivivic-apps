@@ -100,5 +100,12 @@ function rememberInbox(k){if(!keyOk(k))return;try{var a=inboxes().filter(functio
 function fill(el,list){var a=[];(function walk(x){if(Array.isArray(x))x.forEach(walk);else if(x!=null&&x!==false)a.push(x);})(list);el.replaceChildren.apply(el,a);}
 /* v149 누구용 링크인지 머리 줄 — 사장님 「…이관계를 해당 링크페이지에 명시해 주세요」 */
 function who(text,kind){return h('div','who '+kind,text);}
-window.PO={who:who,fill:fill,h:h,show:show,num:num,when:when,getMany:getMany,getOne:getOne,commit:commit,rkey:rkey,keyOk:keyOk,noOk:noOk,lib:lib,codes:codes,scanner:scanner,shrink:shrink,inboxes:inboxes,rememberInbox:rememberInbox};
+/* v159 납품 회차: 배송 문서 next 를 따라 지금 회차까지. 돌려줌 = [{id, doc}] 첫 회차부터(앞 회차 prev 도 따라감) */
+function shipChain(k){
+  var back=function(id,acc){return getOne('erp_poship/'+id).then(function(d){if(!d)return acc;acc.unshift({id:id,doc:d});return d.prev&&keyOk(d.prev)&&acc.length<30?back(d.prev,acc):acc;});};
+  var fwd=function(acc){var l=acc[acc.length-1];if(!l||!l.doc.next||!keyOk(l.doc.next)||acc.length>=30)return Promise.resolve(acc);
+    return getOne('erp_poship/'+l.doc.next).then(function(d){if(!d)return acc;acc.push({id:l.doc.next,doc:d});return fwd(acc);});};
+  return back(k,[]).then(fwd);
+}
+window.PO={shipChain:shipChain,who:who,fill:fill,h:h,show:show,num:num,when:when,getMany:getMany,getOne:getOne,commit:commit,rkey:rkey,keyOk:keyOk,noOk:noOk,lib:lib,codes:codes,scanner:scanner,shrink:shrink,inboxes:inboxes,rememberInbox:rememberInbox};
 })();

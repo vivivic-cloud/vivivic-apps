@@ -24,11 +24,13 @@ var P=window.PO,h=P.h,show=P.show,mainEl=document.getElementById('main');
 function say(t,bad){mainEl.replaceChildren(h('p','msg'+(bad?' bad':''),t));}
 var key=(location.hash||'').slice(1);
 if(!P.keyOk(key)){say('발주서가 없습니다.',true);return;}
-var S={ship:null,pub:null,dlv:null,conf:null,vname:''},busy=false,err='',CODE=null;
+var S={ship:null,pub:null,dlv:null,conf:null,vname:'',chain:[],past:[]},cur=key,busy=false,err='',CODE=null;
 function load(){
-  return P.getOne('erp_poship/'+key).then(function(s){
-    if(!s){S.ship=false;return;}S.ship=s;
-    return P.getMany(['erp_podocs_pub/'+s.pubKey,'erp_podlv/'+key,'erp_poconfirm/'+s.pono,'erp_pobox/'+s.box]).then(function(m){S.pub=m['erp_podocs_pub/'+s.pubKey];S.dlv=m['erp_podlv/'+key];S.conf=m['erp_poconfirm/'+s.pono];var vb=m['erp_pobox/'+s.box];S.vname=vb&&vb.kind==='출고처'?show(vb.name):'';});
+  return P.shipChain(key).then(function(ch){   /* v159 같은 링크 = 지금 회차(next 를 따라감) */
+    if(!ch.length){S.ship=false;return;}var last=ch[ch.length-1],s=last.doc;S.ship=s;S.chain=ch;cur=last.id;
+    var names=['erp_podocs_pub/'+s.pubKey,'erp_poconfirm/'+s.pono,'erp_pobox/'+s.box].concat(ch.map(function(x){return 'erp_podlv/'+x.id;}));
+    return P.getMany(names).then(function(m){S.pub=m['erp_podocs_pub/'+s.pubKey];S.dlv=m['erp_podlv/'+cur];S.conf=m['erp_poconfirm/'+s.pono];var vb=m['erp_pobox/'+s.box];S.vname=vb&&vb.kind==='출고처'?show(vb.name):'';
+      S.past=ch.slice(0,-1).map(function(x,i){return {n:i+1,d:m['erp_podlv/'+x.id]};}).filter(function(x){return x.d;});});
   }).then(draw,function(){if(S.ship==null)say('불러오지 못했습니다.',true);});
 }
 function canDone(){var d=S.dlv;return !!(d&&d.inAt&&!d.locked&&Number(d.doneRev||0)<Number(d.rev||0));}
@@ -36,7 +38,7 @@ function doDone(){
   if(busy||!canDone())return;
   if(!confirm(S.ship.pono+' 납품완료를 저장합니다.'))return;
   busy=true;err='';draw();
-  P.commit([{name:'erp_podlv/'+key,fields:{doneAt:new Date().toISOString(),doneRev:Number(S.dlv.rev)},mask:['doneAt','doneRev'],exists:true}])
+  P.commit([{name:'erp_podlv/'+cur,fields:{doneAt:new Date().toISOString(),doneRev:Number(S.dlv.rev)},mask:['doneAt','doneRev'],exists:true}])
     .then(function(){busy=false;return load();},function(){busy=false;err='납품완료를 저장하지 못했습니다.';return load();});
 }
 function kv(pairs){var d=h('dl');pairs.forEach(function(p){d.append(h('dt','',p[0]),h('dd',p[2]||'',p[1]));});return d;}
@@ -47,7 +49,7 @@ function draw(){
   (d.rows||[]).forEach(function(r){if(r)inq[show(r.ccode)]=r.qty;});
   document.title='발주서 '+no;
   var fin=(S.pub&&S.pub.final===true)||(S.dlv&&S.dlv.final===true);   /* v155 영림원 입력완료 = 납품완료(QR·바코드·단추 없음) */
-  if(!CODE&&S.conf&&!fin)CODE=P.codes(new URL('입고.html#'+key,location.href).href,no);   /* v148 발주확인 전에는 QR·바코드 대신 「발주확인 전」(v136) — 확인되면 같은 링크에 나타남 */
+  if(CODE&&CODE._k!==cur)CODE=null;if(!CODE&&S.conf&&!fin){CODE=P.codes(new URL('입고.html#'+cur,location.href).href,no);CODE._k=cur;}   /* v159 QR = 지금 회차 */   /* v148 발주확인 전에는 QR·바코드 대신 「발주확인 전」(v136) — 확인되면 같은 링크에 나타남 */
   var done=d.doneAt&&Number(d.doneRev||0)>=Number(d.rev||0)&&d.rev;
   var step=function(t,on,at){return h('div','step'+(on?' on':''),h('span','',t),h('span','',at||''));};
   var btn=h('button','wide',done?'납품완료됨':'납품완료');btn.type='button';btn.disabled=busy||!canDone();btn.addEventListener('click',doDone);
@@ -56,7 +58,8 @@ function draw(){
     h('h1','mono',no),h('p','sub','발주서 · 발주일 '+show(pub.podate)),
     fin?h('p','st on','납품완료'):S.conf?CODE:h('p','st','발주확인 전'),
     h('div','steps',step('입고확인'+(Number(d.rev)>1?' (수정 '+(Number(d.rev)-1)+')':''),!!d.inAt,d.inAt?P.when(d.inAt):''),step('납품완료',!!done,done?P.when(d.doneAt):''),!fin&&d.locked?step('잠김',true,''):null),
-    fin?null:h('div','acts',btn),err?h('p','err',err):null,
+    fin?null:h('div','acts',btn),
+    S.past.length?h('div','steps',S.past.map(function(x){var q=(x.d.rows||[]).map(function(r){return P.num(r.qty);}).join(', ');return h('div','step on',h('span','',x.n+'회 납품 '+q),h('span','',x.d.doneAt?P.when(x.d.doneAt):''));})):null,   /* v159 지난 회차 */err?h('p','err',err):null,
     rows.length?h('div','po',rows.map(function(x){var c=show(x.ccode);return h('div','row',h('div','nt',show(x.cname)),
       kv([['품번',c,'mono'],['규격',show(x.cspec)],['단위',show(x.unit)],['발주수량',P.num(x.qty),'n'],['입고수량',inq[c]!=null?P.num(inq[c]):'','n'],['납품예정일',show(x.duedate)],['창고',show(x.wh)]]));})):null));
 }

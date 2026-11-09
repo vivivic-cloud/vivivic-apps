@@ -45,7 +45,7 @@ function load(){
 /* 입고처: 배송열쇠 → 이 박스의 발주인지 보고 열기(박스 문서에 배송열쇠가 아직 없으면 배송 문서의 발주번호로 봄) */
 function openShip(sk){
   if(!P.keyOk(sk)){topErr='이 입고처 박스에 없는 발주입니다.';draw();return Promise.resolve();}
-  return P.getOne('erp_poship/'+sk).then(function(s){
+  return P.shipChain(sk).then(function(ch){var l=ch[ch.length-1];if(l)sk=l.id;return l?l.doc:null;}).then(function(s){   /* v159 지금 회차 */
     var p=s&&(BOX.pos||[]).filter(function(x){return x&&x.pono===s.pono&&P.keyOk(x.inTok);})[0];
     if(p&&!CONF[p.pono]){ACT=null;topErr='발주확인 전';draw();return;}   /* v153 */
     if(!p){   /* v152 다른 입고처 발주의 기사 QR → 그 발주의 입고처 박스로 넘김(사장님 결정 전 임시). 갈 박스를 모르면 안내 */
@@ -95,7 +95,7 @@ function shareShip(p){
 /* ---- 입고처: 연 발주서의 입고(사진·입고수량·입고확인·수정요청) ---- */
 function locked(){return !!(ACT&&ACT.dlv&&ACT.dlv.locked);}
 function canEdit(){return !!ACT&&!locked()&&(!ACT.inr||ACT.editing);}
-function qtyOf(x){var c=show(x.ccode);if(ACT.draft[c]!=null)return ACT.draft[c];var r=ACT.inr&&(ACT.inr.rows||[]).filter(function(y){return y&&show(y.ccode)===c;})[0];return r?String(r.qty):show(x.qty);}
+function qtyOf(x){var c=show(x.ccode);if(ACT.draft[c]!=null)return ACT.draft[c];var r=ACT.inr&&(ACT.inr.rows||[]).filter(function(y){return y&&show(y.ccode)===c;})[0];if(r)return String(r.qty);var L=Number(x.qty||0)-Number(x.dlv||0);return String(L>0?Math.round(L*100)/100:Number(x.qty||0));   /* v159 처음 값 = 남은 수량 */}
 function addPhotos(files){
   var p=actPo();if(!p||busy.in||!canEdit())return;var free=[];ACT.imgs.forEach(function(x,i){if(!x)free.push(i);});
   var fs=Array.prototype.slice.call(files||[]).slice(0,free.length);if(!fs.length){errs[p.pono]=free.length?'':'사진은 6장까지입니다.';draw();return;}
@@ -157,7 +157,8 @@ function draw(){
     if(fin)top.append(h('span','st on','납품완료'));
     else if(out){if(c)top.append(h('span','st on','발주확인 '+when(c.at)));
       else{top.append(h('span','st','발주확인 전'));var b=h('button','','발주확인');b.type='button';b.disabled=!!busy[p.pono];b.addEventListener('click',function(){confirmPo(p.pono);});top.append(b);}}
-    else top.append(h('span','st on',d.locked?'잠김':d.doneAt&&Number(d.doneRev||0)>=Number(d.rev||0)&&d.rev?'납품완료 '+when(d.doneAt):d.inAt?'입고확인 '+when(d.inAt):'입고대기'));
+    if(!fin&&Number(p.left)>0)top.append(h('span','st','남음 '+num(p.left)));   /* v159 부분납품 뒤 */
+    if(fin){}else if(!out)top.append(h('span','st on',d.locked?'잠김':d.doneAt&&Number(d.doneRev||0)>=Number(d.rev||0)&&d.rev?'납품완료 '+when(d.doneAt):d.inAt?'입고확인 '+when(d.inAt):'입고대기'));
     var ck=p.pono+'|'+p.pubKey;if(out&&c&&!CODES[ck])CODES[ck]=P.codes(P.keyOk(p.pubKey)?new URL('발주서.html#'+p.pubKey,location.href).href:'',show(p.pono));
     var head=out?[['발주일',show(p.podate)]]:[['발주일',show(p.podate)],['구매거래처',show(p.vendor)],['발주확인',c?when(c.at):'']];
     var el=h('div','po',top,out&&c&&!fin?CODES[ck]:null,kv(head),
