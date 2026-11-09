@@ -98,5 +98,7 @@ function inboxes(){try{return JSON.parse(localStorage.getItem('po.inboxes')||'[]
 function rememberInbox(k){if(!keyOk(k))return;try{var a=inboxes().filter(function(x){return x!==k;});a.unshift(k);localStorage.setItem('po.inboxes',JSON.stringify(a.slice(0,10)));}catch(e){}}
 /* 화면 채우기: 배열 안 null·false 는 뺌(replaceChildren 에 null 을 주면 「null」 글자가 됨) */
 function fill(el,list){var a=[];(function walk(x){if(Array.isArray(x))x.forEach(walk);else if(x!=null&&x!==false)a.push(x);})(list);el.replaceChildren.apply(el,a);}
-window.PO={fill:fill,h:h,show:show,num:num,when:when,getMany:getMany,getOne:getOne,commit:commit,rkey:rkey,keyOk:keyOk,noOk:noOk,lib:lib,codes:codes,scanner:scanner,shrink:shrink,inboxes:inboxes,rememberInbox:rememberInbox};
+/* v149 누구용 링크인지 머리 줄 — 사장님 「…이관계를 해당 링크페이지에 명시해 주세요」 */
+function who(text,kind){return h('div','who '+kind,text);}
+window.PO={who:who,fill:fill,h:h,show:show,num:num,when:when,getMany:getMany,getOne:getOne,commit:commit,rkey:rkey,keyOk:keyOk,noOk:noOk,lib:lib,codes:codes,scanner:scanner,shrink:shrink,inboxes:inboxes,rememberInbox:rememberInbox};
 })();
