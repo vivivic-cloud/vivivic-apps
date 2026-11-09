@@ -1876,6 +1876,7 @@
 - **규칙 제안 고침**: `erp_staff` 만들기에 익명 + 칸 `agent·name·firstAt·lastAt` 만(agent 참) 길을 더함. 권한 칸은 못 넣는다.
 - **되돌리기 파일** = `firestore-rules-되돌리기.rules`(11-09 읽은 배포 규칙 글자 그대로 — 릴리스 rulesets/22c4f153…, 10-06 배포). 되돌리는 법: 빈 폴더에 `firebase.json` = `{"firestore":{"rules":"firestore-rules-되돌리기.rules"}}` 과 그 파일을 두고 `firebase deploy --only firestore:rules --project vivivic-4b7ef`(이 맥 CLI 는 사장님 계정 로그인) 또는 파이어베이스 콘솔 › Firestore › 규칙에 붙여 넣고 게시.
 - **다른 앱 확인(11-09)**: `~/Projects` 의 이 프로젝트 쓰는 앱(조혼가구·에이엠티·납품내역·벤더피아연동·vivivic-docs·viggle 등) 코드에 `erp_` 컬렉션 쓰는 곳 없음(문서 md 뿐). 바뀌는 곳은 `erp_` 뿐이고 artifacts·그 밖은 규칙 글자 그대로.
+- **v128 발주서 공개 페이지 덩어리 더함(11-09, 발주서관리 작업자 요청)**: `match /erp_podocs_pub/{key} { allow get: if true; }` — 열쇠를 아는 한 장만, 목록·쓰기는 막힘. 시험 8가지 더해 43가지 모두 기대대로(로그인 없이·익명 get 됨 · 목록 막힘 · 쓰기 막힘 · 로그인 없이 다른 erp_ 막힘 · 관리자 씀).
 - 규칙 시험(에뮬레이터, 35가지 모두 기대대로): v115 25가지 + 작업자 줄 만들기 됨 · 권한 칸 넣으면 막힘 · agent 빠지면 막힘 · 권한 전 읽기 막힘 · 관리자가 권한 준 뒤 읽기·쓰기·고침 됨 · lastAt 됨 · 스스로 권한 막힘.
 
 ## 발주서 공개 페이지 (v128, 11-09)
