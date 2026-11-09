@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 발주서 공개 페이지(v128 · v130 위쪽 QR·바코드 · v131 cdnjs 를 못 받으면 같은 폴더 라이브러리/ 사본 — 폼 「발주서관리」와 같은 라이브러리·크기) — 영림원외주입력 「발주서관리」 QR 이 여는 보기 전용 한 장. 폼과 별개 파일, 로그인 없음, 메뉴·폼으로 가는 길 없음.
+<!-- 발주서 공개 페이지(v128 · v130 위쪽 QR·바코드 · v136 발주확인(erp_poconfirm/<발주번호>) 전에는 QR·바코드 대신 「발주확인 전」 · v131 cdnjs 를 못 받으면 같은 폴더 라이브러리/ 사본 — 폼 「발주서관리」와 같은 라이브러리·크기) — 영림원외주입력 「발주서관리」 QR 이 여는 보기 전용 한 장. 폼과 별개 파일, 로그인 없음, 메뉴·폼으로 가는 길 없음.
      주소 = 발주서.html#<열쇠>. 자료 = 파이어스토어 erp_podocs_pub/<열쇠> 한 장(REST GET). 열쇠 없이는 못 연다(발주번호로 안 열림).
      보이는 칸은 임시(사장님이 쓰면서 고침): 발주번호·발주일·품번·품명·규격·단위·발주수량·납품예정일·창고·납품 상황. 단가·구매거래처 뺌.
      저장소 규칙 배포 전에는 로그인 없는 읽기가 막혀 익명 로그인 뒤 다시 읽는다. 규칙에 `match /erp_podocs_pub/{key} { allow get: if true; }` 가 들어가면 바로 읽힌다. -->
@@ -31,6 +31,7 @@ dd.mono{font-family:var(--mono)}dd.n{font-variant-numeric:tabular-nums}
 table{width:100%;border-collapse:collapse;font-size:14px;border:1px solid var(--line);border-radius:12px;overflow:hidden}
 th{background:var(--fill2);color:var(--muted);font-weight:800;font-size:12px;text-align:left;padding:8px 10px}
 td{border-top:1px solid var(--rowline);padding:8px 10px;word-break:break-all}
+.st{margin:0;font-size:13px;font-weight:800;color:#92400e}
 .codes{display:grid;justify-items:center;gap:8px;margin:0 0 16px}.qr canvas{display:block;max-width:100%;image-rendering:pixelated}
 .bc{width:100%;max-width:360px}.bc svg{display:block;width:100%;height:auto}
 th:not(:first-child),td.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -71,6 +72,17 @@ function codes(no){
   }).catch(function(){err.hidden=false;err.textContent='바코드를 그리지 못했습니다.';});
   return h('div','codes',qrBox,bcBox,err);
 }
+/* v136 사장님 「거래처 발주 확인전 까지는 발주서에 큐알 바코드 발행 안되게 해주세요」 — erp_poconfirm/<발주번호> 가 있어야 그림(없거나 못 읽으면 「발주확인 전」) */
+function codeSlot(no){
+  var box=h('div','codes');
+  if(!/^[A-Za-z0-9_-]{1,100}$/.test(no)){box.append(h('p','st','발주확인 전'));return box;}
+  var cu='https://firestore.googleapis.com/v1/projects/'+PROJ+'/databases/(default)/documents/erp_poconfirm/'+no+'?key='+KEY;
+  var cget=function(tok){return fetch(cu,{headers:tok?{Authorization:'Bearer '+tok}:{},referrerPolicy:'no-referrer',cache:'no-store'});};
+  cget(null).then(function(r){return r.status===401||r.status===403?anon().then(cget):r;}).then(function(r){
+    if(r.ok)box.replaceWith(codes(no));else box.replaceChildren(h('p','st','발주확인 전'));
+  }).catch(function(){box.replaceChildren(h('p','st','발주확인 전'));});
+  return box;
+}
 function say(t,bad){mainEl.replaceChildren(h('p','msg'+(bad?' bad':''),t));}
 /* 파이어스토어 REST 값 → 보통 값 */
 function val(x){if(!x)return null;var k=Object.keys(x)[0],y=x[k];
@@ -98,7 +110,7 @@ get(null).then(function(r){return r.status===401||r.status===403?anon().then(get
     var kv=function(pairs){var d=h('dl');pairs.forEach(function(p){d.append(h('dt','',p[0]),h('dd',p[2]||'',p[1]));});return d;};
     mainEl.replaceChildren.apply(mainEl,[].concat(
       h('h1','','발주서'),
-      codes(show(f.pono)),
+      codeSlot(show(f.pono)),
       h('div','head',kv([['발주번호',show(f.pono),'mono'],['발주일',show(f.podate)]])),
       rows.map(function(x){return h('div','row',h('div','nt',show(x.cname)),
         kv([['품번',show(x.ccode),'mono'],['규격',show(x.cspec)],['단위',show(x.unit)],['발주수량',num(x.qty),'n'],['납품예정일',show(x.duedate)],['창고',show(x.wh)]]));}),
