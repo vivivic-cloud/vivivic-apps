@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v127 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v128 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -338,7 +338,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 /* v126 발주서관리 — 폰 기준 */
 .podlist{display:grid;gap:8px}.podbtn{display:grid;gap:2px;text-align:left;width:100%;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font:inherit;color:inherit;cursor:pointer}
 .podbtn:hover{background:var(--fill4)}.podbtn .nt{font-weight:800;word-break:break-all}.podbtn .ns{font-size:12px;color:var(--muted);font-weight:600}
-.podcodes{display:grid;justify-items:center;gap:8px;margin:12px 0}.podqr canvas{display:block;width:180px;height:180px;image-rendering:pixelated}
+.podcodes{display:grid;justify-items:center;gap:8px;margin:12px 0}.podqr canvas{display:block;max-width:100%;image-rendering:pixelated}
 .podbc{width:100%;max-width:360px}.podbc svg{display:block;width:100%;height:auto}
 .podkv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 12px;margin:10px 0;font-size:14px}.podkv dt{color:var(--muted);font-weight:700}.podkv dd{margin:0;word-break:break-all;font-weight:600}.podkv dd.n{font-variant-numeric:tabular-nums}.podkv dd.mono{font-family:var(--mono)}
 .podrow{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:10px 0}.podrow .nt{font-weight:800;word-break:break-all}.podrow .podkv{margin:6px 0 0}
@@ -361,7 +361,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v127</span>
+    <span class="ver">v128</span>
   </div>
 </header>
 <div class="wrap">
@@ -4559,7 +4559,16 @@ function renderStock(){
    만드는 사람 = erp_podocs 저장 권한이 있는 담당자가 폼을 열 때(podSync, create = 없을 때만). 아직 안 만든 발주도 목록에는 원본으로 보인다.
    QR = 이 문서 화면 주소(#podocs/발주번호) · 바코드 Code128 = 발주번호. 납품 상황 = erp_purdelvs 납품수량 합(purDone — 오류 뺌, 대기 포함). */
 var PODOC={key:'podocs',n:'',title:'발주서관리',screen:'발주서관리'};BYKEY.podocs=PODOC;
-var PODOCS=null,podSel='',podDraw=null,podBusy={},podLibP={};
+var PODOCS=null,PODPUB=null,podSel='',podDraw=null,podBusy={},podLibP={};
+/* v128 사장님 「발주관련 큐알 바코드 스캔시 본프로그램의 로그인과 관련없이 해당 페이지만 볼 수 있는 페이지를 보일 수 있나요?」 · 「큐알코드 프로그램 관련없는 페이지로 만들었니?」
+   공개 페이지 = 같은 폴더 발주서.html#<열쇠>(폼과 별개 파일, 로그인 없음, 보기만). 열쇠 = 발주서마다 무작위 32자(erp_podocs.pubKey).
+   공개 문서 = erp_podocs_pub/<열쇠> — 임시로 보일 칸만 담음(단가·구매거래처 뺌): pono·podate·rows(ccode·cname·cspec·unit·qty·duedate·wh·dlv 납품수량 합)·at.
+   만들고 고치는 사람 = erp_podocs_pub 저장 권한 있는 담당자가 폼을 열 때(podSync). 납품수량이 바뀌면 그때 공개 문서를 고친다. */
+function podKey(){var a=new Uint8Array(24);crypto.getRandomValues(a);return btoa(String.fromCharCode.apply(null,a)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
+function podKeyOk(k){return /^[A-Za-z0-9_-]{32,64}$/.test(String(k||''));}
+function podPubUrl(k){return new URL('발주서.html#'+k,location.href).href;}
+function podPubOf(d){var no=purTrim(d.pono||d.id);return {pono:no,podate:show(d.podate),rows:(d.rows||[]).map(function(x){return {ccode:show(x.ccode),cname:show(x.cname),cspec:show(x.cspec),unit:show(x.unit),qty:show(x.qty),duedate:show(x.duedate),wh:show(x.wh),dlv:purDone(no,purTrim(x.ccode))};})};}
+function podPubSig(p){return JSON.stringify([show(p.pono),show(p.podate),(p.rows||[]).map(function(x){return [show(x.ccode),show(x.cname),show(x.cspec),show(x.unit),show(x.qty),show(x.duedate),show(x.wh),Number(x.dlv||0)];})]);}
 var POD_LIBS={qr:['https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js','sha384-mZT2gIty7ZDdOGkxfP6joZcYdMW1Jvj9dRlfpTmaJAKKXTqzygtB22k7FLe+KZC1','qrcode'],
   bc:['https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/barcodes/JsBarcode.code128.min.js','sha384-7XguhfRLAUmvSGmJn2K+BQDpX0gf5NMsj79jcgd7TVtV87euzdySNZqTjOQxgIiB','JsBarcode']};
 function podLib(k){
@@ -4598,21 +4607,31 @@ function podSync(){
   var have={};PODOCS.forEach(function(d){have[d.id]=1;});
   podSrc().forEach(function(d){
     if(have[d.pono]||podBusy[d.pono]||!podIdOk(d.pono))return;podBusy[d.pono]=1;
-    var doc=Object.assign({},d,{createdAt:new Date().toISOString(),createdBy:ERP_USER&&ERP_USER.id||''});
+    var doc=Object.assign({},d,{pubKey:podKey(),createdAt:new Date().toISOString(),createdBy:ERP_USER&&ERP_USER.id||''});   /* v128 공개 열쇠 */
     var ref=db.collection('erp_podocs').doc(d.pono);
     (ref.create?ref.create(doc):Promise.reject(new Error('create'))).catch(function(e){console.warn('발주서 못 만듦',d.pono,e);});
   });
+  /* v128 열쇠 없는 옛 발주서에 열쇠 · 공개 문서 만들기·고치기(저장된 발주서의 열쇠로만 — 두 사람이 동시에 열어도 열쇠 하나) */
+  PODOCS.forEach(function(d){
+    if(!d.pubKey){if(podBusy['k:'+d.id])return;podBusy['k:'+d.id]=1;var k=podKey();
+      db.collection('erp_podocs').doc(d.id).updateIf(function(c){return c.pubKey?null:{pubKey:k};}).catch(function(e){console.warn('열쇠 못 넣음',d.id,e);});return;}
+    if(!podKeyOk(d.pubKey)||PODPUB==null||data.purdelvs==null||!canCol('erp_podocs_pub','w'))return;
+    var want=podPubOf(d),sig=podPubSig(want),have=PODPUB.filter(function(p){return p.id===d.pubKey;})[0],ref=db.collection('erp_podocs_pub').doc(d.pubKey);
+    if(have&&podPubSig(have)===sig)return;
+    if(podBusy['p:'+d.pubKey]===sig)return;podBusy['p:'+d.pubKey]=sig;
+    var o=Object.assign({},want,{at:new Date().toISOString()});
+    (have?ref.update(o):ref.create(o)).catch(function(e){podBusy['p:'+d.pubKey]='';console.warn('공개 발주서 못 씀',d.id,e);});
+  });
 }
 function podNum(v){if(isEmpty(v))return '';var n=Number(v);return isFinite(n)&&String(v).trim()!==''?n.toLocaleString('ko-KR',{maximumFractionDigits:6}):String(v);}
-function podUrl(no){return String(location.href).split('#')[0]+'#podocs/'+encodeURIComponent(no);}
 function podGo(no){podSel=no||'';try{history.replaceState(null,'','#podocs'+(no?'/'+encodeURIComponent(no):''));}catch(e){}if(podDraw)podDraw();window.scrollTo(0,0);}
 function podKv(pairs){return h('dl',{class:'podkv'},pairs.reduce(function(a,p){return a.concat([h('dt',{},p[0]),h('dd',{class:p[2]||''},p[1])]);},[]));}
-function podCodes(no){
+function podCodes(no,key){
   var qrBox=h('div',{class:'podqr'}),bcBox=h('div',{class:'podbc'}),err=h('p',{class:'msg bad',hidden:true});
-  podLib('qr').then(function(qrcode){
-    var q=qrcode(0,'M');q.addData(podUrl(no));q.make();
-    var n=q.getModuleCount(),cell=Math.max(3,Math.floor(180/(n+8))),sz=(n+8)*cell;
-    var cv=h('canvas',{width:String(sz),height:String(sz),role:'img','aria-label':'QR코드 '+no});var c=cv.getContext('2d');
+  if(podKeyOk(key))podLib('qr').then(function(qrcode){
+    var q=qrcode(0,'M');q.addData(podPubUrl(key));q.make();   /* v128 QR = 공개 페이지 주소 */
+    var n=q.getModuleCount(),cell=6,sz=(n+8)*cell;   /* v128 칸 6 → 화면은 절반(칸 3) — 주소가 길어도 칸이 안 뭉개짐 */
+    var cv=h('canvas',{width:String(sz),height:String(sz),role:'img','aria-label':'QR코드 '+no,style:'width:'+sz/2+'px;height:'+sz/2+'px'});var c=cv.getContext('2d');
     c.fillStyle='#fff';c.fillRect(0,0,sz,sz);c.fillStyle='#000';
     for(var r=0;r<n;r++)for(var k=0;k<n;k++)if(q.isDark(r,k))c.fillRect((k+4)*cell,(r+4)*cell,cell,cell);
     qrBox.replaceChildren(cv);
@@ -4629,7 +4648,7 @@ function podView(d){
   var no=purTrim(d.pono||d.id),rows=d.rows||[];
   return [].concat(
     h('div',{class:'actions'},h('button',{type:'button',class:'btn small',on:{click:function(){podGo('');}}},'목록')),
-    podCodes(no),
+    podCodes(no,d.pubKey),
     podKv([['발주번호',no,'mono'],['발주일',show(d.podate)],['구매거래처',show(d.vendor)]]),
     rows.map(function(x){return h('div',{class:'podrow'},
       h('div',{class:'nt'},show(x.cname)),
@@ -6408,7 +6427,7 @@ function erpMenus(){
   var out=[{k:'check',t:CHECK.title,cols:[]}];
   ['수입','구매','생산'].forEach(function(pg){
     if(PERM_SPLIT[pg]){STEPS.filter(function(s){return s.page===pg&&!s.hidden;}).forEach(function(s){out.push({k:s.key,t:PAGE_NAMES[pg]+' · '+s.title,cols:['erp_'+s.key]});});
-      if(pg==='구매')out.push({k:'podocs',t:PAGE_NAMES[pg]+' · '+PODOC.title,cols:['erp_podocs']});   /* v126 발주서관리만 줄 수 있게 */
+      if(pg==='구매')out.push({k:'podocs',t:PAGE_NAMES[pg]+' · '+PODOC.title,cols:['erp_podocs','erp_podocs_pub']});   /* v128 공개 문서 */   /* v126 발주서관리만 줄 수 있게 */
       return;}   /* v121 구매는 화면마다 권한 */
     out.push({k:'p:'+pg,t:PAGE_NAMES[pg],cols:STEPS.filter(function(s){return s.page===pg;}).map(function(s){return 'erp_'+s.key;})});});
   out.push({k:'stocks',t:'물류 · [물류] 재고현황',cols:['erp_stocks']});
@@ -6597,6 +6616,9 @@ dbP.then(function(d){
   db.collection('erp_podocs').onSnapshot(function(snap){
     PODOCS=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});refreshAll();
   },function(){PODOCS=PODOCS||[];refreshAll();});
+  db.collection('erp_podocs_pub').onSnapshot(function(snap){   /* v128 */
+    PODPUB=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});podSync();
+  },function(){PODPUB=null;});
   /* v102 재고 조회 */
   db.collection('erp_stocks').onSnapshot(function(snap){
     STOCKS=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});renderNav();if(stkDraw)stkDraw();
