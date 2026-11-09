@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v162 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v163 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -350,6 +350,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 .dlvph{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 4px}.dlvth{padding:0;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff;cursor:zoom-in;width:72px;height:72px}.dlvth img{display:block;width:100%;height:100%;object-fit:cover}
 .imgbig{position:fixed;inset:0;z-index:400;background:rgba(15,15,15,.82);display:grid;place-items:center;padding:16px;cursor:zoom-out}.imgbig img{max-width:100%;max-height:100%;border-radius:10px;box-shadow:0 8px 30px rgba(0,0,0,.4)}   /* v147 납품 사진 */
 .podfin{display:grid;gap:4px}.podfin .podbtn{border:0;padding:0}.podkv2 .nt{font-weight:800;margin:6px 0 0}   /* v156 납품완료목록 */
+.dlvsum{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:4px;font-size:12px}.dlvsum .dlvstate{font-weight:800}.dlvsum .dlvstate.warn{color:var(--amber)}.dlvsum .dlvover{margin:0}
 .dlvover{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:0 0 8px}   /* v157 */
 .podli{display:flex;gap:8px;align-items:stretch}.podli .podbtn{flex:1 1 auto;min-width:0}.podli .podshare{flex:0 0 auto;margin:0;align-self:center}.podbtn .nt{font-weight:800;word-break:break-all}.podbtn .ns{font-size:12px;color:var(--muted);font-weight:600}
 .podcodes{display:grid;justify-items:center;gap:8px;margin:12px 0}.podqr canvas{display:block;max-width:100%;image-rendering:pixelated}
@@ -375,7 +376,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v162</span>
+    <span class="ver">v163</span>
   </div>
 </header>
 <div class="wrap">
@@ -3547,12 +3548,30 @@ function cutMake(r){
 function chooseBox(r,un){   /* v159 남은 발주: 「발주수정」·「부분납품」 */
   un=un||dlvUnder(r);if(!un.length)return null;
   var no0=purTrim(r.pono),m0=(data.pomods||[]).filter(function(d){return purTrim(d.pono)===no0&&(d.status==='대기'||d.status==='진행중');})[0],w=canCol('erp_pomods','w')&&canCol('erp_purdelvs','w');
-  var b=function(t,fn){return h('button',{type:'button',class:'btn small',on:{click:function(e){e.stopPropagation();fn();}}},t);};
+  var b=function(t,fn){return h('button',{type:'button',class:'btn small',on:{click:function(e){e.stopPropagation();e.preventDefault();var k='b:'+r.id;if(podBusy[k])return;podBusy[k]=1;setTimeout(function(){podBusy[k]=0;},4000);fn();}}},t);};   /* v163 겉에서도 누름 · 두 번 눌림 막음 */
   var sh=(POSHIP||[]).filter(function(x){return x.id===(r.flow&&r.flow.ship);})[0],undec=!r.partial&&!(sh&&sh.next)&&(r.choose||r.status==='완료'||r.status==='대기');   /* v161 대기면 늘 고를 수 있음 */   /* v159 이미 완료된 옛 납품(선택 칸 없던 때)도 고를 수 있게 */
   var st=m0?' · 발주수정 '+m0.status:r.partial||(sh&&sh.next)?' · 부분납품':undec?' · 선택 전':'';
   return h('div',{class:'dlvover'},h('span',{class:'podwarn'},'남음 '+un.map(function(o){return podNum(o.left);}).join(', ')+st),
     m0?(canMenu(menuOf('pomods'),'r')?b('발주수정 보기',function(){go('pomods');}):null):undec&&w?[b('발주수정',function(){cutMake(r);}),b('부분납품',function(){partialGo(r);})]:null);
 }
+/* v163 사장님 「저장된 각 납품입력 대기 박스 외부에서도 납품상황을 자세히 알 수 있게…내부까지 들여다보지 않고 발주수정·부분납품 버튼을 누를 수 있게 하고, 누른 후 처리가 완료됨 상태도 박스 외부 상태에서 알려야 합니다」
+   접힌 카드 겉(summary)에 한 줄: 발주수량 · 납품수량(회차 합계) · 남은 수량/초과 수량 · 상태 + 같은 단추(dlvOverBox 의 단추를 옮겨 씀) */
+function dlvNums(r){var no=purTrim(r.pono),src=(data[r.purCol==='erp_purords'?'purords':'purchases']||[]).filter(function(d){return d.id===r.purId;})[0],po=0,dl=0;
+  (r.rows||[]).forEach(function(x){var c=purTrim(x.ccode),sx=src&&(src.rows||[]).filter(function(y){return y&&purTrim(y.ccode)===c&&purTrim(y.vendor)===purTrim(r.vendor);})[0],
+    mine=r.status==='오류'?0:Number(x.qty||0),others=purDone(no,c)-mine;po+=poQtyOf(no,c,sx?sx.qty:x.poqty);dl+=others+Number(x.qty||0);});
+  po=Math.round(po*100)/100;dl=Math.round(dl*100)/100;return {po:po,dl:dl,diff:Math.round((po-dl)*100)/100};}
+function dlvState(r,n){var no=purTrim(r.pono),ms=data.pomods||[],m=ms.filter(function(d){return purTrim(d.pono)===no&&(d.status==='대기'||d.status==='진행중');})[0];
+  if(m)return {t:'발주수정 '+m.status,w:true};
+  var sh=(POSHIP||[]).filter(function(x){return x.id===(r.flow&&r.flow.ship);})[0];
+  if(r.status==='완료'&&n.diff===0)return {t:'처리 완료'};
+  if(r.partial||(sh&&sh.next))return {t:'부분납품 중'};
+  if(n.diff>0)return {t:'적게 납품',w:true};if(n.diff<0)return {t:'초과 납품',w:true};
+  if(ms.some(function(d){return d.dlvId===r.id&&d.status==='완료';})&&r.status!=='완료')return {t:'발주수정 완료'};
+  return {t:r.status==='완료'?'처리 완료':'정상'};}
+function dlvSum(s,r){var n=dlvNums(r),st=dlvState(r,n),ob=dlvOverBox(s,r),w=h('div',{class:'dlvsum'},
+    h('span',{},'발주수량 '+podNum(n.po)),h('span',{},'납품수량 '+podNum(n.dl)),n.diff?h('span',{},(n.diff>0?'남은 수량 ':'초과 수량 ')+podNum(Math.abs(n.diff))):null,
+    h('span',{class:'dlvstate'+(st.w?' warn':'')},st.t));
+  if(ob)Array.prototype.slice.call(ob.querySelectorAll('button')).forEach(function(b){w.append(b);});return w;}
 function dlvOverBox(s,r){   /* v158 「초과 N · 발주수정 대기」 + 「발주수정 보기」(문서는 저절로 생김) · v159 「남음 N」·「발주수정」·「부분납품」 */
   if(r.status==='완료'&&r.flow&&!podFinal(purTrim(r.pono))){var u2=dlvUnder(r);return u2.length?chooseBox(r,u2):null;}   /* v159 완료됐지만 남은 수량 */
   if(r.status!=='대기'&&r.status!=='오류')return null;var ov=dlvOver(r);
@@ -3562,8 +3581,8 @@ function dlvOverBox(s,r){   /* v158 「초과 N · 발주수정 대기」 + 「�
   }
   var no=purTrim(r.pono),m=(data.pomods||[]).filter(function(d){return purTrim(d.pono)===no&&(d.status==='대기'||d.status==='진행중');})[0];
   return h('div',{class:'dlvover'},h('span',{class:'podwarn'},'초과 '+ov.map(function(o){return podNum(o.over);}).join(', ')+(m?' · 발주수정 '+m.status:'')),
-    m?(canMenu(menuOf('pomods'),'r')?h('button',{type:'button',class:'btn small',on:{click:function(e){e.stopPropagation();go('pomods');}}},'발주수정 보기'):null)
-      :(canCol('erp_pomods','w')&&canCol('erp_purdelvs','w')?h('button',{type:'button',class:'btn small',on:{click:function(e){e.stopPropagation();overMake(r,ov);}}},'발주수정'):null));
+    m?(canMenu(menuOf('pomods'),'r')?h('button',{type:'button',class:'btn small',on:{click:function(e){e.stopPropagation();e.preventDefault();go('pomods');}}},'발주수정 보기'):null)
+      :(canCol('erp_pomods','w')&&canCol('erp_purdelvs','w')?h('button',{type:'button',class:'btn small',on:{click:function(e){e.stopPropagation();e.preventDefault();var k='b:'+r.id;if(podBusy[k])return;podBusy[k]=1;setTimeout(function(){podBusy[k]=0;},4000);overMake(r,ov);}}},'발주수정'):null));
 }
 /* v161 넘치게 납품: 발주수정 대기가 없을 때(사장님이 지운 뒤 등) 「발주수정」 단추로 다시 만듦 — 새 발주수량 = 지금 발주수량 + 초과 */
 function overMake(r,ov){
@@ -6069,7 +6088,7 @@ function recBody(s,r){
   });
   if(s.recNos)s.recNos(r).forEach(function(x){if(!isEmpty(x[1]))dl.append(h('dt',{},x[0]),h('dd',{},show(x[1])));});   /* v80 영림원 번호 */
   var parts=[dl];
-  if(s.key==='purdelvs'){var ob=dlvOverBox(s,r);if(ob)parts.unshift(ob);var ph=dlvPhotos(r);if(ph)parts.push(ph);}   /* v157 초과·발주수정 */   /* v147 입고처 사진 */
+  if(s.key==='purdelvs'){var ph=dlvPhotos(r);if(ph)parts.push(ph);}   /* v157 초과·발주수정 */   /* v147 입고처 사진 */
   if(s.rowFields&&(r.rows||[]).length){
     var th=h('tr',{},s.rowFields.map(function(f){return h('th',{},f.label);}));
     var trs=r.rows.map(function(row){return h('tr',{},s.rowFields.map(function(f){return h('td',{class:f.type==='number'?'n':''},show(row[f.k]));}));});
@@ -6169,7 +6188,7 @@ function recCard(s,r,kit,openIds){
     var pk=kit.pk(r);
     var gap=s.flowCols?flowGap(r):'';   /* v53 */
     var d=h('details',{class:'rec'+(gap?' gap':''),'data-id':r.id},
-      h('summary',{},pk,h('div',{class:'rt'},h('b',{},s.recTitle(r)||'(이름 없음)'),h('small',{},s.subt(r)+(ed?' · 바뀐 칸: '+editLabs(s,r.edit.changed):''))),
+      h('summary',{},pk,h('div',{class:'rt'},h('b',{},s.recTitle(r)||'(이름 없음)'),h('small',{},s.subt(r)+(ed?' · 바뀐 칸: '+editLabs(s,r.edit.changed):'')),s.key==='purdelvs'?dlvSum(s,r):null),
         gap?h('span',{class:'chip 오류',title:flowGapSay(r.name,gap)},gap==='공정 모름'?'공정 모름 — 불러오기 다시':gap):null,
         r.source==='영림원'?h('span',{class:'chip src',title:'영림원에서 불러온 자료'},'영림원'):null,   /* v23 */
         r.ylwDiff?h('span',{class:'chip diff',title:'영림원에 등록된 값과 다릅니다'},'영림원과 다름'):null,
