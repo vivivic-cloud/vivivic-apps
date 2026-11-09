@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v124 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v125 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -353,7 +353,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v124</span>
+    <span class="ver">v125</span>
   </div>
 </header>
 <div class="wrap">
@@ -3329,8 +3329,8 @@ function impChainFn(key){
       if(impNextOf(key,p).length){stop('이 '+c.noLab+' 은(는) 그 사이 저장되었습니다. 저장하지 않았습니다.');return;}
       var doc={pono:p.pono,vendor:p.vendor,term:p.term,cur:p.cur,rate:fRate?Number(rate):p.rate,rows:(p.rows||[]).map(function(o){return Object.assign({},o);}),status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(s)};
       doc[c.idK]=p.id;if(c.noK!=='pono')doc[c.noK]=p[c.noK];doc[c.dateK]=date;doc[c.myK]=no;
-      return db.collection('erp_'+key).add(doc).then(function(){
-        if(data[key])data[key].push(doc);
+      return db.collection('erp_'+key).add(doc).then(function(ref){
+        dataPut(key,doc,ref);
         busy=false;pick(null);out.textContent=no+' 을(를) 저장했습니다. 대기로 쌓였습니다.';
         refreshLists();renderList();renderNav();renderSum();
       },function(e){stop('저장하지 못했습니다. '+errText(e));});
@@ -3540,8 +3540,8 @@ function purLinkFn(key){
         status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(s)};
       if(key==='purapprs'){doc.reqId=p.id;doc.linkReqno=purTrim(p.reqno);doc.reqdate=p.reqdate;doc.apprdate=date;doc.apprno='';}
       else{doc.apprId=p.id;doc.reqId=p.reqId||'';doc.linkApprno=purTrim(p.apprno);doc.linkReqno=p.linkReqno||'';doc.reqdate=p.reqdate||'';doc.apprdate=p.apprdate||'';doc.podate=date;doc.pos=[];}
-      return db.collection('erp_'+key).add(doc).then(function(){
-        if(data[key])data[key].push(doc);
+      return db.collection('erp_'+key).add(doc).then(function(ref){
+        dataPut(key,doc,ref);
         busy=false;pick(null);out.textContent=(p[c.noK])+' 을(를) 저장했습니다. 대기로 쌓였습니다.';
         refreshLists();renderList();renderNav();renderSum();
       },function(e){stop('저장하지 못했습니다. '+errText(e));});
@@ -3641,8 +3641,8 @@ function purdPickFn(){
       var late=!now?'이 발주는 그 사이 남은 수량이 없어졌습니다.':rows.map(function(r){var x=now.rows.filter(function(y){return y.ccode===r.ccode;})[0];return x?rowErr(r,x.left):r.cname+' 은(는) 그 사이 남은 수량이 없어졌습니다.';}).filter(Boolean)[0];
       if(late){stop(late+' 저장하지 않았습니다.');return;}
       var doc={purId:p.purId,purCol:p.purCol,pono:p.pono,vendor:p.vendor,dlvdate:date,rows:rows.map(function(r){return {cname:r.cname,ccode:r.ccode,cspec:r.cspec,unit:r.unit,poqty:r.poqty,qty:Number(r.qty),price:r.price,wh:r.wh};}),dlvno:'',status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(s)};
-      return db.collection('erp_purdelvs').add(doc).then(function(){
-        if(data.purdelvs)data.purdelvs.push(doc);
+      return db.collection('erp_purdelvs').add(doc).then(function(ref){
+        dataPut('purdelvs',doc,ref);
         busy=false;pick(null);out.textContent=p.pono+' 납품을 저장했습니다. 대기로 쌓였습니다.';
         renderList();renderNav();renderSum();
       },function(e){stop('저장하지 못했습니다. '+errText(e));});
@@ -3984,6 +3984,11 @@ function prodRunFn(){
   fn.box=h('section',{class:'ps inform conwho',on:{focusout:function(){setTimeout(function(){if(pending)fn.refresh();},0);}}},hd,none,out,box,done,gone);
   return fn;
 }
+/* v125 사장님 「현재 수입비엘 입고 화면에서 하나의 비엘을 선택하고 저장 했으나 아래 저장된 항목에는 동일한 비엘넘버로 두개의 저장된항목이 생성되었습니다.」
+   파이어스토어는 add 가 끝나기 전에 스냅샷을 먼저 보낸다(새 문서가 이미 data 에 들어옴). 그 뒤 같은 문서를 또 push 하면 목록에 id 없는 두 번째 카드가 남았다.
+   방금 저장한 문서를 data 에 넣을 때는 이 함수로 — 같은 id(없으면 같은 createdAt)가 이미 있으면 안 넣는다. */
+function dataPut(key,doc,ref){var a=data[key];if(!a)return;var id=ref&&ref.id;if(id&&!doc.id)doc.id=id;
+  if(a.some(function(r){return r===doc||(id?r.id===id:(!!doc.createdAt&&r.createdAt===doc.createdAt));}))return;a.push(doc);}
 function impinOf(bl){var no=String(bl.blno||'').trim();return (data.impins||[]).filter(function(r){return r.status!=='오류'&&(r.blId===bl.id||String(r.blno||'').trim()===no);});}
 function impblOpen(){return (data.impbls||[]).filter(function(r){return r.id&&r.status!=='오류'&&!impinOf(r).length;});}
 function impPickFn(){
@@ -4028,8 +4033,8 @@ function impPickFn(){
       if(old){stop(old);return;}
       if(impinOf(b).length){stop('이 B/L 은 그 사이 입고가 저장되었습니다. 저장하지 않았습니다.');return;}
       var doc={blId:b.id,blno:b.blno,vendor:b.vendor,indate:date,wh:wh,rows:rows.map(function(r){return {cname:r.cname,ccode:r.ccode,cspec:r.cspec,unit:r.unit,price:r.price,blqty:r.blqty,qty:Number(r.qty)};}),status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(s)};
-      return db.collection('erp_impins').add(doc).then(function(){
-        if(data.impins)data.impins.push(doc);
+      return db.collection('erp_impins').add(doc).then(function(ref){
+        dataPut('impins',doc,ref);
         busy=false;pick(null);out.textContent=b.blno+' 입고를 저장했습니다. 대기로 쌓였습니다.';
         renderList();renderNav();renderSum();
       },function(e){stop('저장하지 못했습니다. '+errText(e));});
@@ -5286,11 +5291,11 @@ function showBulk(s,recs,say,guide){
       var nv=normVals(s,it.vals),doc;if(s.flowCols)nv.rows=flowRows(nv.rows);else if(s.rowFields)nv.rows=bulkRows(s,nv.rows);   /* v43 BOM: 빈 행 뺌 */
       return (s.flowCols?addNewProcs(nv.rows,{}):Promise.resolve()).then(function(){
       doc=Object.assign(nv,{status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(s)});if(s.fillDoc)s.fillDoc(doc);
-      return db.collection('erp_'+s.key).add(doc);}).then(function(){
+      return db.collection('erp_'+s.key).add(doc);}).then(function(ref){
         done++;it.saved=true;
         if(b.cur===it){b.cur=null;b.editing.hidden=true;form.reset();form.el.hidden=true;}
         /* 방금 저장한 이름은 스냅샷이 오기 전에도 겹침으로 잡히게 바로 넣어 둔다 */
-        if(data[s.key])data[s.key].push(doc);
+        dataPut(s.key,doc,ref);
       },function(e){err=errText(e);});
     });},Promise.resolve()).then(function(){
       b.busy=false;bulkDraw();
@@ -6256,8 +6261,8 @@ function save2(s){
   var doc,np=[];
   /* v20 공정·공정흐름: 목록에 없는 공정을 먼저 erp_processes 에 대기로 쌓고(입력 작업자가 공정을 먼저 넣는다) 흐름을 쌓는다 */
   (s.flowCols?addNewProcs(res.value.rows,res.memos).then(function(a){np=a;}):Promise.resolve()).then(function(){
-    return stepAdd(s,res.value).then(function(x){doc=x.doc;});
-  }).then(function(){var fromBulk=bulk&&bulk.cur;if(fromBulk&&data[s.key])data[s.key].push(doc);bulkSaved();form.reset();
+    return stepAdd(s,res.value).then(function(x){doc=x.doc;doc.id=doc.id||x.id;});
+  }).then(function(){var fromBulk=bulk&&bulk.cur;if(fromBulk)dataPut(s.key,doc);bulkSaved();form.reset();
     var more=np.length?' 새 공정 '+np.length+'개('+np.map(function(x){return x.name;}).join(', ')+')도 공정으로 대기에 쌓였습니다.':'';
     flash((fromBulk?'저장했습니다. 일괄 업로드 목록에서 「저장됨」으로 바뀌었습니다.':'저장했습니다. 대기 상태로 쌓였습니다.')+more);})
    .catch(function(e){flash('저장하지 못했습니다. '+errText(e),true);})
