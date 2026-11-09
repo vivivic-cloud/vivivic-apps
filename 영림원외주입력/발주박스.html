@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 발주박스 공유 페이지(v133) — 영림원외주입력 「발주서관리」 출고처(구매거래처)·입고처(입고창고) 박스를 로그인 없이 보는 한 장. 폼과 별개 파일, 메뉴·폼으로 가는 길 없음.
+<!-- 발주박스 공유 페이지(v133 · v142 발주확인된 발주 카드에 QR(공개 발주서 주소)·바코드(발주번호)) — 영림원외주입력 「발주서관리」 출고처(구매거래처)·입고처(입고창고) 박스를 로그인 없이 보는 한 장. 폼과 별개 파일, 메뉴·폼으로 가는 길 없음.
      주소 = 발주박스.html#<박스 열쇠>. 자료 = erp_pobox/<열쇠>(폼이 씀) · erp_poconfirm/<발주번호>(발주확인 — 출고처 박스에서만 만듦).
      출고처 = 그 거래처 발주 모두(v138 단가 안 보임 — 사장님 「발주관리 구매처 쪽에서도 단가는 안나타나게 해주세요」) + 「발주확인」 단추. 입고처 = 발주확인된 것만 「입고대기」(단가 없음).
      저장소 규칙(제안): erp_pobox get 누구나 · erp_poconfirm get 누구나, create 는 그 출고처 박스 열쇠 + 그 박스 발주번호만. 규칙 배포 전에는 막혀 익명 로그인 뒤 다시 시도. -->
@@ -33,6 +33,8 @@ dd{margin:0;font-weight:600;word-break:break-all}
 dd.mono{font-family:var(--mono)}dd.n{font-variant-numeric:tabular-nums}
 .row{border-top:1px solid var(--rowline);padding:8px 0 0;margin:8px 0 0}
 .row .nt{font-weight:800;word-break:break-all;margin:0 0 4px}
+.codes{display:grid;justify-items:center;gap:6px;margin:4px 0 10px}.qr canvas{display:block;max-width:100%;image-rendering:pixelated}
+.bc{width:100%;max-width:360px}.bc svg{display:block;width:100%;height:auto}
 .err{color:var(--red);font-weight:700;font-size:13px;margin:6px 0 0}
 </style>
 </head>
@@ -91,6 +93,33 @@ function confirmPo(no){
     .then(function(r){busy[no]=0;if(r.ok||r.status===409)return load();errs[no]='발주확인을 저장하지 못했습니다.';draw();},
       function(){busy[no]=0;errs[no]='발주확인을 저장하지 못했습니다.';draw();});
 }
+/* v142 사장님 「발주확정된 입고처 발주서에는 큐알이랑 바코드도 안보이고」 — 발주확인된 카드에만 QR·바코드(v136 기준 그대로). 폼·발주서.html 과 같은 판·SRI·크기, cdnjs 못 받으면 같은 폴더 사본(v131) */
+var LIBS={qr:['https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js','sha384-mZT2gIty7ZDdOGkxfP6joZcYdMW1Jvj9dRlfpTmaJAKKXTqzygtB22k7FLe+KZC1','qrcode','라이브러리/qrcode.min.js'],
+  bc:['https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/barcodes/JsBarcode.code128.min.js','sha384-7XguhfRLAUmvSGmJn2K+BQDpX0gf5NMsj79jcgd7TVtV87euzdySNZqTjOQxgIiB','JsBarcode','라이브러리/JsBarcode.code128.min.js']},libP={};
+function lib(k){var L=LIBS[k];if(window[L[2]])return Promise.resolve(window[L[2]]);if(libP[k])return libP[k];
+  var one=function(src,sri){return new Promise(function(ok,no){var sc=document.createElement('script');sc.src=src;
+    if(sri){sc.integrity=sri;sc.crossOrigin='anonymous';sc.referrerPolicy='no-referrer';}
+    sc.onload=function(){window[L[2]]?ok(window[L[2]]):no(new Error(k));};sc.onerror=function(){sc.remove();no(new Error(k));};document.head.append(sc);});};
+  return libP[k]=one(L[0],L[1]).catch(function(){return one(L[3]);}).catch(function(e){libP[k]=null;throw e;});}
+var CODES={};   /* 같은 발주 카드는 다시 그리지 않고 붙여 둠(1분마다 다시 읽어도 안 깜박임) */
+function codes(no,pk){
+  var ck=no+'|'+pk;if(CODES[ck])return CODES[ck];
+  var qrBox=h('div','qr'),bcBox=h('div','bc'),err=h('p','err');err.hidden=true;
+  if(/^[A-Za-z0-9_-]{32,64}$/.test(pk))lib('qr').then(function(qrcode){
+    var q=qrcode(0,'M');q.addData(new URL('발주서.html#'+pk,location.href).href);q.make();
+    var n=q.getModuleCount(),cell=6,sz=(n+8)*cell,cv=document.createElement('canvas');
+    cv.width=sz;cv.height=sz;cv.style.width=sz/2+'px';cv.style.height=sz/2+'px';cv.setAttribute('role','img');cv.setAttribute('aria-label','QR코드 '+no);
+    var c=cv.getContext('2d');c.fillStyle='#fff';c.fillRect(0,0,sz,sz);c.fillStyle='#000';
+    for(var r=0;r<n;r++)for(var k=0;k<n;k++)if(q.isDark(r,k))c.fillRect((k+4)*cell,(r+4)*cell,cell,cell);
+    qrBox.replaceChildren(cv);
+  }).catch(function(){err.hidden=false;err.textContent='QR코드를 그리지 못했습니다.';});
+  if(no)lib('bc').then(function(JsBarcode){
+    var sv=document.createElementNS('http://www.w3.org/2000/svg','svg');sv.setAttribute('role','img');sv.setAttribute('aria-label','바코드 '+no);
+    JsBarcode(sv,no,{format:'CODE128',width:1.6,height:64,fontSize:14,margin:16,displayValue:true});
+    sv.removeAttribute('width');sv.removeAttribute('height');bcBox.replaceChildren(sv);
+  }).catch(function(){err.hidden=false;err.textContent='바코드를 그리지 못했습니다.';});
+  return CODES[ck]=h('div','codes',qrBox,bcBox,err);
+}
 function kv(pairs){var d=h('dl');pairs.forEach(function(p){d.append(h('dt','',p[0]),h('dd',p[2]||'',p[1]));});return d;}
 function draw(){
   if(BOX===false){say('발주서가 없습니다.',true);return;}
@@ -104,7 +133,7 @@ function draw(){
       else{top.append(h('span','st','발주확인 전'));var b=h('button','','발주확인');b.type='button';b.disabled=!!busy[p.pono];b.addEventListener('click',function(){confirmPo(p.pono);});top.append(b);}}
     else top.append(h('span','st on','입고대기'));
     var head=out?[['발주일',show(p.podate)]]:[['발주일',show(p.podate)],['구매거래처',show(p.vendor)],['발주확인',c?when(c.at):'']];
-    return h('div','po',top,kv(head),
+    return h('div','po',top,c?codes(show(p.pono),show(p.pubKey)):null,kv(head),
       rows.map(function(x){var f=[['품번',show(x.ccode),'mono'],['규격',show(x.cspec)],['단위',show(x.unit)],['발주수량',num(x.qty),'n']];
         f.push(['납품예정일',show(x.duedate)],['창고',show(x.wh)],['납품수량',num(x.dlv),'n']);
         return h('div','row',h('div','nt',show(x.cname)),kv(f));}),
