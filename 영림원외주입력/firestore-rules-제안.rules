@@ -69,7 +69,8 @@ service cloud.firestore {
     // 구매납품(erp_purdelvs)은 폼(담당자)이 기록을 맞춰 보고 만든다. 고치기·지우기는 담당자만(아래 덩어리).
     function pbox(k) { return get(/databases/$(database)/documents/erp_pobox/$(k)).data; }
     function ppub(k) { return get(/databases/$(database)/documents/erp_podocs_pub/$(k)).data; }
-    // 배송 열쇠: 출고처 박스 열쇠 + 발주확인 된 그 박스 발주번호 + 그 발주 공개열쇠
+    // 배송 열쇠: 출고처 박스 열쇠 + 그 박스 발주번호 + 그 발주 공개열쇠
+    // v148 발주확인 전에도 만듦(사장님 「배송기사 공유 버튼은 제한없이」) — 확인 전 QR·바코드 숨김은 화면이 지킴
     match /erp_poship/{k} {
       allow get: if true;
       allow create: if k.size() >= 32
@@ -79,7 +80,6 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/erp_pobox/$(request.resource.data.box))
         && pbox(request.resource.data.box).kind == '출고처'
         && request.resource.data.pono in pbox(request.resource.data.box).ponos
-        && exists(/databases/$(database)/documents/erp_poconfirm/$(request.resource.data.pono))
         && exists(/databases/$(database)/documents/erp_podocs_pub/$(request.resource.data.pubKey))
         && ppub(request.resource.data.pubKey).pono == request.resource.data.pono;
     }
