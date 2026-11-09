@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v157 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v158 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -375,7 +375,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v157</span>
+    <span class="ver">v158</span>
   </div>
 </header>
 <div class="wrap">
@@ -3527,13 +3527,36 @@ function dlvOver(r){
     if(over>0)out.push({x:x,base:base,over:over});});
   return out;
 }
-function dlvOverBox(s,r){
+function dlvOverBox(s,r){   /* v158 「초과 N · 발주수정 대기」 + 「발주수정 보기」(문서는 저절로 생김) */
   if(r.status!=='대기'&&r.status!=='오류')return null;var ov=dlvOver(r);if(!ov.length)return null;
-  var no=purTrim(r.pono),wait=(data.pomods||[]).some(function(d){return purTrim(d.pono)===no&&(d.status==='대기'||d.status==='진행중');});
-  var btn=wait||!canMenu(menuOf('pomods'),'w')?null:h('button',{type:'button',class:'btn small',on:{click:function(e){e.stopPropagation();
-    POMOD_PRE={vals:{pono:no,vendor:r.vendor||''},rows:ov.map(function(o){return {cname:o.x.cname||'',ccode:purTrim(o.x.ccode),cspec:o.x.cspec||'',unit:o.x.unit||'',curqty:o.base,qty:Math.round((o.base+o.over)*100)/100};}),
-      ctx:{pono:no,dlvId:r.id,purId:r.purId||'',purCol:r.purCol||'erp_purchases'}};go('pomods');}}},'발주수정');
-  return h('div',{class:'dlvover'},h('span',{class:'podwarn'},'초과 '+ov.map(function(o){return podNum(o.over);}).join(', ')),wait?h('span',{class:'ns'},'발주수정 대기'):btn);
+  var no=purTrim(r.pono),m=(data.pomods||[]).filter(function(d){return purTrim(d.pono)===no&&(d.status==='대기'||d.status==='진행중');})[0];
+  return h('div',{class:'dlvover'},h('span',{class:'podwarn'},'초과 '+ov.map(function(o){return podNum(o.over);}).join(', ')+(m?' · 발주수정 '+m.status:'')),
+    m&&canMenu(menuOf('pomods'),'r')?h('button',{type:'button',class:'btn small',on:{click:function(e){e.stopPropagation();go('pomods');}}},'발주수정 보기'):null);
+}
+/* v158 사장님 「발주수정시 그냥 동일 발주서로 실제 납품완료된 발주서 수량으로 바로 수정대기 폼이 대기중으로 되게 하면 안될까?」
+   구매납품 대기(또는 「초과」로 오류난) 문서가 남은 수량보다 많으면 같은 발주번호 발주수정(erp_pomods/mod_<발주번호>_<납품문서 id>, auto)을 대기로 저절로 만든다.
+   새 발주수량 = 지금 발주수량 + 초과분. 납품수량이 바뀌면(수정요청) 따라 고치고, 초과가 없어지면 지운다 — 발주수정이 대기일 때만. 진행중·완료는 안 건드림.
+   한 발주에 대기·진행중 발주수정은 하나. 사장님이 지우면(같은 납품수량일 때) 다시 안 만든다(납품 문서 modSig). 「초과」로 오류난 납품 문서는 대기로 돌린다. */
+function dlvSig(r){return JSON.stringify((r.rows||[]).map(function(x){return [purTrim(x.ccode),Number(x.qty||0)];}));}
+function podModSync(){
+  if(!db||!db.collection||data.purdelvs==null||data.pomods==null||data.purchases==null||data.purords==null||!canCol('erp_pomods','w')||!canCol('erp_purdelvs','w'))return;
+  data.purdelvs.forEach(function(r){
+    if(!r.id)return;var err=r.status==='오류'&&/초과/.test(String(r.agentNote||''));if(r.status!=='대기'&&!err)return;
+    var no=purTrim(r.pono),ov=dlvOver(r),sig=dlvSig(r),id='mod_'+no+'_'+r.id;if(!/^[A-Za-z0-9_-]+$/.test(id))return;
+    var mine=data.pomods.filter(function(d){return d.id===id;})[0],other=data.pomods.filter(function(d){return d.id!==id&&purTrim(d.pono)===no&&(d.status==='대기'||d.status==='진행중');})[0];
+    var rows=ov.map(function(o){return {cname:o.x.cname||'',ccode:purTrim(o.x.ccode),cspec:o.x.cspec||'',unit:o.x.unit||'',curqty:o.base,qty:Math.round((o.base+o.over)*100)/100};});
+    var bk='m:'+id,want=JSON.stringify([rows,sig]);if(podBusy[bk]===want)return;
+    if(!ov.length){if(mine&&mine.status==='대기'&&mine.auto){podBusy[bk]=want;db.collection('erp_pomods').doc(id).deleteIf(function(c){return c.status==='대기';}).catch(function(){podBusy[bk]='';});}return;}
+    if(mine){if(mine.status==='대기'&&mine.basis!==sig){podBusy[bk]=want;
+        db.collection('erp_pomods').doc(id).updateIf(function(c){return c.status==='대기'?{rows:rows,basis:sig}:null;}).catch(function(){podBusy[bk]='';});}
+      return;}
+    if(other||r.modSig===sig)return;   /* 같은 발주 다른 발주수정이 처리 중 · 사장님이 지운 것 */
+    podBusy[bk]=want;
+    db.collection('erp_pomods').doc(id).create({pono:no,vendor:r.vendor||'',rows:rows,status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(BYKEY.pomods),
+        auto:true,basis:sig,dlvId:r.id,purId:r.purId||'',purCol:r.purCol||'erp_purchases'})
+      .then(function(){var o={modSig:sig};if(err){o.status='대기';o.agentNote='';}return db.collection('erp_purdelvs').doc(r.id).update(o);})
+      .catch(function(e){podBusy[bk]='';console.warn('발주수정 못 만듦',no,e);});
+  });
 }
 function purchDoc(d){
   d.rows=(d.rows||[]).map(function(o){var m=purPlate(o.ccode)||{};return {cname:m.name||'',ccode:purTrim(o.ccode),cspec:m.spec||'',unit:m.unit||'',qty:Number(o.qty),duedate:o.duedate,wh:o.wh,vendor:o.vendor,io:purTrim(o.io),cur:purTrim(o.cur),price:Number(o.price)};});
@@ -6851,7 +6874,7 @@ function staffRepoTable(){
     ['자료 보호','늘지 않음 — 파이어베이스 키는 원래 공개 값, 자료는 저장소 규칙이 지킴','저장소 규칙 배포(위)']]);
 }
 function go(k){if(BYKEY[k]&&BYKEY[k].shownIn)k=BYKEY[k].shownIn;if(k!==cur||k==='podocs')podSel='';cur=k;navOpen=null;try{history.replaceState(null,'','#'+k);}catch(e){location.hash=k;}renderNav();renderSum();renderStep();}
-function refreshAll(){renderNav();renderSum();renderList();refreshLists();if(impDraw)impDraw();if(sheetDraw)sheetDraw();if(ifRefresh)ifRefresh();if(stkDraw)stkDraw();if(podDraw)podDraw();podSync();podTokSync();podBoxSync();podShipInSync();podFlowSync();}
+function refreshAll(){renderNav();renderSum();renderList();refreshLists();if(impDraw)impDraw();if(sheetDraw)sheetDraw();if(ifRefresh)ifRefresh();if(stkDraw)stkDraw();if(podDraw)podDraw();podSync();podTokSync();podBoxSync();podShipInSync();podFlowSync();podModSync();}
 
 /* ---------- boot ---------- */
 
