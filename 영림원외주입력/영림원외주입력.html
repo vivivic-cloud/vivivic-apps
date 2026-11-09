@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v138 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v139 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -339,6 +339,8 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 .podlist{display:grid;gap:8px}.podbtn{display:grid;gap:2px;text-align:left;width:100%;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font:inherit;color:inherit;cursor:pointer}
 .podbtn:hover{background:var(--fill4)}.podst{font-weight:800!important;color:var(--amber)!important}.podst.on{color:var(--green)!important}
 .podgrp{margin:14px 0;border:1px solid var(--line2);border-radius:14px;padding:10px;background:var(--fill4)}.podgh{display:flex;align-items:center;gap:4px 8px;flex-wrap:wrap;margin:0 0 8px;min-width:0}.podgh .nt{min-width:0;word-break:break-all}
+.podgrp.warn{border-color:#f59e0b;background:var(--amber-bg);box-shadow:inset 4px 0 0 #f59e0b}.podwarn{font-size:12px;font-weight:900;color:var(--amber);background:#fde68a;border-radius:999px;padding:1px 8px;white-space:nowrap}   /* v139 사장님 「거래처 발주 확인이 안된 발주서가 있는 박스를 하이라이트 하여 발주확인이 안된 발주서가 있음을 알려 주세요」 — 경고 색 = 기존 --amber·--amber-bg·#fde68a(.guideback) */
+.podli.warn .podbtn{border-color:#f59e0b;background:#fffbeb;box-shadow:inset 4px 0 0 #f59e0b}
 .podgt{flex:1 1 auto;min-width:0;display:flex;align-items:center;gap:4px 8px;flex-wrap:wrap;background:none;border:0;padding:4px 0;font:inherit;color:inherit;text-align:left;cursor:pointer}.podgrp:not(.open) .podgh{margin:0}.podgt .navarr{color:var(--muted);width:12px}   /* v135 접고 펴기 */   /* v134 박스 테두리 안 머리 줄에 공유 */.podgh .nt{font-weight:900;font-size:15px}.podgh .ns{font-size:12px;color:var(--muted);font-weight:700}.podgh .podshare{margin:0 0 0 auto}
 .podli{display:flex;gap:8px;align-items:stretch}.podli .podbtn{flex:1 1 auto;min-width:0}.podli .podshare{flex:0 0 auto;margin:0;align-self:center}.podbtn .nt{font-weight:800;word-break:break-all}.podbtn .ns{font-size:12px;color:var(--muted);font-weight:600}
 .podcodes{display:grid;justify-items:center;gap:8px;margin:12px 0}.podqr canvas{display:block;max-width:100%;image-rendering:pixelated}
@@ -364,7 +366,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v138</span>
+    <span class="ver">v139</span>
   </div>
 </header>
 <div class="wrap">
@@ -4727,7 +4729,8 @@ function renderPodocs(){
     if(!all.length){box.replaceChildren(h('p',{class:'msg'},'발주서가 없습니다.'));return;}
     var line=function(d,st){
       var no=purTrim(d.pono||d.id),rs=d.rows||[];
-      return h('div',{class:'podli'},h('button',{type:'button',class:'podbtn',on:{click:function(){podGo(no);}}},
+      var warn=st&&!st.on&&POCONF!=null;   /* v139 발주확인 전 줄 = 경고 색 */
+      return h('div',{class:'podli'+(warn?' warn':'')},h('button',{type:'button',class:'podbtn',on:{click:function(){podGo(no);}}},
         h('span',{class:'mono nt'},no),
         h('span',{class:'ns'},[show(d.vendor),show(d.podate)].filter(Boolean).join(' · ')),
         h('span',{class:'ns'},rs.length?show(rs[0].cname)+(rs.length>1?' 외 '+(rs.length-1)+'줄':''):''),
@@ -4740,12 +4743,13 @@ function renderPodocs(){
     else{   /* v133 박스(거래처·창고)마다 — 입고처는 발주확인된 것만(입고대기) */
       var names=boxNames(podView2);
       body=names.length?names.map(function(name){
-        var ds=boxDocs(podView2,name);if(podView2==='입고처')ds=ds.filter(function(d){return !!confOf(purTrim(d.pono||d.id));});
+        var ds=boxDocs(podView2,name),nUn=POCONF==null?0:ds.filter(function(d){return !confOf(purTrim(d.pono||d.id));}).length;   /* v139 발주확인 전 건수(입고처는 목록에 안 보이는 것까지) */
+        if(podView2==='입고처')ds=ds.filter(function(d){return !!confOf(purTrim(d.pono||d.id));});
         var b=boxOf(podView2,name);
         var gk=podView2+':'+name,open=!!podOpenGrp[gk];   /* v135 머리 줄을 누르면 펼침·닫힘(공유 단추는 따로라 안 펼침) */
-        return h('div',{class:'podgrp'+(open?' open':'')},h('div',{class:'podgh'},
+        return h('div',{class:'podgrp'+(open?' open':'')+(nUn?' warn':'')},h('div',{class:'podgh'},
             h('button',{type:'button',class:'podgt','aria-expanded':open?'true':'false',on:{click:function(){if(open)delete podOpenGrp[gk];else podOpenGrp[gk]=1;draw();}}},
-              h('span',{class:'navarr','aria-hidden':'true'},open?'▾':'▸'),h('span',{class:'nt'},name),h('span',{class:'ns'},(podView2==='입고처'?'입고대기 ':'')+ds.length+'건')),
+              h('span',{class:'navarr','aria-hidden':'true'},open?'▾':'▸'),h('span',{class:'nt'},name),h('span',{class:'ns'},(podView2==='입고처'?'입고대기 ':'')+ds.length+'건'),nUn?h('span',{class:'podwarn'},'발주확인 전 '+nUn):null),
             b?boxShareBtn(b):null),
           !open?null:h('div',{class:'podlist'},ds.map(function(d){return line(d,podView2==='입고처'?{t:'입고대기 · 발주확인 '+confTime(confOf(purTrim(d.pono||d.id))),on:1}:cst(d));})));}):[h('p',{class:'msg'},'발주서가 없습니다.')];
     }
