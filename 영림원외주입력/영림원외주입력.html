@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v141 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v143 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -371,7 +371,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v141</span>
+    <span class="ver">v143</span>
   </div>
 </header>
 <div class="wrap">
@@ -4698,8 +4698,11 @@ function podView(d){
 var POBOX=null,POCONF=null;
 function boxUrl(k){return new URL('발주박스.html#'+k,location.href).href;}
 function boxOf(kind,name){var a=(POBOX||[]).filter(function(b){return b.kind===kind&&b.name===name&&podKeyOk(b.id);}).sort(function(x,y){return String(x.createdAt||'')<String(y.createdAt||'')?-1:1;});return a[0]||null;}
-function boxNames(kind){var n=[];(PODOCS||[]).forEach(function(d){(kind==='출고처'?[show(d.vendor)]:(d.rows||[]).map(function(x){return show(x.wh);})).forEach(function(v){v=purTrim(v);if(v&&n.indexOf(v)<0)n.push(v);});});return n.sort();}
-function boxDocs(kind,name){return (PODOCS||[]).filter(function(d){return kind==='출고처'?purTrim(d.vendor)===name:(d.rows||[]).some(function(x){return purTrim(x.wh)===name;});}).sort(function(a,b){return String(a.pono||a.id)<String(b.pono||b.id)?1:-1;});}
+/* v143 사장님 「입고처 발주관리 박스에는 출고처에서 발주확인 안된건은 보이면 안된다니까」 · 바로잡음 「아 발주확인된건이 보이는게 아니라 발주확인건 1개 라는 표기를 입고처에 할 필요없어」
+   입고처 = 발주확인된 발주서만(목록·건수·저장 문서 모두). 확인된 발주가 없는 창고는 묶음도 없음. 입고처 머리 줄에 「발주확인 전 N」·강조 없음(출고처는 그대로). */
+function podIsConf(d){return POCONF!=null&&!!confOf(purTrim(d.pono||d.id));}
+function boxNames(kind){var n=[];(PODOCS||[]).forEach(function(d){if(kind==='입고처'&&!podIsConf(d))return;(kind==='출고처'?[show(d.vendor)]:(d.rows||[]).map(function(x){return show(x.wh);})).forEach(function(v){v=purTrim(v);if(v&&n.indexOf(v)<0)n.push(v);});});return n.sort();}
+function boxDocs(kind,name){return (PODOCS||[]).filter(function(d){return kind==='출고처'?purTrim(d.vendor)===name:podIsConf(d)&&(d.rows||[]).some(function(x){return purTrim(x.wh)===name;});}).sort(function(a,b){return String(a.pono||a.id)<String(b.pono||b.id)?1:-1;});}
 function boxWant(kind,name){
   var pos=boxDocs(kind,name).map(function(d){var no=purTrim(d.pono||d.id);
     var rows=(d.rows||[]).filter(function(x){return kind==='출고처'||purTrim(x.wh)===name;}).map(function(x){
@@ -4710,8 +4713,10 @@ function boxWant(kind,name){
 }
 function boxSig(b){return JSON.stringify([show(b.kind),show(b.name),(b.ponos||[]).map(show),(b.pos||[]).map(function(p){return [show(p.pono),show(p.podate),show(p.pubKey),show(p.vendor),(p.rows||[]).map(function(x){return [show(x.ccode),show(x.cname),show(x.cspec),show(x.unit),show(x.qty),show(x.price),show(x.duedate),show(x.wh),Number(x.dlv||0)];})];})]);}
 function podBoxSync(){
-  if(!db||!db.collection||PODOCS==null||POBOX==null||data.purdelvs==null||!canCol('erp_pobox','w'))return;
-  ['출고처','입고처'].forEach(function(kind){boxNames(kind).forEach(function(name){
+  if(!db||!db.collection||PODOCS==null||POBOX==null||POCONF==null||data.purdelvs==null||!canCol('erp_pobox','w'))return;   /* v143 입고처는 발주확인 값을 읽은 뒤에만 */
+  ['출고처','입고처'].forEach(function(kind){var ns=boxNames(kind);
+    if(kind==='입고처')(POBOX||[]).forEach(function(b){if(b.kind==='입고처'&&ns.indexOf(b.name)<0&&boxOf('입고처',b.name)===b)ns.push(b.name);});   /* 옛 박스(확인된 발주 없음)는 빈 목록으로 고침 */
+    ns.forEach(function(name){
     var want=boxWant(kind,name),sig=boxSig(want),have=boxOf(kind,name),bk='b:'+kind+':'+name;
     if(have&&boxSig(have)===sig)return;
     if(podBusy[bk]===sig)return;podBusy[bk]=sig;
@@ -4754,7 +4759,7 @@ function renderPodocs(){
     else{   /* v133 박스(거래처·창고)마다 — 입고처는 발주확인된 것만(입고대기) */
       var names=boxNames(podView2);
       body=names.length?names.map(function(name){
-        var ds=boxDocs(podView2,name),nUn=POCONF==null?0:ds.filter(function(d){return !confOf(purTrim(d.pono||d.id));}).length;   /* v139 발주확인 전 건수(입고처는 목록에 안 보이는 것까지) */
+        var ds=boxDocs(podView2,name),nUn=POCONF==null||podView2==='입고처'?0:ds.filter(function(d){return !confOf(purTrim(d.pono||d.id));}).length;   /* v139 발주확인 전 건수(입고처는 목록에 안 보이는 것까지) */
         if(podView2==='입고처')ds=ds.filter(function(d){return !!confOf(purTrim(d.pono||d.id));});
         var b=boxOf(podView2,name);
         var gk=podView2+':'+name,open=!!podOpenGrp[gk];   /* v135 머리 줄을 누르면 펼침·닫힘(공유 단추는 따로라 안 펼침) */
@@ -6712,7 +6717,7 @@ dbP.then(function(d){
     POBOX=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});podBoxSync();if(podDraw)podDraw();
   },function(){POBOX=null;});
   db.collection('erp_poconfirm').onSnapshot(function(snap){
-    POCONF=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});renderNav();if(podDraw)podDraw();
+    POCONF=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});renderNav();if(podDraw)podDraw();podBoxSync();   /* v143 확인되면 입고처 박스에 넣음(폼이 열려 있을 때 바로) */
   },function(){POCONF=null;});
   db.collection('erp_podocs_pub').onSnapshot(function(snap){   /* v128 */
     PODPUB=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});podSync();if(podDraw)podDraw();
