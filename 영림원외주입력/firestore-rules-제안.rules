@@ -49,6 +49,22 @@ service cloud.firestore {
       allow get: if true;
     }
 
+    // v133 출고처·입고처 박스(발주박스.html#열쇠) — 무작위 32자 열쇠를 아는 사람만 한 장 읽음(get). 만들기·고치기는 아래 덩어리(담당자).
+    match /erp_pobox/{key} {
+      allow get: if true;
+    }
+    // v133 발주확인 — 출고처 박스 열쇠를 아는 사람이 그 박스 발주번호만 한 번 만든다. 고치기·지우기는 담당자만(아래 덩어리).
+    match /erp_poconfirm/{pono} {
+      allow get: if true;
+      allow create: if request.resource.data.keys().hasOnly(['box', 'pono', 'at'])
+        && request.resource.data.pono == pono
+        && request.resource.data.box is string
+        && request.resource.data.at is string
+        && exists(/databases/$(database)/documents/erp_pobox/$(request.resource.data.box))
+        && get(/databases/$(database)/documents/erp_pobox/$(request.resource.data.box)).data.kind == '출고처'
+        && pono in get(/databases/$(database)/documents/erp_pobox/$(request.resource.data.box)).data.ponos;
+    }
+
     // erp_ 업무 자료: 보기 = 권한 받은 담당자 모두(드롭다운이 다른 메뉴 자료를 읽음) · 저장·삭제 = 컬렉션마다
     match /{col}/{id} {
       allow read: if col.matches('^erp_.*') && col != 'erp_staff' && isStaff();
