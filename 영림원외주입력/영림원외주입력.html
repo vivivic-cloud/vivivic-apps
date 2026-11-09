@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v132 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v133 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -337,7 +337,9 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 .stkbar{display:flex;flex-wrap:wrap;gap:8px 14px;margin:14px 0 10px}.stkbar label{display:flex;align-items:center;gap:6px}.stkbar select{width:auto;min-width:120px}   /* v102 재고 */
 /* v126 발주서관리 — 폰 기준 */
 .podlist{display:grid;gap:8px}.podbtn{display:grid;gap:2px;text-align:left;width:100%;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;font:inherit;color:inherit;cursor:pointer}
-.podbtn:hover{background:var(--fill4)}.podli{display:flex;gap:8px;align-items:stretch}.podli .podbtn{flex:1 1 auto;min-width:0}.podli .podshare{flex:0 0 auto;margin:0;align-self:center}.podbtn .nt{font-weight:800;word-break:break-all}.podbtn .ns{font-size:12px;color:var(--muted);font-weight:600}
+.podbtn:hover{background:var(--fill4)}.podst{font-weight:800!important;color:var(--amber)!important}.podst.on{color:var(--green)!important}
+.podgrp{margin:14px 0 18px}.podgh{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 6px}.podgh .nt{font-weight:900;font-size:15px}.podgh .ns{font-size:12px;color:var(--muted);font-weight:700}.podgh .podshare{margin:0 0 0 auto}
+.podli{display:flex;gap:8px;align-items:stretch}.podli .podbtn{flex:1 1 auto;min-width:0}.podli .podshare{flex:0 0 auto;margin:0;align-self:center}.podbtn .nt{font-weight:800;word-break:break-all}.podbtn .ns{font-size:12px;color:var(--muted);font-weight:600}
 .podcodes{display:grid;justify-items:center;gap:8px;margin:12px 0}.podqr canvas{display:block;max-width:100%;image-rendering:pixelated}
 .podbc{width:100%;max-width:360px}.podbc svg{display:block;width:100%;height:auto}
 .podkv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 12px;margin:10px 0;font-size:14px}.podkv dt{color:var(--muted);font-weight:700}.podkv dd{margin:0;word-break:break-all;font-weight:600}.podkv dd.n{font-variant-numeric:tabular-nums}.podkv dd.mono{font-family:var(--mono)}
@@ -361,7 +363,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v132</span>
+    <span class="ver">v133</span>
   </div>
 </header>
 <div class="wrap">
@@ -4666,7 +4668,7 @@ function podView(d){
   return [].concat(
     h('div',{class:'actions'},h('button',{type:'button',class:'btn small',on:{click:function(){podGo('');}}},'목록'),podCanShare(d)?podShareBtn(d):null),
     podCodes(no,d.pubKey),
-    podKv([['발주번호',no,'mono'],['발주일',show(d.podate)],['구매거래처',show(d.vendor)]]),
+    podKv([['발주번호',no,'mono'],['발주일',show(d.podate)],['구매거래처',show(d.vendor)],['발주확인',confOf(no)?confTime(confOf(no)):'발주확인 전']]),   /* v133 */
     rows.map(function(x){return h('div',{class:'podrow'},
       h('div',{class:'nt'},show(x.cname)),
       podKv([['품번',show(x.ccode),'mono'],['규격',show(x.cspec)],['단위',show(x.unit)],['발주수량',podNum(x.qty),'n'],['단가',podNum(x.price),'n'],['납품예정일',show(x.duedate)],['창고',show(x.wh)]]));}),
@@ -4674,22 +4676,74 @@ function podView(d){
     h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},['품명','발주수량','납품수량'].map(function(t){return h('th',{},t);}))),
       h('tbody',{},rows.map(function(x){return h('tr',{},h('td',{},show(x.cname)),h('td',{class:'n'},podNum(x.qty)),h('td',{class:'n'},podNum(purDone(no,purTrim(x.ccode)))));})))));
 }
+/* v133 사장님 「현재 발주서 관리 메뉴의 발주서들이 각 출고처(구매거래처) / 입고처(입고창고) 별로 분리 되어 관리 되어야 합니다. 출고처 기준으로 각 구매처마다 해당 박스를 공유하여 사용하게 하고 이 출고처 발주서는 해당 거래처 별로 발주 생성시 발주를 확인했음을 발주확인 버튼으로 알려야 하고 이렇게 발주가 확인되는 순간 입고처(입고창고) 사용자에게 해당 발주가 구매처에서 발주가 확인되어 입고대기중인 목록이 나타나기 시작하면 됩니다.」
+   사장님 결정(11-09): 들어오는 길 = 박스별 공유 링크(로그인 없음) · 출고처 박스에 단가 보임(입고처 박스는 단가 없음).
+   박스 문서 erp_pobox/<무작위 열쇠> = {kind:'출고처'|'입고처', name(구매거래처|창고), ponos, pos, at, createdAt}. 출고처 = 그 거래처 발주서 모두(단가 포함) · 입고처 = 줄 창고가 그 창고인 발주서(그 창고 줄만, 단가 없음, 구매거래처 보임).
+   발주확인 = 공유 페이지 발주박스.html 에서 erp_poconfirm/<발주번호> = {box, pono, at} 를 만든다(저장소 규칙이 「그 출고처 박스 열쇠 + 그 박스의 발주번호」만 허락). 입고처 페이지는 그 문서가 있는 발주만 「입고대기」로 보인다.
+   박스 만들기·고치기 = 저장 권한 있는 담당자가 폼을 열 때(podBoxSync) — 새 발주서가 박스에 들어가는 때도 그때. */
+var POBOX=null,POCONF=null;
+function boxUrl(k){return new URL('발주박스.html#'+k,location.href).href;}
+function boxOf(kind,name){var a=(POBOX||[]).filter(function(b){return b.kind===kind&&b.name===name&&podKeyOk(b.id);}).sort(function(x,y){return String(x.createdAt||'')<String(y.createdAt||'')?-1:1;});return a[0]||null;}
+function boxNames(kind){var n=[];(PODOCS||[]).forEach(function(d){(kind==='출고처'?[show(d.vendor)]:(d.rows||[]).map(function(x){return show(x.wh);})).forEach(function(v){v=purTrim(v);if(v&&n.indexOf(v)<0)n.push(v);});});return n.sort();}
+function boxDocs(kind,name){return (PODOCS||[]).filter(function(d){return kind==='출고처'?purTrim(d.vendor)===name:(d.rows||[]).some(function(x){return purTrim(x.wh)===name;});}).sort(function(a,b){return String(a.pono||a.id)<String(b.pono||b.id)?1:-1;});}
+function boxWant(kind,name){
+  var pos=boxDocs(kind,name).map(function(d){var no=purTrim(d.pono||d.id);
+    var rows=(d.rows||[]).filter(function(x){return kind==='출고처'||purTrim(x.wh)===name;}).map(function(x){
+      var r={ccode:show(x.ccode),cname:show(x.cname),cspec:show(x.cspec),unit:show(x.unit),qty:show(x.qty),duedate:show(x.duedate),wh:show(x.wh),dlv:purDone(no,purTrim(x.ccode))};
+      if(kind==='출고처')r.price=show(x.price);return r;});
+    var o={pono:no,podate:show(d.podate),pubKey:show(d.pubKey),rows:rows};if(kind==='입고처')o.vendor=show(d.vendor);return o;});
+  return {kind:kind,name:name,ponos:pos.map(function(p){return p.pono;}),pos:pos};
+}
+function boxSig(b){return JSON.stringify([show(b.kind),show(b.name),(b.ponos||[]).map(show),(b.pos||[]).map(function(p){return [show(p.pono),show(p.podate),show(p.pubKey),show(p.vendor),(p.rows||[]).map(function(x){return [show(x.ccode),show(x.cname),show(x.cspec),show(x.unit),show(x.qty),show(x.price),show(x.duedate),show(x.wh),Number(x.dlv||0)];})];})]);}
+function podBoxSync(){
+  if(!db||!db.collection||PODOCS==null||POBOX==null||data.purdelvs==null||!canCol('erp_pobox','w'))return;
+  ['출고처','입고처'].forEach(function(kind){boxNames(kind).forEach(function(name){
+    var want=boxWant(kind,name),sig=boxSig(want),have=boxOf(kind,name),bk='b:'+kind+':'+name;
+    if(have&&boxSig(have)===sig)return;
+    if(podBusy[bk]===sig)return;podBusy[bk]=sig;
+    var now=new Date().toISOString(),done=function(e){podBusy[bk]='';console.warn('박스 못 씀',kind,name,e);};
+    if(have)db.collection('erp_pobox').doc(have.id).update(Object.assign({},want,{at:now})).catch(done);
+    else db.collection('erp_pobox').doc(podKey()).create(Object.assign({},want,{at:now,createdAt:now})).catch(done);
+  });});
+}
+function confOf(no){return (POCONF||[]).filter(function(c){return c.id===no;})[0]||null;}
+function confTime(c){var t=c&&c.at?new Date(c.at):null;if(!t||isNaN(t))return c?show(c.at):'';var p=function(n){return String(n).padStart(2,'0');};return t.getFullYear()+'-'+p(t.getMonth()+1)+'-'+p(t.getDate())+' '+p(t.getHours())+':'+p(t.getMinutes());}
+function boxShareBtn(b){return h('button',{type:'button',class:'btn small podshare',on:{click:function(){
+  var url=boxUrl(b.id),text='발주서 · '+b.name+' ('+b.kind+')';
+  if(navigator.share)return navigator.share({title:text,text:text,url:url}).catch(function(e){if(e&&e.name==='AbortError')return;return podCopy(text+'\n'+url).then(function(){flash('링크를 복사했습니다.');});}).catch(function(){flash('공유하지 못했습니다.',true);});
+  podCopy(text+'\n'+url).then(function(){flash('링크를 복사했습니다.');},function(){flash('복사하지 못했습니다.',true);});}}},'공유');}
+var podView2='출고처';   /* v133 목록 보기: 출고처 · 입고처 · 전체 */
 function renderPodocs(){
   bulk=null;listBox=null;listBox2=null;sheetDraw=null;ifRefresh=null;
   var box=h('div',{class:'podbox'}),lastKey='';
   function draw(){
     if(cur!=='podocs')return;
     if(PODOCS==null||data.purchases==null||data.purords==null){box.replaceChildren(h('p',{class:'msg'},'불러오는 중'));lastKey='';return;}
-    var all=podAll(),key=JSON.stringify([podSel,all,podSel?data.purdelvs:0,(PODPUB||[]).map(function(p){return p.id;})]);if(key===lastKey)return;lastKey=key;   /* 같은 내용이면 다시 안 그림(QR 깜박임) */
+    var all=podAll(),key=JSON.stringify([podSel,podView2,all,podSel?data.purdelvs:0,(PODPUB||[]).map(function(p){return p.id;}),(POBOX||[]).map(function(b){return [b.id,b.kind,b.name];}),POCONF]);if(key===lastKey)return;lastKey=key;   /* 같은 내용이면 다시 안 그림(QR 깜박임) */
     if(podSel){var d=all.filter(function(x){return purTrim(x.pono||x.id)===podSel;})[0];
       box.replaceChildren.apply(box,d?podView(d):[h('div',{class:'actions'},h('button',{type:'button',class:'btn small',on:{click:function(){podGo('');}}},'목록')),h('p',{class:'msg bad'},'문서가 없습니다.')]);return;}
     if(!all.length){box.replaceChildren(h('p',{class:'msg'},'발주서가 없습니다.'));return;}
-    box.replaceChildren(h('div',{class:'lsinfo'},h('span',{},all.length+'건')),h('div',{class:'podlist'},all.map(function(d){
+    var line=function(d,st){
       var no=purTrim(d.pono||d.id),rs=d.rows||[];
       return h('div',{class:'podli'},h('button',{type:'button',class:'podbtn',on:{click:function(){podGo(no);}}},
         h('span',{class:'mono nt'},no),
         h('span',{class:'ns'},[show(d.vendor),show(d.podate)].filter(Boolean).join(' · ')),
-        h('span',{class:'ns'},rs.length?show(rs[0].cname)+(rs.length>1?' 외 '+(rs.length-1)+'줄':''):'')),podCanShare(d)?podShareBtn(d):null);})));   /* v132 줄마다 공유 */
+        h('span',{class:'ns'},rs.length?show(rs[0].cname)+(rs.length>1?' 외 '+(rs.length-1)+'줄':''):''),
+        st?h('span',{class:'ns podst'+(st.on?' on':'')},st.t):null),podCanShare(d)?podShareBtn(d):null);};   /* v132 줄마다 공유 */
+    var tabs=h('div',{class:'wcpicks',role:'tablist','aria-label':'발주서 보기'},['출고처','입고처','전체'].map(function(v){var on=v===podView2;
+      return h('button',{type:'button',role:'tab',class:'btn small wcpick'+(on?' primary':''),'aria-selected':on?'true':'false',on:{click:function(){if(!on){podView2=v;draw();}}}},v);}));
+    var cst=function(d){var c=confOf(purTrim(d.pono||d.id));return c?{t:'발주확인 '+confTime(c),on:1}:{t:'발주확인 전'};};
+    var body;
+    if(podView2==='전체')body=[h('div',{class:'lsinfo'},h('span',{},all.length+'건')),h('div',{class:'podlist'},all.map(function(d){return line(d,cst(d));}))];
+    else{   /* v133 박스(거래처·창고)마다 — 입고처는 발주확인된 것만(입고대기) */
+      var names=boxNames(podView2);
+      body=names.length?names.map(function(name){
+        var ds=boxDocs(podView2,name);if(podView2==='입고처')ds=ds.filter(function(d){return !!confOf(purTrim(d.pono||d.id));});
+        var b=boxOf(podView2,name);
+        return h('div',{class:'podgrp'},h('div',{class:'podgh'},h('span',{class:'nt'},name),h('span',{class:'ns'},(podView2==='입고처'?'입고대기 ':'')+ds.length+'건'),b?boxShareBtn(b):null),
+          h('div',{class:'podlist'},ds.map(function(d){return line(d,podView2==='입고처'?{t:'입고대기 · 발주확인 '+confTime(confOf(purTrim(d.pono||d.id))),on:1}:cst(d));})));}):[h('p',{class:'msg'},'발주서가 없습니다.')];
+    }
+    box.replaceChildren.apply(box,[tabs].concat(body));
   }
   podDraw=draw;
   mainEl.replaceChildren(h('section',{class:'card'},h('div',{class:'stephead'},h('h2',{},PODOC.title)),box));
@@ -6444,7 +6498,7 @@ function erpMenus(){
   var out=[{k:'check',t:CHECK.title,cols:[]}];
   ['수입','구매','생산'].forEach(function(pg){
     if(PERM_SPLIT[pg]){STEPS.filter(function(s){return s.page===pg&&!s.hidden;}).forEach(function(s){out.push({k:s.key,t:PAGE_NAMES[pg]+' · '+s.title,cols:['erp_'+s.key]});});
-      if(pg==='구매')out.push({k:'podocs',t:PAGE_NAMES[pg]+' · '+PODOC.title,cols:['erp_podocs','erp_podocs_pub']});   /* v128 공개 문서 */   /* v126 발주서관리만 줄 수 있게 */
+      if(pg==='구매')out.push({k:'podocs',t:PAGE_NAMES[pg]+' · '+PODOC.title,cols:['erp_podocs','erp_podocs_pub','erp_pobox','erp_poconfirm']});   /* v133 박스·발주확인 */   /* v128 공개 문서 */   /* v126 발주서관리만 줄 수 있게 */
       return;}   /* v121 구매는 화면마다 권한 */
     out.push({k:'p:'+pg,t:PAGE_NAMES[pg],cols:STEPS.filter(function(s){return s.page===pg;}).map(function(s){return 'erp_'+s.key;})});});
   out.push({k:'stocks',t:'물류 · [물류] 재고현황',cols:['erp_stocks']});
@@ -6594,7 +6648,7 @@ function staffRepoTable(){
     ['자료 보호','늘지 않음 — 파이어베이스 키는 원래 공개 값, 자료는 저장소 규칙이 지킴','저장소 규칙 배포(위)']]);
 }
 function go(k){if(BYKEY[k]&&BYKEY[k].shownIn)k=BYKEY[k].shownIn;if(k!==cur||k==='podocs')podSel='';cur=k;navOpen=null;try{history.replaceState(null,'','#'+k);}catch(e){location.hash=k;}renderNav();renderSum();renderStep();}
-function refreshAll(){renderNav();renderSum();renderList();refreshLists();if(impDraw)impDraw();if(sheetDraw)sheetDraw();if(ifRefresh)ifRefresh();if(stkDraw)stkDraw();if(podDraw)podDraw();podSync();}
+function refreshAll(){renderNav();renderSum();renderList();refreshLists();if(impDraw)impDraw();if(sheetDraw)sheetDraw();if(ifRefresh)ifRefresh();if(stkDraw)stkDraw();if(podDraw)podDraw();podSync();podBoxSync();}
 
 /* ---------- boot ---------- */
 
@@ -6633,6 +6687,12 @@ dbP.then(function(d){
   db.collection('erp_podocs').onSnapshot(function(snap){
     PODOCS=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});refreshAll();
   },function(){PODOCS=PODOCS||[];refreshAll();});
+  db.collection('erp_pobox').onSnapshot(function(snap){   /* v133 */
+    POBOX=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});podBoxSync();if(podDraw)podDraw();
+  },function(){POBOX=null;});
+  db.collection('erp_poconfirm').onSnapshot(function(snap){
+    POCONF=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});renderNav();if(podDraw)podDraw();
+  },function(){POCONF=null;});
   db.collection('erp_podocs_pub').onSnapshot(function(snap){   /* v128 */
     PODPUB=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});podSync();if(podDraw)podDraw();
   },function(){PODPUB=null;});

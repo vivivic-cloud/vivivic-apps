@@ -1,0 +1,122 @@
+<!doctype html>
+<!-- 발주박스 공유 페이지(v133) — 영림원외주입력 「발주서관리」 출고처(구매거래처)·입고처(입고창고) 박스를 로그인 없이 보는 한 장. 폼과 별개 파일, 메뉴·폼으로 가는 길 없음.
+     주소 = 발주박스.html#<박스 열쇠>. 자료 = erp_pobox/<열쇠>(폼이 씀) · erp_poconfirm/<발주번호>(발주확인 — 출고처 박스에서만 만듦).
+     출고처 = 그 거래처 발주 모두(단가 보임, 사장님 11-09 결정) + 「발주확인」 단추. 입고처 = 발주확인된 것만 「입고대기」(단가 없음).
+     저장소 규칙(제안): erp_pobox get 누구나 · erp_poconfirm get 누구나, create 는 그 출고처 박스 열쇠 + 그 박스 발주번호만. 규칙 배포 전에는 막혀 익명 로그인 뒤 다시 시도. -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>발주서</title>
+<link rel="icon" href="data:,">
+<style>
+:root{--ink:#37352f;--muted:#787774;--line:#ededeb;--fill2:#f5f5f4;--rowline:#f0eeec;--red:#dc2626;--green:#166534;--amber:#92400e;
+  --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI",Helvetica,Arial,sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Monaco,monospace}
+*{box-sizing:border-box}
+html{color-scheme:light}
+body{margin:0;background:#fff;color:var(--ink);font:400 15px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
+main{max-width:560px;margin:0 auto;padding:20px 16px calc(32px + env(safe-area-inset-bottom,0px))}
+h1{font-size:20px;font-weight:900;letter-spacing:-0.02em;margin:0;word-break:break-all}
+.sub{color:var(--muted);font-weight:700;font-size:13px;margin:2px 0 14px}
+.msg{color:var(--muted);font-weight:700}.msg.bad{color:var(--red)}
+.po{border:1px solid var(--line);border-radius:14px;padding:12px;margin:12px 0}
+.po .top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 8px}
+.po .no{font-family:var(--mono);font-weight:800;word-break:break-all}
+.st{font-size:12px;font-weight:800;color:var(--amber)}.st.on{color:var(--green)}
+button{font:inherit;font-weight:800;border-radius:10px;border:1px solid var(--ink);background:var(--ink);color:#fff;padding:9px 14px;min-height:40px;cursor:pointer;margin-left:auto}
+button:disabled{opacity:.5}
+dl{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:3px 12px;margin:0}
+dt{color:var(--muted);font-weight:700;font-size:13px;padding-top:1px}
+dd{margin:0;font-weight:600;word-break:break-all}
+dd.mono{font-family:var(--mono)}dd.n{font-variant-numeric:tabular-nums}
+.row{border-top:1px solid var(--rowline);padding:8px 0 0;margin:8px 0 0}
+.row .nt{font-weight:800;word-break:break-all;margin:0 0 4px}
+.err{color:var(--red);font-weight:700;font-size:13px;margin:6px 0 0}
+</style>
+</head>
+<body>
+<main id="main"><p class="msg">불러오는 중</p></main>
+<script>
+(function(){
+"use strict";
+var KEY='AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs',PROJ='vivivic-4b7ef',DOCS='projects/'+PROJ+'/databases/(default)/documents';
+var BASE='https://firestore.googleapis.com/v1/';
+var mainEl=document.getElementById('main');
+function h(tag,cls){var e=document.createElement(tag);if(cls)e.className=cls;for(var i=2;i<arguments.length;i++){var c=arguments[i];(Array.isArray(c)?c:[c]).forEach(function(x){if(x==null||x===false)return;e.append(x.nodeType?x:document.createTextNode(String(x)));});}return e;}
+function show(v){return v==null?'':String(v);}
+function num(v){if(v==null||String(v).trim()==='')return '';var n=Number(v);return isFinite(n)?n.toLocaleString('ko-KR',{maximumFractionDigits:6}):String(v);}
+function say(t,bad){mainEl.replaceChildren(h('p','msg'+(bad?' bad':''),t));}
+function val(x){if(!x)return null;var k=Object.keys(x)[0],y=x[k];
+  if(k==='mapValue'){var o={};Object.keys(y.fields||{}).forEach(function(f){o[f]=val(y.fields[f]);});return o;}
+  if(k==='arrayValue')return (y.values||[]).map(val);
+  if(k==='integerValue')return Number(y);if(k==='nullValue')return null;return y;}
+function fieldsOf(j){var f={};Object.keys(j.fields||{}).forEach(function(k){f[k]=val(j.fields[k]);});return f;}
+function when(s){var t=new Date(s);if(!s||isNaN(t))return show(s);var p=function(n){return String(n).padStart(2,'0');};return t.getFullYear()+'-'+p(t.getMonth()+1)+'-'+p(t.getDate())+' '+p(t.getHours())+':'+p(t.getMinutes());}
+var key=(location.hash||'').slice(1);
+if(!/^[A-Za-z0-9_-]{32,64}$/.test(key)){say('발주서가 없습니다.',true);return;}
+/* 규칙 배포 전: 로그인 없는 요청이 막히면 익명 로그인 토큰(이 탭에서만)으로 다시 */
+var tok=null;
+function anon(){
+  try{var t=JSON.parse(sessionStorage.getItem('po.tok')||'null');if(t&&t.exp>Date.now())return Promise.resolve(tok=t.id);}catch(e){}
+  return fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key='+KEY,{method:'POST',headers:{'Content-Type':'application/json'},body:'{"returnSecureToken":true}'})
+    .then(function(r){return r.json();}).then(function(j){if(!j.idToken)throw new Error('anon');
+      try{sessionStorage.setItem('po.tok',JSON.stringify({id:j.idToken,exp:Date.now()+50*60*1000}));}catch(e){}return tok=j.idToken;});
+}
+function call(path,opt){
+  var go=function(){var o=Object.assign({cache:'no-store',referrerPolicy:'no-referrer'},opt||{});o.headers=Object.assign({'Content-Type':'application/json'},(opt&&opt.headers)||{},tok?{Authorization:'Bearer '+tok}:{});
+    return fetch(BASE+path+(path.indexOf('?')<0?'?':'&')+'key='+KEY,o);};
+  return go().then(function(r){return (r.status===401||r.status===403)&&!tok?anon().then(go):r;});
+}
+var BOX=null,CONF={},busy={},errs={};
+function load(){
+  return call(DOCS+'/erp_pobox/'+key).then(function(r){
+    if(r.status===404||r.status===403){BOX=false;return;}
+    if(!r.ok)throw new Error(r.status);
+    return r.json().then(function(j){BOX=fieldsOf(j);
+      var ponos=(BOX.ponos||[]).filter(Boolean);if(!ponos.length){CONF={};return;}
+      return call(DOCS+':batchGet',{method:'POST',body:JSON.stringify({documents:ponos.map(function(n){return DOCS+'/erp_poconfirm/'+n;})})}).then(function(r2){
+        if(!r2.ok)throw new Error(r2.status);
+        return r2.json().then(function(a){var c={};(a||[]).forEach(function(x){if(x.found){var f=fieldsOf(x.found);c[f.pono||x.found.name.split('/').pop()]=f;}});CONF=c;});
+      });
+    });
+  }).then(draw,function(){if(BOX==null)say('불러오지 못했습니다.',true);});
+}
+function confirmPo(no){
+  if(!confirm(no+' 발주를 확인합니다.'))return;
+  busy[no]=1;errs[no]='';draw();
+  var at=new Date().toISOString();
+  call(DOCS+'/erp_poconfirm?documentId='+encodeURIComponent(no),{method:'POST',body:JSON.stringify({fields:{box:{stringValue:key},pono:{stringValue:no},at:{stringValue:at}}})})
+    .then(function(r){busy[no]=0;if(r.ok||r.status===409)return load();errs[no]='발주확인을 저장하지 못했습니다.';draw();},
+      function(){busy[no]=0;errs[no]='발주확인을 저장하지 못했습니다.';draw();});
+}
+function kv(pairs){var d=h('dl');pairs.forEach(function(p){d.append(h('dt','',p[0]),h('dd',p[2]||'',p[1]));});return d;}
+function draw(){
+  if(BOX===false){say('발주서가 없습니다.',true);return;}
+  if(!BOX)return;
+  var out=BOX.kind==='출고처',pos=(BOX.pos||[]).filter(Boolean);
+  if(!out)pos=pos.filter(function(p){return !!CONF[p.pono];});   /* 입고처 = 발주확인된 것만 */
+  document.title='발주서 '+show(BOX.name);
+  var cards=pos.map(function(p){
+    var c=CONF[p.pono],rows=(p.rows||[]).filter(Boolean),top=h('div','top',h('span','no',show(p.pono)));
+    if(out){if(c)top.append(h('span','st on','발주확인 '+when(c.at)));
+      else{top.append(h('span','st','발주확인 전'));var b=h('button','','발주확인');b.type='button';b.disabled=!!busy[p.pono];b.addEventListener('click',function(){confirmPo(p.pono);});top.append(b);}}
+    else top.append(h('span','st on','입고대기'));
+    var head=out?[['발주일',show(p.podate)]]:[['발주일',show(p.podate)],['구매거래처',show(p.vendor)],['발주확인',c?when(c.at):'']];
+    return h('div','po',top,kv(head),
+      rows.map(function(x){var f=[['품번',show(x.ccode),'mono'],['규격',show(x.cspec)],['단위',show(x.unit)],['발주수량',num(x.qty),'n']];
+        if(out)f.push(['단가',num(x.price),'n']);
+        f.push(['납품예정일',show(x.duedate)],['창고',show(x.wh)],['납품수량',num(x.dlv),'n']);
+        return h('div','row',h('div','nt',show(x.cname)),kv(f));}),
+      errs[p.pono]?h('p','err',errs[p.pono]):null);});
+  mainEl.replaceChildren.apply(mainEl,[].concat(h('h1','',show(BOX.name)),h('p','sub',out?'출고처 · '+pos.length+'건':'입고처 · 입고대기 '+pos.length+'건'),
+    cards.length?cards:h('p','msg',out?'발주서가 없습니다.':'입고대기 발주가 없습니다.')));
+}
+load();
+setInterval(function(){if(document.visibilityState==='visible'&&!Object.keys(busy).some(function(k){return busy[k];}))load();},60000);   /* 입고처는 발주확인이 들어오면 1분 안에 나타남 */
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible')load();});
+})();
+</script>
+</body>
+</html>
