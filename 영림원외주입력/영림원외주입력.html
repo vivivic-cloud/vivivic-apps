@@ -381,7 +381,7 @@ table.asmt tr.chg td{background:var(--amber-bg)}table.asmt tr.off td{color:var(-
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v180</span>
+    <span class="ver">v181</span>
   </div>
 </header>
 <div class="wrap">
@@ -1874,7 +1874,7 @@ var NAV_BOXES=[
   {id:'base',title:'기본입력',icon:'layers',items:function(){return ['basic','check'].concat(STEPS.filter(function(s){return !s.hidden&&!s.page;}).map(function(s){return s.key;}));}},
   {id:'구매',title:PAGE_NAMES['구매'],icon:'sheet',items:function(){return ['purprices','purreqs','purapprs','purords','purchases','purdelvs','pomods','podocs'];}},   /* v126 발주서관리 */
   {id:'수입',title:PAGE_NAMES['수입'],icon:'import',items:function(){return ['imporders','imppays','impinvs','impbls','impins'];}},
-  {id:'생산',title:PAGE_NAMES['생산'],icon:'layers',items:function(){return ['prods','proddlvs','asmpo'];}},
+  {id:'생산',title:PAGE_NAMES['생산'],icon:'layers',items:function(){return ['prods','proddlvs','asmpo','asmlink'];}},
   {id:'물류',title:'물류 · [물류] 재고현황',icon:'box',items:function(){return ['stocks'];}},
   {id:'staff',title:'담당자 관리',icon:'users',items:function(){return ['staff'];}}];
 var BASIC_URL='../영림원기본정보입력/영림원기본정보입력.html';   /* v166 사장님 「해당 프로그램을 입력폼 메뉴에 넣어 주세요」 — 기본입력 박스 첫 줄 */
@@ -1889,6 +1889,7 @@ function renderNav(){
     var s=BYKEY[k]||{},num,title=s.title,sub;
     if(k==='check'){num='✓';title=CHECK.title;sub='품목마다 빠진 것 보기';}
     else if(k==='stocks'){num=ico('box');title='물류 · [물류] 재고현황';sub=STOCKS==null?'불러오는 중':last?stkTime(last):'아직 없음';}
+    else if(k==='asmlink'){num=String(i);sub='';}   /* v181 */
     else if(k==='asmpo'){num=String(i);sub=data.asmpo==null?'불러오는 중':'대기 '+(data.asmpo||[]).filter(function(r){return r.status==='대기';}).length;}   /* v176 */
     else if(k==='podocs'){num=String(i);sub=PODOCS==null||data.purchases==null||data.purords==null?'불러오는 중':podAll().length+'건';}   /* v126 */
     else if(k==='staff'){num=ico('users');title='담당자 관리';sub=STAFF?STAFF.length+'명':'불러오는 중';}
@@ -1908,7 +1909,7 @@ function renderNav(){
   navEl.replaceChildren.apply(navEl,out);
 }
 function renderSum(){
-  if(cur==='stocks'||cur==='staff'||cur==='podocs'||cur==='asmpo'||!canMenu(menuOf(cur),'r')){sumEl.replaceChildren();return;}   /* v115 담당자 관리도 */   /* v102 재고 조회는 대기·완료 문서가 없다 */
+  if(cur==='stocks'||cur==='staff'||cur==='podocs'||cur==='asmpo'||cur==='asmlink'||!canMenu(menuOf(cur),'r')){sumEl.replaceChildren();return;}   /* v115 담당자 관리도 */   /* v102 재고 조회는 대기·완료 문서가 없다 */
   var t={'대기':0,'진행중':0,'완료':0,'오류':0,'수정대기':0};
   var pg=(BYKEY[cur]||{}).page||'';   /* v75 맨 위 요약 = 지금 페이지 것만(1~11단계에 수입을 섞지 않음) */
   STEPS.filter(function(s){return (s.page||'')===pg;}).forEach(function(s){var c=counts(s.key);STATUS.forEach(function(k){t[k]+=c[k];});});
@@ -5272,6 +5273,7 @@ function renderPodocs(){
    링크 = 발주.html#<열쇠>(로그인 없음). 거기서 저장한 발주서 = erp_asmpo/<무작위 32자> {box,vendor,pcode,pname,pspec,qty,need,rows[{ccode,cname,cspec,unit,per,base,qty,on}],at,status:'대기'}.
    폼 = 업체 박스(공유·QR·제품) + 받은 발주서(대기·삭제). 영림원 입력·가공처 지시는 이번 범위 아님 — 나중에 주간생산계획입력(500498) 첫 단서. */
 var ASMPO={key:'asmpo',n:'',title:'발주서',screen:'발주서'};BYKEY.asmpo=ASMPO;
+var ASMLINK={key:'asmlink',n:'',title:'발주공유 링크',screen:'발주공유 링크'};BYKEY.asmlink=ASMLINK;   /* v181 사장님 「이거부터 안나오게 고쳐」 — 「발주서」 메뉴에서 빼서 따로 탭 */
 var ASMBOX=null,asmDraw=null,asmBusy={},asmOpen={},asmCard={};
 function asmUrl(k){return new URL('발주.html#'+k,location.href).href;}
 function asmIsAsm(proc){return /조립/.test(String(proc==null?'':proc));}
@@ -5462,7 +5464,7 @@ function renderAsm(){
   bulk=null;listBox=null;listBox2=null;sheetDraw=null;ifRefresh=null;
   var box=h('div',{class:'podbox'}),lastKey='';
   function draw(){
-    if(cur!=='asmpo')return;
+    if(cur!=='asmpo'&&cur!=='asmlink')return;
     if(ASMBOX==null||data.contracts==null||data.boms==null||data.materials==null||data.asmpo==null){box.replaceChildren(h('p',{class:'msg'},'불러오는 중'));lastKey='';return;}
     var names=asmNames(),wants=names.map(asmWant),pos=(data.asmpo||[]).slice().sort(function(a,b){return String(a.at||'')<String(b.at||'')?1:-1;});
     var key=JSON.stringify([data.items&&data.items.length,data.itemwcs&&data.itemwcs.length,data.prods,data.proddlvs,data.prodmoves,asmOpen,asmCard,wants.map(asmSig),(ASMBOX||[]).map(function(b){return [b.id,b.vendor,b.createdAt];}),pos,picked.asmpo]);if(key===lastKey)return;lastKey=key;
@@ -5476,10 +5478,10 @@ function renderAsm(){
     var vend=names.length?names.map(function(n,i){var b=asmBoxOf(n),w=wants[i],k='l:'+n,open=!!asmOpen[k];   /* v179 발주공유 링크 = 따로 묶음 */
       return h('div',{class:'podgrp'+(open?' open':'')},h('div',{class:'podgh'},
           h('button',{type:'button',class:'podgt','aria-expanded':open?'true':'false',on:{click:function(){if(open)delete asmOpen[k];else asmOpen[k]=1;draw();}}},
-            h('span',{class:'navarr','aria-hidden':'true'},open?'▾':'▸'),h('span',{class:'nt'},n),h('span',{class:'ns'},'제품 '+w.items.length)),
+            h('span',{class:'navarr','aria-hidden':'true'},open?'▾':'▸'),h('span',{class:'nt'},n)),   /* v181 「제품 n」 숫자 뺌(발주로 보임) */
           b?asmShareBtn(b):null),
         !open?null:h('div',{},b?asmQr(asmUrl(b.id)):null,h('div',{class:'podlist'},w.items.map(function(it){
-          return h('div',{class:'podbtn asmit'},h('span',{class:'nt'},it.pname),h('span',{class:'ns mono'},it.pcode),h('span',{class:'ns'},'부속 '+it.rows.length+'줄'));}))));
+          return h('div',{class:'podbtn asmit'},h('span',{class:'nt'},it.pname),h('span',{class:'ns mono'},it.pcode));}))));
     }):[h('p',{class:'msg'},'조립업체가 없습니다.')];
     var dels=pos.filter(function(r){return (r.status==='대기'||r.status==='오류')&&!asmProdsOf(r).length;}),kit=delKit(ASMPO,dels);   /* v180 생산으로 넘긴 발주서는 그 생산 대기를 지운 뒤에 지움 */
     var card=function(d){var rs=d.rows||[],open=!!asmCard[d.id],pk=kit.pk(d);
@@ -5489,11 +5491,12 @@ function renderAsm(){
             h('span',{class:'ns'},[show(d.vendor),d.kind==='부속'?'공통부속 발주':'발주 수량 '+podNum(d.qty),'필요일 '+show(d.need),asmWhen(d.at)].join(' · ')),
             asmChip(asmLinkStage(d)))),
         !open?null:asmPoTable(d));};
+    if(cur==='asmlink'){box.replaceChildren.apply(box,vend);return;}   /* v181 발주공유 링크 탭 = 업체 링크 묶음만 */
     box.replaceChildren.apply(box,[h('h3',{class:'asmh'},'조립업체')].concat(prog,[h('h3',{class:'asmh'},'발주서'),h('div',{class:'lsinfo'},h('span',{},pos.length+'건')),kit.bar].filter(Boolean),
-      pos.length?pos.map(card):[h('p',{class:'msg'},'발주서가 없습니다.')],[h('h3',{class:'asmh'},'발주공유 링크')],vend));
+      pos.length?pos.map(card):[h('p',{class:'msg'},'발주서가 없습니다.')]));
   }
   asmDraw=draw;
-  mainEl.replaceChildren(h('section',{class:'card'},h('div',{class:'stephead'},h('h2',{},ASMPO.title)),box));
+  mainEl.replaceChildren(h('section',{class:'card'},h('div',{class:'stephead'},h('h2',{},cur==='asmlink'?ASMLINK.title:ASMPO.title)),box));
   draw();
 }
 /* ---------- v38 앞 단계 미등록 안내 ----------
@@ -5656,7 +5659,7 @@ function renderStep(){
   if(cur==='check'){renderCheck();return;}
   if(cur==='stocks'){renderStock();return;}   /* v102 */
   if(cur==='podocs'){renderPodocs();return;}   /* v126 */
-  if(cur==='asmpo'){renderAsm();return;}   /* v176 */
+  if(cur==='asmpo'||cur==='asmlink'){renderAsm();return;}   /* v176 · v181 발주공유 링크 */
   var s=BYKEY[cur];bulk=null;
   form=buildForm(s);
   if(s.key==='pomods'&&POMOD_PRE){var pp=POMOD_PRE;POMOD_PRE=null;POMOD_CTX=pp.ctx;setTimeout(function(){if(BYKEY[cur]===s)form.fill(pp.vals,pp.rows);},0);}   /* v157 「발주수정」으로 연 때 채움 */
@@ -7272,7 +7275,8 @@ function erpMenus(){
       if(pg==='구매')out.push({k:'podocs',t:PAGE_NAMES[pg]+' · '+PODOC.title,cols:['erp_podocs','erp_podocs_pub','erp_pobox','erp_poconfirm','erp_poship','erp_poshipref','erp_poin','erp_podlv','erp_podlvimg','erp_pointok']});   /* v133 박스·발주확인 */   /* v128 공개 문서 */   /* v126 발주서관리만 줄 수 있게 */
       return;}   /* v121 구매는 화면마다 권한 */
     out.push({k:'p:'+pg,t:PAGE_NAMES[pg],cols:STEPS.filter(function(s){return s.page===pg;}).map(function(s){return 'erp_'+s.key;})});});
-  out.push({k:'asmpo',t:PAGE_NAMES['생산']+' · '+ASMPO.title,cols:['erp_asmpo','erp_asmbox']});   /* v176 조립업체 발주 링크 */
+  out.push({k:'asmpo',t:PAGE_NAMES['생산']+' · '+ASMPO.title,cols:['erp_asmpo','erp_asmbox']});
+  out.push({k:'asmlink',t:PAGE_NAMES['생산']+' · '+ASMLINK.title,cols:['erp_asmbox']});   /* v181 */   /* v176 조립업체 발주 링크 */
   out.push({k:'stocks',t:'물류 · [물류] 재고현황',cols:['erp_stocks']});
   out.push({k:'basic',t:'영림원 기본정보 입력',cols:['erp_basic']});   /* v165 erp_basic 쓰기 권한(화면 없음 — erpFixCur 는 건너뜀) */
   STEPS.filter(function(s){return !s.hidden&&!s.page;}).forEach(function(s){
@@ -7280,7 +7284,7 @@ function erpMenus(){
   return out;
 }
 var MENUS=erpMenus();
-function menuOf(k){if(k==='check'||k==='stocks'||k==='staff'||k==='podocs'||k==='asmpo')return k;var s=BYKEY[k];if(!s)return k;if(s.page)return PERM_SPLIT[s.page]?k:'p:'+s.page;return s.shownIn||k;}
+function menuOf(k){if(k==='check'||k==='stocks'||k==='staff'||k==='podocs'||k==='asmpo'||k==='asmlink')return k;var s=BYKEY[k];if(!s)return k;if(s.page)return PERM_SPLIT[s.page]?k:'p:'+s.page;return s.shownIn||k;}
 function canMenu(k,op){if(!ME)return false;if(ME.admin===true)return true;var p=permOf(ME.perms,k);return !!(p&&p[op]);}
 /* 컬렉션 권한 = 그 컬렉션을 가진 메뉴 중 하나라도. erp_imports(불러오기 요청)는 어느 메뉴든 · v167 erp_rates(영림원 환율정보)는 수입·구매 메뉴 보기·저장 */
 function colPerms(perms){
