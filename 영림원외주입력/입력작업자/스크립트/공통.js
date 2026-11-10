@@ -39,6 +39,36 @@
     if (i.value !== Y.today()) throw new Error(page + ' 일자 ' + i.value + ' ≠ 오늘 ' + Y.today() + ' — 저장하지 않음');
     return i.value;
   };
+  // 브라우저 기본 창(alert·confirm) 자동 확인(11-10, 사장님 「이런 확인버튼 자동으로 누르게 못하냐」).
+  //   기본 창이 뜨면 확장 쪽에서는 탭이 멈춘 것처럼 보인다(작업지시생성 뒤 10분+ 멈춤 두 번).
+  //   Y.dlgOn() = 맨 위 창 + 같은 출처 iframe 모두의 alert·confirm 을 바꿔 글을 window.__dlg 에 쌓고 confirm 은 true.
+  //   Y.dlgOff() = 원래대로 되돌리고 쌓인 글을 돌려준다. **내가 지금 하려는 동작 단추 직전에 켜고, 누른 뒤 바로 끈다.**
+  //   화면을 새로 열면(그 뒤 생긴 iframe) 안 걸리므로 단추마다 다시 켠다. 글이 뜻밖(다른 자료 삭제·전표·정산·오류)이면 멈추고 보고.
+  Y.dlgOn = () => {
+    window.__dlg = window.__dlg || [];
+    let n = 0;
+    const hook = (w) => {
+      try {
+        if (!w.__dlgOrig) w.__dlgOrig = { a: w.alert, c: w.confirm };
+        w.alert = (m) => { window.__dlg.push({ t: 'alert', m: String(m), at: new Date().toLocaleTimeString() }); };
+        w.confirm = (m) => { window.__dlg.push({ t: 'confirm', m: String(m), at: new Date().toLocaleTimeString() }); return true; };
+        n++;
+        for (let i = 0; i < w.frames.length; i++) hook(w.frames[i]);
+      } catch (e) {}
+    };
+    hook(window);
+    return n;
+  };
+  Y.dlgOff = () => {
+    const un = (w) => {
+      try {
+        if (w.__dlgOrig) { w.alert = w.__dlgOrig.a; w.confirm = w.__dlgOrig.c; delete w.__dlgOrig; }
+        for (let i = 0; i < w.frames.length; i++) un(w.frames[i]);
+      } catch (e) {}
+    };
+    un(window);
+    return window.__dlg || [];
+  };
   Y.sheet = (page, name) => {
     const s = Y.win(page)[name];
     if (!s || typeof s.GetAllData !== 'function') throw new Error(page + ' 에 시트 ' + name + ' 없음');
