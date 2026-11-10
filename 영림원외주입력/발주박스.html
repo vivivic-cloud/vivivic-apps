@@ -1,6 +1,7 @@
 <!doctype html>
 <!-- 발주박스 공유 페이지 — 로그인 없음, 폼과 별개. 주소 = 발주박스.html#<박스 열쇠>[&s=<배송열쇠>]. 자료 = erp_pobox/<열쇠>(폼이 씀) · erp_poconfirm/<발주번호>.
      v149 맨 위 머리 줄(누구용 링크): 출고처 = 「출고처 발주목록 박스 — 거래처」 · 입고처 = 「입고처 발주목록 박스 — 창고」 · 기사 QR 로 연 때(&s=) = 「입고처 입고 확인 — 창고」.
+     v187 「발주확인」 = 카드 안 「확인」·「취소」(confirm() 창 안 씀 — 카톡 안 브라우저에서 창이 안 떠 못 누름).
      v155 영림원 입력완료(폼이 pos.final 을 적음) = 「납품완료」, QR·바코드·발주확인·배송기사 공유·사진·입고수량·입고확인·수정요청 모두 없음(보기만).
      v148 「배송기사 공유」 제한 없음(사장님 「배송기사 공유 버튼은 제한없이 사용할 수 있게 해주세요」) — 발주확인 전·잠김에도, 몇 번이든 같은 링크.
      v133 출고처·입고처 박스 · v138 단가 없음 · v142 QR·바코드 · v145 납품 흐름 · v146 입고를 박스 안 발주서에서:
@@ -75,9 +76,10 @@ function goIn(txt){   /* 위 「스캔」·발주번호 칸 */
   openShip(p.ship);
 }
 function scanTop(){if(stopCam)stopCam();topErr='';camEl=h('div','cam');draw();stopCam=P.scanner(camEl,function(t){stopCam=null;camEl=null;goIn(t);},function(){camEl=null;topErr='카메라를 쓸 수 없습니다. 발주번호를 넣어 주세요.';draw();});}
+/* v187 카톡 안 브라우저 등은 confirm() 창을 안 띄우고 바로 false → 「발주확인」 을 눌러도 아무 일 없음(PUPO202611100001). 확인창 대신 카드 안 「확인」·「취소」 */
+var ASK={};
 function confirmPo(no){
-  if(!confirm(no+' 발주를 확인합니다.'))return;
-  busy[no]=1;errs[no]='';draw();
+  ASK[no]=0;busy[no]=1;errs[no]='';draw();
   P.commit([{name:'erp_poconfirm/'+no,fields:{box:key,pono:no,at:new Date().toISOString()},exists:false}])
     .then(function(){busy[no]=0;return load();},function(){busy[no]=0;return load().then(function(){if(!CONF[no]){errs[no]='발주확인을 저장하지 못했습니다.';draw();}});});
 }
@@ -163,12 +165,13 @@ function draw(){
     var c=CONF[p.pono],d=DLV[p.pono]||{},rows=(p.rows||[]).filter(Boolean),top=h('div','top',h('span','no',show(p.pono))),act=!out&&ACT&&ACT.pono===p.pono,fin=p.final===true||d.final===true;   /* v155 영림원 입력완료 = 납품완료 */
     if(fin)top.append(h('span','st on','납품완료'));
     else if(out){if(c)top.append(h('span','st on','발주확인 '+when(c.at)));
-      else{top.append(h('span','st','발주확인 전'));var b=h('button','','발주확인');b.type='button';b.disabled=!!busy[p.pono];b.addEventListener('click',function(){confirmPo(p.pono);});top.append(b);}}
+      else{top.append(h('span','st','발주확인 전'));var b=h('button','','발주확인');b.type='button';b.disabled=!!busy[p.pono]||!!ASK[p.pono];b.addEventListener('click',function(){ASK[p.pono]=1;errs[p.pono]='';draw();});top.append(b);}}
     if(fin){}else if(!out)top.append(h('span','st on',d.locked?'잠김':d.doneAt&&Number(d.doneRev||0)>=Number(d.rev||0)&&d.rev?'납품완료 '+when(d.doneAt):d.inAt?'입고확인 '+when(d.inAt):'입고대기'));
     var ck=p.pono+'|'+p.pubKey;if(out&&c&&!CODES[ck])CODES[ck]=P.codes(P.keyOk(p.pubKey)?new URL('발주서.html#'+p.pubKey,location.href).href:'',show(p.pono));
     var head=out?[['발주일',show(p.podate)]]:[['발주일',show(p.podate)],['구매거래처',show(p.vendor)],['발주확인',c?when(c.at):'']];
     var pl=!fin&&p.part?h('p','part',P.partText(p.part,out?'다음 출고 대기':'남음 '+num(p.part.left)+' 입고 예정')):null;   /* v160 부분납품 */
-    var el=h('div','po',top,pl,out&&c&&!fin?CODES[ck]:null,kv(head),
+    var ask=out&&!c&&!fin&&ASK[p.pono]?h('div','acts',h('p','part',p.pono+' 발주를 확인합니다.'),h('div','manual',(function(){var y=h('button','','확인');y.type='button';y.addEventListener('click',function(){confirmPo(p.pono);});return y;})(),(function(){var n=h('button','sec','취소');n.type='button';n.addEventListener('click',function(){ASK[p.pono]=0;draw();});return n;})())):null;   /* v187 */
+    var el=h('div','po',top,ask,pl,out&&c&&!fin?CODES[ck]:null,kv(head),
       rows.map(function(x){return h('div','row',h('div','nt',show(x.cname)),kv([['품번',show(x.ccode),'mono'],['규격',show(x.cspec)],['단위',show(x.unit)],['발주수량',num(x.qty),'n'],['납품예정일',show(x.duedate)],['창고',show(x.wh)],['납품수량',num(x.dlv),'n']]));}),
       out&&!fin?h('div','ship',(function(){var sb=h('button','','배송기사 공유');sb.type='button';sb.disabled=!!busy['s'+p.pono];sb.addEventListener('click',function(){shareShip(p);});return sb;})(),NOTE[p.pono]?h('span','note',NOTE[p.pono]):null):null,
       act?inPart(p):null,

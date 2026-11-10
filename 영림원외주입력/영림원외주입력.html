@@ -381,7 +381,7 @@ table.asmt tr.chg td{background:var(--amber-bg)}table.asmt tr.off td{color:var(-
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v186</span>
+    <span class="ver">v187</span>
   </div>
 </header>
 <div class="wrap">
@@ -5097,6 +5097,8 @@ function podBoxSync(){
     if(kind==='입고처')(POBOX||[]).forEach(function(b){if(b.kind==='입고처'&&ns.indexOf(b.name)<0&&boxOf('입고처',b.name)===b)ns.push(b.name);});   /* 옛 박스(확인된 발주 없음)는 빈 목록으로 고침 */
     ns.forEach(function(name){
     var want=boxWant(kind,name),sig=boxSig(want),have=boxOf(kind,name),bk='b:'+kind+':'+name;
+    /* v187 같은 종류·이름 박스가 둘 이상(11-09 14:36 에 6개가 겹쳐 생김) — 옛 링크 박스도 같은 내용으로 맞춤(안 하면 그 링크에 새 발주가 안 보여 발주확인 못 함) */
+    (POBOX||[]).forEach(function(b){if(have&&b!==have&&b.kind===kind&&b.name===name&&podKeyOk(b.id)&&boxSig(b)!==sig&&podBusy['d:'+b.id]!==sig){podBusy['d:'+b.id]=sig;db.collection('erp_pobox').doc(b.id).update(Object.assign({},want,{at:new Date().toISOString()})).catch(function(e){podBusy['d:'+b.id]='';console.warn('박스 못 씀',kind,name,e);});}});
     if(have&&boxSig(have)===sig)return;
     if(podBusy[bk]===sig)return;podBusy[bk]=sig;
     var now=new Date().toISOString(),done=function(e){podBusy[bk]='';console.warn('박스 못 씀',kind,name,e);};
