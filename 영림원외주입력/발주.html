@@ -1,5 +1,6 @@
 <!doctype html>
-<!-- v178 새로고침 단추 · 발주서 목록 = 박스 문서 pos(폼이 씀) + 이 폰에서 막 저장한 것. v177 제품 = 고르기 칸(select). v176 조립업체 발주 링크 — 사장님 「조립업체에서 시작될 발주링크를 만들어보자」(11-10). 로그인 없음, 폼과 별개.
+<!-- v180 「제품 발주」·「공통부속 발주」 두 탭(공통부속 = 박스 parts 에서 여러 줄 골라 수량, 문서 kind '부속' — 규칙 배포 뒤 저장됨) · 발주서마다 단계(폼이 박스 pos.st 에 적음)·부속 공정·도착 숫자.
+     v178 새로고침 단추 · 발주서 목록 = 박스 문서 pos(폼이 씀) + 이 폰에서 막 저장한 것. v177 제품 = 고르기 칸(select). v176 조립업체 발주 링크 — 사장님 「조립업체에서 시작될 발주링크를 만들어보자」(11-10). 로그인 없음, 폼과 별개.
      주소 = 발주.html#<조립업체 박스 열쇠>. 자료 = erp_asmbox/<열쇠>(폼이 씀: vendor·pcodes·items[{pcode,pname,pspec,rows[{ccode,cname,cspec,unit,per}]}]).
      제품 고르기 → 발주 수량·필요일 → 기본 BOM 부속 줄 전부(필요 수량 처음 값 = BOM 수량 × 발주 수량) → 줄마다 빼기(체크 해제)·수량 고치기 → 「발주서 저장」
        = erp_asmpo/<무작위 32자> {box,vendor,pcode,pname,pspec,qty,need,rows[{ccode,cname,cspec,unit,per,base,qty,on}],at,status:'대기'} 새로 만들기(REST commit, 없을 때만).
@@ -36,9 +37,14 @@ td input[type=number]{width:84px;font:inherit;text-align:right;border:1px solid 
 td input[type=checkbox]{width:20px;height:20px;margin:0}
 tr.chg td{background:#fffbeb}tr.off td{background:var(--fill3);color:var(--muted)}tr.off td:not(:first-child){text-decoration:line-through}
 tr.off input[type=number]{visibility:hidden}
+tr.idle td{color:var(--muted)}tr.idle input[type=number]{visibility:hidden}
 .sent{border-top:1px solid var(--line);margin:18px 0 0;padding:12px 0 0}
 .sent h2{font-size:15px;font-weight:900;margin:0 0 8px}
 .sent .po{margin:8px 0}
+/* v180 두 탭 · 공통부속 표의 제품 칸 */
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 12px}.tabs button{min-height:44px}
+td.for{white-space:normal;min-width:160px;font-size:12px;color:var(--muted)}
+.st.bad{color:var(--red)}
 </style>
 </head>
 <body>
@@ -53,12 +59,12 @@ function when(s){var t=new Date(s);if(!s||isNaN(t))return show(s);var p=function
 function r4(n){return Math.round(n*10000)/10000;}
 var key=(location.hash||'').slice(1).split('&')[0];
 if(!P.keyOk(key)){say('발주 링크가 없습니다.',true);return;}
-var BOX=null,SEL=null,QTY='',NEED='',ROWS=[],ERR='',NOTE='',BUSY=false,SENT=[];
+var BOX=null,SEL=null,QTY='',NEED='',ROWS=[],ERR='',NOTE='',BUSY=false,SENT=[],MODE='제품',PART={};   /* v180 PART = 공통부속 고른 것 {ccode:{on,qty}} */
 /* v178 발주서 목록 = 저장소 기준: 폼이 박스 문서에 적는 그 박스 발주서 요약(pos — 폼에서 지우면 빠짐, 상태 그대로)
    + 이 폰에서 막 저장해 아직 pos 에 없는 것(한 장씩 get, 저장소에 없으면 뺌). 링크는 erp_asmpo 목록을 못 읽는다(규칙 get 만). */
 function sentIds(){try{var o=JSON.parse(localStorage.getItem('asm.sent')||'{}');return (o[key]||[]).filter(P.keyOk);}catch(e){return [];}}
 function sentPut(ids){try{var o=JSON.parse(localStorage.getItem('asm.sent')||'{}');o[key]=ids.slice(0,30);localStorage.setItem('asm.sent',JSON.stringify(o));}catch(e){}}
-function sumOf(id,d){var rs=d.rows||[];return {id:id,pname:d.pname,qty:d.qty,need:d.need,status:d.status,at:d.at,n:rs.length,
+function sumOf(id,d){var rs=d.rows||[];return {id:id,kind:d.kind==='부속'?'부속':'제품',pname:d.kind==='부속'?(rs.length?show(rs[0].cname)+(rs.length>1?' 외 '+(rs.length-1):''):''):d.pname,qty:d.qty,need:d.need,status:d.status,at:d.at,n:rs.length,st:{t:'발주서 저장',c:'wait'},
   off:rs.filter(function(r){return r&&r.on===false;}).length,chg:rs.filter(function(r){return r&&r.on!==false&&Number(r.qty)!==Number(r.base);}).length};}
 function loadSent(){
   var pos=Array.isArray(BOX&&BOX.pos)?BOX.pos.filter(function(p){return p&&P.keyOk(p.id);}):[],have={};pos.forEach(function(p){have[p.id]=1;});
@@ -103,6 +109,31 @@ function save(){
     SEL=null;ROWS=[];QTY='';NEED='';NOTE='저장했습니다.';BUSY=false;draw();window.scrollTo(0,0);
   },function(){BUSY=false;ERR='저장하지 못했습니다. 잠시 뒤 다시 눌러 주세요.';draw();});
 }
+/* v180 공통부속 발주 */
+function parts(){return ((BOX&&BOX.parts)||[]).filter(function(p){return p&&p.ccode;});}
+function savePart(){
+  var on=parts().filter(function(p){var x=PART[p.ccode];return x&&x.on;}),e='';NOTE='';
+  if(!on.length)e='발주할 부속을 골라 주세요.';
+  for(var i=0;!e&&i<on.length;i++){var v=Number(PART[on[i].ccode].qty);if(String(PART[on[i].ccode].qty).trim()===''||!isFinite(v)||v<=0)e=show(on[i].cname)+' 수량을 넣어 주세요.';}
+  if(!e&&!/^\d{4}-\d{2}-\d{2}$/.test(NEED))e='필요일을 넣어 주세요.';
+  ERR=e;if(e){draw();return;}
+  if(!confirm('공통부속 '+on.length+'줄 발주서를 저장합니다.'))return;
+  var id=P.rkey(),now=new Date().toISOString(),rows=on.map(function(p){return {ccode:show(p.ccode),cname:show(p.cname),cspec:show(p.cspec),unit:show(p.unit),qty:Number(PART[p.ccode].qty),on:true,for:(p.for||[]).map(show)};});
+  var doc={box:key,vendor:show(BOX.vendor),kind:'부속',pcode:'',pname:'',pspec:'',qty:r4(rows.reduce(function(a,r){return a+r.qty;},0)),need:NEED,rows:rows,at:now,status:'대기'};
+  BUSY=true;draw();
+  P.commit([{name:'erp_asmpo/'+id,fields:doc,exists:false}]).then(function(){
+    sentPut([id].concat(sentIds()));SENT.unshift(sumOf(id,doc));PART={};NEED='';NOTE='저장했습니다.';BUSY=false;draw();window.scrollTo(0,0);
+  },function(){BUSY=false;ERR='저장하지 못했습니다. 잠시 뒤 다시 눌러 주세요.';draw();});
+}
+function partEl(p){
+  var x=PART[p.ccode]||(PART[p.ccode]={on:false,qty:''});
+  var cb=h('input');cb.type='checkbox';cb.checked=x.on;cb.setAttribute('aria-label','발주 '+show(p.cname));
+  var qi=h('input');qi.type='number';qi.inputMode='decimal';qi.step='any';qi.min='0';qi.value=x.qty;qi.disabled=!x.on;qi.setAttribute('aria-label','수량 '+show(p.cname));
+  var tr=h('tr',x.on?'':'idle',h('td','',cb),h('td','',show(p.cname)),h('td','mono',show(p.ccode)),h('td','',show(p.cspec)),h('td','',show(p.unit)),h('td','for',(p.for||[]).map(show).join(' · ')),h('td','n',qi));
+  cb.addEventListener('change',function(){x.on=cb.checked;qi.disabled=!x.on;tr.className=x.on?'':'idle';if(x.on)qi.focus();});
+  qi.addEventListener('input',function(){x.qty=qi.value;});
+  return tr;
+}
 function rowEl(x){
   var cb=h('input');cb.type='checkbox';cb.checked=x.on;cb.setAttribute('aria-label','발주 '+show(x.r.cname));
   var qi=h('input');qi.type='number';qi.inputMode='decimal';qi.step='any';qi.min='0';qi.value=x.qty;qi.setAttribute('aria-label','필요 수량 '+show(x.r.cname));
@@ -113,11 +144,36 @@ function rowEl(x){
   qi.addEventListener('input',function(){x.qty=qi.value;x.edited=true;mark();});
   return tr;
 }
+function sentEl(){   /* v180 발주서마다 단계(폼이 적음) · 부속 공정·도착 */
+  if(!SENT.length)return null;
+  return h('section','sent',h('h2','','발주서'),SENT.map(function(d){
+    var st=d.st||{t:show(d.status),c:'wait'},off=Number(d.off||0),ch=Number(d.chg||0);
+    return h('div','po',h('div','top',h('span','nt',show(d.pname)),h('span','st'+(st.c==='done'?' on':st.c==='bad'?' bad':''),show(st.t))),
+      h('dl','',d.kind==='부속'?[h('dt','','발주'),h('dd','','공통부속 '+num(d.n||0)+'줄')]:[h('dt','','발주 수량'),h('dd','n',num(d.qty)),h('dt','','줄'),h('dd','n',num(d.n||0)+(off?' · 빼기 '+off:'')+(ch?' · 고침 '+ch:''))],
+        h('dt','','필요일'),h('dd','',show(d.need)),
+        Number(d.pt)?[h('dt','','부속 공정'),h('dd','n',num(d.pd)+' / '+num(d.pt))]:null,
+        Number(d.an)?[h('dt','','부속 도착'),h('dd','n',num(d.ad)+' / '+num(d.an))]:null,
+        h('dt','','저장'),h('dd','',when(d.at))));
+  }));
+}
 function draw(){
   if(BOX===null){say('불러오지 못했습니다.',true);return;}
   if(BOX===false){say('발주 링크가 없습니다.',true);return;}
   var rf=h('button','sec',LOADING?'불러오는 중':'새로고침');rf.type='button';rf.disabled=LOADING;rf.addEventListener('click',function(){NOTE='';load();draw();});   /* v178 사장님 「발주링크에 새로고침 버튼을 만들어 주세요」 */
   var its=items(),out=[P.who('발주 — '+show(BOX.vendor),'out'),h('div','bar',rf)];
+  var tab=function(m,t){var b=h('button',MODE===m?'':'sec',t);b.type='button';b.setAttribute('aria-pressed',MODE===m?'true':'false');b.addEventListener('click',function(){if(MODE!==m){MODE=m;ERR='';NOTE='';draw();}});return b;};
+  out.push(h('div','tabs',tab('제품','제품 발주'),tab('부속','공통부속 발주')));   /* v180 사장님 「발주서 입력 링크에서 공통 부속도  골라서 따로 발주 할 수 있어야 함」 */
+  if(MODE==='부속'){
+    if(NOTE)out.push(h('p','note',NOTE));
+    var ps=parts();
+    if(!ps.length)out.push(h('p','msg','발주할 부속이 없습니다.'));
+    else{var dP=h('input');dP.type='date';dP.value=NEED;dP.addEventListener('input',function(){NEED=dP.value;});dP.addEventListener('change',function(){NEED=dP.value;});
+      var erP=h('p','err',ERR);erP.hidden=!ERR;mainEl.oninput=function(){if(ERR){ERR='';erP.hidden=true;}};
+      var svP=h('button','wide',BUSY?'저장 중':'발주서 저장');svP.type='button';svP.disabled=BUSY;svP.addEventListener('click',savePart);
+      out.push(h('section','po',h('label','one','필요일',dP),
+        h('div','tw',h('table','',h('thead','',h('tr','',['발주','품명','품번','규격','단위','제품','수량'].map(function(t,i){return h('th',i===6?'n':'',t);}))),h('tbody','',ps.map(partEl)))),erP,svP));}
+    out.push(sentEl());P.fill(mainEl,out);return;
+  }
   if(NOTE)out.push(h('p','note',NOTE));
   if(!its.length)out.push(h('p','msg','발주할 제품이 없습니다.'));
   if(its.length){   /* v177 제품 = 고르기 칸(사장님 「제품선택칸이 없습니다」) */
@@ -139,11 +195,7 @@ function draw(){
     }
     out.push(h('section','po',sec));
   }
-  if(SENT.length)out.push(h('section','sent',h('h2','','발주서'),SENT.map(function(d){
-    var off=Number(d.off||0),ch=Number(d.chg||0);
-    return h('div','po',h('div','top',h('span','nt',show(d.pname)),h('span','st',show(d.status))),
-      h('dl','',h('dt','','발주 수량'),h('dd','n',num(d.qty)),h('dt','','필요일'),h('dd','',show(d.need)),h('dt','','줄'),h('dd','n',num(d.n||0)+(off?' · 빼기 '+off:'')+(ch?' · 고침 '+ch:'')),h('dt','','저장'),h('dd','',when(d.at))));
-  })));
+  out.push(sentEl());
   P.fill(mainEl,out);
 }
 load();
