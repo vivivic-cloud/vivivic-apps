@@ -1,5 +1,6 @@
 <!doctype html>
-<!-- v182 「필요일」 → 「납품요청일」 · 발주서 목록 = 「등록대기」·「등록완료」 접힌 카드(폼 「발주서」 와 같은 꼴), 세는 말 뺌.
+<!-- v183 제품 발주 부속 표의 공통부속(두 제품 이상 BOM) 줄 = 처음 체크 해제 · 왼쪽 띠.
+     v182 「필요일」 → 「납품요청일」 · 발주서 목록 = 「등록대기」·「등록완료」 접힌 카드(폼 「발주서」 와 같은 꼴), 세는 말 뺌.
      v181 사장님 「발주서 링크에는 품번 나올필요없어요 숨겨 주세요.」 — 화면에서 품번 칸·글자 모두 뺌(문서에는 그대로 저장).
      v180 「제품 발주」·「공통부속 발주」 두 탭(공통부속 = 박스 parts 에서 여러 줄 골라 수량, 문서 kind '부속' — 규칙 배포 뒤 저장됨) · 발주서마다 단계(폼이 박스 pos.st 에 적음)·부속 공정·도착 숫자.
      v178 새로고침 단추 · 발주서 목록 = 박스 문서 pos(폼이 씀) + 이 폰에서 막 저장한 것. v177 제품 = 고르기 칸(select). v176 조립업체 발주 링크 — 사장님 「조립업체에서 시작될 발주링크를 만들어보자」(11-10). 로그인 없음, 폼과 별개.
@@ -39,6 +40,7 @@ td input[type=number]{width:84px;font:inherit;text-align:right;border:1px solid 
 td input[type=checkbox]{width:20px;height:20px;margin:0}
 tr.chg td{background:#fffbeb}tr.off td{background:var(--fill3);color:var(--muted)}tr.off td:not(:first-child){text-decoration:line-through}
 tr.off input[type=number]{visibility:hidden}
+tr.com td:first-child{box-shadow:inset 3px 0 0 #93c5fd}   /* v183 공통부속 줄 */
 tr.idle td{color:var(--muted)}tr.idle input[type=number]{visibility:hidden}
 .sent{border-top:1px solid var(--line);margin:18px 0 0;padding:12px 0 0}
 .sent h2{font-size:15px;font-weight:900;margin:0 0 8px}
@@ -92,7 +94,10 @@ function load(){
     .then(loadSent).then(function(){LOADING=false;draw();},function(){LOADING=false;draw();});
 }
 function items(){return ((BOX&&BOX.items)||[]).filter(function(it){return it&&it.pcode&&(it.rows||[]).length;});}
-function pickItem(it){SEL=it;ERR='';NOTE='';QTY='';ROWS=(it.rows||[]).map(function(r){return {r:r,on:true,qty:'',edited:false};});draw();}
+/* v183 사장님 「발주링크 제품발주- 공통부속 기본적으로 체크안되어 있게 해주세요」 — 공통부속 = 박스 parts 중 두 제품 이상 BOM 에 있는 부속(for 2개 이상). 처음 체크 해제, 줄 왼쪽 띠로만 구별 */
+function comSet(){var o={};parts().forEach(function(p){if((p.for||[]).length>=2)o[p.ccode]=1;});return o;}
+function pickItem(it){SEL=it;ERR='';NOTE='';QTY='';var cm=comSet();ROWS=(it.rows||[]).map(function(r){var c=!!cm[r.ccode];return {r:r,on:!c,com:c,qty:'',edited:false};});draw();}
+function rowCls(x){return (x.on?'':(x.com?'idle':'off'))+(x.com?' com':'')+(chg(x)?' chg':'');}
 /* 발주 수량이 바뀌면 손대지 않은 줄의 필요 수량 = BOM 수량 × 발주 수량 */
 function baseOf(x){var q=Number(QTY);return QTY!==''&&isFinite(q)&&q>0?r4(Number(x.r.per||0)*q):'';}
 function setQty(v){QTY=v;ROWS.forEach(function(x){if(!x.edited)x.qty=baseOf(x)===''?'':String(baseOf(x));});}
@@ -145,9 +150,9 @@ function partEl(p){
 function rowEl(x){
   var cb=h('input');cb.type='checkbox';cb.checked=x.on;cb.setAttribute('aria-label','발주 '+show(x.r.cname));
   var qi=h('input');qi.type='number';qi.inputMode='decimal';qi.step='any';qi.min='0';qi.value=x.qty;qi.setAttribute('aria-label','필요 수량 '+show(x.r.cname));
-  var tr=h('tr',(x.on?'':'off')+(chg(x)?' chg':''),h('td','',cb),h('td','',show(x.r.cname)),h('td','',show(x.r.cspec)),h('td','',show(x.r.unit)),
+  var tr=h('tr',rowCls(x),h('td','',cb),h('td','',show(x.r.cname)),h('td','',show(x.r.cspec)),h('td','',show(x.r.unit)),
     h('td','n',baseOf(x)===''?'':num(baseOf(x))),h('td','n',qi));
-  var mark=function(){tr.className=(x.on?'':'off')+(chg(x)?' chg':'');};
+  var mark=function(){tr.className=rowCls(x);};
   cb.addEventListener('change',function(){x.on=cb.checked;if(x.on&&String(x.qty).trim()===''){x.edited=false;x.qty=baseOf(x)===''?'':String(baseOf(x));qi.value=x.qty;}mark();});
   qi.addEventListener('input',function(){x.qty=qi.value;x.edited=true;mark();});
   return tr;
