@@ -1,5 +1,6 @@
 <!doctype html>
-<!-- v180 「제품 발주」·「공통부속 발주」 두 탭(공통부속 = 박스 parts 에서 여러 줄 골라 수량, 문서 kind '부속' — 규칙 배포 뒤 저장됨) · 발주서마다 단계(폼이 박스 pos.st 에 적음)·부속 공정·도착 숫자.
+<!-- v181 사장님 「발주서 링크에는 품번 나올필요없어요 숨겨 주세요.」 — 화면에서 품번 칸·글자 모두 뺌(문서에는 그대로 저장).
+     v180 「제품 발주」·「공통부속 발주」 두 탭(공통부속 = 박스 parts 에서 여러 줄 골라 수량, 문서 kind '부속' — 규칙 배포 뒤 저장됨) · 발주서마다 단계(폼이 박스 pos.st 에 적음)·부속 공정·도착 숫자.
      v178 새로고침 단추 · 발주서 목록 = 박스 문서 pos(폼이 씀) + 이 폰에서 막 저장한 것. v177 제품 = 고르기 칸(select). v176 조립업체 발주 링크 — 사장님 「조립업체에서 시작될 발주링크를 만들어보자」(11-10). 로그인 없음, 폼과 별개.
      주소 = 발주.html#<조립업체 박스 열쇠>. 자료 = erp_asmbox/<열쇠>(폼이 씀: vendor·pcodes·items[{pcode,pname,pspec,rows[{ccode,cname,cspec,unit,per}]}]).
      제품 고르기 → 발주 수량·필요일 → 기본 BOM 부속 줄 전부(필요 수량 처음 값 = BOM 수량 × 발주 수량) → 줄마다 빼기(체크 해제)·수량 고치기 → 「발주서 저장」
@@ -129,7 +130,7 @@ function partEl(p){
   var x=PART[p.ccode]||(PART[p.ccode]={on:false,qty:''});
   var cb=h('input');cb.type='checkbox';cb.checked=x.on;cb.setAttribute('aria-label','발주 '+show(p.cname));
   var qi=h('input');qi.type='number';qi.inputMode='decimal';qi.step='any';qi.min='0';qi.value=x.qty;qi.disabled=!x.on;qi.setAttribute('aria-label','수량 '+show(p.cname));
-  var tr=h('tr',x.on?'':'idle',h('td','',cb),h('td','',show(p.cname)),h('td','mono',show(p.ccode)),h('td','',show(p.cspec)),h('td','',show(p.unit)),h('td','for',(p.for||[]).map(show).join(' · ')),h('td','n',qi));
+  var tr=h('tr',x.on?'':'idle',h('td','',cb),h('td','',show(p.cname)),h('td','',show(p.cspec)),h('td','',show(p.unit)),h('td','for',(p.for||[]).map(show).join(' · ')),h('td','n',qi));
   cb.addEventListener('change',function(){x.on=cb.checked;qi.disabled=!x.on;tr.className=x.on?'':'idle';if(x.on)qi.focus();});
   qi.addEventListener('input',function(){x.qty=qi.value;});
   return tr;
@@ -137,7 +138,7 @@ function partEl(p){
 function rowEl(x){
   var cb=h('input');cb.type='checkbox';cb.checked=x.on;cb.setAttribute('aria-label','발주 '+show(x.r.cname));
   var qi=h('input');qi.type='number';qi.inputMode='decimal';qi.step='any';qi.min='0';qi.value=x.qty;qi.setAttribute('aria-label','필요 수량 '+show(x.r.cname));
-  var tr=h('tr',(x.on?'':'off')+(chg(x)?' chg':''),h('td','',cb),h('td','',show(x.r.cname)),h('td','mono',show(x.r.ccode)),h('td','',show(x.r.cspec)),h('td','',show(x.r.unit)),
+  var tr=h('tr',(x.on?'':'off')+(chg(x)?' chg':''),h('td','',cb),h('td','',show(x.r.cname)),h('td','',show(x.r.cspec)),h('td','',show(x.r.unit)),
     h('td','n',baseOf(x)===''?'':num(baseOf(x))),h('td','n',qi));
   var mark=function(){tr.className=(x.on?'':'off')+(chg(x)?' chg':'');};
   cb.addEventListener('change',function(){x.on=cb.checked;if(x.on&&String(x.qty).trim()===''){x.edited=false;x.qty=baseOf(x)===''?'':String(baseOf(x));qi.value=x.qty;}mark();});
@@ -171,13 +172,13 @@ function draw(){
       var erP=h('p','err',ERR);erP.hidden=!ERR;mainEl.oninput=function(){if(ERR){ERR='';erP.hidden=true;}};
       var svP=h('button','wide',BUSY?'저장 중':'발주서 저장');svP.type='button';svP.disabled=BUSY;svP.addEventListener('click',savePart);
       out.push(h('section','po',h('label','one','필요일',dP),
-        h('div','tw',h('table','',h('thead','',h('tr','',['발주','품명','품번','규격','단위','제품','수량'].map(function(t,i){return h('th',i===6?'n':'',t);}))),h('tbody','',ps.map(partEl)))),erP,svP));}
+        h('div','tw',h('table','',h('thead','',h('tr','',['발주','품명','규격','단위','제품','수량'].map(function(t,i){return h('th',i===5?'n':'',t);}))),h('tbody','',ps.map(partEl)))),erP,svP));}
     out.push(sentEl());P.fill(mainEl,out);return;
   }
   if(NOTE)out.push(h('p','note',NOTE));
   if(!its.length)out.push(h('p','msg','발주할 제품이 없습니다.'));
   if(its.length){   /* v177 제품 = 고르기 칸(사장님 「제품선택칸이 없습니다」) */
-    var pSel=h('select');var o0=h('option','','선택');o0.value='';pSel.append(o0);its.forEach(function(it,i){var o=h('option','',show(it.pname)+' ('+show(it.pcode)+')');o.value=String(i);if(SEL===it)o.selected=true;pSel.append(o);});
+    var pSel=h('select');var o0=h('option','','선택');o0.value='';pSel.append(o0);its.forEach(function(it,i){var o=h('option','',show(it.pname));o.value=String(i);if(SEL===it)o.selected=true;pSel.append(o);});
     if(!SEL)pSel.value='';
     pSel.addEventListener('change',function(){var it=its[Number(pSel.value)];if(pSel.value===''){SEL=null;ROWS=[];ERR='';draw();}else if(it&&SEL!==it)pickItem(it);});
     var sec=[h('label','one','제품',pSel)];
@@ -190,7 +191,7 @@ function draw(){
     dIn.addEventListener('change',function(){NEED=dIn.value;});dIn.addEventListener('input',function(){NEED=dIn.value;});
     var sv=h('button','wide',BUSY?'저장 중':'발주서 저장');sv.type='button';sv.disabled=BUSY;sv.addEventListener('click',save);
     sec.push(h('div','fl',h('label','','발주 수량',qIn),h('label','','필요일',dIn)),
-      h('div','tw',h('table','',h('thead','',h('tr','',['발주','품명','품번','규격','단위','BOM 수량','필요 수량'].map(function(t,i){return h('th',i>=5?'n':'',t);}))),tb)),
+      h('div','tw',h('table','',h('thead','',h('tr','',['발주','품명','규격','단위','BOM 수량','필요 수량'].map(function(t,i){return h('th',i>=4?'n':'',t);}))),tb)),
       er,sv);
     }
     out.push(h('section','po',sec));
