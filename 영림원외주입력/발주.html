@@ -1,5 +1,6 @@
 <!doctype html>
-<!-- v183 제품 발주 부속 표의 공통부속(두 제품 이상 BOM) 줄 = 처음 체크 해제 · 왼쪽 띠.
+<!-- v184 발주서 = 업체 박스 하나(처음 닫힘, 겉 숫자 칩, 안 등록대기·등록완료) — 폼 「발주서」 업체 박스와 같은 꼴.
+     v183 제품 발주 부속 표의 공통부속(두 제품 이상 BOM) 줄 = 처음 체크 해제 · 왼쪽 띠.
      v182 「필요일」 → 「납품요청일」 · 발주서 목록 = 「등록대기」·「등록완료」 접힌 카드(폼 「발주서」 와 같은 꼴), 세는 말 뺌.
      v181 사장님 「발주서 링크에는 품번 나올필요없어요 숨겨 주세요.」 — 화면에서 품번 칸·글자 모두 뺌(문서에는 그대로 저장).
      v180 「제품 발주」·「공통부속 발주」 두 탭(공통부속 = 박스 parts 에서 여러 줄 골라 수량, 문서 kind '부속' — 규칙 배포 뒤 저장됨) · 발주서마다 단계(폼이 박스 pos.st 에 적음)·부속 공정·도착 숫자.
@@ -51,6 +52,7 @@ tr.idle td{color:var(--muted)}tr.idle input[type=number]{visibility:hidden}
 .cardh{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;width:100%;text-align:left;background:none;border:0;color:var(--ink);padding:10px 12px;font-weight:600;min-height:44px}
 .cardh .arr{color:var(--muted);width:12px}.cardh .nt{font-weight:800;word-break:break-all}.cardh .ns{font-size:12px;color:var(--muted);font-weight:700;flex-basis:100%;padding-left:20px}
 .cardh .st{padding-left:20px}.card .tw{margin:0 10px 10px}
+.vbox{background:var(--fill3)}.vbox .vin{padding:0 10px 10px}.vbox .vin .card{background:#fff}.boxh .st{padding-left:0}
 /* v180 두 탭 · 공통부속 표의 제품 칸 */
 .tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 12px}.tabs button{min-height:44px}
 td.for{white-space:normal;min-width:160px;font-size:12px;color:var(--muted)}
@@ -174,10 +176,18 @@ function cardEl(d){
           :h('tr',(off?'off':'')+(cg?' chg':''),h('td','',off?'':'✓'),h('td','',show(x.cname)),h('td','',show(x.cspec)),h('td','',show(x.unit)),h('td','n',num(x.base)),h('td','n',off?'':num(x.qty)));}))));}
   return h('div','card'+(open?' open':''),hd,body);
 }
+/* v184 폼 「발주서」 업체 박스와 같은 꼴 — 박스 하나(처음 닫힘), 겉 = 업체 이름 + 숫자 칩(등록대기 n · 등록완료 n · 단계별 n, 0 숨김), 안 = 등록대기·등록완료 */
+var BOXOPEN=false;
+function chips(){var reg=SENT.filter(function(d){return Number((d.st||{}).r||1)<=2;}).length,done=SENT.filter(function(d){return Number((d.st||{}).r||1)>2;}),by={},o=[];
+  done.forEach(function(d){var t=show(d.st.t);if(!by[t]){by[t]={n:0,c:d.st.c,r:Number(d.st.r)};o.push(t);}by[t].n++;});o.sort(function(a,b){return by[a].r-by[b].r;});
+  return [reg?h('span','st','등록대기 '+reg):null,done.length?h('span','st on','등록완료 '+done.length):null].concat(o.map(function(t){return h('span','st'+(by[t].c==='done'?' on':by[t].c==='bad'?' bad':''),t+' '+by[t].n);})).filter(Boolean);}
 function sentEl(){
   var reg=SENT.filter(function(d){return Number((d.st||{}).r||1)<=2;}),done=SENT.filter(function(d){return Number((d.st||{}).r||1)>2;});
-  return h('section','sent',h('h2','','발주서'),h('h3','','등록대기'),h('p','cnt',reg.length+'건'),reg.length?reg.map(cardEl):h('p','msg','발주서가 없습니다.'),
-    h('h3','','등록완료'),h('p','cnt',done.length+'건'),done.map(cardEl));
+  var hd=h('button','cardh boxh',h('span','arr',BOXOPEN?'▾':'▸'),h('span','nt',show(BOX.vendor)),chips());hd.type='button';hd.setAttribute('aria-expanded',BOXOPEN?'true':'false');
+  hd.addEventListener('click',function(){BOXOPEN=!BOXOPEN;draw();});
+  return h('section','sent',h('h2','','발주서'),h('div','card vbox'+(BOXOPEN?' open':''),hd,!BOXOPEN?null:h('div','vin',
+    h('h3','','등록대기'),h('p','cnt',reg.length+'건'),reg.length?reg.map(cardEl):h('p','msg','발주서가 없습니다.'),
+    h('h3','','등록완료'),h('p','cnt',done.length+'건'),done.map(cardEl))));
 }
 function draw(){
   if(BOX===null){say('불러오지 못했습니다.',true);return;}

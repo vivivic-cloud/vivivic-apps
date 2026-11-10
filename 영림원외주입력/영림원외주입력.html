@@ -5406,6 +5406,10 @@ function asmLinkStage(a){
   var ss=ds.map(asmProdStage),m=ss.slice().sort(function(x,y){return x.r-y.r;})[0],o={r:m.r,t:m.t,c:m.c,pt:0,pd:0,an:0,ad:0};
   ss.forEach(function(s){o.pt+=s.pt;o.pd+=s.pd;o.an+=s.an;o.ad+=s.ad;});return o;
 }
+/* v184 사장님 「발주서 발주대기 목록은 각 거래처 박스안에 두고 내부 상황을 박스외부에 표기 해주세요」 — 박스 겉 숫자 칩(0 은 숨김) */
+function asmCountChips(ls){var reg=ls.filter(function(x){return x.st.r<=2;}).length,done=ls.filter(function(x){return x.st.r>2;}),by={},o=[];
+  done.forEach(function(x){var t=x.st.t;if(!by[t]){by[t]={n:0,c:x.st.c,r:x.st.r};o.push(t);}by[t].n++;});o.sort(function(a,b){return by[a].r-by[b].r;});
+  return [reg?h('span',{class:'asmst wait'},'등록대기 '+reg):null,done.length?h('span',{class:'asmst done'},'등록완료 '+done.length):null].concat(o.map(function(t){return h('span',{class:'asmst '+by[t].c},t+' '+by[t].n);})).filter(Boolean);}
 function asmRegChip(st){return st.r<=2?{t:st.c==='bad'?'오류':/진행중/.test(st.t)?'진행중':'대기',c:st.c}:st;}   /* v182 등록대기 칩 = 대기·진행중·오류 */
 function asmTitle(a){if(a.kind!=='부속')return show(a.pname);var rs=a.rows||[];return rs.length?show(rs[0].cname)+(rs.length>1?' 외 '+(rs.length-1):''):'';}
 function asmConvDocs(a){
@@ -5479,7 +5483,7 @@ function renderAsm(){
       var line=function(x,isReg){return asmLine(x,v,x.a&&delIds[x.a.id]?kit.pk(x.a):null,isReg);};
       return h('div',{class:'podgrp'+(open?' open':'')},h('div',{class:'podgh'},
           h('button',{type:'button',class:'podgt','aria-expanded':open?'true':'false',on:{click:function(){if(open)delete asmOpen[k];else asmOpen[k]=1;draw();}}},
-            h('span',{class:'navarr','aria-hidden':'true'},open?'▾':'▸'),h('span',{class:'nt'},v)),
+            h('span',{class:'navarr','aria-hidden':'true'},open?'▾':'▸'),h('span',{class:'nt'},v),asmCountChips(ls)),
           b?h('button',{type:'button',class:'btn small podshare',on:{click:function(){if(asmOpen[qk])delete asmOpen[qk];else{asmOpen[qk]=1;asmOpen[k]=1;}draw();}}},'QR'):null,
           b?asmShareBtn(b):null),
         !open?null:h('div',{class:'asmlines'},asmOpen[qk]&&b?asmQr(asmUrl(b.id)):null,
