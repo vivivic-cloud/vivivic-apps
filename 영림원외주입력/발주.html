@@ -1,0 +1,136 @@
+<!doctype html>
+<!-- v176 조립업체 발주 링크 — 사장님 「조립업체에서 시작될 발주링크를 만들어보자」(11-10). 로그인 없음, 폼과 별개.
+     주소 = 발주.html#<조립업체 박스 열쇠>. 자료 = erp_asmbox/<열쇠>(폼이 씀: vendor·pcodes·items[{pcode,pname,pspec,rows[{ccode,cname,cspec,unit,per}]}]).
+     제품 고르기 → 발주 수량·필요일 → 기본 BOM 부속 줄 전부(필요 수량 처음 값 = BOM 수량 × 발주 수량) → 줄마다 빼기(체크 해제)·수량 고치기 → 「발주서 저장」
+       = erp_asmpo/<무작위 32자> {box,vendor,pcode,pname,pspec,qty,need,rows[{ccode,cname,cspec,unit,per,base,qty,on}],at,status:'대기'} 새로 만들기(REST commit, 없을 때만).
+     이 폰에서 저장한 발주서 id 는 localStorage asm.sent 에 남겨 아래에 보인다(폼에서 지우면 사라짐). 영림원 입력·가공처 지시는 안 함. -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>INGHOME 발주</title>
+<meta name="description" content="발주서 작성">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="INGHOME">
+<meta property="og:title" content="INGHOME 발주">
+<meta property="og:description" content="발주서 작성">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="발주공통.css">
+<style>
+.picks{display:grid;gap:8px;margin:0 0 14px}
+.pick{display:grid;gap:2px;text-align:left;width:100%;background:#fff;color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-height:44px}
+.pick .nt{font-weight:800;word-break:break-all}.pick .ns{font-size:12px;color:var(--muted);font-weight:600;font-family:var(--mono)}
+.pick.on{border-color:var(--ink);box-shadow:0 0 0 2px rgba(55,53,47,.12)}
+.fl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin:0 0 10px}
+.fl label{display:grid;gap:4px;font-size:13px;font-weight:700;color:var(--muted)}
+.fl input{font:inherit;color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:10px 12px;min-height:44px;width:100%;background:#fff}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:12px;margin:0 0 12px}
+table{border-collapse:collapse;font-size:13px;min-width:100%}
+th,td{padding:7px 8px;border-bottom:1px solid var(--rowline);text-align:left;white-space:nowrap;vertical-align:middle}
+th{background:var(--fill3);color:var(--muted);font-weight:800;font-size:12px}
+tr:last-child td{border-bottom:0}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}td.mono{font-family:var(--mono)}
+td input[type=number]{width:84px;font:inherit;text-align:right;border:1px solid var(--line);border-radius:8px;padding:6px 8px;min-height:36px}
+td input[type=checkbox]{width:20px;height:20px;margin:0}
+tr.chg td{background:#fffbeb}tr.off td{background:var(--fill3);color:var(--muted)}tr.off td:not(:first-child){text-decoration:line-through}
+tr.off input[type=number]{visibility:hidden}
+.sent{border-top:1px solid var(--line);margin:18px 0 0;padding:12px 0 0}
+.sent h2{font-size:15px;font-weight:900;margin:0 0 8px}
+.sent .po{margin:8px 0}
+</style>
+</head>
+<body>
+<main id="main"><p class="msg">불러오는 중</p></main>
+<script src="발주공통.js"></script>
+<script>
+(function(){
+"use strict";
+var P=window.PO,h=P.h,show=P.show,num=P.num,mainEl=document.getElementById('main');
+function say(t,bad){mainEl.replaceChildren(h('p','msg'+(bad?' bad':''),t));}
+function when(s){var t=new Date(s);if(!s||isNaN(t))return show(s);var p=function(n){return String(n).padStart(2,'0');};return t.getFullYear()+'-'+p(t.getMonth()+1)+'-'+p(t.getDate())+' '+p(t.getHours())+':'+p(t.getMinutes());}
+function r4(n){return Math.round(n*10000)/10000;}
+var key=(location.hash||'').slice(1).split('&')[0];
+if(!P.keyOk(key)){say('발주 링크가 없습니다.',true);return;}
+var BOX=null,SEL=null,QTY='',NEED='',ROWS=[],ERR='',NOTE='',BUSY=false,SENT=[];
+/* 이 폰에서 저장한 발주서(이 박스) */
+function sentIds(){try{var o=JSON.parse(localStorage.getItem('asm.sent')||'{}');return (o[key]||[]).filter(P.keyOk);}catch(e){return [];}}
+function sentPut(ids){try{var o=JSON.parse(localStorage.getItem('asm.sent')||'{}');o[key]=ids.slice(0,30);localStorage.setItem('asm.sent',JSON.stringify(o));}catch(e){}}
+function loadSent(){var ids=sentIds();if(!ids.length){SENT=[];return Promise.resolve();}
+  return P.getMany(ids.map(function(i){return 'erp_asmpo/'+i;})).then(function(o){
+    SENT=ids.map(function(i){var d=o['erp_asmpo/'+i];return d?Object.assign({id:i},d):null;}).filter(Boolean);
+    if(SENT.length!==ids.length)sentPut(SENT.map(function(d){return d.id;}));},function(){});}
+function load(){
+  return P.getOne('erp_asmbox/'+key).then(function(b){BOX=b||false;},function(){BOX=null;})
+    .then(loadSent).then(draw);
+}
+function items(){return ((BOX&&BOX.items)||[]).filter(function(it){return it&&it.pcode&&(it.rows||[]).length;});}
+function pickItem(it){SEL=it;ERR='';NOTE='';QTY='';ROWS=(it.rows||[]).map(function(r){return {r:r,on:true,qty:'',edited:false};});draw();}
+/* 발주 수량이 바뀌면 손대지 않은 줄의 필요 수량 = BOM 수량 × 발주 수량 */
+function baseOf(x){var q=Number(QTY);return QTY!==''&&isFinite(q)&&q>0?r4(Number(x.r.per||0)*q):'';}
+function setQty(v){QTY=v;ROWS.forEach(function(x){if(!x.edited)x.qty=baseOf(x)===''?'':String(baseOf(x));});}
+function chg(x){if(!x.on)return false;var b=baseOf(x);return b!==''&&String(x.qty).trim()!==''&&Number(x.qty)!==b;}
+function check(){
+  var q=Number(QTY);if(QTY===''||!isFinite(q)||q<=0)return '발주 수량을 넣어 주세요.';
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(NEED))return '필요일을 넣어 주세요.';
+  var on=ROWS.filter(function(x){return x.on;});if(!on.length)return '발주할 줄이 없습니다.';
+  for(var i=0;i<on.length;i++){var v=Number(on[i].qty);if(String(on[i].qty).trim()===''||!isFinite(v)||v<=0)return show(on[i].r.cname)+' 수량을 넣어 주세요.';}
+  return '';
+}
+function save(){
+  var e=check();ERR=e;NOTE='';if(e){draw();return;}
+  if(!confirm(show(SEL.pname)+' '+num(QTY)+' 발주서를 저장합니다.'))return;
+  var id=P.rkey(),now=new Date().toISOString(),q=Number(QTY);
+  var doc={box:key,vendor:show(BOX.vendor),pcode:show(SEL.pcode),pname:show(SEL.pname),pspec:show(SEL.pspec),qty:q,need:NEED,
+    rows:ROWS.map(function(x){var b=r4(Number(x.r.per||0)*q);return {ccode:show(x.r.ccode),cname:show(x.r.cname),cspec:show(x.r.cspec),unit:show(x.r.unit),per:Number(x.r.per||0),base:b,qty:x.on?Number(x.qty):0,on:!!x.on};}),
+    at:now,status:'대기'};
+  BUSY=true;draw();
+  P.commit([{name:'erp_asmpo/'+id,fields:doc,exists:false}]).then(function(){
+    sentPut([id].concat(sentIds()));SENT.unshift(Object.assign({id:id},doc));
+    SEL=null;ROWS=[];QTY='';NEED='';NOTE='저장했습니다.';BUSY=false;draw();window.scrollTo(0,0);
+  },function(){BUSY=false;ERR='저장하지 못했습니다. 잠시 뒤 다시 눌러 주세요.';draw();});
+}
+function rowEl(x){
+  var cb=h('input');cb.type='checkbox';cb.checked=x.on;cb.setAttribute('aria-label','발주 '+show(x.r.cname));
+  var qi=h('input');qi.type='number';qi.inputMode='decimal';qi.step='any';qi.min='0';qi.value=x.qty;qi.setAttribute('aria-label','필요 수량 '+show(x.r.cname));
+  var tr=h('tr',(x.on?'':'off')+(chg(x)?' chg':''),h('td','',cb),h('td','',show(x.r.cname)),h('td','mono',show(x.r.ccode)),h('td','',show(x.r.cspec)),h('td','',show(x.r.unit)),
+    h('td','n',baseOf(x)===''?'':num(baseOf(x))),h('td','n',qi));
+  var mark=function(){tr.className=(x.on?'':'off')+(chg(x)?' chg':'');};
+  cb.addEventListener('change',function(){x.on=cb.checked;if(x.on&&String(x.qty).trim()===''){x.edited=false;x.qty=baseOf(x)===''?'':String(baseOf(x));qi.value=x.qty;}mark();});
+  qi.addEventListener('input',function(){x.qty=qi.value;x.edited=true;mark();});
+  return tr;
+}
+function draw(){
+  if(BOX===null){say('불러오지 못했습니다.',true);return;}
+  if(BOX===false){say('발주 링크가 없습니다.',true);return;}
+  var its=items(),out=[P.who('발주 — '+show(BOX.vendor),'out')];
+  if(NOTE)out.push(h('p','note',NOTE));
+  if(!its.length)out.push(h('p','msg','발주할 제품이 없습니다.'));
+  out.push(h('div','picks',its.map(function(it){var b=h('button','pick'+(SEL===it?' on':''),h('span','nt',show(it.pname)),h('span','ns',show(it.pcode)));b.type='button';
+    b.addEventListener('click',function(){if(SEL!==it)pickItem(it);});return b;})));
+  if(SEL){
+    var qIn=h('input');qIn.type='number';qIn.inputMode='decimal';qIn.step='any';qIn.min='0';qIn.value=QTY;
+    var dIn=h('input');dIn.type='date';dIn.value=NEED;
+    var tb=h('tbody','',ROWS.map(rowEl)),er=h('p','err',ERR);er.hidden=!ERR;
+    mainEl.oninput=function(){if(ERR){ERR='';er.hidden=true;}};
+    qIn.addEventListener('input',function(){setQty(qIn.value);tb.replaceChildren.apply(tb,ROWS.map(rowEl));});
+    dIn.addEventListener('change',function(){NEED=dIn.value;});dIn.addEventListener('input',function(){NEED=dIn.value;});
+    var sv=h('button','wide',BUSY?'저장 중':'발주서 저장');sv.type='button';sv.disabled=BUSY;sv.addEventListener('click',save);
+    out.push(h('section','po',h('div','top',h('span','nt',show(SEL.pname))),
+      h('div','fl',h('label','','발주 수량',qIn),h('label','','필요일',dIn)),
+      h('div','tw',h('table','',h('thead','',h('tr','',['발주','품명','품번','규격','단위','BOM 수량','필요 수량'].map(function(t,i){return h('th',i>=5?'n':'',t);}))),tb)),
+      er,sv));
+  }
+  if(SENT.length)out.push(h('section','sent',h('h2','','발주서'),SENT.map(function(d){
+    var rs=d.rows||[],off=rs.filter(function(r){return r&&r.on===false;}).length,ch=rs.filter(function(r){return r&&r.on!==false&&Number(r.qty)!==Number(r.base);}).length;
+    return h('div','po',h('div','top',h('span','nt',show(d.pname)),h('span','st',show(d.status))),
+      h('dl','',h('dt','','발주 수량'),h('dd','n',num(d.qty)),h('dt','','필요일'),h('dd','',show(d.need)),h('dt','','줄'),h('dd','n',rs.length+(off?' · 빼기 '+off:'')+(ch?' · 고침 '+ch:'')),h('dt','','저장'),h('dd','',when(d.at))));
+  })));
+  P.fill(mainEl,out);
+}
+load();
+})();
+</script>
+</body>
+</html>
