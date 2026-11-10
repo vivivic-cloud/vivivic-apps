@@ -232,7 +232,6 @@ nav .navlist{display:flex;flex-direction:column;gap:2px;margin:2px 0 8px 12px;pa
 .prhead{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:14px;font-weight:800;overflow-wrap:anywhere}.prsub{margin-top:2px;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
 .pritem{margin-top:10px;font-size:13px;font-weight:800;overflow-wrap:anywhere}
 .prrow{border-top:1px solid var(--rowline);padding:8px 0;font-size:13px;min-width:0;overflow-wrap:anywhere}.prrow .btn.small{margin:6px 6px 0 0}.prrow select{width:100%;max-width:320px;margin-top:4px}
-.prdet>summary{list-style:none;cursor:pointer}.prdet>summary::-webkit-details-marker{display:none}.prdet>summary .prhead::before{content:'▸';color:var(--muted);font-size:12px}.prdet[open]>summary .prhead::before{content:'▾'}.prdet>summary input.pk{margin:0}   /* v189 */
 .prline{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}.prline small{color:var(--muted)}.prbad{color:var(--red);font-size:12px;margin-top:2px;white-space:pre-line}.prnote{font-size:12px;margin-top:2px;color:var(--amber);white-space:pre-line}.prwip{margin-top:4px;font-size:12px}
 .prpanel{margin-top:8px;padding:10px;border:1px solid var(--line2);border-radius:8px;background:#fff}
 .wcpick:disabled{opacity:.8}   /* v63 저장된 업체도 숫자가 보이게 */
@@ -382,7 +381,7 @@ table.asmt tr.chg td{background:var(--amber-bg)}table.asmt tr.off td{color:var(-
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v189</span>
+    <span class="ver">v190</span>
   </div>
 </header>
 <div class="wrap">
@@ -4148,7 +4147,7 @@ function prodKind(r){return r.last?'완성 부속':'재공품';}
 function prodMoveNo(r){return r.last?r.itemNo:wipCode(r.itemNo,r.seq);}
 function prodDone(d){return d.status==='완료'&&(d.rows||[]).every(function(r){return prodNum(r.qty-prodSum(prodDlvs(d,r).filter(function(x){return x.status==='완료';}),'dlvQty'))<=0;});}
 function prodRunFn(){
-  var s=BYKEY.proddlvs,busy=false,open=null,pending=false,kit=null,OPENP={},hd=h('h3',{class:'deltitle'});   /* v103 kit = 대기·오류 생산 지우기 */
+  var s=BYKEY.proddlvs,busy=false,open=null,pending=false,kit=null,hd=h('h3',{class:'deltitle'});   /* v103 kit = 대기·오류 생산 지우기 */
   var box=h('div',{}),done=h('details',{class:'prgap',hidden:true}),gone=h('details',{class:'gonebox',hidden:true}),none=h('p',{class:'hint',hidden:true},'진행 중인 생산이 없습니다. 「주간생산계획입력·외주발주입력」에서 넣으면 여기에 보입니다.'),out=h('p',{class:'pslink','aria-live':'polite'});
   function fieldsFor(){var o={};['dlvDate','stmtNo','stmtAmt'].forEach(function(k){o[k]=makeField(s.fields.filter(function(f){return f.k===k;})[0]);});return o;}
   /* v171 외주발주된 제품 고르기 → v174 입력부 하나 + 공정별로 모인 표(재단·엣지·보링…) + 저장 하나 = 공정마다 문서 한 건. 사장님 「이 발주의 이런 부자재들이 이런공정으로 나눠져있다 저장 하려면 해라 이런식으로 보이게」 */
@@ -4229,16 +4228,9 @@ function prodRunFn(){
     });
   }
   function noteOf(a){return a.filter(function(x){return x.status==='오류'||(x.agentNote&&x.status!=='완료');}).map(function(x){return x.status==='오류'?h('div',{class:'prbad'},'오류: '+(x.agentNote||'영림원 처리 실패')):h('div',{class:'prnote'},x.agentNote);});}
-  function rowEl(d,r){   /* v171 줄 단추(외주납품입력·자재출고입력)는 없앴다 — 납품은 위에서 생산 하나를 골라 전 공정을 한 번에 */
-    var made=prodMade(d,r),ds=prodDlvs(d,r);
-    var wait=ds.filter(function(x){return x.status==='대기'||x.status==='진행중';}).length;
-    var kids=[h('div',{class:'prline'},h('b',{},r.seq+'. '+r.proc),h('span',{},r.wc),r.orderNo?h('small',{},'발주 '+r.orderNo):'',h('span',{},'납품 '+show(made)+' / '+show(r.qty)),wait?h('span',{class:'chip 대기'},'처리 대기 '+wait):'')];
-    kids=kids.concat(noteOf(ds.filter(function(x){return !x.whole;})));
-    return h('div',{class:'prrow'},kids);
-  }
-  function cardEl(d){   /* v189 사장님 「이런 생산외주 2.자재출고 페이지에 각 발주를 펼쳐서 알 수 있는 이런 내용을 미리 정신없이 나열해 놓을 필요가 있냐?」 — 목록은 머리 줄만, 공정·업체·발주·납품은 펼칠 때만 */
-    var chip={'대기':'발주 대기','진행중':'발주 중','완료':'발주 끝','오류':'오류'}[d.status]||d.status,seen='',kids=[];
-    var sum=h('summary',{},h('div',{class:'prhead'},kit?kit.pk(d):null,h('span',{},d.itemNo),h('span',{},show(d.qty)+'개'),h('span',{class:'chip '+d.status},chip)),
+  function cardEl(d){   /* v190 사장님 「이런 생산외주 2.자재출고 페이지에 각 발주를 펼쳐서 알 수 있는 이런 내용을 미리 정신없이 나열해 놓을 필요가 있냐?」 · 「펼쳐도 안보여도되」 · 「어차피 발주번호별로 확인 되잖아」 — 반자재·공정·업체·발주·납품 줄 없음, 머리 줄만 */
+    var chip={'대기':'발주 대기','진행중':'발주 중','완료':'발주 끝','오류':'오류'}[d.status]||d.status,kids=[];
+    kids.push(h('div',{class:'prhead'},kit?kit.pk(d):null,h('span',{},d.itemNo),h('span',{},show(d.qty)+'개'),h('span',{class:'chip '+d.status},chip)),
       h('div',{class:'prsub'},[d.itemName,'생산계획완료일 '+d.dueDate,d.planNo?'생산계획 '+d.planNo:''].filter(Boolean).join(' · ')));
     if(d.agentNote&&d.status!=='완료')kids.push(h('div',{class:d.status==='오류'?'prbad':'prnote'},d.agentNote));   /* v100 대기·진행중 메모도 */
     kids=kids.concat(noteOf(prodWhole(d)));   /* v171 전 공정 납품 문서 메모 */
@@ -4247,14 +4239,7 @@ function prodRunFn(){
     var dueKey='due|'+d.id;
     if(open&&open.key===dueKey)kids.push(open.el);
     else if(d.status==='오류'||d.status==='대기')kids.push(h('button',{type:'button',class:'btn small',disabled:busy,on:{click:function(){openDue(d);}}},'생산계획완료일 고치기'));
-    (d.rows||[]).forEach(function(r){
-      if(r.itemNo!==seen&&d.kind==='제품'){kids.push(h('div',{class:'pritem'},r.itemNo+' · '+(r.itemName||'')+' · '+show(r.qty)+'개'));}seen=r.itemNo;
-      kids.push(rowEl(d,r));
-    });
-    var dt=h('details',{class:'prcard prdet'},[sum].concat(kids));
-    if(OPENP[d.id]||(open&&open.key===dueKey))dt.open=true;
-    dt.addEventListener('toggle',function(){if(dt.open)OPENP[d.id]=1;else delete OPENP[d.id];});
-    return dt;
+    return h('div',{class:'prcard'},kids);
   }
   function draw(){
     var a=(data.prods||[]).filter(function(d){return d.id;}).slice().sort(function(x,y){return String(y.createdAt||'')<String(x.createdAt||'')?-1:1;});
