@@ -355,7 +355,8 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 .podfin{display:grid;gap:4px}.podfin .podbtn{border:0;padding:0}.podkv2 .nt{font-weight:800;margin:6px 0 0}   /* v156 납품완료목록 */
 .dlvsum{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin-top:4px;font-size:12px}.dlvsum .dlvstate{font-weight:800}.dlvsum .dlvstate.warn{color:var(--amber)}.dlvsum .dlvover{margin:0}
 .dlvover{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:0 0 8px}   /* v157 */
-.asmh{font-size:14px;font-weight:900;margin:16px 0 6px}.asmh:first-child{margin-top:4px}.podgrp.asmpo .podgh{margin:0;flex-wrap:nowrap;align-items:flex-start}.podgrp.asmpo .podgh .pk{margin-top:6px}.podgrp.asmpo.open .podgh{margin:0 0 8px}.podgh .pk{flex:0 0 auto;margin:0}.asmit{cursor:default}table.asmt td,table.asmt th{white-space:nowrap}table.asmt td.asmn{text-align:right;font-variant-numeric:tabular-nums}table.asmt tr.chg td{background:var(--amber-bg)}table.asmt tr.off td{color:var(--muted);text-decoration:line-through}   /* v176 발주서 */
+.asmh{font-size:14px;font-weight:900;margin:16px 0 6px}.asmh:first-child{margin-top:4px}.podgrp.asmpo .podgh{margin:0;flex-wrap:nowrap;align-items:flex-start}.podgrp.asmpo .podgh .pk{margin-top:6px}.podgrp.asmpo.open .podgh{margin:0 0 8px}.podgh .pk{flex:0 0 auto;margin:0}.asmit{cursor:default}table.asmt td,table.asmt th{white-space:nowrap}table.asmt td.asmn{text-align:right;font-variant-numeric:tabular-nums}table.asmg td{vertical-align:top}table.asmg td.asmc{min-width:150px}.asmp{font-size:12px;font-weight:700;margin:0 0 3px}.asmst{display:inline-block;font-size:11.5px;font-weight:800;border-radius:999px;padding:1px 8px;margin:0 4px 3px 0;border:1px solid var(--line);color:var(--muted);background:var(--fill4);white-space:nowrap}.asmst.done{color:#166534;background:#f0fdf4;border-color:#bbf7d0}.asmst.wait{color:var(--amber);background:var(--amber-bg);border-color:#fde68a}table.asmg tr.asmrow td{background:var(--fill4);font-weight:700}.asmord{margin:10px 0 0}.asmoh{display:flex;gap:6px;align-items:baseline;margin:0 0 6px}.asmoh .nt{font-weight:900}.asmoh .ns{font-size:12px;color:var(--muted);font-weight:700}.asmprod{border:1px solid var(--line);border-radius:12px;background:#fff;padding:10px;margin:0 0 10px}.asmph{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;margin:0 0 6px}.asmph .nt{font-weight:800;word-break:break-all}.asmph .ns{font-size:12px;color:var(--muted);font-weight:700}   /* v179 */
+table.asmt tr.chg td{background:var(--amber-bg)}table.asmt tr.off td{color:var(--muted);text-decoration:line-through}   /* v176 발주서 */
 .podli{display:flex;gap:8px;align-items:stretch}.podli .podbtn{flex:1 1 auto;min-width:0}.podli .podshare{flex:0 0 auto;margin:0;align-self:center}.podbtn .nt{font-weight:800;word-break:break-all}.podbtn .ns{font-size:12px;color:var(--muted);font-weight:600}
 .podcodes{display:grid;justify-items:center;gap:8px;margin:12px 0}.podqr canvas{display:block;max-width:100%;image-rendering:pixelated}
 .podbc{width:100%;max-width:360px}.podbc svg{display:block;width:100%;height:auto}
@@ -380,7 +381,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v178</span>
+    <span class="ver">v179</span>
   </div>
 </header>
 <div class="wrap">
@@ -5320,6 +5321,58 @@ function asmQr(url){
 }
 function asmWhen(s){var t=s?new Date(s):null;if(!t||isNaN(t))return show(s);var p=function(n){return String(n).padStart(2,'0');};return t.getFullYear()+'-'+p(t.getMonth()+1)+'-'+p(t.getDate())+' '+p(t.getHours())+':'+p(t.getMinutes());}
 function asmChg(x){return x&&x.on!==false&&Number(x.qty)!==Number(x.base);}
+/* v179 사장님 「실제 영림원에 등록완료된 발주가 발주등록완료된 상태로 해당 조립업체의 박스에만 보여야 되는거 아닌가요?」 · 「…이 발주가 시작되었지만 조립이전 공정이 이런게 남았다 반자재도 도착전이고 반자재의 이전 공정도 시작전이고」
+   조립업체 박스 = erp_prods(오류·영림원에 없음 뺌)의 제품 자기 줄(조립) 중 외주발주번호(orderNo)가 있는 줄의 외주거래처. 박스 안 = 그 조립 외주발주번호마다 · 제품마다 부속 공정 상태.
+   상태는 폼 문서로만: 공정 줄 orderNo = 외주발주 · erp_proddlvs(그 생산·품번·공정차수, 오류 뺌) = 외주납품 대기/진행중/완료(줄 dlvNo 있으면 완료) · 다음 업체가 다르면 자재출고(줄 outNo, 옛 erp_prodmoves 문서) · 조립 줄 inNo = 외주입고 완료. 없으면 「시작 전」. */
+function asmProds(){return (data.prods||[]).filter(function(d){return d&&d.status!=='오류'&&!ylwGone(d)&&d.kind==='제품';});}
+function asmAsmRow(d){return (d.rows||[]).filter(function(r){return r.itemNo===d.itemNo;}).sort(function(x,y){return Number(x.seq)-Number(y.seq);})[0]||null;}
+function asmOrders(){   /* [{wc, orders:[{no, prods:[d]}]}] — 조립 외주발주가 있는 업체만 */
+  var by={};asmProds().forEach(function(d){var r=asmAsmRow(d);if(!r||!purTrim(r.orderNo)||!purTrim(r.wc))return;var w=purTrim(r.wc),no=purTrim(r.orderNo);
+    var v=by[w]||(by[w]={});(v[no]||(v[no]=[])).push(d);});
+  return Object.keys(by).sort().map(function(w){return {wc:w,orders:Object.keys(by[w]).sort().reverse().map(function(no){return {no:no,prods:by[w][no].sort(function(a,b){return String(a.itemName||'').localeCompare(String(b.itemName||''),'ko');})};})};});
+}
+function asmDlv(d,r){   /* 그 공정 줄의 외주납품 문서 줄들(오류 뺌) */
+  var out=[];(data.proddlvs||[]).forEach(function(x){if(!x||x.status==='오류'||x.prodId!==d.id)return;
+    if(x.all)(x.rows||[]).forEach(function(y){if(y&&y.itemNo===r.itemNo&&String(y.seq)===String(r.seq))out.push({doc:x,row:y});});
+    else if(x.itemNo===r.itemNo&&String(x.seq)===String(r.seq))out.push({doc:x,row:x});});return out;}
+function asmStepSt(d,r){   /* {t:글자, c:'done'|'wait'|'none'} */
+  if(!purTrim(r.orderNo))return {t:'시작 전',c:'none'};
+  var ds=asmDlv(d,r);if(!ds.length)return {t:'외주발주',c:'wait'};
+  if(ds.some(function(x){return purTrim(x.row.dlvNo)||x.doc.status==='완료';}))return {t:'외주납품 완료',c:'done'};
+  return {t:'외주납품 '+show(ds[0].doc.status||'대기'),c:'wait'};
+}
+function asmMoveSt(d,r){   /* 다음 업체가 다를 때만. null = 출고 필요 없음 */
+  var nx=prodNext(d,r);if(!nx||purTrim(nx.wc)===purTrim(r.wc))return null;
+  var ds=asmDlv(d,r);if(ds.some(function(x){return purTrim(x.row.outNo);}))return {t:'자재출고 완료',c:'done'};
+  var mv=(data.prodmoves||[]).filter(function(x){return x&&x.status!=='오류'&&x.prodId===d.id&&x.itemNo===r.itemNo&&String(x.seq)===String(r.seq);});
+  if(mv.some(function(x){return x.status==='완료'||purTrim(x.outNo);}))return {t:'자재출고 완료',c:'done'};
+  if(mv.length)return {t:'자재출고 '+show(mv[0].status||'대기'),c:'wait'};
+  if(ds.length)return {t:'자재출고 대기',c:'wait'};
+  return null;   /* 외주납품 문서 전에는 출고 칸 안 보임 */
+}
+function asmArrived(d,last,asmWc){   /* 부속 마지막 공정 → 조립업체 */
+  if(!last)return false;var st=asmStepSt(d,last);if(st.c!=='done')return false;
+  if(purTrim(last.wc)===purTrim(asmWc))return true;var m=asmMoveSt(d,last);return !!(m&&m.c==='done');
+}
+function asmChip(st){return h('span',{class:'asmst '+st.c},st.t);}
+function asmProdCard(d,asmWc){
+  var ar=asmAsmRow(d),parts={},order=[];
+  (d.rows||[]).forEach(function(r){if(r.itemNo===d.itemNo)return;if(!parts[r.itemNo]){parts[r.itemNo]=[];order.push(r.itemNo);}parts[r.itemNo].push(r);});
+  var maxP=0,arrived=0;order.forEach(function(k){parts[k].sort(function(x,y){return Number(x.seq)-Number(y.seq);});maxP=Math.max(maxP,parts[k].length);});
+  var cell=function(r){var st=asmStepSt(d,r),mv=asmMoveSt(d,r);return h('td',{class:'asmc'},h('div',{class:'asmp'},show(r.proc)+' · '+show(r.wc)),asmChip(st),mv?asmChip(mv):null);};
+  var trs=order.map(function(k){var rs=parts[k],last=rs[rs.length-1],ok=asmArrived(d,last,asmWc);if(ok)arrived++;
+    var tds=[h('td',{},show(rs[0].itemName)),h('td',{class:'mono'},k),h('td',{class:'asmn'},podNum(rs[0].qty))];
+    for(var i=0;i<maxP;i++)tds.push(rs[i]?cell(rs[i]):h('td',{}));
+    tds.push(h('td',{},asmChip(ok?{t:'도착',c:'done'}:{t:'도착 전',c:'none'})));
+    return h('tr',{},tds);});
+  var ast=ar?asmStepSt(d,ar):{t:'시작 전',c:'none'},inn=ar&&asmDlv(d,ar).some(function(x){return purTrim(x.row.inNo);});
+  var asmTr=ar?h('tr',{class:'asmrow'},[h('td',{},show(d.itemName)),h('td',{class:'mono'},show(d.itemNo)),h('td',{class:'asmn'},podNum(ar.qty||d.qty)),
+    h('td',{class:'asmc',colspan:String(Math.max(1,maxP))},h('div',{class:'asmp'},show(ar.proc)+' · '+show(ar.wc)),asmChip(ast),inn?asmChip({t:'외주입고 완료',c:'done'}):null),h('td',{})]):null;
+  var head=['품명','품번','수량'];for(var i=0;i<maxP;i++)head.push('공정 '+(i+1));head.push('도착');
+  return h('div',{class:'asmprod'},h('div',{class:'asmph'},h('span',{class:'nt'},show(d.itemName)),
+      h('span',{class:'ns'},['생산계획 '+show(d.planNo),podNum(d.qty)+'개','부속 '+order.length+'종 중 도착 '+arrived].join(' · ')),asmChip(ast)),
+    h('div',{class:'tw'},h('table',{class:'asmt asmg'},h('thead',{},h('tr',{},head.map(function(t){return h('th',{},t);}))),h('tbody',{},trs.concat(asmTr?[asmTr]:[])))));
+}
 function renderAsm(){
   bulk=null;listBox=null;listBox2=null;sheetDraw=null;ifRefresh=null;
   var box=h('div',{class:'podbox'}),lastKey='';
@@ -5327,10 +5380,17 @@ function renderAsm(){
     if(cur!=='asmpo')return;
     if(ASMBOX==null||data.contracts==null||data.boms==null||data.materials==null||data.asmpo==null){box.replaceChildren(h('p',{class:'msg'},'불러오는 중'));lastKey='';return;}
     var names=asmNames(),wants=names.map(asmWant),pos=(data.asmpo||[]).slice().sort(function(a,b){return String(a.at||'')<String(b.at||'')?1:-1;});
-    var key=JSON.stringify([asmOpen,asmCard,wants.map(asmSig),(ASMBOX||[]).map(function(b){return [b.id,b.vendor,b.createdAt];}),pos,picked.asmpo]);if(key===lastKey)return;lastKey=key;
-    var vend=names.length?names.map(function(n,i){var b=asmBoxOf(n),w=wants[i],open=!!asmOpen[n];
+    var key=JSON.stringify([data.prods,data.proddlvs,data.prodmoves,asmOpen,asmCard,wants.map(asmSig),(ASMBOX||[]).map(function(b){return [b.id,b.vendor,b.createdAt];}),pos,picked.asmpo]);if(key===lastKey)return;lastKey=key;
+    var ords=asmOrders();
+    var prog=ords.length?ords.map(function(g){var k='p:'+g.wc,open=!!asmOpen[k],np=0;g.orders.forEach(function(o){np+=o.prods.length;});
       return h('div',{class:'podgrp'+(open?' open':'')},h('div',{class:'podgh'},
-          h('button',{type:'button',class:'podgt','aria-expanded':open?'true':'false',on:{click:function(){if(open)delete asmOpen[n];else asmOpen[n]=1;draw();}}},
+          h('button',{type:'button',class:'podgt','aria-expanded':open?'true':'false',on:{click:function(){if(open)delete asmOpen[k];else asmOpen[k]=1;draw();}}},
+            h('span',{class:'navarr','aria-hidden':'true'},open?'▾':'▸'),h('span',{class:'nt'},g.wc),h('span',{class:'ns'},'외주발주 '+g.orders.length+' · 제품 '+np))),
+        !open?null:h('div',{},g.orders.map(function(o){return h('div',{class:'asmord'},h('div',{class:'asmoh'},h('span',{class:'ns'},'외주발주'),h('span',{class:'mono nt'},o.no)),o.prods.map(function(d){return asmProdCard(d,g.wc);}));})));
+    }):[h('p',{class:'msg'},'조립업체가 없습니다.')];
+    var vend=names.length?names.map(function(n,i){var b=asmBoxOf(n),w=wants[i],k='l:'+n,open=!!asmOpen[k];   /* v179 발주공유 링크 = 따로 묶음 */
+      return h('div',{class:'podgrp'+(open?' open':'')},h('div',{class:'podgh'},
+          h('button',{type:'button',class:'podgt','aria-expanded':open?'true':'false',on:{click:function(){if(open)delete asmOpen[k];else asmOpen[k]=1;draw();}}},
             h('span',{class:'navarr','aria-hidden':'true'},open?'▾':'▸'),h('span',{class:'nt'},n),h('span',{class:'ns'},'제품 '+w.items.length)),
           b?asmShareBtn(b):null),
         !open?null:h('div',{},b?asmQr(asmUrl(b.id)):null,h('div',{class:'podlist'},w.items.map(function(it){
@@ -5346,8 +5406,8 @@ function renderAsm(){
         !open?null:h('div',{class:'tw'},h('table',{class:'asmt'},h('thead',{},h('tr',{},['발주','품명','품번','규격','단위','BOM 수량','필요 수량'].map(function(t){return h('th',{},t);}))),
           h('tbody',{},rs.map(function(x){return h('tr',{class:(x.on===false?'off':'')+(asmChg(x)?' chg':'')},h('td',{},x.on===false?'':'✓'),h('td',{},show(x.cname)),h('td',{class:'mono'},show(x.ccode)),h('td',{},show(x.cspec)),h('td',{},show(x.unit)),
             h('td',{class:'asmn'},podNum(x.base)),h('td',{class:'asmn'},x.on===false?'':podNum(x.qty)));})))));};
-    box.replaceChildren.apply(box,[h('h3',{class:'asmh'},'조립업체')].concat(vend,[h('h3',{class:'asmh'},'발주서'),h('div',{class:'lsinfo'},h('span',{},pos.length+'건')),kit.bar].filter(Boolean),
-      pos.length?pos.map(card):[h('p',{class:'msg'},'발주서가 없습니다.')]));
+    box.replaceChildren.apply(box,[h('h3',{class:'asmh'},'조립업체')].concat(prog,[h('h3',{class:'asmh'},'발주서'),h('div',{class:'lsinfo'},h('span',{},pos.length+'건')),kit.bar].filter(Boolean),
+      pos.length?pos.map(card):[h('p',{class:'msg'},'발주서가 없습니다.')],[h('h3',{class:'asmh'},'발주공유 링크')],vend));
   }
   asmDraw=draw;
   mainEl.replaceChildren(h('section',{class:'card'},h('div',{class:'stephead'},h('h2',{},ASMPO.title)),box));
