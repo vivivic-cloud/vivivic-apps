@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- v177 제품 = 고르기 칸(select). v176 조립업체 발주 링크 — 사장님 「조립업체에서 시작될 발주링크를 만들어보자」(11-10). 로그인 없음, 폼과 별개.
+<!-- v178 새로고침 단추 · 발주서 목록 = 박스 문서 pos(폼이 씀) + 이 폰에서 막 저장한 것. v177 제품 = 고르기 칸(select). v176 조립업체 발주 링크 — 사장님 「조립업체에서 시작될 발주링크를 만들어보자」(11-10). 로그인 없음, 폼과 별개.
      주소 = 발주.html#<조립업체 박스 열쇠>. 자료 = erp_asmbox/<열쇠>(폼이 씀: vendor·pcodes·items[{pcode,pname,pspec,rows[{ccode,cname,cspec,unit,per}]}]).
      제품 고르기 → 발주 수량·필요일 → 기본 BOM 부속 줄 전부(필요 수량 처음 값 = BOM 수량 × 발주 수량) → 줄마다 빼기(체크 해제)·수량 고치기 → 「발주서 저장」
        = erp_asmpo/<무작위 32자> {box,vendor,pcode,pname,pspec,qty,need,rows[{ccode,cname,cspec,unit,per,base,qty,on}],at,status:'대기'} 새로 만들기(REST commit, 없을 때만).
@@ -19,6 +19,8 @@
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="발주공통.css">
 <style>
+/* v178 새로고침 */
+.bar{display:flex;justify-content:flex-end;margin:-6px 0 10px}.bar button{min-height:40px;padding:8px 14px}
 label.one{display:grid;gap:4px;font-size:13px;font-weight:700;color:var(--muted);margin:0 0 10px}
 label.one select{font:inherit;font-weight:700;color:var(--ink);border:1px solid var(--ink);border-radius:12px;padding:10px 12px;min-height:48px;width:100%;background:#fff;max-width:100%}
 .fl{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin:0 0 10px}
@@ -52,16 +54,28 @@ function r4(n){return Math.round(n*10000)/10000;}
 var key=(location.hash||'').slice(1).split('&')[0];
 if(!P.keyOk(key)){say('발주 링크가 없습니다.',true);return;}
 var BOX=null,SEL=null,QTY='',NEED='',ROWS=[],ERR='',NOTE='',BUSY=false,SENT=[];
-/* 이 폰에서 저장한 발주서(이 박스) */
+/* v178 발주서 목록 = 저장소 기준: 폼이 박스 문서에 적는 그 박스 발주서 요약(pos — 폼에서 지우면 빠짐, 상태 그대로)
+   + 이 폰에서 막 저장해 아직 pos 에 없는 것(한 장씩 get, 저장소에 없으면 뺌). 링크는 erp_asmpo 목록을 못 읽는다(규칙 get 만). */
 function sentIds(){try{var o=JSON.parse(localStorage.getItem('asm.sent')||'{}');return (o[key]||[]).filter(P.keyOk);}catch(e){return [];}}
 function sentPut(ids){try{var o=JSON.parse(localStorage.getItem('asm.sent')||'{}');o[key]=ids.slice(0,30);localStorage.setItem('asm.sent',JSON.stringify(o));}catch(e){}}
-function loadSent(){var ids=sentIds();if(!ids.length){SENT=[];return Promise.resolve();}
-  return P.getMany(ids.map(function(i){return 'erp_asmpo/'+i;})).then(function(o){
-    SENT=ids.map(function(i){var d=o['erp_asmpo/'+i];return d?Object.assign({id:i},d):null;}).filter(Boolean);
-    if(SENT.length!==ids.length)sentPut(SENT.map(function(d){return d.id;}));},function(){});}
+function sumOf(id,d){var rs=d.rows||[];return {id:id,pname:d.pname,qty:d.qty,need:d.need,status:d.status,at:d.at,n:rs.length,
+  off:rs.filter(function(r){return r&&r.on===false;}).length,chg:rs.filter(function(r){return r&&r.on!==false&&Number(r.qty)!==Number(r.base);}).length};}
+function loadSent(){
+  var pos=Array.isArray(BOX&&BOX.pos)?BOX.pos.filter(function(p){return p&&P.keyOk(p.id);}):[],have={};pos.forEach(function(p){have[p.id]=1;});
+  var ids=sentIds(),rest=ids.filter(function(i){return !have[i];});
+  var done=function(extra){SENT=pos.concat(extra).sort(function(a,b){return String(a.at||'')<String(b.at||'')?1:-1;});
+    sentPut(ids.filter(function(i){return have[i]||extra.some(function(x){return x.id===i;});}));};
+  if(!rest.length){done([]);return Promise.resolve();}
+  return P.getMany(rest.map(function(i){return 'erp_asmpo/'+i;})).then(function(o){
+    done(rest.map(function(i){var d=o['erp_asmpo/'+i];return d&&d.box===key?sumOf(i,d):null;}).filter(Boolean));},function(){done([]);});}
+var LOADING=false;
 function load(){
-  return P.getOne('erp_asmbox/'+key).then(function(b){BOX=b||false;},function(){BOX=null;})
-    .then(loadSent).then(draw);
+  LOADING=true;
+  return P.getOne('erp_asmbox/'+key).then(function(b){BOX=b||false;},function(){if(!BOX)BOX=null;})
+    .then(function(){   /* 새로고침: 고른 제품이 그대로면 친 값 유지 */
+      if(!SEL)return;var n=items().filter(function(it){return it.pcode===SEL.pcode;})[0];
+      if(n&&JSON.stringify(n.rows)===JSON.stringify(SEL.rows)){SEL=n;ROWS.forEach(function(x,i){x.r=n.rows[i];});}else{SEL=null;ROWS=[];QTY='';}})
+    .then(loadSent).then(function(){LOADING=false;draw();},function(){LOADING=false;draw();});
 }
 function items(){return ((BOX&&BOX.items)||[]).filter(function(it){return it&&it.pcode&&(it.rows||[]).length;});}
 function pickItem(it){SEL=it;ERR='';NOTE='';QTY='';ROWS=(it.rows||[]).map(function(r){return {r:r,on:true,qty:'',edited:false};});draw();}
@@ -85,7 +99,7 @@ function save(){
     at:now,status:'대기'};
   BUSY=true;draw();
   P.commit([{name:'erp_asmpo/'+id,fields:doc,exists:false}]).then(function(){
-    sentPut([id].concat(sentIds()));SENT.unshift(Object.assign({id:id},doc));
+    sentPut([id].concat(sentIds()));SENT.unshift(sumOf(id,doc));
     SEL=null;ROWS=[];QTY='';NEED='';NOTE='저장했습니다.';BUSY=false;draw();window.scrollTo(0,0);
   },function(){BUSY=false;ERR='저장하지 못했습니다. 잠시 뒤 다시 눌러 주세요.';draw();});
 }
@@ -102,7 +116,8 @@ function rowEl(x){
 function draw(){
   if(BOX===null){say('불러오지 못했습니다.',true);return;}
   if(BOX===false){say('발주 링크가 없습니다.',true);return;}
-  var its=items(),out=[P.who('발주 — '+show(BOX.vendor),'out')];
+  var rf=h('button','sec',LOADING?'불러오는 중':'새로고침');rf.type='button';rf.disabled=LOADING;rf.addEventListener('click',function(){NOTE='';load();draw();});   /* v178 사장님 「발주링크에 새로고침 버튼을 만들어 주세요」 */
+  var its=items(),out=[P.who('발주 — '+show(BOX.vendor),'out'),h('div','bar',rf)];
   if(NOTE)out.push(h('p','note',NOTE));
   if(!its.length)out.push(h('p','msg','발주할 제품이 없습니다.'));
   if(its.length){   /* v177 제품 = 고르기 칸(사장님 「제품선택칸이 없습니다」) */
@@ -125,9 +140,9 @@ function draw(){
     out.push(h('section','po',sec));
   }
   if(SENT.length)out.push(h('section','sent',h('h2','','발주서'),SENT.map(function(d){
-    var rs=d.rows||[],off=rs.filter(function(r){return r&&r.on===false;}).length,ch=rs.filter(function(r){return r&&r.on!==false&&Number(r.qty)!==Number(r.base);}).length;
+    var off=Number(d.off||0),ch=Number(d.chg||0);
     return h('div','po',h('div','top',h('span','nt',show(d.pname)),h('span','st',show(d.status))),
-      h('dl','',h('dt','','발주 수량'),h('dd','n',num(d.qty)),h('dt','','필요일'),h('dd','',show(d.need)),h('dt','','줄'),h('dd','n',rs.length+(off?' · 빼기 '+off:'')+(ch?' · 고침 '+ch:'')),h('dt','','저장'),h('dd','',when(d.at))));
+      h('dl','',h('dt','','발주 수량'),h('dd','n',num(d.qty)),h('dt','','필요일'),h('dd','',show(d.need)),h('dt','','줄'),h('dd','n',num(d.n||0)+(off?' · 빼기 '+off:'')+(ch?' · 고침 '+ch:'')),h('dt','','저장'),h('dd','',when(d.at))));
   })));
   P.fill(mainEl,out);
 }

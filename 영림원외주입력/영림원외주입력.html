@@ -380,7 +380,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v177</span>
+    <span class="ver">v178</span>
   </div>
 </header>
 <div class="wrap">
@@ -5288,13 +5288,18 @@ function asmWant(vendor){
   items.sort(function(x,y){return x.pname.localeCompare(y.pname,'ko');});
   return {vendor:vendor,pcodes:items.map(function(i){return i.pcode;}),items:items};
 }
-function asmSig(b){return JSON.stringify([show(b.vendor),(b.pcodes||[]).map(show),(b.items||[]).map(function(i){return [show(i.pcode),show(i.pname),show(i.pspec),(i.rows||[]).map(function(x){return [show(x.ccode),show(x.cname),show(x.cspec),show(x.unit),Number(x.per||0)];})];})]);}
+/* v178 사장님 「조혼이 발주링크에 입력한 발주서 는 입력폼 에서 등록대기 상태에서 삭제 하였습니다. 이또한 발주링크에 연동되어 표기 되어야 합니다…」
+   링크는 erp_asmpo 목록을 못 읽는다(규칙: get 만) → 폼이 박스 문서에 그 박스 발주서 요약 pos 를 적는다(지우면·상태가 바뀌면 고침). */
+function asmPos(boxId){return (data.asmpo||[]).filter(function(d){return d.box===boxId;}).sort(function(a,b){return String(a.at||'')<String(b.at||'')?1:-1;}).map(function(d){var rs=d.rows||[];
+  return {id:d.id,pcode:show(d.pcode),pname:show(d.pname),qty:Number(d.qty||0),need:show(d.need),status:show(d.status),at:show(d.at),n:rs.length,off:rs.filter(function(r){return r&&r.on===false;}).length,chg:rs.filter(function(r){return r&&r.on!==false&&Number(r.qty)!==Number(r.base);}).length};});}
+function asmPosSig(b){return JSON.stringify((b.pos||[]).map(function(p){return [show(p.id),show(p.pcode),show(p.pname),Number(p.qty||0),show(p.need),show(p.status),show(p.at),Number(p.n||0),Number(p.off||0),Number(p.chg||0)];}));}
+function asmSig(b){return asmPosSig(b)+JSON.stringify([show(b.vendor),(b.pcodes||[]).map(show),(b.items||[]).map(function(i){return [show(i.pcode),show(i.pname),show(i.pspec),(i.rows||[]).map(function(x){return [show(x.ccode),show(x.cname),show(x.cspec),show(x.unit),Number(x.per||0)];})];})]);}
 function asmBoxOf(vendor){var a=(ASMBOX||[]).filter(function(b){return b.vendor===vendor&&podKeyOk(b.id);}).sort(function(x,y){return String(x.createdAt||'')<String(y.createdAt||'')?-1:1;});return a[0]||null;}
 function asmBoxSync(){
-  if(!db||!db.collection||ASMBOX==null||data.contracts==null||data.boms==null||data.materials==null||!canCol('erp_asmbox','w'))return;
+  if(!db||!db.collection||ASMBOX==null||data.contracts==null||data.boms==null||data.materials==null||data.asmpo==null||!canCol('erp_asmbox','w'))return;   /* v178 발주서 요약도 */
   var ns=asmNames();(ASMBOX||[]).forEach(function(b){if(ns.indexOf(b.vendor)<0&&asmBoxOf(b.vendor)===b)ns.push(b.vendor);});   /* 조립 계약이 없어진 업체 박스는 빈 목록으로 */
   ns.forEach(function(v){
-    var want=asmWant(v),sig=asmSig(want),have=asmBoxOf(v),bk='a:'+v;
+    var want=asmWant(v),have=asmBoxOf(v),bk='a:'+v;want.pos=have?asmPos(have.id):[];var sig=asmSig(want);
     if(have&&asmSig(have)===sig)return;
     if(asmBusy[bk]===sig)return;asmBusy[bk]=sig;
     var now=new Date().toISOString(),done=function(e){asmBusy[bk]='';console.warn('발주 박스 못 씀',v,e);};
@@ -7331,7 +7336,7 @@ dbP.then(function(d){
   },function(){PODPUB=null;});
   /* v176 발주서(조립업체 발주 링크) */
   db.collection('erp_asmbox').onSnapshot(function(snap){ASMBOX=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});asmBoxSync();if(asmDraw)asmDraw();},function(){ASMBOX=null;});
-  db.collection('erp_asmpo').onSnapshot(function(snap){data.asmpo=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});renderNav();if(asmDraw)asmDraw();},function(){data.asmpo=data.asmpo||[];renderNav();if(asmDraw)asmDraw();});
+  db.collection('erp_asmpo').onSnapshot(function(snap){data.asmpo=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});asmBoxSync();renderNav();if(asmDraw)asmDraw();},function(){data.asmpo=data.asmpo||[];renderNav();if(asmDraw)asmDraw();});
   /* v102 재고 조회 */
   db.collection('erp_stocks').onSnapshot(function(snap){
     STOCKS=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});renderNav();if(stkDraw)stkDraw();
