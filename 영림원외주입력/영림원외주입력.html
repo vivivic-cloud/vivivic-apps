@@ -381,7 +381,7 @@ table.asmt tr.chg td{background:var(--amber-bg)}table.asmt tr.off td{color:var(-
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v187</span>
+    <span class="ver">v188</span>
   </div>
 </header>
 <div class="wrap">
@@ -4913,8 +4913,9 @@ function podPubUrl(k){return new URL('발주서.html#'+k,location.href).href;}
 function podInbox(d){var w=((d.rows||[]).filter(function(x){return x&&purTrim(x.wh);})[0]||{}).wh,b=w?boxOf('입고처',purTrim(w)):null;return b?b.id:'';}   /* v153 ⚠ 시험용 */
 /* v155 사장님 「…영림원 등록 대기에서 입력이 완료되어 입력완료로 변경된경우를 그렇게 처리해 줄 수 있을ㅅ까요?」 — 그 발주의 구매납품(flow_) 문서가 「완료」면 모든 곳에서 「납품완료」: 보기만, 단추 모두 꺼짐, QR·바코드 안 그림.
    링크 페이지는 erp_purdelvs 를 못 읽어 폼이 공개 문서·박스 pos·erp_podlv 에 final:true 를 적는다(폼이 열릴 때). 쓰기는 규칙이 이미 막음(erp_purdelvs 가 대기 아니면). */
-function podFinal(no){   /* v159 발주가 닫힘 = 납품 흐름 완료가 있고, 원본 줄마다 「완료」 납품 합 ≥ 발주수량(완료된 발주수정 반영) */
-  var ds=(data.purdelvs||[]).filter(function(r){return purTrim(r.pono)===no&&r.status==='완료';});if(!ds.some(function(r){return String(r.id||'').indexOf('flow_')===0;}))return false;
+function podFinal(no){   /* v159 발주가 닫힘 = 원본 줄마다 「완료」 납품 합 ≥ 발주수량(완료된 발주수정 반영) */
+  /* v188 사장님 「…입력폼등록대기로 입력이 되어 영림원에 입력완료가 된것도 완료로 처리되게 코드 수정해」 — 링크(flow_) 납품이 없어도 손 입력 구매납품 「완료」 합이 차면 닫힘(PUPO202611100001) */
+  var ds=(data.purdelvs||[]).filter(function(r){return purTrim(r.pono)===no&&r.status==='완료';});if(!ds.length)return false;
   var po=(PODOCS||[]).filter(function(d){return purTrim(d.pono||d.id)===no;})[0];if(!po)return false;
   var src=(data[po.purCol==='erp_purords'?'purords':'purchases']||[]).filter(function(d){return d.id===po.purId;})[0],rows=(src&&src.rows||[]).filter(function(x){return x&&purTrim(x.vendor)===purTrim(po.vendor);});
   if(!rows.length)return false;
@@ -5203,7 +5204,9 @@ function podTokSync(){
 }
 /* v156 사장님 「발주서 관리 납품완료 건은 납품완료목록에서 따로 관리 하게 해주세요」 — 영림원 입력완료(flow_ 구매납품 완료) 발주를 거래처별로, 납품일 늦은 것부터. 보기만 */
 function podDoneList(){
-  var recs=(data.purdelvs||[]).filter(function(r){return String(r.id||'').indexOf('flow_')===0&&r.status==='완료'&&podFinal(purTrim(r.pono));});   /* v159 닫힌 발주만(부분납품은 안 옮김) */
+  var isF=function(r){return String(r.id||'').indexOf('flow_')===0;},fin=(data.purdelvs||[]).filter(function(r){return r.status==='완료'&&podFinal(purTrim(r.pono));});   /* v159 닫힌 발주만(부분납품은 안 옮김) */
+  var hasF={};fin.forEach(function(r){if(isF(r))hasF[purTrim(r.pono)]=1;});
+  var recs=fin.filter(function(r){return isF(r)||!hasF[purTrim(r.pono)];});   /* v188 손 입력 납품도 — 링크 납품이 있는 발주는 링크 납품만(두 번 안 나옴) */
   if(!recs.length)return [h('p',{class:'msg'},'발주서가 없습니다.')];
   var by={};recs.forEach(function(r){var v=purTrim(r.vendor);(by[v]=by[v]||[]).push(r);});
   var latest=function(a){return a.reduce(function(m,r){return String(r.dlvdate||'')>m?String(r.dlvdate||''):m;},'');};
@@ -5227,7 +5230,7 @@ function renderPodocs(){
   function draw(){
     if(cur!=='podocs')return;
     if(PODOCS==null||data.purchases==null||data.purords==null){box.replaceChildren(h('p',{class:'msg'},'불러오는 중'));lastKey='';return;}
-    var all=podAll(),key=JSON.stringify([podSel,podView2,podOpenGrp,(data.purdelvs||[]).filter(function(r){return String(r.id||'').indexOf('flow_')===0;}).map(function(r){return r.id+r.status;}),Object.keys(DLV_IMG).length,podSel?[POSHIP,POIN,PODLV]:0,all,podSel?data.purdelvs:0,(PODPUB||[]).map(function(p){return p.id;}),(POBOX||[]).map(function(b){return [b.id,b.kind,b.name];}),POCONF]);if(key===lastKey)return;lastKey=key;   /* 같은 내용이면 다시 안 그림(QR 깜박임) */
+    var all=podAll(),key=JSON.stringify([podSel,podView2,podOpenGrp,(data.purdelvs||[]).map(function(r){return r.id+r.status;}),Object.keys(DLV_IMG).length,podSel?[POSHIP,POIN,PODLV]:0,all,podSel?data.purdelvs:0,(PODPUB||[]).map(function(p){return p.id;}),(POBOX||[]).map(function(b){return [b.id,b.kind,b.name];}),POCONF]);if(key===lastKey)return;lastKey=key;   /* 같은 내용이면 다시 안 그림(QR 깜박임) */
     if(podSel){var d=all.filter(function(x){return purTrim(x.pono||x.id)===podSel;})[0];
       box.replaceChildren.apply(box,d?podView(d):[h('div',{class:'actions'},h('button',{type:'button',class:'btn small',on:{click:function(){podGo('');}}},'목록')),h('p',{class:'msg bad'},'문서가 없습니다.')]);return;}
     if(!all.length){box.replaceChildren(h('p',{class:'msg'},'발주서가 없습니다.'));return;}
