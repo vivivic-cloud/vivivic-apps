@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원 기본정보 입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v2 -->
+<!-- 영림원 기본정보 입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v3 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -118,6 +118,17 @@ table.sheet td.lock{padding:6px 10px;color:var(--muted);background:var(--fill4)}
 table.sheet td.bad{box-shadow:inset 0 0 0 2px var(--red);background:var(--red-bg)}
 table.sheet td.un{box-shadow:inset 0 0 0 2px #f59e0b}
 .plan td{white-space:normal;vertical-align:top}
+.steps{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:4px 0 6px}
+.stp{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;gap:6px;align-items:center;padding:6px 12px;min-height:36px;border-radius:999px;border:1px solid var(--line);font-size:12.5px;font-weight:800;color:var(--muted)}
+.stp b{font-family:var(--mono);font-size:11px}
+.stp:hover{background:var(--fill3)}
+.stp[aria-current="step"]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.stp:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.wiz .box{margin-top:12px}
+.wiz .box .row h3{margin:0}
+.setrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px}
+.setbtn{display:flex;gap:6px}
+.wiznav{border-top:1px solid var(--line);padding-top:14px;margin-top:22px}
 .toast:not(:empty){position:fixed;left:16px;right:16px;bottom:16px;z-index:50;margin:0 auto;max-width:480px;padding:10px 14px;background:#fff;border:1px solid #e3e2e0;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.08)}
 #erp-login{position:fixed;inset:0;z-index:300;background:#fff;display:grid;place-items:center;padding:16px}
 #erp-login form{width:min(360px,100%);display:grid;gap:10px}#erp-login h2{margin:0 0 4px;font-size:18px;font-weight:900;letter-spacing:-0.02em}
@@ -143,7 +154,7 @@ table.sheet td.un{box-shadow:inset 0 0 0 2px #f59e0b}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v2</span>
+    <span class="ver">v3</span>
     <a class="btn small" href="../영림원외주입력/영림원외주입력.html" style="margin-left:8px">입력폼</a>
   </div>
 </header>
@@ -215,14 +226,14 @@ function connectDb(){
 }
 (function(){
 "use strict";
-var VER='v2';
+var VER='v3';
 var GS_MAKER='https://script.google.com/macros/s/AKfycbzxW9K--tKq_uqHnzNdecOA4YbKosK51XVG1MJVFTVTzB5Kz5o7gN1YeYuthCRI4PshOw/exec';   /* 영림원외주입력 v113 웹앱(구글시트양식/양식만들기.gs) — 파일 이름은 「외주입력_」 로 시작해야 받는다 */
 var GS_NAME='외주입력_기본정보_한행입력표';
 var XLSX_URL='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js',xlsxP=null;
 var COL='erp_basic';
 var SPEC=null,db=null,ME=null,data={basic:null},T={};   /* T = 폼 자료(erp_items …) — 드롭다운·미등록·넘기기 겹침 확인 */
 var TCOLS=['erp_items','erp_materials','erp_boms','erp_itemflows','erp_itemmats','erp_itemwcs','erp_contracts','erp_purprices','erp_flows','erp_processes','erp_workcenters','erp_vendors','erp_classes'];
-var cur='제품',open={},sel={},q='',busy=false,boxKind='',dirty=false,later=false;
+var cur='단계',open={},sel={},q='',busy=false,boxKind='',dirty=false,later=false;
 /* 편집 중(dirty)에는 저장소 변경으로 화면을 다시 그리지 않는다 — 고치던 값이 사라지지 않게. 저장·닫기 뒤에 그린다 */
 function soft(){if(dirty){later=true;return;}draw();}
 var mainEl=document.getElementById('main'),navEl=document.getElementById('nav'),sumEl=document.getElementById('sum'),toastEl=document.getElementById('toast'),bannerEl=document.getElementById('banner');
@@ -284,18 +295,19 @@ function unreg(opt,v){return CHECKED[opt]&&s(v)&&T.erp_flows&&listOf(opt).indexO
 function rows(){return data.basic||[];}
 function kindRows(k){return rows().filter(function(r){return k==='자재'?r.kind==='자재':r.kind==='품목'&&(k==='제품'?r.asset!=='반제품':r.asset==='반제품');});}
 function drawSum(){
-  var all=rows(),wait=all.filter(function(r){return r.status!=='넘김';}).length,tst=all.filter(function(r){return (r.test||[]).length;}).length;
-  sumEl.replaceChildren(h('span',{class:'pill'},'제품 '+kindRows('제품').length),h('span',{class:'pill'},'반제품 '+kindRows('반제품').length),h('span',{class:'pill'},'자재 '+kindRows('자재').length),
+  var all=rows().filter(function(r){return r.kind!=='단계';}),wait=all.filter(function(r){return r.status!=='넘김';}).length,tst=all.filter(function(r){return (r.test||[]).length;}).length;
+  sumEl.replaceChildren(h('span',{class:'pill'},'단계 입력 '+sets().length),h('span',{class:'pill'},'제품 '+kindRows('제품').length),h('span',{class:'pill'},'반제품 '+kindRows('반제품').length),h('span',{class:'pill'},'자재 '+kindRows('자재').length),
     h('span',{class:'pill'},'대기 '+wait),h('span',{class:'pill ok'},'넘김 '+(all.length-wait)),tst?h('span',{class:'pill warn'},'테스트값 남은 행 '+tst):'');
 }
-function drawNav(){navEl.replaceChildren.apply(navEl,['제품','반제품','자재'].map(function(k){
-  return h('button',{type:'button','aria-current':cur===k?'page':null,on:{click:function(){cur=k;sel={};q='';boxKind='';try{history.replaceState(null,'','#'+k);}catch(e){}draw();}}},h('span',{class:'nt'},k),h('span',{class:'ns'},String(kindRows(k).length)));}));}
+function drawNav(){navEl.replaceChildren.apply(navEl,['단계','제품','반제품','자재'].map(function(k){
+  return h('button',{type:'button','aria-current':cur===k?'page':null,on:{click:function(){cur=k;sel={};q='';boxKind='';PLAN=null;try{history.replaceState(null,'','#'+k);}catch(e){}draw();}}},h('span',{class:'nt'},k==='단계'?'단계 입력':k),h('span',{class:'ns'},String(k==='단계'?sets().length:kindRows(k).length)));}));}
 
 /* ---------- 화면 ---------- */
 function draw(){
   if(!SPEC||!data.basic){return;}
   dirty=false;later=false;
-  drawSum();drawNav();
+  drawSum();drawNav();refreshMatDl();
+  if(cur==='단계'){var wc=h('section',{class:'card'});drawWizard(wc);mainEl.replaceChildren(wc);return;}
   var list=kindRows(cur),ql=q.toLowerCase();
   var shown=list.filter(function(r){return !ql||(s(r.name)+' '+s(r.code)+' '+s(r.flow)).toLowerCase().indexOf(ql)>=0;})
     .sort(function(a,b){return s(a.code).localeCompare(s(b.code),'ko');});
@@ -476,13 +488,13 @@ var XLSX_FAIL='엑셀 도구를 불러오지 못했습니다. 인터넷 연결�
 function cellOut(r,f){var v;if(f.rep){var a=r[f.rep]||[];v=a[f.i]?a[f.i][f.c.k]:'';}else v=r[f.c.k];
   if(f.key==='test')return (r.test||[]).map(function(k){return keyLabel(sheetOf(r.kind),k);}).join(' · ');
   if(v===true)return 'O';if(v===false||v==null)return '';return v;}
-function buildBook(X){
+function buildBook(X,only){
   var wb=X.utils.book_new();
   SPEC.sheets.forEach(function(sh){
     var fc=flatCols(sh),r1=[],r2=fc.map(function(f){return f.lab+(f.c.req?'*':'');}),merges=[],col=0;
     sh.groups.forEach(function(g){var n=g.cols.length*(g.n||1);r1.push(g.g);for(var i=1;i<n;i++)r1.push('');if(n>1)merges.push({s:{r:0,c:col},e:{r:0,c:col+n-1}});col+=n;});
     var aoa=[r1,r2];
-    rows().filter(function(r){return r.kind===sh.kind;}).sort(function(a,b){return s(a.code).localeCompare(s(b.code),'ko');}).forEach(function(r){aoa.push(fc.map(function(f){return cellOut(r,f);}));});
+    (only||rows()).filter(function(r){return r.kind===sh.kind;}).sort(function(a,b){return s(a.code).localeCompare(s(b.code),'ko');}).forEach(function(r){aoa.push(fc.map(function(f){return cellOut(r,f);}));});
     var ws=X.utils.aoa_to_sheet(aoa);ws['!merges']=merges;ws['!cols']=fc.map(function(){return {wch:14};});
     X.utils.book_append_sheet(wb,ws,sh.name);
   });
@@ -684,8 +696,233 @@ function planBox(){
     h('div',{class:'row'},go,h('button',{type:'button',class:'btn',on:{click:function(){PLAN=null;boxKind='';draw();}}},'닫기'),msg));
 }
 
+/* ---------- 단계 입력 (v3) ----------
+   한 제품 묶음 = erp_basic 문서 s_… (kind '단계'). 첫 단서(품명·품번·반제품명·자재명)는 처음 나온 단계에서 한 번만 넣고,
+   다음 단계는 그 이름을 저절로 보여 주며 빈칸만 받는다. 「대기 저장」 = 품목·신규 자재 행(i_·m_)을 만들고 → 넘기기(폼 대기).
+   ⚠ 임시: 단계 구성 · 반제품은 모두 제품 바로 아래 · 9·10·11 머리 칸은 묶음 하나에 한 번(모든 품목 같은 값). */
+var STEPS=['제품','반제품','자재','BOM','신규 자재','공정·외주','저장'];
+var W=null;
+function uid(){return Math.random().toString(36).slice(2,9);}
+function newSet(){return {_id:'s_'+Date.now().toString(36)+uid(),kind:'단계',status:'작성중',step:0,
+  items:[{k:'p',asset:'제품',state:'사용',io:'내자',imp:'A등급',unit:'EA',mats:[],bq:{},pw:[]}],news:{},com:{}};}
+function newSub(){var p=W.items[0];return {k:uid(),asset:'반제품',state:'사용',io:s(p.io)||'내자',imp:s(p.imp)||'A등급',unit:'EA',mats:[],bq:{},pw:[]};}
+function sets(){return rows().filter(function(r){return r.kind==='단계';}).sort(function(a,b){return s(b.updatedAt).localeCompare(s(a.updatedAt));});}
+function colsOf(kind,g){var x=sheetOf(kind).groups.filter(function(y){return y.g===g;})[0];return x?x.cols:[];}
+function flowProcs(f){var fl=okDocs('erp_flows').filter(function(d){return s(d.name)===s(f);})[0];return fl?(fl.rows||[]).map(function(x){return s(x.proc);}).filter(Boolean):[];}
+/* 구매자재 드롭다운 = 영림원에서 불러온 자재(폼 erp_materials, 재공품 빼고) + 이 프로그램에 등록한 자재 행 */
+function matOpts(){var out=[],seen={};
+  rows().filter(function(r){return r.kind==='자재';}).concat(okDocs('erp_materials').filter(function(d){return s(d.asset)!=='재공품';})).forEach(function(d){
+    var c=s(d.code);if(!c||seen[c])return;seen[c]=1;out.push({code:c,name:s(d.name),spec:s(d.spec),unit:s(d.unit),label:[s(d.name),s(d.spec),c].filter(Boolean).join(' · ')});});
+  return out;}
+function refreshMatDl(){var d=document.getElementById('dl-mat');if(!d){d=h('datalist',{id:'dl-mat'});document.body.append(d);}
+  d.replaceChildren.apply(d,matOpts().map(function(o){return h('option',{value:o.label});}));}
+function matFind(t){t=s(t);if(!t)return null;return matOpts().filter(function(o){return o.label===t||o.code===t;})[0]||null;}
+function kids(it){var out=[];
+  if(it.k==='p')W.items.slice(1).forEach(function(sb){out.push({k:sb.k,name:s(sb.name),code:s(sb.code),spec:s(sb.spec),unit:s(sb.unit),sub:true});});
+  (it.mats||[]).forEach(function(m){if(!s(m.name))return;var nw=m.neu?(W.news[s(m.name)]||{}):null;
+    out.push({k:m.k,name:s(m.name),code:nw?s(nw.code):s(m.code),spec:nw?s(nw.spec):s(m.spec),unit:nw?s(nw.unit):s(m.unit),neu:!!m.neu});});
+  return out;}
+function newNames(){var out=[];W.items.forEach(function(it){(it.mats||[]).forEach(function(m){var n=s(m.name);if(m.neu&&n&&out.indexOf(n)<0)out.push(n);});});return out;}
+function itemTitle(it,i){return (s(it.name)||(i?'반제품 '+i:'제품'))+(s(it.code)?' · '+s(it.code):'');}
+/* 묶음 → 한 행들(품목·자재). 저장·넘기기·엑셀은 이 행들로 지금 코드를 그대로 쓴다 */
+function setRows(){
+  var c=W.com||{},out=[];
+  W.items.forEach(function(it){
+    var ps=flowProcs(it.flow);
+    out.push({kind:'품목',name:s(it.name),code:s(it.code),spec:s(it.spec),eng:s(it.eng),asset:s(it.asset),state:s(it.state),io:s(it.io),imp:s(it.imp),unit:s(it.unit),rep:!!it.rep,
+      big:s(it.big),mid:s(it.mid),small:s(it.small),flow:s(it.flow),pver:s(it.pver),
+      bom:kids(it).map(function(kd,i){var q=(it.bq||{})[kd.k]||{};return {proc:s(q.proc),order:String(i+1),cname:kd.name,ccode:kd.code,cspec:kd.spec,cver:'',inunit:s(q.inunit)||kd.unit,qn:s(q.qn),qd:s(q.qd),hasSub:!!kd.sub,grain:!!q.grain,memo:''};}),
+      rev:s(c.rev),bomRev:s(c.bomRev),tunit:s(c.tunit),time:s(c.time),cunit:s(c.cunit),cur:s(c.cur),basis:s(c.basis),vat:!!c.vat,from:s(c.from),
+      procs:ps.map(function(p,i){var w=(it.pw||[])[i]||{};return {proc:p,wc1:s(w.wc1),wc2:s(w.wc2),wc3:s(w.wc3),ocode:s(w.ocode),price:s(w.price)};}),
+      test:[],set:W._id});
+  });
+  newNames().forEach(function(n){var m=W.news[n]||{};
+    out.push({kind:'자재',name:n,code:s(m.code),spec:s(m.spec),eng:s(m.eng),asset:s(m.asset),state:s(m.state),io:s(m.io),imp:s(m.imp),unit:s(m.unit),small:s(m.small),
+      pp:(m.pp||[]).filter(function(p){return p&&Object.keys(p).some(function(f){return s(p[f])!=='';});}),test:[],set:W._id});});
+  return out;
+}
+function wizChecks(){
+  var out=[],codes={};
+  setRows().forEach(function(r){var t=(r.kind==='자재'?'신규 자재 ':'')+(s(r.name)||'(이름 없음)');
+    if(s(r.code)){if(codes[r.code])out.push(t+' — '+(r.kind==='자재'?'자재번호':'품번')+' '+r.code+' 겹침');codes[r.code]=1;}
+    checks(r).forEach(function(x){if(!/하위품번 미등록/.test(x))out.push(t+' — '+x);});
+    if(r.kind==='품목'){
+      var nb=(r.bom||[]).filter(function(b){return !s(b.ccode);}).map(function(b){return b.cname;});if(nb.length)out.push(t+' — 하위품번 없음: '+nb.join(', '));
+      var nq=(r.bom||[]).filter(function(b){return !s(b.qn);}).map(function(b){return b.cname;});if(nq.length)out.push(t+' — BOM 소요량(분자) 빈칸: '+nq.join(', '));
+      var np=(r.bom||[]).filter(function(b){return !s(b.proc);}).map(function(b){return b.cname;});if(np.length)out.push(t+' — BOM 공정 빈칸: '+np.join(', '));
+      if(!(r.bom||[]).length)out.push(t+' — BOM 줄 없음');
+    }
+  });
+  return out;
+}
+function saveDraft(quiet){
+  if(!W||!can('w'))return Promise.resolve();
+  var w0=W,o=clone(W);delete o._id;o.updatedAt=now();o.by=ERP_USER.id;if(!o.createdAt)o.createdAt=o.updatedAt;
+  o.title=s(W.items[0].name);o.code=s(W.items[0].code);
+  return db.write([{c:COL,id:W._id,set:o}]).then(function(){w0.createdAt=o.createdAt;if(!quiet)say('임시 저장했습니다.');},function(e){say('임시 저장하지 못했습니다. '+errText(e),true);});
+}
+function goStep(n){if(!W)return;W.step=Math.max(0,Math.min(STEPS.length-1,n));saveDraft(true);boxKind='';draw();window.scrollTo({top:0,behavior:'smooth'});}
+/* 칸 하나 — 칸.json 의 칸 이름·목록 그대로 */
+function fld(o,c,after,ro){
+  var f=h('div',{class:'f'});
+  if(c.t==='bool'){var cb=h('input',{type:'checkbox',checked:!!o[c.k],disabled:!!ro,on:{change:function(e){o[c.k]=e.target.checked;dirty=true;if(after)after();}}});f.append(h('label',{},cb,' ',c.l));return f;}
+  var inp=h('input',{type:c.t==='date'?'date':'text',value:s(o[c.k]),list:c.opts?'dl-'+c.opts:null,inputmode:c.t==='num'?'decimal':null,readonly:ro?true:null,
+    on:{input:function(e){o[c.k]=e.target.value;dirty=true;},change:function(){if(after)after();}}});
+  f.append(h('label',{},c.l,c.req?h('span',{class:'req'},'*'):''),inp);
+  if(c.opts&&unreg(c.opts,o[c.k]))f.append(h('span',{class:'unreg'},'미등록'));
+  return f;
+}
+function grid(o,cols,after){return h('div',{class:'grid'},cols.map(function(c){return fld(o,c,after);}));}
+function itemGrids(it,after){
+  var box=h('div',{});
+  ['4 품목등록','3 품목 대중소분류','8 품목별공정흐름유형등록'].forEach(function(g){box.append(h('div',{class:'sub'},g),grid(it,colsOf('품목',g),after));});
+  return box;
+}
+function drawWizard(card){
+  if(!W){
+    card.append(h('div',{class:'stephead'},h('h2',{},'단계 입력')));
+    card.append(h('div',{class:'actions'},h('button',{type:'button',class:'btn primary',disabled:!can('w'),on:{click:function(){W=newSet();draw();}}},ico('plus'),'새 제품 입력')));
+    var ss=sets(),lw=h('div',{class:'list'},h('h3',{},'입력 중인 제품 ',h('span',{},ss.length+'건')));
+    if(!ss.length)lw.append(h('p',{class:'empty'},'입력 중인 제품 없음'));
+    ss.forEach(function(d){
+      var subs=(d.items||[]).length-1;
+      lw.append(h('div',{class:'rec setrow'},h('span',{class:'rt'},h('b',{},s(d.title)||'(품명 없음)'),h('small',{},[s(d.code),'반제품 '+subs,STEPS[d.step||0]].filter(Boolean).join(' · '))),
+        h('span',{class:'chips'},h('span',{class:'chip '+(d.status==='저장'?'넘김':'대기')},d.status==='저장'?'대기 저장':'작성중')),
+        h('span',{class:'setbtn'},h('button',{type:'button',class:'btn small',on:{click:function(){W=clone(d);W._id=d._id;draw();}}},'열기'),
+          h('button',{type:'button',class:'btn small danger',disabled:!can('d'),on:{click:function(){delRows([d]);}}},'삭제'))));
+    });
+    card.append(lw);return;
+  }
+  var p=W.items[0];
+  card.append(h('div',{class:'stephead'},h('h2',{},s(p.name)||'새 제품')));
+  var bar=h('div',{class:'steps'},STEPS.map(function(t,i){return h('button',{type:'button',class:'stp','aria-current':W.step===i?'step':null,on:{click:function(){goStep(i);}}},h('b',{},String(i+1)),t);}),h('span',{class:'chip test'},'임시'));
+  card.append(bar);
+  var body=h('div',{class:'wiz'}),re=function(){dirty=true;var y=window.scrollY;draw();window.scrollTo(0,y);};
+  var st=STEPS[W.step];
+  if(st==='제품'){
+    body.append(itemGrids(p));
+  }
+  if(st==='반제품'){
+    W.items.slice(1).forEach(function(it,j){
+      var i=j+1;
+      body.append(h('div',{class:'box'},h('div',{class:'row'},h('h3',{},itemTitle(it,i)),h('button',{type:'button',class:'btn small danger',style:'margin-left:auto',on:{click:function(){if(s(it.name)&&!confirm(s(it.name)+' 을(를) 뺍니다.'))return;W.items.splice(i,1);re();}}},'빼기')),
+        itemGrids(it,re)));
+    });
+    if(W.items.length<2)body.append(h('p',{class:'empty'},'반제품 없음'));
+    body.append(h('div',{class:'actions'},h('button',{type:'button',class:'btn',on:{click:function(){W.items.push(newSub());re();}}},ico('plus'),'반제품 더하기')));
+  }
+  if(st==='자재'){
+    W.items.forEach(function(it,i){
+      var tb=h('tbody');
+      (it.mats=it.mats||[]).forEach(function(m,j){
+        var hit=m.neu?null:{code:m.code,spec:m.spec,unit:m.unit},nw=m.neu?(W.news[s(m.name)]||{}):null;
+        var inp=h('input',{type:'text',value:s(m.txt||m.name),list:'dl-mat',placeholder:'자재명',on:{input:function(e){m.txt=e.target.value;dirty=true;},change:function(e){
+          var o=matFind(e.target.value);m.txt=e.target.value;
+          if(o){m.name=o.name;m.code=o.code;m.spec=o.spec;m.unit=o.unit;m.neu=false;m.txt=o.label;}
+          else{m.name=s(e.target.value);m.code='';m.spec='';m.unit='';m.neu=!!m.name;}
+          re();}}});
+        tb.append(h('tr',{},h('td',{class:'lock'},String(j+1)),h('td',{},inp),
+          h('td',{class:'lock'},m.neu?s(nw.code):s(m.code)),h('td',{class:'lock'},m.neu?s(nw.spec):s(m.spec)),h('td',{class:'lock'},m.neu?s(nw.unit):s(m.unit)),
+          h('td',{class:'lock'},m.neu?h('span',{class:'chip test'},'신규 자재'):''),
+          h('td',{},h('button',{type:'button',class:'btn small',on:{click:function(){it.mats.splice(j,1);if(it.bq)delete it.bq[m.k];re();}}},'빼기'))));
+      });
+      if(!it.mats.length)tb.append(h('tr',{},h('td',{colspan:7,class:'lock'},'줄 없음')));
+      body.append(h('div',{class:'sub'},itemTitle(it,i),h('button',{type:'button',class:'btn small',on:{click:function(){it.mats.push({k:uid()});re();}}},ico('plus'),'자재 더하기')),
+        h('div',{class:'tw'},h('table',{class:'sheet'},h('thead',{},h('tr',{},['#','자재명','자재번호','규격','기준단위','',''].map(function(t){return h('th',{},t);}))),tb)));
+    });
+  }
+  if(st==='BOM'){
+    var bc=colsOf('품목','7 BOM 줄'),cl=function(k){return bc.filter(function(c){return c.k===k;})[0]||{l:k};};
+    W.items.forEach(function(it,i){
+      var ks=kids(it),dlid='dl-fp-'+it.k,ps=flowProcs(it.flow);it.bq=it.bq||{};
+      body.append(h('datalist',{id:dlid},ps.map(function(v){return h('option',{value:v});})));
+      var tb=h('tbody');
+      ks.forEach(function(kd,j){var q=it.bq[kd.k]=it.bq[kd.k]||{};
+        var ti=function(k,ph){return h('td',{},h('input',{type:'text',value:s(q[k]),placeholder:ph||'',list:k==='proc'?dlid:(k==='inunit'?'dl-unit':null),inputmode:/^q/.test(k)?'decimal':null,on:{input:function(e){q[k]=e.target.value;dirty=true;}}}));};
+        var pc=ti('proc');if(s(q.proc)&&ps.length&&ps.indexOf(s(q.proc))<0)pc.classList.add('bad');
+        tb.append(h('tr',{},pc,h('td',{class:'lock'},String(j+1)),h('td',{class:'lock'},kd.name),h('td',{class:'lock'},kd.code||'—'),h('td',{class:'lock'},kd.spec),
+          ti('inunit',kd.unit),ti('qn'),ti('qd'),h('td',{class:'lock'},kd.sub?'O':''),
+          h('td',{},h('input',{type:'checkbox',checked:!!q.grain,on:{change:function(e){q.grain=e.target.checked;dirty=true;}}}))));
+      });
+      if(!ks.length)tb.append(h('tr',{},h('td',{colspan:10,class:'lock'},'줄 없음')));
+      body.append(h('div',{class:'sub'},itemTitle(it,i)),
+        h('div',{class:'grid'},fld(it,colsOf('품목','7 BOM등록업로드')[0])),
+        h('div',{class:'tw'},h('table',{class:'sheet'},h('thead',{},h('tr',{},['proc','order','cname','ccode','cspec','inunit','qn','qd','hasSub','grain'].map(function(k){return h('th',{},cl(k).l);}))),tb)));
+    });
+  }
+  if(st==='신규 자재'){
+    var nn=newNames(),mc=colsOf('자재','5 자재등록'),pg=sheetOf('자재').groups.filter(function(g){return g.rep==='pp';})[0];
+    if(!nn.length)body.append(h('p',{class:'empty'},'신규 자재 없음'));
+    nn.forEach(function(n){
+      var m=W.news[n]=W.news[n]||{asset:'원자재',state:'사용',io:'내자',imp:'A등급',unit:'EA'};m.name=n;
+      var used=W.items.filter(function(it){return (it.mats||[]).some(function(x){return x.neu&&s(x.name)===n;});}).map(function(it){return s(it.name);}).filter(Boolean);
+      var pp=m.pp=m.pp||[];while(pp.length<pg.n)pp.push({});
+      var tb=h('tbody',{},pp.map(function(row,i){return h('tr',{},h('td',{class:'lock'},pg.pre+(i+1)),pg.cols.map(function(c){
+        return h('td',{},h('input',{type:c.t==='date'?'date':'text',value:s(row[c.k]),list:c.opts?'dl-'+c.opts:null,inputmode:c.t==='num'?'decimal':null,on:{input:function(e){row[c.k]=e.target.value;dirty=true;}}}));}));}));
+      body.append(h('div',{class:'box'},h('h3',{},n,used.length?h('span',{class:'msg'},' '+used.join(' · ')):''),
+        h('div',{class:'grid'},mc.map(function(c){return fld(m,c,null,c.k==='name');})),
+        h('div',{class:'sub'},pg.g),
+        h('div',{class:'tw'},h('table',{class:'sheet'},h('thead',{},h('tr',{},h('th',{},''),pg.cols.map(function(c){return h('th',{},c.l);}))),tb))));
+    });
+  }
+  if(st==='공정·외주'){
+    var com=W.com=W.com||{};
+    ['9 제품별공정별소요자재','10 제품별공정별워크센터','11 외주계약등록'].forEach(function(g){body.append(h('div',{class:'sub'},g),grid(com,colsOf('품목',g)));});
+    var wl=colsOf('품목','10 공정순서'),ol=colsOf('품목','11 공정순서'),lab=function(a,k){return (a.filter(function(c){return c.k===k;})[0]||{l:k}).l;};
+    W.items.forEach(function(it,i){
+      var ps=flowProcs(it.flow),pw=it.pw=it.pw||[];
+      body.append(h('div',{class:'sub'},itemTitle(it,i),s(it.flow)?h('span',{class:'msg'},s(it.flow)):''));
+      if(!ps.length){body.append(h('p',{class:'err'},s(it.flow)?'공정흐름유형 「'+s(it.flow)+'」 미등록':'공정흐름유형 없음'));return;}
+      var tb=h('tbody',{},ps.map(function(pn,j){var w=pw[j]=pw[j]||{};
+        var ti=function(k,list,ph){var td=h('td',{},h('input',{type:'text',value:s(w[k]),list:list,placeholder:ph||'',inputmode:k==='price'?'decimal':null,on:{input:function(e){w[k]=e.target.value;dirty=true;},change:function(){if(list){td.classList.toggle('un',unreg('wc',w[k]));}}}}));if(list&&unreg('wc',w[k]))td.classList.add('un');return td;};
+        return h('tr',{},h('td',{class:'lock'},String(j+1)),h('td',{class:'lock'},pn),ti('wc1','dl-wc'),ti('wc2','dl-wc'),ti('wc3','dl-wc'),ti('ocode',null,j+1===ps.length?s(it.code):(s(it.code)?s(it.code)+'_'+(j+1):'')),ti('price'));}));
+      body.append(h('div',{class:'tw'},h('table',{class:'sheet'},h('thead',{},h('tr',{},h('th',{},'공정순서'),h('th',{},lab(wl,'proc')),h('th',{},lab(wl,'wc1')),h('th',{},lab(wl,'wc2')),h('th',{},lab(wl,'wc3')),h('th',{},lab(ol,'ocode')),h('th',{},lab(ol,'price')))),tb)));
+    });
+  }
+  if(st==='저장'){
+    var rs=setRows(),ck=wizChecks(),have={};rows().forEach(function(r){have[r._id]=r;});
+    body.append(h('div',{class:'sum'},h('span',{class:'pill'},'제품 1'),h('span',{class:'pill'},'반제품 '+(W.items.length-1)),h('span',{class:'pill'},'신규 자재 '+newNames().length),
+      ck.length?h('span',{class:'pill warn'},'확인 '+ck.length):h('span',{class:'pill ok'},'확인 0')));
+    body.append(h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},['구분','품명','품번','BOM','공정순서',''].map(function(t){return h('th',{},t);}))),
+      h('tbody',{},rs.map(function(r){var ex=s(r.code)&&have[idOf(r)];return h('tr',{},h('td',{},r.kind==='자재'?'신규 자재':s(r.asset)),h('td',{},s(r.name)),h('td',{},s(r.code)||'—'),
+        h('td',{class:'n'},r.kind==='품목'?String((r.bom||[]).length):''),h('td',{},r.kind==='품목'?(r.procs||[]).map(function(x){return x.proc;}).join('-'):''),
+        h('td',{},ex&&s(ex.set)!==W._id?h('span',{class:'chip bad'},'이미 있음 — 덮어씀'):''));})))));
+    if(ck.length)body.append(h('div',{class:'sub'},'확인'),h('ul',{class:'err'},ck.map(function(t){return h('li',{},t);})));
+    var msg=h('span',{class:'msg'});
+    body.append(h('div',{class:'actions'},
+      h('button',{type:'button',class:'btn primary',disabled:!can('w'),on:{click:function(){finishSet(msg);}}},ico('send'),'대기 저장'),
+      h('button',{type:'button',class:'btn',on:{click:function(){downloadSet();}}},ico('download'),'엑셀로 받기'),msg));
+    if(boxKind)body.append(drawBox());
+  }
+  card.append(body);
+  var msg2=h('span',{class:'msg'});
+  card.append(h('div',{class:'actions wiznav'},
+    h('button',{type:'button',class:'btn',disabled:W.step===0,on:{click:function(){goStep(W.step-1);}}},'이전'),
+    W.step<STEPS.length-1?h('button',{type:'button',class:'btn primary',on:{click:function(){goStep(W.step+1);}}},'다음'):'',
+    h('button',{type:'button',class:'btn',disabled:!can('w'),on:{click:function(){saveDraft(false);}}},'임시 저장'),
+    h('button',{type:'button',class:'btn',on:{click:function(){saveDraft(true);W=null;boxKind='';PLAN=null;draw();}}},'닫기'),msg2));
+}
+function finishSet(msg){
+  var rs=setRows(),noc=rs.filter(function(r){return !s(r.code);});
+  if(noc.length){msg.textContent='품번·자재번호 빈칸: '+noc.map(function(r){return s(r.name)||'(이름 없음)';}).join(', ');msg.className='msg bad';return;}
+  var ids={},dup=rs.filter(function(r){var i=idOf(r);if(ids[i])return true;ids[i]=1;return false;});
+  if(dup.length){msg.textContent='겹친 번호: '+dup.map(function(r){return r.code;}).join(', ');msg.className='msg bad';return;}
+  var t=now(),have={};rows().forEach(function(r){have[r._id]=r;});
+  var ops=rs.map(function(r){var id=idOf(r),old=have[id]||{};r._id=id;return {c:COL,id:id,set:Object.assign(clean(r),{status:'대기',createdAt:old.createdAt||t,updatedAt:t,by:ERP_USER.id})};});
+  W.status='저장';W.savedAt=t;
+  var o=clone(W);delete o._id;o.updatedAt=t;o.by=ERP_USER.id;o.createdAt=W.createdAt||t;o.title=s(W.items[0].name);o.code=s(W.items[0].code);
+  ops.push({c:COL,id:W._id,set:o});
+  msg.textContent='저장하는 중';msg.className='msg';
+  db.write(ops).then(function(){
+    say(rs.length+'행을 저장했습니다. 폼 대기로 넘기기를 확인해 주세요.');
+    var go=function(){PLAN=buildPlan(rs);boxKind='plan';draw();var b=mainEl.querySelector('.wiz .box:last-child');if(b)b.scrollIntoView({block:'start',behavior:'smooth'});};
+    if(ERPSPEC)go();else fetch('../영림원외주입력/erp-spec.json').then(function(r){return r.json();}).then(function(j){ERPSPEC=j;go();},function(){say('규격(erp-spec.json)을 읽지 못했습니다.',true);});
+  },function(e){msg.textContent='저장하지 못했습니다. '+errText(e);msg.className='msg bad';});
+}
+function downloadSet(){var rs=setRows();loadXlsx().then(function(X){saveFile(X.write(buildBook(X,rs),{type:'array',bookType:'xlsx'}),'외주입력_기본정보_'+(s(W.items[0].code)||s(W.items[0].name)||'제품')+'.xlsx');say('엑셀을 받았습니다.');},function(){say(XLSX_FAIL,true);});}
+
 /* ---------- 시작 ---------- */
-try{var hs=decodeURIComponent(location.hash.slice(1));if(['제품','반제품','자재'].indexOf(hs)>=0)cur=hs;}catch(e){}
+try{var hs=decodeURIComponent(location.hash.slice(1));if(['단계','제품','반제품','자재'].indexOf(hs)>=0)cur=hs;}catch(e){}
 fetch('칸.json').then(function(r){return r.json();}).then(function(j){SPEC=j;refreshDl();draw();},function(){bannerEl.replaceChildren(h('div',{class:'banner'},'칸 정의(칸.json)를 읽지 못했습니다.'));});
 connectDb().then(function(d){
   db=d;
