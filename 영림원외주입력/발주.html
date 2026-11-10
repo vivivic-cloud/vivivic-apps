@@ -1,5 +1,6 @@
 <!doctype html>
-<!-- v181 사장님 「발주서 링크에는 품번 나올필요없어요 숨겨 주세요.」 — 화면에서 품번 칸·글자 모두 뺌(문서에는 그대로 저장).
+<!-- v182 「필요일」 → 「납품요청일」 · 발주서 목록 = 「등록대기」·「등록완료」 접힌 카드(폼 「발주서」 와 같은 꼴), 세는 말 뺌.
+     v181 사장님 「발주서 링크에는 품번 나올필요없어요 숨겨 주세요.」 — 화면에서 품번 칸·글자 모두 뺌(문서에는 그대로 저장).
      v180 「제품 발주」·「공통부속 발주」 두 탭(공통부속 = 박스 parts 에서 여러 줄 골라 수량, 문서 kind '부속' — 규칙 배포 뒤 저장됨) · 발주서마다 단계(폼이 박스 pos.st 에 적음)·부속 공정·도착 숫자.
      v178 새로고침 단추 · 발주서 목록 = 박스 문서 pos(폼이 씀) + 이 폰에서 막 저장한 것. v177 제품 = 고르기 칸(select). v176 조립업체 발주 링크 — 사장님 「조립업체에서 시작될 발주링크를 만들어보자」(11-10). 로그인 없음, 폼과 별개.
      주소 = 발주.html#<조립업체 박스 열쇠>. 자료 = erp_asmbox/<열쇠>(폼이 씀: vendor·pcodes·items[{pcode,pname,pspec,rows[{ccode,cname,cspec,unit,per}]}]).
@@ -42,6 +43,12 @@ tr.idle td{color:var(--muted)}tr.idle input[type=number]{visibility:hidden}
 .sent{border-top:1px solid var(--line);margin:18px 0 0;padding:12px 0 0}
 .sent h2{font-size:15px;font-weight:900;margin:0 0 8px}
 .sent .po{margin:8px 0}
+/* v182 폼 「발주서」 와 같은 카드 */
+.sent h3{font-size:13px;font-weight:800;color:var(--muted);margin:12px 0 2px}.sent .cnt{font-size:12px;font-weight:700;color:var(--muted);margin:0 0 6px}
+.card{border:1px solid var(--line);border-radius:14px;margin:8px 0;background:var(--fill3)}.card.open{background:#fff}
+.cardh{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;width:100%;text-align:left;background:none;border:0;color:var(--ink);padding:10px 12px;font-weight:600;min-height:44px}
+.cardh .arr{color:var(--muted);width:12px}.cardh .nt{font-weight:800;word-break:break-all}.cardh .ns{font-size:12px;color:var(--muted);font-weight:700;flex-basis:100%;padding-left:20px}
+.cardh .st{padding-left:20px}.card .tw{margin:0 10px 10px}
 /* v180 두 탭 · 공통부속 표의 제품 칸 */
 .tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 12px}.tabs button{min-height:44px}
 td.for{white-space:normal;min-width:160px;font-size:12px;color:var(--muted)}
@@ -65,7 +72,7 @@ var BOX=null,SEL=null,QTY='',NEED='',ROWS=[],ERR='',NOTE='',BUSY=false,SENT=[],M
    + 이 폰에서 막 저장해 아직 pos 에 없는 것(한 장씩 get, 저장소에 없으면 뺌). 링크는 erp_asmpo 목록을 못 읽는다(규칙 get 만). */
 function sentIds(){try{var o=JSON.parse(localStorage.getItem('asm.sent')||'{}');return (o[key]||[]).filter(P.keyOk);}catch(e){return [];}}
 function sentPut(ids){try{var o=JSON.parse(localStorage.getItem('asm.sent')||'{}');o[key]=ids.slice(0,30);localStorage.setItem('asm.sent',JSON.stringify(o));}catch(e){}}
-function sumOf(id,d){var rs=d.rows||[];return {id:id,kind:d.kind==='부속'?'부속':'제품',pname:d.kind==='부속'?(rs.length?show(rs[0].cname)+(rs.length>1?' 외 '+(rs.length-1):''):''):d.pname,qty:d.qty,need:d.need,status:d.status,at:d.at,n:rs.length,st:{t:'발주서 저장',c:'wait'},
+function sumOf(id,d){var rs=d.rows||[];return {id:id,kind:d.kind==='부속'?'부속':'제품',pname:d.kind==='부속'?(rs.length?show(rs[0].cname)+(rs.length>1?' 외 '+(rs.length-1):''):''):d.pname,qty:d.qty,need:d.need,status:d.status,at:d.at,n:rs.length,st:{r:1,t:'발주서 저장',c:'wait'},rows:rs.filter(function(r){return d.kind!=='부속'||r.on!==false;}).map(function(r){return {cname:r.cname,cspec:r.cspec,unit:r.unit,base:r.base,qty:r.qty,on:r.on!==false,for:r.for||[]};}),
   off:rs.filter(function(r){return r&&r.on===false;}).length,chg:rs.filter(function(r){return r&&r.on!==false&&Number(r.qty)!==Number(r.base);}).length};}
 function loadSent(){
   var pos=Array.isArray(BOX&&BOX.pos)?BOX.pos.filter(function(p){return p&&P.keyOk(p.id);}):[],have={};pos.forEach(function(p){have[p.id]=1;});
@@ -92,7 +99,7 @@ function setQty(v){QTY=v;ROWS.forEach(function(x){if(!x.edited)x.qty=baseOf(x)==
 function chg(x){if(!x.on)return false;var b=baseOf(x);return b!==''&&String(x.qty).trim()!==''&&Number(x.qty)!==b;}
 function check(){
   var q=Number(QTY);if(QTY===''||!isFinite(q)||q<=0)return '발주 수량을 넣어 주세요.';
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(NEED))return '필요일을 넣어 주세요.';
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(NEED))return '납품요청일을 넣어 주세요.';
   var on=ROWS.filter(function(x){return x.on;});if(!on.length)return '발주할 줄이 없습니다.';
   for(var i=0;i<on.length;i++){var v=Number(on[i].qty);if(String(on[i].qty).trim()===''||!isFinite(v)||v<=0)return show(on[i].r.cname)+' 수량을 넣어 주세요.';}
   return '';
@@ -116,7 +123,7 @@ function savePart(){
   var on=parts().filter(function(p){var x=PART[p.ccode];return x&&x.on;}),e='';NOTE='';
   if(!on.length)e='발주할 부속을 골라 주세요.';
   for(var i=0;!e&&i<on.length;i++){var v=Number(PART[on[i].ccode].qty);if(String(PART[on[i].ccode].qty).trim()===''||!isFinite(v)||v<=0)e=show(on[i].cname)+' 수량을 넣어 주세요.';}
-  if(!e&&!/^\d{4}-\d{2}-\d{2}$/.test(NEED))e='필요일을 넣어 주세요.';
+  if(!e&&!/^\d{4}-\d{2}-\d{2}$/.test(NEED))e='납품요청일을 넣어 주세요.';
   ERR=e;if(e){draw();return;}
   if(!confirm('공통부속 '+on.length+'줄 발주서를 저장합니다.'))return;
   var id=P.rkey(),now=new Date().toISOString(),rows=on.map(function(p){return {ccode:show(p.ccode),cname:show(p.cname),cspec:show(p.cspec),unit:show(p.unit),qty:Number(PART[p.ccode].qty),on:true,for:(p.for||[]).map(show)};});
@@ -145,17 +152,27 @@ function rowEl(x){
   qi.addEventListener('input',function(){x.qty=qi.value;x.edited=true;mark();});
   return tr;
 }
-function sentEl(){   /* v180 발주서마다 단계(폼이 적음) · 부속 공정·도착 */
-  if(!SENT.length)return null;
-  return h('section','sent',h('h2','','발주서'),SENT.map(function(d){
-    var st=d.st||{t:show(d.status),c:'wait'},off=Number(d.off||0),ch=Number(d.chg||0);
-    return h('div','po',h('div','top',h('span','nt',show(d.pname)),h('span','st'+(st.c==='done'?' on':st.c==='bad'?' bad':''),show(st.t))),
-      h('dl','',d.kind==='부속'?[h('dt','','발주'),h('dd','','공통부속 '+num(d.n||0)+'줄')]:[h('dt','','발주 수량'),h('dd','n',num(d.qty)),h('dt','','줄'),h('dd','n',num(d.n||0)+(off?' · 빼기 '+off:'')+(ch?' · 고침 '+ch:''))],
-        h('dt','','필요일'),h('dd','',show(d.need)),
-        Number(d.pt)?[h('dt','','부속 공정'),h('dd','n',num(d.pd)+' / '+num(d.pt))]:null,
-        Number(d.an)?[h('dt','','부속 도착'),h('dd','n',num(d.ad)+' / '+num(d.an))]:null,
-        h('dt','','저장'),h('dd','',when(d.at))));
-  }));
+/* v182 사장님 「…저장된 발주서는 등록대기목록에 있게해주세요. 입력폼의 발주서와 동일한 구조로 만들어 주세요.」
+   폼 「발주서」 와 같은 꼴: 「등록대기」(영림원 입력 전) · 「등록완료」 묶음, 접힌 카드(이름 · 칸 값 · 상태 칩) → 펴면 줄 표. 품번·업체·번호 없음. */
+var OPEN={};
+function regChip(st){st=st||{};var r=Number(st.r||1);return r<=2?{t:st.c==='bad'?'오류':/진행중/.test(st.t||'')?'진행중':'대기',c:st.c||'wait'}:{t:show(st.t),c:st.c||'done'};}
+function cardEl(d){
+  var open=!!OPEN[d.id],ch=regChip(d.st),pt=Number(d.pt||0),an=Number(d.an||0),rs=d.rows||[];
+  var meta=[d.kind==='부속'?'공통부속 발주':'제품 발주',d.kind==='부속'?'':'발주 수량 '+num(d.qty),'납품요청일 '+show(d.need),when(d.at),pt?'부속 공정 '+num(d.pd)+'/'+num(pt):'',an?'부속 도착 '+num(d.ad)+'/'+num(an):''].filter(Boolean);
+  var hd=h('button','cardh',h('span','arr',open?'▾':'▸'),h('span','nt',show(d.pname)),h('span','ns',meta.join(' · ')),h('span','st'+(ch.c==='done'?' on':ch.c==='bad'?' bad':''),ch.t));
+  hd.type='button';hd.setAttribute('aria-expanded',open?'true':'false');hd.addEventListener('click',function(){if(open)delete OPEN[d.id];else OPEN[d.id]=1;draw();});
+  var body=null;
+  if(open&&rs.length){var isP=d.kind==='부속';
+    body=h('div','tw',h('table','',h('thead','',h('tr','',(isP?['품명','규격','단위','제품','수량']:['발주','품명','규격','단위','BOM 수량','필요 수량']).map(function(t,i){return h('th',(isP?i===4:i>=4)?'n':'',t);}))),
+      h('tbody','',rs.map(function(x){var off=x.on===false,cg=!isP&&!off&&Number(x.qty)!==Number(x.base);
+        return isP?h('tr','',h('td','',show(x.cname)),h('td','',show(x.cspec)),h('td','',show(x.unit)),h('td','for',(x.for||[]).map(show).join(' · ')),h('td','n',num(x.qty)))
+          :h('tr',(off?'off':'')+(cg?' chg':''),h('td','',off?'':'✓'),h('td','',show(x.cname)),h('td','',show(x.cspec)),h('td','',show(x.unit)),h('td','n',num(x.base)),h('td','n',off?'':num(x.qty)));}))));}
+  return h('div','card'+(open?' open':''),hd,body);
+}
+function sentEl(){
+  var reg=SENT.filter(function(d){return Number((d.st||{}).r||1)<=2;}),done=SENT.filter(function(d){return Number((d.st||{}).r||1)>2;});
+  return h('section','sent',h('h2','','발주서'),h('h3','','등록대기'),h('p','cnt',reg.length+'건'),reg.length?reg.map(cardEl):h('p','msg','발주서가 없습니다.'),
+    h('h3','','등록완료'),h('p','cnt',done.length+'건'),done.map(cardEl));
 }
 function draw(){
   if(BOX===null){say('불러오지 못했습니다.',true);return;}
@@ -171,7 +188,7 @@ function draw(){
     else{var dP=h('input');dP.type='date';dP.value=NEED;dP.addEventListener('input',function(){NEED=dP.value;});dP.addEventListener('change',function(){NEED=dP.value;});
       var erP=h('p','err',ERR);erP.hidden=!ERR;mainEl.oninput=function(){if(ERR){ERR='';erP.hidden=true;}};
       var svP=h('button','wide',BUSY?'저장 중':'발주서 저장');svP.type='button';svP.disabled=BUSY;svP.addEventListener('click',savePart);
-      out.push(h('section','po',h('label','one','필요일',dP),
+      out.push(h('section','po',h('label','one','납품요청일',dP),
         h('div','tw',h('table','',h('thead','',h('tr','',['발주','품명','규격','단위','제품','수량'].map(function(t,i){return h('th',i===5?'n':'',t);}))),h('tbody','',ps.map(partEl)))),erP,svP));}
     out.push(sentEl());P.fill(mainEl,out);return;
   }
@@ -190,7 +207,7 @@ function draw(){
     qIn.addEventListener('input',function(){setQty(qIn.value);tb.replaceChildren.apply(tb,ROWS.map(rowEl));});
     dIn.addEventListener('change',function(){NEED=dIn.value;});dIn.addEventListener('input',function(){NEED=dIn.value;});
     var sv=h('button','wide',BUSY?'저장 중':'발주서 저장');sv.type='button';sv.disabled=BUSY;sv.addEventListener('click',save);
-    sec.push(h('div','fl',h('label','','발주 수량',qIn),h('label','','필요일',dIn)),
+    sec.push(h('div','fl',h('label','','발주 수량',qIn),h('label','','납품요청일',dIn)),
       h('div','tw',h('table','',h('thead','',h('tr','',['발주','품명','규격','단위','BOM 수량','필요 수량'].map(function(t,i){return h('th',i>=4?'n':'',t);}))),tb)),
       er,sv);
     }
