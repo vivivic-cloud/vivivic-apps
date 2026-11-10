@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v174 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v175 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -379,7 +379,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v174</span>
+    <span class="ver">v175</span>
   </div>
 </header>
 <div class="wrap">
@@ -4150,9 +4150,8 @@ function prodRunFn(){
   /* v171 외주발주된 제품 고르기 → v174 입력부 하나 + 공정별로 모인 표(재단·엣지·보링…) + 저장 하나 = 공정마다 문서 한 건. 사장님 「이 발주의 이런 부자재들이 이런공정으로 나눠져있다 저장 하려면 해라 이런식으로 보이게」 */
   var sel=null,carry=null,F1=fieldsFor(),who=h('div',{class:'wcpicks',role:'group','aria-label':'외주발주입력까지 등록된 생산'});
   var msg1=h('span',{class:'msg','aria-live':'polite'}),grp=h('div',{});
-  var save1=h('button',{type:'button',class:'btn primary',on:{click:saveAll}},'저장');
   var panel=h('div',{class:'ifbox',hidden:true},h('div',{class:'grid',style:'margin-top:12px'},F1.dlvDate.el,F1.stmtNo.el,F1.stmtAmt.el),grp,
-    h('div',{class:'row'},save1,msg1));
+    h('div',{class:'row'},msg1));
   function bad(m,t){m.textContent=t;m.className='msg bad';}
   function drawWho(){
     var a=prodDlvOpen();
@@ -4160,14 +4159,14 @@ function prodRunFn(){
     who.hidden=!a.length;
     who.replaceChildren.apply(who,a.map(function(d){var on=sel&&sel.id===d.id;
       return h('button',{type:'button',class:'btn small wcpick'+(on?' primary':''),'aria-pressed':on?'true':'false',disabled:busy,on:{click:function(){pick(on?null:d);}}},d.itemNo,h('span',{class:'wcrank'},show(d.qty)));}));
-    panel.hidden=!sel;save1.disabled=busy;
+    panel.hidden=!sel;
     var gs=sel?prodDlvDocs(sel,'','',''):[];
-    save1.textContent=gs.length>1?'저장 (공정 '+gs.length+'건)':'저장';
     grp.replaceChildren.apply(grp,gs.map(function(x){
       var c=function(lab,v,cl){return h('td',{'data-l':lab,class:cl||''},show(v));};
       return h('div',{style:'margin-top:14px'},h('h4',{},[x.proc,x.wc,x.rows.length+'줄'].join(' · ')),
         h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},['품번','품명','공정','작업지시번호','외주발주번호','납품수량'].map(function(t){return h('th',{},t);}))),
-          h('tbody',{},x.rows.map(function(r){return h('tr',{},[c('품번',r.itemNo),c('품명',r.itemName,'nm'),c('공정',r.seq+'. '+r.proc),c('작업지시번호',r.workNo),c('외주발주번호',r.orderNo),c('납품수량',r.dlvQty,'n')]);})))));
+          h('tbody',{},x.rows.map(function(r){return h('tr',{},[c('품번',r.itemNo),c('품명',r.itemName,'nm'),c('공정',r.seq+'. '+r.proc),c('작업지시번호',r.workNo),c('외주발주번호',r.orderNo),c('납품수량',r.dlvQty,'n')]);})))),
+        h('div',{class:'row'},h('button',{type:'button',class:'btn primary',disabled:busy,on:{click:function(){saveGrp(x.proc+'|'+x.wc);}}},'저장')));   /* v175 묶음마다 저장 */
     }));
   }
   function pick(d){
@@ -4175,7 +4174,7 @@ function prodRunFn(){
     if(d){var c=carry||{};carry=null;F1.dlvDate.reset();F1.stmtNo.reset();F1.stmtAmt.reset();F1.dlvDate.set(c.dlvDate||conToday());if(c.stmtNo)F1.stmtNo.set(c.stmtNo);if(!isEmpty(c.stmtAmt))F1.stmtAmt.set(c.stmtAmt);}
     drawWho();
   }
-  function saveAll(){
+  function saveGrp(k){   /* v175 공정 묶음 하나만 저장 = 문서 한 건. 입력부(외주납품일·명세서)는 그대로 두고 다음 묶음에 다시 쓴다. 사장님 「각 공정별로 묶인걸 각각 등록대기 저장 하고 싶다는 말」 */
     if(!db){bad(msg1,'저장소에 연결되지 않아 저장할 수 없습니다.');return;}
     var d=sel;if(!d)return;
     var date=F1.dlvDate.get(),no=purTrim(F1.stmtNo.get()),amt=purTrim(F1.stmtAmt.get()),ae=impPosErr('명세서 금액')(amt);
@@ -4185,11 +4184,13 @@ function prodRunFn(){
     function stop(t){busy=false;drawWho();bad(msg1,t);}
     freshCheck().then(function(old){
       if(old){stop(old);return;}
-      if(!prodDlvOpen().some(function(x){return x.id===d.id;})){stop('그 사이 납품이 저장되었거나 발주가 바뀌었습니다. 저장하지 않았습니다.');return;}
-      var docs=prodDlvDocs(d,date,no,amt),n=0;   /* v174 공정마다 한 건, 차례대로 */
-      return docs.reduce(function(p,doc){return p.then(function(){return db.collection('erp_proddlvs').add(doc).then(function(ref){dataPut('proddlvs',doc,ref);n++;});});},Promise.resolve()).then(function(){
-        busy=false;sel=null;out.textContent=d.itemNo+' 외주납품 공정 '+n+'건을 저장했습니다. 대기로 쌓였습니다.';draw();renderList();renderNav();renderSum();
-      },function(e){busy=false;sel=null;draw();renderList();renderNav();renderSum();bad(msg1,'저장하지 못했습니다'+(n?'(공정 '+n+'건은 저장됨)':'')+'. '+errText(e));});
+      var cur=prodDlvOpen().filter(function(x){return x.id===d.id;})[0];
+      var doc=cur&&prodDlvDocs(cur,date,no,amt).filter(function(x){return x.proc+'|'+x.wc===k;})[0];
+      if(!doc){stop('그 사이 납품이 저장되었거나 발주가 바뀌었습니다. 저장하지 않았습니다.');return;}
+      return db.collection('erp_proddlvs').add(doc).then(function(ref){
+        dataPut('proddlvs',doc,ref);busy=false;msg1.textContent='';
+        out.textContent=d.itemNo+' · '+doc.proc+' 외주납품을 저장했습니다. 대기로 쌓였습니다.';draw();renderList();renderNav();renderSum();
+      },function(e){stop('저장하지 못했습니다. '+errText(e));});
     });
   }
   function openDue(d){   /* v100 오류·대기 문서의 완료일만 고친다. planNo·stage·rows 는 그대로 — 입력 작업자가 stage 다음부터 잇는다 */
