@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v172 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v173 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -379,7 +379,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v172</span>
+    <span class="ver">v173</span>
   </div>
 </header>
 <div class="wrap">
@@ -4146,45 +4146,57 @@ function prodRunFn(){
   var s=BYKEY.proddlvs,busy=false,open=null,pending=false,kit=null,hd=h('h3',{class:'deltitle'});   /* v103 kit = 대기·오류 생산 지우기 */
   var box=h('div',{}),done=h('details',{class:'prgap',hidden:true}),gone=h('details',{class:'gonebox',hidden:true}),none=h('p',{class:'hint',hidden:true},'진행 중인 생산이 없습니다. 「주간생산계획입력·외주발주입력」에서 넣으면 여기에 보입니다.'),out=h('p',{class:'pslink','aria-live':'polite'});
   function fieldsFor(){var o={};['dlvDate','stmtNo','stmtAmt'].forEach(function(k){o[k]=makeField(s.fields.filter(function(f){return f.k===k;})[0]);});return o;}
-  /* v171 외주발주된 제품 고르기 → v172 남은 공정마다 문서 하나 */
-  var sel=null,carry=null,F1=fieldsFor(),who=h('div',{class:'wcpicks',role:'group','aria-label':'외주발주입력까지 등록된 생산'});
-  var msg1=h('span',{class:'msg','aria-live':'polite'}),tb=h('tbody',{});
-  var save1=h('button',{type:'button',class:'btn primary',on:{click:saveAll}},'저장');
-  var panel=h('div',{class:'ifbox',hidden:true},h('div',{class:'grid',style:'margin-top:12px'},F1.dlvDate.el,F1.stmtNo.el,F1.stmtAmt.el),
-    h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},['품번','품명','공정','외주거래처','작업지시번호','외주발주번호','납품수량'].map(function(t){return h('th',{},t);}))),tb)),
-    h('div',{class:'row'},save1,msg1));
+  /* v171 외주발주된 제품 고르기 → v173 고르면 남은 공정마다 묶음 하나(외주납품일·명세서·표·저장). 사장님 「저장하기 전에 나워저장하고 싶은데?」 */
+  var sel=null,carry=null,rowF={},who=h('div',{class:'wcpicks',role:'group','aria-label':'외주발주입력까지 등록된 생산'});
+  var panel=h('div',{hidden:true});
   function bad(m,t){m.textContent=t;m.className='msg bad';}
+  function rowKey(r){return r.itemNo+'|'+r.seq;}
+  function rowBox(r){   /* 공정 하나 = 칸·표·저장. 칸 값은 다시 그려도 남는다 */
+    var k=rowKey(r),o=rowF[k];
+    if(!o){
+      var c=carry||{};o={F:fieldsFor(),msg:h('span',{class:'msg','aria-live':'polite'}),tb:h('tbody',{})};
+      o.F.dlvDate.set(c.dlvDate||conToday());if(c.stmtNo)o.F.stmtNo.set(c.stmtNo);if(!isEmpty(c.stmtAmt))o.F.stmtAmt.set(c.stmtAmt);
+      o.save=h('button',{type:'button',class:'btn primary',on:{click:function(){saveOne(k);}}},'저장');
+      o.el=h('div',{class:'ifbox',style:'margin-top:12px'},h('h4',{},r.seq+'. '+r.proc),
+        h('div',{class:'grid'},o.F.dlvDate.el,o.F.stmtNo.el,o.F.stmtAmt.el),
+        h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},['품번','품명','공정','외주거래처','작업지시번호','외주발주번호','납품수량'].map(function(t){return h('th',{},t);}))),o.tb)),
+        h('div',{class:'row'},o.save,o.msg));
+      rowF[k]=o;
+    }
+    var c2=function(lab,v,cl){return h('td',{'data-l':lab,class:cl||''},show(v));};
+    o.tb.replaceChildren(h('tr',{},[c2('품번',r.itemNo),c2('품명',r.itemName,'nm'),c2('공정',r.seq+'. '+r.proc),c2('외주거래처',r.wc),c2('작업지시번호',r.workNo),c2('외주발주번호',r.orderNo),c2('납품수량',r.dlvQty,'n')]));
+    o.save.disabled=busy;return o.el;
+  }
   function drawWho(){
     var a=prodDlvOpen();
     if(sel&&!a.some(function(d){return d.id===sel.id;}))sel=null;
     who.hidden=!a.length;
     who.replaceChildren.apply(who,a.map(function(d){var on=sel&&sel.id===d.id;
       return h('button',{type:'button',class:'btn small wcpick'+(on?' primary':''),'aria-pressed':on?'true':'false',disabled:busy,on:{click:function(){pick(on?null:d);}}},d.itemNo,h('span',{class:'wcrank'},show(d.qty)));}));
-    panel.hidden=!sel;save1.disabled=busy;
-    tb.replaceChildren.apply(tb,sel?prodDlvDoc(sel,'','','').rows.map(function(r){
-      var c=function(lab,v,cl){return h('td',{'data-l':lab,class:cl||''},show(v));};
-      return h('tr',{},[c('품번',r.itemNo),c('품명',r.itemName,'nm'),c('공정',r.seq+'. '+r.proc),c('외주거래처',r.wc),c('작업지시번호',r.workNo),c('외주발주번호',r.orderNo),c('납품수량',r.dlvQty,'n')]);}):[]);
+    panel.hidden=!sel;
+    panel.replaceChildren.apply(panel,sel?prodDlvDoc(sel,'','','').rows.map(rowBox):[]);
   }
   function pick(d){
-    sel=d;msg1.textContent='';if(d)out.textContent='';
-    if(d){var c=carry||{};carry=null;F1.dlvDate.reset();F1.stmtNo.reset();F1.stmtAmt.reset();F1.dlvDate.set(c.dlvDate||conToday());if(c.stmtNo)F1.stmtNo.set(c.stmtNo);if(!isEmpty(c.stmtAmt))F1.stmtAmt.set(c.stmtAmt);}
-    drawWho();
+    sel=d;rowF={};if(d)out.textContent='';
+    drawWho();if(d)carry=null;
   }
-  function saveAll(){
-    if(!db){bad(msg1,'저장소에 연결되지 않아 저장할 수 없습니다.');return;}
-    var d=sel;if(!d)return;
-    var date=F1.dlvDate.get(),no=purTrim(F1.stmtNo.get()),amt=purTrim(F1.stmtAmt.get()),ae=impPosErr('명세서 금액')(amt);
-    F1.dlvDate.setError(date?'':'필수 항목입니다.');F1.stmtAmt.setError(ae);
-    if(!date||ae){bad(msg1,ae||'필수 항목이 비어 있습니다.');return;}
-    busy=true;drawWho();msg1.textContent='저장하는 중입니다.';msg1.className='msg';
-    function stop(t){busy=false;drawWho();bad(msg1,t);}
+  function saveOne(k){   /* v173 공정 하나만 저장 = 문서 한 건(v172 꼴 그대로) */
+    var o=rowF[k],d=sel;if(!o||!d)return;
+    if(!db){bad(o.msg,'저장소에 연결되지 않아 저장할 수 없습니다.');return;}
+    var date=o.F.dlvDate.get(),no=purTrim(o.F.stmtNo.get()),amt=purTrim(o.F.stmtAmt.get()),ae=impPosErr('명세서 금액')(amt);
+    o.F.dlvDate.setError(date?'':'필수 항목입니다.');o.F.stmtAmt.setError(ae);
+    if(!date||ae){bad(o.msg,ae||'필수 항목이 비어 있습니다.');return;}
+    busy=true;drawWho();o.msg.textContent='저장하는 중입니다.';o.msg.className='msg';
+    function stop(t){busy=false;drawWho();bad(o.msg,t);}
     freshCheck().then(function(old){
       if(old){stop(old);return;}
-      if(!prodDlvOpen().some(function(x){return x.id===d.id;})){stop('그 사이 납품이 저장되었거나 발주가 바뀌었습니다. 저장하지 않았습니다.');return;}
-      var docs=prodDlvDocs(d,date,no,amt),n=0;   /* v172 공정마다 한 건, 차례대로 */
-      return docs.reduce(function(p,doc){return p.then(function(){return db.collection('erp_proddlvs').add(doc).then(function(ref){dataPut('proddlvs',doc,ref);n++;});});},Promise.resolve()).then(function(){
-        busy=false;sel=null;out.textContent=d.itemNo+' 외주납품 공정 '+n+'건을 저장했습니다. 대기로 쌓였습니다.';draw();renderList();renderNav();renderSum();
-      },function(e){busy=false;sel=null;draw();renderList();renderNav();renderSum();bad(msg1,'저장하지 못했습니다'+(n?'(공정 '+n+'건은 저장됨)':'')+'. '+errText(e));});
+      var cur=prodDlvOpen().filter(function(x){return x.id===d.id;})[0];
+      var doc=cur&&prodDlvDocs(cur,date,no,amt).filter(function(x){return rowKey(x.rows[0])===k;})[0];
+      if(!doc){stop('그 사이 납품이 저장되었거나 발주가 바뀌었습니다. 저장하지 않았습니다.');return;}
+      return db.collection('erp_proddlvs').add(doc).then(function(ref){
+        dataPut('proddlvs',doc,ref);delete rowF[k];busy=false;
+        out.textContent=doc.rows[0].itemNo+' · '+doc.rows[0].proc+' 외주납품을 저장했습니다. 대기로 쌓였습니다.';draw();renderList();renderNav();renderSum();
+      },function(e){stop('저장하지 못했습니다. '+errText(e));});
     });
   }
   function openDue(d){   /* v100 오류·대기 문서의 완료일만 고친다. planNo·stage·rows 는 그대로 — 입력 작업자가 stage 다음부터 잇는다 */
@@ -4318,7 +4330,7 @@ function prodRunFn(){
   };
   fn.copyAny=function(r){   /* v171 복사등록: 외주납품일·명세서 값을 넣고 다른 생산을 고른다(고를 생산이 하나면 바로) */
     var a=prodDlvOpen();if(!a.length)return null;
-    return {box:fn.box,fill:function(){carry={dlvDate:r.dlvDate,stmtNo:r.stmtNo,stmtAmt:r.stmtAmt};if(a.length===1)pick(a[0]);else{F1.dlvDate.set(r.dlvDate||conToday());drawWho();}}};
+    return {box:fn.box,fill:function(){carry={dlvDate:r.dlvDate,stmtNo:r.stmtNo,stmtAmt:r.stmtAmt};if(a.length===1)pick(a[0]);else drawWho();}};
   };
   fn.box=h('section',{class:'ps inform conwho',on:{focusout:function(){setTimeout(function(){if(pending)fn.refresh();},0);}}},hd,who,panel,none,out,box,done,gone);
   return fn;
