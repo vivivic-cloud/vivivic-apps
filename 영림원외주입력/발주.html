@@ -1,5 +1,6 @@
 <!doctype html>
-<!-- v202 사장님 「업무 흐름에 따라 납품될 수 없는 공정이 납품확인 버튼이 눌리면 안됩니다…」 — 보낸 공정이 앞 공정 물건을 아직 입고확인 안 했으면(fp 열쇠 없음) 「납품확인」 단추 없음.
+<!-- v203 사장님 「발주서 입고대기 박스의 내용은 출고되는 거래처별로 박스구분되어 보여지게 해주세요」 — 입고대기 안 = 보내는(출고) 거래처마다 박스(처음 닫힘, 폼과 같게). 카드에 보낸 거래처가 여럿이면 거래처마다 나눔.
+     v202 사장님 「업무 흐름에 따라 납품될 수 없는 공정이 납품확인 버튼이 눌리면 안됩니다…」 — 보낸 공정이 앞 공정 물건을 아직 입고확인 안 했으면(fp 열쇠 없음) 「납품확인」 단추 없음.
      v201 사장님 「보내는 쪽에 적혀있는 납품대기라는 표현 모두 삭제해줘」 — 보낼 납품 칩 = 「받을업체-공정」만(완료면 「… 납품완료」).
      v200 사장님 「거래처박스가 있고 거래처 박스로 들어가면 작업박스와 입고대기 박스를 만들라고요 해당 박스로 들어가면 목록 보이게 해달라고」 — 머리 아래 박스 둘(처음 닫힘): 작업(시트 단추·발주·발주서·보낼 납품·납품완료) · 입고대기(받을 납품 「납품확인」).
      v199 사장님 「업체별 박스에 입고확인(납품받을것) / 작업(납품보낼것)  이렇게 구ㅡ분해」 — 상자 둘: 입고확인(받을 납품, 「납품확인」) · 작업(보낼 납품 + 납품완료). 조립 시트도 입고확인 상자.
@@ -292,10 +293,16 @@ function bx3(k,t,n,kids,empty){var o=!!BXO[k],a=[];(function walk(x){if(Array.is
   return h('section','bx3'+(o?' open':''),hd,o?(a.length?a:(empty?h('div','empty',empty):null)):null);}
 function sheetEl(sh){var ps=sh?sh.pos||[]:[],b=ps.filter(function(p){return !sheetDone(p);}),c=ps.filter(sheetDone);   /* v200 작업 = 보낼 납품 + 납품완료 */
   return b.map(function(p){return sheetCard(sh.proc,p,'out');}).concat(c.length?[h('h3','lh sub','납품완료',h('span','',c.length+'건'))].concat(c.map(function(p){return sheetCard(sh.proc,p,'done');})):[]);}
-function inCards(){var o=[];sheets().forEach(function(sh){(sh.pos||[]).filter(pendIn).forEach(function(p){o.push(sheetCard(sh.proc,p,'in'));});});
-  ((BOX&&BOX.rcv)||[]).filter(pendIn).forEach(function(p){o.push(sheetCard(show(BOX.asmProc)||'조립',p,'in'));});return o;}
+function fwOf(q){var f=String(q.fw||''),s=String(q.from||''),i=s.lastIndexOf('-');return f||(i>0?s.slice(0,i):s);}   /* v203 보낸 거래처(옛 박스 = 「업체-공정」 앞) */
+function inGroups(){var by={},ord=[];
+  function add(pr,p){var ws=[];(p.parts||[]).forEach(function(q){if(P.noOk(q.fk)){var w=fwOf(q);if(ws.indexOf(w)<0)ws.push(w);}});
+    ws.forEach(function(w){var c={};Object.keys(p).forEach(function(x){c[x]=p[x];});c.id=p.id+':'+w;c.parts=(p.parts||[]).filter(function(q){return P.noOk(q.fk)&&fwOf(q)===w;});if(!pendIn(c))return;
+      if(!by[w]){by[w]=[];ord.push(w);}by[w].push(sheetCard(pr,c,'in'));});}
+  sheets().forEach(function(sh){(sh.pos||[]).forEach(function(p){add(sh.proc,p);});});((BOX&&BOX.rcv)||[]).forEach(function(p){add(show(BOX.asmProc)||'조립',p);});
+  return ord.map(function(w){return {w:w,cs:by[w]};});}
+function inCards(){var n=0,o=inGroups().map(function(g){n+=g.cs.length;return bx3('i:'+g.w,show(g.w),g.cs.length,g.cs,'');});o.n=n;return o;}   /* v203 입고대기 안 = 출고 거래처 박스 */
 function nWork(){var n=0;sheets().forEach(function(sh){(sh.pos||[]).forEach(function(p){if(!sheetDone(p))n++;});});SENT.forEach(function(d){if(grpOf(d)!=='납품완료')n++;});return n;}
-function fin(out){var inC=inCards();P.fill(mainEl,out.slice(0,2).concat([bx3('w','작업',nWork(),out.slice(2)),bx3('i','입고대기',inC.length,inC,'입고대기가 없습니다.')]));}   /* v200 */
+function fin(out){var inC=inCards();P.fill(mainEl,out.slice(0,2).concat([bx3('w','작업',nWork(),out.slice(2)),bx3('i','입고대기',inC.n,inC,'입고대기가 없습니다.')]));}   /* v200 */
 function draw(){
   if(BOX===null){say('불러오지 못했습니다.',true);return;}
   if(BOX===false){say('발주 링크가 없습니다.',true);return;}
