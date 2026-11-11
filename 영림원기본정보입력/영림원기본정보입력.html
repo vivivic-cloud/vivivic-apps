@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원 기본정보 입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v4 -->
+<!-- 영림원 기본정보 입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v5 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -128,7 +128,12 @@ table.sheet td.un{box-shadow:inset 0 0 0 2px #f59e0b}
 .wiz .box .row h3{margin:0}
 .setrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px}
 .setbtn{display:flex;gap:6px}
-.tplbar{margin:0 0 6px}.tplgs{margin-top:8px}
+.tplbar{margin:0 0 6px}
+.comp .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.comp select{max-width:240px}.comp input[type=text]{flex:1 1 180px;width:auto}
+.comp .compchips{justify-content:flex-start;padding-left:0;flex-basis:auto}.compchips .chip{font-size:12px;padding:4px 4px 4px 10px;display:inline-flex;align-items:center;gap:2px}
+.chip .x{all:unset;cursor:pointer;padding:0 6px;font-size:14px;line-height:1}.chip .x:focus-visible{outline:2px solid var(--ink)}
+.compline{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:4px 0 6px}
+.nmadd{display:flex;gap:8px;margin:8px 0 4px}.nmadd input{flex:1 1 180px;max-width:360px}.nmtab td:nth-child(2){min-width:180px}.tplgs{margin-top:8px}
 .wiznav{border-top:1px solid var(--line);padding-top:14px;margin-top:22px}
 .toast:not(:empty){position:fixed;left:16px;right:16px;bottom:16px;z-index:50;margin:0 auto;max-width:480px;padding:10px 14px;background:#fff;border:1px solid #e3e2e0;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.08)}
 #erp-login{position:fixed;inset:0;z-index:300;background:#fff;display:grid;place-items:center;padding:16px}
@@ -155,7 +160,7 @@ table.sheet td.un{box-shadow:inset 0 0 0 2px #f59e0b}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v4</span>
+    <span class="ver">v5</span>
     <a class="btn small" href="../영림원외주입력/영림원외주입력.html" style="margin-left:8px">입력폼</a>
   </div>
 </header>
@@ -227,7 +232,7 @@ function connectDb(){
 }
 (function(){
 "use strict";
-var VER='v4';
+var VER='v5';
 var GS_MAKER='https://script.google.com/macros/s/AKfycbzxW9K--tKq_uqHnzNdecOA4YbKosK51XVG1MJVFTVTzB5Kz5o7gN1YeYuthCRI4PshOw/exec';   /* 영림원외주입력 v113 웹앱(구글시트양식/양식만들기.gs) — 파일 이름은 「외주입력_」 로 시작해야 받는다 */
 var GS_NAME='외주입력_기본정보_한행입력표';
 var XLSX_URL='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js',xlsxP=null;
@@ -280,6 +285,7 @@ function okDocs(c){return (T[c]||[]).filter(function(d){return d.status!=='오�
 function uniq(a){return a.filter(function(v,i){return v&&a.indexOf(v)===i;});}
 function listOf(name){
   var o=SPEC&&SPEC.opts[name];if(o)return o;
+  if(name.indexOf('nm-')===0)return nmList(name.slice(3));
   if(name==='flow')return uniq(okDocs('erp_flows').map(function(d){return s(d.name);}));
   if(name==='proc')return uniq(okDocs('erp_processes').map(function(d){return s(d.name);}));
   if(name==='wc')return uniq(okDocs('erp_workcenters').map(function(d){return s(d.name);}));
@@ -296,18 +302,19 @@ function unreg(opt,v){return CHECKED[opt]&&s(v)&&T.erp_flows&&listOf(opt).indexO
 function rows(){return data.basic||[];}
 function kindRows(k){return rows().filter(function(r){return k==='자재'?r.kind==='자재':r.kind==='품목'&&(k==='제품'?r.asset!=='반제품':r.asset==='반제품');});}
 function drawSum(){
-  var all=rows().filter(function(r){return r.kind!=='단계';}),wait=all.filter(function(r){return r.status!=='넘김';}).length,tst=all.filter(function(r){return (r.test||[]).length;}).length;
+  var all=rows().filter(function(r){return r.kind==='품목'||r.kind==='자재';}),wait=all.filter(function(r){return r.status!=='넘김';}).length,tst=all.filter(function(r){return (r.test||[]).length;}).length;
   sumEl.replaceChildren(h('span',{class:'pill'},'단계 입력 '+sets().length),h('span',{class:'pill'},'제품 '+kindRows('제품').length),h('span',{class:'pill'},'반제품 '+kindRows('반제품').length),h('span',{class:'pill'},'자재 '+kindRows('자재').length),
     h('span',{class:'pill'},'대기 '+wait),h('span',{class:'pill ok'},'넘김 '+(all.length-wait)),tst?h('span',{class:'pill warn'},'테스트값 남은 행 '+tst):'');
 }
-function drawNav(){navEl.replaceChildren.apply(navEl,['단계','제품','반제품','자재'].map(function(k){
-  return h('button',{type:'button','aria-current':cur===k?'page':null,on:{click:function(){cur=k;sel={};q='';boxKind='';PLAN=null;try{history.replaceState(null,'','#'+k);}catch(e){}draw();}}},h('span',{class:'nt'},k==='단계'?'단계 입력':k),h('span',{class:'ns'},String(k==='단계'?sets().length:kindRows(k).length)));}));}
+function drawNav(){navEl.replaceChildren.apply(navEl,['단계','제품','반제품','자재','명칭'].map(function(k){
+  return h('button',{type:'button','aria-current':cur===k?'page':null,on:{click:function(){cur=k;sel={};q='';boxKind='';PLAN=null;try{history.replaceState(null,'','#'+k);}catch(e){}draw();}}},h('span',{class:'nt'},k==='단계'?'단계 입력':k==='명칭'?'일관성 메뉴':k),h('span',{class:'ns'},k==='명칭'?'임시':String(k==='단계'?sets().length:kindRows(k).length)));}));}
 
 /* ---------- 화면 ---------- */
 function draw(){
   if(!SPEC||!data.basic){return;}
   dirty=false;later=false;
-  drawSum();drawNav();refreshMatDl();
+  drawSum();drawNav();refreshMatDl();refreshNmDl();
+  if(cur==='명칭'){var nc=h('section',{class:'card'});drawNames(nc);mainEl.replaceChildren(nc);return;}
   if(cur==='단계'){var wc=h('section',{class:'card'});drawWizard(wc);mainEl.replaceChildren(wc);return;}
   var list=kindRows(cur),ql=q.toLowerCase();
   var shown=list.filter(function(r){return !ql||(s(r.name)+' '+s(r.code)+' '+s(r.flow)).toLowerCase().indexOf(ql)>=0;})
@@ -705,7 +712,7 @@ var STEPS=['제품','반제품','자재','BOM','신규 자재','공정·외주',
 var W=null;
 function uid(){return Math.random().toString(36).slice(2,9);}
 function newSet(){return {_id:'s_'+Date.now().toString(36)+uid(),kind:'단계',status:'작성중',step:0,
-  items:[{k:'p',asset:'제품',state:'사용',io:'내자',imp:'A등급',unit:'EA',mats:[],bq:{},pw:[]}],news:{},com:{}};}
+  items:[{k:'p',asset:'제품',state:'사용',io:'내자',imp:'A등급',unit:'EA',mats:[],bq:{},pw:[]}],news:{},com:{},comp:[],compDone:false};}
 function newSub(){var p=W.items[0];return {k:uid(),asset:'반제품',state:'사용',io:s(p.io)||'내자',imp:s(p.imp)||'A등급',unit:'EA',mats:[],bq:{},pw:[]};}
 function sets(){return rows().filter(function(r){return r.kind==='단계';}).sort(function(a,b){return s(b.updatedAt).localeCompare(s(a.updatedAt));});}
 function colsOf(kind,g){var x=sheetOf(kind).groups.filter(function(y){return y.g===g;})[0];return x?x.cols:[];}
@@ -760,14 +767,14 @@ function saveDraft(quiet){
   if(!W||!can('w'))return Promise.resolve();
   var w0=W,o=clone(W);delete o._id;o.updatedAt=now();o.by=ERP_USER.id;if(!o.createdAt)o.createdAt=o.updatedAt;
   o.title=s(W.items[0].name);o.code=s(W.items[0].code);
-  return db.write([{c:COL,id:W._id,set:o}]).then(function(){w0.createdAt=o.createdAt;if(!quiet)say('임시 저장했습니다.');},function(e){say('임시 저장하지 못했습니다. '+errText(e),true);});
+  return db.write([{c:COL,id:W._id,set:o}]).then(function(){w0.createdAt=o.createdAt;if(!quiet)say('임시 저장했습니다.');nmCollect();},function(e){say('임시 저장하지 못했습니다. '+errText(e),true);});
 }
 function goStep(n){if(!W)return;W.step=Math.max(0,Math.min(STEPS.length-1,n));saveDraft(true);boxKind='';wizGs='';draw();window.scrollTo({top:0,behavior:'smooth'});}
 /* 칸 하나 — 칸.json 의 칸 이름·목록 그대로 */
-function fld(o,c,after,ro){
+function fld(o,c,after,ro,noNm){
   var f=h('div',{class:'f'});
   if(c.t==='bool'){var cb=h('input',{type:'checkbox',checked:!!o[c.k],disabled:!!ro,on:{change:function(e){o[c.k]=e.target.checked;dirty=true;if(after)after();}}});f.append(h('label',{},cb,' ',c.l));return f;}
-  var inp=h('input',{type:c.t==='date'?'date':'text',value:s(o[c.k]),list:c.opts?'dl-'+c.opts:null,inputmode:c.t==='num'?'decimal':null,readonly:ro?true:null,
+  var inp=h('input',{type:c.t==='date'?'date':'text',value:s(o[c.k]),list:c.opts?'dl-'+c.opts:(!noNm&&NM_COL[c.k]?'dl-nm-'+NM_COL[c.k]:null),inputmode:c.t==='num'?'decimal':null,readonly:ro?true:null,
     on:{input:function(e){o[c.k]=e.target.value;dirty=true;},change:function(){if(after)after();}}});
   f.append(h('label',{},c.l,c.req?h('span',{class:'req'},'*'):''),inp);
   if(c.opts&&unreg(c.opts,o[c.k]))f.append(h('span',{class:'unreg'},'미등록'));
@@ -794,7 +801,7 @@ function drawWizard(card){
     });
     card.append(lw);return;
   }
-  var p=W.items[0];
+  compFix();var p=W.items[0];
   card.append(h('div',{class:'stephead'},h('h2',{},s(p.name)||'새 제품')));
   var bar=h('div',{class:'steps'},STEPS.map(function(t,i){return h('button',{type:'button',class:'stp','aria-current':W.step===i?'step':null,on:{click:function(){goStep(i);}}},h('b',{},String(i+1)),t);}),h('span',{class:'chip test'},'임시'));
   card.append(bar);
@@ -805,13 +812,16 @@ function drawWizard(card){
     body.append(itemGrids(p));
   }
   if(st==='반제품'){
+    if(!W.compDone){body.append(compBox(re));}
+    else{
+    body.append(h('div',{class:'row compline'},h('b',{},'구성품'),h('span',{class:'msg'},W.comp.join(' · ')),h('button',{type:'button',class:'btn small',on:{click:function(){W.compDone=false;re();}}},'구성 고치기')));
     W.items.slice(1).forEach(function(it,j){
       var i=j+1;
-      body.append(h('div',{class:'box'},h('div',{class:'row'},h('h3',{},itemTitle(it,i)),h('button',{type:'button',class:'btn small danger',style:'margin-left:auto',on:{click:function(){if(s(it.name)&&!confirm(s(it.name)+' 을(를) 뺍니다.'))return;W.items.splice(i,1);re();}}},'빼기')),
+      body.append(h('div',{class:'box'},h('div',{class:'row'},s(it.comp)?h('span',{class:'chip 대기'},s(it.comp)):'',h('h3',{},itemTitle(it,i)),h('button',{type:'button',class:'btn small danger',style:'margin-left:auto',on:{click:function(){if(s(it.name)&&!confirm(s(it.name)+' 을(를) 뺍니다.'))return;W.items.splice(i,1);var ci=W.comp.indexOf(s(it.comp));if(ci>=0)W.comp.splice(ci,1);re();}}},'빼기')),
         itemGrids(it,re)));
     });
     if(W.items.length<2)body.append(h('p',{class:'empty'},'반제품 없음'));
-    body.append(h('div',{class:'actions'},h('button',{type:'button',class:'btn',on:{click:function(){W.items.push(newSub());re();}}},ico('plus'),'반제품 더하기')));
+    }
   }
   if(st==='자재'){
     W.items.forEach(function(it,i){
@@ -862,7 +872,7 @@ function drawWizard(card){
       var tb=h('tbody',{},pp.map(function(row,i){return h('tr',{},h('td',{class:'lock'},pg.pre+(i+1)),pg.cols.map(function(c){
         return h('td',{},h('input',{type:c.t==='date'?'date':'text',value:s(row[c.k]),list:c.opts?'dl-'+c.opts:null,inputmode:c.t==='num'?'decimal':null,on:{input:function(e){row[c.k]=e.target.value;dirty=true;}}}));}));}));
       body.append(h('div',{class:'box'},h('h3',{},n,used.length?h('span',{class:'msg'},' '+used.join(' · ')):''),
-        h('div',{class:'grid'},mc.map(function(c){return fld(m,c,null,c.k==='name');})),
+        h('div',{class:'grid'},mc.map(function(c){return fld(m,c,null,c.k==='name',true);})),
         h('div',{class:'sub'},pg.g),
         h('div',{class:'tw'},h('table',{class:'sheet'},h('thead',{},h('tr',{},h('th',{},''),pg.cols.map(function(c){return h('th',{},c.l);}))),tb))));
     });
@@ -923,6 +933,76 @@ function finishSet(msg){
 }
 function downloadSet(){var rs=setRows();loadXlsx().then(function(X){saveFile(X.write(buildBook(X,rs),{type:'array',bookType:'xlsx'}),'외주입력_기본정보_'+(s(W.items[0].code)||s(W.items[0].name)||'제품')+'.xlsx');say('엑셀을 받았습니다.');},function(){say(XLSX_FAIL,true);});}
 
+/* ---------- 일관성 메뉴 (v5, ⚠ 메뉴 이름 임시) ----------
+   입력 화면 드롭다운에 들어갈 명칭 목록을 한곳(erp_basic 문서 n_names, kind '명칭')에 둔다.
+   이 목록 = 단계 입력 드롭다운(dl-nm-*) · 단계별 양식 「목록」 시트. 입력 화면에서 직접 추가한 명칭도 여기로 들어간다.
+   구성품 처음 목록(상판·지판·가와R·가와L)만 사장님이 정하셨고, 나머지 목록은 빈 채로 시작해 입력하면 쌓인다. */
+var NM_ID='n_names';
+var NM_LISTS=[{k:'parts',l:'구성품',def:['상판','지판','가와R','가와L']},{k:'big',l:'품목대분류'},{k:'mid',l:'품목중분류'},{k:'small',l:'품목소분류'},{k:'tunit',l:'시간단위'},{k:'cunit',l:'사업단위'},{k:'basis',l:'정산기준'}];
+var NM_COL={big:'big',mid:'mid',small:'small',tunit:'tunit',cunit:'cunit',basis:'basis'};   /* 품목 칸 키 → 목록 키 */
+function nmDoc(){return rows().filter(function(r){return r._id===NM_ID;})[0]||null;}
+function nmList(k){var d=nmDoc(),L=d&&d.lists&&d.lists[k];if(Array.isArray(L))return L.slice();var x=NM_LISTS.filter(function(y){return y.k===k;})[0];return x&&x.def?x.def.slice():[];}
+function nmAll(){var o={};NM_LISTS.forEach(function(x){o[x.k]=nmList(x.k);});return o;}
+function nmSave(lists){return db.write([{c:COL,id:NM_ID,set:{kind:'명칭',lists:lists,updatedAt:now(),by:ERP_USER.id}}]);}
+/* add = {목록키: [값…]} — 없는 값만 끝에 붙여 한 번에 저장 */
+function nmAdd(add){if(!can('w'))return Promise.resolve(0);var all=nmAll(),n=0;
+  Object.keys(add).forEach(function(k){(add[k]||[]).map(s).filter(Boolean).forEach(function(v){if(all[k]&&all[k].indexOf(v)<0){all[k].push(v);n++;}});});
+  return n?nmSave(all).then(function(){return n;},function(e){say('일관성 메뉴에 넣지 못했습니다. '+errText(e),true);return 0;}):Promise.resolve(0);}
+/* 임시 저장 때 묶음에서 쓴 명칭을 목록에 모은다(입력 화면에서 친 것도 목록으로) */
+function nmCollect(){if(!W)return;var add={parts:(W.comp||[]).slice()};
+  W.items.forEach(function(it){['big','mid','small'].forEach(function(k){(add[k]=add[k]||[]).push(it[k]);});});
+  var c=W.com||{};['tunit','cunit','basis'].forEach(function(k){add[k]=[c[k]];});return nmAdd(add);}
+function refreshNmDl(){NM_LISTS.forEach(function(x){var id='dl-nm-'+x.k,d=document.getElementById(id);if(!d){d=h('datalist',{id:id});document.body.append(d);}
+  d.replaceChildren.apply(d,nmList(x.k).map(function(v){return h('option',{value:v});}));});}
+function drawNames(card){
+  card.append(h('div',{class:'stephead'},h('h2',{},'일관성 메뉴 ',h('span',{class:'chip test'},'임시'))));
+  var all=nmAll(),ro=!can('w');
+  var put=function(){dirty=false;nmSave(all).then(function(){say('저장했습니다.');},function(e){say('저장하지 못했습니다. '+errText(e),true);});};
+  NM_LISTS.forEach(function(x){
+    var L=all[x.k],tb=h('tbody');
+    L.forEach(function(v,i){
+      var inp=h('input',{type:'text',value:v,disabled:ro,on:{input:function(){dirty=true;},change:function(e){var t=s(e.target.value);
+        if(!t){e.target.value=v;return;}if(t!==v&&L.indexOf(t)>=0){say('「'+t+'」 은(는) 이미 있습니다.',true);e.target.value=v;return;}L[i]=t;put();}}});
+      var mv=function(d){var j=i+d;if(j<0||j>=L.length)return;var a=L[i];L[i]=L[j];L[j]=a;put();};
+      tb.append(h('tr',{},h('td',{class:'lock'},String(i+1)),h('td',{},inp),
+        h('td',{},h('span',{class:'setbtn'},h('button',{type:'button',class:'btn small',disabled:ro||!i,'aria-label':'위로',on:{click:function(){mv(-1);}}},'↑'),
+          h('button',{type:'button',class:'btn small',disabled:ro||i===L.length-1,'aria-label':'아래로',on:{click:function(){mv(1);}}},'↓'),
+          h('button',{type:'button',class:'btn small danger',disabled:ro,on:{click:function(){L.splice(i,1);put();}}},'빼기')))));
+    });
+    if(!L.length)tb.append(h('tr',{},h('td',{colspan:3,class:'lock'},'없음')));
+    var add=h('input',{type:'text',placeholder:x.l,disabled:ro,on:{keydown:function(e){if(e.key==='Enter'){e.preventDefault();go();}}}});
+    var go=function(){var t=s(add.value);if(!t)return;if(L.indexOf(t)>=0){say('「'+t+'」 은(는) 이미 있습니다.',true);return;}L.push(t);put();};
+    card.append(h('div',{class:'sub'},x.l,h('span',{class:'msg'},L.length+'개')),
+      h('div',{class:'tw'},h('table',{class:'sheet nmtab'},tb)),
+      h('div',{class:'row nmadd'},add,h('button',{type:'button',class:'btn',disabled:ro,on:{click:go}},ico('plus'),'더하기')));
+  });
+}
+/* ---------- 2 반제품 — 구성품 확정(영림원에 없는 폼 기능, v5) ----------
+   반제품 상세 전에 제품의 구성품을 먼저 고르고 「구성 확정」 → 구성품마다 반제품 줄(품명 처음 값 = 구성품 이름, ⚠ 임시). */
+function compFix(){   /* 옛 묶음(v3·v4) — 구성품 칸이 없으면 반제품 이름으로 */
+  if(W.comp)return;W.comp=W.items.slice(1).map(function(it){if(!s(it.comp))it.comp=s(it.name);return s(it.comp);}).filter(Boolean);W.compDone=W.items.length>1;}
+function compConfirm(re){
+  var keep=W.comp.slice(),subs=W.items.slice(1),gone=subs.filter(function(it){return s(it.comp)&&keep.indexOf(s(it.comp))<0;});
+  var used=gone.filter(function(it){return s(it.code)||(s(it.name)&&s(it.name)!==s(it.comp));});
+  if(used.length&&!confirm('구성에서 뺀 '+used.map(function(it){return s(it.comp);}).join(', ')+' 반제품 입력을 지웁니다.'))return;
+  var next=keep.map(function(c){var it=subs.filter(function(x){return s(x.comp)===c;})[0];if(!it){it=newSub();it.comp=c;it.name=c;}return it;});
+  subs.forEach(function(it){if(!s(it.comp))next.push(it);});
+  W.items=[W.items[0]].concat(next);W.compDone=true;re();
+}
+function compBox(re){
+  var sel=W.comp,box=h('div',{class:'box comp'},h('h3',{},'구성품'));
+  box.append(h('div',{class:'chips compchips'},sel.length?sel.map(function(c,i){return h('span',{class:'chip 대기'},c,' ',h('button',{type:'button',class:'x','aria-label':c+' 빼기',on:{click:function(){sel.splice(i,1);re();}}},'×'));}):h('span',{class:'msg'},'구성품 없음')));
+  var DIRECT='__direct',left=nmList('parts').filter(function(v){return sel.indexOf(v)<0;});
+  var other=h('input',{type:'text',placeholder:'구성품',hidden:true,on:{keydown:function(e){if(e.key==='Enter'){e.preventDefault();addOther();}}}});
+  var addB=h('button',{type:'button',class:'btn',hidden:true,on:{click:function(){addOther();}}},ico('plus'),'더하기');
+  var pick=h('select',{on:{change:function(e){var v=e.target.value;if(v===DIRECT){other.hidden=false;addB.hidden=false;other.focus();return;}if(v){sel.push(v);re();}}}},
+    h('option',{value:''},'선택'),left.map(function(v){return h('option',{value:v},v);}),h('option',{value:DIRECT},'직접 추가'));
+  function addOther(){var t=s(other.value);if(!t)return;if(sel.indexOf(t)>=0){say('「'+t+'」 은(는) 이미 골랐습니다.',true);return;}sel.push(t);nmAdd({parts:[t]});re();}
+  box.append(h('div',{class:'row'},pick,other,addB),
+    h('div',{class:'row'},h('button',{type:'button',class:'btn primary',disabled:!sel.length,on:{click:function(){compConfirm(re);}}},'구성 확정')));
+  return box;
+}
+
 /* ---------- 단계 입력 단계별 양식 (v4) ----------
    단계마다 「양식 다운로드」(엑셀·구글 스프레드시트)·「일괄 업로드」(엑셀·구글 스프레드시트). 폼 v113 과 같은 길:
    구글 = 누를 때 엑셀 양식과 같은 파일을 GS_MAKER 웹앱에 보내 드라이브 「영림원외주입력 양식」 폴더에 구글시트로 만든다.
@@ -930,7 +1010,7 @@ function downloadSet(){var rs=setRows();loadXlsx().then(function(X){saveFile(X.w
    올리기는 저장하지 않는다 — 화면(묶음)에 채우기만, 저장은 단계 넘길 때·임시 저장. */
 var TPL_ROWS=500;
 function tc(l,k,o){return Object.assign({l:l,k:k},o||{});}
-function colsKey(kind,g){return colsOf(kind,g).map(function(c){return tc(c.l,c.k,{opts:c.opts,t:c.t,req:c.req});});}
+function colsKey(kind,g){return colsOf(kind,g).map(function(c){return tc(c.l,c.k,{opts:c.opts||(kind==='품목'&&NM_COL[c.k]?'nm-'+NM_COL[c.k]:undefined),t:c.t,req:c.req});});}
 function itemCols(){return colsKey('품목','4 품목등록').concat(colsKey('품목','3 품목 대중소분류'),colsKey('품목','8 품목별공정흐름유형등록'));}
 function findItem(code,name){code=s(code);name=s(name);
   return W.items.filter(function(it){return code&&s(it.code)===code;})[0]||W.items.filter(function(it){return name&&s(it.name)===name;})[0]||null;}
@@ -941,11 +1021,13 @@ function bomLab(k){var c=colsOf('품목','7 BOM 줄').filter(function(x){return 
 var STEP_TPL={
   '제품':{cols:itemCols,rows:function(cols){var p=W.items[0];return [cols.map(function(c){return cellOutV(c,p[c.k]);})];},
     apply:function(rs,cols){if(!rs.length)return '읽을 줄이 없습니다.';var n=setCols(W.items[0],cols,rs[0]);return '제품 '+n+'칸 반영'+(rs.length>1?' (첫 줄만 — 반제품은 2단계 양식)':'');}},
-  '반제품':{cols:itemCols,rows:function(cols){return W.items.slice(1).map(function(it){return cols.map(function(c){return cellOutV(c,it[c.k]);});});},
-    apply:function(rs,cols){var nu=0,up=0;rs.forEach(function(r){var code=s(r.code),name=s(r.name);if(!code&&!name)return;
-      var it=W.items.slice(1).filter(function(x){return code&&s(x.code)===code;})[0]||W.items.slice(1).filter(function(x){return name&&s(x.name)===name;})[0];
-      if(!it){it=newSub();W.items.push(it);nu++;}else up++;setCols(it,cols,r);});
-      return '반제품 새로 '+nu+' · 고침 '+up;}},
+  '반제품':{cols:function(){return [tc('구성품','comp',{opts:'nm-parts',req:1})].concat(itemCols());},rows:function(cols){return W.items.slice(1).map(function(it){return cols.map(function(c){return cellOutV(c,it[c.k]);});});},
+    apply:function(rs,cols){compFix();var nu=0,up=0,np=[];rs.forEach(function(r){var comp=s(r.comp),code=s(r.code),name=s(r.name);if(!comp&&!code&&!name)return;
+      var subs=W.items.slice(1),it=subs.filter(function(x){return comp&&s(x.comp)===comp;})[0]||subs.filter(function(x){return code&&s(x.code)===code;})[0]||subs.filter(function(x){return name&&s(x.name)===name;})[0];
+      if(!it){it=newSub();W.items.push(it);nu++;}else up++;setCols(it,cols,r);if(!s(it.comp))it.comp=name;
+      if(s(it.comp)&&W.comp.indexOf(s(it.comp))<0){W.comp.push(s(it.comp));np.push(s(it.comp));}});
+      if(W.items.length>1)W.compDone=true;if(np.length)nmAdd({parts:np});
+      return '반제품 새로 '+nu+' · 고침 '+up+(np.length?' · 구성품 더함 '+np.join(', '):'');}},
   '자재':{cols:function(){return [tc('모품목명','pname',{req:1}),tc('모품목번호','pcode'),tc('자재명','mat',{opts:'mat',req:1})];},
     rows:function(){var out=[];W.items.forEach(function(it){var ms=(it.mats||[]).filter(function(m){return s(m.name);});
       if(!ms.length)out.push([s(it.name),s(it.code),'']);ms.forEach(function(m){out.push([s(it.name),s(it.code),s(m.txt||m.name)]);});});return out;},
@@ -1055,7 +1137,7 @@ function tplBar(st){
 }
 
 /* ---------- 시작 ---------- */
-try{var hs=decodeURIComponent(location.hash.slice(1));if(['단계','제품','반제품','자재'].indexOf(hs)>=0)cur=hs;}catch(e){}
+try{var hs=decodeURIComponent(location.hash.slice(1));if(['단계','제품','반제품','자재','명칭'].indexOf(hs)>=0)cur=hs;}catch(e){}
 fetch('칸.json').then(function(r){return r.json();}).then(function(j){SPEC=j;refreshDl();draw();},function(){bannerEl.replaceChildren(h('div',{class:'banner'},'칸 정의(칸.json)를 읽지 못했습니다.'));});
 connectDb().then(function(d){
   db=d;
