@@ -1,5 +1,6 @@
 <!doctype html>
-<!-- v186 묶음 등록대기 → 납품대기 → 납품완료 · 납품 카드 숫자 칩 · 펴면 공정별 외주납품·자재출고·도착·조립 외주납품·외주입고 대기/완료.
+<!-- v193 공정업체 시트 — 박스 sheets[{proc,pos}](폼이 씀): 그 업체가 맡은 공정마다 시트 하나, 카드 = 그 공정 줄 외주납품 대기/완료. 조립업체는 「조립」 시트 = 아래 v176~v186 그대로. 공정업체만인 박스는 발주 탭 없음.
+     v186 묶음 등록대기 → 납품대기 → 납품완료 · 납품 카드 숫자 칩 · 펴면 공정별 외주납품·자재출고·도착·조립 외주납품·외주입고 대기/완료.
      v185 발주서 카드 = 폼 「저장한 항목」 카드 모양(details.rec · 칩 대기·진행중·완료·오류).
      v184 발주서 = 업체 박스 하나(처음 닫힘, 겉 숫자 칩, 안 등록대기·등록완료) — 폼 「발주서」 업체 박스와 같은 꼴.
      v183 제품 발주 부속 표의 공통부속(두 제품 이상 BOM) 줄 = 처음 체크 해제 · 왼쪽 띠.
@@ -74,6 +75,7 @@ table.det td{vertical-align:top}table.det td.dc{min-width:120px}table.det .dp{fo
 .tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 12px}.tabs button{min-height:44px}
 td.for{white-space:normal;min-width:160px;font-size:12px;color:var(--muted)}
 .st.bad{color:var(--red)}
+.sheets{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}.sheets button{min-height:40px;padding:8px 14px}   /* v193 공정 시트 */
 </style>
 </head>
 <body>
@@ -225,11 +227,33 @@ function sentEl(){
   return h('section','sent',h('h2','','발주서'),h('div','card vbox'+(BOXOPEN?' open':''),hd,!BOXOPEN?null:h('div','vin',
     ['등록대기','납품대기','납품완료'].reduce(function(o,g){return o.concat([h('h3','lh',g,h('span','',G[g].length+'건'))],G[g].length?G[g].map(cardEl):(g==='등록대기'?[h('div','empty','발주서가 없습니다.')]:[]));},[]))));   /* h() 는 배열 한 겹만 펴서 납작하게 */
 }
+/* v193 사장님 「…각 공정업체박스에 해당공정을 각각 다른시트에서 관리 해야 합니다」 — 시트 = 공정. '' = 조립(발주·발주서) */
+var SHEET=null;
+function sheets(){return ((BOX&&BOX.sheets)||[]).filter(function(x){return x&&x.proc;});}
+function isAsmBox(){return items().length>0||parts().length>0||((BOX&&BOX.pos)||[]).length>0;}
+function sheetCard(pr,p){
+  var k=pr+':'+p.id,open=!!OPEN[k],g=p.g==='납품완료'?'납품완료':'납품대기';
+  var body=open?h('div','recb',h('div','tw',h('table','',h('thead','',h('tr','',['품명','수량','외주납품'].map(function(t,i){return h('th',i===1?'n':'',t);}))),
+    h('tbody','',(p.parts||[]).map(function(q){return h('tr','',h('td','',show(q.cname)),h('td','n',num(q.qty)),h('td','',dc('외주납품',!!q.dlv)));}))))):null;
+  var dt=h('details','rec',h('summary','',h('div','rt',h('b','',show(p.title)),h('small','',[p.kind==='부속'?'공통부속 발주':'제품 발주','납품요청일 '+show(p.need)].join(' · ')),
+    h('div','nums',h('span','chip '+(Number(p.pd)===Number(p.pt)?'완료':'진행중'),'외주납품 '+num(p.pd)+'/'+num(p.pt)))),h('span','chip '+(g==='납품완료'?'완료':'진행중'),g)),body);
+  if(open)dt.open=true;
+  dt.addEventListener('toggle',function(){if(dt.open===!!OPEN[k])return;if(dt.open)OPEN[k]=1;else delete OPEN[k];draw();});
+  return dt;
+}
+function sheetEl(sh){var ps=sh?sh.pos||[]:[];
+  return ['납품대기','납품완료'].reduce(function(o,g){var a=ps.filter(function(p){return (p.g==='납품완료'?'납품완료':'납품대기')===g;});
+    return o.concat([h('h3','lh',g,h('span','',a.length+'건'))],a.length?a.map(function(p){return sheetCard(sh.proc,p);}):(g==='납품대기'?[h('div','empty','발주서가 없습니다.')]:[]));},[]);}
 function draw(){
   if(BOX===null){say('불러오지 못했습니다.',true);return;}
   if(BOX===false){say('발주 링크가 없습니다.',true);return;}
   var rf=h('button','sec',LOADING?'불러오는 중':'새로고침');rf.type='button';rf.disabled=LOADING;rf.addEventListener('click',function(){NOTE='';load();draw();});   /* v178 사장님 「발주링크에 새로고침 버튼을 만들어 주세요」 */
   var its=items(),out=[P.who('발주 — '+show(BOX.vendor),'out'),h('div','bar',rf)];
+  var shs=sheets(),isA=isAsmBox(),tabsV=(isA?['']:[]).concat(shs.map(function(x){return x.proc;}));
+  if(SHEET==null||tabsV.indexOf(SHEET)<0)SHEET=tabsV.length?tabsV[0]:'';
+  if(tabsV.length>1)out.push(h('div','sheets',tabsV.map(function(t){var b=h('button',SHEET===t?'':'sec',t===''?(show(BOX.asmProc)||'조립'):t);b.type='button';b.setAttribute('aria-pressed',SHEET===t?'true':'false');
+    b.addEventListener('click',function(){if(SHEET!==t){SHEET=t;ERR='';NOTE='';draw();}});return b;})));
+  if(SHEET!==''||!isA){out=out.concat(sheetEl(shs.filter(function(x){return x.proc===SHEET;})[0]||null));P.fill(mainEl,out);return;}
   var tab=function(m,t){var b=h('button',MODE===m?'':'sec',t);b.type='button';b.setAttribute('aria-pressed',MODE===m?'true':'false');b.addEventListener('click',function(){if(MODE!==m){MODE=m;ERR='';NOTE='';draw();}});return b;};
   out.push(h('div','tabs',tab('제품','제품 발주'),tab('부속','공통부속 발주')));   /* v180 사장님 「발주서 입력 링크에서 공통 부속도  골라서 따로 발주 할 수 있어야 함」 */
   if(MODE==='부속'){
