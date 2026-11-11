@@ -1,5 +1,7 @@
 <!doctype html>
-<!-- v193 공정업체 시트 — 박스 sheets[{proc,pos}](폼이 씀): 그 업체가 맡은 공정마다 시트 하나, 카드 = 그 공정 줄 외주납품 대기/완료. 조립업체는 「조립」 시트 = 아래 v176~v186 그대로. 공정업체만인 박스는 발주 탭 없음.
+<!-- v195 받을 납품 「납품확인」 — 시트 카드 줄마다 받을 납품(앞 공정 보낸업체-공정 납품대기 + 「납품확인」)·보낼 납품(받을업체-공정 납품대기), 조립 시트 「도착」 칸도 「납품확인」.
+       = erp_prodconfirm/<열쇠 fk> {box:이 박스 열쇠, dk, at} 새로 만들기(규칙: 박스 cks 에 든 열쇠만). 상태는 erp_prodconfirm 을 한 장씩 get(없으면 박스 값).
+     v193 공정업체 시트 — 박스 sheets[{proc,pos}](폼이 씀): 그 업체가 맡은 공정마다 시트 하나, 카드 = 그 공정 줄 외주납품 대기/완료. 조립업체는 「조립」 시트 = 아래 v176~v186 그대로. 공정업체만인 박스는 발주 탭 없음.
      v186 묶음 등록대기 → 납품대기 → 납품완료 · 납품 카드 숫자 칩 · 펴면 공정별 외주납품·자재출고·도착·조립 외주납품·외주입고 대기/완료.
      v185 발주서 카드 = 폼 「저장한 항목」 카드 모양(details.rec · 칩 대기·진행중·완료·오류).
      v184 발주서 = 업체 박스 하나(처음 닫힘, 겉 숫자 칩, 안 등록대기·등록완료) — 폼 「발주서」 업체 박스와 같은 꼴.
@@ -76,6 +78,7 @@ table.det td{vertical-align:top}table.det td.dc{min-width:120px}table.det .dp{fo
 td.for{white-space:normal;min-width:160px;font-size:12px;color:var(--muted)}
 .st.bad{color:var(--red)}
 .sheets{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}.sheets button{min-height:40px;padding:8px 14px}   /* v193 공정 시트 */
+.rcv{display:grid;gap:4px;margin:2px 0 0}.rcv button{min-height:36px;padding:6px 12px;font-size:13px;justify-self:start}.rcv .manual button{min-height:36px;padding:6px 12px;font-size:13px}.rcv .part{margin:0;font-size:12px}.rcv .err{margin:0;font-size:12px}.rcv .at{font-size:11px;color:var(--muted);font-weight:700}   /* v195 납품확인 */
 </style>
 </head>
 <body>
@@ -112,7 +115,7 @@ function load(){
     .then(function(){   /* 새로고침: 고른 제품이 그대로면 친 값 유지 */
       if(!SEL)return;var n=items().filter(function(it){return it.pcode===SEL.pcode;})[0];
       if(n&&JSON.stringify(n.rows)===JSON.stringify(SEL.rows)){SEL=n;ROWS.forEach(function(x,i){x.r=n.rows[i];});}else{SEL=null;ROWS=[];QTY='';}})
-    .then(loadSent).then(function(){LOADING=false;draw();},function(){LOADING=false;draw();});
+    .then(loadCf).then(loadSent).then(function(){LOADING=false;draw();},function(){LOADING=false;draw();});
 }
 function items(){return ((BOX&&BOX.items)||[]).filter(function(it){return it&&it.pcode&&(it.rows||[]).length;});}
 /* v183 사장님 「발주링크 제품발주- 공통부속 기본적으로 체크안되어 있게 해주세요」 — 공통부속 = 박스 parts 중 두 제품 이상 BOM 에 있는 부속(for 2개 이상). 처음 체크 해제, 줄 왼쪽 띠로만 구별 */
@@ -189,18 +192,42 @@ function chipCls(ch){return ch.c==='bad'?'오류':ch.c==='done'?'완료':/진행
 function grpOf(d){if(d.g)return d.g;return Number((d.st||{}).r||1)<=2?'등록대기':'납품대기';}
 function dc(lab,ok){return h('span','chip '+(ok?'완료':'대기'),lab+' '+(ok?'완료':'대기'));}
 /* v194 사장님 「발주서 납품관계에 따라 표기되는 납품대기 상태를 납품받을업체-가공명 납품대기 이렇게 표기해 주어야 합니다」 — to = 「받을업체-받는 공정」(폼이 씀) */
-function dlc(ok,to){return !ok&&to?h('span','chip 대기',show(to)+' 납품대기'):dc('외주납품',ok);}
-function sheetG(p){if(p.g==='납품완료')return '납품완료';var t=[];(p.parts||[]).forEach(function(q){if(!q.dlv&&q.to&&t.indexOf(q.to)<0)t.push(q.to);});return t.length===1?show(t[0])+' 납품대기':'납품대기';}
+function dlc(ok,to){return to?h('span','chip '+(ok?'완료':'대기'),show(to)+(ok?' 납품완료':' 납품대기')):dc('외주납품',ok);}   /* v195 to 가 있으면 ok = 받는 쪽 납품확인 */
+/* v195 사장님 「자그럼 이를 납품 보내는 쪽과 납품 받는쪽 두곳으로 나눠발생되게 해야 합니다. 그리고 납품 받는쪽에는 납품확인 버튼을 만들어 해당 공정품이 다음 공정으로 납품 완료되었음이 확인 되어야 합니다」
+   열쇠 k(보낼 납품)·fk(받을 납품) = 폼이 박스에 적음. 상태 = erp_prodconfirm/<열쇠> 있음(get, 규칙 배포 전·못 읽으면 박스 ok·fok·arr 값). 「납품확인」 = 카드 안 「확인」·「취소」(발주박스 v187 과 같음 — confirm() 창 안 씀). */
+var CF={},ASK={},BZ={},CERR={};
+function cfKeys(){var a=[],put=function(k){if(P.noOk(k)&&a.indexOf(k)<0)a.push(k);};
+  sheets().forEach(function(sh){(sh.pos||[]).forEach(function(p){(p.parts||[]).forEach(function(q){put(q.k);put(q.fk);});});});
+  ((BOX&&BOX.pos)||[]).forEach(function(d){(d.det||[]).forEach(function(x){(x.parts||[]).forEach(function(q){put(q.fk);(q.steps||[]).forEach(function(z){put(z.k);});});});});return a;}
+function loadCf(){var ks=cfKeys(),c={},ch=[];for(var i=0;i<ks.length;i+=100)ch.push(ks.slice(i,i+100));
+  return Promise.all(ch.map(function(g){return P.getMany(g.map(function(k){return 'erp_prodconfirm/'+k;})).then(function(o){g.forEach(function(k){if(o['erp_prodconfirm/'+k])c[k]=o['erp_prodconfirm/'+k];});},function(){});})).then(function(){CF=c;});}
+function cf(k,fb){return !!(k&&CF[k])||!!fb;}
+function okOut(q){return q.to?cf(q.k,q.ok):!!q.dlv;}
+function rcv(k){ASK[k]=0;BZ[k]=1;CERR[k]='';draw();
+  P.commit([{name:'erp_prodconfirm/'+k,fields:{box:key,dk:k,at:new Date().toISOString()},exists:false}])
+    .then(function(){BZ[k]=0;return load();},function(){BZ[k]=0;return load().then(function(){if(!CF[k]){CERR[k]='납품확인을 저장하지 못했습니다.';draw();}});});}
+function rcvEl(k,from,fb,arr){   /* 받는 쪽 칸 */
+  if(!P.noOk(k))return arr?dc('도착',!!fb):'';
+  if(cf(k,fb)){var c=CF[k];return h('div','rcv',h('span','chip 완료',arr?'도착 완료':(from?show(from)+' 납품완료':'납품완료')),c&&c.at?h('span','at','납품확인 '+P.when(c.at)):null);}
+  var lab=from?show(from)+' 납품대기':'납품대기';
+  if(ASK[k]){var y=h('button','','확인'),n=h('button','sec','취소');y.type=n.type='button';y.addEventListener('click',function(){rcv(k);});n.addEventListener('click',function(){ASK[k]=0;draw();});
+    return h('div','rcv',h('span','chip 대기',lab),h('p','part',(from?show(from)+' ':'')+'납품을 확인합니다.'),h('div','manual',y,n));}
+  var b=h('button','',BZ[k]?'저장 중':'납품확인');b.type='button';b.disabled=!!BZ[k];b.addEventListener('click',function(){ASK[k]=1;CERR[k]='';draw();});
+  return h('div','rcv',h('span','chip 대기',lab),b,CERR[k]?h('p','err',CERR[k]):null);}
+function sheetDone(p){var a=p.parts||[];return a.length?a.every(okOut):p.g==='납품완료';}   /* v195 완료 = 보낼 납품 모두 받는 쪽 납품확인 */
+function sheetG(p){if(sheetDone(p))return '납품완료';var t=[];(p.parts||[]).forEach(function(q){if(!okOut(q)&&q.to&&t.indexOf(q.to)<0)t.push(q.to);});return t.length===1?show(t[0])+' 납품대기':'납품대기';}
 function numChips(d){var a=[],pt=Number(d.pt||0),an=Number(d.an||0);
+  var ad=Number(d.ad||0),dp=[];if(d.kind!=='부속')(d.det||[]).forEach(function(x){(x.parts||[]).forEach(function(q){if(q.arr!=null&&P.noOk(q.fk))dp.push(q);});});if(dp.length){an=dp.length;ad=dp.filter(function(q){return cf(q.fk,q.arr);}).length;}   /* v195 도착 = 납품확인(바로 반영) */
   if(pt)a.push(h('span','chip '+(Number(d.pd)===pt?'완료':'진행중'),'외주납품 '+num(d.pd)+'/'+num(pt)));
-  if(an)a.push(h('span','chip '+(Number(d.ad)===an?'완료':'진행중'),'부속 도착 '+num(d.ad)+'/'+num(an)));
+  if(an)a.push(h('span','chip '+(ad===an?'완료':'진행중'),'부속 도착 '+num(ad)+'/'+num(an)));
   if(d.kind!=='부속'){a.push(dc('조립 외주납품',!!d.as));if(d.as)a.push(dc('외주입고',!!d.inn));}
   return a;}
 function detEl(x,isP){var maxP=0;(x.parts||[]).forEach(function(p){maxP=Math.max(maxP,(p.steps||[]).length);});
+  isP=isP||(x.parts||[]).some(function(p){return p.arr!=null;});   /* v195 공통부속도 도착(조립업체 납품확인) */
   var head=['품명'];for(var i=0;i<maxP;i++)head.push('공정 '+(i+1));if(isP)head.push('도착');
   var trs=(x.parts||[]).map(function(p){var tds=[h('td','',show(p.cname))];
-    for(var i=0;i<maxP;i++){var z=(p.steps||[])[i];tds.push(z?h('td','dc',h('div','dp',show(z.proc)),dlc(!!z.dlv,z.to),z.mv==null?null:dc('자재출고',!!z.mv)):h('td',''));}
-    if(isP)tds.push(h('td','dc',dc('도착',!!p.arr)));return h('tr','',tds);});
+    for(var i=0;i<maxP;i++){var z=(p.steps||[])[i];tds.push(z?h('td','dc',h('div','dp',show(z.proc)),dlc(z.to?cf(z.k,z.ok):!!z.dlv,z.to),z.mv==null?null:dc('자재출고',!!z.mv)):h('td',''));}
+    if(isP)tds.push(h('td','dc',p.arr==null?'':rcvEl(p.fk,p.from,p.arr,1)));return h('tr','',tds);});
   if(x.asm){var c=h('td','dc',h('div','dp',show(x.asm.proc)),dc('외주납품',!!x.asm.dlv),dc('외주입고',!!x.asm.inn));c.colSpan=Math.max(1,maxP);trs.push(h('tr','asmrow',h('td','','조립'),c,isP?h('td',''):null));}
   return h('div','tw',h('table','det',h('thead','',h('tr','',head.map(function(t){return h('th','',t);}))),h('tbody','',trs)));}
 function cardEl(d){
@@ -234,18 +261,19 @@ function sentEl(){
 var SHEET=null;
 function sheets(){return ((BOX&&BOX.sheets)||[]).filter(function(x){return x&&x.proc;});}
 function isAsmBox(){return items().length>0||parts().length>0||((BOX&&BOX.pos)||[]).length>0;}
-function sheetCard(pr,p){
-  var k=pr+':'+p.id,open=!!OPEN[k],g=p.g==='납품완료'?'납품완료':'납품대기';
-  var body=open?h('div','recb',h('div','tw',h('table','',h('thead','',h('tr','',['품명','수량','외주납품'].map(function(t,i){return h('th',i===1?'n':'',t);}))),
-    h('tbody','',(p.parts||[]).map(function(q){return h('tr','',h('td','',show(q.cname)),h('td','n',num(q.qty)),h('td','',dlc(!!q.dlv,q.to)));}))))):null;
+function sheetCard(pr,p){   /* v195 받을 납품(「납품확인」) · 보낼 납품 */
+  var k=pr+':'+p.id,open=!!OPEN[k],g=sheetDone(p)?'납품완료':'납품대기',ps=p.parts||[],hf=ps.some(function(q){return P.noOk(q.fk);}),pd=ps.filter(okOut).length,pt=ps.length||Number(p.pt||0),nf=ps.filter(function(q){return P.noOk(q.fk)&&!cf(q.fk,q.fok);}).length;
+  if(!ps.length)pd=Number(p.pd||0);
+  var body=open?h('div','recb',h('div','tw',h('table','det',h('thead','',h('tr','',(hf?['품명','수량','받을 납품','보낼 납품']:['품명','수량','보낼 납품']).map(function(t,i){return h('th',i===1?'n':'',t);}))),
+    h('tbody','',ps.map(function(q){return h('tr','',h('td','',show(q.cname)),h('td','n',num(q.qty)),hf?h('td','dc',P.noOk(q.fk)?rcvEl(q.fk,q.from,q.fok):''):null,h('td','dc',dlc(okOut(q),q.to)));}))))):null;
   var dt=h('details','rec',h('summary','',h('div','rt',h('b','',show(p.title)),h('small','',[p.kind==='부속'?'공통부속 발주':'제품 발주','납품요청일 '+show(p.need)].join(' · ')),
-    h('div','nums',h('span','chip '+(Number(p.pd)===Number(p.pt)?'완료':'진행중'),'외주납품 '+num(p.pd)+'/'+num(p.pt)))),h('span','chip '+(g==='납품완료'?'완료':'진행중'),sheetG(p))),body);
+    h('div','nums',h('span','chip '+(pd===pt?'완료':'진행중'),'납품 '+num(pd)+'/'+num(pt)),nf?h('span','chip 대기','납품확인 대기 '+num(nf)):null)),h('span','chip '+(g==='납품완료'?'완료':'진행중'),sheetG(p))),body);
   if(open)dt.open=true;
   dt.addEventListener('toggle',function(){if(dt.open===!!OPEN[k])return;if(dt.open)OPEN[k]=1;else delete OPEN[k];draw();});
   return dt;
 }
 function sheetEl(sh){var ps=sh?sh.pos||[]:[];
-  return ['납품대기','납품완료'].reduce(function(o,g){var a=ps.filter(function(p){return (p.g==='납품완료'?'납품완료':'납품대기')===g;});
+  return ['납품대기','납품완료'].reduce(function(o,g){var a=ps.filter(function(p){return (sheetDone(p)?'납품완료':'납품대기')===g;});
     return o.concat([h('h3','lh',g,h('span','',a.length+'건'))],a.length?a.map(function(p){return sheetCard(sh.proc,p);}):(g==='납품대기'?[h('div','empty','발주서가 없습니다.')]:[]));},[]);}
 function draw(){
   if(BOX===null){say('불러오지 못했습니다.',true);return;}

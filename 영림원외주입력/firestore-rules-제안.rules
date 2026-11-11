@@ -175,6 +175,18 @@ service cloud.firestore {
         && request.resource.data.need is string && request.resource.data.need.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
         && request.resource.data.rows is list && request.resource.data.rows.size() > 0 && request.resource.data.rows.size() <= 300;
     }
+    // v195 생산 공정 납품확인(발주.html 받는 쪽 「납품확인」) — 배포 전(사장님 「배포하세요」 뒤에 배포).
+    // 받는 업체 박스 열쇠를 아는 사람이 그 박스 cks(폼이 적는 받을 납품 열쇠 목록)에 든 열쇠만 한 번 만든다. 고치기·지우기는 담당자만(아래 덩어리). 구매 erp_poconfirm 과 같은 꼴.
+    match /erp_prodconfirm/{dk} {
+      allow get: if true;
+      allow create: if dk.matches('^k[a-z0-9]{2,30}$')
+        && request.resource.data.keys().hasOnly(['box', 'dk', 'at'])
+        && request.resource.data.dk == dk
+        && request.resource.data.at is string
+        && request.resource.data.box is string && request.resource.data.box.matches('^[A-Za-z0-9_-]{32,64}$')
+        && exists(/databases/$(database)/documents/erp_asmbox/$(request.resource.data.box))
+        && dk in abox(request.resource.data.box).get('cks', []);
+    }
 
     // erp_ 업무 자료: 보기 = 권한 받은 담당자 모두(드롭다운이 다른 메뉴 자료를 읽음) · 저장·삭제 = 컬렉션마다
     match /{col}/{id} {
