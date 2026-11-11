@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원 기본정보 입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v3 -->
+<!-- 영림원 기본정보 입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v4 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -128,6 +128,7 @@ table.sheet td.un{box-shadow:inset 0 0 0 2px #f59e0b}
 .wiz .box .row h3{margin:0}
 .setrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px}
 .setbtn{display:flex;gap:6px}
+.tplbar{margin:0 0 6px}.tplgs{margin-top:8px}
 .wiznav{border-top:1px solid var(--line);padding-top:14px;margin-top:22px}
 .toast:not(:empty){position:fixed;left:16px;right:16px;bottom:16px;z-index:50;margin:0 auto;max-width:480px;padding:10px 14px;background:#fff;border:1px solid #e3e2e0;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.08)}
 #erp-login{position:fixed;inset:0;z-index:300;background:#fff;display:grid;place-items:center;padding:16px}
@@ -154,7 +155,7 @@ table.sheet td.un{box-shadow:inset 0 0 0 2px #f59e0b}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v3</span>
+    <span class="ver">v4</span>
     <a class="btn small" href="../영림원외주입력/영림원외주입력.html" style="margin-left:8px">입력폼</a>
   </div>
 </header>
@@ -226,7 +227,7 @@ function connectDb(){
 }
 (function(){
 "use strict";
-var VER='v3';
+var VER='v4';
 var GS_MAKER='https://script.google.com/macros/s/AKfycbzxW9K--tKq_uqHnzNdecOA4YbKosK51XVG1MJVFTVTzB5Kz5o7gN1YeYuthCRI4PshOw/exec';   /* 영림원외주입력 v113 웹앱(구글시트양식/양식만들기.gs) — 파일 이름은 「외주입력_」 로 시작해야 받는다 */
 var GS_NAME='외주입력_기본정보_한행입력표';
 var XLSX_URL='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js',xlsxP=null;
@@ -761,7 +762,7 @@ function saveDraft(quiet){
   o.title=s(W.items[0].name);o.code=s(W.items[0].code);
   return db.write([{c:COL,id:W._id,set:o}]).then(function(){w0.createdAt=o.createdAt;if(!quiet)say('임시 저장했습니다.');},function(e){say('임시 저장하지 못했습니다. '+errText(e),true);});
 }
-function goStep(n){if(!W)return;W.step=Math.max(0,Math.min(STEPS.length-1,n));saveDraft(true);boxKind='';draw();window.scrollTo({top:0,behavior:'smooth'});}
+function goStep(n){if(!W)return;W.step=Math.max(0,Math.min(STEPS.length-1,n));saveDraft(true);boxKind='';wizGs='';draw();window.scrollTo({top:0,behavior:'smooth'});}
 /* 칸 하나 — 칸.json 의 칸 이름·목록 그대로 */
 function fld(o,c,after,ro){
   var f=h('div',{class:'f'});
@@ -799,6 +800,7 @@ function drawWizard(card){
   card.append(bar);
   var body=h('div',{class:'wiz'}),re=function(){dirty=true;var y=window.scrollY;draw();window.scrollTo(0,y);};
   var st=STEPS[W.step];
+  body.append(tplBar(st));
   if(st==='제품'){
     body.append(itemGrids(p));
   }
@@ -920,6 +922,137 @@ function finishSet(msg){
   },function(e){msg.textContent='저장하지 못했습니다. '+errText(e);msg.className='msg bad';});
 }
 function downloadSet(){var rs=setRows();loadXlsx().then(function(X){saveFile(X.write(buildBook(X,rs),{type:'array',bookType:'xlsx'}),'외주입력_기본정보_'+(s(W.items[0].code)||s(W.items[0].name)||'제품')+'.xlsx');say('엑셀을 받았습니다.');},function(){say(XLSX_FAIL,true);});}
+
+/* ---------- 단계 입력 단계별 양식 (v4) ----------
+   단계마다 「양식 다운로드」(엑셀·구글 스프레드시트)·「일괄 업로드」(엑셀·구글 스프레드시트). 폼 v113 과 같은 길:
+   구글 = 누를 때 엑셀 양식과 같은 파일을 GS_MAKER 웹앱에 보내 드라이브 「영림원외주입력 양식」 폴더에 구글시트로 만든다.
+   양식에는 앞 단계에서 넣은 품목(품명·품번 …)이 줄로 미리 들어가고, 빈칸만 채워 올리면 그 단계에 그대로 들어간다.
+   올리기는 저장하지 않는다 — 화면(묶음)에 채우기만, 저장은 단계 넘길 때·임시 저장. */
+var TPL_ROWS=500;
+function tc(l,k,o){return Object.assign({l:l,k:k},o||{});}
+function colsKey(kind,g){return colsOf(kind,g).map(function(c){return tc(c.l,c.k,{opts:c.opts,t:c.t,req:c.req});});}
+function itemCols(){return colsKey('품목','4 품목등록').concat(colsKey('품목','3 품목 대중소분류'),colsKey('품목','8 품목별공정흐름유형등록'));}
+function findItem(code,name){code=s(code);name=s(name);
+  return W.items.filter(function(it){return code&&s(it.code)===code;})[0]||W.items.filter(function(it){return name&&s(it.name)===name;})[0]||null;}
+function cellIn(c,v){if(c.t==='bool')return boolIn(v);if(c.t==='date')return dateIn(v);return typeof v==='number'?String(v):s(v);}
+function cellOutV(c,v){if(c.t==='bool')return v===true?'O':'X';return v==null?'':v;}
+function setCols(o,cols,row){var n=0;cols.forEach(function(c){if(!(c.k in row))return;var v=cellIn(c,row[c.k]);if(c.t!=='bool'&&v===''&&s(o[c.k])==='')return;if(o[c.k]!==v){o[c.k]=v;n++;}});return n;}
+function bomLab(k){var c=colsOf('품목','7 BOM 줄').filter(function(x){return x.k===k;})[0];return c?c.l:k;}
+var STEP_TPL={
+  '제품':{cols:itemCols,rows:function(cols){var p=W.items[0];return [cols.map(function(c){return cellOutV(c,p[c.k]);})];},
+    apply:function(rs,cols){if(!rs.length)return '읽을 줄이 없습니다.';var n=setCols(W.items[0],cols,rs[0]);return '제품 '+n+'칸 반영'+(rs.length>1?' (첫 줄만 — 반제품은 2단계 양식)':'');}},
+  '반제품':{cols:itemCols,rows:function(cols){return W.items.slice(1).map(function(it){return cols.map(function(c){return cellOutV(c,it[c.k]);});});},
+    apply:function(rs,cols){var nu=0,up=0;rs.forEach(function(r){var code=s(r.code),name=s(r.name);if(!code&&!name)return;
+      var it=W.items.slice(1).filter(function(x){return code&&s(x.code)===code;})[0]||W.items.slice(1).filter(function(x){return name&&s(x.name)===name;})[0];
+      if(!it){it=newSub();W.items.push(it);nu++;}else up++;setCols(it,cols,r);});
+      return '반제품 새로 '+nu+' · 고침 '+up;}},
+  '자재':{cols:function(){return [tc('모품목명','pname',{req:1}),tc('모품목번호','pcode'),tc('자재명','mat',{opts:'mat',req:1})];},
+    rows:function(){var out=[];W.items.forEach(function(it){var ms=(it.mats||[]).filter(function(m){return s(m.name);});
+      if(!ms.length)out.push([s(it.name),s(it.code),'']);ms.forEach(function(m){out.push([s(it.name),s(it.code),s(m.txt||m.name)]);});});return out;},
+    apply:function(rs){var by={},miss=0,nn={};rs.forEach(function(r){var it=findItem(r.pcode,r.pname);if(!it){if(s(r.mat))miss++;return;}(by[it.k]=by[it.k]||{it:it,rows:[]}).rows.push(r);});
+      Object.keys(by).forEach(function(k){var it=by[k].it,old=it.mats||[];
+        it.mats=by[k].rows.filter(function(r){return s(r.mat);}).map(function(r){
+          var t=s(r.mat),o=matFind(t);if(!o){var byName=matOpts().filter(function(x){return x.name===t;});if(byName.length===1)o=byName[0];}
+          var keep=old.filter(function(m){return (o&&s(m.code)===o.code&&!m.neu)||(!o&&m.neu&&s(m.name)===t);})[0];
+          var m={k:keep?keep.k:uid()};if(o){m.name=o.name;m.code=o.code;m.spec=o.spec;m.unit=o.unit;m.neu=false;m.txt=o.label;}else{m.name=t;m.code='';m.spec='';m.unit='';m.neu=true;m.txt=t;nn[t]=1;}
+          return m;});});
+      return Object.keys(by).length+'개 모품목 자재 반영 · 신규 자재 '+Object.keys(nn).length+(miss?' · 모품목 못 찾음 '+miss+'줄':'');}},
+  'BOM':{cols:function(){return [tc('모품목명','pname',{req:1}),tc('모품목번호','pcode'),tc(colsOf('품목','7 BOM등록업로드')[0].l,'pver'),tc(bomLab('cname'),'cname',{req:1}),tc(bomLab('ccode'),'ccode'),tc(bomLab('cspec'),'cspec'),
+      tc(bomLab('proc'),'proc',{opts:'proc'}),tc(bomLab('inunit'),'inunit',{opts:'unit'}),tc(bomLab('qn'),'qn'),tc(bomLab('qd'),'qd'),tc(bomLab('grain'),'grain',{t:'bool'})];},
+    rows:function(){var out=[];W.items.forEach(function(it){var q0=it.bq||{};kids(it).forEach(function(kd){var q=q0[kd.k]||{};
+      out.push([s(it.name),s(it.code),s(it.pver),kd.name,kd.code,kd.spec,s(q.proc),s(q.inunit),s(q.qn),s(q.qd),q.grain?'O':'X']);});});return out;},
+    apply:function(rs){var n=0,miss=0;rs.forEach(function(r){var it=findItem(r.pcode,r.pname);if(!it){miss++;return;}
+      if(s(r.pver))it.pver=s(r.pver);
+      var ks=kids(it),kd=ks.filter(function(x){return s(r.ccode)&&x.code===s(r.ccode);})[0]||ks.filter(function(x){return x.name===s(r.cname);})[0];
+      if(!kd){miss++;return;}it.bq=it.bq||{};var q=it.bq[kd.k]=it.bq[kd.k]||{};
+      ['proc','inunit','qn','qd'].forEach(function(k){q[k]=typeof r[k]==='number'?String(r[k]):s(r[k]);});q.grain=boolIn(r.grain);n++;});
+      return 'BOM '+n+'줄 반영'+(miss?' · 3 자재·2 반제품에 없는 줄 '+miss+'개(그 단계에서 먼저 넣으세요)':'');}},
+  '신규 자재':{cols:function(){var pg=sheetOf('자재').groups.filter(function(g){return g.rep==='pp';})[0],out=colsKey('자재','5 자재등록');
+      for(var i=0;i<pg.n;i++)pg.cols.forEach(function(c){out.push(tc(pg.pre+(i+1)+' '+c.l,'pp.'+i+'.'+c.k,{opts:c.opts,t:c.t}));});return out;},
+    rows:function(cols){return newNames().map(function(n){var m=W.news[n]||{name:n};return cols.map(function(c){var p=/^pp\.(\d+)\.(\w+)$/.exec(c.k);
+      if(c.k==='name')return n;if(p){var r=(m.pp||[])[+p[1]]||{};return cellOutV(c,r[p[2]]);}return cellOutV(c,m[c.k]);});});},
+    apply:function(rs,cols){var nn=newNames(),n=0,skip=[];rs.forEach(function(r){var nm=s(r.name);if(!nm)return;if(nn.indexOf(nm)<0){skip.push(nm);return;}
+      var m=W.news[nm]=W.news[nm]||{asset:'원자재',state:'사용',io:'내자',imp:'A등급',unit:'EA'};m.name=nm;m.pp=m.pp||[];
+      cols.forEach(function(c){if(!(c.k in r)||c.k==='name')return;var v=cellIn(c,r[c.k]),p=/^pp\.(\d+)\.(\w+)$/.exec(c.k);
+        if(p){(m.pp[+p[1]]=m.pp[+p[1]]||{})[p[2]]=v;}else m[c.k]=v;});n++;});
+      return '신규 자재 '+n+'건 반영'+(skip.length?' · 3 자재에 없는 이름은 건너뜀: '+skip.join(', '):'');}},
+  '공정·외주':{cols:function(){var wl=colsOf('품목','10 공정순서'),ol=colsOf('품목','11 공정순서'),L=function(a,k){return (a.filter(function(c){return c.k===k;})[0]||{l:k}).l;};
+      return [tc('품명','name',{req:1}),tc('품번','code'),tc('공정순서','seq'),tc(L(wl,'proc'),'proc'),tc(L(wl,'wc1'),'wc1',{opts:'wc'}),tc(L(wl,'wc2'),'wc2',{opts:'wc'}),tc(L(wl,'wc3'),'wc3',{opts:'wc'}),tc(L(ol,'ocode'),'ocode'),tc(L(ol,'price'),'price')];},
+    rows:function(){var out=[];W.items.forEach(function(it){var pw=it.pw||[];flowProcs(it.flow).forEach(function(p,j){var w=pw[j]||{};
+      out.push([s(it.name),s(it.code),j+1,p,s(w.wc1),s(w.wc2),s(w.wc3),s(w.ocode),s(w.price)]);});});return out;},
+    extra:{name:'공통',cols:function(){return colsKey('품목','9 제품별공정별소요자재').concat(colsKey('품목','10 제품별공정별워크센터'),colsKey('품목','11 외주계약등록'));},
+      rows:function(cols){var c=W.com||{};return [cols.map(function(x){return cellOutV(x,c[x.k]);})];}},
+    apply:function(rs,cols,ex){var n=0,miss=0;rs.forEach(function(r){var it=findItem(r.code,r.name);if(!it){miss++;return;}var ps=flowProcs(it.flow);
+      var j=+s(r.seq)-1;if(!(j>=0&&j<ps.length))j=ps.indexOf(s(r.proc));if(j<0){miss++;return;}
+      it.pw=it.pw||[];var w=it.pw[j]=it.pw[j]||{};['wc1','wc2','wc3','ocode','price'].forEach(function(k){w[k]=typeof r[k]==='number'?String(r[k]):s(r[k]);});n++;});
+      var cm='';if(ex&&ex.rows.length){W.com=W.com||{};cm=' · 공통 '+setCols(W.com,ex.cols,ex.rows[0])+'칸';}
+      return '공정순서 '+n+'줄 반영'+cm+(miss?' · 못 맞춘 줄 '+miss+'개(품번·공정흐름유형 확인)':'');}}
+};
+var TPL_STEP_N={'제품':1,'반제품':2,'자재':3,'BOM':4,'신규 자재':5,'공정·외주':6};
+function tplList(c){if(c.t==='bool')return ['O','X'];if(!c.opts)return null;if(c.opts==='mat')return matOpts().map(function(o){return o.label;});var l=listOf(c.opts);return l&&l.length?l:null;}
+function tplSheet(X,cols,rows){var labs=cols.map(function(c){return c.l+(c.req?'*':'');});var ws=X.utils.aoa_to_sheet([labs].concat(rows));
+  ws['!cols']=labs.map(function(t,i){var w=Math.max(10,t.length*2+2);rows.forEach(function(r){w=Math.max(w,Math.min(40,String(r[i]==null?'':r[i]).length*1.6+2));});return {wch:w};});return ws;}
+/* SheetJS 무료판은 드롭다운(데이터 유효성 검사)을 못 쓴다 → 폼 v6 addValidation 과 같이 첫 시트 XML 에 직접 넣는다(목록 밖 입력 허용 = showErrorMessage 0) */
+function tplValid(X,bytes,dv){
+  var zip=X.CFB.read(new Uint8Array(bytes),{type:'array'}),ent=X.CFB.find(zip,'/xl/worksheets/sheet1.xml');if(!ent)return bytes;
+  var xml=new TextDecoder('utf-8').decode(ent.content),esc=function(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');};
+  var tag='<dataValidations count="'+dv.length+'">'+dv.map(function(d){return '<dataValidation type="list" allowBlank="1" showInputMessage="1" showErrorMessage="0" sqref="'+d.col+'2:'+d.col+TPL_ROWS+'"><formula1>'+esc("'목록'!$"+d.src+'$1:$'+d.src+'$'+d.n)+'</formula1></dataValidation>';}).join('')+'</dataValidations>';
+  var after=/<(hyperlinks|printOptions|pageMargins|pageSetup|headerFooter|rowBreaks|colBreaks|customProperties|cellWatches|ignoredErrors|smartTags|drawing|legacyDrawing|legacyDrawingHF|picture|oleObjects|controls|webPublishItems|tableParts|extLst)[\s>\/]/.exec(xml);
+  xml=after?xml.slice(0,after.index)+tag+xml.slice(after.index):xml.replace('</worksheet>',tag+'</worksheet>');
+  ent.content=new TextEncoder().encode(xml);ent.size=ent.content.length;return X.CFB.write(zip,{type:'array',fileType:'zip'});}
+function tplBuild(X,st){
+  var T=STEP_TPL[st],cols=T.cols(),wb=X.utils.book_new(),hid=[0];
+  X.utils.book_append_sheet(wb,tplSheet(X,cols,T.rows(cols)),st);
+  if(T.extra){var ec=T.extra.cols();X.utils.book_append_sheet(wb,tplSheet(X,ec,T.extra.rows(ec)),T.extra.name);hid.push(0);}
+  var dv=[],lists=[];cols.forEach(function(c,i){var l=tplList(c);if(!l)return;lists.push(l);dv.push({col:X.utils.encode_col(i),src:X.utils.encode_col(lists.length-1),n:l.length});});
+  if(lists.length){var aoa=[];lists.forEach(function(l,c){l.forEach(function(v,r){(aoa[r]=aoa[r]||[])[c]=v;});});X.utils.book_append_sheet(wb,X.utils.aoa_to_sheet(aoa),'목록');hid.push(1);}
+  wb.Workbook={Sheets:hid.map(function(x){return {Hidden:x};})};
+  var bytes=X.write(wb,{type:'array',bookType:'xlsx'});if(dv.length)bytes=tplValid(X,bytes,dv);
+  var who=s(W.items[0].code)||s(W.items[0].name)||'새제품';
+  return {bytes:bytes,name:('외주입력_기본정보_'+TPL_STEP_N[st]+'_'+st+'_'+who).replace(/[\/\\<>:"|?*]/g,'_').slice(0,70)+'_양식'};
+}
+function tplDownload(st){loadXlsx().then(function(X){var r=tplBuild(X,st);saveFile(r.bytes,r.name+'.xlsx');say('양식을 받았습니다.');},function(){say(XLSX_FAIL,true);});}
+function tplGs(st){
+  var w=window.open('','_blank');if(w){try{w.opener=null;w.document.title='구글시트 양식';w.document.body.textContent='구글시트 양식을 만드는 중입니다.';}catch(e){}}
+  var fail=function(){if(w&&!w.closed)w.close();say('구글시트 양식을 만들지 못했습니다. 「양식 다운로드 → 엑셀」로 받아 주세요.',true);};
+  say('구글시트 양식을 만드는 중입니다.');
+  loadXlsx().then(function(X){var r=tplBuild(X,st);
+    return fetch(GS_MAKER,{method:'POST',body:JSON.stringify({name:r.name,data:b64(gsClean(X,r.bytes))}),credentials:'omit'}).then(function(x){return x.ok?x.json():Promise.reject(new Error('http'));})
+      .then(function(j){if(!j||!j.ok||!/^https:\/\/docs\.google\.com\/spreadsheets\/d\/[\w-]{20,}/.test(j.url||''))return Promise.reject(new Error('maker'));
+        if(w&&!w.closed)w.location.href=j.url;else window.open(j.url,'_blank','noopener');say('구글시트 양식을 드라이브 「영림원외주입력 양식」 폴더에 만들어 열었습니다.');});
+  }).catch(fail);
+}
+function tplRead(X,wb,st){
+  var T=STEP_TPL[st],cols=T.cols(),norm=function(t){return s(t).replace(/\s+/g,'').replace(/^\*+|\*+$/g,'');};
+  var read=function(ws,cs){if(!ws)return null;var a=X.utils.sheet_to_json(ws,{header:1,raw:true,defval:''}),hi=-1;
+    for(var i=0;i<Math.min(6,a.length);i++){if(a[i].some(function(x){return cs.some(function(c){return norm(x)===norm(c.l);});})){hi=i;break;}}
+    if(hi<0)return null;var head=a[hi].map(norm),pos={};cs.forEach(function(c){var j=head.indexOf(norm(c.l));if(j>=0)pos[c.k]=j;});
+    if(!Object.keys(pos).length)return null;
+    return a.slice(hi+1).filter(function(r){return r.some(function(x){return s(x)!=='';});}).map(function(r){var o={};Object.keys(pos).forEach(function(k){o[k]=r[pos[k]];});return o;});};
+  var rs=read(wb.Sheets[st],cols)||read(wb.Sheets[wb.SheetNames[0]],cols);
+  if(!rs){say('「'+st+'」 양식 칸 이름을 찾지 못했습니다. 이 단계에서 받은 양식을 올려 주세요.',true);return;}
+  var ex=null;if(T.extra){var ec=T.extra.cols(),er=read(wb.Sheets[T.extra.name],ec);if(er)ex={cols:ec,rows:er};}
+  var m=T.apply(rs,cols,ex);dirty=true;wizGs='';var y=window.scrollY;draw();window.scrollTo(0,y);say(m+'. 확인 뒤 다음·임시 저장을 누르세요.');
+}
+function tplFile(st){var inp=h('input',{type:'file',accept:'.xlsx,.xls,.csv',on:{change:function(){var f=inp.files[0];if(!f)return;
+  loadXlsx().then(function(X){return f.arrayBuffer().then(function(b){tplRead(X,X.read(b,{type:'array'}),st);});},function(){say(XLSX_FAIL,true);});}}});inp.click();}
+function gsBook(u){var m=String(u).match(/\/spreadsheets\/d\/([\w-]{20,})/);if(!m)return Promise.reject(new Error('link'));
+  return loadXlsx().then(function(X){return fetch('https://docs.google.com/spreadsheets/d/'+m[1]+'/export?format=xlsx',{credentials:'omit'})
+    .then(function(r){return r.ok?r.arrayBuffer():Promise.reject(new Error('share'));},function(){return Promise.reject(new Error('share'));})
+    .then(function(b){var u8=new Uint8Array(b);if(u8[0]!==0x50||u8[1]!==0x4B)return Promise.reject(new Error('share'));return {X:X,wb:X.read(b,{type:'array'})};});},function(){return Promise.reject(new Error('xlsx'));});}
+function gsErr(e){say(e&&e.message==='link'?'구글시트 링크가 아닙니다.':e&&e.message==='xlsx'?XLSX_FAIL:GS_SHARE,true);}
+var wizGs='';
+function tplBar(st){
+  if(!STEP_TPL[st])return '';
+  var bar=h('div',{class:'actions tplbar'},
+    pickBtn('양식 다운로드','download',[['엑셀',function(){tplDownload(st);}],['구글 스프레드시트',function(){tplGs(st);}]]),
+    pickBtn('일괄 업로드','fileup',[['엑셀',function(){tplFile(st);}],['구글 스프레드시트',function(){wizGs=st;var y=window.scrollY;draw();window.scrollTo(0,y);var n=mainEl.querySelector('.tplgs input');if(n)n.focus();}]]));
+  if(wizGs!==st)return bar;
+  var inp=h('input',{type:'text',placeholder:'https://docs.google.com/spreadsheets/d/…'});
+  return h('div',{},bar,h('div',{class:'box tplgs'},h('div',{class:'row'},inp,
+    h('button',{type:'button',class:'btn primary',on:{click:function(){say('구글시트를 읽는 중입니다.');gsBook(inp.value).then(function(r){tplRead(r.X,r.wb,st);},gsErr);}}},'읽기'),
+    h('button',{type:'button',class:'btn',on:{click:function(){wizGs='';draw();}}},'닫기'))));
+}
 
 /* ---------- 시작 ---------- */
 try{var hs=decodeURIComponent(location.hash.slice(1));if(['단계','제품','반제품','자재'].indexOf(hs)>=0)cur=hs;}catch(e){}
