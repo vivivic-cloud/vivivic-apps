@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원 기본정보 입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v5 -->
+<!-- 영림원 기본정보 입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v6 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -133,7 +133,7 @@ table.sheet td.un{box-shadow:inset 0 0 0 2px #f59e0b}
 .comp .compchips{justify-content:flex-start;padding-left:0;flex-basis:auto}.compchips .chip{font-size:12px;padding:4px 4px 4px 10px;display:inline-flex;align-items:center;gap:2px}
 .chip .x{all:unset;cursor:pointer;padding:0 6px;font-size:14px;line-height:1}.chip .x:focus-visible{outline:2px solid var(--ink)}
 .compline{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:4px 0 6px}
-.nmadd{display:flex;gap:8px;margin:8px 0 4px}.nmadd input{flex:1 1 180px;max-width:360px}.nmtab td:nth-child(2){min-width:180px}.tplgs{margin-top:8px}
+.nmadd{display:flex;gap:8px;margin:8px 0 4px}.nmadd input{flex:1 1 180px;max-width:360px}.nmtab{width:100%}.nmtab td:nth-child(2){width:100%;min-width:0}.nmtab td:nth-child(2) input[type=text]{min-width:60px}.nmtab .btn.small{padding:5px 8px}.tplgs{margin-top:8px}
 .wiznav{border-top:1px solid var(--line);padding-top:14px;margin-top:22px}
 .toast:not(:empty){position:fixed;left:16px;right:16px;bottom:16px;z-index:50;margin:0 auto;max-width:480px;padding:10px 14px;background:#fff;border:1px solid #e3e2e0;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.08)}
 #erp-login{position:fixed;inset:0;z-index:300;background:#fff;display:grid;place-items:center;padding:16px}
@@ -160,7 +160,7 @@ table.sheet td.un{box-shadow:inset 0 0 0 2px #f59e0b}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v5</span>
+    <span class="ver">v6</span>
     <a class="btn small" href="../영림원외주입력/영림원외주입력.html" style="margin-left:8px">입력폼</a>
   </div>
 </header>
@@ -232,7 +232,7 @@ function connectDb(){
 }
 (function(){
 "use strict";
-var VER='v5';
+var VER='v6';
 var GS_MAKER='https://script.google.com/macros/s/AKfycbzxW9K--tKq_uqHnzNdecOA4YbKosK51XVG1MJVFTVTzB5Kz5o7gN1YeYuthCRI4PshOw/exec';   /* 영림원외주입력 v113 웹앱(구글시트양식/양식만들기.gs) — 파일 이름은 「외주입력_」 로 시작해야 받는다 */
 var GS_NAME='외주입력_기본정보_한행입력표';
 var XLSX_URL='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js',xlsxP=null;
@@ -954,11 +954,15 @@ function nmCollect(){if(!W)return;var add={parts:(W.comp||[]).slice()};
   var c=W.com||{};['tunit','cunit','basis'].forEach(function(k){add[k]=[c[k]];});return nmAdd(add);}
 function refreshNmDl(){NM_LISTS.forEach(function(x){var id='dl-nm-'+x.k,d=document.getElementById(id);if(!d){d=h('datalist',{id:id});document.body.append(d);}
   d.replaceChildren.apply(d,nmList(x.k).map(function(v){return h('option',{value:v});}));});}
+var nmTab='parts';   /* v6 일관성 메뉴 = 목록마다 탭(시트) 하나, 보이는 것은 고른 탭 목록만 */
 function drawNames(card){
   card.append(h('div',{class:'stephead'},h('h2',{},'일관성 메뉴 ',h('span',{class:'chip test'},'임시'))));
+  if(!NM_LISTS.some(function(x){return x.k===nmTab;}))nmTab=NM_LISTS[0].k;
+  card.append(h('div',{class:'steps',role:'tablist'},NM_LISTS.map(function(x){var n=nmList(x.k).length;
+    return h('button',{type:'button',class:'stp',role:'tab','aria-selected':nmTab===x.k?'true':'false','aria-current':nmTab===x.k?'step':null,on:{click:function(){if(nmTab===x.k)return;nmTab=x.k;dirty=false;draw();}}},x.l,h('b',{},String(n)));})));
   var all=nmAll(),ro=!can('w');
   var put=function(){dirty=false;nmSave(all).then(function(){say('저장했습니다.');},function(e){say('저장하지 못했습니다. '+errText(e),true);});};
-  NM_LISTS.forEach(function(x){
+  NM_LISTS.filter(function(x){return x.k===nmTab;}).forEach(function(x){
     var L=all[x.k],tb=h('tbody');
     L.forEach(function(v,i){
       var inp=h('input',{type:'text',value:v,disabled:ro,on:{input:function(){dirty=true;},change:function(e){var t=s(e.target.value);
