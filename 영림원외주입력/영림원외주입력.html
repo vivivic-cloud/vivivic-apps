@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v175 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v191 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -381,7 +381,7 @@ table.asmt tr.chg td{background:var(--amber-bg)}table.asmt tr.off td{color:var(-
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v190</span>
+    <span class="ver">v191</span>
   </div>
 </header>
 <div class="wrap">
@@ -3585,8 +3585,9 @@ function purchKey(r){return [r.reqdate].concat((r.rows||[]).map(function(o){retu
 function purchCheck(v){   /* v90 일괄 목록 「모두 저장」은 입력 칸 검사를 안 거친다 */
   return rateRowsErr(v.rows,v.reqdate)||(v.rows||[]).map(function(o){return purPlateErr(o.ccode)||purQtyErr('요청수량')(o.qty)||optsErr('창고',PUR_WHS)(o.wh)||purVendorErr(o.vendor)||impPosErr('단가')(o.price);}).filter(Boolean)[0]||'';
 }
-function purchSaveCheck(v){
-  var seen={},dup='';
+function purchSaveCheck(v,id){
+  var seen={},dup='',k=purchKey(v),same=(data.purchases||[]).filter(function(r){return r.id!==id&&purchKey(r)===k;})[0];   /* v191 사장님 「그럼 우리폼에서 입력완료로 되어 있는 동일한 발주가 대기로 되어 있지 못하게 하면 되잖아」 — 일괄 목록(bulkState)과 같은 기준 purchKey */
+  if(same){var no=(same.pos||[]).map(function(p){return p.pono;}).filter(Boolean).join(', ');return '같은 발주가 이미 있습니다('+(no||same.status||'대기')+'). 저장하지 않았습니다.';}
   (v.rows||[]).forEach(function(o){var k=purTrim(o.vendor)+'|'+purTrim(o.ccode);if(seen[k])dup=dup||o.ccode;seen[k]=1;});
   return dup?'같은 구매거래처에 품번 「'+dup+'」 줄이 둘입니다. 한 줄로 합치거나 나눠서 따로 저장하세요. 저장하지 않았습니다.':rateRowsErr(v.rows,v.reqdate)||purCross('purreqs',v);   /* v167 환율 */   /* v121 */
 }
