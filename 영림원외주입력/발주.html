@@ -1,5 +1,6 @@
 <!doctype html>
-<!-- v196 사장님 「받는쪽과 보내는쪽 기준으로 안나눠져있는데?」 — 공정 시트 묶음 = 받을 납품(「납품확인」) · 보낼 납품 · 납품완료, 조립 시트 맨 위 받을 납품(박스 rcv).
+<!-- v199 사장님 「업체별 박스에 입고확인(납품받을것) / 작업(납품보낼것)  이렇게 구ㅡ분해」 — 상자 둘: 입고확인(받을 납품, 「납품확인」) · 작업(보낼 납품 + 납품완료). 조립 시트도 입고확인 상자.
+     v196 사장님 「받는쪽과 보내는쪽 기준으로 안나눠져있는데?」 — 공정 시트 묶음 = 받을 납품(「납품확인」) · 보낼 납품 · 납품완료, 조립 시트 맨 위 받을 납품(박스 rcv).
      v195 받을 납품 「납품확인」 — 시트 카드 줄마다 받을 납품(앞 공정 보낸업체-공정 납품대기 + 「납품확인」)·보낼 납품(받을업체-공정 납품대기), 조립 시트 「도착」 칸도 「납품확인」.
        = erp_prodconfirm/<열쇠 fk> {box:이 박스 열쇠, dk, at} 새로 만들기(규칙: 박스 cks 에 든 열쇠만). 상태는 erp_prodconfirm 을 한 장씩 get(없으면 박스 값).
      v193 공정업체 시트 — 박스 sheets[{proc,pos}](폼이 씀): 그 업체가 맡은 공정마다 시트 하나, 카드 = 그 공정 줄 외주납품 대기/완료. 조립업체는 「조립」 시트 = 아래 v176~v186 그대로. 공정업체만인 박스는 발주 탭 없음.
@@ -79,6 +80,7 @@ table.det td{vertical-align:top}table.det td.dc{min-width:120px}table.det .dp{fo
 td.for{white-space:normal;min-width:160px;font-size:12px;color:var(--muted)}
 .st.bad{color:var(--red)}
 .sheets{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}.sheets button{min-height:40px;padding:8px 14px}   /* v193 공정 시트 */
+.bx2{border:1px solid var(--line);border-radius:14px;background:#fff;padding:2px 12px 10px;margin:8px 0 12px}.bx2>h3.lh{font-size:15px}.bx2 h3.sub{font-size:13px}   /* v199 입고확인·작업 상자 */
 .rcv{display:grid;gap:4px;margin:2px 0 0}.rcv button{min-height:36px;padding:6px 12px;font-size:13px;justify-self:start}.rcv .manual button{min-height:36px;padding:6px 12px;font-size:13px}.rcv .part{margin:0;font-size:12px}.rcv .err{margin:0;font-size:12px}.rcv .at{font-size:11px;color:var(--muted);font-weight:700}   /* v195 납품확인 */
 </style>
 </head>
@@ -279,11 +281,13 @@ function sheetCard(pr,p,mode){   /* v196 mode = in(받을 납품 — 「납품�
   dt.addEventListener('toggle',function(){if(dt.open===!!OPEN[k])return;if(dt.open)OPEN[k]=1;else delete OPEN[k];draw();});
   return dt;
 }
-function sheetEl(sh){var ps=sh?sh.pos||[]:[],G=[];
-  if(ps.some(function(p){return (p.parts||[]).some(function(q){return P.noOk(q.fk);});}))G.push(['받을 납품','in',ps.filter(pendIn)]);
-  G.push(['보낼 납품','out',ps.filter(function(p){return !sheetDone(p);})],['납품완료','done',ps.filter(sheetDone)]);
-  return G.reduce(function(o,g){return o.concat([h('h3','lh',g[0],h('span','',g[2].length+'건'))],g[2].map(function(p){return sheetCard(sh.proc,p,g[1]);}));},[]);}
-function rcvSec(){var a=((BOX&&BOX.rcv)||[]).filter(pendIn);return a.length?[h('h3','lh','받을 납품',h('span','',a.length+'건'))].concat(a.map(function(p){return sheetCard('조립',p,'in');})):[];}   /* v196 조립업체가 받을 납품 */
+function bx2(t,n,kids,empty){return h('section','bx2',[h('h3','lh',t,h('span','',n+'건'))].concat(kids.length?kids:(empty?[h('div','empty',empty)]:[])));}
+function sheetEl(sh){var ps=sh?sh.pos||[]:[],out=[];
+  if(ps.some(function(p){return (p.parts||[]).some(function(q){return P.noOk(q.fk);});})){var a=ps.filter(pendIn);out.push(bx2('입고확인',a.length,a.map(function(p){return sheetCard(sh.proc,p,'in');}),'입고확인할 납품이 없습니다.'));}
+  var b=ps.filter(function(p){return !sheetDone(p);}),c=ps.filter(sheetDone);
+  out.push(bx2('작업',b.length,b.map(function(p){return sheetCard(sh.proc,p,'out');}).concat(c.length?[h('h3','lh sub','납품완료',h('span','',c.length+'건'))].concat(c.map(function(p){return sheetCard(sh.proc,p,'done');})):[]),'발주서가 없습니다.'));
+  return out;}
+function rcvSec(){var r=(BOX&&BOX.rcv)||[],a=r.filter(pendIn);return r.length?[bx2('입고확인',a.length,a.map(function(p){return sheetCard('조립',p,'in');}),'입고확인할 납품이 없습니다.')]:[];}   /* v196 조립업체가 받을 납품 */
 function draw(){
   if(BOX===null){say('불러오지 못했습니다.',true);return;}
   if(BOX===false){say('발주 링크가 없습니다.',true);return;}
