@@ -1,0 +1,186 @@
+rules_version = '2';
+// v114 영림원외주입력 담당자 권한 — 제안(배포 안 함). 배포는 사장님 허락 뒤에만.
+// 지금 배포된 규칙(2026-10-06)과 다른 곳: ① 맨 아래 「그 밖」 에서 erp_ 를 뺐다 ② erp_staff · erp_ 두 덩어리를 더했다.
+// artifacts(벤더피아 자료) 덩어리와 erp_ 밖 컬렉션은 글자 그대로 — 다른 앱(익명 로그인)은 그대로 돈다.
+// 배포 전 할 일 = 영림원외주입력/CLAUDE.md 「담당자 로그인·권한 (v114)」.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 벤더피아 자료(vp_ 로 시작하는 칸) — 사장님 계정만
+    match /artifacts/{app}/public/data/{col}/{rest=**} {
+      allow read, write: if request.auth != null
+        && (!col.matches('^vp_.*')
+            || request.auth.uid == 'cpBhoh6cT5bAMdmlidsUYl4A0Uz2');
+    }
+
+    // 그 밖 — 지금까지 그대로 (erp_ 만 뺌)
+    match /{top}/{rest=**} {
+      allow read, write: if request.auth != null && top != 'artifacts' && !top.matches('^erp_.*');
+    }
+
+    // ---- 영림원외주입력 ----
+    function staffPath() { return /databases/$(database)/documents/erp_staff/$(request.auth.uid); }
+    function hasMe() { return request.auth != null && exists(staffPath()); }
+    function me() { return get(staffPath()).data; }
+    function isAdmin() { return hasMe() && me().get('admin', false) == true; }
+    function isStaff() { return hasMe() && (me().get('admin', false) == true || me().get('ok', false) == true); }
+    function can(col, op) {
+      return isAdmin() || (hasMe() && me().get('cols', {}).get(col, {}).get(op, false) == true);
+    }
+
+    // 담당자 문서: 내 것은 처음 한 번 만들고(권한 칸 없이) 마지막 로그인만 고친다. 권한은 관리자만.
+    match /erp_staff/{uid} {
+      allow read: if request.auth != null && (request.auth.uid == uid || isAdmin());
+      allow create: if request.auth != null && request.auth.uid == uid
+        && ((request.auth.token.firebase.sign_in_provider == 'password'
+             && request.resource.data.keys().hasOnly(['vpId', 'email', 'firstAt', 'lastAt']))
+          // v127 입력 작업자(AI) — 붙박은 익명 계정이 「입력 작업자」 줄만 만든다. 권한은 관리자가 담당자 관리에서 준다.
+          || (request.auth.token.firebase.sign_in_provider == 'anonymous'
+             && request.resource.data.keys().hasOnly(['agent', 'name', 'firstAt', 'lastAt'])
+             && request.resource.data.agent == true));
+      allow update: if isAdmin()
+        || (request.auth != null && request.auth.uid == uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastAt']));
+      allow delete: if isAdmin();
+    }
+
+    // v128 발주서 공개 페이지(발주서.html#열쇠) — 무작위 32자 열쇠를 아는 사람만 한 장 읽음(get). 목록(list)·쓰기는 아래 덩어리 그대로.
+    match /erp_podocs_pub/{key} {
+      allow get: if true;
+    }
+
+    // v133 출고처·입고처 박스(발주박스.html#열쇠) — 무작위 32자 열쇠를 아는 사람만 한 장 읽음(get). 만들기·고치기는 아래 덩어리(담당자).
+    match /erp_pobox/{key} {
+      allow get: if true;
+    }
+    // v133 발주확인 — 출고처 박스 열쇠를 아는 사람이 그 박스 발주번호만 한 번 만든다. 고치기·지우기는 담당자만(아래 덩어리).
+    match /erp_poconfirm/{pono} {
+      allow get: if true;
+      allow create: if request.resource.data.keys().hasOnly(['box', 'pono', 'at'])
+        && request.resource.data.pono == pono
+        && request.resource.data.box is string
+        && request.resource.data.at is string
+        && exists(/databases/$(database)/documents/erp_pobox/$(request.resource.data.box))
+        && get(/databases/$(database)/documents/erp_pobox/$(request.resource.data.box)).data.kind == '출고처'
+        && pono in get(/databases/$(database)/documents/erp_pobox/$(request.resource.data.box)).data.ponos;
+    }
+
+    // v144 배송기사·입고확인 링크 — 로그인 없는 화면은 기록 문서만 만든다(id 에 열쇠). 목록(list)은 안 엶.
+    // 구매납품(erp_purdelvs)은 폼(담당자)이 기록을 맞춰 보고 만든다. 고치기·지우기는 담당자만(아래 덩어리).
+    function pbox(k) { return get(/databases/$(database)/documents/erp_pobox/$(k)).data; }
+    function ppub(k) { return get(/databases/$(database)/documents/erp_podocs_pub/$(k)).data; }
+    // 배송 열쇠: 출고처 박스 열쇠 + 그 박스 발주번호 + 그 발주 공개열쇠
+    // v148 발주확인 전에도 만듦(사장님 「배송기사 공유 버튼은 제한없이」) — 확인 전 QR·바코드 숨김은 화면이 지킴
+    match /erp_poship/{k} {
+      allow get: if true;
+      allow create: if k.size() >= 32
+        && request.resource.data.keys().hasOnly(['box', 'pono', 'pubKey', 'at'])
+        && request.resource.data.box is string && request.resource.data.pono is string
+        && request.resource.data.pubKey is string && request.resource.data.at is string
+        && exists(/databases/$(database)/documents/erp_pobox/$(request.resource.data.box))
+        && pbox(request.resource.data.box).kind == '출고처'
+        && request.resource.data.pono in pbox(request.resource.data.box).ponos
+        && exists(/databases/$(database)/documents/erp_podocs_pub/$(request.resource.data.pubKey))
+        && ppub(request.resource.data.pubKey).pono == request.resource.data.pono;
+    }
+    // 박스+발주 → 배송 열쇠(같은 commit 에서 erp_poship 와 함께)
+    match /erp_poshipref/{id} {
+      allow get: if true;
+      allow create: if request.resource.data.keys().hasOnly(['ship', 'box', 'pono'])
+        && request.resource.data.ship is string && request.resource.data.box is string && request.resource.data.pono is string
+        && id == request.resource.data.box + '_' + request.resource.data.pono
+        && existsAfter(/databases/$(database)/documents/erp_poship/$(request.resource.data.ship))
+        && getAfter(/databases/$(database)/documents/erp_poship/$(request.resource.data.ship)).data.box == request.resource.data.box
+        && getAfter(/databases/$(database)/documents/erp_poship/$(request.resource.data.ship)).data.pono == request.resource.data.pono;
+    }
+    // v145 납품 흐름(입고처가 기사 폰 QR 을 찍음) — v144 의 erp_poscan·erp_poflow·erp_podone 은 뺌.
+    // erp_purdelvs/flow_<배송열쇠> 가 대기가 아니면(영림원 입력 시작) 링크 쓰기가 모두 막힌다.
+    function unlocked(ship) {
+      return !exists(/databases/$(database)/documents/erp_purdelvs/$('flow_' + ship))
+        || get(/databases/$(database)/documents/erp_purdelvs/$('flow_' + ship)).data.status == '대기';
+    }
+    function ptok(t) { return get(/databases/$(database)/documents/erp_pointok/$(t)).data; }
+    function pship(s) { return get(/databases/$(database)/documents/erp_poship/$(s)).data; }
+    // 입고열쇠 문서 — 폼(담당자)만 씀(아래 덩어리 can(col,'w')), 로그인 없이 get
+    match /erp_pointok/{t} {
+      allow get: if true;
+    }
+    // 입고 기록 — id = <입고열쇠>_<배송열쇠>, rev 는 1 부터 하나씩
+    match /erp_poin/{id} {
+      allow get: if true;
+      allow create, update: if request.resource.data.keys().hasOnly(['tok', 'ship', 'pono', 'rows', 'at', 'rev', 'photos'])
+        && request.resource.data.tok is string && request.resource.data.ship is string
+        && request.resource.data.pono is string && request.resource.data.at is string
+        && request.resource.data.rev is int && request.resource.data.rows is list && request.resource.data.rows.size() <= 50
+        && id == request.resource.data.tok + '_' + request.resource.data.ship
+        && exists(/databases/$(database)/documents/erp_pointok/$(request.resource.data.tok))
+        && ptok(request.resource.data.tok).pono == request.resource.data.pono
+        && exists(/databases/$(database)/documents/erp_poship/$(request.resource.data.ship))
+        && pship(request.resource.data.ship).pono == request.resource.data.pono
+        && (resource == null ? request.resource.data.rev == 1 : request.resource.data.rev == resource.data.rev + 1)
+        && unlocked(request.resource.data.ship);
+    }
+    // 기사·입고처 화면 표시 — id = <배송열쇠>. 폼이 locked=true 를 걸면 끝.
+    match /erp_podlv/{s} {
+      allow get: if true;
+      allow create: if request.resource.data.keys().hasOnly(['pono', 'rows', 'inAt', 'rev'])
+        && request.resource.data.rev is int && request.resource.data.inAt is string
+        && exists(/databases/$(database)/documents/erp_poship/$(s)) && pship(s).pono == request.resource.data.pono
+        && unlocked(s);
+      allow update: if request.resource.data.pono == resource.data.pono
+        && resource.data.get('locked', false) != true && unlocked(s)
+        && ((request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rows', 'inAt', 'rev'])
+              && request.resource.data.rev is int && request.resource.data.rev > resource.data.rev
+              && request.resource.data.inAt is string)
+          || (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['doneAt', 'doneRev'])
+              && 'inAt' in resource.data && request.resource.data.doneRev == resource.data.rev
+              && request.resource.data.doneAt is string));
+    }
+    // 사진 — id = <입고열쇠>_<배송열쇠>_<0~5>, JPEG data URL 한 장(1MB 문서 한도 안). 한 번만 만듦.
+    match /erp_podlvimg/{id} {
+      allow get: if true;
+      allow create: if request.resource.data.keys().hasOnly(['tok', 'ship', 'pono', 'data', 'at'])
+        && request.resource.data.tok is string && request.resource.data.ship is string
+        && id.matches(request.resource.data.tok + '_' + request.resource.data.ship + '_[0-5]')
+        && request.resource.data.data is string && request.resource.data.data.size() < 1000000
+        && request.resource.data.data.matches('^data:image/jpeg;base64,[A-Za-z0-9+/=]+$')
+        && exists(/databases/$(database)/documents/erp_pointok/$(request.resource.data.tok))
+        && ptok(request.resource.data.tok).pono == request.resource.data.pono
+        && exists(/databases/$(database)/documents/erp_poship/$(request.resource.data.ship))
+        && pship(request.resource.data.ship).pono == request.resource.data.pono
+        && unlocked(request.resource.data.ship);
+    }
+
+    // v176 조립업체 발주 링크(발주.html#열쇠) — 11-10 배포됨. v180 공통부속 발주(kind 부속) 줄 더함 — 배포 전(사장님 「배포하세요」 뒤에 배포).
+    // 박스 = 무작위 32자 열쇠를 아는 사람만 한 장 읽음. 만들기·고치기는 아래 덩어리(담당자).
+    match /erp_asmbox/{key} {
+      allow get: if true;
+    }
+    // 발주서 = 박스 열쇠를 아는 사람이 그 박스 업체·제품으로 「대기」 한 장을 새로 만든다(id 무작위 32자). 한 장 읽기는 id 를 아는 사람만. 고치기·지우기는 담당자만(아래 덩어리).
+    function abox(k) { return get(/databases/$(database)/documents/erp_asmbox/$(k)).data; }
+    match /erp_asmpo/{id} {
+      allow get: if true;
+      allow create: if id.matches('^[A-Za-z0-9_-]{32,64}$')
+        && request.resource.data.keys().hasOnly(['box', 'vendor', 'kind', 'pcode', 'pname', 'pspec', 'qty', 'need', 'rows', 'at', 'status'])
+        && request.resource.data.status == '대기'
+        && request.resource.data.box is string && request.resource.data.box.matches('^[A-Za-z0-9_-]{32,64}$')
+        && exists(/databases/$(database)/documents/erp_asmbox/$(request.resource.data.box))
+        && abox(request.resource.data.box).vendor == request.resource.data.vendor
+        // v180 제품 발주 = kind 없음(v176 그대로, pcode 가 박스 제품) · 공통부속 발주 = kind '부속', pcode 빈칸, 박스에 부속 목록 있음.
+        //      부속 줄이 박스 parts 에 있는지는 규칙이 못 봄(목록 돌기 없음) → 폼이 넘길 때 막는다(asmConvDocs).
+        && ((!('kind' in request.resource.data.keys()) && request.resource.data.pcode in abox(request.resource.data.box).pcodes)
+            || (request.resource.data.get('kind', '') == '부속' && request.resource.data.pcode == ''
+                && abox(request.resource.data.box).get('parts', []).size() > 0))
+        && request.resource.data.qty is number && request.resource.data.qty > 0
+        && request.resource.data.need is string && request.resource.data.need.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.rows is list && request.resource.data.rows.size() > 0 && request.resource.data.rows.size() <= 300;
+    }
+
+    // erp_ 업무 자료: 보기 = 권한 받은 담당자 모두(드롭다운이 다른 메뉴 자료를 읽음) · 저장·삭제 = 컬렉션마다
+    match /{col}/{id} {
+      allow read: if col.matches('^erp_.*') && col != 'erp_staff' && isStaff();
+      allow create, update: if col.matches('^erp_.*') && col != 'erp_staff' && can(col, 'w');
+      allow delete: if col.matches('^erp_.*') && col != 'erp_staff' && can(col, 'd');
+    }
+  }
+}
