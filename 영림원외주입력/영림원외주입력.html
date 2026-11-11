@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v200 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v201 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -382,7 +382,7 @@ table.asmt tr.chg td{background:var(--amber-bg)}table.asmt tr.off td{color:var(-
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v200</span>
+    <span class="ver">v201</span>
   </div>
 </header>
 <div class="wrap">
@@ -5330,13 +5330,13 @@ function asmSheets(){   /* {업체:[{proc, pos:[{id,title,kind,need,pt,pd,g,part
       return {id:c.id,title:c.title,kind:c.kind,need:c.need,pt:c.parts.length,pd:pd,g:pd===c.parts.length?'납품완료':'납품대기',parts:c.parts};})};});});
   return out;
 }
-function asmSheetG(p){if(p.g!=='납품대기')return p.g;var t=[];(p.parts||[]).forEach(function(q){if(!q.ok&&q.to&&t.indexOf(q.to)<0)t.push(q.to);});return t.length===1?t[0]+' 납품대기':p.g;}   /* v194 받을 곳이 하나면 「업체-공정 납품대기」 */
+function asmSheetG(p){if(p.g!=='납품대기')return p.g;var t=[];(p.parts||[]).forEach(function(q){if(!q.ok&&q.to&&t.indexOf(q.to)<0)t.push(q.to);});return t.length===1?t[0]:'';}   /* v194 받을 곳이 하나면 「업체-공정」 · v201 사장님 「보내는 쪽에 적혀있는 납품대기라는 표현 모두 삭제해줘」 */
 function asmSheetCard(v,pr,p,mode){   /* 폼 시트 카드 = 저장한 항목 모양 · v196 mode = in(받을 납품 — 「납품확인」) · out(보낼 납품) · done(납품완료) */
   var k='s:'+v+':'+pr+':'+p.id+':'+mode,open=!!asmCard[k],ps=p.parts||[],hf=ps.some(function(q){return !!q.fk;}),chip,num,cols,rows;
   if(mode==='in'){var ins=ps.filter(function(q){return !!q.fk;}),fr=[];ins.forEach(function(q){if(!q.fok&&q.from&&fr.indexOf(q.from)<0)fr.push(q.from);});
     chip=h('span',{class:'chip 진행중'},(fr.length===1?fr[0]+' ':'')+'납품대기');num='납품확인 '+ins.filter(function(q){return q.fok;}).length+'/'+ins.length;
     cols=['품명','수량','받을 납품'];rows=ins.map(function(q){return h('tr',{},h('td',{},show(q.cname)),h('td',{class:'asmn'},podNum(q.qty)),h('td',{},asmRcvCell(q.fk,q.from,q.fok,v)));});}
-  else{chip=h('span',{class:'chip '+(p.g==='납품완료'?'완료':'진행중')},asmSheetG(p));num='납품 '+p.pd+'/'+p.pt;
+  else{var sg=asmSheetG(p);chip=sg?h('span',{class:'chip '+(p.g==='납품완료'?'완료':'진행중')},sg):null;num='납품 '+p.pd+'/'+p.pt;
     cols=mode==='done'&&hf?['품명','수량','받을 납품','보낼 납품']:['품명','수량','보낼 납품'];
     rows=ps.map(function(q){return h('tr',{},h('td',{},show(q.cname)),h('td',{class:'asmn'},podNum(q.qty)),mode==='done'&&hf?h('td',{},asmRcvCell(q.fk,q.from,q.fok,v)):null,h('td',{},asmDlvChip(q.to?q.ok:q.dlv,q.to)));});}
   var nc=num.split(' ')[1].split('/');
@@ -5462,7 +5462,7 @@ function asmArrived(d,last,asmWc){   /* 부속 마지막 공정 → 조립업체
 function asmChip(st){return h('span',{class:'asmst '+st.c},st.t);}
 /* v194 사장님 「발주서 납품관계에 따라 표기되는 납품대기 상태를 납품받을업체-가공명 납품대기 이렇게 표기해 주어야 합니다」 — 받을 업체 = 다음 공정 외주거래처(부속 마지막 = 조립 줄 · 공통부속 = 발주한 조립업체), 가공명 = 그 받는 공정 이름 */
 function asmTo(d,r){var nx=prodNext(d,r),w='',p='';if(nx){w=purTrim(nx.wc);p=show(nx.proc);}else if(d.kind==='부속'&&purTrim(d.asmVendor)){w=purTrim(d.asmVendor);p=asmProcOf(w);}return w&&p?w+'-'+p:'';}
-function asmDlvChip(ok,to){return to?h('span',{class:'chip '+(ok?'완료':'대기')},to+(ok?' 납품완료':' 납품대기')):asmDoneChip('외주납품',ok);}   /* v195 to 가 있으면 ok = 받는 쪽 납품확인 */
+function asmDlvChip(ok,to){return to?h('span',{class:'chip '+(ok?'완료':'대기')},to+(ok?' 납품완료':'')):asmDoneChip('외주납품',ok);}   /* v195 to 가 있으면 ok = 받는 쪽 납품확인 · v201 보내는 쪽 「납품대기」 글자 없앰 */
 /* v195 사장님 「자그럼 이를 납품 보내는 쪽과 납품 받는쪽 두곳으로 나눠발생되게 해야 합니다. 그리고 납품 받는쪽에는 납품확인 버튼을 만들어 해당 공정품이 다음 공정으로 납품 완료되었음이 확인 되어야 합니다」
    공정 납품 하나 = 생산 d 의 공정 줄 r 물건이 다음 공정(받는 업체)으로 감. 열쇠 asmDk = 'k' + 해시 둘(djb2·FNV-1a, 생산 id·품번·공정순서 — 발주서 id·품번은 링크에 안 나감).
    보내는 쪽 = 그 공정 업체 박스 그 공정 시트 「보낼 납품」(받을업체-받는공정 납품대기) · 받는 쪽 = 다음 공정 업체 박스 그 공정 시트 「받을 납품」(보낸업체-보낸공정 납품대기 + 「납품확인」).

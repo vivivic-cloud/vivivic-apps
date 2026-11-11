@@ -1,5 +1,6 @@
 <!doctype html>
-<!-- v200 사장님 「거래처박스가 있고 거래처 박스로 들어가면 작업박스와 입고대기 박스를 만들라고요 해당 박스로 들어가면 목록 보이게 해달라고」 — 머리 아래 박스 둘(처음 닫힘): 작업(시트 단추·발주·발주서·보낼 납품·납품완료) · 입고대기(받을 납품 「납품확인」).
+<!-- v201 사장님 「보내는 쪽에 적혀있는 납품대기라는 표현 모두 삭제해줘」 — 보낼 납품 칩 = 「받을업체-공정」만(완료면 「… 납품완료」).
+     v200 사장님 「거래처박스가 있고 거래처 박스로 들어가면 작업박스와 입고대기 박스를 만들라고요 해당 박스로 들어가면 목록 보이게 해달라고」 — 머리 아래 박스 둘(처음 닫힘): 작업(시트 단추·발주·발주서·보낼 납품·납품완료) · 입고대기(받을 납품 「납품확인」).
      v199 사장님 「업체별 박스에 입고확인(납품받을것) / 작업(납품보낼것)  이렇게 구ㅡ분해」 — 상자 둘: 입고확인(받을 납품, 「납품확인」) · 작업(보낼 납품 + 납품완료). 조립 시트도 입고확인 상자.
      v196 사장님 「받는쪽과 보내는쪽 기준으로 안나눠져있는데?」 — 공정 시트 묶음 = 받을 납품(「납품확인」) · 보낼 납품 · 납품완료, 조립 시트 맨 위 받을 납품(박스 rcv).
      v195 받을 납품 「납품확인」 — 시트 카드 줄마다 받을 납품(앞 공정 보낸업체-공정 납품대기 + 「납품확인」)·보낼 납품(받을업체-공정 납품대기), 조립 시트 「도착」 칸도 「납품확인」.
@@ -196,7 +197,7 @@ function chipCls(ch){return ch.c==='bad'?'오류':ch.c==='done'?'완료':/진행
 function grpOf(d){if(d.g)return d.g;return Number((d.st||{}).r||1)<=2?'등록대기':'납품대기';}
 function dc(lab,ok){return h('span','chip '+(ok?'완료':'대기'),lab+' '+(ok?'완료':'대기'));}
 /* v194 사장님 「발주서 납품관계에 따라 표기되는 납품대기 상태를 납품받을업체-가공명 납품대기 이렇게 표기해 주어야 합니다」 — to = 「받을업체-받는 공정」(폼이 씀) */
-function dlc(ok,to){return to?h('span','chip '+(ok?'완료':'대기'),show(to)+(ok?' 납품완료':' 납품대기')):dc('외주납품',ok);}   /* v195 to 가 있으면 ok = 받는 쪽 납품확인 */
+function dlc(ok,to){return to?h('span','chip '+(ok?'완료':'대기'),show(to)+(ok?' 납품완료':'')):dc('외주납품',ok);}   /* v195 to 가 있으면 ok = 받는 쪽 납품확인 */
 /* v195 사장님 「자그럼 이를 납품 보내는 쪽과 납품 받는쪽 두곳으로 나눠발생되게 해야 합니다. 그리고 납품 받는쪽에는 납품확인 버튼을 만들어 해당 공정품이 다음 공정으로 납품 완료되었음이 확인 되어야 합니다」
    열쇠 k(보낼 납품)·fk(받을 납품) = 폼이 박스에 적음. 상태 = erp_prodconfirm/<열쇠> 있음(get, 규칙 배포 전·못 읽으면 박스 ok·fok·arr 값). 「납품확인」 = 카드 안 「확인」·「취소」(발주박스 v187 과 같음 — confirm() 창 안 씀). */
 var CF={},ASK={},BZ={},CERR={};
@@ -220,7 +221,7 @@ function rcvEl(k,from,fb,arr){   /* 받는 쪽 칸 */
   var b=h('button','',BZ[k]?'저장 중':'납품확인');b.type='button';b.disabled=!!BZ[k];b.addEventListener('click',function(){ASK[k]=1;CERR[k]='';draw();});
   return h('div','rcv',h('span','chip 대기',lab),b,CERR[k]?h('p','err',CERR[k]):null);}
 function sheetDone(p){var a=p.parts||[];return a.length?a.every(okOut):p.g==='납품완료';}   /* v195 완료 = 보낼 납품 모두 받는 쪽 납품확인 */
-function sheetG(p){if(sheetDone(p))return '납품완료';var t=[];(p.parts||[]).forEach(function(q){if(!okOut(q)&&q.to&&t.indexOf(q.to)<0)t.push(q.to);});return t.length===1?show(t[0])+' 납품대기':'납품대기';}
+function sheetG(p){if(sheetDone(p))return '납품완료';var t=[];(p.parts||[]).forEach(function(q){if(!okOut(q)&&q.to&&t.indexOf(q.to)<0)t.push(q.to);});return t.length===1?show(t[0]):'';}
 function numChips(d){var a=[],pt=Number(d.pt||0),an=Number(d.an||0);
   var ad=Number(d.ad||0),dp=[];if(d.kind!=='부속')(d.det||[]).forEach(function(x){(x.parts||[]).forEach(function(q){if(q.arr!=null&&P.noOk(q.fk))dp.push(q);});});if(dp.length){an=dp.length;ad=dp.filter(function(q){return cf(q.fk,q.arr);}).length;}   /* v195 도착 = 납품확인(바로 반영) */
   if(pt)a.push(h('span','chip '+(Number(d.pd)===pt?'완료':'진행중'),'외주납품 '+num(d.pd)+'/'+num(pt)));
@@ -272,7 +273,7 @@ function sheetCard(pr,p,mode){   /* v196 mode = in(받을 납품 — 「납품�
   if(mode==='in'){var ins=ps.filter(function(q){return P.noOk(q.fk);}),fr=[];ins.forEach(function(q){if(!cf(q.fk,q.fok)&&q.from&&fr.indexOf(q.from)<0)fr.push(q.from);});
     a=ins.filter(function(q){return cf(q.fk,q.fok);}).length;b=ins.length;chip=h('span','chip 진행중',(fr.length===1?show(fr[0])+' ':'')+'납품대기');
     cols=['품명','수량','받을 납품'];rows=ins.map(function(q){return h('tr','',h('td','',show(q.cname)),h('td','n',num(q.qty)),h('td','dc',rcvEl(q.fk,q.from,q.fok)));});}
-  else{a=ps.length?ps.filter(okOut).length:Number(p.pd||0);b=ps.length||Number(p.pt||0);var g=sheetDone(p)?'납품완료':'납품대기';chip=h('span','chip '+(g==='납품완료'?'완료':'진행중'),sheetG(p));
+  else{a=ps.length?ps.filter(okOut).length:Number(p.pd||0);b=ps.length||Number(p.pt||0);var g=sheetDone(p)?'납품완료':'납품대기';var sg=sheetG(p);chip=sg?h('span','chip '+(g==='납품완료'?'완료':'진행중'),sg):null;
     var both=mode==='done'&&hf;cols=both?['품명','수량','받을 납품','보낼 납품']:['품명','수량','보낼 납품'];
     rows=ps.map(function(q){return h('tr','',h('td','',show(q.cname)),h('td','n',num(q.qty)),both?h('td','dc',P.noOk(q.fk)?rcvEl(q.fk,q.from,q.fok):''):null,h('td','dc',dlc(okOut(q),q.to)));});}
   var body=open?h('div','recb',h('div','tw',h('table','det',h('thead','',h('tr','',cols.map(function(t,i){return h('th',i===1?'n':'',t);}))),h('tbody','',rows)))):null;
