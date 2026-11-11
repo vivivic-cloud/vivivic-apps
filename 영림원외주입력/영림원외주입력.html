@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v195 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v196 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -381,7 +381,7 @@ table.asmt tr.chg td{background:var(--amber-bg)}table.asmt tr.off td{color:var(-
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v195</span>
+    <span class="ver">v196</span>
   </div>
 </header>
 <div class="wrap">
@@ -5294,14 +5294,14 @@ function asmPos(boxId){return (data.asmpo||[]).filter(function(d){return d.box==
     rows:rs.filter(function(r){return r&&(d.kind!=='부속'||r.on!==false);}).map(function(r){return {cname:show(r.cname),cspec:show(r.cspec),unit:show(r.unit),base:Number(r.base||0),qty:Number(r.qty||0),on:r.on!==false,for:(r.for||[]).map(show)};})};});}   /* v182 링크 카드를 펴면 보일 줄(품번 없음) */   /* v180 kind·단계(st)·부속 공정·도착 — 링크가 보임. 업체 이름·번호·단가는 안 넣음 */
 function asmPosSig(b){return JSON.stringify((b.pos||[]).map(function(p){return [show(p.id),show(p.pcode),show(p.pname),Number(p.qty||0),show(p.need),show(p.status),show(p.at),Number(p.n||0),Number(p.off||0),Number(p.chg||0),show(p.kind),p.st?[p.st.r,show(p.st.t),show(p.st.c)]:0,Number(p.pt||0),Number(p.pd||0),Number(p.an||0),Number(p.ad||0),JSON.stringify(p.rows||[]),show(p.g),!!p.as,!!p.inn,JSON.stringify(p.det||[])];}));}
 function asmSheetSig(b){return JSON.stringify([show(b.asmProc),(b.sheets||[]).map(function(x){return [show(x.proc),(x.pos||[]).map(function(p){return [show(p.id),show(p.title),show(p.kind),show(p.need),Number(p.pt||0),Number(p.pd||0),show(p.g),(p.parts||[]).map(function(q){return [show(q.cname),Number(q.qty||0),!!q.dlv,show(q.to),show(q.k),!!q.ok,show(q.from),show(q.fk),!!q.fok];})];})];})]);}
-function asmSig(b){return JSON.stringify(b.cks||[])+asmSheetSig(b)+asmPosSig(b)+JSON.stringify((b.parts||[]).map(function(p){return [show(p.ccode),show(p.cname),show(p.cspec),show(p.unit),(p.for||[]).map(show)];}))+JSON.stringify([show(b.vendor),(b.pcodes||[]).map(show),(b.items||[]).map(function(i){return [show(i.pcode),show(i.pname),show(i.pspec),(i.rows||[]).map(function(x){return [show(x.ccode),show(x.cname),show(x.cspec),show(x.unit),Number(x.per||0)];})];})]);}
+function asmSig(b){return JSON.stringify([b.cks||[],b.rcv||[]])+asmSheetSig(b)+asmPosSig(b)+JSON.stringify((b.parts||[]).map(function(p){return [show(p.ccode),show(p.cname),show(p.cspec),show(p.unit),(p.for||[]).map(show)];}))+JSON.stringify([show(b.vendor),(b.pcodes||[]).map(show),(b.items||[]).map(function(i){return [show(i.pcode),show(i.pname),show(i.pspec),(i.rows||[]).map(function(x){return [show(x.ccode),show(x.cname),show(x.cspec),show(x.unit),Number(x.per||0)];})];})]);}
 function asmBoxOf(vendor){var a=(ASMBOX||[]).filter(function(b){return b.vendor===vendor&&podKeyOk(b.id);}).sort(function(x,y){return String(x.createdAt||'')<String(y.createdAt||'')?-1:1;});return a[0]||null;}
 function asmBoxSync(){
   if(!db||!db.collection||ASMBOX==null||PCONF==null||data.contracts==null||data.boms==null||data.materials==null||data.asmpo==null||data.prods==null||!canCol('erp_asmbox','w'))return;   /* v195 납품확인 읽은 뒤 */   /* v178 발주서 요약도 · v180 단계(생산 문서) */
-  var SH=asmSheets(),RK=asmRecvKeys(),ns=asmNames();Object.keys(SH).concat(Object.keys(RK)).forEach(function(v){if(ns.indexOf(v)<0)ns.push(v);});   /* v195 받는 업체도 박스 */   /* v193 납품대기 발주의 공정업체도 박스 */
+  var SH=asmSheets(),RK=asmRecvKeys(),RC=asmRcvCards(),ns=asmNames();Object.keys(SH).concat(Object.keys(RK)).forEach(function(v){if(ns.indexOf(v)<0)ns.push(v);});   /* v195 받는 업체도 박스 */   /* v193 납품대기 발주의 공정업체도 박스 */
   (ASMBOX||[]).forEach(function(b){if(ns.indexOf(b.vendor)<0&&asmBoxOf(b.vendor)===b)ns.push(b.vendor);});   /* 조립 계약이 없어진 업체 박스는 빈 목록으로 */
   ns.forEach(function(v){
-    var want=asmWant(v),have=asmBoxOf(v),bk='a:'+v;want.pos=have?asmPos(have.id):[];want.sheets=SH[v]||[];want.cks=RK[v]||[];want.asmProc=asmProcOf(v);var sig=asmSig(want);
+    var want=asmWant(v),have=asmBoxOf(v),bk='a:'+v;want.pos=have?asmPos(have.id):[];want.sheets=SH[v]||[];want.cks=RK[v]||[];want.rcv=RC[v]||[];want.asmProc=asmProcOf(v);var sig=asmSig(want);
     if(have&&asmSig(have)===sig)return;
     if(asmBusy[bk]===sig)return;asmBusy[bk]=sig;
     var now=new Date().toISOString(),done=function(e){asmBusy[bk]='';console.warn('발주 박스 못 씀',v,e);};
@@ -5330,16 +5330,43 @@ function asmSheets(){   /* {업체:[{proc, pos:[{id,title,kind,need,pt,pd,g,part
   return out;
 }
 function asmSheetG(p){if(p.g!=='납품대기')return p.g;var t=[];(p.parts||[]).forEach(function(q){if(!q.ok&&q.to&&t.indexOf(q.to)<0)t.push(q.to);});return t.length===1?t[0]+' 납품대기':p.g;}   /* v194 받을 곳이 하나면 「업체-공정 납품대기」 */
-function asmSheetCard(v,pr,p){   /* 폼 시트 카드 = 저장한 항목 모양 · v195 받을 납품(「납품확인」) · 보낼 납품 */
-  var k='s:'+v+':'+pr+':'+p.id,open=!!asmCard[k],hf=(p.parts||[]).some(function(q){return !!q.fk;}),nf=(p.parts||[]).filter(function(q){return q.fk&&!q.fok;}).length;
+function asmSheetCard(v,pr,p,mode){   /* 폼 시트 카드 = 저장한 항목 모양 · v196 mode = in(받을 납품 — 「납품확인」) · out(보낼 납품) · done(납품완료) */
+  var k='s:'+v+':'+pr+':'+p.id+':'+mode,open=!!asmCard[k],ps=p.parts||[],hf=ps.some(function(q){return !!q.fk;}),chip,num,cols,rows;
+  if(mode==='in'){var ins=ps.filter(function(q){return !!q.fk;}),fr=[];ins.forEach(function(q){if(!q.fok&&q.from&&fr.indexOf(q.from)<0)fr.push(q.from);});
+    chip=h('span',{class:'chip 진행중'},(fr.length===1?fr[0]+' ':'')+'납품대기');num='납품확인 '+ins.filter(function(q){return q.fok;}).length+'/'+ins.length;
+    cols=['품명','수량','받을 납품'];rows=ins.map(function(q){return h('tr',{},h('td',{},show(q.cname)),h('td',{class:'asmn'},podNum(q.qty)),h('td',{},asmRcvCell(q.fk,q.from,q.fok,v)));});}
+  else{chip=h('span',{class:'chip '+(p.g==='납품완료'?'완료':'진행중')},asmSheetG(p));num='납품 '+p.pd+'/'+p.pt;
+    cols=mode==='done'&&hf?['품명','수량','받을 납품','보낼 납품']:['품명','수량','보낼 납품'];
+    rows=ps.map(function(q){return h('tr',{},h('td',{},show(q.cname)),h('td',{class:'asmn'},podNum(q.qty)),mode==='done'&&hf?h('td',{},asmRcvCell(q.fk,q.from,q.fok,v)):null,h('td',{},asmDlvChip(q.to?q.ok:q.dlv,q.to)));});}
+  var nc=num.split(' ')[1].split('/');
   var dt=h('details',{class:'rec asmrec'},h('summary',{},h('div',{class:'rt'},h('b',{},show(p.title)),h('small',{},[p.kind==='부속'?'공통부속 발주':'제품 발주','납품요청일 '+show(p.need)].join(' · ')),
-      h('div',{class:'asmnum'},h('span',{class:'chip '+(p.pd===p.pt?'완료':'진행중')},'납품 '+p.pd+'/'+p.pt),nf?h('span',{class:'chip 대기'},'납품확인 대기 '+nf):null)),h('span',{class:'chip '+(p.g==='납품완료'?'완료':'진행중')},asmSheetG(p))),
-    open?h('div',{class:'asmbody'},h('div',{class:'tw'},h('table',{class:'asmt asmg'},h('thead',{},h('tr',{},(hf?['품명','수량','받을 납품','보낼 납품']:['품명','수량','보낼 납품']).map(function(t){return h('th',{},t);}))),
-      h('tbody',{},(p.parts||[]).map(function(q){return h('tr',{},h('td',{},show(q.cname)),h('td',{class:'asmn'},podNum(q.qty)),hf?h('td',{},asmRcvCell(q.fk,q.from,q.fok,v)):null,h('td',{},asmDlvChip(q.to?q.ok:q.dlv,q.to)));}))))):null);
+      h('div',{class:'asmnum'},h('span',{class:'chip '+(nc[0]===nc[1]?'완료':'진행중')},num))),chip),
+    open?h('div',{class:'asmbody'},h('div',{class:'tw'},h('table',{class:'asmt asmg'},h('thead',{},h('tr',{},cols.map(function(t){return h('th',{},t);}))),h('tbody',{},rows)))):null);
   if(open)dt.open=true;
   dt.addEventListener('toggle',function(){if(dt.open===open)return;if(dt.open)asmCard[k]=1;else delete asmCard[k];asmDraw&&asmDraw();});
   return dt;
 }
+/* v196 사장님 「받는쪽과 보내는쪽 기준으로 안나눠져있는데?」 — 공정 시트 묶음 = 받을 납품(앞 공정이 이 업체로 보내는 것, 「납품확인」 대기) · 보낼 납품(이 업체가 다음 공정으로 보내는 것) · 납품완료.
+   같은 발주 카드가 받을 납품·보낼 납품 둘 다에 나올 수 있다(받을 것과 보낼 것이 다 남았을 때). 첫 공정(받을 납품 없음)은 받을 납품 묶음을 안 그림. */
+function asmPendIn(p){return (p.parts||[]).some(function(q){return q.fk&&!q.fok;});}
+function asmSheetBody(v,pr,ps){
+  var hasIn=ps.some(function(p){return (p.parts||[]).some(function(q){return !!q.fk;});}),G=[];
+  if(hasIn)G.push(['받을 납품','in',ps.filter(asmPendIn)]);
+  G.push(['보낼 납품','out',ps.filter(function(p){return p.g!=='납품완료';})],['납품완료','done',ps.filter(function(p){return p.g==='납품완료';})]);
+  return G.reduce(function(o,g){return o.concat([h('h3',{},g[0],h('span',{},g[2].length+'건'))],g[2].map(function(p){return asmSheetCard(v,pr,p,g[1]);}));},[]);
+}
+/* 조립업체가 받을 납품 = 부속 마지막 공정 → 조립(제품 발주) · 공통부속 마지막 공정 → 발주한 조립업체. 박스 rcv[{id,title,kind,need,at,parts[{cname,qty,from,fk,fok}]}] */
+function asmRcvCards(){
+  var by={};asmVendorLines().forEach(function(g){g.lines.forEach(function(x){if(asmGroup(x.st)==='등록대기')return;var d0=x.ds[0]||{};
+    var need=x.a?show(x.a.need):show(d0.dueDate),kind=(x.a?x.a.kind:d0.kind)==='부속'?'부속':'제품';
+    x.ds.forEach(function(d){(d.rows||[]).forEach(function(r){if(!r||(d.kind==='제품'&&r.itemNo===d.itemNo)||asmIsAsm(r.proc))return;
+      var nx=prodNext(d,r),toA=nx?(d.kind==='제품'&&nx.itemNo===d.itemNo):d.kind==='부속';if(!toA)return;var w=asmRecvWc(d,r);if(!w)return;
+      var V=by[w]||(by[w]={}),c=V[x.id]||(V[x.id]={id:asmHash(x.id),title:x.title,kind:kind,need:need,at:x.at,parts:[]});
+      c.parts.push({cname:show(r.itemName),qty:Number(r.qty||0),from:asmLab(r),fk:asmDk(d,r),fok:asmOk(d,r)});});});});});
+  var out={};Object.keys(by).forEach(function(w){out[w]=Object.keys(by[w]).map(function(k){return by[w][k];}).sort(function(a,b){return String(a.at)<String(b.at)?1:-1;}).map(function(c){return {id:c.id,title:c.title,kind:c.kind,need:c.need,parts:c.parts};});});
+  return out;
+}
+function asmRcvBody(v,rc){var a=(rc||[]).filter(asmPendIn);return a.length?[h('h3',{},'받을 납품',h('span',{},a.length+'건'))].concat(a.map(function(p){return asmSheetCard(v,'조립',p,'in');})):[];}
 function asmQr(url){
   var bx=h('div',{class:'podqr'}),err=h('p',{class:'msg bad',hidden:true});
   podLib('qr').then(function(qrcode){
@@ -5477,8 +5504,9 @@ function asmDetail(d){
   return {parts:ps,asm:ar?{proc:show(ar.proc),wc:show(ar.wc),qty:ar.qty||d.qty,dlv:asmStepSt(d,ar).c==='done',inn:asmDlv(d,ar).some(function(x){return purTrim(x.row.inNo);})}:null};
 }
 /* v184 사장님 「발주서 발주대기 목록은 각 거래처 박스안에 두고 내부 상황을 박스외부에 표기 해주세요」 — 박스 겉 숫자 칩(0 은 숨김) */
-function asmCountChips(ls,sh){var n={};ls.forEach(function(x){var g=asmGroup(x.st);n[g]=(n[g]||0)+1;});(sh||[]).forEach(function(s){(s.pos||[]).forEach(function(p){n[p.g]=(n[p.g]||0)+1;});});   /* v193 시트 카드도 셈 */   /* v186 등록대기 · 납품대기 · 납품완료 */
-  return [n['등록대기']?h('span',{class:'chip 대기'},'등록대기 '+n['등록대기']):null,n['납품대기']?h('span',{class:'chip 진행중'},'납품대기 '+n['납품대기']):null,n['납품완료']?h('span',{class:'chip 완료'},'납품완료 '+n['납품완료']):null].filter(Boolean);}
+function asmCountChips(ls,sh,rc){var n={};ls.forEach(function(x){var g=asmGroup(x.st);n[g]=(n[g]||0)+1;});var ni=(rc||[]).filter(asmPendIn).length,no=0;
+  (sh||[]).forEach(function(s){(s.pos||[]).forEach(function(p){if(asmPendIn(p))ni++;if(p.g==='납품완료')n['납품완료']=(n['납품완료']||0)+1;else no++;});});   /* v196 시트 카드 = 받을 납품 · 보낼 납품 · 납품완료 */
+  return [n['등록대기']?h('span',{class:'chip 대기'},'등록대기 '+n['등록대기']):null,ni?h('span',{class:'chip 진행중'},'받을 납품 '+ni):null,no?h('span',{class:'chip 진행중'},'보낼 납품 '+no):null,n['납품대기']?h('span',{class:'chip 진행중'},'납품대기 '+n['납품대기']):null,n['납품완료']?h('span',{class:'chip 완료'},'납품완료 '+n['납품완료']):null].filter(Boolean);}
 function asmRegChip(st){return st.r<=2?{t:st.c==='bad'?'오류':/진행중/.test(st.t)?'진행중':'대기',c:st.c}:st;}   /* v182 등록대기 칩 = 대기·진행중·오류 */
 function asmTitle(a){if(a.kind!=='부속')return show(a.pname);var rs=a.rows||[];return rs.length?show(rs[0].cname)+(rs.length>1?' 외 '+(rs.length-1):''):'';}
 function asmConvDocs(a){
@@ -5549,8 +5577,8 @@ function renderAsm(){
     var key=JSON.stringify([PCONF,data.items&&data.items.length,data.itemwcs&&data.itemwcs.length,data.prods,data.proddlvs,data.prodmoves,asmOpen,asmCard,wants.map(asmSig),(ASMBOX||[]).map(function(b){return [b.id,b.vendor,b.createdAt];}),pos,picked.asmpo]);if(key===lastKey)return;lastKey=key;
     /* v184 사장님 「입력폼 발주서랑 공유링크랑 뭔차이인가요 발주서에 각 거래처별박스가 공유링크가 되는거 아니이요?」 · 「이진행상태가 공유링크랑 동일한거 아니냐구요」
        「발주서」 = 조립업체(외주계약 조립, asmNames + 발주가 있는 업체)마다 박스 하나: 머리 = 이름 · 「QR」 · 「공유」, 안 = 「등록대기」·「등록완료」(링크와 같은 줄) + 삭제 체크 */
-    var vls=asmVendorLines(),lineBy={},SH=asmSheets();vls.forEach(function(g){lineBy[g.v]=g.lines;});
-    var vs=names.slice();vls.forEach(function(g){if(vs.indexOf(g.v)<0)vs.push(g.v);});Object.keys(SH).forEach(function(v){if(vs.indexOf(v)<0)vs.push(v);});vs.sort();
+    var vls=asmVendorLines(),lineBy={},SH=asmSheets(),RC=asmRcvCards();vls.forEach(function(g){lineBy[g.v]=g.lines;});
+    var vs=names.slice();vls.forEach(function(g){if(vs.indexOf(g.v)<0)vs.push(g.v);});Object.keys(SH).concat(Object.keys(RC)).forEach(function(v){if(vs.indexOf(v)<0)vs.push(v);});vs.sort();
     var dels=pos.filter(function(r){return (r.status==='대기'||r.status==='오류')&&!asmProdsOf(r).length;}),kit=delKit(ASMPO,dels),delIds={};dels.forEach(function(d){delIds[d.id]=d;});   /* v180 생산으로 넘긴 발주서는 그 생산 대기를 지운 뒤에 지움 */
     var boxes=vs.length?vs.map(function(v){var b=asmBoxOf(v),k='v:'+v,qk='q:'+v,open=!!asmOpen[k],ls=lineBy[v]||[],shs=SH[v]||[],isA=names.indexOf(v)>=0||ls.length>0;
       /* v193 시트 = 조립(이 업체 조립 발주) + 공정마다 하나. 고른 시트 = asmOpen['s:'+업체] (''= 조립) */
@@ -5561,12 +5589,12 @@ function renderAsm(){
       var line=function(x,g){return asmLine(x,v,x.a&&delIds[x.a.id]?kit.pk(x.a):null,g);};
       return h('div',{class:'podgrp'+(open?' open':'')},h('div',{class:'podgh'},
           h('button',{type:'button',class:'podgt','aria-expanded':open?'true':'false',on:{click:function(){if(open)delete asmOpen[k];else asmOpen[k]=1;draw();}}},
-            h('span',{class:'navarr','aria-hidden':'true'},open?'▾':'▸'),h('span',{class:'nt'},v),asmCountChips(ls,shs)),
+            h('span',{class:'navarr','aria-hidden':'true'},open?'▾':'▸'),h('span',{class:'nt'},v),asmCountChips(ls,shs,RC[v])),
           b?h('button',{type:'button',class:'btn small podshare',on:{click:function(){if(asmOpen[qk])delete asmOpen[qk];else{asmOpen[qk]=1;asmOpen[k]=1;}draw();}}},'QR'):null,
           b?asmShareBtn(b,!isA):null),
         !open?null:h('div',{class:'asmlines list'},asmOpen[qk]&&b?asmQr(asmUrl(b.id)):null,shTabs,
-          curSh?['납품대기','납품완료'].reduce(function(o,g){var ps=curSh.pos.filter(function(p){return p.g===g;});return o.concat([h('h3',{},g,h('span',{},ps.length+'건'))],ps.map(function(p){return asmSheetCard(v,cs,p);}));},[])
-          :['등록대기','납품대기','납품완료'].reduce(function(o,g){return o.concat([h('h3',{},g,h('span',{},G[g].length+'건'))],G[g].length?G[g].map(function(x){return line(x,g);}):(g==='등록대기'?[h('div',{class:'empty'},'발주서가 없습니다.')]:[]));},[])));   /* h() 는 배열 한 겹만 펴서 납작하게 */
+          curSh?asmSheetBody(v,cs,curSh.pos)
+          :asmRcvBody(v,RC[v]).concat(['등록대기','납품대기','납품완료'].reduce(function(o,g){return o.concat([h('h3',{},g,h('span',{},G[g].length+'건'))],G[g].length?G[g].map(function(x){return line(x,g);}):(g==='등록대기'?[h('div',{class:'empty'},'발주서가 없습니다.')]:[]));},[]))));   /* v196 조립 시트 맨 위 받을 납품 */   /* h() 는 배열 한 겹만 펴서 납작하게 */
     }):[h('p',{class:'msg'},'조립업체가 없습니다.')];
     box.replaceChildren.apply(box,[kit.bar].filter(Boolean).concat(boxes));
   }
