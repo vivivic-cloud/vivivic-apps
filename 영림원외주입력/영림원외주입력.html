@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v197 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v198 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -381,7 +381,7 @@ table.asmt tr.chg td{background:var(--amber-bg)}table.asmt tr.off td{color:var(-
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v197</span>
+    <span class="ver">v198</span>
   </div>
 </header>
 <div class="wrap">
@@ -5372,7 +5372,7 @@ function asmRcvBody(v,rc){var a=(rc||[]).filter(asmPendIn);return a.length?[h('h
    필요 = 그 업체(외주거래처 = 창고 이름)의 아직 외주납품 안 된 공정 줄마다 그 품목 기본 BOM(imBom) 중 같은 공정 줄 × 남은 수량. 5 자재(재공품 뺌)만 — 원장·엣지필름 등.
    재고 = erp_stocks 실재고 문서들의 그 창고 줄 재고수량(품번별 합). 박스 겉 = 「재고부족 n」 / 「재고 있음」, 펴면 자재별 소요량·재고수량·단위(품번·규격은 좁은 화면에 안 들어가 뺌). */
 function asmMat(c){return (data.materials||[]).filter(function(m){return purTrim(m.code)===c&&m.status!=='오류'&&m.asset!=='재공품';})[0]||null;}
-function asmNeeds(){   /* {업체:[{ccode,cname,cspec,unit,need}]} */
+function asmNeeds(){   /* v198 {업체:{공정:[{ccode,cname,cspec,unit,need}]}} */
   var by={};
   asmVendorLines().forEach(function(g){g.lines.forEach(function(x){if(asmGroup(x.st)==='납품완료')return;
     x.ds.forEach(function(d){if(!d||d.status==='오류')return;(d.rows||[]).forEach(function(r){
@@ -5380,8 +5380,8 @@ function asmNeeds(){   /* {업체:[{ccode,cname,cspec,unit,need}]} */
       var rem=Number(r.qty||0)-prodSum(prodDlvs(d,r).filter(function(z){return z.status==='완료';}),'dlvQty');if(!(rem>0))return;
       var b=imBom(purTrim(r.itemNo));(b&&b.rows||[]).forEach(function(m){if(!m||show(m.proc).trim()!==show(r.proc).trim())return;var c=purTrim(m.ccode),mt=c&&asmMat(c);if(!mt)return;
         var q=rem*Number(m.qn||0)/(Number(m.qd||1)||1);if(!(q>0))return;
-        var V=by[w]||(by[w]={}),o=V[c]||(V[c]={ccode:c,cname:show(mt.name||m.cname),cspec:show(mt.spec||m.cspec),unit:show(m.inunit||mt.unit),need:0});o.need+=q;});});});});});
-  var out={};Object.keys(by).forEach(function(w){out[w]=Object.keys(by[w]).map(function(c){var o=by[w][c];o.need=Math.round(o.need*1e4)/1e4;return o;}).sort(function(a,b){return a.cname.localeCompare(b.cname,'ko');});});
+        var pr=show(r.proc).trim(),V0=by[w]||(by[w]={}),V=V0[pr]||(V0[pr]={}),o=V[c]||(V[c]={ccode:c,cname:show(mt.name||m.cname),cspec:show(mt.spec||m.cspec),unit:show(m.inunit||mt.unit),need:0});o.need+=q;});});});});});
+  var out={};Object.keys(by).forEach(function(w){out[w]={};Object.keys(by[w]).forEach(function(pr){var P=by[w][pr];out[w][pr]=Object.keys(P).map(function(c){var o=P[c];o.need=Math.round(o.need*1e4)/1e4;return o;}).sort(function(a,b){return a.cname.localeCompare(b.cname,'ko');});});});
   return out;
 }
 function asmStk(){   /* {창고:{품번:재고수량}} · at = 가장 늦은 불러온 일시 — 실재고만 */
@@ -5389,7 +5389,9 @@ function asmStk(){   /* {창고:{품번:재고수량}} · at = 가장 늦은 불
     (d.rows||[]).forEach(function(r){var w=purTrim(r['창고']),c=purTrim(r['품번']);if(!w||!c)return;var W=m[w]||(m[w]={});W[c]=(W[c]||0)+stkNum(r[STK_Q]);});});
   return {m:m,at:at,any:any};
 }
-function asmStkLines(v,N,S){return (N[v]||[]).map(function(o){var q=S.any?((S.m[v]||{})[o.ccode]||0):null;return Object.assign({},o,{have:q,short:q!=null&&q<o.need});});}
+/* v198 사장님 「해당 업체 공정에서 해당 재고만 보이도록 해줘」 — 공정 시트마다 그 공정 자재만(prs = 공정 이름 목록). 박스 겉 칩은 전 공정을 품번별로 합쳐 셈 */
+function asmStkLines(v,prs,N,S){var V=N[v]||{},by={},ls=[];(prs||Object.keys(V)).forEach(function(pr){(V[pr]||[]).forEach(function(o){var x=by[o.ccode];if(!x){x=by[o.ccode]=Object.assign({},o);ls.push(x);}else x.need=Math.round((x.need+o.need)*1e4)/1e4;});});
+  return ls.sort(function(a,b){return a.cname.localeCompare(b.cname,'ko');}).map(function(o){var q=S.any?((S.m[v]||{})[o.ccode]||0):null;return Object.assign({},o,{have:q,short:q!=null&&q<o.need});});}
 function asmStkChip(ls,S){if(!ls.length||!S.any)return null;var n=ls.filter(function(o){return o.short;}).length;return n?h('span',{class:'chip 오류'},'재고부족 '+n):h('span',{class:'chip 완료'},'재고 있음');}
 function asmStkBtn(v){
   var b=impBusy('stocks');
@@ -5397,10 +5399,10 @@ function asmStkBtn(v){
     db.collection('erp_imports').add({stepKey:'stocks',stepTitle:STOCK.title,steps:IMPORT_BTN.stocks,only:'all',mode:'import',basis:'실재고',date:conToday(),wh:v,status:'대기',agentNote:'',createdAt:new Date().toISOString(),specRef:'erp-spec.json#imports'})
       .catch(function(er){t.disabled=false;alert('요청하지 못했습니다. '+errText(er));});}}},'재고업데이트');
 }
-function asmStkBody(v,ls,S){
-  if(!ls.length&&!S.any&&!impBusy('stocks'))return null;
+function asmStkBody(v,ls,S,pr){
+  if(!ls.length)return null;
   var l=impLast('stocks'),b=impBusy('stocks'),bad=l&&l.status==='오류'&&String(l.createdAt||'')>String(S.at||'');
-  var k='k:'+v,open=!!asmCard[k];
+  var k='k:'+v+':'+pr,open=!!asmCard[k];
   var dt=h('details',{class:'rec asmrec'},h('summary',{},h('div',{class:'rt'},h('b',{},'실재고'),h('small',{},[v,S.at?stkTime(S.at):'',b?'요청 중':''].filter(Boolean).join(' · ')),bad?h('small',{class:'bad'},show(l.agentNote)):null),asmStkChip(ls,S)||''),
     open?h('div',{class:'asmbody'},h('div',{class:'tw'},h('table',{class:'asmt asmg'},h('thead',{},h('tr',{},['품명','소요량','재고수량','단위'].map(function(t){return h('th',{},t);}))),
       h('tbody',{},ls.map(function(o){return h('tr',{class:o.short?'short':''},h('td',{},o.cname),h('td',{class:'asmn'},podNum(o.need)),h('td',{class:'asmn'},o.have==null?'':podNum(o.have)),h('td',{},o.unit));}))))):null);
@@ -5622,9 +5624,9 @@ function renderAsm(){
     var vls=asmVendorLines(),lineBy={},SH=asmSheets(),RC=asmRcvCards();vls.forEach(function(g){lineBy[g.v]=g.lines;});
     var vs=names.slice();vls.forEach(function(g){if(vs.indexOf(g.v)<0)vs.push(g.v);});Object.keys(NEED).forEach(function(v){if(vs.indexOf(v)<0)vs.push(v);});Object.keys(SH).concat(Object.keys(RC)).forEach(function(v){if(vs.indexOf(v)<0)vs.push(v);});vs.sort();
     var dels=pos.filter(function(r){return (r.status==='대기'||r.status==='오류')&&!asmProdsOf(r).length;}),kit=delKit(ASMPO,dels),delIds={};dels.forEach(function(d){delIds[d.id]=d;});   /* v180 생산으로 넘긴 발주서는 그 생산 대기를 지운 뒤에 지움 */
-    var boxes=vs.length?vs.map(function(v){var b=asmBoxOf(v),k='v:'+v,qk='q:'+v,open=!!asmOpen[k],ls=lineBy[v]||[],shs=SH[v]||[],isA=names.indexOf(v)>=0||ls.length>0,sl=asmStkLines(v,NEED,STK2);   /* v197 실재고 */
+    var boxes=vs.length?vs.map(function(v){var b=asmBoxOf(v),k='v:'+v,qk='q:'+v,open=!!asmOpen[k],ls=lineBy[v]||[],shs=SH[v]||[],isA=names.indexOf(v)>=0||ls.length>0,sl=asmStkLines(v,null,NEED,STK2),np=Object.keys(NEED[v]||{});   /* v197 실재고 · v198 np = 자재가 필요한 공정 */
       /* v193 시트 = 조립(이 업체 조립 발주) + 공정마다 하나. 고른 시트 = asmOpen['s:'+업체] (''= 조립) */
-      var cs=asmOpen['s:'+v],tabsV=(isA?['']:[]).concat(shs.map(function(s){return s.proc;}));if(cs==null||tabsV.indexOf(cs)<0)cs=(ls.length||!shs.length)?(tabsV[0]==null?'':tabsV[0]):shs[0].proc;   /* 처음 = 내용 있는 시트 */
+      var cs=asmOpen['s:'+v],tabsV=(isA?['']:[]).concat(shs.map(function(s){return s.proc;}));np.forEach(function(pr){if(!asmIsAsm(pr)&&tabsV.indexOf(pr)<0)tabsV.push(pr);});   /* v198 시트 없는 공정 자재 = 그 공정 시트 */if(cs==null||tabsV.indexOf(cs)<0)cs=(ls.length||!shs.length)?(tabsV[0]==null?'':tabsV[0]):shs[0].proc;   /* 처음 = 내용 있는 시트 */
       var shTabs=tabsV.length>1?h('div',{class:'asmsheets'},tabsV.map(function(t){return h('button',{type:'button',class:'btn small','aria-pressed':t===cs?'true':'false',on:{click:function(){asmOpen['s:'+v]=t;draw();}}},t===''?(asmProcOf(v)||'조립'):t);})):null;
       var curSh=cs===''?null:shs.filter(function(s){return s.proc===cs;})[0];
       var G={'등록대기':[],'납품대기':[],'납품완료':[]};ls.forEach(function(x){G[asmGroup(x.st)].push(x);});
@@ -5634,8 +5636,9 @@ function renderAsm(){
             h('span',{class:'navarr','aria-hidden':'true'},open?'▾':'▸'),h('span',{class:'nt'},v),asmCountChips(ls,shs,RC[v]),asmStkChip(sl,STK2)),asmStkBtn(v),
           b?h('button',{type:'button',class:'btn small podshare',on:{click:function(){if(asmOpen[qk])delete asmOpen[qk];else{asmOpen[qk]=1;asmOpen[k]=1;}draw();}}},'QR'):null,
           b?asmShareBtn(b,!isA):null),
-        !open?null:h('div',{class:'asmlines list'},asmOpen[qk]&&b?asmQr(asmUrl(b.id)):null,asmStkBody(v,sl,STK2),shTabs,
-          curSh?asmSheetBody(v,cs,curSh.pos)
+        !open?null:h('div',{class:'asmlines list'},asmOpen[qk]&&b?asmQr(asmUrl(b.id)):null,shTabs,
+          asmStkBody(v,asmStkLines(v,cs===''?np.filter(asmIsAsm):[cs],NEED,STK2),STK2,cs),   /* v198 고른 시트 공정 자재만 */
+          curSh?asmSheetBody(v,cs,curSh.pos):cs!==''?[]
           :asmRcvBody(v,RC[v]).concat(['등록대기','납품대기','납품완료'].reduce(function(o,g){return o.concat([h('h3',{},g,h('span',{},G[g].length+'건'))],G[g].length?G[g].map(function(x){return line(x,g);}):(g==='등록대기'?[h('div',{class:'empty'},'발주서가 없습니다.')]:[]));},[]))));   /* v196 조립 시트 맨 위 받을 납품 */   /* h() 는 배열 한 겹만 펴서 납작하게 */
     }):[h('p',{class:'msg'},'조립업체가 없습니다.')];
     box.replaceChildren.apply(box,[kit.bar].filter(Boolean).concat(boxes));
