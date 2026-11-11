@@ -1,5 +1,6 @@
 <!doctype html>
-<!-- v199 사장님 「업체별 박스에 입고확인(납품받을것) / 작업(납품보낼것)  이렇게 구ㅡ분해」 — 상자 둘: 입고확인(받을 납품, 「납품확인」) · 작업(보낼 납품 + 납품완료). 조립 시트도 입고확인 상자.
+<!-- v200 사장님 「거래처박스가 있고 거래처 박스로 들어가면 작업박스와 입고대기 박스를 만들라고요 해당 박스로 들어가면 목록 보이게 해달라고」 — 머리 아래 박스 둘(처음 닫힘): 작업(시트 단추·발주·발주서·보낼 납품·납품완료) · 입고대기(받을 납품 「납품확인」).
+     v199 사장님 「업체별 박스에 입고확인(납품받을것) / 작업(납품보낼것)  이렇게 구ㅡ분해」 — 상자 둘: 입고확인(받을 납품, 「납품확인」) · 작업(보낼 납품 + 납품완료). 조립 시트도 입고확인 상자.
      v196 사장님 「받는쪽과 보내는쪽 기준으로 안나눠져있는데?」 — 공정 시트 묶음 = 받을 납품(「납품확인」) · 보낼 납품 · 납품완료, 조립 시트 맨 위 받을 납품(박스 rcv).
      v195 받을 납품 「납품확인」 — 시트 카드 줄마다 받을 납품(앞 공정 보낸업체-공정 납품대기 + 「납품확인」)·보낼 납품(받을업체-공정 납품대기), 조립 시트 「도착」 칸도 「납품확인」.
        = erp_prodconfirm/<열쇠 fk> {box:이 박스 열쇠, dk, at} 새로 만들기(규칙: 박스 cks 에 든 열쇠만). 상태는 erp_prodconfirm 을 한 장씩 get(없으면 박스 값).
@@ -80,7 +81,7 @@ table.det td{vertical-align:top}table.det td.dc{min-width:120px}table.det .dp{fo
 td.for{white-space:normal;min-width:160px;font-size:12px;color:var(--muted)}
 .st.bad{color:var(--red)}
 .sheets{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}.sheets button{min-height:40px;padding:8px 14px}   /* v193 공정 시트 */
-.bx2{border:1px solid var(--line);border-radius:14px;background:#fff;padding:2px 12px 10px;margin:8px 0 12px}.bx2>h3.lh{font-size:15px}.bx2 h3.sub{font-size:13px}   /* v199 입고확인·작업 상자 */
+.bx3{border:1px solid var(--line);border-radius:14px;background:#fff;margin:8px 0 12px}.bx3.open{padding:0 12px 12px}.bx3>.cardh{padding:12px}.bx3.open>.cardh{padding:12px 0}.bx3 h3.sub{font-size:13px}   /* v200 작업·입고대기 박스 */
 .rcv{display:grid;gap:4px;margin:2px 0 0}.rcv button{min-height:36px;padding:6px 12px;font-size:13px;justify-self:start}.rcv .manual button{min-height:36px;padding:6px 12px;font-size:13px}.rcv .part{margin:0;font-size:12px}.rcv .err{margin:0;font-size:12px}.rcv .at{font-size:11px;color:var(--muted);font-weight:700}   /* v195 납품확인 */
 </style>
 </head>
@@ -275,19 +276,23 @@ function sheetCard(pr,p,mode){   /* v196 mode = in(받을 납품 — 「납품�
     var both=mode==='done'&&hf;cols=both?['품명','수량','받을 납품','보낼 납품']:['품명','수량','보낼 납품'];
     rows=ps.map(function(q){return h('tr','',h('td','',show(q.cname)),h('td','n',num(q.qty)),both?h('td','dc',P.noOk(q.fk)?rcvEl(q.fk,q.from,q.fok):''):null,h('td','dc',dlc(okOut(q),q.to)));});}
   var body=open?h('div','recb',h('div','tw',h('table','det',h('thead','',h('tr','',cols.map(function(t,i){return h('th',i===1?'n':'',t);}))),h('tbody','',rows)))):null;
-  var dt=h('details','rec',h('summary','',h('div','rt',h('b','',show(p.title)),h('small','',[p.kind==='부속'?'공통부속 발주':'제품 발주','납품요청일 '+show(p.need)].join(' · ')),
+  var dt=h('details','rec',h('summary','',h('div','rt',h('b','',show(p.title)),h('small','',[mode==='in'?show(pr):'',p.kind==='부속'?'공통부속 발주':'제품 발주','납품요청일 '+show(p.need)].filter(Boolean).join(' · ')),
     h('div','nums',h('span','chip '+(a===b?'완료':'진행중'),(mode==='in'?'납품확인 ':'납품 ')+num(a)+'/'+num(b)))),chip),body);
   if(open)dt.open=true;
   dt.addEventListener('toggle',function(){if(dt.open===!!OPEN[k])return;if(dt.open)OPEN[k]=1;else delete OPEN[k];draw();});
   return dt;
 }
-function bx2(t,n,kids,empty){return h('section','bx2',[h('h3','lh',t,h('span','',n+'건'))].concat(kids.length?kids:(empty?[h('div','empty',empty)]:[])));}
-function sheetEl(sh){var ps=sh?sh.pos||[]:[],out=[];
-  if(ps.some(function(p){return (p.parts||[]).some(function(q){return P.noOk(q.fk);});})){var a=ps.filter(pendIn);out.push(bx2('입고확인',a.length,a.map(function(p){return sheetCard(sh.proc,p,'in');}),'입고확인할 납품이 없습니다.'));}
-  var b=ps.filter(function(p){return !sheetDone(p);}),c=ps.filter(sheetDone);
-  out.push(bx2('작업',b.length,b.map(function(p){return sheetCard(sh.proc,p,'out');}).concat(c.length?[h('h3','lh sub','납품완료',h('span','',c.length+'건'))].concat(c.map(function(p){return sheetCard(sh.proc,p,'done');})):[]),'발주서가 없습니다.'));
-  return out;}
-function rcvSec(){var r=(BOX&&BOX.rcv)||[],a=r.filter(pendIn);return r.length?[bx2('입고확인',a.length,a.map(function(p){return sheetCard('조립',p,'in');}),'입고확인할 납품이 없습니다.')]:[];}   /* v196 조립업체가 받을 납품 */
+var BXO={};
+function bx3(k,t,n,kids,empty){var o=!!BXO[k],a=[];(function walk(x){if(Array.isArray(x))x.forEach(walk);else if(x!=null&&x!==false)a.push(x);})(kids);
+  var hd=h('button','cardh',h('span','arr',o?'▾':'▸'),h('span','nt',t),h('span','chip '+(n?'진행중':'완료'),n+'건'));hd.type='button';hd.setAttribute('aria-expanded',o?'true':'false');
+  hd.addEventListener('click',function(){BXO[k]=!o;draw();});
+  return h('section','bx3'+(o?' open':''),hd,o?(a.length?a:(empty?h('div','empty',empty):null)):null);}
+function sheetEl(sh){var ps=sh?sh.pos||[]:[],b=ps.filter(function(p){return !sheetDone(p);}),c=ps.filter(sheetDone);   /* v200 작업 = 보낼 납품 + 납품완료 */
+  return b.map(function(p){return sheetCard(sh.proc,p,'out');}).concat(c.length?[h('h3','lh sub','납품완료',h('span','',c.length+'건'))].concat(c.map(function(p){return sheetCard(sh.proc,p,'done');})):[]);}
+function inCards(){var o=[];sheets().forEach(function(sh){(sh.pos||[]).filter(pendIn).forEach(function(p){o.push(sheetCard(sh.proc,p,'in'));});});
+  ((BOX&&BOX.rcv)||[]).filter(pendIn).forEach(function(p){o.push(sheetCard(show(BOX.asmProc)||'조립',p,'in'));});return o;}
+function nWork(){var n=0;sheets().forEach(function(sh){(sh.pos||[]).forEach(function(p){if(!sheetDone(p))n++;});});SENT.forEach(function(d){if(grpOf(d)!=='납품완료')n++;});return n;}
+function fin(out){var inC=inCards();P.fill(mainEl,out.slice(0,2).concat([bx3('w','작업',nWork(),out.slice(2)),bx3('i','입고대기',inC.length,inC,'입고대기가 없습니다.')]));}   /* v200 */
 function draw(){
   if(BOX===null){say('불러오지 못했습니다.',true);return;}
   if(BOX===false){say('발주 링크가 없습니다.',true);return;}
@@ -297,9 +302,9 @@ function draw(){
   if(SHEET==null||tabsV.indexOf(SHEET)<0)SHEET=tabsV.length?tabsV[0]:'';
   if(tabsV.length>1)out.push(h('div','sheets',tabsV.map(function(t){var b=h('button',SHEET===t?'':'sec',t===''?(show(BOX.asmProc)||'조립'):t);b.type='button';b.setAttribute('aria-pressed',SHEET===t?'true':'false');
     b.addEventListener('click',function(){if(SHEET!==t){SHEET=t;ERR='';NOTE='';draw();}});return b;})));
-  if(SHEET!==''||!isA){out=out.concat(sheetEl(shs.filter(function(x){return x.proc===SHEET;})[0]||null));P.fill(mainEl,out);return;}
+  if(SHEET!==''||!isA){out=out.concat(sheetEl(shs.filter(function(x){return x.proc===SHEET;})[0]||null));fin(out);return;}
   var tab=function(m,t){var b=h('button',MODE===m?'':'sec',t);b.type='button';b.setAttribute('aria-pressed',MODE===m?'true':'false');b.addEventListener('click',function(){if(MODE!==m){MODE=m;ERR='';NOTE='';draw();}});return b;};
-  out=out.concat(rcvSec());out.push(h('div','tabs',tab('제품','제품 발주'),tab('부속','공통부속 발주')));   /* v180 사장님 「발주서 입력 링크에서 공통 부속도  골라서 따로 발주 할 수 있어야 함」 */
+  out.push(h('div','tabs',tab('제품','제품 발주'),tab('부속','공통부속 발주')));   /* v180 사장님 「발주서 입력 링크에서 공통 부속도  골라서 따로 발주 할 수 있어야 함」 */
   if(MODE==='부속'){
     if(NOTE)out.push(h('p','note',NOTE));
     var ps=parts();
@@ -309,7 +314,7 @@ function draw(){
       var svP=h('button','wide',BUSY?'저장 중':'발주서 저장');svP.type='button';svP.disabled=BUSY;svP.addEventListener('click',savePart);
       out.push(h('section','po',h('label','one','납품요청일',dP),
         h('div','tw',h('table','',h('thead','',h('tr','',['발주','품명','규격','단위','제품','수량'].map(function(t,i){return h('th',i===5?'n':'',t);}))),h('tbody','',ps.map(partEl)))),erP,svP));}
-    out.push(sentEl());P.fill(mainEl,out);return;
+    out.push(sentEl());fin(out);return;
   }
   if(NOTE)out.push(h('p','note',NOTE));
   if(!its.length)out.push(h('p','msg','발주할 제품이 없습니다.'));
@@ -333,7 +338,7 @@ function draw(){
     out.push(h('section','po',sec));
   }
   out.push(sentEl());
-  P.fill(mainEl,out);
+  fin(out);
 }
 load();
 })();
