@@ -114,3 +114,4 @@
 - 실제 엑셀 확인은 `osascript` 로 Microsoft Excel(`with timeout` 필수). 구글 변환은 테마·docProps 뺀 작은 xlsx, 수식이 있으면 `styles.xml` 필요.
 - ERP 업로드가 있는 것은 **BOM 뿐**(품목·거래처·외주계약은 건별). 폼 「엑셀 업로드」는 폼 칸 채우기다. 외주계약등록은 외주거래처 = 워크센터 기준.
 - ERP 화면에서 실제로 열어 본 것·아직 못 본 것 목록 = 판기록-2 「알아낸 것」 끝.
+- 대기 조회(터미널) = `입력작업자/스크립트/작업자표.py` 표로 REST 컬렉션마다 읽기 — `listCollectionIds` 는 403 이라 컬렉션 이름을 손으로 준다. `erp_asmpo` status 「대기」는 링크 발주서 상태라 그대로 남는다 → 영림원 대기는 `prodIds` 의 `erp_prods` 상태로 본다. `erp_imports` 대기 = 불러오기(읽기) 요청(11-12).
