@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v210 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v211 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -420,7 +420,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v210</span>
+    <span class="ver">v211</span>
   </div>
 </header>
 <div class="wrap">
@@ -5539,6 +5539,27 @@ function asmConfirm(k,lab,v,fp){
   if(!db||!db.collection||!k||pcOf(k))return;if(fp&&!pcOf(fp)){alert(lab+' 이 앞 공정 납품을 아직 입고확인하지 않아 납품확인할 수 없습니다.');return;}if(!confirm(lab+' 납품확인을 저장합니다.'))return;
   var b=asmBoxOf(v);db.collection('erp_prodconfirm').doc(k).create({box:b?b.id:'',dk:k,at:new Date().toISOString()}).catch(function(e){if(!pcOf(k))alert('납품확인을 저장하지 못했습니다.');console.warn('납품확인',e);});
 }
+/* v211 사장님 「그러면 그런것들이 납품확인과 동시에 등록대기로 자동으로 가야겠지?」
+   받는 쪽 납품확인(erp_prodconfirm/<열쇠 k>, 폼·링크 어디서 눌렀든)이 생기면 폼이 그 공정 줄의 외주납품 등록대기 erp_proddlvs/<k> 를 만든다.
+   모양 = 「외주납품입력·자재출고입력」 저장(prodDlvDocs 묶음 한 장)과 같음 — all:true, rows = 그 공정 줄 한 줄(남은 발주 수량 = 납품수량, 다음 업체가 다르면 moveKind·wipNo·toWc… 자재출고 칸 그대로), 머리 seq·proc·wc, dlvDate = 납품확인 날, ck = 열쇠.
+   두 번 안 생김: 문서 id = 열쇠(create = 없을 때만) · 그 줄에 이미 외주납품 문서(오류 뺌)가 있으면(prodLeft 0) 안 만듦.
+   지난 납품확인(PC_DLV_FROM 전, 11-11~12 44건)은 영림원에 이미 들어갔을 수 있어 안 만든다. 링크에서 누른 것은 담당자(외주납품 쓰기 권한)가 폼을 열어 둔 때 만들어진다. 되돌리기 단추는 없다(v195 담당자만). */
+var PC_DLV_FROM='2026-11-12T07:51:00.000Z',pcDlvBusy={};
+function pcDlvRow(k){var hit=null;(data.prods||[]).some(function(d){if(!d||!d.id||d.status==='오류'||ylwGone(d))return false;
+  return (d.rows||[]).some(function(r){if(!r||(d.kind==='제품'&&r.itemNo===d.itemNo)||asmIsAsm(r.proc))return false;if(asmDk(d,r)!==k)return false;hit={d:d,r:r};return true;});});return hit;}
+function pcDlvDoc(d,r,c){
+  var t=c.at?new Date(c.at):new Date();if(isNaN(t))t=new Date();var p=function(n){return String(n).padStart(2,'0');},date=t.getFullYear()+'-'+p(t.getMonth()+1)+'-'+p(t.getDate());
+  var w=prodDlvDoc(d,date,'',''),row=w.rows.filter(function(x){return x.itemNo===r.itemNo&&String(x.seq)===String(r.seq);})[0];if(!row)return null;
+  w.rows=[row];w.seq=row.seq;w.proc=row.proc;w.wc=row.wc;w.ck=c.dk||c.id;w.createdAt=new Date().toISOString();return w;}
+function pcDlvSync(){
+  if(!db||!db.collection||!PCONF||data.prods==null||data.proddlvs==null||!canCol('erp_proddlvs','w'))return;
+  Object.keys(PCONF).forEach(function(k){var c=PCONF[k];if(!c||!c.at||String(c.at)<PC_DLV_FROM||pcDlvBusy[k])return;
+    if((data.proddlvs||[]).some(function(x){return x&&(x.id===k||x.ck===k);}))return;
+    var m=pcDlvRow(k);if(!m||!purTrim(m.r.orderNo)||prodLeft(m.d,m.r)<=0)return;   /* 외주발주번호 전이면 다음에 다시 봄 */
+    var doc=pcDlvDoc(m.d,m.r,Object.assign({id:k},c));if(!doc)return;pcDlvBusy[k]=1;
+    db.collection('erp_proddlvs').doc(k).create(doc).then(function(made){if(made){dataPut('proddlvs',doc,{id:k});renderList();renderNav();renderSum();}},function(e){pcDlvBusy[k]=0;console.warn('납품확인 등록대기 못 만듦',k,e);});
+  });
+}
 function asmRcvCell(k,from,ok,v,arr,fp){   /* 받는 쪽 칸: 보낸업체-보낸공정 납품대기 + 「납품확인」 → 납품완료 */
   if(!k)return arr?asmDoneChip('도착',false):'';var c=pcOf(k);ok=ok||!!c;
   if(ok)return [h('span',{class:'chip 완료'},arr?'도착 완료':(from?from+' 납품완료':'납품완료')),c&&c.at?h('div',{class:'asmp'},'납품확인 '+asmWhen2(c.at)):null];
@@ -7662,7 +7683,7 @@ function staffRepoTable(){
     ['자료 보호','늘지 않음 — 파이어베이스 키는 원래 공개 값, 자료는 저장소 규칙이 지킴','저장소 규칙 배포(위)']]);
 }
 function go(k){if(BYKEY[k]&&BYKEY[k].shownIn)k=BYKEY[k].shownIn;if(k!==cur||k==='podocs')podSel='';cur=k;navOpen=NARROW()?'':null;try{history.replaceState(null,'','#'+k);}catch(e){location.hash=k;}renderNav();renderSum();renderStep();}
-function refreshAll(){rateSyncAll();renderNav();renderSum();renderList();refreshLists();if(impDraw)impDraw();if(sheetDraw)sheetDraw();if(ifRefresh)ifRefresh();if(stkDraw)stkDraw();if(podDraw)podDraw();if(asmDraw)asmDraw();asmConvSync();asmBoxSync();podSync();podTokSync();podBoxSync();podShipInSync();podFlowSync();podModSync();}
+function refreshAll(){rateSyncAll();renderNav();renderSum();renderList();refreshLists();if(impDraw)impDraw();if(sheetDraw)sheetDraw();if(ifRefresh)ifRefresh();if(stkDraw)stkDraw();if(podDraw)podDraw();if(asmDraw)asmDraw();asmConvSync();asmBoxSync();pcDlvSync();podSync();podTokSync();podBoxSync();podShipInSync();podFlowSync();podModSync();}
 
 /* ---------- boot ---------- */
 
@@ -7720,7 +7741,7 @@ dbP.then(function(d){
   },function(){PODPUB=null;});
   /* v176 발주서(조립업체 발주 링크) */
   db.collection('erp_asmbox').onSnapshot(function(snap){ASMBOX=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});asmBoxSync();if(asmDraw)asmDraw();},function(){ASMBOX=null;});
-  db.collection('erp_prodconfirm').onSnapshot(function(snap){var m={};snap.docs.forEach(function(x){m[x.id]=Object.assign({id:x.id},x.data());});PCONF=m;asmBoxSync();if(asmDraw)asmDraw();},function(){PCONF=PCONF||{};asmBoxSync();if(asmDraw)asmDraw();});   /* v195 납품확인 */
+  db.collection('erp_prodconfirm').onSnapshot(function(snap){var m={};snap.docs.forEach(function(x){m[x.id]=Object.assign({id:x.id},x.data());});PCONF=m;asmBoxSync();pcDlvSync();if(asmDraw)asmDraw();},function(){PCONF=PCONF||{};asmBoxSync();if(asmDraw)asmDraw();});   /* v195 납품확인 */
   db.collection('erp_asmpo').onSnapshot(function(snap){data.asmpo=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});asmConvSync();asmBoxSync();renderNav();if(asmDraw)asmDraw();},function(){data.asmpo=data.asmpo||[];renderNav();if(asmDraw)asmDraw();});
   /* v102 재고 조회 */
   db.collection('erp_stocks').onSnapshot(function(snap){
