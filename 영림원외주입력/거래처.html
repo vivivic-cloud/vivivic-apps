@@ -6,7 +6,9 @@
      v222 사장님 「거래처 공유 발주링크도 입력폼의 거래처별 박스구성 동일하게 나타나게 해줘라」 — 폼 거래처 박스 안과 같은 흑백 정사각 박스, 토글 없음.
        이 페이지 = 그 거래처 박스 안부터(다른 거래처 없음). 칸이 둘 이상이면 정사각 박스(「발주서」·「출고처 발주목록 박스」·「입고처 발주목록 박스」, 겉 = 건수·요약 칩·제품명)
        → 누르면 그 박스만. 칸이 하나면 바로 그 안. 안 = 옛 페이지를 그대로 띄움(같은 코드·같은 규칙·같은 기능) — 안 페이지가 박스(단계 → 발주 → 한 장)를 그리고
-       경로(VL.crumb)·겉 요약(VL.sum)을 이 페이지로 보냄. 맨 위 한 줄 경로(거래처 › 박스 › 단계 › 발주)로 돌아감. -->
+       경로(VL.crumb)·겉 요약(VL.sum)을 이 페이지로 보냄. 맨 위 한 줄 경로(거래처 › 박스 › 단계 › 발주)로 돌아감.
+     v223 사장님 「링크된 거래처박스에 뒤로가기 홈으로가기등 버튼이 없어요」 — 맨 위 「뒤로」(한 단계 앞 박스 = 경로 바로 앞)·「처음으로」(이 링크 첫 화면).
+       폰·카톡 뒤로가기 = 한 단계 앞 박스: 경로 깊이만큼 history 를 쌓고(pushState, 주소 그대로) popstate 에서 한 단계 앞으로. 링크 밖(다른 거래처·폼)으로 가는 길 없음. -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -27,6 +29,7 @@ main.vl{padding:0 0 calc(24px + env(safe-area-inset-bottom,0px))}
 .vlbody{padding:0 16px}
 .vlfr iframe{display:block;width:100%;border:0;height:120px;background:#fff}
 .vlhead .msg{margin:12px 0 0}
+.vlnav{display:flex;gap:6px;margin:0 0 2px}.vlnav button{min-height:40px;padding:8px 14px}   /* v223 뒤로·처음으로 */
 </style>
 </head>
 <body>
@@ -55,12 +58,22 @@ window.VL={
   sum:function(win,s){var p=partOf(win);if(!p)return;p.sum=s||null;if(ACT==null)render();},
   top:function(){window.scrollTo(0,0);}
 };
+var CS=[],HD=0,IGN=0;   /* v223 지금 경로 · 쌓은 history 깊이 · 우리가 부른 history.go 에서 온 popstate 무시 */
+function back(){if(CS.length>1&&CS[CS.length-2].go)CS[CS.length-2].go();}
+function home(){if(CS.length>1&&CS[0].go)CS[0].go();}
+var SYQ=0;function syncHist(){if(SYQ)return;SYQ=1;setTimeout(function(){SYQ=0;syncNow();},0);}   /* 한 번 누름에 그림이 여러 번이어도 history 는 한 번만 */
+function syncNow(){var d=CS.length-1;
+  if(d>HD){for(;HD<d;HD++)try{history.pushState({vl:HD+1},'',location.href);}catch(e){}}
+  else if(d<HD){var n=HD-d;HD=d;IGN++;try{history.go(-n);}catch(e){IGN--;}}}
+window.addEventListener('popstate',function(){if(IGN){IGN--;return;}if(HD>0){HD--;back();}});
 function render(){
   var a=cur(),multi=PARTS.length>1,cs=[];
   var home=function(){if(a&&a.cs&&a.cs[0]&&a.cs[0].go)a.cs[0].go();if(multi)activate(null);};
   cs.push({t:NAME,go:home});
   if(a){if(multi)cs.push({t:a.label,go:function(){if(a.cs[0]&&a.cs[0].go)a.cs[0].go();}});cs=cs.concat((a.cs||[]).slice(1));}
-  headEl.replaceChildren(h('div','asmcrumb',cs.reduce(function(o,c,i){var last=i===cs.length-1,b=null;if(!last){b=h('button','',c.t);b.type='button';b.addEventListener('click',function(){c.go&&c.go();});}return o.concat([i?h('i','','›'):null,last?h('b','',c.t):b]);},[])));
+  CS=cs;syncHist();
+  var bb=h('button','sec','뒤로'),hb=h('button','sec','처음으로');bb.type=hb.type='button';bb.disabled=hb.disabled=cs.length<2;bb.addEventListener('click',back);hb.addEventListener('click',home);
+  headEl.replaceChildren(h('div','vlnav',bb,hb),h('div','asmcrumb',cs.reduce(function(o,c,i){var last=i===cs.length-1,b=null;if(!last){b=h('button','',c.t);b.type='button';b.addEventListener('click',function(){c.go&&c.go();});}return o.concat([i?h('i','','›'):null,last?h('b','',c.t):b]);},[])));
   if(a){bodyEl.replaceChildren();return;}
   bodyEl.replaceChildren(h('div','asmgrid2',PARTS.map(function(p){var s=p.sum,nm=[],seen={};
     ((s&&s.names)||[]).forEach(function(m){var t=show(m.t);if(!t)return;if(seen[t]){if(!m.done)seen[t].done=false;return;}seen[t]={t:t,done:!!m.done};nm.push(seen[t]);});
