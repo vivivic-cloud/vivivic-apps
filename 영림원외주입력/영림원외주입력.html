@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v213 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v214 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -421,7 +421,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v213</span>
+    <span class="ver">v214</span>
   </div>
 </header>
 <div class="wrap">
@@ -1214,6 +1214,7 @@ var STEPS=[
   F('seq','공정순서','number'),
   F('proc','공정','text'),
   F('wc','외주거래처','text',{req:1}),
+  F('wh','납품창고','text'),   /* v214 501617 줄 납품창고 = 다음 공정 업체 창고(prodWhSet) */
   F('wcFirst','우선순위 1 업체','text',{noErp:1}),
   F('workNo','작업지시번호','text',{noErp:1}),
   F('orderNo','외주발주번호','text',{noErp:1})
@@ -1346,9 +1347,9 @@ var ROUTES={
   how:['purId 의 erp_purchases 문서(v121 purCol 이 erp_purords 면 erp_purords 문서)가 완료이고 pono 가 그 pos 에 있어야 합니다. 대기·진행중이면 건너뛰고, 없으면 오류로 두고 agentNote에 적습니다.','구매발주조회 501578 에서 pono 줄 선택 → 「구매납품등록」 → 501583. 화면 수량은 남은 수량입니다. 납품일 dlvdate 를 넣고 줄의 납품수량 qty·창고 wh 를 문서 값으로 고친 뒤 대조합니다.','저장 → dlvno.','납품조회 501585 = 입고완료를 확인합니다.','재고 501179 에서 그 창고 수량이 qty 만큼 늘었는지 봅니다. 끝나면 status 완료·agentNote.'],
   unverified:['나눠 납품에서 한 줄을 통째로 빼는 것 — 시험 전이라 폼은 납품수량 0 을 막습니다','앞 납품에서 다 들어온 줄이 다음 501583 에 어떻게 나오는지 — 시험은 두 줄 다 남은 경우뿐이었습니다','무검사 자동입고 설정 자리 — 납품 표 숨은 칸 검사구분 무검사·501585 입고완료는 봤습니다','메뉴 경로 중간 단계 — OpenPageSeq 로 엽니다']},
  prods:{method:'화면 입력(여러 화면 차례로)',note:'폼 v81. 화면은 1~11단계와 분리된 「생산/외주」 입구의 「주간생산계획입력·외주발주입력」 탭입니다. 설계안 = 설계안/생산외주-폼.md. 한 문서 = 생산 한 건. 폼이 저장 때 그 품목(제품이면 부속까지)의 앞 단계 완료를 봤으므로, 다른 품목의 대기·오류 때문에 건너뛰지 않습니다. rows = 공정마다 한 줄(제품이면 부속 줄 + 제품 줄). rows.qty 는 BOM 수량 그대로입니다(부속 재고로 줄이지 않음, 임시). wc = 사장님이 고른 업체, wcFirst = 우선순위 1 업체. (폼 v169) 양식 올리기로 생긴 문서는 fromSheet true 이고 wc = 우선순위 1 업체입니다. prodGap(배열)이 있으면 저장 때 그 품목 1~11단계가 덜 끝났던 문서이니, 영림원에서 품번·공정·외주거래처가 있는지 먼저 보고 없으면 넣지 말고 오류 + agentNote 로 둡니다. 입력 작업자가 쓰는 칸 = planNo · stage(계획·작업지시·외주발주) · rows.workNo · rows.orderNo. 폼은 stage 가 있는 문서를 못 지웁니다. 전표·정산·외주발주서출력·MAIL 은 누르지 않습니다.',
-  how:['(폼 v100) dueEdit 가 있으면 사장님이 완료일을 고친 문서입니다. stage 까지 이미 영림원에 있으니 새로 만들지 말고 AGENTS.md 3-11 「완료일 고침」대로 합니다. dueEdit·dueLog·planNo·stage·rows.workNo 는 지우지 않습니다.','주간생산계획입력 500498: 사업단위 본사를 먼저 넣고 품번 itemNo · 생산계획수량 qty · 생산계획완료일 dueDate → 저장 → 일괄확정처리. stage 계획 · planNo.','kind 가 제품이면 줄 선택 + 반제품 생산계획 생성 → 저장. 나온 부속·수량을 rows 와 대조하고 다르면 멈춰 오류로 둡니다. 부속 줄을 확정합니다.','처리할 줄 선택 + 작업지시생성. 탭이 몇 분 멈출 수 있으니 다시 누르지 않습니다. rows.workNo. stage 작업지시.','외주계획 501608 → 외주발주입력 501617: rows 의 모든 공정을 한꺼번에 발주합니다(시험 전). 외주거래처가 wc 와 같은지 대조합니다. 저장 → 소요자재가져오기 → 저장. 다음 공정 소요자재에 재공품 줄이 있는지 봅니다. rows.orderNo. stage 외주발주. 막히면 멈추고 오류 + 화면 문구.','임시: 엣지 발주를 넣을 때 그 필름 소요수량을 자재이동 501125 외주불출로 본사 창고에서 엣지 업체 창고로 옮깁니다.','완료 + agentNote 에 번호.'],
+  how:['(폼 v100) dueEdit 가 있으면 사장님이 완료일을 고친 문서입니다. stage 까지 이미 영림원에 있으니 새로 만들지 말고 AGENTS.md 3-11 「완료일 고침」대로 합니다. dueEdit·dueLog·planNo·stage·rows.workNo 는 지우지 않습니다.','주간생산계획입력 500498: 사업단위 본사를 먼저 넣고 품번 itemNo · 생산계획수량 qty · 생산계획완료일 dueDate → 저장 → 일괄확정처리. stage 계획 · planNo.','kind 가 제품이면 줄 선택 + 반제품 생산계획 생성 → 저장. 나온 부속·수량을 rows 와 대조하고 다르면 멈춰 오류로 둡니다. 부속 줄을 확정합니다.','처리할 줄 선택 + 작업지시생성. 탭이 몇 분 멈출 수 있으니 다시 누르지 않습니다. rows.workNo. stage 작업지시.','외주계획 501608 → 외주발주입력 501617: rows 의 모든 공정을 한꺼번에 발주합니다(시험 전). 외주거래처가 wc 와 같은지 대조합니다. (폼 v214) 줄마다 납품창고를 rows.wh 로 바꿉니다(다음 공정 업체 창고 — 사장님 11-12·11-13). wh 가 「확인 못 함」이면 저장하지 말고 오류 + agentNote. wh 가 없는 옛 문서는 화면 기본 그대로. 저장 → 소요자재가져오기 → 저장. 다음 공정 소요자재에 재공품 줄이 있는지 봅니다. rows.orderNo. stage 외주발주. 막히면 멈추고 오류 + 화면 문구.','임시: 엣지 발주를 넣을 때 그 필름 소요수량을 자재이동 501125 외주불출로 본사 창고에서 엣지 업체 창고로 옮깁니다.','완료 + agentNote 에 번호.'],
   unverified:['전 공정 외주발주 한꺼번에 저장 — 시험 전(앞 공정 납품 전에 다음 공정 발주·소요자재가 되는지)','wc 가 wcFirst 와 다를 때 업체 바꾸는 화면 — 501634 · 502554 · 501617 시험 전. 다르면 오류로 둡니다','공정 3개 이상 · 조립 · 제품 입고 — 시험 전','같은 업체 줄이 발주서 한 장으로 묶이는지','납기일 · 생산부서 · 외주발주일 · 발주부서 · 발주담당자에 들어오는 값 — 화면 재확인','메뉴 경로 중간 단계 — OpenPageSeq 로 엽니다']},
- proddlvs:{method:'외주발주조회에서 넘겨 화면 입력(공정 차례대로) + 자재출고',note:'폼 v171. 화면은 「생산/외주」 입구의 「외주납품입력·자재출고입력」 탭입니다. 사장님 말씀 「아니다 그냥 발주된 제품만선택해서 각 단계가 남품된것으로 간주하는 입력하는 구조를 만들어줘」. 새 문서(all true): 폼 v172 부터 한 건 = 외주발주까지 등록된 생산(erp_prods, 모든 rows 에 orderNo) 하나의 공정 하나 납품(폼 v174 부터 rows = 같은 공정·같은 외주거래처 줄 모두(부속 여러 개), 머리에도 첫 줄 seq·proc·wc). 사장님 말씀 「입력폼 외주납품입력·자재출고입력 발주서를 클릭하면 저장목록이 생성되는데 이것을 각 공정별 분리 등록하게 나눠줄 수 있나요?」. 생산 하나를 고르면 남은 공정마다 한 건씩 createdAt 차례(부속 줄 다음 제품 줄)로 쌓입니다. 같은 prodId 의 앞 공정 문서가 완료된 뒤 처리합니다(임시 — 공정별 문서를 따로 넣는 것은 시험 전). v171 문서는 rows 가 여러 줄(전 공정 한 건)일 수 있고 처리는 같습니다. 공정마다 남은 발주 수량 전부를 납품한 것으로 봅니다. 사장님 값 = dlvDate 외주납품일(영림원 칸) · stmtNo·stmtAmt 명세서 번호·금액(폼 기록만, 영림원 칸 확인 전이니 넣지 않음). 머리 = prodId(erp_prods 문서 id) · planNo · kind · itemNo · itemName · qty. rows = 공정마다 한 줄(erp_prods rows 차례 = 부속 줄 다음 제품 줄): itemNo · itemName · seq · proc · wc · workNo · orderNo · dlvQty 납품수량 · last, 그리고 다음 공정 업체가 다를 때만 moveKind(재공품·완성 부속) · wipNo(보낼 품번) · toWc(받는 업체) · nextProc · toWorkNo(다음 공정 작업지시번호). moveKind 가 빈 줄은 출고가 없습니다(마지막 공정 또는 같은 업체). 입력 작업자가 쓰는 칸 = rows.dlvNo · rows.inNo · rows.outNo · rows.stock 과 agentNote. 원장은 구매납품 때 외주업체 창고에 들어와 있고 엣지필름은 외주발주 때 옮겼으니(사장님 11-10, 사장님-규칙.md 「원장·엣지필름 창고」) 여기서 출고하는 것은 재공품·완성 부속뿐입니다. 옛 문서(all 없음) = 공정 하나의 납품 한 번(v81~v170), 처리는 옛 how 그대로(AGENTS.md 3-11). 정산·전표는 하지 않습니다.',
+ proddlvs:{method:'외주발주조회에서 넘겨 화면 입력(공정 차례대로) + 자재출고',note:'폼 v171. 화면은 「생산/외주」 입구의 「외주납품입력·자재출고입력」 탭입니다. 사장님 말씀 「아니다 그냥 발주된 제품만선택해서 각 단계가 남품된것으로 간주하는 입력하는 구조를 만들어줘」. 새 문서(all true): 폼 v172 부터 한 건 = 외주발주까지 등록된 생산(erp_prods, 모든 rows 에 orderNo) 하나의 공정 하나 납품(폼 v174 부터 rows = 같은 공정·같은 외주거래처 줄 모두(부속 여러 개), 머리에도 첫 줄 seq·proc·wc). 사장님 말씀 「입력폼 외주납품입력·자재출고입력 발주서를 클릭하면 저장목록이 생성되는데 이것을 각 공정별 분리 등록하게 나눠줄 수 있나요?」. 생산 하나를 고르면 남은 공정마다 한 건씩 createdAt 차례(부속 줄 다음 제품 줄)로 쌓입니다. 같은 prodId 의 앞 공정 문서가 완료된 뒤 처리합니다(임시 — 공정별 문서를 따로 넣는 것은 시험 전). v171 문서는 rows 가 여러 줄(전 공정 한 건)일 수 있고 처리는 같습니다. 공정마다 남은 발주 수량 전부를 납품한 것으로 봅니다. 사장님 값 = dlvDate 외주납품일(영림원 칸) · stmtNo·stmtAmt 명세서 번호·금액(폼 기록만, 영림원 칸 확인 전이니 넣지 않음). 머리 = prodId(erp_prods 문서 id) · planNo · kind · itemNo · itemName · qty. rows = 공정마다 한 줄(erp_prods rows 차례 = 부속 줄 다음 제품 줄): itemNo · itemName · seq · proc · wc · workNo · orderNo · dlvQty 납품수량 · last, 그리고 다음 공정 업체가 다를 때만 moveKind(재공품·완성 부속 — 폼 v214 부터는 erp_prods 줄에 납품창고 wh 가 없는 옛 생산만. wh 가 있으면 외주발주 때 납품창고가 다음 공정 업체 창고라 출고가 없습니다) · wipNo(보낼 품번) · toWc(받는 업체) · nextProc · toWorkNo(다음 공정 작업지시번호). moveKind 가 빈 줄은 출고가 없습니다(마지막 공정 또는 같은 업체). 입력 작업자가 쓰는 칸 = rows.dlvNo · rows.inNo · rows.outNo · rows.stock 과 agentNote. 원장은 구매납품 때 외주업체 창고에 들어와 있고 엣지필름은 외주발주 때 옮겼으니(사장님 11-10, 사장님-규칙.md 「원장·엣지필름 창고」) 여기서 출고하는 것은 재공품·완성 부속뿐입니다. 옛 문서(all 없음) = 공정 하나의 납품 한 번(v81~v170), 처리는 옛 how 그대로(AGENTS.md 3-11). 정산·전표는 하지 않습니다.',
   how:['prodId 의 erp_prods 문서가 완료(외주발주·필름 이동까지)여야 합니다. 대기·진행중이면 건너뜁니다. 문서가 없으면 오류.','rows 를 그 차례대로(품목마다 seq 순서, 부속 줄을 모두 끝낸 뒤 제품 줄) 처리합니다. dlvNo 가 이미 있는 줄은 건너뜁니다(멈췄다 다시 할 때). 줄마다 끝나면 그 줄 칸을 바로 문서에 적습니다(status 진행중 그대로).','줄마다 외주납품: 501614 로 같은 납품이 이미 있는지 봅니다 → 외주발주조회 501610 에서 orderNo 줄 선택 + 외주납품 → 501613 외주납품일 dlvDate · 납품수량 dlvQty → 모든 칸 대조 → 저장. 번호 칸으로 확인해 rows.dlvNo. 입고는 저장 때 저절로 됩니다(501614 입고완료 → rows.inNo). 시트 오류는 저장 전에 MutationObserver 로 모읍니다.','그 줄에 moveKind 가 있으면 다음 줄을 납품하기 전에 자재출고: 자재출고요청현황 500938 을 toWorkNo 로 조회 → nextProc 줄 선택 + 출고처리 → 자재출고입력 500940 · 출고유형 외주출고 · 입고창고 = toWc 대조 · wipNo 줄 출고창고 = wc · 금회출고수량 = dlvQty · 다른 자재 줄은 요청수량 그대로(0·행삭제 안 됨) → 저장 → rows.outNo. 원장·필름 줄 출고창고는 바꾸지 않습니다.','501186 재공재고 · 501179 창고별 재고로 앞 업체가 줄고 다음 업체에 생겼는지 대조해 rows.stock 에 짧게 적습니다.','「현재고가 부족하여」 등으로 막히면 그 줄에서 멈추고 오류 + agentNote 에 품번·공정·화면 문구 그대로. 다 되면 완료 + agentNote 에 번호.'],
   unverified:['한 생산의 전 공정을 이어서 납품·출고 — 공정 하나씩은 11-06 시험됨, 4제품 전체는 시험 전','완성 부속을 조립 업체로 출고(조립 작업지시로 500938 에 나오는지 · 다른 부속 줄이 함께 나올 때) — 시험 전','외주납품일이 외주발주일보다 앞일 때 막히는지 — 시험 전','명세서 번호·금액이 들어갈 영림원 칸','납품부서 · 납품담당자 · 납품구분 값']},
  prodmoves:{method:'자재출고요청현황에서 넘겨 화면 입력',note:'폼 v81, v84 완성 부속. 외주납품입력·자재출고입력 탭 카드의 [재공품 자재출고입력]·[완성 부속 자재출고입력] 한 번 = 문서 하나. kind = 재공품(옛 문서는 칸 없음) · 완성 부속. wipNo = 보낼 품번(재공품 품번 또는 부속 품번). fromWc 와 toWc 가 같으면 폼은 문서를 만들지 않습니다. 재공품을 실제로 보내는 날 사장님이 누릅니다. 외주발주·납품과 뗀 까닭 = 재공품은 다음 공정이 시작되기 전까지 현재 공정 창고에 보여야 합니다. fromWc = 앞 공정 업체 창고, toWc = 다음 공정 업체 창고, qty = 앞 공정 납품 합 - 이미 보낸 합, wipNo = 재공품 품번. 입력 작업자가 쓰는 칸 = outNo · stock. 임시: 재공품 이동은 자재출고로 합니다(자재이동 501125·이동입력 501096 에는 재공품이 안 잡힘). 폼 v171 부터 이 문서를 만드는 단추가 없습니다 — 자재출고는 erp_proddlvs 전 공정 납품 문서(all) 처리 안에서 합니다. 이 컬렉션에는 옛 문서만 있습니다.',
@@ -1446,7 +1447,7 @@ var IMPORT_SPEC={collection:'erp_imports',statuses:['대기','진행중','완료
    prods:{screen:'주간생산계획조회 + 작업지시조회 + 외주발주품목조회',page:'500499 + 500880 + 501611',sheet:'SS + SSWorkOrder + SS',script:'없음 — 첫 요청 때 공정등록-읽기.js 꼴로 만든다',read:'ylw.read.prods',match:'planNo',onlyT:'품번이 T 로 시작',
      query:'세 화면 모두 필수 날짜 칸이 있다. 사업단위 본사 · 날짜를 자료가 다 들어오게 넓혀 조회. 500880·501611 줄은 생산계획번호·작업지시번호로 잇는다. 생산계획번호 끝이 -숫자 인 반제품 계획은 앞 번호 문서의 rows 로 합친다. 작업지시가 없는 계획은 넣지 않고 건수만 agentNote 에 적는다',
      link:{kind:'품목자산분류 제품 = 제품 · 반제품 = 부속',last:'rows.seq 와 rows.last 는 조회 표에 칸이 없어 같은 품번·공정의 완료 erp_itemmats 문서 procs 에서 읽는다. 못 찾으면 그 생산을 넣지 않는다',stage:'외주발주번호까지 있으면 외주발주 · 없으면 작업지시'},
-     fieldMap:{planNo:'생산계획번호',itemName:'품명',itemNo:'품번',qty:'생산계획수량',dueDate:'생산계획완료일'},rowFieldMap:{itemName:'제품명',itemNo:'제품번호',proc:'공정',wc:'워크센터',qty:'지시수량',workNo:'작업지시번호',orderNo:'(501611) 외주발주번호'},noRead:['rows.wcFirst']},
+     fieldMap:{planNo:'생산계획번호',itemName:'품명',itemNo:'품번',qty:'생산계획수량',dueDate:'생산계획완료일'},rowFieldMap:{itemName:'제품명',itemNo:'제품번호',proc:'공정',wc:'워크센터',qty:'지시수량',workNo:'작업지시번호',orderNo:'(501611) 외주발주번호'},noRead:['rows.wcFirst','rows.wh']},
    proddlvs:{screen:'외주납품품목조회 + 외주입고품목조회',page:'501631 + 501624',sheet:'SS + SS',script:'없음 — 첫 요청 때 공정등록-읽기.js 꼴로 만든다',read:'ylw.read.proddlvs',match:'dlvNo',onlyT:'외주품번호가 T 로 시작',
      query:'두 화면 모두 필수 날짜 칸이 있다. 사업단위 본사 · 날짜를 자료가 다 들어오게 넓혀 조회. 501631 은 외주납품, 501624 는 외주입고번호를 읽어 작업지시번호·외주품번호로 잇는다',
      link:{prodId:'rows.workNo 가 같은 erp_prods 문서 id',itemNo:'같은 작업지시번호의 rows 중 외주품번호가 맞는 줄. 앞 공정 = 품번_공정순서 · 마지막 공정 = 품번',seq:'그 줄의 seq',proc:'그 줄의 proc',orderNo:'그 줄의 orderNo'},
@@ -4026,6 +4027,15 @@ function prodLines(code,qty){
   add(code,qty);
   return out;
 }
+/* v214 사장님 11-12 「모든 납품 상황에서 다음공정이 정해진 곳은 따로 출고이동 없는걸로 세팅해줘」 · 11-13 「입력폼에서 다음 공정 업체가 정해지면 이 출고가 다음공정창고로 가는것으로 세팅하면 되지않나요?」
+   외주발주(501617) 줄 납품창고 rows.wh = 다음 공정 업체 창고(재단 → 엣지 업체 · 엣지 → 보링 업체 · 부속 마지막 → 조립 줄 업체 · 공통부속 마지막 → 링크 발주 조립업체 asmVendor · 다음 공정 없음·같은 업체 = 자기 업체).
+   창고 이름 = 그 업체 워크센터등록(erp_workcenters) 「납품창고」 그대로, 없으면 「확인 못 함」. 저장 때 정하고 업체를 바꾸면 따라 바뀐다.
+   rows.wh 가 있는 생산은 공정 사이 자재출고(500938 → 500940)를 만들지 않는다(prodMoveNeed). wh 없는 옛 문서는 옛 그대로. */
+function prodWhOf(wc){var w=purTrim(wc);if(!w)return '확인 못 함';
+  var x=(data.workcenters||[]).filter(function(r){return r&&r.status!=='오류'&&purTrim(r.name)===w;})[0];return x&&purTrim(x.whDeliv)?purTrim(x.whDeliv):'확인 못 함';}
+function prodWhTo(d,r){var nx=prodNext(d,r);if(nx)return nx.wc;if(r.last&&d.kind==='부속'&&purTrim(d.asmVendor))return d.asmVendor;return r.wc;}
+function prodWhSet(d){(d.rows||[]).forEach(function(r){r.wh=prodWhOf(prodWhTo(d,r));});return d;}
+function prodMoveNeed(d,r){var nx=prodNext(d,r);return !!(nx&&purTrim(nx.wc)!==purTrim(r.wc)&&!purTrim(r.wh));}
 function prodPickFn(){
   var s=BYKEY.prods,busy=false,lines=[],mine={},fld={};
   ['itemNo','qty','dueDate'].forEach(function(k){fld[k]=makeField(s.fields.filter(function(f){return f.k===k;})[0]);});
@@ -4038,12 +4048,12 @@ function prodPickFn(){
     parts.hidden=!code;draw();
   }
   function draw(){
-    var seen='';
+    var seen='',it0=ifItem(purTrim(fld.itemNo.get()))||{};prodWhSet({kind:it0.asset==='제품'?'제품':'부속',itemNo:purTrim(fld.itemNo.get()),rows:lines});   /* v214 */
     list.replaceChildren.apply(list,lines.map(function(r){
       var head=r.itemNo!==seen?h('div',{class:'pritem'},r.itemNo+' · '+(r.itemName||'')+' · '+show(r.qty)+'개'):'';seen=r.itemNo;
       var sel=h('select',{'aria-label':r.itemNo+' '+r.proc+' 외주거래처',disabled:busy,on:{change:function(e){r.wc=e.target.value;mine[keyOf(r)]=r.wc;draw();}}},r.opts.map(function(o,i){return h('option',{value:o},o+(i===0?' (우선순위 1)':''));}));
       sel.value=r.wc;
-      return h('div',{},head,h('div',{class:'prrow'},h('div',{class:'prline'},h('b',{},r.seq+'. '+r.proc)),sel,r.wc!==r.wcFirst?h('div',{class:'hint warn'},'우선순위 1 이 아닌 업체입니다.'):''));
+      return h('div',{},head,h('div',{class:'prrow'},h('div',{class:'prline'},h('b',{},r.seq+'. '+r.proc)),sel,h('div',{class:'prwip'},'납품창고 '+r.wh),r.wc!==r.wcFirst?h('div',{class:'hint warn'},'우선순위 1 이 아닌 업체입니다.'):''));
     }));
     btn.disabled=busy;
   }
@@ -4072,7 +4082,7 @@ function prodPickFn(){
       var g=prodGap(code);if(g.length){stop('그 사이 앞 단계가 바뀌었습니다: '+g.join(', ')+'. 저장하지 않았습니다.');return;}
       var it=ifItem(code)||{},doc={kind:it.asset==='제품'?'제품':'부속',itemNo:code,itemName:it.name||'',qty:Number(q),dueDate:date,
         rows:lines.map(function(r){return {itemNo:r.itemNo,itemName:r.itemName,qty:r.qty,seq:r.seq,proc:r.proc,wc:r.wc,wcFirst:r.wcFirst,last:r.last,workNo:'',orderNo:''};}),
-        planNo:'',stage:'',status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(s)};
+        planNo:'',stage:'',status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(s)};prodWhSet(doc);
       if(doc.rows.some(function(r){return !r.wc;})){stop('업체가 없는 공정이 있습니다. 저장하지 않았습니다.');return;}
       return db.collection('erp_prods').add(doc).then(function(){
         busy=false;mine={};fld.itemNo.set('');fld.qty.reset();fld.dueDate.reset();fld.itemNo.setError('');lines=[];parts.hidden=true;draw();msg.textContent='';sayDue();
@@ -4113,7 +4123,7 @@ function prodPickFn(){
         var ii=ifItem(code)||{},g=(LISTS['dl-prods']||[]).indexOf(code)>=0?[]:prodGap(code);
         it.doc={kind:ii.asset==='제품'?'제품':'부속',itemNo:code,itemName:ii.name||'',qty:Number(q),dueDate:date,
           rows:ls.map(function(r){return {itemNo:r.itemNo,itemName:r.itemName,qty:r.qty,seq:r.seq,proc:r.proc,wc:r.wc,wcFirst:r.wcFirst,last:r.last,workNo:'',orderNo:''};}),
-          planNo:'',stage:'',status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(s),fromSheet:true};
+          planNo:'',stage:'',status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(s),fromSheet:true};prodWhSet(it.doc);
         if(g.length){it.doc.prodGap=g;it.unreg=1;it.why='미등록: '+g.join(', ');}
         return it;
       });
@@ -4156,7 +4166,7 @@ function prodDlvOpen(){   /* v171 고를 수 있는 생산 = 모든 공정에 �
 function prodDlvDoc(d,date,no,amt){   /* 남은 발주 수량 전부 = 납품. 다음 공정 업체가 다르면 자재출고할 품번·업체를 줄에 적어 둔다(입력 작업자용) */
   var rows=(d.rows||[]).map(function(r){
     var q=prodLeft(d,r);if(q<=0)return null;
-    var nx=prodNext(d,r),mv=!!(nx&&nx.wc!==r.wc);
+    var nx=prodNext(d,r),mv=prodMoveNeed(d,r);   /* v214 납품창고가 정해진 줄은 출고 없음 */
     return {itemNo:r.itemNo,itemName:r.itemName||'',seq:r.seq,proc:r.proc,wc:r.wc,workNo:r.workNo||'',orderNo:r.orderNo||'',dlvQty:q,last:!!r.last,
       moveKind:mv?prodKind(r):'',wipNo:mv?prodMoveNo(r):'',toWc:mv?nx.wc:'',nextProc:mv?nx.proc:'',toWorkNo:mv?(nx.workNo||''):'',dlvNo:'',inNo:'',outNo:'',stock:''};
   }).filter(Boolean);
@@ -5503,7 +5513,7 @@ function asmStepSt(d,r){   /* {t:글자, c:'done'|'wait'|'none'} */
   return {t:'외주납품 '+show(ds[0].doc.status||'대기'),c:'wait'};
 }
 function asmMoveSt(d,r){   /* 다음 업체가 다를 때만. null = 출고 필요 없음 */
-  var nx=prodNext(d,r);if(!nx||purTrim(nx.wc)===purTrim(r.wc))return null;
+  if(!prodMoveNeed(d,r))return null;   /* v214 */
   var ds=asmDlv(d,r);if(ds.some(function(x){return purTrim(x.row.outNo);}))return {t:'자재출고 완료',c:'done'};
   var mv=(data.prodmoves||[]).filter(function(x){return x&&x.status!=='오류'&&x.prodId===d.id&&x.itemNo===r.itemNo&&String(x.seq)===String(r.seq);});
   if(mv.some(function(x){return x.status==='완료'||purTrim(x.outNo);}))return {t:'자재출고 완료',c:'done'};
@@ -5626,7 +5636,7 @@ function asmDetail(d){
   var isP=d.kind==='제품',ar=isP?asmAsmRow(d):null,parts={},order=[];
   (d.rows||[]).forEach(function(r){if(isP&&r.itemNo===d.itemNo)return;if(!parts[r.itemNo]){parts[r.itemNo]=[];order.push(r.itemNo);}parts[r.itemNo].push(r);});
   var ps=order.map(function(k){var rs=parts[k].sort(function(x,y){return Number(x.seq)-Number(y.seq);}),last=rs[rs.length-1];
-    return {code:k,cname:show(rs[0].itemName),qty:rs[0].qty,steps:rs.map(function(r){var nx=prodNext(d,r),need=!!(nx&&purTrim(nx.wc)!==purTrim(r.wc)),m=need?asmMoveSt(d,r):null;
+    return {code:k,cname:show(rs[0].itemName),qty:rs[0].qty,steps:rs.map(function(r){var need=prodMoveNeed(d,r),m=need?asmMoveSt(d,r):null;
       return {proc:show(r.proc),wc:show(r.wc),to:asmTo(d,r),dlv:asmStepSt(d,r).c==='done',k:asmDk(d,r),ok:asmOk(d,r),mv:need?!!(m&&m.c==='done'):null};}),arr:isP||purTrim(d.asmVendor)?asmArrived(d,last,ar?ar.wc:''):null,fk:asmDk(d,last),from:asmLab(last),fp:asmPre(d,last)};});   /* v195 도착 = 조립업체 납품확인(공통부속도) */
   return {parts:ps,asm:ar?{proc:show(ar.proc),wc:show(ar.wc),qty:ar.qty||d.qty,dlv:asmStepSt(d,ar).c==='done',inn:asmDlv(d,ar).some(function(x){return purTrim(x.row.inNo);})}:null};
 }
@@ -5639,7 +5649,7 @@ function asmTitle(a){if(a.kind!=='부속')return show(a.pname);var rs=a.rows||[]
 function asmConvDocs(a){
   var box=(ASMBOX||[]).filter(function(b){return b.id===a.box;})[0];if(!box)return {why:'발주 링크 없음'};
   var want=asmWant(box.vendor),now=new Date().toISOString(),rowOf=function(r){return {itemNo:r.itemNo,itemName:r.itemName,qty:r.qty,seq:r.seq,proc:r.proc,wc:r.wc,wcFirst:r.wcFirst,last:r.last,workNo:'',orderNo:''};};
-  var base=function(o){return Object.assign(o,{planNo:'',stage:'',status:'대기',agentNote:'',createdAt:now,route:routeOf(BYKEY.prods),fromAsm:a.id,asmVendor:box.vendor});};
+  var base=function(o){return prodWhSet(Object.assign(o,{planNo:'',stage:'',status:'대기',agentNote:'',createdAt:now,route:routeOf(BYKEY.prods),fromAsm:a.id,asmVendor:box.vendor}));};   /* v214 납품창고 */
   var need=show(a.need);if(!/^\d{4}-\d{2}-\d{2}$/.test(need))return {why:'납품요청일 없음'};
   if(a.kind!=='부속'){
     var pc=purTrim(a.pcode),q=Number(a.qty);if(want.pcodes.indexOf(pc)<0)return {why:'조립 외주계약 제품 아님'};if(!(q>0))return {why:'수량 없음'};
