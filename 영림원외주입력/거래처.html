@@ -1,0 +1,71 @@
+<!doctype html>
+<!-- v220 거래처 링크(사장님 「발주링크 납품확인링크 구매납품확인 링크등 나눠진 거래처 링크를 하나로 합쳐 주세요」 · 「거래처는 나눠져 있어야죠」)
+     거래처마다 링크 하나 = 거래처.html#<열쇠>. 자료 = erp_pobox/<열쇠> {kind:'거래처', name, a, o, i}(폼이 만듦, 새 문서만 — 옛 박스 안 건드림).
+       a = 그 거래처 발주서 박스(erp_asmbox → 발주.html: 발주·생산 납품확인) · o = 출고처 발주목록 박스(발주박스.html: 구매 발주확인) · i = 입고처 발주목록 박스(발주박스.html: 구매 입고확인).
+     한 페이지에 그 거래처 것만 차례로(다른 거래처 것은 안 보임). 각 칸은 옛 페이지를 그대로 안에 띄움(같은 코드·같은 규칙, 높이는 안 내용에 맞춤).
+     옛 링크(발주.html#k · 발주박스.html#k · 출고처박스/입고처박스.html#k) = 폼이 만든 erp_pobox/to_<k> {kind:'거래처링크', v} 를 보고 여기로 넘어옴(없으면 옛 화면 그대로). 로그인 없음. -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>INGHOME 거래처</title>
+<meta name="description" content="거래처 발주·납품확인">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="INGHOME">
+<meta property="og:title" content="INGHOME 거래처">
+<meta property="og:description" content="거래처 발주·납품확인">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="발주공통.css">
+<style>
+main.vl{padding:0 0 calc(24px + env(safe-area-inset-bottom,0px))}
+.vlhead{padding:20px 16px 4px}
+.vlnav{display:flex;flex-wrap:wrap;gap:6px;padding:8px 16px 4px}
+.vlnav a{font-size:13px;font-weight:800;color:var(--ink);text-decoration:none;border:1px solid var(--ink);border-radius:999px;padding:6px 12px;background:#fff}
+.vlsec{border-top:2px solid var(--ink);margin:14px 0 0}
+.vlsh{display:flex;align-items:center;gap:8px;width:100%;background:#fff;color:var(--ink);border:0;border-radius:0;padding:12px 16px;min-height:48px;font-size:16px;font-weight:900;text-align:left}
+.vlsh .ar{flex:0 0 auto;width:14px;color:var(--muted)}
+.vlsec iframe{display:block;width:100%;border:0;height:120px;background:#fff}
+.vlhead .msg{margin:12px 0 0}
+</style>
+</head>
+<body>
+<main id="main" class="vl"><div class="vlhead"><p class="msg">불러오는 중</p></div></main>
+<script src="발주공통.js"></script>
+<script>
+(function(){
+"use strict";
+var P=window.PO,h=P.h,show=P.show,mainEl=document.getElementById('main');
+function say(t,bad){mainEl.replaceChildren(h('div','vlhead',h('p','msg'+(bad?' bad':''),t)));}
+var key=(location.hash||'').slice(1).split('&')[0];
+if(!P.keyOk(key)){say('링크가 없습니다.',true);return;}
+var OPEN={};try{OPEN=JSON.parse(sessionStorage.getItem('vl.open.'+key)||'{}')||{};}catch(e){OPEN={};}
+function keep(){try{sessionStorage.setItem('vl.open.'+key,JSON.stringify(OPEN));}catch(e){}}
+/* 안 페이지 높이 = 안 내용 높이(같은 출처라 읽을 수 있음) */
+function fit(fr){
+  var go=function(){try{var d=fr.contentDocument;if(!d||!d.documentElement)return;var m=d.getElementById('main')||d.body;if(!m)return;var hgt=Math.ceil(m.getBoundingClientRect().bottom+(d.defaultView?d.defaultView.scrollY:0));if(hgt>0)fr.style.height=hgt+'px';}catch(e){}};
+  fr.addEventListener('load',function(){go();try{var d=fr.contentDocument;if(window.ResizeObserver){var ro=new ResizeObserver(go);ro.observe(d.documentElement);if(d.body)ro.observe(d.body);}
+    else setInterval(go,1000);}catch(e){}});
+}
+P.getOne('erp_pobox/'+key).then(function(v){
+  if(!v||v.kind!=='거래처'){say('링크가 없습니다.',true);return;}
+  var parts=[['a','발주서','발주.html'],['o','출고처 발주목록 박스','출고처박스.html'],['i','입고처 발주목록 박스','입고처박스.html']]
+    .filter(function(p){return P.keyOk(v[p[0]]);});
+  if(!parts.length){say('발주서가 없습니다.',true);return;}
+  document.title='INGHOME-'+show(v.name);
+  var nav=parts.length>1?h('div','vlnav',parts.map(function(p){var a=h('a','',p[1]);a.href='#'+key;a.addEventListener('click',function(e){e.preventDefault();var s=document.getElementById('vl-'+p[0]);if(s)s.scrollIntoView({behavior:'smooth',block:'start'});});return a;})):null;
+  var secs=parts.map(function(p){
+    var open=OPEN[p[0]]!==0,fr=null,body=h('div','');
+    var btn=h('button','vlsh',h('span','ar',open?'▾':'▸'),h('span','',p[1]));btn.type='button';btn.setAttribute('aria-expanded',open?'true':'false');
+    var put=function(){if(fr||!open)return;fr=document.createElement('iframe');fr.title=p[1];fr.setAttribute('allow','camera; clipboard-write; web-share; fullscreen');fit(fr);fr.src=p[2]+'#'+v[p[0]];body.append(fr);};
+    btn.addEventListener('click',function(){open=!open;OPEN[p[0]]=open?1:0;keep();btn.setAttribute('aria-expanded',open?'true':'false');btn.firstChild.textContent=open?'▾':'▸';body.hidden=!open;put();});
+    body.hidden=!open;put();
+    var s=h('section','vlsec',btn,body);s.id='vl-'+p[0];return s;});
+  P.fill(mainEl,[h('div','vlhead',h('h1','',show(v.name))),nav,secs]);
+},function(){say('불러오지 못했습니다.',true);});
+window.addEventListener('hashchange',function(){var k2=(location.hash||'').slice(1).split('&')[0];if(k2!==key)location.reload();});
+})();
+</script>
+</body>
+</html>

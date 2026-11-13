@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v219 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v220 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -421,7 +421,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v219</span>
+    <span class="ver">v220</span>
   </div>
 </header>
 <div class="wrap">
@@ -5157,7 +5157,7 @@ function podBoxSync(){
 }
 function confOf(no){return (POCONF||[]).filter(function(c){return c.id===no;})[0]||null;}
 function confTime(c){var t=c&&c.at?new Date(c.at):null;if(!t||isNaN(t))return c?show(c.at):'';var p=function(n){return String(n).padStart(2,'0');};return t.getFullYear()+'-'+p(t.getMonth()+1)+'-'+p(t.getDate())+' '+p(t.getHours())+':'+p(t.getMinutes());}
-function boxShareBtn(b){return h('button',{type:'button',class:'btn small podshare',on:{click:function(){shareMsg(boxShareText(b),boxUrl(b.id,b.kind));}}},'공유');}   /* v160 상황별 글 · 글 한 덩어리 */
+function boxShareBtn(b){return h('button',{type:'button',class:'btn small podshare',on:{click:function(){shareMsg(boxShareText(b),vlUrl(b.name)||boxUrl(b.id,b.kind));}}},'공유');}   /* v220 거래처 링크 하나(없으면 옛 박스 링크) */   /* v160 상황별 글 · 글 한 덩어리 */
 /* v145 사장님 확정 흐름(「이해한 내용이 맞으니 작업해 주세요」 + 보충 「스캔한 발주가 그 입고처 박스에 없는 발주면 오류」 · 「입고처 스캔 링크 발주서에 수정요청 단추」) — v144 기사 스캔 방식을 바꿈.
    출고처 「발주확인」 → QR·바코드 · 「배송기사 공유」 = 배송.html#<배송열쇠>(erp_poship) → 기사 폰 QR = 입고.html#<배송열쇠> → 입고처가 찍음 →
    입고.html: 그 입고처 박스에 있는 발주인지(박스 pos 의 inTok) → 사진(erp_podlvimg)·입고수량·「입고확인」 = erp_poin/<입고열쇠>_<배송열쇠>{tok,ship,pono,rows,at,rev,photos} + 표시 erp_podlv/<배송열쇠>{pono,rows,inAt,rev} →
@@ -5367,7 +5367,7 @@ function asmBoxSync(){
     else db.collection('erp_asmbox').doc(podKey()).create(Object.assign({},want,{at:now,createdAt:now})).catch(done);
   });
 }
-function asmShareBtn(b,dlvOnly){return h('button',{type:'button',class:'btn small podshare',on:{click:function(){shareMsg('INGHOME-'+b.vendor+(dlvOnly?' - 납품대기 발주서가 있습니다.':' - 발주서를 작성해 주세요.'),asmUrl(b.id));}}},'공유');}   /* v193 dlvOnly = 조립 아닌 공정업체 박스 */
+function asmShareBtn(b,dlvOnly){return h('button',{type:'button',class:'btn small podshare',on:{click:function(){shareMsg('INGHOME-'+b.vendor+(dlvOnly?' - 납품대기 발주서가 있습니다.':' - 발주서를 작성해 주세요.'),vlUrl(b.vendor)||asmUrl(b.id));}}},'공유');}   /* v220 거래처 링크 하나 */   /* v193 dlvOnly = 조립 아닌 공정업체 박스 */
 /* v193 사장님 「생산/외주 - 발주서에 납품대기문서가 발생되면 관련된 해당 납품관련 거래처별 박스가 생성되고 이남품 완료 여부를 결정할 각 부속들이 도착해 있어야 할것 같아요」 ·
    「조립업체는 이미 박스가 있으니 조립업체의 반재재 납품여부는 이미있는 박스를 활용합시다」 · 「이럴때 같은 업체에 다른 공정의 납품여부가 보일 수 있습니다. 그러니 각 공정업체박스에 해당공정을 각각 다른시트에서 관리 해야 합니다」
    발주 줄(asmVendorLines)이 납품대기·납품완료면 그 생산의 부속 공정 줄(조립 뺌) 외주거래처마다 박스(erp_asmbox, 업체당 하나 — 조립업체는 그 박스) 안 시트 sheets[{proc, pos}] 에 적는다.
@@ -5759,14 +5759,14 @@ function renderAsm(){
         return h('div',{class:'asmstage'},pv?null:h('div',{class:'asmbar'},asmStkBtn(v),
             b?h('button',{type:'button',class:'btn small podshare',on:{click:function(){if(asmOpen[qk])delete asmOpen[qk];else{asmOpen[qk]=1;asmOpen[k]=1;}draw();}}},'QR'):null,
             b?asmShareBtn(b,!isA):null),
-          !pv&&asmOpen[qk]&&b?asmQr(asmUrl(b.id)):null,
+          !pv&&asmOpen[qk]&&b?asmQr(vlUrl(v)||asmUrl(b.id)):null,   /* v220 */
           asmPair(v,PAIR));}
       return h('div',{class:'asmtile asmv'+(open?' open':'')},h('div',{class:'asmface',role:'button',tabindex:'0','aria-expanded':open?'true':'false',on:{click:function(){asmGo(open?'':v);draw();},keydown:asmKey}},
           h('b',{class:'asmtt asmvt'},v),h('div',{class:'asmnum'},asmCountChips(ls,shs,RC[v]),asmStkChip(sl,STK2))),
         !open?null:h('div',{class:'asmin'},h('div',{class:'asmbar'},asmStkBtn(v),
             b?h('button',{type:'button',class:'btn small podshare',on:{click:function(){if(asmOpen[qk])delete asmOpen[qk];else{asmOpen[qk]=1;asmOpen[k]=1;}draw();}}},'QR'):null,
             b?asmShareBtn(b,!isA):null),
-          asmOpen[qk]&&b?asmQr(asmUrl(b.id)):null,
+          asmOpen[qk]&&b?asmQr(vlUrl(v)||asmUrl(b.id)):null,   /* v220 */
           asmPair(v,PAIR)));
     }):[h('p',{class:'msg'},'조립업체가 없습니다.')];
     if(vOn){var st=boxes[0];if(asmSolo){var tt=asmSolo.querySelector('.asmtt');crumb.push({t:tt?tt.textContent:''});st=h('div',{class:'asmstage'},asmSolo);}   /* v209 연 발주 박스만 */
@@ -5791,6 +5791,35 @@ function lnkNames(){var n=[],put=function(x){x=show(x).trim();if(x&&n.indexOf(x)
   if(canMenu('podocs','r'))(POBOX||[]).forEach(function(b){if(podKeyOk(b.id)&&(b.kind==='출고처'||b.kind==='입고처'))put(b.name);});
   if(canMenu('asmpo','r'))(ASMBOX||[]).forEach(function(b){if(podKeyOk(b.id))put(b.vendor);});
   return n.sort(function(a,b){return a.localeCompare(b,'ko');});}
+/* ---------- v220 거래처 링크 하나로 ----------
+   사장님 11-13 「발주링크 납품확인링크 구매납품확인 링크등 나눠진 거래처 링크를 하나로 합쳐 주세요」 · 「거래처는 나눠져 있어야죠」.
+   거래처(이름)마다 erp_pobox/<무작위 열쇠> {kind:'거래처', name, a:발주서 박스, o:출고처 박스, i:입고처 박스} 한 장 → 링크 = 거래처.html#<열쇠>(그 거래처 박스만 한 페이지에).
+   옛 링크 = 그 이름의 모든 박스(겹친 옛 박스 포함) 열쇠마다 erp_pobox/to_<박스 열쇠> {kind:'거래처링크', name, v} → 발주.html·발주박스.html 이 보고 넘어감.
+   새 문서만 만든다(옛 박스·규칙 안 건드림 — erp_pobox 는 열쇠 아는 사람 get 허용 그대로). 박스 문서들은 kind 로 걸러 써서 이 문서들은 다른 곳에 안 섞임.
+   쓰기 = erp_pobox 쓰기 권한 담당자가 폼을 열 때(박스 동기화와 같은 꼴). 없으면 공유·QR 은 옛 링크. */
+function vlOf(name){var a=(POBOX||[]).filter(function(b){return b.kind==='거래처'&&b.name===name&&podKeyOk(b.id);}).sort(function(x,y){return String(x.createdAt||'')<String(y.createdAt||'')?-1:1;});return a[0]||null;}
+function vlUrl(name){var d=vlOf(show(name).trim());return d?new URL('거래처.html#'+d.id,location.href).href:'';}
+var vlBusy={};
+function vlSync(){
+  if(!db||!db.collection||POBOX==null||ASMBOX==null||!canCol('erp_pobox','w'))return;
+  var ns=[],put=function(x){x=show(x).trim();if(x&&ns.indexOf(x)<0)ns.push(x);};
+  POBOX.forEach(function(b){if(podKeyOk(b.id)&&(b.kind==='출고처'||b.kind==='입고처'))put(b.name);});
+  ASMBOX.forEach(function(b){if(podKeyOk(b.id))put(b.vendor);});
+  ns.forEach(function(v){
+    var o=boxOf('출고처',v),i=boxOf('입고처',v),a=asmBoxOf(v),want={kind:'거래처',name:v,a:a?a.id:'',o:o?o.id:'',i:i?i.id:''},have=vlOf(v),now=new Date().toISOString();
+    var sig=JSON.stringify([want.a,want.o,want.i]),bk='v:'+v,id=have?have.id:'';
+    if(!have||JSON.stringify([have.a||'',have.o||'',have.i||''])!==sig){
+      if(vlBusy[bk]===sig)return;vlBusy[bk]=sig;var done=function(e){vlBusy[bk]='';console.warn('거래처 링크 못 씀',v,e);};
+      if(have)db.collection('erp_pobox').doc(have.id).update(Object.assign({},want,{at:now})).catch(done);
+      else{id=podKey();db.collection('erp_pobox').doc(id).set(Object.assign({},want,{at:now,createdAt:now})).catch(done);}
+    }
+    var olds=POBOX.filter(function(b){return podKeyOk(b.id)&&(b.kind==='출고처'||b.kind==='입고처')&&show(b.name).trim()===v;}).map(function(b){return b.id;})
+      .concat(ASMBOX.filter(function(b){return podKeyOk(b.id)&&show(b.vendor).trim()===v;}).map(function(b){return b.id;}));
+    olds.forEach(function(k){var pid='to_'+k,ph=(POBOX||[]).filter(function(b){return b.id===pid;})[0];if(ph&&ph.v===id&&ph.kind==='거래처링크')return;
+      var pk='p:'+pid;if(vlBusy[pk]===id)return;vlBusy[pk]=id;
+      db.collection('erp_pobox').doc(pid).set({kind:'거래처링크',name:v,v:id,at:now}).catch(function(e){vlBusy[pk]='';console.warn('옛 링크 잇기 못 씀',v,e);});});
+  });
+}
 function renderLinks(){
   bulk=null;listBox=null;listBox2=null;sheetDraw=null;ifRefresh=null;
   var box=h('div',{class:'podbox'}),lastKey='';
@@ -5798,13 +5827,14 @@ function renderLinks(){
     if(cur!=='links')return;
     if(POBOX==null&&ASMBOX==null){box.replaceChildren(h('p',{class:'msg'},'불러오는 중'));lastKey='';return;}
     var asmN=data.contracts==null?null:asmNames(),ns=lnkNames();
-    var key=JSON.stringify([ns,(POBOX||[]).map(function(b){return [b.id,b.kind,b.name,b.createdAt];}),(ASMBOX||[]).map(function(b){return [b.id,b.vendor,b.createdAt];}),asmN,lnkQr]);if(key===lastKey)return;lastKey=key;
+    var key=JSON.stringify([ns,(POBOX||[]).map(function(b){return [b.id,b.kind,b.name,b.createdAt,b.a,b.o,b.i];}),(ASMBOX||[]).map(function(b){return [b.id,b.vendor,b.createdAt];}),asmN,lnkQr]);if(key===lastKey)return;lastKey=key;
     var row=function(qk,t,url,shareBtn){var a=h('a',{href:url,target:'_blank',rel:'noopener'});try{a.textContent=decodeURI(url);}catch(e){a.textContent=url;}
       return h('div',{class:'lnkrow'},h('span',{class:'lt'},t),shareBtn,
         h('button',{type:'button',class:'btn small podshare',on:{click:function(){podCopy(url).then(function(){flash('링크를 복사했습니다.');},function(){flash('복사하지 못했습니다. '+url,true);});}}},'복사'),
         h('button',{type:'button',class:'btn small podshare','aria-expanded':lnkQr[qk]?'true':'false',on:{click:function(){if(lnkQr[qk])delete lnkQr[qk];else lnkQr[qk]=1;draw();}}},'QR'),
         a,lnkQr[qk]?asmQr(url):null);};
-    var cards=ns.map(function(v){var rs=[];
+    var cards=ns.map(function(v){var rs=[],vu=vlUrl(v);
+      if(vu){rs.push(row('v:'+v,'거래처 링크',vu,h('button',{type:'button',class:'btn small podshare',on:{click:function(){shareMsg('INGHOME-'+v,vu);}}},'공유')));return h('div',{class:'lnkv'},h('h3',{},v),rs);}   /* v220 거래처마다 링크 하나 */
       if(canMenu('podocs','r'))['출고처','입고처'].forEach(function(kind){var b=boxOf(kind,v);if(b)rs.push(row('b:'+b.id,kind+' 발주목록 박스',boxUrl(b.id,kind),boxShareBtn(b)));});
       var ab=canMenu('asmpo','r')?asmBoxOf(v):null;if(ab)rs.push(row('a:'+ab.id,ASMPO.title,asmUrl(ab.id),asmShareBtn(ab,asmN!=null&&asmN.indexOf(v)<0)));
       return rs.length?h('div',{class:'lnkv'},h('h3',{},v),rs):null;}).filter(Boolean);
@@ -7797,7 +7827,7 @@ dbP.then(function(d){
     PODOCS=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});refreshAll();
   },function(){PODOCS=PODOCS||[];refreshAll();});
   db.collection('erp_pobox').onSnapshot(function(snap){   /* v133 */
-    POBOX=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});podBoxSync();podSync();   /* v153 공개 문서 inbox */if(podDraw)podDraw();if(lnkDraw)lnkDraw();
+    POBOX=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});podBoxSync();podSync();vlSync();   /* v220 */   /* v153 공개 문서 inbox */if(podDraw)podDraw();if(lnkDraw)lnkDraw();
   },function(){POBOX=null;});
   [['erp_poship','POSHIP'],['erp_poin','POIN'],['erp_podlv','PODLV'],['erp_pointok','PTOK']].forEach(function(c){   /* v145 배송·입고 기록 */
     db.collection(c[0]).onSnapshot(function(snap){var a=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});
@@ -7810,7 +7840,7 @@ dbP.then(function(d){
     PODPUB=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});podSync();if(podDraw)podDraw();
   },function(){PODPUB=null;});
   /* v176 발주서(조립업체 발주 링크) */
-  db.collection('erp_asmbox').onSnapshot(function(snap){ASMBOX=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});asmBoxSync();if(asmDraw)asmDraw();if(lnkDraw)lnkDraw();},function(){ASMBOX=null;});
+  db.collection('erp_asmbox').onSnapshot(function(snap){ASMBOX=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});asmBoxSync();vlSync();   /* v220 */if(asmDraw)asmDraw();if(lnkDraw)lnkDraw();},function(){ASMBOX=null;});
   db.collection('erp_prodconfirm').onSnapshot(function(snap){var m={};snap.docs.forEach(function(x){m[x.id]=Object.assign({id:x.id},x.data());});PCONF=m;asmBoxSync();pcDlvSync();if(asmDraw)asmDraw();},function(){PCONF=PCONF||{};asmBoxSync();if(asmDraw)asmDraw();});   /* v195 납품확인 */
   db.collection('erp_asmpo').onSnapshot(function(snap){data.asmpo=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});asmConvSync();asmBoxSync();renderNav();if(asmDraw)asmDraw();},function(){data.asmpo=data.asmpo||[];renderNav();if(asmDraw)asmDraw();});
   /* v102 재고 조회 */
