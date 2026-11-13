@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v216 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v217 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -421,7 +421,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v216</span>
+    <span class="ver">v217</span>
   </div>
 </header>
 <div class="wrap">
@@ -4285,35 +4285,6 @@ function prodRunFn(){
       },function(e){stop('저장하지 못했습니다. '+errText(e));});
     });
   }
-  /* v216 대기·오류 생산의 외주발주 전 줄(orderNo 없음) 납품창고만 고친다 — 다음 작업이 진행된(외주발주된) 줄은 못 고침. 다른 칸은 그대로 */
-  function prodWhOpen(d){return (d.rows||[]).filter(function(r){return !purTrim(r.orderNo);});}
-  function openWh(d){
-    var P={key:'wh|'+d.id},msg=h('span',{class:'msg','aria-live':'polite'}),ins=[];prodWhDl();
-    var rs=prodWhOpen(d).map(function(r){var i=h('input',{type:'text',list:'dl-prodwh',value:show(r.wh),'aria-label':r.itemNo+' '+r.proc+' 납품창고'});ins.push({r:r,i:i});
-      return h('div',{class:'prrow'},h('div',{class:'prline'},h('b',{},r.seq+'. '+r.proc),h('small',{},[r.itemNo,r.wc].filter(Boolean).join(' · '))),h('label',{class:'prwip'},'납품창고 ',i));});
-    var save=h('button',{type:'button',class:'btn primary',on:{click:function(){saveWh(d,ins,msg,save);}}},'저장');
-    var close=h('button',{type:'button',class:'btn',on:{click:function(){open=null;draw();}}},'닫기');
-    P.el=h('div',{class:'prpanel'},rs,h('div',{class:'row'},save,close,msg));open=P;draw();
-  }
-  function saveWh(d,ins,msg,btn){
-    if(!db){bad(msg,'저장소에 연결되지 않아 저장할 수 없습니다.');return;}
-    var want={};ins.forEach(function(x){want[x.r.itemNo+'|'+x.r.seq]=purTrim(x.i.value);});
-    if(ins.some(function(x){return !purTrim(x.i.value);})){bad(msg,'필수 항목이 비어 있습니다.');return;}
-    if(ins.every(function(x){return purTrim(x.i.value)===purTrim(x.r.wh);})){bad(msg,'납품창고가 그대로입니다. 저장하지 않았습니다.');return;}
-    busy=true;btn.disabled=true;msg.textContent='저장하는 중입니다.';msg.className='msg';
-    function stop(t){busy=false;btn.disabled=false;bad(msg,t);}
-    freshCheck().then(function(old){
-      if(old){stop(old);return;}
-      return db.collection('erp_prods').doc(d.id).updateIf(function(cur){
-        if(cur.status!=='오류'&&cur.status!=='대기')return null;var hit=false;
-        var rows=(cur.rows||[]).map(function(r){var k=r.itemNo+'|'+r.seq;if(!(k in want)||purTrim(r.orderNo))return r;hit=true;return Object.assign({},r,{wh:want[k]});});
-        return hit?{rows:rows,status:'대기',agentNote:''}:null;
-      }).then(function(ok){
-        if(!ok){stop('그 사이 입력 작업자가 외주발주를 시작했습니다. 저장하지 않았습니다.');return;}
-        busy=false;open=null;out.textContent=d.itemNo+' 납품창고를 고쳤습니다. 대기로 돌아갔습니다.';draw();
-      },function(e){stop('저장하지 못했습니다. '+errText(e));});
-    });
-  }
   function noteOf(a){return a.filter(function(x){return x.status==='오류'||(x.agentNote&&x.status!=='완료');}).map(function(x){return x.status==='오류'?h('div',{class:'prbad'},'오류: '+(x.agentNote||'영림원 처리 실패')):h('div',{class:'prnote'},x.agentNote);});}
   function cardEl(d){   /* v190 사장님 「이런 생산외주 2.자재출고 페이지에 각 발주를 펼쳐서 알 수 있는 이런 내용을 미리 정신없이 나열해 놓을 필요가 있냐?」 · 「펼쳐도 안보여도되」 · 「어차피 발주번호별로 확인 되잖아」 — 반자재·공정·업체·발주·납품 줄 없음, 머리 줄만 */
     var chip={'대기':'발주 대기','진행중':'발주 중','완료':'발주 끝','오류':'오류'}[d.status]||d.status,kids=[];
@@ -4326,8 +4297,6 @@ function prodRunFn(){
     var dueKey='due|'+d.id;
     if(open&&open.key===dueKey)kids.push(open.el);
     else if(d.status==='오류'||d.status==='대기')kids.push(h('button',{type:'button',class:'btn small',disabled:busy,on:{click:function(){openDue(d);}}},'생산계획완료일 고치기'));
-    if(open&&open.key==='wh|'+d.id)kids.push(open.el);
-    else if((d.status==='오류'||d.status==='대기')&&prodWhOpen(d).length)kids.push(h('button',{type:'button',class:'btn small',disabled:busy,on:{click:function(){openWh(d);}}},'납품창고 고치기'));   /* v216 */
     return h('div',{class:'prcard'},kids);
   }
   function draw(){
