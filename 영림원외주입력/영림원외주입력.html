@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v226 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v227 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -423,7 +423,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v226</span>
+    <span class="ver">v227</span>
   </div>
 </header>
 <div class="wrap">
@@ -1927,7 +1927,7 @@ function counts(key){
   return c;
 }
 /* ---------- v225 읽기 줄이기 (사장님 11-13 「1~3번으로 고쳐줘」 — 1 메뉴별로 읽기 · 2 진행 중 + 최근만 · 3 건수는 count()) ----------
-   늘 지켜봄(예외) = 담당자(erp_staff) · 기본정보(1~11단계 — 분류 빼고) · 구매단가·환율(날짜로 찾는 기준값) · 업체 링크 자동 맞춤에 쓰는 것(구매·생산 문서, 발주서·박스·배송·입고·납품확인 기록) — 폼이 어느 메뉴에 있든 링크 박스를 맞추기 때문.
+   늘 지켜봄(예외) = 담당자(erp_staff) · 기본정보(1~11단계 — 분류 빼고) · 구매단가·환율(날짜로 찾는 기준값) · 구매·생산 문서(진행 중+최근만 — 자재 합치기 MAT_REFS·환율 통화·생산 목록·발주수정 자동이 다른 메뉴에서도 씀) · 조립업체 박스(erp_asmbox, 납품창고 조립처 찾기). v227 링크 자료는 안 읽음.
    메뉴별(그 메뉴일 때만, 떠나면 끊음) = PER_MENU. 조건 = WIN 단계는 「status 대기·진행중·오류·수정대기」 + 「createdAt 최근 RECENT_DAYS 일」 두 질의를 합침, 링크 기록은 시각 칸 최근만.
    RECENT_DAYS = 90 — 발주~납품이 길어도 링크 박스에서 빠지지 않게. 그보다 오래된 완료 자료 = 목록 아래 「지난 자료 보기」(기간을 골라 그때만 한 번 읽음, 동기화에 안 섞음).
    ⚠ 링크 박스 내용은 최근 90일 발주서로 다시 짜인다(그보다 오래된 발주는 링크에서 빠짐). 브라우저 저장(캐시) 없음. */
@@ -1943,18 +1943,9 @@ function wDefs(){
   STEPS.forEach(function(s){d.push({c:'erp_'+s.key,spec:WIN[s.key]?{open:1,t:['createdAt']}:null,when:PER_MENU[s.key],
     on:function(sn){data[s.key]=L(sn);if(CNT[s.key])CNT[s.key].doneT=0;refreshAll();},err:function(){data[s.key]=data[s.key]||[];refreshAll();},off:function(){data[s.key]=null;}});});
   d.push({c:'erp_rates',on:function(sn){data.rates=L(sn);refreshAll();},err:function(){data.rates=data.rates||[];refreshAll();}});   /* v167 환율(기준정보) */
-  d.push({c:'erp_imports',spec:{open:1,t:['createdAt']},on:function(sn){IMPORTS=L(sn);if(impDraw)impDraw();if(ifRefresh)ifRefresh();if(asmDraw)asmDraw();},err:function(){IMPORTS=IMPORTS||[];if(impDraw)impDraw();}});   /* v23 불러오기 요청 */
-  d.push({c:'erp_podocs',spec:{t:['createdAt']},on:function(sn){PODOCS=L(sn);refreshAll();},err:function(){PODOCS=PODOCS||[];refreshAll();}});   /* v126 */
-  d.push({c:'erp_pobox',on:function(sn){POBOX=L(sn);podBoxSync();podSync();vlSync();if(podDraw)podDraw();if(lnkDraw)lnkDraw();},err:function(){POBOX=null;}});   /* v133 박스는 전체(거래처마다 몇 장) */
-  [['erp_poship','POSHIP',['at']],['erp_poin','POIN',['at']],['erp_podlv','PODLV',['inAt','doneAt']],['erp_pointok','PTOK',['at']]].forEach(function(c){   /* v145 배송·입고 기록 */
-    d.push({c:c[0],spec:{t:c[2]},on:function(sn){var a=L(sn);if(c[1]==='POSHIP')POSHIP=a;else if(c[1]==='POIN')POIN=a;else if(c[1]==='PODLV')PODLV=a;else PTOK=a;podTokSync();podBoxSync();podShipInSync();podFlowSync();if(podDraw)podDraw();},
-      err:function(){if(c[1]==='POSHIP'&&POSHIP==null){POSHIP=[];podBoxSync();}}});});
-  d.push({c:'erp_poconfirm',spec:{t:['at']},on:function(sn){POCONF=L(sn);renderNav();if(podDraw)podDraw();podBoxSync();},err:function(){POCONF=null;}});   /* v143 */
-  d.push({c:'erp_podocs_pub',spec:{t:['at']},on:function(sn){PODPUB=L(sn);podSync();if(podDraw)podDraw();},err:function(){PODPUB=null;}});   /* v128 */
-  d.push({c:'erp_asmbox',on:function(sn){ASMBOX=L(sn);asmBoxSync();vlSync();if(asmDraw)asmDraw();if(lnkDraw)lnkDraw();},err:function(){ASMBOX=null;}});   /* v176 박스는 전체 */
-  d.push({c:'erp_prodconfirm',spec:{t:['at']},on:function(sn){var m={};sn.docs.forEach(function(x){m[x.id]=Object.assign({id:x.id},x.data());});PCONF=m;asmBoxSync();pcDlvSync();if(asmDraw)asmDraw();},err:function(){PCONF=PCONF||{};asmBoxSync();if(asmDraw)asmDraw();}});   /* v195 */
-  d.push({c:'erp_asmpo',spec:{open:1,t:['at']},on:function(sn){data.asmpo=L(sn);asmConvSync();asmBoxSync();renderNav();if(asmDraw)asmDraw();},err:function(){data.asmpo=data.asmpo||[];renderNav();if(asmDraw)asmDraw();}});
-  d.push({c:'erp_stocks',when:PER_MENU.stocks,on:function(sn){STOCKS=L(sn);renderNav();if(stkDraw)stkDraw();if(asmDraw)asmDraw();},err:function(){STOCKS=STOCKS||[];renderNav();if(stkDraw)stkDraw();if(asmDraw)asmDraw();},off:function(){STOCKS=null;}});   /* v102 */
+  d.push({c:'erp_imports',spec:{open:1,t:['createdAt']},on:function(sn){IMPORTS=L(sn);if(impDraw)impDraw();if(ifRefresh)ifRefresh();},err:function(){IMPORTS=IMPORTS||[];if(impDraw)impDraw();}});   /* v23 불러오기 요청 */
+  d.push({c:'erp_asmbox',on:function(sn){ASMBOX=L(sn);},err:function(){ASMBOX=null;}});   /* v227 링크 자료는 안 읽음 — 조립업체 박스는 납품창고 조립처 찾기(prodAsmOf)용으로 읽기만 */
+  d.push({c:'erp_stocks',when:PER_MENU.stocks,on:function(sn){STOCKS=L(sn);renderNav();if(stkDraw)stkDraw();},err:function(){STOCKS=STOCKS||[];renderNav();if(stkDraw)stkDraw();},off:function(){STOCKS=null;}});   /* v102 */
   return d;
 }
 function wSync(){
@@ -1999,7 +1990,7 @@ var NAV_BOXES=[
   {id:'구매',title:PAGE_NAMES['구매'],icon:'sheet',items:function(){return ['purprices','purreqs','purapprs','purords','purchases','purdelvs','pomods'];}},   /* v126 발주서관리 */   /* v223 사장님 「발주3건은 그대로 두고 저 메뉴를 없애 달라고」 — 메뉴 목록에서만 뺌. 화면(renderPodocs)·박스 동기화(refreshAll)·#podocs/번호 주소·업체별 링크는 그대로 */
   {id:'수입',title:PAGE_NAMES['수입'],icon:'import',items:function(){return ['imporders','imppays','impinvs','impbls','impins'];}},
   {id:'생산',title:PAGE_NAMES['생산'],icon:'layers',items:function(){return ['prods','proddlvs'];}},   /* v223 「생산/외주 발주서」 메뉴만 뺌(asmBoxSync·업체별 링크 그대로) */
-  /* v224 사장님 「업체별 링크 메뉴도 삭제」 — 메뉴 박스 뺌 · v226 업체 링크 페이지 파일 지움, #links 주소도 막음(LINK_GONE) */
+  /* v224 사장님 「업체별 링크 메뉴도 삭제」 — 메뉴 박스 뺌 · v226 업체 링크 페이지 파일 지움 · v227 화면 코드도 뺌 */
   {id:'물류',title:'물류 · [물류] 재고현황',icon:'box',items:function(){return ['stocks'];}},
   {id:'staff',title:'담당자 관리',icon:'users',items:function(){return ['staff'];}}];
 var BASIC_URL='../영림원기본정보입력/영림원기본정보입력.html';   /* v166 사장님 「해당 프로그램을 입력폼 메뉴에 넣어 주세요」 — 기본입력 박스 첫 줄 */
@@ -2014,9 +2005,6 @@ function renderNav(){
     var s=BYKEY[k]||{},num,title=s.title,sub;
     if(k==='check'){num='✓';title=CHECK.title;sub='품목마다 빠진 것 보기';}
     else if(k==='stocks'){num=ico('box');title='물류 · [물류] 재고현황';sub=STOCKS==null?(WATCH.erp_stocks?'불러오는 중':''):last?stkTime(last):'아직 없음';}   /* v225 재고는 그 메뉴에서만 읽음 */
-    else if(k==='asmpo'){num=String(i);sub=data.asmpo==null?'불러오는 중':'대기 '+(data.asmpo||[]).filter(function(r){return r.status==='대기';}).length;}   /* v176 */
-    else if(k==='podocs'){num=String(i);sub=PODOCS==null||data.purchases==null||data.purords==null?'불러오는 중':podAll().length+'건';}   /* v126 */
-    else if(k==='links'){num=ico('link');title=LINKS.title;sub=POBOX==null&&ASMBOX==null?'불러오는 중':lnkNames().length+'곳';}   /* v213 */
     else if(k==='staff'){num=ico('users');title='담당자 관리';sub=STAFF?STAFF.length+'명':'불러오는 중';}
     else if(k==='basic'){num=ico('sheet');title='영림원 기본정보 입력';sub='';}   /* v166 별도 프로그램 — 같은 창으로 연다 */
     else{num=s.page?String(i):String(s.n);var cc=counts(k);sub=cc==null?'불러오는 중':cntText(cc);}   /* v225 */
@@ -5026,24 +5014,12 @@ function renderStock(){
     tabs,info,tw));
   draw();
 }
-/* ---------- v126 발주서관리 ----------
-   사장님 11-09 「구매발주 입력이 완료된 발주는 발주서관리 메뉴를 만들어 각 발주별 새로운 문서가 생성되어야 합니다. 새로운 문서는 영림원 구매발주서와 별개로 실제 현장에서 실물이 오고갈때 현장 작업자 누구든 제품을 확인하고 납품상황이 완료될때까지 핸드폰으로 사용해야할 문서입니다. 첫번째로 영림원 발주번호에 맞춰 큐알코드와 바코드가 생성되어야 하며 발주내용이 정확하게 들어가 있어야 합니다」
-   문서 = erp_podocs/<영림원 발주번호> 하나(문서 id 가 발주번호라 두 번 안 생김). 원본 = erp_purchases·erp_purords 완료 문서의 pos(발주마다 {pono, vendor}) + 그 거래처 줄.
-   발주일 = erp_purords podate · erp_purchases reqdate(입력 작업자가 발주생성일에 reqdate 를 넣음, AGENTS 3-10). 줄 값은 폼 문서 글자 그대로, 없는 값은 빈칸.
-   만드는 사람 = erp_podocs 저장 권한이 있는 담당자가 폼을 열 때(podSync, create = 없을 때만). 아직 안 만든 발주도 목록에는 원본으로 보인다.
-   QR = 이 문서 화면 주소(#podocs/발주번호) · 바코드 Code128 = 발주번호. 납품 상황 = erp_purdelvs 납품수량 합(purDone — 오류 뺌, 대기 포함). */
-var PODOC={key:'podocs',n:'',title:'발주서관리',screen:'발주서관리'};BYKEY.podocs=PODOC;
-var PODOCS=null,PODPUB=null,podSel='',podDraw=null,podBusy={},podLibP={};
-/* v128 사장님 「발주관련 큐알 바코드 스캔시 본프로그램의 로그인과 관련없이 해당 페이지만 볼 수 있는 페이지를 보일 수 있나요?」 · 「큐알코드 프로그램 관련없는 페이지로 만들었니?」
-   공개 페이지 = 같은 폴더 발주서.html#<열쇠>(폼과 별개 파일, 로그인 없음, 보기만). 열쇠 = 발주서마다 무작위 32자(erp_podocs.pubKey).
-   공개 문서 = erp_podocs_pub/<열쇠> — 임시로 보일 칸만 담음(단가·구매거래처 뺌): pono·podate·rows(ccode·cname·cspec·unit·qty·duedate·wh·dlv 납품수량 합)·at.
-   만들고 고치는 사람 = erp_podocs_pub 저장 권한 있는 담당자가 폼을 열 때(podSync). 납품수량이 바뀌면 그때 공개 문서를 고친다. */
-function podKey(){var a=new Uint8Array(24);crypto.getRandomValues(a);return btoa(String.fromCharCode.apply(null,a)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
-function podKeyOk(k){return /^[A-Za-z0-9_-]{32,64}$/.test(String(k||''));}
-function podPubUrl(k){return new URL('발주서.html#'+k,location.href).href;}
-function podInbox(d){var w=((d.rows||[]).filter(function(x){return x&&purTrim(x.wh);})[0]||{}).wh,b=w?boxOf('입고처',purTrim(w)):null;return b?b.id:'';}   /* v153 ⚠ 시험용 */
-/* v155 사장님 「…영림원 등록 대기에서 입력이 완료되어 입력완료로 변경된경우를 그렇게 처리해 줄 수 있을ㅅ까요?」 — 그 발주의 구매납품(flow_) 문서가 「완료」면 모든 곳에서 「납품완료」: 보기만, 단추 모두 꺼짐, QR·바코드 안 그림.
-   링크 페이지는 erp_purdelvs 를 못 읽어 폼이 공개 문서·박스 pos·erp_podlv 에 final:true 를 적는다(폼이 열릴 때). 쓰기는 규칙이 이미 막음(erp_purdelvs 가 대기 아니면). */
+/* ---------- v227 업체 링크 코드 뺌 (사장님 「업체링크,페이지 모두삭제」 · 분배 방 11-13 「남은 링크 관련 코드를 폼에서 뺍니다」) ----------
+   v126~v222 의 발주서관리·발주서(조립업체 발주 링크)·업체별 링크 세 화면과, 폼이 열릴 때 링크 자료(erp_pobox·asmbox 내용·podocs·podocs_pub·pointok·poconfirm·poship·poin·podlv·prodconfirm·asmpo)를
+   읽고 맞추던 코드(podSync·podBoxSync·podTokSync·podShipInSync·podFlowSync·asmConvSync·asmBoxSync·pcDlvSync·vlSync 등)를 모두 뺐다 — git 기록 v226(ea56004)에 있음. 저장 자료는 그대로.
+   남긴 것 = 구매납품 카드(「발주수정」·「부분납품」, dlvOverBox·chooseBox·dlvState)가 쓰는 podFinal·podNum·podBusy·partialGo(링크 배송 잇기 갈래 뺌).
+   PODOCS·POSHIP 은 이제 안 읽음(null) → 링크 납품(flow) 문서 갈래는 타지 않음. ASMBOX = 생산 납품창고 rows.wh 의 조립처 찾기(prodAsmOf) 때문에 erp_asmbox 를 읽기만 함(쓰기 없음). */
+var PODOCS=null,POSHIP=null,ASMBOX=null,podBusy={};
 function podFinal(no){   /* v159 발주가 닫힘 = 원본 줄마다 「완료」 납품 합 ≥ 발주수량(완료된 발주수정 반영) */
   /* v188 사장님 「…입력폼등록대기로 입력이 되어 영림원에 입력완료가 된것도 완료로 처리되게 코드 수정해」 — 링크(flow_) 납품이 없어도 손 입력 구매납품 「완료」 합이 차면 닫힘(PUPO202611100001) */
   var ds=(data.purdelvs||[]).filter(function(r){return purTrim(r.pono)===no&&r.status==='완료';});if(!ds.length)return false;
@@ -5052,917 +5028,11 @@ function podFinal(no){   /* v159 발주가 닫힘 = 원본 줄마다 「완료�
   if(!rows.length)return false;
   return rows.every(function(x){var c=purTrim(x.ccode),sum=0;ds.forEach(function(r){(r.rows||[]).forEach(function(y){if(purTrim(y.ccode)===c)sum+=Number(y.qty||0);});});return sum+0.0001>=poQtyOf(no,c,x.qty);});
 }
-/* v160 사장님 「부분납품으로 남은 발주는 해당 거래처들이 알수 있게 상황에 맞는 발주서마다 표기 해 주어야 함」 — 부분납품을 고른 열린 발주의 합계(납품·발주·남음) */
-function podPart(no){
-  if(podFinal(no))return null;
-  var part=(data.purdelvs||[]).some(function(r){return purTrim(r.pono)===no&&r.partial===true&&r.status!=='오류';})||shipChain(no).length>1;if(!part)return null;
-  var po=(PODOCS||[]).filter(function(d){return purTrim(d.pono||d.id)===no;})[0];if(!po)return null;
-  var src=(data[po.purCol==='erp_purords'?'purords':'purchases']||[]).filter(function(d){return d.id===po.purId;})[0],q=0,dl=0;
-  (src&&src.rows||[]).filter(function(x){return x&&purTrim(x.vendor)===purTrim(po.vendor);}).forEach(function(x){var c=purTrim(x.ccode);q+=poQtyOf(no,c,x.qty);dl+=purDone(no,c);});
-  var r2=function(n){return Math.round(n*100)/100;};return {dlv:r2(dl),qty:r2(q),left:r2(Math.max(0,q-dl))};
-}
-function partText(pt){return pt?'부분납품 · 납품 '+podNum(pt.dlv)+' / 발주 '+podNum(pt.qty)+' · 남음 '+podNum(pt.left):'';}
-function podPubOf(d){var no=purTrim(d.pono||d.id);return {pono:no,podate:show(d.podate),inbox:podInbox(d),final:podFinal(no),part:podPart(no),rows:(d.rows||[]).map(function(x){return {ccode:show(x.ccode),cname:show(x.cname),cspec:show(x.cspec),unit:show(x.unit),qty:show(x.qty),duedate:show(x.duedate),wh:show(x.wh),dlv:purDone(no,purTrim(x.ccode))};})};}
-function podPubSig(p){return JSON.stringify([show(p.pono),show(p.podate),show(p.inbox),p.final===true,p.part?[Number(p.part.dlv),Number(p.part.qty),Number(p.part.left)]:0,(p.rows||[]).map(function(x){return [show(x.ccode),show(x.cname),show(x.cspec),show(x.unit),show(x.qty),show(x.duedate),show(x.wh),Number(x.dlv||0)];})]);}
-var POD_LIBS={qr:['https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js','sha384-mZT2gIty7ZDdOGkxfP6joZcYdMW1Jvj9dRlfpTmaJAKKXTqzygtB22k7FLe+KZC1','qrcode','라이브러리/qrcode.min.js'],
-  bc:['https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/barcodes/JsBarcode.code128.min.js','sha384-7XguhfRLAUmvSGmJn2K+BQDpX0gf5NMsj79jcgd7TVtV87euzdySNZqTjOQxgIiB','JsBarcode','라이브러리/JsBarcode.code128.min.js']};   /* v131 cdnjs 를 못 받으면 같은 폴더 사본(글자 그대로) */
-function podLib(k){
-  var L=POD_LIBS[k];if(window[L[2]])return Promise.resolve(window[L[2]]);
-  var one=function(src,sri){return new Promise(function(ok,no){
-    var sc=sri?h('script',{src:src,integrity:sri,crossorigin:'anonymous',referrerpolicy:'no-referrer'}):h('script',{src:src});
-    sc.onload=function(){window[L[2]]?ok(window[L[2]]):no(new Error(k));};sc.onerror=function(){sc.remove();no(new Error(k));};
-    document.head.append(sc);});};
-  if(!podLibP[k])podLibP[k]=one(L[0],L[1]).catch(function(){return one(L[3]);}).catch(function(e){podLibP[k]=null;throw e;});
-  return podLibP[k];
-}
-function podIdOk(no){return /^[A-Za-z0-9_-]{1,100}$/.test(no);}
-function podSrc(){   /* 완료 발주 → 발주서 문서 꼴 */
-  var out=[],seen={};
-  [['purchases','erp_purchases'],['purords','erp_purords']].forEach(function(kc){
-    (data[kc[0]]||[]).slice().sort(function(x,y){return String(x.createdAt||'')<String(y.createdAt||'')?-1:1;}).forEach(function(d){
-      if(!d.id||d.status!=='완료')return;
-      (d.pos||[]).forEach(function(p){
-        var no=purTrim(p&&p.pono),vd=purTrim(p&&p.vendor);if(!no||seen[no])return;seen[no]=1;
-        out.push({pono:no,podate:kc[0]==='purords'?purTrim(d.podate):purTrim(d.reqdate),vendor:vd,purCol:kc[1],purId:d.id,
-          rows:(d.rows||[]).filter(function(x){return x&&purTrim(x.vendor)===vd;}).map(function(x){
-            return {ccode:purTrim(x.ccode),cname:show(x.cname),cspec:show(x.cspec),unit:show(x.unit),qty:show(x.qty),duedate:show(x.duedate),wh:show(x.wh)};})});   /* v141 단가 안 담음 */
-      });
-    });
-  });
-  return out;
-}
-function podAll(){   /* 저장된 발주서 + 아직 안 만든 완료 발주 */
-  var by={},out=[];
-  (PODOCS||[]).forEach(function(d){var no=purTrim(d.pono||d.id);if(no&&!by[no]){by[no]=1;out.push(d);}});
-  podSrc().forEach(function(d){if(!by[d.pono]){by[d.pono]=1;out.push(d);}});
-  return out.sort(function(a,b){return String(a.pono)<String(b.pono)?1:-1;});
-}
-function podSync(){
-  if(!db||!db.collection||PODOCS==null||data.purchases==null||data.purords==null||!canCol('erp_podocs','w'))return;
-  var have={};PODOCS.forEach(function(d){have[d.id]=1;});
-  podSrc().forEach(function(d){
-    if(have[d.pono]||podBusy[d.pono]||!podIdOk(d.pono))return;podBusy[d.pono]=1;
-    var doc=Object.assign({},d,{pubKey:podKey(),inTok:podKey(),createdAt:new Date().toISOString(),createdBy:ERP_USER&&ERP_USER.id||''});   /* v128 공개 열쇠 */
-    var ref=db.collection('erp_podocs').doc(d.pono);
-    (ref.create?ref.create(doc):Promise.reject(new Error('create'))).catch(function(e){console.warn('발주서 못 만듦',d.pono,e);});
-  });
-  /* v141 사장님 「야 왜 아직도 발주관리 발주서들에서 가격이 나오냐」 — 이미 저장된 발주서 문서 줄의 단가(price)를 뺀다(없을 때만 안 씀) */
-  PODOCS.forEach(function(d){
-    if(!(d.rows||[]).some(function(x){return x&&Object.prototype.hasOwnProperty.call(x,'price');})||podBusy['np:'+d.id])return;podBusy['np:'+d.id]=1;
-    db.collection('erp_podocs').doc(d.id).updateIf(function(c){var rs=c.rows||[];if(!rs.some(function(x){return x&&Object.prototype.hasOwnProperty.call(x,'price');}))return null;
-      return {rows:rs.map(function(x){var o=Object.assign({},x);delete o.price;return o;})};}).catch(function(e){podBusy['np:'+d.id]=0;console.warn('발주서 단가 못 뺌',d.id,e);});
-  });
-  /* v128 열쇠 없는 옛 발주서에 열쇠 · 공개 문서 만들기·고치기(저장된 발주서의 열쇠로만 — 두 사람이 동시에 열어도 열쇠 하나) */
-  PODOCS.forEach(function(d){
-    if(!d.inTok&&d.pubKey&&!podBusy['i:'+d.id]){podBusy['i:'+d.id]=1;var it=podKey();   /* v145 입고열쇠 */
-      db.collection('erp_podocs').doc(d.id).updateIf(function(c){return c.inTok?null:{inTok:it};}).catch(function(e){podBusy['i:'+d.id]=0;console.warn('입고열쇠 못 넣음',d.id,e);});}
-    if(!d.pubKey){if(podBusy['k:'+d.id])return;podBusy['k:'+d.id]=1;var k=podKey();
-      db.collection('erp_podocs').doc(d.id).updateIf(function(c){return c.pubKey?null:{pubKey:k};}).catch(function(e){console.warn('열쇠 못 넣음',d.id,e);});return;}
-    if(!podKeyOk(d.pubKey)||PODPUB==null||data.purdelvs==null||!canCol('erp_podocs_pub','w'))return;
-    var want=podPubOf(d),sig=podPubSig(want),have=PODPUB.filter(function(p){return p.id===d.pubKey;})[0],ref=db.collection('erp_podocs_pub').doc(d.pubKey);
-    if(have&&podPubSig(have)===sig)return;
-    if(podBusy['p:'+d.pubKey]===sig)return;podBusy['p:'+d.pubKey]=sig;
-    var o=Object.assign({},want,{at:new Date().toISOString()});
-    (have?ref.update(o):ref.create(o)).catch(function(e){podBusy['p:'+d.pubKey]='';console.warn('공개 발주서 못 씀',d.id,e);});
-  });
-}
 function podNum(v){if(isEmpty(v))return '';var n=Number(v);return isFinite(n)&&String(v).trim()!==''?n.toLocaleString('ko-KR',{maximumFractionDigits:6}):String(v);}
-/* v132 사장님 「발주서관리의 각 목록을 발주서 스캔시 나타나는 단일 페이지 링크를 카톡으로 보낼 수 있게 해주세요」
-   공유 = QR 과 같은 공개 주소(열쇠). 폰 = 기기 공유 창(navigator.share → 카카오톡 고름), 없으면 글+주소 복사. 글 = 발주번호·품명·수량(단가·거래처 안 넣음, 공개 페이지 기준).
-   공개 문서가 저장소에 있는 발주서만 단추가 나온다(열쇠만 있고 공개 문서가 아직 없으면 링크가 「없습니다」라서). */
-function podCanShare(d){var k=d&&d.pubKey;return podKeyOk(k)&&(PODPUB==null||PODPUB.some(function(p){return p.id===k;}));}
-function podShareText(d){var rs=d.rows||[],no=purTrim(d.pono||d.id),a=rs[0];
-  return ['발주서 '+no,a?[show(a.cname),podNum(a.qty)+(show(a.unit)?' '+show(a.unit):'')].filter(Boolean).join(' ')+(rs.length>1?' 외 '+(rs.length-1)+'줄':''):''].filter(Boolean).join('\n');}
-function podCopy(t){
-  if(navigator.clipboard&&navigator.clipboard.writeText)return navigator.clipboard.writeText(t);
-  return new Promise(function(ok,no){var ta=h('textarea',{readonly:'',style:'position:fixed;top:0;left:0;opacity:0'});ta.value=t;document.body.append(ta);ta.select();
-    var r=false;try{r=document.execCommand('copy');}catch(e){}ta.remove();r?ok():no(new Error('copy'));});
-}
-function podShare(d){
-  var url=podPubUrl(d.pubKey),text=podShareText(d);return shareMsg(text,url);   /* v160 */
-  if(navigator.share)return navigator.share({title:'발주서 '+purTrim(d.pono||d.id),text:text,url:url}).catch(function(e){if(e&&e.name==='AbortError')return;return podCopy(text+'\n'+url).then(function(){flash('링크를 복사했습니다.');});}).catch(function(){flash('공유하지 못했습니다.',true);});
-  return podCopy(text+'\n'+url).then(function(){flash('링크를 복사했습니다.');},function(){flash('복사하지 못했습니다.',true);});
-}
-function podShareBtn(d){return h('button',{type:'button',class:'btn small podshare',on:{click:function(e){e.stopPropagation();podShare(d);}}},'공유');}
-function podGo(no){podSel=no||'';try{history.replaceState(null,'','#podocs'+(no?'/'+encodeURIComponent(no):''));}catch(e){}if(podDraw)podDraw();window.scrollTo(0,0);}
-function podKv(pairs){return h('dl',{class:'podkv'},pairs.reduce(function(a,p){return a.concat([h('dt',{},p[0]),h('dd',{class:p[2]||''},p[1])]);},[]));}
-function podCodes(no,key){
-  var qrBox=h('div',{class:'podqr'}),bcBox=h('div',{class:'podbc'}),err=h('p',{class:'msg bad',hidden:true});
-  if(podKeyOk(key))podLib('qr').then(function(qrcode){
-    var q=qrcode(0,'M');q.addData(podPubUrl(key));q.make();   /* v128 QR = 공개 페이지 주소 */
-    var n=q.getModuleCount(),cell=6,sz=(n+8)*cell;   /* v128 칸 6 → 화면은 절반(칸 3) — 주소가 길어도 칸이 안 뭉개짐 */
-    var cv=h('canvas',{width:String(sz),height:String(sz),role:'img','aria-label':'QR코드 '+no,style:'width:'+sz/2+'px;height:'+sz/2+'px'});var c=cv.getContext('2d');
-    c.fillStyle='#fff';c.fillRect(0,0,sz,sz);c.fillStyle='#000';
-    for(var r=0;r<n;r++)for(var k=0;k<n;k++)if(q.isDark(r,k))c.fillRect((k+4)*cell,(r+4)*cell,cell,cell);
-    qrBox.replaceChildren(cv);
-  }).catch(function(){err.hidden=false;err.textContent='QR코드를 그리지 못했습니다.';});
-  podLib('bc').then(function(JsBarcode){
-    var sv=document.createElementNS('http://www.w3.org/2000/svg','svg');sv.setAttribute('role','img');sv.setAttribute('aria-label','바코드 '+no);
-    JsBarcode(sv,no,{format:'CODE128',width:1.6,height:64,fontSize:14,margin:8,displayValue:true});
-    sv.removeAttribute('width');sv.removeAttribute('height');
-    bcBox.replaceChildren(sv);
-  }).catch(function(){err.hidden=false;err.textContent='바코드를 그리지 못했습니다.';});
-  return h('div',{class:'podcodes'},qrBox,bcBox,err);
-}
-function podView(d,inBox){   /* v221 inBox = 발주 박스 안(「목록」 대신 맨 위 경로 한 줄) */
-  var no=purTrim(d.pono||d.id),rows=d.rows||[];
-  return [].concat(
-    h('div',{class:'actions'},inBox?null:h('button',{type:'button',class:'btn small',on:{click:function(){podGo('');}}},'목록'),podCanShare(d)&&!podFinal(no)?podShareBtn(d):null),
-    podFinal(no)?h('p',{class:'podst on'},'납품완료'):POCONF==null?null:confOf(no)?podCodes(no,d.pubKey):h('p',{class:'podst'},'발주확인 전'),   /* v155 완료 = QR·바코드 없음 */   /* v136 사장님 「거래처 발주 확인전 까지는 발주서에 큐알 바코드 발행 안되게 해주세요」 */
-    podPart(no)?h('p',{class:'podst'},partText(podPart(no))):null,   /* v160 */
-    podFinal(no)?null:(function(){var r=(data.purdelvs||[]).filter(function(x){return purTrim(x.pono)===no&&(x.status==='대기'||x.status==='완료')&&x.flow;}).sort(function(a,b){return String(a.createdAt||'')<String(b.createdAt||'')?1:-1;})[0];return r?chooseBox(r):null;})(),   /* v159 */
-    podKv([['발주번호',no,'mono'],['발주일',show(d.podate)],['구매거래처',show(d.vendor)],['발주확인',confOf(no)?confTime(confOf(no)):'발주확인 전'],['배송',POSHIP==null?'':flowText(no)]]),   /* v144 */   /* v133 */
-    rows.map(function(x){return h('div',{class:'podrow'},
-      h('div',{class:'nt'},show(x.cname)),
-      podKv([['품번',show(x.ccode),'mono'],['규격',show(x.cspec)],['단위',show(x.unit)],['발주수량',podNum(x.qty),'n'],['납품예정일',show(x.duedate)],['창고',show(x.wh)]]));}),
-    h('h3',{class:'podh'},'납품 상황'),
-    h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},['품명','발주수량','납품수량'].map(function(t){return h('th',{},t);}))),
-      h('tbody',{},rows.map(function(x){return h('tr',{},h('td',{},show(x.cname)),h('td',{class:'n'},podNum(x.qty)),h('td',{class:'n'},podNum(purDone(no,purTrim(x.ccode)))));})))));
-}
-/* v133 사장님 「현재 발주서 관리 메뉴의 발주서들이 각 출고처(구매거래처) / 입고처(입고창고) 별로 분리 되어 관리 되어야 합니다. 출고처 기준으로 각 구매처마다 해당 박스를 공유하여 사용하게 하고 이 출고처 발주서는 해당 거래처 별로 발주 생성시 발주를 확인했음을 발주확인 버튼으로 알려야 하고 이렇게 발주가 확인되는 순간 입고처(입고창고) 사용자에게 해당 발주가 구매처에서 발주가 확인되어 입고대기중인 목록이 나타나기 시작하면 됩니다.」
-   사장님 결정(11-09): 들어오는 길 = 박스별 공유 링크(로그인 없음) · 단가는 어디에도 없음(v138 출고처 · v141 폼 발주서관리까지).
-   박스 문서 erp_pobox/<무작위 열쇠> = {kind:'출고처'|'입고처', name(구매거래처|창고), ponos, pos, at, createdAt}. 출고처 = 그 거래처 발주서 모두(단가 포함) · 입고처 = 줄 창고가 그 창고인 발주서(그 창고 줄만, 단가 없음, 구매거래처 보임).
-   발주확인 = 공유 페이지 발주박스.html 에서 erp_poconfirm/<발주번호> = {box, pono, at} 를 만든다(저장소 규칙이 「그 출고처 박스 열쇠 + 그 박스의 발주번호」만 허락). 입고처 페이지는 그 문서가 있는 발주만 「입고대기」로 보인다.
-   박스 만들기·고치기 = 저장 권한 있는 담당자가 폼을 열 때(podBoxSync) — 새 발주서가 박스에 들어가는 때도 그때. */
-var POBOX=null,POCONF=null;
-function boxUrl(k,kind){return new URL((kind==='출고처'?'출고처박스.html':kind==='입고처'?'입고처박스.html':'발주박스.html')+'#'+k,location.href).href;}   /* v160 카드 제목용 입구 파일(옛 발주박스.html 주소도 그대로 열림) */
-/* v160 사장님 「상황에 맞는 발주링크 카톡 메세지 변경은 어떻게 된거지?」 — 박스 공유 글을 박스 상황 하나로(가장 급한 것). v137 꼴: 「INGHOME-{이름} - …」 + 다음 줄 링크 */
-function boxShareText(b){
-  var n='INGHOME-'+b.name+' - ',ds=boxDocs(b.kind,b.name).filter(function(d){return !podFinal(purTrim(d.pono||d.id));});
-  var conf=function(d){return !!confOf(purTrim(d.pono||d.id));},part=function(d){return !!podPart(purTrim(d.pono||d.id));};
-  if(b.kind==='출고처'){
-    if(ds.some(function(d){return !conf(d);}))return n+'발주서가 발행되었습니다. 발주를 확인해 주세요.';   /* ① 발주확인 전 */
-    if(ds.some(part))return n+'부분납품으로 남은 발주가 있습니다. 남은 수량 출고를 준비해 주세요.';   /* ② 부분납품 남음 */
-    return n+'발주서가 발행되었습니다. 발주를 확인해 주세요.';}
-  var cd=ds.filter(conf);
-  if(cd.some(function(d){return !part(d);}))return n+'입고 예정 발주가 있습니다. 입고를 준비해 주세요.';   /* ① 새 입고 대기 */
-  if(cd.some(part))return n+'부분납품으로 남은 수량이 입고 예정입니다.';   /* ② 부분납품 남음 */
-  return n+'입고처 발주목록입니다.';
-}
-/* v160 사장님 「출고처 박스 공유시에도 그냥 이렇게 발주서 라고만 하고 카톡이 도착해」 — 공유 창에 url 을 따로 주면 카톡이 링크만 보냄 → 글 한 덩어리(문구 + 줄바꿈 + 링크)로 */
-function shareMsg(text,url){var msg=text+'\n'+url;   /* v162 누르는 순간 글+링크를 먼저 복사(공유 창에 카카오톡이 없거나 닫아도 붙여넣기 가능) → 공유 창 */
-  var cp=podCopy(msg).then(function(){return true;},function(){return false;});
-  var done=function(ok){flash(ok?'글과 링크를 복사했습니다. 카카오톡이 안 보이면 붙여넣으세요.':'복사하지 못했습니다. 글: '+msg,!ok);};
-  if(navigator.share)return navigator.share({text:msg}).then(function(){return cp;},function(e){return cp;}).then(done);
-  return cp.then(done);}
-function boxOf(kind,name){var a=(POBOX||[]).filter(function(b){return b.kind===kind&&b.name===name&&podKeyOk(b.id);}).sort(function(x,y){return String(x.createdAt||'')<String(y.createdAt||'')?-1:1;});return a[0]||null;}
-/* v143 사장님 「입고처 발주관리 박스에는 출고처에서 발주확인 안된건은 보이면 안된다니까」 · 바로잡음 「아 발주확인된건이 보이는게 아니라 발주확인건 1개 라는 표기를 입고처에 할 필요없어」
-   입고처 = 발주확인된 발주서만(목록·건수·저장 문서 모두). 확인된 발주가 없는 창고는 묶음도 없음. 입고처 머리 줄에 「발주확인 전 N」·강조 없음(출고처는 그대로). */
-function podIsConf(d){return POCONF!=null&&!!confOf(purTrim(d.pono||d.id));}
-function boxNames(kind){var n=[];(PODOCS||[]).forEach(function(d){   /* v153 입고처 박스 문서는 확인 전 발주도 담음(화면은 확인된 것만) — 폼이 안 열려도 확인되면 바로 입고 가능 */(kind==='출고처'?[show(d.vendor)]:(d.rows||[]).map(function(x){return show(x.wh);})).forEach(function(v){v=purTrim(v);if(v&&n.indexOf(v)<0)n.push(v);});});return n.sort();}
-function boxDocs(kind,name){return (PODOCS||[]).filter(function(d){return kind==='출고처'?purTrim(d.vendor)===name:(d.rows||[]).some(function(x){return purTrim(x.wh)===name;});}).sort(function(a,b){return String(a.pono||a.id)<String(b.pono||b.id)?1:-1;});}
-function boxWant(kind,name){
-  var pos=boxDocs(kind,name).map(function(d){var no=purTrim(d.pono||d.id);
-    var rows=(d.rows||[]).filter(function(x){return kind==='출고처'||purTrim(x.wh)===name;}).map(function(x){
-      var r={ccode:show(x.ccode),cname:show(x.cname),cspec:show(x.cspec),unit:show(x.unit),qty:show(x.qty),duedate:show(x.duedate),wh:show(x.wh),dlv:purDone(no,purTrim(x.ccode))};
-      return r;});   /* v138 사장님 「발주관리 구매처 쪽에서도 단가는 안나타나게 해주세요」 — 출고처 박스에도 단가 안 넣음(옛 박스는 boxSig 가 price 를 보아 다음 저장 때 pos 통째로 바뀌며 빠짐) */
-    var o={pono:no,podate:show(d.podate),pubKey:show(d.pubKey),rows:rows,final:podFinal(no),part:podPart(no)};   /* v160 part */   /* v155 */
-    if(kind==='입고처'){o.vendor=show(d.vendor);o.inTok=show(d.inTok);var sh=shipCur(no);o.ship=sh?sh.id:'';}   /* v159 지금 회차 */
-    var dl=0,lf=0;rows.forEach(function(x){dl+=Number(x.dlv||0);lf+=Math.max(0,Number(x.qty||0)-Number(x.dlv||0));});o.left=dl>0&&!o.final?Math.round(lf*100)/100:0;   /* v159 남음 */   /* v145 입고열쇠·배송 링크(입고처만 앎) */
-    return o;});
-  return {kind:kind,name:name,ponos:pos.map(function(p){return p.pono;}),pos:pos};
-}
-function boxSig(b){return JSON.stringify([show(b.kind),show(b.name),(b.ponos||[]).map(show),(b.pos||[]).map(function(p){return [show(p.pono),show(p.podate),show(p.pubKey),show(p.vendor),show(p.inTok),show(p.ship),p.final===true,Number(p.left||0),p.part?[Number(p.part.dlv),Number(p.part.qty),Number(p.part.left)]:0,(p.rows||[]).map(function(x){return [show(x.ccode),show(x.cname),show(x.cspec),show(x.unit),show(x.qty),show(x.price),show(x.duedate),show(x.wh),Number(x.dlv||0)];})];})]);}
-function podBoxSync(){
-  if(!db||!db.collection||PODOCS==null||POBOX==null||POCONF==null||POSHIP==null||data.purdelvs==null||!canCol('erp_pobox','w'))return;   /* v145 배송 링크도 읽은 뒤 */   /* v143 입고처는 발주확인 값을 읽은 뒤에만 */
-  ['출고처','입고처'].forEach(function(kind){var ns=boxNames(kind);
-    if(kind==='입고처')(POBOX||[]).forEach(function(b){if(b.kind==='입고처'&&ns.indexOf(b.name)<0&&boxOf('입고처',b.name)===b)ns.push(b.name);});   /* 옛 박스(확인된 발주 없음)는 빈 목록으로 고침 */
-    ns.forEach(function(name){
-    var want=boxWant(kind,name),sig=boxSig(want),have=boxOf(kind,name),bk='b:'+kind+':'+name;
-    /* v187 같은 종류·이름 박스가 둘 이상(11-09 14:36 에 6개가 겹쳐 생김) — 옛 링크 박스도 같은 내용으로 맞춤(안 하면 그 링크에 새 발주가 안 보여 발주확인 못 함) */
-    (POBOX||[]).forEach(function(b){if(have&&b!==have&&b.kind===kind&&b.name===name&&podKeyOk(b.id)&&boxSig(b)!==sig&&podBusy['d:'+b.id]!==sig){podBusy['d:'+b.id]=sig;db.collection('erp_pobox').doc(b.id).update(Object.assign({},want,{at:new Date().toISOString()})).catch(function(e){podBusy['d:'+b.id]='';console.warn('박스 못 씀',kind,name,e);});}});
-    if(have&&boxSig(have)===sig)return;
-    if(podBusy[bk]===sig)return;podBusy[bk]=sig;
-    var now=new Date().toISOString(),done=function(e){podBusy[bk]='';console.warn('박스 못 씀',kind,name,e);};
-    if(have)db.collection('erp_pobox').doc(have.id).update(Object.assign({},want,{at:now})).catch(done);
-    else db.collection('erp_pobox').doc(podKey()).create(Object.assign({},want,{at:now,createdAt:now})).catch(done);
-  });});
-}
-function confOf(no){return (POCONF||[]).filter(function(c){return c.id===no;})[0]||null;}
-function confTime(c){var t=c&&c.at?new Date(c.at):null;if(!t||isNaN(t))return c?show(c.at):'';var p=function(n){return String(n).padStart(2,'0');};return t.getFullYear()+'-'+p(t.getMonth()+1)+'-'+p(t.getDate())+' '+p(t.getHours())+':'+p(t.getMinutes());}
-function boxShareBtn(b){return h('button',{type:'button',class:'btn small podshare',on:{click:function(){shareMsg(boxShareText(b),vlUrl(b.name)||boxUrl(b.id,b.kind));}}},'공유');}   /* v220 거래처 링크 하나(없으면 옛 박스 링크) */   /* v160 상황별 글 · 글 한 덩어리 */
-/* v145 사장님 확정 흐름(「이해한 내용이 맞으니 작업해 주세요」 + 보충 「스캔한 발주가 그 입고처 박스에 없는 발주면 오류」 · 「입고처 스캔 링크 발주서에 수정요청 단추」) — v144 기사 스캔 방식을 바꿈.
-   출고처 「발주확인」 → QR·바코드 · 「배송기사 공유」 = 배송.html#<배송열쇠>(erp_poship) → 기사 폰 QR = 입고.html#<배송열쇠> → 입고처가 찍음 →
-   입고.html: 그 입고처 박스에 있는 발주인지(박스 pos 의 inTok) → 사진(erp_podlvimg)·입고수량·「입고확인」 = erp_poin/<입고열쇠>_<배송열쇠>{tok,ship,pono,rows,at,rev,photos} + 표시 erp_podlv/<배송열쇠>{pono,rows,inAt,rev} →
-   기사 「납품완료」 = erp_podlv.doneAt·doneRev(=rev) → 폼(podFlowSync)이 erp_purdelvs/flow_<배송열쇠> 대기 만들기 · 수정요청 뒤 다시 입고확인(rev+1)·납품완료면 대기 문서 수량 고침(대기일 때만).
-   입고열쇠(inTok) = 발주서마다(erp_podocs.inTok), erp_pointok/<inTok>{pono} 로 규칙이 확인 · 입고처 박스 pos 에만 실림(기사·출고처는 모름).
-   잠금 = erp_purdelvs/flow_ 가 대기가 아니면(입력 작업자 처리 시작) 폼이 erp_podlv.locked=true, 규칙은 erp_purdelvs 상태를 직접 봄. */
-var POSHIP=null,POIN=null,PODLV=null,PTOK=null;
-function ymdOf(iso){var d=new Date(iso);if(isNaN(d))return conToday();return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);}
-/* v159 사장님 「그럼 발주가 남았을때 발주수정과 / 부분납품 버튼을 만들어 발주수정시 동시 수정되는 폼입력이 대기상태가 되고 부분납품시 남은 발주서를 계속 유지하도록 해야겠네 이로인해 현장납품 공유링크바코드스캔 관계도 해당 발주로 되살려 놔야 하고」
-   납품 회차: 같은 배송기사 링크(첫 배송 문서)에 회차마다 배송 문서를 잇는다 — erp_poship/<회차열쇠>{box,pono,pubKey,at,prev,inbox}, 앞 회차 next. 회차마다 표시(erp_podlv)·입고(erp_poin)·구매납품(flow_<회차열쇠>)이 따로라 규칙을 안 바꿈. */
-function shipValid(x,no){if(purTrim(x.pono)!==no||!podKeyOk(x.id))return false;var b=(POBOX||[]).filter(function(y){return y.id===x.box;})[0];return !!(b&&b.kind==='출고처'&&(b.ponos||[]).indexOf(no)>=0);}
-function shipFor(no){   /* 첫 회차(출고처 「배송기사 공유」 링크, 먼저 만든 것) */
-  return (POSHIP||[]).filter(function(x){return !x.prev&&shipValid(x,no);}).sort(function(a,b){return String(a.at||'')<String(b.at||'')?-1:1;})[0]||null;}
-function shipChain(no){var a=[],k=shipFor(no),seen={};while(k&&!seen[k.id]&&a.length<30){seen[k.id]=1;a.push(k);var nx=k.next;k=nx?(POSHIP||[]).filter(function(x){return x.id===nx&&purTrim(x.pono)===no;})[0]||null:null;}return a;}
-function shipCur(no){var a=shipChain(no);return a[a.length-1]||null;}
-function flowOfShip(no,sh){
-  var po=(PODOCS||[]).filter(function(d){return purTrim(d.pono||d.id)===no;})[0],o={ship:sh};if(!sh||!po)return o;
-  o.dlv=(PODLV||[]).filter(function(x){return x.id===sh.id&&purTrim(x.pono)===no;})[0]||null;
-  o.in=po.inTok?(POIN||[]).filter(function(x){return x.id===po.inTok+'_'+sh.id&&purTrim(x.pono)===no;})[0]||null:null;
-  return o;
-}
-function flowOf(no){return flowOfShip(no,shipCur(no));}   /* 지금 회차 */
-/* 그 발주 원본 줄(그 거래처)마다 남은 수량 — pd 는 빼고 셈(오류 아닌 경우) */
-function poLeft(no,po,pd){
-  var src=(data[po.purCol==='erp_purords'?'purords':'purchases']||[]).filter(function(d){return d.id===po.purId;})[0],out=[];if(!src)return out;
-  (src.rows||[]).filter(function(x){return x&&purTrim(x.vendor)===purTrim(po.vendor);}).forEach(function(x){var c=purTrim(x.ccode),mine=0;
-    if(pd&&pd.status!=='오류')(pd.rows||[]).forEach(function(y){if(purTrim(y.ccode)===c)mine+=Number(y.qty||0);});
-    out.push({ccode:c,base:poQtyOf(no,c,x.qty),done:Math.round((purDone(no,c)-mine)*100)/100});});
-  return out;
-}
-function podFlowSync(){
-  if(!db||!db.collection||PODOCS==null||POSHIP==null||POIN==null||PODLV==null||POBOX==null||data.purdelvs==null||data.purchases==null||data.purords==null)return;
-  var canW=canCol('erp_purdelvs','w');
-  PODOCS.forEach(function(po){var no=purTrim(po.pono||po.id),FIN=podFinal(no);shipChain(no).forEach(function(sh){   /* v159 회차마다 */
-    var f=flowOfShip(no,sh);
-    var id='flow_'+f.ship.id,pd=(data.purdelvs||[]).filter(function(r){return r.id===id;})[0];
-    /* 잠금 표시: 구매납품 문서가 대기가 아니면 링크 수정 막음 */
-    var fin=FIN;   /* v155 · v159 발주가 닫혔을 때만 납품완료 */
-    if(f.dlv&&((pd&&pd.status!=='대기'&&f.dlv.locked!==true)||(fin&&f.dlv.final!==true))&&canCol('erp_podlv','w')&&podBusy['L:'+id]!==(fin?2:1)){podBusy['L:'+id]=fin?2:1;
-      db.collection('erp_podlv').doc(f.ship.id).update(fin?{locked:true,final:true}:{locked:true}).catch(function(e){podBusy['L:'+id]=0;console.warn('잠금 표시 못 함',no,e);});}
-    if(!canW||!f.in||!f.dlv||!f.dlv.doneAt)return;
-    var rev=Number(f.in.rev||0);if(!(rev>0&&Number(f.dlv.doneRev)===rev&&String(f.in.at)<=String(f.dlv.doneAt)))return;   /* 이 입고확인에 대한 납품완료여야 */
-    var src=(data[po.purCol==='erp_purords'?'purords':'purchases']||[]).filter(function(d){return d.id===po.purId;})[0];if(!src)return;
-    var qty={};(f.in.rows||[]).forEach(function(r){if(r&&r.ccode!=null)qty[purTrim(r.ccode)]=Number(r.qty);});
-    var rows=(src.rows||[]).filter(function(x){return x&&purTrim(x.vendor)===purTrim(po.vendor)&&qty[purTrim(x.ccode)]>0;}).map(function(x){var c=purTrim(x.ccode);
-      return {cname:x.cname||'',ccode:c,cspec:x.cspec||'',unit:x.unit||'',poqty:poQtyOf(no,c,x.qty),qty:qty[c],price:x.price,wh:x.wh||''};});
-    if(!rows.length)return;
-    var flow={ship:f.ship.id,inAt:f.in.at,rev:rev,doneAt:f.dlv.doneAt,photos:Number(f.in.photos||0),rnd:shipChain(no).indexOf(sh)+1},bk='f:'+id+':'+rev;
-    var under=poLeft(no,po,pd).some(function(L){return L.base-L.done-(qty[L.ccode]||0)>0.0001;});   /* v159 남은 수량이 있으면 사장님 선택(발주수정·부분납품) 전까지 choose */
-    if(podBusy[bk])return;
-    if(!pd){podBusy[bk]=1;
-      db.collection('erp_purdelvs').doc(id).create({purId:po.purId,purCol:po.purCol||'erp_purchases',pono:no,vendor:po.vendor,dlvdate:ymdOf(f.dlv.doneAt),rows:rows,dlvno:'',status:'대기',agentNote:'',
-        createdAt:new Date().toISOString(),route:routeOf(BYKEY.purdelvs),flow:flow,choose:under?'남음':''}).catch(function(e){podBusy[bk]=0;console.warn('납품완료 납품 못 만듦',no,e);});
-    }else if(pd.status==='대기'&&Number(pd.flow&&pd.flow.rev||0)<rev){podBusy[bk]=1;   /* 수정요청 뒤 다시 납품완료 → 대기 문서 수량 고침(대기일 때만) */
-      db.collection('erp_purdelvs').doc(id).updateIf(function(c){if(!(c.status==='대기'&&Number(c.flow&&c.flow.rev||0)<rev))return null;var o={rows:rows,dlvdate:ymdOf(f.dlv.doneAt),flow:flow};
-          if(!c.partial&&!(data.pomods||[]).some(function(m){return m.id==='mod_'+no+'_'+id&&m.kind==='cut';}))o.choose=under?'남음':'';return o;})
-        .catch(function(e){podBusy[bk]=0;console.warn('납품 수정 못 함',no,e);});
-    }
-  });});
-}
-/* v159 「부분납품」: 이 구매납품만 대기로 넘기고(choose 지움·partial) 같은 배송기사 링크에 다음 회차를 잇는다 */
-function partialGo(r){
-  var no=purTrim(r.pono),sh=(POSHIP||[]).filter(function(x){return x.id===(r.flow&&r.flow.ship);})[0];
+function partialGo(r){   /* v159 「부분납품」: 이 구매납품만 대기로 넘기고(choose 지움·partial) 남은 발주는 열어 둠 — v227 배송기사 링크 잇기 뺌 */
+  var no=purTrim(r.pono);
   if(!confirm(no+' 부분납품으로 넘기고 남은 발주를 계속 받습니다.'))return;
-  var go2=function(){return db.collection('erp_purdelvs').doc(r.id).update({choose:'',partial:true});};
-  if(!sh)return go2().then(function(){flash('부분납품으로 넘겼습니다. 남은 발주는 그대로 열려 있습니다.');},function(e){flash('넘기지 못했습니다. '+errText(e),true);});   /* v161 배송기사 링크 없는(손으로 넣은) 납품 */
-  if(sh.next)return go2().then(function(){flash('부분납품으로 넘겼습니다.');},function(e){flash('넘기지 못했습니다. '+errText(e),true);});
-  var k=podKey(),at=new Date().toISOString();
-  db.collection('erp_poship').doc(k).create({box:sh.box,pono:no,pubKey:sh.pubKey||'',at:at,prev:sh.id,inbox:sh.inbox||''})
-    .then(function(){return db.collection('erp_poship').doc(sh.id).update({next:k});}).then(go2)
-    .then(function(){flash('부분납품으로 넘겼습니다. 같은 배송기사 링크로 다음 납품을 받습니다.');},function(e){flash('넘기지 못했습니다. '+errText(e),true);});
-}
-function flowText(no){var f=flowOf(no),d=f.dlv;if(!f.ship)return '';
-  if(d&&d.locked)return '잠김';
-  if(d&&d.doneAt&&Number(d.doneRev||0)>=Number(d.rev||0)&&d.rev)return '납품완료 '+confTime({at:d.doneAt})+(Number(d.rev)>1?' (수정 '+(Number(d.rev)-1)+')':'');
-  if(f.in)return '입고확인 '+confTime(f.in)+(Number(f.in.rev)>1?' (수정 '+(Number(f.in.rev)-1)+')':'');
-  return '배송기사 공유됨';}
-/* v151 사장님 「일단 해당 보안은 차후에 보완하는것으로 하고 테스트 시점인 지금은 누가찍어도 열리는것ㅇ로 테스트를 빨리 마무리 합시다」
-   ⚠ 시험용: 배송 링크 문서(erp_poship, 누구나 get)에 그 발주의 입고처 박스 열쇠(inbox)를 폼이 적는다 → 기사 QR 을 누가 찍어도 그 입고처 박스가 열림. 실제 운영 전 보안 보완. */
-function podShipInSync(){
-  if(!db||!db.collection||POSHIP==null||POBOX==null||!canCol('erp_poship','w'))return;
-  POSHIP.forEach(function(x){if(!podKeyOk(x.id))return;var no=purTrim(x.pono);
-    var b=(POBOX||[]).filter(function(y){return y.kind==='입고처'&&podKeyOk(y.id)&&(y.ponos||[]).indexOf(no)>=0;}).sort(function(a,c){return String(a.createdAt||'')<String(c.createdAt||'')?-1:1;})[0];
-    var want=b?b.id:'';if(!want||x.inbox===want||podBusy['si:'+x.id]===want)return;podBusy['si:'+x.id]=want;
-    db.collection('erp_poship').doc(x.id).update({inbox:want}).catch(function(e){podBusy['si:'+x.id]='';console.warn('배송 링크에 입고처 못 적음',no,e);});});
-}
-/* 입고열쇠 문서(erp_pointok) — 폼이 만듦 */
-function podTokSync(){
-  if(!db||!db.collection||PODOCS==null||PTOK==null||!canCol('erp_pointok','w'))return;
-  PODOCS.forEach(function(d){if(!podKeyOk(d.inTok)||podBusy['t:'+d.inTok]||PTOK.some(function(t){return t.id===d.inTok;}))return;podBusy['t:'+d.inTok]=1;
-    db.collection('erp_pointok').doc(d.inTok).create({pono:purTrim(d.pono||d.id),at:new Date().toISOString()}).catch(function(e){podBusy['t:'+d.inTok]=0;console.warn('입고열쇠 못 만듦',d.id,e);});});
-}
-/* v156 사장님 「발주서 관리 납품완료 건은 납품완료목록에서 따로 관리 하게 해주세요」 — 영림원 입력완료(flow_ 구매납품 완료) 발주를 거래처별로, 납품일 늦은 것부터. 보기만 */
-function podDoneList(){
-  var isF=function(r){return String(r.id||'').indexOf('flow_')===0;},fin=(data.purdelvs||[]).filter(function(r){return r.status==='완료'&&podFinal(purTrim(r.pono));});   /* v159 닫힌 발주만(부분납품은 안 옮김) */
-  var hasF={};fin.forEach(function(r){if(isF(r))hasF[purTrim(r.pono)]=1;});
-  var recs=fin.filter(function(r){return isF(r)||!hasF[purTrim(r.pono)];});   /* v188 손 입력 납품도 — 링크 납품이 있는 발주는 링크 납품만(두 번 안 나옴) */
-  if(!recs.length)return [h('p',{class:'msg'},'발주서가 없습니다.')];
-  var by={};recs.forEach(function(r){var v=purTrim(r.vendor);(by[v]=by[v]||[]).push(r);});
-  var latest=function(a){return a.reduce(function(m,r){return String(r.dlvdate||'')>m?String(r.dlvdate||''):m;},'');};
-  return [h('div',{class:'lsinfo'},h('span',{},recs.length+'건'))].concat(Object.keys(by).sort(function(a,b){return latest(by[a])<latest(by[b])?1:-1;}).map(function(v){
-    var rs=by[v].sort(function(a,b){return String(a.dlvdate||'')<String(b.dlvdate||'')?1:-1;}),gk='완료:'+v,open=!!podOpenGrp[gk];
-    return h('div',{class:'podgrp'+(open?' open':'')},h('div',{class:'podgh'},
-        h('button',{type:'button',class:'podgt','aria-expanded':open?'true':'false',on:{click:function(){if(open)delete podOpenGrp[gk];else podOpenGrp[gk]=1;podDraw&&podDraw();}}},
-          h('span',{class:'navarr','aria-hidden':'true'},open?'▾':'▸'),h('span',{class:'nt'},v),h('span',{class:'ns'},rs.length+'건'))),
-      !open?null:h('div',{class:'podlist'},rs.map(function(r){var no=purTrim(r.pono),po=(PODOCS||[]).filter(function(d){return purTrim(d.pono||d.id)===no;})[0]||{};
-        var rows=(r.rows||[]).map(function(x){var left=Math.round((Number(x.poqty||0)-purDone(no,purTrim(x.ccode)))*100)/100;
-          return h('div',{class:'podkv2'},h('div',{class:'nt'},show(x.cname)),podKv([['발주수량',podNum(x.poqty),'n'],['입고수량',podNum(x.qty),'n']].concat(left>0?[['남은 수량',podNum(left),'n']]:[])));});
-        return h('div',{class:'podrow podfin'},h('button',{type:'button',class:'podbtn',on:{click:function(){podGo(no);}}},h('span',{class:'mono nt'},no),
-            h('span',{class:'ns'},[show(r.vendor),show(r.dlvdate),show(po.podate)?'발주일 '+show(po.podate):''].filter(Boolean).join(' · ')),h('span',{class:'ns podst on'},'납품완료')),
-          podKv([['납품번호',show(r.dlvno),'mono']]),rows,dlvPhotos(r));}))); }));
-}
-var podView2='출고처';   /* v133 목록 보기: 출고처 · 입고처 · 전체 */
-var podBx={},podLv='';   /* v221 열린 박스: v(거래처·창고) · s(단계) · o(발주번호) — 보기를 바꾸면 처음으로 */
-var podOpenGrp={};   /* v135 사장님 「업체별 발주서는 토글목록으로 해당업체 선택시만 펼쳐지게 해주세요 기본 모습은 모든 토글이 닫힌 상태입니다」 — 열린 묶음(보기:이름). 처음엔 모두 닫힘 */
-/* v221 사장님 「구매입력의 8 발주서 관리거래처 박스도 - 생산외주박스와 동일하게 만들어 주세요」 — 생산외주 발주서(v204~v212) 틀 그대로, 흑백, 토글 없음.
-   출고처 = 구매거래처 정사각 박스(겉 = 이름·단계별 건수) → 누르면 그 거래처만: 공유 + 단계 박스 셋 「발주확인 전」·「발주확인」·「납품완료」(겉 = 건수·안의 품명 모두, 단계 이름 = 이 화면에서 쓰던 글자) → 발주마다 정사각 박스(겉 = 발주번호·발주일·상태) → 그 발주 한 장(podView).
-   입고처 = 창고 정사각 박스 → 누르면 그 창고 발주 박스(발주확인된 것, 납품완료 뺌 — v143·v156 그대로) → 발주 한 장.
-   누른 박스만 화면에, 맨 위 한 줄(보기 › 거래처 › 단계 › 발주번호)로 돌아감. 상태 podBx. 저장 없음. */
-function podBoxes(cst){
-  var view=podView2,B=podBx,isO=view==='출고처',pn=function(d){return purTrim(d.pono||d.id);};
-  var notFin=function(d){return !podFinal(pn(d));},conf=function(d){return POCONF!=null&&!!confOf(pn(d));};
-  var names=boxNames(view).filter(function(n){var ds=boxDocs(view,n);return isO?ds.length>0:ds.some(function(d){return notFin(d)&&conf(d);});});   /* 출고처 = 납품완료만 남은 거래처도(납품완료 박스) · 입고처 = v153 그대로 */
-  var docsOf=function(n){var ds=boxDocs(view,n);return isO?ds:ds.filter(function(d){return notFin(d)&&conf(d);});};
-  var stOf=function(d){return podFinal(pn(d))?'d':conf(d)?'c':'u';},STG=[{key:'u',t:'발주확인 전'},{key:'c',t:'발주확인'},{key:'d',t:'납품완료'}];
-  var stTxt=function(d){if(isO)return cst(d);var no=pn(d),pt=podPart(no);return pt?{t:partText(pt)}:{t:'입고대기 · 발주확인 '+confTime(confOf(no)),on:1};};
-  var chipCls=function(d,t){return podFinal(pn(d))?'완료':t.on||podPart(pn(d))?'진행중':'대기';};
-  var uniq=function(a){var o=[];a.forEach(function(x){x=show(x);if(x&&o.indexOf(x)<0)o.push(x);});return o;};
-  var go=function(o){podBx=o;podDraw&&podDraw();};
-  var face=function(kids,on,click){return h('div',{class:'asmface',role:'button',tabindex:'0','aria-expanded':on?'true':'false',on:{click:click,keydown:asmKey}},kids);};
-  var docFace=function(d){var no=pn(d),rs=d.rows||[],t=stTxt(d);
-    return [h('b',{class:'asmtt mono'},no),h('small',{},[isO?'':show(d.vendor),show(d.podate)?'발주일 '+show(d.podate):''].filter(Boolean).join(' · ')),
-      rs.length?h('ul',{class:'asmnames'},h('li',{},show(rs[0].cname)+(rs.length>1?' 외 '+(rs.length-1)+'줄':''))):null,
-      h('div',{class:'asmnum'},h('span',{class:'chip '+chipCls(d,t)},t.t))];};
-  var docTile=function(d,base){return h('div',{class:'asmtile'},face(docFace(d),false,function(){go(Object.assign({},base,{o:pn(d)}));}));};
-  var crumb=function(cs){return h('div',{class:'asmcrumb'},cs.reduce(function(o,c,i){var last=i===cs.length-1;return o.concat([i?h('i',{},'›'):null,last?h('b',{},c.t):h('button',{type:'button',on:{click:function(){go(c.b);}}},c.t)].filter(Boolean));},[]));};
-  var cnt=function(ds){var o=[];STG.forEach(function(g){var n=ds.filter(function(d){return stOf(d)===g.key;}).length;if(isO&&n)o.push(h('span',{class:'chip '+(g.key==='u'?'대기':g.key==='c'?'진행중':'완료')},g.t+' '+n));});
-    var np=ds.filter(function(d){return !!podPart(pn(d));}).length;if(np)o.push(h('span',{class:'chip 진행중'},'부분납품 '+np));if(!isO)o.unshift(h('span',{class:'chip 진행중'},'입고대기 '+ds.length));return o;};
-  if(B.v&&names.indexOf(B.v)<0)B=podBx={};
-  if(!B.v){if(!names.length)return [h('p',{class:'msg'},'발주서가 없습니다.')];
-    return [h('div',{class:'asmgrid asmvg'},names.map(function(n){var ds=docsOf(n);
-      return h('div',{class:'asmtile asmv'},face([h('b',{class:'asmtt asmvt'},n),h('div',{class:'asmnum'},cnt(ds))],false,function(){go({v:n});}));}))];}
-  var v=B.v,ds=docsOf(v),b=boxOf(view,v),cs=[{t:view,b:{}},{t:v,b:{v:v}}],out;
-  if(B.s&&isO){var g=STG.filter(function(x){return x.key===B.s;})[0];if(g)cs.push({t:g.t,b:{v:v,s:g.key}});else B=podBx={v:v};}
-  if(B.o){var d=ds.filter(function(x){return pn(x)===B.o;})[0];
-    if(d){cs.push({t:B.o});var back=Object.assign({},B);delete back.o;
-      out=[crumb(cs),h('div',{class:'asmstage'},h('div',{class:'asmtile open'},face(docFace(d),true,function(){go(back);}),h('div',{class:'asmin'},podView(d,1))))];out.solo=1;return out;}
-    delete B.o;}
-  var last=cs[cs.length-1];delete last.b;
-  if(!isO||B.s){var list=isO?ds.filter(function(d){return stOf(d)===B.s;}):ds;
-    out=[crumb(cs)].concat(!isO&&b?[h('div',{class:'asmbar'},boxShareBtn(b))]:[],list.length?[h('div',{class:'asmgrid'},list.map(function(d){return docTile(d,B);}))]:[h('div',{class:'empty'},'발주서가 없습니다.')]);out.solo=1;return out;}
-  out=[crumb(cs),b?h('div',{class:'asmbar'},boxShareBtn(b)):null,h('div',{class:'asmgrid2'},STG.map(function(g){var gs=ds.filter(function(d){return stOf(d)===g.key;}),nm=[];gs.forEach(function(d){(d.rows||[]).forEach(function(x){nm.push(x.cname);});});
-      var np=gs.filter(function(d){return !!podPart(pn(d));}).length;
-      return h('div',{class:'asmtile asmsq'},face([h('b',{class:'asmtt asmvt'},g.t),h('div',{class:'asmn2'},gs.length+'건'),np?h('div',{class:'asmnum'},h('span',{class:'chip 진행중'},'부분납품 '+np)):null,
-        nm.length?h('ul',{class:'asmnames'},uniq(nm).map(function(t){return h('li',{class:g.key==='d'?'done':null},t);})):null],false,function(){go({v:v,s:g.key});}));}))].filter(Boolean);
-  out.solo=1;return out;
-}
-function renderPodocs(){
-  bulk=null;listBox=null;listBox2=null;sheetDraw=null;ifRefresh=null;
-  var box=h('div',{class:'podbox'}),lastKey='';
-  function draw(){
-    if(cur!=='podocs')return;
-    if(PODOCS==null||data.purchases==null||data.purords==null){box.replaceChildren(h('p',{class:'msg'},'불러오는 중'));lastKey='';return;}
-    var all=podAll(),key=JSON.stringify([podSel,podView2,podBx,podBx.o?[POSHIP,POIN,PODLV,data.purdelvs]:0,podOpenGrp,(data.purdelvs||[]).map(function(r){return r.id+r.status;}),Object.keys(DLV_IMG).length,podSel?[POSHIP,POIN,PODLV]:0,all,podSel?data.purdelvs:0,(PODPUB||[]).map(function(p){return p.id;}),(POBOX||[]).map(function(b){return [b.id,b.kind,b.name];}),POCONF]);if(key===lastKey)return;lastKey=key;   /* 같은 내용이면 다시 안 그림(QR 깜박임) */
-    box.className='podbox'+(!podSel&&(podView2==='출고처'||podView2==='입고처')?' asmq':'');   /* v221 거래처 박스 = 생산외주 발주서와 같은 흑백 정사각 박스 */
-    if(podSel){var d=all.filter(function(x){return purTrim(x.pono||x.id)===podSel;})[0];
-      box.replaceChildren.apply(box,d?podView(d):[h('div',{class:'actions'},h('button',{type:'button',class:'btn small',on:{click:function(){podGo('');}}},'목록')),h('p',{class:'msg bad'},'문서가 없습니다.')]);return;}
-    if(!all.length){box.replaceChildren(h('p',{class:'msg'},'발주서가 없습니다.'));return;}
-    var line=function(d,st){
-      var no=purTrim(d.pono||d.id),rs=d.rows||[];
-      var warn=st&&!st.on&&POCONF!=null;   /* v139 발주확인 전 줄 = 경고 색 */
-      return h('div',{class:'podli'+(warn?' warn':'')},h('button',{type:'button',class:'podbtn',on:{click:function(){podGo(no);}}},
-        h('span',{class:'mono nt'},no),
-        h('span',{class:'ns'},[show(d.vendor),show(d.podate)].filter(Boolean).join(' · ')),
-        h('span',{class:'ns'},rs.length?show(rs[0].cname)+(rs.length>1?' 외 '+(rs.length-1)+'줄':''):''),
-        st?h('span',{class:'ns podst'+(st.on?' on':'')},st.t):null));};   /* v134 줄마다 공유(v132) 없앰 — 공유는 박스 머리 줄 하나 · 발주서 한 장 화면 */
-    var tabs=h('div',{class:'wcpicks',role:'tablist','aria-label':'발주서 보기'},['출고처','입고처','전체','납품완료목록'].map(function(v){var on=v===podView2;
-      return h('button',{type:'button',role:'tab',class:'btn small wcpick'+(on?' primary':''),'aria-selected':on?'true':'false',on:{click:function(){if(!on){podView2=v;podBx={};draw();}}}},v);}));
-    var cst=function(d){var c=confOf(purTrim(d.pono||d.id));if(podFinal(purTrim(d.pono||d.id)))return {t:'납품완료',on:1};var pt=podPart(purTrim(d.pono||d.id));if(pt)return {t:partText(pt)};return c?{t:'발주확인 '+confTime(c),on:1}:{t:'발주확인 전'};};
-    var body;
-    if(podView2==='전체')body=[h('div',{class:'lsinfo'},h('span',{},all.length+'건')),h('div',{class:'podlist'},all.map(function(d){return line(d,cst(d));}))];
-    else if(podView2==='납품완료목록')body=podDoneList();   /* v156 */
-    else{body=podBoxes(cst);if(body.solo){box.replaceChildren.apply(box,[tabs].concat(body));var lv=JSON.stringify(podBx);if(lv!==podLv){podLv=lv;var y=box.getBoundingClientRect().top;if(y<0)window.scrollBy(0,y-8);}return;}podLv='';}   /* v221 */
-    box.replaceChildren.apply(box,[tabs].concat(body));
-  }
-  podDraw=draw;
-  mainEl.replaceChildren(h('section',{class:'card'},h('div',{class:'stephead'},h('h2',{},PODOC.title)),box));
-  draw();
-}
-/* ---------- v176 발주서(조립업체 발주 링크) ----------
-   사장님 11-10 「조립업체에서 시작될 발주링크를 만들어보자」. 영림원에 없는 단계라 메뉴 이름 = 사장님 말 「발주서」.
-   조립업체 = 11 외주계약 완료 문서(erp_contracts) 중 공정 이름에 「조립」이 든 줄의 외주거래처. 그 업체 박스 = 그 줄의 제품들.
-   제품마다 부속 줄 = 7 BOM 완료 문서(모품목번호 = 제품번호, 차수 = 계약 공정차수, 없으면 첫 완료 문서)의 줄 중 원장(5 자재 품목자산분류 원자재) 뺀 것. 줄 수량 per = 소요량(분자)/(분모).
-   박스 문서 erp_asmbox/<무작위 32자> = {vendor,pcodes,items[{pcode,pname,pspec,rows[{ccode,cname,cspec,unit,per}]}],at,createdAt} — erp_asmbox 저장 권한자가 폼을 열 때 만들고 다르면 고침(podBoxSync 꼴).
-   링크 = 발주.html#<열쇠>(로그인 없음). 거기서 저장한 발주서 = erp_asmpo/<무작위 32자> {box,vendor,pcode,pname,pspec,qty,need,rows[{ccode,cname,cspec,unit,per,base,qty,on}],at,status:'대기'}.
-   폼 = 업체 박스(공유·QR·제품) + 받은 발주서(대기·삭제). 영림원 입력·가공처 지시는 이번 범위 아님 — 나중에 주간생산계획입력(500498) 첫 단서. */
-var ASMPO={key:'asmpo',n:'',title:'발주서',screen:'발주서'};BYKEY.asmpo=ASMPO;
-/* v184 「발주공유 링크」 탭 없앰(사장님 「그럼 발주서 공유링크메뉴는 없더도 되잖아요」) — 업체 박스 머리에 공유 */   /* v181 사장님 「이거부터 안나오게 고쳐」 — 「발주서」 메뉴에서 빼서 따로 탭 */
-var ASMBOX=null,asmDraw=null,asmLv='',asmBusy={},asmOpen={},asmCard={},PCONF=null;   /* v195 PCONF = erp_prodconfirm {열쇠:문서} */
-function asmUrl(k){return new URL('발주.html#'+k,location.href).href;}
-function asmIsAsm(proc){return /조립/.test(String(proc==null?'':proc));}
-function asmRaw(code){code=purTrim(code);return (data.materials||[]).some(function(m){return purTrim(m.code)===code&&m.status!=='오류'&&m.asset==='원자재';});}
-function asmBom(pcode,seq){var a=(data.boms||[]).filter(function(d){return d.status==='완료'&&purTrim(d.pcode)===pcode;}),v=verPad(seq);return a.filter(function(d){return verPad(d.pver)===v;})[0]||a[0]||null;}
-function asmNames(){var n=[];(data.contracts||[]).forEach(function(d){if(d.status!=='완료')return;var v=purTrim(d.vendor);if(v&&n.indexOf(v)<0&&(d.rows||[]).some(function(r){return r&&asmIsAsm(r.proc);}))n.push(v);});return n.sort();}
-function asmWant(vendor){
-  var items=[],seen={};
-  (data.contracts||[]).forEach(function(d){if(d.status!=='완료'||purTrim(d.vendor)!==vendor)return;
-    (d.rows||[]).forEach(function(r){if(!r||!asmIsAsm(r.proc))return;var pc=purTrim(r.pcode);if(!pc||seen[pc])return;seen[pc]=1;
-      var b=asmBom(pc,r.seq);if(!b)return;
-      var rows=(b.rows||[]).filter(function(x){return x&&purTrim(x.ccode)&&!asmRaw(x.ccode);}).slice().sort(function(x,y){return (Number(x.order)||0)-(Number(y.order)||0);}).map(function(x){
-        var qd=Number(x.qd||1)||1;return {ccode:purTrim(x.ccode),cname:show(x.cname),cspec:show(x.cspec),unit:show(x.inunit),per:Math.round(Number(x.qn||0)/qd*1e6)/1e6};});
-      if(rows.length)items.push({pcode:pc,pname:show(b.pname||r.prod),pspec:show(b.pspec),rows:rows});});});
-  items.sort(function(x,y){return x.pname.localeCompare(y.pname,'ko');});
-  return {vendor:vendor,pcodes:items.map(function(i){return i.pcode;}),items:items,parts:asmParts(items)};   /* v180 parts = 공통부속 발주용 */
-}
-/* v178 사장님 「조혼이 발주링크에 입력한 발주서 는 입력폼 에서 등록대기 상태에서 삭제 하였습니다. 이또한 발주링크에 연동되어 표기 되어야 합니다…」
-   링크는 erp_asmpo 목록을 못 읽는다(규칙: get 만) → 폼이 박스 문서에 그 박스 발주서 요약 pos 를 적는다(지우면·상태가 바뀌면 고침). */
-function asmPos(boxId){return (data.asmpo||[]).filter(function(d){return d.box===boxId;}).sort(function(a,b){return String(a.at||'')<String(b.at||'')?1:-1;}).map(function(d){var rs=d.rows||[],st=asmLinkStage(d);
-  return {id:d.id,kind:d.kind==='부속'?'부속':'제품',pcode:show(d.pcode),pname:asmTitle(d),qty:Number(d.qty||0),need:show(d.need),status:show(d.status),at:show(d.at),n:rs.filter(function(r){return d.kind!=='부속'||r.on!==false;}).length,off:rs.filter(function(r){return r&&r.on===false;}).length,chg:d.kind==='부속'?0:rs.filter(function(r){return r&&r.on!==false&&Number(r.qty)!==Number(r.base);}).length,
-    st:{r:st.r,t:st.t,c:st.c},pt:st.pt,pd:st.pd,an:st.an,ad:st.ad,g:asmGroup(st),as:!!st.as,inn:!!st.inn,
-    det:asmProdsOf(d).map(function(p){var x=asmDetail(p);return {parts:x.parts.map(function(q){return {cname:q.cname,qty:Number(q.qty||0),steps:q.steps.map(function(z){return {proc:z.proc,to:z.to,dlv:z.dlv,k:z.k,ok:z.ok,mv:z.mv};}),arr:q.arr,fk:q.arr==null?'':q.fk,from:q.arr==null?'':q.from,fp:q.arr==null?'':q.fp};}),asm:x.asm?{proc:x.asm.proc,dlv:x.asm.dlv,inn:x.asm.inn}:null};}),   /* v186 링크 납품 상태 표(품번·업체 없음) */
-    rows:rs.filter(function(r){return r&&(d.kind!=='부속'||r.on!==false);}).map(function(r){return {cname:show(r.cname),cspec:show(r.cspec),unit:show(r.unit),base:Number(r.base||0),qty:Number(r.qty||0),on:r.on!==false,for:(r.for||[]).map(show)};})};});}   /* v182 링크 카드를 펴면 보일 줄(품번 없음) */   /* v180 kind·단계(st)·부속 공정·도착 — 링크가 보임. 업체 이름·번호·단가는 안 넣음 */
-function asmPosSig(b){return JSON.stringify((b.pos||[]).map(function(p){return [show(p.id),show(p.pcode),show(p.pname),Number(p.qty||0),show(p.need),show(p.status),show(p.at),Number(p.n||0),Number(p.off||0),Number(p.chg||0),show(p.kind),p.st?[p.st.r,show(p.st.t),show(p.st.c)]:0,Number(p.pt||0),Number(p.pd||0),Number(p.an||0),Number(p.ad||0),JSON.stringify(p.rows||[]),show(p.g),!!p.as,!!p.inn,JSON.stringify(p.det||[])];}));}
-function asmSheetSig(b){return JSON.stringify([show(b.asmProc),(b.sheets||[]).map(function(x){return [show(x.proc),(x.pos||[]).map(function(p){return [show(p.id),show(p.title),show(p.kind),show(p.need),Number(p.pt||0),Number(p.pd||0),show(p.g),(p.parts||[]).map(function(q){return [show(q.cname),Number(q.qty||0),!!q.dlv,show(q.to),show(q.k),!!q.ok,show(q.from),show(q.fk),!!q.fok,show(q.fp)];})];})];})]);}
-function asmSig(b){return JSON.stringify([b.cks||[],b.rcv||[]])+asmSheetSig(b)+asmPosSig(b)+JSON.stringify((b.parts||[]).map(function(p){return [show(p.ccode),show(p.cname),show(p.cspec),show(p.unit),(p.for||[]).map(show)];}))+JSON.stringify([show(b.vendor),(b.pcodes||[]).map(show),(b.items||[]).map(function(i){return [show(i.pcode),show(i.pname),show(i.pspec),(i.rows||[]).map(function(x){return [show(x.ccode),show(x.cname),show(x.cspec),show(x.unit),Number(x.per||0)];})];})]);}
-function asmBoxOf(vendor){var a=(ASMBOX||[]).filter(function(b){return b.vendor===vendor&&podKeyOk(b.id);}).sort(function(x,y){return String(x.createdAt||'')<String(y.createdAt||'')?-1:1;});return a[0]||null;}
-function asmBoxSync(){
-  if(!db||!db.collection||ASMBOX==null||PCONF==null||data.contracts==null||data.boms==null||data.materials==null||data.asmpo==null||data.prods==null||!canCol('erp_asmbox','w'))return;   /* v195 납품확인 읽은 뒤 */   /* v178 발주서 요약도 · v180 단계(생산 문서) */
-  var SH=asmSheets(),RK=asmRecvKeys(),RC=asmRcvCards(),ns=asmNames();Object.keys(SH).concat(Object.keys(RK)).forEach(function(v){if(ns.indexOf(v)<0)ns.push(v);});   /* v195 받는 업체도 박스 */   /* v193 납품대기 발주의 공정업체도 박스 */
-  (ASMBOX||[]).forEach(function(b){if(ns.indexOf(b.vendor)<0&&asmBoxOf(b.vendor)===b)ns.push(b.vendor);});   /* 조립 계약이 없어진 업체 박스는 빈 목록으로 */
-  ns.forEach(function(v){
-    var want=asmWant(v),have=asmBoxOf(v),bk='a:'+v;want.pos=have?asmPos(have.id):[];want.sheets=SH[v]||[];want.cks=RK[v]||[];want.rcv=RC[v]||[];want.asmProc=asmProcOf(v);var sig=asmSig(want);
-    if(have&&asmSig(have)===sig)return;
-    if(asmBusy[bk]===sig)return;asmBusy[bk]=sig;
-    var now=new Date().toISOString(),done=function(e){asmBusy[bk]='';console.warn('발주 박스 못 씀',v,e);};
-    if(have)db.collection('erp_asmbox').doc(have.id).update(Object.assign({},want,{at:now})).catch(done);
-    else db.collection('erp_asmbox').doc(podKey()).create(Object.assign({},want,{at:now,createdAt:now})).catch(done);
-  });
-}
-function asmShareBtn(b,dlvOnly){return h('button',{type:'button',class:'btn small podshare',on:{click:function(){shareMsg('INGHOME-'+b.vendor+(dlvOnly?' - 납품대기 발주서가 있습니다.':' - 발주서를 작성해 주세요.'),vlUrl(b.vendor)||asmUrl(b.id));}}},'공유');}   /* v220 거래처 링크 하나 */   /* v193 dlvOnly = 조립 아닌 공정업체 박스 */
-/* v193 사장님 「생산/외주 - 발주서에 납품대기문서가 발생되면 관련된 해당 납품관련 거래처별 박스가 생성되고 이남품 완료 여부를 결정할 각 부속들이 도착해 있어야 할것 같아요」 ·
-   「조립업체는 이미 박스가 있으니 조립업체의 반재재 납품여부는 이미있는 박스를 활용합시다」 · 「이럴때 같은 업체에 다른 공정의 납품여부가 보일 수 있습니다. 그러니 각 공정업체박스에 해당공정을 각각 다른시트에서 관리 해야 합니다」
-   발주 줄(asmVendorLines)이 납품대기·납품완료면 그 생산의 부속 공정 줄(조립 뺌) 외주거래처마다 박스(erp_asmbox, 업체당 하나 — 조립업체는 그 박스) 안 시트 sheets[{proc, pos}] 에 적는다.
-   시트 = 공정 이름 그대로. 카드 = 그 업체·그 공정 줄만(다른 업체 이름·품번·번호 없음). 시트 묶음 = 그 공정 줄 외주납품이 모두 완료면 납품완료. */
-function asmProcOf(v){var p='';(data.contracts||[]).some(function(d){return d.status==='완료'&&purTrim(d.vendor)===v&&(d.rows||[]).some(function(r){if(r&&asmIsAsm(r.proc)){p=show(r.proc);return true;}return false;});});return p;}
-function asmHash(s){var x=5381,i;s=String(s);for(i=0;i<s.length;i++)x=((x<<5)+x+s.charCodeAt(i))>>>0;return 's'+x.toString(36);}   /* 링크에 발주서 id 를 안 내보냄 */
-function asmSheets(){   /* {업체:[{proc, pos:[{id,title,kind,need,pt,pd,g,parts[{cname,qty,dlv}]}]}]} */
-  var by={},seq={};
-  asmVendorLines().forEach(function(g){g.lines.forEach(function(x){if(asmGroup(x.st)==='등록대기')return;var d0=x.ds[0]||{};
-    var need=x.a?show(x.a.need):show(d0.dueDate),kind=(x.a?x.a.kind:d0.kind)==='부속'?'부속':'제품';
-    x.ds.forEach(function(d){var isP=d.kind==='제품';(d.rows||[]).forEach(function(r){if(!r||(isP&&r.itemNo===d.itemNo)||asmIsAsm(r.proc))return;var w=purTrim(r.wc),pr=show(r.proc);if(!w||!pr)return;
-      if(seq[pr]==null||Number(r.seq)<seq[pr])seq[pr]=Number(r.seq)||0;
-      var V=by[w]||(by[w]={}),S=V[pr]||(V[pr]={}),c=S[x.id]||(S[x.id]={id:asmHash(x.id),title:x.title,kind:kind,need:need,at:x.at,parts:[]});
-      var pv=asmFromRow(d,r);c.parts.push({cname:show(r.itemName),qty:Number(r.qty||0),to:asmTo(d,r),dlv:asmStepSt(d,r).c==='done',k:asmDk(d,r),ok:asmOk(d,r),from:pv?asmLab(pv):'',fw:pv?purTrim(pv.wc):'',fk:pv?asmDk(d,pv):'',fok:pv?asmOk(d,pv):false,fp:pv?asmPre(d,pv):''});   /* v202 fp = 보낸 공정의 입고 열쇠 */   /* v195 보낼 납품(k·ok) · 받을 납품(앞 공정 from·fk·fok) */});});});});
-  var out={};Object.keys(by).forEach(function(w){out[w]=Object.keys(by[w]).sort(function(a,b){return (seq[a]-seq[b])||a.localeCompare(b,'ko');}).map(function(pr){var S=by[w][pr];
-    return {proc:pr,pos:Object.keys(S).map(function(k){return S[k];}).sort(function(a,b){return String(a.at)<String(b.at)?1:-1;}).map(function(c){var pd=c.parts.filter(function(p){return p.to?p.ok:p.dlv;}).length;   /* v195 완료 = 받는 쪽 납품확인 */
-      return {id:c.id,title:c.title,kind:c.kind,need:c.need,pt:c.parts.length,pd:pd,g:pd===c.parts.length?'납품완료':'납품대기',parts:c.parts};})};});});
-  return out;
-}
-function asmSheetG(p){if(p.g!=='납품대기')return p.g;var t=[];(p.parts||[]).forEach(function(q){if(!q.ok&&q.to&&t.indexOf(q.to)<0)t.push(q.to);});return t.length===1?t[0]:'';}   /* v194 받을 곳이 하나면 「업체-공정」 · v201 사장님 「보내는 쪽에 적혀있는 납품대기라는 표현 모두 삭제해줘」 */
-/* v204 사장님 「생산외주 발주서 - 각 거래처를 정사각형 박스로 만들어줘 그리고각 거래처 박스안에 입고대기 / 작업 박스도 정사각으로 나눠서 표기해줘 그안에 내용들도 이렇게 토글로 하지말고 각 발주별 정사각 박스로 나타나게 해줘 각 박스 표면에는 내부 상황을 대략적으로정리해서 보여주고 특히 작업/입고대기 박스에는 박스내부 제품명이 모두 박스표면에 표기가 되어 상황을 알려줘야함 디자인 할때 컬러색상은 사용하지말고 현지 입력폼 다른 디자인처럼 흑백으로만 디자인해줘」
-   asmTile = 발주 정사각 박스: 닫힘 = 정사각 겉면, 누르면 줄 전체 폭(겉면 + 안). 상태 asmCard[k](전 details 와 같은 열쇠). body = 열릴 때만 부르는 함수. */
-/* v206 사장님 「생산/외주  발주서 거래처별 박스 들어갔을때 해당 거래처 정보만 나오게 해 현재 이전 토클 펼침목록이 거래처와 상관없어 살아 있어 보기가 매우 힘들다」 — 거래처는 하나만 열림(열면 다른 거래처 박스 안 보임), 열고 닫을 때 안쪽 펼침(작업·입고대기 고름·발주 박스·QR)을 모두 닫음 */
-function asmGo(v){Object.keys(asmOpen).forEach(function(x){if(/^[vpqr]:/.test(x))delete asmOpen[x];});asmCard={};if(v)asmOpen['v:'+v]=1;}
-function asmKey(e){if(e.target!==e.currentTarget)return;if(e.key==='Enter'||e.key===' '){e.preventDefault();e.currentTarget.click();}}
-/* v209 사장님 「생산 /외주 발주서부분 해당 박스 클릭하면 해당 박스 관련만 나오게 해줘 왜 자꾸 이전 박스에 종속을 시켜서 사용감을 떨어뜨리지?」 — 연 발주 박스는 asmSolo 로 잡아 그 박스만 화면에(renderAsm). 하나만 열림. */
-var asmSolo=null;
-function asmTile(k,face,body,cls){var o=!!asmCard[k];
-  var el=h('div',{class:'asmtile'+(cls?' '+cls:'')+(o?' open':'')},h('div',{class:'asmface',role:'button',tabindex:'0','aria-expanded':o?'true':'false',on:{click:function(){if(o)delete asmCard[k];else{asmCard={};asmCard[k]=1;}asmDraw&&asmDraw();},keydown:asmKey}},face),o?h('div',{class:'asmin'},body()):null);
-  if(o)asmSolo=el;return el;}
-function asmSheetCard(v,pr,p,mode){   /* 폼 시트 카드 = 저장한 항목 모양 · v196 mode = in(받을 납품 — 「납품확인」) · out(보낼 납품) · done(납품완료) */
-  var k='s:'+v+':'+pr+':'+p.id+':'+mode,open=!!asmCard[k],ps=p.parts||[],hf=ps.some(function(q){return !!q.fk;}),chip,num,cols,rows;
-  if(mode==='in'){var ins=ps.filter(function(q){return !!q.fk;}),fr=[];ins.forEach(function(q){if(!q.fok&&q.from&&fr.indexOf(q.from)<0)fr.push(q.from);});
-    chip=h('span',{class:'chip 진행중'},(fr.length===1?fr[0]+' ':'')+'납품대기');num='납품확인 '+ins.filter(function(q){return q.fok;}).length+'/'+ins.length;
-    cols=['품명','수량','받을 납품'];rows=ins.map(function(q){return h('tr',{},h('td',{},show(q.cname)),h('td',{class:'asmn'},podNum(q.qty)),h('td',{},asmRcvCell(q.fk,q.from,q.fok,v,0,q.fp)));});}
-  else{var sg=asmSheetG(p);chip=sg?h('span',{class:'chip '+(p.g==='납품완료'?'완료':'진행중')},sg):null;num='납품 '+p.pd+'/'+p.pt;
-    cols=mode==='done'&&hf?['품명','수량','받을 납품','보낼 납품']:['품명','수량','보낼 납품'];
-    rows=ps.map(function(q){return h('tr',{},h('td',{},show(q.cname)),h('td',{class:'asmn'},podNum(q.qty)),mode==='done'&&hf?h('td',{},asmRcvCell(q.fk,q.from,q.fok,v,0,q.fp)):null,h('td',{},asmDlvChip(q.to?q.ok:q.dlv,q.to)));});}
-  var nc=num.split(' ')[1].split('/');
-  return asmTile(k,[h('b',{class:'asmtt'},show(p.title)),h('small',{},[pr,p.kind==='부속'?'공통부속 발주':'제품 발주','납품요청일 '+show(p.need)].filter(Boolean).join(' · ')),
-      h('div',{class:'asmnum'},h('span',{class:'chip '+(nc[0]===nc[1]?'완료':'진행중')},num),chip)],
-    function(){return h('div',{class:'tw'},h('table',{class:'asmt asmg'},h('thead',{},h('tr',{},cols.map(function(t){return h('th',{},t);}))),h('tbody',{},rows)));});   /* v204 정사각 박스 */
-}
-/* v196 사장님 「받는쪽과 보내는쪽 기준으로 안나눠져있는데?」 — 공정 시트 묶음 = 받을 납품(앞 공정이 이 업체로 보내는 것, 「납품확인」 대기) · 보낼 납품(이 업체가 다음 공정으로 보내는 것) · 납품완료.
-   같은 발주 카드가 받을 납품·보낼 납품 둘 다에 나올 수 있다(받을 것과 보낼 것이 다 남았을 때). 첫 공정(받을 납품 없음)은 받을 납품 묶음을 안 그림. */
-function asmPendIn(p){return (p.parts||[]).some(function(q){return q.fk&&!q.fok;});}
-/* v200 사장님 「업체별 박스에 입고확인(납품받을것) / 작업(납품보낼것)  이렇게 구ㅡ분해」 → 「거래처박스가 있고 거래처 박스로 들어가면 작업박스와 입고대기 박스를 만들라고요 해당 박스로 들어가면 목록 보이게 해달라고」
-   거래처 박스를 펴면 박스 둘: 「작업」(이 업체가 할 일 = 보낼 납품 · 납품완료, 조립업체는 조립 발주 · 공정이 여럿이면 시트 단추 · 실재고) · 「입고대기」(앞 공정·부속이 이 업체로 오는 것 중 납품확인 안 된 것 — 펴면 「납품확인」). 둘 다 처음 닫힘, 누르면 목록. */
-function asmPair(v,a,pk,gc){var k=(pk||'p:')+v,sel=asmOpen[k],cur=a.filter(function(x){return x.key===sel;})[0];   /* v204 거래처 안 「작업」·「입고대기」 정사각 박스 둘 — 누른 박스의 안을 아래에(처음 닫힘) */
-  if(cur)return h('div',{class:'asmpair'},cur.kids.length?cur.kids:(cur.empty?[h('div',{class:'empty'},cur.empty)]:[]));   /* v209 고른 박스의 안만 — 박스 격자는 빠짐 */
-  return h('div',{class:'asmpair'},h('div',{class:gc||'asmgrid2'},a.map(function(x){var on=x===cur;
-      return h('div',{class:'asmtile asmsq'+(on?' sel':'')},h('div',{class:'asmface',role:'button',tabindex:'0','aria-pressed':on?'true':'false',on:{click:function(){if(on)delete asmOpen[k];else asmOpen[k]=x.key;asmDraw&&asmDraw();},keydown:asmKey}},
-        h('b',{class:'asmtt asmvt'},x.t),h('div',{class:'asmn2'},x.n+'건'),x.sum.length?h('div',{class:'asmnum'},x.sum):null,
-        x.names.length?h('ul',{class:'asmnames'},x.names.map(function(m){return h('li',{class:m.done?'done':null},m.t);})):null));})),
-    cur?h('div',{class:'asmpanel'},cur.kids.length?cur.kids:(cur.empty?[h('div',{class:'empty'},cur.empty)]:[])):null);}
-function asmWorkBody(v,pr,ps){var b=ps.filter(function(p){return p.g!=='납품완료';});   /* v212 납품완료는 「납품완료」 박스로 */
-  return b.length?[h('div',{class:'asmgrid'},b.map(function(p){return asmSheetCard(v,pr,p,'out');}))]:[];}   /* v204 정사각 박스 격자 */
-/* v203 사장님 「발주서 입고대기 박스의 내용은 출고되는 거래처별로 박스구분되어 보여지게 해주세요」 — 입고대기 안 = 보내는(출고) 거래처마다 박스(처음 닫힘). 한 카드에 보낸 거래처가 여럿이면 거래처마다 그 줄만 가진 카드로 나눔. */
-function asmFw(q){var f=String(q.fw||''),s=String(q.from||''),i=s.lastIndexOf('-');return f||(i>0?s.slice(0,i):s);}   /* 옛 박스(fw 없음) = 「업체-공정」 앞 */
-function asmInGroups(shs,rc){var by={},ord=[];
-  function add(pr,p){var ws=[];(p.parts||[]).forEach(function(q){if(q.fk){var w=asmFw(q);if(ws.indexOf(w)<0)ws.push(w);}});
-    ws.forEach(function(w){var c={};Object.keys(p).forEach(function(x){c[x]=p[x];});c.id=p.id+':'+w;c.parts=(p.parts||[]).filter(function(q){return q.fk&&asmFw(q)===w;});if(!asmPendIn(c))return;
-      if(!by[w]){by[w]=[];ord.push(w);}by[w].push({pr:pr,p:c});});}
-  (shs||[]).forEach(function(sh){(sh.pos||[]).forEach(function(p){add(sh.proc,p);});});(rc||[]).forEach(function(p){add(null,p);});
-  return ord.map(function(w){return {w:w,cs:by[w]};});}
-function asmInCards(v,shs,rc){var n=0,nm=[],o=asmInGroups(shs,rc).map(function(g){n+=g.cs.length;g.cs.forEach(function(c){var t=show(c.p.title);if(t&&nm.indexOf(t)<0)nm.push(t);});   /* v204 출고 거래처마다 묶음 + 발주 정사각 박스 격자 */
-    return h('div',{class:'asmfrom'},h('h3',{class:'asmsub'},g.w,h('span',{},g.cs.length+'건')),h('div',{class:'asmgrid'},g.cs.map(function(c){return asmSheetCard(v,c.pr==null?(asmProcOf(v)||'조립'):c.pr,c.p,'in');})));});o.n=n;o.names=nm;o.ws=asmInGroups(shs,rc).map(function(g){return h('span',{class:'chip 진행중'},g.w+' '+g.cs.length);});return o;}
-/* 조립업체가 받을 납품 = 부속 마지막 공정 → 조립(제품 발주) · 공통부속 마지막 공정 → 발주한 조립업체. 박스 rcv[{id,title,kind,need,at,parts[{cname,qty,from,fk,fok}]}] */
-function asmRcvCards(){
-  var by={};asmVendorLines().forEach(function(g){g.lines.forEach(function(x){if(asmGroup(x.st)==='등록대기')return;var d0=x.ds[0]||{};
-    var need=x.a?show(x.a.need):show(d0.dueDate),kind=(x.a?x.a.kind:d0.kind)==='부속'?'부속':'제품';
-    x.ds.forEach(function(d){(d.rows||[]).forEach(function(r){if(!r||(d.kind==='제품'&&r.itemNo===d.itemNo)||asmIsAsm(r.proc))return;
-      var nx=prodNext(d,r),toA=nx?(d.kind==='제품'&&nx.itemNo===d.itemNo):d.kind==='부속';if(!toA)return;var w=asmRecvWc(d,r);if(!w)return;
-      var V=by[w]||(by[w]={}),c=V[x.id]||(V[x.id]={id:asmHash(x.id),title:x.title,kind:kind,need:need,at:x.at,parts:[]});
-      c.parts.push({cname:show(r.itemName),qty:Number(r.qty||0),from:asmLab(r),fw:purTrim(r.wc),fk:asmDk(d,r),fok:asmOk(d,r),fp:asmPre(d,r)});});});});});
-  var out={};Object.keys(by).forEach(function(w){out[w]=Object.keys(by[w]).map(function(k){return by[w][k];}).sort(function(a,b){return String(a.at)<String(b.at)?1:-1;}).map(function(c){return {id:c.id,title:c.title,kind:c.kind,need:c.need,parts:c.parts};});});
-  return out;
-}
-/* v197 사장님 「그럼 각 거래처 발주서에 재고업데이트 버튼을 만들어 해당 작업을 하기위한 재고가 실재로 있는지 확인할 수 있게 해줘」
-   「재고업데이트」 = v102 재고현황과 같은 불러오기 요청(erp_imports stepKey stocks · basis 실재고 · date 오늘 · wh 업체 창고) → 입력 작업자가 창고별 재고조회 501179 를 읽어 erp_stocks 를 덮어씀.
-   필요 = 그 업체(외주거래처 = 창고 이름)의 아직 외주납품 안 된 공정 줄마다 그 품목 기본 BOM(imBom) 중 같은 공정 줄 × 남은 수량. 5 자재(재공품 뺌)만 — 원장·엣지필름 등.
-   재고 = erp_stocks 실재고 문서들의 그 창고 줄 재고수량(품번별 합). 박스 겉 = 「재고부족 n」 / 「재고 있음」, 펴면 자재별 소요량·재고수량·단위(품번·규격은 좁은 화면에 안 들어가 뺌). */
-function asmMat(c){return (data.materials||[]).filter(function(m){return purTrim(m.code)===c&&m.status!=='오류'&&m.asset!=='재공품';})[0]||null;}
-function asmNeeds(){   /* v198 {업체:{공정:[{ccode,cname,cspec,unit,need}]}} */
-  var by={};
-  asmVendorLines().forEach(function(g){g.lines.forEach(function(x){if(asmGroup(x.st)==='납품완료')return;
-    x.ds.forEach(function(d){if(!d||d.status==='오류')return;(d.rows||[]).forEach(function(r){
-      var w=r&&purTrim(r.wc);if(!w||asmStepSt(d,r).c==='done')return;
-      var rem=Number(r.qty||0)-prodSum(prodDlvs(d,r).filter(function(z){return z.status==='완료';}),'dlvQty');if(!(rem>0))return;
-      var b=imBom(purTrim(r.itemNo));(b&&b.rows||[]).forEach(function(m){if(!m||show(m.proc).trim()!==show(r.proc).trim())return;var c=purTrim(m.ccode),mt=c&&asmMat(c);if(!mt)return;
-        var q=rem*Number(m.qn||0)/(Number(m.qd||1)||1);if(!(q>0))return;
-        var pr=show(r.proc).trim(),V0=by[w]||(by[w]={}),V=V0[pr]||(V0[pr]={}),o=V[c]||(V[c]={ccode:c,cname:show(mt.name||m.cname),cspec:show(mt.spec||m.cspec),unit:show(m.inunit||mt.unit),need:0});o.need+=q;});});});});});
-  var out={};Object.keys(by).forEach(function(w){out[w]={};Object.keys(by[w]).forEach(function(pr){var P=by[w][pr];out[w][pr]=Object.keys(P).map(function(c){var o=P[c];o.need=Math.round(o.need*1e4)/1e4;return o;}).sort(function(a,b){return a.cname.localeCompare(b.cname,'ko');});});});
-  return out;
-}
-function asmStk(){   /* {창고:{품번:재고수량}} · at = 가장 늦은 불러온 일시 — 실재고만 */
-  var m={},at='',any=false;(STOCKS||[]).forEach(function(d){if(d.basis!=='실재고')return;any=true;if((d.importedAt||'')>at)at=d.importedAt;
-    (d.rows||[]).forEach(function(r){var w=purTrim(r['창고']),c=purTrim(r['품번']);if(!w||!c)return;var W=m[w]||(m[w]={});W[c]=(W[c]||0)+stkNum(r[STK_Q]);});});
-  return {m:m,at:at,any:any};
-}
-/* v198 사장님 「해당 업체 공정에서 해당 재고만 보이도록 해줘」 — 공정 시트마다 그 공정 자재만(prs = 공정 이름 목록). 박스 겉 칩은 전 공정을 품번별로 합쳐 셈 */
-function asmStkLines(v,prs,N,S){var V=N[v]||{},by={},ls=[];(prs||Object.keys(V)).forEach(function(pr){(V[pr]||[]).forEach(function(o){var x=by[o.ccode];if(!x){x=by[o.ccode]=Object.assign({},o);ls.push(x);}else x.need=Math.round((x.need+o.need)*1e4)/1e4;});});
-  return ls.sort(function(a,b){return a.cname.localeCompare(b.cname,'ko');}).map(function(o){var q=S.any?((S.m[v]||{})[o.ccode]||0):null;return Object.assign({},o,{have:q,short:q!=null&&q<o.need});});}
-function asmStkChip(ls,S){if(!ls.length||!S.any)return null;var n=ls.filter(function(o){return o.short;}).length;return n?h('span',{class:'chip 오류'},'재고부족 '+n):h('span',{class:'chip 완료'},'재고 있음');}
-function asmStkBtn(v){
-  var b=impBusy('stocks');
-  return h('button',{type:'button',class:'btn small podshare',disabled:b||!db||!canCol('erp_imports','w'),on:{click:function(e){var t=e.currentTarget;t.disabled=true;
-    db.collection('erp_imports').add({stepKey:'stocks',stepTitle:STOCK.title,steps:IMPORT_BTN.stocks,only:'all',mode:'import',basis:'실재고',date:conToday(),wh:v,status:'대기',agentNote:'',createdAt:new Date().toISOString(),specRef:'erp-spec.json#imports'})
-      .catch(function(er){t.disabled=false;alert('요청하지 못했습니다. '+errText(er));});}}},'재고업데이트');
-}
-function asmStkBody(v,ls,S,pr){
-  if(!ls.length)return null;
-  var l=impLast('stocks'),b=impBusy('stocks'),bad=l&&l.status==='오류'&&String(l.createdAt||'')>String(S.at||'');
-  var k='k:'+v+':'+pr,open=!!asmCard[k];
-  return h('div',{class:'asmgrid'},asmTile(k,[h('b',{class:'asmtt'},'실재고'),h('small',{},[v,S.at?stkTime(S.at):'',b?'요청 중':''].filter(Boolean).join(' · ')),bad?h('small',{class:'bad'},show(l.agentNote)):null,h('div',{class:'asmnum'},asmStkChip(ls,S))],
-    function(){return h('div',{class:'tw'},h('table',{class:'asmt asmg'},h('thead',{},h('tr',{},['품명','소요량','재고수량','단위'].map(function(t){return h('th',{},t);}))),
-      h('tbody',{},ls.map(function(o){return h('tr',{class:o.short?'short':''},h('td',{},o.cname),h('td',{class:'asmn'},podNum(o.need)),h('td',{class:'asmn'},o.have==null?'':podNum(o.have)),h('td',{},o.unit));}))));}));   /* v204 정사각 박스 */
-}
-function asmQr(url){
-  var bx=h('div',{class:'podqr'}),err=h('p',{class:'msg bad',hidden:true});
-  podLib('qr').then(function(qrcode){
-    var q=qrcode(0,'M');q.addData(url);q.make();var n=q.getModuleCount(),cell=6,sz=(n+8)*cell;
-    var cv=h('canvas',{width:String(sz),height:String(sz),role:'img','aria-label':'QR코드',style:'width:'+sz/2+'px;height:'+sz/2+'px'});var c=cv.getContext('2d');
-    c.fillStyle='#fff';c.fillRect(0,0,sz,sz);c.fillStyle='#000';for(var r=0;r<n;r++)for(var k=0;k<n;k++)if(q.isDark(r,k))c.fillRect((k+4)*cell,(r+4)*cell,cell,cell);
-    bx.replaceChildren(cv);
-  }).catch(function(){err.hidden=false;err.textContent='QR코드를 그리지 못했습니다.';});
-  return h('div',{class:'podcodes'},bx,err);
-}
-function asmWhen(s){var t=s?new Date(s):null;if(!t||isNaN(t))return show(s);var p=function(n){return String(n).padStart(2,'0');};return t.getFullYear()+'-'+p(t.getMonth()+1)+'-'+p(t.getDate())+' '+p(t.getHours())+':'+p(t.getMinutes());}
-function asmChg(x){return x&&x.on!==false&&Number(x.qty)!==Number(x.base);}
-/* v179 사장님 「실제 영림원에 등록완료된 발주가 발주등록완료된 상태로 해당 조립업체의 박스에만 보여야 되는거 아닌가요?」 · 「…이 발주가 시작되었지만 조립이전 공정이 이런게 남았다 반자재도 도착전이고 반자재의 이전 공정도 시작전이고」
-   조립업체 박스 = erp_prods(오류·영림원에 없음 뺌)의 제품 자기 줄(조립) 중 외주발주번호(orderNo)가 있는 줄의 외주거래처. 박스 안 = 그 조립 외주발주번호마다 · 제품마다 부속 공정 상태.
-   상태는 폼 문서로만: 공정 줄 orderNo = 외주발주 · erp_proddlvs(그 생산·품번·공정차수, 오류 뺌) = 외주납품 대기/진행중/완료(줄 dlvNo 있으면 완료) · 다음 업체가 다르면 자재출고(줄 outNo, 옛 erp_prodmoves 문서) · 조립 줄 inNo = 외주입고 완료. 없으면 「시작 전」. */
-function asmProds(){return (data.prods||[]).filter(function(d){return d&&d.status!=='오류'&&!ylwGone(d)&&d.kind==='제품';});}
-function asmAsmRow(d){return (d.rows||[]).filter(function(r){return r.itemNo===d.itemNo;}).sort(function(x,y){return Number(x.seq)-Number(y.seq);})[0]||null;}
-function asmOrders(){   /* [{wc, orders:[{no, prods:[d]}]}] — 조립 외주발주가 있는 업체만 */
-  var by={};asmProds().forEach(function(d){var r=asmAsmRow(d);if(!r||!purTrim(r.orderNo)||!purTrim(r.wc))return;var w=purTrim(r.wc),no=purTrim(r.orderNo);
-    var v=by[w]||(by[w]={});(v[no]||(v[no]=[])).push(d);});
-  return Object.keys(by).sort().map(function(w){return {wc:w,orders:Object.keys(by[w]).sort().reverse().map(function(no){return {no:no,prods:by[w][no].sort(function(a,b){return String(a.itemName||'').localeCompare(String(b.itemName||''),'ko');})};})};});
-}
-function asmDlv(d,r){   /* 그 공정 줄의 외주납품 문서 줄들(오류 뺌) */
-  var out=[];(data.proddlvs||[]).forEach(function(x){if(!x||x.status==='오류'||x.prodId!==d.id)return;
-    if(x.all)(x.rows||[]).forEach(function(y){if(y&&y.itemNo===r.itemNo&&String(y.seq)===String(r.seq))out.push({doc:x,row:y});});
-    else if(x.itemNo===r.itemNo&&String(x.seq)===String(r.seq))out.push({doc:x,row:x});});return out;}
-function asmStepSt(d,r){   /* {t:글자, c:'done'|'wait'|'none'} */
-  if(!purTrim(r.orderNo))return {t:'시작 전',c:'none'};
-  var ds=asmDlv(d,r);if(!ds.length)return {t:'외주발주',c:'wait'};
-  if(ds.some(function(x){return purTrim(x.row.dlvNo)||x.doc.status==='완료';}))return {t:'외주납품 완료',c:'done'};
-  return {t:'외주납품 '+show(ds[0].doc.status||'대기'),c:'wait'};
-}
-function asmMoveSt(d,r){   /* 다음 업체가 다를 때만. null = 출고 필요 없음 */
-  if(!prodMoveNeed(d,r))return null;   /* v214 */
-  var ds=asmDlv(d,r);if(ds.some(function(x){return purTrim(x.row.outNo);}))return {t:'자재출고 완료',c:'done'};
-  var mv=(data.prodmoves||[]).filter(function(x){return x&&x.status!=='오류'&&x.prodId===d.id&&x.itemNo===r.itemNo&&String(x.seq)===String(r.seq);});
-  if(mv.some(function(x){return x.status==='완료'||purTrim(x.outNo);}))return {t:'자재출고 완료',c:'done'};
-  if(mv.length)return {t:'자재출고 '+show(mv[0].status||'대기'),c:'wait'};
-  if(ds.length)return {t:'자재출고 대기',c:'wait'};
-  return null;   /* 외주납품 문서 전에는 출고 칸 안 보임 */
-}
-function asmArrived(d,last,asmWc){   /* 부속 마지막 공정 → 조립업체 */
-  /* v193 임시(사장님이 도착 기준을 아직 안 정함) = 부속 마지막 공정 외주납품 입력완료(erp_proddlvs 완료·dlvNo)만 본다. 자재출고는 안 봄 */
-  if(!last)return false;return asmOk(d,last);   /* v195 임시 = 조립업체가 받는 쪽으로 「납품확인」 한 것(영림원 외주납품 입력완료 아님) */
-}
-function asmChip(st){return h('span',{class:'asmst '+st.c},st.t);}
-/* v194 사장님 「발주서 납품관계에 따라 표기되는 납품대기 상태를 납품받을업체-가공명 납품대기 이렇게 표기해 주어야 합니다」 — 받을 업체 = 다음 공정 외주거래처(부속 마지막 = 조립 줄 · 공통부속 = 발주한 조립업체), 가공명 = 그 받는 공정 이름 */
-function asmTo(d,r){var nx=prodNext(d,r),w='',p='';if(nx){w=purTrim(nx.wc);p=show(nx.proc);}else if(d.kind==='부속'&&purTrim(d.asmVendor)){w=purTrim(d.asmVendor);p=asmProcOf(w);}return w&&p?w+'-'+p:'';}
-function asmDlvChip(ok,to){return to?h('span',{class:'chip '+(ok?'완료':'대기')},to+(ok?' 납품완료':'')):asmDoneChip('외주납품',ok);}   /* v195 to 가 있으면 ok = 받는 쪽 납품확인 · v201 보내는 쪽 「납품대기」 글자 없앰 */
-/* v195 사장님 「자그럼 이를 납품 보내는 쪽과 납품 받는쪽 두곳으로 나눠발생되게 해야 합니다. 그리고 납품 받는쪽에는 납품확인 버튼을 만들어 해당 공정품이 다음 공정으로 납품 완료되었음이 확인 되어야 합니다」
-   공정 납품 하나 = 생산 d 의 공정 줄 r 물건이 다음 공정(받는 업체)으로 감. 열쇠 asmDk = 'k' + 해시 둘(djb2·FNV-1a, 생산 id·품번·공정순서 — 발주서 id·품번은 링크에 안 나감).
-   보내는 쪽 = 그 공정 업체 박스 그 공정 시트 「보낼 납품」(받을업체-받는공정 납품대기) · 받는 쪽 = 다음 공정 업체 박스 그 공정 시트 「받을 납품」(보낸업체-보낸공정 납품대기 + 「납품확인」).
-   부속 마지막 공정 → 조립업체 박스 조립 시트 「도착」 칸(받는 쪽). 납품확인 = erp_prodconfirm/<열쇠> {box, dk, at}(규칙: 받는 업체 박스 cks 에 든 열쇠만, 구매 erp_poconfirm 과 같은 꼴). 있으면 양쪽 납품완료. 되돌리기는 담당자만(단추 없음). */
-function asmFnv(s){var x=0x811c9dc5,i;s=String(s);for(i=0;i<s.length;i++){x^=s.charCodeAt(i);x=Math.imul(x,16777619)>>>0;}return x.toString(36);}
-function asmDk(d,r){var s=show(d.id)+'|'+show(r.itemNo)+'|'+show(r.seq);return 'k'+asmHash(s).slice(1)+asmFnv(s);}   /* 해시 둘(djb2·FNV-1a) */
-function pcOf(k){return k&&PCONF&&PCONF[k]||null;}
-function asmOk(d,r){return !!pcOf(asmDk(d,r));}
-function asmFromRow(d,r){return prodSib(d,r,-1);}   /* 이 공정 줄로 보내는 앞 공정(같은 품목) */
-function asmLab(r){return purTrim(r.wc)&&show(r.proc)?purTrim(r.wc)+'-'+show(r.proc):'';}
-function asmRecvWc(d,r){var nx=prodNext(d,r);return nx?purTrim(nx.wc):d.kind==='부속'?purTrim(d.asmVendor):'';}
-function asmRecvKeys(){   /* {받는 업체:[열쇠]} — 박스 cks(규칙이 이 목록으로 납품확인 허락) */
-  var by={};asmVendorLines().forEach(function(g){g.lines.forEach(function(x){if(asmGroup(x.st)==='등록대기')return;
-    x.ds.forEach(function(d){(d.rows||[]).forEach(function(r){if(!r||(d.kind==='제품'&&r.itemNo===d.itemNo)||asmIsAsm(r.proc))return;var w=asmRecvWc(d,r),k=asmDk(d,r);if(!w)return;var a=by[w]||(by[w]=[]);if(a.indexOf(k)<0)a.push(k);});});});});
-  Object.keys(by).forEach(function(w){by[w].sort();});return by;}
-function asmWhen2(s){var t=s?new Date(s):null;if(!t||isNaN(t))return '';var p=function(n){return String(n).padStart(2,'0');};return (t.getMonth()+1)+'-'+p(t.getDate())+' '+p(t.getHours())+':'+p(t.getMinutes());}
-/* v202 사장님 「업무 흐름에 따라 납품될 수 없는 공정이 납품확인 버튼이 눌리면 안됩니다. 현재 1건이 눌려져 있고 이를 다시 복구해주면서 이런식으로 버튼이 눌리지 않게 해주세요.」
-   공정 줄 r 의 물건은 r 이 먼저 앞 공정 물건을 입고(납품확인)해야 보낼 수 있다 → r 납품확인은 asmPre(d,r)(= r 의 입고 열쇠)가 확인됐을 때만(첫 공정은 늘). 아니면 단추 없음. */
-function asmPre(d,r){var pv=prodSib(d,r,-1);return pv?asmDk(d,pv):'';}
-function asmConfirm(k,lab,v,fp){
-  if(!db||!db.collection||!k||pcOf(k))return;if(fp&&!pcOf(fp)){alert(lab+' 이 앞 공정 납품을 아직 입고확인하지 않아 납품확인할 수 없습니다.');return;}if(!confirm(lab+' 납품확인을 저장합니다.'))return;
-  var b=asmBoxOf(v);db.collection('erp_prodconfirm').doc(k).create({box:b?b.id:'',dk:k,at:new Date().toISOString()}).catch(function(e){if(!pcOf(k))alert('납품확인을 저장하지 못했습니다.');console.warn('납품확인',e);});
-}
-/* v211 사장님 「그러면 그런것들이 납품확인과 동시에 등록대기로 자동으로 가야겠지?」
-   받는 쪽 납품확인(erp_prodconfirm/<열쇠 k>, 폼·링크 어디서 눌렀든)이 생기면 폼이 그 공정 줄의 외주납품 등록대기 erp_proddlvs/<k> 를 만든다.
-   모양 = 「외주납품입력·자재출고입력」 저장(prodDlvDocs 묶음 한 장)과 같음 — all:true, rows = 그 공정 줄 한 줄(남은 발주 수량 = 납품수량, 다음 업체가 다르면 moveKind·wipNo·toWc… 자재출고 칸 그대로), 머리 seq·proc·wc, dlvDate = 납품확인 날, ck = 열쇠.
-   두 번 안 생김: 문서 id = 열쇠(create = 없을 때만) · 그 줄에 이미 외주납품 문서(오류 뺌)가 있으면(prodLeft 0) 안 만듦.
-   지난 납품확인(PC_DLV_FROM 전, 11-11~12 44건)은 영림원에 이미 들어갔을 수 있어 안 만든다. 링크에서 누른 것은 담당자(외주납품 쓰기 권한)가 폼을 열어 둔 때 만들어진다. 되돌리기 단추는 없다(v195 담당자만). */
-var PC_DLV_FROM='2026-11-12T07:51:00.000Z',pcDlvBusy={};
-function pcDlvRow(k){var hit=null;(data.prods||[]).some(function(d){if(!d||!d.id||d.status==='오류'||ylwGone(d))return false;
-  return (d.rows||[]).some(function(r){if(!r||(d.kind==='제품'&&r.itemNo===d.itemNo)||asmIsAsm(r.proc))return false;if(asmDk(d,r)!==k)return false;hit={d:d,r:r};return true;});});return hit;}
-function pcDlvDoc(d,r,c){
-  var t=c.at?new Date(c.at):new Date();if(isNaN(t))t=new Date();var p=function(n){return String(n).padStart(2,'0');},date=t.getFullYear()+'-'+p(t.getMonth()+1)+'-'+p(t.getDate());
-  var w=prodDlvDoc(d,date,'',''),row=w.rows.filter(function(x){return x.itemNo===r.itemNo&&String(x.seq)===String(r.seq);})[0];if(!row)return null;
-  w.rows=[row];w.seq=row.seq;w.proc=row.proc;w.wc=row.wc;w.ck=c.dk||c.id;w.createdAt=new Date().toISOString();return w;}
-function pcDlvSync(){
-  if(!db||!db.collection||!PCONF||data.prods==null||data.proddlvs==null||!canCol('erp_proddlvs','w'))return;
-  Object.keys(PCONF).forEach(function(k){var c=PCONF[k];if(!c||!c.at||String(c.at)<PC_DLV_FROM||pcDlvBusy[k])return;
-    if((data.proddlvs||[]).some(function(x){return x&&(x.id===k||x.ck===k);}))return;
-    var m=pcDlvRow(k);if(!m||!purTrim(m.r.orderNo)||prodLeft(m.d,m.r)<=0)return;   /* 외주발주번호 전이면 다음에 다시 봄 */
-    var doc=pcDlvDoc(m.d,m.r,Object.assign({id:k},c));if(!doc)return;pcDlvBusy[k]=1;
-    db.collection('erp_proddlvs').doc(k).create(doc).then(function(made){if(made){dataPut('proddlvs',doc,{id:k});renderList();renderNav();renderSum();}},function(e){pcDlvBusy[k]=0;console.warn('납품확인 등록대기 못 만듦',k,e);});
-  });
-}
-function asmRcvCell(k,from,ok,v,arr,fp){   /* 받는 쪽 칸: 보낸업체-보낸공정 납품대기 + 「납품확인」 → 납품완료 */
-  if(!k)return arr?asmDoneChip('도착',false):'';var c=pcOf(k);ok=ok||!!c;
-  if(ok)return [h('span',{class:'chip 완료'},arr?'도착 완료':(from?from+' 납품완료':'납품완료')),c&&c.at?h('div',{class:'asmp'},'납품확인 '+asmWhen2(c.at)):null];
-  return [h('span',{class:'chip 대기'},(from||'')+' 납품대기'),fp&&!pcOf(fp)?null:h('div',{},h('button',{type:'button',class:'btn small',on:{click:function(){asmConfirm(k,from||'',v,fp);}}},'납품확인'))];   /* v202 보낸 공정이 아직 입고 전이면 단추 없음 */
-}
-function asmProdCard(d,asmWc){   /* v186 공정마다 외주납품 대기/완료 · 자재출고 대기/완료 · 도착 · 조립 외주납품·외주입고 */
-  var isP=d.kind==='제품',dt=asmDetail(d),maxP=0,pst=asmProdStage(d),hasA=dt.parts.some(function(p){return p.arr!=null;});dt.parts.forEach(function(p){maxP=Math.max(maxP,p.steps.length);});
-  var trs=dt.parts.map(function(p){var tds=[h('td',{},p.cname),h('td',{class:'mono'},p.code),h('td',{class:'asmn'},podNum(p.qty))];
-    for(var i=0;i<maxP;i++){var x=p.steps[i];tds.push(x?h('td',{class:'asmc'},h('div',{class:'asmp'},x.proc+' · '+x.wc),asmDlvChip(x.to?x.ok:x.dlv,x.to),x.mv==null?null:asmDoneChip('자재출고',x.mv)):h('td',{}));}
-    if(hasA)tds.push(h('td',{class:'asmc'},p.arr==null?'':asmRcvCell(p.fk,p.from,p.arr,asmWc||'',1,p.fp)));   /* v195 받는 쪽 「납품확인」 */
-    return h('tr',{},tds);});
-  var A=dt.asm,asmTr=A?h('tr',{class:'asmrow'},[h('td',{},show(d.itemName)),h('td',{class:'mono'},show(d.itemNo)),h('td',{class:'asmn'},podNum(A.qty)),
-    h('td',{class:'asmc',colspan:String(Math.max(1,maxP))},h('div',{class:'asmp'},A.proc+' · '+A.wc),asmDoneChip('외주납품',A.dlv),asmDoneChip('외주입고',A.inn)),h('td',{})]):null;
-  var head=['품명','품번','수량'];for(var i=0;i<maxP;i++)head.push('공정 '+(i+1));if(hasA)head.push('도착');
-  return h('div',{class:'asmprod'},h('div',{class:'asmph'},h('span',{class:'nt'},show(d.itemName)),
-      h('span',{class:'ns'},[show(d.planNo)?'생산계획번호 '+show(d.planNo):'','생산계획수량 '+podNum(d.qty)].filter(Boolean).join(' · ')),asmChip(pst)),
-    h('div',{class:'tw'},h('table',{class:'asmt asmg'},h('thead',{},h('tr',{},head.map(function(t){return h('th',{},t);}))),h('tbody',{},trs.concat(asmTr?[asmTr]:[])))));
-}
-/* ---------- v180 링크 발주 → 주간생산계획입력 대기 · 한 줄 단계 ----------
-   사장님 「…발주확인을 눌러 - 입고폼에 발주계획대기가 되고- 이를 영림원에 입력이 완료된 상태 인거잖아?」 · 「자 그걸 발주링크에서도 알 수 있게 그리고 새로운 발주도 할 수 있게 , 또한 입력폼에서도 발주서 박스만 보고도 상황이 어디까지 온건지 알 수 있게」
-   · 「발주서 입력 링크에서 공통 부속도  골라서 따로 발주 할 수 있어야 함」.
-   넘기기(asmConvSync) = erp_prods·erp_asmpo 저장 권한자가 폼을 열 때, 대기 발주서(prodIds 없음)마다 erp_prods 대기 문서를 id 「asm_<발주서id>」(공통부속은 「asm_<id>_<줄>」)로 없을 때만 만들고 발주서에 prodIds 를 적는다.
-   제품 발주 = 문서 하나(kind 제품, 공정 줄 = 주간생산계획입력 탭과 같은 prodLines, 뺀 부속 줄은 빼고 고친 부속은 수량 바꿈, asmEdit = 뺀·고친 줄) — 입력 작업자 길 1.
-   공통부속 발주 = 부속 줄마다 문서 하나(kind 부속, 반자재 품번으로 직접) — 입력 작업자 길 2. 두 쪽 다 fromAsm = 발주서 id. */
-function asmParts(items){var by={},out=[];(items||[]).forEach(function(it){(it.rows||[]).forEach(function(x){var p=by[x.ccode];
-  if(!p){p=by[x.ccode]={ccode:x.ccode,cname:x.cname,cspec:x.cspec,unit:x.unit,for:[]};out.push(p);}if(p.for.indexOf(it.pname)<0)p.for.push(it.pname);});});
-  return out.sort(function(a,b){return String(a.cname).localeCompare(String(b.cname),'ko');});}
-function asmProdsOf(a){return (a.prodIds||[]).map(function(id){return (data.prods||[]).filter(function(d){return d.id===id;})[0];}).filter(Boolean);}
-function asmLinked(){var m={};(data.asmpo||[]).forEach(function(a){(a.prodIds||[]).forEach(function(id){m[id]=a.id;});});return m;}
-function asmProdStage(d){   /* {r 차례, t 글자, c 색, pt·pd 부속 공정 전체·외주납품 완료, an·ad 부속 종류·도착} */
-  var parts=(d.rows||[]).filter(function(r){return d.kind!=='제품'||r.itemNo!==d.itemNo;}),pt=parts.length,pd=parts.filter(function(r){return asmStepSt(d,r).c==='done';}).length,an=0,ad=0;
-  if(d.kind==='제품'){var lastOf={};parts.forEach(function(r){var l=lastOf[r.itemNo];if(!l||Number(r.seq)>Number(l.seq))lastOf[r.itemNo]=r;});var ar0=asmAsmRow(d),w=ar0?ar0.wc:'';
-    Object.keys(lastOf).forEach(function(k){an++;if(asmArrived(d,lastOf[k],w))ad++;});}
-  var ar1=d.kind==='제품'?asmAsmRow(d):null,as=!!(ar1&&asmStepSt(d,ar1).c==='done'),inn=!!(ar1&&asmDlv(d,ar1).some(function(x){return purTrim(x.row.inNo);}));
-  var o=function(r,t,c){return {r:r,t:t,c:c,pt:pt,pd:pd,an:an,ad:ad,as:as,inn:inn,k:d.kind==='부속'?'부속':'제품'};},st=show(d.status);
-  if(st!=='완료')return o(2,'주간생산계획입력 '+(st||'대기'),st==='오류'?'bad':'wait');
-  if(d.kind==='제품'){var ar=asmAsmRow(d);
-    if(ar&&asmDlv(d,ar).some(function(x){return purTrim(x.row.inNo);}))return o(7,'외주입고 완료','done');
-    if(ar&&asmStepSt(d,ar).c==='done')return o(6,'조립 외주납품 완료','done');
-    if(an&&ad===an)return o(5,'부속 도착 완료','done');}
-  else if(pt&&pd===pt)return o(5,'외주납품 완료','done');
-  if(pd>0)return o(4,'외주납품 진행','wait');
-  return o(3,'외주발주입력 완료','done');
-}
-function asmLinkStage(a){
-  var k=a.kind==='부속'?'부속':'제품',ds=asmProdsOf(a);if(!ds.length)return {r:1,t:'발주서 저장',c:'wait',pt:0,pd:0,an:0,ad:0,as:false,inn:false,k:k};
-  var ss=ds.map(asmProdStage),m=ss.slice().sort(function(x,y){return x.r-y.r;})[0],o={r:m.r,t:m.t,c:m.c,pt:0,pd:0,an:0,ad:0,as:k==='제품',inn:k==='제품',k:k};
-  ss.forEach(function(s){o.pt+=s.pt;o.pd+=s.pd;o.an+=s.an;o.ad+=s.ad;if(!s.as)o.as=false;if(!s.inn)o.inn=false;});return o;
-}
-/* v186 사장님 「이렇게 등록이 완료된 발주서는 해당 발주링크와 발주서메뉴에서 이제 납품대기 상태가 되어 각 납품상태가 표기 되어야 합니다.」
-   묶음 = 등록대기(영림원 입력 전) → 납품대기(입력 끝 ~ 납품·입고 전) → 납품완료(제품 = 외주입고 완료 · 공통부속 = 모든 공정 외주납품 완료). */
-function asmGroup(st){if(st.r<=2)return '등록대기';if(st.k==='부속')return st.r>=5?'납품완료':'납품대기';return st.as&&st.ad===st.an?'납품완료':'납품대기';}   /* v193 제품 = 부속 모두 도착 + 조립 외주납품 완료 */
-function asmDoneChip(lab,ok){return h('span',{class:'chip '+(ok?'완료':'대기')},lab+' '+(ok?'완료':'대기'));}
-function asmNumChips(st){   /* 납품 카드 겉 숫자 칩 */
-  var a=[];if(st.pt)a.push(h('span',{class:'chip '+(st.pd===st.pt?'완료':'진행중')},'외주납품 '+st.pd+'/'+st.pt));
-  if(st.an)a.push(h('span',{class:'chip '+(st.ad===st.an?'완료':'진행중')},'부속 도착 '+st.ad+'/'+st.an));
-  if(st.k==='제품'){a.push(asmDoneChip('조립 외주납품',st.as));if(st.as)a.push(asmDoneChip('외주입고',st.inn));}
-  return a;}
-/* v186 납품 상태 표 자료(폼 문서로만) — 부속마다 공정(외주납품 대기/완료 · 업체가 바뀌면 자재출고 대기/완료) · 도착 · 조립(외주납품 · 외주입고) */
-function asmDetail(d){
-  var isP=d.kind==='제품',ar=isP?asmAsmRow(d):null,parts={},order=[];
-  (d.rows||[]).forEach(function(r){if(isP&&r.itemNo===d.itemNo)return;if(!parts[r.itemNo]){parts[r.itemNo]=[];order.push(r.itemNo);}parts[r.itemNo].push(r);});
-  var ps=order.map(function(k){var rs=parts[k].sort(function(x,y){return Number(x.seq)-Number(y.seq);}),last=rs[rs.length-1];
-    return {code:k,cname:show(rs[0].itemName),qty:rs[0].qty,steps:rs.map(function(r){var need=prodMoveNeed(d,r),m=need?asmMoveSt(d,r):null;
-      return {proc:show(r.proc),wc:show(r.wc),to:asmTo(d,r),dlv:asmStepSt(d,r).c==='done',k:asmDk(d,r),ok:asmOk(d,r),mv:need?!!(m&&m.c==='done'):null};}),arr:isP||purTrim(d.asmVendor)?asmArrived(d,last,ar?ar.wc:''):null,fk:asmDk(d,last),from:asmLab(last),fp:asmPre(d,last)};});   /* v195 도착 = 조립업체 납품확인(공통부속도) */
-  return {parts:ps,asm:ar?{proc:show(ar.proc),wc:show(ar.wc),qty:ar.qty||d.qty,dlv:asmStepSt(d,ar).c==='done',inn:asmDlv(d,ar).some(function(x){return purTrim(x.row.inNo);})}:null};
-}
-/* v184 사장님 「발주서 발주대기 목록은 각 거래처 박스안에 두고 내부 상황을 박스외부에 표기 해주세요」 — 박스 겉 숫자 칩(0 은 숨김) */
-function asmCountChips(ls,sh,rc){var n={};ls.forEach(function(x){var g=asmGroup(x.st);n[g]=(n[g]||0)+1;});var ni=asmInGroups(sh,rc).reduce(function(a,g){return a+g.cs.length;},0),no=0;   /* v203 출고 거래처별 카드 수 */
-  (sh||[]).forEach(function(s){(s.pos||[]).forEach(function(p){if(p.g==='납품완료')n['납품완료']=(n['납품완료']||0)+1;else no++;});});   /* v196 시트 카드 = 받을 납품 · 보낼 납품 · 납품완료 */
-  return [n['등록대기']?h('span',{class:'chip 대기'},'등록대기 '+n['등록대기']):null,ni?h('span',{class:'chip 진행중'},'입고대기 '+ni):null,no?h('span',{class:'chip 진행중'},'작업 '+no):null,n['납품대기']?h('span',{class:'chip 진행중'},'납품대기 '+n['납품대기']):null].filter(Boolean);}   /* v210 사장님 「발주서 거래처 박스 표면에 납품완료 표기 하지마」 */
-function asmRegChip(st){return st.r<=2?{t:st.c==='bad'?'오류':/진행중/.test(st.t)?'진행중':'대기',c:st.c}:st;}   /* v182 등록대기 칩 = 대기·진행중·오류 */
-function asmTitle(a){if(a.kind!=='부속')return show(a.pname);var rs=a.rows||[];return rs.length?show(rs[0].cname)+(rs.length>1?' 외 '+(rs.length-1):''):'';}
-function asmConvDocs(a){
-  var box=(ASMBOX||[]).filter(function(b){return b.id===a.box;})[0];if(!box)return {why:'발주 링크 없음'};
-  var want=asmWant(box.vendor),now=new Date().toISOString(),rowOf=function(r){return {itemNo:r.itemNo,itemName:r.itemName,qty:r.qty,seq:r.seq,proc:r.proc,wc:r.wc,wcFirst:r.wcFirst,last:r.last,workNo:'',orderNo:''};};
-  var base=function(o){return prodWhSet(Object.assign(o,{planNo:'',stage:'',status:'대기',agentNote:'',createdAt:now,route:routeOf(BYKEY.prods),fromAsm:a.id,asmVendor:box.vendor}));};   /* v214 납품창고 */
-  var need=show(a.need);if(!/^\d{4}-\d{2}-\d{2}$/.test(need))return {why:'납품요청일 없음'};
-  if(a.kind!=='부속'){
-    var pc=purTrim(a.pcode),q=Number(a.qty);if(want.pcodes.indexOf(pc)<0)return {why:'조립 외주계약 제품 아님'};if(!(q>0))return {why:'수량 없음'};
-    var off={},edit={};(a.rows||[]).forEach(function(r){var c=purTrim(r.ccode);if(r.on===false)off[c]=1;else if(Number(r.qty)!==Number(r.base))edit[c]=Number(r.qty);});
-    var ls=prodLines(pc,q).filter(function(l){return !off[l.itemNo];});ls.forEach(function(l){if(edit[l.itemNo]!=null)l.qty=prodNum(edit[l.itemNo]);});
-    if(!ls.length)return {why:'공정 없음'};var nw=ls.filter(function(l){return !l.wc;});if(nw.length)return {why:'외주거래처 없는 공정 '+nw.map(function(l){return l.itemNo+' '+l.proc;}).join(', ')};
-    var it=ifItem(pc)||{};
-    return {docs:[{id:'asm_'+a.id,doc:base({kind:'제품',itemNo:pc,itemName:it.name||show(a.pname),qty:q,dueDate:need,rows:ls.map(rowOf),
-      asmEdit:(a.rows||[]).filter(function(r){return r.on===false||Number(r.qty)!==Number(r.base);}).map(function(r){return {itemNo:purTrim(r.ccode),itemName:show(r.cname),base:Number(r.base||0),qty:r.on===false?0:Number(r.qty),on:r.on!==false};})})}]};
-  }
-  var ok=want.parts.map(function(p){return p.ccode;}),rs=(a.rows||[]).filter(function(r){return r&&r.on!==false;}),docs=[];
-  if(!rs.length)return {why:'부속 없음'};
-  for(var i=0;i<rs.length;i++){var c=purTrim(rs[i].ccode),q2=Number(rs[i].qty);
-    if(ok.indexOf(c)<0)return {why:c+' 은(는) 이 업체 제품 부속이 아님'};if(!(q2>0))return {why:c+' 수량 없음'};
-    var l2=prodLines(c,q2);if(!l2.length)return {why:c+' 공정 없음'};var n2=l2.filter(function(l){return !l.wc;});if(n2.length)return {why:'외주거래처 없는 공정 '+n2.map(function(l){return l.itemNo+' '+l.proc;}).join(', ')};
-    var i2=ifItem(c)||{};docs.push({id:'asm_'+a.id+'_'+i,doc:base({kind:'부속',itemNo:c,itemName:i2.name||show(rs[i].cname),qty:q2,dueDate:need,rows:l2.map(rowOf)})});}
-  return {docs:docs};
-}
-function asmConvSync(){
-  if(!db||!db.collection||data.asmpo==null||data.prods==null||ASMBOX==null||!data.items||!data.itemmats||!data.itemwcs||!data.contracts||!data.boms||!data.materials||!canCol('erp_prods','w')||!canCol('erp_asmpo','w'))return;
-  (data.asmpo||[]).forEach(function(a){
-    var bk='c:'+a.id;if(a.status!=='대기'||(a.prodIds&&a.prodIds.length)||asmBusy[bk])return;
-    var r=asmConvDocs(a);if(!r.docs)return;asmBusy[bk]=1;
-    r.docs.reduce(function(p,x){return p.then(function(){return db.collection('erp_prods').doc(x.id).create(x.doc);});},Promise.resolve())
-      .then(function(){return db.collection('erp_asmpo').doc(a.id).updateIf(function(cur){return cur&&!(cur.prodIds&&cur.prodIds.length)?{prodIds:r.docs.map(function(x){return x.id;}),convAt:new Date().toISOString()}:null;});})
-      .catch(function(e){asmBusy[bk]=0;console.warn('발주서 넘기기 못 함',a.id,e);});
-  });
-}
-function asmLine(x,v,pk,grp){   /* v186 grp = 등록대기·납품대기·납품완료 */   /* v184 pk = 삭제 체크 칸 · isReg = 등록대기 칩(대기·진행중·오류) */   /* 업체 박스 한 줄 = 링크 발주서(넘긴 생산 포함) 또는 영림원 조립 발주 생산 */
-  var open=!!asmCard['b:'+x.id],st=x.st,a=x.a,ds=x.ds;
-  var meta=a?[a.kind==='부속'?'공통부속 발주':'제품 발주',a.kind==='부속'?'':'발주 수량 '+podNum(a.qty),'납품요청일 '+show(a.need),asmWhen(a.at)].filter(Boolean)   /* v182 「필요일」 → 「납품요청일」, 세는 말(n줄·n개) 뺌 */
-    :['외주발주번호 '+show((asmAsmRow(ds[0])||{}).orderNo),'생산계획수량 '+podNum(ds[0].qty),'생산계획번호 '+show(ds[0].planNo)];
-  var nums=[];
-  /* v185 사장님 「생산/외주 발주관련 링크 발주서 디자인을 1.주간생산계획입력의 저장항목박스 디자인과 일관성을 유지해 주세요」 — 저장한 항목 카드(details.rec · .rt b/small · .chip) 그대로 */
-  var cs=grp==='등록대기'?asmRegChip(st):{t:grp,c:grp==='납품완료'?'done':'wait'},cl=grp==='납품대기'?'진행중':asmChipCls(cs);
-  if(pk)pk.addEventListener('click',function(e){e.stopPropagation();});
-  return asmTile('b:'+x.id,[pk||null,h('b',{class:'asmtt'},x.title),h('small',{},meta.concat(nums).join(' · ')),h('div',{class:'asmnum'},grp==='등록대기'?null:asmNumChips(st),h('span',{class:'chip '+cl},cs.t))],
-    function(){return [a?asmPoTable(a):null,a&&!ds.length&&x.why?h('p',{class:'msg bad'},x.why):null];});   /* v204 정사각 박스 · v210 배열 안 배열이라 h() 가 한 겹만 펴 「[object HTMLDivElement]」 글자가 났다. 공정·업체 상세 카드(asmProdCard)는 사장님 규칙(v190)대로 뺐다 */
-}
-function asmChipCls(cs){return cs.c==='bad'?'오류':cs.c==='done'?'완료':/진행/.test(cs.t)?'진행중':'대기';}   /* v185 저장한 항목 칩 색 4가지 */
-function asmPoTable(d){return h('div',{class:'tw'},h('table',{class:'asmt'},h('thead',{},h('tr',{},['발주','품명','품번','규격','단위','BOM 수량','필요 수량'].map(function(t){return h('th',{},t);}))),
-  h('tbody',{},(d.rows||[]).map(function(x){return h('tr',{class:(x.on===false?'off':'')+(d.kind!=='부속'&&asmChg(x)?' chg':'')},h('td',{},x.on===false?'':'✓'),h('td',{},show(x.cname)),h('td',{class:'mono'},show(x.ccode)),h('td',{},show(x.cspec)),h('td',{},show(x.unit)),
-    h('td',{class:'asmn'},d.kind==='부속'?'':podNum(x.base)),h('td',{class:'asmn'},x.on===false?'':podNum(x.qty)));}))));}
-function asmVendorLines(){   /* [{v, lines}] */
-  var linked=asmLinked(),by={},put=function(v,x){(by[v]||(by[v]=[])).push(x);};
-  (data.asmpo||[]).forEach(function(a){var b=(ASMBOX||[]).filter(function(y){return y.id===a.box;})[0],v=b?b.vendor:show(a.vendor);
-    var ds=asmProdsOf(a),r=ds.length?null:asmConvDocs(a);put(v,{id:a.id,a:a,ds:ds,st:asmLinkStage(a),title:asmTitle(a),at:show(a.at),why:r&&r.why?r.why:''});});
-  asmOrders().forEach(function(g){g.orders.forEach(function(o){o.prods.forEach(function(d){if(linked[d.id])return;
-    put(g.wc,{id:d.id,a:null,ds:[d],st:asmProdStage(d),title:show(d.itemName),at:show(d.createdAt)});});});});
-  return Object.keys(by).sort().map(function(v){return {v:v,lines:by[v].sort(function(x,y){return x.at<y.at?1:-1;})};});
-}
-function renderAsm(){
-  bulk=null;listBox=null;listBox2=null;sheetDraw=null;ifRefresh=null;
-  var box=h('div',{class:'podbox asmq'}),lastKey='';
-  function draw(){
-    if(cur!=='asmpo')return;
-    if(ASMBOX==null||data.contracts==null||data.boms==null||data.materials==null||data.asmpo==null){box.replaceChildren(h('p',{class:'msg'},'불러오는 중'));lastKey='';return;}
-    var names=asmNames(),wants=names.map(asmWant),pos=(data.asmpo||[]).slice().sort(function(a,b){return String(a.at||'')<String(b.at||'')?1:-1;});
-    var STK2=asmStk(),NEED=asmNeeds(),ist=impLast('stocks');
-    var key=JSON.stringify([STK2.at,STK2.any,NEED,ist?[ist.id,ist.status]:0,PCONF,data.items&&data.items.length,data.itemwcs&&data.itemwcs.length,data.prods,data.proddlvs,data.prodmoves,asmOpen,asmCard,wants.map(asmSig),(ASMBOX||[]).map(function(b){return [b.id,b.vendor,b.createdAt];}),pos,picked.asmpo]);if(key===lastKey)return;lastKey=key;
-    /* v184 사장님 「입력폼 발주서랑 공유링크랑 뭔차이인가요 발주서에 각 거래처별박스가 공유링크가 되는거 아니이요?」 · 「이진행상태가 공유링크랑 동일한거 아니냐구요」
-       「발주서」 = 조립업체(외주계약 조립, asmNames + 발주가 있는 업체)마다 박스 하나: 머리 = 이름 · 「QR」 · 「공유」, 안 = 「등록대기」·「등록완료」(링크와 같은 줄) + 삭제 체크 */
-    var vls=asmVendorLines(),lineBy={},SH=asmSheets(),RC=asmRcvCards();vls.forEach(function(g){lineBy[g.v]=g.lines;});
-    var vs=names.slice();vls.forEach(function(g){if(vs.indexOf(g.v)<0)vs.push(g.v);});Object.keys(NEED).forEach(function(v){if(vs.indexOf(v)<0)vs.push(v);});Object.keys(SH).concat(Object.keys(RC)).forEach(function(v){if(vs.indexOf(v)<0)vs.push(v);});vs.sort();
-    var dels=pos.filter(function(r){return (r.status==='대기'||r.status==='오류')&&!asmProdsOf(r).length;}),kit=delKit(ASMPO,dels),delIds={};dels.forEach(function(d){delIds[d.id]=d;});   /* v180 생산으로 넘긴 발주서는 그 생산 대기를 지운 뒤에 지움 */
-    var vOn=vs.filter(function(v){return !!asmOpen['v:'+v];})[0];if(vOn)vs=[vOn];   /* v206 연 거래처 하나만 보임 */
-    asmSolo=null;var crumb=[];
-    var boxes=vs.length?vs.map(function(v){var b=asmBoxOf(v),k='v:'+v,qk='q:'+v,open=!!asmOpen[k],ls=lineBy[v]||[],shs=SH[v]||[],isA=names.indexOf(v)>=0||ls.length>0,sl=asmStkLines(v,null,NEED,STK2),np=Object.keys(NEED[v]||{});   /* v197 실재고 · v198 np = 자재가 필요한 공정 */
-      /* v193 시트 = 조립(이 업체 조립 발주) + 공정마다 하나. 고른 시트 = asmOpen['s:'+업체] (''= 조립) */
-      var tabsV=(isA?['']:[]).concat(shs.map(function(s){return s.proc;}));np.forEach(function(pr){if(!asmIsAsm(pr)&&tabsV.indexOf(pr)<0)tabsV.push(pr);});   /* v198 시트 없는 공정 자재 = 그 공정 시트 */
-      var G={'등록대기':[],'납품대기':[],'납품완료':[]};ls.forEach(function(x){G[asmGroup(x.st)].push(x);});
-      var line=function(x,g){return asmLine(x,v,x.a&&delIds[x.a.id]?kit.pk(x.a):null,g);};
-      var inC=asmInCards(v,shs,RC[v]),nW=G['등록대기'].length+G['납품대기'].length;shs.forEach(function(sh){(sh.pos||[]).forEach(function(p){if(p.g!=='납품완료')nW++;});});   /* v200 */
-      var nDone=G['납품완료'].length;shs.forEach(function(sh){(sh.pos||[]).forEach(function(p){if(p.g==='납품완료')nDone++;});});
-      var wsum=[G['등록대기'].length?h('span',{class:'chip 대기'},'등록대기 '+G['등록대기'].length):null,G['납품대기'].length?h('span',{class:'chip 진행중'},'납품대기 '+G['납품대기'].length):null,null].filter(Boolean);   /* v212 납품완료는 따로 박스 */
-      /* v207 사장님 「거래처별 작업박스 표면에  발주된 품목의 공정명만 나타나게 해줘 발주된 공정이 보링 뿐이라면 표면에 보링 공정명만 나타나고 해당 박스 클릭시 각 공정별 박스가 나타나 그안 에 발주내용이 나타나게 해줘」
-         작업 겉면 = 발주가 있는 공정 이름만(다 납품완료면 흐리게) · 작업 안 = 공정마다 정사각 박스(겉 = 공정명·건수·칩·제품명, 고른 것 asmOpen['r:'+업체], 처음 닫힘) → 안 = 그 공정 실재고 + 발주 박스. v193 시트 단추 없앰. */
-      var pn=function(t){return t===''?(asmProcOf(v)||'조립'):t;},DN=[];
-      var procs=tabsV.map(function(t){var sh=t===''?null:shs.filter(function(s){return s.proc===t;})[0],ps=sh?sh.pos||[]:[],nm=[],seen={};
-        var add=function(x,d){x=show(x);if(!x)return;if(seen[x]){if(!d)seen[x].done=false;return;}seen[x]={t:x,done:!!d};nm.push(seen[x]);};
-        var n,dn,sum,kids,has;
-        if(t===''){n=G['등록대기'].length+G['납품대기'].length;has=n>0;ls.forEach(function(x){if(asmGroup(x.st)!=='납품완료')add(x.title,false);else DN.push({pr:pn(t),x:x});});   /* v212 납품완료 = 따로 박스 */
-          sum=[G['등록대기'].length?h('span',{class:'chip 대기'},'등록대기 '+G['등록대기'].length):null,G['납품대기'].length?h('span',{class:'chip 진행중'},'납품대기 '+G['납품대기'].length):null].filter(Boolean);
-          kids=['등록대기','납품대기'].reduce(function(o,g){return o.concat([h('h3',{class:'asmsub'},g,h('span',{},G[g].length+'건'))],G[g].length?[h('div',{class:'asmgrid'},G[g].map(function(x){return line(x,g);}))]:(g==='등록대기'?[h('div',{class:'empty'},'발주서가 없습니다.')]:[]));},[]);}
-        else{n=ps.filter(function(p){return p.g!=='납품완료';}).length;has=n>0;ps.forEach(function(p){if(p.g!=='납품완료')add(p.title,false);else DN.push({pr:t,p:p});});
-          sum=[];kids=asmWorkBody(v,t,ps);}
-        nm=nm.filter(function(m){return !m.done;}).concat(nm.filter(function(m){return m.done;}));var sb=asmStkBody(v,asmStkLines(v,t===''?np.filter(asmIsAsm):[t],NEED,STK2),STK2,t);
-        return {key:t,t:pn(t),n:n,sum:sum,names:nm,has:has,done:has&&!n,stk:!!sb,kids:[sb].filter(Boolean).concat(kids),empty:''};}).filter(function(p){return p.has||p.stk;});   /* 발주도 실재고도 없는 공정 박스는 안 그림 */   /* v198 그 공정 자재만 */
-      var wn=procs.filter(function(p){return p.has;}).map(function(p){return {t:p.t,done:p.done};});
-      wn=wn.filter(function(m){return !m.done;}).concat(wn.filter(function(m){return m.done;}));
-      var wkids=procs.length?[asmPair(v,procs,'r:','asmgrid')]:[];
-      /* v212 사장님 「생산/외부  발주서 거래처별 박스에 납품완료건은 납품완료 박스를 만들어 따로 관리해 주세요」 — 작업 옆 「납품완료」 정사각 박스(완료 = asmGroup·시트 p.g 「납품완료」 그대로), 안 = 발주별 정사각 박스 */
-      var dnm=[],dpc={},dpo=[];DN.forEach(function(d){var tt=show(d.x?d.x.title:d.p.title);if(tt&&dnm.indexOf(tt)<0)dnm.push(tt);if(dpc[d.pr]==null){dpc[d.pr]=0;dpo.push(d.pr);}dpc[d.pr]++;});
-      var dkids=DN.length?[h('div',{class:'asmgrid'},DN.map(function(d){return d.x?line(d.x,'납품완료'):asmSheetCard(v,d.pr,d.p,'done');}))]:[];
-      var PAIR=[{key:'w',t:'작업',n:nW,names:wn,sum:wsum,kids:wkids,empty:'발주서가 없습니다.'},{key:'i',t:'입고대기',n:inC.n,names:inC.names.map(function(t){return {t:t};}),sum:inC.ws,kids:inC,empty:'입고대기가 없습니다.'},
-        {key:'d',t:'납품완료',n:DN.length,names:dnm.map(function(t){return {t:t};}),sum:dpo.map(function(pr){return h('span',{class:'chip 완료'},pr+' '+dpc[pr]);}),kids:dkids,empty:'납품완료가 없습니다.'}];
-      if(open){var pv=asmOpen['p:'+v],rv=pv==='w'?asmOpen['r:'+v]:null,rp=procs.filter(function(p){return p.key===rv;})[0];   /* v209 거래처 · 작업/입고대기 · 공정 = 맨 위 한 줄 */
-        crumb=[{t:'거래처',go:function(){asmGo('');}},{t:v,go:function(){asmGo(v);}}];
-        if(pv)crumb.push({t:pv==='w'?'작업':pv==='d'?'납품완료':'입고대기',go:function(){delete asmOpen['r:'+v];asmCard={};}});
-        if(rp)crumb.push({t:rp.t,go:function(){asmCard={};}});
-        return h('div',{class:'asmstage'},pv?null:h('div',{class:'asmbar'},asmStkBtn(v),
-            b?h('button',{type:'button',class:'btn small podshare',on:{click:function(){if(asmOpen[qk])delete asmOpen[qk];else{asmOpen[qk]=1;asmOpen[k]=1;}draw();}}},'QR'):null,
-            b?asmShareBtn(b,!isA):null),
-          !pv&&asmOpen[qk]&&b?asmQr(vlUrl(v)||asmUrl(b.id)):null,   /* v220 */
-          asmPair(v,PAIR));}
-      return h('div',{class:'asmtile asmv'+(open?' open':'')},h('div',{class:'asmface',role:'button',tabindex:'0','aria-expanded':open?'true':'false',on:{click:function(){asmGo(open?'':v);draw();},keydown:asmKey}},
-          h('b',{class:'asmtt asmvt'},v),h('div',{class:'asmnum'},asmCountChips(ls,shs,RC[v]),asmStkChip(sl,STK2))),
-        !open?null:h('div',{class:'asmin'},h('div',{class:'asmbar'},asmStkBtn(v),
-            b?h('button',{type:'button',class:'btn small podshare',on:{click:function(){if(asmOpen[qk])delete asmOpen[qk];else{asmOpen[qk]=1;asmOpen[k]=1;}draw();}}},'QR'):null,
-            b?asmShareBtn(b,!isA):null),
-          asmOpen[qk]&&b?asmQr(vlUrl(v)||asmUrl(b.id)):null,   /* v220 */
-          asmPair(v,PAIR)));
-    }):[h('p',{class:'msg'},'조립업체가 없습니다.')];
-    if(vOn){var st=boxes[0];if(asmSolo){var tt=asmSolo.querySelector('.asmtt');crumb.push({t:tt?tt.textContent:''});st=h('div',{class:'asmstage'},asmSolo);}   /* v209 연 발주 박스만 */
-      var cb=h('div',{class:'asmcrumb'},crumb.reduce(function(o,c,i){var last=i===crumb.length-1;return o.concat([i?h('i',{},'›'):null,last?h('b',{},c.t):h('button',{type:'button',on:{click:function(){c.go();draw();}}},c.t)].filter(Boolean));},[]));
-      box.replaceChildren.apply(box,[kit.bar].filter(Boolean).concat([cb,st]));
-      var lv=crumb.map(function(c){return c.t;}).join('›');if(lv!==asmLv){asmLv=lv;var y=box.getBoundingClientRect().top;if(y<0)window.scrollBy(0,y-8);}return;}
-    asmLv='';
-    box.replaceChildren.apply(box,[kit.bar].filter(Boolean).concat(vs.length?[h('div',{class:'asmgrid asmvg'},boxes)]:boxes));   /* v204 거래처 정사각 박스 격자 */
-  }
-  asmDraw=draw;
-  mainEl.replaceChildren(h('section',{class:'card'},h('div',{class:'stephead'},h('h2',{},ASMPO.title)),box));
-  draw();
-}
-/* ---------- v213 업체별 링크 ----------
-   사장님 11-13 「입력폼에 각 업체별 링크 모아둔 페이지 만들어줘」. 메뉴 이름 = 사장님 말 「업체별 링크」(영림원에 없는 화면).
-   업체(이름)마다 카드 하나: 구매 출고처 박스(출고처박스.html) · 구매 입고처 박스(입고처박스.html) · 생산 발주서 박스(발주.html) — 각 줄 = 이름·주소·「공유」·「복사」·「QR」.
-   박스는 폼이 이미 만든 것만(새로 만들지 않음). 같은 종류·이름 박스가 여럿이면 처음 만든 것(boxOf·asmBoxOf — 발주서관리·발주서 화면 공유와 같은 링크).
-   보기 = 발주서관리 또는 발주서 보기 권한(canMenu). 저장 없음. */
-var LINKS={key:'links',n:'',title:'업체별 링크'};BYKEY.links=LINKS;
-var lnkDraw=null,lnkQr={};
-function lnkNames(){var n=[],put=function(x){x=show(x).trim();if(x&&n.indexOf(x)<0)n.push(x);};
-  if(canMenu('podocs','r'))(POBOX||[]).forEach(function(b){if(podKeyOk(b.id)&&(b.kind==='출고처'||b.kind==='입고처'))put(b.name);});
-  if(canMenu('asmpo','r'))(ASMBOX||[]).forEach(function(b){if(podKeyOk(b.id))put(b.vendor);});
-  return n.sort(function(a,b){return a.localeCompare(b,'ko');});}
-/* ---------- v220 거래처 링크 하나로 ----------
-   사장님 11-13 「발주링크 납품확인링크 구매납품확인 링크등 나눠진 거래처 링크를 하나로 합쳐 주세요」 · 「거래처는 나눠져 있어야죠」.
-   거래처(이름)마다 erp_pobox/<무작위 열쇠> {kind:'거래처', name, a:발주서 박스, o:출고처 박스, i:입고처 박스} 한 장 → 링크 = 거래처.html#<열쇠>(그 거래처 박스만 한 페이지에).
-   옛 링크 = 그 이름의 모든 박스(겹친 옛 박스 포함) 열쇠마다 erp_pobox/to_<박스 열쇠> {kind:'거래처링크', name, v} → 발주.html·발주박스.html 이 보고 넘어감.
-   새 문서만 만든다(옛 박스·규칙 안 건드림 — erp_pobox 는 열쇠 아는 사람 get 허용 그대로). 박스 문서들은 kind 로 걸러 써서 이 문서들은 다른 곳에 안 섞임.
-   쓰기 = erp_pobox 쓰기 권한 담당자가 폼을 열 때(박스 동기화와 같은 꼴). 없으면 공유·QR 은 옛 링크. */
-function vlOf(name){var a=(POBOX||[]).filter(function(b){return b.kind==='거래처'&&b.name===name&&podKeyOk(b.id);}).sort(function(x,y){return String(x.createdAt||'')<String(y.createdAt||'')?-1:1;});return a[0]||null;}
-/* v222 사장님 「지금 배송기사 공유 링크왜에는 모든기능이 통합된 하나의 주소에서 모든상황 이 다 보이게 만들어야 하는데」 — 11-13 18:36 조회 = 거래처 링크 문서 0장(담당자가 폼을 연 때만 만들던 것).
-   이제 공유·QR·복사·업체별 링크 화면이 그 거래처 링크를 부르는 순간(vlUrl) 그 자리에서 만든다(vlMake): 열쇠를 먼저 정해 바로 주소를 돌려주고 저장은 뒤따름(공유 창이 기다리지 않게),
-   만드는 중인 열쇠는 vlPend 로 두 번 안 만듦 · 옛 링크 넘김(to_)도 같이. 쓰기 권한(erp_pobox w) 없는 사람은 못 만들어 전처럼 옛 링크. 있는 자료는 지우지 않음. */
-var vlBusy={},vlPend={};
-function vlWant(v){var o=boxOf('출고처',v),i=boxOf('입고처',v),a=asmBoxOf(v);return {kind:'거래처',name:v,a:a?a.id:'',o:o?o.id:'',i:i?i.id:''};}
-function vlId(v){var d=vlOf(v);return d?d.id:(vlPend[v]||'');}
-function vlMake(v){
-  v=show(v).trim();if(!v)return '';
-  if(!db||!db.collection||POBOX==null||!canCol('erp_pobox','w'))return vlId(v);
-  var want=vlWant(v),have=vlOf(v),now=new Date().toISOString(),sig=JSON.stringify([want.a,want.o,want.i]),bk='v:'+v,id=have?have.id:(vlPend[v]||'');
-  if(!have&&!id){id=podKey();vlPend[v]=id;vlBusy[bk]=sig;
-    db.collection('erp_pobox').doc(id).set(Object.assign({},want,{at:now,createdAt:now})).catch(function(e){if(vlPend[v]===id)delete vlPend[v];vlBusy[bk]='';console.warn('거래처 링크 못 씀',v,e);});}
-  else if(have&&JSON.stringify([have.a||'',have.o||'',have.i||''])!==sig&&vlBusy[bk]!==sig){vlBusy[bk]=sig;
-    db.collection('erp_pobox').doc(have.id).update(Object.assign({},want,{at:now})).catch(function(e){vlBusy[bk]='';console.warn('거래처 링크 못 씀',v,e);});}
-  var olds=POBOX.filter(function(b){return podKeyOk(b.id)&&(b.kind==='출고처'||b.kind==='입고처')&&show(b.name).trim()===v;}).map(function(b){return b.id;})
-    .concat((ASMBOX||[]).filter(function(b){return podKeyOk(b.id)&&show(b.vendor).trim()===v;}).map(function(b){return b.id;}));
-  olds.forEach(function(k){var pid='to_'+k,ph=(POBOX||[]).filter(function(b){return b.id===pid;})[0];if(ph&&ph.v===id&&ph.kind==='거래처링크')return;
-    var pk='p:'+pid;if(vlBusy[pk]===id)return;vlBusy[pk]=id;
-    db.collection('erp_pobox').doc(pid).set({kind:'거래처링크',name:v,v:id,at:now}).catch(function(e){vlBusy[pk]='';console.warn('옛 링크 잇기 못 씀',v,e);});});
-  return id;
-}
-function vlUrl(name){var v=show(name).trim(),id=vlId(v);if(!id||!vlOf(v))id=vlMake(v)||id;return id?new URL('거래처.html#'+id,location.href).href:'';}
-function vlSync(){
-  if(!db||!db.collection||POBOX==null||ASMBOX==null||!canCol('erp_pobox','w'))return;
-  var ns=[],put=function(x){x=show(x).trim();if(x&&ns.indexOf(x)<0)ns.push(x);};
-  POBOX.forEach(function(b){if(podKeyOk(b.id)&&(b.kind==='출고처'||b.kind==='입고처'))put(b.name);});
-  ASMBOX.forEach(function(b){if(podKeyOk(b.id))put(b.vendor);});
-  ns.forEach(vlMake);
-}
-function renderLinks(){
-  bulk=null;listBox=null;listBox2=null;sheetDraw=null;ifRefresh=null;
-  var box=h('div',{class:'podbox'}),lastKey='';
-  function draw(){
-    if(cur!=='links')return;
-    if(POBOX==null&&ASMBOX==null){box.replaceChildren(h('p',{class:'msg'},'불러오는 중'));lastKey='';return;}
-    var asmN=data.contracts==null?null:asmNames(),ns=lnkNames();
-    var key=JSON.stringify([ns,(POBOX||[]).map(function(b){return [b.id,b.kind,b.name,b.createdAt,b.a,b.o,b.i];}),(ASMBOX||[]).map(function(b){return [b.id,b.vendor,b.createdAt];}),asmN,lnkQr]);if(key===lastKey)return;lastKey=key;
-    var row=function(qk,t,url,shareBtn){var a=h('a',{href:url,target:'_blank',rel:'noopener'});try{a.textContent=decodeURI(url);}catch(e){a.textContent=url;}
-      return h('div',{class:'lnkrow'},h('span',{class:'lt'},t),shareBtn,
-        h('button',{type:'button',class:'btn small podshare',on:{click:function(){podCopy(url).then(function(){flash('링크를 복사했습니다.');},function(){flash('복사하지 못했습니다. '+url,true);});}}},'복사'),
-        h('button',{type:'button',class:'btn small podshare','aria-expanded':lnkQr[qk]?'true':'false',on:{click:function(){if(lnkQr[qk])delete lnkQr[qk];else lnkQr[qk]=1;draw();}}},'QR'),
-        a,lnkQr[qk]?asmQr(url):null);};
-    var cards=ns.map(function(v){var rs=[],vu=vlUrl(v);
-      if(vu){rs.push(row('v:'+v,'거래처 링크',vu,h('button',{type:'button',class:'btn small podshare',on:{click:function(){shareMsg('INGHOME-'+v,vu);}}},'공유')));return h('div',{class:'lnkv'},h('h3',{},v),rs);}   /* v220 거래처마다 링크 하나 */
-      if(canMenu('podocs','r'))['출고처','입고처'].forEach(function(kind){var b=boxOf(kind,v);if(b)rs.push(row('b:'+b.id,kind+' 발주목록 박스',boxUrl(b.id,kind),boxShareBtn(b)));});
-      var ab=canMenu('asmpo','r')?asmBoxOf(v):null;if(ab)rs.push(row('a:'+ab.id,ASMPO.title,asmUrl(ab.id),asmShareBtn(ab,asmN!=null&&asmN.indexOf(v)<0)));
-      return rs.length?h('div',{class:'lnkv'},h('h3',{},v),rs):null;}).filter(Boolean);
-    box.replaceChildren.apply(box,cards.length?[h('div',{class:'lnkgrid'},cards)]:[h('p',{class:'msg'},'링크가 없습니다.')]);
-  }
-  lnkDraw=draw;
-  mainEl.replaceChildren(h('section',{class:'card'},h('div',{class:'stephead'},h('h2',{},LINKS.title)),box));
-  draw();
+  db.collection('erp_purdelvs').doc(r.id).update({choose:'',partial:true}).then(function(){flash('부분납품으로 넘겼습니다. 남은 발주는 그대로 열려 있습니다.');},function(e){flash('넘기지 못했습니다. '+errText(e),true);});
 }
 /* ---------- v38 앞 단계 미등록 안내 ----------
    사장님 11-02: 「모든 입력 조혼가구 검색으로 상품을 찾았는데 영림원 이전단계 미등록으로 입력이 안될때 해당 상품을 등록하기 위한 절차를 안내하면서 이전절차를 등록할 수 있도록 유도해줘」
@@ -6118,7 +5188,6 @@ function guideStep(s,say,fn,ip){
   else if(vs.length){form.fill(vs[0],vs[0].rows||[]);say('안내로 칸을 채웠습니다. 빈 칸을 채우고 저장을 누르세요(자동 저장 안 함).');}
 }
 function renderStep(){
-  if(LINK_GONE[cur]){cur=STEPS[0].key;try{history.replaceState(null,'','#'+cur);}catch(e){}renderNav();renderSum();}   /* v226 링크 화면 막음 */
   wSync();   /* v225 메뉴별 읽기 */
   document.body.setAttribute('data-step',cur);   /* v208 지금 단계 = 모양(CSS)만 가르는 표지 */
   if(cur==='staff'){renderStaff();return;}   /* v115 */
@@ -6126,9 +5195,6 @@ function renderStep(){
   if(!canMenu(menuOf(cur),'r')){renderNoPerm();return;}
   if(cur==='check'){renderCheck();return;}
   if(cur==='stocks'){renderStock();return;}   /* v102 */
-  if(cur==='podocs'){renderPodocs();return;}   /* v126 */
-  if(cur==='asmpo'){renderAsm();return;}   /* v176 */
-  if(cur==='links'){renderLinks();return;}   /* v213 */
   var s=BYKEY[cur];bulk=null;
   form=buildForm(s);
   if(s.key==='pomods'&&POMOD_PRE){var pp=POMOD_PRE;POMOD_PRE=null;POMOD_CTX=pp.ctx;setTimeout(function(){if(BYKEY[cur]===s)form.fill(pp.vals,pp.rows);},0);}   /* v157 「발주수정」으로 연 때 채움 */
@@ -6948,23 +6014,6 @@ function uploadCert(s,file,say){
     say(e&&e.message==='script'?'읽기 도구를 불러오지 못했습니다. 인터넷 연결을 확인해 주세요.':'파일을 읽지 못했습니다. PDF 나 사진(jpg · png · heic) 파일인지 확인해 주세요.',true);
   });
 }
-/* v147 사장님 「…폼 안에서 사진을 보는 화면은 아직 없습니다. - 해당 사진이 영림원 입력 대기중인 해당 발주 박스에 나타나게 해주세요」
-   구매납품입력 저장 목록 카드(납품 흐름으로 생긴 문서 r.flow)에 입고처 사진(erp_podlvimg/<입고열쇠>_<배송열쇠>_<0~5>) 작은 그림 · 누르면 크게. 상태와 상관없이(대기·진행중·완료) 보임. 사진 없으면 아무것도 없음. */
-var DLV_IMG={},dlvImgBusy={};
-function dlvPhotos(r){
-  var f=r&&r.flow;if(!f||!podKeyOk(f.ship)||!(Number(f.photos)>0))return null;
-  var po=(PODOCS||[]).filter(function(d){return purTrim(d.pono||d.id)===purTrim(r.pono);})[0],tok=po&&po.inTok;if(!podKeyOk(tok))return null;
-  var base=tok+'_'+f.ship,c=DLV_IMG[base];
-  if(!c){if(!dlvImgBusy[base]&&db&&db.collection){dlvImgBusy[base]=1;
-      Promise.all([0,1,2,3,4,5].map(function(i){var ref=db.collection('erp_podlvimg').doc(base+'_'+i);return ref.get?ref.get().catch(function(){return null;}):Promise.resolve(null);}))
-        .then(function(a){DLV_IMG[base]=a.filter(function(x){return x&&String(x.data||'').indexOf('data:image/jpeg;base64,')===0;}).map(function(x){return x.data;});renderList();if(podDraw)podDraw();},function(){dlvImgBusy[base]=0;});}
-    return null;}
-  if(!c.length)return null;
-  return h('div',{class:'dlvph'},c.map(function(d){var im=h('img',{alt:'입고 사진',src:d,loading:'lazy'});
-    return h('button',{type:'button',class:'dlvth','aria-label':'사진 크게 보기',on:{click:function(e){e.stopPropagation();imgBig(d);}}},im);}));
-}
-function imgBig(d){var ov=h('div',{class:'imgbig',role:'dialog','aria-label':'입고 사진',on:{click:function(){ov.remove();}}},h('img',{alt:'입고 사진',src:d}));
-  document.addEventListener('keydown',function k(e){if(e.key==='Escape'){ov.remove();document.removeEventListener('keydown',k);}});document.body.append(ov);}
 function recBody(s,r){
   var dl=h('dl',{});
   var chg=hasEdit(r)?r.edit.changed:[];   /* v34 수정대기: 바뀐 칸은 굵게 + 이전 값 줄긋기 */
@@ -6975,7 +6024,6 @@ function recBody(s,r){
   });
   if(s.recNos)s.recNos(r).forEach(function(x){if(!isEmpty(x[1]))dl.append(h('dt',{},x[0]),h('dd',{},show(x[1])));});   /* v80 영림원 번호 */
   var parts=[dl];
-  if(s.key==='purdelvs'){var ph=dlvPhotos(r);if(ph)parts.push(ph);}   /* v157 초과·발주수정 */   /* v147 입고처 사진 */
   if(s.rowFields&&(r.rows||[]).length){
     var th=h('tr',{},s.rowFields.map(function(f){return h('th',{},f.label);}));
     var trs=r.rows.map(function(row){return h('tr',{},s.rowFields.map(function(f){return h('td',{class:f.type==='number'?'n':''},show(row[f.k]));}));});
@@ -7752,11 +6800,10 @@ function erpMenus(){
   var out=[{k:'check',t:CHECK.title,cols:[]}];
   ['수입','구매','생산'].forEach(function(pg){
     if(PERM_SPLIT[pg]){STEPS.filter(function(s){return s.page===pg&&!s.hidden;}).forEach(function(s){out.push({k:s.key,t:PAGE_NAMES[pg]+' · '+s.title,cols:['erp_'+s.key]});});
-      if(pg==='구매')out.push({k:'podocs',t:PAGE_NAMES[pg]+' · '+PODOC.title,cols:['erp_podocs','erp_podocs_pub','erp_pobox','erp_poconfirm','erp_poship','erp_poshipref','erp_poin','erp_podlv','erp_podlvimg','erp_pointok']});   /* v133 박스·발주확인 */   /* v128 공개 문서 */   /* v126 발주서관리만 줄 수 있게 */
+      /* v227 「발주서관리」 권한 뺌(화면 없음) */
       return;}   /* v121 구매는 화면마다 권한 */
     out.push({k:'p:'+pg,t:PAGE_NAMES[pg],cols:STEPS.filter(function(s){return s.page===pg;}).map(function(s){return 'erp_'+s.key;})});});
-  out.push({k:'asmpo',t:PAGE_NAMES['생산']+' · '+ASMPO.title,cols:['erp_asmpo','erp_asmbox','erp_prodconfirm','erp_stocks']});   /* v197 재고업데이트(실재고 읽기)   /* v195 납품확인 */
-   /* v176 조립업체 발주 링크 */
+  /* v227 「발주서」(조립업체 발주 링크) 권한 뺌(화면 없음) */
   out.push({k:'stocks',t:'물류 · [물류] 재고현황',cols:['erp_stocks']});
   out.push({k:'basic',t:'영림원 기본정보 입력',cols:['erp_basic']});   /* v165 erp_basic 쓰기 권한(화면 없음 — erpFixCur 는 건너뜀) */
   STEPS.filter(function(s){return !s.hidden&&!s.page;}).forEach(function(s){
@@ -7764,8 +6811,8 @@ function erpMenus(){
   return out;
 }
 var MENUS=erpMenus();
-function menuOf(k){if(k==='check'||k==='stocks'||k==='staff'||k==='podocs'||k==='asmpo'||k==='links')return k;var s=BYKEY[k];if(!s)return k;if(s.page)return PERM_SPLIT[s.page]?k:'p:'+s.page;return s.shownIn||k;}
-function canMenu(k,op){if(!ME)return false;if(ME.admin===true)return true;if(k==='links')return canMenu('podocs',op)||canMenu('asmpo',op);   /* v213 업체별 링크 = 발주서관리·발주서 권한 */
+function menuOf(k){if(k==='check'||k==='stocks'||k==='staff')return k;var s=BYKEY[k];if(!s)return k;if(s.page)return PERM_SPLIT[s.page]?k:'p:'+s.page;return s.shownIn||k;}
+function canMenu(k,op){if(!ME)return false;if(ME.admin===true)return true;
   var p=permOf(ME.perms,k);return !!(p&&p[op]);}
 /* 컬렉션 권한 = 그 컬렉션을 가진 메뉴 중 하나라도. erp_imports(불러오기 요청)는 어느 메뉴든 · v167 erp_rates(영림원 환율정보)는 수입·구매 메뉴 보기·저장 */
 function colPerms(perms){
@@ -7776,7 +6823,7 @@ function colPerms(perms){
 function canCol(col,op){if(!ME)return false;if(ME.admin===true)return true;var c=colPerms(ME.perms||{})[col];return !!(c&&c[op]);}
 window.ERP_CAN=canCol;
 function anyPerm(perms){return Object.keys(perms||{}).some(function(k){var p=perms[k]||{};return p.r||p.w||p.d;});}
-function erpClear(){bulk=null;listBox=null;listBox2=null;sheetDraw=null;impDraw=null;ifRefresh=null;stkDraw=null;podDraw=null;asmDraw=null;lnkDraw=null;}
+function erpClear(){bulk=null;listBox=null;listBox2=null;sheetDraw=null;impDraw=null;ifRefresh=null;stkDraw=null;}
 function erpWait(){erpClear();staffDraw=null;mainEl.replaceChildren(h('section',{class:'card'},h('p',{class:'msg'},'불러오는 중')));}
 /* 지금 메뉴를 못 보면 볼 수 있는 첫 메뉴로 */
 function erpFixCur(){
@@ -7905,19 +6952,12 @@ function staffRepoTable(){
     ['구글시트 양식 웹앱(Apps Script)','영향 없음(드라이브만 씀)','—'],
     ['자료 보호','늘지 않음 — 파이어베이스 키는 원래 공개 값, 자료는 저장소 규칙이 지킴','저장소 규칙 배포(위)']]);
 }
-function go(k){if(LINK_GONE[k])k=STEPS[0].key;   /* v226 */
-  if(BYKEY[k]&&BYKEY[k].shownIn)k=BYKEY[k].shownIn;if(k!==cur||k==='podocs')podSel='';cur=k;wSync();navOpen=NARROW()?'':null;try{history.replaceState(null,'','#'+k);}catch(e){location.hash=k;}renderNav();renderSum();renderStep();}
-function refreshAll(){rateSyncAll();renderNav();renderSum();renderList();refreshLists();if(impDraw)impDraw();if(sheetDraw)sheetDraw();if(ifRefresh)ifRefresh();if(stkDraw)stkDraw();if(podDraw)podDraw();if(asmDraw)asmDraw();if(lnkDraw)lnkDraw();asmConvSync();asmBoxSync();pcDlvSync();podSync();podTokSync();podBoxSync();podShipInSync();podFlowSync();podModSync();}
+function go(k){if(BYKEY[k]&&BYKEY[k].shownIn)k=BYKEY[k].shownIn;cur=k;wSync();navOpen=NARROW()?'':null;try{history.replaceState(null,'','#'+k);}catch(e){location.hash=k;}renderNav();renderSum();renderStep();}
+function refreshAll(){rateSyncAll();renderNav();renderSum();renderList();refreshLists();if(impDraw)impDraw();if(sheetDraw)sheetDraw();if(ifRefresh)ifRefresh();if(stkDraw)stkDraw();podModSync();}   /* v227 링크 맞추기 뺌 — 발주수정 자동(구매)만 */
 
 /* ---------- boot ---------- */
 
-/* v226 사장님 「업체링크,페이지 모두삭제하라고했을텐데」 — 업체 링크 페이지 파일을 지웠으므로 링크를 만들거나 여는 화면(발주서관리·발주서·업체별 링크 — 공유·QR·복사 단추가 이 셋 안에만 있음)으로 가는 길을 막는다.
-   주소(#podocs·#podocs/번호·#asmpo·#links)로 와도 첫 메뉴로. 화면 코드·박스 동기화 코드는 남아 있으나 열 길이 없음. */
-var LINK_GONE={podocs:1,asmpo:1,links:1};
-var hash=location.hash.slice(1);if(BYKEY[hash]&&!LINK_GONE[hash])cur=BYKEY[hash].shownIn||hash;
-var podHash=function(){var m=/^#podocs\/(.+)$/.exec(location.hash);if(!m||LINK_GONE.podocs)return false;try{podSel=decodeURIComponent(m[1]);}catch(e){podSel=m[1];}cur='podocs';return true;};   /* v126 발주서 문서 주소 = #podocs/발주번호 (QR) */
-podHash();
-window.addEventListener('hashchange',function(){if(podHash()){navOpen=null;renderNav();renderSum();renderStep();}});
+var hash=location.hash.slice(1);if(BYKEY[hash])cur=BYKEY[hash].shownIn||hash;   /* v227 #podocs·#asmpo·#links 는 화면이 없어 첫 메뉴 */
 dbP=connectDb();   /* v28: 발주 상품검색이 첫 화면부터 기다릴 수 있게 먼저 */
 renderNav();renderSum();renderStep();refreshLists();
 
@@ -7932,7 +6972,7 @@ dbP.then(function(d){
   if(!db){ME={admin:true};   /* 연결 못 함 — 예전처럼 화면은 보이고 저장은 안 됨 */
     renderNav();renderStep();
     bannerEl.append(h('div',{class:'banner'},'파이어베이스에 연결하지 못했습니다. 인터넷 연결을 확인하고 다시 열어 주세요. 지금은 입력해도 저장되지 않습니다.'));
-    STEPS.forEach(function(s){data[s.key]=[];});data.asmpo=[];ASMBOX=[];PCONF={};IMPORTS=[];STOCKS=[];PODOCS=[];refreshAll();return;
+    STEPS.forEach(function(s){data[s.key]=[];});ASMBOX=[];IMPORTS=[];STOCKS=[];refreshAll();return;
   }
   wSync();   /* v225 읽기 줄이기 — 무엇을 어떻게 지켜보는지는 wDefs(늘·메뉴별·조건) */
 });
