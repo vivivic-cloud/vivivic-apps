@@ -109,5 +109,16 @@ function shipChain(k){
 }
 /* v160 부분납품 표시: 「부분납품 · 납품 60 / 발주 100 · 남음 40」 + 상황 꼬리 */
 function partText(pt,tail){if(!pt)return '';return '부분납품 · 납품 '+num(pt.dlv)+' / 발주 '+num(pt.qty)+' · 남음 '+num(pt.left)+(tail?' · '+tail:'');}
-window.PO={partText:partText,shipChain:shipChain,who:who,fill:fill,h:h,show:show,num:num,when:when,getMany:getMany,getOne:getOne,commit:commit,rkey:rkey,keyOk:keyOk,noOk:noOk,lib:lib,codes:codes,scanner:scanner,shrink:shrink,inboxes:inboxes,rememberInbox:rememberInbox};
+/* v222 거래처 링크 박스(폼 .asmq 정사각 박스와 같은 꼴) — 사장님 「거래처 공유 발주링크도 입력폼의 거래처별 박스구성 동일하게 나타나게 해줘라」
+   emb() = 거래처.html 안에 들어 있으면 바깥 VL(경로·박스 겉 요약을 바깥이 그림). crumb(cs) = 맨 위 한 줄 [{t, go}] — 안에 있으면 바깥으로 보내고 null.
+   tile(face, click, cls) = 정사각 박스(누르면 click). sum(o) = 바깥 거래처 박스 겉 요약 {n, chips:[[글자,색]], names:[{t,done}]} */
+function emb(){try{return window.self!==window.top&&window.parent&&window.parent.VL?window.parent.VL:null;}catch(e){return null;}}
+function crumb(cs){var V=emb();if(V){var m=document.getElementById('main');if(m)m.style.paddingTop='4px';V.crumb(window,cs);return null;}
+  return h('div','asmcrumb',cs.reduce(function(o,c,i){var last=i===cs.length-1,b=null;if(!last){b=h('button','',c.t);b.type='button';b.addEventListener('click',function(){c.go();});}return o.concat([i?h('i','','›'):null,last?h('b','',c.t):b]);},[]));}
+function tkey(e){if(e.target!==e.currentTarget)return;if(e.key==='Enter'||e.key===' '){e.preventDefault();e.currentTarget.click();}}
+function face(kids,click,on){var f=h('div','asmface',kids);f.setAttribute('role','button');f.tabIndex=0;f.setAttribute('aria-expanded',on?'true':'false');f.addEventListener('click',click);f.addEventListener('keydown',tkey);return f;}
+function tile(kids,click,cls){return h('div','asmtile'+(cls?' '+cls:''),face(kids,click,false));}
+function sum(o){var V=emb();if(V)V.sum(window,o);}
+function uniq(a){var o=[];a.forEach(function(x){x=show(x);if(x&&o.indexOf(x)<0)o.push(x);});return o;}
+window.PO={emb:emb,crumb:crumb,face:face,tile:tile,sum:sum,uniq:uniq,partText:partText,shipChain:shipChain,who:who,fill:fill,h:h,show:show,num:num,when:when,getMany:getMany,getOne:getOne,commit:commit,rkey:rkey,keyOk:keyOk,noOk:noOk,lib:lib,codes:codes,scanner:scanner,shrink:shrink,inboxes:inboxes,rememberInbox:rememberInbox};
 })();

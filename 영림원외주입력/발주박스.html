@@ -26,7 +26,7 @@
 <style>.po.act{border-color:var(--ink);box-shadow:0 0 0 2px rgba(55,53,47,.12)}.in{border-top:1px solid var(--rowline);margin:12px 0 0;padding:12px 0 0}.in .acts{margin:10px 0 0}</style>
 </head>
 <body>
-<main id="main"><p class="msg">불러오는 중</p></main>
+<main id="main" class="asmq"><p class="msg">불러오는 중</p></main>
 <script src="발주공통.js"></script>
 <script>
 (function(){
@@ -63,7 +63,7 @@ function openShip(sk){
       ACT=null;topErr='이 입고처 박스에 없는 발주입니다.';draw();return;}
     topErr='';ACT={pono:p.pono,ship:sk,inr:null,dlv:null,imgs:[],editing:false,draft:{},editBox:null};
     try{history.replaceState(null,'','#'+key+'&s='+sk);}catch(e){}
-    return loadAct().then(function(){draw();var el=document.querySelector('.po.act');if(el)el.scrollIntoView({block:'start'});});
+    return loadAct().then(function(){NAV={o:p.pono};draw();});   /* v222 연 발주 = 그 발주 박스만 */
   },function(){topErr='불러오지 못했습니다.';draw();});
 }
 function actPo(){return ACT&&(BOX.pos||[]).filter(function(x){return x&&x.pono===ACT.pono;})[0];}
@@ -160,15 +160,19 @@ function inPart(p){
     h('div','acts',pb,file,ib,eb),ACT.editBox&&!ACT.editing?ACT.editBox:null);
 }
 function kv(pairs){var d=h('dl');pairs.forEach(function(p){d.append(h('dt','',p[0]),h('dd',p[2]||'',p[1]));});return d;}
-function draw(){
-  if(BOX===false){say('발주서가 없습니다.',true);return;}
-  if(!BOX)return;
-  var out=BOX.kind==='출고처',pos=(BOX.pos||[]).filter(Boolean);
-  if(!out)pos=pos.filter(function(p){return !!CONF[p.pono];});   /* 입고처 = 발주확인된 것만 */
-  pos=pos.filter(function(p){return p.final!==true||(ACT&&ACT.pono===p.pono);});   /* v156 납품완료는 목록·건수에서 뺌(기사 QR 로 연 그 발주만 보기용으로 남김) */
-  if(!out&&ACT)pos=pos.filter(function(p){return p.pono===ACT.pono;}).concat(pos.filter(function(p){return p.pono!==ACT.pono;}));   /* 연 발주서를 맨 위로 */
-  document.title='발주서 '+show(BOX.name);
-  var cards=pos.map(function(p){
+/* v222 사장님 「거래처 공유 발주링크도 입력폼의 거래처별 박스구성 동일하게 나타나게 해줘라」 — 폼 「발주서관리」(v221 podBoxes) 와 같은 흑백 정사각 박스, 토글 없음.
+   출고처 = 단계 박스 셋 「발주확인 전」·「발주확인」·「납품완료」(겉 = 건수·부분납품·안의 품명) → 발주 박스(겉 = 발주번호·발주일·첫 품명·상태) → 그 발주 한 장(아래 카드 그대로: 발주확인 확인·취소·QR·바코드·배송기사 공유).
+   입고처 = 발주 박스(발주확인된 것, 납품완료 뺌 — v153·v156 그대로) + 위 「스캔」·발주번호 → 그 발주 한 장(입고·사진·입고확인·수정요청 그대로).
+   누른 박스만 화면에, 맨 위 한 줄 경로로 돌아감(거래처.html 안이면 경로는 바깥 맨 위). NAV {s 단계, o 발주번호}. */
+var NAV={},STG=[{key:'u',t:'발주확인 전'},{key:'c',t:'발주확인'},{key:'d',t:'납품완료'}],LASTNAV='';
+function go(n){NAV=n||{};topErr='';draw();}
+function finOf(p){var d=DLV[p.pono]||{};return p.final===true||d.final===true;}
+function stOf(p){return finOf(p)?'d':CONF[p.pono]?'c':'u';}
+function stTxt(p,out){var c=CONF[p.pono],d=DLV[p.pono]||{};
+  if(finOf(p))return {t:'납품완료',c:'완료'};if(p.part)return {t:'부분납품',c:'진행중'};
+  if(out)return c?{t:'발주확인 '+when(c.at),c:'진행중'}:{t:'발주확인 전',c:'대기'};
+  return {t:d.locked?'잠김':d.doneAt&&Number(d.doneRev||0)>=Number(d.rev||0)&&d.rev?'납품완료 '+when(d.doneAt):d.inAt?'입고확인 '+when(d.inAt):'입고대기',c:'진행중'};}
+function cardOf(p,out){
     var c=CONF[p.pono],d=DLV[p.pono]||{},rows=(p.rows||[]).filter(Boolean),top=h('div','top',h('span','no',show(p.pono))),act=!out&&ACT&&ACT.pono===p.pono,fin=p.final===true||d.final===true;   /* v155 영림원 입력완료 = 납품완료 */
     if(fin)top.append(h('span','st on','납품완료'));
     else if(out){if(c)top.append(h('span','st on','발주확인 '+when(c.at)));
@@ -183,14 +187,46 @@ function draw(){
       out&&!fin?h('div','ship',(function(){var sb=h('button','','배송기사 공유');sb.type='button';sb.disabled=!!busy['s'+p.pono];sb.addEventListener('click',function(){shareShip(p);});return sb;})(),NOTE[p.pono]?h('span','note',NOTE[p.pono]):null):null,
       act?inPart(p):null,
       errs[p.pono]?h('p','err',errs[p.pono]):null);
-    if(act)el.classList.add('act');return el;});
-  var bar=null;
-  if(!out){var inp=h('input'),okb=h('button','sec','확인'),sc=h('button','wide','스캔');inp.placeholder='발주번호';inp.setAttribute('aria-label','발주번호');inp.autocomplete='off';okb.type='button';sc.type='button';
-    okb.addEventListener('click',function(){goIn(inp.value);});inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();goIn(inp.value);}});sc.addEventListener('click',scanTop);
-    bar=h('div','acts',sc,camEl,h('div','manual',inp,okb),topErr?h('p','err',topErr):null);}
-  P.fill(mainEl,[out?P.who('출고처 발주목록 박스 — '+show(BOX.name),'out'):P.who('입고처 발주목록 박스 — '+show(BOX.name),'in'),   /* v150 기사 QR 로 열어도 「입고처 발주목록 박스」 그대로(사장님 바로잡음) */   /* v149 */
-    h('h1','',show(BOX.name)),h('p','sub',out?'출고처 · '+pos.length+'건':'입고처 · 입고대기 '+pos.length+'건'),bar,
-    cards.length?cards:h('p','msg',out?'발주서가 없습니다.':'입고대기 발주가 없습니다.')]);
+    if(act)el.classList.add('act');return el;
+}
+function poFace(p,out){var rs=(p.rows||[]).filter(Boolean),t=stTxt(p,out);
+  return [h('b','asmtt mono',show(p.pono)),h('small','',[out?'':show(p.vendor),show(p.podate)?'발주일 '+show(p.podate):''].filter(Boolean).join(' · ')),
+    rs.length?h('ul','asmnames',h('li','',show(rs[0].cname)+(rs.length>1?' 외 '+(rs.length-1)+'줄':''))):null,h('div','asmnum',h('span','chip '+t.c,t.t))];}
+function draw(){
+  if(BOX===false){say('발주서가 없습니다.',true);P.sum({n:0,chips:[],names:[]});return;}
+  if(!BOX)return;
+  var out=BOX.kind==='출고처',pos=(BOX.pos||[]).filter(Boolean),V=P.emb();
+  if(!out){pos=pos.filter(function(p){return !!CONF[p.pono];});   /* 입고처 = 발주확인된 것만 */
+    pos=pos.filter(function(p){return p.final!==true||(ACT&&ACT.pono===p.pono);});   /* v156 납품완료는 목록·건수에서 뺌(기사 QR 로 연 그 발주만 보기용으로 남김) */
+    if(ACT)pos=pos.filter(function(p){return p.pono===ACT.pono;}).concat(pos.filter(function(p){return p.pono!==ACT.pono;}));}   /* 연 발주서를 맨 위로 */
+  document.title='발주서 '+show(BOX.name);
+  if(!out&&topErr&&NAV.o)NAV={};
+  /* 바깥 거래처 박스 겉 요약 */
+  if(out){var ch=[];STG.forEach(function(g){var n=pos.filter(function(p){return stOf(p)===g.key;}).length;if(n)ch.push([g.t+' '+n,g.key==='u'?'대기':g.key==='c'?'진행중':'완료']);});
+    var np=pos.filter(function(p){return p.part&&!finOf(p);}).length;if(np)ch.push(['부분납품 '+np,'진행중']);
+    var nm=[];pos.forEach(function(p){(p.rows||[]).forEach(function(x){if(x)nm.push({t:x.cname,done:finOf(p)});});});
+    P.sum({n:pos.filter(function(p){return !finOf(p);}).length,chips:ch,names:nm});}
+  else{var nm2=[];pos.forEach(function(p){(p.rows||[]).forEach(function(x){if(x)nm2.push({t:x.cname});});});P.sum({n:pos.length,chips:[['입고대기 '+pos.length,'진행중']],names:nm2});}
+  var root={t:show(BOX.name),go:function(){go({});}},cs=[root],body=[];
+  if(NAV.s&&out){var g=STG.filter(function(x){return x.key===NAV.s;})[0];if(g){var s0=NAV.s;cs.push({t:g.t,go:function(){go({s:s0});}});}else NAV={};}
+  var po=NAV.o&&pos.filter(function(p){return p.pono===NAV.o;})[0];
+  if(NAV.o&&!po){var o0=Object.assign({},NAV);delete o0.o;NAV=o0;}
+  if(po){cs.push({t:show(po.pono)});var back=Object.assign({},NAV);delete back.o;
+    body=[h('div','asmtile open',P.face(poFace(po,out),function(){go(back);},true),h('div','asmin',cardOf(po,out)))];}
+  else if(out&&!NAV.s){
+    body=[h('div','asmgrid2',STG.map(function(g){var gs=pos.filter(function(p){return stOf(p)===g.key;}),nm=[];gs.forEach(function(p){(p.rows||[]).forEach(function(x){if(x)nm.push(x.cname);});});
+      var np=gs.filter(function(p){return p.part&&!finOf(p);}).length;
+      return P.tile([h('b','asmtt asmvt',g.t),h('div','asmn2',gs.length+'건'),np?h('div','asmnum',h('span','chip 진행중','부분납품 '+np)):null,
+        nm.length?h('ul','asmnames',P.uniq(nm).map(function(t){return h('li',g.key==='d'?'done':'',t);})):null],function(){go({s:g.key});},'asmsq');}))];}
+  else{var list=out?pos.filter(function(p){return stOf(p)===NAV.s;}):pos,base=Object.assign({},NAV);
+    var bar=null;
+    if(!out){var inp=h('input'),okb=h('button','sec','확인'),sc=h('button','wide','스캔');inp.placeholder='발주번호';inp.setAttribute('aria-label','발주번호');inp.autocomplete='off';okb.type='button';sc.type='button';
+      okb.addEventListener('click',function(){goIn(inp.value);});inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();goIn(inp.value);}});sc.addEventListener('click',scanTop);
+      bar=h('div','acts',sc,camEl,h('div','manual',inp,okb),topErr?h('p','err',topErr):null);}
+    body=[bar,list.length?h('div','asmgrid',list.map(function(p){return P.tile(poFace(p,out),function(){go(Object.assign({},base,{o:p.pono}));});})):h('div','empty',out?'발주서가 없습니다.':'입고대기 발주가 없습니다.')];}
+  P.fill(mainEl,[V?null:(out?P.who('출고처 발주목록 박스 — '+show(BOX.name),'out'):P.who('입고처 발주목록 박스 — '+show(BOX.name),'in')),   /* v150 · v149 머리 줄(거래처.html 안에서는 바깥 경로가 대신) */
+    P.crumb(cs),body]);
+  var nv=JSON.stringify(NAV);if(nv!==LASTNAV){LASTNAV=nv;if(V)V.top();else window.scrollTo(0,0);}
 }
 load().then(function(){if(BOX&&BOX.kind==='입고처'&&sq)return openShip(sq);});
 window.addEventListener('hashchange',function(){var k2=(location.hash||'').slice(1).split('&')[0];if(k2!==key)location.reload();});   /* v152 다른 박스로 넘길 때(주소 # 만 바뀜) 다시 엶 */
