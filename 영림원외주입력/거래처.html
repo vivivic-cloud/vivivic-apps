@@ -8,7 +8,9 @@
        → 누르면 그 박스만. 칸이 하나면 바로 그 안. 안 = 옛 페이지를 그대로 띄움(같은 코드·같은 규칙·같은 기능) — 안 페이지가 박스(단계 → 발주 → 한 장)를 그리고
        경로(VL.crumb)·겉 요약(VL.sum)을 이 페이지로 보냄. 맨 위 한 줄 경로(거래처 › 박스 › 단계 › 발주)로 돌아감.
      v223 사장님 「링크된 거래처박스에 뒤로가기 홈으로가기등 버튼이 없어요」 — 맨 위 「뒤로」(한 단계 앞 박스 = 경로 바로 앞)·「처음으로」(이 링크 첫 화면).
-       폰·카톡 뒤로가기 = 한 단계 앞 박스: 경로 깊이만큼 history 를 쌓고(pushState, 주소 그대로) popstate 에서 한 단계 앞으로. 링크 밖(다른 거래처·폼)으로 가는 길 없음. -->
+       폰·카톡 뒤로가기 = 한 단계 앞 박스: 경로 깊이만큼 history 를 쌓고(pushState, 주소 그대로) popstate 에서 한 단계 앞으로. 링크 밖(다른 거래처·폼)으로 가는 길 없음.
+     v225 사장님 「지금 배송기사 공유 링크왜에는 모든기능이 통합된 하나의 주소에서 모든상황 이 다 보이게 만들어야 하는데」 — 배송기사 링크(배송.html)만 따로, 나머지는 모두 이 주소.
+       기사 발주서 QR(입고.html#배송열쇠, QR 안 주소라 그대로) → 이 주소 #열쇠&s=<배송열쇠> → 「입고처 발주목록 박스」 안 그 발주 한 장(입고수량·사진·입고확인·수정요청). &s= 는 읽고 주소에서 지움(주소 = 거래처 링크 하나). -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -43,8 +45,9 @@ main.vl{max-width:1180px;padding:22px max(16px,env(safe-area-inset-left,0px)) ca
 var P=window.PO,h=P.h,show=P.show,mainEl=document.getElementById('main');
 function say(t,bad){mainEl.replaceChildren(h('div','vlhead',h('p','msg'+(bad?' bad':''),t)));}
 var h2El=h('h2','',''),cardEl=null;
-var key=(location.hash||'').slice(1).split('&')[0];
+var hp=(location.hash||'').slice(1).split('&'),key=hp[0],sq=(hp.filter(function(x){return x.indexOf('s=')===0;})[0]||'').slice(2);
 if(!P.keyOk(key)){say('링크가 없습니다.',true);return;}
+if(!P.keyOk(sq))sq='';else try{history.replaceState(null,'','#'+key);}catch(e){}   /* v225 기사 QR 로 온 발주(입고처 박스 안에서 열음) */
 var NAME='',PARTS=[],ACT=null,headEl=h('div',''),bodyEl=h('div','vlbody'),frEl=h('div','vlfr');
 /* 안 페이지 높이 = 안 내용 높이(같은 출처라 읽을 수 있음) */
 function fitNow(fr){try{var d=fr.contentDocument;if(!d||!d.documentElement)return;var m=d.getElementById('main')||d.body;if(!m)return;var hgt=Math.ceil(m.getBoundingClientRect().bottom+(d.defaultView?d.defaultView.scrollY:0));if(hgt>0)fr.style.height=hgt+'px';}catch(e){}}
@@ -88,10 +91,10 @@ function render(){
 P.getOne('erp_pobox/'+key).then(function(v){
   if(!v||v.kind!=='거래처'){say('링크가 없습니다.',true);return;}
   PARTS=[['a','발주서','발주.html'],['o','출고처 발주목록 박스','출고처박스.html'],['i','입고처 발주목록 박스','입고처박스.html']]
-    .filter(function(p){return P.keyOk(v[p[0]]);}).map(function(p){return {key:p[0],label:p[1],src:p[2]+'#'+v[p[0]],cs:[],sum:null,fr:null};});
+    .filter(function(p){return P.keyOk(v[p[0]]);}).map(function(p){return {key:p[0],label:p[1],src:p[2]+'#'+v[p[0]]+(p[0]==='i'&&sq?'&s='+sq:''),cs:[],sum:null,fr:null};});
   if(!PARTS.length){say('발주서가 없습니다.',true);return;}
   NAME=show(v.name);document.title='INGHOME-'+NAME;
-  ACT=PARTS.length===1?PARTS[0].key:null;
+  ACT=PARTS.length===1?PARTS[0].key:sq&&P.keyOk(v.i)?'i':null;
   PARTS.forEach(function(p){var fr=document.createElement('iframe');fr.title=p.label;fr.setAttribute('allow','camera; clipboard-write; web-share; fullscreen');fr.hidden=p.key!==ACT;fit(fr);p.fr=fr;fr.src=p.src;frEl.append(fr);});
   mainEl.replaceChildren(h('div','vlhead',h('h1','',NAME)),h('section','card',h('div','stephead',h2El),headEl,bodyEl,frEl));render();   /* v224 폼과 같은 짜임: 머리띠 · h1 · 카드(h2 · 경로 · 박스) */
 },function(){say('불러오지 못했습니다.',true);});

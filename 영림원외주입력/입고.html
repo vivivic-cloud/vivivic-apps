@@ -2,7 +2,8 @@
 <!-- ⚠ v151 시험용: 누가 찍어도 열림(erp_poship.inbox) — 실제 운영 전 보안 보완(사장님 11-09).
      기사 폰 발주서 QR 이 가리키는 주소(입고.html#<배송열쇠>) — v146 부터 넘겨주기만 한다(QR 안 주소라 지우면 안 됨). v150 박스 열쇠가 없는 폰 = 「입고처 발주목록 박스 링크를 먼저 열어 주세요」.
      이 폰에서 연 입고처 발주박스(localStorage po.inboxes, 주소에 &b= 가 있으면 그것) 중 이 발주가 있는 박스로 → 발주박스.html#<박스 열쇠>&s=<배송열쇠>
-     (그 박스 안 발주서에서 사진·입고수량·입고확인·수정요청). 없으면 「이 입고처 박스에 없는 발주입니다.」로 멈춤. 로그인 없음. -->
+     (그 박스 안 발주서에서 사진·입고수량·입고확인·수정요청). 없으면 「이 입고처 박스에 없는 발주입니다.」로 멈춤. 로그인 없음.
+     v225 그 박스의 거래처 링크가 있으면 거래처.html#<거래처 열쇠>&s=<배송열쇠> 로(거래처 링크 하나 안에서 입고). -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -32,7 +33,7 @@ P.getOne('erp_poship/'+ship).then(function(s){
   return P.getMany(['erp_poconfirm/'+s.pono,'erp_podocs_pub/'+s.pubKey]).then(function(o){
     if(!o['erp_poconfirm/'+s.pono]){say('발주확인 전',true);return;}
     var ib=P.keyOk(s.inbox)?s.inbox:o['erp_podocs_pub/'+s.pubKey]&&o['erp_podocs_pub/'+s.pubKey].inbox;
-    if(P.keyOk(ib)){location.replace(new URL('발주박스.html#'+ib+'&s='+ship,location.href).href);return;}
+    if(P.keyOk(ib))return goBox(ib);
     return fallback(s);
   });
 }).catch(function(){say('불러오지 못했습니다.',true);});
@@ -42,9 +43,12 @@ function fallback(s){
   return P.getMany(ks.map(function(k){return 'erp_pobox/'+k;})).then(function(m){
     var k=ks.filter(function(k){var b=m['erp_pobox/'+k];return b&&b.kind==='입고처'&&(b.pos||[]).some(function(p){return p&&p.pono===s.pono&&P.keyOk(p.inTok);});})[0];
     if(!k){say('입고처 발주목록 박스가 아직 준비되지 않았습니다.',true);return;}   /* 폼이 한 번 열리면 inbox 가 적힘 */
-    location.replace(new URL('발주박스.html#'+k+'&s='+ship,location.href).href);
+    return goBox(k);
   });
 }
+/* v225 사장님 「…배송기사 공유 링크왜에는 모든기능이 통합된 하나의 주소에서 모든상황 이 다 보이게」 — 그 입고처 박스의 거래처 링크가 있으면(폼이 만든 erp_pobox/to_<박스열쇠>) 거래처.html#<열쇠>&s= 로 바로(그 링크 안 입고처 박스에서 그 발주 한 장). 없으면 전처럼 발주박스.html */
+function goBox(ib){var old=function(){location.replace(new URL('발주박스.html#'+ib+'&s='+ship,location.href).href);};
+  return P.getOne('erp_pobox/to_'+ib).then(function(d){if(d&&d.kind==='거래처링크'&&P.keyOk(d.v))location.replace(new URL('거래처.html#'+d.v+'&s='+ship,location.href).href);else old();},old);}
 })();
 </script>
 </body>

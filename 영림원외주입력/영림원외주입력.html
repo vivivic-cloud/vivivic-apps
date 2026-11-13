@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v221 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v222 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -422,7 +422,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v221</span>
+    <span class="ver">v222</span>
   </div>
 </header>
 <div class="wrap">
@@ -5829,27 +5829,34 @@ function lnkNames(){var n=[],put=function(x){x=show(x).trim();if(x&&n.indexOf(x)
    새 문서만 만든다(옛 박스·규칙 안 건드림 — erp_pobox 는 열쇠 아는 사람 get 허용 그대로). 박스 문서들은 kind 로 걸러 써서 이 문서들은 다른 곳에 안 섞임.
    쓰기 = erp_pobox 쓰기 권한 담당자가 폼을 열 때(박스 동기화와 같은 꼴). 없으면 공유·QR 은 옛 링크. */
 function vlOf(name){var a=(POBOX||[]).filter(function(b){return b.kind==='거래처'&&b.name===name&&podKeyOk(b.id);}).sort(function(x,y){return String(x.createdAt||'')<String(y.createdAt||'')?-1:1;});return a[0]||null;}
-function vlUrl(name){var d=vlOf(show(name).trim());return d?new URL('거래처.html#'+d.id,location.href).href:'';}
-var vlBusy={};
+/* v222 사장님 「지금 배송기사 공유 링크왜에는 모든기능이 통합된 하나의 주소에서 모든상황 이 다 보이게 만들어야 하는데」 — 11-13 18:36 조회 = 거래처 링크 문서 0장(담당자가 폼을 연 때만 만들던 것).
+   이제 공유·QR·복사·업체별 링크 화면이 그 거래처 링크를 부르는 순간(vlUrl) 그 자리에서 만든다(vlMake): 열쇠를 먼저 정해 바로 주소를 돌려주고 저장은 뒤따름(공유 창이 기다리지 않게),
+   만드는 중인 열쇠는 vlPend 로 두 번 안 만듦 · 옛 링크 넘김(to_)도 같이. 쓰기 권한(erp_pobox w) 없는 사람은 못 만들어 전처럼 옛 링크. 있는 자료는 지우지 않음. */
+var vlBusy={},vlPend={};
+function vlWant(v){var o=boxOf('출고처',v),i=boxOf('입고처',v),a=asmBoxOf(v);return {kind:'거래처',name:v,a:a?a.id:'',o:o?o.id:'',i:i?i.id:''};}
+function vlId(v){var d=vlOf(v);return d?d.id:(vlPend[v]||'');}
+function vlMake(v){
+  v=show(v).trim();if(!v)return '';
+  if(!db||!db.collection||POBOX==null||!canCol('erp_pobox','w'))return vlId(v);
+  var want=vlWant(v),have=vlOf(v),now=new Date().toISOString(),sig=JSON.stringify([want.a,want.o,want.i]),bk='v:'+v,id=have?have.id:(vlPend[v]||'');
+  if(!have&&!id){id=podKey();vlPend[v]=id;vlBusy[bk]=sig;
+    db.collection('erp_pobox').doc(id).set(Object.assign({},want,{at:now,createdAt:now})).catch(function(e){if(vlPend[v]===id)delete vlPend[v];vlBusy[bk]='';console.warn('거래처 링크 못 씀',v,e);});}
+  else if(have&&JSON.stringify([have.a||'',have.o||'',have.i||''])!==sig&&vlBusy[bk]!==sig){vlBusy[bk]=sig;
+    db.collection('erp_pobox').doc(have.id).update(Object.assign({},want,{at:now})).catch(function(e){vlBusy[bk]='';console.warn('거래처 링크 못 씀',v,e);});}
+  var olds=POBOX.filter(function(b){return podKeyOk(b.id)&&(b.kind==='출고처'||b.kind==='입고처')&&show(b.name).trim()===v;}).map(function(b){return b.id;})
+    .concat((ASMBOX||[]).filter(function(b){return podKeyOk(b.id)&&show(b.vendor).trim()===v;}).map(function(b){return b.id;}));
+  olds.forEach(function(k){var pid='to_'+k,ph=(POBOX||[]).filter(function(b){return b.id===pid;})[0];if(ph&&ph.v===id&&ph.kind==='거래처링크')return;
+    var pk='p:'+pid;if(vlBusy[pk]===id)return;vlBusy[pk]=id;
+    db.collection('erp_pobox').doc(pid).set({kind:'거래처링크',name:v,v:id,at:now}).catch(function(e){vlBusy[pk]='';console.warn('옛 링크 잇기 못 씀',v,e);});});
+  return id;
+}
+function vlUrl(name){var v=show(name).trim(),id=vlId(v);if(!id||!vlOf(v))id=vlMake(v)||id;return id?new URL('거래처.html#'+id,location.href).href:'';}
 function vlSync(){
   if(!db||!db.collection||POBOX==null||ASMBOX==null||!canCol('erp_pobox','w'))return;
   var ns=[],put=function(x){x=show(x).trim();if(x&&ns.indexOf(x)<0)ns.push(x);};
   POBOX.forEach(function(b){if(podKeyOk(b.id)&&(b.kind==='출고처'||b.kind==='입고처'))put(b.name);});
   ASMBOX.forEach(function(b){if(podKeyOk(b.id))put(b.vendor);});
-  ns.forEach(function(v){
-    var o=boxOf('출고처',v),i=boxOf('입고처',v),a=asmBoxOf(v),want={kind:'거래처',name:v,a:a?a.id:'',o:o?o.id:'',i:i?i.id:''},have=vlOf(v),now=new Date().toISOString();
-    var sig=JSON.stringify([want.a,want.o,want.i]),bk='v:'+v,id=have?have.id:'';
-    if(!have||JSON.stringify([have.a||'',have.o||'',have.i||''])!==sig){
-      if(vlBusy[bk]===sig)return;vlBusy[bk]=sig;var done=function(e){vlBusy[bk]='';console.warn('거래처 링크 못 씀',v,e);};
-      if(have)db.collection('erp_pobox').doc(have.id).update(Object.assign({},want,{at:now})).catch(done);
-      else{id=podKey();db.collection('erp_pobox').doc(id).set(Object.assign({},want,{at:now,createdAt:now})).catch(done);}
-    }
-    var olds=POBOX.filter(function(b){return podKeyOk(b.id)&&(b.kind==='출고처'||b.kind==='입고처')&&show(b.name).trim()===v;}).map(function(b){return b.id;})
-      .concat(ASMBOX.filter(function(b){return podKeyOk(b.id)&&show(b.vendor).trim()===v;}).map(function(b){return b.id;}));
-    olds.forEach(function(k){var pid='to_'+k,ph=(POBOX||[]).filter(function(b){return b.id===pid;})[0];if(ph&&ph.v===id&&ph.kind==='거래처링크')return;
-      var pk='p:'+pid;if(vlBusy[pk]===id)return;vlBusy[pk]=id;
-      db.collection('erp_pobox').doc(pid).set({kind:'거래처링크',name:v,v:id,at:now}).catch(function(e){vlBusy[pk]='';console.warn('옛 링크 잇기 못 씀',v,e);});});
-  });
+  ns.forEach(vlMake);
 }
 function renderLinks(){
   bulk=null;listBox=null;listBox2=null;sheetDraw=null;ifRefresh=null;

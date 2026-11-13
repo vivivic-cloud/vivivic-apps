@@ -121,7 +121,7 @@ function tile(kids,click,cls){return h('div','asmtile'+(cls?' '+cls:''),face(kid
 function sum(o){var V=emb();if(V)V.sum(window,o);}
 function uniq(a){var o=[];a.forEach(function(x){x=show(x);if(x&&o.indexOf(x)<0)o.push(x);});return o;}
 /* v224 머리띠 — 다른 VIVIVIC 프로그램(폼·에이엠티·조혼가구 <header>)과 같은 VIVIVIC + 판 배지. 거래처.html 안(iframe)에서는 바깥 머리띠 하나만 */
-var LINKVER='v224';
+var LINKVER='v225';
 function topbar(){if(emb()||document.querySelector('.topbar'))return;var hd=h('header','topbar',h('div','topbar-in',h('div','brand','VIVIVIC'),h('span','ver',LINKVER)));document.body.insertBefore(hd,document.body.firstChild);}
 topbar();
 window.PO={emb:emb,crumb:crumb,face:face,tile:tile,sum:sum,uniq:uniq,partText:partText,shipChain:shipChain,who:who,fill:fill,h:h,show:show,num:num,when:when,getMany:getMany,getOne:getOne,commit:commit,rkey:rkey,keyOk:keyOk,noOk:noOk,lib:lib,codes:codes,scanner:scanner,shrink:shrink,inboxes:inboxes,rememberInbox:rememberInbox};
