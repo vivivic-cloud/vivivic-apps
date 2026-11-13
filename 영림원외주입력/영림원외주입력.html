@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v224 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v225 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -139,6 +139,7 @@ details.gonebox{margin-top:10px;font-size:13px}details.gonebox>summary{cursor:po
 .lsearch>input{flex:1 1 auto;max-width:420px}   /* v37 4 품목 저장한 항목 검색 */
 .lsinfo{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted);font-weight:700;margin:0 0 10px}
 .lsinfo .lscnt.need{color:var(--amber)}
+.oldbox{margin:12px 0 0}.oldbox>summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--muted);padding:6px 0}.oldrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0 10px}   /* v225 지난 자료 보기 */
 .toast:not(:empty){position:fixed;left:16px;right:16px;bottom:16px;z-index:50;margin:0 auto;max-width:480px;padding:10px 14px;background:#fff;border:1px solid #e3e2e0;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.08)}
 .delbar{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;letter-spacing:0}
 details.rec>summary .rt{flex:1}
@@ -422,7 +423,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v224</span>
+    <span class="ver">v225</span>
   </div>
 </header>
 <div class="wrap">
@@ -505,6 +506,17 @@ function connectDb(){
       };},
       /* v40 분류 수정: 여러 문서를 한 트랜잭션으로. list = [{c:컬렉션, id}], decide(지금 문서 배열 — 없으면 null) → 문서마다 고칠 값(null = 안 고침) 배열, 또는 null = 모두 안 고침. true = 고침 */
       /* v115 담당자 — 내 문서·전체 목록(관리자)·고치기. 저장소 규칙(제안)이 같은 칸만 허락한다 */
+      /* v225 읽기 줄이기 — watch: spec 없으면 컬렉션 전체, 있으면 조건 질의 여럿(status in 진행 중 · 시각 칸 >= since)을 지켜보고 id 로 합쳐 한 번에 넘김(모두 한 번씩 온 뒤부터).
+         질의마다 칸 하나만 거르므로 복합 색인이 필요 없다. 돌려주는 값 = 끊기 함수. countEq = count() 집계(문서는 안 읽음). range = 한 칸 기간(지난 자료 보기, 한 번 읽기). */
+      watch:function(name,spec,next,err){var C=F.collection(fs,name),qs=[];
+        if(!spec)qs=[C];else{if(spec.open)qs.push(F.query(C,F.where('status','in',spec.open)));(spec.t||[]).forEach(function(t){qs.push(F.query(C,F.where(t,'>=',spec.since)));});}
+        var parts=qs.map(function(){return null;}),fail=false;
+        var uns=qs.map(function(q,i){return F.onSnapshot(q,function(sn){parts[i]=sn.docs;if(fail||parts.some(function(x){return x==null;}))return;
+          var m={},out=[];parts.forEach(function(ds){ds.forEach(function(d){if(m[d.id])return;m[d.id]=1;out.push({id:d.id,data:function(){return d.data();}});});});next({docs:out});},
+          function(e){if(fail)return;fail=true;if(err)err(e);});});
+        return function(){uns.forEach(function(u){u();});};},
+      countEq:function(name,field,v){return F.getCountFromServer(F.query(F.collection(fs,name),F.where(field,'==',v))).then(function(sn){return sn.data().count;});},
+      range:function(name,field,a,b){return F.getDocs(F.query(F.collection(fs,name),F.where(field,'>=',a),F.where(field,'<',b))).then(function(sn){return sn.docs.map(function(d){return Object.assign({id:d.id},d.data());});});},
       staffMe:function(next,err){return F.onSnapshot(staffRef(user.uid),function(d){next(d.exists()?d.data():null);},err);},
       staffAll:function(next,err){return F.onSnapshot(F.collection(fs,'erp_staff'),function(s){next(s.docs.map(function(d){return Object.assign({uid:d.id},d.data());}));},err);},
       staffSet:function(uid,o){return F.setDoc(staffRef(uid),o,{merge:true});},
@@ -1907,8 +1919,78 @@ var navEl=document.getElementById('nav'),mainEl=document.getElementById('main'),
 var listBox=null,listBox2=null,msgTimer=null;
 
 function counts(key){
-  var a=data[key]||[];var c={total:a.length,'대기':0,'진행중':0,'완료':0,'오류':0,'수정대기':0};
-  a.forEach(function(r){if(ylwGone(r)){c.total--;return;}if(c[r.status]!=null)c[r.status]++;});return c;   /* v104 영림원에 없음은 안 셈 */
+  var a=data[key];
+  if(a==null){if(!WDEF||WATCH['erp_'+key])return null;cntAsk(key);var k0=CNT[key];return k0&&k0.all?Object.assign({},k0.all):null;}   /* v225 지켜보지 않는 메뉴 = count() 로만 셈(null = 아직 · 지켜보는 중이면 문서 오기를 기다림) */
+  var c={total:a.length,'대기':0,'진행중':0,'완료':0,'오류':0,'수정대기':0};
+  a.forEach(function(r){if(ylwGone(r)){c.total--;return;}if(c[r.status]!=null)c[r.status]++;});   /* v104 영림원에 없음은 안 셈 */
+  if(WIN[key]){cntAsk(key);var k=CNT[key],d=k&&k.done!=null?k.done-a.filter(ylwGone).length:null;if(d!=null&&d>c['완료']){c.total+=d-c['완료'];c['완료']=d;}}   /* v225 진행 중은 읽은 것 그대로(모두 읽음), 완료 = count()(최근 밖 포함) */
+  return c;
+}
+/* ---------- v225 읽기 줄이기 (사장님 11-13 「1~3번으로 고쳐줘」 — 1 메뉴별로 읽기 · 2 진행 중 + 최근만 · 3 건수는 count()) ----------
+   늘 지켜봄(예외) = 담당자(erp_staff) · 기본정보(1~11단계 — 분류 빼고) · 구매단가·환율(날짜로 찾는 기준값) · 업체 링크 자동 맞춤에 쓰는 것(구매·생산 문서, 발주서·박스·배송·입고·납품확인 기록) — 폼이 어느 메뉴에 있든 링크 박스를 맞추기 때문.
+   메뉴별(그 메뉴일 때만, 떠나면 끊음) = PER_MENU. 조건 = WIN 단계는 「status 대기·진행중·오류·수정대기」 + 「createdAt 최근 RECENT_DAYS 일」 두 질의를 합침, 링크 기록은 시각 칸 최근만.
+   RECENT_DAYS = 90 — 발주~납품이 길어도 링크 박스에서 빠지지 않게. 그보다 오래된 완료 자료 = 목록 아래 「지난 자료 보기」(기간을 골라 그때만 한 번 읽음, 동기화에 안 섞음).
+   ⚠ 링크 박스 내용은 최근 90일 발주서로 다시 짜인다(그보다 오래된 발주는 링크에서 빠짐). 브라우저 저장(캐시) 없음. */
+var RECENT_DAYS=90,OPEN_ST=['대기','진행중','오류','수정대기'],WATCH={},WDEF=null,CNT={},CNTQ={},OLD={};
+var WIN={imporders:1,imppays:1,impinvs:1,impbls:1,impins:1,purreqs:1,purapprs:1,purords:1,purchases:1,purdelvs:1,pomods:1,prods:1,proddlvs:1,prodmoves:1};
+var PER_MENU={classes:function(){return navBoxOf(cur)==='base';},stocks:function(){return cur==='stocks';}};
+['imporders','imppays','impinvs','impbls','impins'].forEach(function(k){PER_MENU[k]=function(){return (BYKEY[cur]||{}).page==='수입';};});
+['purreqs','purapprs'].forEach(function(k){PER_MENU[k]=function(){return (BYKEY[cur]||{}).page==='구매';};});
+PER_MENU.prodmoves=function(){return (BYKEY[cur]||{}).page==='생산';};
+function wSince(){return new Date(Date.now()-RECENT_DAYS*864e5).toISOString();}
+function wDefs(){
+  var L=function(sn){return sn.docs.map(function(x){return Object.assign({id:x.id},x.data());});},d=[];
+  STEPS.forEach(function(s){d.push({c:'erp_'+s.key,spec:WIN[s.key]?{open:1,t:['createdAt']}:null,when:PER_MENU[s.key],
+    on:function(sn){data[s.key]=L(sn);if(CNT[s.key])CNT[s.key].doneT=0;refreshAll();},err:function(){data[s.key]=data[s.key]||[];refreshAll();},off:function(){data[s.key]=null;}});});
+  d.push({c:'erp_rates',on:function(sn){data.rates=L(sn);refreshAll();},err:function(){data.rates=data.rates||[];refreshAll();}});   /* v167 환율(기준정보) */
+  d.push({c:'erp_imports',spec:{open:1,t:['createdAt']},on:function(sn){IMPORTS=L(sn);if(impDraw)impDraw();if(ifRefresh)ifRefresh();if(asmDraw)asmDraw();},err:function(){IMPORTS=IMPORTS||[];if(impDraw)impDraw();}});   /* v23 불러오기 요청 */
+  d.push({c:'erp_podocs',spec:{t:['createdAt']},on:function(sn){PODOCS=L(sn);refreshAll();},err:function(){PODOCS=PODOCS||[];refreshAll();}});   /* v126 */
+  d.push({c:'erp_pobox',on:function(sn){POBOX=L(sn);podBoxSync();podSync();vlSync();if(podDraw)podDraw();if(lnkDraw)lnkDraw();},err:function(){POBOX=null;}});   /* v133 박스는 전체(거래처마다 몇 장) */
+  [['erp_poship','POSHIP',['at']],['erp_poin','POIN',['at']],['erp_podlv','PODLV',['inAt','doneAt']],['erp_pointok','PTOK',['at']]].forEach(function(c){   /* v145 배송·입고 기록 */
+    d.push({c:c[0],spec:{t:c[2]},on:function(sn){var a=L(sn);if(c[1]==='POSHIP')POSHIP=a;else if(c[1]==='POIN')POIN=a;else if(c[1]==='PODLV')PODLV=a;else PTOK=a;podTokSync();podBoxSync();podShipInSync();podFlowSync();if(podDraw)podDraw();},
+      err:function(){if(c[1]==='POSHIP'&&POSHIP==null){POSHIP=[];podBoxSync();}}});});
+  d.push({c:'erp_poconfirm',spec:{t:['at']},on:function(sn){POCONF=L(sn);renderNav();if(podDraw)podDraw();podBoxSync();},err:function(){POCONF=null;}});   /* v143 */
+  d.push({c:'erp_podocs_pub',spec:{t:['at']},on:function(sn){PODPUB=L(sn);podSync();if(podDraw)podDraw();},err:function(){PODPUB=null;}});   /* v128 */
+  d.push({c:'erp_asmbox',on:function(sn){ASMBOX=L(sn);asmBoxSync();vlSync();if(asmDraw)asmDraw();if(lnkDraw)lnkDraw();},err:function(){ASMBOX=null;}});   /* v176 박스는 전체 */
+  d.push({c:'erp_prodconfirm',spec:{t:['at']},on:function(sn){var m={};sn.docs.forEach(function(x){m[x.id]=Object.assign({id:x.id},x.data());});PCONF=m;asmBoxSync();pcDlvSync();if(asmDraw)asmDraw();},err:function(){PCONF=PCONF||{};asmBoxSync();if(asmDraw)asmDraw();}});   /* v195 */
+  d.push({c:'erp_asmpo',spec:{open:1,t:['at']},on:function(sn){data.asmpo=L(sn);asmConvSync();asmBoxSync();renderNav();if(asmDraw)asmDraw();},err:function(){data.asmpo=data.asmpo||[];renderNav();if(asmDraw)asmDraw();}});
+  d.push({c:'erp_stocks',when:PER_MENU.stocks,on:function(sn){STOCKS=L(sn);renderNav();if(stkDraw)stkDraw();if(asmDraw)asmDraw();},err:function(){STOCKS=STOCKS||[];renderNav();if(stkDraw)stkDraw();if(asmDraw)asmDraw();},off:function(){STOCKS=null;}});   /* v102 */
+  return d;
+}
+function wSync(){
+  if(!db||!db.watch)return;if(!WDEF)WDEF=wDefs();
+  WDEF.forEach(function(w){var want=!w.when||w.when(),on=!!WATCH[w.c];
+    if(want&&!on){var sp=w.spec?{open:w.spec.open?OPEN_ST:null,t:w.spec.t||[],since:wSince()}:null;WATCH[w.c]=db.watch(w.c,sp,w.on,w.err);}
+    else if(!want&&on){WATCH[w.c]();delete WATCH[w.c];if(w.off)w.off();}});
+}
+/* 건수(보이는 메뉴 줄·맨 위 요약만 부름): 지켜보는 WIN 단계 = 완료만 count() 한 번(문서가 바뀌면 다음에 다시) · 지켜보지 않는 단계 = 상태마다 count()(5분에 한 번까지) */
+function cntAsk(key,force){
+  if(!db||!db.countEq)return;var all=data[key]==null,f=all?'all':'done',k=CNT[key]||(CNT[key]={}),q=key+'/'+f;
+  if(CNTQ[q])return;if(!force&&k[f+'T']&&(!all||Date.now()-k[f+'T']<300000))return;CNTQ[q]=1;
+  var sts=all?STATUS:['완료'];
+  Promise.all(sts.map(function(st){return db.countEq('erp_'+key,'status',st);})).then(function(ns){
+    if(all){var o={total:0};sts.forEach(function(st,i){o[st]=ns[i];o.total+=ns[i];});k.all=o;}else k.done=ns[0];
+    k[f+'T']=Date.now();CNTQ[q]=0;renderNav();renderSum();if(cur===key)renderList();},function(e){k[f+'T']=Date.now();CNTQ[q]=0;console.warn('건수 못 셈',key,e);});
+}
+/* 「지난 자료 보기」 — 최근 RECENT_DAYS 일 밖 자료. 기간을 골라 「보기」를 누를 때만 그 기간(createdAt)을 한 번 읽는다. 지금 목록에 있는 것은 빼고 보임 */
+function oldBox(s){
+  var o=OLD[s.key]||(OLD[s.key]={open:false,from:'',to:'',list:null,busy:0,err:''}),ymd=function(t){var p=function(n){return String(n).padStart(2,'0');};return t.getFullYear()+'-'+p(t.getMonth()+1)+'-'+p(t.getDate());};
+  var e0=new Date(Date.now()-RECENT_DAYS*864e5);if(!o.to)o.to=ymd(e0);if(!o.from)o.from=ymd(new Date(e0.getTime()-30*864e5));
+  var fi=h('input',{type:'date',value:o.from,'aria-label':'시작일',on:{change:function(){o.from=fi.value;}}}),ti=h('input',{type:'date',value:o.to,'aria-label':'끝일',on:{change:function(){o.to=ti.value;}}});
+  var go1=function(){
+    if(!o.from||!o.to||o.from>o.to){o.err='기간을 확인해 주세요.';renderList();return;}
+    if(!db||!db.range){o.err='연결되지 않았습니다.';renderList();return;}
+    var a=new Date(o.from+'T00:00:00'),b=new Date(new Date(o.to+'T00:00:00').getTime()+864e5);
+    o.busy=1;o.err='';o.open=true;renderList();
+    db.range('erp_'+s.key,'createdAt',a.toISOString(),b.toISOString()).then(function(l){o.list=l;o.busy=0;renderList();},function(e){o.busy=0;o.err='읽지 못했습니다: '+errText(e);renderList();});};
+  var have={};(data[s.key]||[]).forEach(function(r){have[r.id]=1;});
+  var l=(o.list||[]).filter(function(r){return !have[r.id];}).sort(function(x,y){return (y.createdAt||'')<(x.createdAt||'')?-1:1;});
+  var body=o.busy?[h('div',{class:'empty'},'불러오는 중입니다.')]:o.err?[h('div',{class:'empty'},o.err)]:o.list==null?[]:
+    l.length?[h('div',{class:'lsinfo'},o.from+' ~ '+o.to+' · '+l.length+'건')].concat(l.map(function(r){return recCard(s,r,{pk:function(){return null;}},{});})):[h('div',{class:'empty'},'그 기간에 지난 자료가 없습니다.')];
+  var d=h('details',{class:'oldbox'},[h('summary',{},'지난 자료 보기'),h('div',{class:'hint'},'평소에는 진행 중인 것과 최근 '+RECENT_DAYS+'일 것만 읽습니다. 기간을 고르고 「보기」를 누르면 그 기간만 읽습니다.'),
+    h('div',{class:'oldrow'},fi,h('span',{},'~'),ti,h('button',{type:'button',class:'btn small',on:{click:go1}},'보기'))].concat(body));
+  d.open=o.open;d.addEventListener('toggle',function(){o.open=d.open;});
+  return d;
 }
 /* v120 맨 위 메뉴 = 박스. 사장님 말씀 「현재 입력폼 12345678~11 로 연결나눠진 기본입력 들을 기본입력 박스안에 순서대로 정렬 되게 해줘 나머지 박스도 영림원 의 입력 흐름에 맞는 순서를 정해서 박스 클릭시 해당 입력의 나열이 보이도록 해줘」
    박스 순서 = NAV_BOXES. 박스를 누르면 목록이 펼쳐짐(한 번에 하나) · 지금 메뉴의 박스는 열림(navOpen=null) · 보이는 메뉴 없는 박스는 숨김(v115 권한) */
@@ -1931,13 +2013,13 @@ function renderNav(){
   var item=function(k,i){
     var s=BYKEY[k]||{},num,title=s.title,sub;
     if(k==='check'){num='✓';title=CHECK.title;sub='품목마다 빠진 것 보기';}
-    else if(k==='stocks'){num=ico('box');title='물류 · [물류] 재고현황';sub=STOCKS==null?'불러오는 중':last?stkTime(last):'아직 없음';}
+    else if(k==='stocks'){num=ico('box');title='물류 · [물류] 재고현황';sub=STOCKS==null?(WATCH.erp_stocks?'불러오는 중':''):last?stkTime(last):'아직 없음';}   /* v225 재고는 그 메뉴에서만 읽음 */
     else if(k==='asmpo'){num=String(i);sub=data.asmpo==null?'불러오는 중':'대기 '+(data.asmpo||[]).filter(function(r){return r.status==='대기';}).length;}   /* v176 */
     else if(k==='podocs'){num=String(i);sub=PODOCS==null||data.purchases==null||data.purords==null?'불러오는 중':podAll().length+'건';}   /* v126 */
     else if(k==='links'){num=ico('link');title=LINKS.title;sub=POBOX==null&&ASMBOX==null?'불러오는 중':lnkNames().length+'곳';}   /* v213 */
     else if(k==='staff'){num=ico('users');title='담당자 관리';sub=STAFF?STAFF.length+'명':'불러오는 중';}
     else if(k==='basic'){num=ico('sheet');title='영림원 기본정보 입력';sub='';}   /* v166 별도 프로그램 — 같은 창으로 연다 */
-    else{num=s.page?String(i):String(s.n);sub=data[k]==null?'불러오는 중':cntText(counts(k));}
+    else{num=s.page?String(i):String(s.n);var cc=counts(k);sub=cc==null?'불러오는 중':cntText(cc);}   /* v225 */
     return h('button',{type:'button',on:{click:function(){if(k==='basic'){location.href=BASIC_URL;return;}go(k);if(NARROW()){navOpen='';renderNav();var m=document.getElementById('main');if(m)window.scrollTo(0,Math.max(0,m.getBoundingClientRect().top+window.pageYOffset-70));}}},'aria-current':k===cur?'step':null},
       h('span',{class:'num'},num),h('span',{},h('div',{class:'nt'},title),h('div',{class:'ns'},sub)));};
   var curBox=navBoxOf(cur),open=navOpen==null?curBox:navOpen,out=[];
@@ -1955,7 +2037,7 @@ function renderSum(){
   if(cur==='stocks'||cur==='staff'||cur==='podocs'||cur==='asmpo'||cur==='links'||!canMenu(menuOf(cur),'r')){sumEl.replaceChildren();return;}   /* v115 담당자 관리도 */   /* v102 재고 조회는 대기·완료 문서가 없다 */
   var t={'대기':0,'진행중':0,'완료':0,'오류':0,'수정대기':0};
   var pg=(BYKEY[cur]||{}).page||'';   /* v75 맨 위 요약 = 지금 페이지 것만(1~11단계에 수입을 섞지 않음) */
-  STEPS.filter(function(s){return (s.page||'')===pg;}).forEach(function(s){var c=counts(s.key);STATUS.forEach(function(k){t[k]+=c[k];});});
+  STEPS.filter(function(s){return (s.page||'')===pg;}).forEach(function(s){var c=counts(s.key);if(c)STATUS.forEach(function(k){t[k]+=c[k];});});
   sumEl.replaceChildren(
     h('span',{class:'pill'},'대기 '+t['대기']),
     h('span',{class:'pill'},'진행중 '+t['진행중']),
@@ -6036,6 +6118,7 @@ function guideStep(s,say,fn,ip){
   else if(vs.length){form.fill(vs[0],vs[0].rows||[]);say('안내로 칸을 채웠습니다. 빈 칸을 채우고 저장을 누르세요(자동 저장 안 함).');}
 }
 function renderStep(){
+  wSync();   /* v225 메뉴별 읽기 */
   document.body.setAttribute('data-step',cur);   /* v208 지금 단계 = 모양(CSS)만 가르는 표지 */
   if(cur==='staff'){renderStaff();return;}   /* v115 */
   if(!ME){erpWait();return;}
@@ -6977,7 +7060,8 @@ function renderListIn(s,listBox,title){
   var gbox=gone.length?h('details',{class:'gonebox'},[h('summary',{},'영림원에 없음 '+gone.length+'건')].concat(gkit.bar?[gkit.bar]:[],
     gone.slice().sort(function(x,y){return (y.createdAt||'')<(x.createdAt||'')?-1:1;}).map(function(r){return recCard(s,r,gkit,openIds);}))):null;
   if(gbox)gbox.open=gOpen;
-  if(!a.length){listBox.replaceChildren.apply(listBox,[head,h('div',{class:'empty'},'아직 저장한 '+s.title+' 항목이 없습니다. 위 폼에 입력하고 저장하면 여기에 쌓입니다.')].concat(gbox?[gbox]:[]));return;}
+  var obox=WIN[s.key]?oldBox(s):null;   /* v225 지난 자료 보기 */
+  if(!a.length){listBox.replaceChildren.apply(listBox,[head,h('div',{class:'empty'},'아직 저장한 '+s.title+' 항목이 없습니다. 위 폼에 입력하고 저장하면 여기에 쌓입니다.')].concat(gbox?[gbox]:[],obox?[obox]:[]));return;}
   var sorted=a.slice().sort(function(x,y){return (y.createdAt||'')<(x.createdAt||'')?-1:1;});
   if(s.flowCols)sorted=sorted.filter(flowGap).concat(sorted.filter(function(r){return !flowGap(r);}));   /* v53 빈 흐름이 맨 위 */
   var ss=SEARCH_STEPS[s.key],sq=ss?String(LISTQ[s.key]||'').trim().toLowerCase():null;   /* v37: 4 품목(v39: 3 분류도)은 검색어에 맞는 기록만 */
@@ -6985,7 +7069,7 @@ function renderListIn(s,listBox,title){
   var items=sorted.map(function(r){return recCard(s,r,kit,openIds);});
   if(sq!=null){listSearch(s,listBox,head,a,sq,items,gbox);return;}
   var wb=s.key==='itemmats'?imWipBar():null;   /* v78 */
-  listBox.replaceChildren.apply(listBox,[head].concat(wb?[wb]:[],items,gbox?[gbox]:[]));
+  listBox.replaceChildren.apply(listBox,[head].concat(wb?[wb]:[],items,gbox?[gbox]:[],obox?[obox]:[]));
 }
 /* 저장한 항목 카드 한 장(v104 renderListIn 에서 떼어 냄 — 「영림원에 없음」 칸도 같이 씀) */
 function recCard(s,r,kit,openIds){
@@ -7820,7 +7904,7 @@ function staffRepoTable(){
     ['구글시트 양식 웹앱(Apps Script)','영향 없음(드라이브만 씀)','—'],
     ['자료 보호','늘지 않음 — 파이어베이스 키는 원래 공개 값, 자료는 저장소 규칙이 지킴','저장소 규칙 배포(위)']]);
 }
-function go(k){if(BYKEY[k]&&BYKEY[k].shownIn)k=BYKEY[k].shownIn;if(k!==cur||k==='podocs')podSel='';cur=k;navOpen=NARROW()?'':null;try{history.replaceState(null,'','#'+k);}catch(e){location.hash=k;}renderNav();renderSum();renderStep();}
+function go(k){if(BYKEY[k]&&BYKEY[k].shownIn)k=BYKEY[k].shownIn;if(k!==cur||k==='podocs')podSel='';cur=k;wSync();navOpen=NARROW()?'':null;try{history.replaceState(null,'','#'+k);}catch(e){location.hash=k;}renderNav();renderSum();renderStep();}
 function refreshAll(){rateSyncAll();renderNav();renderSum();renderList();refreshLists();if(impDraw)impDraw();if(sheetDraw)sheetDraw();if(ifRefresh)ifRefresh();if(stkDraw)stkDraw();if(podDraw)podDraw();if(asmDraw)asmDraw();if(lnkDraw)lnkDraw();asmConvSync();asmBoxSync();pcDlvSync();podSync();podTokSync();podBoxSync();podShipInSync();podFlowSync();podModSync();}
 
 /* ---------- boot ---------- */
@@ -7845,46 +7929,7 @@ dbP.then(function(d){
     bannerEl.append(h('div',{class:'banner'},'파이어베이스에 연결하지 못했습니다. 인터넷 연결을 확인하고 다시 열어 주세요. 지금은 입력해도 저장되지 않습니다.'));
     STEPS.forEach(function(s){data[s.key]=[];});data.asmpo=[];ASMBOX=[];PCONF={};IMPORTS=[];STOCKS=[];PODOCS=[];refreshAll();return;
   }
-  STEPS.forEach(function(s){
-    db.collection('erp_'+s.key).onSnapshot(function(snap){
-      data[s.key]=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});
-      refreshAll();
-    },function(){data[s.key]=data[s.key]||[];refreshAll();});
-  });
-  /* v167 영림원 환율정보(기준정보 — T 거르기 없음) */
-  db.collection('erp_rates').onSnapshot(function(snap){
-    data.rates=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});refreshAll();
-  },function(){data.rates=data.rates||[];refreshAll();});
-  /* v23 불러오기 요청 */
-  db.collection('erp_imports').onSnapshot(function(snap){
-    IMPORTS=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});
-    if(impDraw)impDraw();if(ifRefresh)ifRefresh();if(asmDraw)asmDraw();   /* v197 재고업데이트 · v98 엣지필름 바꾸기가 요청 상태를 보인다 */
-  },function(){IMPORTS=IMPORTS||[];if(impDraw)impDraw();});
-  /* v126 발주서관리 */
-  db.collection('erp_podocs').onSnapshot(function(snap){
-    PODOCS=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});refreshAll();
-  },function(){PODOCS=PODOCS||[];refreshAll();});
-  db.collection('erp_pobox').onSnapshot(function(snap){   /* v133 */
-    POBOX=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});podBoxSync();podSync();vlSync();   /* v220 */   /* v153 공개 문서 inbox */if(podDraw)podDraw();if(lnkDraw)lnkDraw();
-  },function(){POBOX=null;});
-  [['erp_poship','POSHIP'],['erp_poin','POIN'],['erp_podlv','PODLV'],['erp_pointok','PTOK']].forEach(function(c){   /* v145 배송·입고 기록 */
-    db.collection(c[0]).onSnapshot(function(snap){var a=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});
-      if(c[1]==='POSHIP')POSHIP=a;else if(c[1]==='POIN')POIN=a;else if(c[1]==='PODLV')PODLV=a;else PTOK=a;podTokSync();podBoxSync();podShipInSync();podFlowSync();if(podDraw)podDraw();},function(){if(c[1]==='POSHIP'&&POSHIP==null){POSHIP=[];podBoxSync();}});   /* 못 읽어도 박스는 고침(배송 링크 없이) */
-  });
-  db.collection('erp_poconfirm').onSnapshot(function(snap){
-    POCONF=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});renderNav();if(podDraw)podDraw();podBoxSync();   /* v143 확인되면 입고처 박스에 넣음(폼이 열려 있을 때 바로) */
-  },function(){POCONF=null;});
-  db.collection('erp_podocs_pub').onSnapshot(function(snap){   /* v128 */
-    PODPUB=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});podSync();if(podDraw)podDraw();
-  },function(){PODPUB=null;});
-  /* v176 발주서(조립업체 발주 링크) */
-  db.collection('erp_asmbox').onSnapshot(function(snap){ASMBOX=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});asmBoxSync();vlSync();   /* v220 */if(asmDraw)asmDraw();if(lnkDraw)lnkDraw();},function(){ASMBOX=null;});
-  db.collection('erp_prodconfirm').onSnapshot(function(snap){var m={};snap.docs.forEach(function(x){m[x.id]=Object.assign({id:x.id},x.data());});PCONF=m;asmBoxSync();pcDlvSync();if(asmDraw)asmDraw();},function(){PCONF=PCONF||{};asmBoxSync();if(asmDraw)asmDraw();});   /* v195 납품확인 */
-  db.collection('erp_asmpo').onSnapshot(function(snap){data.asmpo=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});asmConvSync();asmBoxSync();renderNav();if(asmDraw)asmDraw();},function(){data.asmpo=data.asmpo||[];renderNav();if(asmDraw)asmDraw();});
-  /* v102 재고 조회 */
-  db.collection('erp_stocks').onSnapshot(function(snap){
-    STOCKS=snap.docs.map(function(x){return Object.assign({id:x.id},x.data());});renderNav();if(stkDraw)stkDraw();if(asmDraw)asmDraw();
-  },function(){STOCKS=STOCKS||[];renderNav();if(stkDraw)stkDraw();if(asmDraw)asmDraw();});
+  wSync();   /* v225 읽기 줄이기 — 무엇을 어떻게 지켜보는지는 wDefs(늘·메뉴별·조건) */
 });
 })();
 </script>
