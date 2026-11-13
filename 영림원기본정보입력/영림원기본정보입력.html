@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원 기본정보 입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v9 -->
+<!-- 영림원 기본정보 입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v10 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -178,7 +178,7 @@ table.sheet td.un{box-shadow:inset 0 0 0 2px #f59e0b}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v9</span>
+    <span class="ver">v10</span>
     <a class="btn small" href="../영림원외주입력/영림원외주입력.html" style="margin-left:8px">입력폼</a>
   </div>
 </header>
@@ -250,7 +250,7 @@ function connectDb(){
 }
 (function(){
 "use strict";
-var VER='v9';
+var VER='v10';
 var GS_MAKER='https://script.google.com/macros/s/AKfycbzxW9K--tKq_uqHnzNdecOA4YbKosK51XVG1MJVFTVTzB5Kz5o7gN1YeYuthCRI4PshOw/exec';   /* 영림원외주입력 v113 웹앱(구글시트양식/양식만들기.gs) — 파일 이름은 「외주입력_」 로 시작해야 받는다 */
 var GS_NAME='외주입력_기본정보_한행입력표';
 var XLSX_URL='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js',xlsxP=null;
@@ -579,6 +579,7 @@ function takeBook(X,wb){
         if(f.rep){var arr=o[f.rep]=o[f.rep]||[];arr[f.i]=arr[f.i]||{};arr[f.i][f.c.k]=v;}else o[f.c.k]=v;});
       ['bom','procs','pp'].forEach(function(k){if(o[k])o[k]=o[k].filter(function(x){return x&&Object.keys(x).some(function(f){return x[f]!==''&&x[f]!==false;});});});
       if(!s(o.code))return;
+      if(o.kind==='품목'&&s(o.flow)&&!o.procs){var ps=flowProcs(o.flow);if(ps.length)o.procs=ps.map(function(x){return {proc:x};});}   /* v10: 공정순서 칸 없는 시트(품목등록업로드 꼴) = 공정흐름유형대로 */
       got.push(o);
     });
   });
@@ -1113,7 +1114,8 @@ function itemImport(X,wb){
   var G=setsFromRows(got.rows),have={},ops=[],t=now(),nNew=0,nUp=0,nSub=0,dup=0,comps=[],cls={big:[],mid:[],small:[]};
   sets().forEach(function(d){if(s(d.code))have[s(d.code)]=d;});
   var keys=itemCols().map(function(c){return c.k;}).concat(['u_set','u_lot','u_ser','u_lossIn','u_lossOut','u_buyer','u_desc']);
-  var put=function(o,r){keys.forEach(function(k){if(k in r)o[k]=r[k];});['big','mid','small'].forEach(function(k){if(s(r[k]))cls[k].push(s(r[k]));});};
+  var flowUn={};   /* v10: 8 공정흐름유형 칸 — 빈칸이면 그대로 둠, 목록 밖이면 막지 않고 「미등록」 수만 */
+  var put=function(o,r){keys.forEach(function(k){if(!(k in r))return;if(k==='flow'&&!s(r.flow))return;o[k]=r[k];});if(s(o.flow)&&unreg('flow',o.flow))flowUn[s(o.flow)]=1;['big','mid','small'].forEach(function(k){if(s(r[k]))cls[k].push(s(r[k]));});};
   G.groups.forEach(function(g){
     var old=have[s(g.p.code)],w=old?clone(old):newSet();if(old)w._id=old._id;
     put(w.items[0],g.p);
@@ -1131,16 +1133,45 @@ function itemImport(X,wb){
     ops.push({c:COL,id:w._id,set:o});if(old)nUp++;else nNew++;
   });
   if(!ops.length){say('제품 줄(품목자산분류 「제품」)이 없습니다.',true);return;}
-  if(!confirm('시트 「'+got.sheet+'」 → 제품 '+G.groups.length+' · 반제품 '+nSub+(dup?' · 같은 품번 겹침 '+dup+'줄 뺌':'')+(G.orphan?' · 제품 없는 반제품 '+G.orphan+'줄 뺌':'')+'\n새 묶음 '+nNew+' · 고침 '+nUp+' 으로 저장합니다.'))return;
+  if(!confirm('시트 「'+got.sheet+'」 → 제품 '+G.groups.length+' · 반제품 '+nSub+(dup?' · 같은 품번 겹침 '+dup+'줄 뺌':'')+(G.orphan?' · 제품 없는 반제품 '+G.orphan+'줄 뺌':'')+(Object.keys(flowUn).length?' · 공정흐름유형 미등록 '+Object.keys(flowUn).join(', '):'')+'\n새 묶음 '+nNew+' · 고침 '+nUp+' 으로 저장합니다.'))return;
   db.write(ops).then(function(){say('제품 '+G.groups.length+'개를 단계 입력에 넣었습니다. (새 '+nNew+' · 고침 '+nUp+(dup?' · 겹침 '+dup+'줄 뺌':'')+')');
     var add={parts:comps};Object.keys(cls).forEach(function(k){add[k]=cls[k];});nmAdd(add);},function(e){say('저장하지 못했습니다. '+errText(e),true);});
 }
 function newSubOf(p){return {k:uid(),asset:'반제품',state:'사용',io:s(p.io)||'내자',imp:s(p.imp)||'A등급',unit:'EA',mats:[],bq:{},pw:[]};}
 function itemFile(){var inp=h('input',{type:'file',accept:'.xlsx,.xls,.csv',on:{change:function(){var f=inp.files[0];if(!f)return;
   loadXlsx().then(function(X){return f.arrayBuffer().then(function(b){itemImport(X,X.read(b,{type:'array'}));});},function(){say(XLSX_FAIL,true);});}}});inp.click();}
+/* v10: 품목등록업로드 꼴 양식 받기 — 1행 「품목등록업로드」 · 2행 사장님 시트 45칸 + 8 품목별공정흐름유형등록 칸 · 3행부터 묶음마다 제품 줄 + 반제품 줄.
+   칸 이름 = 사장님 시트(드라이브 「1기본입력」 11-13 읽기) 그대로. 칸.json 에 없는 칸(부서·URL …)은 빈칸. 공정흐름유형 열만 드롭다운(목록 밖 입력 허용). */
+var UP_HEAD=['품명','품번','규격','영문명','품목자산분류','기준단위','품목대분류','품목중분류','품목소분류','품목상태','내외자구분','중요도','세트품목여부','부서','담당자','판매단가에 부가세포함여부','URL','부가세구분','부가세종류','Lot 관리 여부','Serial 관리 여부','유통기한구분','유통기간','Serial No. 식별코드','소요량계산방식','소요량산정구분','사내Loss율','외주Loss율','생산유형구분','적정Lot사이즈','생산LeadTime(일)','Batch생산여부','Batch Size','출고구분','제조사','기본구매처','구매최소수량','구매간격수량','평균조달일수','적정발주수량','구매단가에 부가세포함 여부','관세율','납기구분','수탁거래처','품목설명'];
+function upBuild(X){
+  var fc=colsOf('품목','8 품목별공정흐름유형등록'),head=UP_HEAD.concat(fc.map(function(c){return c.l;}));
+  var byLab={};flatCols(sheetOf('품목')).forEach(function(f){if(!f.rep&&f.key!=='test'&&f.key!=='tpl'&&!(f.lab in byLab))byLab[f.lab]=f.c;});
+  var out=function(it){return head.map(function(l){var c=byLab[l];if(!c)return '';var v=it[c.k];if(c.t==='bool')return v===true?'True':'False';return v==null?'':v;});};
+  var rows=[];sets().slice().sort(function(a,b){return s(a.createdAt).localeCompare(s(b.createdAt));}).forEach(function(w){(w.items||[]).forEach(function(it){rows.push(out(it));});});
+  var ws=X.utils.aoa_to_sheet([['품목등록업로드'],head].concat(rows));
+  ws['!cols']=head.map(function(t,i){var w=Math.max(8,t.length*2+2);rows.forEach(function(r){w=Math.max(w,Math.min(40,String(r[i]).length*1.6+2));});return {wch:w};});
+  var wb=X.utils.book_new(),hid=[0];X.utils.book_append_sheet(wb,ws,'시트1');
+  var fl=listOf('flow')||[],dv=[];
+  if(fl.length){X.utils.book_append_sheet(wb,X.utils.aoa_to_sheet(fl.map(function(v){return [v];})),'목록');hid.push(1);dv.push({col:X.utils.encode_col(UP_HEAD.length),src:'A',n:fl.length});}
+  wb.Workbook={Sheets:hid.map(function(x){return {Hidden:x};})};
+  var bytes=X.write(wb,{type:'array',bookType:'xlsx'});if(dv.length)bytes=tplValid(X,bytes,dv,3);
+  return {bytes:bytes,name:'외주입력_기본정보_품목등록업로드_양식',n:rows.length};
+}
+function upDownload(){loadXlsx().then(function(X){var r=upBuild(X);saveFile(r.bytes,r.name+'.xlsx');say('양식을 받았습니다.'+(r.n?' 저장한 품목 '+r.n+'줄이 들어 있습니다.':''));},function(){say(XLSX_FAIL,true);});}
+function upGs(){
+  var w=window.open('','_blank');if(w){try{w.opener=null;w.document.title='구글시트 양식';w.document.body.textContent='구글시트 양식을 만드는 중입니다.';}catch(e){}}
+  var fail=function(){if(w&&!w.closed)w.close();say('구글시트 양식을 만들지 못했습니다. 「양식 다운로드 → 엑셀」로 받아 주세요.',true);};
+  say('구글시트 양식을 만드는 중입니다.');
+  loadXlsx().then(function(X){var r=upBuild(X);
+    return fetch(GS_MAKER,{method:'POST',body:JSON.stringify({name:r.name,data:b64(gsClean(X,r.bytes))}),credentials:'omit'}).then(function(x){return x.ok?x.json():Promise.reject(new Error('http'));})
+      .then(function(j){if(!j||!j.ok||!/^https:\/\/docs\.google\.com\/spreadsheets\/d\/[\w-]{20,}/.test(j.url||''))return Promise.reject(new Error('maker'));
+        if(w&&!w.closed)w.location.href=j.url;else window.open(j.url,'_blank','noopener');say('구글시트 양식을 드라이브 「영림원외주입력 양식」 폴더에 만들어 열었습니다.');});
+  }).catch(fail);
+}
 var setGs=false;
 function setUpBar(){
   var bar=h('div',{class:'actions'},h('button',{type:'button',class:'btn primary',disabled:!can('w'),on:{click:function(){W=newSet();draw();}}},ico('plus'),'새 제품 입력'),
+    pickBtn('양식 다운로드','download',[['엑셀',function(){upDownload();}],['구글 스프레드시트',function(){upGs();}]]),
     pickBtn('일괄 업로드','fileup',[['엑셀',function(){itemFile();}],['구글 스프레드시트',function(){setGs=true;draw();var n=mainEl.querySelector('.tplgs input');if(n)n.focus();}]]));
   if(!setGs)return bar;
   var inp=h('input',{type:'text',placeholder:'https://docs.google.com/spreadsheets/d/…'});
@@ -1221,10 +1252,10 @@ function tplList(c){if(c.t==='bool')return ['O','X'];if(!c.opts)return null;if(c
 function tplSheet(X,cols,rows){var labs=cols.map(function(c){return c.l+(c.req?'*':'');});var ws=X.utils.aoa_to_sheet([labs].concat(rows));
   ws['!cols']=labs.map(function(t,i){var w=Math.max(10,t.length*2+2);rows.forEach(function(r){w=Math.max(w,Math.min(40,String(r[i]==null?'':r[i]).length*1.6+2));});return {wch:w};});return ws;}
 /* SheetJS 무료판은 드롭다운(데이터 유효성 검사)을 못 쓴다 → 폼 v6 addValidation 과 같이 첫 시트 XML 에 직접 넣는다(목록 밖 입력 허용 = showErrorMessage 0) */
-function tplValid(X,bytes,dv){
+function tplValid(X,bytes,dv,r0){r0=r0||2;
   var zip=X.CFB.read(new Uint8Array(bytes),{type:'array'}),ent=X.CFB.find(zip,'/xl/worksheets/sheet1.xml');if(!ent)return bytes;
   var xml=new TextDecoder('utf-8').decode(ent.content),esc=function(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');};
-  var tag='<dataValidations count="'+dv.length+'">'+dv.map(function(d){return '<dataValidation type="list" allowBlank="1" showInputMessage="1" showErrorMessage="0" sqref="'+d.col+'2:'+d.col+TPL_ROWS+'"><formula1>'+esc("'목록'!$"+d.src+'$1:$'+d.src+'$'+d.n)+'</formula1></dataValidation>';}).join('')+'</dataValidations>';
+  var tag='<dataValidations count="'+dv.length+'">'+dv.map(function(d){return '<dataValidation type="list" allowBlank="1" showInputMessage="1" showErrorMessage="0" sqref="'+d.col+r0+':'+d.col+TPL_ROWS+'"><formula1>'+esc("'목록'!$"+d.src+'$1:$'+d.src+'$'+d.n)+'</formula1></dataValidation>';}).join('')+'</dataValidations>';
   var after=/<(hyperlinks|printOptions|pageMargins|pageSetup|headerFooter|rowBreaks|colBreaks|customProperties|cellWatches|ignoredErrors|smartTags|drawing|legacyDrawing|legacyDrawingHF|picture|oleObjects|controls|webPublishItems|tableParts|extLst)[\s>\/]/.exec(xml);
   xml=after?xml.slice(0,after.index)+tag+xml.slice(after.index):xml.replace('</worksheet>',tag+'</worksheet>');
   ent.content=new TextEncoder().encode(xml);ent.size=ent.content.length;return X.CFB.write(zip,{type:'array',fileType:'zip'});}
