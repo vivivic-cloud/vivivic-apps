@@ -24,12 +24,14 @@
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="발주공통.css">
 <style>
-main.vl{padding:0 0 calc(24px + env(safe-area-inset-bottom,0px))}
-.vlhead{padding:16px 16px 0}
-.vlbody{padding:0 16px}
+main.vl{max-width:1180px;padding:22px max(16px,env(safe-area-inset-left,0px)) calc(32px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-right,0px))}   /* v224 폼 .wrap 값 */
+.vlhead{margin:0 0 14px}
 .vlfr iframe{display:block;width:100%;border:0;height:120px;background:#fff}
 .vlhead .msg{margin:12px 0 0}
-.vlnav{display:flex;gap:6px;margin:0 0 2px}.vlnav button{min-height:40px;padding:8px 14px}   /* v223 뒤로·처음으로 */
+.vlnav{display:flex;gap:6px;margin:0 0 8px}   /* v223 뒤로·처음으로 — v224 폼 .btn.small 꼴 */
+.vlnav button{padding:5px 10px;font-size:11px;min-height:32px}
+@media (max-width:480px){.vlnav button{min-height:36px}}
+@media (max-width:820px){main.vl{padding-top:16px}}
 </style>
 </head>
 <body>
@@ -40,9 +42,10 @@ main.vl{padding:0 0 calc(24px + env(safe-area-inset-bottom,0px))}
 "use strict";
 var P=window.PO,h=P.h,show=P.show,mainEl=document.getElementById('main');
 function say(t,bad){mainEl.replaceChildren(h('div','vlhead',h('p','msg'+(bad?' bad':''),t)));}
+var h2El=h('h2','',''),cardEl=null;
 var key=(location.hash||'').slice(1).split('&')[0];
 if(!P.keyOk(key)){say('링크가 없습니다.',true);return;}
-var NAME='',PARTS=[],ACT=null,headEl=h('div','vlhead'),bodyEl=h('div','vlbody'),frEl=h('div','vlfr');
+var NAME='',PARTS=[],ACT=null,headEl=h('div',''),bodyEl=h('div','vlbody'),frEl=h('div','vlfr');
 /* 안 페이지 높이 = 안 내용 높이(같은 출처라 읽을 수 있음) */
 function fitNow(fr){try{var d=fr.contentDocument;if(!d||!d.documentElement)return;var m=d.getElementById('main')||d.body;if(!m)return;var hgt=Math.ceil(m.getBoundingClientRect().bottom+(d.defaultView?d.defaultView.scrollY:0));if(hgt>0)fr.style.height=hgt+'px';}catch(e){}}
 function fit(fr){
@@ -72,7 +75,8 @@ function render(){
   cs.push({t:NAME,go:home});
   if(a){if(multi)cs.push({t:a.label,go:function(){if(a.cs[0]&&a.cs[0].go)a.cs[0].go();}});cs=cs.concat((a.cs||[]).slice(1));}
   CS=cs;syncHist();
-  var bb=h('button','sec','뒤로'),hb=h('button','sec','처음으로');bb.type=hb.type='button';bb.disabled=hb.disabled=cs.length<2;bb.addEventListener('click',back);hb.addEventListener('click',home);
+  var a2=cur();h2El.textContent=a2?a2.label:'';h2El.hidden=!a2;   /* v224 카드 머리 = 폼 .stephead h2 */
+  var bb=h('button','sec','← 뒤로'),hb=h('button','sec','처음으로');bb.type=hb.type='button';bb.disabled=hb.disabled=cs.length<2;bb.addEventListener('click',back);hb.addEventListener('click',home);
   headEl.replaceChildren(h('div','vlnav',bb,hb),h('div','asmcrumb',cs.reduce(function(o,c,i){var last=i===cs.length-1,b=null;if(!last){b=h('button','',c.t);b.type='button';b.addEventListener('click',function(){c.go&&c.go();});}return o.concat([i?h('i','','›'):null,last?h('b','',c.t):b]);},[])));
   if(a){bodyEl.replaceChildren();return;}
   bodyEl.replaceChildren(h('div','asmgrid2',PARTS.map(function(p){var s=p.sum,nm=[],seen={};
@@ -89,7 +93,7 @@ P.getOne('erp_pobox/'+key).then(function(v){
   NAME=show(v.name);document.title='INGHOME-'+NAME;
   ACT=PARTS.length===1?PARTS[0].key:null;
   PARTS.forEach(function(p){var fr=document.createElement('iframe');fr.title=p.label;fr.setAttribute('allow','camera; clipboard-write; web-share; fullscreen');fr.hidden=p.key!==ACT;fit(fr);p.fr=fr;fr.src=p.src;frEl.append(fr);});
-  mainEl.replaceChildren(headEl,bodyEl,frEl);render();
+  mainEl.replaceChildren(h('div','vlhead',h('h1','',NAME)),h('section','card',h('div','stephead',h2El),headEl,bodyEl,frEl));render();   /* v224 폼과 같은 짜임: 머리띠 · h1 · 카드(h2 · 경로 · 박스) */
 },function(){say('불러오지 못했습니다.',true);});
 window.addEventListener('hashchange',function(){var k2=(location.hash||'').slice(1).split('&')[0];if(k2!==key)location.reload();});
 })();
