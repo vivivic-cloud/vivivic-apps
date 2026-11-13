@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v225 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v226 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -423,7 +423,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v225</span>
+    <span class="ver">v226</span>
   </div>
 </header>
 <div class="wrap">
@@ -1999,7 +1999,7 @@ var NAV_BOXES=[
   {id:'구매',title:PAGE_NAMES['구매'],icon:'sheet',items:function(){return ['purprices','purreqs','purapprs','purords','purchases','purdelvs','pomods'];}},   /* v126 발주서관리 */   /* v223 사장님 「발주3건은 그대로 두고 저 메뉴를 없애 달라고」 — 메뉴 목록에서만 뺌. 화면(renderPodocs)·박스 동기화(refreshAll)·#podocs/번호 주소·업체별 링크는 그대로 */
   {id:'수입',title:PAGE_NAMES['수입'],icon:'import',items:function(){return ['imporders','imppays','impinvs','impbls','impins'];}},
   {id:'생산',title:PAGE_NAMES['생산'],icon:'layers',items:function(){return ['prods','proddlvs'];}},   /* v223 「생산/외주 발주서」 메뉴만 뺌(asmBoxSync·업체별 링크 그대로) */
-  /* v224 사장님 「업체별 링크 메뉴도 삭제」 — 메뉴 박스만 뺌(renderLinks·#links 주소·업체 링크 주소·거래처.html 그대로) */
+  /* v224 사장님 「업체별 링크 메뉴도 삭제」 — 메뉴 박스 뺌 · v226 업체 링크 페이지 파일 지움, #links 주소도 막음(LINK_GONE) */
   {id:'물류',title:'물류 · [물류] 재고현황',icon:'box',items:function(){return ['stocks'];}},
   {id:'staff',title:'담당자 관리',icon:'users',items:function(){return ['staff'];}}];
 var BASIC_URL='../영림원기본정보입력/영림원기본정보입력.html';   /* v166 사장님 「해당 프로그램을 입력폼 메뉴에 넣어 주세요」 — 기본입력 박스 첫 줄 */
@@ -6118,6 +6118,7 @@ function guideStep(s,say,fn,ip){
   else if(vs.length){form.fill(vs[0],vs[0].rows||[]);say('안내로 칸을 채웠습니다. 빈 칸을 채우고 저장을 누르세요(자동 저장 안 함).');}
 }
 function renderStep(){
+  if(LINK_GONE[cur]){cur=STEPS[0].key;try{history.replaceState(null,'','#'+cur);}catch(e){}renderNav();renderSum();}   /* v226 링크 화면 막음 */
   wSync();   /* v225 메뉴별 읽기 */
   document.body.setAttribute('data-step',cur);   /* v208 지금 단계 = 모양(CSS)만 가르는 표지 */
   if(cur==='staff'){renderStaff();return;}   /* v115 */
@@ -7904,13 +7905,17 @@ function staffRepoTable(){
     ['구글시트 양식 웹앱(Apps Script)','영향 없음(드라이브만 씀)','—'],
     ['자료 보호','늘지 않음 — 파이어베이스 키는 원래 공개 값, 자료는 저장소 규칙이 지킴','저장소 규칙 배포(위)']]);
 }
-function go(k){if(BYKEY[k]&&BYKEY[k].shownIn)k=BYKEY[k].shownIn;if(k!==cur||k==='podocs')podSel='';cur=k;wSync();navOpen=NARROW()?'':null;try{history.replaceState(null,'','#'+k);}catch(e){location.hash=k;}renderNav();renderSum();renderStep();}
+function go(k){if(LINK_GONE[k])k=STEPS[0].key;   /* v226 */
+  if(BYKEY[k]&&BYKEY[k].shownIn)k=BYKEY[k].shownIn;if(k!==cur||k==='podocs')podSel='';cur=k;wSync();navOpen=NARROW()?'':null;try{history.replaceState(null,'','#'+k);}catch(e){location.hash=k;}renderNav();renderSum();renderStep();}
 function refreshAll(){rateSyncAll();renderNav();renderSum();renderList();refreshLists();if(impDraw)impDraw();if(sheetDraw)sheetDraw();if(ifRefresh)ifRefresh();if(stkDraw)stkDraw();if(podDraw)podDraw();if(asmDraw)asmDraw();if(lnkDraw)lnkDraw();asmConvSync();asmBoxSync();pcDlvSync();podSync();podTokSync();podBoxSync();podShipInSync();podFlowSync();podModSync();}
 
 /* ---------- boot ---------- */
 
-var hash=location.hash.slice(1);if(BYKEY[hash])cur=BYKEY[hash].shownIn||hash;
-var podHash=function(){var m=/^#podocs\/(.+)$/.exec(location.hash);if(!m)return false;try{podSel=decodeURIComponent(m[1]);}catch(e){podSel=m[1];}cur='podocs';return true;};   /* v126 발주서 문서 주소 = #podocs/발주번호 (QR) */
+/* v226 사장님 「업체링크,페이지 모두삭제하라고했을텐데」 — 업체 링크 페이지 파일을 지웠으므로 링크를 만들거나 여는 화면(발주서관리·발주서·업체별 링크 — 공유·QR·복사 단추가 이 셋 안에만 있음)으로 가는 길을 막는다.
+   주소(#podocs·#podocs/번호·#asmpo·#links)로 와도 첫 메뉴로. 화면 코드·박스 동기화 코드는 남아 있으나 열 길이 없음. */
+var LINK_GONE={podocs:1,asmpo:1,links:1};
+var hash=location.hash.slice(1);if(BYKEY[hash]&&!LINK_GONE[hash])cur=BYKEY[hash].shownIn||hash;
+var podHash=function(){var m=/^#podocs\/(.+)$/.exec(location.hash);if(!m||LINK_GONE.podocs)return false;try{podSel=decodeURIComponent(m[1]);}catch(e){podSel=m[1];}cur='podocs';return true;};   /* v126 발주서 문서 주소 = #podocs/발주번호 (QR) */
 podHash();
 window.addEventListener('hashchange',function(){if(podHash()){navOpen=null;renderNav();renderSum();renderStep();}});
 dbP=connectDb();   /* v28: 발주 상품검색이 첫 화면부터 기다릴 수 있게 먼저 */
