@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v217 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v218 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -4303,13 +4303,14 @@ function prodRunFn(){
     var a=(data.prods||[]).filter(function(d){return d.id;}).slice().sort(function(x,y){return String(y.createdAt||'')<String(x.createdAt||'')?-1:1;});
     var ga=a.filter(ylwGone);a=a.filter(function(d){return !ylwGone(d);});   /* v104 영림원에 없음 생산은 카드에서 빼고 접힌 칸에만 */
     var live=a.filter(function(d){return !prodDone(d);}),end=a.filter(prodDone);
-    kit=delKit(BYKEY.prods,a.filter(function(d){return delOk(BYKEY.prods,d);}));
+    var kit0=delKit(BYKEY.prods,a.filter(function(d){return delOk(BYKEY.prods,d);})),dkit=delKit(BYKEY.prods,a.filter(function(d){return delOkDone(BYKEY.prods,d);}),2);   /* v216 */
+    kit={bar:kit0.bar,pk:function(d){return kit0.pk(d)||dkit.pk(d);}};
     var gk=delKit(BYKEY.prods,ga.filter(function(d){return delOk(BYKEY.prods,d);}),1);
     gone.hidden=!ga.length;
     gone.replaceChildren.apply(gone,[h('summary',{},'영림원에 없음 '+ga.length+'건')].concat(gk.bar?[gk.bar]:[],ga.map(function(d){   /* 납품·출고 단추 없이 머리만 */
       return h('div',{class:'prcard'},h('div',{class:'prhead'},gk.pk(d),h('span',{},d.itemNo),h('span',{},show(d.qty)+'개'),h('span',{class:'chip gone'},'영림원에 없음')),
         h('div',{class:'prsub'},[d.itemName,'생산계획완료일 '+d.dueDate,d.planNo?'생산계획 '+d.planNo:''].filter(Boolean).join(' · ')));})));
-    hd.replaceChildren.apply(hd,[BYKEY.proddlvs.title].concat(kit.bar?[kit.bar]:[]));
+    hd.replaceChildren.apply(hd,[BYKEY.proddlvs.title].concat(kit0.bar?[kit0.bar]:[],dkit.bar?[dkit.bar]:[]));
     none.hidden=!!live.length||!data.prods;
     box.replaceChildren.apply(box,live.map(cardEl));
     done.hidden=!end.length;
@@ -6844,6 +6845,13 @@ function ylwGone(r){return !!(r&&r.ylwGone&&r.status==='완료');}   /* v80 stag
 function ylwNoOf(r){return !!((r.all?'':r.planNo)||r.reqno||r.apprno||(r.pos&&r.pos.length)||r.dlvno||r.dlvNo||r.inNo||r.outNo||(r.rows||[]).some(function(x){return x&&(r.all?(x.dlvNo||x.inNo||x.outNo):(x.workNo||x.orderNo));}));}   /* v171 전 공정 납품 문서 줄의 workNo·orderNo 는 발주에서 옮긴 값 */
 /* v103 함께 만든 문서 묶음: 뒤 문서가 앞 문서를 가리키면 앞 문서는 못 지운다(뒤 문서 먼저) */
 var DEL_KIDS={imporders:[['imppays','poId']],imppays:[['impinvs','payId']],impinvs:[['impbls','invId']],impbls:[['impins','blId']],purreqs:[['purapprs','reqId']],purapprs:[['purords','apprId']],purords:[['purdelvs','purId']],purchases:[['purdelvs','purId']],prods:[['proddlvs','prodId'],['prodmoves','prodId']]};
+/* v216 완료 문서 지우기(사장님 11-13 「테스트 관련 모든 기록을 입력폼에서 지웁니다」): 폼 문서만 지운다 — 영림원 기록은 그대로. 뒤 문서(DEL_KIDS)가 남아 있으면 못 지운다 */
+var DONE_DEL={purchases:1,purdelvs:1,prods:1,proddlvs:1,imporders:1,imppays:1,impinvs:1,impbls:1,impins:1,purreqs:1,purapprs:1,purords:1,purprices:1};   /* v217 수입 5단계 · 구매 나머지 */
+function canDelDone(r){return !!(r&&r.status==='완료'&&!ylwGone(r));}
+function delOkDone(s,r){
+  if(!DONE_DEL[s.key]||!canDelDone(r)||!canCol('erp_'+s.key,'d'))return false;
+  return !(DEL_KIDS[s.key]||[]).some(function(k){return (data[k[0]]||[]).some(function(x){return x[k[1]]===r.id;});});
+}
 function delOk(s,r){
   if(!canDel(r))return false;
   if((DEL_KIDS[s.key]||[]).some(function(k){return (data[k[0]]||[]).some(function(x){return x[k[1]]===r.id;});}))return false;
@@ -6851,32 +6859,33 @@ function delOk(s,r){
   return true;
 }
 /* v103 모든 등록 메뉴 공용: 「선택 삭제 N건」·「대기·오류 모두 삭제」 단추 줄 + 줄마다 체크 칸. dels = 지울 수 있는 문서 */
-function delKit(s,dels,gone){   /* v104 gone = 「영림원에 없음」 묶음용(따로 고르고 단추 글자만 다름) */
+function delKit(s,dels,gone){   /* v216 gone===2 = 완료 문서 */   /* v104 gone = 「영림원에 없음」 묶음용(따로 고르고 단추 글자만 다름) */
   if(!canCol('erp_'+s.key,'d'))dels=[];   /* v115 삭제 권한 없으면 단추·체크 칸 없음 */
-  var pkk=s.key+(gone?'#gone':''),keep={},pk0=picked[pkk]||{};
+  var pkk=s.key+(gone===2?'#done':gone?'#gone':''),keep={},pk0=picked[pkk]||{};
   dels.forEach(function(r){if(pk0[r.id])keep[r.id]=1;});picked[pkk]=keep;
   var sel=function(){return dels.filter(function(r){return keep[r.id];});};
-  var selBtn=h('button',{type:'button',class:'btn small',on:{click:function(){delMany(s,sel());}}});
-  var drawSel=function(){var n=sel().length;selBtn.hidden=!n;selBtn.textContent='선택 삭제 '+n+'건';};
+  var selBtn=h('button',{type:'button',class:'btn small',on:{click:function(){delMany(s,sel(),gone);}}});
+  var drawSel=function(){var n=sel().length;selBtn.hidden=!n;selBtn.textContent=(gone===2?'완료 선택 삭제 ':'선택 삭제 ')+n+'건';};
   drawSel();
-  return {bar:dels.length?h('div',{class:'delbar'},selBtn,h('button',{type:'button',class:'btn small',on:{click:function(){delMany(s,dels);}}},gone?'영림원에 없음 모두 삭제':'대기·오류 모두 삭제')):null,
+  return {bar:dels.length?h('div',{class:'delbar'},selBtn,h('button',{type:'button',class:'btn small',on:{click:function(){delMany(s,dels,gone);}}},gone===2?'완료 모두 삭제':gone?'영림원에 없음 모두 삭제':'대기·오류 모두 삭제')):null,
     pk:function(r){if(dels.indexOf(r)<0)return null;
       var c=h('input',{type:'checkbox',class:'pk','aria-label':'선택',on:{click:function(e){e.stopPropagation();},change:function(){if(c.checked)keep[r.id]=1;else delete keep[r.id];drawSel();}}});
       c.checked=!!keep[r.id];return c;}};
 }
-function delMany(s,rows){
+function delMany(s,rows,mode){
+  var okF=mode===2?canDelDone:canDel;
   if(!db){flash('저장소에 연결되지 않아 지울 수 없습니다.',true);return;}
   if(!rows.length)return;
-  if(!confirm(s.title+' '+rows.length+'건을 지웁니다. 되돌릴 수 없습니다.'))return;
+  if(!confirm(mode===2?s.title+' 완료 '+rows.length+'건을 폼에서 지웁니다. 영림원 기록은 지워지지 않습니다. 되돌릴 수 없습니다.':s.title+' '+rows.length+'건을 지웁니다. 되돌릴 수 없습니다.'))return;
   Array.prototype.forEach.call(document.querySelectorAll('.delbar .btn'),function(b){b.disabled=true;});
   Promise.all(rows.map(function(r){
-    return db.collection('erp_'+s.key).doc(r.id).deleteIf(canDel).catch(function(e){console.warn('삭제 실패',e);return null;});
+    return db.collection('erp_'+s.key).doc(r.id).deleteIf(okF).catch(function(e){console.warn('삭제 실패',e);return null;});
   })).then(function(res){
     var done=res.filter(function(x){return x===true;}).length,kept=res.filter(function(x){return x===false;}).length,fail=res.filter(function(x){return x==null;}).length;
-    picked[s.key]={};picked[s.key+'#gone']={};
+    picked[s.key]={};picked[s.key+'#gone']={};picked[s.key+'#done']={};
     if(data[s.key])data[s.key]=data[s.key].filter(function(r){return !rows.some(function(x,i){return x.id===r.id&&res[i]===true;});});
     renderList();renderNav();renderSum();if(impDraw)impDraw();if(ifRefresh)ifRefresh();   /* v103 불러오기 요청·생산 카드도 다시 그림 */
-    flash(done+'건을 지웠습니다.'+(kept?' '+kept+'건은 그 사이 진행중·완료로 바뀌어 남겼습니다.':'')+(fail?' '+fail+'건은 지우지 못했습니다. 잠시 뒤 다시 시도해 주세요.':''),!!fail);
+    flash(done+'건을 지웠습니다.'+(kept?' '+kept+'건은 그 사이 '+(mode===2?'바뀌어':'진행중·완료로 바뀌어')+' 남겼습니다.':'')+(fail?' '+fail+'건은 지우지 못했습니다. 잠시 뒤 다시 시도해 주세요.':''),!!fail);
   });
 }
 function renderList(){
@@ -6890,7 +6899,9 @@ function renderListIn(s,listBox,title){
   var head=h('h3',{},title,h('span',{},a?a.length+'건':''));
   var dels=(a||[]).filter(function(r){return delOk(s,r);}),kit=delKit(s,dels);
   var gkit=delKit(s,gone.filter(function(r){return delOk(s,r);}),1);
-  if(kit.bar)head.append(kit.bar);
+  var dkit=delKit(s,(a||[]).filter(function(r){return delOkDone(s,r);}),2),kit0=kit;   /* v216 완료 문서 */
+  kit={bar:kit0.bar,pk:function(r){return kit0.pk(r)||dkit.pk(r);}};
+  if(kit0.bar)head.append(kit0.bar);if(dkit.bar)head.append(dkit.bar);
   if(a==null){listBox.replaceChildren(head,h('div',{class:'empty'},'불러오는 중입니다.'));return;}
   var openIds={};
   Array.prototype.forEach.call(listBox.querySelectorAll('details[data-id]'),function(d){if(d.open)openIds[d.getAttribute('data-id')]=1;});
