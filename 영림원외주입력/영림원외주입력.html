@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v215 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v216 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -421,7 +421,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v215</span>
+    <span class="ver">v216</span>
   </div>
 </header>
 <div class="wrap">
@@ -4033,11 +4033,16 @@ function prodLines(code,qty){
    rows.wh 가 있는 생산은 공정 사이 자재출고(500938 → 500940)를 만들지 않는다(prodMoveNeed). wh 없는 옛 문서는 옛 그대로. */
 function prodWhOf(wc){var w=purTrim(wc);if(!w)return '확인 못 함';
   var x=(data.workcenters||[]).filter(function(r){return r&&r.status!=='오류'&&purTrim(r.name)===w;})[0];return x&&purTrim(x.whDeliv)?purTrim(x.whDeliv):'확인 못 함';}
-function prodWhTo(d,r){var nx=prodNext(d,r);if(nx)return nx.wc;if(r.last&&d.kind==='부속'&&purTrim(d.asmVendor))return d.asmVendor;return r.wc;}
+function prodWhTo(d,r){var nx=prodNext(d,r);if(nx)return nx.wc;if(r.last&&d.kind==='부속')return purTrim(d.asmVendor)||prodAsmOf(r.itemNo);return r.wc;}   /* v216 부속 마지막 = 조립처(asmVendor, 없으면 그 부속을 받는 조립업체 발주 링크 박스 erp_asmbox 하나) */
+/* v216 11-13 「납품창고 = 다음 공정 업체」 세팅 · 사장님 원칙 「조립업체 링크로 들어온 발주가 입력폼 모든 발주의 시작」 → 공정 발주 때 조립처는 늘 정해져 있다.
+   asmVendor 없는 부속(직접 입력) = 그 부속이 박스 parts 에 있는 조립업체 링크 박스가 한 곳이면 그 업체, 아니면 '' → 「확인 못 함」(짓지 않음, 손으로 고침). */
+function prodAsmOf(code){var c=purTrim(code),vs=[];(ASMBOX||[]).forEach(function(b){var v=purTrim(b.vendor);if(v&&vs.indexOf(v)<0&&(b.parts||[]).some(function(x){return x&&purTrim(x.ccode)===c;}))vs.push(v);});return vs.length===1?vs[0]:'';}
+function prodWhList(){var o=[];(data.workcenters||[]).forEach(function(r){var w=r&&r.status!=='오류'?purTrim(r.whDeliv):'';if(w&&o.indexOf(w)<0)o.push(w);});return o.sort(function(a,b){return a.localeCompare(b,'ko');});}
+function prodWhDl(){var el=document.getElementById('dl-prodwh');if(!el){el=h('datalist',{id:'dl-prodwh'});document.body.append(el);}el.replaceChildren.apply(el,prodWhList().map(function(w){return h('option',{value:w});}));}   /* v216 납품창고 손으로 고치기 목록(목록 밖 글자도 받음) */
 function prodWhSet(d){(d.rows||[]).forEach(function(r){r.wh=prodWhOf(prodWhTo(d,r));});return d;}
 function prodMoveNeed(d,r){var nx=prodNext(d,r);return !!(nx&&purTrim(nx.wc)!==purTrim(r.wc)&&!purTrim(r.wh));}
 function prodPickFn(){
-  var s=BYKEY.prods,busy=false,lines=[],mine={},fld={};
+  var s=BYKEY.prods,busy=false,lines=[],mine={},whMine={},fld={};   /* v216 whMine = 손으로 고친 납품창고 */
   ['itemNo','qty','dueDate'].forEach(function(k){fld[k]=makeField(s.fields.filter(function(f){return f.k===k;})[0]);});
   var msg=h('span',{class:'msg','aria-live':'polite'}),out=h('p',{class:'pslink','aria-live':'polite'}),list=h('div',{}),btn=h('button',{type:'button',class:'btn primary',on:{click:saveIt}},'저장');
   var none=h('p',{class:'hint',hidden:true},'고를 수 있는 품목이 없습니다. 아래에서 빠진 단계를 보세요.'),gap=h('details',{class:'prgap',hidden:true}),parts=h('div',{hidden:true},h('div',{class:'sub',style:'margin-top:12px'},'공정별 업체'),list,h('div',{class:'row'},btn,msg));
@@ -4048,16 +4053,16 @@ function prodPickFn(){
     parts.hidden=!code;draw();
   }
   function draw(){
-    var seen='',it0=ifItem(purTrim(fld.itemNo.get()))||{};prodWhSet({kind:it0.asset==='제품'?'제품':'부속',itemNo:purTrim(fld.itemNo.get()),rows:lines});   /* v214 */
+    var seen='',it0=ifItem(purTrim(fld.itemNo.get()))||{};prodWhSet({kind:it0.asset==='제품'?'제품':'부속',itemNo:purTrim(fld.itemNo.get()),rows:lines});lines.forEach(function(r){var m=whMine[keyOf(r)];if(m)r.wh=m;});prodWhDl();   /* v214 · v216 손으로 고친 값 */
     list.replaceChildren.apply(list,lines.map(function(r){
       var head=r.itemNo!==seen?h('div',{class:'pritem'},r.itemNo+' · '+(r.itemName||'')+' · '+show(r.qty)+'개'):'';seen=r.itemNo;
       var sel=h('select',{'aria-label':r.itemNo+' '+r.proc+' 외주거래처',disabled:busy,on:{change:function(e){r.wc=e.target.value;mine[keyOf(r)]=r.wc;draw();}}},r.opts.map(function(o,i){return h('option',{value:o},o+(i===0?' (우선순위 1)':''));}));
       sel.value=r.wc;
-      return h('div',{},head,h('div',{class:'prrow'},h('div',{class:'prline'},h('b',{},r.seq+'. '+r.proc)),sel,h('div',{class:'prwip'},'납품창고 '+r.wh),r.wc!==r.wcFirst?h('div',{class:'hint warn'},'우선순위 1 이 아닌 업체입니다.'):''));
+      return h('div',{},head,h('div',{class:'prrow'},h('div',{class:'prline'},h('b',{},r.seq+'. '+r.proc)),sel,h('label',{class:'prwip'},'납품창고 ',h('input',{type:'text',list:'dl-prodwh',value:r.wh,disabled:busy,'aria-label':r.itemNo+' '+r.proc+' 납품창고',on:{change:function(e){var v=purTrim(e.target.value);if(v)whMine[keyOf(r)]=v;else delete whMine[keyOf(r)];draw();}}})),r.wc!==r.wcFirst?h('div',{class:'hint warn'},'우선순위 1 이 아닌 업체입니다.'):''));
     }));
     btn.disabled=busy;
   }
-  fld.itemNo.el.addEventListener('change',function(){msg.textContent='';out.textContent='';mine={};redo();});
+  fld.itemNo.el.addEventListener('change',function(){msg.textContent='';out.textContent='';mine={};whMine={};redo();});
   fld.qty.el.addEventListener('input',function(){msg.textContent='';redo();});
   var dueWarn=h('p',{class:'hint warn',hidden:true});
   function dueText(){var it=ifItem(purTrim(fld.itemNo.get()))||{};return prodDueWarn(it.asset,fld.dueDate.get());}
@@ -4082,10 +4087,10 @@ function prodPickFn(){
       var g=prodGap(code);if(g.length){stop('그 사이 앞 단계가 바뀌었습니다: '+g.join(', ')+'. 저장하지 않았습니다.');return;}
       var it=ifItem(code)||{},doc={kind:it.asset==='제품'?'제품':'부속',itemNo:code,itemName:it.name||'',qty:Number(q),dueDate:date,
         rows:lines.map(function(r){return {itemNo:r.itemNo,itemName:r.itemName,qty:r.qty,seq:r.seq,proc:r.proc,wc:r.wc,wcFirst:r.wcFirst,last:r.last,workNo:'',orderNo:''};}),
-        planNo:'',stage:'',status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(s)};prodWhSet(doc);
+        planNo:'',stage:'',status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(s)};prodWhSet(doc);doc.rows.forEach(function(r){var m=whMine[keyOf(r)];if(m)r.wh=m;});   /* v216 */
       if(doc.rows.some(function(r){return !r.wc;})){stop('업체가 없는 공정이 있습니다. 저장하지 않았습니다.');return;}
       return db.collection('erp_prods').add(doc).then(function(){
-        busy=false;mine={};fld.itemNo.set('');fld.qty.reset();fld.dueDate.reset();fld.itemNo.setError('');lines=[];parts.hidden=true;draw();msg.textContent='';sayDue();
+        busy=false;mine={};whMine={};fld.itemNo.set('');fld.qty.reset();fld.dueDate.reset();fld.itemNo.setError('');lines=[];parts.hidden=true;draw();msg.textContent='';sayDue();
         out.textContent=code+' 생산을 저장했습니다. 대기로 쌓였습니다. 「외주납품입력·자재출고입력」에서 볼 수 있습니다.';
       },function(e){stop('저장하지 못했습니다. '+errText(e));});
     });
@@ -4096,7 +4101,7 @@ function prodPickFn(){
     done(recs.map(function(rc){
       var c=purTrim(rc.itemNo),ok=(LISTS['dl-prods']||[]).indexOf(c)>=0;
       return {label:[c||'(품번 없음)',show(rc.qty)+'개',rc.dueDate].filter(Boolean).join(' · '),why:ok?'':'앞 단계 등록이 끝나지 않았거나 없는 품번입니다',fill:function(){
-        mine={};msg.textContent='';out.textContent='';fld.itemNo.set(c);fld.qty.reset();fld.dueDate.reset();if(!isEmpty(rc.qty))fld.qty.set(rc.qty);if(rc.dueDate)fld.dueDate.set(rc.dueDate);
+        mine={};whMine={};msg.textContent='';out.textContent='';fld.itemNo.set(c);fld.qty.reset();fld.dueDate.reset();if(!isEmpty(rc.qty))fld.qty.set(rc.qty);if(rc.dueDate)fld.dueDate.set(rc.dueDate);
         if(ok)redo();else{lines=[];parts.hidden=true;draw();}
       }};
     }));
@@ -4280,6 +4285,35 @@ function prodRunFn(){
       },function(e){stop('저장하지 못했습니다. '+errText(e));});
     });
   }
+  /* v216 대기·오류 생산의 외주발주 전 줄(orderNo 없음) 납품창고만 고친다 — 다음 작업이 진행된(외주발주된) 줄은 못 고침. 다른 칸은 그대로 */
+  function prodWhOpen(d){return (d.rows||[]).filter(function(r){return !purTrim(r.orderNo);});}
+  function openWh(d){
+    var P={key:'wh|'+d.id},msg=h('span',{class:'msg','aria-live':'polite'}),ins=[];prodWhDl();
+    var rs=prodWhOpen(d).map(function(r){var i=h('input',{type:'text',list:'dl-prodwh',value:show(r.wh),'aria-label':r.itemNo+' '+r.proc+' 납품창고'});ins.push({r:r,i:i});
+      return h('div',{class:'prrow'},h('div',{class:'prline'},h('b',{},r.seq+'. '+r.proc),h('small',{},[r.itemNo,r.wc].filter(Boolean).join(' · '))),h('label',{class:'prwip'},'납품창고 ',i));});
+    var save=h('button',{type:'button',class:'btn primary',on:{click:function(){saveWh(d,ins,msg,save);}}},'저장');
+    var close=h('button',{type:'button',class:'btn',on:{click:function(){open=null;draw();}}},'닫기');
+    P.el=h('div',{class:'prpanel'},rs,h('div',{class:'row'},save,close,msg));open=P;draw();
+  }
+  function saveWh(d,ins,msg,btn){
+    if(!db){bad(msg,'저장소에 연결되지 않아 저장할 수 없습니다.');return;}
+    var want={};ins.forEach(function(x){want[x.r.itemNo+'|'+x.r.seq]=purTrim(x.i.value);});
+    if(ins.some(function(x){return !purTrim(x.i.value);})){bad(msg,'필수 항목이 비어 있습니다.');return;}
+    if(ins.every(function(x){return purTrim(x.i.value)===purTrim(x.r.wh);})){bad(msg,'납품창고가 그대로입니다. 저장하지 않았습니다.');return;}
+    busy=true;btn.disabled=true;msg.textContent='저장하는 중입니다.';msg.className='msg';
+    function stop(t){busy=false;btn.disabled=false;bad(msg,t);}
+    freshCheck().then(function(old){
+      if(old){stop(old);return;}
+      return db.collection('erp_prods').doc(d.id).updateIf(function(cur){
+        if(cur.status!=='오류'&&cur.status!=='대기')return null;var hit=false;
+        var rows=(cur.rows||[]).map(function(r){var k=r.itemNo+'|'+r.seq;if(!(k in want)||purTrim(r.orderNo))return r;hit=true;return Object.assign({},r,{wh:want[k]});});
+        return hit?{rows:rows,status:'대기',agentNote:''}:null;
+      }).then(function(ok){
+        if(!ok){stop('그 사이 입력 작업자가 외주발주를 시작했습니다. 저장하지 않았습니다.');return;}
+        busy=false;open=null;out.textContent=d.itemNo+' 납품창고를 고쳤습니다. 대기로 돌아갔습니다.';draw();
+      },function(e){stop('저장하지 못했습니다. '+errText(e));});
+    });
+  }
   function noteOf(a){return a.filter(function(x){return x.status==='오류'||(x.agentNote&&x.status!=='완료');}).map(function(x){return x.status==='오류'?h('div',{class:'prbad'},'오류: '+(x.agentNote||'영림원 처리 실패')):h('div',{class:'prnote'},x.agentNote);});}
   function cardEl(d){   /* v190 사장님 「이런 생산외주 2.자재출고 페이지에 각 발주를 펼쳐서 알 수 있는 이런 내용을 미리 정신없이 나열해 놓을 필요가 있냐?」 · 「펼쳐도 안보여도되」 · 「어차피 발주번호별로 확인 되잖아」 — 반자재·공정·업체·발주·납품 줄 없음, 머리 줄만 */
     var chip={'대기':'발주 대기','진행중':'발주 중','완료':'발주 끝','오류':'오류'}[d.status]||d.status,kids=[];
@@ -4292,6 +4326,8 @@ function prodRunFn(){
     var dueKey='due|'+d.id;
     if(open&&open.key===dueKey)kids.push(open.el);
     else if(d.status==='오류'||d.status==='대기')kids.push(h('button',{type:'button',class:'btn small',disabled:busy,on:{click:function(){openDue(d);}}},'생산계획완료일 고치기'));
+    if(open&&open.key==='wh|'+d.id)kids.push(open.el);
+    else if((d.status==='오류'||d.status==='대기')&&prodWhOpen(d).length)kids.push(h('button',{type:'button',class:'btn small',disabled:busy,on:{click:function(){openWh(d);}}},'납품창고 고치기'));   /* v216 */
     return h('div',{class:'prcard'},kids);
   }
   function draw(){
