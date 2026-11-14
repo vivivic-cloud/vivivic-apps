@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v234 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v235 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -125,6 +125,14 @@ input.bad,select.bad{border-color:var(--red)}
 .chip.src{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}
 .chip.diff{background:var(--amber-bg);color:var(--amber);border-color:#fde68a}
 .unreg{font-size:11px;color:#b45309;font-weight:700}
+/* v235 세트구성품등록 — 임시 칩 · 벤더피아에서 불러오기 목록(세로 목록, 가로로 안 밀림) */
+.chip.tmp{background:var(--amber-bg);color:var(--amber);border-color:#fde68a;margin-left:4px;vertical-align:1px}
+.vpbox{flex-basis:100%;min-width:0;border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:6px;background:#fff}
+.vpbox input[type=search]{flex:1 1 200px;min-width:0}
+.vplist{max-height:50vh;overflow-y:auto;overflow-x:hidden}
+.vpitem{display:flex;align-items:flex-start;gap:8px;padding:8px 2px;border-bottom:1px solid var(--rowline);font-weight:400;cursor:pointer}
+.vpitem input{margin-top:3px;flex:none}.vpt{display:flex;flex-direction:column;min-width:0;flex:1;overflow-wrap:anywhere}
+.vpt code{font:12px var(--mono);color:var(--muted)}.vpt small{font-size:11px;color:var(--muted)}
 .chip.unreg{background:#fff7ed;color:#b45309;border-color:#fed7aa}
 td.unreg>input,td.unreg>select{border-color:#f59e0b}
 .chip.gone{background:#f3f4f6;color:#6b7280;border-color:#d1d5db}
@@ -425,7 +433,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v234</span>
+    <span class="ver">v235</span>
   </div>
 </header>
 <div class="wrap">
@@ -518,6 +526,7 @@ function connectDb(){
           function(e){if(fail)return;fail=true;if(err)err(e);});});
         return function(){uns.forEach(function(u){u();});};},
       countEq:function(name,field,v){return F.getCountFromServer(F.query(F.collection(fs,name),F.where(field,'==',v))).then(function(sn){return sn.data().count;});},
+      readCol:function(path){return F.getDocs(F.collection(fs,path)).then(function(sn){return sn.docs.map(function(d){return Object.assign({id:d.id},d.data());});});},   /* v235 벤더피아 자료 읽기만(세트구성품등록) */
       range:function(name,field,a,b){return F.getDocs(F.query(F.collection(fs,name),F.where(field,'>=',a),F.where(field,'<',b))).then(function(sn){return sn.docs.map(function(d){return Object.assign({id:d.id},d.data());});});},
       staffMe:function(next,err){return F.onSnapshot(staffRef(user.uid),function(d){next(d.exists()?d.data():null);},err);},
       staffAll:function(next,err){return F.onSnapshot(F.collection(fs,'erp_staff'),function(s){next(s.docs.map(function(d){return Object.assign({uid:d.id},d.data());}));},err);},
@@ -1319,12 +1328,39 @@ var STEPS=[
  ],
  recNos:function(r){return [['출고번호',r.outNo],['재고 대조',r.stock]];},
  recTitle:function(r){return r.wipNo;},
- subt:function(r){return [r.fromWc+' → '+r.toWc,show(r.qty)+'개'].filter(Boolean).join(' · ');}}
+ subt:function(r){return [r.fromWc+' → '+r.toWc,show(r.qty)+'개'].filter(Boolean).join(' · ');}},
+
+/* v235 세트구성품등록(502184, 물류 › [물류] 기본정보) — 판매 묶음(온라인 1개 = 제품 A+B). 칸 이름 = 보관/화면별-요령/세트품목-화면.md(11-14 화면) 글자 그대로.
+   세트구성품번 = 벤더피아 단품코드(= 영림원 품번, 11-14 사장님 결정). 「벤더피아에서 불러오기」 = 납품내역_상품목록(단품 2개 이상) → 세트품명·세트품번·구성 단품·수량.
+   ⚠ 임시(SET_TEMP): 세트품번 = 벤더피아 상품코드 · 단가 비율 처음 값 = 구성품수량 · 구성품단위 처음 값 EA · 세트품의 품목등록(품목자산분류 세트품) 연결 없음 */
+{key:'setitems',n:'물류1',page:'물류',title:'세트구성품등록',screen:'세트구성품등록',
+ path:['물류','[물류] 기본정보','세트구성품등록'],needs:[],
+ note:'',
+ fields:[
+  F('pname','세트품명','text',{req:1}),
+  F('pcode','세트품번','text',{req:1,mono:1}),
+  F('pspec','세트품규격','text'),
+  F('unit','기준단위','text',{def:'EA',alias:['판매단위']}),
+  F('autoin','판매출고시세트자동입고','check',{def:true})
+ ],
+ rowTitle:'세트구성품정보',
+ rowFields:[
+  F('cname','세트구성품명','text',{req:1}),
+  F('ccode','세트구성품번','text',{mono:1}),
+  F('cspec','세트구성품규격','text'),
+  F('cunit','구성품단위','text',{req:1,def:'EA'}),
+  F('qty','구성품수량','number',{req:1,step:'any'}),
+  F('ratio','단가 비율','number',{step:'any'}),
+  F('wh','기본창고','text')
+ ],
+ nameK:'pcode',dupLab:'세트품번',dupKey:function(v){return vpKey(v.pcode);},saveCheck:setDup,
+ recTitle:function(r){return r.pname||r.pcode;},
+ subt:function(r){return [r.pcode,(r.rows||[]).map(function(x){return (x.ccode||x.cname)+(Number(x.qty)>1?' ×'+x.qty:'');}).join(' + ')].filter(Boolean).join(' · ');}}
 ];
 var BYKEY={};STEPS.forEach(function(s){BYKEY[s.key]=s;});
 
 /* ---------- machine-readable ERP route, embedded in every saved record ---------- */
-var PAGE_NAMES={'수입':'구매/수입 · [수입] 수입관리','구매':'구매/수입 · [구매] 구매·입고','생산':'생산/외주'};   /* v99 페이지 입구 = 영림원 메뉴그룹·프로세스 글자 그대로. page 값(수입·구매·생산)은 코드 안 구분자라 그대로 */
+var PAGE_NAMES={'수입':'구매/수입 · [수입] 수입관리','구매':'구매/수입 · [구매] 구매·입고','생산':'생산/외주','물류':'물류 · [물류] 기본정보'};   /* v235 물류 = 세트구성품등록 */   /* v99 페이지 입구 = 영림원 메뉴그룹·프로세스 글자 그대로. page 값(수입·구매·생산)은 코드 안 구분자라 그대로 */
 var ROUTES={
  vendors:{method:'화면 입력(건별)',requiredIf:{bizno:'kinds에 외주가공거래처·국내매입거래처·국내매출거래처가 하나라도 있을 때 (숫자 10자리, 000-00-00000 꼴로 저장)'},how:['기본 > [기본] 거래처정보 화면에서 거래처 아이콘을 눌러 거래처등록을 엽니다.','조회로 같은 거래처명이 이미 있는지 확인합니다. 있으면 오류로 두고 사용자에게 알립니다.','신규를 누르고 상호, 거래처명 등 fieldMap 항목을 입력합니다.','우측 거래처종류 표에서 kinds에 있는 종류의 선택 칸에 체크합니다.','세무정보 영역에 사업자번호 등을 입력하고 저장합니다.'],unverified:['거래처종류 표의 아래쪽 항목','저장 동작과 필수 검증']},
  workcenters:{method:'화면 입력(그리드 행)',how:['생산/외주 > [생산] 기본정보 맵에서 워크센터 아이콘을 눌러 워크센터등록을 엽니다.','사업단위를 확인하고 조회로 기존 워크센터를 불러옵니다. 같은 이름이 있으면 새로 만들지 않고 agentNote에 적습니다.','그리드의 첫 빈 행(A 표시)에 fieldMap 항목을 열 제목에 맞춰 입력합니다. 워크센터구분이 사외외주이면 외주거래처에 1단계 거래처등록의 거래처를 선택합니다.','저장하고 조회로 확인합니다.'],requiredIf:{vendor:'kind가 사외외주일 때'},unverified:['저장 동작']},
@@ -1377,6 +1413,9 @@ var ROUTES={
  impins:{method:'B/L 조회에서 넘겨 화면 입력',note:'폼 v74. 한 문서 = B/L 하나의 입고 한 번. blId = erp_impbls 문서 id. rows.blqty 는 폼 대조용이라 영림원 칸이 아닙니다. 수입처·가격조건·통화·환율·품번·단위·단가·담당자·부서는 B/L 에서 넘어옵니다(11-06 시험). 입고창고 wh 는 표 칸이라 모든 줄에 넣습니다.',
   how:['⛔ (폼 v167 환율 · 입력작업자/AGENTS.md 3-8 「환율 먼저」) 문서 rate = 폼이 넣은 값: 수입Order·따로 넣는 수입BL = 영림원 환율정보(환율정보등록·환율정보조회) 그 날짜·통화 매매기준율, 수입Payment·수입Invoice·Invoice 에서 이은 수입BL·수입입고 = 앞 문서 rate 그대로(Order~입고 같은 환율). 화면 환율 칸에 rate 를 넣고 「환율선택」 창에서 매매기준율 체크 → 「선택」(다른 날 값이면 창 환율일을 바꿔 조회). 창이 0.00 이면 그날 환율이 없는 것 — 오늘 일자면 「환율받기」 뒤 다시, 아니면 저장 안 함. 화면 환율이 문서 rate 와 다르면 저장하지 말고 멈춰 오류 + agentNote(화면 환율 · 문서 rate · 날짜 · 통화). BL 환율은 입고 전에 맞춘다(입고 뒤엔 영림원이 수정을 막음). 문서에 rate 가 없으면(v167 전 문서) 3-8 「환율 먼저」 대로 하고 저장 뒤 화면 환율을 그 문서 rate 에 적는다(폼이 B/L 과 다르면 「환율 다름」 표시).','blId 의 erp_impbls 문서가 완료여야 합니다. 대기·진행중이면 건너뛰고, 없거나 오류면 오류로 두고 agentNote에 적습니다.','수입BL조회를 엽니다(Home.OpenPageSeq(501068)). blno 를 조회해 줄을 선택하고 「수입입고」를 누릅니다. 입고 화면(501071)에는 신규 단추가 없습니다.','수입입고입력에서 입고일 indate 를 넣고, 표 줄마다 수량 qty 와 입고창고 wh 를 넣습니다. 입고창고는 기본 본사로 넘어오므로 반드시 바꿉니다.','저장 전에 모든 줄의 모든 칸을 문서 값과 대조하고, 저장 뒤 조회로 다시 대조합니다.','창고별 재고조회(501179)에서 재고기준 실재고·자산재고의 wh 창고 수량을 확인합니다. 끝나면 status 완료·agentNote 에 수입입고번호.'],
   unverified:['입고 수량을 B/L 수량과 다르게 저장(시험은 같은 수량)','B/L 하나를 나눠 입고','입고창고 코드도움 전체 목록','표 두 줄 이상 저장(시험은 1줄)','수입비용이 원가·전표에 필요한지 — 입고·재고에는 불필요']},
+ setitems:{method:'화면 입력(왼쪽 세트품목정보 줄 더블클릭 → 오른쪽 세트구성품정보 줄)',note:'폼 v235. 화면은 1~11단계와 분리된 「물류 · [물류] 기본정보」 입구입니다. 한 문서 = 세트품 하나 + 구성품 rows. ccode(세트구성품번) = 벤더피아 단품코드 = 영림원 품번(11-14 사장님 결정, 앞뒤 빈칸 지우고 소문자로 같게 봄). ⚠ 임시: pcode 세트품번 = 벤더피아 상품코드(「벤더피아에서 불러오기」가 채움) · ratio 단가 비율 처음 값 = 구성품수량 · cunit 처음 값 EA · 세트품의 품목등록(품목자산분류 세트품)은 이 문서가 만들지 않습니다.',
+  how:['pcode 세트품이 영림원 품목등록(500215)에 품목자산분류 「세트품」으로 있어야 합니다(저장하면 세트품목 ☑ 저절로). 없으면 넣지 말고 오류 + agentNote(「세트품 품목등록 먼저」).','rows 의 ccode 구성품이 영림원 품목에 있어야 합니다. 없으면 오류 + agentNote(없는 품번).','세트구성품등록(502184)을 엽니다 → 조회 → 왼쪽 세트품목정보에서 세트품 줄을 더블클릭 → 오른쪽 머리에 세트품명이 들어옵니다.','오른쪽 세트구성품정보에 rows 한 줄씩: 세트구성품명(코드도움 — 품명으로 찾음, 품번 칸에 넣으면 안 잡힘) · 구성품단위 · 구성품수량 · 단가 비율 · 기본창고(빈칸이면 비움) → 저장.','autoin 이 true 면 왼쪽 줄 「판매출고시세트자동입고」 체크칸을 진짜로 클릭(스크립트 SetText 로는 저장 안 됨) → 저장 → 조회로 ☑ 확인.','저장 전에 모든 줄·칸을 문서 값과 대조하고, 저장 뒤 조회로 다시 대조합니다. 절차 = 입력작업자/판매-품목연결-절차.md 경우 1.'],
+  unverified:['세트구성품업로드 화면으로 여러 세트를 한 번에 넣는 길 — 화면을 안 봄','기본창고를 넣으면 투입 창고가 그쪽으로 가는지','이미 구성이 있는 세트품에 줄을 더하거나 고치는 길','세트품번 규칙(벤더피아 상품코드를 쓸지) — 사장님 미정']},
  purprices:{method:'화면 입력(그리드 행)',note:'폼 v78, 통화 v79. 화면은 1~11단계와 분리된 「구매/수입 · [구매] 구매·입고」 입구입니다(order 끝). 한 문서 = 구매단가등록 표 한 줄. 같은 원장을 매입처마다 문서 하나씩 넣습니다. 폼은 같은 구매거래처·품번·적용시작일을 막습니다(오류 건 뺌). code 는 화면 별표가 없지만 폼에서는 골라야 품명·규격·단위가 채워집니다. name·spec·unit 은 저장 때 5 자재등록 값입니다. io·cur 처음 값은 내수·KRW 입니다. 화면의 내외자구분 처음 값은 빈칸이므로 꼭 io 를 고릅니다. 적용종료일은 잠긴 칸이라 넣지 않습니다(저장 때 저절로). 단가 변경은 기존 줄을 고치지 않고 새 적용시작일 문서로 들어옵니다. 원장 판단 = 자재소분류 대분류에 보드가 든 자재(엣지필름 뺌). 숫자 칸 price·minqty·stepqty·days 는 숫자로 저장하고, 빈 선택 칸은 빈 글자입니다.',
   how:['vendor 가 영림원 거래처에(국내매입거래처), code 가 자재등록에 있어야 합니다. 없으면 오류로 두고 agentNote에 적습니다.','구매단가등록을 엽니다(Home.OpenPageSeq(501868)). 구매거래처·품번으로 조회해 같은 구매거래처·품번·적용시작일이 있는지 먼저 봅니다. 있으면 새로 만들지 않고 오류 + agentNote.','표 빈 줄에 구매거래처·품번(code)을 코드도움으로 넣습니다. 품명·규격·단위는 저절로 나오니 문서 값과 같은지 봅니다. 내외자구분·통화·단가·구매최소수량·구매간격수량·적용시작일·특이사항·제조사·조달일수를 넣습니다.','저장 전에 모든 줄의 모든 칸을 문서 값과 대조합니다. 문서에 없는 칸에 값이 있으면 저장하지 않습니다.','저장 뒤 조회로 다시 대조합니다. 끝나면 status 완료·agentNote.'],
   unverified:['501868 저장 — 화면 조사만 했고 저장 시험은 안 했습니다','통화 코드도움 전체 목록 — 시험 전. 폼은 화면에서 본 KRW 만 받습니다','같은 품번 두 거래처 저장 — 시험 전','같은 거래처·품목·시작일 겹침 처리','단가 0','소수 자리 — 표시는 소수 2','품의 기본단가가져오기 결과','대표단가여부(숨은 칸) · 우선 구매처','메뉴 경로 중간 단계 — OpenPageSeq 로 엽니다']},
@@ -1515,6 +1554,9 @@ var IMPORT_SPEC={collection:'erp_imports',statuses:['대기','진행중','완료
      check:'⏳ 화면 확인 필요 — 자재출고를 조회하는 화면의 번호가 기록에 없다. 기록에 있는 것은 입력 화면 500940 과 요청 현황 500938 뿐이다. 아래 칸 이름은 500940 글자다.',query:'⏳ 확인 못 함',
      link:{prodId:'workNo 가 같은 erp_prods 문서 id',kind:'재공품 품번(품번_공정순서) = 재공품 · 부속 품번 = 완성 부속',seq:'prods rows 에서 보낸 공정의 seq',nextSeq:'prods rows 에서 받는 공정의 seq'},
      fieldMap:{outNo:'출고번호',toWc:'입고창고',workNo:'작업지시번호',fromWc:'출고창고',qty:'금회출고수량'},noRead:['stock']},
+   setitems:{screen:'세트구성품조회 또는 세트구성품등록',page:'확인 못 함 + 502184',sheet:'확인 못 함',script:'없음 — 첫 요청 때 화면을 보고 만든다',read:'ylw.read.setitems',match:'pcode',onlyT:'세트품번이 T 로 시작',
+     check:'⏳ 화면 확인 필요 — 세트구성품조회 화면은 메뉴 검색으로 이름만 봤다(11-14). 세트구성품등록 502184 는 왼쪽 줄 더블클릭으로 오른쪽 구성품을 읽는다. 아래 칸 이름은 502184 글자다.',query:'⏳ 확인 못 함',
+     fieldMap:{pname:'세트품명',pcode:'세트품번',pspec:'세트품규격',unit:'기준단위',autoin:'판매출고시세트자동입고'},rowFieldMap:{cname:'세트구성품명',ccode:'세트구성품번',cspec:'세트구성품규격',cunit:'구성품단위',qty:'구성품수량',ratio:'단가 비율',wh:'기본창고'},noRead:[]},
    stocks:{screen:'창고별 재고조회',page:501179,sheet:'SS1',script:'입력작업자/스크립트/재고-읽기.js',read:'ylw.stock.run(요청)',collection:'erp_stocks',match:'재고기준 + 품목자산분류(문서 id 「실재고_원자재」)',onlyT:'품번이 T 로 시작',
      query:'물류 › [물류] 재고현황 › 창고별 재고현황 › 창고별재고. 사업단위 본사 · 기준일 = 요청 date · 재고기준 = 요청 basis(실재고·자산재고) · 품목자산분류 빈칸 · 0수량 조회여부 끔 · 단위조회기준 기준단위 → 조회 (폼 v102)',
      replace:'조회 자료라 덮어쓴다(이 단계만). 요청 basis 의 문서 9개(품목자산분류 상품·제품·반제품·원자재·부자재·재공품·저장품·세트품·소모품)를 모두 다시 쓴다. 줄이 없는 분류는 빈 rows. count 는 세기만',
@@ -1858,6 +1900,7 @@ function buildForm(step){
     if(step.key==='boms')bomRowHook(r,bomPF);   /* v31 소요량 자동(원장당 재단 수량) */
     if(purDF)purRowHook(r,purDF);   /* v80 구매단가 저절로 */
     if(impHF)purRowHook(r,impHF.date,impHF);   /* v119 */
+    if(step.key==='setitems')setRowHook(r);   /* v235 */
     rows.push(r);rowsBox.append(r.el);relabel();return r;
   }
   /* v22 공정·공정흐름: 이름 ⇄ 공정 칸. 이름을 치면 공정 칸을 다시 만들고(목록 밖 조각 = 미등록), 공정 칸을 바꾸면 이름을 「-」로 다시 잇는다 */
@@ -1983,6 +2026,7 @@ var PER_MENU={classes:function(){return navBoxOf(cur)==='base';},stocks:function
 ['imporders','imppays','impinvs','impbls','impins'].forEach(function(k){PER_MENU[k]=function(){return (BYKEY[cur]||{}).page==='수입';};});
 ['purreqs','purapprs','purcalcs'].forEach(function(k){PER_MENU[k]=function(){return (BYKEY[cur]||{}).page==='구매';};});
 PER_MENU.prodmoves=function(){return (BYKEY[cur]||{}).page==='생산';};
+PER_MENU.setitems=function(){return cur==='setitems';};   /* v235 */
 function wSince(){return new Date(Date.now()-RECENT_DAYS*864e5).toISOString();}
 function wDefs(){
   var L=function(sn){return sn.docs.map(function(x){return Object.assign({id:x.id},x.data());});},d=[];
@@ -2037,6 +2081,7 @@ var NAV_BOXES=[
   {id:'생산',title:PAGE_NAMES['생산'],icon:'layers',items:function(){return ['prods','proddlvs'];}},   /* v223 「생산/외주 발주서」 메뉴만 뺌(asmBoxSync·업체별 링크 그대로) */
   /* v224 사장님 「업체별 링크 메뉴도 삭제」 — 메뉴 박스 뺌 · v226 업체 링크 페이지 파일 지움 · v227 화면 코드도 뺌 */
   {id:'pdm',title:'구매발주납품 관리',icon:'box',items:function(){return ['pdm'];}},   /* v230 사장님 「구매발주납품 관리 메뉴를 만들어서 그안에 테스트에 사용된 모든 거래처 박스를 만들어줘」 */
+  {id:'물류기본',title:PAGE_NAMES['물류'],icon:'layers',items:function(){return ['setitems'];}},   /* v235 세트구성품등록 */
   {id:'물류',title:'물류 · [물류] 재고현황',icon:'box',items:function(){return ['stocks'];}},
   {id:'staff',title:'담당자 관리',icon:'users',items:function(){return ['staff'];}}];
 var BASIC_URL='../영림원기본정보입력/영림원기본정보입력.html';   /* v166 사장님 「해당 프로그램을 입력폼 메뉴에 넣어 주세요」 — 기본입력 박스 첫 줄 */
@@ -2185,8 +2230,8 @@ function pick(icon,label,choices){
    단추를 누르면 요청 상자가 열린다: 범위(전체 기본 / T로 시작하는 것만) + 「건수 먼저 보기」·「불러오기 요청」.
    요청은 erp_imports 에 「대기」로 쌓이고, 입력 작업자가 영림원 조회 화면에서 읽어 처리한다(규약 IMPORT_SPEC). 폼은 요청과 결과만 보여 준다. */
 var IMPORT_BTN={vendors:['vendors'],workcenters:['workcenters'],classes:['classes'],items:['items'],materials:['materials'],flows:['processes','flows'],boms:['boms'],itemflows:['itemflows'],itemmats:['itemmats'],itemwcs:['itemwcs'],contracts:['contracts'],
-  imporders:['imporders'],imppays:['imporders','imppays'],impinvs:['imporders','imppays','impinvs'],impbls:['impbls'],impins:['impbls','impins'],purprices:['purprices'],purreqs:['purreqs'],purapprs:['purreqs','purapprs'],purords:['purreqs','purapprs','purords'],purchases:['purchases'],purdelvs:['purchases','purords','purdelvs'],purcalcs:['purdelvs','purcalcs'],pomods:['purchases','purords','pomods'],prods:['prods'],proddlvs:['prods','proddlvs','prodmoves'],stocks:['stocks']};   /* v85 뒤 문서는 앞 문서로 이어져 앞 단계를 함께 읽는다 */
-var IMPORT_CHECK={imporders:1,imppays:1,impinvs:1,impbls:1,impins:1,purreqs:1,purapprs:1,purords:1,purchases:1,purdelvs:1,purcalcs:1,proddlvs:1};   /* v85 ⏳ 조회 칸이 기록에 다 없는 메뉴 */
+  imporders:['imporders'],imppays:['imporders','imppays'],impinvs:['imporders','imppays','impinvs'],impbls:['impbls'],impins:['impbls','impins'],purprices:['purprices'],purreqs:['purreqs'],purapprs:['purreqs','purapprs'],purords:['purreqs','purapprs','purords'],purchases:['purchases'],purdelvs:['purchases','purords','purdelvs'],purcalcs:['purdelvs','purcalcs'],pomods:['purchases','purords','pomods'],prods:['prods'],proddlvs:['prods','proddlvs','prodmoves'],stocks:['stocks'],setitems:['setitems']};   /* v85 뒤 문서는 앞 문서로 이어져 앞 단계를 함께 읽는다 */
+var IMPORT_CHECK={setitems:1,imporders:1,imppays:1,impinvs:1,impbls:1,impins:1,purreqs:1,purapprs:1,purords:1,purchases:1,purdelvs:1,purcalcs:1,proddlvs:1};   /* v85 ⏳ 조회 칸이 기록에 다 없는 메뉴 */
 var IMPORT_BIG={items:'품목은 영림원에 1,500개가 넘습니다(11-01 사용 1,568개). 「건수 먼저 보기」로 센 뒤 고르세요.',
   boms:'BOM은 영림원에 모품목이 550개가 넘고, 모품목마다 화면을 열어 읽어 「전체」는 20분 넘게 걸립니다. 「건수 먼저 보기」로 센 뒤 고르세요.'};
 var IMPORTS=null,impDraw=null,IMPS={key:'imports',title:'영림원에서 불러오기 요청'};   /* v103 IMPS = 요청 지우기(delMany)용 */
@@ -3703,6 +3748,94 @@ function purPlateErr(v){return '';}   /* v117 목록 밖 품번도 받는다(「
 function purVendorErr(v){return '';}   /* v117 */
 function purNumErr(label){return function(v){return isEmpty(v)||/^\d+(\.\d+)?$/.test(String(v).trim())?'':label+'은(는) 숫자입니다.';};}
 function purKey(r){return [r.vendor,r.code,r.from].map(function(x){return String(x==null?'':x).trim();}).join('|');}
+/* ---------- v235 세트구성품등록 (setitems) ----------
+   벤더피아 자료(벤더피아연동 goods.js 가 올림, 읽기만) = artifacts/vivivic-4b7ef/public/data/
+     납품내역_단품목록 문서 단품_N 줄 「단품코드\t단품명\t판매상태\t양품수」 · 납품내역_상품목록 문서 상품_N 줄 「상품코드\t상품명\t판매상태\t단품코드,단품코드,…」(같은 단품 2개면 코드 두 번 = 수량).
+   이 메뉴를 열 때 한 번 읽는다(VP). 세트구성품번 = 단품코드 = 영림원 품번(11-14 사장님 결정, 비교는 앞뒤 빈칸·대소문자 무시 vpKey).
+   ⚠ 임시(SET_TEMP): 세트품번 = 벤더피아 상품코드 · 단가 비율 처음 값 = 구성품수량 · 구성품단위 EA · 세트품 품목등록(품목자산분류 세트품) 연결 없음. */
+var VP_PATH='artifacts/vivivic-4b7ef/public/data/',VP={goods:null,sets:null,busy:null,err:'',byCode:{},byName:{}};
+function vpKey(c){return String(c==null?'':c).trim().toLowerCase();}
+function vpLines(ds,pre){
+  var re=new RegExp('^'+pre+'(\\d+)$'),out=[];
+  ds.filter(function(d){return re.test(d.id);}).sort(function(a,b){return Number(re.exec(a.id)[1])-Number(re.exec(b.id)[1]);})
+    .forEach(function(d){(d['줄']||[]).forEach(function(l){out.push(String(l).split('\t'));});});
+  return out;
+}
+function vpLoad(){
+  if(VP.goods)return Promise.resolve();
+  if(VP.busy)return VP.busy;
+  if(!db||!db.readCol)return Promise.resolve();
+  VP.err='';
+  VP.busy=Promise.all([db.readCol(VP_PATH+'납품내역_단품목록'),db.readCol(VP_PATH+'납품내역_상품목록')]).then(function(r){
+    VP.goods=vpLines(r[0],'단품_').map(function(a){return {code:String(a[0]||'').trim(),name:String(a[1]||'').trim(),st:String(a[2]||'').trim()};}).filter(function(g){return g.code;});
+    VP.byCode={};VP.byName={};
+    VP.goods.forEach(function(g){VP.byCode[vpKey(g.code)]=g;if(g.name)(VP.byName[g.name]=VP.byName[g.name]||[]).push(g);});
+    VP.sets=vpLines(r[1],'상품_').map(function(a){return {code:String(a[0]||'').trim(),name:String(a[1]||'').trim(),st:String(a[2]||'').trim(),
+      codes:String(a[3]||'').split(',').map(function(x){return x.trim();}).filter(Boolean)};}).filter(function(x){return x.code&&x.codes.length>=2;});   /* 단품 2개 이상 = 묶음 */
+    var dl=function(id,vals){var e=document.getElementById(id);if(!e){e=h('datalist',{id:id});document.body.append(e);}
+      e.replaceChildren.apply(e,vals.map(function(v){return h('option',{value:v});}));};
+    dl('dl-vp-code',VP.goods.map(function(g){return g.code;}));
+    dl('dl-vp-name',uniq(VP.goods.map(function(g){return g.name;}).filter(Boolean)));
+    VP.busy=null;
+    if(form&&form.rowsNow&&cur==='setitems')form.rowsNow().forEach(function(x){if(x.vpMark)x.vpMark();});
+  },function(e){VP.busy=null;VP.err='벤더피아 상품목록을 읽지 못했습니다: '+errText(e);});
+  return VP.busy;
+}
+function setDup(v,id){var k=vpKey(v.pcode);return k&&(data.setitems||[]).some(function(r){return r.id!==id&&r.status!=='오류'&&vpKey(r.pcode)===k;})?'같은 세트품번이 이미 저장되어 있습니다 — 저장하지 않았습니다.':'';}
+function setFillRow(o){   /* 양식·붙여넣기 줄: 세트구성품번 ⇄ 세트구성품명 (벤더피아 단품목록) */
+  if(!VP.goods)return;
+  if(!isEmpty(o.ccode)&&isEmpty(o.cname)){var g=VP.byCode[vpKey(o.ccode)];if(g)o.cname=g.name;}
+  else if(isEmpty(o.ccode)&&!isEmpty(o.cname)){var l=VP.byName[String(o.cname).trim()];if(l&&l.length===1)o.ccode=l[0].code;}
+}
+function tmpChip(x){if(!x)return;var l=x.el.querySelector('label');if(l)l.append(' ',h('span',{class:'chip tmp'},'임시'));}
+function setRowHook(r){   /* 줄 칸: 단품코드 ⇄ 단품명 드롭다운(목록 밖 입력 허용 · 「미등록」만) */
+  var by=function(k){return r.fields.filter(function(x){return x.f.k===k;})[0];};
+  var fc=by('ccode'),fn=by('cname');if(!fc||!fn)return;
+  var ic=fc.el.querySelector('input'),inn=fn.el.querySelector('input');
+  ic.setAttribute('list','dl-vp-code');inn.setAttribute('list','dl-vp-name');
+  var un=h('div',{class:'unreg',hidden:true},'미등록');fc.el.append(un);
+  var mark=function(){var v=fc.get();un.hidden=!(VP.goods&&v&&!VP.byCode[vpKey(v)]);};
+  ic.addEventListener('change',function(){var g=VP.byCode[vpKey(fc.get())];if(g&&g.name&&g.name!==fn.get())fn.set(g.name);mark();});
+  inn.addEventListener('change',function(){var l=VP.byName[fn.get()];if(l&&l.length===1&&vpKey(fc.get())!==vpKey(l[0].code)){fc.set(l[0].code);mark();}});
+  ic.addEventListener('input',mark);r.vpMark=mark;
+  tmpChip(by('ratio'));
+}
+function vpVals(p){   /* 벤더피아 상품 하나 → 세트구성품등록 한 건 */
+  var n={},order=[];p.codes.forEach(function(c){var k=vpKey(c);if(!n[k]){n[k]={c:c,q:0};order.push(k);}n[k].q++;});
+  return {pname:p.name,pcode:p.code,pspec:'',unit:'EA',autoin:true,
+    rows:order.map(function(k){var g=VP.byCode[k],q=String(n[k].q);return {cname:g?g.name:'',ccode:n[k].c,cspec:'',cunit:'EA',qty:q,ratio:q,wh:''};})};
+}
+function vpBoxFn(s,say){   /* 「벤더피아에서 불러오기」 — 묶음 상품 찾기 · 고르기 → 폼(1건) 또는 일괄 목록(여러 건) */
+  var pick={},MAX=100;
+  var qIn=h('input',{type:'search',placeholder:'상품코드 · 상품명 · 단품코드',autocomplete:'off','aria-label':'벤더피아 상품 찾기'});
+  var info=h('div',{class:'lsinfo'}),list=h('div',{class:'vplist'});
+  var goBtn=h('button',{type:'button',class:'btn primary small'},'채우기');
+  var box=h('div',{class:'vpbox',hidden:true},h('div',{class:'oldrow'},qIn,goBtn),info,list);
+  var have=function(){var m={};(data.setitems||[]).forEach(function(r){if(r.status!=='오류')m[vpKey(r.pcode)]=1;});return m;};
+  var draw=function(){
+    if(VP.err){info.replaceChildren(VP.err);list.replaceChildren();return;}
+    if(!VP.sets){info.replaceChildren('불러오는 중');list.replaceChildren();return;}
+    var q=qIn.value.trim().toLowerCase(),hv=have();
+    var hit=VP.sets.filter(function(p){return !q||p.code.toLowerCase().indexOf(q)>=0||p.name.toLowerCase().indexOf(q)>=0||p.codes.some(function(c){return c.toLowerCase().indexOf(q)>=0;});});
+    var np=Object.keys(pick).length;
+    info.replaceChildren(h('span',{},'묶음 상품 '+VP.sets.length.toLocaleString()),h('span',{},'찾음 '+hit.length.toLocaleString()),h('span',{},'고름 '+np));
+    goBtn.disabled=!np;goBtn.textContent=np>1?'채우기 '+np+'건':'채우기';
+    list.replaceChildren.apply(list,hit.slice(0,MAX).map(function(p){
+      var k=vpKey(p.code),saved=!!hv[k],cb=h('input',{type:'checkbox',checked:!!pick[k],disabled:saved});
+      cb.addEventListener('change',function(){if(cb.checked)pick[k]=p;else delete pick[k];draw();});
+      var uq={};p.codes.forEach(function(c){uq[vpKey(c)]=1;});
+      return h('label',{class:'vpitem'},cb,h('span',{class:'vpt'},h('code',{},p.code),h('span',{},p.name),
+        h('small',{},'단품 '+Object.keys(uq).length+' · 구성품수량 '+p.codes.length)),saved?h('span',{class:'chip'},'저장됨'):'');}));
+  };
+  qIn.addEventListener('input',draw);
+  goBtn.addEventListener('click',function(){
+    var ps=Object.keys(pick).map(function(k){return pick[k];});if(!ps.length)return;
+    if(ps.length===1){var v=vpVals(ps[0]),rows=v.rows;delete v.rows;form.fill(v,rows);say('벤더피아 상품 '+ps[0].code+' 구성 '+rows.length+'줄을 칸에 채웠습니다. 확인하고 저장을 누르세요.');}
+    else{showBulk(s,ps.map(function(p,i){return {line:i+1,vals:vpVals(p)};}),say);say('벤더피아에서 '+ps.length+'건을 읽었습니다 — 아래 일괄 업로드 목록에서 확인하세요.');}
+    pick={};box.hidden=true;draw();
+  });
+  return {box:box,toggle:function(){box.hidden=!box.hidden;if(!box.hidden){draw();vpLoad().then(draw);qIn.focus();}}};
+}
 function purDup(v,id){return (data.purprices||[]).some(function(r){return r.id!==id&&r.status!=='오류'&&purKey(r)===purKey(v);})?'같은 구매거래처·품번·적용시작일이 이미 저장되어 있습니다 — 저장하지 않았습니다.':'';}
 function purFill(v,keep){var m=purPlate(v.code);if(!m&&keep)return;m=m||{};v.name=m.name||'';v.spec=m.spec||'';v.unit=m.unit||'';}   /* v117 keep = 목록 밖 품번이면 사람이 친 품명·규격·단위를 둠 */
 function purDoc(d){purFill(d,1);d.price=Number(d.price);['minqty','stepqty','days'].forEach(function(k){if(!isEmpty(d[k]))d[k]=Number(d[k]);});}
@@ -5317,9 +5450,9 @@ function renderStep(){
   if(s.key==='pomods'&&POMOD_PRE){var pp=POMOD_PRE;POMOD_PRE=null;POMOD_CTX=pp.ctx;setTimeout(function(){if(BYKEY[cur]===s)form.fill(pp.vals,pp.rows);},0);}   /* v157 「발주수정」으로 연 때 채움 */
   form.el.addEventListener('submit',function(e){e.preventDefault();save(s);});
   /* v46 BOM: 엑셀·구글시트에서 여러 줄(탭)을 복사해 입력 칸에 붙이면 양식 올리기와 같은 길(takeSheet) — 모품목마다 한 건으로 나뉜다 */
-  if(s.key==='boms')form.el.addEventListener('paste',function(e){
+  if(s.key==='boms'||s.key==='setitems')form.el.addEventListener('paste',function(e){   /* v235 세트구성품등록도 — 머리줄 없이 자료 줄만(양식 열 차례) */
     var txt=(e.clipboardData||window.clipboardData).getData('text/plain')||'';
-    if(txt.indexOf('\t')<0||!/\n\s*\S/.test(txt.replace(/\s+$/,'')))return;   /* 한 줄·한 칸은 보통 붙여넣기 */
+    if(txt.indexOf('\t')<0||(s.key==='boms'&&!/\n\s*\S/.test(txt.replace(/\s+$/,''))))return;   /* 한 줄·한 칸은 보통 붙여넣기 */
     e.preventDefault();
     loadXlsx().then(function(X){takeSheet(X,s,parseTsv(txt.replace(/\s+$/,'')),say);},function(){say(XLSX_FAIL,true);});
   });
@@ -5373,6 +5506,9 @@ function renderStep(){
   var noBar=(s.noForm&&!s.xlCols)||s.noXl,xlQ=h('div',{class:'bulklist',style:'flex-basis:100%'});   /* v91 앞 문서를 고르는 메뉴: 양식 줄을 건별 단추로 */
   var impBar=IMPORT_BTN[s.key]&&noBar?h('div',{class:'actions'},impBtn,imp):null;   /* v85 양식 단추 줄이 없는 메뉴는 불러오기만 한 줄 */
   xlBar.append(IMPORT_BTN[s.key]&&!impBar?impBtn:'',gsRow,xlMsg,IMPORT_BTN[s.key]&&!impBar?imp:'',xlQ);
+  if(s.key==='setitems'){var vpFn=vpBoxFn(s,say);tmpChip(form.field('pcode'));   /* v235 벤더피아에서 불러오기 · 임시 = 세트품번 규칙 */
+    var vpBtn=h('button',{type:'button',class:'btn imp',on:{click:function(){vpFn.toggle();vpBtn.setAttribute('aria-expanded',String(!vpFn.box.hidden));}}},ico('import'),'벤더피아에서 불러오기');
+    impBtn.after(vpBtn);xlQ.before(vpFn.box);vpLoad();}
   xlPick=s.xlCols?{fn:inFn||pdFn||prFn||pnFn,box:xlQ}:null;
   sheetDraw=null;
   if(SHEET_STEPS[s.key]){   /* v35 완료 품목 셀 표 */
@@ -5725,11 +5861,12 @@ function takeSheet(X,s,aoa,say){
     var full=function(l){return l.filter(function(c){return String(c).trim()!=='';}).length>=8;};
     if(hi<0&&ac&&aoa.some(function(l){return full(l)&&/^\d*$/.test(String(l[0]).trim())&&String(l[1]).trim()!=='';})){map=ac.map(function(a){return a.f.aceOnly?null:a.f;});hi=-1;}
     else if(hi<0&&s.key==='boms'&&aoa.some(function(l){return full(l)&&l.length>=cols.length-1;})){map=cols.slice();hi=-1;}
+    else if(hi<0&&s.key==='setitems'){map=cols.slice();hi=-1;}   /* v235 머리줄 없는 붙여넣기 = 양식 열 차례 */
     else if(hi<0){say('이 단계 양식의 열 이름을 찾지 못했습니다. 양식 다운로드로 받은 파일에 입력해 올려 주세요.',true);return;}
     /* 머리 칸과 행 칸이 같은 키를 쓰는 단계가 있다(외주계약: 사업단위·단위 모두 unit) — 키가 아니라 칸으로 가른다 */
     var rowFs=s.rowFields||[];
     var head={},rowVals=[],recs=[],lines=0;
-    var bomSplit=s.key==='boms'||s.key==='imporders'||s.key==='impbls'||s.key==='purchases'||s.key==='purreqs',splitK=s.key==='boms'?'pcode':s.key==='purchases'||s.key==='purreqs'?'reqdate':s.key==='imporders'?'pono':'blno',grps=[],grp=null;   /* v43 BOM: 모품목번호(없으면 모품목명)가 바뀌면 새 BOM — 한 장에 여러 BOM */
+    var bomSplit=s.key==='boms'||s.key==='setitems'||s.key==='imporders'||s.key==='impbls'||s.key==='purchases'||s.key==='purreqs',splitK=s.key==='boms'||s.key==='setitems'?'pcode':s.key==='purchases'||s.key==='purreqs'?'reqdate':s.key==='imporders'?'pono':'blno',grps=[],grp=null;   /* v43 BOM: 모품목번호(없으면 모품목명)가 바뀌면 새 BOM — 한 장에 여러 BOM */
     var d0=hi+1;   /* 자료 첫 줄. v47 영림원 양식은 머리가 두 줄(코드 · 한글) — 다음 줄도 칸 이름이면 건너뜀 */
     if(hi>=0&&aoa[d0]&&aoa[d0].filter(function(c){return byLabel[normHead(c)];}).length>=3)d0++;
     if(s.xlCols){   /* v91 앞 문서를 고르는 메뉴 */
@@ -5766,6 +5903,7 @@ function takeSheet(X,s,aoa,say){
         Object.keys(one).forEach(function(k){if(!(k in grp.vals))grp.vals[k]=one[k];});
         if(hasRow)grp.vals.rows.push(o);
       }
+      if(s.key==='setitems'&&hasRow)setFillRow(o);   /* v235 단품코드 ⇄ 단품명 */
       if(hasRow)rowVals.push(o);
       if(one.rows)one.rows=one.rows.filter(Boolean);
       /* v22: 공정·공정흐름은 이름 기준 — 이름이 있으면 공정 칸(수식 값)은 보지 않고 이름을 「-」로 나눈다(수식 값이 비어 있어도 됨). 이름이 없으면 공정 칸 그대로 */
@@ -5776,6 +5914,7 @@ function takeSheet(X,s,aoa,say){
     if(BYKEY[cur]!==s)return;
     if(bomSplit&&grps.length>1){   /* v43: 모품목이 여럿이면 BOM 마다 한 건(전에는 첫 줄 모품목 하나로 합쳐졌다) */
       if(s.key==='boms')grps.forEach(function(g){g.vals.rows.forEach(function(o){bomAutoQty(g.vals.pcode,o);});});
+      if(s.key==='setitems')grps.forEach(function(g){var v=g.vals;if(!('autoin' in v))v.autoin=true;if(isEmpty(v.unit))v.unit='EA';v.rows.forEach(function(o){if(isEmpty(o.cunit))o.cunit='EA';});});   /* v235 빈칸 = 처음 값 */
       if(s.key==='purchases')grps.forEach(function(g){g.vals.rows.forEach(function(o){var p=purPriceOf(o.vendor,o.ccode,g.vals.reqdate);if(!p)return;if(isEmpty(o.price))o.price=String(p.price);['io','cur'].forEach(function(k){if(isEmpty(o[k])&&!isEmpty(p[k]))o[k]=purTrim(p[k]);});});});   /* v89 「모두 저장」은 입력 칸을 안 거친다 · v119 내외자구분·통화도 */
       if(s.key==='imporders'||s.key==='impbls')grps.forEach(function(g){g.vals.rows.forEach(function(o){if(isEmpty(o.price)){var p=purPriceOf(g.vals.vendor,o.ccode,s.key==='impbls'?g.vals.bldate:g.vals.podate,g.vals.cur);if(p)o.price=String(p.price);}});});   /* v119 */
       showBulk(s,grps,say);return;}
@@ -7003,7 +7142,7 @@ var PERM_SPLIT={'구매':1};   /* v121 사장님 「요청 품의 발주 단계�
 function permOf(perms,k){perms=perms||{};if(perms[k])return perms[k];var s=BYKEY[k];return s&&s.page&&PERM_SPLIT[s.page]?perms['p:'+s.page]||null:null;}
 function erpMenus(){
   var out=[{k:'check',t:CHECK.title,cols:[]}];
-  ['수입','구매','생산'].forEach(function(pg){
+  ['수입','구매','생산','물류'].forEach(function(pg){
     if(PERM_SPLIT[pg]){STEPS.filter(function(s){return s.page===pg&&!s.hidden;}).forEach(function(s){out.push({k:s.key,t:PAGE_NAMES[pg]+' · '+s.title,cols:['erp_'+s.key].concat(s.moreCols||[])});});
       /* v227 「발주서관리」 권한 뺌(화면 없음) */
       return;}   /* v121 구매는 화면마다 권한 */
