@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v232 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v233 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -425,7 +425,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v232</span>
+    <span class="ver">v233</span>
   </div>
 </header>
 <div class="wrap">
@@ -6939,18 +6939,38 @@ BYKEY.staff={key:'staff',n:'',title:'담당자 관리'};
 BYKEY.pdm={key:'pdm',n:'',title:'구매발주납품 관리'};
 var PDM_VENDORS=['T경기','T럭스','T로앤','T수입시험','T신태광','T아인','T에이엠티','T엘데코','T우정','T이룸','T조혼','T진아','T해피코','T현진산업'],PDM_ON='';
 /* v231 사장님 11-14 「일단 엘데코 현진산업과 같은 구매만 있는 업체박스안에 발주확인 /생산중 /납품완료 박스를 만들어줘」.
-   구매 전용 = 폼 구매발주(erp_purchases rows.vendor)에만 있고 공정·외주(erp_workcenters·itemwcs·contracts·asmbox)에 없는 거래처(11-14 읽음).
-   단계 박스 셋은 아직 비움(발주 넣기·단계 넘김·링크는 따로 지시). 저장 없음. */
-var PDM_PURONLY=['T신태광','T엘데코','T현진산업'],PDM_STAGES=['발주확인','생산중','납품완료'],PDM_STG='';
+   단계 박스 셋은 아직 비움(발주 넣기·단계 넘김·링크는 따로 지시). 저장 없음.
+   v233 사장님 11-14 「그럼 이부분이 구매발주 납품박스에 자동으로 적용되게(차후 등록에 따라) 지금 해놓을 수 있나?」·「발주가 없어도 단서가 있으면 해야죠」
+   → 고정 목록(PDM_PURONLY) 없앰. 분류 = 폼에 저장된 등록 자료(pdmKind):
+     공정 단서 = 제품별공정별워크센터등록(erp_itemwcs wc·proc) · 외주계약등록(erp_contracts vendor·rows.proc) — 워크센터 이름은 워크센터등록(erp_workcenters name→vendor)으로 거래처로 바꿈.
+       T조립 = 조립, 다른 공정(T재단·T엣지·T보링 …) = 가공, 둘 다 = 조립·가공.
+     구매 단서 = 구매단가등록(erp_purprices vendor) · 구매발주(erp_purords rows.vendor · erp_purchases rows.vendor·pos.vendor). 공정 단서 없이 구매 단서만 = 구매 전용.
+     아무 단서 없음 = 미정(박스 안 비움). 오류·영림원에 없음(ylwGone) 문서는 단서로 안 셈. 발주가 없어도 단서면 됨.
+   단계 박스(발주확인·생산중·납품완료) = 구매 전용만. 조립·가공은 분류 표시만(단계 박스는 지시 없음). 자료가 바뀌면 refreshAll → pdmDraw 로 다시 그림. */
+var PDM_STAGES=['발주확인','생산중','납품완료'],PDM_STG='',pdmDraw=null;
+var PDM_LAB={asm:'조립업체',proc:'가공업체',both:'조립·가공업체',pur:'구매 전용',none:'미정'};
+function pdmKind(v){
+  var ok=function(d){return d&&d.status!=='오류'&&!ylwGone(d);},t=function(x){return String(x==null?'':x).trim();};
+  var wcV={};(data.workcenters||[]).filter(ok).forEach(function(w){if(t(w.name))wcV[t(w.name)]=t(w.vendor)||t(w.name);});
+  var me=function(n){n=t(n);return !!n&&(wcV[n]||n)===v;};
+  var asm=false,proc=false,pur=false,seen=function(p){p=t(p);if(!p)return;if(p==='T조립')asm=true;else proc=true;};
+  (data.itemwcs||[]).filter(ok).forEach(function(d){if(me(d.wc))seen(d.proc);});
+  (data.contracts||[]).filter(ok).forEach(function(d){if(me(d.vendor))(d.rows||[]).forEach(function(r){seen(r&&r.proc);});});
+  if(asm&&proc)return 'both';if(asm)return 'asm';if(proc)return 'proc';
+  (data.purprices||[]).filter(ok).forEach(function(d){if(t(d.vendor)===v)pur=true;});
+  ['purords','purchases'].forEach(function(k){(data[k]||[]).filter(ok).forEach(function(d){(d.rows||[]).concat(d.pos||[]).forEach(function(r){if(r&&t(r.vendor)===v)pur=true;});});});
+  return pur?'pur':'none';
+}
 function renderPdm(){
   erpClear();staffDraw=null;
   var box=h('div',{class:'podbox asmq'});
   var go1=function(v,g){PDM_ON=v;PDM_STG=g||'';draw();var y=box.getBoundingClientRect().top;if(y<0)window.scrollBy(0,y-8);};
   var face=function(v,on){return h('div',{class:'asmface',role:'button',tabindex:'0','aria-expanded':on?'true':'false',
-    on:{click:function(){go1(on?'':v);},keydown:function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();go1(on?'':v);}}}},h('b',{class:'asmtt asmvt'},v));};
+    on:{click:function(){go1(on?'':v);},keydown:function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();go1(on?'':v);}}}},h('b',{class:'asmtt asmvt'},v),h('small',{},PDM_LAB[pdmKind(v)]));};   /* v233 분류 표시 */
   function draw(){
+    if(!box.isConnected){if(pdmDraw===draw)pdmDraw=null;return;}   /* v233 다른 메뉴로 갔으면 그만 */
     if(PDM_ON&&PDM_VENDORS.indexOf(PDM_ON)<0)PDM_ON='';
-    var pur=PDM_PURONLY.indexOf(PDM_ON)>=0;if(!pur||PDM_STAGES.indexOf(PDM_STG)<0)PDM_STG='';
+    var pur=!!PDM_ON&&pdmKind(PDM_ON)==='pur';if(!pur||PDM_STAGES.indexOf(PDM_STG)<0)PDM_STG='';
     if(!PDM_ON){box.replaceChildren(h('div',{class:'asmgrid asmvg'},PDM_VENDORS.map(function(v){return h('div',{class:'asmtile asmv'},face(v,false));})));return;}
     if(PDM_STG){   /* v231 단계 박스를 누르면 그 박스만 */
       var sf=h('div',{class:'asmface',role:'button',tabindex:'0','aria-expanded':'true',on:{click:function(){go1(PDM_ON);},keydown:function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();go1(PDM_ON);}}}},h('b',{class:'asmtt asmvt'},PDM_STG));
@@ -6963,7 +6983,7 @@ function renderPdm(){
       h('div',{class:'asmgrid asmvg'},h('div',{class:'asmtile asmv open'},face(PDM_ON,true),stg)));
   }
   mainEl.replaceChildren(h('section',{class:'card'},h('div',{class:'stephead'},h('h2',{},BYKEY.pdm.title)),box));
-  draw();
+  draw();pdmDraw=draw;   /* v233 등록 자료가 바뀌면 분류·단계 박스 다시 */
 }
 var PERM_SPLIT={'구매':1};   /* v121 사장님 「요청 품의 발주 단계가 있는 폼을 각각 분리 통합」 — 구매 화면마다 따로 권한(요청만·품의만). 옛 'p:구매' 권한은 permOf 가 구매 화면 모두로 읽는다(담당자 관리에서 다시 저장하면 화면별로 바뀜) */
 function permOf(perms,k){perms=perms||{};if(perms[k])return perms[k];var s=BYKEY[k];return s&&s.page&&PERM_SPLIT[s.page]?perms['p:'+s.page]||null:null;}
@@ -6995,7 +7015,7 @@ function colPerms(perms){
 function canCol(col,op){if(!ME)return false;if(ME.admin===true)return true;var c=colPerms(ME.perms||{})[col];return !!(c&&c[op]);}
 window.ERP_CAN=canCol;
 function anyPerm(perms){return Object.keys(perms||{}).some(function(k){var p=perms[k]||{};return p.r||p.w||p.d;});}
-function erpClear(){bulk=null;listBox=null;listBox2=null;sheetDraw=null;impDraw=null;ifRefresh=null;stkDraw=null;}
+function erpClear(){bulk=null;listBox=null;listBox2=null;sheetDraw=null;impDraw=null;ifRefresh=null;stkDraw=null;pdmDraw=null;}
 function erpWait(){erpClear();staffDraw=null;mainEl.replaceChildren(h('section',{class:'card'},h('p',{class:'msg'},'불러오는 중')));}
 /* 지금 메뉴를 못 보면 볼 수 있는 첫 메뉴로 */
 function erpFixCur(){
@@ -7125,7 +7145,7 @@ function staffRepoTable(){
     ['자료 보호','늘지 않음 — 파이어베이스 키는 원래 공개 값, 자료는 저장소 규칙이 지킴','저장소 규칙 배포(위)']]);
 }
 function go(k){if(BYKEY[k]&&BYKEY[k].shownIn)k=BYKEY[k].shownIn;cur=k;wSync();navOpen=NARROW()?'':null;try{history.replaceState(null,'','#'+k);}catch(e){location.hash=k;}renderNav();renderSum();renderStep();}
-function refreshAll(){rateSyncAll();renderNav();renderSum();renderList();refreshLists();if(impDraw)impDraw();if(sheetDraw)sheetDraw();if(ifRefresh)ifRefresh();if(stkDraw)stkDraw();podModSync();}   /* v227 링크 맞추기 뺌 — 발주수정 자동(구매)만 */
+function refreshAll(){rateSyncAll();renderNav();renderSum();renderList();refreshLists();if(impDraw)impDraw();if(sheetDraw)sheetDraw();if(ifRefresh)ifRefresh();if(stkDraw)stkDraw();if(pdmDraw)pdmDraw();podModSync();}   /* v227 링크 맞추기 뺌 — 발주수정 자동(구매)만 */
 
 /* ---------- boot ---------- */
 
