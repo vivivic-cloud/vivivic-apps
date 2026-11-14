@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v230 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v231 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -424,7 +424,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v230</span>
+    <span class="ver">v231</span>
   </div>
 </header>
 <div class="wrap">
@@ -6915,17 +6915,29 @@ BYKEY.staff={key:'staff',n:'',title:'담당자 관리'};
    생산외주 발주서 박스 틀(흑백 정사각 .asmtile) · 누른 박스만 보임 · 맨 위 한 줄 경로로 돌아감. 저장·링크 없음. */
 BYKEY.pdm={key:'pdm',n:'',title:'구매발주납품 관리'};
 var PDM_VENDORS=['T경기','T럭스','T로앤','T수입시험','T신태광','T아인','T에이엠티','T엘데코','T우정','T이룸','T조혼','T진아','T해피코','T현진산업'],PDM_ON='';
+/* v231 사장님 11-14 「일단 엘데코 현진산업과 같은 구매만 있는 업체박스안에 발주확인 /생산중 /납품완료 박스를 만들어줘」.
+   구매 전용 = 폼 구매발주(erp_purchases rows.vendor)에만 있고 공정·외주(erp_workcenters·itemwcs·contracts·asmbox)에 없는 거래처(11-14 읽음).
+   단계 박스 셋은 아직 비움(발주 넣기·단계 넘김·링크는 따로 지시). 저장 없음. */
+var PDM_PURONLY=['T신태광','T엘데코','T현진산업'],PDM_STAGES=['발주확인','생산중','납품완료'],PDM_STG='';
 function renderPdm(){
   erpClear();staffDraw=null;
   var box=h('div',{class:'podbox asmq'});
-  var go1=function(v){PDM_ON=v;draw();var y=box.getBoundingClientRect().top;if(y<0)window.scrollBy(0,y-8);};
+  var go1=function(v,g){PDM_ON=v;PDM_STG=g||'';draw();var y=box.getBoundingClientRect().top;if(y<0)window.scrollBy(0,y-8);};
   var face=function(v,on){return h('div',{class:'asmface',role:'button',tabindex:'0','aria-expanded':on?'true':'false',
     on:{click:function(){go1(on?'':v);},keydown:function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();go1(on?'':v);}}}},h('b',{class:'asmtt asmvt'},v));};
   function draw(){
     if(PDM_ON&&PDM_VENDORS.indexOf(PDM_ON)<0)PDM_ON='';
+    var pur=PDM_PURONLY.indexOf(PDM_ON)>=0;if(!pur||PDM_STAGES.indexOf(PDM_STG)<0)PDM_STG='';
     if(!PDM_ON){box.replaceChildren(h('div',{class:'asmgrid asmvg'},PDM_VENDORS.map(function(v){return h('div',{class:'asmtile asmv'},face(v,false));})));return;}
+    if(PDM_STG){   /* v231 단계 박스를 누르면 그 박스만 */
+      var sf=h('div',{class:'asmface',role:'button',tabindex:'0','aria-expanded':'true',on:{click:function(){go1(PDM_ON);},keydown:function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();go1(PDM_ON);}}}},h('b',{class:'asmtt asmvt'},PDM_STG));
+      var vn=PDM_ON;
+      box.replaceChildren(h('div',{class:'asmcrumb'},h('button',{type:'button',on:{click:function(){go1('');}}},'거래처'),h('i',{},'›'),h('button',{type:'button',on:{click:function(){go1(vn);}}},vn),h('i',{},'›'),h('b',{},PDM_STG)),
+        h('div',{class:'asmgrid asmvg'},h('div',{class:'asmtile open'},sf)));return;}
+    var stg=pur?h('div',{class:'asmin'},h('div',{class:'asmgrid2'},PDM_STAGES.map(function(g){   /* v231 구매 전용 업체 안 단계 박스 셋(비움) */
+      return h('div',{class:'asmtile'},h('div',{class:'asmface',role:'button',tabindex:'0',on:{click:function(){go1(PDM_ON,g);},keydown:function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();go1(PDM_ON,g);}}}},h('b',{class:'asmtt'},g)));}))):'';
     box.replaceChildren(h('div',{class:'asmcrumb'},h('button',{type:'button',on:{click:function(){go1('');}}},'거래처'),h('i',{},'›'),h('b',{},PDM_ON)),
-      h('div',{class:'asmgrid asmvg'},h('div',{class:'asmtile asmv open'},face(PDM_ON,true))));
+      h('div',{class:'asmgrid asmvg'},h('div',{class:'asmtile asmv open'},face(PDM_ON,true),stg)));
   }
   mainEl.replaceChildren(h('section',{class:'card'},h('div',{class:'stephead'},h('h2',{},BYKEY.pdm.title)),box));
   draw();
