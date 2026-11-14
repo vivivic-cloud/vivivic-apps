@@ -125,6 +125,7 @@
 - 막히면 오류 + 화면 문구. 수량·창고를 문서와 다르게 맞추지 않는다. 자세히 = 절차 원문 「3-10.」.
 
 - **구매 정산(`erp_purcalcs`, 폼 v229)**: 한 문서 = 완료된 구매납품 한 건(`dlvId`·`dlvno`). 구매입고정산처리 501596 조회 → 숨은 칸 `DelvNo` = `dlvno` 줄(품번·입고수량·입고단가·창고를 `rows` 와 대조, 정산일·전표행번호가 이미 있으면 멈춤) → 세금계산서일 `taxdate`·지급예정일 `paydate`(값 있을 때만)·증빙 `evid`·지급방법 `paytype` → 저장(`inno`=입고번호, `stage` 정산) → 「전표처리」 → 자동전표 저장(`slipno`, `stage` 전표처리) → 매입세금계산서발행(구매) 527309 그 입고번호 줄 발행일 `billdate`·세금계산서종류 `billkind` → 「매입세금계산서발행」 → 다시 조회(`taxno`, `stage` 매입세금계산서) → 완료. ⛔ 전송·메일 안 함. 여러 건 한 장 묶기는 시험 전 — 한 건씩. 규격 = `erp-spec.json` purcalcs.
+  - **서류 담기(폼 v232, 완료 직전 한 건마다)**: `스크립트/정산서류-읽기.js` — 저장 안 누르고 읽기만. 501596 그 줄만 선택 → `ylw.cdoc.calc(입고번호)` · 그 줄 「전표처리」 창 → `ylw.cdoc.slip()` + 「출력」 오즈 회계전표 100% 를 zoom(save_to_disk) → jpeg(`sips -s format jpeg -s formatOptions 70 -Z 1200`) → 페이지에 file input 만들어 file_upload → `ylw.cdoc.img(input)` 를 slip 의 `img`·`imgTitle '회계전표'` 로 · 527309 그 줄 「매입세금계산서」(527278) → `ylw.cdoc.tax()` → `ylw.cdoc.save(문서 id, 'calc'|'slip'|'tax', 값)` 셋 → `ylw.cdoc.done(문서 id)`. 전표 창은 저장 없이 닫는다. ⚠ `erp_purcalcdocs` 쓰기 = 사장님이 「담당자 관리」에서 이 메뉴 권한을 다시 저장해야 생김(v232 에 컬렉션 더함).
 
 ### 3-11. 생산·외주 (`erp_prods` → `erp_proddlvs` → `erp_prodmoves`)
 ⛔ **전표·정산·외주발주서출력·MAIL 은 누르지 않는다.** 화면이 멈추면 다시 누르지 말고 조회로. 저장 확인은 번호 칸으로, 시트 오류는 `MutationObserver`. **다른 품목의 대기·오류 때문에 건너뛰지 않는다.** 양식 문서(`fromSheet`·`prodGap`)는 품번·공정·업체가 영림원에 있는지 먼저(3-0-미등록).

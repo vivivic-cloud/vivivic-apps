@@ -7,6 +7,7 @@
 |---|---|---|---|---|---|
 | (모든 표 화면) | `공통.js` | — | `ylw.paste`·`ylw.setChk`·`ylw.check`·`ylw.rows`·`ylw.fs`·`ylw.reopen`·`ylw.dateGuard`(11-08) | — | 11-01 |
 | 거래처등록(500347) | `거래처등록-채우기.js` | `erp_vendors` 한 건 `{sangho,name,corp,rep,tel,biztype,bizitem,kinds,…}` | `ylwFill(v)` · `ylwKinds(종류들)` · `ylwRead()` · `ylwCheck(v)` | 아니오(한 화면 한 건) | 10-31 저장 8건 · 11-01 칸 id·종류 체크(저장 없음) |
+| 구매 정산 서류 담기(501596 · 전표입력(자동전표) · 527278) | `정산서류-읽기.js` | `erp_purcalcs` 완료 문서 한 건 | `ylw.cdoc.calc(입고번호)`·`slip()`·`tax()`·`img(input)`·`save(id, 종류, 값)`·`done(id)` | 한 건씩(읽기만) | 11-14 같은 꼴로 3건(관리자 계정으로 씀) |
 | 구매요청·품의·발주 대조(501563·501568·501576) | `구매입력-채우기.js` | `erp_purchases` 문서 한 줄 | `ylw.pur.req` · `appCheck` · `poCheck` · 번호 `reqNo`·`appNo` | 문서 한 건 한 줄만(파일 그대로는 아직 안 돌림 — 11-06 3건은 같은 순서를 손 스크립트로) | 11-06 실제 3건 |
 | 구매단가등록(501868) | `구매단가등록-채우기.js` | `erp_purprices` 배열 | `ylw.pp.fill` · `ylw.pp.verify` | 예(칸마다 붙임, 파일 그대로는 아직 안 돌림 — 11-06 2건은 같은 순서를 손 스크립트로) | 11-06 실제 2건 |
 | 외주발주입력(501617) 업체별 한 장 | `외주발주-업체별-채우기.js` | 외주거래처 · 줄 수 · 작업지시번호 정규식 | `ylw.po.vendor(업체, 줄수, 정규식)` | 예(업체 하나씩) | 11-08 같은 흐름 저장, 이 파일은 저장 시험 전 |
