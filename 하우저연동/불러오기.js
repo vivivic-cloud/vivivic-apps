@@ -6,7 +6,7 @@
   const 판 = chrome.runtime.getManifest().version;
   let 글 = [];
   if (길 === "/login") 글 = ["login.css", "login.js"];
-  else if (길 === "/home" || 길 === "/") 글 = ["menu.css", "menu.js"];
+  else if (길 === "/home" || 길 === "/" || 길 === "/order/all") 글 = ["menu.css", "menu.js"];
   else if (길 === "/storage/inventory/list") 글 = ["표.css", "표.js", "inventory.js"];
   else if (길 === "/product/home") 글 = ["표.css", "표.js", "product.js"];
   if (!글.length) return;
