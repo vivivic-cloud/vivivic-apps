@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v270 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v271 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -150,6 +150,7 @@ details.gonebox{margin-top:10px;font-size:13px}details.gonebox>summary{cursor:po
 .pdmpend{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:6px;background:var(--fill4,#f7f6f3);border:1px solid var(--line2);color:var(--muted);font-size:11px;font-weight:800;vertical-align:middle}.pdmpend.bad{background:#fdecec;border-color:#f5c2c2;color:#b91c1c}.pdmpendc{border-style:dashed}.pdmpendc .pdmact .msg{color:var(--muted);font-size:12px}   /* v254 영림원 입력대기 */
 .vrsec{margin:0 0 14px}.vrrow{display:grid;grid-template-columns:1fr 1fr;gap:6px 8px;padding:8px 0;border-top:1px solid var(--line2);min-width:0}.vrrow .vrwide{grid-column:1/-1}.vrrow .vrf{display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:700;color:var(--muted);min-width:0}.vrrow select,.vrrow input{width:100%;min-width:0;box-sizing:border-box}.vrclue{display:block;font-size:11px;font-weight:600;color:var(--faint)}   /* v257 단서 */.vrtabs{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}.vrrow.vrhead{border-top:0;padding-top:0}.vrrow input[readonly]{background:var(--fill4,#f7f6f3);color:var(--muted)}   /* v258 구매발주요청 시트·구매요청입력 칸 */.vrappr dd select,.vrappr dd input{width:100%;max-width:240px;box-sizing:border-box}.vrappr dd .vrclue{margin-top:2px}   /* v266 품의 확인 칸 */.vrrow .vrmeta{font-weight:600;color:var(--faint);overflow-wrap:anywhere}   /* v255 구매발주요청 */
 .asmq .pdmgrps .pdmtodo,.asmq .pdmgrps .pdmct,.asmq .pdmgrps .asmnames li{word-break:keep-all;overflow-wrap:normal}   /* v260 묶음 박스 알림 글이 한 글자씩 꺾이지 않게(낱말 단위) */
+.vrylw{border-style:dashed}.vrwv{margin:0 0 4px;font-size:13px}   /* v271 품의 메뉴 영림원 입력대기 */
 .pdmnav{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 6px}.pdmnav .btn.pdmnavb{background:#fff;border:1px solid var(--line2);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.06);min-height:40px;padding:8px 14px}.pdmnav .btn.pdmnavb span{font-size:15px;line-height:1}   /* v253 뒤로·거래처 홈 */
 .pdmfinday{display:flex;align-items:center;gap:6px;flex:1 1 100%;min-width:0}.pdmfinday input[type=date]{flex:1 1 0;width:auto;min-width:0;padding-left:8px;padding-right:6px;font-size:13px}.pdmfintag{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:6px;background:#fdecec;color:#b91c1c;font-size:11px;font-weight:800;vertical-align:middle}   /* v251 입고완료 */
 .oldbox{margin:12px 0 0}.oldbox>summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--muted);padding:6px 0}.oldrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0 10px}   /* v225 지난 자료 보기 */
@@ -470,7 +471,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v270</span>
+    <span class="ver">v271</span>
   </div>
 </header>
 <div class="wrap">
@@ -8148,18 +8149,37 @@ function pdmApprTile(v,go1){
   return h('div',{class:'asmtile'},h('div',{class:'asmface',role:'button',tabindex:'0',on:{click:function(){go1(v,PDM_APPR_STG);},keydown:function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();go1(v,PDM_APPR_STG);}}}},
     h('b',{class:'asmtt'},PDM_APPR_STG),h('span',{class:'asmn2'},wl===undefined?'…':String(wl.length)),pdmApprChip(wl&&wl.length),h('ul',{class:'asmnames'},(wl||[]).slice(0,6).map(function(r){var x=(r.rows||[])[0]||{};return h('li',{},String(x.cname||x.ccode||''));}))));
 }
+/* v271 사장님 「구매발주 품의메뉴에 영림원 입력대기 를 만들어 현재 입력대기중인 모든 건이 나타나게 해주세요」
+   영림원 입력대기 = 품의 확인한 요청(purId 있음, erp_vreqs) 중 그 구매·수입 문서(erp_purchases vreq_<id>)가 아직 완료가 아닌 것(대기·진행중·오류) — 모든 거래처 한곳에.
+   품의 대기(아직 품의 안 함)·완료는 안 넣음. 품의 확인 오래된 것부터. 카드는 거래처별 품의 칸과 같은 카드(읽기만) + 거래처 이름. */
+var VAP_WAIT=false;
+function vrYlwWait(){if(VREQS==null||data.purchases==null)return undefined;
+  return VREQS.filter(function(r){if(!r.purId||r.reqId)return false;var st=vrApprState(r);return st.open&&st.lab!=='품의 확인'&&st.lab!=='…';})
+    .sort(function(a,b){return String(a.apprAt||a.at||'').localeCompare(String(b.apprAt||b.at||''));});}
+function vrYlwChip(l){return l===undefined?h('div',{class:'pdmtodos'},h('span',{class:'pdmnone'},'…')):h('div',{class:'pdmtodos'},l.length?h('span',{class:'pdmnone'},'입력 기다림 '+l.length+'건'):h('span',{class:'pdmnone'},'없음'));}
+function vrYlwView(redraw){
+  var l=vrYlwWait();if(l===undefined)return h('p',{class:'msg'},'불러오는 중…');
+  if(!l.length)return h('div',{class:'empty'},'영림원 입력대기 건이 없습니다.');
+  return h('div',{},l.map(function(r){var c=pdmApprCard(r,redraw,false);c.insertBefore(h('div',{class:'vrwv'},h('b',{},r.vendor||'')),c.firstChild);return c;}));
+}
 /* 새 메뉴 「구매/발주 품의」 — 거래처 박스(pdmIsReq, 0건도) → 그 거래처 품의 대기 요청 → 「품의 확인」 */
 function renderVappr(){
   erpClear();staffDraw=null;
   var box=h('div',{class:'podbox asmq'});
   var top1=function(){var y=box.getBoundingClientRect().top;if(y<0)window.scrollBy(0,y-8);};
-  var go=function(v){VAP_ON=v;draw();top1();};
+  var go=function(v){VAP_ON=v;VAP_WAIT=false;draw();top1();};
+  var goW=function(){VAP_ON='';VAP_WAIT=true;draw();top1();};   /* v271 */
   function draw(){
     if(!box.isConnected){if(vapDraw===draw)vapDraw=null;return;}
     var vs=PDM_VENDORS.filter(pdmIsReq);if(VAP_ON&&vs.indexOf(VAP_ON)<0)VAP_ON='';
-    if(!VAP_ON){box.replaceChildren(h('div',{class:'asmgrid asmvg'},vs.map(function(v){var wl=vrApprWait(v);
+    if(VAP_WAIT){var yl=vrYlwWait();   /* v271 영림원 입력대기 */
+      box.replaceChildren(h('div',{class:'pdmnav'},h('button',{type:'button',class:'btn pdmnavb',on:{click:function(){go('');}}},h('span',{'aria-hidden':'true'},'←'),'뒤로')),
+        h('div',{class:'asmcrumb'},h('button',{type:'button',on:{click:function(){go('');}}},'거래처'),h('i',{},'›'),h('b',{},'영림원 입력대기')),
+        h('h3',{class:'asmsub'},'영림원 입력대기',h('span',{},yl===undefined?'':yl.length+'건')),vrYlwView(function(){if(vapDraw===draw)draw();}));return;}
+    if(!VAP_ON){var yw=vrYlwWait();box.replaceChildren(h('div',{class:'asmgrid asmvg'},[h('div',{class:'asmtile asmv vrylw'},h('div',{class:'asmface',role:'button',tabindex:'0',on:{click:goW,keydown:function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();goW();}}}},
+        h('b',{class:'asmtt asmvt'},'영림원 입력대기'),h('span',{class:'asmn2'},yw===undefined?'…':String(yw.length)),vrYlwChip(yw)))].concat(vs.map(function(v){var wl=vrApprWait(v);
       return h('div',{class:'asmtile asmv'},h('div',{class:'asmface',role:'button',tabindex:'0',on:{click:function(){go(v);},keydown:function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();go(v);}}}},
-        h('b',{class:'asmtt asmvt'},v),h('small',{class:'pdmpr'},pdmLab(v)),pdmApprChip(wl&&wl.length)));})));pdmHot(box);return;}
+        h('b',{class:'asmtt asmvt'},v),h('small',{class:'pdmpr'},pdmLab(v)),pdmApprChip(wl&&wl.length)));}))));pdmHot(box);return;}
     var v=VAP_ON;
     box.replaceChildren(h('div',{class:'pdmnav'},h('button',{type:'button',class:'btn pdmnavb',on:{click:function(){go('');}}},h('span',{'aria-hidden':'true'},'←'),'뒤로')),
       h('div',{class:'asmcrumb'},h('button',{type:'button',on:{click:function(){go('');}}},'거래처'),h('i',{},'›'),h('b',{},v)),
