@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v248 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v249 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -376,6 +376,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 button.pdmtodo{cursor:pointer;transition:background .15s,border-color .15s,transform .15s}button.pdmtodo:hover{border-color:#9cc6ee;background:#e3effa}button.pdmtodo:active{transform:scale(.97)}button.pdmtodo:focus-visible{outline:2px solid #2383e2;outline-offset:2px}
 .pdmdot{position:relative;flex:none;width:7px;height:7px;margin-top:4px;border-radius:50%;background:#2383e2}.pdmdot::after{content:'';position:absolute;inset:0;border-radius:50%;background:#2383e2;animation:pdmping 1.9s cubic-bezier(0,0,.2,1) infinite}
 .pdmct{min-width:0}.pdmgo{flex:none;font-weight:900;color:#2383e2;margin-left:1px}
+.pdmpo dd.pdmred{color:#dc2626;font-weight:900}.pdmpo dd.pdmblink{animation:pdmblink 1.2s ease-in-out infinite}@keyframes pdmblink{0%,100%{color:#b91c1c}50%{color:#f87171}}@media (prefers-reduced-motion:reduce){.pdmpo dd.pdmblink{animation:none}}   /* v249 발주수정 고친 줄 붉게 깜박임 */
 .pdmreq{margin:12px 0 0;padding:9px 11px;border-radius:10px;border:1px solid #cfe3f6;background:linear-gradient(180deg,#f3f8fd,#e8f2fb);color:#1d5f9e;font-size:12.5px;font-weight:700;line-height:1.5;box-shadow:0 1px 2px rgba(35,131,226,.10);min-width:0}.pdmreq p{display:flex;gap:8px;align-items:flex-start;margin:0;overflow-wrap:anywhere;word-break:keep-all}.pdmreq p+p{margin-top:6px}.pdmreq .pdmdot{margin-top:6px}.pdmreq.sent{background:var(--fill4);border-color:var(--line2);color:var(--muted);box-shadow:none;font-weight:600}.pdmreq+.asmbar.pdmact{margin-top:8px}   /* v248 발주수정 위 수정 요청 글 */
 @keyframes pdmping{0%{transform:scale(1);opacity:.55}75%,100%{transform:scale(2.9);opacity:0}}
 .asmtile.pdmhot{border-color:#a9cdf0;animation:pdmglow 2.8s ease-in-out infinite}.asmtile.pdmhot .asmn2{color:#2383e2}
@@ -448,7 +449,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v248</span>
+    <span class="ver">v249</span>
   </div>
 </header>
 <div class="wrap">
@@ -7316,10 +7317,10 @@ function pdmScanBar(w,redraw){
   bt.addEventListener('click',function(){PDM_SMSG={w:'',t:'',bad:false};if(PDM_SCANEL)pdmScanStop();else pdmScanStart(w,redraw);redraw();});
   return h('div',{},h('div',{class:'asmbar'},bt,h('span',{class:'msg'+(PDM_SMSG.w===w&&PDM_SMSG.bad?' bad':''),role:'status'},PDM_SMSG.w===w?PDM_SMSG.t:'')),PDM_SCANEL||null);
 }
-function pdmRecvRows(r){   /* 입고확인 기록 — 발주수량·입고수량·차이 */
-  return h('div',{class:'pdmrows'},(r.items||[]).map(function(x){var d=Math.round((Number(x.qty)-Number(x.poqty||0))*100)/100;
-    return h('dl',{},h('dt',{},'품명'),h('dd',{},x.cname),h('dt',{},'품번'),h('dd',{},x.ccode),h('dt',{},'발주수량'),h('dd',{},pdmNum(x.poqty)),h('dt',{},'입고수량'),h('dd',{},pdmNum(x.qty)),
-      h('dt',{},'차이'),h('dd',{class:d?'pdmchg':null},d===0?'0':(d>0?'+':'')+pdmNum(d)));}));
+function pdmRecvRows(r,hl){   /* 입고확인 기록 — 발주수량·입고수량·차이 · v249 hl 'blink' = 고친 줄 입고수량·차이 붉게 깜박임 · 'red' = 붉게만 */
+  return h('div',{class:'pdmrows'},(r.items||[]).map(function(x){var d=Math.round((Number(x.qty)-Number(x.poqty||0))*100)/100,rc=d&&hl?(hl==='blink'?' pdmred pdmblink':' pdmred'):'';
+    return h('dl',{},h('dt',{},'품명'),h('dd',{},x.cname),h('dt',{},'품번'),h('dd',{},x.ccode),h('dt',{},'발주수량'),h('dd',{},pdmNum(x.poqty)),h('dt',{},'입고수량'),h('dd',{class:rc?rc.trim():null},pdmNum(x.qty)),
+      h('dt',{},'차이'),h('dd',{class:((d?'pdmchg':'')+rc).trim()||null},d===0?'0':(d>0?'+':'')+pdmNum(d)));}));
 }
 function pdmInList(w){if(PDM_FLOW==null)return undefined;   /* 입고대기 = 발주확인 · 그 창고 줄 · 입고확인 전 */
   return pdmPurPos(true).map(function(p){var f=pdmFlowOf(p.pono);if(!f||!f.okAt||pdmRecvOf(f,w))return null;var r=p.rows.filter(function(x){return x.wh===w;});return r.length?Object.assign({},p,{rows:r,flow:f}):null;}).filter(Boolean);}
@@ -7378,7 +7379,9 @@ function pdmMakeView(v,redraw,done){   /* v238 생산중 — 발주확인 칸과
       head.querySelector('dl').append.apply(head.querySelector('dl'),[].concat.apply([],ds));
       return h('div',{class:'rowcard pdmpo'},head,recvs.length?recvs:pdmPoRows(p.rows));}
     if(done==='wait'){   /* v243 납품대기 — 발주수정 */
-      var m=pdmModOf(p.pono),mr=pdmModRows(p),mk='md|'+p.pono,bt=null;
+      var m0=pdmModOf(p.pono);   /* v249 사장님 「발주수정 페이지 차이 수량과 입고수량 숫자가 붉은색으로 깜박이게 해주세요」 — 누르기 전 깜박임, 누른 뒤 붉게만(임시) */
+      recvs=ws.map(function(w){var sh=pdmShipOf(p.pono,w);return sh&&sh.recv?h('div',{},h('div',{class:'sub pdmsub'},'입고확인'+(ws.length>1?' · '+w:'')),pdmRecvRows(sh.recv,m0?'red':'blink')):null;}).filter(Boolean);
+      var m=m0,mr=pdmModRows(p),mk='md|'+p.pono,bt=null;
       if(m)head.querySelector('dl').append(h('dt',{},'발주수정'),h('dd',{},[m.status,m.id.indexOf('mod_'+p.pono+'_recv')===0?'':'다른 발주수정'].filter(Boolean).join(' · ')));
       else if(mr.length){bt=h('button',{type:'button',class:'btn primary small',disabled:!(canCol('erp_pomods','w'))},'발주수정');
         bt.addEventListener('click',function(){
