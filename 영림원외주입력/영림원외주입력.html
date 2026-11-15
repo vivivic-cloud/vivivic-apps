@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v249 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v250 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -449,7 +449,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v249</span>
+    <span class="ver">v250</span>
   </div>
 </header>
 <div class="wrap">
@@ -7239,12 +7239,13 @@ function pdmFlowOf(no){return (PDM_FLOW||[]).filter(function(f){return f.id===no
 function pdmRecvOf(f,wh){return ((f&&f.recv)||[]).filter(function(r){return r&&r.wh===wh;})[0]||null;}
 function pdmOkList(v){if(PDM_FLOW==null)return undefined;return pdmPurPos().filter(function(p){return p.vendor===v&&!pdmFlowOf(p.pono);});}   /* 발주확인 대기 */
 function pdmMakeList(v,mode){if(PDM_FLOW==null||PDM_SHIPS==null)return undefined;   /* v238 생산중 = 발주확인된 발주 · v239 배송기사 납품완료(창고마다)가 다 되면 납품완료 · v243 그중 입고수량을 고친 발주 = 납품대기(mode 'wait'), 같으면 납품완료('done') */
-  return pdmPurPos(true).map(function(p){var f=pdmFlowOf(p.pono);if(p.vendor!==v||!f||!f.okAt)return null;var d=pdmDoneAll(p),x=d&&pdmChanged(p);
+  return pdmPurPos(true).map(function(p){var f=pdmFlowOf(p.pono);if(p.vendor!==v||!f||!f.okAt)return null;var d=pdmDoneAll(p),x=d&&pdmChanged(p)&&!pdmModDone(p.pono);   /* v250 사장님 「구매처 발주수정이 완료되면 납품완료박스로 해당 발주가 이동되게 해주세요」 — 발주수정 완료(입고완료대기와 같은 기준)면 납품완료 */
     return (mode==='done'?d&&!x:mode==='wait'?x:!d)?Object.assign({},p,{flow:f}):null;}).filter(Boolean);}
 /* v243 사장님 「발주와 동일하게 납품완료가된 경우는 구매처 납품완료박스안에서 완료처리가 되어 구매납품입력에서 영림원 입력대기로 저장되어야 합니다. 수정된 납품수랴이라면 구매처 납품완료 박스가 아닌 납품대기박스를 만들어 이쪽으로 이동시키고 이곳에서 구매처가 발주수정 버튼을 누르면 구매입고의 발주수정 영림원 등록 저장 완료된 상태가 되어야 합니다.」
    고친 것 = 입고확인 기록(배송 문서 recv.items)의 입고수량 ≠ 그때 발주수량(poqty) 인 줄이 하나라도 있음. 둘 다 배송기사 납품완료(doneAt) 뒤.
    납품완료(같음) = 폼이 저절로(임시) 구매납품입력 대기 erp_purdelvs/recv_<배송 열쇠> 를 만든다(구매납품입력 「저장」과 같은 칸 + ship) — 입력 작업자가 501583 에 넣음.
    납품대기(고침) = 「발주수정」 → 발주수정 대기 erp_pomods/mod_<발주번호>_recv (발주수정 탭과 같은 칸, 새 발주수량 = 앞 납품 + 이번 입고수량) — 입력 작업자가 501576 에 넣음. 그 뒤 납품 등록은 다음 지시. */
+function pdmModDone(no){var m=pdmModOf(no);return !!(m&&m.status==='완료');}   /* v250 발주수정 완료 = 영림원 수정 등록까지(입고완료대기 pdmInDoneList 와 같은 기준) */
 function pdmChanged(p){return pdmWhs(p).some(function(w){var sh=pdmShipOf(p.pono,w);return !!(sh&&sh.recv&&(sh.recv.items||[]).some(function(x){return Math.round((Number(x.qty)-Number(x.poqty||0))*100)/100!==0;}));});}
 function pdmYmd(iso){var d=new Date(iso);if(isNaN(d))return '';var z=function(n){return String(n).padStart(2,'0');};return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate());}
 function pdmSrc(p){var a=String(p.src||'').split('/');return {col:a[0]||'erp_purchases',id:a[1]||''};}
@@ -7255,7 +7256,7 @@ function pdmDlvSync(){   /* 납품완료(같음) 발주 → 구매납품입력 �
     pdmWhs(p).forEach(function(w){var sh=pdmShipOf(p.pono,w);if(!sh||!sh.recv||!sh.doneAt)return;var id='recv_'+sh.id;
       if(PDM_DLVBUSY[id]||(data.purdelvs||[]).some(function(d){return d.id===id;}))return;PDM_DLVBUSY[id]=1;
       var rows=(sh.recv.items||[]).map(function(x){var r=p.rows.filter(function(y){return y.ccode===x.ccode&&y.wh===w;})[0]||{};
-        return {cname:x.cname||'',ccode:x.ccode,cspec:x.cspec||'',unit:x.unit||'',poqty:Number(x.poqty||0),qty:Number(x.qty),price:r.price,wh:w};});
+        return {cname:x.cname||'',ccode:x.ccode,cspec:x.cspec||'',unit:x.unit||'',poqty:poQtyOf(p.pono,x.ccode,x.poqty),qty:Number(x.qty),price:r.price,wh:w};   /* v250 발주수량 = 완료된 발주수정 반영 · 납품수량 = 입고수량(임시) */});
       db.collection('erp_purdelvs').doc(id).create({purId:sc.id,purCol:sc.col,pono:p.pono,vendor:p.vendor,dlvdate:pdmYmd(sh.recv.at),rows:rows,dlvno:'',status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(BYKEY.purdelvs),ship:sh.id})
         .catch(function(e){console.warn('구매납품 대기 못 만듦',p.pono,e);delete PDM_DLVBUSY[id];});});});});
 }
@@ -7465,8 +7466,8 @@ function pdmHasPur(v){var ok=function(d){return d&&d.status!=='오류'&&!ylwGone
 var PDM_WH_DONE='입고완료대기';
 function pdmRecvChanged(r){return !!(r&&(r.items||[]).some(function(x){return Math.round((Number(x.qty)-Number(x.poqty||0))*100)/100!==0;}));}
 function pdmInDoneList(w){if(PDM_FLOW==null||PDM_SHIPS==null)return undefined;
-  return pdmPurPos(true).map(function(p){var sh=pdmShipOf(p.pono,w);if(!sh||!pdmRecvChanged(sh.recv))return null;var m=pdmModOf(p.pono);if(m&&m.status==='완료')return null;
-    return Object.assign({},p,{rows:p.rows.filter(function(x){return x.wh===w;}),flow:pdmFlowOf(p.pono),ship:sh,mod:m});}).filter(Boolean);}
+  return pdmPurPos(true).map(function(p){var sh=pdmShipOf(p.pono,w);if(!sh||!pdmRecvChanged(sh.recv))return null;if(pdmModDone(p.pono))return null;
+    return Object.assign({},p,{rows:p.rows.filter(function(x){return x.wh===w;}),flow:pdmFlowOf(p.pono),ship:sh,mod:pdmModOf(p.pono)});}).filter(Boolean);}
 function pdmInDoneView(w){
   var ps=pdmInDoneList(w);
   if(ps===undefined)return h('p',{class:'msg'},'불러오는 중…');
