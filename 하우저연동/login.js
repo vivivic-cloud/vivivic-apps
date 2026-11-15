@@ -16,6 +16,10 @@
   const 머리 = document.createElement("div");
   머리.id = "hw-로그인머리";
   머리.innerHTML = "<h1>하우저</h1><p>하우저 아이디·비밀번호로 로그인하세요. 이 확장은 입력한 값을 저장하지 않습니다.</p>";
+  const 칩 = document.createElement("div");
+  칩.id = "hw-버전";   // 판 번호 = manifest version (불러오기.js 가 data-hw-판 에 넣어 줌)
+  칩.textContent = "v" + (document.documentElement.getAttribute("data-hw-판") || "?");
+  document.body.appendChild(칩);
   const 폼 = 칸.closest("form");
   if (폼 && 폼.parentElement) 폼.parentElement.insertBefore(머리, 폼);
 })();
