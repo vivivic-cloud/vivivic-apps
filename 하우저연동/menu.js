@@ -7,7 +7,7 @@
   뿌리.id = "hw-메뉴";
   뿌리.innerHTML = '<div class="box"><h1>하우저</h1>' +
     PAGES.map(([n, u]) => `<a class="hw-btn" href="${u}" target="_blank" rel="noopener">${n}</a>`).join("") +
-    '<button type="button" class="hw-btn light">하우저 원본</button>' +
+    '<button type="button" class="hw-원본" title="하우저 원래 화면 보기">하우저 원본</button>' +
     '<p class="sub">읽기만 합니다. 하우저 자료를 고치거나 저장·전송하지 않습니다.</p></div>';
   const 칩 = document.createElement("div");
   칩.id = "hw-버전";   // 판 번호 = manifest version (불러오기.js 가 data-hw-판 에 넣어 줌)
