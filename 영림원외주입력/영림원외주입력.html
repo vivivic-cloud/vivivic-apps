@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v272 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v273 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -471,7 +471,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v272</span>
+    <span class="ver">v273</span>
   </div>
 </header>
 <div class="wrap">
@@ -579,18 +579,21 @@ function connectDb(){
       ERP_USER={uid:user.uid,mail:user.email||'',id:gU?String(user.email||'').toLowerCase():erpIdOf(user.email),google:gU,boss:user.erpGok==='boss',name:user.displayName||''};   /* v259 구글 = 아이디 칸에 구글 이메일 */
       window.erpOut=function(){return m[1].signOut(auth).then(function(){location.reload();});};
       var staffRef=function(uid){return F.doc(fs,'erp_staff',uid);};
+      /* v273 깨우미 신호 — 「대기」·「수정대기」로 저장하면 erp_agentq/ping 한 장에 n 을 1 올린다(입력 PC 깨우미가 이 한 장만 3~10초마다 읽음). 실패는 조용히(깨우미는 5분마다 전체 훑기도 함) */
+      var pingQ=function(name,o){if(!o||(o.status!=='대기'&&o.status!=='수정대기')||!/^erp_/.test(name)||name==='erp_agentq'||(window.ERP_CAN&&!window.ERP_CAN('erp_agentq','w')))return;try{F.setDoc(F.doc(fs,'erp_agentq','ping'),{n:F.increment(1),at:new Date().toISOString()},{merge:true}).catch(function(){});}catch(e){}};
+      var pingAny=function(name,o){if(o&&o.status)pingQ(name,o);};
       /* 화면 코드가 쓰는 모양(collection/doc/add/update/delete/onSnapshot)만 맞춘 얇은 껍데기 */
       return {collection:function(name){return {
         onSnapshot:function(next,err){return F.onSnapshot(F.collection(fs,name),function(s){next({docs:s.docs.map(function(d){return {id:d.id,data:function(){return d.data();}};})});},err);},
-        add:function(data){return erpGuard(name,'w')||F.addDoc(F.collection(fs,name),data);},
-        doc:function(id){return {delete:function(){return erpGuard(name,'d')||F.deleteDoc(F.doc(fs,name,id));},update:function(o){return erpGuard(name,'w')||F.updateDoc(F.doc(fs,name,id),o);},
+        add:function(data){return erpGuard(name,'w')||F.addDoc(F.collection(fs,name),data).then(function(r){pingQ(name,data);return r;});},
+        doc:function(id){return {delete:function(){return erpGuard(name,'d')||F.deleteDoc(F.doc(fs,name,id));},update:function(o){return erpGuard(name,'w')||F.updateDoc(F.doc(fs,name,id),o).then(function(r){pingQ(name,o);return r;});},
           /* v13: 지우기 직전 문서를 다시 읽어 ok(문서)일 때만 지운다(트랜잭션) — 그 사이 입력 작업자가 진행중으로 바꾼 건은 남는다. true = 지움 */
           deleteIf:function(ok){var g=erpGuard(name,'d');if(g)return g;var ref=F.doc(fs,name,id);return F.runTransaction(fs,function(t){return t.get(ref).then(function(d){if(!d.exists()||!ok(d.data()))return false;t.delete(ref);return true;});});},
           /* v34 수정: 문서를 다시 읽어 make(문서)가 고칠 값을 주면 고친다(트랜잭션) — 그 사이 입력 작업자가 상태를 바꿨으면 null 을 주어 안 고침. true = 고침 */
           /* v126 발주서: 없을 때만 만든다(트랜잭션, 문서 id 지정) — 있으면 그대로 두고 false */
           get:function(){return F.getDoc(F.doc(fs,name,id)).then(function(d){return d.exists()?d.data():null;});},   /* v147 한 장 읽기(납품 사진) */
-          create:function(o){var g=erpGuard(name,'w');if(g)return g;var ref=F.doc(fs,name,id);return F.runTransaction(fs,function(t){return t.get(ref).then(function(d){if(d.exists())return false;t.set(ref,o);return true;});});},
-          updateIf:function(make){var g=erpGuard(name,'w');if(g)return g;var ref=F.doc(fs,name,id);return F.runTransaction(fs,function(t){return t.get(ref).then(function(d){var o=d.exists()?make(d.data()):null;if(!o)return false;t.update(ref,o);return true;});});}};}
+          create:function(o){var g=erpGuard(name,'w');if(g)return g;var ref=F.doc(fs,name,id);return F.runTransaction(fs,function(t){return t.get(ref).then(function(d){if(d.exists())return false;t.set(ref,o);return true;});}).then(function(ok){if(ok)pingQ(name,o);return ok;});},
+          updateIf:function(make){var g=erpGuard(name,'w');if(g)return g;var ref=F.doc(fs,name,id),po=null;return F.runTransaction(fs,function(t){return t.get(ref).then(function(d){var o=d.exists()?make(d.data()):null;if(!o)return false;t.update(ref,o);po=o;return true;});}).then(function(ok){if(ok)pingQ(name,po);return ok;});}};}
       };},
       /* v40 분류 수정: 여러 문서를 한 트랜잭션으로. list = [{c:컬렉션, id}], decide(지금 문서 배열 — 없으면 null) → 문서마다 고칠 값(null = 안 고침) 배열, 또는 null = 모두 안 고침. true = 고침 */
       /* v115 담당자 — 내 문서·전체 목록(관리자)·고치기. 저장소 규칙(제안)이 같은 칸만 허락한다 */
@@ -613,9 +616,9 @@ function connectDb(){
         return F.getDoc(r).then(function(d){return d.exists()?F.updateDoc(r,{lastAt:now}):F.setDoc(r,ERP_USER.google?{email:ERP_USER.mail,name:ERP_USER.name,firstAt:now,lastAt:now}:{vpId:ERP_USER.id,email:ERP_USER.mail,firstAt:now,lastAt:now});});},   /* v259 구글 계정 줄 = email·name */
       gokAll:function(next,err){return F.onSnapshot(F.collection(fs,'erp_gok'),function(s){next(s.docs.map(function(d){return Object.assign({email:d.id},d.data());}));},err);},   /* v259 구글 계정 승인 명단(관리자만 읽힘) */
       gokSet:function(em,o){return F.setDoc(F.doc(fs,'erp_gok',em),o,{merge:true});},
-      updateAll:function(list,decide){for(var gi=0;gi<list.length;gi++){var g=erpGuard(list[gi].c,'w');if(g)return g;}var refs=list.map(function(x){return F.doc(fs,x.c,x.id);});return F.runTransaction(fs,function(t){
+      updateAll:function(list,decide){for(var gi=0;gi<list.length;gi++){var g=erpGuard(list[gi].c,'w');if(g)return g;}var refs=list.map(function(x){return F.doc(fs,x.c,x.id);}),sig=null;return F.runTransaction(fs,function(t){
         return Promise.all(refs.map(function(r){return t.get(r);})).then(function(ds){var o=decide(ds.map(function(d){return d.exists()?d.data():null;}));if(!o)return false;
-          o.forEach(function(p,i){if(p&&p.$delete&&window.ERP_CAN&&!window.ERP_CAN(list[i].c,'d'))throw erpPermErr();});o.forEach(function(p,i){if(!p)return;if(p.$delete)t.delete(refs[i]);else if(p.$set)t.set(refs[i],p.$set);else t.update(refs[i],p);});return true;});});}};   /* v96 $delete·$set = 5 자재 합치기·되돌리기 */
+          o.forEach(function(p,i){if(p&&p.$delete&&window.ERP_CAN&&!window.ERP_CAN(list[i].c,'d'))throw erpPermErr();});o.forEach(function(p,i){if(!p)return;if(p.$delete)t.delete(refs[i]);else if(p.$set)t.set(refs[i],p.$set);else t.update(refs[i],p);});sig=o;return true;});}).then(function(ok){if(ok)(sig||[]).forEach(function(p,i){if(p&&!p.$delete)pingQ(list[i].c,p.$set||p);});return ok;});}};   /* v96 $delete·$set = 5 자재 합치기·되돌리기 */
     });
   }).catch(function(e){console.warn('파이어베이스 연결 실패',e);return null;});
 }
@@ -8337,7 +8340,7 @@ function canMenu(k,op){if(!ME)return false;if(ME.admin===true)return true;
 /* 컬렉션 권한 = 그 컬렉션을 가진 메뉴 중 하나라도. erp_imports(불러오기 요청)는 어느 메뉴든 · v167 erp_rates(영림원 환율정보)는 수입·구매 메뉴 보기·저장 */
 function colPerms(perms){
   var cols={},put=function(c,op){(cols[c]=cols[c]||{r:false,w:false,d:false})[op]=true;};
-  MENUS.forEach(function(m){var p=permOf(perms,m.k)||{};['r','w','d'].forEach(function(op){if(p[op]){m.cols.forEach(function(c){put(c,op);});put('erp_imports',op);if(op!=='d'&&/^p:수입$|^imp|^pur/.test(m.k))put('erp_rates',op);}});});
+  MENUS.forEach(function(m){var p=permOf(perms,m.k)||{};['r','w','d'].forEach(function(op){if(p[op]){m.cols.forEach(function(c){put(c,op);});put('erp_imports',op);if(op!=='d')put('erp_agentq',op);if(op!=='d'&&/^p:수입$|^imp|^pur/.test(m.k))put('erp_rates',op);}});});
   return cols;
 }
 function canCol(col,op){if(!ME)return false;if(ME.admin===true)return true;var c=colPerms(ME.perms||{})[col];return !!(c&&c[op]);}
