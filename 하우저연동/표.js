@@ -16,7 +16,7 @@
     if (!t) return null;
     const heads = [...t.querySelectorAll("thead th")].map(글);
     const rows = [...t.querySelectorAll("tbody tr")].filter((r) => r.children.length === heads.length).map((r) => {
-      const o = { _링크: "" };
+      const o = { _링크: "", _값: r.getAttribute("value") || "" };
       [...r.children].forEach((c, i) => { o[heads[i]] = 글(c); });
       const a = r.querySelector("a[href^='/']");
       if (a) o._링크 = a.getAttribute("href");
@@ -122,7 +122,7 @@
       const 줄들 = 걸렸다 ? rs : rs.slice(0, 보일수);     // 거르면 맞는 줄 전부, 안 거르면 50줄씩
       $("tbody").innerHTML = 줄들.map((r) => "<tr data-i=\"" + d.rows.indexOf(r) + "\">" + 칸들.map((c) => {
         const v = r[c] || "";
-        if (c === o.첫칸) return `<td><button type="button" class="hw-이름">${esc(v)}</button></td>`;
+        if (c === o.첫칸) return `<td><button type="button" class="hw-이름">${esc(v)}</button>` + (o.보태기 && r._구성 ? `<div class="hw-구성">${esc(r._구성)}</div>` : "") + `</td>`;
         const n = o.숫자칸.includes(c);
         const cls = n ? "n" + (v === "0" ? " z" : (c === "불량 재고" && 수(v) > 0 ? " bad" : "")) : "";
         return `<td class="${cls}">${esc(v)}</td>`;
@@ -136,6 +136,13 @@
       if (고른 != null) { const tr = $("tr[data-i=\"" + 고른 + "\"]"); if (tr) tr.classList.add("on"); }
     };
     그리기();
+    /* 상품명 옆 보탬(구성품명) — 줄마다 한 번만 가져오고(r._구성 에 둠) 동시에 2건씩 천천히. 읽기(GET)만. */
+    if (o.보태기) {
+      const 차례 = d.rows.filter((r) => r._값);
+      const 칸채우기 = (r) => { const tr = $("tr[data-i=\"" + d.rows.indexOf(r) + "\"]"); if (!tr || !r._구성) return; const td = tr.children[0]; if (td && !td.querySelector(".hw-구성")) { const el = document.createElement("div"); el.className = "hw-구성"; el.textContent = r._구성; td.appendChild(el); } };
+      const 일꾼 = async () => { while (차례.length) { const r = 차례.shift(); try { r._구성 = (await o.보태기(r)) || ""; } catch (e) { r._구성 = ""; } 칸채우기(r); await 쉬(400); } };
+      일꾼(); 일꾼();
+    }
     $(".더").onclick = () => { 보일수 += 걸음; 그리기(); };
     $(".전체").onclick = () => { 보일수 = d.rows.length; 그리기(); };
     $(".접기").onclick = () => { 보일수 = 처음; 그리기(); };
