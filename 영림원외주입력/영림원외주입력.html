@@ -404,6 +404,7 @@ table.asmt tr.chg td{background:var(--amber-bg)}table.asmt tr.off td{color:var(-
 .podkv{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 12px;margin:10px 0;font-size:14px}.podkv dt{color:var(--muted);font-weight:700}.podkv dd{margin:0;word-break:break-all;font-weight:600}.podkv dd.n{font-variant-numeric:tabular-nums}.podkv dd.mono{font-family:var(--mono)}
 .podrow{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:10px 0}.podrow .nt{font-weight:800;word-break:break-all}.podrow .podkv{margin:6px 0 0}
 .podh{font-size:14px;font-weight:900;margin:18px 0 6px}.podbox .tw{max-height:none}.podbox td.n,.podbox th:not(:first-child){text-align:right}.podbox td{white-space:normal;word-break:break-all}
+.vpnbox td{white-space:nowrap}.vpnbox td.w{white-space:normal;min-width:140px;max-width:320px;overflow-wrap:anywhere}.vpnbox td.mono{font-family:var(--mono);font-size:12px}.vpnbox td.muted{color:var(--muted);font-size:12px}.vpnbox tr.vpnh{cursor:pointer}.vpnbox tr.vpnh.open td{font-weight:800}.vpnbox tr.vpnd td{background:var(--fill4)}.vpnq{flex:1 1 220px;min-width:0}.vpnq input{font:inherit;font-size:13px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:8px;padding:9px 12px;min-height:40px;min-width:0;flex:1;width:auto}.vpnq input:focus{outline:none;border-color:var(--ink)}   /* v263 벤더피아 상품명연결 */
 .stktabs{margin:0 0 10px}.stkbox th{height:28px}.stkbox thead tr+tr th{top:28px}.stkbox th[colspan]{text-align:center}
 /* v115 담당자 로그인·담당자 관리 */
 #erp-login{position:fixed;inset:0;z-index:300;background:#fff;display:grid;place-items:center;padding:16px}
@@ -454,7 +455,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v262</span>
+    <span class="ver">v263</span>
   </div>
 </header>
 <div class="wrap">
@@ -2152,7 +2153,7 @@ var NAV_BOXES=[
   {id:'생산',title:PAGE_NAMES['생산'],icon:'layers',items:function(){return ['prods','proddlvs'];}},   /* v223 「생산/외주 발주서」 메뉴만 뺌(asmBoxSync·업체별 링크 그대로) */
   /* v224 사장님 「업체별 링크 메뉴도 삭제」 — 메뉴 박스 뺌 · v226 업체 링크 페이지 파일 지움 · v227 화면 코드도 뺌 */
   {id:'pdm',title:'구매발주납품 관리',icon:'box',items:function(){return ['pdm'];}},   /* v230 사장님 「구매발주납품 관리 메뉴를 만들어서 그안에 테스트에 사용된 모든 거래처 박스를 만들어줘」 */
-  {id:'물류기본',title:PAGE_NAMES['물류'],icon:'layers',items:function(){return ['setitems'];}},   /* v235 세트구성품등록 */
+  {id:'물류기본',title:PAGE_NAMES['물류'],icon:'layers',items:function(){return ['setitems','vpnames'];}},   /* v235 세트구성품등록 · v263 2. 벤더피아 상품명연결 */
   {id:'물류',title:'물류 · [물류] 재고현황',icon:'box',items:function(){return ['stocks'];}},
   {id:'admin',title:'관리자',icon:'users',items:function(){return ['staff','vperm','ids'];}}];   /* v255 사장님 「입력폼에 관리자메뉴를 만들어 이곳에서 현재의 담당자관리/거래처별 발주권한관리/아이디관리 를 할 수 있도록」 — 담당자 관리(#staff)를 이 박스 안으로 옮김(화면·기능 그대로) */
 var BASIC_URL='../영림원기본정보입력/영림원기본정보입력.html';   /* v166 사장님 「해당 프로그램을 입력폼 메뉴에 넣어 주세요」 — 기본입력 박스 첫 줄 */
@@ -2173,6 +2174,7 @@ function renderNav(){
     else if(k==='vperm'){num=ico('box');title='거래처별 발주권한관리';sub='거래처 '+vrVendors().length;}   /* v255 */
     else if(k==='ids'){num=ico('users');title='아이디관리';sub=STAFF?STAFF.length+'개':'불러오는 중';}   /* v255 */
     else if(k==='basic'){num=ico('sheet');title='영림원 기본정보 입력';sub='';}
+    else if(k==='vpnames'){num=String(i);title='벤더피아 상품명연결';sub=VP.prods?'상품 '+VP.prods.length.toLocaleString():'';}   /* v263 */
     else if(k==='pdm'){num=ico('box');title='구매발주납품 관리';sub='거래처 '+PDM_VENDORS.length;}   /* v230 */   /* v166 별도 프로그램 — 같은 창으로 연다 */
     else{num=s.page?String(i):String(s.n);var cc=counts(k);sub=cc==null?'불러오는 중':cntText(cc);}   /* v225 */
     return h('button',{type:'button',on:{click:function(){if(k==='basic'){location.href=BASIC_URL;return;}go(k);if(NARROW()){navOpen='';renderNav();var m=document.getElementById('main');if(m)window.scrollTo(0,Math.max(0,m.getBoundingClientRect().top+window.pageYOffset-70));}}},'aria-current':k===cur?'step':null},
@@ -2189,7 +2191,7 @@ function renderNav(){
   navEl.replaceChildren.apply(navEl,out);
 }
 function renderSum(){
-  if(!cur||cur==='stocks'||isAdmKey(cur)||cur==='pdm'||cur==='podocs'||cur==='asmpo'||cur==='links'||!canMenu(menuOf(cur),'r')){sumEl.replaceChildren();return;}   /* v115 담당자 관리도 */   /* v102 재고 조회는 대기·완료 문서가 없다 */
+  if(!cur||cur==='stocks'||cur==='vpnames'||isAdmKey(cur)||cur==='pdm'||cur==='podocs'||cur==='asmpo'||cur==='links'||!canMenu(menuOf(cur),'r')){sumEl.replaceChildren();return;}   /* v115 담당자 관리도 */   /* v102 재고 조회는 대기·완료 문서가 없다 */
   var t={'대기':0,'진행중':0,'완료':0,'오류':0,'수정대기':0};
   var pg=(BYKEY[cur]||{}).page||'';   /* v75 맨 위 요약 = 지금 페이지 것만(1~11단계에 수입을 섞지 않음) */
   STEPS.filter(function(s){return (s.page||'')===pg;}).forEach(function(s){var c=counts(s.key);if(c)STATUS.forEach(function(k){t[k]+=c[k];});});
@@ -3845,6 +3847,9 @@ function vpLoad(){
     VP.goods=vpLines(r[0],'단품_').map(function(a){return {code:String(a[0]||'').trim(),name:String(a[1]||'').trim(),st:String(a[2]||'').trim()};}).filter(function(g){return g.code;});
     VP.byCode={};VP.byName={};
     VP.goods.forEach(function(g){VP.byCode[vpKey(g.code)]=g;if(g.name)(VP.byName[g.name]=VP.byName[g.name]||[]).push(g);});
+    VP.prods=vpLines(r[1],'상품_').map(function(a){return {code:String(a[0]||'').trim(),name:String(a[1]||'').trim(),st:String(a[2]||'').trim(),
+      codes:String(a[3]||'').split(',').map(function(x){return x.trim();}).filter(Boolean)};}).filter(function(x){return x.code;});   /* v263 벤더피아 상품명연결 = 모든 상품 */
+    VP.at=[r[0],r[1]].map(function(ds){var i=ds.filter(function(d){return d.id==='_정보';})[0];return i&&i['올린때']||'';});
     VP.sets=vpLines(r[1],'상품_').map(function(a){return {code:String(a[0]||'').trim(),name:String(a[1]||'').trim(),st:String(a[2]||'').trim(),
       codes:String(a[3]||'').split(',').map(function(x){return x.trim();}).filter(Boolean)};}).filter(function(x){return x.code&&x.codes.length>=2;});   /* 단품 2개 이상 = 묶음 */
     var dl=function(id,vals){var e=document.getElementById(id);if(!e){e=h('datalist',{id:id});document.body.append(e);}
@@ -5356,6 +5361,86 @@ function renderStock(){
     tabs,info,tw));
   draw();
 }
+/* ---------- v263 물류 · [물류] 기본정보 › 2. 벤더피아 상품명연결 ----------
+   사장님 11-15 「물류기본정보 메뉴에 2.벤더피아 상품명연결 메뉴를 만들어 벤더피아 상품관리에 나타나는 상품명 기준으로 연결된 단품이 보이게 해주세요 이는 영림원등록 자료로 사용 됩니다.」
+   보기만 한다(쓰기 없음). 자료 = 벤더피아연동이 올린 납품내역_상품목록(상품코드·상품명·판매상태·단품코드 — 상품관리 화면 열 글자 그대로) + 납품내역_단품목록(단품명). vpLoad 가 같이 읽음.
+   단품코드 「a+a+b」 = 같은 단품 두 번(구성 수량) → 펼치면 한 줄씩. 영림원 품번 = 단품코드(11-14 사장님 결정) → 폼 4 품목·5 자재 기록과 견줌(vpKey).
+   ⚠ 저장 자료에 없는 것: 매출처명·매입처명·옵션상품유무·금액 칸(벤더피아연동이 네 칸만 올림). */
+var VPN={q:'',st:'',open:{},max:100,all:false},vpnDraw=null;
+function vpnErp(code){   /* 단품코드 → 폼 4 품목·5 자재 기록 (영림원 품번 = 단품코드) */
+  var k=vpKey(code),hit=(data.items||[]).concat(data.materials||[]).filter(function(r){return !ylwGone(r)&&vpKey(r.code)===k;});
+  if(!hit.length)return null;
+  var ok=hit.filter(function(r){return r.status==='완료';})[0];return ok||hit[0];
+}
+function vpnHit(){
+  var q=VPN.q.trim().toLowerCase();
+  return (VP.prods||[]).filter(function(p){
+    if(VPN.st&&p.st!==VPN.st)return false;
+    if(!q)return true;
+    if(p.code.toLowerCase().indexOf(q)>=0||p.name.toLowerCase().indexOf(q)>=0)return true;
+    return p.codes.some(function(c){var g=VP.byCode[vpKey(c)];return c.toLowerCase().indexOf(q)>=0||(g&&g.name.toLowerCase().indexOf(q)>=0);});
+  });
+}
+var VPN_COLS=['상품코드','상품명','판매상태','단품코드','단품명','영림원 품번','상태'];
+function vpnSave(toDrive,say){
+  if(!VP.prods){say('불러온 자료가 없습니다.',true);return;}
+  loadXlsx().then(function(X){
+    var aoa=[VPN_COLS];
+    vpnHit().forEach(function(p){
+      if(!p.codes.length){aoa.push([p.code,p.name,p.st,'','','','']);return;}
+      p.codes.forEach(function(c){var g=VP.byCode[vpKey(c)],e=vpnErp(c);aoa.push([p.code,p.name,p.st,c,g?g.name:'',e?e.code:'',e?e.status:'']);});
+    });
+    var wb=X.utils.book_new();X.utils.book_append_sheet(wb,X.utils.aoa_to_sheet(aoa),'벤더피아 상품명연결');
+    var name=('벤더피아상품명연결_'+conToday()+'.xlsx').replace(/[\\\/:*?"<>|]/g,'_');
+    saveFile(new Blob([X.write(wb,{bookType:'xlsx',type:'array'})],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),name);
+    if(toDrive){window.open(STK_DRIVE,'_blank','noopener');say('「'+name+'」 → 「영림원외주입력 양식」 폴더');}
+    else say('「'+name+'」');
+  },function(){say(XLSX_FAIL,true);});
+}
+function renderVpNames(){
+  bulk=null;listBox=null;listBox2=null;sheetDraw=null;ifRefresh=null;
+  var msg=h('span',{class:'msg','aria-live':'polite'});
+  var say=function(t,bad){msg.textContent=t;msg.className='msg'+(bad?' bad':'');};
+  var dl=pick(ico('download'),'양식 다운로드',[['엑셀',function(){vpnSave(false,say);}],['구글 스프레드시트',function(){vpnSave(true,say);}]]);
+  var qIn=h('input',{type:'search',value:VPN.q,placeholder:'상품코드 · 상품명 · 단품코드 · 단품명',autocomplete:'off','aria-label':'찾기',on:{input:function(){VPN.q=qIn.value;VPN.max=100;draw();}}});
+  var stSel=h('select',{'aria-label':'판매상태',on:{change:function(){VPN.st=stSel.value;VPN.max=100;draw();}}});
+  var allBtn=h('button',{type:'button',class:'btn small',on:{click:function(){VPN.all=!VPN.all;VPN.open={};draw();}}});
+  var info=h('div',{class:'lsinfo'}),tw=h('div',{class:'tw vpnbox'}),more=h('div',{});
+  function draw(){
+    if(cur!=='vpnames')return;
+    if(VP.err){info.replaceChildren(VP.err);tw.replaceChildren();more.replaceChildren();return;}
+    if(!VP.prods){info.replaceChildren(h('span',{},'불러오는 중'));tw.replaceChildren();more.replaceChildren();return;}
+    var sts=uniq(VP.prods.map(function(p){return p.st;}).filter(Boolean));
+    stSel.replaceChildren.apply(stSel,[h('option',{value:''},'전체')].concat(sts.map(function(x){return h('option',{value:x},x);})));stSel.value=VPN.st;
+    allBtn.textContent=VPN.all?'모두 접기':'모두 펼치기';
+    var hit=vpnHit(),t=VP.at&&VP.at[1];
+    info.replaceChildren(h('span',{},'상품 '+VP.prods.length.toLocaleString()),h('span',{},'찾음 '+hit.length.toLocaleString()),
+      t?h('span',{},'벤더피아에서 올린 일시 '+stkTime(t)):'');
+    var rows=[];
+    hit.slice(0,VPN.max).forEach(function(p){
+      var k=vpKey(p.code),op=VPN.all?!VPN.open[k]:!!VPN.open[k];
+      var tg=function(){if(VPN.open[k])delete VPN.open[k];else VPN.open[k]=1;draw();};
+      rows.push(h('tr',{class:'vpnh'+(op?' open':''),tabindex:'0','aria-expanded':op?'true':'false',on:{click:tg,keydown:function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();tg();}}}},
+        h('td',{class:'mono'},h('span',{class:'navarr','aria-hidden':'true'},op?'▾ ':'▸ '),p.code),h('td',{class:'w'},p.name),h('td',{},p.st),
+        h('td',{class:'mono w'},p.codes.join('+')),h('td',{class:'muted'},'단품 '+p.codes.length),h('td',{}),h('td',{})));
+      if(op)p.codes.forEach(function(c){var g=VP.byCode[vpKey(c)],e=vpnErp(c);
+        rows.push(h('tr',{class:'vpnd'},h('td',{}),h('td',{}),h('td',{}),h('td',{class:'mono'},c),h('td',{class:'w'},g?g.name:''),
+          h('td',{class:'mono'},e?e.code:''),h('td',{},e?h('span',{class:'chip'},e.status):'')));});
+    });
+    tw.replaceChildren(h('table',{},h('thead',{},h('tr',{},VPN_COLS.map(function(c){return h('th',{},c);}))),h('tbody',{},rows)));
+    more.replaceChildren(hit.length>VPN.max?h('button',{type:'button',class:'btn small',on:{click:function(){VPN.max+=100;draw();}}},'더 보기 ('+Math.min(VPN.max,hit.length)+' / '+hit.length.toLocaleString()+')'):'');
+  }
+  vpnDraw=draw;
+  mainEl.replaceChildren(h('section',{class:'card'},
+    h('div',{class:'stephead'},
+      h('p',{class:'path'},'벤더피아 경로',['Master','상품관리'].map(function(p){return h('code',{},p);}),h('span',{},'화면: 상품목록조회')),
+      h('h2',{},'벤더피아 상품명연결')),
+    h('div',{class:'hint'},'벤더피아 상품관리의 상품명마다 연결된 단품을 봅니다(보기만). 상품을 누르면 단품이 펼쳐집니다. 영림원 품번 = 단품코드(11-14 결정) — 「영림원 품번」·「상태」는 이 폼 4 품목·5 자재 기록입니다.'),
+    h('div',{class:'actions'},dl,msg),
+    h('div',{class:'stkbar'},h('label',{class:'vpnq'},'찾기',qIn),h('label',{},'판매상태',stSel),allBtn),
+    info,tw,more));
+  draw();vpLoad().then(draw);
+}
 /* ---------- v227 업체 링크 코드 뺌 (사장님 「업체링크,페이지 모두삭제」 · 분배 방 11-13 「남은 링크 관련 코드를 폼에서 뺍니다」) ----------
    v126~v222 의 발주서관리·발주서(조립업체 발주 링크)·업체별 링크 세 화면과, 폼이 열릴 때 링크 자료(erp_pobox·asmbox 내용·podocs·podocs_pub·pointok·poconfirm·poship·poin·podlv·prodconfirm·asmpo)를
    읽고 맞추던 코드(podSync·podBoxSync·podTokSync·podShipInSync·podFlowSync·asmConvSync·asmBoxSync·pcDlvSync·vlSync 등)를 모두 뺐다 — git 기록 v226(ea56004)에 있음. 저장 자료는 그대로.
@@ -5531,6 +5616,7 @@ function renderStep(){
   if(!canMenu(menuOf(cur),'r')){renderNoPerm();return;}
   if(cur==='check'){renderCheck();return;}
   if(cur==='stocks'){renderStock();return;}   /* v102 */
+  if(cur==='vpnames'){renderVpNames();return;}   /* v263 */
   if(cur==='pdm'){renderPdm();return;}   /* v230 */
   var s=BYKEY[cur];bulk=null;
   form=buildForm(s);
@@ -7998,7 +8084,7 @@ function erpMenus(){
   return out;
 }
 var MENUS=erpMenus();
-function menuOf(k){if(k==='check'||k==='stocks'||isAdmKey(k)||k==='pdm')return k;var s=BYKEY[k];if(!s)return k;if(s.page)return PERM_SPLIT[s.page]?k:'p:'+s.page;return s.shownIn||k;}
+function menuOf(k){if(k==='vpnames')return 'p:물류';if(k==='check'||k==='stocks'||isAdmKey(k)||k==='pdm')return k;var s=BYKEY[k];if(!s)return k;if(s.page)return PERM_SPLIT[s.page]?k:'p:'+s.page;return s.shownIn||k;}
 function canMenu(k,op){if(!ME)return false;if(ME.admin===true)return true;
   var p=permOf(ME.perms,k);return !!(p&&p[op]);}
 /* 컬렉션 권한 = 그 컬렉션을 가진 메뉴 중 하나라도. erp_imports(불러오기 요청)는 어느 메뉴든 · v167 erp_rates(영림원 환율정보)는 수입·구매 메뉴 보기·저장 */
@@ -8141,7 +8227,7 @@ function staffRepoTable(){
     ['자료 보호','늘지 않음 — 파이어베이스 키는 원래 공개 값, 자료는 저장소 규칙이 지킴','저장소 규칙 배포(위)']]);
 }
 function go(k){if(BYKEY[k]&&BYKEY[k].shownIn)k=BYKEY[k].shownIn;cur=k;wSync();navOpen=NARROW()?'':null;try{history.replaceState(null,'','#'+k);}catch(e){location.hash=k;}renderNav();renderSum();renderStep();}
-function refreshAll(){rateSyncAll();renderNav();renderSum();renderList();refreshLists();if(impDraw)impDraw();if(sheetDraw)sheetDraw();if(ifRefresh)ifRefresh();if(stkDraw)stkDraw();if(pdmDraw)pdmDraw();if(vpmDraw)vpmDraw();podModSync();}   /* v257 불러온 자재가 들어오면 발주권한 후보 다시 */   /* v227 링크 맞추기 뺌 — 발주수정 자동(구매)만 */
+function refreshAll(){rateSyncAll();renderNav();renderSum();renderList();refreshLists();if(impDraw)impDraw();if(sheetDraw)sheetDraw();if(ifRefresh)ifRefresh();if(stkDraw)stkDraw();if(vpnDraw&&cur==='vpnames')vpnDraw();if(pdmDraw)pdmDraw();if(vpmDraw)vpmDraw();podModSync();}   /* v257 불러온 자재가 들어오면 발주권한 후보 다시 */   /* v227 링크 맞추기 뺌 — 발주수정 자동(구매)만 */
 
 /* ---------- boot ---------- */
 
