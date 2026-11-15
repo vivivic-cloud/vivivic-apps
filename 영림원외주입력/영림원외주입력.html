@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v240 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v241 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -437,7 +437,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v240</span>
+    <span class="ver">v241</span>
   </div>
 </header>
 <div class="wrap">
@@ -7227,9 +7227,10 @@ function pdmDoneAll(p){var ws=pdmWhs(p);return ws.length>0&&ws.every(function(w)
 function pdmShipMsg(p,w){   /* v240 사장님 「배송기사링크 공유시 카카오톡 메세지에 입고처 이름과 제품명이 메세지로 보내지도록」 */
   var ns=[];p.rows.forEach(function(x){if(x.wh===w&&x.cname&&ns.indexOf(x.cname)<0)ns.push(x.cname);});
   var nm=ns.length?ns[0]+(ns.length>1?' 외 '+(ns.length-1)+'건':''):'';
-  return {title:[w,nm].filter(Boolean).join(' · '),text:'입고처 '+w+'\n제품 '+nm+'\n발주번호 '+p.pono};
+  var d=new Date(),z=function(n){return String(n).padStart(2,'0');},day=d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate());   /* v241 첫 줄 = 공유한 날짜 + 입고처명 */
+  return {title:day+' '+w,text:day+' '+w+'\n제품 '+nm+'\n발주번호 '+p.pono};
 }
-function pdmShipUrl(k){return new URL('배송기사.html#'+k,location.href).href;}
+function pdmShipUrl(k,w){return new URL((PUR_WHS.indexOf(w)>=0?'배송기사-'+w+'.html':'배송기사.html')+'#'+k,location.href).href;}   /* v241 입고처별 파일(카톡 미리보기 제목 「T경기 입고」, 배송기사-입고처파일만들기.py) · 목록 밖 창고 = 공용 */
 function pdmShipEnsure(p,w){
   var sh=pdmShipOf(p.pono,w);if(sh)return Promise.resolve(sh.id);
   if(!db)return Promise.reject(new Error('저장소 연결 없음'));
@@ -7258,7 +7259,7 @@ function pdmScanStart(w,redraw){   /* 카메라 하나 — 다시 그려도 같�
   }).catch(function(e){console.warn('스캔',e);pdmScanStop();PDM_SMSG={w:w,t:'카메라를 열지 못했습니다.',bad:true};redraw();});},0);
 }
 function pdmScanGot(w,t){
-  t=String(t||'').trim();var m=/^VVSHIP:([A-Za-z0-9]{32})$/.exec(t)||/배송기사\.html#([A-Za-z0-9]{32})$/.exec(t),sh=m?(PDM_SHIPS||[]).filter(function(d){return d.id===m[1];})[0]:null;
+  t=String(t||'').trim();var m=/^VVSHIP:([A-Za-z0-9]{32})$/.exec(t)||/배송기사(?:-[^\/#]+)?\.html#([A-Za-z0-9]{32})$/.exec(t),sh=m?(PDM_SHIPS||[]).filter(function(d){return d.id===m[1];})[0]:null;
   var p=sh&&sh.wh===w?(pdmInList(w)||[]).filter(function(x){return x.pono===sh.pono;})[0]:null;
   if(!p){PDM_SMSG={w:w,t:'이 입고대기에 없는 발주입니다.',bad:true};return;}
   PDM_SCAN[p.pono+'|'+w]=sh.id;PDM_SMSG={w:w,t:p.pono+' 스캔했습니다.',bad:false};
@@ -7328,7 +7329,7 @@ function pdmMakeView(v,redraw,done){   /* v238 생산중 — 발주확인 칸과
     var bts=ws.map(function(w){var sh=pdmShipOf(p.pono,w);if(sh&&sh.doneAt)return null;
       var bt=h('button',{type:'button',class:'btn small'},'배송기사 공유'+(ws.length>1?' · '+w:''));
       bt.addEventListener('click',function(){bt.disabled=true;PDM_FMSG={k:k,t:'',bad:false};
-        pdmShipEnsure(p,w).then(function(id){var u=pdmShipUrl(id),m=pdmShipMsg(p,w);   /* v240 공유 글 = 입고처·제품명(카톡 메시지) */
+        pdmShipEnsure(p,w).then(function(id){var u=pdmShipUrl(id,w),m=pdmShipMsg(p,w);   /* v240 공유 글 = 입고처·제품명(카톡 메시지) */
           if(navigator.share)return navigator.share({title:m.title,text:m.text,url:u}).then(function(){},function(){});
           return navigator.clipboard.writeText(m.text+'\n'+u).then(function(){PDM_FMSG={k:k,t:'링크를 복사했습니다.',bad:false};},function(){PDM_FMSG={k:k,t:u,bad:false};});
         }).catch(function(e){console.warn(e);PDM_FMSG={k:k,t:'링크를 만들지 못했습니다.',bad:true};}).then(function(){bt.disabled=false;redraw();});});
