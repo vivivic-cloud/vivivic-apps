@@ -9,7 +9,10 @@
      모양은 조혼가구/재고관리.html 의 머리띠·묶음·딱지 값 그대로다(새 꼴을 만들지 않았다).
      v1.1.0 (11-16) 사장님: 「확인할 것 한 줄마다 … 해당 프로그램의 해당 부분까지 바로 열리는 링크」
        → 줄마다 [화면][일지][방] 순서. 화면 = `화면링크`·`화면이름`(없으면 안 보임). 방별 한 일 줄도 같다.
-     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.1.0 -->
+     v1.2.0 (11-16) 사장님: 「모든 박스(줄)에 삭제 버튼 … 삭제하면 그 알림을 만들기 위해 기록된 모든 기록이 같이 지워져야」
+       → 줄마다 [삭제] → 「삭제하면 되돌릴 수 없습니다」 확인창 → 파이어스토어 `ws_deleted` 에 **지문(해시)만** 적고 화면에서 바로 뺀다.
+         글·요약은 어디에도 안 적는다. 갱신(예약 작업)은 올리기 전에 이 목록을 읽어 그 줄을 data.json 에서 빼고 다시 안 만든다.
+     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.2.0 -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -72,13 +75,23 @@
     .상태.작업중{ background:#f3f8f3; color:#2f6b2f; box-shadow:inset 0 0 0 1px #cfe3cf; }
     .상태.대기{ background:var(--vg-ink); color:#fff; }
     .한일{ margin-top:3px; font-size:13px; font-weight:600; color:var(--vg-soft); overflow-wrap:anywhere; }
+
+    /* 삭제 — 줄 맨 끝(오른쪽), 눈에 덜 띄게. 누르면 확인창 */
+    .링크.삭제{ margin-left:auto; color:var(--vg-muted); }
+    /* 확인창 — 이 집이 쓰는 값 그대로(흰 바탕·테두리·둥근 모서리) */
+    #모달{ position:fixed; inset:0; z-index:100; background:rgba(17,17,16,.38); display:none; align-items:center; justify-content:center; padding:16px; }
+    #모달.켜짐{ display:flex; }
+    .모달몸{ width:100%; max-width:320px; background:#fff; border:1px solid var(--vg-edge); border-radius:14px; padding:18px 16px 14px; box-shadow:0 12px 32px -12px rgba(0,0,0,.45); }
+    .모달글{ margin:0 0 14px; font-size:15px; font-weight:800; letter-spacing:-.3px; }
+    .모달줄{ display:flex; gap:8px; justify-content:flex-end; }
+    .링크.진함{ background:var(--vg-ink); border-color:var(--vg-ink); color:#fff; }
 </style>
 </head>
 <body>
 <header>
     <div class="머리">
         <span class="로고">VIVIVIC</span>
-        <span class="판">v1.1.0</span>
+        <span class="판">v1.2.0</span>
         <span class="딱지" id="딱지">읽는 중</span>
     </div>
 </header>
@@ -93,8 +106,13 @@
     <div id="방목록"></div>
 </main>
 
+<div id="모달"><div class="모달몸" role="dialog" aria-modal="true">
+    <p class="모달글">삭제하면 되돌릴 수 없습니다</p>
+    <div class="모달줄"><button type="button" class="링크" id="모달취소">취소</button><button type="button" class="링크 진함" id="모달삭제">삭제</button></div>
+</div></div>
+
 <script>
-/* 읽기만 한다. 자료 한 벌: data.json
+/* 읽기 + 삭제 표시. 자료 한 벌: data.json
    { 갱신:"2026-11-15T22:30:00+09:00",
      확인:[{글, 방, 방링크, 일지링크, 화면링크, 화면이름}],
      묶음:[{이름, 방:[{제목, 상태("작업중"|"사장님 지시 대기"|"끝남"), 마지막, 한일, 링크, 화면링크, 화면이름}]}] } */
@@ -108,11 +126,21 @@ const 때글 = iso => {
     return `${p.month}-${p.day} ${p.hour}:${p.minute}`;
 };
 const 폄 = new Set();
+/* 삭제 표시 — 파이어스토어 `ws_deleted`(지문만). 못 열면 도우미가 null 이고 삭제 단추는 안 나온다 */
+window.묘비준비 = new Promise(r => { window.__묘비끝 = r; setTimeout(() => r(null), 8000); });
+let 도우미 = null, 묘비들 = [], 지금자료 = null, 지울것 = null;
+/* 올리기.py 의 `지문붙이고_지운것빼기` 와 같은 규칙이다 */
+const 지웠나 = {
+    확인: x => 묘비들.some(m => m.종류 === '확인' && (m.id === x.id || (m.방해시 && m.방해시 === x.방해시 && m.보고해시 && m.보고해시 === x.보고해시))),
+    방: b => 묘비들.some(m => m.종류 === '방' && m.id === b.id && new Date(b.마지막) <= new Date(m.마지막))
+};
+const 삭제단추 = (k, x) => 도우미 && x.id ? `<button type="button" class="링크 삭제" data-k="${k}" data-id="${글자바꿈(x.id)}">삭제</button>` : '';
 /* 그 프로그램의 해당 화면으로 가는 링크 — 줄마다 [화면][일지][방] 순서의 맨 앞. 새 창으로 연다 */
 const 화면링크 = x => 믿는주소(x.화면링크) && x.화면링크.startsWith('https://')
     ? `<a class="링크" href="${믿는주소(x.화면링크)}" target="_blank" rel="noopener">${글자바꿈(x.화면이름 || '화면 열기')}</a>` : '';
 
 function 그리기(자료) {
+    지금자료 = 자료;
     const 딱 = document.getElementById('딱지');
     const 갱 = new Date(자료.갱신);
     if (isNaN(갱)) { 딱.textContent = '갱신 시각 없음'; 딱.classList.add('빨강'); }
@@ -122,7 +150,7 @@ function 그리기(자료) {
         딱.classList.toggle('빨강', Date.now() - 갱.getTime() > 3 * 3600 * 1000);
     }
 
-    const 확인 = 자료.확인 || [];
+    const 확인 = (자료.확인 || []).filter(x => !지웠나.확인(x));
     document.getElementById('확인셈').textContent = 확인.length;
     document.getElementById('확인목록').innerHTML = 확인.length ? 확인.map(x => `
         <div class="카드"><div class="카드몸">
@@ -132,10 +160,11 @@ function 그리기(자료) {
                 ${화면링크(x)}
                 ${믿는주소(x.일지링크) ? `<a class="링크" href="${믿는주소(x.일지링크)}" target="_blank" rel="noopener">일지</a>` : ''}
                 ${믿는주소(x.방링크) ? `<a class="링크" href="${믿는주소(x.방링크)}">방 열기</a>` : ''}
+                ${삭제단추('확인', x)}
             </div>
         </div></div>`).join('') : '<p class="알림">확인할 것 없음</p>';
 
-    const 묶음 = 자료.묶음 || [];
+    const 묶음 = (자료.묶음 || []).map(g => ({ ...g, 방: (g.방 || []).filter(b => !지웠나.방(b)) })).filter(g => g.방.length);
     document.getElementById('방셈').textContent = 묶음.reduce((n, g) => n + (g.방 || []).length, 0);
     document.getElementById('방목록').innerHTML = 묶음.length ? 묶음.map((g, i) => `
         <div class="묶음${폄.has(i) ? ' 폄' : ''}" data-i="${i}">
@@ -148,7 +177,7 @@ function 그리기(자료) {
                     </div>
                     <div class="한일">${글자바꿈(b.한일)}</div>
                     <div class="밑">${글자바꿈(때글(b.마지막))}</div>
-                    ${믿는주소(b.링크) || 믿는주소(b.화면링크) ? `<div class="링크줄">${화면링크(b)}${믿는주소(b.링크) ? `<a class="링크" href="${믿는주소(b.링크)}">방 열기</a>` : ''}</div>` : ''}
+                    ${믿는주소(b.링크) || 믿는주소(b.화면링크) || (도우미 && b.id) ? `<div class="링크줄">${화면링크(b)}${믿는주소(b.링크) ? `<a class="링크" href="${믿는주소(b.링크)}">방 열기</a>` : ''}${삭제단추('방', b)}</div>` : ''}
                 </div>`).join('')}</div>
         </div>`).join('') : '<p class="알림">아직 자료가 없습니다</p>';
 }
@@ -160,11 +189,40 @@ document.getElementById('방목록').addEventListener('click', e => {
     칸.classList.contains('폄') ? 폄.add(i) : 폄.delete(i);
 });
 
+/* 삭제 — 먼저 확인창, 확인해야만 쓴다 */
+const 모달 = document.getElementById('모달');
+const 모달닫기 = () => { 모달.classList.remove('켜짐'); 지울것 = null; };
+document.addEventListener('click', e => {
+    const 단추 = e.target.closest('.링크.삭제'); if (!단추) return;
+    지울것 = { k: 단추.dataset.k, id: 단추.dataset.id };
+    모달.classList.add('켜짐');
+});
+document.getElementById('모달취소').addEventListener('click', 모달닫기);
+모달.addEventListener('click', e => { if (e.target === 모달) 모달닫기(); });
+document.getElementById('모달삭제').addEventListener('click', async () => {
+    const 대상 = 지울것; 모달닫기(); if (!대상 || !도우미 || !지금자료) return;
+    const 줄 = 대상.k === '확인' ? (지금자료.확인 || []).find(x => x.id === 대상.id)
+        : (지금자료.묶음 || []).flatMap(g => g.방 || []).find(b => b.id === 대상.id);
+    if (!줄) return;
+    /* 지문만 적는다 — 글·요약·링크는 안 적는다 */
+    const 표 = { 종류: 대상.k, id: 대상.id, 방해시: 줄.방해시 || '', 보고해시: 줄.보고해시 || '',
+                 마지막: 대상.k === '방' ? (줄.마지막 || '') : '', 때: new Date().toISOString() };
+    try {
+        await 도우미.쓰기(표); 묘비들.push(표); 그리기(지금자료);
+        document.getElementById('알림').textContent = '';
+    } catch (e) {
+        document.getElementById('알림').textContent = '삭제하지 못했습니다';
+    }
+});
+
 async function 읽기() {
     try {
         const r = await fetch('data.json?t=' + Date.now(), { cache:'no-store' });
         if (!r.ok) throw new Error(r.status);
-        그리기(await r.json());
+        const 자료 = await r.json();
+        도우미 = 도우미 || await window.묘비준비;
+        if (도우미) { try { 묘비들 = await 도우미.목록(); } catch (e) { /* 못 읽으면 이전 목록 그대로 */ } }
+        그리기(자료);
         document.getElementById('알림').textContent = '';
     } catch (e) {
         document.getElementById('딱지').textContent = '못 읽음';
@@ -174,6 +232,23 @@ async function 읽기() {
 }
 읽기();
 setInterval(읽기, 5 * 60 * 1000);   /* 열어 둔 채로도 5분마다 새로 읽는다 */
+</script>
+<script type="module">
+/* 삭제 표시 저장 — 조혼가구·재고관리와 같은 파이어베이스(익명 로그인). 쓰는 곳은 `ws_deleted` 하나뿐 */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+import { getFirestore, collection, doc, getDocs, setDoc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+try {
+    const app = initializeApp({ apiKey:"AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs", authDomain:"vivivic-4b7ef.firebaseapp.com",
+        projectId:"vivivic-4b7ef", storageBucket:"vivivic-4b7ef.firebasestorage.app", messagingSenderId:"830175660542",
+        appId:"1:830175660542:web:9054030480c8280af8d8af" });
+    const auth = getAuth(app), db = getFirestore(app), 앱 = 'vivivic-4b7ef', 칸이름 = 'ws_deleted';
+    await new Promise((ok, no) => onAuthStateChanged(auth, u => { if (u) ok(); else signInAnonymously(auth).catch(no); }));
+    window.__묘비끝({
+        목록: async () => (await getDocs(collection(db, 'artifacts', 앱, 'public', 'data', 칸이름))).docs.map(d => d.data()),
+        쓰기: async 표 => setDoc(doc(db, 'artifacts', 앱, 'public', 'data', 칸이름, 표.종류 + '-' + 표.id), 표)
+    });
+} catch (e) { window.__묘비끝(null); }
 </script>
 </body>
 </html>
