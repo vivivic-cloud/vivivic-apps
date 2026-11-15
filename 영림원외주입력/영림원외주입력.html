@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v247 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v248 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -376,6 +376,7 @@ table.sheet td.empty0{padding:14px;color:var(--muted)}
 button.pdmtodo{cursor:pointer;transition:background .15s,border-color .15s,transform .15s}button.pdmtodo:hover{border-color:#9cc6ee;background:#e3effa}button.pdmtodo:active{transform:scale(.97)}button.pdmtodo:focus-visible{outline:2px solid #2383e2;outline-offset:2px}
 .pdmdot{position:relative;flex:none;width:7px;height:7px;margin-top:4px;border-radius:50%;background:#2383e2}.pdmdot::after{content:'';position:absolute;inset:0;border-radius:50%;background:#2383e2;animation:pdmping 1.9s cubic-bezier(0,0,.2,1) infinite}
 .pdmct{min-width:0}.pdmgo{flex:none;font-weight:900;color:#2383e2;margin-left:1px}
+.pdmreq{margin:12px 0 0;padding:9px 11px;border-radius:10px;border:1px solid #cfe3f6;background:linear-gradient(180deg,#f3f8fd,#e8f2fb);color:#1d5f9e;font-size:12.5px;font-weight:700;line-height:1.5;box-shadow:0 1px 2px rgba(35,131,226,.10);min-width:0}.pdmreq p{display:flex;gap:8px;align-items:flex-start;margin:0;overflow-wrap:anywhere;word-break:keep-all}.pdmreq p+p{margin-top:6px}.pdmreq .pdmdot{margin-top:6px}.pdmreq.sent{background:var(--fill4);border-color:var(--line2);color:var(--muted);box-shadow:none;font-weight:600}.pdmreq+.asmbar.pdmact{margin-top:8px}   /* v248 발주수정 위 수정 요청 글 */
 @keyframes pdmping{0%{transform:scale(1);opacity:.55}75%,100%{transform:scale(2.9);opacity:0}}
 .asmtile.pdmhot{border-color:#a9cdf0;animation:pdmglow 2.8s ease-in-out infinite}.asmtile.pdmhot .asmn2{color:#2383e2}
 @keyframes pdmglow{0%,100%{box-shadow:0 0 0 0 rgba(35,131,226,0)}50%{box-shadow:0 0 0 4px rgba(35,131,226,.13)}}
@@ -447,7 +448,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v247</span>
+    <span class="ver">v248</span>
   </div>
 </header>
 <div class="wrap">
@@ -7386,7 +7387,7 @@ function pdmMakeView(v,redraw,done){   /* v238 생산중 — 발주확인 칸과
           db.collection('erp_pomods').doc('mod_'+p.pono+'_recv').create({pono:p.pono,vendor:p.vendor,rows:mr,status:'대기',agentNote:'',createdAt:new Date().toISOString(),route:routeOf(BYKEY.pomods),
             basis:'',dlvId:'',purId:sc.id,purCol:sc.col,ships:ws.map(function(w){var sh=pdmShipOf(p.pono,w);return sh?sh.id:'';}).filter(Boolean)})
             .then(function(ok){PDM_FMSG={k:mk,t:ok?'발주수정을 저장했습니다.':'이미 저장된 발주수정입니다.',bad:!ok};redraw();},function(e){console.warn(e);PDM_FMSG={k:mk,t:'저장하지 못했습니다: '+errText(e),bad:true};bt.disabled=false;redraw();});});}
-      return h('div',{class:'rowcard pdmpo'},head,recvs,bt||PDM_FMSG.k===mk?h('div',{class:'asmbar pdmact'},bt,pdmFMsg(mk)):null);}
+      return h('div',{class:'rowcard pdmpo'},head,recvs,pdmReqBox(p,m),bt||PDM_FMSG.k===mk?h('div',{class:'asmbar pdmact'},bt,pdmFMsg(mk)):null);}   /* v248 단추 바로 위 수정 요청 글 */
     var bts=ws.map(function(w){var sh=pdmShipOf(p.pono,w);if(sh&&sh.doneAt)return null;
       var bt=h('button',{type:'button',class:'btn small'},'배송기사 공유'+(ws.length>1?' · '+w:''));
       bt.addEventListener('click',function(){bt.disabled=true;PDM_FMSG={k:k,t:'',bad:false};
@@ -7471,6 +7472,26 @@ function pdmInDoneView(w){
     var head=pdmPoHead(p,[h('dt',{},'입고확인'),h('dd',{},pdmWhen(sh.recv.at)+(sh.recv.by?' · '+sh.recv.by:'')),sh.doneAt?[h('dt',{},'납품완료'),h('dd',{},pdmWhen(sh.doneAt))]:null,
       h('dt',{},'구매처 발주수정'),h('dd',{},m?m.status:'발주수정 전')]);
     return h('div',{class:'rowcard pdmpo'},head,h('div',{class:'sub pdmsub'},'입고확인'),pdmRecvRows(sh.recv));}));
+}
+/* v248 사장님 「구매처 발주수정 버튼 주변에 수정된 내용에 대해서 간략하게 메세지가 나타나게 해주세요. - 입고처명에 납품 중인 품명+발주수량이 입고수량으로 수정 요청중 입니다. 확인해 주세요. 이렇게」
+   줄마다 「{입고처}에 납품 중인 {품명} {발주수량}{단위}이/가 {입고수량}{단위}으로/로 수정 요청중 입니다. 확인해 주세요.」 — 조사는 끝 글자 소리(한글 받침 · 숫자 · 영문 글자 이름)로.
+   발주수정을 누른 뒤(임시) = 흐린 칸에 「… 수정 요청을 보냈습니다(발주수정 대기|진행중)」 · 완료면 「… 수정했습니다(발주수정 완료)」. */
+function pdmJong(w){   /* 끝 소리 받침: 0 없음 · 1 있음 · 2 ㄹ */
+  w=String(w||'').trim();var c=w.charAt(w.length-1);if(!c)return 0;var k=c.charCodeAt(0);
+  if(k>=0xAC00&&k<=0xD7A3){var j=(k-0xAC00)%28;return j===0?0:j===8?2:1;}
+  if(/[0-9]/.test(c))return {'0':1,'1':2,'2':0,'3':1,'4':0,'5':0,'6':1,'7':2,'8':2,'9':0}[c];
+  c=c.toUpperCase();if(c==='L'||c==='R')return 2;if(c==='M'||c==='N')return 1;return 0;
+}
+function pdmIga(w){return w+(pdmJong(w)?'이':'가');}
+function pdmRo(w){var j=pdmJong(w);return w+(j===1?'으로':'로');}
+function pdmReqLines(p){var out=[];pdmWhs(p).forEach(function(w){var sh=pdmShipOf(p.pono,w);((sh&&sh.recv&&sh.recv.items)||[]).forEach(function(x){
+    if(Math.round((Number(x.qty)-Number(x.poqty||0))*100)/100===0)return;var u=String(x.unit||'').trim();
+    out.push({w:w,name:x.cname||x.ccode,a:pdmNum(x.poqty)+u,b:pdmNum(x.qty)+u});});});return out;}
+function pdmReqBox(p,m){
+  var ls=pdmReqLines(p);if(!ls.length)return null;
+  var tail=!m?' 수정 요청중 입니다. 확인해 주세요.':m.status==='완료'?' 수정했습니다(발주수정 완료).':' 수정 요청을 보냈습니다(발주수정 '+m.status+').';
+  return h('div',{class:'pdmreq'+(m?' sent':''),role:'status'},ls.map(function(l){return h('p',{},!m?h('span',{class:'pdmdot','aria-hidden':'true'}):null,
+    h('span',{},l.w+'에 납품 중인 '+l.name+' '+pdmIga(l.a)+' '+pdmRo(l.b)+tail));}));
 }
 function pdmModAble(p){return !pdmModOf(p.pono)&&pdmModRows(p).length>0;}
 function pdmTodo(v){   /* null = 구매처·입고처 아님 · undefined = 읽는 중 · [{stg,lab,n}] */
