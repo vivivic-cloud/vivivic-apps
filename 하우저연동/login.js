@@ -5,14 +5,22 @@
   const 칸 = document.getElementById("loginId");
   if (!칸 || !document.getElementById("loginPw")) return;
   document.documentElement.classList.add("hw-login");
-  // 칸에서 위로 올라가며, 길 위의 요소는 남기고 곁가지(머리·꼬리·안내)는 감춘다.
-  let e = 칸;
-  while (e && e !== document.body) {
+  // 0.3.2: 남길 것 = 아이디 칸·비밀번호 칸(.input_comm 통째)·안내 줄(.emph_error)·로그인 유지(.check_comm)·로그인 단추(.btn_comm).
+  // 그 길 위의 요소는 남기고, 길 곁가지(머리·꼬리·안내·링크)만 감춘다. 남길 것 안쪽(글자·지우기 단추)은 건드리지 않는다.
+  const 폼안 = 칸.closest("form") || document.body;
+  const 남길것 = [...폼안.querySelectorAll(".input_comm, .emph_error, .check_comm, .btn_comm")];
+  const 칸상자 = 칸.closest(".input_comm") || 칸;
+  if (!남길것.includes(칸상자)) 남길것.push(칸상자);
+  const 길 = new Set();
+  for (const t of 남길것) for (let e = t; e && e !== document.body; e = e.parentElement) 길.add(e);
+  for (const e of 길) {
     e.classList.add("hw-keep");
-    if (e.parentElement) for (const 형 of e.parentElement.children)
-      if (형 !== e && !형.classList.contains("hw-keep") && 형.tagName !== "SCRIPT" && 형.tagName !== "STYLE") 형.classList.add("hw-숨김");
-    e = e.parentElement;
+    if (남길것.includes(e)) continue;   // 남길 것 안쪽은 그대로
+    for (const 형 of e.children)
+      if (!길.has(형) && 형.tagName !== "SCRIPT" && 형.tagName !== "STYLE") 형.classList.add("hw-숨김");
   }
+  if (document.body) for (const 형 of document.body.children)
+    if (!길.has(형) && 형.tagName !== "SCRIPT" && 형.tagName !== "STYLE") 형.classList.add("hw-숨김");
   const 머리 = document.createElement("div");
   머리.id = "hw-로그인머리";
   머리.innerHTML = "<h1>하우저</h1><p>하우저 아이디·비밀번호로 로그인하세요. 이 확장은 입력한 값을 저장하지 않습니다.</p>";
