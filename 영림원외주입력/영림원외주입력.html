@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v243 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v244 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -437,7 +437,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v243</span>
+    <span class="ver">v244</span>
   </div>
 </header>
 <div class="wrap">
@@ -3881,12 +3881,21 @@ function purRowHook(r,dateF,imp){   /* imp = 수입Order 머리 칸 {vendor,cur,
   return r;
 }
 function purchKey(r){var n=function(v){return isEmpty(v)?'':String(Number(v));};return [purTrim(r.reqdate)].concat((r.rows||[]).map(function(o){return [purTrim(o.vendor),purTrim(o.ccode),n(o.qty),purTrim(o.duedate),purTrim(o.wh),purTrim(o.io),purTrim(o.cur),n(o.price)].join('|');}).sort()).join('\n');}   /* v89 같은 요청을 양식으로 두 번 올린 것을 막는다 · v219 사장님 「같은발주라는건 모든 상황이 같은걸 같은 발주라고 봐야지」 — 요청일 + 줄마다 구매거래처·품번·수량·납기요청일·창고·내외자구분·통화·단가가 모두 같을 때만 같은 발주 */
+/* v244 사장님 「창고가 둘인 발주서는 만들어 지지 않게 입력폼에서 제한되게 해줘」 — 발주 한 장 = 구매거래처 하나(영림원 발주생성이 매입처마다 한 장)
+   → 같은 구매거래처 줄들의 창고가 다르면 저장하지 않는다. 구매요청·품의·발주 한 화면(입력 칸·양식 일괄 「모두 저장」·수정·복사) · 구매품의·구매발주 나눠 넣기. 이미 저장된 문서는 안 건드림. */
+function purWhErr(rows){
+  var g={},ord=[];(rows||[]).forEach(function(o,i){if(!o)return;var v=purTrim(o.vendor),w=purTrim(o.wh);if(!w)return;if(!g[v]){g[v]=[];ord.push(v);}g[v].push({n:i+1,w:w});});
+  var bad=ord.filter(function(v){return g[v].some(function(x){return x.w!==g[v][0].w;});});
+  if(!bad.length)return '';
+  return '창고가 다른 줄이 있습니다 — 창고별로 발주를 나눠 주세요: '+bad.map(function(v){return (v||'구매거래처 없음')+' ('+g[v].map(function(x){return x.n+'줄 '+x.w;}).join(', ')+')';}).join(' · ')+'. 저장하지 않았습니다.';
+}
 function purchCheck(v){   /* v90 일괄 목록 「모두 저장」은 입력 칸 검사를 안 거친다 */
-  return rateRowsErr(v.rows,v.reqdate)||(v.rows||[]).map(function(o){return purPlateErr(o.ccode)||purQtyErr('요청수량')(o.qty)||optsErr('창고',PUR_WHS)(o.wh)||purVendorErr(o.vendor)||impPosErr('단가')(o.price);}).filter(Boolean)[0]||'';
+  return purWhErr(v.rows)||rateRowsErr(v.rows,v.reqdate)||(v.rows||[]).map(function(o){return purPlateErr(o.ccode)||purQtyErr('요청수량')(o.qty)||optsErr('창고',PUR_WHS)(o.wh)||purVendorErr(o.vendor)||impPosErr('단가')(o.price);}).filter(Boolean)[0]||'';
 }
 function purchSaveCheck(v,id){
   var seen={},dup='',k=purchKey(v),no=function(r){return (r.pos||[]).map(function(p){return p.pono;}).filter(Boolean).join(', ');},same=(data.purchases||[]).filter(function(r){return r.id!==id&&purchKey(r)===k;}).sort(function(a,b){return !!no(b)-!!no(a);})[0];   /* v191 사장님 「그럼 우리폼에서 입력완료로 되어 있는 동일한 발주가 대기로 되어 있지 못하게 하면 되잖아」 — 일괄 목록(bulkState)과 같은 기준 purchKey */
   if(same)return '같은 발주가 이미 있습니다('+(no(same)||same.status||'대기')+'). 저장하지 않았습니다.';   /* 발주번호 있는 것(완료)을 먼저 보인다 */
+  var we=purWhErr(v.rows);if(we)return we;   /* v244 */
   (v.rows||[]).forEach(function(o){var k=purTrim(o.vendor)+'|'+purTrim(o.ccode);if(seen[k])dup=dup||o.ccode;seen[k]=1;});
   return dup?'같은 구매거래처에 품번 「'+dup+'」 줄이 둘입니다. 한 줄로 합치거나 나눠서 따로 저장하세요. 저장하지 않았습니다.':rateRowsErr(v.rows,v.reqdate)||purCross('purreqs',v);   /* v167 환율 */   /* v121 */
 }
@@ -4086,6 +4095,7 @@ function purLinkFn(key){
     var vs=rows.map(vals),bad=vs.map(rowErr).filter(Boolean)[0]||'';
     if(c.edit&&!bad){var seen={};vs.forEach(function(o){var k=o.vendor+'|'+purTrim(o.ccode);if(seen[k])bad=bad||'같은 구매거래처에 품번 「'+o.ccode+'」 줄이 둘입니다. 저장하지 않았습니다.';seen[k]=1;});}
     if(!bad&&date)bad=rateRowsErr(vs,date);   /* v167 */
+    if(!bad)bad=purWhErr(vs);   /* v244 품의·발주 나눠 넣기도 창고 하나 */
     if(!date||bad){msg.textContent=bad||'필수 항목이 비어 있습니다.';msg.className='msg bad';return;}
     var p=prev;busy=true;draw();drawWho();msg.textContent='저장하는 중입니다.';msg.className='msg';
     function stop(t){busy=false;draw();drawWho();msg.textContent=t;msg.className='msg bad';}
