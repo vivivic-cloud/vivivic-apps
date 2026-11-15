@@ -1,5 +1,5 @@
 rules_version = '2';
-// v114 영림원외주입력 담당자 권한 — 제안(배포 안 함). 배포는 사장님 허락 뒤에만.
+// v239 안(= v236 안 + erp_purship) · v114 영림원외주입력 담당자 권한 — 제안(배포 안 함). 배포는 사장님 허락 뒤에만.
 // 지금 배포된 규칙(2026-10-06)과 다른 곳: ① 맨 아래 「그 밖」 에서 erp_ 를 뺐다 ② erp_staff · erp_ 두 덩어리를 더했다.
 // artifacts(벤더피아 자료) 덩어리와 erp_ 밖 컬렉션은 글자 그대로 — 다른 앱(익명 로그인)은 그대로 돈다.
 // 배포 전 할 일 = 영림원외주입력/CLAUDE.md 「담당자 로그인·권한 (v114)」.
@@ -186,6 +186,43 @@ service cloud.firestore {
         && request.resource.data.box is string && request.resource.data.box.matches('^[A-Za-z0-9_-]{32,64}$')
         && exists(/databases/$(database)/documents/erp_asmbox/$(request.resource.data.box))
         && dk in abox(request.resource.data.box).get('cks', []);
+    }
+
+    // v236 조립처 발주링크(조립처발주.html#열쇠) — 배포 전(사장님 「배포하세요」 뒤에 배포). 옛 링크 규칙(erp_asmbox·asmpo 등)과 따로.
+    // 열쇠 문서 erp_asmlink/<열쇠 32자> = {vendor, items, at} — 열쇠를 아는 사람만 한 장 읽음(get, 목록 없음). 만들기·고치기·지우기는 아래 덩어리(담당자, erp_asmlink 권한).
+    function alink(k) { return get(/databases/$(database)/documents/erp_asmlink/$(k)).data; }
+    match /erp_asmlink/{key} {
+      allow get: if true;
+      // 발주 = 그 열쇠 아래에만(다른 업체 안 섞임). 열쇠를 아는 사람이 읽고(목록 포함) 새 한 장을 만든다. 고치기·지우기는 담당자만.
+      match /po/{id} {
+        allow read: if exists(/databases/$(database)/documents/erp_asmlink/$(key)) || isStaff();
+        allow create: if id.matches('^[A-Za-z0-9]{32}$')
+          && exists(/databases/$(database)/documents/erp_asmlink/$(key))
+          && request.resource.data.keys().hasOnly(['vendor', 'code', 'name', 'spec', 'qty', 'need', 'memo', 'at'])
+          && request.resource.data.keys().hasAll(['vendor', 'code', 'name', 'spec', 'qty', 'need', 'memo', 'at'])
+          && request.resource.data.vendor == alink(key).vendor
+          && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 200
+          && request.resource.data.code is string && request.resource.data.code.size() <= 100
+          && request.resource.data.spec is string && request.resource.data.spec.size() <= 200
+          && request.resource.data.memo is string && request.resource.data.memo.size() <= 500
+          && request.resource.data.qty is int && request.resource.data.qty > 0 && request.resource.data.qty <= 1000000
+          && request.resource.data.need is string && request.resource.data.need.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+          && request.resource.data.at is string && request.resource.data.at.size() <= 40;
+        allow update: if can('erp_asmlink', 'w');
+        allow delete: if can('erp_asmlink', 'd');
+      }
+    }
+
+    // v239 구매발주 배송기사 링크(배송기사.html#열쇠) — 배포 전(사장님 「배포하세요」 뒤에 배포). 이 파일 = v236 안 + 이 덩어리(둘 다 배포 전이라 함께 배포).
+    // erp_purship/<열쇠 32자> = {pono, vendor, wh, items, at, by, recv?, doneAt?} — 만들기·입고확인(recv) = 폼 담당자(아래 덩어리, erp_purship 권한).
+    // 로그인 없는 배송기사: 열쇠를 아는 사람만 한 장 읽음(get, 목록 없음) · 입고확인(recv) 뒤 · 납품완료 전에만 doneAt 한 칸을 적음.
+    match /erp_purship/{key} {
+      allow get: if key.matches('^[A-Za-z0-9]{32}$');
+      allow update: if key.matches('^[A-Za-z0-9]{32}$')
+        && resource.data.get('recv', null) != null
+        && resource.data.get('doneAt', null) == null
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['doneAt'])
+        && request.resource.data.doneAt is string && request.resource.data.doneAt.size() <= 40;
     }
 
     // erp_ 업무 자료: 보기 = 권한 받은 담당자 모두(드롭다운이 다른 메뉴 자료를 읽음) · 저장·삭제 = 컬렉션마다
