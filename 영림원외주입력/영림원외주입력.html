@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v269 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v270 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -470,7 +470,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v269</span>
+    <span class="ver">v270</span>
   </div>
 </header>
 <div class="wrap">
@@ -8133,9 +8133,14 @@ function pdmApprCard(r,redraw,act){
 }
 function pdmApprView(v,redraw,act){
   var l=vrApprAll(v);if(l===undefined)return h('p',{class:'msg'},'불러오는 중…');
-  var w=l.filter(function(r){return !r.purId;}),d=l.filter(function(r){return !!r.purId;});
+  var w=l.filter(function(r){return !r.purId;});
+  /* v270 사장님 「구매발주 품의 품의완료 건은 품의 완료목록에서 최근 2주간만 보이며 나머지는 날짜 검색시 보이게 해주세요」 — 품의 완료 = 품의 확인 날(apprAt) 기준 오늘 포함 14일, 최근 위 ·
+     날짜검색 = 입고완료·납품완료 칸과 같은 pdmFinBar(열쇠 'ap|거래처') · 영림원 입력이 안 끝난 것(대기·진행중·오류)은 날짜 상관없이 늘(v252 「할 일 남은 건은 숨기지 않음」) */
+  var d=l.filter(function(r){return !!r.purId;}).map(function(r){var st=vrApprState(r);return Object.assign({},r,{day:pdmYmd(r.apprAt||r.at),keep:st.open&&st.lab!=='품의 확인'&&st.lab!=='…'});})
+    .sort(function(a,b){return String(b.apprAt||'').localeCompare(String(a.apprAt||''));});
+  var ds=pdmFinShow('ap|'+v,d),bar=pdmFinBar('ap|'+v,ds.length,redraw);
   return h('div',{},h('h3',{class:'asmsub'},'품의 대기',h('span',{},w.length+'건')),w.length?w.map(function(r){return pdmApprCard(r,redraw,act);}):h('div',{class:'empty'},'품의 대기 요청이 없습니다.'),
-    d.length?[h('h3',{class:'asmsub'},'품의 확인한 요청',h('span',{},d.length+'건'))].concat(d.map(function(r){return pdmApprCard(r,redraw,act);})):null);
+    h('h3',{class:'asmsub'},'품의 완료',h('span',{},ds.length+'건')),bar,ds.length?ds.map(function(r){return pdmApprCard(r,redraw,act);}):h('div',{class:'empty'},'품의 완료 요청이 없습니다.'));
 }
 function pdmApprChip(n){return n===undefined?h('div',{class:'pdmtodos'},h('span',{class:'pdmnone'},'…')):h('div',{class:'pdmtodos'},n>0?h('span',{class:'pdmtodo'},pdmCallKids({lab:'품의',n:n})):pdmTodoNone());}
 function pdmApprTile(v,go1){
