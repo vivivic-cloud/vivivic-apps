@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v252 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v253 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -147,6 +147,7 @@ details.gonebox{margin-top:10px;font-size:13px}details.gonebox>summary{cursor:po
 .lsearch>input{flex:1 1 auto;max-width:420px}   /* v37 4 품목 저장한 항목 검색 */
 .lsinfo{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--muted);font-weight:700;margin:0 0 10px}
 .lsinfo .lscnt.need{color:var(--amber)}
+.pdmnav{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 6px}.pdmnav .btn.pdmnavb{background:#fff;border:1px solid var(--line2);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.06);min-height:40px;padding:8px 14px}.pdmnav .btn.pdmnavb span{font-size:15px;line-height:1}   /* v253 뒤로·거래처 홈 */
 .pdmfinday{display:flex;align-items:center;gap:6px;flex:1 1 100%;min-width:0}.pdmfinday input[type=date]{flex:1 1 0;width:auto;min-width:0;padding-left:8px;padding-right:6px;font-size:13px}.pdmfintag{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:6px;background:#fdecec;color:#b91c1c;font-size:11px;font-weight:800;vertical-align:middle}   /* v251 입고완료 */
 .oldbox{margin:12px 0 0}.oldbox>summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--muted);padding:6px 0}.oldrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0 10px}   /* v225 지난 자료 보기 */
 .toast:not(:empty){position:fixed;left:16px;right:16px;bottom:16px;z-index:50;margin:0 auto;max-width:480px;padding:10px 14px;background:#fff;border:1px solid #e3e2e0;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.08)}
@@ -450,7 +451,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v252</span>
+    <span class="ver">v253</span>
   </div>
 </header>
 <div class="wrap">
@@ -7559,10 +7560,29 @@ function pdmTodoMsg(t){return t.lab+' '+t.n+'건 — 확인해 주세요';}
 function pdmCallKids(t){return [h('span',{class:'pdmdot','aria-hidden':'true'}),h('span',{class:'pdmct'},pdmTodoMsg(t)),h('span',{class:'pdmgo','aria-hidden':'true'},'›')];}
 function pdmHot(root){Array.prototype.forEach.call(root.querySelectorAll('.pdmtodo'),function(e){var t=e.closest('.asmtile');if(t&&!t.classList.contains('open'))t.classList.add('pdmhot');});}
 function pdmTodoNone(){return h('span',{class:'pdmnone'},'확인할 건 없음');}
+var PDM_GO=null,PDM_TOP=null;
+function pdmDepth(v,g){return v?(g?2:1):0;}
+function pdmHist(){var s=history.state,d=pdmDepth(PDM_ON,PDM_STG);return !!(s&&s.pdm&&s.d===d&&s.v===PDM_ON&&s.g===PDM_STG);}   /* v253 지금 화면 = 기록 맨 위 칸 */
+function pdmHistSync(){if(pdmHist())return;var u=location.href,d=pdmDepth(PDM_ON,PDM_STG);   /* 메뉴에 들어올 때 기록을 지금 화면 깊이에 맞춤 */
+  try{history.replaceState({pdm:1,d:0,v:'',g:''},'',u);if(d>=1)history.pushState({pdm:1,d:1,v:PDM_ON,g:''},'',u);if(d===2)history.pushState({pdm:1,d:2,v:PDM_ON,g:PDM_STG},'',u);}catch(e){}}
+window.addEventListener('popstate',function(e){var s=e.state;if(!s||!s.pdm)return;   /* v253 휴대폰 뒤로가기 = 한 단계 위 */
+  PDM_ON=s.v||'';PDM_STG=s.g||'';
+  if(cur!=='pdm'){go('pdm');return;}
+  if(pdmDraw){pdmDraw();if(PDM_TOP)PDM_TOP();}});
 function renderPdm(){
   erpClear();staffDraw=null;
   var box=h('div',{class:'podbox asmq'});
-  var go1=function(v,g){PDM_ON=v;PDM_STG=g||'';draw();var y=box.getBoundingClientRect().top;if(y<0)window.scrollBy(0,y-8);};
+  var top1=function(){var y=box.getBoundingClientRect().top;if(y<0)window.scrollBy(0,y-8);};
+  var go1=function(v,g){g=g||'';var d0=pdmDepth(PDM_ON,PDM_STG),d1=pdmDepth(v,g),hs=pdmHist();   /* v253 한 단계 = 기록 한 칸 → 휴대폰 뒤로가기도 한 단계 */
+    if(hs&&d1<d0&&(d1===0||v===PDM_ON)){history.go(d1-d0);return;}   /* 위로 = 기록을 되돌림(popstate 가 그림) */
+    PDM_ON=v;PDM_STG=g;
+    try{var u=location.href;if(d1>d0){if(d0===0&&d1===2)history.pushState({pdm:1,d:1,v:v,g:''},'',u);history.pushState({pdm:1,d:d1,v:v,g:g},'',u);}else history.replaceState({pdm:1,d:d1,v:v,g:g},'',u);}catch(e){}
+    draw();top1();};
+  PDM_GO=go1;PDM_TOP=top1;
+  var navBar=function(){   /* v253 사장님 「각 거래처박스 뒤로가기 버튼 또는 각 거래처 홈으로 가기 버튼을 만들어 주세요.」 — 뒤로 = 한 단계 위 · 거래처 홈 = 그 업체 박스 처음(칸 화면에서만) */
+    var bk=h('button',{type:'button',class:'btn pdmnavb',on:{click:function(){go1(PDM_STG?PDM_ON:'');}}},h('span',{'aria-hidden':'true'},'←'),'뒤로');
+    var hm=PDM_STG?h('button',{type:'button',class:'btn pdmnavb',on:{click:function(){go1(PDM_ON);}}},h('span',{'aria-hidden':'true'},'⌂'),'거래처 홈'):null;
+    return h('div',{class:'pdmnav'},bk,hm);};
   var face=function(v,on){return h('div',{class:'asmface',role:'button',tabindex:'0','aria-expanded':on?'true':'false',
     on:{click:function(){go1(on?'':v);},keydown:function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();go1(on?'':v);}}}},h('b',{class:'asmtt asmvt'},v),h('small',{class:'pdmpr'},pdmLab(v)),todo(v));};   /* v233 분류 표시 · v234 맡은 공정 모두 · v245 할 일 */
   var todo=function(v){var t=pdmTodo(v);if(t===null)return null;if(t===undefined)return h('div',{class:'pdmtodos'},h('span',{class:'pdmnone'},'…'));
@@ -7585,7 +7605,7 @@ function renderPdm(){
       var sf=h('div',{class:'asmface',role:'button',tabindex:'0','aria-expanded':'true',on:{click:function(){go1(PDM_ON);},keydown:function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();go1(PDM_ON);}}}},h('b',{class:'asmtt asmvt'},PDM_STG));
       var vn=PDM_ON,inner=PDM_STG===PDM_ASM_STG?h('div',{class:'asmin'},pdmPoList(vn)):PDM_STG===PDM_WH_STG?h('div',{class:'asmin'},pdmInView(vn,redo)):PDM_STG===PDM_WH_DONE?h('div',{class:'asmin'},pdmInDoneView(vn)):PDM_STG===PDM_WH_FIN?h('div',{class:'asmin'},pdmFinView(vn,redo)):PDM_STG==='발주확인'?h('div',{class:'asmin'},pdmOkView(vn,redo)):PDM_STG==='생산중'?h('div',{class:'asmin'},pdmMakeView(vn,redo)):PDM_STG==='납품대기'?h('div',{class:'asmin'},pdmMakeView(vn,redo,'wait')):PDM_STG==='납품완료'?h('div',{class:'asmin'},pdmMakeView(vn,redo,'done')):null;   /* v238 생산중 */   /* v236 들어온 발주 · v237 발주확인·입고대기 */
       var fa=document.activeElement,fi=fa&&box.contains(fa)&&fa.getAttribute('data-pdmi'),fs=fi!=null&&fi!==false?[fa.selectionStart,fa.selectionEnd]:null;   /* 다시 그려도 입고수량 칸 커서 그대로 */
-      box.replaceChildren(h('div',{class:'asmcrumb'},h('button',{type:'button',on:{click:function(){go1('');}}},'거래처'),h('i',{},'›'),h('button',{type:'button',on:{click:function(){go1(vn);}}},vn),h('i',{},'›'),h('b',{},PDM_STG)),
+      box.replaceChildren(navBar(),h('div',{class:'asmcrumb'},h('button',{type:'button',on:{click:function(){go1('');}}},'거래처'),h('i',{},'›'),h('button',{type:'button',on:{click:function(){go1(vn);}}},vn),h('i',{},'›'),h('b',{},PDM_STG)),
         h('div',{class:'asmgrid asmvg'},h('div',{class:'asmtile open'},sf,inner)));
       if(fi!=null&&fi!==false){var ni=box.querySelector('input[data-pdmi="'+fi+'"]');if(ni){ni.focus();try{ni.setSelectionRange(fs[0],fs[1]);}catch(e){}}}
       return;}
@@ -7614,11 +7634,12 @@ function renderPdm(){
       var g2=stg&&stg.querySelector?stg.querySelector('.asmgrid2'):null;
       if(g2){g2.append(wt);g2.append(dt);g2.append(ft);}else if(stg&&stg.append)stg.append(h('div',{class:'asmgrid2'},wt,dt,ft));else stg=h('div',{class:'asmin'},h('div',{class:'asmgrid2'},wt,dt,ft));
     }
-    box.replaceChildren(h('div',{class:'asmcrumb'},h('button',{type:'button',on:{click:function(){go1('');}}},'거래처'),h('i',{},'›'),h('b',{},PDM_ON)),
+    box.replaceChildren(navBar(),h('div',{class:'asmcrumb'},h('button',{type:'button',on:{click:function(){go1('');}}},'거래처'),h('i',{},'›'),h('b',{},PDM_ON)),
       h('div',{class:'asmgrid asmvg'},h('div',{class:'asmtile asmv open'},face(PDM_ON,true),stg)));
     pdmHot(box);   /* v247 */
   }
   mainEl.replaceChildren(h('section',{class:'card'},h('div',{class:'stephead'},h('h2',{},BYKEY.pdm.title)),box));
+  pdmHistSync();   /* v253 */
   draw();pdmDraw=draw;   /* v233 등록 자료가 바뀌면 분류·단계 박스 다시 */
   pdmWatch(function(){if(pdmDraw===draw)draw();});   /* v236 링크·들어온 발주 */
   pdmShipWatch(redo);   /* v239 배송기사 공유 */
