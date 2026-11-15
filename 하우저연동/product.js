@@ -6,9 +6,8 @@ let 그룹 = null;
 const 그룹찾기 = async () => {
   if (그룹) return 그룹;
   const 나 = (await (await fetch("/api/account/v1/users/me", { credentials: "include" })).json()).data;
-  const 목 = (await (await fetch("/api/account/v1/users/" + (나.srl || 나.userSrl) + "/groups", { credentials: "include" })).json()).data;
-  const 줄 = Array.isArray(목) ? 목 : Object.values(목 || {}).find(Array.isArray) || [];
-  그룹 = 줄[0] && 줄[0].id; return 그룹;
+  const 목 = (await (await fetch("/api/account/v1/users/" + 나.srl + "/groups", { credentials: "include" })).json()).data;
+  그룹 = ((목 && 목.groups) || [])[0]; 그룹 = 그룹 && 그룹.srl; return 그룹;
 };
 const 구성품명 = async (r) => {
   const g = await 그룹찾기(); if (!g) return "";
