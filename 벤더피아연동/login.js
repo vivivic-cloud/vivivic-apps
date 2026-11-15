@@ -29,7 +29,7 @@
      이 고침은 **새로고침만으로** 먹어야 한다. 그게 핵심이다. */
 /* ⚠⚠ 화면글 판은 **여기 한 군데서만** 적는다. `manifest.json` 의 version 과 **늘 같이** 올려라
    (배포 차례에 적어 두었다). 두 군데서 적으면 반드시 어긋난다. */
-const VP_화면글판 = "0.34.97";   // ⚠ manifest.json 의 version 과 **같은 값**
+const VP_화면글판 = "0.34.98";   // ⚠ manifest.json 의 version 과 **같은 값**
 
 /* ⚠⚠ 10-22 「벤더피아」 단추가 여는 **새 창 오리지널**의 표식을 보는 물음. 새 창(`window.name === "vp원본"`)과 그 안 모든 frame 에서는
    우리 글이 **하나도 돌지 않아야** 한다. 1차로 `불러오기.js`·`짚개.js`(확장 안)가 막고, 이 물음은 login.js 가 한 번 더 막는 안전망이다.
@@ -394,4 +394,58 @@ const ERP계정 = (() => {
   단추.addEventListener("mouseleave", 또렷(false));
   단추.addEventListener("click", (e) => e.stopPropagation());     // 벤더피아 쪽 클릭 처리에 안 닿게
   document.documentElement.appendChild(단추);                     // 몸이 아니라 뿌리에 (`#vp-바꾸기` 와 같다)
+})();
+
+/* ⚠⚠ 11-15 [구글 계정 로그인] 사장님: 「구글 계정으로 로그인을 붙이고, 승인된 구글 계정만 사용할 수 있게」 (0.34.98)
+   벤더피아연동(우리 화면)을 쓰기 전에 **구글 계정 로그인 + 승인 명단 확인**을 한 번 거친다. 벤더피아 로그인은 그대로 그 뒤에.
+   · 구글 로그인은 이 창이 아니라 **github.io 작은 창**(`구글로그인.html`)에서 한다 — 벤더피아 주소는 파이어베이스 허용 주소가 아니고,
+     구글 토큰을 벤더피아 쪽에 두지 않기 위해서다. 작은 창이 승인 명단(파이어스토어 `erp_gok/<이메일>`, 영림원외주입력과 같은 명단)을
+     **서버 규칙으로** 확인하고 결과(이메일·이름)만 이 창에 보낸다(`postMessage`, 보낸 곳 = vivivic-cloud.github.io 만 받음, 한 번 쓰는 표 n).
+   · 통과 = 이 벤더피아 출처 localStorage `vg.구글문` {email,name,until} — **12시간** 뒤 다시 확인(사용중지는 늦어도 12시간 뒤 먹음).
+     ⚠ 확장은 우리 서버가 없어 이 문은 화면 막음이다(벤더피아 자료 자체는 벤더피아 로그인이 지킨다). 서버 확인은 작은 창 쪽 규칙.
+   · 승인 안 됨 = 「승인되지 않은 계정입니다」.
+   · 새 창 오리지널(`VP원본창`)은 벤더피아 그 자체라 문을 안 띄운다.
+   · `VG_구글문켬` = false 동안(파이어베이스 구글 로그인 켜기 전 전환 기간)은 문이 안 뜬다 — 시험만 주소 끝 `vg구글=1`(이 탭에서 계속). 켜는 법 = 벤더피아연동/CLAUDE.md */
+const VG_구글문켬 = false;
+(() => {
+  if (window.VP원본창()) return;
+  if (!document.body || document.body.tagName === "FRAMESET") return;
+  try { if (/[?&#]vg구글=1/.test(decodeURIComponent(location.href))) sessionStorage.setItem("vg.구글시험", "1"); } catch (e) {}
+  let 시험 = false;
+  try { 시험 = sessionStorage.getItem("vg.구글시험") === "1" || window.top.sessionStorage.getItem("vg.구글시험") === "1"; } catch (e) {}
+  if (!VG_구글문켬 && !시험) return;
+  const 열쇠 = "vg.구글문", 창주소 = "https://vivivic-cloud.github.io/vivivic-apps/%EB%B2%A4%EB%8D%94%ED%94%BC%EC%95%84%EC%97%B0%EB%8F%99/%EA%B5%AC%EA%B8%80%EB%A1%9C%EA%B7%B8%EC%9D%B8.html";
+  const 지금표 = () => { try { const v = JSON.parse(localStorage.getItem(열쇠) || "null"); return v && v.email && v.until > Date.now() ? v : null; } catch (e) { return null; } };
+  window.VG구글 = () => 지금표();
+  window.VG구글나가기 = () => { try { localStorage.removeItem(열쇠); } catch (e) {} location.reload(); };
+  if (지금표()) return;
+  const 문 = document.createElement("div");
+  문.id = "vg-구글문";
+  문.style.cssText = "position:fixed;inset:0;z-index:2147482500;background:#fff;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;"
+    + "font-family:Inter,-apple-system,'Apple SD Gothic Neo',sans-serif;color:#37352f";
+  문.innerHTML = '<div style="width:100%;max-width:340px">'
+    + '<h1 style="font-size:26px;font-weight:900;margin:0 0 8px;letter-spacing:-.02em">벤더피아연동</h1>'
+    + '<p style="margin:0 0 20px;font-size:14px;color:#787774">승인된 구글 계정으로 로그인한 뒤 사용할 수 있습니다.</p>'
+    + '<button type="button" style="width:100%;padding:14px;border:0;border-radius:12px;background:#37352f;color:#fff;font-size:15px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px">'
+    + '<svg viewBox="0 0 48 48" width="18" height="18" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg>'
+    + '<span>구글 계정으로 로그인</span></button>'
+    + '<p class="vg-구글말" aria-live="polite" style="margin:12px 0 0;font-size:13px;font-weight:700;color:#d44c47;min-height:1em"></p></div>';
+  document.documentElement.appendChild(문);                         // 뿌리에 — `vp-clean` 감추기에 안 걸린다
+  const 말 = 문.querySelector(".vg-구글말"), 단추 = 문.querySelector("button");
+  const 풀기 = () => { 문.remove(); };
+  addEventListener("storage", (e) => { if (e.key === 열쇠 && 지금표()) 풀기(); });
+  let 표 = "";
+  addEventListener("message", (e) => {
+    if (e.origin !== "https://vivivic-cloud.github.io" || !e.data || e.data.__vg !== "구글문" || !표 || e.data.n !== 표) return;
+    if (e.data.ok === true && e.data.email) {
+      try { localStorage.setItem(열쇠, JSON.stringify({ email: String(e.data.email), name: String(e.data.name || ""), until: Date.now() + 12 * 3600 * 1000 })); } catch (err) {}
+      풀기();
+    } else 말.textContent = e.data.email ? "승인되지 않은 계정입니다. (" + e.data.email + ")" : (e.data.말 || "로그인하지 못했습니다.");
+  });
+  단추.addEventListener("click", (e) => {
+    e.stopPropagation(); 말.textContent = "";
+    표 = Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, "0")).join("");
+    const w = window.open(창주소 + "#n=" + 표, "vg구글", "width=480,height=640");
+    if (!w) 말.textContent = "팝업이 막혔습니다. 이 주소의 팝업을 허용한 뒤 다시 누르세요.";
+  });
 })();

@@ -1,0 +1,78 @@
+<!doctype html>
+<!-- 벤더피아연동 구글 계정 로그인 작은 창 v1 (2026-11-15, 확장 화면글 0.34.98)
+     벤더피아 화면의 「구글 계정으로 로그인」(login.js 맨 아래)이 이 창을 연다. 여기서 구글 로그인(파이어베이스 vivivic-4b7ef) →
+     승인 명단 erp_gok/<이메일 소문자> 를 서버 규칙으로 읽어 확인 → 결과(이메일·이름·통과 여부)만 연 창(벤더피아)에 보내고 닫힌다.
+     구글 토큰은 이 창(github.io)에만 있고 벤더피아 쪽에는 안 간다. 명단은 영림원외주입력 「관리자 › 아이디관리」 와 같은 것. -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>구글 계정 로그인</title>
+<style>
+:root{--ink:#37352f;--muted:#787774;--fill:#f1f1ef;--line:#e3e2e0;--bad:#d44c47}
+*{box-sizing:border-box}
+html,body{margin:0;background:#fff;color:var(--ink);font-family:Inter,-apple-system,"Apple SD Gothic Neo",sans-serif}
+main{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+.box{width:100%;max-width:340px}
+h1{font-size:26px;font-weight:900;margin:0 0 8px;letter-spacing:-.02em}
+p{margin:0 0 20px;font-size:14px;color:var(--muted)}
+button{width:100%;padding:14px;margin-top:4px;border:0;border-radius:12px;background:var(--ink);color:#fff;font-size:15px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px}
+button.sub{background:var(--fill);color:var(--ink);font-weight:700}
+button[disabled]{opacity:.6;cursor:default}
+button svg{width:18px;height:18px;flex:none}
+#msg{margin:12px 0 0;font-size:13px;font-weight:700;color:var(--bad);min-height:1em}
+#msg.ok{color:var(--muted)}
+</style>
+</head>
+<body>
+<main><div class="box">
+  <h1>벤더피아연동</h1>
+  <p id="sub">승인된 구글 계정으로 로그인합니다.</p>
+  <button id="go" type="button" disabled><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg><span>구글 계정으로 로그인</span></button>
+  <p id="msg" aria-live="polite"></p>
+</div></main>
+<script type="module">
+const FB_CONFIG={apiKey:"AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",authDomain:"vivivic-4b7ef.firebaseapp.com",projectId:"vivivic-4b7ef",storageBucket:"vivivic-4b7ef.firebasestorage.app",messagingSenderId:"830175660542",appId:"1:830175660542:web:9054030480c8280af8d8af"};
+const V='https://www.gstatic.com/firebasejs/11.2.0/';
+const go=document.getElementById('go'),msg=document.getElementById('msg');
+const say=(t,ok)=>{msg.textContent=t||'';msg.className=ok?'ok':'';};
+const n=(/[#&]n=([0-9a-f]{8,64})/.exec(location.hash)||[])[1]||'';
+/* 연 창(벤더피아)에만 결과를 보낸다 — 받을 곳을 벤더피아 두 주소로 못 박는다. 연 창이 없으면(주소로 바로 열면) 이 창에 결과만 보인다. */
+const tell=(o)=>{if(!window.opener||!n)return false;['https://vendorpia.com','https://www.vendorpia.com'].forEach(t=>{try{window.opener.postMessage(Object.assign({__vg:'구글문',n},o),t);}catch(e){}});return true;};
+const gErr=(e)=>{const c=e&&e.code||'';
+  if(/popup-closed-by-user|cancelled-popup-request/.test(c))return '';
+  if(/popup-blocked/.test(c))return '팝업이 막혔습니다. 이 주소의 팝업을 허용한 뒤 다시 누르세요.';
+  if(/operation-not-allowed/.test(c))return '구글 로그인이 아직 켜지지 않았습니다(관리자 설정 전).';
+  if(/unauthorized-domain/.test(c))return '이 주소가 구글 로그인 허용 주소에 없습니다(관리자 설정 전).';
+  if(/network/.test(c))return '인터넷 연결을 확인하세요.';
+  return '로그인하지 못했습니다. ('+(c||'알 수 없음')+')';};
+try{
+  const [A,B,F]=await Promise.all([import(V+'firebase-app.js'),import(V+'firebase-auth.js'),import(V+'firebase-firestore.js')]);
+  const app=A.initializeApp(FB_CONFIG,'vp-gate'),auth=B.getAuth(app),fs=F.getFirestore(app);
+  let busy=false;
+  /* 승인 확인 — 영림원외주입력 erpGokCheck 와 같은 식: 내 줄을 읽고, 없으면 만들어 본다(규칙이 첫 관리자만 허락) */
+  const check=async(u)=>{const em=String(u.email||'').toLowerCase();if(!em||!u.emailVerified)return false;const ref=F.doc(fs,'erp_gok',em);
+    try{const d=await F.getDoc(ref);if(d.exists())return d.data().on===true;}catch(e){return false;}
+    try{await F.setDoc(ref,{on:true,name:u.displayName||'',at:new Date().toISOString(),by:em});return true;}catch(e){return false;}};
+  B.onAuthStateChanged(auth,async(u)=>{
+    if(busy)return;
+    if(!u||u.isAnonymous||!(u.providerData||[]).some(p=>p.providerId==='google.com')){go.disabled=false;return;}
+    busy=true;go.disabled=true;say('승인 명단을 확인하는 중…',true);
+    const ok=await check(u);busy=false;
+    if(ok){
+      document.getElementById('sub').textContent=(u.email||'')+' 로 로그인했습니다.';
+      if(tell({ok:true,email:u.email,name:u.displayName||''})){say('벤더피아연동으로 돌아갑니다.',true);setTimeout(()=>window.close(),400);}
+      else say('승인된 계정입니다. 이 창은 닫아도 됩니다.',true);
+      return;
+    }
+    tell({ok:false,email:u.email||''});
+    await B.signOut(auth);
+    say('승인되지 않은 계정입니다. ('+(u.email||'')+')');go.disabled=false;
+  });
+  go.addEventListener('click',async()=>{say('');go.disabled=true;
+    try{const pv=new B.GoogleAuthProvider();pv.setCustomParameters({prompt:'select_account'});await B.signInWithPopup(auth,pv);}
+    catch(e){const t=gErr(e);say(t);if(t)tell({ok:false,말:t});go.disabled=false;}});
+}catch(e){say('로그인 도구를 불러오지 못했습니다. 인터넷 연결을 확인하세요.');console.warn(e);}
+</script>
+</body>
+</html>

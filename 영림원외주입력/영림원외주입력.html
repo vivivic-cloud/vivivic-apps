@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v258 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v259 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -406,7 +406,7 @@ table.asmt tr.chg td{background:var(--amber-bg)}table.asmt tr.off td{color:var(-
 .stktabs{margin:0 0 10px}.stkbox th{height:28px}.stkbox thead tr+tr th{top:28px}.stkbox th[colspan]{text-align:center}
 /* v115 담당자 로그인·담당자 관리 */
 #erp-login{position:fixed;inset:0;z-index:300;background:#fff;display:grid;place-items:center;padding:16px}
-#erp-login form{width:min(360px,100%);display:grid;gap:10px}#erp-login h2{margin:0 0 4px;font-size:18px;font-weight:900;letter-spacing:-0.02em}
+#erp-login form,#erp-login .gbox{width:min(360px,100%);display:grid;gap:10px}#erp-login .gbtn{display:flex;align-items:center;justify-content:center;gap:10px}#erp-login .gbtn svg{width:18px;height:18px;flex:none}#erp-login .old{width:min(360px,100%);margin-top:14px;font-size:13px;color:var(--muted)}#erp-login .old summary{cursor:pointer;font-weight:700}#erp-login .old form{margin-top:10px}#erp-login .wrap{display:grid;justify-items:center}#erp-login h2{margin:0 0 4px;font-size:18px;font-weight:900;letter-spacing:-0.02em}
 .who{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);font-weight:700;min-width:0}
 .who span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .staffbox h3{font-size:14px;font-weight:900;margin:22px 0 6px}.staffbox h3:first-child{margin-top:4px}
@@ -453,7 +453,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v258</span>
+    <span class="ver">v259</span>
   </div>
 </header>
 <div class="wrap">
@@ -491,24 +491,63 @@ function erpLoginErr(e){var c=e&&e.code||'';
   if(/too-many-requests/.test(c))return '여러 번 틀려 잠시 막혔습니다. 잠시 뒤 다시 하세요.';
   if(/network/.test(c))return '인터넷 연결을 확인하세요.';
   return '로그인하지 못했습니다. ('+(c||'알 수 없음')+')';}
-function erpLoginUI(go){
-  var box=document.getElementById('erp-login');if(box){box.hidden=false;return;}
-  box=document.createElement('div');box.id='erp-login';
-  box.innerHTML='<form class="card"><h2>벤더피아 로그인</h2><input type="text" name="vpid" placeholder="아이디" autocomplete="username" autocapitalize="off" required><input type="password" name="vppw" placeholder="비밀번호" autocomplete="current-password" required><button class="btn primary" type="submit">로그인</button><p class="msg bad" aria-live="polite"></p></form>';
-  document.body.append(box);
-  var fm=box.querySelector('form'),msg=box.querySelector('.msg'),bt=box.querySelector('button'),idIn=fm.elements.vpid,pwIn=fm.elements.vppw;
-  fm.addEventListener('submit',function(e){e.preventDefault();msg.textContent='';bt.disabled=true;
-    go(idIn.value,pwIn.value).then(function(){box.hidden=true;pwIn.value='';},function(err){msg.textContent=erpLoginErr(err);})
-      .then(function(){bt.disabled=false;});});
-  idIn.focus();
+/* v259 구글 계정 로그인 + 승인 명단(2026-11-15 사장님 「구글 계정으로 로그인 · 승인된 구글 계정만」).
+   승인 명단 = 파이어스토어 erp_gok/<구글 이메일 소문자> {on, name, at, by}. 관리자 › 아이디관리 「구글 계정 승인 명단」 에서 추가·사용중지.
+   확인은 서버(저장소 규칙 gOk) — 명단에 없거나 사용중지면 이 폼의 erp_ 자료를 읽지도 쓰지도 못한다. 이 화면의 막음은 안내일 뿐.
+   첫 관리자(사장님) 이메일은 규칙에만 있다(배포 때 넣음, 저장소에 안 씀) — 그 계정은 처음 로그인 때 제 명단 줄을 만들고 관리자가 된다.
+   ERP_GOOGLE_ONLY=false 인 동안(전환 기간: 파이어베이스 구글 로그인 켜기 전) 옛 「벤더피아 아이디로 로그인」 도 접어 둔다. 켜면 true 로 + 규칙 전환본 배포(CLAUDE.md). */
+var ERP_GOOGLE_ONLY=false;
+var ERP_G_SVG='<svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg>';
+function erpGErr(e){var c=e&&e.code||'';
+  if(/popup-closed-by-user|cancelled-popup-request/.test(c))return '';
+  if(/popup-blocked/.test(c))return '팝업이 막혔습니다. 이 주소의 팝업을 허용한 뒤 다시 누르세요.';
+  if(/operation-not-allowed/.test(c))return '구글 로그인이 아직 켜지지 않았습니다(관리자 설정 전).';
+  if(/unauthorized-domain/.test(c))return '이 주소가 구글 로그인 허용 주소에 없습니다(관리자 설정 전).';
+  if(/network/.test(c))return '인터넷 연결을 확인하세요.';
+  return '로그인하지 못했습니다. ('+(c||'알 수 없음')+')';}
+function erpLoginUI(g,old,msgText){
+  var box=document.getElementById('erp-login');
+  if(!box){
+    box=document.createElement('div');box.id='erp-login';
+    box.innerHTML='<div class="wrap"><div class="gbox card"><h2>로그인</h2><button class="btn primary gbtn" type="button">'+ERP_G_SVG+'<span>구글 계정으로 로그인</span></button><p class="msg bad gmsg" aria-live="polite"></p></div>'+
+      (ERP_GOOGLE_ONLY?'':'<details class="old"><summary>전환 기간 — 벤더피아 아이디로 로그인</summary><form><input type="text" name="vpid" placeholder="아이디" autocomplete="username" autocapitalize="off" required><input type="password" name="vppw" placeholder="비밀번호" autocomplete="current-password" required><button class="btn" type="submit">로그인</button><p class="msg bad" aria-live="polite"></p></form></details>')+'</div>';
+    document.body.append(box);
+    var gb=box.querySelector('.gbtn'),gm=box.querySelector('.gmsg');
+    gb.addEventListener('click',function(){gm.textContent='';gb.disabled=true;
+      g().then(null,function(err){gm.textContent=erpGErr(err);}).then(function(){gb.disabled=false;});});
+    var fm=box.querySelector('form');
+    if(fm){var msg=fm.querySelector('.msg'),bt=fm.querySelector('button'),idIn=fm.elements.vpid,pwIn=fm.elements.vppw;
+      fm.addEventListener('submit',function(e){e.preventDefault();msg.textContent='';bt.disabled=true;
+        old(idIn.value,pwIn.value).then(function(){pwIn.value='';},function(err){msg.textContent=erpLoginErr(err);})
+          .then(function(){bt.disabled=false;});});}
+  }
+  box.hidden=false;box.querySelector('.gmsg').textContent=msgText||'';
 }
-/* 로그인될 때까지 기다린다. 예전 익명 로그인이 남아 있으면 끊고 로그인 칸을 띄운다. */
-function erpSignIn(A,auth){return new Promise(function(res){var done=false;
+/* 승인 확인 — 내 명단 줄을 읽는다(규칙: 내 이메일 줄만 읽힘). 없으면 만들어 본다(규칙이 첫 관리자만 허락) → 되면 첫 관리자.
+   돌려줌 = 'ok' | 'boss' | 'no' */
+function erpGokCheck(F,fs,u){var em=String(u.email||'').toLowerCase(),ref=F.doc(fs,'erp_gok',em);
+  if(!em||!u.emailVerified)return Promise.resolve('no');
+  return F.getDoc(ref).then(function(d){
+    if(d.exists())return d.data().on===true?'ok':'no';
+    return F.setDoc(ref,{on:true,name:u.displayName||'',at:new Date().toISOString(),by:em}).then(function(){return 'boss';},function(){return 'no';});
+  },function(){return 'no';});}
+/* 로그인될 때까지 기다린다. 구글 = 승인 명단 확인 · 옛 벤더피아 계정 = 전환 기간에만 · 익명은 끊는다. */
+function erpSignIn(A,auth,F,fs){return new Promise(function(res){var done=false,busy=false;
+  var gGo=function(){var pv=new A.GoogleAuthProvider();pv.setCustomParameters({prompt:'select_account'});return A.signInWithPopup(auth,pv);};
+  var oldGo=function(id,pw){return erpKey(id,pw).then(function(p){return A.signInWithEmailAndPassword(auth,erpMail(id),p);});};
+  var note='',ui=function(t){if(t!=null)note=t;erpLoginUI(gGo,oldGo,note);};   /* 끊은 뒤 다시 불려도 안내 글이 남게 */
+  var pass=function(u,st){done=true;var b=document.getElementById('erp-login');if(b)b.hidden=true;u.erpGok=st;res(u);};
   A.onAuthStateChanged(auth,function(u){
-    if(done)return;
-    if(u&&!u.isAnonymous){done=true;var b=document.getElementById('erp-login');if(b)b.hidden=true;res(u);return;}
-    if(u){A.signOut(auth);return;}
-    erpLoginUI(function(id,pw){return erpKey(id,pw).then(function(p){return A.signInWithEmailAndPassword(auth,erpMail(id),p);});});
+    if(done||busy)return;
+    if(!u){ui();return;}
+    if(u.isAnonymous){A.signOut(auth);return;}
+    var pr=(u.providerData||[]).map(function(x){return x.providerId;});
+    if(pr.indexOf('google.com')>=0){busy=true;
+      erpGokCheck(F,fs,u).then(function(st){busy=false;
+        if(st==='no'){A.signOut(auth);ui('승인되지 않은 계정입니다. ('+(u.email||'')+')');return;}
+        pass(u,st);});return;}
+    if(!ERP_GOOGLE_ONLY){pass(u,'old');return;}
+    A.signOut(auth);ui('이제 구글 계정으로 로그인합니다.');
   });});}
 /* 화면 쪽 권한 막음 — 저장소 규칙이 배포되기 전에도 폼 안에서는 막힌다. ERP_CAN 은 아래 화면 코드가 채운다. */
 function erpPermErr(){var e=new Error('권한이 없습니다.');e.code='erp-perm';return e;}
@@ -517,8 +556,9 @@ function connectDb(){
   var V='https://www.gstatic.com/firebasejs/11.2.0/';
   return Promise.all([import(V+'firebase-app.js'),import(V+'firebase-auth.js'),import(V+'firebase-firestore.js')]).then(function(m){
     var app=m[0].initializeApp(FB_CONFIG,'erp-input'),auth=m[1].getAuth(app),F=m[2],fs=F.getFirestore(app);
-    return erpSignIn(m[1],auth).then(function(user){
-      ERP_USER={uid:user.uid,mail:user.email||'',id:erpIdOf(user.email)};
+    return erpSignIn(m[1],auth,F,fs).then(function(user){
+      var gU=user.erpGok!=='old';
+      ERP_USER={uid:user.uid,mail:user.email||'',id:gU?String(user.email||'').toLowerCase():erpIdOf(user.email),google:gU,boss:user.erpGok==='boss',name:user.displayName||''};   /* v259 구글 = 아이디 칸에 구글 이메일 */
       window.erpOut=function(){return m[1].signOut(auth).then(function(){location.reload();});};
       var staffRef=function(uid){return F.doc(fs,'erp_staff',uid);};
       /* 화면 코드가 쓰는 모양(collection/doc/add/update/delete/onSnapshot)만 맞춘 얇은 껍데기 */
@@ -552,7 +592,9 @@ function connectDb(){
       staffAll:function(next,err){return F.onSnapshot(F.collection(fs,'erp_staff'),function(s){next(s.docs.map(function(d){return Object.assign({uid:d.id},d.data());}));},err);},
       staffSet:function(uid,o){return F.setDoc(staffRef(uid),o,{merge:true});},
       staffSeen:function(){var r=staffRef(user.uid),now=new Date().toISOString();
-        return F.getDoc(r).then(function(d){return d.exists()?F.updateDoc(r,{lastAt:now}):F.setDoc(r,{vpId:ERP_USER.id,email:ERP_USER.mail,firstAt:now,lastAt:now});});},
+        return F.getDoc(r).then(function(d){return d.exists()?F.updateDoc(r,{lastAt:now}):F.setDoc(r,ERP_USER.google?{email:ERP_USER.mail,name:ERP_USER.name,firstAt:now,lastAt:now}:{vpId:ERP_USER.id,email:ERP_USER.mail,firstAt:now,lastAt:now});});},   /* v259 구글 계정 줄 = email·name */
+      gokAll:function(next,err){return F.onSnapshot(F.collection(fs,'erp_gok'),function(s){next(s.docs.map(function(d){return Object.assign({email:d.id},d.data());}));},err);},   /* v259 구글 계정 승인 명단(관리자만 읽힘) */
+      gokSet:function(em,o){return F.setDoc(F.doc(fs,'erp_gok',em),o,{merge:true});},
       updateAll:function(list,decide){for(var gi=0;gi<list.length;gi++){var g=erpGuard(list[gi].c,'w');if(g)return g;}var refs=list.map(function(x){return F.doc(fs,x.c,x.id);});return F.runTransaction(fs,function(t){
         return Promise.all(refs.map(function(r){return t.get(r);})).then(function(ds){var o=decide(ds.map(function(d){return d.exists()?d.data():null;}));if(!o)return false;
           o.forEach(function(p,i){if(p&&p.$delete&&window.ERP_CAN&&!window.ERP_CAN(list[i].c,'d'))throw erpPermErr();});o.forEach(function(p,i){if(!p)return;if(p.$delete)t.delete(refs[i]);else if(p.$set)t.set(refs[i],p.$set);else t.update(refs[i],p);});return true;});});}};   /* v96 $delete·$set = 5 자재 합치기·되돌리기 */
@@ -7889,10 +7931,37 @@ function renderIds(){
     box.replaceChildren(me,h('h3',{},'아이디 '+list.length+'개'),!STAFF?h('p',{class:'msg'+(STAFF_ERR?' bad':'')},STAFF_ERR?'아이디 목록을 읽지 못했습니다.':'불러오는 중'):
       h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},['아이디','이름','구분','관리자','보기 메뉴','첫 로그인','마지막 로그인'].map(function(t,i){return h('th',{class:i===3||i===4?'c':null},t);}))),
         h('tbody',{},list.map(function(x){var nr=MENUS.filter(function(m){return (permOf(x.perms,m.k)||{}).r;}).length;
-          return h('tr',{class:ERP_USER&&x.uid===ERP_USER.uid?'sel':null},h('td',{},x.agent===true?'uid 끝 '+String(x.uid).slice(-4):(x.vpId||'—')),h('td',{},x.name||'—'),h('td',{},x.agent===true?'입력 작업자':'담당자'),
+          return h('tr',{class:ERP_USER&&x.uid===ERP_USER.uid?'sel':null},h('td',{},x.agent===true?'uid 끝 '+String(x.uid).slice(-4):(x.vpId||x.email||'—')),h('td',{},x.name||'—'),h('td',{},x.agent===true?'입력 작업자':x.vpId?'담당자(벤더피아 아이디)':'담당자'),
             h('td',{class:'c'},x.admin===true?'관리자':'—'),h('td',{class:'c'},x.admin===true?'전체':nr+' / '+MENUS.length),h('td',{},staffTime(x.firstAt)),h('td',{},staffTime(x.lastAt)));})))));};
-  mainEl.replaceChildren(h('section',{class:'card'},h('div',{class:'stephead'},h('h2',{},BYKEY.ids.title)),box));
+  var gbox=h('div',{class:'staffbox'});
+  mainEl.replaceChildren(h('section',{class:'card'},h('div',{class:'stephead'},h('h2',{},BYKEY.ids.title)),box,gbox));
   idsDraw();
+  gokView(gbox);
+}
+/* v259 구글 계정 승인 명단 — erp_gok/<이메일 소문자> {on,name,at,by}. 명단에 있고 「사용」 인 구글 계정만 로그인 뒤 쓸 수 있다(저장소 규칙이 막음).
+   추가 = 이메일·이름 · 사용중지/다시 사용 = on 만 바꿈(지우지 않음). 사용중지는 그 사람이 다음에 자료를 읽거나 쓸 때부터 막힌다. */
+var GOK=null,gokUn=null;
+function gokView(box){
+  if(gokUn){gokUn();gokUn=null;}
+  var msg=h('p',{class:'msg','aria-live':'polite'}),emIn=h('input',{type:'email',placeholder:'구글 이메일',autocomplete:'off',autocapitalize:'off',style:'flex:1 1 240px;width:auto;min-width:0'}),nmIn=h('input',{type:'text',placeholder:'이름',style:'flex:0 1 140px;width:auto;min-width:0'});
+  var say=function(t,bad){msg.textContent=t||'';msg.className='msg'+(bad?' bad':'');};
+  var add=h('button',{type:'button',class:'btn small primary',on:{click:function(){var em=emIn.value.trim().toLowerCase();
+    if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){say('이메일을 확인하세요.',true);return;}
+    add.disabled=true;db.gokSet(em,{on:true,name:nmIn.value.trim(),at:new Date().toISOString(),by:ERP_USER&&ERP_USER.mail||''}).then(function(){emIn.value='';nmIn.value='';say('추가했습니다.');},function(e){say('저장하지 못했습니다. ('+(e&&e.code||e)+')',true);}).then(function(){add.disabled=false;});}}},'추가');
+  var tb=h('div');
+  var draw=function(){if(cur!=='ids')return;
+    var list=(GOK||[]).slice().sort(function(a,b){return String(a.at||'').localeCompare(String(b.at||''));});
+    tb.replaceChildren(!GOK?h('p',{class:'msg'},'불러오는 중'):!list.length?h('p',{class:'msg'},'명단이 비어 있습니다.'):
+      h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},['구글 이메일','이름','상태','추가한 때',''].map(function(t,i){return h('th',{class:i===2||i===4?'c':null},t);}))),
+        h('tbody',{},list.map(function(x){var on=x.on===true;
+          return h('tr',{class:ERP_USER&&x.email===ERP_USER.id?'sel':null},h('td',{},x.email),h('td',{},x.name||'—'),h('td',{class:'c'},h('span',{class:'pill'+(on?' ok':' err')},on?'사용':'사용중지')),h('td',{},staffTime(x.at)),
+            h('td',{class:'c'},h('button',{type:'button',class:'btn small',on:{click:function(ev){var b=ev.currentTarget;
+              if(on&&ERP_USER&&x.email===ERP_USER.id&&!confirm('내 계정을 사용중지하면 이 폼을 더는 못 씁니다. 그래도 할까요?'))return;
+              b.disabled=true;db.gokSet(x.email,{on:!on}).then(function(){say(on?'사용중지했습니다.':'다시 사용으로 바꿨습니다.');},function(e){b.disabled=false;say('바꾸지 못했습니다. ('+(e&&e.code||e)+')',true);});}}},on?'사용중지':'다시 사용')));})))));};
+  box.replaceChildren(h('h3',{},'구글 계정 승인 명단'),h('p',{class:'msg'},'명단에 있고 「사용」 인 구글 계정만 로그인해 쓸 수 있습니다.'),
+    h('div',{class:'staffbar'},emIn,nmIn,add),msg,tb);
+  draw();
+  if(db&&db.gokAll)gokUn=db.gokAll(function(l){GOK=l;draw();},function(e){GOK=[];draw();say('명단을 읽지 못했습니다. ('+(e&&e.code||e)+')',true);});
 }
 var PERM_SPLIT={'구매':1};   /* v121 사장님 「요청 품의 발주 단계가 있는 폼을 각각 분리 통합」 — 구매 화면마다 따로 권한(요청만·품의만). 옛 'p:구매' 권한은 permOf 가 구매 화면 모두로 읽는다(담당자 관리에서 다시 저장하면 화면별로 바뀜) */
 function permOf(perms,k){perms=perms||{};if(perms[k])return perms[k];var s=BYKEY[k];return s&&s.page&&PERM_SPLIT[s.page]?perms['p:'+s.page]||null:null;}
@@ -7972,7 +8041,7 @@ function staffParts(){
     h('tbody',{},list.map(function(x){
       var nr=MENUS.filter(function(m){return (permOf(x.perms,m.k)||{}).r;}).length;
       return h('tr',{class:x.uid===STAFF_SEL?'sel':null},
-        h('td',{},x.name||'—'),h('td',{},x.agent===true?'uid 끝 '+String(x.uid).slice(-4):(x.vpId||'—')),   /* v127 입력 작업자 줄 = 아이디 대신 uid 끝 4자리 */h('td',{class:'c'},x.admin===true?'관리자':'—'),
+        h('td',{},x.name||'—'),h('td',{},x.agent===true?'uid 끝 '+String(x.uid).slice(-4):(x.vpId||x.email||'—')),   /* v127 입력 작업자 줄 = 아이디 대신 uid 끝 4자리 */h('td',{class:'c'},x.admin===true?'관리자':'—'),
         h('td',{class:'c'},x.admin===true?'전체':nr+' / '+MENUS.length),
         h('td',{},h('button',{type:'button',class:'btn small',on:{click:function(){staffFolder(x);}}},ico('link'),x.folder&&x.folder.url?'지정됨':'공유 폴더')),
         h('td',{},staffTime(x.firstAt)),h('td',{},staffTime(x.lastAt)),
@@ -7995,7 +8064,7 @@ function staffEditor(x){
     var c=h('input',{type:'checkbox',checked:D.admin||D.perms[m.k][o[0]],disabled:D.admin,'aria-label':m.t+' '+o[1],on:{change:function(){setOp(m.k,o[0],c.checked);staffDraw();}}});
     return h('td',{class:'c'},c);}));});
   var save=h('button',{type:'button',class:'btn primary',on:{click:function(){
-    var name=D.name.trim(),who=name||x.vpId||'';
+    var name=D.name.trim(),who=name||x.vpId||x.email||'';
     if(!confirm(who+' 권한을 저장합니다.'))return;
     save.disabled=true;
     var perms=D.admin?{}:D.perms,o={name:name,admin:self?true:D.admin,perms:perms,cols:colPerms(perms),ok:D.admin||anyPerm(perms),permAt:new Date().toISOString(),permBy:ERP_USER?ERP_USER.id:''};
@@ -8003,7 +8072,7 @@ function staffEditor(x){
       .then(function(){save.disabled=false;staffDraw();});}}},'저장');
   if(STAFF_MSG){msg.textContent=STAFF_MSG[0];msg.className='msg'+STAFF_MSG[1];}
   var undo=h('button',{type:'button',class:'btn',on:{click:function(){STAFF_DRAFT=staffDraftOf(x);staffDraw();}}},'되돌리기');
-  return [h('h3',{},(x.name||x.vpId||'')+' 권한'),
+  return [h('h3',{},(x.name||x.vpId||x.email||'')+' 권한'),
     h('div',{class:'staffbar'},h('label',{},'이름',nameIn),h('label',{},adm,'관리자')),
     h('div',{class:'tw'},h('table',{},h('thead',{},head),h('tbody',{},body))),
     h('div',{class:'actions'},save,undo,msg)];
@@ -8021,7 +8090,7 @@ function staffFolder(x){
     save.disabled=true;
     db.staffSet(x.uid,{folder:u||m?{url:u,email:m,at:new Date().toISOString(),state:'공유 전'}:null}).then(function(){dlg.close();},function(e){save.disabled=false;msg.textContent='저장하지 못했습니다. '+errText(e);msg.className='msg bad';});}}},'저장');
   var share=h('button',{type:'button',class:'btn',disabled:true},'공유하기');
-  dlg.append(h('h3',{},'공유 폴더 · '+(x.name||x.vpId||'')),
+  dlg.append(h('h3',{},'공유 폴더 · '+(x.name||x.vpId||x.email||'')),
     h('div',{class:'f'},h('label',{},'폴더 링크'),url),h('div',{class:'f'},h('label',{},'구글 계정'),mail),
     h('div',{class:'actions'},save,share,h('button',{type:'button',class:'btn',on:{click:function(){dlg.close();}}},'닫기')),
     h('p',{class:'msg bad'},'공유하기 불가: 폼에는 사장님 구글 드라이브 공유 권한이 없습니다(확인 못 함 · 차후 판단).'),msg);
@@ -8068,7 +8137,7 @@ renderNav();renderSum();renderStep();refreshLists();
 dbP.then(function(d){
   db=d;
   if(db){   /* v115 내 권한 → 화면, 담당자 목록(관리자·첫 관리자 지정) */
-    db.staffSeen().catch(function(e){console.warn('담당자 기록 못 함',e);});
+    db.staffSeen().then(function(){if(ERP_USER&&ERP_USER.boss)return db.staffSet(ERP_USER.uid,{admin:true});}).catch(function(e){console.warn('담당자 기록 못 함',e);});   /* v259 첫 관리자(규칙의 사장님 이메일) = 관리자 */
     db.staffMe(function(me){var was=ME?JSON.stringify([ME.admin,ME.perms]):null;ME=me||{};erpTop();
       if(was!==JSON.stringify([ME.admin,ME.perms])){erpFixCur();renderNav();renderSum();renderStep();}},function(e){console.warn('내 권한 못 읽음',e);ME={};erpTop();renderNav();renderStep();});
     db.staffAll(function(list){STAFF=list;renderNav();if(cur==='staff'&&staffDraw)staffDraw();else if(cur==='ids'&&idsDraw)idsDraw();else if(ME&&!canMenu(menuOf(cur),'r'))renderStep();},function(){STAFF=null;STAFF_ERR=true;});
