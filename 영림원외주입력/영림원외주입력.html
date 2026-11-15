@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v245 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v246 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -438,7 +438,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v245</span>
+    <span class="ver">v246</span>
   </div>
 </header>
 <div class="wrap">
@@ -7392,7 +7392,7 @@ function pdmMakeView(v,redraw,done){   /* v238 생산중 — 발주확인 칸과
 function pdmInView(w,redraw){
   var ps=pdmInList(w);
   if(ps===undefined)return h('p',{class:'msg'},'불러오는 중…');
-  if(!ps.length){pdmScanStop();return h('div',{class:'empty'},'입고대기 발주가 없습니다.');}
+  if(!ps.length)return h('div',{},pdmScanBar(w,redraw),h('div',{class:'empty'},'입고대기 발주가 없습니다.'));   /* v246 빈 칸이어도 스캔 단추 그대로 */
   return h('div',{},pdmScanBar(w,redraw),ps.map(function(p){var k='in|'+p.pono+'|'+w,open=PDM_RCV&&PDM_RCV.k===k,f=p.flow,sk=PDM_SCAN[p.pono+'|'+w],sh=sk?(PDM_SHIPS||[]).filter(function(d){return d.id===sk;})[0]:null;   /* v239 스캔한 발주만 입고확인 */
     var head=pdmPoHead(p,[h('dt',{},'발주확인'),h('dd',{},pdmWhen(f.okAt)+(f.okBy?' · '+f.okBy:''))]);
     if(!open){
@@ -7441,9 +7441,31 @@ function pdmInView(w,redraw){
 /* v245 사장님 「구매처 입고처 모든박스에 확인버튼이 활성화된  누를 대기상태인건이 있으면 각 박스표면 해당확인을 해야한다는 메세지가 보여지게 해주세요 아무확인건이 없는 상태라면 해당 확인이 없다는 메세지가 보이게 해주세요. 확인해야할 메시지 상태에서는 메세지가 하일라이트 되며 해당 확인을 하도록 유도해 주세요.」
    할 일(박스 겉) = 구매처: 「발주확인」 칸 발주(단추 발주확인) · 「납품대기」 칸에서 발주수정을 아직 안 누른 발주(단추 발주수정) / 입고처(창고 박스): 「입고대기」 발주(스캔 → 입고확인).
    건수 = 그 칸 단추가 보이는 발주 수(같은 목록 함수). 강조 = 폼 .podwarn(구매납품 「남음」 알약) · 누르면 그 칸으로. 없으면 흐린 「확인할 건 없음」. 구매처·입고처가 아닌 박스(조립·가공만)는 안 붙임. */
+/* v246 사장님 「지금까지 만든 거래처별 박스는 해당 내용이 없어도 계속 빈박스 상태로 유지되게 해주세요. 지금까지 납품 논리로 발생된 모든 박스가 기본적으로 거래처 박스안에서 작업이 없더라도 유지 되어야 합니다.」
+   칸 = 업체 분류 기준(자료 건수와 상관없이 늘): 구매처(`pdmHasPur` — 구매 단서가 있으면 조립·가공을 같이 해도) = 발주확인·생산중·납품대기·납품완료 · 입고처(`pdmIsWh` 창고) = 입고대기·입고완료대기 · 조립처(`pdmIsAsm`) = 링크 복사·공유 + 들어온 발주. 미정(단서 없음)만 칸 없음.
+   v246 사장님 「입고처 수정된 발주가 있다면 구매처에서 수정확인 되어 완료가 될때까지 입고완료대기 박스에 남겨져 있어야 합니다.」 → 입고처 「입고완료대기」 = 그 창고 입고확인에서 입고수량을 고친 발주 중
+   그 발주의 발주수정(erp_pomods)이 「완료」(입력 작업자가 영림원 구매발주 수정까지 넣음 — 임시)가 아닌 것. 입고처 단추 없음. */
+function pdmHasPur(v){var ok=function(d){return d&&d.status!=='오류'&&!ylwGone(d);},t=function(x){return String(x==null?'':x).trim();},pur=false;
+  (data.purprices||[]).filter(ok).forEach(function(d){if(t(d.vendor)===v)pur=true;});
+  ['purords','purchases'].forEach(function(k){(data[k]||[]).filter(ok).forEach(function(d){(d.rows||[]).concat(d.pos||[]).forEach(function(r){if(r&&t(r.vendor)===v)pur=true;});});});
+  return pur;}
+var PDM_WH_DONE='입고완료대기';
+function pdmRecvChanged(r){return !!(r&&(r.items||[]).some(function(x){return Math.round((Number(x.qty)-Number(x.poqty||0))*100)/100!==0;}));}
+function pdmInDoneList(w){if(PDM_FLOW==null||PDM_SHIPS==null)return undefined;
+  return pdmPurPos(true).map(function(p){var sh=pdmShipOf(p.pono,w);if(!sh||!pdmRecvChanged(sh.recv))return null;var m=pdmModOf(p.pono);if(m&&m.status==='완료')return null;
+    return Object.assign({},p,{rows:p.rows.filter(function(x){return x.wh===w;}),flow:pdmFlowOf(p.pono),ship:sh,mod:m});}).filter(Boolean);}
+function pdmInDoneView(w){
+  var ps=pdmInDoneList(w);
+  if(ps===undefined)return h('p',{class:'msg'},'불러오는 중…');
+  if(!ps.length)return h('div',{class:'empty'},'입고완료대기 발주가 없습니다.');
+  return h('div',{},ps.map(function(p){var sh=p.ship,m=p.mod;
+    var head=pdmPoHead(p,[h('dt',{},'입고확인'),h('dd',{},pdmWhen(sh.recv.at)+(sh.recv.by?' · '+sh.recv.by:'')),sh.doneAt?[h('dt',{},'납품완료'),h('dd',{},pdmWhen(sh.doneAt))]:null,
+      h('dt',{},'구매처 발주수정'),h('dd',{},m?m.status:'발주수정 전')]);
+    return h('div',{class:'rowcard pdmpo'},head,h('div',{class:'sub pdmsub'},'입고확인'),pdmRecvRows(sh.recv));}));
+}
 function pdmModAble(p){return !pdmModOf(p.pono)&&pdmModRows(p).length>0;}
 function pdmTodo(v){   /* null = 구매처·입고처 아님 · undefined = 읽는 중 · [{stg,lab,n}] */
-  var pur=pdmKind(v)==='pur',wh=pdmIsWh(v);if(!pur&&!wh)return null;
+  var pur=pdmHasPur(v),wh=pdmIsWh(v);if(!pur&&!wh)return null;   /* v246 구매 단서면 구매처 */
   var out=[],ok,wt,il;
   if(pur){ok=pdmOkList(v);wt=pdmMakeList(v,'wait');if(ok===undefined||wt===undefined)return undefined;
     out.push({stg:'발주확인',lab:'발주확인',n:ok.length},{stg:'납품대기',lab:'발주수정',n:wt.filter(pdmModAble).length});}
@@ -7468,15 +7490,15 @@ function renderPdm(){
   function draw(){
     if(!box.isConnected){if(pdmDraw===draw)pdmDraw=null;pdmStop();return;}   /* v233 다른 메뉴로 갔으면 그만 · v236 링크 읽기도 끊음 */
     if(PDM_ON&&PDM_VENDORS.indexOf(PDM_ON)<0)PDM_ON='';
-    var pur=!!PDM_ON&&pdmKind(PDM_ON)==='pur',asm=!!PDM_ON&&pdmIsAsm(PDM_ON),wh=!!PDM_ON&&pdmIsWh(PDM_ON);   /* v237 창고 박스 = 입고대기 */
-    if(!((pur&&PDM_STAGES.indexOf(PDM_STG)>=0)||(asm&&PDM_STG===PDM_ASM_STG)||(wh&&PDM_STG===PDM_WH_STG)))PDM_STG='';
+    var pur=!!PDM_ON&&pdmHasPur(PDM_ON),asm=!!PDM_ON&&pdmIsAsm(PDM_ON),wh=!!PDM_ON&&pdmIsWh(PDM_ON);   /* v237 창고 박스 = 입고대기 */
+    if(!((pur&&PDM_STAGES.indexOf(PDM_STG)>=0)||(asm&&PDM_STG===PDM_ASM_STG)||(wh&&(PDM_STG===PDM_WH_STG||PDM_STG===PDM_WH_DONE))))PDM_STG='';
     if(PDM_SCANEL&&PDM_STG!==PDM_WH_STG)pdmScanStop();   /* v239 입고대기를 떠나면 카메라 끔 */
     if(PDM_RCV&&PDM_RCV.k.indexOf('in|')===0&&!(PDM_STG===PDM_WH_STG&&PDM_RCV.k.slice(PDM_RCV.k.lastIndexOf('|')+1)===PDM_ON))PDM_RCV=null;   /* 다른 박스로 가면 입고확인 단계 닫음 */
     pdmItemSync();pdmDlvSync();   /* v243 납품완료 → 구매납품입력 대기 */
     if(!PDM_ON){box.replaceChildren(h('div',{class:'asmgrid asmvg'},PDM_VENDORS.map(function(v){return h('div',{class:'asmtile asmv'},face(v,false));})));return;}
     if(PDM_STG){   /* v231 단계 박스를 누르면 그 박스만 */
       var sf=h('div',{class:'asmface',role:'button',tabindex:'0','aria-expanded':'true',on:{click:function(){go1(PDM_ON);},keydown:function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();go1(PDM_ON);}}}},h('b',{class:'asmtt asmvt'},PDM_STG));
-      var vn=PDM_ON,inner=PDM_STG===PDM_ASM_STG?h('div',{class:'asmin'},pdmPoList(vn)):PDM_STG===PDM_WH_STG?h('div',{class:'asmin'},pdmInView(vn,redo)):PDM_STG==='발주확인'?h('div',{class:'asmin'},pdmOkView(vn,redo)):PDM_STG==='생산중'?h('div',{class:'asmin'},pdmMakeView(vn,redo)):PDM_STG==='납품대기'?h('div',{class:'asmin'},pdmMakeView(vn,redo,'wait')):PDM_STG==='납품완료'?h('div',{class:'asmin'},pdmMakeView(vn,redo,'done')):null;   /* v238 생산중 */   /* v236 들어온 발주 · v237 발주확인·입고대기 */
+      var vn=PDM_ON,inner=PDM_STG===PDM_ASM_STG?h('div',{class:'asmin'},pdmPoList(vn)):PDM_STG===PDM_WH_STG?h('div',{class:'asmin'},pdmInView(vn,redo)):PDM_STG===PDM_WH_DONE?h('div',{class:'asmin'},pdmInDoneView(vn)):PDM_STG==='발주확인'?h('div',{class:'asmin'},pdmOkView(vn,redo)):PDM_STG==='생산중'?h('div',{class:'asmin'},pdmMakeView(vn,redo)):PDM_STG==='납품대기'?h('div',{class:'asmin'},pdmMakeView(vn,redo,'wait')):PDM_STG==='납품완료'?h('div',{class:'asmin'},pdmMakeView(vn,redo,'done')):null;   /* v238 생산중 */   /* v236 들어온 발주 · v237 발주확인·입고대기 */
       var fa=document.activeElement,fi=fa&&box.contains(fa)&&fa.getAttribute('data-pdmi'),fs=fi!=null&&fi!==false?[fa.selectionStart,fa.selectionEnd]:null;   /* 다시 그려도 입고수량 칸 커서 그대로 */
       box.replaceChildren(h('div',{class:'asmcrumb'},h('button',{type:'button',on:{click:function(){go1('');}}},'거래처'),h('i',{},'›'),h('button',{type:'button',on:{click:function(){go1(vn);}}},vn),h('i',{},'›'),h('b',{},PDM_STG)),
         h('div',{class:'asmgrid asmvg'},h('div',{class:'asmtile open'},sf,inner)));
@@ -7488,16 +7510,21 @@ function renderPdm(){
         g==='발주확인'||g==='생산중'||g==='납품대기'||g==='납품완료'?[h('span',{class:'asmn2'},ol===undefined?'…':String(ol.length)),stgTodo(PDM_ON,g),h('ul',{class:'asmnames'},(ol||[]).slice(0,6).map(function(p){return h('li',{},String((p.rows[0]||{}).cname||p.pono));}))]:null));}))):'';
     if(asm){   /* v236 조립업체 = 링크 복사·공유 + 「들어온 발주」 박스 */
       var ps=pdmPos(PDM_ON),g=PDM_ASM_STG;
-      stg=h('div',{class:'asmin'},pdmLinkBar(PDM_ON),h('div',{class:'asmgrid2'},h('div',{class:'asmtile'},h('div',{class:'asmface',role:'button',tabindex:'0',
+      var at=h('div',{class:'asmtile'},h('div',{class:'asmface',role:'button',tabindex:'0',
         on:{click:function(){go1(PDM_ON,g);},keydown:function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();go1(PDM_ON,g);}}}},
-        h('b',{class:'asmtt'},g),h('span',{class:'asmn2'},ps===undefined?'…':String(ps.length)),h('ul',{class:'asmnames'},(ps||[]).slice(0,6).map(function(p){return h('li',{},String(p.name||''));}))))));
+        h('b',{class:'asmtt'},g),h('span',{class:'asmn2'},ps===undefined?'…':String(ps.length)),ps&&!ps.length?pdmTodoNone():null,h('ul',{class:'asmnames'},(ps||[]).slice(0,6).map(function(p){return h('li',{},String(p.name||''));}))));
+      var ga=stg&&stg.querySelector?stg.querySelector('.asmgrid2'):null;   /* v246 구매처이기도 하면 칸을 덮지 않고 더함 */
+      if(ga){stg.insertBefore(pdmLinkBar(PDM_ON),ga);ga.append(at);}else stg=h('div',{class:'asmin'},pdmLinkBar(PDM_ON),h('div',{class:'asmgrid2'},at));
     }
     if(wh){   /* v237 창고 박스 = 「입고대기」(발주확인된 구매발주 중 줄 창고가 이 박스) */
       var il=pdmInList(PDM_ON),wt=h('div',{class:'asmtile'},h('div',{class:'asmface',role:'button',tabindex:'0',
         on:{click:function(){go1(PDM_ON,PDM_WH_STG);},keydown:function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();go1(PDM_ON,PDM_WH_STG);}}}},
         h('b',{class:'asmtt'},PDM_WH_STG),h('span',{class:'asmn2'},il===undefined?'…':String(il.length)),stgTodo(PDM_ON,PDM_WH_STG),h('ul',{class:'asmnames'},(il||[]).slice(0,6).map(function(p){return h('li',{},String((p.rows[0]||{}).cname||p.pono));}))));
+      var dl2=pdmInDoneList(PDM_ON),dt=h('div',{class:'asmtile'},h('div',{class:'asmface',role:'button',tabindex:'0',   /* v246 입고완료대기 */
+        on:{click:function(){go1(PDM_ON,PDM_WH_DONE);},keydown:function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();go1(PDM_ON,PDM_WH_DONE);}}}},
+        h('b',{class:'asmtt'},PDM_WH_DONE),h('span',{class:'asmn2'},dl2===undefined?'…':String(dl2.length)),stgTodo(PDM_ON,PDM_WH_DONE),h('ul',{class:'asmnames'},(dl2||[]).slice(0,6).map(function(p){return h('li',{},String((p.rows[0]||{}).cname||p.pono));}))));
       var g2=stg&&stg.querySelector?stg.querySelector('.asmgrid2'):null;
-      if(g2)g2.append(wt);else if(stg&&stg.append)stg.append(h('div',{class:'asmgrid2'},wt));else stg=h('div',{class:'asmin'},h('div',{class:'asmgrid2'},wt));
+      if(g2){g2.append(wt);g2.append(dt);}else if(stg&&stg.append)stg.append(h('div',{class:'asmgrid2'},wt,dt));else stg=h('div',{class:'asmin'},h('div',{class:'asmgrid2'},wt,dt));
     }
     box.replaceChildren(h('div',{class:'asmcrumb'},h('button',{type:'button',on:{click:function(){go1('');}}},'거래처'),h('i',{},'›'),h('b',{},PDM_ON)),
       h('div',{class:'asmgrid asmvg'},h('div',{class:'asmtile asmv open'},face(PDM_ON,true),stg)));
