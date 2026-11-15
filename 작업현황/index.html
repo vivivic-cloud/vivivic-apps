@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<!-- 작업현황 — 작업자 방들이 한 일을 모아 보여 준다.
+
+     사장님 11-15: 「각 채팅작업자들이 한 일을 보고받고 정리해주는 그리고 내가 뭘시켰으니 확인해야 할것들」
+     「디자인은 항상 말하지만 비비빅 조혼가구 에이엠티 등등의 디자인 일관성을 유지해야함」
+
+     보이는 것은 셋뿐이다: ① 사장님 확인할 것 ② 방별 한 일 ③ 마지막 갱신 시각.
+     자료는 `data.json` 한 벌 — 예약 작업(작업현황-갱신)이 30분마다 다시 쓴다. 이 화면은 읽기만 한다.
+     모양은 조혼가구/재고관리.html 의 머리띠·묶음·딱지 값 그대로다(새 꼴을 만들지 않았다).
+     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.0.0 -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>작업현황 · VIVIVIC</title>
+<style>
+    :root{
+        --vg-ink:#111110; --vg-body:#1A1A19; --vg-soft:#6E6E6A; --vg-muted:#9C9C98;
+        --vg-edge:#E2E2DF; --vg-fill:#F4F4F2;
+    }
+    *{ box-sizing:border-box; }
+    html,body{ margin:0; padding:0; background:#fff; color:var(--vg-body);
+        font:15px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",system-ui,sans-serif;
+        -webkit-text-size-adjust:100%; }
+
+    /* 머리띠 — 조혼가구·재고관리가 쓰는 그 꼴 그대로 */
+    header{ position:sticky; top:0; z-index:40; background:#fff; border-bottom:1px solid var(--vg-edge); }
+    .머리{ display:flex; align-items:center; gap:8px; padding:12px 16px 12px; }
+    .로고{ font-size:19px; font-weight:900; letter-spacing:-.6px; }
+    .판{ font-size:9px; font-weight:700; color:#b0aeaa; background:#f1f0ef;
+        padding:1px 6px; border-radius:4px; letter-spacing:.04em; font-family:ui-monospace,monospace; }
+    .딱지{ margin-left:auto; font-size:12px; font-weight:700; color:var(--vg-soft); text-align:right; }
+    .딱지.빨강{ color:#b91c1c; }
+
+    main{ max-width:560px; margin:0 auto; padding:12px 16px calc(28px + env(safe-area-inset-bottom)); }
+    .알림{ margin:8px 2px; font-size:13px; font-weight:700; color:var(--vg-soft); }
+
+    .제목줄{ display:flex; align-items:center; gap:8px; margin:18px 2px 8px; }
+    .제목줄 h2{ margin:0; font-size:15px; font-weight:800; letter-spacing:-.3px; }
+    .셈{ font-size:11px; font-weight:800; color:var(--vg-soft);
+        background:var(--vg-fill); border-radius:999px; padding:3px 9px; }
+
+    /* 카드 — 재고관리 .제품 과 같은 값 */
+    .카드{ border:1px solid var(--vg-edge); border-radius:14px; margin-bottom:8px; background:#fff; }
+    .카드몸{ padding:12px 14px; }
+    .글{ font-size:14px; font-weight:700; overflow-wrap:anywhere; }
+    .밑{ margin-top:2px; font-size:11px; font-weight:700; color:var(--vg-muted); overflow-wrap:anywhere; }
+    .링크줄{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+    .링크{ display:inline-flex; align-items:center; min-height:44px; padding:10px 14px; border-radius:12px;
+        border:1px solid var(--vg-edge); background:#fff; color:var(--vg-soft);
+        font:inherit; font-size:13px; font-weight:800; text-decoration:none; white-space:nowrap; }
+    .링크:active{ background:var(--vg-fill); }
+
+    /* 묶음 — 접었다 펴는 것 (재고관리 .제품 머리·몸) */
+    .묶음{ border:1px solid var(--vg-edge); border-radius:14px; margin-bottom:8px; overflow:hidden; background:#fff; }
+    .묶음머리{ width:100%; min-height:52px; padding:12px 14px; border:0; background:#fff;
+        font:inherit; text-align:left; cursor:pointer; display:flex; align-items:center; gap:8px; }
+    .묶음머리:active{ background:var(--vg-fill); }
+    .묶음이름{ font-size:15px; font-weight:800; letter-spacing:-.3px; min-width:0; overflow-wrap:anywhere; }
+    .묶음머리 .셈{ margin-left:auto; flex:0 0 auto; }
+    .묶음몸{ display:none; border-top:1px solid var(--vg-edge); padding:2px 14px 6px; }
+    .묶음.폄 .묶음몸{ display:block; }
+
+    .방{ padding:10px 0; border-bottom:1px dashed #ededeb; }
+    .방:last-child{ border-bottom:0; }
+    .방위{ display:flex; align-items:center; gap:8px; }
+    .방이름{ font-size:14px; font-weight:700; min-width:0; flex:1; overflow-wrap:anywhere; }
+    .상태{ flex:0 0 auto; font-size:11px; font-weight:800; color:var(--vg-soft);
+        background:var(--vg-fill); border-radius:999px; padding:3px 9px; white-space:nowrap; }
+    .상태.작업중{ background:#f3f8f3; color:#2f6b2f; box-shadow:inset 0 0 0 1px #cfe3cf; }
+    .상태.대기{ background:var(--vg-ink); color:#fff; }
+    .한일{ margin-top:3px; font-size:13px; font-weight:600; color:var(--vg-soft); overflow-wrap:anywhere; }
+</style>
+</head>
+<body>
+<header>
+    <div class="머리">
+        <span class="로고">VIVIVIC</span>
+        <span class="판">v1.0.0</span>
+        <span class="딱지" id="딱지">읽는 중</span>
+    </div>
+</header>
+
+<main>
+    <p class="알림" id="알림"></p>
+
+    <div class="제목줄"><h2>사장님 확인할 것</h2><span class="셈" id="확인셈">0</span></div>
+    <div id="확인목록"></div>
+
+    <div class="제목줄"><h2>방별 한 일</h2><span class="셈" id="방셈">0</span></div>
+    <div id="방목록"></div>
+</main>
+
+<script>
+/* 읽기만 한다. 자료 한 벌: data.json
+   { 갱신:"2026-11-15T22:30:00+09:00",
+     확인:[{글, 방, 방링크, 일지링크}],
+     묶음:[{이름, 방:[{제목, 상태("작업중"|"사장님 지시 대기"|"끝남"), 마지막, 한일, 링크}]}] } */
+const 글자바꿈 = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+/* 링크는 https 와 앱 방 주소(claude://)만 연다 */
+const 믿는주소 = u => /^(https:\/\/|claude:\/\/)/.test(String(u || '')) ? 글자바꿈(u) : '';
+const 때글 = iso => {
+    const d = new Date(iso); if (isNaN(d)) return '';
+    const p = new Intl.DateTimeFormat('ko-KR', { timeZone:'Asia/Seoul', month:'2-digit', day:'2-digit',
+        hour:'2-digit', minute:'2-digit', hour12:false }).formatToParts(d).reduce((a, x) => (a[x.type] = x.value, a), {});
+    return `${p.month}-${p.day} ${p.hour}:${p.minute}`;
+};
+const 폄 = new Set();
+
+function 그리기(자료) {
+    const 딱 = document.getElementById('딱지');
+    const 갱 = new Date(자료.갱신);
+    if (isNaN(갱)) { 딱.textContent = '갱신 시각 없음'; 딱.classList.add('빨강'); }
+    else {
+        딱.textContent = '갱신 ' + 때글(자료.갱신);
+        /* 3시간 넘게 안 바뀌면 빨갛게 — 예약 작업이 멈췄다는 뜻 */
+        딱.classList.toggle('빨강', Date.now() - 갱.getTime() > 3 * 3600 * 1000);
+    }
+
+    const 확인 = 자료.확인 || [];
+    document.getElementById('확인셈').textContent = 확인.length;
+    document.getElementById('확인목록').innerHTML = 확인.length ? 확인.map(x => `
+        <div class="카드"><div class="카드몸">
+            <div class="글">${글자바꿈(x.글)}</div>
+            <div class="밑">${글자바꿈(x.방)}</div>
+            <div class="링크줄">
+                ${믿는주소(x.일지링크) ? `<a class="링크" href="${믿는주소(x.일지링크)}" target="_blank" rel="noopener">일지</a>` : ''}
+                ${믿는주소(x.방링크) ? `<a class="링크" href="${믿는주소(x.방링크)}">방 열기</a>` : ''}
+            </div>
+        </div></div>`).join('') : '<p class="알림">확인할 것 없음</p>';
+
+    const 묶음 = 자료.묶음 || [];
+    document.getElementById('방셈').textContent = 묶음.reduce((n, g) => n + (g.방 || []).length, 0);
+    document.getElementById('방목록').innerHTML = 묶음.length ? 묶음.map((g, i) => `
+        <div class="묶음${폄.has(i) ? ' 폄' : ''}" data-i="${i}">
+            <button class="묶음머리" type="button"><span class="묶음이름">${글자바꿈(g.이름)}</span><span class="셈">${(g.방 || []).length}</span></button>
+            <div class="묶음몸">${(g.방 || []).map(b => `
+                <div class="방">
+                    <div class="방위">
+                        <span class="방이름">${글자바꿈(b.제목)}</span>
+                        <span class="상태${b.상태 === '작업중' ? ' 작업중' : b.상태 === '사장님 지시 대기' ? ' 대기' : ''}">${글자바꿈(b.상태)}</span>
+                    </div>
+                    <div class="한일">${글자바꿈(b.한일)}</div>
+                    <div class="밑">${글자바꿈(때글(b.마지막))}</div>
+                    ${믿는주소(b.링크) ? `<div class="링크줄"><a class="링크" href="${믿는주소(b.링크)}">방 열기</a></div>` : ''}
+                </div>`).join('')}</div>
+        </div>`).join('') : '<p class="알림">아직 자료가 없습니다</p>';
+}
+
+document.getElementById('방목록').addEventListener('click', e => {
+    const 머리 = e.target.closest('.묶음머리'); if (!머리) return;
+    const 칸 = 머리.parentElement, i = Number(칸.dataset.i);
+    칸.classList.toggle('폄');
+    칸.classList.contains('폄') ? 폄.add(i) : 폄.delete(i);
+});
+
+async function 읽기() {
+    try {
+        const r = await fetch('data.json?t=' + Date.now(), { cache:'no-store' });
+        if (!r.ok) throw new Error(r.status);
+        그리기(await r.json());
+        document.getElementById('알림').textContent = '';
+    } catch (e) {
+        document.getElementById('딱지').textContent = '못 읽음';
+        document.getElementById('딱지').classList.add('빨강');
+        document.getElementById('알림').textContent = '자료를 못 읽었습니다';
+    }
+}
+읽기();
+setInterval(읽기, 5 * 60 * 1000);   /* 열어 둔 채로도 5분마다 새로 읽는다 */
+</script>
+</body>
+</html>
