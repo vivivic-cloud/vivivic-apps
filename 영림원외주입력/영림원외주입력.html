@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v267 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v268 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -470,7 +470,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v267</span>
+    <span class="ver">v268</span>
   </div>
 </header>
 <div class="wrap">
@@ -8081,11 +8081,22 @@ function vrApprDraft(r){   /* 줄마다 구매거래처·내외자구분·통화
     return {vendor:v,io:p?purTrim(p.io):'',cur:p?purTrim(p.cur):'KRW',price:p&&!isEmpty(p.price)?String(p.price):''};});
   return d;
 }
+/* v268 사장님 11-15 「이게 뭔발이야 구매품의 확인단계야」 — 품의 확인이 「같은 발주가 이미 있습니다(PUPO202611150001)」로 막힘.
+   원인: v219 같은 발주(purchKey = 요청일 + 줄마다 구매거래처·품번·수량·납기요청일·창고·내외자구분·통화·단가)가 모두 같은 사람 입력 발주가 있었음(요청 출처는 안 봄).
+   품의 확인 = 거래처 요청 하나로 만드는 새 발주 → 같은 요청 문서(erp_purchases vreq_<id> 또는 vreq.id)만 막고, 창고 둘(v244)·같은 구매거래처·품번 두 줄·환율은 그대로. */
+function vrApprDup(v,r,id){
+  var same=(data.purchases||[]).filter(function(x){return x.id===id||(x.vreq&&x.vreq.id===r.id);})[0];
+  if(same)return '이 요청은 이미 품의 확인되어 저장되었습니다('+((same.pos||[]).map(function(p){return p.pono;}).filter(Boolean).join(', ')||same.status||'대기')+') — 구매·수입 「'+BYKEY.purchases.title+'」 목록 '+same.id+' 에서 확인하세요.';
+  var we=purWhErr(v.rows);if(we)return we;
+  var seen={},dup='';(v.rows||[]).forEach(function(o){var k=purTrim(o.vendor)+'|'+purTrim(o.ccode);if(seen[k])dup=dup||o.ccode;seen[k]=1;});
+  if(dup)return '같은 구매거래처에 품번 「'+dup+'」 줄이 둘입니다 — 요청 줄을 확인하세요. 저장하지 않았습니다.';
+  return rateRowsErr(v.rows,v.reqdate)||'';
+}
 function vrApprGo(r){   /* 품의 확인 → 한 번에 입력(erp_purchases) 대기 */
   var D=vrApprDraft(r),v={reqdate:r.reqdate,rows:(r.rows||[]).map(function(x,i){var o=D[i]||{};return {ccode:x.ccode,qty:x.qty,duedate:x.duedate,wh:x.wh,vendor:purTrim(o.vendor),io:purTrim(o.io),cur:purTrim(o.cur)||'KRW',price:o.price};})};
   var miss='';v.rows.forEach(function(o,i){if(miss)return;if(!o.vendor)miss=(i+1)+'줄 구매거래처를 골라 주세요.';else if(isEmpty(o.price))miss=(i+1)+'줄 단가를 넣어 주세요.';});
   if(!r.reqdate)miss=miss||'요청일이 없습니다.';
-  var id='vreq_'+r.id,err=miss||purchCheck(v)||purchSaveCheck(v,id);
+  var id='vreq_'+r.id,err=miss||purchCheck(v)||vrApprDup(v,r,id);   /* v268 같은 발주 = 같은 요청(요청 문서 번호)만 — 사람 입력용 v219 purchSaveCheck 는 안 씀 */
   if(err)return Promise.reject(new Error(err));
   var doc={reqdate:v.reqdate,rows:v.rows};purchDoc(doc);
   doc.rows.forEach(function(o,i){var x=(r.rows||[])[i]||{};['cname','cspec','unit'].forEach(function(f){if(!o[f]&&x[f])o[f]=x[f];});});
