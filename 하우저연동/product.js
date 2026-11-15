@@ -14,7 +14,17 @@ const 구성품명 = async (r) => {
   const j = (await (await fetch("/api/product/v1/groups/" + g + "/products/" + encodeURIComponent(r._값), { credentials: "include" })).json()).data;
   return ((j && j.relateds) || []).map((x) => x.product && x.product.name).filter(Boolean).join(" · ");
 };
+/* 벤더피아 연결(0.6.0) — 하우저 상품번호 = 벤더피아 상품코드(번호 또는 h번호)로 맞추고, 번호가 없으면 상품명(분류 뺀 것) 일치로. 자료 = 벤더피아연동이 올린 납품내역 창고(확장 배경이 읽음, 읽기만). 다리 = 불러오기.js */
+const 이름뽑기 = (s) => String(s || "").replace(/\s[^ ]+ >.*$/, "").trim();
+const 벤더피아 = (rows) => new Promise((끝) => {
+  const id = "v" + Date.now() + Math.random().toString(36).slice(2, 6);
+  const 듣 = (e) => { if (e.source !== window || !e.data || e.data.__hw !== "벤더피아답" || e.data.id !== id) return; clearTimeout(시계); window.removeEventListener("message", 듣); 끝(e.data.답); };
+  const 시계 = setTimeout(() => { window.removeEventListener("message", 듣); 끝({ ok: false, 까닭: "확장이 옛 판입니다(덮어쓰기+↻ 필요) 또는 답 없음" }); }, 25000);
+  window.addEventListener("message", 듣);
+  window.postMessage({ __hw: "벤더피아요청", id, 목록: rows.map((r) => ({ 번: r["하우저 상품번호"], 이름: 이름뽑기(r["상품명"]) })) }, "*");
+});
 HW표.열기({
+  벤더피아, 번호칸: "하우저 상품번호",
   보태기: 구성품명,
   제목: 등록 ? "하우저 등록상품보기" : "하우저 상품 조회",
   표선택: "table.tbl_global",

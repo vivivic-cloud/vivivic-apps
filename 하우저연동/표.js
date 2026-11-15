@@ -108,7 +108,14 @@
 
     const 날짜 = (v) => { const m = String(v || "").match(/(\d{4})\D(\d{1,2})\D(\d{1,2})/); return m ? m[1] + "-" + m[2].padStart(2, "0") + "-" + m[3].padStart(2, "0") : ""; };
     const 처음 = 50, 걸음 = 50;
-    let 보일수 = 처음, 고른 = null;
+    let 보일수 = 처음, 고른 = null, vp글 = "";
+    /* 벤더피아 연결(0.6.0) — 맞은 줄은 벤더피아 상품 단추 + 그 단품 단추들(벤더피아연동 .vp-goods-list 꼴), 안 맞은 줄은 붉은 「벤더피아 없음」. 단추 글자는 읽은 값 그대로 */
+    const vp칸 = (r, i) => {
+      const v = r._vp; if (!v) return "";
+      if (v === "없음") return '<div class="hw-vp"><span class="hw-vp없음">벤더피아 없음</span></div>';
+      return '<div class="hw-vp">' + `<button type="button" class="hw-vb" data-i="${i}" data-k="-1">${esc(v.이름)}<small>${esc(v.코드.join(", "))}</small></button>` +
+        v.단품.map((x, k) => `<button type="button" class="hw-vb 단" data-i="${i}" data-k="${k}">${esc(x.이름 || x.코드)}${x.수 > 1 ? "<small>×" + x.수 + "</small>" : ""}</button>`).join("") + "</div>";
+    };
     const 그리기 = () => {
       const q = ($(".hw-q").value || "").trim().toLowerCase();
       const f = $(".from") ? $(".from").value : "", t = $(".to") ? $(".to").value : "";
@@ -122,12 +129,12 @@
       const 줄들 = 걸렸다 ? rs : rs.slice(0, 보일수);     // 거르면 맞는 줄 전부, 안 거르면 50줄씩
       $("tbody").innerHTML = 줄들.map((r) => "<tr data-i=\"" + d.rows.indexOf(r) + "\">" + 칸들.map((c) => {
         const v = r[c] || "";
-        if (c === o.첫칸) return `<td><button type="button" class="hw-이름">${esc(v)}</button>` + (o.보태기 && r._구성 ? `<div class="hw-구성">${esc(r._구성)}</div>` : "") + `</td>`;
+        if (c === o.첫칸) return `<td><button type="button" class="hw-이름">${esc(v)}</button>` + (o.보태기 && r._구성 ? `<div class="hw-구성">${esc(r._구성)}</div>` : "") + vp칸(r, d.rows.indexOf(r)) + `</td>`;
         const n = o.숫자칸.includes(c);
         const cls = n ? "n" + (v === "0" ? " z" : (c === "불량 재고" && 수(v) > 0 ? " bad" : "")) : "";
         return `<td class="${cls}">${esc(v)}</td>`;
       }).join("") + "</tr>").join("");
-      $(".hw-메모").innerHTML = (기준 ? `<span>${esc(기준)}</span>` : "") + `<span>${esc(o.단위)}<b>${rs.length}</b></span>` + (o.합계칸 || []).map((k) => `<span>${esc(k)}<b>${rs.reduce((s, r) => s + 수(r[k]), 0).toLocaleString()}</b></span>`).join("");
+      $(".hw-메모").innerHTML = (기준 ? `<span>${esc(기준)}</span>` : "") + `<span>${esc(o.단위)}<b>${rs.length}</b></span>` + (vp글 ? `<span>${esc(vp글)}</span>` : "") + (o.합계칸 || []).map((k) => `<span>${esc(k)}<b>${rs.reduce((s, r) => s + 수(r[k]), 0).toLocaleString()}</b></span>`).join("");
       $(".hw-빔").hidden = rs.length > 0; if (!rs.length) $(".hw-빔").textContent = "조건에 맞는 줄이 없습니다.";
       const 더 = $(".hw-더보기");
       더.hidden = 걸렸다 || rs.length <= 처음;
@@ -136,6 +143,15 @@
       if (고른 != null) { const tr = $("tr[data-i=\"" + 고른 + "\"]"); if (tr) tr.classList.add("on"); }
     };
     그리기();
+    /* 벤더피아 연결 — o.벤더피아(읽은 줄들) 가 {ok, 맞음:{상품번호:{…}}, 올린때} 를 주면 줄마다 붙인다. 읽기만 */
+    if (o.벤더피아) (async () => {
+      let a; try { a = await o.벤더피아(d.rows); } catch (e) { a = { ok: false, 까닭: String((e && e.message) || e) }; }
+      if (!a || !a.ok) { vp글 = "벤더피아 자료 못 받음 — " + ((a && a.까닭) || "답 없음"); 그리기(); return; }
+      let 맞 = 0;
+      for (const r of d.rows) { const v = a.맞음[r[o.번호칸]]; r._vp = v || "없음"; if (v) 맞++; }
+      vp글 = "벤더피아 연결 " + 맞 + " · 없음 " + (d.rows.length - 맞) + (a.올린때 ? " (자료 올린 때 " + a.올린때.slice(0, 16).replace("T", " ") + ")" : "");
+      그리기();
+    })();
     /* 상품명 옆 보탬(구성품명) — 줄마다 한 번만 가져오고(r._구성 에 둠) 동시에 2건씩 천천히. 읽기(GET)만. */
     if (o.보태기) {
       const 차례 = d.rows.filter((r) => r._값);
@@ -154,6 +170,17 @@
     const 닫기 = () => { 창.hidden = true; 고른 = null; for (const x of 뿌리.querySelectorAll("tr.on")) x.classList.remove("on"); };
     창.querySelector(".hw-상세머리 button").onclick = 닫기;
     $("tbody").onclick = (ev) => {
+      const vb = ev.target.closest(".hw-vb");
+      if (vb) {                                                   // 벤더피아 단추 — 하우저 보기 안에서 볼 수 있는 만큼(읽은 자료) 상세 창에
+        const r = d.rows[+vb.dataset.i], v = r && r._vp, k = +vb.dataset.k; if (!v || v === "없음") return;
+        const x = k >= 0 ? v.단품[k] : null, 줄 = (이름, 값) => `<dl><dt>${esc(이름)}</dt><dd>${esc(값) || "—"}</dd></dl>`;
+        창.hidden = false; 발.hidden = true; 발.innerHTML = "";
+        창.querySelector("strong").textContent = x ? (x.이름 || x.코드) : v.이름;
+        창.querySelector(".hw-상세몸").innerHTML = x
+          ? 줄("구분", "벤더피아 단품") + 줄("단품코드", x.코드) + 줄("판매상태", x.상태) + 줄("연결 상품", v.이름 + " (" + v.코드.join(", ") + ")") + 줄("하우저 상품", r[o.첫칸])
+          : 줄("구분", "벤더피아 상품") + 줄("상품코드", v.코드.join(", ")) + 줄("판매상태", v.상태) + 줄("맞춘 길", v.길 === "번호" ? "하우저 상품번호 = 벤더피아 상품코드" : "상품명 일치") + 줄("연결 단품", v.단품.map((y) => (y.이름 || y.코드) + (y.수 > 1 ? " ×" + y.수 : "")).join(" / ")) + 줄("하우저 상품", r[o.첫칸]);
+        return;
+      }
       const tr = ev.target.closest("tr"); if (!tr) return;
       const r = d.rows[+tr.dataset.i];
       고른 = +tr.dataset.i;

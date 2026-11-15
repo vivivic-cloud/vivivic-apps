@@ -11,6 +11,14 @@
   else if (길 === "/product/home") 글 = ["표.css", "표.js", "product.js"];
   if (!글.length) return;
   document.documentElement.setAttribute("data-hw-판", 판);
+  /* 0.6.0 다리: 페이지 쪽 글(product.js)이 벤더피아 자료를 달라고 하면 배경(bg.js)에 묻고 답을 돌려준다. 읽기만. */
+  if (길 === "/product/home") window.addEventListener("message", (e) => {
+    const m = e.data;
+    if (e.source !== window || !m || m.__hw !== "벤더피아요청" || typeof m.id !== "string") return;
+    chrome.runtime.sendMessage({ __hw: "벤더피아", 목록: Array.isArray(m.목록) ? m.목록 : [] }, (r) => {
+      window.postMessage({ __hw: "벤더피아답", id: m.id, 답: (!chrome.runtime.lastError && r) || { ok: false, 까닭: "확장 배경이 답 없음" } }, "*");
+    });
+  });
   chrome.runtime.sendMessage({ __hw: "글", 목록: 글 }, (r) => {
     const 결과 = (!chrome.runtime.lastError && r && r.결과) || {};
     const 못 = 글.filter((f) => !/^(깃|이미|확장)/.test(결과[f] || ""));
