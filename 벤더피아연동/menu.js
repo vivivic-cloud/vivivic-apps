@@ -25,6 +25,9 @@
     { name: "CS등록", url: (주문관리주소 || "/System/Delivery/firmDvList.aspx") + "#vgCS" },
     /* 11-07 [새 지시 CS정산] 「벤더메인 메뉴에 cs정산 메뉴를 만들어 …」 — 주문관리 쪽 + `#vgCal` → search.js 가 cs정산.js 를 부른다 */
     { name: "CS정산", url: "/System/Sales/orderMst.aspx#vgCal" },
+    /* 11-16 [새 지시 하우저 메뉴] 「벤더피아 메인에 하우져 메뉴를 만들어서 클릭시 벤피아상품중  배송사가 하우저 인것의 상품들의 정보가 보이게 해줘」
+       — 주문관리 쪽 + `#vgHau` → search.js 가 표를 세우고 하우저.js 가 상품관리(배송사 하우저)를 조회만 해 채운다 */
+    { name: "하우저", url: "/System/Sales/orderMst.aspx#vgHau" },
   ];
 
   /* 10-26 [새 지시 새창] 사장님: 「현재 페이지에서 어떤방식으로든 단품관리 상품관리등 링크를 타고 넘어갈때 화면 전환이 아닌 새페이지로 나타나게 해줘」

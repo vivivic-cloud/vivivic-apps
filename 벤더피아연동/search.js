@@ -266,6 +266,11 @@
      [새 지시 CS정산목록] 사장님(그대로): 「일치하는 벤더피아의 주문관리 목록이 나타나야 함」
      → 일찍 돌아가지 않고 이 글을 끝까지 돌려 **CS등록과 같은 표**(`머리알기`+`addRows`)를 세운다. 맨 끝 `VP정산표` 가 그 표를 cs정산.js 에 빌려준다. */
   const 정산보기 = CS전용 && /(^|[#&])vgCal\b/i.test(location.hash || "");
+  /* 11-16 [새 지시 하우저 메뉴] 사장님(그대로): 「벤더피아 메인에 하우져 메뉴를 만들어서 클릭시 벤피아상품중  배송사가 하우저 인것의 상품들의 정보가 보이게 해줘」
+     메인 메뉴 「하우저」 = `orderMst.aspx#vgHau` — CS정산과 같은 길: 이 글이 쪽 틀과 표(`머리알기`+`addRows`)를 세우고 형제 `하우저.js` 가
+     상품관리(salesGoods.aspx)를 배송사 하우저로 조회만 해 이 표에 그린다(확장 안 글은 그대로 → 덮어쓰기 없음). */
+  const 하우저보기 = CS전용 && /(^|[#&])vgHau\b/i.test(location.hash || "");
+  const 따로보기 = 정산보기 || 하우저보기;            // 주문관리 목록·검색창 대신 다른 글이 표를 채우는 쪽
   function 상담내용보기() {
     const 주소 = "/System/CS/inquiryList.aspx";
     const 숨은칸 = new Set(["", "주문번호", "ctCd", "inquiryCd", "매출처", "매출처주문번호", "매출처상품코드", "주문자", "주문자전화",
@@ -495,8 +500,8 @@
   root.innerHTML = CS전용 ? `
     <div class="vp-search">
       <a class="vp-home" href="/index.aspx">← 메인</a>
-      ${정산보기 ? "<h1>CS정산</h1>" : `<div class="vp-머리줄"><h1>CS등록</h1><a class="vp-머리단추" href="/System/Sales/orderMst.aspx#vgInq" target="_blank" rel="noopener">상담내용보기</a><button type="button" class="vp-머리단추 vp-모든랙단추">모든랙주문확인</button></div>`}
-      <form class="vp-bar"${정산보기 ? ' style="display:none"' : ""}>
+      ${정산보기 ? "<h1>CS정산</h1>" : 하우저보기 ? "<h1>하우저</h1>" : `<div class="vp-머리줄"><h1>CS등록</h1><a class="vp-머리단추" href="/System/Sales/orderMst.aspx#vgInq" target="_blank" rel="noopener">상담내용보기</a><button type="button" class="vp-머리단추 vp-모든랙단추">모든랙주문확인</button></div>`}
+      <form class="vp-bar"${따로보기 ? ' style="display:none"' : ""}>
         <input type="date" name="from" required>
         <span>~</span>
         <input type="date" name="to" required>
@@ -697,7 +702,7 @@
   }
   /* 10-25 CS등록(주문관리)도 이름 단추 — 확장(불러오기.js)은 주문관리에 goods.js 를 안 보내므로(덮어쓰기 필요) 여기서 바로 부른다.
      CS정산은 표를 그린 뒤에 부른다(조회 중 벤더피아 요청을 안 늘린다, 맨 끝 `VP정산표`). */
-  if (!정산보기) 상품단추불러오기();
+  if (!따로보기) 상품단추불러오기();
 
   /* ── 상담 이력 ──────────────────────────────────────────
      사장님 10-15: 「**상담할때 고객문의에 이력을 남기는데 이력남길수있게 해주세요**」
@@ -1970,7 +1975,7 @@
        확인하여 각 데이터 열의 넓이를 조정할 수 있게 하고 최대한 벤더피아의 실제 화면과 최대한 비슷한 모습으로 보이도록 텍스트 사이즈 등을 조정해 주세요.」
      칸 넓이는 `<col>` 이 정한다(table-layout: fixed). 처음 넓이 = 글 너비에 맞춤(받은 줄을 볼 때마다 넓어지기만, `자동`) · 끌어 바꾼 칸은 그 값(`둠`).
      저장 = localStorage 「vp열넓이:배송」·「vp열넓이:CS」 `{칸이름: px}`(같은 이름 둘째 칸은 「이름#2」). 경계를 두 번 누르면 그 칸만 처음 넓이로. */
-  const 넓이열쇠 = "vp열넓이:" + (CS전용 ? "CS" : "배송");
+  const 넓이열쇠 = "vp열넓이:" + (하우저보기 ? "하우저" : CS전용 ? "CS" : "배송");
   const 표글꼴 = '"Microsoft Sans Serif", 돋움, sans-serif';
   const 최소넓이 = 16, 여유 = 8, 끝넓이 = 130, 긴칸끝 = 200, 이름칸끝 = 280;
   const 긴칸 = /상품명|단품명|단품구성|옵션/;
@@ -2135,7 +2140,7 @@
        검색창 글을 고치면 평소 멀티검색으로 돌아간다. 손으로 친 「모든랙」은 평소대로 네 칸. */
   const 모든랙상품명 = "모든랙";
   let 상품명만 = false;
-  if (CS전용 && bar && !정산보기) {
+  if (CS전용 && bar && !따로보기) {
     bar.q.addEventListener("input", () => { 상품명만 = false; });
     root.querySelector(".vp-모든랙단추").addEventListener("click", () => {
       bar.q.value = 모든랙상품명;
@@ -2269,7 +2274,7 @@
   }
   /* 11-07 [새 지시 CS정산목록] cs정산.js 가 쓰는 주문관리 표 — 읽는 법·그리는 법을 두 벌로 만들지 않는다.
      칸·차례·값·취소 줄·이름 단추·줄 누름·열 끌기(열쇠 `vp열넓이:CS`)가 CS등록 목록과 같다. */
-  if (정산보기) {
+  if (따로보기) {
     let 굿즈부름 = false;
     const 비우기 = () => {
       상담판닫기();
@@ -2293,9 +2298,10 @@
         if (!굿즈부름) { 굿즈부름 = true; 상품단추불러오기(); }
       },
     };
+    if (하우저보기) window.VP하우저표 = window.VP정산표;   // 같은 표 — 이름만 하나 더
     const sc = document.createElement("script");
-    sc.src = 형제("cs정산.js");
-    sc.addEventListener("error", () => window.VP말?.("CS정산:글 못 받음"));
+    sc.src = 형제(하우저보기 ? "하우저.js" : "cs정산.js");
+    sc.addEventListener("error", () => window.VP말?.((하우저보기 ? "하우저" : "CS정산") + ":글 못 받음"));
     document.head.appendChild(sc);
   } else if (CS전용) CS목록보이기();
 })();
