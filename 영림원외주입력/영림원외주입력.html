@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v274 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v275 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -156,6 +156,7 @@ details.gonebox{margin-top:10px;font-size:13px}details.gonebox>summary{cursor:po
 .oldbox{margin:12px 0 0}.oldbox>summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--muted);padding:6px 0}.oldrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0 10px}   /* v225 지난 자료 보기 */
 .toast:not(:empty){position:fixed;left:16px;right:16px;bottom:16px;z-index:50;margin:0 auto;max-width:480px;padding:10px 14px;background:#fff;border:1px solid #e3e2e0;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.08)}
 .delbar{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;letter-spacing:0}
+.lsheet .lsearch input{font:inherit;font-size:13px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:8px;padding:9px 12px;min-height:40px;min-width:0;flex:1 1 auto;max-width:420px;box-sizing:border-box}.lsheet .lsearch input:focus{outline:none;border-color:var(--ink)}.lsheetbox td{vertical-align:middle}.lsheetbox td.w{white-space:normal;min-width:160px;max-width:320px;overflow-wrap:anywhere}.lsheetbox th.lsh-m,.lsheetbox td.lsh-m{position:sticky;left:0;z-index:1;background:#fff;box-shadow:inset -1px 0 0 var(--line)}.lsheetbox thead th.lsh-m{z-index:3;background:var(--fill2)}.lsheetbox td.lsh-m{white-space:normal;min-width:110px;max-width:min(220px,44vw)}.lsh-mw{display:flex;align-items:center;gap:8px;overflow-wrap:anywhere}.lsh-mw input.pk{flex:none;margin:0}.lsh-sort{all:unset;cursor:pointer;display:inline-block;white-space:nowrap}.lsh-sort:focus-visible{outline:2px solid var(--ink);outline-offset:2px}.lsheetbox .chip{display:inline-block}   /* v275 저장한 항목 시트로 보기 */
 .vwcall{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;min-height:32px}.vwcall input.pk{margin:0}.chip.vwc{background:#ecfdf5;color:#047857;border-color:#a7f3d0}   /* v274 거래처 → 워크센터 보내기 */
 details.rec>summary .rt{flex:1}
 details.rec>summary input.pk{flex:none;margin:0}
@@ -472,7 +473,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v274</span>
+    <span class="ver">v275</span>
   </div>
 </header>
 <div class="wrap">
@@ -6672,6 +6673,52 @@ function vwcSend(rows){
     });
   });
 }
+/* ---------- v275 저장한 항목 「시트로 보기」(공용) ----------
+   사장님 11-16 「거래처등록 저장된 각거래처와 내부내용이 시트로 펼쳐져서 시트형식으로 모든 거래처 내용을 볼 수 있게 해줘」 · 「워크센터도 저장목록 시트로 보이게 해줘」.
+   LSHEET_STEPS 에 단계 키를 넣으면 그 메뉴 저장한 항목 머리에 「시트로 보기」 단추 → 카드 대신 표(한 줄 = 문서 하나).
+   열 = 체크·첫 칸 recTitle(붙박이) · 그 단계 fields 칸 이름 그대로 · 상태 · 단계별 더한 열(more). 보기만(고치기는 카드 「수정」 그대로).
+   찾기 = 모든 열 글자 · 머리 누르면 정렬(오름 → 내림). 표 상자 .tw(높이 60vh 안 · 가로 스크롤은 상자 안만 · 머리 줄 붙박이). 체크 칸 = 카드와 같은 kit.pk(삭제·워크센터 보내기 같이). 영림원에 없음·지난 자료는 표 아래 그대로. */
+var LSHEET={};   /* 단계 키 → {on,q,k,dir,inp} */
+var LSHEET_STEPS={
+  vendors:{more:[['워크센터',function(r){var w=vwcOf(r);return w?(w.status==='완료'?'있음':'보냄'):'';}]]},
+  workcenters:{more:[['보낸 거래처',function(r){if(r.sentFrom!=='거래처등록')return '';var v=(data.vendors||[]).filter(function(x){return x.id===r.vendorId;})[0];return v?(v.name||v.sangho||''):(r.vendor||'');}]]}};
+function lsheetOn(s){return !!(LSHEET_STEPS[s.key]&&LSHEET[s.key]&&LSHEET[s.key].on);}
+function lsheetBtn(s){
+  if(!LSHEET_STEPS[s.key])return null;
+  var on=lsheetOn(s);
+  return h('div',{class:'delbar'},h('button',{type:'button',class:'btn small','aria-pressed':on?'true':'false',on:{click:function(){var o=LSHEET[s.key]||(LSHEET[s.key]={});o.on=!o.on;renderList();}}},on?'카드로 보기':'시트로 보기'));
+}
+function lsheetCols(s){
+  var c=[{lab:s.fields[0]&&s.recTitle?(s.key==='workcenters'?'워크센터':'거래처명'):'이름',v:function(r){return s.recTitle(r)||'';},first:1}];
+  s.fields.forEach(function(f){if(c[0].lab===f.label)return;c.push({lab:f.label,v:function(r){return show(r[f.k]);}});});
+  c.push({lab:'상태',v:function(r){return STATUS.indexOf(r.status)>=0?r.status:'대기';},st:1});
+  (LSHEET_STEPS[s.key].more||[]).forEach(function(m){c.push({lab:m[0],v:m[1]});});
+  return c;
+}
+function lsheetDraw(s,listBox,head,rows,kit,tail){
+  var o=LSHEET[s.key],cols=lsheetCols(s);
+  var old=listBox.querySelector('.lsheet .tw'),sx=old?old.scrollLeft:0,sy=old?old.scrollTop:0;
+  var foc=!!o.inp&&document.activeElement===o.inp,ss=foc?o.inp.selectionStart:0;   /* 칸을 옮기기 전에 봐야 함(옮기면 초점이 풀림) */
+  if(!o.inp)o.inp=h('input',{type:'search',autocomplete:'off',placeholder:'찾기','aria-label':s.title+' 시트 찾기',on:{input:function(){o.q=o.inp.value;renderList();}}});
+  var q=String(o.q||'').trim().toLowerCase();
+  var vis=rows.filter(function(r){return !q||cols.some(function(c){return String(c.v(r)).toLowerCase().indexOf(q)>=0;});});
+  if(o.k!=null&&cols[o.k]){var c=cols[o.k],d=o.dir<0?-1:1;
+    vis=vis.slice().sort(function(x,y){var a=String(c.v(x)),b=String(c.v(y)),na=Number(a),nb=Number(b);
+      if(a!==''&&b!==''&&isFinite(na)&&isFinite(nb))return (na-nb)*d;return a.localeCompare(b,'ko')*d;});}
+  var ths=cols.map(function(c,i){
+    var srt=o.k===i?(o.dir<0?'descending':'ascending'):'none';
+    return h('th',{class:c.first?'lsh-m':'','aria-sort':srt},h('button',{type:'button',class:'lsh-sort',on:{click:function(){if(o.k===i)o.dir=-(o.dir||1);else{o.k=i;o.dir=1;}renderList();}}},c.lab,o.k===i?(o.dir<0?' ▾':' ▴'):''));});
+  var trs=vis.map(function(r){
+    return h('tr',{},cols.map(function(c,i){var v=c.v(r);
+      if(c.first)return h('td',{class:'lsh-m'},h('div',{class:'lsh-mw'},kit.pk(r)||'',h('b',{},v||'(이름 없음)')));
+      if(c.st)return h('td',{},h('span',{class:'chip '+v},v));
+      return h('td',{class:String(v).length>24?'w':''},v);}));});
+  var tw=h('div',{class:'tw lsheetbox'},h('table',{},h('thead',{},h('tr',{},ths)),h('tbody',{},trs.length?trs:[h('tr',{},h('td',{colspan:cols.length},q?'「'+o.q.trim()+'」에 맞는 줄이 없습니다.':'없습니다.'))])));
+  var box=h('div',{class:'lsheet'},h('div',{class:'lsearch'},o.inp),h('div',{class:'lsinfo'},h('span',{},(q?'찾음 '+vis.length+' / ':'')+'전체 '+rows.length+'건')),tw);
+  listBox.replaceChildren.apply(listBox,[head,box].concat(tail.filter(Boolean)));
+  tw.scrollLeft=sx;tw.scrollTop=sy;
+  if(foc){o.inp.focus();try{o.inp.setSelectionRange(ss,ss);}catch(e){}}
+}
 function renderList(){
   if(!listBox)return;
   var s=BYKEY[cur];
@@ -6686,6 +6733,7 @@ function renderListIn(s,listBox,title){
   var dkit=delKit(s,(a||[]).filter(function(r){return delOkDone(s,r);}),2),kit0=kit;   /* v216 완료 문서 */
   var wk=s.key==='vendors'&&a?vwcKit(a):null;   /* v274 거래처 분류 — 워크센터 보내기(체크 칸은 삭제 체크 칸과 한 칸) */
   kit={bar:kit0.bar,pk:function(r){var c=kit0.pk(r)||dkit.pk(r);return wk?wk.pk(r,c):c;}};
+  var shb=lsheetBtn(s);if(shb)head.append(shb);   /* v275 시트로 보기 */
   if(wk&&wk.bar)head.append(wk.bar);
   if(kit0.bar)head.append(kit0.bar);if(dkit.bar)head.append(dkit.bar);
   if(a==null){listBox.replaceChildren(head,h('div',{class:'empty'},'불러오는 중입니다.'));return;}
@@ -6701,6 +6749,7 @@ function renderListIn(s,listBox,title){
   if(s.flowCols)sorted=sorted.filter(flowGap).concat(sorted.filter(function(r){return !flowGap(r);}));   /* v53 빈 흐름이 맨 위 */
   var ss=SEARCH_STEPS[s.key],sq=ss?String(LISTQ[s.key]||'').trim().toLowerCase():null;   /* v37: 4 품목(v39: 3 분류도)은 검색어에 맞는 기록만 */
   if(sq!=null)sorted=sorted.filter(function(r){return EDITING[s.key+'/'+r.id]||(sq&&ss.keys.some(function(k){return String(r[k]==null?'':r[k]).toLowerCase().indexOf(sq)>=0;}));});
+  if(lsheetOn(s)){lsheetDraw(s,listBox,head,sorted,kit,[gbox,obox]);return;}   /* v275 시트로 보기 = 카드 대신 표 */
   var items=sorted.map(function(r){return recCard(s,r,kit,openIds);});
   if(sq!=null){listSearch(s,listBox,head,a,sq,items,gbox);return;}
   var wb=s.key==='itemmats'?imWipBar():null;   /* v78 */
