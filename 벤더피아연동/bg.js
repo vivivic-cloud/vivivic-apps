@@ -135,3 +135,103 @@ chrome.runtime.onMessage.addListener((m, 보낸이, 답) => {
   누구중.then(답);
   return true;
 });
+
+/* ── 발주역입력 재단에 「벤더피아연동 단품관리 목록」 건네기 (11-16 [단품다리], 0.35.0) ──────────
+   사장님: 「벤더피아 아이디로 로그인하게 하고, 벤더피아연동의 단품관리 페이지에 따라서 연동되어 검색되도록 해 주세요.」
+   · 묻는 쪽 = `단품다리.js`(github.io `/vivivic-apps/발주역입력/` 의 content script)뿐. sender 가 이 확장 + 그 주소일 때만 답한다.
+   · 차례: ① 로그인 확인 = 서류관리와 같은 `벤더피아누구()`(벤더피아 `/index.aspx` 조회). 로그인 아니면 목록 없이 { 로그인:false }.
+           ② 단품관리 화면과 **같은 저장**(`vpCache:/System/Master/goods.aspx|단품명|{}||2000-01-01|<오늘>`)에 오늘 받은 것이 있으면 그것.
+              「다시」 면 그 단품관리 저장(`vpCache:/System/Master/goods.aspx|단품명|…`)만 먼저 지운다 — 단품관리 화면을 새로고침한 것과 같은 뜻.
+           ③ 없으면 화면 없는 문서(`단품받기.html`, offscreen DOM_PARSER)에서 vp-data.js `list()` 를 단품관리 미리 받기와 같은 조건으로 돌려
+              벤더피아에 새로 묻고(사장님 크롬의 벤더피아 쿠키), 같은 열쇠에 담긴 것을 읽어 건넨다. 끝나면 그 문서를 닫는다.
+   · 건네는 줄 = [단품코드, 단품명, 판매상태] 세 칸만. 같은 코드 여러 줄은 하나로, 차례 = 중지 아닌 것 먼저 · 단품명 가나다 · 코드
+     (goods.js `단품목록짓기` 와 같은 차례).
+   ⚠ 받은 목록은 **페이지(그 탭)로만** 간다. 창고·바깥으로 안 보낸다. */
+const 단품쪽 = "https://vivivic-cloud.github.io/vivivic-apps/발주역입력/";
+const 단품주소 = "/System/Master/goods.aspx";
+const 단품열쇠앞 = "vpCache:" + 단품주소 + "|단품명|";
+const 오늘글 = () => { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
+const 단품열쇠 = () => 단품열쇠앞 + "{}||2000-01-01|" + 오늘글();
+const 받기문서 = "단품받기.html";
+let 단품중 = null;
+
+const 단품세칸 = (hit) => {
+  const h = (hit && hit.heads) || [], ci = h.indexOf("단품코드"), ni = h.indexOf("단품명"), si = h.indexOf("판매상태");
+  if (ci < 0 || ni < 0) return null;
+  const m = new Map();
+  for (const r of hit.rows || []) {
+    const c = String(r[ci] == null ? "" : r[ci]).trim(), n = String(r[ni] == null ? "" : r[ni]).trim();
+    if (!c || !n || n === "합계") continue;
+    m.set(c, [c, n, si < 0 ? "" : String(r[si] == null ? "" : r[si]).trim()]);
+  }
+  return [...m.values()].sort((a, b) => (a[2] === "중지") - (b[2] === "중지")
+    || a[1].localeCompare(b[1], "ko", { numeric: true }) || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+};
+
+async function 화면없이받기() {
+  const 주소 = chrome.runtime.getURL(받기문서);
+  try {
+    const 있나 = await chrome.runtime.getContexts({ contextTypes: ["OFFSCREEN_DOCUMENT"], documentUrls: [주소] });
+    if (!있나.length) await chrome.offscreen.createDocument({ url: 받기문서, reasons: ["DOM_PARSER"], justification: "벤더피아 단품관리 목록을 단품관리 화면과 같은 방식으로 받아 읽는다" });
+    return await chrome.runtime.sendMessage({ __vp: "단품받기시작" });
+  } finally {
+    try { await chrome.offscreen.closeDocument(); } catch (e) {}
+  }
+}
+
+async function 단품목록주기(다시) {
+  const 판 = chrome.runtime.getManifest().version;
+  const 누구 = await 벤더피아누구();
+  if (누구.로그인 !== true) return { 로그인: 누구.로그인, 까닭: 누구.까닭 || "", 판 };
+  if (다시) {
+    const 다 = await chrome.storage.local.get(null);
+    await chrome.storage.local.remove(Object.keys(다).filter((k) => k.startsWith(단품열쇠앞)));
+  }
+  const 열쇠 = 단품열쇠();
+  let hit = (await chrome.storage.local.get(열쇠))[열쇠];
+  let 까닭 = "";
+  if (!hit) {
+    const r = await 화면없이받기().catch((e) => ({ 됨: false, 까닭: String(e && e.message || e).slice(0, 80) }));
+    if (!r || !r.됨) 까닭 = (r && r.까닭) || "받지 못함";
+    hit = (await chrome.storage.local.get(열쇠))[열쇠];
+  }
+  const 줄 = hit ? 단품세칸(hit) : null;
+  if (!줄) return { 로그인: true, 까닭: 까닭 || "단품관리 목록이 비었습니다", 판 };
+  return { 로그인: true, 까닭: "", 판, 받은때: hit.at || null, 줄 };
+}
+
+chrome.runtime.onMessage.addListener((m, 보낸이, 답) => {
+  if (!m || 보낸이.id !== chrome.runtime.id) return;
+  if (m.__vp === "단품목록") {
+    let 쪽 = "";
+    try { 쪽 = decodeURI(String(보낸이.url || "")); } catch (e) { return; }
+    if (!쪽.startsWith(단품쪽)) return;
+    // 탭 여럿이 겹쳐 물으면 하나로(벤더피아에 같은 조회를 두 번 안 보낸다). 「다시」 가 아니면 진행 중인 것을 같이 기다린다.
+    // 「다시」 는 진행 중인 것이 끝난 뒤에 이어서(화면 없는 문서는 한 번에 하나뿐).
+    if (!단품중 || m.다시) {
+      const 앞 = 단품중 || Promise.resolve();
+      const 새 = 앞.catch(() => {}).then(() => 단품목록주기(!!m.다시))
+        .catch((e) => ({ 로그인: null, 까닭: "탈 " + String(e && e.message || e).slice(0, 60) }));
+      단품중 = 새;
+      새.then(() => { if (단품중 === 새) 단품중 = null; });
+    }
+    단품중.then(답);
+    return true;
+  }
+  if (m.__vp === "단품받기저장") {
+    // 화면 없는 문서(단품받기.html)의 VP저장 — 그 문서에서 온 것만. 단품관리 저장 열쇠만 쓰게 한다.
+    if (String(보낸이.url || "") !== chrome.runtime.getURL(받기문서)) return;
+    const s = chrome.storage.local;
+    const 열쇠만 = (k) => typeof k === "string" && k.startsWith(단품열쇠앞);
+    (async () => {
+      if (m.일 === "get") {
+        if (m.열쇠 === null) { const 다 = await s.get(null); const 남 = {}; for (const k of Object.keys(다)) if (열쇠만(k)) 남[k] = 다[k]; return 남; }
+        return 열쇠만(m.열쇠) ? await s.get(m.열쇠) : {};
+      }
+      if (m.일 === "set") { const v = m.값 || {}; if (Object.keys(v).every(열쇠만)) await s.set(v); return null; }
+      if (m.일 === "remove") { const k = [].concat(m.열쇠 || []).filter(열쇠만); if (k.length) await s.remove(k); return null; }
+      return null;
+    })().then(답, () => 답(null));
+    return true;
+  }
+});
