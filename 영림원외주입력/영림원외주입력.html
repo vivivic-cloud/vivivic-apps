@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v273 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v274 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -156,6 +156,7 @@ details.gonebox{margin-top:10px;font-size:13px}details.gonebox>summary{cursor:po
 .oldbox{margin:12px 0 0}.oldbox>summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--muted);padding:6px 0}.oldrow{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0 10px}   /* v225 지난 자료 보기 */
 .toast:not(:empty){position:fixed;left:16px;right:16px;bottom:16px;z-index:50;margin:0 auto;max-width:480px;padding:10px 14px;background:#fff;border:1px solid #e3e2e0;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.08)}
 .delbar{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;letter-spacing:0}
+.vwcall{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;min-height:32px}.vwcall input.pk{margin:0}.chip.vwc{background:#ecfdf5;color:#047857;border-color:#a7f3d0}   /* v274 거래처 → 워크센터 보내기 */
 details.rec>summary .rt{flex:1}
 details.rec>summary input.pk{flex:none;margin:0}
 .empty{color:var(--muted);border:1px dashed var(--line2);border-radius:12px;padding:18px;font-size:13px;background:var(--fill4)}
@@ -471,7 +472,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v273</span>
+    <span class="ver">v274</span>
   </div>
 </header>
 <div class="wrap">
@@ -6611,6 +6612,66 @@ function delMany(s,rows,mode){
     flash(done+'건을 지웠습니다.'+(kept?' '+kept+'건은 그 사이 '+(mode===2?'바뀌어':'진행중·완료로 바뀌어')+' 남겼습니다.':'')+(fail?' '+fail+'건은 지우지 못했습니다. 잠시 뒤 다시 시도해 주세요.':''),!!fail);
   });
 }
+/* ---------- v274 거래처 분류 — 워크센터 보내기 ----------
+   사장님 11-16 「입력폼 거래처등록에 현재 불러온거래처를 분류하는 기능을 만들어줘 첫번째기능은 워크센터 보내기야 저장된 업체를 체크해서 보내기 버튼 누르면 워크센터등록의 목록이 되도록해줘」.
+   거래처등록 저장한 항목(불러온 것 포함) 줄 체크 칸 + 「전체 선택」 + 「워크센터 보내기 N건」 → 체크한 거래처마다 erp_workcenters 대기 문서 하나(stepAdd = 보통 저장 길, 깨우미 신호 포함).
+   ⚠ 임시(11-16 erp_workcenters 17건을 보고 정함): 워크센터 = 외주거래처 = 거래처명 그대로 · 창고 6칸 = 거래처명(사장님-규칙 10-31 「창고 6칸 같은 이름」) · 워크센터구분 사외외주 · 나머지 칸 = 워크센터등록 칸 처음 값.
+   이미 있음 = 워크센터등록(오류·불러온 것 포함 모든 문서)에 워크센터 또는 외주거래처가 그 거래처명인 문서 → 만들지 않음. 같은 이름 거래처를 두 개 골라도 하나만.
+   삭제 체크 칸이 있는 줄(대기·오류)은 그 칸 하나를 같이 쓴다(체크 = 삭제 선택 + 보내기 선택). 영림원에는 안 씀. */
+var vwcBusy=false;
+function vwcName(r){return String(r&&r.name||'').trim();}
+function vwcOf(r){var n=vwcName(r);if(!n)return null;return (data.workcenters||[]).filter(function(w){return String(w.name||'').trim()===n||String(w.vendor||'').trim()===n;})[0]||null;}
+function vwcChip(r){var w=vwcOf(r);if(!w)return null;return h('span',{class:'chip vwc',title:'워크센터 '+(w.name||'')+' · '+(w.status||'대기')},w.status==='완료'?'워크센터 있음':'워크센터 보냄');}
+function vwcDoc(r){
+  var s=BYKEY.workcenters,n=vwcName(r),v={};
+  s.fields.forEach(function(f){v[f.k]=fieldDef(f);});
+  Object.assign(v,{name:n,vendor:n,kind:'사외외주',whMat:n,whProd:n,whDeliv:n,whSite:n,whIn:n,whSemi:n});
+  v=normVals(s,v);v.sentFrom='거래처등록';v.vendorId=r.id||'';v.tmpRule='임시(v274): 워크센터·외주거래처·창고 6칸 = 거래처명, 워크센터구분 = 사외외주';
+  return v;
+}
+function vwcKit(rows){
+  if(!canCol('erp_workcenters','w'))return {bar:null,pk:function(r,c){return c;}};
+  var keep=picked['vendors#wc']||{},ids={};rows.forEach(function(r){ids[r.id]=1;});
+  Object.keys(keep).forEach(function(k){if(!ids[k])delete keep[k];});picked['vendors#wc']=keep;
+  var boxes=[];
+  var sel=function(){return rows.filter(function(r){return keep[r.id];});};
+  var all=h('input',{type:'checkbox',class:'pk','aria-label':'전체 선택',on:{change:function(){var v=all.checked;
+    boxes.forEach(function(c){if(c.checked!==v){c.checked=v;c.dispatchEvent(new Event('change'));}});draw();}}});
+  var btn=h('button',{type:'button',class:'btn small',on:{click:function(){vwcSend(sel());}}});
+  function draw(){var n=sel().length;btn.textContent='워크센터 보내기'+(n?' '+n+'건':'');btn.disabled=!n||vwcBusy;
+    all.checked=!!rows.length&&n===rows.length;all.indeterminate=n>0&&n<rows.length;}
+  draw();
+  return {bar:rows.length?h('div',{class:'delbar vwcbar'},h('label',{class:'vwcall'},all,'전체 선택'),btn):null,
+    pk:function(r,c){
+      if(!c)c=h('input',{type:'checkbox',class:'pk','aria-label':'선택',on:{click:function(e){e.stopPropagation();}}});
+      if(keep[r.id]&&!c.checked){c.checked=true;c.dispatchEvent(new Event('change'));}
+      else if(c.checked)keep[r.id]=1;
+      c.addEventListener('change',function(){if(c.checked)keep[r.id]=1;else delete keep[r.id];draw();});
+      boxes.push(c);draw();return c;}};
+}
+function vwcSend(rows){
+  if(!db){flash('저장소에 연결되지 않아 보낼 수 없습니다.',true);return;}
+  if(vwcBusy||!rows.length)return;
+  if(data.workcenters==null){flash('워크센터등록 목록을 아직 읽지 못했습니다. 잠시 뒤 다시 눌러 주세요.',true);return;}
+  var s=BYKEY.workcenters,made=[],had=[],bad=[],seen={},noOut=0;
+  vwcBusy=true;renderList();
+  freshCheck().then(function(old){
+    if(old){vwcBusy=false;renderList();flash(old,true);return;}
+    return rows.reduce(function(p,r){return p.then(function(){
+      var n=vwcName(r);
+      if(!n){bad.push('(이름 없음)');return;}
+      if(seen[n]||vwcOf(r)){had.push(n);return;}
+      seen[n]=1;
+      return stepAdd(s,vwcDoc(r)).then(function(x){dataPut('workcenters',x.doc,{id:x.id});made.push(n);
+        if((r.kinds||[]).indexOf('외주가공거래처')<0)noOut++;},function(e){bad.push(n+'('+errText(e)+')');});
+    });},Promise.resolve()).then(function(){
+      vwcBusy=false;picked['vendors#wc']={};picked.vendors={};
+      renderList();renderNav();renderSum();
+      flash('워크센터등록 '+made.length+'건 만듦 · 이미 있음 '+had.length+'건 건너뜀'+(had.length?'('+had.join(', ')+')':'')+'.'+
+        (noOut?' 외주가공거래처 아님 '+noOut+'건.':'')+(bad.length?' 못 만듦 '+bad.length+'건: '+bad.join(', ')+'.':''),!!bad.length);
+    });
+  });
+}
 function renderList(){
   if(!listBox)return;
   var s=BYKEY[cur];
@@ -6623,7 +6684,9 @@ function renderListIn(s,listBox,title){
   var dels=(a||[]).filter(function(r){return delOk(s,r);}),kit=delKit(s,dels);
   var gkit=delKit(s,gone.filter(function(r){return delOk(s,r);}),1);
   var dkit=delKit(s,(a||[]).filter(function(r){return delOkDone(s,r);}),2),kit0=kit;   /* v216 완료 문서 */
-  kit={bar:kit0.bar,pk:function(r){return kit0.pk(r)||dkit.pk(r);}};
+  var wk=s.key==='vendors'&&a?vwcKit(a):null;   /* v274 거래처 분류 — 워크센터 보내기(체크 칸은 삭제 체크 칸과 한 칸) */
+  kit={bar:kit0.bar,pk:function(r){var c=kit0.pk(r)||dkit.pk(r);return wk?wk.pk(r,c):c;}};
+  if(wk&&wk.bar)head.append(wk.bar);
   if(kit0.bar)head.append(kit0.bar);if(dkit.bar)head.append(dkit.bar);
   if(a==null){listBox.replaceChildren(head,h('div',{class:'empty'},'불러오는 중입니다.'));return;}
   var openIds={};
@@ -6685,6 +6748,7 @@ function recCard(s,r,kit,openIds){
         (function(){var g=rateGap(s,r);return g?h('span',{class:'chip 오류',title:g},'환율 다름'):null;})(),   /* v167 수입입고 ≠ B/L */
         (function(){var u=st!=='완료'?unregLabs(s,r):[];return u.length?h('span',{class:'chip unreg',title:'미등록: '+u.join('·')},'미등록'):null;})(),   /* v117 목록 밖 값 */
         ylwGone(r)?h('span',{class:'chip gone',title:'영림원 불러오기('+r.ylwGone+')에서 영림원에 없음'},'영림원에 없음'):null,   /* v104 */
+        s.key==='vendors'?vwcChip(r):null,   /* v274 워크센터 있음/보냄 */
         h('span',{class:'chip '+st},st)),
       h('div',{class:'recbody'},
         gap?h('div',{class:'gapnote'},gap==='공정 없음'?'안에 공정이 없어 8단계에서 고를 수 없습니다. 「공정 채우기」로 공정을 넣고 저장하면 입력 작업자가 영림원 상세를 채웁니다.':'공정을 읽지 못해 8단계에서 고를 수 없습니다. 위 「영림원에서 불러오기」를 다시 눌러 주세요.'):null,
