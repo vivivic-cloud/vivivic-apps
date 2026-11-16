@@ -13,6 +13,8 @@
      v1.3.0(11-16): 사장님 「…다른 달에만 있는 것들은 양식 제목만 있는 빈칸으로 남겨서라도 양식은 동일하게 나타나게 해 줘.」 — 9달 칸을 합친 한 양식(16칸)으로 모든 달을 같은 차례로.
        그 달에 없는 칸은 제목만, 칸은 빈칸. 5월 「출고예정일」 은 「출고예정일(입고처)」 칸에, 「출고일」 은 따로(「임시」). 창고 값·단품 검색은 그대로.
      v1.3.1(11-16): 사장님 「한 칸으로 합치기」 — 6~9월 「출고일」 도 같은 칸으로. 칸 제목 「출고예정일(입고처) / 출고일」(PDF 두 이름을 이음). 15칸.
+     v1.4.0(11-16): 사장님 「재단 세부내역 각 열 가로 넓이를 조절 가능하게 해 주세요.」 — 칸 머리 오른쪽 경계를 끌어 칸마다 너비를 넓히고 좁힌다(마우스·손가락).
+       고친 너비는 이 브라우저에 남는다(localStorage, 칸 이름마다 · 모든 달 같이). 경계를 두 번 누르면 그 칸만 처음 너비로. 칸·값·디자인은 그대로.
 
      ⚠ 값은 창고(artifacts/vivivic-4b7ef/public/data/발주역입력_재단)에서 **읽기만** 한다.
         창고에 넣는 것은 tools/재단내역서읽기.py(드라이브 PDF → 창고). 공개 저장소라 업무 값은 이 파일에 없다.
@@ -98,6 +100,17 @@ html,body{height:100%;overflow:hidden}
 .dpr-t td.num{text-align:right}
 .dpr-t .dpr-k{position:sticky;left:0;z-index:1;font-weight:700;color:var(--vg-ink)}
 .dpr-t th.dpr-k{background:var(--vg-fill)}
+/* 칸 너비 조절(v1.4.0) — 칸 머리 오른쪽 경계 손잡이(.칸끈)를 끈다. 한 칸이라도 고치면 표를 고정 너비(colgroup)로 바꾸고,
+   좁혀 넘치는 글은 칸 안에서 잘린다(…). 손잡이는 평소 안 보이고, 마우스를 올리거나 끌 때만 경계에 선이 진해진다. */
+.dpr-t th{position:relative}
+.dpr-t th.dpr-k{position:sticky}
+.칸끈{position:absolute;top:0;right:0;bottom:0;width:8px;cursor:col-resize;touch-action:none;z-index:2}
+.칸끈:hover,.칸끈.끄는중{background:linear-gradient(to right,transparent 6px,#9C9C98 6px)}
+@media (pointer:coarse){.칸끈{width:16px}.칸끈:hover,.칸끈.끄는중{background:linear-gradient(to right,transparent 14px,#9C9C98 14px)}}
+.dpr-t.고정{table-layout:fixed}
+.dpr-t.고정 th,.dpr-t.고정 td{overflow:hidden;text-overflow:ellipsis}
+.dpr-t.고정 .vk input,.dpr-t.고정 .vk button{min-width:0}
+body.칸끄는중{cursor:col-resize;user-select:none;-webkit-user-select:none}
 /* 제품명 칸 단품 검색(v1.2.0) — 칸 안에 맞게 작게(표 글씨와 같은 11.5px). 고른 것은 단품명 + 작은 코드 */
 .dpr-t td.pc .vk{margin:2px 0 1px}
 .vk input,.vk button{display:block;width:100%;min-width:150px;height:20px;padding:1px 5px;font:inherit;font-size:11.5px;line-height:16px;
@@ -126,7 +139,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.3.1</div>
+  <div class="badge">v1.4.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html" class="on">재단 세부내역</a><a href="보드매입현황.html">보드매입현황</a></nav>
 <h1>재단 세부내역</h1>
@@ -203,7 +216,7 @@ function 그리기(d){
   const 열쇠 = (r,i,n) => 자리[i] < 0 ? 'x:'+n : i===di ? 'd:'+값(r,i) : 'g:'+r.g[자리[i]];
   const 남은 = 칸.map(()=>0);
   let h = '<table class="dpr-t"><thead><tr>' +
-    칸.map((k,i) => `<th class="${i===0?'dpr-k':''}${숫자칸.has(k)?' num':''}">${글(k)}</th>`).join('') + '</tr></thead><tbody>';
+    칸.map((k,i) => `<th class="${i===0?'dpr-k':''}${숫자칸.has(k)?' num':''}" data-k="${글(k)}">${글(k)}<span class="칸끈"></span></th>`).join('') + '</tr></thead><tbody>';
   for(let n=0; n<줄.length; n++){
     const r = 줄[n];
     h += '<tr>';
@@ -221,7 +234,58 @@ function 그리기(d){
   h += '</tbody></table>';
   속.innerHTML = '<div class="표통">' + h + '</div>';
   속.querySelector('.표통').addEventListener('scroll', () => { if(후보 && 후보칸) 후보자리(후보칸); });   /* 표를 밀면 후보 목록이 칸을 따라간다 */
+  너비맞추기(속.querySelector('.dpr-t'));
 }
+
+/* ════ 칸 너비 조절 (v1.4.0) ════
+   사장님 11-16: 「재단 세부내역 각 열 가로 넓이를 조절 가능하게 해 주세요.」
+   칸 머리 오른쪽 경계(.칸끈)를 끌면 그 칸 너비가 바뀐다. 고친 너비 = 이 브라우저 localStorage `발주역입력_재단_칸너비` {칸 이름: px}
+   (화면 기억용 — 창고에 안 넣음, 모든 달 같은 칸 이름이면 같은 너비). 경계를 두 번 누르면(더블클릭·두 번 톡) 그 칸만 처음 너비(내용만큼)로.
+   고친 칸이 없으면 표는 예전 그대로(내용만큼). 있으면 칸마다 지금 너비를 재어 colgroup 에 박고 고친 칸만 바꾼다. */
+const 너비열쇠 = '발주역입력_재단_칸너비';
+let 칸너비 = {};
+try{ 칸너비 = JSON.parse(localStorage.getItem(너비열쇠) || '{}') || {}; }catch(e){ 칸너비 = {}; }
+function 너비저장(){ try{ localStorage.setItem(너비열쇠, JSON.stringify(칸너비)); }catch(e){} }
+function 너비맞추기(t){
+  if(!t) return;
+  t.querySelector('colgroup')?.remove(); t.classList.remove('고정'); t.style.width = '';
+  const ths = [...t.querySelectorAll('thead th')];
+  if(!ths.some(th => 칸너비[th.dataset.k])) return;
+  const 잰 = ths.map(th => th.getBoundingClientRect().width);   /* 내용만큼 너비(고치기 전) */
+  const cg = document.createElement('colgroup');
+  let 합 = 0;
+  ths.forEach((th,i) => { const w = Math.round(칸너비[th.dataset.k] || 잰[i]); 합 += w; const c = document.createElement('col'); c.style.width = w+'px'; cg.appendChild(c); });
+  t.prepend(cg); t.style.width = 합+'px'; t.classList.add('고정');
+}
+let 톡때 = 0, 톡칸 = null;
+document.addEventListener('pointerdown', e => {
+  const 끈 = e.target.closest('.칸끈'); if(!끈 || e.button > 0) return;
+  e.preventDefault();
+  if(document.activeElement && document.activeElement.matches('.vk input')) document.activeElement.blur();
+  const th = 끈.parentElement, t = th.closest('.dpr-t'), k = th.dataset.k, i = [...th.parentElement.children].indexOf(th), x0 = e.clientX;
+  let col = null, 처음 = 0, 표처음 = 0;
+  끈.setPointerCapture(e.pointerId); 끈.classList.add('끄는중'); document.body.classList.add('칸끄는중');
+  const 움 = ev => {
+    const dx = ev.clientX - x0;
+    if(!col){
+      if(Math.abs(dx) <= 3) return;   /* 3px 넘게 끌어야 시작 — 그냥 누름은 너비를 안 바꾼다 */
+      if(!t.classList.contains('고정')){ 칸너비[k] = th.getBoundingClientRect().width; 너비맞추기(t); }
+      col = t.querySelector('colgroup').children[i]; 처음 = parseFloat(col.style.width); 표처음 = parseFloat(t.style.width);
+    }
+    const w = Math.max(24, Math.round(처음 + dx));
+    col.style.width = w+'px'; t.style.width = (표처음 - 처음 + w)+'px'; 칸너비[k] = w;
+  };
+  const 끝 = () => {
+    끈.removeEventListener('pointermove', 움); 끈.removeEventListener('pointerup', 끝); 끈.removeEventListener('pointercancel', 끝);
+    끈.classList.remove('끄는중'); document.body.classList.remove('칸끄는중');
+    if(col){ 너비저장(); 톡때 = 0; return; }
+    /* 안 끌고 두 번 누름 = 그 칸만 처음 너비로 */
+    const 지금 = Date.now();
+    if(톡칸 === k && 지금 - 톡때 < 400){ if(k in 칸너비){ delete 칸너비[k]; 너비저장(); 너비맞추기(t); } 톡때 = 0; }
+    else { 톡칸 = k; 톡때 = 지금; }
+  };
+  끈.addEventListener('pointermove', 움); 끈.addEventListener('pointerup', 끝); 끈.addEventListener('pointercancel', 끝);
+});
 
 /* ════ 벤더피아 단품 연결 (v1.2.0) ════
    단품 목록 = 창고 `납품내역_단품목록` 의 `단품_N` 문서들, 칸 `줄` = ["단품코드\t단품명\t판매상태", …] (판매중 먼저).
