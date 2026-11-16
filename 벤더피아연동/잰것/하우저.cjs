@@ -1,5 +1,5 @@
 /* **하우저** 메뉴를 재는 자 (11-16 [새 지시 하우저 메뉴]). 자료는 전부 지어낸 값이다.
-   흉내 = 사장님 크롬에서 잰 상품관리 꼴: #oGrid 34칸(첫 칸 체크)·숨은 칸 4개(th class 에 `ig…` 생성 이름)·「총 N건」·배송사 고르는 칸 ddlDCo 에 「하우저」·쪽당 27/100/500/700.
+   흉내 = 사장님 크롬에서 잰 상품관리 꼴(바깥 틀 줄 2칸·1칸 포함 — 처음 판이 그것을 머리로 집었다): #oGrid 34칸(첫 칸 체크)·숨은 칸 4개(th class 에 `ig…` 생성 이름)·「총 N건」·배송사 고르는 칸 ddlDCo 에 「하우저」·쪽당 27/100/500/700.
    돌리기: NODE_PATH=<playwright(-core) 있는 node_modules> VP_EXE=<크로미움> node 잰것/하우저.cjs */
 let pw; try { pw = require('playwright'); } catch (e) { pw = require('playwright-core'); }
 const { chromium } = pw;
@@ -24,7 +24,7 @@ const 쪽html = ({ 줄들, 지금, 전체, 쪽크기, 배송사 = '전체', 상�
 <select name="ctl00$Contents$ddlRowCnt">${[27, 100, 500, 700].map((n) => `<option value="${n}"${n === 쪽크기 ? ' selected' : ''}>${n}</option>`).join('')}</select>
 <input type="image" id="btnSearch" name="ctl00$Contents$btnSearch" src="s.gif"><input type="image" name="ctl00$Contents$btnDelete" src="d.gif"><input type="image" name="ctl00$Contents$btnChangeStatus" src="c.gif">
 <span>총 ${전체}건</span>
-<div id="oGrid"><table><tr>${머리.map((h) => `<th class="igg_HeaderCaption  nowrap${숨은[h] ? ' ' + 숨은[h] : ''}" style="width: ${숨은[h] ? 0 : 40}px;">${h}</th>`).join('')}</tr></table><div><table>${줄들.map((값) => `<tr>${값.map((v, i) => `<td>${i === 0 ? '<input id="chkItem" type="checkbox" name="ctl00$Contents$oGrid$it0_0">' : v || '&nbsp;'}</td>`).join('')}</tr>`).join('')}</table></div></div>
+<div id="oGrid"><table><tr><th>틀</th><th><table><tr><th class="igg_HeaderCaption">틀안</th></tr></table></th></tr><tr><th>틀둘</th></tr></table><table><tr>${머리.map((h) => `<th class="igg_HeaderCaption  nowrap${숨은[h] ? ' ' + 숨은[h] : ''}" style="width: ${숨은[h] ? 0 : 40}px;">${h}</th>`).join('')}</tr></table><div><table>${줄들.map((값) => `<tr>${값.map((v, i) => `<td>${i === 0 ? '<input id="chkItem" type="checkbox" name="ctl00$Contents$oGrid$it0_0">' : v || '&nbsp;'}</td>`).join('')}</tr>`).join('')}</table></div></div>
 <div id="Pager1"><input type="hidden" name="ctl00$Contents$Pager1$hdCurrentPage" value="${지금}">${링크.join('')}</div>
 </form></body></html>`;
 };

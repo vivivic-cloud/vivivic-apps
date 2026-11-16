@@ -3,7 +3,7 @@
    화면 = `orderMst.aspx#vgHau`(메인 메뉴). `search.js` 가 쪽 머리(「하우저」)와 표(`VP하우저표` = CS등록·CS정산과 같은 표)를 세우고 이 글을 부른다
    — 확장 안 글은 그대로(덮어쓰기 불필요).
    ⚠⚠ **읽기 전용.** 벤더피아에는 상품관리(`/System/Master/salesGoods.aspx`) GET 한 번 + 조회 POST(+ 700줄 넘으면 쪽 넘김)만 간다. 저장 0.
-   길(11-16 사장님 크롬에서 잼, CLAUDE.md 「하우저」):
+   길(11-16 사장님 크롬에서 잼, CLAUDE.md 「하우저」) — 머리 = 제 칸이 th.igg_HeaderCaption 인 줄(바깥 틀 줄 아님):
      · 배송사는 상품관리 목록 **줄마다** 붙는다(칸 「배송사명」). 상품관리 조회 폼에 배송사 고르는 칸 `ddlDCo`(화면 글자 「배송사」)가 있고
        그 안에 「하우저」가 있다 → 그 칸으로 벤더피아가 거른 줄을 그대로 받는다(값은 글자 「하우저」로 찾는다, 번호를 박지 않는다).
      · 판매상태 = **판매중만(임시)** — 상품관리의 기본값과 같다. 등록기간 = 2000-01-01 ~ 오늘(기본 5년을 넓힘, 임시 — 잴 때는 5년과 같은 수).
@@ -48,7 +48,10 @@
     const g = doc.getElementById("oGrid");
     if (!g) throw new 탈("상품관리 목록(#oGrid)을 찾지 못했습니다. 상품관리 화면이 바뀌었는지 확인이 필요합니다.");
     const 전체 = [...g.querySelectorAll("tr")];
-    const 머리줄 = 전체.find((tr) => tr.querySelector("th.igg_HeaderCaption"));
+    /* ⚠ 바깥 틀 줄(2칸·1칸, 안에 머리 표를 품음)도 `querySelector` 로는 머리 칸이 잡힌다 — 안에 줄을 품지 않고 **제 칸**에 머리 칸이 있는 줄 가운데
+       칸이 가장 많은 줄(11-16 실제 화면에서 처음 판이 2칸 바깥 줄을 집어 2줄만 그렸다) */
+    const 머리줄 = 전체.filter((tr) => !tr.querySelector("tr") && [...tr.cells].some((c) => c.matches("th.igg_HeaderCaption")))
+      .sort((a, z) => z.cells.length - a.cells.length)[0];
     const 총 = Number(((doc.body.textContent || "").match(/총\s*([\d,]+)\s*건/) || [])[1]?.replace(/,/g, "") ?? NaN);
     if (!머리줄) return { heads: [], rows: [], 총: Number.isNaN(총) ? 0 : 총 };
     const n = 머리줄.cells.length;
