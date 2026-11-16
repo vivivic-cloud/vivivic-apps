@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.3.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.4.0
      v1.0.0(11-16): 첫 판. 거래처(시트) 버튼 → 그 시트의 표. 거래처 시트는 「전체 · 1월~10월 · 1~10월 누계 · 1~10월 매입품목」 으로 고른다.
        칸 이름·값은 엑셀 글자(셀 표시 꼴) 그대로. 표 꼴은 재단.html v1.1.0 셀 모양(칸 선 · 11.5px · 여백 2px 5px · 숫자 오른쪽)과 같다.
      v1.1.0(11-16): 거래처 메뉴 끝에 「영림원등록」 — 월별 표에서 납품제품명(품목)을 겹치지 않게 한 줄씩, 칸은 품목 · 규격 · 단가만.
@@ -15,6 +15,11 @@
        단가 칸 오른쪽에 그 줄(품목+규격)의 1~10월 공급가액 합(엑셀 칸 이름 그대로 — 현진산업·현준보드(서광)는 「별도 공급가액(원)」, 부가세 별도 — 임시).
        반품(음수)·무상 줄도 엑셀 값 그대로 더함 · 표 맨 아래 「[1~10월 총계]」 줄 = 거래처 전체 합.
 
+     v1.4.0(11-16): 거래처 메뉴 끝에 「영림원 입력폼」 — 사장님: 「보드매입현황 영림원등록에 영림원 입력폼을 분석해서 관련 자료를 입력할 수 있는 폼으로 만들어서 새로운 시트에 표기해 봐.」
+       영림원등록 줄(품목+규격) 하나 = 한 줄, 칸 = 영림원 자재등록(500251) 10칸 + 구매단가등록(501868) 표 칸(적용종료일 잠김 칸 뺌) — 칸 이름·선택지는
+       영림원외주입력/erp-spec.json(materials·purprices)·영림원기본정보입력/칸.json 의 실제 화면 기록 그대로(11-01·11-03·11-06 화면).
+       미리 채운 값 + 고친 값 → 창고 발주역입력_영림원폼(거래처마다 문서, 고친 칸만). 원본 발주역입력_보드매입 은 읽기만. 양식 다운로드·양식 올리기(엑셀). 영림원 등록 기능 없음.
+
      ⚠ 값은 창고(artifacts/vivivic-4b7ef/public/data/발주역입력_보드매입)에서 **읽기만** 한다.
         창고에 넣는 것은 tools/보드매입읽기.py(드라이브 엑셀 → 창고). 공개 저장소라 업무 값은 이 파일에 없다. -->
 <html lang="ko">
@@ -25,7 +30,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
-    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
     const app = initializeApp({
         apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
         authDomain: "vivivic-4b7ef.firebaseapp.com",
@@ -36,7 +41,7 @@
     });
     const auth = getAuth(app);
     window.db = getFirestore(app);
-    window.fbRead = { doc, getDoc };
+    window.fbRead = { doc, getDoc, setDoc };
     onAuthStateChanged(auth, (u) => {
         if (!u) { signInAnonymously(auth).catch(e => window.목록못읽음('창고에 들어가지 못했습니다', (e&&(e.code||e.message))||'')); return; }
         window.목록읽기();
@@ -104,6 +109,24 @@ html,body{height:100%;overflow:hidden}
 .표제목{font-size:12px;font-weight:700;color:var(--vg-ink);padding:0 0 5px;white-space:nowrap}
 .표+.표{margin-top:16px}
 .글{margin-top:14px;font-size:11.5px;line-height:1.6;color:var(--vg-muted);max-width:1060px;white-space:normal}
+/* v1.4.0 영림원 입력폼 — 같은 .dpr-t 셀 모양, 칸 안에 바로 적는다 */
+.폼줄{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:0 0 8px;flex-shrink:0}
+.폼상태{font-size:11.5px;color:var(--vg-muted)}
+.폼상태.bad{color:var(--vg-red)}
+.폼표 th.묶,.폼표 td.묶{border-left:1px solid #9C9C98}
+.폼표 th .별,.글 .별{color:var(--vg-red);font-weight:800}
+.폼표 th .임{margin-left:3px;font-size:9.5px;font-weight:700;color:var(--vg-red);border:1px solid var(--vg-red);border-radius:3px;padding:0 2px}
+.폼표 td.참{color:var(--vg-muted)}
+.폼표 td.dpr-k.참{color:var(--vg-ink)}
+.폼표 td.따{color:var(--vg-muted);background:var(--vg-fill)}
+.폼표 td.입{padding:0;white-space:nowrap}
+.폼표 td.입:focus-within{outline:2px solid var(--vg-ink);outline-offset:-2px}
+.폼표 td.입 .표시{font-size:11px;font-weight:700;color:var(--vg-red);padding-left:4px}
+.폼표 input,.폼표 select{font:inherit;font-size:11.5px;line-height:1.3;color:var(--vg-body);border:0;border-radius:0;background:transparent;
+  padding:2px 5px;margin:0;outline:none;min-width:0}
+.폼표 input.num{text-align:right}
+.폼표 select{padding:2px 2px;cursor:pointer}
+.폼표 input[type=date]{width:11em}
 .state{background:var(--vg-fill);border-radius:14px;padding:22px 16px;text-align:center;margin-top:12px}
 .state .big{font-size:14px;font-weight:600;color:var(--vg-ink);padding-bottom:6px}
 .state .sub{font-size:12.5px;color:var(--vg-muted);line-height:1.85}
@@ -114,7 +137,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.3.0</div>
+  <div class="badge">v1.4.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드매입현황</a></nav>
 <h1>보드매입현황</h1>
@@ -185,6 +208,7 @@ function 볼것그리기(){
   if(누표) 버튼.push(['누계', (String(누표.제목).match(/\d+~\d+월\s*누계/)||['누계'])[0]]);
   if(목표) 버튼.push(['매입품목', 목표.칸[0] || '매입품목']);
   버튼.push(['영림원', '영림원등록']);
+  버튼.push(['폼', '영림원 입력폼']);   /* v1.4.0 */
   el.innerHTML = 버튼.map(([k,t]) => `<button class="chip${k===볼것?' on':''}" data-k="${글(k)}">${글(t)}</button>`).join('');
   el.querySelectorAll('.chip').forEach(b => b.onclick = () => {
     볼것 = b.dataset.k; el.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x===b)); 그리기();
@@ -213,7 +237,7 @@ const 수 = s => { s = String(s??'').trim().replace(/,/g,''); if(s===''||s==='-'
   const m = s.match(/^\((.*)\)$/); return m ? -Number(m[1])||0 : Number(s)||0; };
 const 무상 = 값 => 값==='0' || 값==='-';
 const 달들글 = 달 => { const n = 달.map(m => parseInt(m)); return n.length===1 || n[0]===n[n.length-1] ? `${n[0]}월` : `${n[0]}~${n[n.length-1]}월`; };
-function 영림원목록(t, 제목){
+function 품목모으기(t){
   const 칸 = t.칸||[], 품 = 칸.indexOf('납품제품명(품목)'), 규 = 칸.indexOf('규격'), 량 = 칸.indexOf('수량');
   const 단 = 칸.includes('별도 단가(원)') ? 칸.indexOf('별도 단가(원)') : 칸.indexOf('단가(원)');
   /* v1.3.0 합계금액 = 공급가액(부가세 별도) — 단가 칸과 같은 기준. 현진·현준은 「별도 공급가액(원)」(임시) */
@@ -232,14 +256,17 @@ function 영림원목록(t, 제목){
     if(끝 && 끝.값===값){ if(!끝.달.includes(z.월)) 끝.달.push(z.월); }
     else m.흐름.push({ 값, 달:[z.월] });
   }
-  const 줄 = [...모.values()].sort((a,b) => b.량-a.량);
-  const 바뀜 = m => new Set(m.흐름.map(x => x.값)).size > 1;
-  const 단가글 = m => {
-    let h = 바뀜(m) ? '※ ' + m.흐름.map(x => `${글(x.값)}(${달들글(x.달)})`).join(' → ')
-                    : 글(m.흐름.length ? m.흐름[0].값 : (m.무.length ? '0' : ''));
-    if(m.무.length && m.흐름.length) h += ` · 무상(${m.무.map(x => parseInt(x)).join('·')}월)`;
-    return h;
-  };
+  return { 칸, 품, 규, 단, 금, 줄:[...모.values()].sort((a,b) => b.량-a.량) };
+}
+const 바뀜 = m => new Set(m.흐름.map(x => x.값)).size > 1;
+const 단가글 = m => {
+  let h = 바뀜(m) ? '※ ' + m.흐름.map(x => `${글(x.값)}(${달들글(x.달)})`).join(' → ')
+                  : 글(m.흐름.length ? m.흐름[0].값 : (m.무.length ? '0' : ''));
+  if(m.무.length && m.흐름.length) h += ` · 무상(${m.무.map(x => parseInt(x)).join('·')}월)`;
+  return h;
+};
+function 영림원목록(t, 제목){
+  const { 칸, 품, 규, 단, 금, 줄 } = 품목모으기(t);
   const 여러 = 줄.filter(바뀜).length;
   /* 엑셀 표시 꼴 #,##0;(#,##0);- 와 같게(음수 괄호 · 0 은 「-」) */
   const 원 = n => { n = Math.round(n); return n===0 ? '-' : n<0 ? `(${(-n).toLocaleString('ko-KR')})` : n.toLocaleString('ko-KR'); };
@@ -255,6 +282,246 @@ function 영림원목록(t, 제목){
   return h;
 }
 
+/* ---------- v1.4.0 영림원 입력폼 ----------
+   영림원등록 줄(품목+규격) 하나 = 한 줄. 칸 = 영림원 두 화면의 칸 이름·선택지 그대로(실제 화면 기록):
+     자재등록(500251) — erp-spec.json materials fieldMap · 칸.json 「5 자재등록」(11-01 화면 확인, 11-03 실제 저장 2건)
+     구매단가등록(501868) — erp-spec.json purprices fieldMap · 조사-원장-수입-구매.md 「구매단가등록 (501868) — 11-06 실제 화면」(적용종료일은 잠긴 칸이라 뺌)
+   구매단가등록의 품명·품번·규격·단위는 영림원에서 품번을 고르면 자재등록 값이 저절로 들어오는 칸이라, 여기서도 자재등록 칸을 따라 보이기만 한다.
+   창고 발주역입력_영림원폼/{거래처} = {거래처, 줄:[{품목, 규격, 값:{칸키:값}}], 고친때} — 값 = 미리 채운 값과 다르게 고친 칸만.
+   임시 = 미리 채운 값의 대응 근거가 확실하지 않은 칸(머리에 「임시」). */
+const 폼자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_영림원폼'];
+const 폼칸 = [
+  {g:'자재등록', k:'m_name', l:'자재명', req:1, 임시:1},
+  {g:'자재등록', k:'m_code', l:'자재번호', req:1},
+  {g:'자재등록', k:'m_spec', l:'규격', 임시:1},
+  {g:'자재등록', k:'m_eng', l:'영문명'},
+  {g:'자재등록', k:'m_asset', l:'품목자산분류', req:1, o:['원자재','부자재','재공품','저장품','소모품']},
+  {g:'자재등록', k:'m_state', l:'자재상태', req:1, 임시:1, o:['임시','사용','생산중지','거래중지','폐기']},
+  {g:'자재등록', k:'m_io', l:'내외자구분', o:['내자','외자']},
+  {g:'자재등록', k:'m_imp', l:'중요도', o:['A등급','B등급','C등급']},
+  {g:'자재등록', k:'m_unit', l:'기준단위', req:1, o:['M','EA','SET','KG','TON','G','BOX','L','ml']},
+  {g:'자재등록', k:'m_small', l:'자재소분류', req:1},
+  {g:'구매단가등록', k:'p_vendor', l:'구매거래처', req:1, 임시:1},
+  {g:'구매단가등록', k:'p_name', l:'품명', req:1, 따라:'m_name'},
+  {g:'구매단가등록', k:'p_code', l:'품번', 따라:'m_code'},
+  {g:'구매단가등록', k:'p_spec', l:'규격', 따라:'m_spec'},
+  {g:'구매단가등록', k:'p_unit', l:'단위', req:1, 따라:'m_unit'},
+  {g:'구매단가등록', k:'p_io', l:'내외자구분', req:1, o:['내수','Local1(후LC)','Local2(선LC)','직수입']},
+  {g:'구매단가등록', k:'p_cur', l:'통화', req:1, o:['KRW','USD','JPY','EUR','GBP','CAD','CNY']},
+  {g:'구매단가등록', k:'p_price', l:'단가', req:1, n:1, 임시:1},
+  {g:'구매단가등록', k:'p_min', l:'구매최소수량', n:1},
+  {g:'구매단가등록', k:'p_step', l:'구매간격수량', n:1},
+  {g:'구매단가등록', k:'p_from', l:'적용시작일', req:1, d:1},
+  {g:'구매단가등록', k:'p_memo', l:'특이사항'},
+  {g:'구매단가등록', k:'p_maker', l:'제조사'},
+  {g:'구매단가등록', k:'p_days', l:'조달일수', n:1}
+];
+const 폼묶음 = ['자재등록','구매단가등록'];
+const 폼값 = {};            // 거래처 → Map(키 → {칸키:값})
+const 줄키 = m => m.이름 + '\t' + m.규격;
+const 숫자글 = v => String(v ?? '').trim().replace(/,/g,'');
+/* 미리 채우는 값 — 근거는 CLAUDE.md 「영림원 입력폼」 대응표 */
+function 기본값(k, m, 거래처){
+  switch(k){
+    case 'm_name': return m.이름;                 // 납품제품명(품목) — 임시(영림원 자재명 꼴은 「백색 18T」 등)
+    case 'm_spec': return m.규격;                 // 엑셀 규격 — 임시(영림원 원장 규격 꼴 「2440*1220」)
+    case 'm_asset': return '원자재';              // 원장·엣지필름 = 자재등록 원자재(11-01 화면 기록)
+    case 'm_state': return '사용';                // 임시
+    case 'm_io': return '내자';                   // 국내거래처
+    case 'p_vendor': return 거래처;               // 엑셀 시트 이름 — 임시(영림원 거래처명과 같은지 모름)
+    case 'p_io': return '내수';                   // 국내 매입(도움말: 내수 = 품의 → 구매발주·납품·입고)
+    case 'p_cur': return 'KRW';
+    case 'p_price': {                             // 마지막 단가(1~10월 중 마지막에 산 단가) — 임시
+      const 끝 = m.흐름[m.흐름.length-1];
+      return 끝 ? 숫자글(끝.값) : (m.무.length ? '0' : '');
+    }
+  }
+  return '';
+}
+function 칸값(f, m, 거래처){
+  if(f.따라) return 칸값(폼칸.find(x => x.k===f.따라), m, 거래처);
+  const 고친 = (폼값[거래처] && 폼값[거래처].get(줄키(m))) || {};
+  return f.k in 고친 ? 고친[f.k] : 기본값(f.k, m, 거래처);
+}
+const 글너비 = t => [...String(t||'')].reduce((a,c) => a + (c.charCodeAt(0) > 0x2000 ? 2 : 1), 0);
+
+async function 폼받기(s){
+  if(폼값[s]) return;
+  const { doc, getDoc } = window.fbRead;
+  const d = await getDoc(doc(window.db, ...폼자리, s));
+  const 모 = new Map();
+  for(const z of ((d.exists() && d.data().줄) || [])) 모.set(z.품목 + '\t' + z.규격, z.값 || {});
+  폼값[s] = 모;
+}
+const 저장틀 = {};
+function 폼상태(t, 나쁨){ const el = document.getElementById('폼상태'); if(el){ el.textContent = t; el.classList.toggle('bad', !!나쁨); } }
+async function 폼저장(s){
+  const { doc, setDoc } = window.fbRead;
+  const 줄 = [...폼값[s].entries()].filter(([,v]) => Object.keys(v).length)
+    .map(([키, 값]) => { const [품목, 규격] = 키.split('\t'); return { 품목, 규격, 값 }; });
+  await setDoc(doc(window.db, ...폼자리, s), { 거래처:s, 줄, 고친때:new Date().toISOString() });
+}
+function 저장예약(s){
+  폼상태('저장 중…');
+  clearTimeout(저장틀[s]);
+  저장틀[s] = setTimeout(() => 폼저장(s).then(
+    () => 폼상태('저장됨 ' + new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})),
+    e => 폼상태('저장하지 못했습니다 ' + ((e&&(e.code||e.message))||''), true)), 500);
+}
+
+async function 폼그리기(){
+  const s = 고른, 속 = document.getElementById('속');
+  if(!폼값[s]){
+    속.innerHTML = '<div class="state"><div class="big">읽는 중입니다…</div></div>';
+    try{ await 폼받기(s); }
+    catch(e){ 속.innerHTML = `<div class="state"><div class="big">창고를 읽지 못했습니다</div><div class="why">${글((e&&(e.code||e.message))||'')}</div></div>`; return; }
+    if(고른!==s || 볼것!=='폼') return;
+  }
+  const 월표 = (받은[s].표||[]).find(t => t.이름==='월별');
+  const { 칸, 품, 규, 줄 } = 품목모으기(월표);
+  /* 칸 너비 = 머리·값 중 긴 것(글자 수) */
+  const 너비 = {};
+  for(const f of 폼칸){
+    if(f.따라 || f.o || f.d) continue;
+    let w = Math.max(글너비(f.l) + 2, f.n ? 7 : 8);
+    for(const m of 줄) w = Math.max(w, 글너비(칸값(f, m, s)) + 2);
+    너비[f.k] = Math.min(w, 44);
+  }
+  let h = `<table class="dpr-t 폼표"><thead><tr><th class="dpr-k" rowspan="2">${글(칸[품])}</th><th rowspan="2">${글(칸[규])}</th>` +
+    폼묶음.map(g => `<th class="묶" colspan="${폼칸.filter(f => f.g===g).length}">${글(g)}</th>`).join('') + '</tr><tr>' +
+    폼칸.map((f,i) => `<th class="${i===0||폼칸[i-1].g!==f.g?'묶':''}">${글(f.l)}${f.req?'<span class="별">*</span>':''}${f.임시?'<span class="임">임시</span>':''}</th>`).join('') +
+    '</tr></thead><tbody>';
+  for(const m of 줄){
+    const 키 = 줄키(m);
+    h += `<tr data-key="${글(키)}"><td class="dpr-k 참">${글(m.이름)}</td><td class="참">${글(m.규격)}</td>`;
+    폼칸.forEach((f,i) => {
+      const 묶 = i===0||폼칸[i-1].g!==f.g ? ' 묶' : '', v = 칸값(f, m, s);
+      if(f.따라){ h += `<td class="따${묶}" data-따라="${f.따라}">${글(v)}</td>`; return; }
+      let 칸글;
+      if(f.o){
+        const 고를 = [''].concat(f.o); if(v && !고를.includes(v)) 고를.push(v);
+        칸글 = `<select data-k="${f.k}">` + 고를.map(o => `<option${o===v?' selected':''}>${글(o)}</option>`).join('') + '</select>';
+      }else if(f.d){
+        칸글 = `<input type="date" data-k="${f.k}" value="${글(v)}">`;
+      }else{
+        칸글 = `<input data-k="${f.k}" value="${글(v)}" style="width:${너비[f.k]}ch"${f.n?' inputmode="decimal" class="num"':''}>`;
+      }
+      const 여러 = f.k==='p_price' && (바뀜(m) || (!m.흐름.length && m.무.length));
+      h += `<td class="입${묶}"${여러?` title="${글(단가글(m).replace(/<[^>]*>/g,''))}"`:''}>${여러?'<span class="표시">※</span>':''}${칸글}</td>`;
+    });
+    h += '</tr>';
+  }
+  h += '</tbody></table>';
+  h += `<div class="글">${줄.length}줄(영림원등록 줄과 같음) · <span class="별">*</span> = 영림원 필수(빨강) 칸 · 「임시」 = 미리 채운 값의 근거가 확실하지 않은 칸 — 확인해 고쳐 주십시오.<br>` +
+    `자재등록 = 영림원 [기본] 품목정보 › 자재등록(500251) · 구매단가등록 = 구매/수입 › 구매단가등록(501868). 구매단가등록의 품명·품번·규격·단위는 영림원에서 품번을 고르면 자재등록 값이 저절로 들어오는 칸이라 왼쪽 자재등록 칸을 따릅니다.<br>` +
+    `단가 = 1~10월 중 마지막 단가(※ = 단가가 바뀐 품목, 칸에 손을 대면 바뀐 차례가 보입니다) · 고친 칸은 바로 창고에 저장됩니다. 영림원에 넣는 기능은 아직 없습니다.</div>`;
+  속.innerHTML = `<div class="폼줄"><button class="chip" id="양식받기">양식 다운로드</button><button class="chip" id="양식올리기">양식 올리기</button>` +
+    `<input type="file" id="양식파일" accept=".xlsx,.xls" hidden><span id="폼상태" class="폼상태"></span></div><div class="표통">${h}</div>`;
+  const 표 = 속.querySelector('.폼표');
+  const 바꿈 = e => {
+    const el = e.target, k = el.dataset.k; if(!k) return;
+    const tr = el.closest('tr'), 키 = tr.dataset.key, m = 줄.find(x => 줄키(x)===키); if(!m) return;
+    const f = 폼칸.find(x => x.k===k);
+    let v = f.n ? 숫자글(el.value) : String(el.value).trim();
+    if(f.n && v && isNaN(Number(v))){ 폼상태(`「${f.l}」 에는 숫자만 넣을 수 있습니다`, true); return; }
+    if(f.n && el.value!==v) el.value = v;
+    const 고친 = 폼값[s].get(키) || {};
+    if(v === 기본값(k, m, s)) delete 고친[k]; else 고친[k] = v;
+    폼값[s].set(키, 고친);
+    tr.querySelectorAll(`td[data-따라="${k}"]`).forEach(td => td.textContent = v);
+    저장예약(s);
+  };
+  표.addEventListener('change', 바꿈);
+  document.getElementById('양식받기').onclick = 양식다운로드;
+  const 파일 = document.getElementById('양식파일');
+  document.getElementById('양식올리기').onclick = () => 파일.click();
+  파일.onchange = () => { const f = 파일.files[0]; 파일.value = ''; if(f) 양식올리기(f); };
+}
+
+/* 양식 다운로드·올리기(엑셀) — 시트 = 거래처, 1행 = 묶음(보드매입현황 · 자재등록 · 구매단가등록), 2행 = 칸 이름, 3행부터 줄.
+   올리기는 납품제품명(품목)+규격 으로 줄을 찾아 고칠 수 있는 칸만 읽는다(구매단가등록 품명·품번·규격·단위는 자재등록 칸을 따르므로 안 읽음). */
+const XLSX_URL = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
+let xlsxP = null;
+function loadXlsx(){
+  if(window.XLSX) return Promise.resolve(window.XLSX);
+  if(!xlsxP) xlsxP = new Promise((ok,no) => { const sc = document.createElement('script'); sc.src = XLSX_URL;
+    sc.onload = () => ok(window.XLSX); sc.onerror = () => { xlsxP = null; sc.remove(); no(new Error('xlsx')); }; document.head.append(sc); });
+  return xlsxP;
+}
+const 거래처시트들 = () => 시트들.filter(s => ((받은[s]||{}).표||[]).some(t => t.이름==='월별'));
+async function 모두받기(){
+  const { doc, getDoc } = window.fbRead;
+  for(const s of 시트들){
+    if(!받은[s]){ const d = await getDoc(doc(window.db, ...창고자리, s)); 받은[s] = d.exists() ? d.data() : { 표:[] }; }
+  }
+  for(const s of 거래처시트들()) await 폼받기(s);
+}
+const 머리2 = () => ['납품제품명(품목)','규격', ...폼칸.map(f => f.l)];
+async function 양식다운로드(){
+  폼상태('양식을 만드는 중…');
+  try{
+    const X = await loadXlsx(); await 모두받기();
+    const wb = X.utils.book_new();
+    for(const s of 거래처시트들()){
+      const 월표 = 받은[s].표.find(t => t.이름==='월별'), { 줄 } = 품목모으기(월표);
+      const 머리1 = ['보드매입현황',''], 합칠 = [{s:{r:0,c:0},e:{r:0,c:1}}];
+      let c = 2;
+      for(const g of 폼묶음){ const n = 폼칸.filter(f => f.g===g).length; 머리1.push(g, ...Array(n-1).fill('')); 합칠.push({s:{r:0,c},e:{r:0,c:c+n-1}}); c += n; }
+      const 줄들 = 줄.map(m => [m.이름, m.규격, ...폼칸.map(f => 칸값(f, m, s))]);
+      const ws = X.utils.aoa_to_sheet([머리1, 머리2(), ...줄들]);
+      ws['!merges'] = 합칠;
+      ws['!cols'] = 머리2().map((t,i) => ({ wch: Math.min(40, Math.max(글너비(t)+2, ...줄들.map(r => 글너비(r[i])+2))) }));
+      X.utils.book_append_sheet(wb, ws, s.slice(0,31));
+    }
+    const bytes = X.write(wb, {type:'array', bookType:'xlsx'});
+    const u = URL.createObjectURL(new Blob([bytes], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+    const a = document.createElement('a'); a.href = u; a.download = '보드매입현황_영림원입력폼_양식.xlsx'; document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(u), 4000);
+    폼상태('양식을 받았습니다(거래처마다 시트 하나).');
+  }catch(e){ 폼상태('양식을 만들지 못했습니다 ' + ((e&&(e.code||e.message))||''), true); }
+}
+function 날짜글(v){
+  v = String(v ?? '').trim(); if(!v) return '';
+  let m = v.match(/^(\d{4})[-./](\d{1,2})[-./](\d{1,2})$/); if(m) return `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/); if(m){ const y = m[3].length===2 ? '20'+m[3] : m[3]; return `${y}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`; }
+  m = v.match(/^(\d{8})$/); if(m) return `${v.slice(0,4)}-${v.slice(4,6)}-${v.slice(6)}`;
+  return v;
+}
+async function 양식올리기(file){
+  폼상태('양식을 읽는 중…');
+  try{
+    const X = await loadXlsx(); await 모두받기();
+    const wb = X.read(await file.arrayBuffer(), {type:'array'});
+    const 머리 = 머리2(), 알림 = [], 고친시트 = [];
+    for(const s of 거래처시트들()){
+      const ws = wb.Sheets[s.slice(0,31)]; if(!ws) continue;
+      const aoa = X.utils.sheet_to_json(ws, {header:1, raw:false, defval:''});
+      const hi = aoa.slice(0,6).findIndex(r => String(r[0]).trim()==='납품제품명(품목)');
+      if(hi<0 || 머리.some((t,i) => String(aoa[hi][i]??'').trim()!==t)){ 알림.push(`${s}: 칸 차례가 양식과 다릅니다(안 읽음)`); continue; }
+      const 월표 = 받은[s].표.find(t => t.이름==='월별'), { 줄 } = 품목모으기(월표);
+      const 찾 = new Map(줄.map(m => [줄키(m), m]));
+      let 맞 = 0, 없 = 0;
+      for(const r of aoa.slice(hi+1)){
+        const 이름 = String(r[0]??'').trim(), 규격 = String(r[1]??'').trim(); if(!이름) continue;
+        const m = 찾.get(이름+'\t'+규격); if(!m){ 없++; continue; }
+        const 고친 = {};
+        폼칸.forEach((f,i) => {
+          if(f.따라) return;
+          let v = String(r[i+2]??'').trim();
+          if(f.n) v = 숫자글(v); if(f.d) v = 날짜글(v);
+          if(v !== 기본값(f.k, m, s)) 고친[f.k] = v;
+        });
+        폼값[s].set(줄키(m), 고친); 맞++;
+      }
+      await 폼저장(s); 고친시트.push(s);
+      알림.push(`${s} ${맞}줄` + (없?` · 못 찾은 줄 ${없}`:''));
+    }
+    if(!고친시트.length && !알림.length) 알림.push('거래처 이름과 같은 시트가 없습니다');
+    if(볼것==='폼') await 폼그리기();
+    폼상태((고친시트.length ? '올려서 저장했습니다 — ' : '') + 알림.join(' · '), !고친시트.length);
+  }catch(e){ 폼상태('양식을 읽지 못했습니다 ' + ((e&&(e.code||e.message))||''), true); }
+}
+
 function 그리기(){
   const d = 받은[고른], 속 = document.getElementById('속');
   const 표들 = d.표||[];
@@ -268,6 +535,8 @@ function 그리기(){
     const t = 표들.find(t => t.이름==='누계'); h = 표글(t, t.줄||[], t.제목);
   }else if(볼것==='영림원'){
     h = 영림원목록(월표, d.제목);
+  }else if(볼것==='폼'){
+    폼그리기(); return;
   }else if(볼것==='매입품목'){
     const t = 표들.find(t => t.이름==='매입품목'); h = 표글(t, t.줄||[], d.제목);
   }else{
