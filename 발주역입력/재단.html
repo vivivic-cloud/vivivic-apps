@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 재단 — 에이엠티 「재단 세부내역」(상세내역서 PDF, 월별)을 달마다 표로 본다.
      사장님 11-16: 「월별 재단내역이 목록으로 보이는 페이지를 만들어라.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.6.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.6.1
      v1.0.0(11-16): 첫 판. 월 버튼 → 그 달 표 하나. 칸 이름·값은 PDF 글자 그대로, 합친 칸(원장수량·재단금액 묶음 등)은 rowspan 으로 그대로 살린다.
      v1.1.0(11-16): 표를 셀 모양으로 촘촘히 — 칸마다 선, 글씨 11.5px, 여백 2px 5px, 숫자 오른쪽 정렬, 칸 너비는 내용만큼. 기능·칸·값은 그대로.
      v1.2.0(11-16): 제품명 칸마다 작은 「단품 검색」 칸 — 사장님 11-16: 「제품명 칸에 벤더피아 단품명을 검색할 수 있게 검색창을 만들고, 벤더피아와 연동되게 해 줘.」
@@ -22,6 +22,10 @@
        단품 후보 = 벤더피아연동 확장(0.35.0~)의 단품관리 목록 그대로(확장 다리 `단품다리.js` ↔ 이 쪽 postMessage, 자료는 이 크롬 안에서만 — 창고에 안 씀).
        벤더피아에 로그인 안 돼 있으면 목록 대신 「벤더피아 로그인 필요」 + 「벤더피아 로그인 화면 열기」(로그인은 벤더피아 자기 화면에서).
        목록 맨 위 「단품 새로 받기」 = 확장이 벤더피아 단품관리에 다시 묻는다. 확장(새 판)이 없는 기기(폰 등)는 예전처럼 창고 사본을 「임시 목록」 으로.
+     v1.6.1(11-16): 사장님 「왜 벤더피아연동 시키라니까 자꾸 뭘 다운받으라고 하냐.」 — **지금 깔린 확장 그대로** 연동(덮어쓰기 없음).
+       창고 `납품내역_단품목록` = 벤더피아연동 단품관리 화면이 목록을 받을 때마다 저절로 올리는 사본(goods.js `단품목록올리기`, 깃 글이라 깔린 판에서 돈다).
+       목록 위 「단품 새로 받기」 = 벤더피아연동 단품관리 화면을 새 탭으로 연다 → 거기서 F5 → 이 탭으로 돌아오면 창고를 다시 읽는다.
+       「새 판 없음」·「임시 목록」 글은 걷음. 0.35.0 다리(`data-벤더피아단품`)가 있는 크롬이면 v1.6.0 길 그대로.
 
      ⚠ 값은 창고(artifacts/vivivic-4b7ef/public/data/발주역입력_재단)에서 **읽기만** 한다.
         창고에 넣는 것은 tools/재단내역서읽기.py(드라이브 PDF → 창고). 공개 저장소라 업무 값은 이 파일에 없다.
@@ -149,7 +153,7 @@ body.칸끄는중{cursor:col-resize;user-select:none;-webkit-user-select:none}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.6.0</div>
+  <div class="badge">v1.6.1</div>
 </header>
 <nav class="쪽길"><a href="재단.html" class="on">재단 세부내역</a><a href="보드매입현황.html">보드매입현황</a></nav>
 <h1>재단 세부내역</h1>
@@ -322,6 +326,8 @@ async function 연결읽기(){
    다리가 없으면(폰·확장 없는 PC·확장 옛 판) 창고 `납품내역_단품목록` 사본으로 찾고 목록 위에 「임시 목록」 이라고 적는다(「임시」). */
 let 단품출처 = '', 단품말 = null, 단품받은때 = null;
 const 벤더피아로그인주소 = 'https://vendorpia.com/';
+const 단품관리주소 = 'https://vendorpia.com/System/Master/goods.aspx';   /* v1.6.1 벤더피아연동 단품관리 화면(확장이 이 주소에서 단품관리를 그린다) */
+let 단품관리열었나 = false;
 const 다리있나 = async () => { for(let i=0;i<15;i++){ if(document.documentElement.hasAttribute('data-벤더피아단품')) return true; await new Promise(r=>setTimeout(r,100)); } return false; };
 function 확장묻기(다시){
   return new Promise(풀 => {
@@ -353,13 +359,14 @@ function 단품읽기(다시){
             : {글:'벤더피아연동 단품관리 목록을 받지 못했습니다' + (답.까닭?' · '+답.까닭:''), 막힘:true};
       return;
     }
-    단품출처 = '창고';
-    단품말 = {임시:true, 글:'임시 목록 — 창고 사본(이 기기에 벤더피아연동 새 판이 없음)'};
+    /* v1.6.1 지금 깔린 확장: 단품관리 화면이 받을 때마다 올린 창고 사본(`_정보.올린때`·`파일`) */
+    단품출처 = '창고'; 단품받은때 = null; 단품말 = null;
     const { collection, getDocs } = window.fbRead;
     const 눈 = await getDocs(collection(window.db, ...단품자리));
     if(이번 !== 단품받기) return;
     const 문들 = [];
-    눈.forEach(d => { if(/^단품_\d+$/.test(d.id)) 문들.push([Number(d.id.slice(3)), d.data().줄||[]]); });
+    눈.forEach(d => { if(/^단품_\d+$/.test(d.id)) 문들.push([Number(d.id.slice(3)), d.data().줄||[]]);
+      else if(d.id === '_정보'){ const x = d.data()||{}; 단품받은때 = x.올린때 || null; 단품말 = {자동:/벤더피아연동/.test(x.파일||'')}; } });
     문들.sort((a,b)=>a[0]-b[0]);
     const 들 = [];
     for(const [,줄] of 문들) for(const s of 줄){
@@ -428,7 +435,8 @@ function 후보그리기(input){
   }
   /* v1.6.0 목록 위: 확장이면 「단품 새로 받기」(받은 때), 창고 사본이면 「임시 목록」 */
   t += 단품출처==='vp' ? `<div class="act" data-act="new">단품 새로 받기<span class="cd">벤더피아연동 단품관리 ${단품들.length.toLocaleString()}개${단품받은때?' · '+때글(단품받은때):''}</span></div>`
-     : 단품말 && 단품말.임시 ? `<div class="msg">${글(단품말.글)}</div>` : '';
+     : `<div class="act" data-act="new">단품 새로 받기<span class="cd">${단품말&&단품말.자동?'벤더피아연동 단품관리 ':'단품 목록 '}${단품들.length.toLocaleString()}개${단품받은때?' · '+때글(단품받은때).replace('받음','올림'):''}</span></div>`
+       + (단품관리열었나 ? '<div class="msg">벤더피아연동 단품관리 탭에서 F5 → 다 받으면 이 탭으로 돌아오세요(목록을 다시 읽습니다)</div>' : '');
   const 낱 = input.value.toLowerCase().split(/\s+/).filter(Boolean);
   후보들 = [];
   if(낱.length) for(const d of 단품들){ if(낱.every(w=>d.찾글.includes(w))){ 후보들.push(d); if(후보들.length>=50) break; } }
@@ -449,8 +457,15 @@ function 후보그리기(input){
   후보.innerHTML = t;
 }
 /* v1.6.0 목록 위 단추 — 로그인은 벤더피아 자기 로그인 화면(새 탭)에서. 아이디·비밀번호는 여기서 받지 않는다. */
+/* v1.6.1 단품관리 탭에서 돌아오면 창고 사본을 다시 읽는다(열린 후보 목록도 새로) */
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState !== 'visible' || !단품관리열었나 || 단품출처 !== '창고') return;
+  const input = 후보칸; 단품읽기(true).then(() => { if(input && 후보칸 === input) 후보그리기(input); }, () => {});
+});
 function 단품단추(일){
   if(일 === 'login'){ window.open(벤더피아로그인주소, '_blank'); return; }
+  if(일 === 'new' && 단품출처 === '창고'){   /* v1.6.1 깔린 확장 그대로: 단품관리 화면을 열어 거기서 받게 한다(받으면 창고 사본이 저절로 바뀜) */
+    단품관리열었나 = true; window.open(단품관리주소, 'vp단품관리'); if(후보칸) 후보그리기(후보칸); return; }
   if(일 === 'new'){ const input = 후보칸; 단품읽기(true); if(input) 후보그리기(input); }
 }
 async function 고르기(input, i){
