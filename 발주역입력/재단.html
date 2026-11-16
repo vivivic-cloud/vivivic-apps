@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 재단 — 에이엠티 「재단 세부내역」(상세내역서 PDF, 월별)을 달마다 표로 본다.
      사장님 11-16: 「월별 재단내역이 목록으로 보이는 페이지를 만들어라.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.2.2
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.2.3
      v1.0.0(11-16): 첫 판. 월 버튼 → 그 달 표 하나. 칸 이름·값은 PDF 글자 그대로, 합친 칸(원장수량·재단금액 묶음 등)은 rowspan 으로 그대로 살린다.
      v1.1.0(11-16): 표를 셀 모양으로 촘촘히 — 칸마다 선, 글씨 11.5px, 여백 2px 5px, 숫자 오른쪽 정렬, 칸 너비는 내용만큼. 기능·칸·값은 그대로.
      v1.2.0(11-16): 제품명 칸마다 작은 「단품 검색」 칸 — 사장님 11-16: 「제품명 칸에 벤더피아 단품명을 검색할 수 있게 검색창을 만들고, 벤더피아와 연동되게 해 줘.」
@@ -9,6 +9,7 @@
        고른 것은 창고 `발주역입력_단품연결`(문서 하나 = PDF 제품명 하나) — 같은 제품명이면 어느 달이든 같은 연결. 원본 `발주역입력_재단` 은 안 건드린다.
      v1.2.1(11-16): 검색 칸을 누를 때 표가 밀리면 후보 목록이 닫히던 것 — 닫지 않고 칸을 따라가게.
      v1.2.2(11-16): 머리 아래 쪽 이동(재단 세부내역 ↔ 보드매입현황.html) 만 더함. 기능·표는 그대로.
+     v1.2.3(11-16): 사장님 「단품검색 창을 열면 해당 제품명의 앞 네 글자가 이미 검색되어 있게 해 줘.」 — 검색 칸을 열면 제품명 앞 네 글자(띄어쓰기 뺌, 「임시」)가 들어가고 전체 선택, 후보도 바로 뜬다.
 
      ⚠ 값은 창고(artifacts/vivivic-4b7ef/public/data/발주역입력_재단)에서 **읽기만** 한다.
         창고에 넣는 것은 tools/재단내역서읽기.py(드라이브 PDF → 창고). 공개 저장소라 업무 값은 이 파일에 없다.
@@ -122,7 +123,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.2.2</div>
+  <div class="badge">v1.2.3</div>
 </header>
 <nav class="쪽길"><a href="재단.html" class="on">재단 세부내역</a><a href="보드매입현황.html">보드매입현황</a></nav>
 <h1>재단 세부내역</h1>
@@ -304,7 +305,19 @@ document.addEventListener('click', e => {
   v.innerHTML = '<input type="search" placeholder="단품 검색" autocomplete="off" enterkeyhint="search">';
   const input = v.querySelector('input'); input.focus(); 후보그리기(input);
 });
-document.addEventListener('focusin', e => { if(e.target.matches('.vk input')){ 단품읽기(); 후보그리기(e.target); } });
+/* 검색 칸을 열면(v1.2.3) 그 줄 PDF 제품명 앞 네 글자(띄어쓰기·줄바꿈 뺌 — 「임시」)를 미리 넣고 전체 선택 — 바로 지우거나 고쳐 칠 수 있다.
+   칸이 비어 있을 때만 넣는다(친 글은 덮지 않음). */
+function 앞네글자(p){ return [...String(p).replace(/\s+/g,'')].slice(0,4).join(''); }
+document.addEventListener('focusin', e => {
+  const input = e.target; if(!input.matches('.vk input')) return;
+  if(!input.value){
+    input.value = 앞네글자(input.closest('.vk').dataset.p);
+    input.select();
+    const 막기 = ev => ev.preventDefault();   /* 누른 손을 뗄 때 선택이 풀리지 않게(한 번만) */
+    input.addEventListener('mouseup', 막기, {once:true}); setTimeout(() => input.removeEventListener('mouseup', 막기), 600);
+  }
+  단품읽기(); 후보그리기(input);
+});
 document.addEventListener('input', e => { if(e.target.matches('.vk input')) 후보그리기(e.target); });
 document.addEventListener('focusout', e => { if(e.target.matches('.vk input')) setTimeout(() => { if(후보칸===e.target && document.activeElement!==e.target) 후보닫기(); }, 0); });
 document.addEventListener('keydown', e => {
