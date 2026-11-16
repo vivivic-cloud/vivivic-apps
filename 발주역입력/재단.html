@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 재단 — 에이엠티 「재단 세부내역」(상세내역서 PDF, 월별)을 달마다 표로 본다.
      사장님 11-16: 「월별 재단내역이 목록으로 보이는 페이지를 만들어라.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.3.1
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.4.1
      v1.0.0(11-16): 첫 판. 월 버튼 → 그 달 표 하나. 칸 이름·값은 PDF 글자 그대로, 합친 칸(원장수량·재단금액 묶음 등)은 rowspan 으로 그대로 살린다.
      v1.1.0(11-16): 표를 셀 모양으로 촘촘히 — 칸마다 선, 글씨 11.5px, 여백 2px 5px, 숫자 오른쪽 정렬, 칸 너비는 내용만큼. 기능·칸·값은 그대로.
      v1.2.0(11-16): 제품명 칸마다 작은 「단품 검색」 칸 — 사장님 11-16: 「제품명 칸에 벤더피아 단품명을 검색할 수 있게 검색창을 만들고, 벤더피아와 연동되게 해 줘.」
@@ -15,6 +15,7 @@
      v1.3.1(11-16): 사장님 「한 칸으로 합치기」 — 6~9월 「출고일」 도 같은 칸으로. 칸 제목 「출고예정일(입고처) / 출고일」(PDF 두 이름을 이음). 15칸.
      v1.4.0(11-16): 사장님 「재단 세부내역 각 열 가로 넓이를 조절 가능하게 해 주세요.」 — 칸 머리 오른쪽 경계를 끌어 칸마다 너비를 넓히고 좁힌다(마우스·손가락).
        고친 너비는 이 브라우저에 남는다(localStorage, 칸 이름마다 · 모든 달 같이). 경계를 두 번 누르면 그 칸만 처음 너비로. 칸·값·디자인은 그대로.
+     v1.4.1(11-16): 안 고친 칸은 잰 너비를 올림으로 박는다 — 반올림이면 1px 모자라 글이 「…」 로 잘렸다(3월 종류 「PB-18T」).
 
      ⚠ 값은 창고(artifacts/vivivic-4b7ef/public/data/발주역입력_재단)에서 **읽기만** 한다.
         창고에 넣는 것은 tools/재단내역서읽기.py(드라이브 PDF → 창고). 공개 저장소라 업무 값은 이 파일에 없다.
@@ -139,7 +140,7 @@ body.칸끄는중{cursor:col-resize;user-select:none;-webkit-user-select:none}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.4.0</div>
+  <div class="badge">v1.4.1</div>
 </header>
 <nav class="쪽길"><a href="재단.html" class="on">재단 세부내역</a><a href="보드매입현황.html">보드매입현황</a></nav>
 <h1>재단 세부내역</h1>
@@ -254,7 +255,7 @@ function 너비맞추기(t){
   const 잰 = ths.map(th => th.getBoundingClientRect().width);   /* 내용만큼 너비(고치기 전) */
   const cg = document.createElement('colgroup');
   let 합 = 0;
-  ths.forEach((th,i) => { const w = Math.round(칸너비[th.dataset.k] || 잰[i]); 합 += w; const c = document.createElement('col'); c.style.width = w+'px'; cg.appendChild(c); });
+  ths.forEach((th,i) => { const w = 칸너비[th.dataset.k] ? Math.round(칸너비[th.dataset.k]) : Math.ceil(잰[i]);   /* 안 고친 칸은 올림 — 반올림으로 1px 모자라면 글이 잘린다 */ 합 += w; const c = document.createElement('col'); c.style.width = w+'px'; cg.appendChild(c); });
   t.prepend(cg); t.style.width = 합+'px'; t.classList.add('고정');
 }
 let 톡때 = 0, 톡칸 = null;
@@ -269,7 +270,7 @@ document.addEventListener('pointerdown', e => {
     const dx = ev.clientX - x0;
     if(!col){
       if(Math.abs(dx) <= 3) return;   /* 3px 넘게 끌어야 시작 — 그냥 누름은 너비를 안 바꾼다 */
-      if(!t.classList.contains('고정')){ 칸너비[k] = th.getBoundingClientRect().width; 너비맞추기(t); }
+      if(!t.classList.contains('고정')){ 칸너비[k] = Math.ceil(th.getBoundingClientRect().width); 너비맞추기(t); }
       col = t.querySelector('colgroup').children[i]; 처음 = parseFloat(col.style.width); 표처음 = parseFloat(t.style.width);
     }
     const w = Math.max(24, Math.round(처음 + dx));
