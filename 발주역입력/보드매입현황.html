@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.2.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.3.0
      v1.0.0(11-16): 첫 판. 거래처(시트) 버튼 → 그 시트의 표. 거래처 시트는 「전체 · 1월~10월 · 1~10월 누계 · 1~10월 매입품목」 으로 고른다.
        칸 이름·값은 엑셀 글자(셀 표시 꼴) 그대로. 표 꼴은 재단.html v1.1.0 셀 모양(칸 선 · 11.5px · 여백 2px 5px · 숫자 오른쪽)과 같다.
      v1.1.0(11-16): 거래처 메뉴 끝에 「영림원등록」 — 월별 표에서 납품제품명(품목)을 겹치지 않게 한 줄씩, 칸은 품목 · 규격 · 단가만.
@@ -10,6 +10,10 @@
        현진산업·현준보드(서광)는 「별도 단가(원)」(부가세 별도 — 다른 거래처 단가와 같은 공급가 기준) · 「(구매내역 없음)」·소계 줄 뺌 · 0원 단가도 그대로 적음.
      v1.2.0(11-16): 영림원등록 — 사장님: 「판매량순으로 나타나게 해 주고, 단가가 변한 시점을 표기해서 알려 줘.」
        줄 차례 = 1~10월 매입 수량 합계 많은 순(임시, 수량 칸은 안 보임) · 단가 칸 「19,500(1~4월) → 21,500(4~10월)」 · 0원 줄은 「무상(N월)」 따로.
+
+     v1.3.0(11-16): 영림원등록 — 사장님: 「제품별 전체 합계금액도 나타나게 해 줘.」
+       단가 칸 오른쪽에 그 줄(품목+규격)의 1~10월 공급가액 합(엑셀 칸 이름 그대로 — 현진산업·현준보드(서광)는 「별도 공급가액(원)」, 부가세 별도 — 임시).
+       반품(음수)·무상 줄도 엑셀 값 그대로 더함 · 표 맨 아래 「[1~10월 총계]」 줄 = 거래처 전체 합.
 
      ⚠ 값은 창고(artifacts/vivivic-4b7ef/public/data/발주역입력_보드매입)에서 **읽기만** 한다.
         창고에 넣는 것은 tools/보드매입읽기.py(드라이브 엑셀 → 창고). 공개 저장소라 업무 값은 이 파일에 없다. -->
@@ -110,7 +114,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.2.0</div>
+  <div class="badge">v1.3.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드매입현황</a></nav>
 <h1>보드매입현황</h1>
@@ -212,14 +216,16 @@ const 달들글 = 달 => { const n = 달.map(m => parseInt(m)); return n.length=
 function 영림원목록(t, 제목){
   const 칸 = t.칸||[], 품 = 칸.indexOf('납품제품명(품목)'), 규 = 칸.indexOf('규격'), 량 = 칸.indexOf('수량');
   const 단 = 칸.includes('별도 단가(원)') ? 칸.indexOf('별도 단가(원)') : 칸.indexOf('단가(원)');
+  /* v1.3.0 합계금액 = 공급가액(부가세 별도) — 단가 칸과 같은 기준. 현진·현준은 「별도 공급가액(원)」(임시) */
+  const 금 = 칸.includes('별도 공급가액(원)') ? 칸.indexOf('별도 공급가액(원)') : 칸.indexOf('공급가액(원)');
   const 모 = new Map();
   for(const z of (t.줄||[])){
     if(z.소) continue;
     const v = z.v||[], 이름 = String(v[품]??'').trim();
     if(!이름 || 이름==='(구매내역 없음)' || /^\[.*(소계|총계)\]$/.test(이름)) continue;
     const 규격 = String(v[규]??'').trim(), 키 = 이름+'\t'+규격, 값 = String(v[단]??'').trim();
-    if(!모.has(키)) 모.set(키, { 이름, 규격, 량:0, 흐름:[], 무:[] });
-    const m = 모.get(키); m.량 += 수(v[량]);
+    if(!모.has(키)) 모.set(키, { 이름, 규격, 량:0, 금:0, 흐름:[], 무:[] });
+    const m = 모.get(키); m.량 += 수(v[량]); m.금 += 수(v[금]);
     if(!값) continue;
     if(무상(값)){ if(!m.무.includes(z.월)) m.무.push(z.월); continue; }
     const 끝 = m.흐름[m.흐름.length-1];
@@ -235,11 +241,15 @@ function 영림원목록(t, 제목){
     return h;
   };
   const 여러 = 줄.filter(바뀜).length;
+  /* 엑셀 표시 꼴 #,##0;(#,##0);- 와 같게(음수 괄호 · 0 은 「-」) */
+  const 원 = n => { n = Math.round(n); return n===0 ? '-' : n<0 ? `(${(-n).toLocaleString('ko-KR')})` : n.toLocaleString('ko-KR'); };
+  const 총 = 줄.reduce((a,m) => a+m.금, 0);
   let h = `<div class="표">${제목?`<div class="표제목">${글(제목)}</div>`:''}<table class="dpr-t"><thead><tr>` +
-    `<th class="dpr-k">${글(칸[품])}</th><th>${글(칸[규])}</th><th>${글(칸[단])}</th></tr></thead><tbody>`;
+    `<th class="dpr-k">${글(칸[품])}</th><th>${글(칸[규])}</th><th>${글(칸[단])}</th><th>${글(칸[금])}</th></tr></thead><tbody>`;
   for(const m of 줄){
-    h += `<tr><td class="dpr-k">${글(m.이름)}</td><td>${글(m.규격)}</td><td class="num">${단가글(m)}</td></tr>`;
+    h += `<tr><td class="dpr-k">${글(m.이름)}</td><td>${글(m.규격)}</td><td class="num">${단가글(m)}</td><td class="num">${원(m.금)}</td></tr>`;
   }
+  h += `<tr class="sub"><td class="dpr-k">[1~10월 총계]</td><td></td><td></td><td class="num">${원(총)}</td></tr>`;
   h += '</tbody></table></div>';
   h += `<div class="글">${줄.length}줄 · 차례: 1~10월 매입 수량 합계가 많은 순(임시) · ※ 단가가 바뀐 품목 ${여러}개 — ( ) 안은 그 단가로 산 달 · 무상 = 0원 줄.</div>`;
   return h;
