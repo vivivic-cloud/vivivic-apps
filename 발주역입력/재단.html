@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<!-- 발주역입력 / 재단 — 에이엠티 「재단 세부내역」(상세내역서 PDF, 월별)을 달마다 표로 본다.
+     사장님 11-16: 「월별 재단내역이 목록으로 보이는 페이지를 만들어라.」
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.0.0
+     v1.0.0(11-16): 첫 판. 월 버튼 → 그 달 표 하나. 칸 이름·값은 PDF 글자 그대로, 합친 칸(원장수량·재단금액 묶음 등)은 rowspan 으로 그대로 살린다.
+
+     ⚠ 값은 창고(artifacts/vivivic-4b7ef/public/data/발주역입력_재단)에서 **읽기만** 한다.
+        창고에 넣는 것은 tools/재단내역서읽기.py(드라이브 PDF → 창고). 공개 저장소라 업무 값은 이 파일에 없다.
+     겉꼴은 납품내역/재단.html(서류관리 제품관리 표 꼴 .dpr-t, 흰 바탕, 월 버튼 .chip, 화면 높이 표 상자)을 그대로 따른다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>재단 — 발주역입력</title>
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+    const app = initializeApp({
+        apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
+        authDomain: "vivivic-4b7ef.firebaseapp.com",
+        projectId: "vivivic-4b7ef",
+        storageBucket: "vivivic-4b7ef.firebasestorage.app",
+        messagingSenderId: "830175660542",
+        appId: "1:830175660542:web:9054030480c8280af8d8af"
+    });
+    const auth = getAuth(app);
+    window.db = getFirestore(app);
+    window.fbRead = { doc, getDoc };
+    onAuthStateChanged(auth, (u) => {
+        if (!u) { signInAnonymously(auth).catch(e => window.목록못읽음('창고에 들어가지 못했습니다', (e&&(e.code||e.message))||'')); return; }
+        window.목록읽기();
+    });
+</script>
+
+<style>
+/* 납품내역/재단.html 과 같은 값 — 색 낱말은 서류관리 --vg-* 와 같다. 값을 새로 짓지 마라. */
+:root{
+  --vg-bg:#fff; --vg-ink:#111110; --vg-body:#1A1A19;
+  --vg-muted:#9C9C98; --vg-edge:#E2E2DF; --vg-fill:#F4F4F2; --vg-red:#FF3B30;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--vg-bg);color:var(--vg-body);
+  font:15px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",system-ui,sans-serif;
+  -webkit-text-size-adjust:100%}
+.wrap{max-width:1100px;margin:0 auto;padding:0 16px}
+header{padding:16px 0 2px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.logo{font-size:13px;color:var(--vg-muted)}
+.logo b{font-size:15px;font-weight:800;letter-spacing:3.2px;color:var(--vg-ink);margin-right:4px}
+.badge{font-size:11px;font-weight:800;letter-spacing:1.2px;color:var(--vg-ink);
+  border:1px solid var(--vg-ink);border-radius:999px;padding:3px 9px}
+h1{font-size:30px;line-height:1.1;letter-spacing:-1.2px;font-weight:700;color:var(--vg-ink);padding:4px 0 12px}
+.months{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border-radius:999px;font-family:inherit;font-size:12px;font-weight:600;line-height:1.45;padding:5px 12px;background:#fff;
+  border:1px solid var(--vg-edge);color:var(--vg-body);cursor:pointer;font-variant-numeric:tabular-nums;transition:all .12s;position:relative}
+.chip::after{content:"";position:absolute;inset:-8px -3px}   /* 누르는 자리 44px */
+.chip:hover{background:var(--vg-fill)}
+.chip.on{background:var(--vg-ink);border-color:var(--vg-ink);color:#fff}
+/* 쪽은 화면 높이 — 화면 전체 막대 없이 표 상자 안에서만 위아래·옆으로 민다(가로 막대가 늘 보는 화면 아래). */
+html,body{height:100%;overflow:hidden}
+.wrap{height:100%;display:flex;flex-direction:column;overflow-y:auto;scrollbar-width:none}
+.wrap::-webkit-scrollbar{display:none}
+.wrap>*{flex-shrink:0}
+.wrap>#속{flex:1 1 0;min-height:0;display:flex;flex-direction:column;margin-top:12px}
+#속>.표통{flex:1 1 auto;min-height:0}
+@media (max-width:600px),(max-height:600px){.wrap>#속{flex:1 0 auto} #속>.표통{flex:1 0 240px}}
+.표통{overflow:auto;-webkit-overflow-scrolling:touch;background:var(--vg-bg)}
+/* 맥 Chrome 오버레이 막대는 평소 숨는다 → ::-webkit-scrollbar 로 늘 보이게(영림원외주입력 v276 과 같은 까닭).
+   scrollbar-width·scrollbar-color 를 여기 넣으면 Chrome 이 아래를 무시한다 — 파이어폭스에만 준다. */
+@supports not selector(::-webkit-scrollbar){.표통{scrollbar-width:thin;scrollbar-color:#C7C7C3 var(--vg-fill)}}
+.표통::-webkit-scrollbar{width:10px;height:10px}
+.표통::-webkit-scrollbar-track,.표통::-webkit-scrollbar-corner{background:var(--vg-fill)}
+.표통::-webkit-scrollbar-thumb{background:#C7C7C3;border-radius:10px}
+/* 표 — 서류관리 제품관리(.dpr-t) 꼴 */
+.dpr-t{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.dpr-t th{font-size:13px;font-weight:800;color:var(--vg-ink);text-align:left;vertical-align:bottom;
+  padding:10px 12px;border-bottom:2px solid var(--vg-ink);background:var(--vg-bg);white-space:nowrap}
+.dpr-t th.num{min-width:84px}
+.dpr-t td{font-size:14px;color:var(--vg-body);padding:13px 12px;
+  border-bottom:1px solid #D6D6D3;vertical-align:top;white-space:nowrap}
+.dpr-t .num{text-align:center}
+.dpr-t .dpr-k{position:sticky;left:0;z-index:1;background:var(--vg-bg);font-weight:700;color:var(--vg-ink)}
+.state{background:var(--vg-fill);border-radius:14px;padding:22px 16px;text-align:center;margin-top:12px}
+.state .big{font-size:14px;font-weight:600;color:var(--vg-ink);padding-bottom:6px}
+.state .sub{font-size:12.5px;color:var(--vg-muted);line-height:1.85}
+.state .why{font-size:11.5px;color:var(--vg-red);padding-top:6px;font-family:ui-monospace,monospace}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
+  <div class="badge">v1.0.0</div>
+</header>
+<h1>재단 세부내역</h1>
+<div class="months" id="고름"></div>
+<div class="state" id="목상태"><div class="big">창고를 읽는 중입니다…</div></div>
+<div id="속"></div>
+</div>
+
+<!-- 짚어서 지시하는 손잡이 — 바이글 박스에서 열면 켜진다. -->
+<script src="../shared/viggle.js"></script>
+
+<script>
+const 창고자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_재단'];
+const 숫자칸 = new Set(['재단수량','원장수량','재단금액']);
+/* 합친 칸 — 같은 칸(g)에 든 줄은 한 칸으로 묶어 그린다(rowspan). 재단일은 쪽이 넘어가도 같은 날이면 잇는다. */
+let 달들 = [], 받은 = {}, 고른 = '', 답했나 = false;
+
+const 글 = v => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+function 목상태(큰,작,까닭){
+  const el=document.getElementById('목상태'); el.style.display='block';
+  el.innerHTML = `<div class="big">${큰}</div>` + (작?`<div class="sub">${작}</div>`:'') + (까닭?`<div class="why">${까닭}</div>`:'');
+}
+window.목록못읽음 = (큰,까닭) => { 답했나=true; 목상태(큰,'관리자에게 알려 주십시오.',까닭||''); };
+setTimeout(() => { if(!답했나) 목상태('창고에 닿지 못했습니다','인터넷이 끊겼거나 창고가 막혀 있습니다. 새로고침해 보십시오.'); }, 20000);
+
+const 달글 = 달 => (+String(달).slice(5,7)) + '월';
+
+window.목록읽기 = async function(){
+  try{
+    const { doc, getDoc } = window.fbRead;
+    const 목 = await getDoc(doc(window.db, ...창고자리, '_달목록'));
+    답했나 = true;
+    달들 = (목.exists() && 목.data().달들) || [];
+    if(!달들.length){ 목상태('창고에 재단 세부내역이 없습니다'); return; }
+    document.getElementById('목상태').style.display='none';
+    document.getElementById('고름').innerHTML = 달들.map(d => `<button class="chip" data-m="${d}">${달글(d)}</button>`).join('');
+    document.querySelectorAll('#고름 .chip').forEach(b => b.onclick = () => 달고름(b.dataset.m));
+    달고름(달들[달들.length-1]);
+  }catch(e){ window.목록못읽음('창고를 읽지 못했습니다', (e&&(e.code||e.message))||''); }
+};
+
+async function 달고름(m){
+  고른 = m;
+  document.querySelectorAll('#고름 .chip').forEach(b => b.classList.toggle('on', b.dataset.m===m));
+  const 속 = document.getElementById('속');
+  if(!받은[m]){
+    속.innerHTML = '<div class="state"><div class="big">읽는 중입니다…</div></div>';
+    try{
+      const { doc, getDoc } = window.fbRead;
+      const s = await getDoc(doc(window.db, ...창고자리, m));
+      받은[m] = s.exists() ? s.data() : { 칸:[], 줄:[] };
+    }catch(e){ 속.innerHTML = `<div class="state"><div class="big">창고를 읽지 못했습니다</div><div class="why">${글((e&&(e.code||e.message))||'')}</div></div>`; return; }
+  }
+  if(고른 !== m) return;
+  그리기(받은[m]);
+}
+
+function 그리기(d){
+  const 칸 = d.칸 || [], 줄 = d.줄 || [];
+  const 속 = document.getElementById('속');
+  if(!줄.length){ 속.innerHTML = '<div class="state"><div class="big">줄 없음</div></div>'; return; }
+  const di = 칸.indexOf('재단일');
+  /* 칸마다 묶음 열쇠: 재단일은 값(이어진 같은 날), 나머지는 PDF 의 합친 칸 번호 g */
+  const 열쇠 = (r,i) => i===di ? 'd:'+r.v[i] : 'g:'+r.g[i];
+  const 남은 = 칸.map(()=>0);
+  let h = '<table class="dpr-t"><thead><tr>' +
+    칸.map((k,i) => `<th class="${i===0?'dpr-k':''}${숫자칸.has(k)?' num':''}">${글(k)}</th>`).join('') + '</tr></thead><tbody>';
+  for(let n=0; n<줄.length; n++){
+    const r = 줄[n];
+    h += '<tr>';
+    for(let i=0;i<칸.length;i++){
+      if(남은[i] > 0){ 남은[i]--; continue; }
+      let span = 1; const k = 열쇠(r,i);
+      while(n+span < 줄.length && 열쇠(줄[n+span],i)===k) span++;
+      남은[i] = span-1;
+      const cls = (i===0?'dpr-k':'') + (숫자칸.has(칸[i])?' num':'');
+      h += `<td${cls.trim()?` class="${cls.trim()}"`:''}${span>1?` rowspan="${span}"`:''}>${글(r.v[i])}</td>`;
+    }
+    h += '</tr>';
+  }
+  h += '</tbody></table>';
+  속.innerHTML = '<div class="표통">' + h + '</div>';
+}
+</script>
+</body>
+</html>
