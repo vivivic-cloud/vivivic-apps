@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.7.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.8.0
      v1.0.0(11-16): 첫 판. 거래처(시트) 버튼 → 그 시트의 표. 거래처 시트는 「전체 · 1월~10월 · 1~10월 누계 · 1~10월 매입품목」 으로 고른다.
        칸 이름·값은 엑셀 글자(셀 표시 꼴) 그대로. 표 꼴은 재단.html v1.1.0 셀 모양(칸 선 · 11.5px · 여백 2px 5px · 숫자 오른쪽)과 같다.
      v1.1.0(11-16): 거래처 메뉴 끝에 「영림원등록」 — 월별 표에서 납품제품명(품목)을 겹치지 않게 한 줄씩, 칸은 품목 · 규격 · 단가만.
@@ -35,13 +35,18 @@
        화면은 그대로. 입력폼을 열면(폼준비) 거래처마다 창고 발주역입력_영림원폼/{거래처} 에 `기준`(모든 품목의 단가 묶음 — 바뀌지 않은 품목도)·`기준글`·`영림원거래처` 를 함께 저장(바뀌었을 때만).
        고친 단가·적용시작일 우선(임시). 대조 규칙 = 영림원외주입력/입력작업자/전달-보드매입현황-기준정보폼.md 「6. 명세서 대조」. 대조 화면은 안 만듦.
 
+     v1.8.0(11-17): 제목 「보드/엣지 매입현황」(화면 제목·<title>·쪽 이동 탭·양식 1행 — 파일 이름·주소·창고 이름은 그대로).
+       명세서 → 영림원 자재 연결표 — 사장님: 「차후 명세서를 올릴 때 명세서의 납품제품명+규격으로 영림원 입력 자재명을 연결하여 … 연결되어 처리되도록」.
+       창고 {거래처} 문서에 `연결`(명세서 표기 → 입력폼 줄 → 자재번호·자재명, 삭제 줄 뺌)을 기준과 함께 저장. 새 표기는 `더한표기`(입력 작업자가 사장님 고른 대로 더함 — 페이지는 지우지 않음).
+       열쇠 정규화(임시) = NFKC(전각→반각) · 빈칸 모두 뺌 · 영문 소문자. 입력폼 맨 앞 회색 두 칸 머리에 「명세서 연결 열쇠」 표시만. 26년 1~10월 실제 기록(영림원 구축 중 지난 자료를 다 넣어 돌려 보는 용도).
+
      ⚠ 값은 창고(artifacts/vivivic-4b7ef/public/data/발주역입력_보드매입)에서 **읽기만** 한다.
         창고에 넣는 것은 tools/보드매입읽기.py(드라이브 엑셀 → 창고). 공개 저장소라 업무 값은 이 파일에 없다. -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>보드매입현황 — 발주역입력</title>
+<title>보드/엣지 매입현황 — 발주역입력</title>
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
@@ -132,11 +137,13 @@ html,body{height:100%;overflow:hidden}
 .폼표 th .별,.글 .별{color:var(--vg-red);font-weight:800}
 .폼표 th .임{margin-left:3px;font-size:9.5px;font-weight:700;color:var(--vg-red);border:1px solid var(--vg-red);border-radius:3px;padding:0 2px}
 .폼표 td.참{color:var(--vg-muted)}
+.폼표 th .열쇠{display:block;font-size:9.5px;font-weight:400;color:var(--vg-muted)}
+.폼표 td .덧표기{margin-left:4px;font-size:9.5px;color:var(--vg-muted);border:1px solid var(--vg-edge);border-radius:3px;padding:0 2px}
 .폼표 td.dpr-k.참{color:var(--vg-ink)}
 .폼표 td.따{color:var(--vg-muted);background:var(--vg-fill)}
 .폼표 td.입{padding:0;white-space:nowrap}
 .폼표 td.입:focus-within{outline:2px solid var(--vg-ink);outline-offset:-2px}
-.폼표 td.입 .표시{font-size:11px;font-weight:700;color:var(--vg-red);padding-left:4px}
+.폼표 td.참 .표시,.폼표 td.입 .표시{font-size:11px;font-weight:700;color:var(--vg-red);padding-left:4px}
 .폼표 input,.폼표 select{font:inherit;font-size:11.5px;line-height:1.3;color:var(--vg-body);border:0;border-radius:0;background:transparent;
   padding:2px 5px;margin:0;outline:none;min-width:0}
 .폼표 input.num{text-align:right}
@@ -160,10 +167,10 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.7.0</div>
+  <div class="badge">v1.8.0</div>
 </header>
-<nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드매입현황</a></nav>
-<h1>보드매입현황</h1>
+<nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a></nav>
+<h1>보드/엣지 매입현황</h1>
 <div class="months" id="거래처"></div>
 <div class="months" id="볼것"></div>
 <div class="state" id="목상태"><div class="big">창고를 읽는 중입니다…</div></div>
@@ -440,6 +447,8 @@ async function 폼받기(s){
   폼값[s] = 모;
   폼이력[s] = JSON.stringify((d.exists() && d.data().이력) || []);
   폼기준[s] = JSON.stringify((d.exists() && d.data().기준) || null);
+  폼더한[s] = (d.exists() && d.data().더한표기) || [];
+  폼연결[s] = JSON.stringify((d.exists() && d.data().연결) || null);
 }
 let 준비됨 = false;
 const 저장틀 = {};
@@ -475,14 +484,44 @@ function 기준모으기(s){
       ...(뺀줄(s, m)?{삭제:true}:{}), 줄, ...(m.무.length?{무상달:m.무.map(x => parseInt(x))}:{}), ...(m.반품.length?{반품달:m.반품.map(x => parseInt(x))}:{}) };
   });
 }
-const 기준그대로 = s => JSON.stringify(기준모으기(s)) === 폼기준[s];
+/* v1.8.0 명세서 → 영림원 자재 연결표 — 사장님 11-17: 「차후 명세서를 올릴 때 명세서의 납품제품명+규격으로 영림원 입력 자재명을 연결하여,
+   해당 명세서 납품제품명으로 명세가 등록되어도 연결되어 처리되도록」.
+   창고 {거래처} 문서 `연결` = [{품목, 규격(명세서 글자 그대로), 열쇠(정규화), 줄품목, 줄규격(입력폼 줄), 자재번호, 자재명, 단위, 출처, 고른때?, 겹침?}]
+     · 26년 기록 = 입력폼 줄마다 하나(그 줄의 납품제품명(품목)+규격 = 26년 1~10월 실제 명세서 글자) — 「삭제(등록 안 함)」 줄은 뺌.
+     · 더한 표기 = 문서 `더한표기` [{품목, 규격, 줄품목, 줄규격, 고른때}] — 입력 작업자가 사장님이 고른 대로 더한다(페이지는 읽기만, merge 저장이라 지우지 않음).
+       자재번호가 아니라 입력폼 줄을 가리키므로, 입력폼에서 자재번호·자재명을 고치면 모든 표기의 연결이 함께 바뀐다.
+     · 열쇠(임시) = 품목·규격 각각 NFKC(전각 → 반각) · 빈칸 모두 뺌 · 영문 소문자 → 「품목|규격」. 다른 줄과 열쇠가 같으면 겹침(입력 작업자는 묻는다).
+   규칙 = 영림원외주입력/입력작업자/전달-보드매입현황-기준정보폼.md 6-0절. */
+const 표기열쇠 = (품목, 규격) => [품목, 규격].map(t => String(t ?? '').normalize('NFKC').replace(/\s+/g,'').toLowerCase()).join('|');
+const 연결글 = '명세서 줄의 납품제품명(품목)+규격 → 열쇠(NFKC·빈칸 뺌·소문자, 임시)로 찾아 자재번호로 등록 · 26년 기록 = 입력폼 줄(삭제 줄 뺌) · 더한 표기 = 더한표기(사장님이 고른 것) · 자재번호·자재명은 입력폼 값을 따름 · 겹침 = 같은 열쇠가 다른 줄 — 묻기 · 자재번호 빈칸이면 아직 등록 못 함';
+const 폼더한 = {};          // 거래처 → 창고 더한표기(입력 작업자가 더함)
+const 폼연결 = {};          // 거래처 → 창고에 있는 연결 JSON 글(같으면 다시 안 씀)
+function 연결모으기(s){
+  const 월표 = ((받은[s]||{}).표||[]).find(t => t.이름==='월별'); if(!월표) return [];
+  const 줄들 = 품목모으기(월표).줄;
+  const 한 = (품목, 규격, m, 출처, 덧) => ({ 품목, 규격, 열쇠:표기열쇠(품목, 규격), 줄품목:m.이름, 줄규격:m.규격,
+    자재번호:칸값({k:'m_code'}, m, s), 자재명:칸값({k:'m_name'}, m, s), 단위:칸값({k:'m_unit'}, m, s), 출처, ...덧 });
+  const 연 = 줄들.filter(m => !뺀줄(s, m)).map(m => 한(m.이름, m.규격, m, '26년 기록', {}));
+  for(const d of (폼더한[s]||[])){
+    const m = 줄들.find(x => x.이름===d.줄품목 && x.규격===d.줄규격);
+    if(!m || 뺀줄(s, m)) continue;
+    const 새 = 한(String(d.품목??''), String(d.규격??''), m, '더한 표기', d.고른때 ? { 고른때:d.고른때 } : {});
+    if(!연.some(x => x.열쇠===새.열쇠 && 줄키({이름:x.줄품목, 규격:x.줄규격})===줄키(m))) 연.push(새);
+  }
+  const 줄수 = new Map();
+  연.forEach(x => { if(!줄수.has(x.열쇠)) 줄수.set(x.열쇠, new Set()); 줄수.get(x.열쇠).add(x.줄품목 + '\t' + x.줄규격); });
+  연.forEach(x => { if(줄수.get(x.열쇠).size > 1) x.겹침 = true; });
+  return 연;
+}
+const 기준그대로 = s => JSON.stringify(기준모으기(s)) === 폼기준[s] && JSON.stringify(연결모으기(s)) === 폼연결[s];
 async function 폼저장(s){
   const { doc, setDoc } = window.fbRead;
   const 줄 = [...폼값[s].entries()].filter(([,v]) => Object.keys(v).length)
     .map(([키, 값]) => { const [품목, 규격] = 키.split('\t'); return { 품목, 규격, 값 }; });
-  const 이력들 = 이력모으기(s), 기준 = 기준모으기(s), 이 = 연결된(s);
-  await setDoc(doc(window.db, ...폼자리, s), { 거래처:s, 줄, 이력:이력들, 기준, 기준글, 영림원거래처:이 ? 이.거래처 : '', 고친때:new Date().toISOString() });
-  폼이력[s] = JSON.stringify(이력들); 폼기준[s] = JSON.stringify(기준);
+  const 이력들 = 이력모으기(s), 기준 = 기준모으기(s), 연 = 연결모으기(s), 이 = 연결된(s);
+  /* v1.8.0 merge — 입력 작업자가 쓰는 `더한표기` 를 지우지 않는다(이 쪽이 쓰는 칸만 바꿈) */
+  await setDoc(doc(window.db, ...폼자리, s), { 거래처:s, 줄, 이력:이력들, 기준, 기준글, 연결:연, 연결글, 영림원거래처:이 ? 이.거래처 : '', 고친때:new Date().toISOString() }, { merge:true });
+  폼이력[s] = JSON.stringify(이력들); 폼기준[s] = JSON.stringify(기준); 폼연결[s] = JSON.stringify(연);
 }
 const 저장알림 = () => 폼상태('저장됨 ' + new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}));
 const 못저장 = e => 폼상태('저장하지 못했습니다 ' + ((e&&(e.code||e.message))||''), true);
@@ -594,7 +633,9 @@ async function 폼그리기(){
     for(const m of 줄) w = Math.max(w, 글너비(칸값(f, m, s)) + 2);
     너비[f.k] = Math.min(w, 44);
   }
-  let h = `<table class="dpr-t 폼표"><thead><tr><th class="dpr-k" rowspan="2">${글(칸[품])}</th><th rowspan="2">${글(칸[규])}</th>` +
+  const 열쇠말 = '명세서 연결 열쇠 — 명세서 줄의 납품제품명(품목)+규격 글자로 이 줄(영림원 자재번호·자재명)을 찾습니다. 자재명을 고쳐도 열쇠는 명세서 글자 그대로.';
+  const 연 = 연결모으기(s);
+  let h = `<table class="dpr-t 폼표"><thead><tr><th class="dpr-k" rowspan="2" title="${글(열쇠말)}">${글(칸[품])}<span class="열쇠">명세서 열쇠</span></th><th rowspan="2" title="${글(열쇠말)}">${글(칸[규])}<span class="열쇠">명세서 열쇠</span></th>` +
     `<th rowspan="2" class="묶">${글(삭제글)}</th>` +
     폼묶음.map(g => `<th class="묶" colspan="${폼칸.filter(f => f.g===g).length}">${글(g)}</th>`).join('') +
     `<th class="묶" rowspan="2">${글(이력글머리)}<span class="임">임시</span></th></tr><tr>` +
@@ -602,7 +643,11 @@ async function 폼그리기(){
     '</tr></thead><tbody>';
   for(const m of 줄){
     const 키 = 줄키(m), 뺌 = 뺀줄(s, m);
-    h += `<tr data-key="${글(키)}"${뺌?' class="뺌"':''}><td class="dpr-k 참">${글(m.이름)}</td><td class="참">${글(m.규격)}</td>` +
+    const 덧 = 연.filter(x => x.출처==='더한 표기' && x.줄품목===m.이름 && x.줄규격===m.규격);
+    const 겹 = 연.some(x => x.겹침 && x.줄품목===m.이름 && x.줄규격===m.규격);
+    const 덧글 = 덧.length ? `<span class="덧표기" title="${글('다른 명세서 표기: ' + 덧.map(x => x.품목 + (x.규격?' '+x.규격:'')).join(' / '))}">+${덧.length}</span>` : '';
+    const 겹글 = 겹 ? `<span class="표시" title="같은 명세서 열쇠가 다른 줄에도 있음 — 명세서 등록 때 사장님께 묻습니다">⚠</span>` : '';
+    h += `<tr data-key="${글(키)}"${뺌?' class="뺌"':''}><td class="dpr-k 참">${글(m.이름)}${덧글}${겹글}</td><td class="참">${글(m.규격)}</td>` +
       `<td class="입 묶 가운데"><input type="checkbox" data-k="x_del"${뺌?' checked':''} title="체크 = 이번 등록에서 뺌(원본은 그대로, 풀면 살아남)"></td>`;
     폼칸.forEach((f,i) => {
       const 묶 = i===0||폼칸[i-1].g!==f.g ? ' 묶' : '', v = 칸값(f, m, s);
@@ -630,7 +675,8 @@ async function 폼그리기(){
     `자재대·중·소분류 = 품목대중소분류정의(자재)로 넘길 분류 — 한 번 넣은 값은 다음부터 고를 수 있습니다(대 → 중 → 소). 자재번호가 다른 줄(모든 거래처)과 같으면 빨갛게 알립니다. ${삭제글} = 체크한 줄은 이번 등록에서 뺍니다(원본은 그대로, 체크를 풀면 살아납니다).<br>` +
     `단가 = 1~10월 중 마지막 단가 · 적용시작일 = 그 단가로 처음 산 달 1일(날짜 칸이 없어 달 첫날 — 임시) · ${이력글머리} = 단가가 같은 묶음마다 「단가(산 달, 적용시작일~)」 — 이력으로 넣을 땐 이 줄들 차례대로, 하나만 넣을 땐 마지막 것.` +
     (M거래처(s) ? ` · 양지데코 = 엣지필름 M 단가: 롤 단가로 산 줄(규격 *100 등)은 길이로 나눈 값(빨간 테 칸, 임시).` : '') +
-    ` 고친 칸은 바로 창고에 저장됩니다. 영림원에 넣는 기능은 아직 없습니다(최종본 뒤 입력작업자와 상의).</div>`;
+    ` 고친 칸은 바로 창고에 저장됩니다. 영림원에 넣는 기능은 아직 없습니다(최종본 뒤 입력작업자와 상의).<br>` +
+    `명세서 열쇠 = 맨 앞 회색 두 칸(26년 1~10월 실제 명세서의 납품제품명+규격). 명세서를 영림원에 올릴 때 이 글자로 이 줄을 찾아 자재번호로 등록합니다(자재명이 명세서와 달라도 됨, ${삭제글} 줄은 연결 안 함). 연결 ${연.length}개${연.filter(x => x.출처==='더한 표기').length?` (더한 표기 ${연.filter(x => x.출처==='더한 표기').length} — 칸의 +N)`:''}.</div>`;
   속.innerHTML = `<div class="폼줄"><button class="chip" id="양식받기">양식 다운로드</button><button class="chip" id="양식올리기">양식 올리기</button>` +
     `<input type="file" id="양식파일" accept=".xlsx,.xls" hidden><span id="폼상태" class="폼상태"></span><span id="겹침" class="폼상태 bad"></span></div><div class="표통">${h}</div>`;
   const 표 = 속.querySelector('.폼표'), 목록 = 속.querySelector('#분류목록');
@@ -796,7 +842,7 @@ async function 양식다운로드(){
     const 이력aoa = [['거래처','납품제품명(품목)','규격','자재번호','구매거래처','차례','단가','산 달','적용시작일','마지막','롤 단가 나눔','삭제(등록 안 함)']];
     for(const s of 거래처시트들()){
       const 월표 = 받은[s].표.find(t => t.이름==='월별'), { 줄 } = 품목모으기(월표);
-      const 머리1 = ['보드매입현황','', '삭제'], 합칠 = [{s:{r:0,c:0},e:{r:0,c:1}}];
+      const 머리1 = ['보드/엣지 매입현황','', '삭제'], 합칠 = [{s:{r:0,c:0},e:{r:0,c:1}}];
       let c = 3;
       for(const g of 폼묶음){ const n = 폼칸.filter(f => f.g===g).length; 머리1.push(g, ...Array(n-1).fill('')); 합칠.push({s:{r:0,c},e:{r:0,c:c+n-1}}); c += n; }
       머리1.push('단가이력');
