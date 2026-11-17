@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v280 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v281 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -127,8 +127,7 @@ input.bad,select.bad{border-color:var(--red)}
 .unreg{font-size:11px;color:#b45309;font-weight:700}
 /* v235 세트구성품등록 — 임시 칩 · 벤더피아에서 불러오기 목록(세로 목록, 가로로 안 밀림) */
 .chip.tmp{background:var(--amber-bg);color:var(--amber);border-color:#fde68a;margin-left:4px;vertical-align:1px}
-.btn .bdbadge{margin-left:6px}.bdbox .bdvn{margin:0 0 8px}.bdbox .wcpick .chip{margin-left:6px}.bdbox .bdopt{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;margin-right:12px}.bdbox .bdopt label{display:inline-flex;gap:4px;align-items:center;cursor:pointer}   /* v277 보드/엣지 매입현황에서 불러오기 */
-.bdbox td{white-space:nowrap}.bdbox td.bad{box-shadow:inset 0 0 0 2px var(--red);background:var(--red-bg)}.bdbox td.chg{background:var(--amber-bg);font-weight:800}.bdbox td.bdwhy{white-space:normal;min-width:180px;font-size:11.5px}.bdbox td.bdwhy.bad{color:var(--red)}.bdbox .bdtmp{color:var(--amber)}.bdbox .bdwith{color:var(--muted)}.bdbox .bdall{margin-top:10px;border-top:1px solid var(--line);padding-top:8px}.bdbox .bdall .sub{font-size:13px;font-weight:800;margin:4px 0}.bdbox .bdtmp .chip{margin-left:0}.bdbox td.bdst .chip+.chip{margin-left:4px}.bdbox .bdno{margin-left:4px;color:var(--muted);font-family:var(--mono,monospace)}.bdbox .bdbad{color:var(--red)}.bdbox .bdnone{margin:8px 0;font-size:12px;color:var(--muted)}.bdbox .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.bdreg .bdvn{margin:8px 0 10px}.bdreg td.bdwhy{white-space:normal;min-width:180px;font-size:12px}.bdreg td.bdwhy.bad,.bdreg .bdbad{color:var(--red)}.bdreg .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}   /* v281 구매자재 일괄등록 */
 .vpbox{flex-basis:100%;min-width:0;border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:6px;background:#fff}
 .vpbox input[type=search]{flex:1 1 200px;min-width:0}
 .vplist{max-height:50vh;overflow-y:auto;overflow-x:hidden}
@@ -479,7 +478,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v280</span>
+    <span class="ver">v281</span>
   </div>
 </header>
 <div class="wrap">
@@ -2121,7 +2120,7 @@ function counts(key){
    ⚠ 링크 박스 내용은 최근 90일 발주서로 다시 짜인다(그보다 오래된 발주는 링크에서 빠짐). 브라우저 저장(캐시) 없음. */
 var RECENT_DAYS=90,OPEN_ST=['대기','진행중','오류','수정대기'],WATCH={},WDEF=null,CNT={},CNTQ={},OLD={};
 var WIN={imporders:1,imppays:1,impinvs:1,impbls:1,impins:1,purreqs:1,purapprs:1,purords:1,purchases:1,purdelvs:1,pomods:1,purcalcs:1,prods:1,proddlvs:1,prodmoves:1};
-var PER_MENU={classes:function(){return navBoxOf(cur)==='base'||!!BD_STEPS[cur];},stocks:function(){return cur==='stocks';}};
+var PER_MENU={classes:function(){return navBoxOf(cur)==='base';},stocks:function(){return cur==='stocks';}};
 ['imporders','imppays','impinvs','impbls','impins'].forEach(function(k){PER_MENU[k]=function(){return (BYKEY[cur]||{}).page==='수입';};});
 ['purreqs','purapprs','purcalcs'].forEach(function(k){PER_MENU[k]=function(){return (BYKEY[cur]||{}).page==='구매'||(k!=='purcalcs'&&(cur==='pdm'||cur==='vappr'));};});   /* v255 구매발주요청 상태(구매요청·품의)를 구매발주납품 관리에서도 봄 */
 PER_MENU.prodmoves=function(){return (BYKEY[cur]||{}).page==='생산';};
@@ -2132,7 +2131,7 @@ function wDefs(){
   var L=function(sn){return sn.docs.map(function(x){return Object.assign({id:x.id},x.data());});},d=[];
   STEPS.forEach(function(s){d.push({c:'erp_'+s.key,spec:WIN[s.key]?{open:1,t:['createdAt']}:null,when:PER_MENU[s.key],
     on:function(sn){data[s.key]=L(sn);if(CNT[s.key])CNT[s.key].doneT=0;refreshAll();},err:function(){data[s.key]=data[s.key]||[];refreshAll();},off:function(){data[s.key]=null;}});});
-  d.push({c:BD_PATH,when:function(){return !!BD_STEPS[cur];},on:function(sn){BD.docs=L(sn);BD.err='';bdRedraw();},err:function(e){BD.docs=BD.docs||[];BD.err='보드/엣지 매입현황 자료를 읽지 못했습니다: '+errText(e);bdRedraw();},off:function(){BD.docs=null;}});   /* v277 보내기(공개 창고, 읽기만) */
+  d.push({c:BD_PATH,when:function(){return cur==='bdreg';},on:function(sn){BD.docs=L(sn);BD.err='';bdRedraw();},err:function(e){BD.docs=BD.docs||[];BD.err='보드/엣지 매입현황 자료를 읽지 못했습니다: '+errText(e);bdRedraw();},off:function(){BD.docs=null;}});   /* v277 보내기(공개 창고, 읽기만) · v281 구매자재 일괄등록 메뉴에서만 */
   d.push({c:'erp_rates',on:function(sn){data.rates=L(sn);refreshAll();},err:function(){data.rates=data.rates||[];refreshAll();}});   /* v167 환율(기준정보) */
   d.push({c:'erp_imports',spec:{open:1,t:['createdAt']},on:function(sn){IMPORTS=L(sn);if(impDraw)impDraw();if(ifRefresh)ifRefresh();},err:function(){IMPORTS=IMPORTS||[];if(impDraw)impDraw();}});   /* v23 불러오기 요청 */
   d.push({c:'erp_stocks',when:PER_MENU.stocks,on:function(sn){STOCKS=L(sn);renderNav();if(stkDraw)stkDraw();},err:function(){STOCKS=STOCKS||[];renderNav();if(stkDraw)stkDraw();},off:function(){STOCKS=null;}});   /* v102 */
@@ -2176,7 +2175,7 @@ function oldBox(s){
 /* v120 맨 위 메뉴 = 박스. 사장님 말씀 「현재 입력폼 12345678~11 로 연결나눠진 기본입력 들을 기본입력 박스안에 순서대로 정렬 되게 해줘 나머지 박스도 영림원 의 입력 흐름에 맞는 순서를 정해서 박스 클릭시 해당 입력의 나열이 보이도록 해줘」
    박스 순서 = NAV_BOXES. 박스를 누르면 목록이 펼쳐짐(한 번에 하나) · 지금 메뉴의 박스는 열림(navOpen=null) · 보이는 메뉴 없는 박스는 숨김(v115 권한) */
 var NAV_BOXES=[
-  {id:'base',title:'기본입력',icon:'layers',items:function(){return ['basic','check'].concat(STEPS.filter(function(s){return !s.hidden&&!s.page;}).map(function(s){return s.key;}));}},
+  {id:'base',title:'기본입력',icon:'layers',items:function(){var a=['basic','check'].concat(STEPS.filter(function(s){return !s.hidden&&!s.page;}).map(function(s){return s.key;}));a.splice(a.indexOf('materials')+1,0,'bdreg');return a;}},   /* v281 구매자재 일괄등록 = 5 자재등록 다음 */
   {id:'구매',title:PAGE_NAMES['구매'],icon:'sheet',items:function(){return ['purprices','purreqs','purapprs','purords','purchases','purdelvs','pomods','purcalcs'];}},   /* v126 발주서관리 */   /* v223 사장님 「발주3건은 그대로 두고 저 메뉴를 없애 달라고」 — 메뉴 목록에서만 뺌. 화면(renderPodocs)·박스 동기화(refreshAll)·#podocs/번호 주소·업체별 링크는 그대로 */
   {id:'수입',title:PAGE_NAMES['수입'],icon:'import',items:function(){return ['imporders','imppays','impinvs','impbls','impins'];}},
   {id:'생산',title:PAGE_NAMES['생산'],icon:'layers',items:function(){return ['prods','proddlvs'];}},   /* v223 「생산/외주 발주서」 메뉴만 뺌(asmBoxSync·업체별 링크 그대로) */
@@ -2206,6 +2205,7 @@ function renderNav(){
     else if(k==='basic'){num=ico('sheet');title='영림원 기본정보 입력';sub='';}
     else if(k==='vpnames'){num=String(i);title='벤더피아 상품명연결';sub=VP.prods?'상품 '+VP.prods.length.toLocaleString():'';}   /* v263 */
     else if(k==='vappr'){num=ico('sheet');title='구매/발주 품의';sub='';}   /* v266 */
+    else if(k==='bdreg'){num=ico('import');title='구매자재 일괄등록';sub='';}   /* v281 */
     else if(k==='pdm'){num=ico('box');title='구매발주납품 관리';sub='거래처 '+PDM_VENDORS.length;}   /* v230 */   /* v166 별도 프로그램 — 같은 창으로 연다 */
     else{num=s.page?String(i):String(s.n);var cc=counts(k);sub=cc==null?'불러오는 중':cntText(cc);}   /* v225 */
     return h('button',{type:'button',on:{click:function(){if(k==='basic'){location.href=BASIC_URL;return;}go(k);if(NARROW()){navOpen='';renderNav();var m=document.getElementById('main');if(m)window.scrollTo(0,Math.max(0,m.getBoundingClientRect().top+window.pageYOffset-70));}}},'aria-current':k===cur?'step':null},
@@ -2222,7 +2222,7 @@ function renderNav(){
   navEl.replaceChildren.apply(navEl,out);
 }
 function renderSum(){
-  if(!cur||cur==='stocks'||cur==='vpnames'||isAdmKey(cur)||cur==='pdm'||cur==='vappr'||cur==='podocs'||cur==='asmpo'||cur==='links'||!canMenu(menuOf(cur),'r')){sumEl.replaceChildren();return;}   /* v115 담당자 관리도 */   /* v102 재고 조회는 대기·완료 문서가 없다 */
+  if(!cur||cur==='stocks'||cur==='vpnames'||cur==='bdreg'||isAdmKey(cur)||cur==='pdm'||cur==='vappr'||cur==='podocs'||cur==='asmpo'||cur==='links'||!canMenu(menuOf(cur),'r')){sumEl.replaceChildren();return;}   /* v115 담당자 관리도 */   /* v102 재고 조회는 대기·완료 문서가 없다 */
   var t={'대기':0,'진행중':0,'완료':0,'오류':0,'수정대기':0};
   var pg=(BYKEY[cur]||{}).page||'';   /* v75 맨 위 요약 = 지금 페이지 것만(1~11단계에 수입을 섞지 않음) */
   STEPS.filter(function(s){return (s.page||'')===pg;}).forEach(function(s){var c=counts(s.key);if(c)STATUS.forEach(function(k){t[k]+=c[k];});});
@@ -3899,7 +3899,7 @@ function setFillRow(o){   /* 양식·붙여넣기 줄: 세트구성품번 ⇄ �
   else if(isEmpty(o.ccode)&&!isEmpty(o.cname)){var l=VP.byName[String(o.cname).trim()];if(l&&l.length===1)o.ccode=l[0].code;}
 }
 function tmpChip(x){if(!x)return;var l=x.el.querySelector('label');if(l)l.append(' ',h('span',{class:'chip tmp'},'임시'));}
-/* ---------- v277 보드/엣지 매입현황에서 불러오기 (3 품목대중소분류정의 · 5 자재등록 · 구매단가등록) ----------
+/* ---------- v277 보드/엣지 매입현황 보내기 받기 — ⚠ v281 부터 화면은 「구매자재 일괄등록」 메뉴 하나(renderBdReg). 세 메뉴의 단추·상자는 지움. 아래 셈(bdEntries·bdState·bdPlan·bdPushOne)은 그대로 씀 ----------
    사장님 11-17 「새로 불러온 파일에 새로운 명세가 있다면 지금과 같은 논리로 영림원 입력폼 자리에 추가되는 경우가 생길 텐데, 이를 입력폼 쪽에서 감지하여 새로운 등록이 준비되도록 해야 해.」
    읽는 곳(읽기만) = 공개 창고 artifacts/vivivic-4b7ef/public/data/발주역입력_영림원폼/{우리 거래처} 의 `보내기`
      {판,고친때,줄:[{열쇠,상태,지문,고친때,거래처,분류,자재등록,구매단가등록,단가이력}]} — 꼴 = 입력작업자/전달-보드매입현황-기준정보폼.md 7절. 세 메뉴를 열었을 때만 지켜본다(wDefs). 「등록안함」 줄은 뺀다.
@@ -3910,8 +3910,8 @@ function tmpChip(x){if(!x)return;var l=x.el.querySelector('label');if(l)l.append
    빨간 줄(넘기지 않음) = 빈 필수칸 · 목록 밖 값 · 겹치는 자재번호 · 이상한 분류 이름(숫자 사이 쉼표 「0,15t」 · 앞뒤 빈칸 · 같은 소분류 이름이 두 중분류 밑) · 자재명 끝 * ·
      단가 숫자 아님 · 날짜 꼴 · 구매거래처 미등록 · 앞 단계 없음(분류 → 자재 → 구매단가).
    ⚠ 임시(첫 등록 때 확인, 화면에 「임시」): 단가이력 여러 줄 / 마지막 단가만(처음 = 마지막 단가만) · 부가세포함여부 처음 값(구매단가등록엔 칸 없음 — 기준 = 별도) · 원화 소수 단가 · 지난 날짜 적용시작일. */
-var BD_PATH=VP_PATH+'발주역입력_영림원폼',BD_SRC='보드/엣지 매입현황',BD_STEPS={classes:1,materials:1,purprices:1};
-var BD={docs:null,err:'',vn:{},mode:'last',all:false,pick:{},sent:{},fail:{},busy:false,draw:null,badge:null};
+var BD_PATH=VP_PATH+'발주역입력_영림원폼',BD_SRC='보드/엣지 매입현황';
+var BD={docs:null,err:'',mode:'last',sent:{},fail:{}};   /* v281 읽은 보내기 · 구매단가 = 마지막 단가만(임시) */
 function bdTr(v){return String(v==null?'':v).trim();}
 function bdVendors(){return (BD.docs||[]).filter(function(d){return d.id.charAt(0)!=='_'&&d['보내기']&&Array.isArray(d['보내기']['줄']);}).sort(function(a,b){return a.id.localeCompare(b.id,'ko');});}
 function bdLive(d){return d['보내기']['줄'].filter(function(r){return r&&r['상태']==='보냄';});}
@@ -3994,12 +3994,7 @@ function bdState(key,vn,e,ctx){
   st.ok=st.t!=='have'&&!E.length&&!st.why;
   return st;
 }
-function bdAll(key){   /* [{vn,pan,at,rows:[{e,st}]}] — v280 메뉴별 표도 「한 번에」와 같은 셈(bdPlan): 같은 거래처의 앞 단계 줄을 함께 넘길 것으로 봄 */
-  var ki=BD_ORDER.indexOf(key);
-  return bdVendors().map(function(d){var b=d['보내기'],P=bdPlan(d.id);return {vn:d.id,pan:b['판'],at:b['고친때'],live:bdLive(d).length,rows:P[ki].rows};});
-}
-function bdCnt(rows){var n=0,c=0,bad=0;rows.forEach(function(x){if(x.st.t==='new')n++;else if(x.st.t==='chg')c++;if(x.st.t!=='have'&&x.st.errs.length)bad++;});return {n:n,c:c,bad:bad};}
-function bdRedraw(){if(BD.badge)BD.badge();if(BD.draw&&!BD.busy)BD.draw();}
+function bdRedraw(){if(bdrDraw&&cur==='bdreg')bdrDraw();}
 /* v279 사장님 「이거 하나 연결로 모두 입력되게 입력폼에 준비해 달라」 — 거래처 하나 → 분류 → 자재등록 → 구매단가등록 대기를 한 번에.
    미리 보기(bdPlan) = 앞 단계에서 넘길 줄을 「있는 것」으로 치고(ctx.virt) 뒤 단계 빨간 줄을 셈 → 앞 단계가 빠진 줄은 뒤 단계에서도 빠짐(분류 없음·자재 없음).
    넘기기(bdRunAll) = 단계마다 실제 자료로 다시 셈해 차례로 넘김(dataPut 으로 앞 단계 문서가 바로 보임). 메뉴별 단추·알림은 그대로. */
@@ -4034,101 +4029,61 @@ function bdPlan(vn,real,only,bad){   /* [{key,go:[{e,st}],skip:[{e,st}],have:N}]
     return {key:key,go:go,skip:skip,have:rows.length-go.length-skip.length,rows:rows};
   });
 }
-function bdBoxFn(s,say){
-  var key=s.key,badgeEl=h('span',{class:'chip diff bdbadge',hidden:true});
-  var vRow=h('div',{class:'wcpicks bdvn',role:'group','aria-label':'거래처'}),info=h('div',{class:'lsinfo'}),opts=h('div',{class:'oldrow'}),body=h('div',{});
-  var msg=h('span',{class:'msg','aria-live':'polite'}),goBtn=h('button',{type:'button',class:'btn primary small'},'대기로 넘기기');
-  var allCb=h('input',{type:'checkbox',checked:BD.all,on:{change:function(){BD.all=allCb.checked;draw();}}});
-  var allBtn=h('button',{type:'button',class:'btn small',on:{click:function(){allOpen=!allOpen;allRes=null;draw();}}},'분류·자재등록·구매단가등록 한 번에'),allBox=h('div',{class:'bdall',hidden:true}),allOpen=true,allRes=null;   /* v279 · v280 처음부터 열림 */
-  var box=h('div',{class:'vpbox bdbox',hidden:true},vRow,info,opts,body,h('div',{class:'row'},goBtn,allBtn,msg),allBox);
-  var cache=null;
-  function badge(){var A=BD.docs?bdAll(key):[],t={n:0,c:0};A.forEach(function(v){var c=bdCnt(v.rows);t.n+=c.n;t.c+=c.c;});
-    badgeEl.hidden=!(t.n||t.c);badgeEl.textContent='새 줄 '+t.n+' · 바뀐 줄 '+t.c;cache=A;}
-  function radio(v,lab){return h('label',{},h('input',{type:'radio',name:'bd-mode',value:v,checked:BD.mode===v,on:{change:function(){BD.mode=v;BD.pick={};badge();draw();}}}),lab);}
-  function td(e,st,f){var v=e.vals[f.k],t=f.type==='check'?(v?'✓':''):bdTr(v),er=st.errs.filter(function(x){return x.k===f.k;}),c=er.length?'bad':st.t==='chg'&&st.diff.indexOf(f.k)>=0?'chg':'';
-    return h('td',c?{class:c,title:er.map(function(x){return x.m;}).join(' · ')}:{},t);}
+/* ---------- v281 구매자재 일괄등록 (기본입력 박스, 5 자재등록 다음) ----------
+   사장님 11-17 「입력폼에 구매자재 일괄등록 이라는 메뉴 만들어 이 양식(보드/엣지 매입현황 영림원보내기)을 받아 등록대기 시키게 하세요. 그 외 다른 부분에 세팅된 이 양식 받아주는 부분은 모두 삭제하세요.」
+   화면 = ① 거래처 고르기 ② 확인 결과(넘길 N · 못 넘길 N · 못 넘길 줄과 이유) ③ 「등록대기」. 미리 보기 표·새 줄/바뀐 줄 배지 없음(v277~v280 세 메뉴의 단추·상자·「한 번에」 표는 지움).
+   셈 = bdPlan(같은 거래처 분류 → 자재등록 → 구매단가등록, 앞 단계에서 함께 넘길 줄은 있는 것으로 봄) · 넘기기 = bdRun(단계마다 실제 자료로 다시 셈 → bdPushOne).
+   이미 대기·진행중·완료이고 바뀌지 않은 줄 = 안 넘김(받은 기록 = 문서 bd 칸) · 바뀐 줄 = 대기·오류 문서면 고쳐 다시 대기, 진행중·완료면 못 넘길 줄(이유). 구매단가 = 마지막 단가만(BD.mode 'last', 임시). */
+var BDR={vn:'',msg:'',bad:false,busy:false};
+function bdRun(V){   /* 분류 → 자재 → 구매단가 차례로 대기. 돌려줌 = {done,bad} */
+  var bad={},done=0,nb=0;
+  return BD_ORDER.reduce(function(p,k){return p.then(function(){
+    var g=bdPlan(V.vn,true,k,bad)[0];   /* 실제 자료로 다시 셈 — 앞 단계가 막 넘긴 문서가 보임 */
+    return g.go.reduce(function(q,x){return q.then(function(){return bdPushOne(k,V,x).then(function(ok){if(ok)done++;else{nb++;if(k==='materials')bad[x.e.key]='넘기지 못함';}});});},Promise.resolve());
+  });},Promise.resolve()).then(function(){return {done:done,bad:nb};});
+}
+var bdrDraw=null;
+function renderBdReg(){
+  bulk=null;listBox=null;listBox2=null;sheetDraw=null;ifRefresh=null;form=null;
+  var vRow=h('div',{class:'wcpicks bdvn',role:'group','aria-label':'거래처'}),res=h('div',{}),msg=h('span',{class:'msg','aria-live':'polite'});
+  var goBtn=h('button',{type:'button',class:'btn primary'},'등록대기');
   function draw(){
-    if(!cache)badge();
-    if(BD.err){info.replaceChildren(BD.err);vRow.replaceChildren();opts.replaceChildren();body.replaceChildren();goBtn.hidden=true;return;}
-    if(!BD.docs){info.replaceChildren('불러오는 중');vRow.replaceChildren();opts.replaceChildren();body.replaceChildren();goBtn.hidden=true;return;}
-    var A=cache,vn=BD.vn[key],V=A.filter(function(v){return v.vn===vn;})[0];
-    vRow.replaceChildren.apply(vRow,A.map(function(v){var c=bdCnt(v.rows),on=v.vn===vn;
-      return h('button',{type:'button',class:'btn small wcpick'+(on?' primary':''),'aria-pressed':on?'true':'false',on:{click:function(){BD.vn[key]=on?'':v.vn;draw();}}},v.vn,c.n+c.c?h('span',{class:'chip diff'},String(c.n+c.c)):'');}));
-    if(!A.length)info.replaceChildren('보낸 거래처 0');
-    if(!V){if(A.length)info.replaceChildren();opts.replaceChildren();body.replaceChildren();goBtn.hidden=true;allBtn.hidden=true;allBox.hidden=true;msg.textContent='';return;}
-    var c=bdCnt(V.rows),dt=new Date(V.at),at=isNaN(dt)?'':pad2(dt.getMonth()+1)+'-'+pad2(dt.getDate())+' '+pad2(dt.getHours())+':'+pad2(dt.getMinutes());
-    info.replaceChildren(h('span',{},'판 '+V.pan),h('span',{},at),h('span',{},'줄 '+V.live),h('span',{class:'lscnt'+(c.n?' need':'')},'새 줄 '+c.n),h('span',{class:'lscnt'+(c.c?' need':'')},'바뀐 줄 '+c.c),c.bad?h('span',{class:'bdbad'},'빨간 줄 '+c.bad):'');
-    opts.replaceChildren.apply(opts,(key==='purprices'?[h('span',{class:'bdopt',role:'radiogroup','aria-label':'단가이력'},radio('last','마지막 단가만'),radio('hist','단가이력 여러 줄'),h('span',{class:'chip tmp'},'임시')),
-      h('span',{class:'bdopt'},'부가세포함여부 별도',h('span',{class:'chip tmp'},'임시'))]:[]).concat([h('label',{class:'bdopt'},allCb,'받은 줄도 보기')]));
-    var rows=V.rows.filter(function(x){return BD.all||x.st.t!=='have'||(x.st.doc&&x.st.doc.status==='오류')||BD.sent[key+'|'+V.vn+'|'+x.e.id]||BD.fail[key+'|'+V.vn+'|'+x.e.id];});
-    var today=conToday(),tmpP=rows.some(function(x){return /\./.test(bdTr(x.e.vals.price));}),tmpF=rows.some(function(x){var f=bdTr(x.e.vals.from);return f&&f<today;});
-    var head=[h('th',{},''),h('th',{},'확인')].concat(s.fields.map(function(f){return h('th',{},f.label,(f.k==='price'&&tmpP)||(f.k==='from'&&tmpF)?h('span',{class:'chip tmp'},'임시'):'');}),[h('th',{},'상태')]);
-    var n=0,tb=h('tbody',{},rows.map(function(x){
-      var e=x.e,st=x.st,id=key+'|'+V.vn+'|'+e.id,d=st.doc,on=st.ok&&BD.pick[id]!==false;if(on)n++;
-      var cb=h('input',{type:'checkbox',checked:on,disabled:!st.ok||BD.busy,'aria-label':'넘기기',on:{change:function(){BD.pick[id]=cb.checked;draw();}}});
-      var stc=st.t==='new'?h('span',{class:'chip diff'},'새 줄'):st.t==='chg'?h('span',{class:'chip diff',title:st.diff.map(function(k){return (s.fields.filter(function(f){return f.k===k;})[0]||{}).label;}).join(' · ')},'바뀐 줄'):'';
-      var dc=d?h('span',{class:'chip '+(d.status||'대기')},d.status||'대기'):'';
-      var no=d&&d.id?h('small',{class:'bdno',title:'대기번호 '+d.id},d.id.slice(0,6)):'';
-      var why=st.t!=='have'?st.errs.map(function(q){return q.m;}).concat(st.why?[st.why]:[]).join(' · '):'';
-      var res=BD.fail[id]||(d&&d.status==='오류'&&d.agentNote?d.agentNote:'')||why,tmpE=st.t!=='have'&&st.tmp&&!BD.fail[id]?h('span',{class:'bdtmp'},h('span',{class:'chip tmp'},'임시'),' '+st.tmp):'';   /* v278 */
-      var wE=st.t!=='have'&&st.with&&!st.errs.length&&!BD.sent[id]?h('span',{class:'bdwith'},st.with):'';   /* v280 앞 단계와 함께 넘김 */
-      return h('tr',{class:st.t!=='have'&&st.errs.length?'bdred':''},h('td',{},cb),h('td',{class:'bdwhy'+(BD.fail[id]||st.errs.length||(d&&d.status==='오류')?' bad':'')},res,res&&(tmpE||wE)?h('br'):'',wE,wE&&tmpE?h('br'):'',tmpE),s.fields.map(function(f){return td(e,st,f);}),
-        h('td',{class:'bdst'},stc,dc,no));}));
-    var tw=h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},head)),tb));
-    body.replaceChildren(rows.length?hbarFor(tw):'',rows.length?tw:h('p',{class:'bdnone'},'새 줄 0 · 바뀐 줄 0'));
-    goBtn.hidden=false;goBtn.disabled=!n||BD.busy;goBtn.textContent=n?'대기로 넘기기 '+n+'건':'대기로 넘기기';
-    goBtn.onclick=function(){allOpen=true;allRun(V,key,1);};   /* v280 앞 단계 줄도 함께(분류 → 자재 → 이 메뉴) */
-    allBtn.hidden=false;allBtn.disabled=BD.busy;allBtn.setAttribute('aria-expanded',String(allOpen));allBox.hidden=!allOpen;if(allOpen)allDraw(V);
+    if(BD.err){vRow.replaceChildren();res.replaceChildren(BD.err);goBtn.hidden=true;return;}
+    if(!BD.docs){vRow.replaceChildren();res.replaceChildren('불러오는 중');goBtn.hidden=true;return;}
+    var vs=bdVendors();
+    vRow.replaceChildren.apply(vRow,vs.map(function(d){var on=d.id===BDR.vn;
+      return h('button',{type:'button',class:'btn small wcpick'+(on?' primary':''),'aria-pressed':on?'true':'false',disabled:BDR.busy,on:{click:function(){BDR.vn=on?'':d.id;BDR.msg='';draw();}}},d.id);}));
+    var d=vs.filter(function(x){return x.id===BDR.vn;})[0];
+    msg.textContent=BDR.msg;msg.className='msg'+(BDR.bad?' bad':'');
+    if(!d){res.replaceChildren();goBtn.hidden=true;return;}
+    var P=bdPlan(d.id),go=0,skip=[],have=0;
+    P.forEach(function(g){go+=g.go.length;have+=g.have;g.skip.forEach(function(x){skip.push({k:g.key,x:x});});});
+    var cnt=h('div',{class:'lsinfo bdrcnt'},h('span',{},'넘길 '+go),h('span',{class:skip.length?'bdbad':''},'못 넘길 '+skip.length),have?h('span',{},'이미 넘김 '+have):'');
+    var tb=skip.length?h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},['단계','줄','이유'].map(function(t){return h('th',{},t);}))),
+      h('tbody',{},skip.map(function(o){return h('tr',{},h('td',{},BYKEY[o.k].title),h('td',{},bdLab(o.k,o.x.e)),h('td',{class:'bdwhy bad'},bdWhy(o.x.st)));})))):'';
+    res.replaceChildren(cnt,tb);
+    goBtn.hidden=false;goBtn.disabled=!go||BDR.busy;goBtn.textContent=go?'등록대기 '+go+'건':'등록대기';
+    goBtn.onclick=function(){
+      if(BDR.busy||!go)return;
+      if(!db){BDR.msg='저장소에 연결되지 않아 넘기지 못했습니다.';BDR.bad=true;draw();return;}
+      if(data.classes==null||data.materials==null){BDR.msg='분류·자재 자료를 읽는 중입니다. 잠시 뒤 다시 눌러 주세요.';BDR.bad=true;draw();return;}
+      BDR.busy=true;BDR.msg='넘기는 중';BDR.bad=false;draw();
+      var b=d['보내기'];
+      freshCheck().then(function(old){
+        if(old)return {old:old};
+        return bdRun({vn:d.id,pan:b['판']});
+      }).then(function(r){
+        BDR.busy=false;
+        if(r.old){BDR.msg=r.old;BDR.bad=true;}else{BDR.msg=r.done+'건 등록대기'+(r.bad?' · 못 넘김 '+r.bad+'건':'');BDR.bad=!!r.bad;}
+        draw();renderNav();renderSum();
+      },function(e){BDR.busy=false;BDR.msg='넘기지 못했습니다. '+errText(e);BDR.bad=true;draw();});
+    };
   }
-  function allDraw(V){   /* v279 한 번에 — 미리 보기 / 넘긴 결과. 한 표 = 단계마다 넘김·뺀 줄 + 뺀 줄 이유 */
-    var P=allRes||bdPlan(V.vn);if(!P){allBox.replaceChildren();return;}
-    var tot=P.reduce(function(n,g){return n+g.go.length;},0),sum=h('tbody',{},P.map(function(g){
-      return h('tr',{},h('td',{},BYKEY[g.key].title),h('td',{},String(allRes?g.done:g.go.length)),h('td',{class:g.skip.length?'bdwhy bad':''},String(g.skip.length+(allRes?g.bad:0))),h('td',{},String(g.have)));}));
-    var lines=[];P.forEach(function(g){g.skip.forEach(function(x){lines.push(h('tr',{},h('td',{},BYKEY[g.key].title),h('td',{},bdLab(g.key,x.e)),h('td',{class:'bdwhy bad'},bdWhy(x.st))));});
-      (g.failed||[]).forEach(function(x){lines.push(h('tr',{},h('td',{},BYKEY[g.key].title),h('td',{},bdLab(g.key,x.e)),h('td',{class:'bdwhy bad'},BD.fail[g.key+'|'+V.vn+'|'+x.e.id]||'넘기지 못함')));});});
-    var t1=h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},['단계',allRes?'넘김':'넘길 줄','뺀 줄','받은 줄'].map(function(x){return h('th',{},x);}))),sum));
-    var t2=lines.length?h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},['단계','줄','뺀 까닭'].map(function(x){return h('th',{},x);}))),h('tbody',{},lines))):'';
-    var run=allRes?'':h('button',{type:'button',class:'btn primary small',disabled:!tot||BD.busy,on:{click:function(){allRun(V);}}},tot?'대기로 넘기기 '+tot+'건':'대기로 넘기기');
-    allBox.replaceChildren(h('div',{class:'sub'},V.vn+' · '+(allRes?'넘긴 결과':'분류 → 자재등록 → 구매단가등록')),t1,t2,run?h('div',{class:'row'},run):'');
-  }
-  function allRun(V,upto,pick){   /* v280 upto = 이 단계까지(메뉴별 「대기로 넘기기」 = 앞 단계 함께) · pick = 그 단계에서 체크한 줄만 */
-    if(BD.busy)return;
-    if(!db){msg.textContent='저장소에 연결되지 않아 넘기지 못했습니다.';msg.className='msg bad';return;}
-    if(data.classes==null||data.materials==null){msg.textContent='분류·자재 자료를 읽는 중입니다. 잠시 뒤 다시 눌러 주세요.';msg.className='msg bad';return;}
-    BD.busy=true;draw();msg.textContent='넘기는 중';msg.className='msg';
-    var res=[];
-    freshCheck().then(function(old){
-      if(old){BD.busy=false;msg.textContent=old;msg.className='msg bad';draw();return;}
-      var bad={};
-      return BD_ORDER.slice(0,BD_ORDER.indexOf(upto||'purprices')+1).reduce(function(p,k){return p.then(function(){
-        var g=bdPlan(V.vn,true,k,bad)[0];g.done=0;g.bad=0;g.failed=[];res.push(g);
-        if(pick&&k===upto)g.go=g.go.filter(function(x){return BD.pick[k+'|'+V.vn+'|'+x.e.id]!==false;});   /* 실제 자료로 다시 셈 — 앞 단계가 막 넘긴 문서가 보임 */
-        return g.go.reduce(function(q,x){return q.then(function(){return bdPushOne(k,V,x).then(function(ok){if(ok)g.done++;else{g.bad++;g.failed.push(x);if(k==='materials')bad[x.e.key]='넘기지 못함';}});});},Promise.resolve());
-      });},Promise.resolve()).then(function(){
-        BD.busy=false;allRes=res;var d=res.reduce(function(n,g){return n+g.done;},0),b=res.reduce(function(n,g){return n+g.bad;},0);
-        msg.textContent=d+'건 대기로 넘김'+(b?' · 못 넘김 '+b+'건':'');msg.className='msg'+(b?' bad':'');
-        cache=null;badge();draw();renderList();renderNav();renderSum();
-      });
-    });
-  }
-  function send(V,todo){
-    if(!todo.length||BD.busy)return;
-    if(!db){msg.textContent='저장소에 연결되지 않아 넘기지 못했습니다.';msg.className='msg bad';return;}
-    BD.busy=true;goBtn.disabled=true;msg.textContent='넘기는 중';msg.className='msg';
-    var done=0,bad=0;
-    freshCheck().then(function(old){
-      if(old){BD.busy=false;msg.textContent=old;msg.className='msg bad';draw();return;}
-      return todo.reduce(function(p,x){return p.then(function(){
-        return bdPushOne(key,V,x).then(function(ok){if(ok)done++;else bad++;});
-      });},Promise.resolve()).then(function(){
-        BD.busy=false;msg.textContent=done+'건 대기로 넘김'+(bad?' · 못 넘김 '+bad+'건':'');msg.className='msg'+(bad?' bad':'');
-        cache=null;badge();draw();renderList();renderNav();renderSum();
-      });
-    });
-  }
-  BD.badge=function(){badge();};BD.draw=function(){cache=null;draw();};
-  badge();
-  return {box:box,badgeEl:badgeEl,toggle:function(){box.hidden=!box.hidden;if(!box.hidden){msg.textContent='';allRes=null;cache=null;draw();}}};
+  bdrDraw=function(){if(!BDR.busy)draw();};
+  mainEl.replaceChildren(h('section',{class:'card bdreg'},
+    h('h2',{},'구매자재 일괄등록'),
+    vRow,res,h('div',{class:'row'},goBtn,msg)));
+  draw();
 }
 function setRowHook(r){   /* 줄 칸: 단품코드 ⇄ 단품명 드롭다운(목록 밖 입력 허용 · 「미등록」만) */
   var by=function(k){return r.fields.filter(function(x){return x.f.k===k;})[0];};
@@ -5950,8 +5905,9 @@ function renderStep(){
   if(cur==='check'){renderCheck();return;}
   if(cur==='stocks'){renderStock();return;}   /* v102 */
   if(cur==='vpnames'){renderVpNames();return;}   /* v263 */
+  if(cur==='bdreg'){renderBdReg();return;}   /* v281 구매자재 일괄등록 */
   if(cur==='pdm'){renderPdm();return;}   /* v230 */
-  var s=BYKEY[cur];bulk=null;BD.draw=BD.badge=null;   /* v277 */
+  var s=BYKEY[cur];bulk=null;
   form=buildForm(s);
   if(s.key==='pomods'&&POMOD_PRE){var pp=POMOD_PRE;POMOD_PRE=null;POMOD_CTX=pp.ctx;setTimeout(function(){if(BYKEY[cur]===s)form.fill(pp.vals,pp.rows);},0);}   /* v157 「발주수정」으로 연 때 채움 */
   form.el.addEventListener('submit',function(e){e.preventDefault();save(s);});
@@ -6015,9 +5971,6 @@ function renderStep(){
   if(s.key==='setitems'){var vpFn=vpBoxFn(s,say);tmpChip(form.field('pcode'));   /* v235 벤더피아에서 불러오기 · 임시 = 세트품번 규칙 */
     var vpBtn=h('button',{type:'button',class:'btn imp',on:{click:function(){vpFn.toggle();vpBtn.setAttribute('aria-expanded',String(!vpFn.box.hidden));}}},ico('import'),'벤더피아에서 불러오기');
     impBtn.after(vpBtn);xlQ.before(vpFn.box);vpLoad();}
-  if(BD_STEPS[s.key]){var bdFn=bdBoxFn(s,say);   /* v277 보드/엣지 매입현황에서 불러오기 · 새 줄·바뀐 줄 알림 */
-    var bdBtn=h('button',{type:'button',class:'btn imp','aria-expanded':'false',on:{click:function(){bdFn.toggle();bdBtn.setAttribute('aria-expanded',String(!bdFn.box.hidden));}}},ico('import'),'보드/엣지 매입현황에서 불러오기',bdFn.badgeEl);
-    impBtn.after(bdBtn);xlQ.before(bdFn.box);}
   xlPick=s.xlCols?{fn:inFn||pdFn||prFn||pnFn,box:xlQ}:null;
   sheetDraw=null;
   if(SHEET_STEPS[s.key]){   /* v35 완료 품목 셀 표 */
@@ -8706,7 +8659,7 @@ function erpMenus(){
   return out;
 }
 var MENUS=erpMenus();
-function menuOf(k){if(k==='vpnames')return 'p:물류';if(k==='check'||k==='stocks'||isAdmKey(k)||k==='pdm'||k==='vappr')return k;var s=BYKEY[k];if(!s)return k;if(s.page)return PERM_SPLIT[s.page]?k:'p:'+s.page;return s.shownIn||k;}
+function menuOf(k){if(k==='vpnames')return 'p:물류';if(k==='bdreg')return 'materials';if(k==='check'||k==='stocks'||isAdmKey(k)||k==='pdm'||k==='vappr')return k;var s=BYKEY[k];if(!s)return k;if(s.page)return PERM_SPLIT[s.page]?k:'p:'+s.page;return s.shownIn||k;}
 function canMenu(k,op){if(!ME)return false;if(ME.admin===true)return true;
   var p=permOf(ME.perms,k);return !!(p&&p[op]);}
 /* 컬렉션 권한 = 그 컬렉션을 가진 메뉴 중 하나라도. erp_imports(불러오기 요청)는 어느 메뉴든 · v167 erp_rates(영림원 환율정보)는 수입·구매 메뉴 보기·저장 */
