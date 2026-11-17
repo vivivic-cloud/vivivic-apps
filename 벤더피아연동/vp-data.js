@@ -663,7 +663,17 @@ ${표} td.vp-상품칸 .vp-goods-list button { position: relative; font-size: 11
 ${표} td.vp-상품칸 .vp-goods-list button .vp-점 { position: absolute; left: 0; top: 100%; margin-top: 1px; min-height: 0; }
 ${표} td.vp-상품칸 .vp-goods-list button .vp-점 i { width: 5px; height: 5px; }
 ${표} td.vp-상품칸 .vp-goods-list .vp-code, ${표} td.vp-상품칸 .vp-goods-list .vp-qty { font-size: 10px; font-weight: 500; margin-left: 3px; padding: 0 3px; }
-#vp-root .vp-표통 table.vp-촘촘 td a { color: #e03e3e; font-weight: 700; text-decoration: underline; }`;
+#vp-root .vp-표통 table.vp-촘촘 td a { color: #e03e3e; font-weight: 700; text-decoration: underline; }
+${표} td .vp-표단품들.vp-단품줄 { display: flex; flex-direction: column; align-items: flex-start; gap: 0; overflow: hidden; white-space: nowrap; }
+${표} td .vp-표단품들.vp-단품줄 > * { flex: none; min-height: 20px; max-width: 100%; }
+#vp-root .vp-떠밀대 { position: fixed; bottom: 0; height: 26px; overflow-x: scroll; overflow-y: hidden; z-index: 10; background: #e3e2e0;
+  box-shadow: 0 -1px 0 #c0c0c0; scrollbar-color: #6f6d66 #e3e2e0; scrollbar-width: auto; }
+#vp-root .vp-떠밀대[hidden] { display: none; }
+#vp-root .vp-떠밀대 > div { height: 1px; }
+#vp-root .vp-떠밀대::-webkit-scrollbar { height: 26px; }
+#vp-root .vp-떠밀대::-webkit-scrollbar-track { background: #e3e2e0; border-radius: 13px; box-shadow: inset 0 0 0 1px #d3d2cf; }
+#vp-root .vp-떠밀대::-webkit-scrollbar-thumb { background: #6f6d66; border-radius: 13px; min-width: 56px; border: 3px solid #e3e2e0; }
+#vp-root .vp-떠밀대::-webkit-scrollbar-thumb:hover { background: #44423d; }`;
     const 글꼴 = '"Microsoft Sans Serif", 돋움, sans-serif';
     const 최소넓이 = 16, 여유 = 8;
     let 재는판 = null;
@@ -742,8 +752,59 @@ ${표} td.vp-상품칸 .vp-goods-list .vp-code, ${표} td.vp-상품칸 .vp-goods
         손.addEventListener("dblclick", (e) => { e.stopPropagation(); 판.둠[i] = false; 판.입히기(); 판.쓰기(); });
       });
       판.입히기();
+      /* 표 통(가로로 밀리는 부모)에 화면 아래 밀대를 붙인다 — 모든 표가 이 부품을 거치므로 여기 한 곳 */
+      requestAnimationFrame(() => { if (t.parentElement) 밀대붙이기(t.parentElement); 다맞추기(); });
       return 판;
     }
-    return { 꼴넣기, 넓이틀, 글너비 };
+    /* 11-17 [새 지시 단품줄바꿈·가로스크롤] 사장님(그대로): 「가로스크롤의 위치를 화면의 맨아래가 아닌 보고있는곳의 하단에서 스크롤이 항상 나타나게 해주세요」
+       표 통의 제 가로 밀대는 통 맨 밑에 있어, 통 밑이 화면 밖이면(상품관리 등 — 쪽이 세로로 밀림) 안 보인다.
+       → 그때만 **화면 맨 아래에 붙는 밀대**(`.vp-떠밀대`, position fixed, 통의 보이는 너비만큼)를 띄워 통과 scrollLeft 를 서로 맞춘다.
+       통 밑이 화면 안이면(제 밀대가 보이면) 숨는다. 통 안이 가로로 안 넘치면 숨는다. 쪽 가로 스크롤은 안 생긴다(화면 너비 안에서만). */
+    const 붙은통 = new WeakSet(), 맞추기들 = new Set();
+    let 예약 = 0;
+    const 다맞추기 = () => { if (예약) return; 예약 = requestAnimationFrame(() => { 예약 = 0; for (const f of 맞추기들) f(); }); };
+    let 듣는중 = false;
+    function 밀대붙이기(통) {
+      if (!통 || 붙은통.has(통) || !통.parentNode) return;
+      붙은통.add(통);
+      꼴넣기();
+      const 대 = document.createElement("div");
+      대.className = "vp-떠밀대";
+      대.hidden = true;
+      대.setAttribute("aria-hidden", "true");
+      const 속 = 대.appendChild(document.createElement("div"));
+      통.after(대);
+      대.addEventListener("scroll", () => { if (Math.abs(통.scrollLeft - 대.scrollLeft) > 0.5) 통.scrollLeft = 대.scrollLeft; }, { passive: true });
+      통.addEventListener("scroll", () => { if (!대.hidden && Math.abs(통.scrollLeft - 대.scrollLeft) > 0.5) 대.scrollLeft = 통.scrollLeft; }, { passive: true });
+      const 맞추기 = () => {
+        if (!통.isConnected || !대.isConnected) { 대.hidden = true; return; }
+        const r = 통.getBoundingClientRect(), 높이 = innerHeight;
+        const 남는 = 통.scrollWidth - 통.clientWidth;
+        const 띄움 = 남는 > 1 && r.width > 0 && r.bottom > 높이 + 1 && r.top < 높이 - 60;
+        if (!띄움) { 대.hidden = true; return; }
+        const 왼 = Math.max(0, r.left + 통.clientLeft), 오 = Math.min(innerWidth, r.left + 통.clientLeft + 통.clientWidth);
+        if (오 - 왼 < 40) { 대.hidden = true; return; }
+        대.style.left = 왼 + "px";
+        대.style.width = (오 - 왼) + "px";
+        대.hidden = false;
+        속.style.width = (남는 + 대.clientWidth) + "px";
+        if (Math.abs(통.scrollLeft - 대.scrollLeft) > 0.5) 대.scrollLeft = 통.scrollLeft;
+      };
+      맞추기들.add(맞추기);
+      try {
+        const 관찰 = new ResizeObserver(다맞추기);
+        관찰.observe(통);
+        const 표들보기 = () => { for (const c of 통.children) if (c !== 대) 관찰.observe(c); };
+        표들보기();
+        new MutationObserver(() => { 표들보기(); 다맞추기(); }).observe(통, { childList: true });
+      } catch (e) {}
+      if (!듣는중) {
+        듣는중 = true;
+        addEventListener("scroll", 다맞추기, { capture: true, passive: true });
+        addEventListener("resize", 다맞추기, { passive: true });
+      }
+      다맞추기();
+    }
+    return { 꼴넣기, 넓이틀, 글너비, 밀대붙이기 };
   })();
 }

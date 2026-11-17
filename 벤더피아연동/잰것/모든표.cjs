@@ -65,7 +65,7 @@ const vp데이터 = fs.readFileSync(path.join(확장, 'vp-data.js'), 'utf8').rep
         const th = t.tHead.rows[0].cells, 줄 = [...t.querySelectorAll('tbody:not([hidden]) tr')];
         const s = getComputedStyle(th[1]), d = 줄[0] && getComputedStyle(줄[0].cells[1]);
         return { 머리: [...th].map((c) => c.firstChild.textContent), 줄수: 줄.length, 묶음: t.querySelectorAll('tbody:not([hidden])').length,
-          첫줄: 줄[0] && [...줄[0].cells].map((c) => c.textContent), 둘째줄단추: 줄[1] && !!줄[1].querySelector('button'),
+          첫줄: 줄[0] && [...줄[0].cells].map((c) => c.textContent), 둘째줄단추: 줄[1] && !!줄[1].querySelector('td:not(.vp-단품칸) button'),
           머리꼴: [s.fontSize, s.fontWeight, s.backgroundColor, s.textAlign, s.position, Math.round(th[1].getBoundingClientRect().height)],
           몸꼴: d && [d.fontSize, d.lineHeight, d.padding, d.borderRight, d.whiteSpace, Math.round(줄[0].getBoundingClientRect().height)],
           첫칸붙음: getComputedStyle(th[0]).position + '/' + (줄[0] && getComputedStyle(줄[0].cells[0]).position),

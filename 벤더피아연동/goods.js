@@ -210,6 +210,7 @@ const 한벌돌리기 = (단품곁다리) => {
       }
     }, () => true, null, !!곁다리);     // 곁다리(배송관리·CS등록)는 뒤에서 받기 — 사장님이 다른 단추를 누르거나 조회하면 그것이 먼저 간다
     linked = { heads, byCode };
+    if (!곁다리 && page.nameCol === "상품명") for (const g of groups.values()) fillRow(g);   // 표 단품명 칸 단추 이름을 단품관리 이름으로 (11-17)
     if (panel.dataset.name) show(panel.dataset.name, ...panel._args);
     if (상품목록) 상품목록올리기(heads, 상품목록);   // 기다리지 않는다 — 못 올려도 화면은 그대로
   }
@@ -1204,6 +1205,38 @@ const 한벌돌리기 = (단품곁다리) => {
     return box;
   }
 
+  /* 11-17 [새 지시 단품줄바꿈·가로스크롤] 사장님(그대로): 「상품관리 데이터에 나타나는 단품명 표기를 단품+단품+...이 아닌 각단품명이 열바뀜으로 보이게 해주세요.
+       또한 이곳에 나타나는 단품명을 단품명버튼으로 바꿔주세요.」
+     상품관리 표의 단품명 칸 = 단품 하나에 한 줄(`.vp-표단품들.vp-단품줄`, 꼴은 vp-data.js `VP표`), 줄마다 `partChips` 와 같은 단품 단추(누름 = 같은 연결 창).
+     ⚠ 실제 자료(11-17 사장님 크롬, 167줄): 단품명은 「+」 로 잇고(앞뒤 빈칸 없음), 단품코드는 「 +」 로 잇는다. 단품 이름 안에도 「+」 가 든 것이 있어
+       (13줄 — 코드 수 < 이름 조각 수) **코드로 나누고** 이름은 단품관리 목록(`linked`)에서 코드로 찾는다. 목록이 오기 전엔 조각 수가 같을 때만 조각 이름, 아니면 코드. */
+  function 표단품줄(row) {
+    const 통 = document.createElement("div");
+    통.className = "vp-표단품들 vp-단품줄";
+    const ci = heads.indexOf("단품코드"), ni = heads.indexOf("단품명");
+    const 글 = String(row[ni] == null ? "" : row[ni]).trim();
+    const codes = ci >= 0 ? splitCodes(String(row[ci] == null ? "" : row[ci])) : [];
+    const names = 글.split("+");
+    const 글줄 = (t) => { 통.appendChild(document.createElement("div")).textContent = t; };
+    if (!codes.length) { if (글) 글줄(글); return 통; }
+    codes.forEach((code, k) => {
+      const part = linked?.byCode.get(code);
+      const label = part ? part[linked.heads.indexOf("단품명")]
+        : codes.length === 1 ? 글 : names.length === codes.length ? names[k].trim() : code;
+      if (unused(label)) { 글줄(label); return; }
+      const shownCode = part ? part[linked.heads.indexOf("단품코드")] : code;
+      const box = 통.appendChild(document.createElement("div"));
+      box.className = "vp-goods-list";
+      chip(box, label, [shownCode], (e) => {
+        e.stopPropagation();
+        const found = linked?.byCode.get(code);
+        if (found) popup(found[linked.heads.indexOf("단품명")], linked.heads, [found], found[linked.heads.indexOf("단품코드")].trim());
+        else alert(linked ? `단품관리에서 ${code}를 찾지 못했습니다.` : "단품 정보를 불러오는 중입니다. 잠시 뒤 다시 눌러 주세요.");
+      }, stockByCode?.get(code), true);
+    });
+    return 통;
+  }
+
   /* 11-07 [새 지시 CS상세단품단추] 상세·연결 창·단품등록 참고에서 글자로 나오던 단품명 = 단품 단추. 「a + b」 는 나눠 단추 둘.
      양품은 이미 받아 둔 값만(새로 안 받음). 누르면 단품관리·재고조회 쪽은 그 줄의 상세, 상품 쪽은 `partChips` 와 같은 연결 창. */
   function 단품열기(코드, 이름) {
@@ -1438,6 +1471,11 @@ const 한벌돌리기 = (단품곁다리) => {
             a.textContent = "inghome 에서 보기";
             a.title = 것.꼴 === "그대로" ? "이름이 그대로 맞습니다" : "이름이 거의 맞습니다 — " + 것.t;
           }
+          return;
+        }
+        if (!d.덧 && d.name === "단품명" && page.nameCol === "상품명" && page.link && String(row[d.i] == null ? "" : row[d.i]).trim()) {
+          td.classList.add("vp-상품칸", "vp-단품칸");      // 11-17 [새 지시 단품줄바꿈·가로스크롤] 단품 하나에 한 줄 · 단품 단추
+          td.appendChild(표단품줄(row));
           return;
         }
         td.textContent = d.덧 ? 덧칸값(d, g, row, n === 0) : (row[d.i] == null ? "" : row[d.i]);

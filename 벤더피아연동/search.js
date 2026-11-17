@@ -2029,7 +2029,9 @@
         if ((i === 단품구성자리 || (i === 단품칸자리 && String(값).includes("+") && String(row[단품코드자리] == null ? "" : row[단품코드자리]).includes("+"))) && String(값).trim()) {
           td.className = "vp-상품칸 vp-단품칸" + (i === 0 ? " vp-first" : "");
           const 통 = td.appendChild(document.createElement("div"));
-          통.className = "vp-표단품들";
+          /* 11-17 [새 지시 단품줄바꿈·가로스크롤] 사장님(그대로): 「cs등록 메뉴의 데이터화면의 단품명도 열바뀜으로 표기되게 해주세요」
+             CS등록(주문관리 화면, CS정산·하우저 빼고)만 단추를 단품 하나에 한 줄로(`.vp-단품줄`, 꼴은 vp-data.js `VP표`) — 단추·누름은 그대로 */
+          통.className = "vp-표단품들" + (CS전용 && !정산보기 && !하우저보기 ? " vp-단품줄" : "");
           단품조각들(통, 값, i === 단품칸자리 ? row[단품코드자리] : "");
           return;
         }
