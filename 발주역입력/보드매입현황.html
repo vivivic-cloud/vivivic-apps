@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.18.5
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.19.0
      v1.0.0(11-16): 첫 판. 거래처(시트) 버튼 → 그 시트의 표. 거래처 시트는 「전체 · 1월~10월 · 1~10월 누계 · 1~10월 매입품목」 으로 고른다.
        칸 이름·값은 엑셀 글자(셀 표시 꼴) 그대로. 표 꼴은 재단.html v1.1.0 셀 모양(칸 선 · 11.5px · 여백 2px 5px · 숫자 오른쪽)과 같다.
      v1.1.0(11-16): 거래처 메뉴 끝에 「영림원등록」 — 월별 표에서 납품제품명(품목)을 겹치지 않게 한 줄씩, 칸은 품목 · 규격 · 단가만.
@@ -90,6 +90,10 @@
      v1.18.4(11-17): 폰(600px 이하)은 둘째 칸 고정 풂 — 두 칸 고정이 375px 화면의 210~290px 를 덮어서(첫 칸만 고정).
      v1.18.5(11-17): 삭제 체크 줄 ≠ 오류건 — 사장님: 「체크 삭제로 입력 안 한 건 삭제된 건이지 오류건이 아니야. 오류건은 입력 오류건이고.」
        오류건(보기·수·빨강) = 결과 오류이고 삭제 체크 아닌 줄만 · 「삭제 N」 보기(같은 표, 삭제 체크 줄만) · 영림원보내기 기본 보기에서 삭제 줄 뺌(체크 → 삭제 보기로, 풀면 돌아옴).
+     v1.19.0(11-17): 「중국엣지필름」 → 「해피코」 거래처 하나로 · 거래처 연결 · 영림원보내기(국내와 같은 표) — 사장님: 「중국엣지필름 명칭 해피코로 바꿔주고,
+       이 업체 입력폼에 거래처랑 연결해줘. 그리고 같은 폼의 제품명 기준 영림원보내기 만들어줘.」 줄 = 제품명+옵션(같은 제품명에 색이 여럿 — 색마다 다른 자재),
+       명세서 열쇠 = 제품명·옵션 글자 그대로. 받은['해피코'] = 창고 발주역입력_중국엣지/해피코 를 월별 표 꼴로 바꾼 것(창고 값은 그대로) → 국내와 같은 길(폼받기·보내기·결과·연결).
+       기본값: 기준단위 M · 내외자구분 외자(임시) · 구매 내외자구분 직수입(임시) · 통화 CNY(임시) · 단가·적용시작일 빈칸(원본 단가 비어 있음).
 
      ⚠ 값은 창고(artifacts/vivivic-4b7ef/public/data/발주역입력_보드매입)에서 읽는다.
         창고에 넣는 것은 tools/보드매입읽기.py(드라이브 엑셀 → 창고) 또는 v1.9.0 「엑셀 새로 불러오기」(사장님이 확인하고 「바꾸기」 를 누를 때만). 공개 저장소라 업무 값은 이 파일에 없다. -->
@@ -251,7 +255,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.18.5</div>
+  <div class="badge">v1.19.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -296,7 +300,7 @@ window.목록읽기 = async function(){
 
 function 거래처단추(){
   document.getElementById('거래처').innerHTML = 시트들.map(s => `<button class="chip" data-s="${글(s)}">${글(s)}</button>`).join('') +
-    `<button class="chip" data-s="__중국">중국엣지필름</button>` +   /* v1.16.0 — 해피코(HPC) 엣지 입고리스트(창고 따로) */
+    `<button class="chip" data-s="해피코">해피코</button>` +   /* v1.16.0 「중국엣지필름」 → v1.19.0 「해피코」(사장님) — 거래처 하나로 */
     `<button class="chip" data-s="__거래처">거래처 연결</button>` +   /* v1.6.0 — 영림원 기존 거래처와 연결(지은 이름) */
     `<button class="chip" data-s="__엑셀">엑셀 새로 불러오기</button>`;   /* v1.9.0 — 새 판 엑셀(지은 이름) */
   document.querySelectorAll('#거래처 .chip').forEach(b => { b.onclick = () => 시트고름(b.dataset.s); b.classList.toggle('on', b.dataset.s===고른); });
@@ -307,7 +311,7 @@ async function 시트고름(s){
   document.getElementById('볼것').innerHTML = '';
   if(s==='__거래처'){ 연결그리기(); return; }
   if(s==='__엑셀'){ 엑셀그리기(); return; }
-  if(s==='__중국'){ 중국고름(); return; }
+  if(s===해피코){ 중국고름(); return; }
   const 속 = document.getElementById('속');
   if(!받은[s]){
     속.innerHTML = '<div class="state"><div class="big">읽는 중입니다…</div></div>';
@@ -362,8 +366,9 @@ const 수 = s => { s = String(s??'').trim().replace(/,/g,''); if(s===''||s==='-'
 const 무상 = 값 => 값==='0' || 값==='-';
 const 달들글 = 달 => { const n = 달.map(m => parseInt(m)); return n.length===1 || n[0]===n[n.length-1] ? `${n[0]}월` : `${n[0]}~${n[n.length-1]}월`; };
 function 품목모으기(t){
-  const 칸 = t.칸||[], 품 = 칸.indexOf('납품제품명(품목)'), 규 = 칸.indexOf('규격'), 량 = 칸.indexOf('수량');
-  const 단 = 칸.includes('별도 단가(원)') ? 칸.indexOf('별도 단가(원)') : 칸.indexOf('단가(원)');
+  const 칸 = t.칸||[], 찾 = (...a) => a.map(k => 칸.indexOf(k)).find(i => i >= 0) ?? -1;
+  const 품 = 찾('납품제품명(품목)','제품명'), 규 = 찾('규격','옵션'), 량 = 찾('수량','수량(M)');   /* v1.19.0 해피코 = 제품명·옵션·수량(M) */
+  const 단 = 칸.includes('별도 단가(원)') ? 칸.indexOf('별도 단가(원)') : 찾('단가(원)','단가');
   const 포 = 칸.includes('별도 단가(원)') ? 칸.indexOf('단가(원)') : -1;   /* v1.7.0 현진·현준 엑셀 「단가(원)」(부가세 포함 원장) — 대조 기준에만 */
   /* v1.3.0 합계금액 = 공급가액(부가세 별도) — 단가 칸과 같은 기준. 현진·현준은 「별도 공급가액(원)」(임시) */
   const 금 = 칸.includes('별도 공급가액(원)') ? 칸.indexOf('별도 공급가액(원)') : 칸.indexOf('공급가액(원)');
@@ -478,7 +483,8 @@ function M단가(s, m, 값){
 }
 /* 기준단위 — 보드 원장은 EA(매), 양지데코는 M. 현진산업 시트·엣지·필름처럼 m 로 보이는 줄은 M 이되 「임시」. */
 const m로보임 = m => /\((시트|엣지|필름)\)/.test(m.이름) || /^0\.\d+$/.test(m.규격);
-function 단위(s, m){ return M거래처(s) || m로보임(m) ? 'M' : 'EA'; }
+function 단위(s, m){ return M거래처(s) || s===해피코 || m로보임(m) ? 'M' : 'EA'; }   /* v1.19.0 해피코 = 수량(M) */
+const 해피코 = '해피코';
 
 /* 단가이력 — 단가가 같은 묶음마다 {단가, 첫 달, 끝 달, 적용시작일(그 묶음 첫 달 1일 — 날짜 칸이 없어 달 첫날, 임시)}.
    이력으로 넣을 때 = 이 줄들을 차례대로(적용종료일은 영림원이 다음 시작일 전날로 저절로) · 마지막 단가 하나만 넣을 때 = 맨 끝 줄. */
@@ -510,11 +516,11 @@ function 기본값(k, m, 거래처, 고친){
     case 'm_spec': return m.규격;                 // 엑셀 규격 — 임시(영림원 원장 규격 꼴 「2440*1220」)
     case 'm_asset': return '원자재';              // 원장·엣지필름 = 자재등록 원자재(11-01 화면 기록)
     case 'm_state': return '사용';                // 사장님 11-16 「사용으로 하고」
-    case 'm_io': return '내자';                   // 국내거래처
+    case 'm_io': return 거래처 === 해피코 ? '외자' : '내자';   // 국내거래처 · v1.19.0 해피코(중국) 외자 — 임시
     case 'm_unit': return 단위(거래처, m);         // 사장님 결정 4 — 원장 EA · 양지데코 M
     case 'p_vendor': { const 이 = 연결된(거래처); return 이 ? 이.거래처 : ''; }   // v1.6.0 연결된 영림원 거래처(영림원 표기 그대로) — 연결 전엔 빈칸(임시)
-    case 'p_io': return '내수';                   // 국내 매입(도움말: 내수 = 품의 → 구매발주·납품·입고)
-    case 'p_cur': return 'KRW';
+    case 'p_io': return 거래처 === 해피코 ? '직수입' : '내수';   // 국내 매입(도움말: 내수 = 품의 → 구매발주·납품·입고) · v1.19.0 해피코 직수입 — 임시
+    case 'p_cur': return 거래처 === 해피코 ? 'CNY' : 'KRW';     // v1.19.0 해피코 = 위안(엑셀 금액 칸 꼴 ¥) — 임시
     case 'p_price': { const 줄 = 이력(거래처, m); return 줄.length ? 줄[줄.length-1].단가 : ''; }        // 마지막 단가 — 임시
     case 'p_from': return 이력(거래처, m).length ? `${해(거래처)}-01-01` : '';   // v1.12.0 사장님 11-17 「마지막 단가로 통일」 — 26년 1월 1일(모든 거래처)
   }
@@ -524,6 +530,8 @@ function 기본값(k, m, 거래처, 고친){
 function 칸임시(k, m, s){
   if(k==='m_unit' && !M거래처(s) && m로보임(m)) return '시트·엣지·필름(m 로 보임) — 기준단위 M 은 임시';
   if(k==='p_vendor' && !연결된(s)) return '영림원 거래처와 아직 연결 안 됨 — 「거래처 연결」 에서 고름';
+  if(s===해피코 && (k==='m_io' || k==='p_io' || k==='p_cur')) return '해피코(중국) — 사장님 결정 전 임시';   /* v1.19.0 */
+  if(s===해피코 && (k==='p_price' || k==='p_from')) return '해피코 원본 단가 빈칸 — 사장님 결정 대기';
   if(k==='p_price'){ const 줄 = 이력(s, m), 끝 = 줄[줄.length-1]; if(끝 && 끝.롤) return 끝.롤 + ' = M 단가(임시)'; }
   return '';
 }
@@ -927,6 +935,7 @@ function 오류목록그리기(){
   el.innerHTML = 모.map(([v, a]) => `<button class="chip" data-가기="${글(v)}" title="${글(v)} 오류 줄로">${글(v)} <b>${a.length}</b></button>`).join('');   /* v1.18.1 이유 줄 뺌 */
   el.querySelectorAll('[data-가기]').forEach(b => b.onclick = async () => {
     오류만 = true; 전체오류보기 = false; 완료보기 = false; 삭제보기 = false;
+    if(b.dataset.가기===해피코){ 중국 && (중국볼것 = '폼'); await 시트고름(해피코); 중국볼것 = '폼'; 중국볼것그리기(); 중국그리기(); return; }
     await 시트고름(b.dataset.가기); 볼것 = '폼'; 볼것그리기(); 그리기();
   });
 }
@@ -1284,12 +1293,24 @@ function loadXlsx(){
     sc.onload = () => ok(window.XLSX); sc.onerror = () => { xlsxP = null; sc.remove(); no(new Error('xlsx')); }; document.head.append(sc); });
   return xlsxP;
 }
-const 거래처시트들 = () => 시트들.filter(s => ((받은[s]||{}).표||[]).some(t => t.이름==='월별'));
+const 국내시트들 = () => 시트들.filter(s => ((받은[s]||{}).표||[]).some(t => t.이름==='월별'));
+const 거래처시트들 = () => 국내시트들().concat(받은[해피코] ? [해피코] : []);   /* v1.19.0 해피코도 영림원보내기 거래처 */
+/* v1.19.0 해피코 → 월별 표 꼴(제품명·옵션·수량(M)·단가 — 창고 값 글자 그대로, 달 = 입고일 달) */
+function 해피코월표(d){
+  const 칸 = d.칸 || [], i = k => 칸.indexOf(k), 고 = ['제품명','옵션','수량(M)','단가'].map(i);
+  return { 제목:'2026년 해피코', 표:[{ 이름:'월별', 칸:['월','제품명','옵션','수량(M)','단가'], 수:[0,0,0,1,1],
+    줄:(d.줄 || []).map(z => ({ v:[z.월 ? parseInt(z.월.slice(5)) + '월' : '', ...고.map(j => j < 0 ? '' : String((z.v || [])[j] ?? ''))], 월:z.월 ? parseInt(z.월.slice(5)) + '월' : '', r:z.r })) }] };
+}
+async function 해피코받기(){
+  if(!중국){ const { doc, getDoc } = window.fbRead; const d = await getDoc(doc(window.db, ...중국자리, 중국문서)); 중국 = d.exists() ? d.data() : { 줄:[] }; }
+  if((중국.줄 || []).length) 받은[해피코] = 해피코월표(중국);
+}
 async function 모두받기(){
   const { doc, getDoc } = window.fbRead;
   for(const s of 시트들){
     if(!받은[s]){ const d = await getDoc(doc(window.db, ...창고자리, s)); 받은[s] = d.exists() ? d.data() : { 표:[] }; }
   }
+  await 해피코받기();
   for(const s of 거래처시트들()) await 폼받기(s);
 }
 const 머리2 = () => ['납품제품명(품목)','규격', 삭제글, ...폼칸.map(f => f.l), 이력글머리];
@@ -1483,7 +1504,7 @@ async function 엑셀바꾸기(){
     엑셀상태('기준·연결·보내기를 다시 셈하는 중…');
     for(const s of 거래처시트들()){ await 폼받기(s); if(!기준그대로(s) || 고른값(이력모으기(s)) !== 폼이력[s]) await 폼저장(s); }
     await 분류저장();
-    새엑셀 = { 바꾼때:new Date().toISOString(), 파일:새.파일, 대조:엑셀대조(Object.fromEntries(거래처시트들().concat(시트들.includes('총괄요약') ? ['총괄요약'] : []).map(n => [n, 받은[n]]))) };
+    새엑셀 = { 바꾼때:new Date().toISOString(), 파일:새.파일, 대조:엑셀대조(Object.fromEntries(국내시트들().concat(시트들.includes('총괄요약') ? ['총괄요약'] : []).map(n => [n, 받은[n]]))) };
     엑셀그리기();
   }catch(e){ 엑셀상태('창고에 쓰지 못했습니다 ' + ((e&&(e.code||e.message))||''), true); }
 }
@@ -1724,7 +1745,8 @@ async function 중국고름(){
       중국 = d.exists() ? d.data() : { 줄:[] };
     }catch(e){ 속.innerHTML = `<div class="state"><div class="big">창고를 읽지 못했습니다</div><div class="why">${글((e&&(e.code||e.message))||'')}</div></div>`; return; }
   }
-  if(고른 !== '__중국') return;
+  if((중국.줄 || []).length) 받은[해피코] = 해피코월표(중국);
+  if(고른 !== 해피코) return;
   중국볼것그리기(); 중국그리기();
 }
 const 중국달글 = (월, 여러해) => { const [y, m] = 월.split('-'); return (여러해 ? y.slice(2) + '년 ' : '') + parseInt(m) + '월'; };
@@ -1732,7 +1754,7 @@ function 중국볼것그리기(){
   const el = document.getElementById('볼것'), 줄 = (중국||{}).줄||[];
   const 달들 = [...new Set(줄.map(z => z.월).filter(Boolean))].sort();
   const 여러해 = new Set(달들.map(m => m.slice(0,4))).size > 1;
-  const 버튼 = [['전체','전체'], ...달들.map(m => ['m:'+m, 중국달글(m, 여러해)]), ['엑셀','엑셀 새로 불러오기']];
+  const 버튼 = [['전체','전체'], ...달들.map(m => ['m:'+m, 중국달글(m, 여러해)]), ['폼','영림원보내기'], ['엑셀','엑셀 새로 불러오기']];   /* v1.19.0 영림원보내기 */
   el.innerHTML = 버튼.map(([k,t]) => `<button class="chip${k===중국볼것?' on':''}" data-k="${글(k)}">${글(t)}</button>`).join('');
   el.querySelectorAll('.chip').forEach(b => b.onclick = () => {
     중국볼것 = b.dataset.k; el.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x===b)); 중국그리기();
@@ -1740,6 +1762,8 @@ function 중국볼것그리기(){
 }
 function 중국그리기(){
   const 속 = document.getElementById('속'), d = 중국||{};
+  볼것 = 중국볼것==='폼' ? '폼' : '전체';
+  if(중국볼것==='폼'){ 폼그리기(); return; }   /* v1.19.0 국내와 같은 영림원보내기 */
   if(중국볼것==='엑셀'){ 중국엑셀그리기(); return; }
   if(!(d.줄||[]).length){ 속.innerHTML = '<div class="state"><div class="big">창고에 해피코 자료가 없습니다</div><div class="sub">「엑셀 새로 불러오기」 에서 엑셀을 고르십시오.</div></div>'; return; }
   const 달 = 중국볼것.startsWith('m:') ? 중국볼것.slice(2) : '';
@@ -1790,6 +1814,7 @@ async function 중국바꾸기(){
     await setDoc(doc(window.db, ...중국자리, 중국문서), 새.문서);
     const d = await getDoc(doc(window.db, ...중국자리, 중국문서));
     중국 = d.exists() ? d.data() : { 줄:[] };
+    if((중국.줄 || []).length) 받은[해피코] = 해피코월표(중국);   /* v1.19.0 영림원보내기 줄도 새 값으로(고친 칸은 열쇠로 이어짐) */
     중국새 = { 바꾼때:new Date().toISOString(), 파일:새.문서.파일 };
     중국볼것그리기(); 중국엑셀그리기();
   }catch(e){ 중국상태('창고에 쓰지 못했습니다 ' + ((e&&(e.code||e.message))||''), true); }
