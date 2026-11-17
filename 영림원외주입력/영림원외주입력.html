@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v281 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v282 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -127,7 +127,7 @@ input.bad,select.bad{border-color:var(--red)}
 .unreg{font-size:11px;color:#b45309;font-weight:700}
 /* v235 세트구성품등록 — 임시 칩 · 벤더피아에서 불러오기 목록(세로 목록, 가로로 안 밀림) */
 .chip.tmp{background:var(--amber-bg);color:var(--amber);border-color:#fde68a;margin-left:4px;vertical-align:1px}
-.bdreg .bdvn{margin:8px 0 10px}.bdreg td.bdwhy{white-space:normal;min-width:180px;font-size:12px}.bdreg td.bdwhy.bad,.bdreg .bdbad{color:var(--red)}.bdreg .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}   /* v281 구매자재 일괄등록 */
+.bdreg .bdvn{margin:8px 0 10px}.bdreg td.bdwhy{white-space:normal;min-width:180px;font-size:12px}.bdreg td.bdwhy.bad,.bdreg .bdbad{color:var(--red)}.bdreg .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}.bdreg .bdrh{font-size:14px;font-weight:800;margin:14px 0 2px}.bdreg td{white-space:nowrap}.bdreg .bdrhave{margin-top:12px}.bdreg .bdrhave>summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--muted);padding:6px 0}   /* v281 구매자재 일괄등록 */
 .vpbox{flex-basis:100%;min-width:0;border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:6px;background:#fff}
 .vpbox input[type=search]{flex:1 1 200px;min-width:0}
 .vplist{max-height:50vh;overflow-y:auto;overflow-x:hidden}
@@ -478,7 +478,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v281</span>
+    <span class="ver">v282</span>
   </div>
 </header>
 <div class="wrap">
@@ -4059,9 +4059,19 @@ function renderBdReg(){
     var P=bdPlan(d.id),go=0,skip=[],have=0;
     P.forEach(function(g){go+=g.go.length;have+=g.have;g.skip.forEach(function(x){skip.push({k:g.key,x:x});});});
     var cnt=h('div',{class:'lsinfo bdrcnt'},h('span',{},'넘길 '+go),h('span',{class:skip.length?'bdbad':''},'못 넘길 '+skip.length),have?h('span',{},'이미 넘김 '+have):'');
-    var tb=skip.length?h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},['단계','줄','이유'].map(function(t){return h('th',{},t);}))),
-      h('tbody',{},skip.map(function(o){return h('tr',{},h('td',{},BYKEY[o.k].title),h('td',{},bdLab(o.k,o.x.e)),h('td',{class:'bdwhy bad'},bdWhy(o.x.st)));})))):'';
-    res.replaceChildren(cnt,tb);
+    /* v282 사장님 「아니 양지데코 누르면 뭐가 등록될지는 보여줘야 될거아냐」 — 등록될 줄을 단계별로(영림원 칸 이름 그대로) · 못 넘길 줄과 이유 · 이미 넘김은 접어 둠. 표는 .tw 안 가로 스크롤 + 위 스크롤 줄(hbarFor) */
+    var tbl=function(heads,rows){var tw=h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},heads.map(function(x){return h('th',{},x);}))),h('tbody',{},rows)));return [hbarFor(tw),tw];};
+    var F=function(k,ks){return ks.map(function(c){return (BYKEY[k].fields.filter(function(f){return f.k===c;})[0]||{}).label||c;});};
+    var BDR_COLS={classes:['big','mid','name'],materials:['name','code','spec','unit','small'],purprices:['code','name','price','from']};
+    var parts=[cnt];
+    P.forEach(function(g,i){if(!g.go.length)return;var ks=BDR_COLS[g.key];
+      parts.push(h('h3',{class:'bdrh'},(i+1)+'. '+BYKEY[g.key].title+' '+g.go.length));
+      parts=parts.concat(tbl(F(g.key,ks),g.go.map(function(x){return h('tr',{},ks.map(function(c){return h('td',{},bdTr(x.e.vals[c]));}));})));});
+    if(skip.length){parts.push(h('h3',{class:'bdrh bdbad'},'못 넘길 줄 '+skip.length));
+      parts=parts.concat(tbl(['단계','줄','이유'],skip.map(function(o){return h('tr',{},h('td',{},BYKEY[o.k].title),h('td',{},bdLab(o.k,o.x.e)),h('td',{class:'bdwhy bad'},bdWhy(o.x.st)));})));}
+    if(have){var hv=[];P.forEach(function(g){g.rows.forEach(function(x){if(x.st.t==='have')hv.push(h('tr',{},h('td',{},BYKEY[g.key].title),h('td',{},bdLab(g.key,x.e)),h('td',{},x.st.doc&&x.st.doc.status||'')));});});
+      parts.push(h('details',{class:'bdrhave'},h('summary',{},'이미 넘김 '+have),h('div',{},tbl(['단계','줄','상태'],hv))));}
+    res.replaceChildren.apply(res,parts);
     goBtn.hidden=false;goBtn.disabled=!go||BDR.busy;goBtn.textContent=go?'등록대기 '+go+'건':'등록대기';
     goBtn.onclick=function(){
       if(BDR.busy||!go)return;
