@@ -666,7 +666,7 @@ ${표} td.vp-상품칸 .vp-goods-list .vp-code, ${표} td.vp-상품칸 .vp-goods
 #vp-root .vp-표통 table.vp-촘촘 td a { color: #e03e3e; font-weight: 700; text-decoration: underline; }
 ${표} td .vp-표단품들.vp-단품줄 { display: flex; flex-direction: column; align-items: flex-start; gap: 0; overflow: hidden; white-space: nowrap; }
 ${표} td .vp-표단품들.vp-단품줄 > * { flex: none; min-height: 20px; max-width: 100%; }
-#vp-root .vp-떠밀대 { position: fixed; bottom: 0; height: 26px; overflow-x: scroll; overflow-y: hidden; z-index: 10; background: #e3e2e0;
+#vp-root .vp-떠밀대 { position: fixed; bottom: 0; overflow-x: scroll; overflow-y: hidden; z-index: 10; background: #e3e2e0;
   box-shadow: 0 -1px 0 #c0c0c0; scrollbar-color: #6f6d66 #e3e2e0; scrollbar-width: auto; }
 #vp-root .vp-떠밀대[hidden] { display: none; }
 #vp-root .vp-떠밀대 > div { height: 1px; }

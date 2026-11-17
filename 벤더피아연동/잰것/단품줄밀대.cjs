@@ -96,7 +96,7 @@ const 판 = 판0;
     const 밀 = await page.evaluate(() => { const 통 = document.querySelector('#vp-root .vp-목록표'), 대 = 통.nextElementSibling, r = 통.getBoundingClientRect();
       return { 대: !!대 && 대.classList.contains('vp-떠밀대'), 보임: 대 && !대.hidden, 통밑: Math.round(r.bottom), 높이: innerHeight, 대밑: 대 && Math.round(대.getBoundingClientRect().bottom), 대높이: 대 && 대.offsetHeight,
         넘침: 통.scrollWidth - 통.clientWidth, 쪽가로: document.documentElement.scrollWidth - innerWidth }; });
-    봤다(밀.대 && 밀.통밑 > 밀.높이 && 밀.넘침 > 0 && 밀.보임 && 밀.대밑 === 밀.높이 && 밀.대높이 === 26, '통 밑이 화면 밖 → 화면 맨 아래 밀대 보임 ' + JSON.stringify(밀));
+    봤다(밀.대 && 밀.통밑 > 밀.높이 && 밀.넘침 > 0 && 밀.보임 && 밀.대밑 === 밀.높이, '통 밑이 화면 밖 → 화면 맨 아래 밀대 보임 ' + JSON.stringify(밀));
     봤다(밀.쪽가로 <= 0, '쪽 가로 스크롤 없음 ' + 밀.쪽가로);
     const 끌 = await page.evaluate(async () => { const 통 = document.querySelector('#vp-root .vp-목록표'), 대 = 통.nextElementSibling;
       대.scrollLeft = 300; await new Promise((r) => setTimeout(r, 100)); const a = 통.scrollLeft;
