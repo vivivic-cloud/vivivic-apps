@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 재단 — 에이엠티 「재단 세부내역」(상세내역서 PDF, 월별)을 달마다 표로 본다.
      사장님 11-16: 「월별 재단내역이 목록으로 보이는 페이지를 만들어라.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.8.1
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.8.2
      v1.0.0(11-16): 첫 판. 월 버튼 → 그 달 표 하나. 칸 이름·값은 PDF 글자 그대로, 합친 칸(원장수량·재단금액 묶음 등)은 rowspan 으로 그대로 살린다.
      v1.1.0(11-16): 표를 셀 모양으로 촘촘히 — 칸마다 선, 글씨 11.5px, 여백 2px 5px, 숫자 오른쪽 정렬, 칸 너비는 내용만큼. 기능·칸·값은 그대로.
      v1.2.0(11-16): 제품명 칸마다 작은 「단품 검색」 칸 — 사장님 11-16: 「제품명 칸에 벤더피아 단품명을 검색할 수 있게 검색창을 만들고, 벤더피아와 연동되게 해 줘.」
@@ -36,6 +36,7 @@
        ④ 품목 「분할」: 같은 줄 안에서 품목·재단수량만 위(품목명R)·아래(품목명L) 두 칸, 합 = 원래 재단수량, 「3」 = 1/3, 위 칸 「⋈」 = 합치기.
        v1.8.1(11-17): 사장님 「품목 분할 시 요구한 수량 적용이 안 되고 요구한 버튼들도 없다」 — 실제 재단수량은 「30개」 꼴이라 숫자가 아닌 것으로 보고 안 나눴다.
          숫자 + 단위(개·매)를 수량으로 읽어 나누고 단위는 숫자 뒤에 그대로. 「-」「₩ 110」 만 나누지 않음.
+       v1.8.2(11-17): 사장님 「연결된 부속 ②③… 품목 옆에 숫자가 너무 안 보여요. 시인성을 좋게 해주세요.」 — 공통 숫자를 진한 파랑 동그라미 배지(흰 굵은 12px 숫자)로, 품목명과 띄우고 좁은 칸에서도 안 잘리게.
        저장: 바뀐 칸만 merge 로 씀(다른 창·기기 값 안 덮음), 창고는 onSnapshot 으로 받아 다른 곳에서 바꾼 것도 바로 보임.
 
      ⚠ 값은 창고(artifacts/vivivic-4b7ef/public/data/발주역입력_재단)에서 **읽기만** 한다.
@@ -164,6 +165,13 @@ body.칸끄는중{cursor:col-resize;user-select:none;-webkit-user-select:none}
 .vpd div.got{color:var(--vg-muted)}
 /* v1.8.0 품목 칸 — 공통 숫자(②…) · 작은 「분할」. 연결 상태면 그 제품명 품목을 누를 수 있고(고름), 그 단품에 이어진 품목은 검정 테(이음) */
 .dpr-t td .ox{margin-left:3px;font-weight:800;color:var(--vg-ink)}
+/* v1.8.2 사장님 「연결된 부속 ②③… 숫자가 너무 안 보여요」 — 진한 파랑 동그라미 배지 + 흰 굵은 숫자(파랑 = 보드매입현황 저장값 #1565c0).
+   품목명과 6px 띄움 · 줄지 않음(좁은 칸에서는 품목명이 먼저 「…」 로 줄고 배지·단추는 남는다) */
+.dpr-t td .ox{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;min-width:17px;height:17px;padding:0 4px;margin-left:6px;
+  border-radius:999px;background:#1565c0;color:#fff;font-size:12px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;vertical-align:middle}
+.dpr-t td.pm .품줄{display:flex;align-items:center}
+.dpr-t td.pm .pn{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.dpr-t td.pm .작{flex:0 0 auto}
 .dpr-t td .작{font:inherit;font-size:10.5px;line-height:14px;height:16px;padding:0 4px;margin-left:6px;border:1px solid var(--vg-edge);border-radius:4px;
   background:var(--vg-bg);color:var(--vg-muted);cursor:pointer;vertical-align:middle;-webkit-appearance:none}
 .dpr-t td .작:hover{color:var(--vg-ink);border-color:#C7C7C3}
@@ -193,7 +201,7 @@ body.칸끄는중{cursor:col-resize;user-select:none;-webkit-user-select:none}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.8.1</div>
+  <div class="badge">v1.8.2</div>
 </header>
 <nav class="쪽길"><a href="재단.html" class="on">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a></nav>
 <h1>재단 세부내역</h1>
@@ -400,7 +408,7 @@ function 연결된(p, k){
   const 남 = 있.filter(c => 이은.includes(c));
   return 남.length ? 남 : [있[0]];
 }
-const 동그라미 = n => n <= 20 ? String.fromCharCode(0x245F + n) : `(${n})`;
+const 동그라미 = n => String(n);   /* v1.8.2 동그라미 = 파랑 배지(.ox), 안은 숫자 그대로 */
 /* 칸 차례와 무관하게 견준다(창고는 맵 칸 차례가 다르게 온다 — 보드매입현황 v1.14 에서 겪음) */
 const 고른값 = v => Array.isArray(v) ? '['+v.map(고른값).join(',')+']' : v && typeof v==='object' ? '{'+Object.keys(v).sort().map(k => JSON.stringify(k)+':'+고른값(v[k])).join(',')+'}' : JSON.stringify(v);
 /* 그 제품명 문서를 바꾼다: 고친 뒤 꼴과 앞 꼴을 견줘 바뀐 칸만 쓴다. 화면은 바로 바꿔 그린다. */
@@ -448,7 +456,7 @@ function 제품다시(p){
 function 품목속(p, m, k){
   const 수 = 연결된(p, k).length, 표 = 수 > 1 ? `<span class="ox">${동그라미(수)}</span>` : '';
   if(연결[p] && 연결[p].분할[k]) return `<div class="반 위"><span class="pn">${글(m)}R</span>${표}<button type="button" class="작 합" title="합치기">⋈</button></div><div class="반 아래"><span class="pn">${글(m)}L</span>${표}</div>`;
-  return `<span class="pn">${글(m)}</span>${표}<button type="button" class="작 나눔">분할</button>`;
+  return `<div class="품줄"><span class="pn">${글(m)}</span>${표}<button type="button" class="작 나눔">분할</button></div>`;
 }
 /* 재단수량 칸 속: 나뉜 칸이면 위·아래 수량(고칠 수 있음) + 「3」 */
 /* v1.8.1 실제 재단수량은 「30개」「20매」 꼴 — 숫자 뒤 단위(개·매)를 떼어 수량으로 읽고, 단위는 나뉜 칸 숫자 뒤에 그대로 보인다. 「-」「₩ 110」 은 숫자 아님 */
