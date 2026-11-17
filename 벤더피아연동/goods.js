@@ -279,7 +279,7 @@ const 한벌돌리기 = (단품곁다리) => {
       <div class="vp-note">불러오는 중…</div>
       <div class="vp-ing-note" hidden></div>
       <div class="vp-cached"></div>
-      <div class="vp-gt vp-gt-목록"><table><thead><tr></tr></thead><tbody></tbody></table></div>
+      <div class="vp-표통 vp-목록표"><table class="vp-촘촘"><thead><tr></tr></thead></table></div>
       <div class="vp-more" hidden>
         <button type="button" class="vp-more-fold">접기</button>
         <button type="button" class="vp-more-next">더보기</button>
@@ -316,26 +316,58 @@ const 한벌돌리기 = (단품곁다리) => {
   const to = filters.querySelector("[name=to]");
   const note = root.querySelector(".vp-note");
   const cached = root.querySelector(".vp-cached");
-  const gt = root.querySelector(".vp-gt");
-  const tbody = gt.querySelector("tbody");
+  const gt = root.querySelector(".vp-목록표");
+  const 목록표 = gt.querySelector("table");
   const pillBar = root.querySelector(".vp-pillbar");
   const pillsBox = pillBar.querySelector(".vp-pills");
   const ingNote = root.querySelector(".vp-ing-note");
   const more = root.querySelector(".vp-more");
-  /* ── 표 (10-21) ─────────────────────────────────────────
-     사장님: 「단품관리와 상품관리 재고조회의 각 버튼이 메인이 되는 표형식으로 나열해줘」
-     첫 칸 = 이름 버튼(전처럼 누르면 상세). 나머지 칸은 `page.cols` (vp-data.js).
-     ⚠ 이름 하나에 줄 하나다. 같은 단품·상품의 줄이 여럿(창고별·매출처별)이어도 표에는 한 줄이고,
-       칸에는 값들을 모아 적는다. 줄이 불어나지 않는 것이 이 표의 약속이다.
-     ⚠ 버튼은 `div.vp-goods-list` 안에 넣는다 — 연두·주황·붉은 줄·검정(눌림) 꼴이 전부 그 이름에
-       걸려 있어, 같은 통에 담으면 버튼의 뜻이 표 안에서도 그대로다(두 벌로 만들지 않는다). */
-  const colDefs = (page.cols || []).map((c) => (typeof c === "string" ? { name: c, col: c } : c));
-  const headRow = gt.querySelector("thead tr");
-  for (const d of [{ name: page.nameCol, main: true }, ...colDefs]) {
-    const th = headRow.appendChild(document.createElement("th"));
-    th.textContent = d.name;
-    if (d.main) th.className = "vp-main";
-    if (d.sum) th.className = "vp-num";
+  /* ── 표 (10-21 → 11-17 [새 지시 모든표 통일]) ─────────────────────────
+     10-21 사장님: 「단품관리와 상품관리 재고조회의 각 버튼이 메인이 되는 표형식으로 나열해줘」
+     11-17 사장님(그대로): 「벤더피아연동 데이터가 나타나는 모든 페이지 표의 형태를 배송관리의 표와 동일한 사이즈 셀구조로 변경해 주세요, 또한 각 페이지별
+       벤더피아 원래 화면과 동일한 열이 나타나야 합니다. 특히 상품관리 메뉴는 원래화면에 나타나는 매입금액 배송비등이 나타나지 않고 있습니다.」
+     → 표 = 배송관리와 같은 `table.vp-촘촘`(공용 `VP표`: 11px·25px 줄·칸선·열 끌기·표 안 가로 스크롤, 열쇠 `vp열넓이:<화면이름>`).
+     → 칸 = 그 화면 원래 목록이 **보이는 칸 그대로**(`page.원래칸`, vp-data.js — 11-17 사장님 크롬 원래 화면에서 읽음) + 프로그램이 덧붙인 칸(`page.덧칸`, 맨 끝).
+     → 줄 = 원래 화면처럼 **받은 줄마다 한 줄**(값이 원래 화면과 같게). 같은 이름의 줄은 한 묶음(`<tbody>`)으로 붙어 다니고,
+       이름 칸 첫 줄에 이름 단추(누르면 상세 — 전과 같음), 그 묶음의 다른 줄은 이름 글자만(임시).
+     ⚠ 거르개·검색·더보기는 여전히 **이름(묶음) 단위**로 고른다. 검색·거르개를 걸면 묶음 안에서도 맞는 줄만 보인다.
+     ⚠ 버튼은 `div.vp-goods-list` 안에 넣는다 — 연두·주황·붉은 줄·검정(눌림) 꼴이 전부 그 이름에 걸려 있다. */
+  const 표머리 = 목록표.tHead.rows[0];
+  let 보일칸 = null;            // [{ name, i(받은 칸 자리) | 덧칸 정의 }] — 첫 목록을 받으면 정한다
+  let 넓이판 = null;
+  const 덧칸들 = (page.덧칸 || []).map((c) => ({ ...c, 덧: true }));
+  function 표틀세우기() {
+    if (보일칸 || !heads.length) return;
+    const 본셈 = {};
+    const 찾기 = (이름) => {                    // 같은 이름 둘째 칸(재고조회 「금액」 둘)은 그 차례의 칸
+      본셈[이름] = (본셈[이름] || 0) + 1;
+      let n = 0;
+      for (let i = 0; i < heads.length; i++) if (heads[i] === 이름 && ++n === 본셈[이름]) return i;
+      return -1;
+    };
+    const 못찾음 = [];
+    보일칸 = [];
+    for (const 이름 of (page.원래칸 || heads.filter(Boolean))) {
+      const i = 찾기(이름);
+      if (i < 0) 못찾음.push(이름); else 보일칸.push({ name: 이름, i });
+    }
+    보일칸.push(...덧칸들);
+    if (못찾음.length) window.VP말?.(page.title + " 원래 칸 중 받은 자료에 없음: " + 못찾음.join(","));
+    표머리.replaceChildren();
+    보일칸.forEach((d, k) => {
+      const th = 표머리.appendChild(document.createElement("th"));
+      th.textContent = d.name;
+      if (!k) th.className = "vp-first";
+      if (d.덧) { th.classList.add("vp-덧칸"); th.title = "벤더피아 원래 칸이 아니라 이 프로그램이 덧붙인 칸"; }
+    });
+    넓이판 = window.VP표 ? window.VP표.넓이틀(목록표, 보일칸.map((d) => d.name), "vp열넓이:" + page.title) : null;
+  }
+  const 이름칸자리 = () => (보일칸 ? 보일칸.findIndex((d) => d.i === col(page.nameCol)) : -1);
+  function 넓이맞추기(rows) {
+    if (!넓이판) return;
+    const 이름k = 이름칸자리();
+    넓이판.맞춤(rows.map((r) => 보일칸.map((d) => (d.덧 ? "" : r[d.i]))), (k, h) =>
+      k === 이름k ? { 끝: 280, 더함: 8 + 110, 굵게: true } : {});
   }
   /* 거르개 알약 (검색부 아래) — 사장님: 「필터로 꼭넣어서 같은 단품의 중복줄이 생기지 않도록」.
      고른 값이 든 줄이 하나라도 있는 이름만 남기고, 그 이름은 여전히 한 줄이다. */
@@ -1363,29 +1395,56 @@ const 한벌돌리기 = (단품곁다리) => {
     : ((row[col(page.pill.col)] || "").trim() || "(없음)");
   const pillItems = (g) => (pillPick ? g.items.filter((r) => pillOf(r) === pillPick) : g.items);
 
-  // 표의 한 칸에 적는 값: 줄들에서 모은 값(중복 없이). 거르개를 골랐으면 그 값이 든 줄만 본다
-  const MOST = 3;
-  function fillRow(g) {
-    const items = page.pill ? pillItems(g) : g.items;
-    colDefs.forEach((d, k) => {
-      const td = g.tds[k];
-      if (d.ing) {
-        td.replaceChildren();
-        const 것 = ing맞은것.get(g.name);
-        if (것 && 것.u) {
-          const a = td.appendChild(document.createElement("a"));
-          a.href = 것.u; a.target = "_blank"; a.rel = "noopener noreferrer";
-          a.textContent = "inghome 에서 보기";
-          a.title = 것.꼴 === "그대로" ? "이름이 그대로 맞습니다" : "이름이 거의 맞습니다 — " + 것.t;
+  /* 11-17 — 묶음(같은 이름)의 줄을 그린다. 바로 그리지 않고 표시만 해 두었다가(`fillRow`) 보이는 묶음만 그린다(`묶음그리기`).
+     보일 줄 = 지금 거르개(`줄거르개`, apply 가 정함)에 맞는 줄 · 없으면 알약으로 고른 줄. */
+  let 줄거르개 = null;
+  function fillRow(g) { g.더러움 = true; 그리기예약(); }
+  let 그리기시계 = 0;
+  function 그리기예약() {
+    if (그리기시계) return;
+    그리기시계 = requestAnimationFrame(() => { 그리기시계 = 0; for (const g of groups.values()) if (!g.tr.hidden) 묶음그리기(g); });
+  }
+  const 덧칸값 = (d, g, row, 첫줄) => {
+    if (d.place) return placeIn(heads, row);
+    if (d.sum) return 첫줄 ? (page.pill ? pillItems(g) : g.items).reduce((n, r) => n + toNumber(r[col(d.sum)]), 0).toLocaleString() : "";
+    return "";
+  };
+  function 묶음그리기(g) {
+    if (!보일칸) 표틀세우기();
+    if (!보일칸) return;
+    const 줄들 = g.items.filter(줄거르개 || ((r) => !page.pill || !pillPick || pillOf(r) === pillPick));
+    const 보임 = 줄들.length ? 줄들 : g.items.slice(0, 1);
+    if (!g.더러움 && g.그린줄 && g.그린줄.length === 보임.length && g.그린줄.every((r, k) => r === 보임[k])) return;
+    g.더러움 = false;
+    g.그린줄 = 보임;
+    const 이름k = 이름칸자리();
+    const 새줄 = 보임.map((row, n) => {
+      const tr = document.createElement("tr");
+      보일칸.forEach((d, k) => {
+        const td = tr.insertCell();
+        if (!k) td.className = "vp-first";
+        if (k === 이름k && n === 0) {
+          td.classList.add("vp-상품칸");
+          const 통 = td.appendChild(document.createElement("div"));
+          통.className = "vp-goods-list";      // ⚠ 버튼 꼴이 이 이름에 걸려 있다 — 위 표 설명 참고
+          통.appendChild(g.b);
+          return;
         }
-        return;
-      }
-      if (d.sum) { td.textContent = items.reduce((n, r) => n + toNumber(r[col(d.sum)]), 0).toLocaleString(); return; }
-      const vals = [...new Set(items.map((r) => (d.place ? placeIn(heads, r) : ((r[col(d.col)] || "").trim())))
-        .filter(Boolean))];
-      td.textContent = vals.length > MOST ? `${vals.slice(0, MOST).join(", ")} 외 ${vals.length - MOST}` : vals.join(", ");
-      td.title = vals.length > MOST ? vals.join(", ") : "";
+        if (d.ing) {
+          const 것 = n === 0 && ing맞은것.get(g.name);
+          if (것 && 것.u) {
+            const a = td.appendChild(document.createElement("a"));
+            a.href = 것.u; a.target = "_blank"; a.rel = "noopener noreferrer";
+            a.textContent = "inghome 에서 보기";
+            a.title = 것.꼴 === "그대로" ? "이름이 그대로 맞습니다" : "이름이 거의 맞습니다 — " + 것.t;
+          }
+          return;
+        }
+        td.textContent = d.덧 ? 덧칸값(d, g, row, n === 0) : (row[d.i] == null ? "" : row[d.i]);
+      });
+      return tr;
     });
+    g.tr.replaceChildren(...새줄);
   }
 
   function renderPills() {
@@ -1431,10 +1490,10 @@ const 한벌돌리기 = (단품곁다리) => {
   // 표 줄 차례를 바꾼다 (테이블 줄에는 CSS order 가 안 먹어 실제로 옮긴다). 이미 그 차례면 안 건드린다.
   function reorder(keyOf) {
     const arr = [...groups.values()].sort((a, z) => keyOf(a) - keyOf(z));
-    const cur = tbody.children;
+    const cur = 목록표.tBodies;     // 11-17 — 묶음 하나 = <tbody> 하나
     let same = cur.length === arr.length;
     for (let i = 0; same && i < arr.length; i++) if (cur[i] !== arr[i].tr) same = false;
-    if (!same) tbody.append(...arr.map((g) => g.tr));
+    if (!same) 목록표.append(...arr.map((g) => g.tr));
   }
 
   /* 검색어 = 빈칸으로 나눈 낱말, 줄의 검색 칸(page.search)을 이은 글에 낱말이 다 들어 있으면 맞음(대소문자 무시).
@@ -1470,6 +1529,8 @@ const 한벌돌리기 = (단품곁다리) => {
       const rankAll = new Map(ranked.map((name, i) => [name, i]));
       for (const [name, { tr }] of groups) tr.hidden = stage !== 2 && !rank.has(name);
       reorder((g) => (rankAll.has(g.name) ? rankAll.get(g.name) : ranked.length + g.i));
+      줄거르개 = null;
+      for (const g of groups.values()) if (!g.tr.hidden) 묶음그리기(g);
       note.textContent = !top ? "최근 3개월 많이 나간 순서를 불러오는 중…"
         : stage === 2 ? `전체 ${groups.size.toLocaleString()}개 · 최근 3개월 많이 나간 순서가 앞에 있습니다`
         : stage === 1 ? `최근 3개월 1개 이상 출고된 ${names.length.toLocaleString()}개 · 많이 나간 순`
@@ -1483,10 +1544,11 @@ const 한벌돌리기 = (단품곁다리) => {
     more.hidden = true;
 
     let count = 0;
+    줄거르개 = matches;
     for (const g of groups.values()) {
       const on = g.items.some(matches);
       g.tr.hidden = !on;
-      if (on) count++;
+      if (on) { count++; 묶음그리기(g); }
     }
     reorder((g) => g.i);
     note.textContent = `${count.toLocaleString()}개` + (loading ? " · 불러오는 중…" : "");
@@ -1526,18 +1588,10 @@ const 한벌돌리기 = (단품곁다리) => {
       }
       const b = document.createElement("button");
       b.type = "button";
-      const tr = document.createElement("tr");
-      const 통 = tr.appendChild(document.createElement("td")).appendChild(document.createElement("div"));
-      tr.firstChild.className = "vp-main";
-      통.className = "vp-goods-list";      // ⚠ 버튼 꼴이 이 이름에 걸려 있다 — 위 표 설명 참고
-      통.appendChild(b);
-      const tds = colDefs.map((d, i) => {
-        const td = tr.appendChild(document.createElement("td"));
-        if (d.sum) td.className = "vp-num";
-        else if (i === 0) td.className = "vp-m";      // 서류관리 표의 둘째 칸(Product model)처럼 줄바꿈 허용
-        return td;
-      });
-      const group = { b, items: [row], name, tr, tds, i: groups.size };
+      const tr = document.createElement("tbody");     // 11-17 — 이름 하나 = 묶음(<tbody>) 하나, 안의 줄은 `묶음그리기` 가
+      tr.hidden = true;                               // apply 가 보일지 정한다(그 전엔 숨김 — 다 그리지 않게)
+      tr.className = "vp-묶음";
+      const group = { b, items: [row], name, tr, i: groups.size, 더러움: true };
       labelGroup(name, group);
       b.addEventListener("click", () => {
         /* ⚠⚠ 10-14 사장님: 「선택된버튼이 검게 변한후 다른선택시 해제되지않고
@@ -1554,7 +1608,7 @@ const 한벌돌리기 = (단품곁다리) => {
         b.classList.add("on");
         show(name, heads, group.items);
       });
-      tbody.appendChild(tr);
+      목록표.appendChild(tr);
       groups.set(name, group);
       noteRow(name, row);
     }
@@ -1635,7 +1689,7 @@ const 한벌돌리기 = (단품곁다리) => {
     const id = ++loadId;
     groups.clear();
     pillNames.clear(); pillSig = "";
-    tbody.replaceChildren();
+    for (const x of [...목록표.tBodies]) x.remove();
     panel.hidden = true;
     loading = true;
     note.textContent = "불러오는 중…";
@@ -1647,7 +1701,9 @@ const 한벌돌리기 = (단품곁다리) => {
         heads = h;
         if (단품목록) 단품목록.push(...rows);
         fillSelects(rows);
+        표틀세우기();
         addRows(rows);
+        넓이맞추기(rows);
         apply();
         note.textContent = `목록 불러오는 중… ${got.toLocaleString()} / ${total.toLocaleString()}`;
       }, () => id === loadId, 곁다리 ? null : document);

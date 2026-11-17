@@ -8,7 +8,9 @@ const VP_DATA = (() => {
   //  noDates: 등록기간이 없는 화면
   //  stock: 단품 버튼에 재고조회의 양품수를 표시하고 연두색으로 (재고는 단품으로만 관리한다)
   //         "self": 이 화면의 줄에서, "link": 재고조회에서 단품코드로 찾아서, "parts": 상품 상세의 단품 버튼만
-  //  cols: 목록 표의 칸 (첫 칸은 늘 이름 버튼). 글자 = 줄 칸 이름 그대로, 객체 = {name, col|place|sum|ing}
+  //  원래칸: 목록 표의 칸 = 벤더피아 원래 화면 목록이 **보이는 칸 그대로**(이름·차례). 11-17 [새 지시 모든표 통일] 사장님 크롬 원래 화면(`window.name="vp원본"`)에서
+  //          머리 칸 넓이 > 0 인 것을 읽음(체크 칸 뺌). 같은 이름이 두 번이면 두 번 적는다(받은 자료의 같은 차례 칸). 받은 자료에 없는 이름은 빼고 그린다.
+  //  덧칸: 원래 화면에 없는데 이 프로그램이 덧붙인 칸(맨 끝) {name, ing|place|sum} — 10-21 부터 있던 칸, 빼지 않았다(11-17 보고)
   //  pill: 검색칸 아래 거르개 알약 {label, col} — col 은 줄 칸 이름, place 는 재고조회의 현위치(창고, 0.본사면 매입처)
   //  fixed: 받을 때 항상 넣는 검색칸 값
   //  splits: 한 번에 700줄을 넘으면 나눠 받는 기준 (앞에서부터). "date"는 등록기간을 반씩, 그 밖은 그 검색칸의 항목별
@@ -20,7 +22,8 @@ const VP_DATA = (() => {
       codeCol: "단품코드",
       // 현위치 = 매입처. 검색칸 아래 거르개 알약으로 (10-21: [전체보기] [현위치별 보기] 탭을 없앴다)
       pill: { label: "현위치", col: "매입처명", drop: true },   // drop: 알약 대신 고르는칸(10-26)
-      cols: ["단품분류", { name: "현위치", col: "매입처명" }, "재고유형", "발주유형", "판매상태"],
+      원래칸: ["매입처명", "창고", "단품분류", "바코드", "단품코드", "단품명", "박스수", "매장판매단가", "수수료", "자재원가", "자재비용",
+        "매입단가", "재고유형", "발주유형", "판매상태", "생산셀명", "포장박스코드", "총재고수량", "등록일", "옵션"],
       stock: "link",
       // 10-25 이름표(배송관리·CS등록 이름 단추) — 이름·코드로 하나만 찾을 때 채우는 검색칸
       lookup: { name: "tbGoodsNm", code: "tbGoodsCd" },
@@ -47,8 +50,10 @@ const VP_DATA = (() => {
       uncheck: ["cbOptionGoodsYn"],
       // 매출처는 검색칸 아래 거르개 알약으로 (10-21) — 한 상품이 매출처마다 한 줄이어도 표에는 한 줄만
       pill: { label: "매출처", col: "매출처명" },
-      cols: [{ name: "매출처", col: "매출처명" }, "매입처명", "배송사명", "판매상태", "옵션상품유무",
-        { name: "상품정보", ing: true }],
+      원래칸: ["매출처명", "상품코드", "상품명", "배송사명", "매입처명", "단품코드", "단품명", "판매금액", "공급금액", "매입금액", "매출이익",
+        "선착불", "수도선불비", "수도착불비", "수도외곽선불비", "수도외곽착불비", "지방선불비", "지방착불비", "지방외곽선불비", "지방외곽착불비",
+        "제주선불비", "제주착불비", "조립설치비", "유리비", "제품비", "상품메모", "판매상태", "등록일", "수정일"],
+      덧칸: [{ name: "상품정보", ing: true }],
       selects: [["매입처명", "매입처"], ["배송사명", "배송사"],
         ["판매상태", "판매상태", "ddlStatus"], ["옵션상품유무", "옵션상품"]],
       serverSelect: ["판매상태", "ddlStatus"],
@@ -70,7 +75,9 @@ const VP_DATA = (() => {
       locationTabs: true,
       // 거르개 알약: 현위치. 표에는 같은 단품이 한 줄만 (현위치가 여럿이면 한 칸에 모아 적는다)
       pill: { label: "현위치", place: true },
-      cols: ["분류명", { name: "현위치", place: true }, { name: "양품수", sum: "양품수" }],
+      원래칸: ["창고", "분류명", "매입처", "단품코드", "단품명", "옵션", "적정재고30", "20일", "10일", "단가", "양품수", "금액", "불량품", "금액",
+        "미확정건", "출고예정", "입고예정", "가용재고", "가용금액", "비고", "이력"],
+      덧칸: [{ name: "현위치", place: true }, { name: "양품수 합", sum: "양품수" }],
       // 첫 화면: 최근 3개월 배송수량이 많은 순 50개 (배송현황관리 › 단품별, 단품관리와 같음)
       top: { url: "/System/SResult/prePostDeliveryList4.aspx", nameCol: "단품명" },
       // 원래 화면처럼 창고별로 받는다 (버튼은 단품명마다, 상세에 창고별 재고)
@@ -612,5 +619,131 @@ if (typeof window !== "undefined" && typeof document !== "undefined" && !window.
       if (window.ResizeObserver) new ResizeObserver(() => 안으로()).observe(판);
       return 판;
     };
+  })();
+}
+
+/* ── 공용 표 부품 `VP표` (11-17 [새 지시 모든표 통일]) ──
+   사장님(그대로): 「벤더피아연동 데이터가 나타나는 모든 페이지 표의 형태를 배송관리의 표와 동일한 사이즈 셀구조로 변경해 주세요, 또한 각 페이지별
+     벤더피아 원래 화면과 동일한 열이 나타나야 합니다. 특히 상품관리 메뉴는 원래화면에 나타나는 매입금액 배송비등이 나타나지 않고 있습니다.」
+   기준 = 배송관리 표(`table.vp-촘촘`, 11-04 [새 지시 표촘촘히]). 11-17 사장님 크롬 배송관리 배포본(0.35.0)에서 잰 값:
+     글 "Microsoft Sans Serif",돋움 11px · 머리 700·#f5f5f5·가운데·안여백 1px 2px 0·높이 25 · 몸 400·#000·글줄 20px·안여백 2px 3px·줄 25
+     · 칸선 오른쪽·아래(머리는 위도) 1px #c0c0c0 · table-layout fixed·separate · 머리 sticky top 0 · 첫 칸 sticky left 0
+     · 머리 칸 오른쪽 끝 7px 끌개(col-resize) · 몸 글 nowrap·ellipsis·overflow hidden · 표 통 안에서만 가로 스크롤(쪽 가로 0).
+   ① `VP표.꼴넣기()` — 위 꼴을 `<style id="vp-표꼴">` 한 벌로 넣는다. search.css 「배송·CS 표 = 벤더피아 꼴」 과 **같은 숫자**다(그 파일이 없는
+      단품·상품·재고 화면도 같은 꼴이 되게). 숫자를 바꾸려면 **둘 다** 바꿔라.
+   ② `VP표.넓이틀(t, heads, 열쇠)` — `<colgroup>` + 머리 칸 끌개 + localStorage `열쇠`(`vp열넓이:…`) 기억 + 경계 두 번 누름 = 처음 넓이.
+      돌려주는 판의 `맞춤(rows, 규칙)` 이 받은 줄 글에 맞춰 처음 넓이를 넓힌다(넓어지기만). search.js·goods.js 가 같이 쓴다.
+   ⚠ 새 표를 만들면 **이 부품을 쓴다**(CLAUDE.md 「모든 표 = 배송관리 기준」). */
+if (typeof window !== "undefined" && typeof document !== "undefined" && !window.VP표) {
+  window.VP표 = (() => {
+    const 표 = "#vp-root table.vp-촘촘";
+    const 꼴 = `
+#vp-root .vp-표통 { overflow: auto; max-height: calc(100vh - 200px); margin-top: 8px; background: #fff; scrollbar-color: #6f6d66 #e3e2e0; scrollbar-width: auto; }
+#vp-root .vp-표통::-webkit-scrollbar { height: 26px; width: 18px; }
+#vp-root .vp-표통::-webkit-scrollbar-track { background: #e3e2e0; border-radius: 13px; box-shadow: inset 0 0 0 1px #d3d2cf; }
+#vp-root .vp-표통::-webkit-scrollbar-thumb { background: #6f6d66; border-radius: 13px; min-width: 56px; min-height: 56px; border: 3px solid #e3e2e0; }
+#vp-root .vp-표통::-webkit-scrollbar-thumb:hover { background: #44423d; }
+#vp-root .vp-표통::-webkit-scrollbar-corner { background: #e3e2e0; }
+${표} { table-layout: fixed; width: auto; min-width: 0; margin: 0; border: 0; border-radius: 0; background: none;
+  border-collapse: separate; border-spacing: 0; font: 11px/20px "Microsoft Sans Serif", 돋움, sans-serif; color: #000;
+  text-indent: 0; letter-spacing: normal; text-transform: none; }
+${표} th { position: sticky; top: 0; z-index: 1; height: 25px; padding: 1px 2px 0; box-sizing: border-box; overflow: hidden; text-overflow: clip;
+  background: #f5f5f5; color: #000; font-size: 11px; font-weight: 700; line-height: normal; text-align: center; vertical-align: middle; white-space: nowrap;
+  border: 0; border-top: 1px solid #c0c0c0; border-right: 1px solid #c0c0c0; border-bottom: 1px solid #c0c0c0; box-shadow: none; user-select: none; -webkit-user-select: none; }
+${표} td { padding: 2px 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: none;
+  color: #000; font-size: 11px; font-weight: 400; line-height: 20px; text-align: left; vertical-align: top;
+  border: 0; border-right: 1px solid #c0c0c0; border-bottom: 1px solid #c0c0c0; }
+${표} th.vp-first, ${표} td.vp-first { position: sticky; left: 0; border-left: 1px solid #c0c0c0; box-shadow: none; }
+${표} th.vp-first { z-index: 3; font-weight: 700; }
+${표} td.vp-first { z-index: 2; background: #fff; font-weight: 400; color: #000; }
+${표} th .vp-열손 { position: absolute; top: 0; right: 0; bottom: 0; width: 7px; cursor: col-resize; touch-action: none; }
+${표} th .vp-열손:hover, ${표} th .vp-열손.vp-끄는중 { background: rgba(0, 0, 0, .28); }
+${표} td.vp-상품칸 .vp-goods-list { display: block; line-height: 13px; }
+${표} td.vp-상품칸 .vp-goods-list button { position: relative; font-size: 11px; font-weight: 700; line-height: 13px; text-align: left; white-space: nowrap; vertical-align: top; }
+${표} td.vp-상품칸 .vp-goods-list button .vp-점 { position: absolute; left: 0; top: 100%; margin-top: 1px; min-height: 0; }
+${표} td.vp-상품칸 .vp-goods-list button .vp-점 i { width: 5px; height: 5px; }
+${표} td.vp-상품칸 .vp-goods-list .vp-code, ${표} td.vp-상품칸 .vp-goods-list .vp-qty { font-size: 10px; font-weight: 500; margin-left: 3px; padding: 0 3px; }
+#vp-root .vp-표통 table.vp-촘촘 td a { color: #e03e3e; font-weight: 700; text-decoration: underline; }`;
+    const 글꼴 = '"Microsoft Sans Serif", 돋움, sans-serif';
+    const 최소넓이 = 16, 여유 = 8;
+    let 재는판 = null;
+    function 꼴넣기() {
+      if (document.getElementById("vp-표꼴")) return;
+      const st = document.createElement("style");
+      st.id = "vp-표꼴";
+      st.textContent = 꼴;
+      (document.head || document.documentElement).appendChild(st);
+    }
+    function 글너비(글, 굵게) {
+      try {
+        재는판 = 재는판 || document.createElement("canvas").getContext("2d");
+        재는판.font = (굵게 ? "700 " : "") + "11px " + 글꼴;
+        return Math.ceil(재는판.measureText(글).width);
+      } catch (e) { return String(글).length * 9; }
+    }
+    const 긴칸 = /상품명|단품명|단품구성|옵션|메모|비고|내용|제목|주소/;
+    const 기본규칙 = (i, h) => ({ 끝: 긴칸.test(h) ? 200 : 130, 더함: 여유, 굵게: false });
+    function 넓이틀(t, heads, 열쇠) {
+      꼴넣기();
+      const 읽기 = () => { try { const v = JSON.parse(localStorage.getItem(열쇠) || "{}"); return v && typeof v === "object" ? v : {}; } catch (e) { return {}; } };
+      const 본셈 = {}, 둔것 = 읽기();
+      const 열쇠들 = heads.map((h) => { 본셈[h] = (본셈[h] || 0) + 1; return 본셈[h] > 1 ? h + "#" + 본셈[h] : h; });
+      const 묶음 = document.createElement("colgroup");
+      const cols = heads.map(() => 묶음.appendChild(document.createElement("col")));
+      t.insertBefore(묶음, t.firstChild);
+      const 자동 = heads.map((h) => 글너비(String(h), true) + 여유);
+      const 둠 = 열쇠들.map((k) => Number(둔것[k]) >= 최소넓이);
+      const 판 = { t, cols, 열쇠들, 자동, 둠, 자리: 열쇠들.map((k, i) => (둠[i] ? Math.round(둔것[k]) : 자동[i])) };
+      판.입히기 = () => {
+        let 합 = 0;
+        cols.forEach((c, i) => {
+          const w = 판.둠[i] ? 판.자리[i] : 판.자동[i];
+          if (c.dataset.w !== String(w)) { c.dataset.w = w; c.style.width = w + "px"; }
+          합 += w;
+        });
+        t.style.width = 합 + "px";
+      };
+      판.쓰기 = () => {
+        const 값 = {};
+        열쇠들.forEach((k, i) => { if (판.둠[i]) 값[k] = 판.자리[i]; });
+        try { localStorage.setItem(열쇠, JSON.stringify(값)); } catch (e) {}
+      };
+      /* 받은 줄의 글에 맞춰 처음 넓이를 넓힌다 — 끝값까지만. 규칙(i, 머리) → {끝, 더함, 굵게} */
+      판.맞춤 = (rows, 규칙 = 기본규칙) => {
+        heads.forEach((h, i) => {
+          const { 끝, 더함, 굵게 } = { ...기본규칙(i, h), ...(규칙(i, h) || {}) };
+          let w = 판.자동[i];
+          for (const row of rows) {
+            if (w >= 끝) break;
+            const 글 = row[i] == null ? "" : String(row[i]).trim();
+            if (글) w = Math.max(w, Math.min(끝, 글너비(글.slice(0, 60), 굵게) + 더함));
+          }
+          판.자동[i] = w;
+        });
+        판.입히기();
+      };
+      [...t.tHead.rows[0].cells].forEach((th, i) => {
+        const 손 = th.appendChild(document.createElement("span"));
+        손.className = "vp-열손";
+        손.title = "끌면 넓이 조정 · 두 번 누르면 처음 넓이로";
+        손.addEventListener("pointerdown", (e) => {
+          e.preventDefault(); e.stopPropagation();
+          const x0 = e.clientX, w0 = 판.둠[i] ? 판.자리[i] : 판.자동[i];
+          try { 손.setPointerCapture(e.pointerId); } catch (err) {}
+          손.classList.add("vp-끄는중");
+          const 움직 = (ev) => { 판.자리[i] = Math.max(최소넓이, Math.round(w0 + ev.clientX - x0)); 판.둠[i] = true; 판.입히기(); };
+          const 끝 = () => {
+            손.removeEventListener("pointermove", 움직); 손.removeEventListener("pointerup", 끝); 손.removeEventListener("pointercancel", 끝);
+            손.classList.remove("vp-끄는중");
+            if (판.둠[i]) 판.쓰기();
+          };
+          손.addEventListener("pointermove", 움직); 손.addEventListener("pointerup", 끝); 손.addEventListener("pointercancel", 끝);
+        });
+        손.addEventListener("dblclick", (e) => { e.stopPropagation(); 판.둠[i] = false; 판.입히기(); 판.쓰기(); });
+      });
+      판.입히기();
+      return 판;
+    }
+    return { 꼴넣기, 넓이틀, 글너비 };
   })();
 }

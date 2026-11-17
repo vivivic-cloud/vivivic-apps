@@ -280,7 +280,7 @@
     const 앞 = "ctl00$Contents$";
     const r = document.createElement("div");
     r.id = "vp-root";
-    r.className = "vp-wide";
+    r.className = "vp-wide vp-촘촘쪽";   // 11-17 모든표 통일 — 배송관리처럼 쪽 너비 끝까지
     r.innerHTML = `
     <div class="vp-search">
       <a class="vp-home" href="/index.aspx">← 메인</a>
@@ -336,17 +336,22 @@
       통.replaceChildren();
       if (!heads.length) return;
       const 보일 = heads.map((h, i) => (숨은칸.has(h) ? -1 : i)).filter((i) => i >= 0);
+      /* 11-17 [새 지시 모든표 통일] 배송관리와 같은 표(`table.vp-촘촘`·공용 `VP표` 넓이 끌기, 열쇠 `vp열넓이:상담내용`).
+         칸은 그대로 — 고객문의 원래 화면(inquiryList.aspx)이 보이는 18칸(11-17 사장님 크롬에서 다시 봄, `숨은칸` 15칸과 체크 칸 뺌). */
       const t = document.createElement("table");
+      t.className = "vp-촘촘";
       const hr = t.createTHead().insertRow();
       보일.forEach((i, k) => { const th = hr.appendChild(document.createElement("th")); th.textContent = heads[i]; if (!k) th.className = "vp-first"; });
       const tb = t.createTBody();
       for (const row of rows) {
         const tr = tb.insertRow();
         tr.className = "vp-줄상담";
-        보일.forEach((i, k) => { const td = tr.insertCell(); td.textContent = row[i] || ""; if (!k) td.className = "vp-first"; else if (긴칸.has(heads[i])) { td.className = "vp-긴글"; td.title = row[i] || ""; } });
+        보일.forEach((i, k) => { const td = tr.insertCell(); td.textContent = row[i] || ""; td.title = row[i] || ""; if (!k) td.className = "vp-first"; else if (긴칸.has(heads[i])) td.className = "vp-긴글"; });
         tr.addEventListener("click", () => 판열기(heads, row));
       }
       통.appendChild(t);
+      const 넓이 = window.VP표 && window.VP표.넓이틀(t, 보일.map((i) => heads[i]), "vp열넓이:상담내용");
+      if (넓이) 넓이.맞춤(rows.map((row) => 보일.map((i) => row[i])));
     }
     /* 쪽 넘김 = 벤더피아가 준 그대로(번호 링크 + 처음·이전·다음·끝 그림 단추) */
     function 쪽그리기(doc) {
@@ -1976,80 +1981,22 @@
      칸 넓이는 `<col>` 이 정한다(table-layout: fixed). 처음 넓이 = 글 너비에 맞춤(받은 줄을 볼 때마다 넓어지기만, `자동`) · 끌어 바꾼 칸은 그 값(`둠`).
      저장 = localStorage 「vp열넓이:배송」·「vp열넓이:CS」 `{칸이름: px}`(같은 이름 둘째 칸은 「이름#2」). 경계를 두 번 누르면 그 칸만 처음 넓이로. */
   const 넓이열쇠 = "vp열넓이:" + (하우저보기 ? "하우저" : CS전용 ? "CS" : "배송");
-  const 표글꼴 = '"Microsoft Sans Serif", 돋움, sans-serif';
-  const 최소넓이 = 16, 여유 = 8, 끝넓이 = 130, 긴칸끝 = 200, 이름칸끝 = 280;
+  /* 11-17 [새 지시 모든표 통일] 넓이 틀·글 맞춤은 공용 부품 `VP표`(vp-data.js)로 옮겼다 — 단품·상품·재고·상담내용보기 표와 **같은 코드**.
+     여기는 배송·CS 표만의 규칙(끝값·더함)만 넘긴다. 숫자는 옮기기 전과 같다(일반 130 · 상품명·단품명·단품구성·옵션 200 · 이름 단추 칸 280(+110) · 주문칸 200(+40)). */
+  const 여유 = 8, 끝넓이 = 130, 긴칸끝 = 200, 이름칸끝 = 280;
   const 긴칸 = /상품명|단품명|단품구성|옵션/;
-  let 넓이판 = null, 재는판 = null;
-  function 글너비(글, 굵게) {
-    try {
-      재는판 = 재는판 || document.createElement("canvas").getContext("2d");
-      재는판.font = (굵게 ? "700 " : "") + "11px " + 표글꼴;
-      return Math.ceil(재는판.measureText(글).width);
-    } catch (e) { return 글.length * 9; }
-  }
-  function 넓이읽기() {
-    try { const 값 = JSON.parse(localStorage.getItem(넓이열쇠) || "{}"); return 값 && typeof 값 === "object" ? 값 : {}; } catch (e) { return {}; }
-  }
-  function 넓이쓰기() {
-    const 값 = {};
-    넓이판.열쇠들.forEach((k, i) => { if (넓이판.둠[i]) 값[k] = 넓이판.자리[i]; });
-    try { localStorage.setItem(넓이열쇠, JSON.stringify(값)); } catch (e) {}
-  }
-  function 넓이입히기() {
-    let 합 = 0;
-    넓이판.cols.forEach((c, i) => {
-      const w = 넓이판.둠[i] ? 넓이판.자리[i] : 넓이판.자동[i];
-      if (c.dataset.w !== String(w)) { c.dataset.w = w; c.style.width = w + "px"; }
-      합 += w;
-    });
-    넓이판.t.style.width = 합 + "px";
-  }
+  let 넓이판 = null;
   function 넓이틀(t, heads) {
-    const 본셈 = {}, 둔것 = 넓이읽기();
-    const 열쇠들 = heads.map((h) => { 본셈[h] = (본셈[h] || 0) + 1; return 본셈[h] > 1 ? h + "#" + 본셈[h] : h; });
-    const 묶음 = document.createElement("colgroup");
-    const cols = heads.map(() => 묶음.appendChild(document.createElement("col")));
-    t.insertBefore(묶음, t.firstChild);
-    const 자동 = heads.map((h) => 글너비(String(h), true) + 여유);
-    const 둠 = 열쇠들.map((k) => Number(둔것[k]) >= 최소넓이);
-    넓이판 = { t, cols, 열쇠들, 자동, 둠, 자리: 열쇠들.map((k, i) => (둠[i] ? Math.round(둔것[k]) : 자동[i])) };
-    const 판 = 넓이판;
-    [...t.tHead.rows[0].cells].forEach((th, i) => {
-      const 손 = th.appendChild(document.createElement("span"));
-      손.className = "vp-열손";
-      손.title = "끌면 넓이 조정 · 두 번 누르면 처음 넓이로";
-      손.addEventListener("pointerdown", (e) => {
-        e.preventDefault(); e.stopPropagation();
-        const x0 = e.clientX, w0 = 판.둠[i] ? 판.자리[i] : 판.자동[i];
-        try { 손.setPointerCapture(e.pointerId); } catch (err) {}
-        손.classList.add("vp-끄는중");
-        const 움직 = (ev) => { 판.자리[i] = Math.max(최소넓이, Math.round(w0 + ev.clientX - x0)); 판.둠[i] = true; 넓이입히기(); };
-        const 끝 = () => {
-          손.removeEventListener("pointermove", 움직); 손.removeEventListener("pointerup", 끝); 손.removeEventListener("pointercancel", 끝);
-          손.classList.remove("vp-끄는중");
-          if (판.둠[i]) 넓이쓰기();
-        };
-        손.addEventListener("pointermove", 움직); 손.addEventListener("pointerup", 끝); 손.addEventListener("pointercancel", 끝);
-      });
-      손.addEventListener("dblclick", (e) => { e.stopPropagation(); 판.둠[i] = false; 넓이입히기(); 넓이쓰기(); });
-    });
-    넓이입히기();
+    넓이판 = window.VP표 ? window.VP표.넓이틀(t, heads, 넓이열쇠) : null;   // vp-data.js 를 안 싣는 옛 흉내 시험에서는 넓이 없이 그린다
   }
   /* 받은 줄의 글에 맞춰 처음 넓이를 넓힌다 — 끝값까지만. 이름 칸은 단추 뒤 코드·양품, 주문칸은 상담 알약 자리를 더 둔다. */
   function 넓이맞춤(rows) {
     if (!넓이판) return;
-    그린머리.forEach((h, i) => {
-      const 이름칸 = i === 상품칸자리 || i === 단품칸자리 || i === 단품구성자리, 끝값 = 이름칸 ? 이름칸끝 : i === 주문칸자리 || 긴칸.test(h) ? 긴칸끝 : 끝넓이;
-      const 더함 = 여유 + (이름칸 ? 110 : i === 주문칸자리 ? 40 : 0);
-      let w = 넓이판.자동[i];
-      for (const row of rows) {
-        if (w >= 끝값) break;
-        const 글 = row[i] == null ? "" : String(row[i]).trim();
-        if (글) w = Math.max(w, Math.min(끝값, 글너비(글.slice(0, 60), 이름칸) + 더함));
-      }
-      넓이판.자동[i] = w;
+    넓이판.맞춤(rows, (i, h) => {
+      const 이름칸 = i === 상품칸자리 || i === 단품칸자리 || i === 단품구성자리;
+      return { 끝: 이름칸 ? 이름칸끝 : i === 주문칸자리 || 긴칸.test(h) ? 긴칸끝 : 끝넓이,
+        더함: 여유 + (이름칸 ? 110 : i === 주문칸자리 ? 40 : 0), 굵게: 이름칸 };
     });
-    넓이입히기();
   }
 
   function addRows(heads, rows, 더있다 = false) {
