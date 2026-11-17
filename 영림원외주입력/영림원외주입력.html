@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v283 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v284 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -127,7 +127,7 @@ input.bad,select.bad{border-color:var(--red)}
 .unreg{font-size:11px;color:#b45309;font-weight:700}
 /* v235 세트구성품등록 — 임시 칩 · 벤더피아에서 불러오기 목록(세로 목록, 가로로 안 밀림) */
 .chip.tmp{background:var(--amber-bg);color:var(--amber);border-color:#fde68a;margin-left:4px;vertical-align:1px}
-.bdreg .bdvn{margin:8px 0 10px}.bdreg td.bdwhy{white-space:normal;min-width:180px;font-size:12px}.bdreg td.bdwhy.bad,.bdreg .bdbad{color:var(--red)}.bdreg .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}.bdreg .bdrh{font-size:14px;font-weight:800;margin:14px 0 2px}.bdreg td{white-space:nowrap}.bdreg .bdrhave{margin-top:12px}.bdreg .bdrhave>summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--muted);padding:6px 0}   /* v281 구매자재 일괄등록 */
+.bdreg .bdvn{margin:8px 0 10px}.bdreg td.bdwhy{white-space:normal;min-width:180px;font-size:12px}.bdreg td.bdwhy.bad,.bdreg .bdbad{color:var(--red)}.bdreg .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}.bdreg .bdrfail{margin:10px 0;padding:12px 14px;border:2px solid var(--red);border-radius:10px;background:var(--red-bg);color:var(--red);font-weight:800;font-size:14px}.bdreg .bdrh{font-size:14px;font-weight:800;margin:14px 0 2px}.bdreg td{white-space:nowrap}.bdreg .bdrhave{margin-top:12px}.bdreg .bdrhave>summary{cursor:pointer;font-size:13px;font-weight:700;color:var(--muted);padding:6px 0}   /* v281 구매자재 일괄등록 */
 .vpbox{flex-basis:100%;min-width:0;border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:6px;background:#fff}
 .vpbox input[type=search]{flex:1 1 200px;min-width:0}
 .vplist{max-height:50vh;overflow-y:auto;overflow-x:hidden}
@@ -478,7 +478,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v283</span>
+    <span class="ver">v284</span>
   </div>
 </header>
 <div class="wrap">
@@ -4034,13 +4034,36 @@ function bdPlan(vn,real,only,bad){   /* [{key,go:[{e,st}],skip:[{e,st}],have:N}]
    화면 = ① 거래처 고르기 ② 확인 결과(넘길 N · 못 넘길 N · 못 넘길 줄과 이유) ③ 「등록대기」. 미리 보기 표·새 줄/바뀐 줄 배지 없음(v277~v280 세 메뉴의 단추·상자·「한 번에」 표는 지움).
    셈 = bdPlan(같은 거래처 분류 → 자재등록 → 구매단가등록, 앞 단계에서 함께 넘길 줄은 있는 것으로 봄) · 넘기기 = bdRun(단계마다 실제 자료로 다시 셈 → bdPushOne).
    이미 대기·진행중·완료이고 바뀌지 않은 줄 = 안 넘김(받은 기록 = 문서 bd 칸) · 바뀐 줄 = 대기·오류 문서면 고쳐 다시 대기, 진행중·완료면 못 넘길 줄(이유). 구매단가 = 마지막 단가만(BD.mode 'last', 임시). */
-var BDR={vn:'',msg:'',bad:false,busy:false};
-function bdRun(V){   /* 분류 → 자재 → 구매단가 차례로 대기. 돌려줌 = {done,bad} */
-  var bad={},done=0,nb=0;
-  return BD_ORDER.reduce(function(p,k){return p.then(function(){
-    var g=bdPlan(V.vn,true,k,bad)[0];   /* 실제 자료로 다시 셈 — 앞 단계가 막 넘긴 문서가 보임 */
-    return g.go.reduce(function(q,x){return q.then(function(){return bdPushOne(k,V,x).then(function(ok){if(ok)done++;else{nb++;if(k==='materials')bad[x.e.key]='넘기지 못함';}});});},Promise.resolve());
-  });},Promise.resolve()).then(function(){return {done:done,bad:nb};});
+var BDR={vn:'',msg:'',bad:false,busy:false,fail:''};
+/* v284 사장님 「등록대기는 전부 들어가거나 전부 안 들어가게」(11-17 17:04 v281 로 양지데코 자재 17건만 들어가고 분류·구매단가는 안 들어간 일) —
+   넘길 줄(bdPlan 미리 셈 그대로)을 한 트랜잭션(db.updateAll)으로: 새 줄 = 새 문서($set, id 를 미리 만듦) · 바뀐 줄 = 대기·오류 문서 고침.
+   하나라도 실패(권한·그 사이 상태 바뀜·저장소 오류)하면 아무것도 안 남는다. createdAt 은 분류 → 자재 → 구매단가 차례로 1ms 씩. */
+function bdNewId(){var c='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',a=new Uint8Array(20),s='';(window.crypto||window.msCrypto).getRandomValues(a);for(var i=0;i<20;i++)s+=c[a[i]%62];return s;}
+function bdNoPerm(){   /* 등록대기를 누를 수 없는 단계(쓰기 권한 없음) 이름들 */
+  return BD_ORDER.filter(function(k){return window.ERP_CAN&&!window.ERP_CAN('erp_'+k,'w');}).map(function(k){return BYKEY[k].title;});
+}
+function bdRun(V,P){   /* 돌려줌 = {n} · 실패면 reject(아무것도 안 씀) */
+  var items=[],t0=Date.now(),why={msg:''};
+  P.forEach(function(g){g.go.forEach(function(x){items.push({k:g.key,x:x,id:x.st.t==='new'?bdNewId():x.st.doc.id});});});
+  if(!items.length)return Promise.resolve({n:0});
+  var docs=items.map(function(it,i){
+    var s=BYKEY[it.k],e=it.x.e,now=new Date(t0+i).toISOString(),bd={'출처':BD_SRC,'거래처':V.vn,'판':V.pan,'받은때':now};
+    if(it.k==='classes'){bd['열쇠']=e.keys;bd['지문']=e.fps;}else{bd['열쇠']=e.key;bd['지문']=e.fp;if(e.hi!=null)bd['이력']=e.hi;}
+    var o=Object.assign(normVals(s,e.vals),{bd:bd,status:'대기',agentNote:''});
+    if(it.x.st.t==='new'){o.createdAt=now;o.route=routeOf(s);}
+    if(s.fillDoc)s.fillDoc(o);
+    return o;});
+  return db.updateAll(items.map(function(it){return {c:'erp_'+it.k,id:it.id};}),function(cur){
+    var out=[];
+    for(var i=0;i<items.length;i++){var it=items[i],c=cur[i];
+      if(it.x.st.t==='new'){if(c){why.msg=BYKEY[it.k].title+' 「'+bdLab(it.k,it.x.e)+'」 문서가 이미 있습니다';return null;}out.push({$set:docs[i]});}
+      else{if(!c||!(c.status==='대기'||c.status==='오류')||hasEdit(c)){why.msg=BYKEY[it.k].title+' 「'+bdLab(it.k,it.x.e)+'」 을(를) 그 사이 입력 작업자가 처리하기 시작했습니다';return null;}out.push(docs[i]);}}
+    return out;
+  }).then(function(ok){
+    if(!ok)return Promise.reject(new Error(why.msg||'저장하지 못했습니다'));
+    items.forEach(function(it,i){if(it.x.st.t==='new')dataPut(it.k,Object.assign({id:it.id},docs[i]),{id:it.id});});
+    return {n:items.length};
+  });
 }
 var bdrDraw=null;
 function renderBdReg(){
@@ -4052,7 +4075,7 @@ function renderBdReg(){
     if(!BD.docs){vRow.replaceChildren();res.replaceChildren('불러오는 중');goBtn.hidden=true;return;}
     var vs=bdVendors();
     vRow.replaceChildren.apply(vRow,vs.map(function(d){var on=d.id===BDR.vn;
-      return h('button',{type:'button',class:'btn small wcpick'+(on?' primary':''),'aria-pressed':on?'true':'false',disabled:BDR.busy,on:{click:function(){BDR.vn=on?'':d.id;BDR.msg='';draw();}}},d.id);}));
+      return h('button',{type:'button',class:'btn small wcpick'+(on?' primary':''),'aria-pressed':on?'true':'false',disabled:BDR.busy,on:{click:function(){BDR.vn=on?'':d.id;BDR.msg='';BDR.fail='';draw();}}},d.id);}));
     var d=vs.filter(function(x){return x.id===BDR.vn;})[0];
     msg.textContent=BDR.msg;msg.className='msg'+(BDR.bad?' bad':'');
     if(!d){res.replaceChildren();goBtn.hidden=true;return;}
@@ -4074,21 +4097,25 @@ function renderBdReg(){
       /* v283 사장님 「이미 넘김 17건은 또 뭐야」 — 「이미 넘김」 → 「이미 있음」(폼에 같은 줄이 이미 있음: 이 메뉴로 넘긴 것 + 다른 곳에서 저장한 것). 단계별 수 · 들어온 길 · 만든 때 */
       parts.push(h('details',{class:'bdrhave'},h('summary',{},'이미 있음 '+have+' ('+hs.join(' · ')+')'),h('div',{},tbl(['단계','줄','상태','들어온 길','만든 때'],hv))));}
     res.replaceChildren.apply(res,parts);
-    goBtn.hidden=false;goBtn.disabled=!go||BDR.busy;goBtn.textContent=go?'등록대기 '+go+'건':'등록대기';
+    var noPerm=bdNoPerm();   /* v284 권한 없는 단계가 있으면 누르기 전에 막음 */
+    if(noPerm.length)res.prepend(h('div',{class:'bdrfail'},'이 계정은 '+noPerm.join(' · ')+' 등록 권한이 없음 — 등록대기를 할 수 없습니다(담당자 관리에서 권한).'));
+    if(BDR.fail)res.prepend(h('div',{class:'bdrfail'},BDR.fail));
+    goBtn.hidden=false;goBtn.disabled=!go||BDR.busy||noPerm.length>0;goBtn.textContent=go?'등록대기 '+go+'건':'등록대기';
     goBtn.onclick=function(){
       if(BDR.busy||!go)return;
       if(!db){BDR.msg='저장소에 연결되지 않아 넘기지 못했습니다.';BDR.bad=true;draw();return;}
-      if(data.classes==null||data.materials==null){BDR.msg='분류·자재 자료를 읽는 중입니다. 잠시 뒤 다시 눌러 주세요.';BDR.bad=true;draw();return;}
-      BDR.busy=true;BDR.msg='넘기는 중';BDR.bad=false;draw();
-      var b=d['보내기'];
+      if(data.classes==null||data.materials==null||data.purprices==null){BDR.msg='분류·자재·구매단가 자료를 읽는 중입니다. 잠시 뒤 다시 눌러 주세요.';BDR.bad=true;draw();return;}
+      if(noPerm.length){draw();return;}
+      BDR.busy=true;BDR.msg='넘기는 중';BDR.bad=false;BDR.fail='';draw();
+      var b=d['보내기'],P2=bdPlan(d.id);   /* 누른 때 다시 셈(보이는 표와 같은 셈) */
       freshCheck().then(function(old){
         if(old)return {old:old};
-        return bdRun({vn:d.id,pan:b['판']});
+        return bdRun({vn:d.id,pan:b['판']},P2);
       }).then(function(r){
         BDR.busy=false;
-        if(r.old){BDR.msg=r.old;BDR.bad=true;}else{BDR.msg=r.done+'건 등록대기'+(r.bad?' · 못 넘김 '+r.bad+'건':'');BDR.bad=!!r.bad;}
+        if(r.old){BDR.msg=r.old;BDR.bad=true;}else{BDR.msg=r.n+'건 등록대기 (분류 → 자재등록 → 구매단가등록 모두 들어감)';BDR.bad=false;}
         draw();renderNav();renderSum();
-      },function(e){BDR.busy=false;BDR.msg='넘기지 못했습니다. '+errText(e);BDR.bad=true;draw();});
+      },function(e){BDR.busy=false;BDR.msg='';BDR.fail='하나도 등록대기되지 않았습니다 — '+errText(e)+(e&&(e.code==='erp-perm'||/permission/i.test(e.code||e.message||''))?' (쓰기 권한 없음)':'');draw();});
     };
   }
   bdrDraw=function(){if(!BDR.busy)draw();};
