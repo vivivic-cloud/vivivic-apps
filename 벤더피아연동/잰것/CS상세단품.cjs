@@ -137,7 +137,7 @@ const 자리 = (고르개) => { const e = document.querySelector(고르개); if 
         통째: td(4, '단품명').querySelector('.vp-goods-list small.vp-code')?.textContent, 줄높이: td(1, '단품구성').parentElement.getBoundingClientRect().height };
     });
     console.log('  ★ 표 단품구성 칸·「a + b」 단품명 칸 = 단추 ' + JSON.stringify(표구성) + ' ' + 못(표구성.구성.join() === 'bis800_b,bis800_d'
-      && 표구성.단품명.join() === 'bis800_b,bis800_b,bis800_d' && 표구성.통째 === 'bis_set' && 표구성.줄높이 <= 26));
+      && 표구성.단품명.join() === 'bis800_b,bis800_b,bis800_d' && 표구성.통째 === 'bis_set' && Math.round(표구성.줄높이) === 65));   // 11-17 [새 지시 모든표 양식] 단품명 「a + a + b」 = 단추 셋 한 줄에 하나 → 3×20+5
     await 줄열기(page, 1);
     let v = await page.evaluate(칸값, '단품명');
     console.log('  ★ 수량만큼 단추 ' + JSON.stringify(v.단추) + ' ' + 못(v.단추.length === 3 && v.단추.every((x) => x.점 === 4)

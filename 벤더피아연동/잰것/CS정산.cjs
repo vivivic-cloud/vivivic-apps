@@ -170,9 +170,9 @@ const 한글csv = execFileSync('python3', ['-c', 'import sys;sys.stdout.buffer.w
     재(!밖글.some((x) => /가나다|라마바|사아자|차카타|옵션|M-\d|encodeURIComponent/.test(decodeURIComponent(x))), '밖으로 나간 요청에 파일·주문 값 없음');
     const 꼴 = await p.evaluate(() => {
       const td = document.querySelector('#vp-root .vp-search > .vp-table tbody td'), s = getComputedStyle(td), tr = td.parentNode, 통 = document.querySelector('#vp-root .vp-search > .vp-table');
-      return { 글: s.fontSize, 높: tr.getBoundingClientRect().height, 쪽밀림: document.documentElement.scrollWidth > innerWidth, 통: getComputedStyle(통).overflowX, 머리: 통.querySelectorAll('thead .vp-열손').length, 촘촘: !!통.querySelector('table.vp-촘촘'), 취소: !!통.querySelector('tr.vp-취소줄') };
+      return { 글: s.fontSize, 높: tr.getBoundingClientRect().height, 단품줄: Math.max(1, ...[...tr.querySelectorAll('.vp-단품줄')].map((x) => x.children.length)), 쪽밀림: document.documentElement.scrollWidth > innerWidth, 통: getComputedStyle(통).overflowX, 머리: 통.querySelectorAll('thead .vp-열손').length, 촘촘: !!통.querySelector('table.vp-촘촘'), 취소: !!통.querySelector('tr.vp-취소줄') };
     });
-    재(꼴.글 === '11px' && Math.round(꼴.높) === 25 && 꼴.촘촘, '글 11px·줄 25px·vp-촘촘 (' + 꼴.글 + ' ' + 꼴.높 + ')');
+    재(꼴.글 === '11px' && Math.round(꼴.높) === (꼴.단품줄 > 1 ? 꼴.단품줄 * 20 + 5 : 25) && 꼴.촘촘, '글 11px·줄 25px(단품 n개 줄 = n×20+5)·vp-촘촘 (' + 꼴.글 + ' ' + 꼴.높 + ' 단품' + 꼴.단품줄 + ')');
     재(!꼴.쪽밀림 && /auto|scroll/.test(꼴.통), '쪽 가로 스크롤 없음·표 안에서만');
     재(꼴.머리 === 33, '칸마다 끌기 손');
     재(꼴.취소, 'CS 취소 줄 칠함 — CS등록과 같은 표');

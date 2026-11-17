@@ -311,64 +311,14 @@
   }
   const 시간글 = (초) => (초 >= 60 ? Math.floor(초 / 60) + "분 " : "") + (초 % 60) + "초";
 
-  /* 못 찾은 업로드 줄 표 — 벤더피아 꼴(`table.vp-촘촘`, search.css). 열 끌기는 `search.js` `넓이틀` 과 같은 쓰임, 저장 열쇠만 따로 */
-  const 넓이열쇠 = "vp열넓이:CS정산", 최소넓이 = 16, 끝넓이 = 130, 긴칸끝 = 200;
+  /* 못 찾은 업로드 줄 표 — 벤더피아 꼴(`table.vp-촘촘`).
+     11-17 [새 지시 모든표 양식] 사장님(그대로): 「벤더피아 연동에 나타나는 모든 표데이터 양식을 현재의 배송관리 상품관리등 셀가로변경, 가로스크롤하단유지 단품명버튼 열바뀜 등으로 나타나게 변경해 주세요」
+     → 제 넓이 코드를 지우고 공용 `VP표.넓이틀`(열 끌기·두 번 누름·화면 아래 밀대)로. 저장 열쇠는 그대로 `vp열넓이:CS정산`, 끝값도 같음(옵션·메모 200, 나머지 130 = `VP표` 기본 규칙). */
+  const 넓이열쇠 = "vp열넓이:CS정산";
   const 칸들 = [["결과", (u) => u.결과], ["줄", (u) => String(u.n)], ["수취인", (u) => u.수취인], ["옵션값", (u) => u.옵션값], ["메모", (u) => u.메모]];
-  const 긴칸 = /옵션|메모/;
-  let 재는판 = null;
-  function 글너비(글, 굵게) {
-    try {
-      재는판 = 재는판 || document.createElement("canvas").getContext("2d");
-      재는판.font = (굵게 ? "700 " : "") + "11px " + 표글꼴;
-      return Math.ceil(재는판.measureText(글).width);
-    } catch (e) { return 글.length * 9; }
-  }
-  function 넓이읽기() {
-    try { const 값 = JSON.parse(localStorage.getItem(넓이열쇠) || "{}"); return 값 && typeof 값 === "object" ? 값 : {}; } catch (e) { return {}; }
-  }
   function 넓이틀(t, 줄값들) {
-    const 묶음 = document.createElement("colgroup");
-    const cols = 칸들.map(() => 묶음.appendChild(document.createElement("col")));
-    t.insertBefore(묶음, t.firstChild);
-    const 둔것 = 넓이읽기();
-    const 자동 = 칸들.map(([h], i) => {
-      const 끝값 = 긴칸.test(h) ? 긴칸끝 : 끝넓이;
-      let w = 글너비(h, true) + 8;
-      for (const 줄 of 줄값들) { if (w >= 끝값) break; if (줄[i]) w = Math.max(w, Math.min(끝값, 글너비(줄[i].slice(0, 60)) + 8)); }
-      return w;
-    });
-    const 둠 = 칸들.map(([h]) => Number(둔것[h]) >= 최소넓이);
-    const 자리 = 칸들.map(([h], i) => (둠[i] ? Math.round(둔것[h]) : 자동[i]));
-    const 입히기 = () => {
-      let 합 = 0;
-      cols.forEach((c, i) => { const w = 둠[i] ? 자리[i] : 자동[i]; c.style.width = w + "px"; 합 += w; });
-      t.style.width = 합 + "px";
-    };
-    const 쓰기 = () => {
-      const 값 = {};
-      칸들.forEach(([h], i) => { if (둠[i]) 값[h] = 자리[i]; });
-      try { localStorage.setItem(넓이열쇠, JSON.stringify(값)); } catch (e) {}
-    };
-    [...t.tHead.rows[0].cells].forEach((th, i) => {
-      const 손 = th.appendChild(document.createElement("span"));
-      손.className = "vp-열손";
-      손.title = "끌면 넓이 조정 · 두 번 누르면 처음 넓이로";
-      손.addEventListener("pointerdown", (e) => {
-        e.preventDefault(); e.stopPropagation();
-        const x0 = e.clientX, w0 = 둠[i] ? 자리[i] : 자동[i];
-        try { 손.setPointerCapture(e.pointerId); } catch (err) {}
-        손.classList.add("vp-끄는중");
-        const 움직 = (ev) => { 자리[i] = Math.max(최소넓이, Math.round(w0 + ev.clientX - x0)); 둠[i] = true; 입히기(); };
-        const 끝 = () => {
-          손.removeEventListener("pointermove", 움직); 손.removeEventListener("pointerup", 끝); 손.removeEventListener("pointercancel", 끝);
-          손.classList.remove("vp-끄는중");
-          if (둠[i]) 쓰기();
-        };
-        손.addEventListener("pointermove", 움직); 손.addEventListener("pointerup", 끝); 손.addEventListener("pointercancel", 끝);
-      });
-      손.addEventListener("dblclick", (e) => { e.stopPropagation(); 둠[i] = false; 입히기(); 쓰기(); });
-    });
-    입히기();
+    const 판 = window.VP표 ? window.VP표.넓이틀(t, 칸들.map(([h]) => h), 넓이열쇠) : null;
+    if (판) 판.맞춤(줄값들);
   }
 
   function 못찾음그리기(못) {

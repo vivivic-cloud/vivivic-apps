@@ -76,7 +76,7 @@ const 쪽html = ({ 줄들, 지금, 전체, 쪽크기, 배송사 = '전체', 상�
       const td = t && t.tBodies[0].rows[0].cells[1];
       const cs = td && getComputedStyle(td);
       return { h1: document.querySelector('#vp-root h1')?.textContent, 알림: document.querySelector('#vp-root .vp-note').textContent, th, 줄: t ? t.tBodies[0].rows.length : 0,
-        글: cs && cs.fontSize, 높이: t && t.tBodies[0].rows[0].getBoundingClientRect().height, 손: t ? t.querySelectorAll('.vp-열손').length : 0,
+        글: cs && cs.fontSize, 높이: t && t.tBodies[0].rows[0].getBoundingClientRect().height, 단품줄: t ? Math.max(1, ...[...t.tBodies[0].rows[0].querySelectorAll('.vp-단품줄')].map((x) => x.children.length)) : 1, 손: t ? t.querySelectorAll('.vp-열손').length : 0,
         검색창숨김: getComputedStyle(document.querySelector('#vp-root .vp-bar')).display === 'none',
         쪽가로: document.documentElement.scrollWidth > innerWidth + 1, 표통: (() => { const w = document.querySelector('#vp-root .vp-table'); return w.scrollWidth > w.clientWidth; })(),
         상품칸: document.querySelectorAll('#vp-root td.vp-상품칸:not(.vp-단품칸)').length, 단품칸: document.querySelectorAll('#vp-root td.vp-단품칸').length,
@@ -90,7 +90,8 @@ const 쪽html = ({ 줄들, 지금, 전체, 쪽크기, 배송사 = '전체', 상�
     재(보낸.filter((x) => !x.GET).every((x) => x.배송사 === '205' && x.상태 === '1' && x.시작 === '2000-01-01') && 보낸[1].조회 && 보낸[1].줄수 === 700 && 보낸[1].시작 === '2000-01-01', '조회 = 배송사 하우저(글자로 찾은 값)·판매중·700줄·2000-01-01부터');
     재(보낸.length === 3 && 보낸[2].대상.endsWith('ctl13'), '요청 = GET 1 + 조회 1 + 2쪽 1: ' + 보낸.length);
     재(보낸.every((x) => !x.쓰기), '쓰기 단추·체크 값 안 보냄');
-    재(판.글 === '11px' && Math.round(판.높이) === 25, '꼴 11px · 줄 25px: ' + 판.글 + ' ' + 판.높이);
+    재(판.글 === '11px' && Math.round(판.높이) === (판.단품줄 > 1 ? 판.단품줄 * 20 + 5 : 25), '꼴 11px · 줄 25px(단품 n개 줄 = n×20+5, 11-17 모든표 양식): ' + 판.글 + ' ' + 판.높이 + ' 단품' + 판.단품줄);
+    재(판.단품줄 > 1, '단품 여럿 = 한 줄에 하나(열바뀜): ' + 판.단품줄);
     재(판.손 === 29, '열 끌기 손잡이 29');
     재(판.상품칸 === 900 && 판.단품칸 === 900 && 판.단품여럿 === 300, '상품명·단품명 칸 = 이름 단추 자리(단품 「a+b」 는 여럿): ' + [판.상품칸, 판.단품칸, 판.단품여럿]);
     재(!판.쪽가로, '쪽 전체 가로 스크롤 없음');

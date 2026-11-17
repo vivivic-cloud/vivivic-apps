@@ -1074,23 +1074,29 @@ const 한벌돌리기 = (단품곁다리) => {
     return box;
   }
 
-  /* 수입정보 창의 표 — 머리줄 한 줄 + 값 한 줄. 서류관리 제품관리 표(CODE#·Product model·…)와 같은 클래스·같은 꼴(`goods.css` 「표 꼴」).
-     첫 칸(단품코드)은 굵게, 상품명은 줄바꿈 허용, 포장규격·입수·CBM·FOB 는 숫자 칸(가운데). 빈 값은 빈 칸으로 둔다(이름은 보인다). */
+  /* 수입정보 창의 표 — 머리줄 한 줄 + 값 한 줄. 칸·차례·값은 그대로(서류관리 Firestore 자료).
+     11-17 [새 지시 모든표 양식] 사장님(그대로): 「벤더피아 연동에 나타나는 모든 표데이터 양식을 현재의 배송관리 상품관리등 셀가로변경, 가로스크롤하단유지 단품명버튼 열바뀜 등으로 나타나게 변경해 주세요」
+     → 옛 서류관리 꼴(`.vp-gt`) 대신 배송관리와 같은 `table.vp-촘촘` + 공용 `VP표`(열 끌기·넓이 기억 `vp열넓이:수입정보`·화면 아래 밀대). 첫 칸 붙음. */
   function 서류표로(heads, row, only) {
     const 통 = document.createElement("div");
-    통.className = "vp-gt";
+    통.className = "vp-표통 vp-수입표";
     const 표 = 통.appendChild(document.createElement("table"));
+    표.className = "vp-촘촘";
     const 머리 = 표.appendChild(document.createElement("thead")).appendChild(document.createElement("tr"));
     const 몸 = 표.appendChild(document.createElement("tbody")).appendChild(document.createElement("tr"));
+    const 보인머리 = [], 보인값 = [];
     heads.forEach((h, i) => {
       if (!h || h === "Page" || (only && !only.includes(i))) return;
       const th = 머리.appendChild(document.createElement("th"));
       const td = 몸.appendChild(document.createElement("td"));
       th.textContent = h;
       td.textContent = row[i];
-      const 클래스 = i === 0 ? "vp-main" : /^(포장규격|입수|CBM|FOB)$/.test(h) ? "vp-num" : h === "상품명" ? "vp-m" : "";
-      if (클래스) { th.className = 클래스; td.className = 클래스; }
+      if (row[i]) td.title = String(row[i]);
+      if (!보인머리.length) { th.className = "vp-first"; td.className = "vp-first"; }
+      보인머리.push(h); 보인값.push(row[i]);
     });
+    const 판 = window.VP표 ? window.VP표.넓이틀(표, 보인머리, "vp열넓이:수입정보") : null;
+    if (판) 판.맞춤([보인값]);
     return 통;
   }
 
@@ -2238,17 +2244,33 @@ const 한벌돌리기 = (단품곁다리) => {
       }
       const 다 = [...답.values()].sort((a, b) => (a.상태 !== "판매중") - (b.상태 !== "판매중") || a.코드.localeCompare(b.코드, "ko", { numeric: true }));
       찾은수.textContent = 다.length.toLocaleString() + "개" + (다.length > 300 ? " · 앞 300개만 보입니다" : "") + (linked ? "" : " · 상품명 연결을 받는 중");
-      찾은것.replaceChildren(...다.slice(0, 300).map((x) => {
-        const 줄 = document.createElement("div"); 줄.className = "vp-등록찾은줄";
-        const 복사 = 줄.appendChild(document.createElement("button"));
+      /* 11-17 [새 지시 모든표 양식] 사장님(그대로): 「벤더피아 연동에 나타나는 모든 표데이터 양식을 현재의 배송관리 상품관리등 셀가로변경, 가로스크롤하단유지 단품명버튼 열바뀜 등으로 나타나게 변경해 주세요」
+         → 줄 목록이던 참고를 배송관리와 같은 `table.vp-촘촘` + 공용 `VP표`(열 끌기·넓이 기억 `vp열넓이:단품등록참고`·화면 아래 밀대)로.
+         칸 = 전에 줄에 보이던 차례 그대로(단품코드 복사 단추 · 단품명 단품 단추 · 단품분류 · 판매상태 · 상품명). 「임시」: 상품명은 전처럼 「첫 상품 외 n」. */
+      const 참고머리 = ["단품코드", "단품명", "단품분류", "판매상태", "상품명"];
+      const 표 = document.createElement("table");
+      표.className = "vp-촘촘 vp-등록참고표";
+      const 머리줄 = 표.createTHead().insertRow();
+      참고머리.forEach((h, i) => { const th = 머리줄.appendChild(document.createElement("th")); th.textContent = h; if (!i) th.className = "vp-first"; });
+      const 몸 = 표.createTBody();
+      const 줄값들 = [];
+      for (const x of 다.slice(0, 300)) {
+        const 상품 = x.상품들[0] ? x.상품들[0] + (x.상품들.length > 1 ? " 외 " + (x.상품들.length - 1) : "") : "";
+        줄값들.push([x.코드, x.이름, x.분류, x.상태, 상품]);
+        const tr = 몸.insertRow();
+        const 코드칸 = tr.insertCell(); 코드칸.className = "vp-first";
+        const 복사 = 코드칸.appendChild(document.createElement("button"));
         복사.type = "button"; 복사.className = "vp-등록복사"; 복사.textContent = x.코드; 복사.title = "누르면 복사됩니다";
         복사.addEventListener("click", () => 코드복사(복사, x.코드));
-        const 글 = 줄.appendChild(document.createElement("div")); 글.className = "vp-등록찾은글";
-        chip(글.appendChild(chipBox()), x.이름, [x.코드], () => 단품열기(x.코드, x.이름), stockByCode?.get(codeKey(x.코드)), true);
-        const 밑 = 글.appendChild(document.createElement("span"));
-        밑.textContent = [x.분류, x.상태, x.상품들[0] ? x.상품들[0] + (x.상품들.length > 1 ? " 외 " + (x.상품들.length - 1) : "") : ""].filter(Boolean).join(" · ");
-        return 줄;
-      }));
+        const 이름칸 = tr.insertCell(); 이름칸.className = "vp-상품칸 vp-단품칸";
+        const 통 = 이름칸.appendChild(document.createElement("div")); 통.className = "vp-goods-list";
+        chip(통, x.이름, [x.코드], () => 단품열기(x.코드, x.이름), stockByCode?.get(codeKey(x.코드)), true);
+        for (const 글 of [x.분류, x.상태, 상품]) { const td = tr.insertCell(); td.textContent = 글; if (글) td.title = 글; }
+      }
+      찾은것.classList.add("vp-표통");
+      찾은것.replaceChildren(표);
+      const 판 = window.VP표 ? window.VP표.넓이틀(표, 참고머리, "vp열넓이:단품등록참고") : null;
+      if (판) 판.맞춤(줄값들, (i) => (i === 0 ? { 더함: 8 + 16 } : i === 1 ? { 끝: 280, 더함: 8 + 110, 굵게: true } : {}));
       /* 상품명 연결이 늦게 오면 한 번 더 찾는다 */
       if (!linked && !기다림) 기다림 = setInterval(() => { if (linked) { clearInterval(기다림); 기다림 = 0; 참고찾기(); } }, 1000);
     }
