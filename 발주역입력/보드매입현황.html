@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.8.1
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.9.0
      v1.0.0(11-16): 첫 판. 거래처(시트) 버튼 → 그 시트의 표. 거래처 시트는 「전체 · 1월~10월 · 1~10월 누계 · 1~10월 매입품목」 으로 고른다.
        칸 이름·값은 엑셀 글자(셀 표시 꼴) 그대로. 표 꼴은 재단.html v1.1.0 셀 모양(칸 선 · 11.5px · 여백 2px 5px · 숫자 오른쪽)과 같다.
      v1.1.0(11-16): 거래처 메뉴 끝에 「영림원등록」 — 월별 표에서 납품제품명(품목)을 겹치지 않게 한 줄씩, 칸은 품목 · 규격 · 단가만.
@@ -43,8 +43,14 @@
        창고 {거래처} 문서에 `연결`(명세서 표기 → 입력폼 줄 → 자재번호·자재명, 삭제 줄 뺌)을 기준과 함께 저장. 새 표기는 `더한표기`(입력 작업자가 사장님 고른 대로 더함 — 페이지는 지우지 않음).
        열쇠 정규화(임시) = NFKC(전각→반각) · 빈칸 모두 뺌 · 영문 소문자. 입력폼 맨 앞 회색 두 칸 머리에 「명세서 연결 열쇠」 표시만. 26년 1~10월 실제 기록(영림원 구축 중 지난 자료를 다 넣어 돌려 보는 용도).
 
-     ⚠ 값은 창고(artifacts/vivivic-4b7ef/public/data/발주역입력_보드매입)에서 **읽기만** 한다.
-        창고에 넣는 것은 tools/보드매입읽기.py(드라이브 엑셀 → 창고). 공개 저장소라 업무 값은 이 파일에 없다. -->
+     v1.9.0(11-17): 엑셀 새로 불러오기 · 영림원보내기 최종값 `보내기` — 사장님: 「해당 불러온 파일을 새로고침으로 불러올 수 있게 해 줘. 새로 불러온 파일에 새로운 명세가 있다면
+       지금과 같은 논리로 영림원 입력폼 자리에 추가되는 경우가 생길 텐데, 이를 입력폼 쪽에서 감지하여 새로운 등록이 준비되도록 해야 해.」
+       거래처 첫 줄 끝 「엑셀 새로 불러오기」(지은 이름): 새 판 엑셀을 브라우저에서 읽어(tools/보드매입읽기.py 와 같은 셈) 바뀐 것 요약 → 「바꾸기」 를 눌러야 창고 발주역입력_보드매입 에 씀 → 합계 대조.
+       고친 칸·분류·거래처 연결·삭제 체크·연결표는 품목+규격 열쇠로 그대로 이어진다(지우지 않음). 꼴이 다른 시트는 안 읽음 · 새 파일에 없는 시트는 그대로 둠(임시).
+       창고 {거래처} 문서에 `보내기` = 화면에 보이는 최종값 전체(판·지문) — 영림원 입력폼이 그대로 읽어 새 줄·바뀐 줄을 감지. 꼴 = 전달 글 7절.
+
+     ⚠ 값은 창고(artifacts/vivivic-4b7ef/public/data/발주역입력_보드매입)에서 읽는다.
+        창고에 넣는 것은 tools/보드매입읽기.py(드라이브 엑셀 → 창고) 또는 v1.9.0 「엑셀 새로 불러오기」(사장님이 확인하고 「바꾸기」 를 누를 때만). 공개 저장소라 업무 값은 이 파일에 없다. -->
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
@@ -170,7 +176,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.8.1</div>
+  <div class="badge">v1.9.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -189,7 +195,7 @@ const 창고자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입�
    _목록 = {시트들:[시트 이름…], 파일, 읽은날}
    시트 문서(이름 = 엑셀 시트 이름) = {시트, 제목(1행), 표:[{이름?, 제목?, 칸:[…], 수:[칸마다 숫자칸 1/0], 줄:[{v:[…], 월?, 소?}]}], 글?:[…]}
      거래처 시트의 표 = [월별, 누계, 매입품목] · 총괄요약의 표 = [구매내역 총괄, 월별 비율] + 글(「※」 줄) */
-let 시트들 = [], 받은 = {}, 고른 = '', 볼것 = '전체', 답했나 = false;
+let 시트들 = [], 받은 = {}, 고른 = '', 볼것 = '전체', 답했나 = false, 목록정보 = {};
 
 const 글 = v => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
 function 목상태(큰,작,까닭){
@@ -204,21 +210,27 @@ window.목록읽기 = async function(){
     const { doc, getDoc } = window.fbRead;
     const 목 = await getDoc(doc(window.db, ...창고자리, '_목록'));
     답했나 = true;
-    시트들 = (목.exists() && 목.data().시트들) || [];
+    목록정보 = 목.exists() ? 목.data() : {};
+    시트들 = 목록정보.시트들 || [];
     if(!시트들.length){ 목상태('창고에 보드매입 자료가 없습니다'); return; }
     document.getElementById('목상태').style.display='none';
-    document.getElementById('거래처').innerHTML = 시트들.map(s => `<button class="chip" data-s="${글(s)}">${글(s)}</button>`).join('') +
-      `<button class="chip" data-s="__거래처">거래처 연결</button>`;   /* v1.6.0 — 영림원 기존 거래처와 연결(지은 이름) */
-    document.querySelectorAll('#거래처 .chip').forEach(b => b.onclick = () => 시트고름(b.dataset.s));
+    거래처단추();
     시트고름(시트들[0]);
   }catch(e){ window.목록못읽음('창고를 읽지 못했습니다', (e&&(e.code||e.message))||''); }
 };
 
+function 거래처단추(){
+  document.getElementById('거래처').innerHTML = 시트들.map(s => `<button class="chip" data-s="${글(s)}">${글(s)}</button>`).join('') +
+    `<button class="chip" data-s="__거래처">거래처 연결</button>` +   /* v1.6.0 — 영림원 기존 거래처와 연결(지은 이름) */
+    `<button class="chip" data-s="__엑셀">엑셀 새로 불러오기</button>`;   /* v1.9.0 — 새 판 엑셀(지은 이름) */
+  document.querySelectorAll('#거래처 .chip').forEach(b => { b.onclick = () => 시트고름(b.dataset.s); b.classList.toggle('on', b.dataset.s===고른); });
+}
 async function 시트고름(s){
   고른 = s; 볼것 = '전체';
   document.querySelectorAll('#거래처 .chip').forEach(b => b.classList.toggle('on', b.dataset.s===s));
   document.getElementById('볼것').innerHTML = '';
   if(s==='__거래처'){ 연결그리기(); return; }
+  if(s==='__엑셀'){ 엑셀그리기(); return; }
   const 속 = document.getElementById('속');
   if(!받은[s]){
     속.innerHTML = '<div class="state"><div class="big">읽는 중입니다…</div></div>';
@@ -452,6 +464,7 @@ async function 폼받기(s){
   폼기준[s] = JSON.stringify((d.exists() && d.data().기준) || null);
   폼더한[s] = (d.exists() && d.data().더한표기) || [];
   폼연결[s] = JSON.stringify((d.exists() && d.data().연결) || null);
+  폼보내기[s] = (d.exists() && d.data().보내기) || null;   /* v1.9.0 */
 }
 let 준비됨 = false;
 const 저장틀 = {};
@@ -516,15 +529,15 @@ function 연결모으기(s){
   연.forEach(x => { if(줄수.get(x.열쇠).size > 1) x.겹침 = true; });
   return 연;
 }
-const 기준그대로 = s => JSON.stringify(기준모으기(s)) === 폼기준[s] && JSON.stringify(연결모으기(s)) === 폼연결[s];
+const 기준그대로 = s => JSON.stringify(기준모으기(s)) === 폼기준[s] && JSON.stringify(연결모으기(s)) === 폼연결[s] && !보내기셈(s);   /* v1.9.0 보내기도 */
 async function 폼저장(s){
   const { doc, setDoc } = window.fbRead;
   const 줄 = [...폼값[s].entries()].filter(([,v]) => Object.keys(v).length)
     .map(([키, 값]) => { const [품목, 규격] = 키.split('\t'); return { 품목, 규격, 값 }; });
-  const 이력들 = 이력모으기(s), 기준 = 기준모으기(s), 연 = 연결모으기(s), 이 = 연결된(s);
-  /* v1.8.0 merge — 입력 작업자가 쓰는 `더한표기` 를 지우지 않는다(이 쪽이 쓰는 칸만 바꿈) */
-  await setDoc(doc(window.db, ...폼자리, s), { 거래처:s, 줄, 이력:이력들, 기준, 기준글, 연결:연, 연결글, 영림원거래처:이 ? 이.거래처 : '', 고친때:new Date().toISOString() }, { merge:true });
-  폼이력[s] = JSON.stringify(이력들); 폼기준[s] = JSON.stringify(기준); 폼연결[s] = JSON.stringify(연);
+  const 이력들 = 이력모으기(s), 기준 = 기준모으기(s), 연 = 연결모으기(s), 이 = 연결된(s), 보 = 보내기셈(s);
+  /* v1.8.0 merge — 입력 작업자가 쓰는 `더한표기` 를 지우지 않는다(이 쪽이 쓰는 칸만 바꿈) · v1.9.0 `보내기` 는 바뀌었을 때만(판 +1) */
+  await setDoc(doc(window.db, ...폼자리, s), { 거래처:s, 줄, 이력:이력들, 기준, 기준글, 연결:연, 연결글, 영림원거래처:이 ? 이.거래처 : '', 고친때:new Date().toISOString(), ...(보 ? { 보내기:보 } : {}) }, { merge:true });
+  폼이력[s] = JSON.stringify(이력들); 폼기준[s] = JSON.stringify(기준); 폼연결[s] = JSON.stringify(연); if(보) 폼보내기[s] = 보;
 }
 const 저장알림 = () => 폼상태('저장됨 ' + new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}));
 const 못저장 = e => 폼상태('저장하지 못했습니다 ' + ((e&&(e.code||e.message))||''), true);
@@ -805,7 +818,8 @@ async function 연결그리기(){
     if(v){ const x = 목.find(y => y.거래처===v) || {}; 연결[우리] = { 거래처:v, 상호:x.상호||'', 고른때:new Date().toISOString() }; }
     else delete 연결[우리];
     폼상태('저장 중…');
-    연결저장().then(() => { 저장알림(); 연결그리기().then(() => 저장알림()); }, 못저장);
+    연결저장().then(() => (폼값[우리] ? 폼저장(우리) : null))   /* v1.9.0 구매거래처가 바뀌니 그 거래처 보내기도 다시 */
+      .then(() => { 저장알림(); 연결그리기().then(() => 저장알림()); }, 못저장);
   });
   document.getElementById('불러오기').onclick = () => 불러오기요청하기().catch(못저장);
   document.getElementById('양식받기').onclick = 양식다운로드;
@@ -913,6 +927,333 @@ async function 양식올리기(file){
     폼상태((고친시트.length ? '올려서 저장했습니다 — ' : '') + 알림.join(' · '), !고친시트.length);
   }catch(e){ 폼상태('양식을 읽지 못했습니다 ' + ((e&&(e.code||e.message))||''), true); }
 }
+
+/* ---------- v1.9.0 영림원보내기 최종값 `보내기` — 영림원 입력폼(영림원외주입력)이 셈 없이 그대로 읽는 꼴 ----------
+   사장님 11-17: 「새로 불러온 파일에 새로운 명세가 있다면 … 입력폼 쪽에서 감지하여 새로운 등록이 준비되도록」.
+   창고 발주역입력_영림원폼/{거래처}.보내기 = {판, 고친때, 줄:[{열쇠, 상태, 지문, 고친때, 거래처:{영림원거래처명}, 분류:{대분류,중분류,소분류},
+     자재등록:{영림원 칸 이름: 값 — 10칸}, 구매단가등록:{영림원 칸 이름: 값 — 14칸, 마지막 단가}, 단가이력:[{단가, 적용시작일, 첫달, 끝달}]}]}
+   · 값 = 영림원보내기 화면에 보이는 값(미리 채운 값 + 고친 값) 그대로, 모두 글자. 단가이력 = `기준` 의 묶음(고친 단가는 마지막 묶음에 — 기준과 같음).
+   · 상태 = 보냄 | 등록안함(「삭제(등록 안 함)」 체크). 엑셀에서 사라진 줄은 `줄` 에서 빠진다.
+   · 지문 = 열쇠·상태·거래처·분류·자재등록·구매단가등록·단가이력 JSON 글의 해시(cyrb53, 16진 14자리). 줄 고친때 = 그 줄 지문이 바뀐 때.
+   · 판 = 줄이 생기거나 빠지거나 지문이 바뀔 때마다 +1 (줄 차례만 바뀐 것은 안 셈). 꼴 = 영림원외주입력/입력작업자/전달-보드매입현황-기준정보폼.md 7절. */
+const 폼보내기 = {};   // 거래처 → 창고 보내기
+const 자재칸 = 폼칸.filter(f => f.g==='자재등록' && f.k!=='m_big' && f.k!=='m_mid');   // 자재등록(500251) 10칸 — 대·중분류는 `분류` 로
+const 구매칸 = 폼칸.filter(f => f.g==='구매단가등록');                                  // 구매단가등록(501868) 14칸
+const 지문셈 = t => {
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for(let i = 0; i < t.length; i++){ const c = t.charCodeAt(i); h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677); }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(16).padStart(14, '0');
+};
+function 보낼줄들(s){
+  const 월표 = ((받은[s]||{}).표||[]).find(t => t.이름==='월별'); if(!월표 || !폼값[s]) return [];
+  const 기 = new Map(기준모으기(s).map(x => [x.품목 + '\t' + x.규격, x])), 이 = 연결된(s);
+  const 칸모 = (fs, m) => Object.fromEntries(fs.map(f => [f.l, 칸값(f, m, s)]));
+  return 품목모으기(월표).줄.map(m => {
+    const 값 = { 열쇠:줄키(m), 상태:뺀줄(s, m) ? '등록안함' : '보냄', 거래처:{ 영림원거래처명:이 ? 이.거래처 : '' },
+      분류:{ 대분류:칸값({k:'m_big'}, m, s), 중분류:칸값({k:'m_mid'}, m, s), 소분류:칸값({k:'m_small'}, m, s) },
+      자재등록:칸모(자재칸, m), 구매단가등록:칸모(구매칸, m),
+      단가이력:((기.get(줄키(m))||{}).줄||[]).map(x => ({ 단가:x.단가, 적용시작일:x.적용시작일, 첫달:x.첫달, 끝달:x.끝달 })) };
+    const { 열쇠, 상태, ...나머지 } = 값;
+    return { 열쇠, 상태, 지문:지문셈(JSON.stringify(값)), ...나머지 };
+  });
+}
+/* 창고 보내기와 견줘 바뀌었으면 새 보내기(판 +1), 같으면 null */
+function 보내기셈(s){
+  const 옛 = 폼보내기[s] || { 판:0, 줄:[] }, 새 = 보낼줄들(s);
+  if(!새.length && !(옛.줄||[]).length) return null;
+  const 옛줄 = new Map((옛.줄||[]).map(z => [z.열쇠, z]));
+  const 같음 = 옛.판 && 새.length===옛줄.size && 새.every(z => (옛줄.get(z.열쇠)||{}).지문===z.지문);
+  if(같음) return null;
+  const 지금 = new Date().toISOString();
+  return { 판:(Number(옛.판)||0) + 1, 고친때:지금,
+    줄:새.map(z => { const o = 옛줄.get(z.열쇠); const { 열쇠, 상태, 지문, ...나 } = z; return { 열쇠, 상태, 지문, 고친때:o && o.지문===지문 && o.고친때 ? o.고친때 : 지금, ...나 }; }) };
+}
+
+/* ---------- v1.9.0 엑셀 새로 불러오기 — 사장님 11-17 「해당 불러온 파일을 새로고침으로 불러올 수 있게 해 줘」 ----------
+   새 판 「2026년 국내거래처 구매내역서」 엑셀을 브라우저에서 읽는다(아래 엑셀읽기 = tools/보드매입읽기.py 와 같은 셈, 같은 엑셀이면 창고 값과 글자까지 같음).
+   ① 읽기만 하고 요약(시트마다 명세 줄 · 보낼 줄 새로·사라짐·바뀜) + 합계 대조를 보인다 → ② 「바꾸기」 를 눌러야 창고 발주역입력_보드매입 을 새 값으로 쓴다.
+   고친 칸·분류·거래처 연결·삭제 체크·연결표(발주역입력_영림원폼)는 품목+규격 열쇠로 이어진다 — 지우지 않는다(열쇠가 사라진 줄의 고친 값도 창고에 남김).
+   꼴이 다른 시트(월별 표 칸이 지금 창고와 다름 · 누계/총계를 못 찾음)는 안 읽고 알림, 지금 값 그대로. 새 파일에 없는 시트도 그대로 둔다(임시).
+   새 거래처 시트 = 거래처로 더함(거래처 연결은 하지 않음 — 「거래처 연결」 에서 고름). 바꾼 뒤 모든 거래처의 기준·연결·보내기를 다시 셈해 저장하고 창고에서 다시 읽어 대조. */
+let 새엑셀 = null;   // {파일, 읽음, 요약:[…], 대조, 쓸:[이름…]} 또는 {바꾼때, 대조}
+const 꼭칸 = ['월','납품제품명(품목)','수량','규격','단가(원)'];
+const 고른값 = o => JSON.stringify(o, (k, v) => v && typeof v==='object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map(x => [x, v[x]])) : v);
+const 명세줄들 = d => { const t = ((d||{}).표||[]).find(x => x.이름==='월별'); return t ? (t.줄||[]).filter(z => !z.소 && (z.v||[])[1] !== '(구매내역 없음)').map(z => JSON.stringify([z.월, ...(z.v||[])])) : []; };
+const 빼기 = (a, b) => { const n = new Map(); b.forEach(x => n.set(x, (n.get(x)||0) + 1)); return a.filter(x => { const k = n.get(x)||0; if(k){ n.set(x, k-1); return false; } return true; }); };
+async function 엑셀고름(file){
+  새엑셀 = null; 엑셀상태('엑셀을 읽는 중…');
+  try{
+    const X = await loadXlsx(); await 폼준비();
+    const 읽음 = 엑셀읽기(X, await file.arrayBuffer());
+    const 요약 = [], 쓸 = [];
+    for(const n of 읽음.순서){
+      const 새 = 읽음.문서들[n], 옛 = 받은[n];
+      if(n==='총괄요약'){ 요약.push({ n, 글:!옛 ? '새 시트' : 고른값(새)===고른값(옛) ? '같음' : '바뀜' }); 쓸.push(n); continue; }
+      const 새칸 = (새.표.find(t => t.이름==='월별')||{}).칸||[], 옛월 = 옛 && (옛.표||[]).find(t => t.이름==='월별');
+      if(옛월 ? 고른값(옛월.칸)!==고른값(새칸) : 꼭칸.some(k => !새칸.includes(k)) || !새칸.some(k => /공급가액\(원\)$/.test(k))){
+        읽음.못읽음.push(`${n}: 월별 표 칸이 ${옛월 ? '지금 창고와' : '양식과'} 다름(${새칸.join(' · ')})`); continue;
+      }
+      if(!폼값[n]) await 폼받기(n);   // 새 거래처 — 창고에 고친 값이 없으면 빈 것
+      const 전 = 보낼줄들(n);
+      받은[n] = 새; const 후 = 보낼줄들(n); 받은[n] = 옛;   // 같은 셈으로 새 값의 보낼 줄
+      const 전모 = new Map(전.map(z => [z.열쇠, z])), 후모 = new Map(후.map(z => [z.열쇠, z]));
+      const 새줄 = 후.filter(z => !전모.has(z.열쇠)), 없줄 = 전.filter(z => !후모.has(z.열쇠)), 바뀐 = 후.filter(z => 전모.has(z.열쇠) && 전모.get(z.열쇠).지문!==z.지문);
+      const 고친남 = 없줄.filter(z => Object.keys((폼값[n] && 폼값[n].get(z.열쇠)) || {}).length).length;
+      const 옛명 = 명세줄들(옛), 새명 = 명세줄들(새);
+      요약.push({ n, 새시트:!옛, 명세:[옛명.length, 새명.length], 새명세:빼기(새명, 옛명).length, 없명세:빼기(옛명, 새명).length,
+        새줄, 없줄, 바뀐, 고친남, 보낼:후.length });
+      쓸.push(n);
+    }
+    const 없는시트 = 시트들.filter(n => !읽음.전체.includes(n));
+    /* 대조 = 새로 읽은 시트 + 안 읽어 그대로 둘 시트(지금 창고 값) — 바꾼 뒤 창고 모습 그대로 */
+    const 둘 = 시트들.filter(n => !쓸.includes(n) && 받은[n] && (n==='총괄요약' || (받은[n].표||[]).some(t => t.이름==='월별')));
+    let 대조; try{ 대조 = 엑셀대조(Object.fromEntries([...쓸.map(n => [n, 읽음.문서들[n]]), ...둘.map(n => [n, 받은[n]])])); }catch(e){ 대조 = { 줄:['대조하지 못했습니다 ' + e.message], 틀림:1 }; }
+    새엑셀 = { 파일:file.name, 읽음, 요약, 쓸, 없는시트, 대조 };
+    엑셀그리기();
+  }catch(e){ 엑셀상태('엑셀을 읽지 못했습니다 ' + ((e&&(e.code||e.message))||''), true); }
+}
+async function 엑셀바꾸기(){
+  const 새 = 새엑셀; if(!새 || !새.쓸.length) return;
+  엑셀상태('창고에 쓰는 중…');
+  try{
+    const { doc, setDoc, getDoc } = window.fbRead;
+    for(const n of 새.쓸) await setDoc(doc(window.db, ...창고자리, n), 새.읽음.문서들[n]);
+    /* 시트 차례 = 새 파일 차례(꼴이 달라 안 읽은 시트도 지금 값으로 그 자리) + 새 파일에 없는 시트는 뒤에 그대로 */
+    const 목시트 = 새.읽음.전체.filter(n => 새.쓸.includes(n) || 시트들.includes(n)).concat(새.없는시트);
+    const 목 = { 시트들:목시트, 파일:새.파일, 읽은날:new Date().toLocaleDateString('sv-SE') };
+    await setDoc(doc(window.db, ...창고자리, '_목록'), 목);
+    목록정보 = 목; 시트들 = 목시트;
+    /* 창고에서 다시 읽어 그 값으로 화면·셈 */
+    for(const n of 시트들){ const d = await getDoc(doc(window.db, ...창고자리, n)); 받은[n] = d.exists() ? d.data() : { 표:[] }; }
+    거래처단추();
+    엑셀상태('기준·연결·보내기를 다시 셈하는 중…');
+    for(const s of 거래처시트들()){ await 폼받기(s); if(!기준그대로(s) || JSON.stringify(이력모으기(s)) !== 폼이력[s]) await 폼저장(s); }
+    await 분류저장();
+    새엑셀 = { 바꾼때:new Date().toISOString(), 파일:새.파일, 대조:엑셀대조(Object.fromEntries(거래처시트들().concat(시트들.includes('총괄요약') ? ['총괄요약'] : []).map(n => [n, 받은[n]]))) };
+    엑셀그리기();
+  }catch(e){ 엑셀상태('창고에 쓰지 못했습니다 ' + ((e&&(e.code||e.message))||''), true); }
+}
+function 엑셀상태(t, 나쁨){ const el = document.getElementById('엑셀상태'); if(el){ el.textContent = t; el.classList.toggle('bad', !!나쁨); } }
+function 엑셀그리기(){
+  const 속 = document.getElementById('속'), 목 = 목록정보 || {}, 새 = 새엑셀;
+  let h = `<div class="글" style="margin-top:0">지금 창고 = ${글(목.파일||'')} · ${글(목.읽은날||'')} 읽음 · 시트 ${시트들.length}개(${시트들.map(글).join(' · ')}).<br>` +
+    `새 판 엑셀(같은 꼴 「2026년 국내거래처 구매내역서」)을 고르면 먼저 바뀐 것만 보여 드립니다. 「바꾸기」 를 눌러야 창고가 바뀝니다. 영림원보내기에서 고친 값·분류·거래처 연결·삭제 체크는 품목+규격 그대로 이어집니다.</div>`;
+  if(새 && 새.요약){
+    const 이름들 = a => 글(a.map(z => z.열쇠.replace('\t', ' ')).join(' / '));
+    const 칸 = (a, 붉) => `<td class="num"${a.length ? ` title="${이름들(a)}"` : ''}>${a.length ? (붉 ? `<span class="별">${a.length}</span>` : a.length) : 0}</td>`;
+    h += `<div class="표"><div class="표제목">${글(새.파일)} — 바꾸기 전 확인(아직 창고에 안 씀)</div><table class="dpr-t"><thead><tr><th class="dpr-k">시트</th><th>명세 줄(지금 → 새)</th><th>새로 생긴 명세</th><th>사라진 명세</th>` +
+      `<th>보낼 줄</th><th>새로 생긴 줄</th><th>사라진 줄</th><th>바뀐 줄</th><th>알림</th></tr></thead><tbody>`;
+    for(const z of 새.요약){
+      if(z.글!==undefined){ h += `<tr><td class="dpr-k">${글(z.n)}</td><td colspan="8">${글(z.글)}</td></tr>`; continue; }
+      h += `<tr><td class="dpr-k">${글(z.n)}</td><td class="num">${z.명세[0]} → ${z.명세[1]}</td><td class="num">${z.새명세}</td><td class="num">${z.없명세}</td>` +
+        `<td class="num">${z.보낼}</td>${칸(z.새줄, 1)}${칸(z.없줄, 1)}${칸(z.바뀐, 1)}` +
+        `<td>${[z.새시트 ? '새 거래처(거래처 연결 안 됨)' : '', z.고친남 ? `사라진 줄 중 고친 값 있음 ${z.고친남}(창고에 남김)` : ''].filter(Boolean).join(' · ')}</td></tr>`;
+    }
+    h += '</tbody></table></div>';
+    const 알 = [...새.읽음.못읽음.map(x => '안 읽음 — ' + x), ...새.없는시트.map(x => `새 파일에 없음 — ${x}(지금 값 그대로 둠)`), ...새.읽음.메모];
+    h += `<div class="글">명세 줄 = 월별 표 품목 줄(소계·구매내역 없음 뺌) · 보낼 줄 = 영림원보내기 줄(품목+규격) — 바뀐 줄 = 영림원에 보낼 값(단가·단가이력·적용시작일 등)이 달라진 줄. 숫자에 손을 대면 품목이 보입니다.` +
+      (알.length ? `<br><span class="별">${알.map(글).join('<br>')}</span>` : '') + `</div>`;
+    h += `<div class="표"><div class="표제목">합계 대조(새 엑셀)</div><div class="글" style="margin-top:0">${새.대조.줄.map(글).join('<br>')}</div></div>`;
+  }else if(새 && 새.바꾼때){
+    h += `<div class="표"><div class="표제목">${글(새.파일)} — 창고에 썼습니다(${때글(새.바꾼때)}) · 창고에서 다시 읽어 대조</div><div class="글" style="margin-top:0">${새.대조.줄.map(글).join('<br>')}</div></div>`;
+  }
+  속.innerHTML = `<div class="폼줄"><button class="chip" id="엑셀고르기">엑셀 고르기</button>` +
+    (새 && 새.요약 && 새.쓸.length ? `<button class="chip on" id="엑셀바꾸기">바꾸기</button><button class="chip" id="엑셀그만">그만두기</button>` : '') +
+    `<input type="file" id="엑셀파일" accept=".xlsx,.xls" hidden><span id="엑셀상태" class="폼상태"></span></div><div class="표통">${h}</div>`;
+  const 파일 = document.getElementById('엑셀파일');
+  document.getElementById('엑셀고르기').onclick = () => 파일.click();
+  파일.onchange = () => { const f = 파일.files[0]; 파일.value = ''; if(f) 엑셀고름(f); };
+  const 바 = document.getElementById('엑셀바꾸기'); if(바) 바.onclick = 엑셀바꾸기;
+  const 그 = document.getElementById('엑셀그만'); if(그) 그.onclick = () => { 새엑셀 = null; 엑셀그리기(); };
+}
+
+/* ==== 엑셀읽기 시작 (v1.9.0) — tools/보드매입읽기.py 를 그대로 옮긴 것(같은 엑셀이면 같은 창고 값). 시험: 노드에서 이 덩이만 떼어 돌린다 ==== */
+function 엑셀읽기(X, buf){
+  const wb = X.read(buf, { type:'array', cellNF:true });
+  const 시트숨김 = ((wb.Workbook||{}).Sheets||[]).reduce((a,x) => (a[x.name] = x.Hidden, a), {});
+  const 셀 = (ws, r, c) => ws[X.utils.encode_cell({ r:r-1, c:c-1 })];
+  const 꼴 = c => (c && c.z) || 'General';
+  const 날짜인가 = c => c && c.t==='n' && 꼴(c)!=='General' && X.SSF.is_date(꼴(c));
+  const 값 = (ws, r, c) => { const x = 셀(ws, r, c); if(!x || x.t==='z') return null; if(x.t==='e') return x.w || '#ERR'; return x.v===undefined ? null : x.v; };
+  const 빈 = v => v===null || v===undefined || v==='';
+  const 파이글 = v => typeof v==='boolean' ? (v?'True':'False') : (typeof v==='number' && Number.isInteger(v) && !Object.is(v,-0) ? String(v) : String(v));
+  /* 파이썬 Decimal(repr(x)).quantize(…, ROUND_HALF_UP) 와 같게 — 글자로 반올림 */
+  function 반올림(x, n){
+    let s = String(x);
+    if(/e/i.test(s)){ const [m, e] = s.split(/e/i); const 부 = m[0]==='-'; let [i, f=''] = m.replace('-','').split('.'); let k = Number(e);
+      let d = i + f, p = i.length + k; if(p <= 0){ d = '0'.repeat(1-p) + d; p = 1; } if(p > d.length) d = d.padEnd(p, '0');
+      s = (부?'-':'') + d.slice(0,p) + (d.slice(p) ? '.' + d.slice(p) : ''); }
+    const 부 = s[0]==='-'; if(부) s = s.slice(1);
+    let [i, f=''] = s.split('.');
+    if(f.length <= n) f = f.padEnd(n, '0');
+    else {
+      const 올 = f[n] >= '5'; f = f.slice(0, n);
+      if(올){ const d = (i + f).split('').map(Number); let k = d.length - 1;
+        while(k >= 0){ if(d[k]===9){ d[k]=0; k--; } else { d[k]++; break; } }
+        if(k < 0) d.unshift(1);
+        const a = d.join(''); i = a.slice(0, a.length - n); f = a.slice(a.length - n); }
+    }
+    i = i.replace(/^0+(?=\d)/, '') || '0';
+    return { 부, i, f, 영:/^0*$/.test(i + f) };
+  }
+  const 쉼표 = i => i.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  function 표시(ws, r, c){
+    const x = 셀(ws, r, c), v = 값(ws, r, c), f = 꼴(x);
+    if(v===null) return '';
+    if(typeof v==='string') return v;
+    if(날짜인가(x)){ const d = X.SSF.parse_date_code(v); return `${String(d.y).padStart(4,'0')}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`; }
+    if(typeof v==='boolean') return v ? 'True' : 'False';
+    let m = f.match(/^0(?:\.(0+))?%$/);
+    if(m){ const n = (m[1]||'').length, q = 반올림(v * 100, n); return (q.부?'-':'') + q.i + (n ? '.' + q.f : '') + '%'; }
+    if(f.startsWith('#,##0') && f.includes(';')){ const q = 반올림(v, 0); if(q.영) return '-'; return q.부 ? `(${쉼표(q.i)})` : 쉼표(q.i); }
+    if(f.startsWith('#,##0')){ const q = 반올림(v, 0); return (q.부?'-':'') + 쉼표(q.i); }
+    return 파이글(v);
+  }
+  const 수인가 = (ws, r, c) => { const x = 셀(ws, r, c); return !!x && x.t==='n' && !날짜인가(x); };
+  function 범위(ws){ const g = X.utils.decode_range(ws['!ref'] || 'A1:A1'); return { 줄:g.e.r + 1, 칸:g.e.c + 1 }; }
+  const 마지막머리 = (ws, r, c0) => { let c = c0; while(!빈(값(ws, r, c))) c++; return c - 1; };
+  const 줄빈가 = (ws, r, c0, c1) => { for(let c = c0; c <= c1; c++) if(!빈(값(ws, r, c))) return false; return true; };
+  const 글로 = v => v===null || v===undefined || v==='' || v===0 || v===false ? '' : 파이글(v);   // 파이썬 str(v or '')
+  function 표만들기(ws, 머리줄, c0, c1, r0, r1){
+    const 칸 = [], 수 = [], 줄 = [];
+    for(let c = c0; c <= c1; c++){ 칸.push(글로(값(ws, 머리줄, c))); 수.push(0); }
+    for(let r = r0; r <= r1; r++){
+      const v = [];
+      for(let c = c0; c <= c1; c++){ if(수인가(ws, r, c)) 수[c-c0] = 1; v.push(표시(ws, r, c)); }
+      줄.push({ v, r });
+    }
+    return { 칸, 수, 줄 };
+  }
+  function 거래처시트(ws, 이름){
+    const 쓴칸 = new Set(), 쓴 = (r, c) => 쓴칸.add(r + ',' + c), { 줄:끝줄, 칸:끝칸 } = 범위(ws);
+    const c1 = 마지막머리(ws, 3, 1);
+    let r = 4;
+    while(r <= 끝줄 && !줄빈가(ws, r, 1, c1)) r++;
+    const 월표 = 표만들기(ws, 3, 1, c1, 4, r - 1);
+    let 월 = '';
+    for(const z of 월표.줄){ if(z.v[0]) 월 = z.v[0]; z.월 = 월; if(/^\[.*소계\]$/.test(z.v[1])) z.소 = 1; }
+    for(let rr = 3; rr < r; rr++) for(let c = 1; c <= c1; c++) 쓴(rr, c);
+    let 누제목줄 = 0;
+    for(let rr = r; rr <= 끝줄; rr++) if(String(글로(값(ws, rr, 1))).includes('누계')){ 누제목줄 = rr; break; }
+    if(!누제목줄) throw new Error('누계 표 제목 줄이 없음');
+    const 머리 = 누제목줄 + 1;
+    let nc0 = 0;
+    for(let c = 1; c <= c1 + 1; c++) if(!빈(값(ws, 머리, c))){ nc0 = c; break; }
+    if(!nc0) throw new Error('누계 표 머리가 없음');
+    const nc1 = 마지막머리(ws, 머리, nc0);
+    let 끝 = 0;
+    for(let rr = 머리 + 1; rr <= 끝줄; rr++) if(String(글로(값(ws, rr, nc0))).includes('총계')){ 끝 = rr; break; }
+    if(!끝) throw new Error('누계 표 「총계」 줄이 없음');
+    const 누표 = 표만들기(ws, 머리, nc0, nc1, 머리 + 1, 끝);
+    누표.제목 = 파이글(값(ws, 누제목줄, 1));
+    누표.줄[누표.줄.length - 1].소 = 1;
+    쓴(누제목줄, 1);
+    for(let rr = 머리; rr <= 끝; rr++) for(let c = nc0; c <= nc1; c++) 쓴(rr, c);
+    const mc0 = c1 + 2, mc1 = 마지막머리(ws, 3, mc0);
+    r = 4;
+    while(r <= 끝줄 && !빈(값(ws, r, mc0))) r++;
+    const 목표 = 표만들기(ws, 3, mc0, mc1, 4, r - 1);
+    for(let rr = 3; rr < r; rr++) for(let c = mc0; c <= mc1; c++) 쓴(rr, c);
+    쓴(1, 1);
+    let 남은 = 0;
+    for(let rr = 1; rr <= 끝줄; rr++) for(let c = 1; c <= 끝칸; c++) if(!빈(값(ws, rr, c)) && !쓴칸.has(rr + ',' + c)) 남은++;
+    return { 문서:{ 시트:이름, 제목:글로(값(ws, 1, 1)),
+      표:[{ ...월표, 이름:'월별' }, { ...누표, 이름:'누계' }, { ...목표, 이름:'매입품목' }] }, 남은 };
+  }
+  function 총괄시트(ws, 이름){
+    const 표들 = [], 쓴 = new Set(), { 줄:끝줄 } = 범위(ws);
+    let r = 1;
+    while(r <= 끝줄){
+      const t = 값(ws, r, 1), 다음 = 값(ws, r + 1, 1), 둘째 = 값(ws, r + 2, 1);
+      if((t && 다음==='거래처') || (t && 둘째==='거래처' && 다음===null)){
+        const 머리 = 다음==='거래처' ? r + 1 : r + 2;
+        const c1 = 마지막머리(ws, 머리, 1);
+        let e = 머리 + 1;
+        while(e <= 끝줄 && !줄빈가(ws, e, 1, c1)) e++;
+        const 표 = 표만들기(ws, 머리, 1, c1, 머리 + 1, e - 1);
+        표.제목 = 파이글(t);
+        표.줄[표.줄.length - 1].소 = 표.줄[표.줄.length - 1].v[0]==='합계' ? 1 : 0;
+        표들.push(표);
+        쓴.add(r + ',1'); for(let rr = 머리; rr < e; rr++) for(let c = 1; c <= c1; c++) 쓴.add(rr + ',' + c);
+        r = e;
+      } else r++;
+    }
+    const 글 = [];
+    for(let rr = 1; rr <= 끝줄; rr++){ const v = 글로(값(ws, rr, 1)); if(!쓴.has(rr + ',1') && v.startsWith('※')) 글.push(v); }
+    if(!표들.length) throw new Error('「거래처」 머리 표가 없음');
+    return { 시트:이름, 제목:'', 표:표들, 글 };
+  }
+  const 문서들 = {}, 순서 = [], 못읽음 = [], 메모 = [], 전체 = [];
+  for(const 이름 of wb.SheetNames){
+    if(시트숨김[이름]) continue;
+    전체.push(이름);
+    const ws = wb.Sheets[이름];
+    try{
+      if(이름==='총괄요약') 문서들[이름] = 총괄시트(ws, 이름);
+      else { const { 문서, 남은 } = 거래처시트(ws, 이름); 문서들[이름] = 문서; if(남은) 메모.push(`${이름} 머리 없는 칸 ${남은}개(담지 않음)`); }
+      순서.push(이름);
+    }catch(e){ 못읽음.push(`${이름}: ${e.message}`); }
+  }
+  return { 문서들, 순서, 못읽음, 메모, 전체 };
+}
+/* 합계 대조 — tools/보드매입읽기.py 「대조」 와 같은 셈(창고에 들어간 글자를 다시 숫자로). 돌려줌 = {줄:[글…], 틀림} */
+function 엑셀대조(문서들){
+  const 숫 = s => { s = String(s ?? '').replace(/,/g,'').trim(); if(s===''||s==='-') return 0; const m = s.match(/^\((.*)\)$/); if(m) s = '-' + m[1]; const n = Number(s); return isNaN(n) ? 0 : n; };
+  const 쉼 = n => Math.round(n).toLocaleString('ko-KR');
+  let 틀림 = 0; const 줄 = [];
+  const 같나 = (이름, a, b) => { const ok = Math.abs(a - b) < .5; if(!ok) 틀림++; return `${이름} ${쉼(a)} ${ok?'=':'≠'} ${쉼(b)}`; };
+  const 월공급 = {};
+  for(const [이름, d] of Object.entries(문서들)){
+    if(이름==='총괄요약') continue;
+    const 월표 = d.표.find(t => t.이름==='월별'), 누표 = d.표.find(t => t.이름==='누계'), 목표 = d.표.find(t => t.이름==='매입품목');
+    const k = 월표.칸, ci = k.indexOf('수량'), ei = k.includes('별도 공급가액(원)') ? k.indexOf('별도 공급가액(원)') : k.indexOf('공급가액(원)'), ai = 4;
+    const 월합 = {}; let 묶 = []; const out = [];
+    for(const z of 월표.줄){
+      if(z.소){
+        const c = 묶.reduce((a,x) => a + 숫(x.v[ci]), 0), e = 묶.reduce((a,x) => a + 숫(x.v[ei]), 0), a = 묶.reduce((s,x) => s + 숫(x.v[ai]), 0);
+        if(!(Math.abs(c - 숫(z.v[ci])) < .5 && Math.abs(e - 숫(z.v[ei])) < .5 && Math.abs(a - 숫(z.v[ai])) < .5)){ 틀림++; out.push(`${z.월} 소계 틀림`); }
+        월합[z.월] = 숫(z.v[ei]); 묶 = [];
+      } else if(z.v[1] !== '(구매내역 없음)') 묶.push(z);
+      else 월합[z.월] = 숫(z.v[ei]);
+    }
+    if(묶.length){ out.push(`소계 없이 끝난 줄 ${묶.length}`); 틀림++; }
+    월공급[이름] = 월합;
+    const nk = 누표.칸, nei = nk.includes('별도 공급가액(원)') ? nk.indexOf('별도 공급가액(원)') : nk.indexOf('공급가액(원)'), nci = nk.indexOf('수량');
+    const 총 = 누표.줄[누표.줄.length - 1].v, 품 = 누표.줄.slice(0, -1);
+    const 월수량 = 월표.줄.filter(z => z.소).reduce((a,z) => a + 숫(z.v[ci]), 0);
+    const mi = 목표.칸.findIndex(x => /^\d+~\d+월 공급가액\(원\)$/.test(x));
+    줄.push(`■ ${이름}: 월별 소계 ${Object.keys(월합).length}달 ${out.length ? out.join(' / ') : '모두 맞음'} · ` + [
+      같나(`${k[ei]} 달 소계 합 vs 총계`, Object.values(월합).reduce((a,b) => a+b, 0), 숫(총[nei])),
+      같나('누계 품목 합 vs 총계', 품.reduce((a,z) => a + 숫(z.v[nei]), 0), 숫(총[nei])),
+      같나('수량 달 소계 합 vs 총계', 월수량, 숫(총[nci])),
+      같나('누계 수량 합 vs 총계', 품.reduce((a,z) => a + 숫(z.v[nci]), 0), 숫(총[nci])),
+      mi >= 0 ? 같나('매입품목 공급가액 합 vs 총계', 목표.줄.reduce((a,z) => a + 숫(z.v[mi]), 0), 숫(총[nei])) : '매입품목 공급가액 칸 없음'
+    ].join(' · '));
+  }
+  const 총괄 = 문서들['총괄요약'];
+  if(총괄){
+    const t = 총괄.표[0], 달i = t.칸.map((x,i) => /^\d+월$/.test(x) ? i : -1).filter(i => i >= 0), 합i = 달i[달i.length - 1] + 1;
+    const 맞춤 = s => String(s||'').replace(/\s|\(주\)|㈜|주식회사/g,'').replace(/\(.*?\)/g,'');
+    const 세로 = t.칸.map(() => 0);
+    for(const z of t.줄.slice(0, -1)){
+      const 시트 = Object.keys(월공급).find(n => 맞춤(n)===맞춤(z.v[0]));
+      const 틀린 = [];
+      for(const i of 달i){ const a = 숫(z.v[i]), b = ((월공급[시트]||{})[t.칸[i]]) || 0; 세로[i] += a; if(Math.abs(a - b) > .5) 틀린.push(`${t.칸[i]} ${쉼(a)}≠${쉼(b)}`); }
+      세로[합i] += 숫(z.v[합i]);
+      if(!시트){ 틀림++; 틀린.push('같은 이름 시트 없음'); }
+      틀림 += 틀린.length && 시트 ? 틀린.length : 0;
+      줄.push(`■ 총괄요약 ${z.v[0]} ↔ ${시트||'?'} 시트 달 소계: ${틀린.length ? 틀린.join(', ') : `${달i.length}달 모두 맞음`} · ` + 같나(t.칸[합i], 달i.reduce((a,i) => a + 숫(z.v[i]), 0), 숫(z.v[합i])));
+    }
+    const 합 = t.줄[t.줄.length - 1].v;
+    줄.push('■ 총괄요약 합계 줄: ' + [...달i, 합i].map(i => 같나(t.칸[i], 세로[i], 숫(합[i]))).join(' · '));
+  }
+  줄.push('대조 결과: ' + (틀림 ? `틀린 곳 ${틀림}` : '모두 맞음'));
+  return { 줄, 틀림 };
+}
+/* ==== 엑셀읽기 끝 ==== */
+
 
 function 그리기(){
   const d = 받은[고른], 속 = document.getElementById('속');
