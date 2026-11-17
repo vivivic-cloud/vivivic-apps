@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.14.1
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.15.0
      v1.0.0(11-16): 첫 판. 거래처(시트) 버튼 → 그 시트의 표. 거래처 시트는 「전체 · 1월~10월 · 1~10월 누계 · 1~10월 매입품목」 으로 고른다.
        칸 이름·값은 엑셀 글자(셀 표시 꼴) 그대로. 표 꼴은 재단.html v1.1.0 셀 모양(칸 선 · 11.5px · 여백 2px 5px · 숫자 오른쪽)과 같다.
      v1.1.0(11-16): 거래처 메뉴 끝에 「영림원등록」 — 월별 표에서 납품제품명(품목)을 겹치지 않게 한 줄씩, 칸은 품목 · 규격 · 단가만.
@@ -65,6 +65,9 @@
        ① 창고 값과 견줄 때 칸 차례 무관(고른값) — 전엔 창고가 칸 차례를 바꿔 늘 「바뀜」 이라 열 때마다 6곳을 차례로 다시 씀.
        ② 창고 문서를 onSnapshot 으로 받아 두고 저장 때 다시 읽지 않음(v1.13.0 보호 그대로) ③ _분류 는 바뀌었을 때만 씀.
      v1.14.1(11-17): 자동저장 기다림 0.5 → 0.3초 · _분류 처음 값도 창고 값으로(첫 저장 때 괜히 안 씀).
+     v1.15.0(11-17): 저장된 값 파랑 · 바뀐 것 없으면 저장 안 함 — 사장님: 「저장되었을 때 입력값 파란색으로 변하게 해줘」 · 「한번 저장한 걸 또 저장하나?? 수정이나 삭제도 없었는데?」
+       창고에 저장된 고친 칸 글자 = 파랑(#1565c0, 새로고침 뒤에도) · 고치면 저장 끝날 때까지 원래 색 · 실패 칸은 파랑 아님.
+       칸 값이 저장된 값과 같으면(같은 값 다시 고름 등) 저장 0번 · 폼저장도 창고와 줄·이력·기준·연결·보내기가 모두 같으면 쓰지 않음.
 
      ⚠ 값은 창고(artifacts/vivivic-4b7ef/public/data/발주역입력_보드매입)에서 읽는다.
         창고에 넣는 것은 tools/보드매입읽기.py(드라이브 엑셀 → 창고) 또는 v1.9.0 「엑셀 새로 불러오기」(사장님이 확인하고 「바꾸기」 를 누를 때만). 공개 저장소라 업무 값은 이 파일에 없다. -->
@@ -173,6 +176,7 @@ html,body{height:100%;overflow:hidden}
 .폼표 input,.폼표 select{font:inherit;font-size:11.5px;line-height:1.3;color:var(--vg-body);border:0;border-radius:0;background:transparent;
   padding:2px 5px;margin:0;outline:none;min-width:0}
 .폼표 input.num{text-align:right}
+.폼표 td.입 .저장값{color:#1565c0}   /* v1.15.0 창고에 저장된 고친 값 = 파랑 */
 .폼표 select{padding:2px 2px;cursor:pointer}
 .폼표 input[type=date]{width:11em}
 /* v1.5.0 삭제(등록 안 함) 줄 · 자재번호 겹침 · 줄마다 임시 칸 */
@@ -199,7 +203,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.14.1</div>
+  <div class="badge">v1.15.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -598,10 +602,30 @@ async function 폼저장(s){
   const 줄 = [...폼값[s].entries()].filter(([,v]) => Object.keys(v).length)
     .map(([키, 값]) => { const [품목, 규격] = 키.split('\t'); return { 품목, 규격, 값 }; });
   const 이력들 = 이력모으기(s), 기준 = 기준모으기(s), 연 = 연결모으기(s), 이 = 연결된(s), 보 = 보내기셈(s);
+  /* v1.15.0 사장님 「한번 저장한 걸 또 저장하나??」 — 창고와 줄·이력·기준·연결·보내기가 모두 같으면 쓰지 않음 */
+  const 줄글 = a => 고른값((a||[]).filter(z => Object.keys(z.값||{}).length).map(z => [z.품목 + '\t' + z.규격, z.값]).sort((x, y) => x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0));
+  const 같음 = d.exists() && !보 && 줄글(줄) === 줄글(창.줄) && 고른값(이력들) === 고른값(창.이력 || []) && 고른값(기준) === 고른값(창.기준 || null)
+    && 고른값(연) === 고른값(창.연결 || null) && (이 ? 이.거래처 : '') === (창.영림원거래처 || '');
   /* v1.8.0 merge — 입력 작업자가 쓰는 `더한표기` 를 지우지 않는다(이 쪽이 쓰는 칸만 바꿈) · v1.9.0 `보내기` 는 바뀌었을 때만(판 +1) */
-  await setDoc(doc(window.db, ...폼자리, s), { 거래처:s, 줄, 이력:이력들, 기준, 기준글, 연결:연, 연결글, 영림원거래처:이 ? 이.거래처 : '', 고친때:new Date().toISOString(), ...(보 ? { 보내기:보 } : {}) }, { merge:true });
+  if(!같음) await setDoc(doc(window.db, ...폼자리, s), { 거래처:s, 줄, 이력:이력들, 기준, 기준글, 연결:연, 연결글, 영림원거래처:이 ? 이.거래처 : '', 고친때:new Date().toISOString(), ...(보 ? { 보내기:보 } : {}) }, { merge:true });
   폼이력[s] = 고른값(이력들); 폼기준[s] = 고른값(기준); 폼연결[s] = 고른값(연); if(보) 폼보내기[s] = 보;
+  파랑칠(s, 내것);
+  return !같음;
   }catch(e){ 더럽돌림(s, 내것); throw e; }
+}
+/* v1.15.0 사장님 「저장되었을 때 입력값 파란색으로 변하게 해줘」 — 창고에 저장된 고친 칸(기본값과 다른 값) = 글자 파랑.
+   치는 중·저장 전·저장 실패 칸은 파랑 아님. 새로고침 뒤에도 창고의 고친 칸은 파랑. */
+function 파랑(s, 키, k){
+  const 고친 = (폼값[s] && 폼값[s].get(키)) || {}, 더 = 폼더럽[s] && 폼더럽[s].get(키);
+  return k in 고친 && !(더 === '*' || (더 && 더.has(k)));
+}
+function 파랑칠(s, 내것){
+  if(고른 !== s || 볼것 !== '폼' || !내것.size) return;
+  const 줄들 = [...document.querySelectorAll('.폼표 tbody tr')];
+  for(const [키] of 내것){
+    const tr = 줄들.find(x => x.dataset.key === 키); if(!tr) continue;
+    tr.querySelectorAll('td.입 [data-k]').forEach(el => { if(el.type !== 'checkbox') el.classList.toggle('저장값', 파랑(s, 키, el.dataset.k)); });
+  }
 }
 /* v1.13.0 저장 실패는 화면 맨 위 빨간 띠로 크게(다음 저장이 되면 사라짐) · 저장 전이면 새로고침·닫기 때 묻기 */
 function 큰알림(t){
@@ -762,11 +786,11 @@ async function 폼그리기(){
       let 칸글;
       if(f.o){
         const 고를 = [''].concat(f.o); if(v && !고를.includes(v)) 고를.push(v);
-        칸글 = `<select data-k="${f.k}">` + 고를.map(o => `<option${o===v?' selected':''}>${글(o)}</option>`).join('') + '</select>';
+        칸글 = `<select data-k="${f.k}"${파랑(s, 키, f.k)?' class="저장값"':''}>` + 고를.map(o => `<option${o===v?' selected':''}>${글(o)}</option>`).join('') + '</select>';
       }else if(f.d){
-        칸글 = `<input type="date" data-k="${f.k}" value="${글(v)}">`;
+        칸글 = `<input type="date" data-k="${f.k}" value="${글(v)}"${파랑(s, 키, f.k)?' class="저장값"':''}>`;
       }else{
-        칸글 = `<input data-k="${f.k}" value="${글(v)}" style="width:${너비[f.k]}ch"${f.n?' inputmode="decimal" class="num"':''}${f.분류?` data-분류="${f.분류}" autocomplete="off"`:''}>`;
+        칸글 = `<input data-k="${f.k}" value="${글(v)}" style="width:${너비[f.k]}ch"${f.n?' inputmode="decimal"':''}${(f.n||파랑(s, 키, f.k))?` class="${[f.n?'num':'', 파랑(s, 키, f.k)?'저장값':''].filter(Boolean).join(' ')}"`:''}${f.분류?` data-분류="${f.분류}" autocomplete="off"`:''}>`;
       }
       const 여러 = f.k==='p_price' && (바뀜(m) || (!m.흐름.length && m.무.length));
       const 임 = 칸임시(f.k, m, s);
@@ -797,8 +821,11 @@ async function 폼그리기(){
     if(f.n && v && isNaN(Number(v))){ 폼상태(`「${f.l}」 에는 숫자만 넣을 수 있습니다`, true); return false; }
     if(el.value!==v) el.value = v;
     /* v1.13.0 자재번호는 손으로 넣은 값이면 기본값과 같아도 남긴다(자재명이 바뀌어도 안 따라감) */
+    const 전 = k in 고친 ? 고친[k] : undefined;
     if(v === 기본값(k, m, s) && k!=='m_code') delete 고친[k]; else 고친[k] = v;
-    폼값[s].set(키, 고친); 더럽힘(s, 키, k);
+    const 후 = k in 고친 ? 고친[k] : undefined;
+    if(전 === 후) return 0;   /* v1.15.0 저장된 값과 같으면 저장 안 함(저장중도 안 뜸) */
+    폼값[s].set(키, 고친); 더럽힘(s, 키, k); el.classList.remove('저장값');
     tr.querySelectorAll(`td[data-따라="${k}"]`).forEach(td => td.textContent = v);
     if(f.분류) 분류기억(칸값({k:'m_big'}, m, s), 칸값({k:'m_mid'}, m, s), 칸값({k:'m_small'}, m, s));
     /* v1.11.0 자재명을 고치면 엘데코 자재번호 기본값도 따라 바뀜(자재번호를 고친 줄은 그대로) */
@@ -849,12 +876,12 @@ async function 폼그리기(){
   function 되돌릴것(목){ 채움되돌림 = 목 ? () => 되돌리기(목) : null; 되돌리기단추.style.display = 목 ? '' : 'none'; }
   function 되돌리기(목){
     되돌릴것(null);
-    const 줄들 = 몸줄();
+    const 줄들 = 몸줄(); let 바뀐수 = 0;
     for(const x of 목){
       const tr = 줄들.find(r => r.dataset.key===x.키), el = tr && tr.querySelector(`[data-k="${x.k}"]`); if(!el) continue;
-      값넣기(el, x.전); 칸적용(el);
+      값넣기(el, x.전); if(칸적용(el)) 바뀐수++;
     }
-    겹침그리기(표, s); 저장예약(s);
+    겹침그리기(표, s); if(바뀐수) 저장예약(s);
     폼상태(`채우기 되돌림 ${목.length}칸 · 저장 중…`);
   }
   되돌리기단추.onclick = () => { if(채움되돌림) 채움되돌림(); };
@@ -909,16 +936,16 @@ async function 폼그리기(){
     if(!채울까 || 끝 <= 처음) return;
     const f = 폼칸.find(x => x.k===원.dataset.k), v = 원.value;
     if(f.n && v.trim() && isNaN(Number(숫자글(v)))){ 폼상태(`「${f.l}」 에는 숫자만 넣을 수 있습니다 — 채우지 않았습니다`, true); return; }
-    const 줄들 = 몸줄(), 목 = [];
+    const 줄들 = 몸줄(), 목 = []; let 바뀐수 = 0;
     for(let i = 처음 + 1; i <= 끝; i++){
       const el = 줄들[i].cells[칸] && 줄들[i].cells[칸].querySelector('[data-k]');
       if(!el || el.type==='checkbox' || el.dataset.k!==원.dataset.k || el.value===v) continue;
       목.push({ 키:줄들[i].dataset.key, k:el.dataset.k, 전:el.value });
-      값넣기(el, v); 칸적용(el);
+      값넣기(el, v); if(칸적용(el)) 바뀐수++;
     }
     if(!목.length){ 폼상태('채울 칸이 없습니다(이미 같은 값)'); return; }
     겹침그리기(표, s);
-    저장예약(s);
+    if(바뀐수) 저장예약(s);
     되돌릴것(목);
     폼상태(`${f.l} ${목.length}칸 채움 · 저장 중…`);
   };
