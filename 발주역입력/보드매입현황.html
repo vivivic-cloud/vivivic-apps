@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.17.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.17.1
      v1.0.0(11-16): 첫 판. 거래처(시트) 버튼 → 그 시트의 표. 거래처 시트는 「전체 · 1월~10월 · 1~10월 누계 · 1~10월 매입품목」 으로 고른다.
        칸 이름·값은 엑셀 글자(셀 표시 꼴) 그대로. 표 꼴은 재단.html v1.1.0 셀 모양(칸 선 · 11.5px · 여백 2px 5px · 숫자 오른쪽)과 같다.
      v1.1.0(11-16): 거래처 메뉴 끝에 「영림원등록」 — 월별 표에서 납품제품명(품목)을 겹치지 않게 한 줄씩, 칸은 품목 · 규격 · 단가만.
@@ -74,6 +74,8 @@
      v1.17.0(11-17): 영림원보내기 — 영림원 등록 결과 보이기 · 오류건 · 완료 줄 잠금. 사장님: 「입력폼에서 저장완료된 건은 이곳에서도 영림원 등록 완료 품목임을 알 수 있도록 연결 장치.
        입력 후 오류건들을 따로 관리·수정할 수 있게」. 입력폼이 쓰는 `결과.{열쇠}` 를 읽기만 · 「영림원 등록」 칸(완료 초록 · 오류 빨강+이유 · 대기·진행중 작게)
        · 「오류건」(이 거래처 오류 줄만) · 「전체 오류건」(모든 거래처 목록 → 고치러 가기) · 완료 줄은 잠금(「고치기」 → 한 번 묻고 풂) · _분류 저장 merge(입력폼이 더하는 칸 보호).
+     v1.17.1(11-17): 대·중·소 분류 규칙 검사 — 사장님: 「입력폼에 영림원과 분류명이 1:1로 매칭되어 있으니 이를 공유해서 대·중·소 분류명 정할 때 오류가 나지 않도록」.
+       규칙 = 영림원외주입력/입력작업자/전달-보드매입현황-기준정보폼.md 8절 그대로(8-1 ①~③) · 영림원 기존 분류(_분류.영림원) 를 고르기 목록에(「영림원 기존」).
 
      ⚠ 값은 창고(artifacts/vivivic-4b7ef/public/data/발주역입력_보드매입)에서 읽는다.
         창고에 넣는 것은 tools/보드매입읽기.py(드라이브 엑셀 → 창고) 또는 v1.9.0 「엑셀 새로 불러오기」(사장님이 확인하고 「바꾸기」 를 누를 때만). 공개 저장소라 업무 값은 이 파일에 없다. -->
@@ -211,6 +213,7 @@ html,body{height:100%;overflow:hidden}
 .폼표 td.등록 .작{color:var(--vg-muted);font-size:10.5px}
 .폼표 td.등록 .고치기{font:inherit;font-size:10.5px;padding:0 4px;border:1px solid var(--vg-edge);border-radius:3px;background:var(--vg-bg);color:var(--vg-ink);cursor:pointer}
 .폼표 [data-k]:disabled{opacity:1;cursor:default}
+.폼표 td.분류틀{background:#FFE9E7;box-shadow:inset 0 0 0 1px var(--vg-red)}   /* v1.17.1 분류 규칙 어긋남 */
 #오류목록{flex-shrink:0;max-height:30vh;overflow:auto;margin:0 0 8px}
 #오류목록 .chip{margin-left:6px}
 .state{background:var(--vg-fill);border-radius:14px;padding:22px 16px;text-align:center;margin-top:12px}
@@ -223,7 +226,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.17.0</div>
+  <div class="badge">v1.17.1</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -504,6 +507,7 @@ function 칸값(f, m, 거래처){
   const 고친 = (폼값[거래처] && 폼값[거래처].get(줄키(m))) || {};
   return f.k in 고친 ? 고친[f.k] : 기본값(f.k, m, 거래처);
 }
+const f분류 = k => k==='m_big' || k==='m_mid' || k==='m_small';
 const 뺀줄 = (s, m) => !!(((폼값[s] && 폼값[s].get(줄키(m))) || {}).x_del);
 const 글너비 = t => [...String(t||'')].reduce((a,c) => a + (c.charCodeAt(0) > 0x2000 ? 2 : 1), 0);
 
@@ -681,6 +685,7 @@ async function 분류받기(){
   const d = await getDoc(doc(window.db, ...폼자리, '_분류'));
   const v = d.exists() ? d.data() : {};
   분류 = { 줄:v.줄||[], 기억:(v.기억||[]).map(x => [x.big||'', x.mid||'', x.name||'']) };
+  영림원분류 = ((v.영림원 || {}).줄 || []).map(x => [String(x.대분류 ?? '').trim(), String(x.중분류 ?? '').trim(), String(x.소분류 ?? '').trim()]);   /* v1.17.1 입력폼이 올린 영림원 기존 분류(읽기만) */
   분류저장글 = 고른값({ 줄:v.줄||[], 기억:v.기억||[] });   /* v1.14.1 창고와 같으면 첫 저장 때도 안 씀 */
 }
 function 지금분류(){   // 모든 거래처 줄(삭제 뺌)에서 대·중·소가 다 찬 것
@@ -714,12 +719,69 @@ async function 분류저장(){
 }
 function 분류고를것(칸, tr){
   const 값 = k => { const el = tr.querySelector(`input[data-k="${k}"]`); return el ? el.value.trim() : ''; };
-  const 다 = 분류.기억.concat(지금분류());
+  const 다 = 영림원분류.concat(분류.기억, 지금분류());   /* v1.17.1 영림원 기존 분류도 고를 수 있게(이름 그대로) */
   let 목;
   if(칸==='big') 목 = 다.map(x => x[0]);
   else if(칸==='mid'){ const b = 값('m_big'); 목 = 다.filter(x => !b || x[0]===b).map(x => x[1]); }
   else { const b = 값('m_big'), mi = 값('m_mid'); 목 = 다.filter(x => (!b || x[0]===b) && (!mi || x[1]===mi)).map(x => x[2]); }
   return [...new Set(목.filter(Boolean))].sort((a,b) => a.localeCompare(b,'ko'));
+}
+
+/* ---- v1.17.1 분류 규칙 검사 — 영림원외주입력/입력작업자/전달-보드매입현황-기준정보폼.md 8절(폼 v287) 그대로, 추측 규칙 없음 ----
+   ① 같은 소분류 이름이 다른 대>중 밑에 둘 이상(모든 거래처, 삭제 줄 뺌) — 영림원은 품목구분 자재 안에서 소분류 이름 하나뿐(11-17 실제 거절)
+   ② 소분류 이름이 영림원 기존 분류(_분류.영림원.줄)에 있는데 대·중이 다름
+   ③ 숫자 사이 쉼표(0,15t) · 앞뒤 빈칸 · 빈칸(대·중·소 중 하나라도 넣은 줄만 — 셋 다 빈 줄은 아직 안 정한 줄)
+   (길이·글자·같은 중/대분류 이름은 확인 못 한 규칙이라 검사 안 함 — 8-1 ④) */
+let 영림원분류 = [];   // [[대, 중, 소]] — _분류.영림원.줄
+const 분류칸 = [['m_big','대분류'], ['m_mid','중분류'], ['m_small','소분류']];
+function 분류검사(){
+  const 줄들 = [], 소경로 = new Map();
+  for(const s of 거래처시트들()){
+    if(!폼값[s]) continue;
+    const 월표 = ((받은[s] || {}).표 || []).find(t => t.이름==='월별'); if(!월표) continue;
+    for(const m of 품목모으기(월표).줄){
+      if(뺀줄(s, m)) continue;
+      const v = 분류칸.map(([k]) => String(칸값({k}, m, s) ?? ''));
+      if(!v.some(x => x.trim())) continue;
+      줄들.push({ s, m, v });
+      const n = v[2].trim(); if(!n) continue;
+      if(!소경로.has(n)) 소경로.set(n, new Map());
+      소경로.get(n).set(v[0].trim() + ' > ' + v[1].trim(), (소경로.get(n).get(v[0].trim() + ' > ' + v[1].trim()) || []).concat(s + ' ' + m.이름));
+    }
+  }
+  const 틀 = new Map();   // 거래처 \n 키 → {칸키: 이유}
+  for(const { s, m, v } of 줄들){
+    const 이유 = {};
+    분류칸.forEach(([k, l], i) => {
+      const x = v[i];
+      if(!x.trim()) 이유[k] = `${l} 빈칸`;
+      else if(x !== x.trim()) 이유[k] = '앞뒤 빈칸';
+      else if(/\d,\d/.test(x)) 이유[k] = '숫자 사이 쉼표 — 점(.)으로';
+    });
+    const n = v[2].trim(), 경 = v[0].trim() + ' > ' + v[1].trim();
+    if(n && !이유.m_small){
+      const 다른 = [...(소경로.get(n) || new Map())].filter(([p]) => p !== 경);
+      const 영 = 영림원분류.filter(x => x[2]===n);
+      if(다른.length) 이유.m_small = `같은 소분류 이름 「${n}」 이 다른 대>중 밑에도 있음(${다른.map(([p, a]) => p + ' — ' + a.slice(0, 3).join(', ')).join(' / ')}) — 영림원은 소분류 이름 하나뿐`;
+      else if(영.length && !영.some(x => x[0] + ' > ' + x[1]===경)) 이유.m_small = `영림원에 이미 있는 소분류 「${n}」(영림원 경로 ${영.map(x => x[0] + ' > ' + x[1]).join(' / ')}) — 대·중이 다르면 못 넣음, 이름을 바꿔야 함`;
+    }
+    if(Object.keys(이유).length) 틀.set(s + '\n' + 줄키(m), 이유);
+  }
+  return 틀;
+}
+function 분류틀그리기(표, s){
+  const 틀 = 분류검사(); let 수 = 0;
+  표.querySelectorAll('tbody tr').forEach(tr => {
+    const 이유 = 틀.get(s + '\n' + tr.dataset.key) || {};
+    if(Object.keys(이유).length) 수++;
+    분류칸.forEach(([k]) => {
+      const td = tr.querySelector(`input[data-k="${k}"]`)?.closest('td'); if(!td) return;
+      td.classList.toggle('분류틀', !!이유[k]);
+      if(이유[k]) td.title = '분류 규칙: ' + 이유[k]; else if(td.title.startsWith('분류 규칙')) td.removeAttribute('title');
+    });
+  });
+  const el = document.getElementById('분류틀알림');
+  if(el) el.textContent = 수 ? `⚠ 분류 규칙 어긋남 ${수}줄 — 영림원이 받지 않습니다(빨간 칸에 마우스 = 까닭)` : '';
 }
 
 /* ---- 자재번호 겹침 — 모든 거래처(삭제 줄 뺌)에서 같은 자재번호 ---- */
@@ -894,7 +956,7 @@ async function 폼그리기(){
     `<button class="chip" id="채움되돌리기" style="display:none" title="방금 끌어 채운 것을 한 번 되돌립니다(Ctrl/⌘+Z)">되돌리기</button>` +
     `<button class="chip${오류만?' on':''}" id="오류만" title="이 거래처의 영림원 등록 오류 줄만 봅니다">오류건 <b id="오류수">0</b></button>` +
     `<button class="chip${전체오류보기?' on':''}" id="전체오류" title="모든 거래처의 영림원 등록 오류 줄">전체 오류건 <b id="전체오류수">0</b></button>` +
-    `<input type="file" id="양식파일" accept=".xlsx,.xls" hidden><span id="폼상태" class="폼상태"></span><span id="겹침" class="폼상태 bad"></span></div><div id="오류목록" class="글" hidden></div><div class="표통">${h}</div>`;
+    `<input type="file" id="양식파일" accept=".xlsx,.xls" hidden><span id="폼상태" class="폼상태"></span><span id="겹침" class="폼상태 bad"></span><span id="분류틀알림" class="폼상태 bad"></span></div><div id="오류목록" class="글" hidden></div><div class="표통">${h}</div>`;
   const 표 = 속.querySelector('.폼표'), 목록 = 속.querySelector('#분류목록'), 표통 = 속.querySelector('.표통');
   /* 칸 하나에 값 넣기 — 손으로 고친 것(change)과 v1.10.0 채우기·되돌리기가 같은 길. 겹침 다시 그림·저장예약은 부르는 쪽이 한 번에 */
   const 칸적용 = el => {
@@ -928,10 +990,11 @@ async function 폼그리기(){
     if(k==='x_del'){
       if(el.checked) 고친.x_del = '1'; else delete 고친.x_del;
       폼값[s].set(키, 고친); 더럽힘(s, 키, 'x_del'); tr.classList.toggle('뺌', el.checked);
-      겹침그리기(표, s); 저장예약(s); return;
+      겹침그리기(표, s); 분류틀그리기(표, s); 저장예약(s); return;
     }
     if(!칸적용(el)) return;
     if(k==='m_code' || k==='m_name') 겹침그리기(표, s);   /* v1.11.0 자재명 → 엘데코 자재번호 기본값 */
+    if(f분류(k)) 분류틀그리기(표, s);   /* v1.17.1 */
     저장예약(s);
   };
   표.addEventListener('change', 바꿈);
@@ -941,7 +1004,8 @@ async function 폼그리기(){
     const el = e.target;
     if(el.dataset && el.dataset.k && el.dataset.k!=='x_del') 손달기(el.closest('td'));
     if(!el.dataset || !el.dataset.분류) return;
-    목록.innerHTML = 분류고를것(el.dataset.분류, el.closest('tr')).map(o => `<option value="${글(o)}">`).join('');
+    const 층 = { big:0, mid:1, name:2 }[el.dataset.분류];
+    목록.innerHTML = 분류고를것(el.dataset.분류, el.closest('tr')).map(o => `<option value="${글(o)}"${영림원분류.some(x => x[층]===o) ? ' label="영림원 기존"' : ''}>`).join('');
     el.setAttribute('list', '분류목록');
   });
 
@@ -965,7 +1029,7 @@ async function 폼그리기(){
       const tr = 줄들.find(r => r.dataset.key===x.키), el = tr && tr.querySelector(`[data-k="${x.k}"]`); if(!el) continue;
       값넣기(el, x.전); if(칸적용(el)) 바뀐수++;
     }
-    겹침그리기(표, s); if(바뀐수) 저장예약(s);
+    겹침그리기(표, s); 분류틀그리기(표, s); if(바뀐수) 저장예약(s);
     폼상태(`채우기 되돌림 ${목.length}칸 · 저장 중…`);
   }
   되돌리기단추.onclick = () => { if(채움되돌림) 채움되돌림(); };
@@ -1028,14 +1092,14 @@ async function 폼그리기(){
       값넣기(el, v); if(칸적용(el)) 바뀐수++;
     }
     if(!목.length){ 폼상태('채울 칸이 없습니다(이미 같은 값)'); return; }
-    겹침그리기(표, s);
+    겹침그리기(표, s); 분류틀그리기(표, s);
     if(바뀐수) 저장예약(s);
     되돌릴것(목);
     폼상태(`${f.l} ${목.length}칸 채움 · 저장 중…`);
   };
   손.addEventListener('pointerup', () => 끌기끝(true));
   손.addEventListener('pointercancel', () => 끌기끝(false));
-  겹침그리기(표, s);
+  겹침그리기(표, s); 분류틀그리기(표, s);
   /* v1.17.0 영림원 등록 결과 · 오류건 · 완료 줄 잠금 */
   document.getElementById('오류만').onclick = e => { 오류만 = !오류만; e.currentTarget.classList.toggle('on', 오류만); 결과칠(s); };
   document.getElementById('전체오류').onclick = e => { 전체오류보기 = !전체오류보기; e.currentTarget.classList.toggle('on', 전체오류보기); 오류목록그리기(); };
