@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.18.4
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.18.5
      v1.0.0(11-16): 첫 판. 거래처(시트) 버튼 → 그 시트의 표. 거래처 시트는 「전체 · 1월~10월 · 1~10월 누계 · 1~10월 매입품목」 으로 고른다.
        칸 이름·값은 엑셀 글자(셀 표시 꼴) 그대로. 표 꼴은 재단.html v1.1.0 셀 모양(칸 선 · 11.5px · 여백 2px 5px · 숫자 오른쪽)과 같다.
      v1.1.0(11-16): 거래처 메뉴 끝에 「영림원등록」 — 월별 표에서 납품제품명(품목)을 겹치지 않게 한 줄씩, 칸은 품목 · 규격 · 단가만.
@@ -88,6 +88,8 @@
      v1.18.3(11-17): 가로 막대를 보이는 자리에 — 사장님: 「가로 스크롤이 없잖아. 봐야 고치지.」 표 상자 높이 = 내용(화면보다 길면 화면까지)이라
        짧은 표는 막대가 표 바로 밑, 긴 표는 화면 아래(전엔 짧은 표도 상자가 화면 끝까지라 막대가 빈 곳 맨 아래에 떠 안 보였음) · 영림원보내기 명세서 열쇠 둘째 칸(규격)도 왼쪽 고정.
      v1.18.4(11-17): 폰(600px 이하)은 둘째 칸 고정 풂 — 두 칸 고정이 375px 화면의 210~290px 를 덮어서(첫 칸만 고정).
+     v1.18.5(11-17): 삭제 체크 줄 ≠ 오류건 — 사장님: 「체크 삭제로 입력 안 한 건 삭제된 건이지 오류건이 아니야. 오류건은 입력 오류건이고.」
+       오류건(보기·수·빨강) = 결과 오류이고 삭제 체크 아닌 줄만 · 「삭제 N」 보기(같은 표, 삭제 체크 줄만) · 영림원보내기 기본 보기에서 삭제 줄 뺌(체크 → 삭제 보기로, 풀면 돌아옴).
 
      ⚠ 값은 창고(artifacts/vivivic-4b7ef/public/data/발주역입력_보드매입)에서 읽는다.
         창고에 넣는 것은 tools/보드매입읽기.py(드라이브 엑셀 → 창고) 또는 v1.9.0 「엑셀 새로 불러오기」(사장님이 확인하고 「바꾸기」 를 누를 때만). 공개 저장소라 업무 값은 이 파일에 없다. -->
@@ -249,7 +251,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.18.4</div>
+  <div class="badge">v1.18.5</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -848,7 +850,8 @@ function 겹침그리기(표, s){
      — 그 줄 보내기 고친때가 오류 때보다 뒤면 「고침(다시 넘길 수 있음)」.
    완료 줄 = 칸 잠금(채우기·양식 올리기도 안 바꿈) — 「고치기」 를 누르면 한 번 묻고 그 줄만 풂(이 화면 동안). */
 const 풀린 = new Set();   // 거래처 \n 열쇠
-let 오류만 = false, 전체오류보기 = false;
+let 오류만 = false, 전체오류보기 = false, 삭제보기 = false;   /* v1.18.5 삭제 보기 = 같은 표, 삭제 체크 줄만 */
+const 뺀키 = (s, 키) => !!(((폼값[s] && 폼값[s].get(키)) || {}).x_del);
 const 때수 = t => !t ? 0 : typeof t.toDate==='function' ? t.toDate().getTime() : t.seconds ? t.seconds * 1000 : (Date.parse(t) || 0);
 const 단계이름 = { 분류:'분류', 자재:'자재', 구매단가:'구매단가' };
 function 등록상태(s, 키){
@@ -865,7 +868,7 @@ const 오류글 = r => r.오.map(x => `${단계이름[x.k]}: ${x.이유 || '이�
 function 오류줄들(s){
   const 월표 = ((받은[s] || {}).표 || []).find(t => t.이름==='월별');
   if(!월표 || !창고본[s] || !창고본[s].결과) return [];
-  return 품목모으기(월표).줄.map(m => ({ m, r:등록상태(s, 줄키(m)) })).filter(x => x.r && x.r.상태==='오류');
+  return 품목모으기(월표).줄.filter(m => !뺀줄(s, m)).map(m => ({ m, r:등록상태(s, 줄키(m)) })).filter(x => x.r && x.r.상태==='오류');   /* v1.18.5 삭제 체크 줄은 오류건 아님 */
 }
 /* v1.18.0 단계 → 칸 · 오류 이유 → 고칠 칸 */
 const 단계칸 = k => f분류(k) ? '분류' : k.startsWith('m_') ? '자재' : k.startsWith('p_') ? '구매단가' : '';
@@ -883,10 +886,10 @@ function 결과칠(s){
   const 표 = 고른===s && document.querySelector('.폼표');
   if(표) 표.querySelectorAll('tbody tr').forEach(tr => {
     const 키 = tr.dataset.key, r = 등록상태(s, 키), td = tr.querySelector('td.등록');
-    const 오 = !!r && r.상태==='오류', 풀 = 풀린.has(s + '\n' + 키);
+    const 뺌 = 뺀키(s, 키), 오 = !!r && r.상태==='오류' && !뺌, 풀 = 풀린.has(s + '\n' + 키);
     const 단계 = k => ((((창고본[s] || {}).결과 || {})[키] || {})[k] || {}).상태;
     tr.classList.toggle('오류', 오); tr.classList.toggle('완료', false);
-    tr.hidden = 완료보기 ? !완료줄(s, 키) : (완료줄(s, 키) || (오류만 && !오));   /* v1.18.2 같은 표에서 줄만 거름 — 등록완료 보기 = 완료 줄만 · 영림원보내기 = 완료 줄 뺌 */
+    tr.hidden = 삭제보기 ? !뺌 : 완료보기 ? !완료줄(s, 키) : (완료줄(s, 키) || 뺌 || (오류만 && !오));   /* v1.18.5 기본 보기·오류건에서 삭제 줄 뺌 */   /* v1.18.2 같은 표에서 줄만 거름 — 등록완료 보기 = 완료 줄만 · 영림원보내기 = 완료 줄 뺌 */
     const 고칠 = new Set(오 && !r.고침 ? r.오.flatMap(고칠칸) : []);
     tr.querySelectorAll('[data-k]').forEach(el => {
       const k = el.dataset.k, 잠 = !풀 && (k==='x_del' ? r && r.상태==='완료' : 단계(단계칸(k))==='완료');   /* 일부만 완료 = 완료 단계 칸 잠금 */
@@ -905,6 +908,7 @@ function 결과칠(s){
   if(a) a.textContent = 오류줄들(고른).length;
   if(b) b.textContent = 거래처시트들().reduce((n, v) => n + 오류줄들(v).length, 0);
   if(c) c.textContent = 완료줄들(고른).length;
+  const d = document.getElementById('삭제수'); if(d && 표) d.textContent = [...표.tBodies[0].rows].filter(x => 뺀키(s, x.dataset.key)).length;
   const 남 = document.getElementById('남은줄'); if(남 && 표) 남.textContent = [...표.querySelectorAll('tbody tr')].filter(x => !x.hidden).length;
   if(표){ const th = 표.querySelector('thead th'); if(th) 표.style.setProperty('--열쇠1', th.getBoundingClientRect().width + 'px'); }   /* v1.18.3 둘째 고정 칸 자리(줄을 거르면 첫 칸 너비가 바뀜) */
   오류목록그리기();
@@ -922,7 +926,7 @@ function 오류목록그리기(){
   const 모 = 거래처시트들().map(v => [v, 오류줄들(v)]).filter(([, a]) => a.length);
   el.innerHTML = 모.map(([v, a]) => `<button class="chip" data-가기="${글(v)}" title="${글(v)} 오류 줄로">${글(v)} <b>${a.length}</b></button>`).join('');   /* v1.18.1 이유 줄 뺌 */
   el.querySelectorAll('[data-가기]').forEach(b => b.onclick = async () => {
-    오류만 = true; 전체오류보기 = false; 완료보기 = false;
+    오류만 = true; 전체오류보기 = false; 완료보기 = false; 삭제보기 = false;
     await 시트고름(b.dataset.가기); 볼것 = '폼'; 볼것그리기(); 그리기();
   });
 }
@@ -996,12 +1000,13 @@ async function 폼그리기(){
   }
   h += '</tbody></table><datalist id="분류목록"></datalist>';
   const 뺀수 = 줄.filter(m => 뺀줄(s, m)).length;
-  h += `<div class="글"><b id="남은줄">${줄.length}</b>줄${뺀수?` · ${삭제글} ${뺀수}`:''}</div>`;   /* v1.18.1 설명 문단 뺌(사장님 「인간은 저런 글을 읽지 않아」) */
+  h += `<div class="글"><b id="남은줄">${줄.length}</b>줄</div>`;   /* v1.18.1 설명 문단 뺌(사장님 「인간은 저런 글을 읽지 않아」) */
   속.innerHTML = `<div class="폼줄"><button class="chip" id="양식받기">양식 다운로드</button><button class="chip" id="양식올리기">양식 올리기</button>` +
     `<button class="chip" id="채움되돌리기" style="display:none" title="방금 끌어 채운 것을 한 번 되돌립니다(Ctrl/⌘+Z)">되돌리기</button>` +
     `<button class="chip${오류만?' on':''}" id="오류만" title="이 거래처의 영림원 등록 오류 줄만 봅니다">오류건 <b id="오류수">0</b></button>` +
     `<button class="chip${전체오류보기?' on':''}" id="전체오류" title="모든 거래처의 영림원 등록 오류 줄">전체 오류건 <b id="전체오류수">0</b></button>` +
     `<button class="chip${완료보기?' on':''}" id="완료만" title="영림원 등록 완료 줄만(같은 표, 잠금)">등록완료 <b id="완료수">0</b></button>` +
+    `<button class="chip${삭제보기?' on':''}" id="삭제만" title="${글(삭제글)} 체크 줄만(체크를 풀면 영림원보내기로)">삭제 <b id="삭제수">0</b></button>` +
     `<input type="file" id="양식파일" accept=".xlsx,.xls" hidden><span id="폼상태" class="폼상태"></span><span id="겹침" class="폼상태 bad"></span><span id="분류틀알림" class="폼상태 bad"></span></div><div id="오류목록" class="글" hidden></div><div class="표통">${h}</div>`;
   const 표 = 속.querySelector('.폼표'), 목록 = 속.querySelector('#분류목록'), 표통 = 속.querySelector('.표통');
   /* 칸 하나에 값 넣기 — 손으로 고친 것(change)과 v1.10.0 채우기·되돌리기가 같은 길. 겹침 다시 그림·저장예약은 부르는 쪽이 한 번에 */
@@ -1036,7 +1041,7 @@ async function 폼그리기(){
     if(k==='x_del'){
       if(el.checked) 고친.x_del = '1'; else delete 고친.x_del;
       폼값[s].set(키, 고친); 더럽힘(s, 키, 'x_del'); tr.classList.toggle('뺌', el.checked);
-      겹침그리기(표, s); 분류틀그리기(표, s); 저장예약(s); return;
+      겹침그리기(표, s); 분류틀그리기(표, s); 결과칠(s); 저장예약(s); return;   /* v1.18.5 체크 → 삭제 보기로 · 풀면 영림원보내기로 */
     }
     if(!칸적용(el)) return;
     if(k==='m_code' || k==='m_name') 겹침그리기(표, s);   /* v1.11.0 자재명 → 엘데코 자재번호 기본값 */
@@ -1147,8 +1152,14 @@ async function 폼그리기(){
   손.addEventListener('pointercancel', () => 끌기끝(false));
   겹침그리기(표, s); 분류틀그리기(표, s);
   /* v1.17.0 영림원 등록 결과 · 오류건 · 완료 줄 잠금 */
-  document.getElementById('오류만').onclick = e => { 오류만 = !오류만; 완료보기 = false; document.getElementById('완료만').classList.remove('on'); e.currentTarget.classList.toggle('on', 오류만); 결과칠(s); };
-  document.getElementById('완료만').onclick = e => { 완료보기 = !완료보기; 오류만 = false; document.getElementById('오류만').classList.remove('on'); e.currentTarget.classList.toggle('on', 완료보기); 결과칠(s); };
+  /* v1.18.5 보기 셋(오류건·등록완료·삭제)은 하나만 켜짐 — 다 끄면 영림원보내기 */
+  const 보기켬 = 이름 => {
+    const 켬 = !{ 오류만, 완료만:완료보기, 삭제만:삭제보기 }[이름];
+    오류만 = 이름==='오류만' && 켬; 완료보기 = 이름==='완료만' && 켬; 삭제보기 = 이름==='삭제만' && 켬;
+    ['오류만','완료만','삭제만'].forEach(id => document.getElementById(id).classList.toggle('on', { 오류만, 완료만:완료보기, 삭제만:삭제보기 }[id]));
+    결과칠(s);
+  };
+  ['오류만','완료만','삭제만'].forEach(id => document.getElementById(id).onclick = () => 보기켬(id));
   document.getElementById('전체오류').onclick = e => { 전체오류보기 = !전체오류보기; e.currentTarget.classList.toggle('on', 전체오류보기); 오류목록그리기(); };
   표.addEventListener('click', e => {
     const b = e.target.closest && e.target.closest('button.고치기'); if(!b) return;
