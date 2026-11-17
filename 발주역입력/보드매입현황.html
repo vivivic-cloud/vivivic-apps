@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.15.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.16.0
      v1.0.0(11-16): 첫 판. 거래처(시트) 버튼 → 그 시트의 표. 거래처 시트는 「전체 · 1월~10월 · 1~10월 누계 · 1~10월 매입품목」 으로 고른다.
        칸 이름·값은 엑셀 글자(셀 표시 꼴) 그대로. 표 꼴은 재단.html v1.1.0 셀 모양(칸 선 · 11.5px · 여백 2px 5px · 숫자 오른쪽)과 같다.
      v1.1.0(11-16): 거래처 메뉴 끝에 「영림원등록」 — 월별 표에서 납품제품명(품목)을 겹치지 않게 한 줄씩, 칸은 품목 · 규격 · 단가만.
@@ -68,6 +68,9 @@
      v1.15.0(11-17): 저장된 값 파랑 · 바뀐 것 없으면 저장 안 함 — 사장님: 「저장되었을 때 입력값 파란색으로 변하게 해줘」 · 「한번 저장한 걸 또 저장하나?? 수정이나 삭제도 없었는데?」
        창고에 저장된 고친 칸 글자 = 파랑(#1565c0, 새로고침 뒤에도) · 고치면 저장 끝날 때까지 원래 색 · 실패 칸은 파랑 아님.
        칸 값이 저장된 값과 같으면(같은 값 다시 고름 등) 저장 0번 · 폼저장도 창고와 줄·이력·기준·연결·보내기가 모두 같으면 쓰지 않음.
+     v1.16.0(11-17): 「중국엣지필름」 메뉴 — 사장님: 「지금 작업과 연결된 폴더에 해피코가 추가되었어요, 해당 파일을 중국엣지필름 메뉴를 만들어 추가해 주세요」.
+       해피코(HPC) 「26년 엣지 입고리스트」 엑셀(시트 「부자재발주」)을 칸·값 그대로 표 하나로. 둘째 줄 = 전체 · 입고일 달(임시) · 엑셀 새로 불러오기.
+       창고 발주역입력_중국엣지/해피코(국내 6곳 발주역입력_보드매입 과 따로 — 국내 자료·영림원보내기는 안 건드림). 넣는 길 = tools/중국엣지읽기.py 또는 「엑셀 새로 불러오기」(「바꾸기」 를 눌러야, 바뀐 것 있을 때만 씀).
 
      ⚠ 값은 창고(artifacts/vivivic-4b7ef/public/data/발주역입력_보드매입)에서 읽는다.
         창고에 넣는 것은 tools/보드매입읽기.py(드라이브 엑셀 → 창고) 또는 v1.9.0 「엑셀 새로 불러오기」(사장님이 확인하고 「바꾸기」 를 누를 때만). 공개 저장소라 업무 값은 이 파일에 없다. -->
@@ -203,7 +206,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.15.0</div>
+  <div class="badge">v1.16.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -248,6 +251,7 @@ window.목록읽기 = async function(){
 
 function 거래처단추(){
   document.getElementById('거래처').innerHTML = 시트들.map(s => `<button class="chip" data-s="${글(s)}">${글(s)}</button>`).join('') +
+    `<button class="chip" data-s="__중국">중국엣지필름</button>` +   /* v1.16.0 — 해피코(HPC) 엣지 입고리스트(창고 따로) */
     `<button class="chip" data-s="__거래처">거래처 연결</button>` +   /* v1.6.0 — 영림원 기존 거래처와 연결(지은 이름) */
     `<button class="chip" data-s="__엑셀">엑셀 새로 불러오기</button>`;   /* v1.9.0 — 새 판 엑셀(지은 이름) */
   document.querySelectorAll('#거래처 .chip').forEach(b => { b.onclick = () => 시트고름(b.dataset.s); b.classList.toggle('on', b.dataset.s===고른); });
@@ -258,6 +262,7 @@ async function 시트고름(s){
   document.getElementById('볼것').innerHTML = '';
   if(s==='__거래처'){ 연결그리기(); return; }
   if(s==='__엑셀'){ 엑셀그리기(); return; }
+  if(s==='__중국'){ 중국고름(); return; }
   const 속 = document.getElementById('속');
   if(!받은[s]){
     속.innerHTML = '<div class="state"><div class="big">읽는 중입니다…</div></div>';
@@ -1484,6 +1489,139 @@ function 엑셀대조(문서들){
   return { 줄, 틀림 };
 }
 /* ==== 엑셀읽기 끝 ==== */
+
+
+/* ==== 중국엣지필름 (v1.16.0) — 해피코(HPC) 「26년 엣지 입고리스트」 엑셀을 칸·값 그대로 표 하나로 ====
+   창고 발주역입력_중국엣지/해피코 = {업체, 파일, 시트, 읽은날, 칸:[머리 글자…], 수:[칸마다 숫자칸 1/0], 줄:[{v:[…], 월:'YYYY-MM'|'', r}]}
+   국내 6곳(발주역입력_보드매입)·영림원보내기와 따로다. 넣는 길 = tools/중국엣지읽기.py 또는 「엑셀 새로 불러오기」(바뀐 것 있을 때만 「바꾸기」).
+   월 = 「입고일」 칸의 달(임시 — 엑셀에 월 칸이 없어 입고리스트의 입고일로 거름). 통화·단위 환산 없음(엑셀 글자 그대로). */
+const 중국자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_중국엣지'], 중국문서 = '해피코';
+let 중국 = null, 중국볼것 = '전체', 중국새 = null;
+async function 중국고름(){
+  중국볼것 = '전체';
+  const 속 = document.getElementById('속');
+  if(!중국){
+    속.innerHTML = '<div class="state"><div class="big">읽는 중입니다…</div></div>';
+    try{
+      const { doc, getDoc } = window.fbRead;
+      const d = await getDoc(doc(window.db, ...중국자리, 중국문서));
+      중국 = d.exists() ? d.data() : { 줄:[] };
+    }catch(e){ 속.innerHTML = `<div class="state"><div class="big">창고를 읽지 못했습니다</div><div class="why">${글((e&&(e.code||e.message))||'')}</div></div>`; return; }
+  }
+  if(고른 !== '__중국') return;
+  중국볼것그리기(); 중국그리기();
+}
+const 중국달글 = (월, 여러해) => { const [y, m] = 월.split('-'); return (여러해 ? y.slice(2) + '년 ' : '') + parseInt(m) + '월'; };
+function 중국볼것그리기(){
+  const el = document.getElementById('볼것'), 줄 = (중국||{}).줄||[];
+  const 달들 = [...new Set(줄.map(z => z.월).filter(Boolean))].sort();
+  const 여러해 = new Set(달들.map(m => m.slice(0,4))).size > 1;
+  const 버튼 = [['전체','전체'], ...달들.map(m => ['m:'+m, 중국달글(m, 여러해)]), ['엑셀','엑셀 새로 불러오기']];
+  el.innerHTML = 버튼.map(([k,t]) => `<button class="chip${k===중국볼것?' on':''}" data-k="${글(k)}">${글(t)}</button>`).join('');
+  el.querySelectorAll('.chip').forEach(b => b.onclick = () => {
+    중국볼것 = b.dataset.k; el.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x===b)); 중국그리기();
+  });
+}
+function 중국그리기(){
+  const 속 = document.getElementById('속'), d = 중국||{};
+  if(중국볼것==='엑셀'){ 중국엑셀그리기(); return; }
+  if(!(d.줄||[]).length){ 속.innerHTML = '<div class="state"><div class="big">창고에 해피코 자료가 없습니다</div><div class="sub">「엑셀 새로 불러오기」 에서 엑셀을 고르십시오.</div></div>'; return; }
+  const 달 = 중국볼것.startsWith('m:') ? 중국볼것.slice(2) : '';
+  const 줄 = d.줄.filter(z => !달 || z.월===달);
+  속.innerHTML = '<div class="표통">' + 표글(d, 줄, `${d.업체||'해피코'} · ${d.시트||''}`) +
+    `<div class="글">${줄.length}줄 · ${글(d.파일||'')} · ${글(d.읽은날||'')} 읽음${달 ? ' · 달 = 입고일 기준(임시)' : ''}</div></div>`;
+}
+
+/* ---- 엑셀 새로 불러오기(중국엣지필름) — 고른 엑셀을 브라우저에서 읽어 지금 창고와 견주고, 「바꾸기」 를 눌러야(바뀐 것 있을 때만) 창고에 쓴다 ---- */
+function 중국엑셀그리기(){
+  const 속 = document.getElementById('속'), d = 중국||{}, 새 = 중국새;
+  let h = `<div class="글" style="margin-top:0">지금 창고 = ${글(d.파일||'없음')}${d.읽은날 ? ' · ' + 글(d.읽은날) + ' 읽음' : ''} · ${(d.줄||[]).length}줄.<br>` +
+    `새 판 엑셀(같은 꼴 「해피코 엣지 입고리스트」)을 고르면 먼저 바뀐 것만 보여 드립니다. 「바꾸기」 를 눌러야 창고가 바뀝니다. 국내 6곳 자료는 그대로입니다.</div>`;
+  if(새 && 새.문서){
+    const 옛 = (d.줄||[]).map(z => JSON.stringify(z.v)), 신 = 새.문서.줄.map(z => JSON.stringify(z.v));
+    const 칸같음 = !(d.칸||[]).length || 고른값(d.칸)===고른값(새.문서.칸);
+    새.같음 = 칸같음 && 고른값(옛)===고른값(신);
+    h += `<div class="표"><div class="표제목">${글(새.문서.파일)} — 바꾸기 전 확인(아직 창고에 안 씀)</div><table class="dpr-t"><thead><tr><th class="dpr-k">시트</th><th>줄(지금 → 새)</th><th>새로 생긴 줄</th><th>사라진 줄</th><th>알림</th></tr></thead><tbody>` +
+      `<tr><td class="dpr-k">${글(새.문서.시트)}</td><td class="num">${옛.length} → ${신.length}</td><td class="num">${빼기(신, 옛).length}</td><td class="num">${빼기(옛, 신).length}</td>` +
+      `<td>${[칸같음 ? '' : `<span class="별">칸이 지금 창고와 다름(${글(새.문서.칸.join(' · '))})</span>`, 새.같음 ? '지금 창고와 같음 — 쓸 것 없음' : ''].filter(Boolean).join(' · ')}</td></tr></tbody></table></div>`;
+  }else if(새 && 새.바꾼때){
+    h += `<div class="글">${글(새.파일)} — 창고에 썼습니다(${때글(새.바꾼때)}) · 창고에서 다시 읽음 ${(d.줄||[]).length}줄.</div>`;
+  }
+  속.innerHTML = `<div class="폼줄"><button class="chip" id="중국고르기">엑셀 고르기</button>` +
+    (새 && 새.문서 && !새.같음 ? `<button class="chip on" id="중국바꾸기">바꾸기</button><button class="chip" id="중국그만">그만두기</button>` : '') +
+    `<input type="file" id="중국파일" accept=".xlsx,.xls" hidden><span id="중국상태" class="폼상태"></span></div><div class="표통">${h}</div>`;
+  const 파일 = document.getElementById('중국파일');
+  document.getElementById('중국고르기').onclick = () => 파일.click();
+  파일.onchange = () => { const f = 파일.files[0]; 파일.value = ''; if(f) 중국엑셀고름(f); };
+  const 바 = document.getElementById('중국바꾸기'); if(바) 바.onclick = 중국바꾸기;
+  const 그 = document.getElementById('중국그만'); if(그) 그.onclick = () => { 중국새 = null; 중국엑셀그리기(); };
+}
+function 중국상태(t, 나쁨){ const el = document.getElementById('중국상태'); if(el){ el.textContent = t; el.classList.toggle('bad', !!나쁨); } }
+async function 중국엑셀고름(file){
+  중국새 = null; 중국상태('엑셀을 읽는 중…');
+  try{
+    const X = await loadXlsx();
+    const 문서 = 중국엑셀읽기(X, await file.arrayBuffer());
+    문서.파일 = file.name; 문서.읽은날 = new Date().toLocaleDateString('sv-SE');
+    중국새 = { 문서 }; 중국엑셀그리기();
+  }catch(e){ 중국상태('엑셀을 읽지 못했습니다 ' + ((e&&(e.code||e.message))||''), true); }
+}
+async function 중국바꾸기(){
+  const 새 = 중국새; if(!새 || !새.문서 || 새.같음) return;
+  중국상태('창고에 쓰는 중…');
+  try{
+    const { doc, setDoc, getDoc } = window.fbRead;
+    await setDoc(doc(window.db, ...중국자리, 중국문서), 새.문서);
+    const d = await getDoc(doc(window.db, ...중국자리, 중국문서));
+    중국 = d.exists() ? d.data() : { 줄:[] };
+    중국새 = { 바꾼때:new Date().toISOString(), 파일:새.문서.파일 };
+    중국볼것그리기(); 중국엑셀그리기();
+  }catch(e){ 중국상태('창고에 쓰지 못했습니다 ' + ((e&&(e.code||e.message))||''), true); }
+}
+
+/* ==== 중국엑셀읽기 시작 (v1.16.0) — tools/중국엣지읽기.py 와 같은 셈(같은 엑셀이면 같은 창고 값). 시험: 노드에서 이 덩이만 떼어 돌린다 ====
+   시트 = 1행에 「제품명」·「입고일」 이 있는 첫 시트. 칸 = 1행 글자 그대로(빈 머리 칸은 끝에서 자름). 줄 = 2행부터 마지막 글이 있는 행까지, 다 빈 행은 뺌.
+   값 = 셀 표시: 글 그대로 · 날짜 = YYYY-MM-DD · 숫자 = 표시 꼴의 [$¥] 같은 통화 글자 + #,##0(.00) 쉼표·소수, 일반은 그대로. */
+function 중국엑셀읽기(X, buf){
+  const wb = X.read(buf, { type:'array', cellNF:true });
+  const 셀 = (ws, r, c) => ws[X.utils.encode_cell({ r:r-1, c:c-1 })];
+  const 꼴 = c => (c && c.z) || 'General';
+  const 날짜인가 = c => c && c.t==='n' && 꼴(c)!=='General' && X.SSF.is_date(꼴(c));
+  const 값 = c => { if(!c || c.t==='z') return null; if(c.t==='e') return c.w || '#ERR'; return c.v===undefined ? null : c.v; };
+  const 반올림 = (v, n) => { const k = 10 ** n, x = Math.round(Math.abs(v) * k + 1e-9) / k; return (v < 0 && x ? '-' : '') + x.toFixed(n); };
+  const 쉼표 = s => { const [i, f] = s.split('.'); return i.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (f !== undefined ? '.' + f : ''); };
+  function 표시(c){
+    const v = 값(c); if(v===null || v==='') return '';
+    if(typeof v==='string') return v;
+    if(typeof v==='boolean') return v ? 'True' : 'False';
+    if(날짜인가(c)){ const d = X.SSF.parse_date_code(v); return `${String(d.y).padStart(4,'0')}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`; }
+    let f = 꼴(c).split(';')[0], 앞 = '';
+    const m = f.match(/^\[\$([^\]-]*)[^\]]*\]/); if(m){ 앞 = m[1]; f = f.slice(m[0].length); }
+    const 꼴맞음 = f.match(/^(#,##)?0(?:\.(0+))?$/);
+    if(꼴맞음){ const s = 반올림(v, (꼴맞음[2]||'').length); return 앞 + (꼴맞음[1] ? 쉼표(s) : s); }
+    return String(v);
+  }
+  let ws = null, 이름 = '';
+  for(const n of wb.SheetNames){
+    const w = wb.Sheets[n], r = w['!ref'] && X.utils.decode_range(w['!ref']); if(!r) continue;
+    const 머리 = []; for(let c = 1; c <= r.e.c + 1; c++) 머리.push(String(값(셀(w, 1, c)) ?? '').trim());
+    if(머리.includes('제품명') && 머리.includes('입고일')){ ws = w; 이름 = n; break; }
+  }
+  if(!ws) throw new Error('1행에 「제품명」·「입고일」 이 있는 시트가 없습니다');
+  const 범 = X.utils.decode_range(ws['!ref']);
+  let 끝칸 = 범.e.c + 1; while(끝칸 > 0 && 표시(셀(ws, 1, 끝칸))==='') 끝칸--;
+  const 칸 = []; for(let c = 1; c <= 끝칸; c++) 칸.push(표시(셀(ws, 1, c)));
+  const 수 = 칸.map(() => 0), 입 = 칸.indexOf('입고일'), 줄 = [];
+  for(let r = 2; r <= 범.e.r + 1; r++){
+    const cs = 칸.map((_, i) => 셀(ws, r, i + 1)), v = cs.map(표시);
+    if(v.every(x => x==='')) continue;
+    cs.forEach((c, i) => { if(c && c.t==='n' && !날짜인가(c)) 수[i] = 1; });
+    const 월 = /^\d{4}-\d{2}-\d{2}$/.test(v[입]||'') ? v[입].slice(0, 7) : '';
+    줄.push({ v, 월, r });
+  }
+  return { 업체:'해피코', 시트:이름, 칸, 수, 줄 };
+}
+/* ==== 중국엑셀읽기 끝 ==== */
 
 
 function 그리기(){
