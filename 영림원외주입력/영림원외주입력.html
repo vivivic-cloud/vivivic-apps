@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v285 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v286 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -478,7 +478,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v285</span>
+    <span class="ver">v286</span>
   </div>
 </header>
 <div class="wrap">
@@ -4099,10 +4099,17 @@ function renderBdReg(){
       g.rows.forEach(function(x){var dd=x.st.doc;if(dd&&dd.id&&!seen[g.key+dd.id]){seen[g.key+dd.id]=1;ds.push(dd);}});
       (data[g.key]||[]).forEach(function(dd){if(dd.id&&dd.bd&&dd.bd['거래처']===d.id&&!seen[g.key+dd.id]){seen[g.key+dd.id]=1;ds.push(dd);}});
       ds.sort(function(x,y){return String(x.createdAt||'')<String(y.createdAt||'')?-1:1;});
-      ds.forEach(function(dd){var st=dd.status||'대기';
-        sr.push(h('tr',{},h('td',{},BYKEY[g.key].title),h('td',{},STC[g.key].map(function(c){return bdTr(dd[c]);}).filter(Boolean).join(' · ')),
-          h('td',{class:st==='오류'?'bdwhy bad':''},h('span',{class:'chip '+st},st),st==='오류'&&dd.agentNote?' '+dd.agentNote:'')));});});
-    if(sr.length){parts.push(h('h3',{class:'bdrh'},'등록 상태 '+sr.length));parts=parts.concat(tbl(['단계','내용','상태'],sr));}
+      ds.forEach(function(dd){sr.push({k:g.key,d:dd,st:dd.status||'대기'});});});
+    /* v286 사장님 「입력폼 구매자재 일괄등록에서 업체별로 입력완료된 건은 완료 목록으로, 오류 건은 오류로, 대기 건은 대기로 따로 관리되게 해줘」
+       — 위 「등록 상태」 표 하나를 status 그대로 셋으로 나눔: 대기(대기·진행중·수정대기) · 오류(이유 = agentNote) · 완료 */
+    var SG=[{n:'대기',f:function(st){return st!=='오류'&&st!=='완료';}},{n:'오류',f:function(st){return st==='오류';}},{n:'완료',f:function(st){return st==='완료';}}];
+    if(sr.length){
+      parts.push(h('div',{class:'lsinfo bdrcnt'},SG.map(function(G){var n=sr.filter(function(o){return G.f(o.st);}).length;return h('span',{class:G.n==='오류'&&n?'bdbad':''},G.n+' '+n);})));
+      SG.forEach(function(G){var rs=sr.filter(function(o){return G.f(o.st);});if(!rs.length)return;var bad=G.n==='오류';
+        parts.push(h('h3',{class:'bdrh'+(bad?' bdbad':'')},G.n+' '+rs.length));
+        parts=parts.concat(tbl(bad?['단계','내용','이유']:['단계','내용','상태'],rs.map(function(o){var dd=o.d;
+          return h('tr',{},h('td',{},BYKEY[o.k].title),h('td',{},STC[o.k].map(function(c){return bdTr(dd[c]);}).filter(Boolean).join(' · ')),
+            bad?h('td',{class:'bdwhy bad'},dd.agentNote||''):h('td',{},h('span',{class:'chip '+o.st},o.st)));})));});}
     res.replaceChildren.apply(res,parts);
     var noPerm=bdNoPerm();   /* v284 권한 없는 단계가 있으면 누르기 전에 막음 */
     if(noPerm.length)res.prepend(h('div',{class:'bdrfail'},'이 계정은 '+noPerm.join(' · ')+' 등록 권한이 없음 — 등록대기를 할 수 없습니다(담당자 관리에서 권한).'));
