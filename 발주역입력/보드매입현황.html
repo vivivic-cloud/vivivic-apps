@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.13.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.14.0
      v1.0.0(11-16): 첫 판. 거래처(시트) 버튼 → 그 시트의 표. 거래처 시트는 「전체 · 1월~10월 · 1~10월 누계 · 1~10월 매입품목」 으로 고른다.
        칸 이름·값은 엑셀 글자(셀 표시 꼴) 그대로. 표 꼴은 재단.html v1.1.0 셀 모양(칸 선 · 11.5px · 여백 2px 5px · 숫자 오른쪽)과 같다.
      v1.1.0(11-16): 거래처 메뉴 끝에 「영림원등록」 — 월별 표에서 납품제품명(품목)을 겹치지 않게 한 줄씩, 칸은 품목 · 규격 · 단가만.
@@ -61,6 +61,9 @@
      v1.13.0(11-17): 저장이 남의 입력을 지우지 않게 — 사장님: 「새로고침 했더니 엘데코 자재번호 입력해 놓은 거 다 사라지네. 0.5초 자동저장이라며」.
        폼저장 = 창고의 지금 `줄` 을 읽고 이 화면에서 고친 칸만 얹어 씀(먼저 열어 둔 다른 창·기기가 옛 기억으로 덮어쓰던 길 막음) · `보내기` 판은 창고 판 +1.
        자재번호는 손으로 넣으면 기본값과 같아도 남김 · 저장 실패 = 화면 맨 위 빨간 띠 · 저장 전·칸에 치는 중 새로고침/닫기 = 브라우저가 물음.
+     v1.14.0(11-17): 저장 빠르게 — 사장님: 「영림원보내기 저장중 왜 이리 오래 걸리냐」.
+       ① 창고 값과 견줄 때 칸 차례 무관(고른값) — 전엔 창고가 칸 차례를 바꿔 늘 「바뀜」 이라 열 때마다 6곳을 차례로 다시 씀.
+       ② 창고 문서를 onSnapshot 으로 받아 두고 저장 때 다시 읽지 않음(v1.13.0 보호 그대로) ③ _분류 는 바뀌었을 때만 씀.
 
      ⚠ 값은 창고(artifacts/vivivic-4b7ef/public/data/발주역입력_보드매입)에서 읽는다.
         창고에 넣는 것은 tools/보드매입읽기.py(드라이브 엑셀 → 창고) 또는 v1.9.0 「엑셀 새로 불러오기」(사장님이 확인하고 「바꾸기」 를 누를 때만). 공개 저장소라 업무 값은 이 파일에 없다. -->
@@ -72,7 +75,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
-    import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, setDoc, collection, getDocs, onSnapshot } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
     const app = initializeApp({
         apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
         authDomain: "vivivic-4b7ef.firebaseapp.com",
@@ -83,7 +86,7 @@
     });
     const auth = getAuth(app);
     window.db = getFirestore(app);
-    window.fbRead = { doc, getDoc, setDoc, collection, getDocs };
+    window.fbRead = { doc, getDoc, setDoc, collection, getDocs, onSnapshot };
     onAuthStateChanged(auth, (u) => {
         if (!u) { signInAnonymously(auth).catch(e => window.목록못읽음('창고에 들어가지 못했습니다', (e&&(e.code||e.message))||'')); return; }
         window.목록읽기();
@@ -195,7 +198,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.13.0</div>
+  <div class="badge">v1.14.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -484,12 +487,16 @@ async function 폼받기(s){
   const 모 = new Map();
   for(const z of ((d.exists() && d.data().줄) || [])) 모.set(z.품목 + '\t' + z.규격, z.값 || {});
   폼값[s] = 모;
-  폼이력[s] = JSON.stringify((d.exists() && d.data().이력) || []);
-  폼기준[s] = JSON.stringify((d.exists() && d.data().기준) || null);
+  폼이력[s] = 고른값((d.exists() && d.data().이력) || []);    /* v1.14.0 칸 차례 무관 비교(창고는 칸 차례가 달라 늘 「바뀜」 → 열 때마다 6곳 다시 씀) */
+  폼기준[s] = 고른값((d.exists() && d.data().기준) || null);
   폼더한[s] = (d.exists() && d.data().더한표기) || [];
-  폼연결[s] = JSON.stringify((d.exists() && d.data().연결) || null);
+  폼연결[s] = 고른값((d.exists() && d.data().연결) || null);
   폼보내기[s] = (d.exists() && d.data().보내기) || null;   /* v1.9.0 */
+  /* v1.14.0 창고 지금 값을 늘 받아 둠(저장 때 다시 읽지 않음 — 다른 창·기기 값 보호는 그대로) */
+  창고본[s] = d.exists() ? d.data() : null;
+  if(window.fbRead.onSnapshot) window.fbRead.onSnapshot(doc(window.db, ...폼자리, s), x => { 창고본[s] = x.exists() ? x.data() : null; }, () => { delete 창고본[s]; });
 }
+const 창고본 = {};   // 거래처 → 창고 문서 지금 값(onSnapshot) · 없으면(undefined) 저장 때 읽음
 let 준비됨 = false;
 const 저장틀 = {};
 function 폼상태(t, 나쁨){ const el = document.getElementById('폼상태'); if(el){ el.textContent = t; el.classList.toggle('bad', !!나쁨); } }
@@ -553,7 +560,7 @@ function 연결모으기(s){
   연.forEach(x => { if(줄수.get(x.열쇠).size > 1) x.겹침 = true; });
   return 연;
 }
-const 기준그대로 = s => JSON.stringify(기준모으기(s)) === 폼기준[s] && JSON.stringify(연결모으기(s)) === 폼연결[s] && !보내기셈(s);   /* v1.9.0 보내기도 */
+const 기준그대로 = s => 고른값(기준모으기(s)) === 폼기준[s] && 고른값(연결모으기(s)) === 폼연결[s] && !보내기셈(s);   /* v1.9.0 보내기도 */
 /* v1.13.0 사장님 11-17 「새로고침 했더니 엘데코 자재번호 입력해 놓은 거 다 사라지네」 — 다른 창·다른 기기에 먼저 열어 둔 화면이
    저장할 때 자기 기억(옛 `줄`) 전체를 덮어써 남이 넣은 칸을 지울 수 있었다. 이제 저장 = 창고의 지금 `줄` 을 먼저 읽고
    이 화면에서 고친 칸만(폼더럽) 그 위에 얹는다. `보내기` 판도 창고 판에서 +1. */
@@ -572,7 +579,9 @@ async function 폼저장(s){
   const 자리 = doc(window.db, ...폼자리, s);
   const 내것 = 폼더럽[s] || new Map(); 폼더럽[s] = new Map();
   try{
-  const d = await getDoc(자리), 창 = (d.exists() && d.data()) || {};
+  /* v1.14.0 받아 둔 창고본이 있으면 다시 읽지 않음 */
+  const d = 창고본[s] !== undefined ? { exists:() => !!창고본[s] } : await getDoc(자리);
+  const 창 = 창고본[s] !== undefined ? (창고본[s] || {}) : ((d.exists() && d.data()) || {});
   const 새 = new Map();
   for(const z of (창.줄 || [])) 새.set(z.품목 + '\t' + z.규격, { ...(z.값 || {}) });
   for(const [키, 칸들] of 내것){
@@ -590,7 +599,7 @@ async function 폼저장(s){
   const 이력들 = 이력모으기(s), 기준 = 기준모으기(s), 연 = 연결모으기(s), 이 = 연결된(s), 보 = 보내기셈(s);
   /* v1.8.0 merge — 입력 작업자가 쓰는 `더한표기` 를 지우지 않는다(이 쪽이 쓰는 칸만 바꿈) · v1.9.0 `보내기` 는 바뀌었을 때만(판 +1) */
   await setDoc(doc(window.db, ...폼자리, s), { 거래처:s, 줄, 이력:이력들, 기준, 기준글, 연결:연, 연결글, 영림원거래처:이 ? 이.거래처 : '', 고친때:new Date().toISOString(), ...(보 ? { 보내기:보 } : {}) }, { merge:true });
-  폼이력[s] = JSON.stringify(이력들); 폼기준[s] = JSON.stringify(기준); 폼연결[s] = JSON.stringify(연); if(보) 폼보내기[s] = 보;
+  폼이력[s] = 고른값(이력들); 폼기준[s] = 고른값(기준); 폼연결[s] = 고른값(연); if(보) 폼보내기[s] = 보;
   }catch(e){ 더럽돌림(s, 내것); throw e; }
 }
 /* v1.13.0 저장 실패는 화면 맨 위 빨간 띠로 크게(다음 저장이 되면 사라짐) · 저장 전이면 새로고침·닫기 때 묻기 */
@@ -618,6 +627,7 @@ function 저장예약(s){
 
 /* ---- 분류(대·중·소) — 한 번 넣은 값은 드롭다운에 저절로(대 → 중 → 소 이어서) ---- */
 let 분류 = null;   // {줄:[…], 기억:[[대,중,소]…]}
+let 분류저장글 = '';   // v1.14.0 마지막으로 쓴 _분류(칸 차례 무관)
 async function 분류받기(){
   if(분류) return;
   const { doc, getDoc } = window.fbRead;
@@ -649,8 +659,10 @@ async function 분류저장(){
   지금.forEach(x => 분류기억(...x));
   const 줄 = 지금.map(([big,mid,name]) => ({ kind:'자재', big, mid, name, use:true }));
   const { doc, setDoc } = window.fbRead;
-  await setDoc(doc(window.db, ...폼자리, '_분류'), { 줄, 기억:분류.기억.map(([big,mid,name]) => ({big,mid,name})), 고친때:new Date().toISOString() });
-  분류.줄 = 줄;
+  const 기억 = 분류.기억.map(([big,mid,name]) => ({big,mid,name})), 글 = 고른값({ 줄, 기억 });
+  if(글 === 분류저장글) return;   /* v1.14.0 분류가 그대로면 안 씀(칸마다 _분류 쓰던 것) */
+  await setDoc(doc(window.db, ...폼자리, '_분류'), { 줄, 기억, 고친때:new Date().toISOString() });
+  분류.줄 = 줄; 분류저장글 = 글;
 }
 function 분류고를것(칸, tr){
   const 값 = k => { const el = tr.querySelector(`input[data-k="${k}"]`); return el ? el.value.trim() : ''; };
@@ -916,7 +928,7 @@ async function 폼그리기(){
   document.getElementById('양식올리기').onclick = () => 파일.click();
   파일.onchange = () => { const f = 파일.files[0]; 파일.value = ''; if(f) 양식올리기(f); };
   /* 단가이력을 창고에 남긴다(바뀌었을 때만 — 입력작업자가 읽는 자리) */
-  if(JSON.stringify(이력모으기(s)) !== 폼이력[s] || !기준그대로(s)) 폼저장(s).catch(못저장);
+  if(고른값(이력모으기(s)) !== 폼이력[s] || !기준그대로(s)) 폼저장(s).catch(못저장);
 }
 
 /* ---------- v1.6.0 거래처 연결 — 영림원 기존 거래처를 그대로 쓴다(사장님 11-16 정정) ----------
@@ -1219,7 +1231,7 @@ async function 엑셀바꾸기(){
     for(const n of 시트들){ const d = await getDoc(doc(window.db, ...창고자리, n)); 받은[n] = d.exists() ? d.data() : { 표:[] }; }
     거래처단추();
     엑셀상태('기준·연결·보내기를 다시 셈하는 중…');
-    for(const s of 거래처시트들()){ await 폼받기(s); if(!기준그대로(s) || JSON.stringify(이력모으기(s)) !== 폼이력[s]) await 폼저장(s); }
+    for(const s of 거래처시트들()){ await 폼받기(s); if(!기준그대로(s) || 고른값(이력모으기(s)) !== 폼이력[s]) await 폼저장(s); }
     await 분류저장();
     새엑셀 = { 바꾼때:new Date().toISOString(), 파일:새.파일, 대조:엑셀대조(Object.fromEntries(거래처시트들().concat(시트들.includes('총괄요약') ? ['총괄요약'] : []).map(n => [n, 받은[n]]))) };
     엑셀그리기();
