@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 재단 — 에이엠티 「재단 세부내역」(상세내역서 PDF, 월별)을 달마다 표로 본다.
      사장님 11-16: 「월별 재단내역이 목록으로 보이는 페이지를 만들어라.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.8.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.8.1
      v1.0.0(11-16): 첫 판. 월 버튼 → 그 달 표 하나. 칸 이름·값은 PDF 글자 그대로, 합친 칸(원장수량·재단금액 묶음 등)은 rowspan 으로 그대로 살린다.
      v1.1.0(11-16): 표를 셀 모양으로 촘촘히 — 칸마다 선, 글씨 11.5px, 여백 2px 5px, 숫자 오른쪽 정렬, 칸 너비는 내용만큼. 기능·칸·값은 그대로.
      v1.2.0(11-16): 제품명 칸마다 작은 「단품 검색」 칸 — 사장님 11-16: 「제품명 칸에 벤더피아 단품명을 검색할 수 있게 검색창을 만들고, 벤더피아와 연동되게 해 줘.」
@@ -34,6 +34,8 @@
        ② 단품명을 누르면 연결 상태 → 그 제품명 줄의 품목을 누르면 연결·이미 연결된 것은 해제. 품목 옆 동그라미 숫자 = 연결된 단품 수(2개부터). 연결 없는 품목은 첫 단품에 자동 연결.
        ③ 연결은 제품명 하나 문서(`발주역입력_단품연결`)에 품목+사이즈 열쇠로 — 같은 제품명이면 모든 달 같은 단품·같은 연결.
        ④ 품목 「분할」: 같은 줄 안에서 품목·재단수량만 위(품목명R)·아래(품목명L) 두 칸, 합 = 원래 재단수량, 「3」 = 1/3, 위 칸 「⋈」 = 합치기.
+       v1.8.1(11-17): 사장님 「품목 분할 시 요구한 수량 적용이 안 되고 요구한 버튼들도 없다」 — 실제 재단수량은 「30개」 꼴이라 숫자가 아닌 것으로 보고 안 나눴다.
+         숫자 + 단위(개·매)를 수량으로 읽어 나누고 단위는 숫자 뒤에 그대로. 「-」「₩ 110」 만 나누지 않음.
        저장: 바뀐 칸만 merge 로 씀(다른 창·기기 값 안 덮음), 창고는 onSnapshot 으로 받아 다른 곳에서 바꾼 것도 바로 보임.
 
      ⚠ 값은 창고(artifacts/vivivic-4b7ef/public/data/발주역입력_재단)에서 **읽기만** 한다.
@@ -176,6 +178,7 @@ body.칸끄는중{cursor:col-resize;user-select:none;-webkit-user-select:none}
 .dpr-t td.qy input.수{width:46px;height:17px;font:inherit;font-size:11.5px;text-align:right;padding:0 3px;color:var(--vg-body);
   border:1px solid var(--vg-edge);border-radius:3px;background:var(--vg-bg);outline:none}
 .dpr-t td.qy input.수:focus{border-color:var(--vg-ink)}
+.dpr-t td.qy .단위{margin-left:-2px}
 .띠{position:fixed;top:0;left:0;right:0;z-index:60;background:var(--vg-red);color:#fff;font-size:12.5px;font-weight:600;padding:6px 16px;text-align:center}
 /* 폰은 16px 아래 글씨 칸을 누르면 화면이 커진다 — 검색 칸·수량 칸만 16px */
 @media (max-width:600px){.vk input{font-size:16px;height:26px} .dpr-t td.qy input.수{font-size:16px;height:24px;width:56px}}
@@ -190,7 +193,7 @@ body.칸끄는중{cursor:col-resize;user-select:none;-webkit-user-select:none}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.8.0</div>
+  <div class="badge">v1.8.1</div>
 </header>
 <nav class="쪽길"><a href="재단.html" class="on">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a></nav>
 <h1>재단 세부내역</h1>
@@ -448,7 +451,9 @@ function 품목속(p, m, k){
   return `<span class="pn">${글(m)}</span>${표}<button type="button" class="작 나눔">분할</button>`;
 }
 /* 재단수량 칸 속: 나뉜 칸이면 위·아래 수량(고칠 수 있음) + 「3」 */
-const 수량수 = q => { const t = String(q??'').replace(/[,\s]/g,''); return /^\d+$/.test(t) ? +t : null; };
+/* v1.8.1 실제 재단수량은 「30개」「20매」 꼴 — 숫자 뒤 단위(개·매)를 떼어 수량으로 읽고, 단위는 나뉜 칸 숫자 뒤에 그대로 보인다. 「-」「₩ 110」 은 숫자 아님 */
+const 수량꼴 = q => { const m = String(q??'').replace(/[,\s]/g,'').match(/^(\d+)(개|매)?$/); return m ? {n:+m[1], 단위:m[2]||''} : null; };
+const 수량수 = q => { const x = 수량꼴(q); return x ? x.n : null; };
 function 위수(나, n){
   switch(나 && 나.방식){
     case '위3': return Math.ceil(n/3);              /* 위 = 1/3, 정수가 아니면 위를 늘림 */
@@ -464,9 +469,9 @@ function 수량속(p, k, q){
   if(!나) return 글(q);
   const n = 수량수(q);
   if(n === null) return `<div class="반 위">${글(q)}</div><div class="반 아래">&nbsp;</div>`;
-  const 위 = 위수(나, n);
-  return `<div class="반 위"><button type="button" class="작 셋" data-w="위">3</button><input class="수" type="text" inputmode="numeric" data-w="위" value="${위}"></div>`
-       + `<div class="반 아래"><button type="button" class="작 셋" data-w="아래">3</button><input class="수" type="text" inputmode="numeric" data-w="아래" value="${n-위}"></div>`;
+  const 위 = 위수(나, n), 단 = 수량꼴(q).단위 ? `<span class="단위">${글(수량꼴(q).단위)}</span>` : '';
+  return `<div class="반 위"><button type="button" class="작 셋" data-w="위">3</button><input class="수" type="text" inputmode="numeric" data-w="위" value="${위}">${단}</div>`
+       + `<div class="반 아래"><button type="button" class="작 셋" data-w="아래">3</button><input class="수" type="text" inputmode="numeric" data-w="아래" value="${n-위}">${단}</div>`;
 }
 /* 연결 상태 — 단품명을 누르면 그 단품(활성). 그 제품명 줄의 품목을 누르면 연결/해제. 같은 단품명을 다시 누르거나 Esc = 끝 */
 let 활성 = null;
