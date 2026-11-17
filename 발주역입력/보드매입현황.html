@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.9.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.10.0
      v1.0.0(11-16): 첫 판. 거래처(시트) 버튼 → 그 시트의 표. 거래처 시트는 「전체 · 1월~10월 · 1~10월 누계 · 1~10월 매입품목」 으로 고른다.
        칸 이름·값은 엑셀 글자(셀 표시 꼴) 그대로. 표 꼴은 재단.html v1.1.0 셀 모양(칸 선 · 11.5px · 여백 2px 5px · 숫자 오른쪽)과 같다.
      v1.1.0(11-16): 거래처 메뉴 끝에 「영림원등록」 — 월별 표에서 납품제품명(품목)을 겹치지 않게 한 줄씩, 칸은 품목 · 규격 · 단가만.
@@ -48,6 +48,10 @@
        거래처 첫 줄 끝 「엑셀 새로 불러오기」(지은 이름): 새 판 엑셀을 브라우저에서 읽어(tools/보드매입읽기.py 와 같은 셈) 바뀐 것 요약 → 「바꾸기」 를 눌러야 창고 발주역입력_보드매입 에 씀 → 합계 대조.
        고친 칸·분류·거래처 연결·삭제 체크·연결표는 품목+규격 열쇠로 그대로 이어진다(지우지 않음). 꼴이 다른 시트는 안 읽음 · 새 파일에 없는 시트는 그대로 둠(임시).
        창고 {거래처} 문서에 `보내기` = 화면에 보이는 최종값 전체(판·지문) — 영림원 입력폼이 그대로 읽어 새 줄·바뀐 줄을 감지. 꼴 = 전달 글 7절.
+     v1.10.0(11-17): 영림원보내기 채우기 손잡이 — 사장님: 「보드매입현황에 영림원 입력폼 입력부를 엑셀처럼 드래그로 아래로 내려 복사 붙여넣게 되게 해 줘.」
+       입력 칸(글·드롭다운·날짜·분류)을 고르면 오른쪽 아래 작은 네모 → 아래로 끌면 범위 표시 → 놓으면 그 아래 줄 같은 칸에 같은 값.
+       회색(따라·참고) 칸·「삭제(등록 안 함)」 체크 칸은 손잡이 없음. 채운 칸은 하나씩 고친 것과 같은 길(칸적용) — 숫자 검사·따라 칸·분류 기억·자재번호 겹침 · 저장은 한 번에(저장예약).
+       「되돌리기」 단추 · Ctrl/⌘+Z = 방금 채우기 한 번만 되돌림(그 뒤 다른 칸을 고치면 사라짐). 여러 칸 묶음 되풀이는 안 함(한 칸 값 복사).
 
      ⚠ 값은 창고(artifacts/vivivic-4b7ef/public/data/발주역입력_보드매입)에서 읽는다.
         창고에 넣는 것은 tools/보드매입읽기.py(드라이브 엑셀 → 창고) 또는 v1.9.0 「엑셀 새로 불러오기」(사장님이 확인하고 「바꾸기」 를 누를 때만). 공개 저장소라 업무 값은 이 파일에 없다. -->
@@ -166,6 +170,12 @@ html,body{height:100%;overflow:hidden}
 .폼표 input[type=checkbox]{width:auto;margin:3px 2px;vertical-align:middle;cursor:pointer}
 .폼표 td.겹{background:#FFE9E7;box-shadow:inset 0 0 0 1px var(--vg-red)}
 .폼표 td.임칸{box-shadow:inset 0 0 0 1px var(--vg-red)}
+/* v1.10.0 채우기 손잡이(엑셀처럼 아래로 끌어 같은 값) — 고른 칸 오른쪽 아래 작은 네모 · 끄는 동안 범위 점선 */
+.폼표 td.손자리{position:relative}
+.채움손{position:absolute;right:-4px;bottom:-4px;width:7px;height:7px;box-sizing:border-box;background:var(--vg-ink);border:1px solid var(--vg-bg);
+  z-index:0;cursor:crosshair;touch-action:none}
+@media (pointer:coarse){.채움손{width:14px;height:14px;right:-7px;bottom:-7px}}
+.폼표 td.채움범위{outline:1px dashed var(--vg-ink);outline-offset:-2px;background:var(--vg-fill)}
 .state{background:var(--vg-fill);border-radius:14px;padding:22px 16px;text-align:center;margin-top:12px}
 .state .big{font-size:14px;font-weight:600;color:var(--vg-ink);padding-bottom:6px}
 .state .sub{font-size:12.5px;color:var(--vg-muted);line-height:1.85}
@@ -176,7 +186,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.9.0</div>
+  <div class="badge">v1.10.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -631,8 +641,16 @@ async function 폼준비(){
   for(const s of 거래처시트들()) if(!기준그대로(s)) await 폼저장(s).catch(못저장);
 }
 
+/* v1.10.0 채우기 되돌리기 — 방금 채우기 한 번만. 글을 치는 중(입력중)이면 브라우저 글 되돌리기 그대로 */
+let 채움되돌림 = null, 입력중 = false;
+document.addEventListener('keydown', e => {
+  if(!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey || String(e.key).toLowerCase()!=='z') return;
+  if(!채움되돌림 || 입력중 || 볼것!=='폼') return;
+  e.preventDefault(); 채움되돌림();
+});
 async function 폼그리기(){
   const s = 고른, 속 = document.getElementById('속');
+  채움되돌림 = null; 입력중 = false;
   if(!준비됨){
     속.innerHTML = '<div class="state"><div class="big">읽는 중입니다…</div></div>';
     try{ await 폼준비(); }
@@ -694,10 +712,26 @@ async function 폼그리기(){
     ` 고친 칸은 바로 창고에 저장됩니다. 영림원에 넣는 기능은 아직 없습니다(최종본 뒤 입력작업자와 상의).<br>` +
     `명세서 열쇠 = 맨 앞 회색 두 칸(26년 1~10월 실제 명세서의 납품제품명+규격). 명세서를 영림원에 올릴 때 이 글자로 이 줄을 찾아 자재번호로 등록합니다(자재명이 명세서와 달라도 됨, ${삭제글} 줄은 연결 안 함). 연결 ${연.length}개${연.filter(x => x.출처==='더한 표기').length?` (더한 표기 ${연.filter(x => x.출처==='더한 표기').length} — 칸의 +N)`:''}.</div>`;
   속.innerHTML = `<div class="폼줄"><button class="chip" id="양식받기">양식 다운로드</button><button class="chip" id="양식올리기">양식 올리기</button>` +
+    `<button class="chip" id="채움되돌리기" style="display:none" title="방금 끌어 채운 것을 한 번 되돌립니다(Ctrl/⌘+Z)">되돌리기</button>` +
     `<input type="file" id="양식파일" accept=".xlsx,.xls" hidden><span id="폼상태" class="폼상태"></span><span id="겹침" class="폼상태 bad"></span></div><div class="표통">${h}</div>`;
-  const 표 = 속.querySelector('.폼표'), 목록 = 속.querySelector('#분류목록');
+  const 표 = 속.querySelector('.폼표'), 목록 = 속.querySelector('#분류목록'), 표통 = 속.querySelector('.표통');
+  /* 칸 하나에 값 넣기 — 손으로 고친 것(change)과 v1.10.0 채우기·되돌리기가 같은 길. 겹침 다시 그림·저장예약은 부르는 쪽이 한 번에 */
+  const 칸적용 = el => {
+    const k = el.dataset.k, tr = el.closest('tr'), 키 = tr.dataset.key, m = 줄.find(x => 줄키(x)===키); if(!m) return false;
+    const 고친 = 폼값[s].get(키) || {};
+    const f = 폼칸.find(x => x.k===k);
+    let v = f.n ? 숫자글(el.value) : String(el.value).trim();
+    if(f.n && v && isNaN(Number(v))){ 폼상태(`「${f.l}」 에는 숫자만 넣을 수 있습니다`, true); return false; }
+    if(el.value!==v) el.value = v;
+    if(v === 기본값(k, m, s)) delete 고친[k]; else 고친[k] = v;
+    폼값[s].set(키, 고친);
+    tr.querySelectorAll(`td[data-따라="${k}"]`).forEach(td => td.textContent = v);
+    if(f.분류) 분류기억(칸값({k:'m_big'}, m, s), 칸값({k:'m_mid'}, m, s), 칸값({k:'m_small'}, m, s));
+    return true;
+  };
   const 바꿈 = e => {
     const el = e.target, k = el.dataset.k; if(!k) return;
+    입력중 = false; 되돌릴것(null);   /* 손으로 고치면 방금 채우기 되돌리기는 사라진다(엑셀처럼 마지막 일만) */
     const tr = el.closest('tr'), 키 = tr.dataset.key, m = 줄.find(x => 줄키(x)===키); if(!m) return;
     const 고친 = 폼값[s].get(키) || {};
     if(k==='x_del'){
@@ -705,23 +739,111 @@ async function 폼그리기(){
       폼값[s].set(키, 고친); tr.classList.toggle('뺌', el.checked);
       겹침그리기(표, s); 저장예약(s); return;
     }
-    const f = 폼칸.find(x => x.k===k);
-    let v = f.n ? 숫자글(el.value) : String(el.value).trim();
-    if(f.n && v && isNaN(Number(v))){ 폼상태(`「${f.l}」 에는 숫자만 넣을 수 있습니다`, true); return; }
-    if(el.value!==v) el.value = v;
-    if(v === 기본값(k, m, s)) delete 고친[k]; else 고친[k] = v;
-    폼값[s].set(키, 고친);
-    tr.querySelectorAll(`td[data-따라="${k}"]`).forEach(td => td.textContent = v);
-    if(f.분류) 분류기억(칸값({k:'m_big'}, m, s), 칸값({k:'m_mid'}, m, s), 칸값({k:'m_small'}, m, s));
+    if(!칸적용(el)) return;
     if(k==='m_code') 겹침그리기(표, s);
     저장예약(s);
   };
   표.addEventListener('change', 바꿈);
+  표.addEventListener('input', () => { 입력중 = true; });
+  표.addEventListener('focusout', () => { 입력중 = false; });
   표.addEventListener('focusin', e => {
-    const el = e.target; if(!el.dataset || !el.dataset.분류) return;
+    const el = e.target;
+    if(el.dataset && el.dataset.k && el.dataset.k!=='x_del') 손달기(el.closest('td'));
+    if(!el.dataset || !el.dataset.분류) return;
     목록.innerHTML = 분류고를것(el.dataset.분류, el.closest('tr')).map(o => `<option value="${글(o)}">`).join('');
     el.setAttribute('list', '분류목록');
   });
+
+  /* ---- v1.10.0 채우기 손잡이 — 사장님 11-17 「엑셀처럼 드래그로 아래로 내려 복사 붙여넣게」 ----
+     고른 칸(글·드롭다운·날짜·분류) 오른쪽 아래 네모를 아래로 끌면 범위 점선 → 놓으면 그 아래 줄 같은 칸에 같은 값(칸적용 = 손으로 고친 것과 같은 길).
+     회색 칸(참고·따라)·삭제(등록 안 함) 체크 칸은 입력이 없어 손잡이도 없고 채우지도 않는다. 위로 끌기·여러 칸 묶음 되풀이는 안 함. */
+  const 손 = document.createElement('div'); 손.className = '채움손'; 손.title = '아래로 끌면 같은 값으로 채웁니다';
+  let 손칸 = null;
+  function 손달기(td){ if(손칸) 손칸.classList.remove('손자리'); 손칸 = td; td.classList.add('손자리'); td.appendChild(손); }
+  const 몸줄 = () => [...표.tBodies[0].rows];
+  const 값넣기 = (el, v) => {
+    if(el.tagName==='SELECT' && ![...el.options].some(o => o.value===v)){ const o = document.createElement('option'); o.textContent = v; el.appendChild(o); }
+    el.value = v;
+  };
+  const 되돌리기단추 = document.getElementById('채움되돌리기');
+  function 되돌릴것(목){ 채움되돌림 = 목 ? () => 되돌리기(목) : null; 되돌리기단추.style.display = 목 ? '' : 'none'; }
+  function 되돌리기(목){
+    되돌릴것(null);
+    const 줄들 = 몸줄();
+    for(const x of 목){
+      const tr = 줄들.find(r => r.dataset.key===x.키), el = tr && tr.querySelector(`[data-k="${x.k}"]`); if(!el) continue;
+      값넣기(el, x.전); 칸적용(el);
+    }
+    겹침그리기(표, s); 저장예약(s);
+    폼상태(`채우기 되돌림 ${목.length}칸 · 저장 중…`);
+  }
+  되돌리기단추.onclick = () => { if(채움되돌림) 채움되돌림(); };
+  let 끌기 = null;
+  function 범위그리기(끝){
+    표.querySelectorAll('td.채움범위').forEach(td => td.classList.remove('채움범위'));
+    if(!끌기) return;
+    끌기.끝 = 끝;
+    const 줄들 = 몸줄();
+    for(let i = 끌기.처음 + 1; i <= 끝; i++) 줄들[i].cells[끌기.칸].classList.add('채움범위');
+  }
+  function 끝줄찾기(x, y){
+    const 줄들 = 몸줄(), 원 = 줄들[끌기.처음];
+    const 위 = 원.getBoundingClientRect().top;
+    if(y <= 원.getBoundingClientRect().bottom) return 끌기.처음;
+    const el = document.elementFromPoint(Math.min(Math.max(x, 1), innerWidth - 1), y), tr = el && el.closest && el.closest('.폼표 tbody tr');
+    if(tr) return Math.max(끌기.처음, 줄들.indexOf(tr));
+    return y > 위 ? Math.max(끌기.처음, 끌기.끝) : 끌기.처음;   // 표 밖이면 그대로
+  }
+  function 끌며밀기(){   /* 표 상자(폰은 쪽도) 끝에 닿으면 저절로 밀기 */
+    if(!끌기) return;
+    const r = 표통.getBoundingClientRect(), y = 끌기.y, 쪽 = document.querySelector('.wrap');
+    let 밀 = 0;
+    if(y > Math.min(r.bottom, innerHeight) - 24) 밀 = 12; else if(y < Math.max(r.top, 0) + 24) 밀 = -12;
+    if(밀){
+      const 앞 = 표통.scrollTop; 표통.scrollTop += 밀;
+      if(표통.scrollTop===앞 && 쪽) 쪽.scrollTop += 밀;
+      범위그리기(끝줄찾기(끌기.x, 끌기.y));
+    }
+    끌기.틀 = requestAnimationFrame(끌며밀기);
+  }
+  손.addEventListener('pointerdown', e => {
+    if(!손칸) return;
+    e.preventDefault(); e.stopPropagation();
+    const 원 = 손칸.querySelector('[data-k]'); if(!원) return;
+    if(document.activeElement===원) 원.blur();   /* 치던 글을 먼저 확정(바꿈 = change) */
+    const tr = 손칸.closest('tr');
+    끌기 = { 처음:몸줄().indexOf(tr), 칸:손칸.cellIndex, 끝:-1, x:e.clientX, y:e.clientY, 원 };
+    끌기.끝 = 끌기.처음;
+    try{ 손.setPointerCapture(e.pointerId); }catch(_){}
+    끌기.틀 = requestAnimationFrame(끌며밀기);
+  });
+  손.addEventListener('pointermove', e => {
+    if(!끌기) return;
+    끌기.x = e.clientX; 끌기.y = e.clientY;
+    범위그리기(끝줄찾기(e.clientX, e.clientY));
+  });
+  const 끌기끝 = 채울까 => {
+    if(!끌기) return;
+    const { 처음, 끝, 칸, 원, 틀 } = 끌기;
+    cancelAnimationFrame(틀); 끌기 = null; 범위그리기(-1);
+    if(!채울까 || 끝 <= 처음) return;
+    const f = 폼칸.find(x => x.k===원.dataset.k), v = 원.value;
+    if(f.n && v.trim() && isNaN(Number(숫자글(v)))){ 폼상태(`「${f.l}」 에는 숫자만 넣을 수 있습니다 — 채우지 않았습니다`, true); return; }
+    const 줄들 = 몸줄(), 목 = [];
+    for(let i = 처음 + 1; i <= 끝; i++){
+      const el = 줄들[i].cells[칸] && 줄들[i].cells[칸].querySelector('[data-k]');
+      if(!el || el.type==='checkbox' || el.dataset.k!==원.dataset.k || el.value===v) continue;
+      목.push({ 키:줄들[i].dataset.key, k:el.dataset.k, 전:el.value });
+      값넣기(el, v); 칸적용(el);
+    }
+    if(!목.length){ 폼상태('채울 칸이 없습니다(이미 같은 값)'); return; }
+    겹침그리기(표, s);
+    저장예약(s);
+    되돌릴것(목);
+    폼상태(`${f.l} ${목.length}칸 채움 · 저장 중…`);
+  };
+  손.addEventListener('pointerup', () => 끌기끝(true));
+  손.addEventListener('pointercancel', () => 끌기끝(false));
   겹침그리기(표, s);
   document.getElementById('양식받기').onclick = 양식다운로드;
   const 파일 = document.getElementById('양식파일');
