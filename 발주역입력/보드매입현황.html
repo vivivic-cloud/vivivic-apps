@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.17.3
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.18.0
      v1.0.0(11-16): 첫 판. 거래처(시트) 버튼 → 그 시트의 표. 거래처 시트는 「전체 · 1월~10월 · 1~10월 누계 · 1~10월 매입품목」 으로 고른다.
        칸 이름·값은 엑셀 글자(셀 표시 꼴) 그대로. 표 꼴은 재단.html v1.1.0 셀 모양(칸 선 · 11.5px · 여백 2px 5px · 숫자 오른쪽)과 같다.
      v1.1.0(11-16): 거래처 메뉴 끝에 「영림원등록」 — 월별 표에서 납품제품명(품목)을 겹치지 않게 한 줄씩, 칸은 품목 · 규격 · 단가만.
@@ -78,6 +78,9 @@
        규칙 = 영림원외주입력/입력작업자/전달-보드매입현황-기준정보폼.md 8절 그대로(8-1 ①~③) · 영림원 기존 분류(_분류.영림원) 를 고르기 목록에(「영림원 기존」).
      v1.17.2(11-17): 소분류 이름이 영림원 기존 분류에 있으면 ① 대신 ② 로만(영림원 경로와 같은 줄은 빨강 아님 — 8-3 「기존 분류 씀」).
      v1.17.3(11-17): 소분류 겹침 알림 글 = 「이름을 바꾸십시오(영림원에 대 > 중 > 소 있음)」(분배 방 지시 글 그대로).
+     v1.18.0(11-17): 등록완료 줄은 영림원보내기 표에서 빼고 「등록완료 N」 표로 따로 — 사장님: 「영림원 등록완료 건은 더 이상 영림원보내기 표 안에 보이지 않아야 합니다.
+       현재 표 안에는 오류로 수정해야 할 것들과 해당 수정 부위를 표기하여 수정되도록 해주세요. 등록완료된 건은 등록완료 표에 따로 관리되게 해주세요.」
+       오류 줄 = 고칠 칸만 빨간 테·배경(단계 이유 → 칸) · 일부만 완료 = 완료 단계 칸 잠금 · 등록완료 표 = 읽기만, 「고치기」 → 묻고 영림원보내기 표로 돌림.
 
      ⚠ 값은 창고(artifacts/vivivic-4b7ef/public/data/발주역입력_보드매입)에서 읽는다.
         창고에 넣는 것은 tools/보드매입읽기.py(드라이브 엑셀 → 창고) 또는 v1.9.0 「엑셀 새로 불러오기」(사장님이 확인하고 「바꾸기」 를 누를 때만). 공개 저장소라 업무 값은 이 파일에 없다. -->
@@ -215,7 +218,9 @@ html,body{height:100%;overflow:hidden}
 .폼표 td.등록 .작{color:var(--vg-muted);font-size:10.5px}
 .폼표 td.등록 .고치기{font:inherit;font-size:10.5px;padding:0 4px;border:1px solid var(--vg-edge);border-radius:3px;background:var(--vg-bg);color:var(--vg-ink);cursor:pointer}
 .폼표 [data-k]:disabled{opacity:1;cursor:default}
-.폼표 td.분류틀{background:#FFE9E7;box-shadow:inset 0 0 0 1px var(--vg-red)}   /* v1.17.1 분류 규칙 어긋남 */
+.폼표 td.분류틀,.폼표 td.고칠칸{background:#FFE9E7;box-shadow:inset 0 0 0 2px var(--vg-red)}   /* v1.17.1 분류 규칙 어긋남 · v1.18.0 오류 단계의 고칠 칸 */
+.폼표 td.입:has([data-k]:disabled){background:var(--vg-fill)}   /* v1.18.0 완료 단계 칸 = 잠금 */
+#완료표 .dpr-t td,#완료표 .dpr-t th{white-space:nowrap}
 #오류목록{flex-shrink:0;max-height:30vh;overflow:auto;margin:0 0 8px}
 #오류목록 .chip{margin-left:6px}
 .state{background:var(--vg-fill);border-radius:14px;padding:22px 16px;text-align:center;margin-top:12px}
@@ -228,7 +233,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.17.3</div>
+  <div class="badge">v1.18.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -846,25 +851,73 @@ function 오류줄들(s){
   if(!월표 || !창고본[s] || !창고본[s].결과) return [];
   return 품목모으기(월표).줄.map(m => ({ m, r:등록상태(s, 줄키(m)) })).filter(x => x.r && x.r.상태==='오류');
 }
+/* v1.18.0 단계 → 칸 · 오류 이유 → 고칠 칸 */
+const 단계칸 = k => f분류(k) ? '분류' : k.startsWith('m_') ? '자재' : k.startsWith('p_') ? '구매단가' : '';
+function 고칠칸(x){   // x = {k:단계, 이유}
+  const t = String(x.이유 || '');
+  if(/앞 단계/.test(t)) return [];   // 앞 단계 오류 때문에 안 넣은 것 — 고칠 곳은 그 앞 단계 칸
+  if(x.k==='분류') return /소분류/.test(t) ? ['m_small'] : ['m_big','m_mid','m_small'];
+  const 글만 = t.replace(/구매단가등록|구매단가|자재등록/g, '');
+  return 폼칸.filter(f => !f.따라 && 단계칸(f.k)===x.k).sort((p, q) => q.l.length - p.l.length)
+    .filter(f => 글만.includes(f.l)).map(f => f.k);
+}
+const 완료줄 = (s, 키) => { const r = 등록상태(s, 키); return !!r && r.상태==='완료' && !풀린.has(s + '\n' + 키); };
 function 결과칠(s){
   if(볼것!=='폼') return;
   const 표 = 고른===s && document.querySelector('.폼표');
   if(표) 표.querySelectorAll('tbody tr').forEach(tr => {
     const 키 = tr.dataset.key, r = 등록상태(s, 키), td = tr.querySelector('td.등록');
-    const 완 = !!r && r.상태==='완료', 오 = !!r && r.상태==='오류', 잠 = 완 && !풀린.has(s + '\n' + 키);
-    tr.classList.toggle('완료', 완); tr.classList.toggle('오류', 오);
-    tr.hidden = 오류만 && !오;
-    tr.querySelectorAll('[data-k]').forEach(el => { if(el.disabled !== 잠) el.disabled = 잠; });
+    const 오 = !!r && r.상태==='오류', 풀 = 풀린.has(s + '\n' + 키);
+    const 단계 = k => ((((창고본[s] || {}).결과 || {})[키] || {})[k] || {}).상태;
+    tr.classList.toggle('오류', 오); tr.classList.toggle('완료', false);
+    tr.hidden = 완료줄(s, 키) || (오류만 && !오);   /* v1.18.0 등록완료 줄은 이 표에서 뺌(등록완료 표로) */
+    const 고칠 = new Set(오 && !r.고침 ? r.오.flatMap(고칠칸) : []);
+    tr.querySelectorAll('[data-k]').forEach(el => {
+      const k = el.dataset.k, 잠 = !풀 && (k==='x_del' ? r && r.상태==='완료' : 단계(단계칸(k))==='완료');   /* 일부만 완료 = 완료 단계 칸 잠금 */
+      if(el.disabled !== 잠) el.disabled = 잠;
+      const c = el.closest('td'); if(c && k!=='x_del') c.classList.toggle('고칠칸', 고칠.has(k));
+    });
     if(!td) return;
     if(!r){ td.innerHTML = ''; td.removeAttribute('title'); }
-    else if(완){ td.innerHTML = `<span class="완">영림원 등록 완료</span>${잠 ? ' <button class="고치기" type="button">고치기</button>' : ''}`; td.title = r.자재번호 ? '영림원 자재코드 ' + r.자재번호 : '영림원 등록 완료'; }
+    else if(r.상태==='완료'){ td.innerHTML = `<span class="완">영림원 등록 완료</span> <span class="작">고치는 중</span>`; td.title = r.자재번호 ? '영림원 자재번호 ' + r.자재번호 : ''; }
     else if(오){ td.innerHTML = `<span class="오">오류</span> ${r.고침 ? '<span class="작">고침(다시 넘길 수 있음) · </span>' : ''}<span class="이유">${글(오류글(r))}</span>`; td.title = 오류글(r); }
-    else { td.innerHTML = `<span class="작">${r.상태==='진행중' ? '등록 진행중' : '등록 대기'}</span>`; td.removeAttribute('title'); }
+    else { td.innerHTML = `<span class="작">${r.상태==='진행중' ? '등록 진행중' : '등록 대기'}${r.오.length ? '' : ''}</span>`; td.removeAttribute('title'); }
   });
-  const a = document.getElementById('오류수'), b = document.getElementById('전체오류수');
+  const a = document.getElementById('오류수'), b = document.getElementById('전체오류수'), c = document.getElementById('완료수');
   if(a) a.textContent = 오류줄들(고른).length;
   if(b) b.textContent = 거래처시트들().reduce((n, v) => n + 오류줄들(v).length, 0);
-  오류목록그리기();
+  if(c) c.textContent = 완료줄들(고른).length;
+  const 남 = document.getElementById('남은줄'); if(남 && 표) 남.textContent = [...표.querySelectorAll('tbody tr')].filter(x => !완료줄(s, x.dataset.key)).length;
+  오류목록그리기(); 완료표그리기(s);
+}
+/* v1.18.0 등록완료 표 — 읽기만. 「고치기」 → 한 번 묻고 그 줄을 영림원보내기 표로 돌림(고치면 지문이 바뀌어 입력폼이 다시 넘김) */
+let 완료보기 = false;
+function 완료줄들(s){
+  const 월표 = ((받은[s] || {}).표 || []).find(t => t.이름==='월별');
+  if(!월표 || !창고본[s] || !창고본[s].결과) return [];
+  return 품목모으기(월표).줄.filter(m => 완료줄(s, 줄키(m)));
+}
+function 완료표그리기(s){
+  const el = document.getElementById('완료표'), 통 = document.querySelector('.표통'); if(!el) return;
+  el.hidden = !완료보기; if(통) 통.hidden = 완료보기;
+  if(!완료보기) return;
+  const 줄 = 완료줄들(s), 값 = (k, m) => 칸값(폼칸.find(f => f.k===k), m, s);
+  const 때글 = r => { const n = Math.max(0, ...Object.values(r).map(x => 때수((x || {}).때))); if(!n) return ''; const d = new Date(n), z = v => String(v).padStart(2, '0'); return `${d.getFullYear()}-${z(d.getMonth()+1)}-${z(d.getDate())} ${z(d.getHours())}:${z(d.getMinutes())}`; };
+  el.innerHTML = !줄.length ? '<div class="글">영림원 등록 완료 줄이 없습니다.</div>' :
+    '<table class="dpr-t"><thead><tr>' + ['영림원 자재번호','자재명','규격','기준단위','자재대분류','자재중분류','자재소분류','단가','적용시작일','등록 때',''].map(x => `<th>${x}</th>`).join('') + '</tr></thead><tbody>' +
+    줄.map(m => { const 키 = 줄키(m), r = ((창고본[s] || {}).결과 || {})[키] || {};
+      return `<tr data-key="${글(키)}"><td>${글((r.자재 || {}).자재번호 || 값('m_code', m))}</td><td>${글(값('m_name', m))}</td><td>${글(값('m_spec', m))}</td><td>${글(값('m_unit', m))}</td>` +
+        `<td>${글(값('m_big', m))}</td><td>${글(값('m_mid', m))}</td><td>${글(값('m_small', m))}</td><td class="num">${글(값('p_price', m))}</td><td>${글(값('p_from', m))}</td><td>${글(때글(r))}</td>` +
+        `<td><button class="chip" data-완고치기="1">고치기</button></td></tr>`; }).join('') + '</tbody></table>' +
+    `<div class="글">영림원에 등록 완료된 줄(분류·자재·구매단가 모두 완료) ${줄.length}줄 — 읽기만. 꼭 고쳐야 하면 「고치기」 → 그 줄이 영림원보내기 표로 돌아갑니다(고치면 입력폼에서 다시 넘김).</div>`;
+  el.querySelectorAll('[data-완고치기]').forEach(b => b.onclick = () => {
+    const 키 = b.closest('tr').dataset.key;
+    if(!confirm('영림원에 등록 완료된 품목입니다.\n여기서 고치면 영림원 값과 달라지고, 입력폼에서 다시 넘겨야 합니다.\n이 줄을 영림원보내기 표로 돌려 고치겠습니까?')) return;
+    풀린.add(s + '\n' + 키); 완료보기 = false;
+    const c = document.getElementById('완료만'); if(c) c.classList.remove('on');
+    결과칠(s);
+    const tr = [...document.querySelectorAll('.폼표 tbody tr')].find(x => x.dataset.key===키); if(tr) tr.scrollIntoView({ block:'center' });
+  });
 }
 function 오류목록그리기(){
   const el = document.getElementById('오류목록'); if(!el) return;
@@ -948,7 +1001,7 @@ async function 폼그리기(){
   }
   h += '</tbody></table><datalist id="분류목록"></datalist>';
   const 뺀수 = 줄.filter(m => 뺀줄(s, m)).length;
-  h += `<div class="글">${줄.length}줄(영림원등록 줄과 같음)${뺀수?` · ${삭제글} ${뺀수}줄`:''} · <span class="별">*</span> = 영림원 필수(빨강) 칸 · 「임시」 = 미리 채운 값의 근거가 확실하지 않은 칸(빨간 테 칸은 그 줄만 — 손을 대면 까닭) — 확인해 고쳐 주십시오.<br>` +
+  h += `<div class="글"><b id="남은줄">${줄.length}</b>줄(영림원등록 ${줄.length}줄 중 등록완료 줄은 「등록완료」 표로)${뺀수?` · ${삭제글} ${뺀수}줄`:''} · <span class="별">*</span> = 영림원 필수(빨강) 칸 · 「임시」 = 미리 채운 값의 근거가 확실하지 않은 칸(빨간 테 칸은 그 줄만 — 손을 대면 까닭) — 확인해 고쳐 주십시오.<br>` +
     `자재등록 = 영림원 [기본] 품목정보 › 자재등록(500251) · 구매단가등록 = 구매/수입 › 구매단가등록(501868) · 구매거래처 = 「거래처 연결」 에서 이은 영림원 거래처(영림원 표기 그대로, 연결 전엔 빈칸). 구매단가등록의 품명·품번·규격·단위는 영림원에서 품번을 고르면 자재등록 값이 저절로 들어오는 칸이라 왼쪽 자재등록 칸을 따릅니다.<br>` +
     `자재대·중·소분류 = 품목대중소분류정의(자재)로 넘길 분류 — 한 번 넣은 값은 다음부터 고를 수 있습니다(대 → 중 → 소). 자재번호가 다른 줄(모든 거래처)과 같으면 빨갛게 알립니다. ${삭제글} = 체크한 줄은 이번 등록에서 뺍니다(원본은 그대로, 체크를 풀면 살아납니다).<br>` +
     `단가 = 1~10월 중 마지막 단가 하나로 통일 · 적용시작일 = ${해(s)}-01-01(26년 모든 발주에 그 단가) · ${이력글머리} = 단가가 같은 묶음마다 「단가(산 달)」 — 보기만, 영림원엔 마지막 단가 하나만 넘깁니다.` +
@@ -959,7 +1012,8 @@ async function 폼그리기(){
     `<button class="chip" id="채움되돌리기" style="display:none" title="방금 끌어 채운 것을 한 번 되돌립니다(Ctrl/⌘+Z)">되돌리기</button>` +
     `<button class="chip${오류만?' on':''}" id="오류만" title="이 거래처의 영림원 등록 오류 줄만 봅니다">오류건 <b id="오류수">0</b></button>` +
     `<button class="chip${전체오류보기?' on':''}" id="전체오류" title="모든 거래처의 영림원 등록 오류 줄">전체 오류건 <b id="전체오류수">0</b></button>` +
-    `<input type="file" id="양식파일" accept=".xlsx,.xls" hidden><span id="폼상태" class="폼상태"></span><span id="겹침" class="폼상태 bad"></span><span id="분류틀알림" class="폼상태 bad"></span></div><div id="오류목록" class="글" hidden></div><div class="표통">${h}</div>`;
+    `<button class="chip${완료보기?' on':''}" id="완료만" title="영림원 등록 완료 줄 — 영림원보내기 표에서 빠진 줄(읽기만)">등록완료 <b id="완료수">0</b></button>` +
+    `<input type="file" id="양식파일" accept=".xlsx,.xls" hidden><span id="폼상태" class="폼상태"></span><span id="겹침" class="폼상태 bad"></span><span id="분류틀알림" class="폼상태 bad"></span></div><div id="오류목록" class="글" hidden></div><div class="표통">${h}</div><div id="완료표" class="표통" hidden></div>`;
   const 표 = 속.querySelector('.폼표'), 목록 = 속.querySelector('#분류목록'), 표통 = 속.querySelector('.표통');
   /* 칸 하나에 값 넣기 — 손으로 고친 것(change)과 v1.10.0 채우기·되돌리기가 같은 길. 겹침 다시 그림·저장예약은 부르는 쪽이 한 번에 */
   const 칸적용 = el => {
@@ -1104,7 +1158,8 @@ async function 폼그리기(){
   손.addEventListener('pointercancel', () => 끌기끝(false));
   겹침그리기(표, s); 분류틀그리기(표, s);
   /* v1.17.0 영림원 등록 결과 · 오류건 · 완료 줄 잠금 */
-  document.getElementById('오류만').onclick = e => { 오류만 = !오류만; e.currentTarget.classList.toggle('on', 오류만); 결과칠(s); };
+  document.getElementById('오류만').onclick = e => { 오류만 = !오류만; 완료보기 = false; document.getElementById('완료만').classList.remove('on'); e.currentTarget.classList.toggle('on', 오류만); 결과칠(s); };
+  document.getElementById('완료만').onclick = e => { 완료보기 = !완료보기; e.currentTarget.classList.toggle('on', 완료보기); 결과칠(s); };
   document.getElementById('전체오류').onclick = e => { 전체오류보기 = !전체오류보기; e.currentTarget.classList.toggle('on', 전체오류보기); 오류목록그리기(); };
   표.addEventListener('click', e => {
     const b = e.target.closest && e.target.closest('button.고치기'); if(!b) return;
