@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v277 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v278 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -128,7 +128,7 @@ input.bad,select.bad{border-color:var(--red)}
 /* v235 세트구성품등록 — 임시 칩 · 벤더피아에서 불러오기 목록(세로 목록, 가로로 안 밀림) */
 .chip.tmp{background:var(--amber-bg);color:var(--amber);border-color:#fde68a;margin-left:4px;vertical-align:1px}
 .btn .bdbadge{margin-left:6px}.bdbox .bdvn{margin:0 0 8px}.bdbox .wcpick .chip{margin-left:6px}.bdbox .bdopt{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;margin-right:12px}.bdbox .bdopt label{display:inline-flex;gap:4px;align-items:center;cursor:pointer}   /* v277 보드/엣지 매입현황에서 불러오기 */
-.bdbox td{white-space:nowrap}.bdbox td.bad{box-shadow:inset 0 0 0 2px var(--red);background:var(--red-bg)}.bdbox td.chg{background:var(--amber-bg);font-weight:800}.bdbox td.bdwhy{white-space:normal;min-width:180px;font-size:11.5px}.bdbox td.bdwhy.bad{color:var(--red)}.bdbox td.bdst .chip+.chip{margin-left:4px}.bdbox .bdno{margin-left:4px;color:var(--muted);font-family:var(--mono,monospace)}.bdbox .bdbad{color:var(--red)}.bdbox .bdnone{margin:8px 0;font-size:12px;color:var(--muted)}.bdbox .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.bdbox td{white-space:nowrap}.bdbox td.bad{box-shadow:inset 0 0 0 2px var(--red);background:var(--red-bg)}.bdbox td.chg{background:var(--amber-bg);font-weight:800}.bdbox td.bdwhy{white-space:normal;min-width:180px;font-size:11.5px}.bdbox td.bdwhy.bad{color:var(--red)}.bdbox .bdtmp{color:var(--amber)}.bdbox .bdtmp .chip{margin-left:0}.bdbox td.bdst .chip+.chip{margin-left:4px}.bdbox .bdno{margin-left:4px;color:var(--muted);font-family:var(--mono,monospace)}.bdbox .bdbad{color:var(--red)}.bdbox .bdnone{margin:8px 0;font-size:12px;color:var(--muted)}.bdbox .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
 .vpbox{flex-basis:100%;min-width:0;border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:6px;background:#fff}
 .vpbox input[type=search]{flex:1 1 200px;min-width:0}
 .vplist{max-height:50vh;overflow-y:auto;overflow-x:hidden}
@@ -479,7 +479,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v277</span>
+    <span class="ver">v278</span>
   </div>
 </header>
 <div class="wrap">
@@ -3930,9 +3930,10 @@ function bdClsErrs(c,sm){   /* [{n:분류 칸 이름, m:까닭}] */
     if(/\d,\d/.test(v))e.push({n:n,m:n+' 「'+v+'」 숫자 사이 쉼표'});
     else if(v&&(v!==v.trim()||/[\t\n]/.test(v)))e.push({n:n,m:n+' 앞뒤 빈칸'});});
   var s=bdTr(c['소분류']),ps=s&&sm[s]?Object.keys(sm[s]):[];
-  if(ps.length>1)e.push({n:'소분류',m:'같은 소분류 「'+s+'」 '+ps.length+'곳('+ps.join(' · ')+')'});
   return e;
 }
+/* v278 사장님 「같은 소분류 이름 막지 마」 — 같은 소분류 이름이 다른 대>중 밑에 있어도 막지 않고 「임시」만. 자재소분류는 「대 > 중 > 소」 경로로 저장(v26)이라 구분됨. 영림원이 같은 이름을 받는지는 첫 등록 때 확인 */
+function bdClsTmp(c,sm){var s=bdTr((c||{})['소분류']),ps=s&&sm[s]?Object.keys(sm[s]):[];return ps.length>1?'같은 소분류 「'+s+'」 '+ps.length+'곳('+ps.join(' · ')+')':'';}
 function bdEntries(key,d){   /* 한 거래처 → 이 메뉴에 넣을 줄. 칸 값 = 보내기 칸 이름(영림원 화면 이름) = 폼 칸 label */
   var s=BYKEY[key],out=[];
   if(key==='classes'){var g={},ord=[];
@@ -3962,7 +3963,7 @@ function bdDocOf(key,vn,e){
   var k=purKey(e.vals);return a.filter(function(r){return purKey(r)===k&&(r.status!=='오류'||mine(r));}).sort(bdOld)[0]||null;
 }
 function bdState(key,vn,e,ctx){
-  var s=BYKEY[key],d=bdDocOf(key,vn,e),st={t:'new',doc:d,diff:[],errs:[],ok:false,why:''};
+  var s=BYKEY[key],d=bdDocOf(key,vn,e),st={t:'new',doc:d,diff:[],errs:[],ok:false,why:'',tmp:''};
   if(d&&key==='classes'&&d.status!=='오류')st.t='have';
   else if(d&&d.bd&&d.bd['지문']===e.fp&&(d.bd['이력']==null?null:d.bd['이력'])===(e.hi==null?null:e.hi))st.t='have';
   else if(d){st.diff=bdDiff(key,e.vals,d);st.t=st.diff.length?'chg':'have';}
@@ -3970,7 +3971,7 @@ function bdState(key,vn,e,ctx){
   s.fields.forEach(function(f){var v=bdTr(e.vals[f.k]);
     if(f.type!=='check'&&(f.req||(key==='purprices'&&f.k==='code'))&&!v)add(f.k,f.label+' 빈칸');
     else if(v&&f.opts&&f.opts.indexOf(v)<0)add(f.k,f.label+' 목록 밖 값');});
-  var ce=bdClsErrs(e.c,ctx.sm);
+  var ce=bdClsErrs(e.c,ctx.sm);if(key!=='purprices')st.tmp=bdClsTmp(e.c,ctx.sm);   /* v278 막지 않음 */
   if(key==='classes')ce.forEach(function(x){add(BD_CK[x.n],x.m);});
   if(key==='materials'){
     ce.forEach(function(x){add('small',x.m);});
@@ -4034,9 +4035,9 @@ function bdBoxFn(s,say){
       var dc=d?h('span',{class:'chip '+(d.status||'대기')},d.status||'대기'):'';
       var no=d&&d.id?h('small',{class:'bdno',title:'대기번호 '+d.id},d.id.slice(0,6)):'';
       var why=st.t!=='have'?st.errs.map(function(q){return q.m;}).concat(st.why?[st.why]:[]).join(' · '):'';
-      var res=BD.fail[id]||(d&&d.status==='오류'&&d.agentNote?d.agentNote:'')||why;
+      var res=BD.fail[id]||(d&&d.status==='오류'&&d.agentNote?d.agentNote:'')||why,tmpE=st.t!=='have'&&st.tmp&&!BD.fail[id]?h('span',{class:'bdtmp'},h('span',{class:'chip tmp'},'임시'),' '+st.tmp):'';   /* v278 */
       return h('tr',{class:st.t!=='have'&&st.errs.length?'bdred':''},h('td',{},cb),s.fields.map(function(f){return td(e,st,f);}),
-        h('td',{class:'bdst'},stc,dc,no),h('td',{class:'bdwhy'+(BD.fail[id]||st.errs.length||(d&&d.status==='오류')?' bad':'')},res));}));
+        h('td',{class:'bdst'},stc,dc,no),h('td',{class:'bdwhy'+(BD.fail[id]||st.errs.length||(d&&d.status==='오류')?' bad':'')},res,res&&tmpE?h('br'):'',tmpE));}));
     var tw=h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},head)),tb));
     body.replaceChildren(rows.length?hbarFor(tw):'',rows.length?tw:h('p',{class:'bdnone'},'새 줄 0 · 바뀐 줄 0'));
     goBtn.hidden=false;goBtn.disabled=!n||BD.busy;goBtn.textContent=n?'대기로 넘기기 '+n+'건':'대기로 넘기기';
