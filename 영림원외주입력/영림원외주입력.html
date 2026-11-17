@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v276 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v277 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -127,6 +127,8 @@ input.bad,select.bad{border-color:var(--red)}
 .unreg{font-size:11px;color:#b45309;font-weight:700}
 /* v235 세트구성품등록 — 임시 칩 · 벤더피아에서 불러오기 목록(세로 목록, 가로로 안 밀림) */
 .chip.tmp{background:var(--amber-bg);color:var(--amber);border-color:#fde68a;margin-left:4px;vertical-align:1px}
+.btn .bdbadge{margin-left:6px}.bdbox .bdvn{margin:0 0 8px}.bdbox .wcpick .chip{margin-left:6px}.bdbox .bdopt{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;margin-right:12px}.bdbox .bdopt label{display:inline-flex;gap:4px;align-items:center;cursor:pointer}   /* v277 보드/엣지 매입현황에서 불러오기 */
+.bdbox td{white-space:nowrap}.bdbox td.bad{box-shadow:inset 0 0 0 2px var(--red);background:var(--red-bg)}.bdbox td.chg{background:var(--amber-bg);font-weight:800}.bdbox td.bdwhy{white-space:normal;min-width:180px;font-size:11.5px}.bdbox td.bdwhy.bad{color:var(--red)}.bdbox td.bdst .chip+.chip{margin-left:4px}.bdbox .bdno{margin-left:4px;color:var(--muted);font-family:var(--mono,monospace)}.bdbox .bdbad{color:var(--red)}.bdbox .bdnone{margin:8px 0;font-size:12px;color:var(--muted)}.bdbox .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
 .vpbox{flex-basis:100%;min-width:0;border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:6px;background:#fff}
 .vpbox input[type=search]{flex:1 1 200px;min-width:0}
 .vplist{max-height:50vh;overflow-y:auto;overflow-x:hidden}
@@ -477,7 +479,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v276</span>
+    <span class="ver">v277</span>
   </div>
 </header>
 <div class="wrap">
@@ -2130,6 +2132,7 @@ function wDefs(){
   var L=function(sn){return sn.docs.map(function(x){return Object.assign({id:x.id},x.data());});},d=[];
   STEPS.forEach(function(s){d.push({c:'erp_'+s.key,spec:WIN[s.key]?{open:1,t:['createdAt']}:null,when:PER_MENU[s.key],
     on:function(sn){data[s.key]=L(sn);if(CNT[s.key])CNT[s.key].doneT=0;refreshAll();},err:function(){data[s.key]=data[s.key]||[];refreshAll();},off:function(){data[s.key]=null;}});});
+  d.push({c:BD_PATH,when:function(){return !!BD_STEPS[cur];},on:function(sn){BD.docs=L(sn);BD.err='';bdRedraw();},err:function(e){BD.docs=BD.docs||[];BD.err='보드/엣지 매입현황 자료를 읽지 못했습니다: '+errText(e);bdRedraw();},off:function(){BD.docs=null;}});   /* v277 보내기(공개 창고, 읽기만) */
   d.push({c:'erp_rates',on:function(sn){data.rates=L(sn);refreshAll();},err:function(){data.rates=data.rates||[];refreshAll();}});   /* v167 환율(기준정보) */
   d.push({c:'erp_imports',spec:{open:1,t:['createdAt']},on:function(sn){IMPORTS=L(sn);if(impDraw)impDraw();if(ifRefresh)ifRefresh();},err:function(){IMPORTS=IMPORTS||[];if(impDraw)impDraw();}});   /* v23 불러오기 요청 */
   d.push({c:'erp_stocks',when:PER_MENU.stocks,on:function(sn){STOCKS=L(sn);renderNav();if(stkDraw)stkDraw();},err:function(){STOCKS=STOCKS||[];renderNav();if(stkDraw)stkDraw();},off:function(){STOCKS=null;}});   /* v102 */
@@ -3896,6 +3899,175 @@ function setFillRow(o){   /* 양식·붙여넣기 줄: 세트구성품번 ⇄ �
   else if(isEmpty(o.ccode)&&!isEmpty(o.cname)){var l=VP.byName[String(o.cname).trim()];if(l&&l.length===1)o.ccode=l[0].code;}
 }
 function tmpChip(x){if(!x)return;var l=x.el.querySelector('label');if(l)l.append(' ',h('span',{class:'chip tmp'},'임시'));}
+/* ---------- v277 보드/엣지 매입현황에서 불러오기 (3 품목대중소분류정의 · 5 자재등록 · 구매단가등록) ----------
+   사장님 11-17 「새로 불러온 파일에 새로운 명세가 있다면 지금과 같은 논리로 영림원 입력폼 자리에 추가되는 경우가 생길 텐데, 이를 입력폼 쪽에서 감지하여 새로운 등록이 준비되도록 해야 해.」
+   읽는 곳(읽기만) = 공개 창고 artifacts/vivivic-4b7ef/public/data/발주역입력_영림원폼/{우리 거래처} 의 `보내기`
+     {판,고친때,줄:[{열쇠,상태,지문,고친때,거래처,분류,자재등록,구매단가등록,단가이력}]} — 꼴 = 입력작업자/전달-보드매입현황-기준정보폼.md 7절. 세 메뉴를 열었을 때만 지켜본다(wDefs). 「등록안함」 줄은 뺀다.
+   받은 기록 = 대기로 넘긴 폼 문서 자신의 bd 칸 {출처,거래처,열쇠,지문,판,받은때,이력?} — 대기번호 = 문서 id · 결과 = 그 문서 status·agentNote (새 컬렉션·규칙 바꿈 없음).
+   새 줄 = 받은 문서가 없음 · 바뀐 줄 = 받은 문서가 있고 지문이 다르며 이 메뉴 칸 값도 다름(지문만 다르면 다른 메뉴 칸이 바뀐 것 → 이 메뉴는 받음).
+     분류 = 대·중·소 경로가 3 분류에 없으면 새 줄(바뀐 줄 없음) · 자재 = bd 거래처·열쇠로 맞춤 · 구매단가 = 구매거래처·품번·적용시작일(purKey).
+   바뀐 줄 넘기기 = 받은 문서가 대기·오류일 때만 그 문서를 고쳐 다시 대기(updateIf). 진행중은 기다림 · 완료는 그 메뉴 「수정」으로(여기서 안 고침).
+   빨간 줄(넘기지 않음) = 빈 필수칸 · 목록 밖 값 · 겹치는 자재번호 · 이상한 분류 이름(숫자 사이 쉼표 「0,15t」 · 앞뒤 빈칸 · 같은 소분류 이름이 두 중분류 밑) · 자재명 끝 * ·
+     단가 숫자 아님 · 날짜 꼴 · 구매거래처 미등록 · 앞 단계 없음(분류 → 자재 → 구매단가).
+   ⚠ 임시(첫 등록 때 확인, 화면에 「임시」): 단가이력 여러 줄 / 마지막 단가만(처음 = 마지막 단가만) · 부가세포함여부 처음 값(구매단가등록엔 칸 없음 — 기준 = 별도) · 원화 소수 단가 · 지난 날짜 적용시작일. */
+var BD_PATH=VP_PATH+'발주역입력_영림원폼',BD_SRC='보드/엣지 매입현황',BD_STEPS={classes:1,materials:1,purprices:1};
+var BD={docs:null,err:'',vn:{},mode:'last',all:false,pick:{},sent:{},fail:{},busy:false,draw:null,badge:null};
+function bdTr(v){return String(v==null?'':v).trim();}
+function bdVendors(){return (BD.docs||[]).filter(function(d){return d.id.charAt(0)!=='_'&&d['보내기']&&Array.isArray(d['보내기']['줄']);}).sort(function(a,b){return a.id.localeCompare(b.id,'ko');});}
+function bdLive(d){return d['보내기']['줄'].filter(function(r){return r&&r['상태']==='보냄';});}
+function bdPath(c){c=c||{};var a=[c['대분류'],c['중분류'],c['소분류']].map(bdTr);return a.some(Boolean)?a.join(CLS_SEP):'';}
+function bdCtx(){   /* 모든 거래처를 한 번에 보는 값 — 소분류 이름 → 대>중 · 자재번호 → 줄 */
+  var sm={},codes={},add=function(b,m,s){b=bdTr(b);m=bdTr(m);s=bdTr(s);if(!s)return;(sm[s]=sm[s]||{})[b+CLS_SEP+m]=1;};
+  bdVendors().forEach(function(d){bdLive(d).forEach(function(r){var c=r['분류']||{},k=bdTr((r['자재등록']||{})['자재번호']);add(c['대분류'],c['중분류'],c['소분류']);
+    if(k)(codes[k]=codes[k]||[]).push(d.id+'|'+r['열쇠']);});});
+  (data.classes||[]).forEach(function(r){if(r.kind==='자재'&&r.status!=='오류')add(r.big,r.mid,r.name);});
+  return {sm:sm,codes:codes};
+}
+var BD_CK={'대분류':'big','중분류':'mid','소분류':'name'};
+function bdClsErrs(c,sm){   /* [{n:분류 칸 이름, m:까닭}] */
+  var e=[];c=c||{};
+  Object.keys(BD_CK).forEach(function(n){var v=String(c[n]==null?'':c[n]);
+    if(/\d,\d/.test(v))e.push({n:n,m:n+' 「'+v+'」 숫자 사이 쉼표'});
+    else if(v&&(v!==v.trim()||/[\t\n]/.test(v)))e.push({n:n,m:n+' 앞뒤 빈칸'});});
+  var s=bdTr(c['소분류']),ps=s&&sm[s]?Object.keys(sm[s]):[];
+  if(ps.length>1)e.push({n:'소분류',m:'같은 소분류 「'+s+'」 '+ps.length+'곳('+ps.join(' · ')+')'});
+  return e;
+}
+function bdEntries(key,d){   /* 한 거래처 → 이 메뉴에 넣을 줄. 칸 값 = 보내기 칸 이름(영림원 화면 이름) = 폼 칸 label */
+  var s=BYKEY[key],out=[];
+  if(key==='classes'){var g={},ord=[];
+    bdLive(d).forEach(function(r){var c=r['분류']||{},p=bdPath(c);
+      if(!g[p]){g[p]={id:'c|'+p,c:c,keys:[],fps:[],vals:{kind:'자재',big:bdTr(c['대분류']),mid:bdTr(c['중분류']),name:bdTr(c['소분류']),use:true}};ord.push(p);}
+      g[p].keys.push(r['열쇠']);g[p].fps.push(r['지문']);});
+    return ord.map(function(p){return g[p];});}
+  bdLive(d).forEach(function(r){
+    var c=r['분류']||{},src=r[key==='materials'?'자재등록':'구매단가등록']||{},v={};
+    s.fields.forEach(function(f){v[f.k]=f.k==='small'&&key==='materials'?bdPath(c):bdTr(src[f.label]);});
+    var e={id:key.charAt(0)+'|'+r['열쇠'],c:c,key:r['열쇠'],fp:r['지문'],vals:v};
+    var hs=key==='purprices'&&BD.mode==='hist'&&Array.isArray(r['단가이력'])&&r['단가이력'].length?r['단가이력']:null;
+    if(!hs){out.push(e);return;}
+    hs.forEach(function(x,i){out.push(Object.assign({},e,{id:e.id+'#'+i,hi:i,vals:Object.assign({},v,{price:bdTr(x['단가']),from:bdTr(x['적용시작일'])})}));});
+  });
+  return out;
+}
+function bdDiff(key,a,b){   /* 이 메뉴 칸 중 값이 다른 칸 키(읽기 전용 칸 = 자재에서 채우는 품명·규격·단위는 안 봄) */
+  return BYKEY[key].fields.filter(function(f){if(f.ro)return false;if(f.type==='check')return !!a[f.k]!==!!b[f.k];
+    var x=bdTr(a[f.k]),y=bdTr(b[f.k]);if(f.type==='number'&&x!==''&&y!=='')return Number(x)!==Number(y);return x!==y;}).map(function(f){return f.k;});
+}
+function bdOld(a,b){return (a.status==='오류')-(b.status==='오류')||(String(b.createdAt||'')<String(a.createdAt||'')?-1:1);}
+function bdDocOf(key,vn,e){
+  var a=data[key]||[],mine=function(r){return r.bd&&r.bd['거래처']===vn&&r.bd['열쇠']===e.key;};
+  if(key==='classes'){var p=clsPath(e.vals);return a.filter(function(r){return r.kind==='자재'&&clsPath(r)===p;}).sort(bdOld)[0]||null;}
+  if(key==='materials')return a.filter(mine).sort(bdOld)[0]||null;
+  var k=purKey(e.vals);return a.filter(function(r){return purKey(r)===k&&(r.status!=='오류'||mine(r));}).sort(bdOld)[0]||null;
+}
+function bdState(key,vn,e,ctx){
+  var s=BYKEY[key],d=bdDocOf(key,vn,e),st={t:'new',doc:d,diff:[],errs:[],ok:false,why:''};
+  if(d&&key==='classes'&&d.status!=='오류')st.t='have';
+  else if(d&&d.bd&&d.bd['지문']===e.fp&&(d.bd['이력']==null?null:d.bd['이력'])===(e.hi==null?null:e.hi))st.t='have';
+  else if(d){st.diff=bdDiff(key,e.vals,d);st.t=st.diff.length?'chg':'have';}
+  var E=st.errs,add=function(k,m){E.push({k:k,m:m});};
+  s.fields.forEach(function(f){var v=bdTr(e.vals[f.k]);
+    if(f.type!=='check'&&(f.req||(key==='purprices'&&f.k==='code'))&&!v)add(f.k,f.label+' 빈칸');
+    else if(v&&f.opts&&f.opts.indexOf(v)<0)add(f.k,f.label+' 목록 밖 값');});
+  var ce=bdClsErrs(e.c,ctx.sm);
+  if(key==='classes')ce.forEach(function(x){add(BD_CK[x.n],x.m);});
+  if(key==='materials'){
+    ce.forEach(function(x){add('small',x.m);});
+    if(/\*\s*$/.test(String(e.vals.name||'')))add('name','자재명 끝 *');
+    var code=bdTr(e.vals.code);
+    if(code){var o=(ctx.codes[code]||[]).filter(function(x){return x!==vn+'|'+e.key;}),od=(data.materials||[]).filter(function(r){return r.status!=='오류'&&bdTr(r.code)===code&&!(r.bd&&r.bd['거래처']===vn&&r.bd['열쇠']===e.key);});
+      if(o.length)add('code','자재번호 겹침('+o.map(function(x){return x.replace('\t',' ').trim();}).join(' · ')+')');
+      else if(od.length)add('code','자재번호 겹침(저장된 자재 「'+(od[0].name||'')+'」)');}
+    if(e.vals.small&&!ce.length&&!clsOf('자재',e.vals.small))add('small','분류 없음 — 품목대중소분류정의 먼저');
+  }
+  if(key==='purprices'){
+    if(e.vals.price&&!impNum(e.vals.price))add('price','단가 숫자 아님');
+    if(e.vals.from&&!/^\d{4}-\d{2}-\d{2}$/.test(e.vals.from))add('from','적용시작일 날짜 꼴 아님');
+    if(e.vals.vendor&&(LISTS['dl-purvendors']||[]).indexOf(e.vals.vendor)<0)add('vendor','구매거래처 미등록');
+    if(e.vals.code){var ms=(data.materials||[]).filter(function(r){return r.status!=='오류'&&bdTr(r.code)===e.vals.code;});
+      if(!ms.length)add('code','자재 없음 — 자재등록 먼저');
+      else if(ms.every(function(r){return r.bd&&!(r.bd['거래처']===vn&&r.bd['열쇠']===e.key);}))add('code','자재번호 겹침(다른 줄 자재 「'+(ms[0].name||'')+'」)');}
+  }
+  if(st.t==='chg'&&d){if(d.status==='진행중')st.why='진행중 — 끝난 뒤 다시';else if(!(d.status==='대기'||d.status==='오류')||hasEdit(d))st.why='영림원에 있음 — 저장한 항목 「수정」으로';}
+  st.ok=st.t!=='have'&&!E.length&&!st.why;
+  return st;
+}
+function bdAll(key){   /* [{vn,pan,at,rows:[{e,st}]}] */
+  var ctx=bdCtx();
+  return bdVendors().map(function(d){var b=d['보내기'];return {vn:d.id,pan:b['판'],at:b['고친때'],live:bdLive(d).length,rows:bdEntries(key,d).map(function(e){return {e:e,st:bdState(key,d.id,e,ctx)};})};});
+}
+function bdCnt(rows){var n=0,c=0,bad=0;rows.forEach(function(x){if(x.st.t==='new')n++;else if(x.st.t==='chg')c++;if(x.st.t!=='have'&&x.st.errs.length)bad++;});return {n:n,c:c,bad:bad};}
+function bdRedraw(){if(BD.badge)BD.badge();if(BD.draw&&!BD.busy)BD.draw();}
+function bdBoxFn(s,say){
+  var key=s.key,badgeEl=h('span',{class:'chip diff bdbadge',hidden:true});
+  var vRow=h('div',{class:'wcpicks bdvn',role:'group','aria-label':'거래처'}),info=h('div',{class:'lsinfo'}),opts=h('div',{class:'oldrow'}),body=h('div',{});
+  var msg=h('span',{class:'msg','aria-live':'polite'}),goBtn=h('button',{type:'button',class:'btn primary small'},'대기로 넘기기');
+  var allCb=h('input',{type:'checkbox',checked:BD.all,on:{change:function(){BD.all=allCb.checked;draw();}}});
+  var box=h('div',{class:'vpbox bdbox',hidden:true},vRow,info,opts,body,h('div',{class:'row'},goBtn,msg));
+  var cache=null;
+  function badge(){var A=BD.docs?bdAll(key):[],t={n:0,c:0};A.forEach(function(v){var c=bdCnt(v.rows);t.n+=c.n;t.c+=c.c;});
+    badgeEl.hidden=!(t.n||t.c);badgeEl.textContent='새 줄 '+t.n+' · 바뀐 줄 '+t.c;cache=A;}
+  function radio(v,lab){return h('label',{},h('input',{type:'radio',name:'bd-mode',value:v,checked:BD.mode===v,on:{change:function(){BD.mode=v;BD.pick={};badge();draw();}}}),lab);}
+  function td(e,st,f){var v=e.vals[f.k],t=f.type==='check'?(v?'✓':''):bdTr(v),er=st.errs.filter(function(x){return x.k===f.k;}),c=er.length?'bad':st.t==='chg'&&st.diff.indexOf(f.k)>=0?'chg':'';
+    return h('td',c?{class:c,title:er.map(function(x){return x.m;}).join(' · ')}:{},t);}
+  function draw(){
+    if(!cache)badge();
+    if(BD.err){info.replaceChildren(BD.err);vRow.replaceChildren();opts.replaceChildren();body.replaceChildren();goBtn.hidden=true;return;}
+    if(!BD.docs){info.replaceChildren('불러오는 중');vRow.replaceChildren();opts.replaceChildren();body.replaceChildren();goBtn.hidden=true;return;}
+    var A=cache,vn=BD.vn[key],V=A.filter(function(v){return v.vn===vn;})[0];
+    vRow.replaceChildren.apply(vRow,A.map(function(v){var c=bdCnt(v.rows),on=v.vn===vn;
+      return h('button',{type:'button',class:'btn small wcpick'+(on?' primary':''),'aria-pressed':on?'true':'false',on:{click:function(){BD.vn[key]=on?'':v.vn;draw();}}},v.vn,c.n+c.c?h('span',{class:'chip diff'},String(c.n+c.c)):'');}));
+    if(!A.length)info.replaceChildren('보낸 거래처 0');
+    if(!V){if(A.length)info.replaceChildren();opts.replaceChildren();body.replaceChildren();goBtn.hidden=true;msg.textContent='';return;}
+    var c=bdCnt(V.rows),dt=new Date(V.at),at=isNaN(dt)?'':pad2(dt.getMonth()+1)+'-'+pad2(dt.getDate())+' '+pad2(dt.getHours())+':'+pad2(dt.getMinutes());
+    info.replaceChildren(h('span',{},'판 '+V.pan),h('span',{},at),h('span',{},'줄 '+V.live),h('span',{class:'lscnt'+(c.n?' need':'')},'새 줄 '+c.n),h('span',{class:'lscnt'+(c.c?' need':'')},'바뀐 줄 '+c.c),c.bad?h('span',{class:'bdbad'},'빨간 줄 '+c.bad):'');
+    opts.replaceChildren.apply(opts,(key==='purprices'?[h('span',{class:'bdopt',role:'radiogroup','aria-label':'단가이력'},radio('last','마지막 단가만'),radio('hist','단가이력 여러 줄'),h('span',{class:'chip tmp'},'임시')),
+      h('span',{class:'bdopt'},'부가세포함여부 별도',h('span',{class:'chip tmp'},'임시'))]:[]).concat([h('label',{class:'bdopt'},allCb,'받은 줄도 보기')]));
+    var rows=V.rows.filter(function(x){return BD.all||x.st.t!=='have'||(x.st.doc&&x.st.doc.status==='오류')||BD.sent[key+'|'+V.vn+'|'+x.e.id]||BD.fail[key+'|'+V.vn+'|'+x.e.id];});
+    var today=conToday(),tmpP=rows.some(function(x){return /\./.test(bdTr(x.e.vals.price));}),tmpF=rows.some(function(x){var f=bdTr(x.e.vals.from);return f&&f<today;});
+    var head=[h('th',{},'')].concat(s.fields.map(function(f){return h('th',{},f.label,(f.k==='price'&&tmpP)||(f.k==='from'&&tmpF)?h('span',{class:'chip tmp'},'임시'):'');}),[h('th',{},'상태'),h('th',{},'확인')]);
+    var n=0,tb=h('tbody',{},rows.map(function(x){
+      var e=x.e,st=x.st,id=key+'|'+V.vn+'|'+e.id,d=st.doc,on=st.ok&&BD.pick[id]!==false;if(on)n++;
+      var cb=h('input',{type:'checkbox',checked:on,disabled:!st.ok||BD.busy,'aria-label':'넘기기',on:{change:function(){BD.pick[id]=cb.checked;draw();}}});
+      var stc=st.t==='new'?h('span',{class:'chip diff'},'새 줄'):st.t==='chg'?h('span',{class:'chip diff',title:st.diff.map(function(k){return (s.fields.filter(function(f){return f.k===k;})[0]||{}).label;}).join(' · ')},'바뀐 줄'):'';
+      var dc=d?h('span',{class:'chip '+(d.status||'대기')},d.status||'대기'):'';
+      var no=d&&d.id?h('small',{class:'bdno',title:'대기번호 '+d.id},d.id.slice(0,6)):'';
+      var why=st.t!=='have'?st.errs.map(function(q){return q.m;}).concat(st.why?[st.why]:[]).join(' · '):'';
+      var res=BD.fail[id]||(d&&d.status==='오류'&&d.agentNote?d.agentNote:'')||why;
+      return h('tr',{class:st.t!=='have'&&st.errs.length?'bdred':''},h('td',{},cb),s.fields.map(function(f){return td(e,st,f);}),
+        h('td',{class:'bdst'},stc,dc,no),h('td',{class:'bdwhy'+(BD.fail[id]||st.errs.length||(d&&d.status==='오류')?' bad':'')},res));}));
+    var tw=h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},head)),tb));
+    body.replaceChildren(rows.length?hbarFor(tw):'',rows.length?tw:h('p',{class:'bdnone'},'새 줄 0 · 바뀐 줄 0'));
+    goBtn.hidden=false;goBtn.disabled=!n||BD.busy;goBtn.textContent=n?'대기로 넘기기 '+n+'건':'대기로 넘기기';
+    goBtn.onclick=function(){send(V,rows.filter(function(x){return x.st.ok&&BD.pick[key+'|'+V.vn+'|'+x.e.id]!==false;}));};
+  }
+  function send(V,todo){
+    if(!todo.length||BD.busy)return;
+    if(!db){msg.textContent='저장소에 연결되지 않아 넘기지 못했습니다.';msg.className='msg bad';return;}
+    BD.busy=true;goBtn.disabled=true;msg.textContent='넘기는 중';msg.className='msg';
+    var done=0,bad=0;
+    freshCheck().then(function(old){
+      if(old){BD.busy=false;msg.textContent=old;msg.className='msg bad';draw();return;}
+      return todo.reduce(function(p,x){return p.then(function(){
+        var e=x.e,id=key+'|'+V.vn+'|'+e.id,now=new Date().toISOString(),bd={'출처':BD_SRC,'거래처':V.vn,'판':V.pan,'받은때':now};
+        if(key==='classes'){bd['열쇠']=e.keys;bd['지문']=e.fps;}else{bd['열쇠']=e.key;bd['지문']=e.fp;if(e.hi!=null)bd['이력']=e.hi;}
+        var nv=normVals(s,e.vals);delete BD.fail[id];
+        if(x.st.t==='new')return stepAdd(s,Object.assign(nv,{bd:bd})).then(function(r){var doc=Object.assign({id:r.id},r.doc);dataPut(key,doc);done++;BD.sent[id]=1;},function(er){bad++;BD.fail[id]='넘기지 못함: '+errText(er);});
+        return db.collection('erp_'+key).doc(x.st.doc.id).updateIf(function(cur){
+          if(!(cur.status==='대기'||cur.status==='오류')||hasEdit(cur))return null;
+          var o=Object.assign({},nv);if(s.fillDoc)s.fillDoc(o);o.status='대기';o.agentNote='';o.bd=bd;return o;
+        }).then(function(ok){if(ok){done++;BD.sent[id]=1;}else{bad++;BD.fail[id]='넘기지 못함: 그 사이 입력 작업자가 처리를 시작했습니다';}},function(er){bad++;BD.fail[id]='넘기지 못함: '+errText(er);});
+      });},Promise.resolve()).then(function(){
+        BD.busy=false;msg.textContent=done+'건 대기로 넘김'+(bad?' · 못 넘김 '+bad+'건':'');msg.className='msg'+(bad?' bad':'');
+        cache=null;badge();draw();renderList();renderNav();renderSum();
+      });
+    });
+  }
+  BD.badge=function(){badge();};BD.draw=function(){cache=null;draw();};
+  badge();
+  return {box:box,badgeEl:badgeEl,toggle:function(){box.hidden=!box.hidden;if(!box.hidden){msg.textContent='';cache=null;draw();}}};
+}
 function setRowHook(r){   /* 줄 칸: 단품코드 ⇄ 단품명 드롭다운(목록 밖 입력 허용 · 「미등록」만) */
   var by=function(k){return r.fields.filter(function(x){return x.f.k===k;})[0];};
   var fc=by('ccode'),fn=by('cname');if(!fc||!fn)return;
@@ -5717,7 +5889,7 @@ function renderStep(){
   if(cur==='stocks'){renderStock();return;}   /* v102 */
   if(cur==='vpnames'){renderVpNames();return;}   /* v263 */
   if(cur==='pdm'){renderPdm();return;}   /* v230 */
-  var s=BYKEY[cur];bulk=null;
+  var s=BYKEY[cur];bulk=null;BD.draw=BD.badge=null;   /* v277 */
   form=buildForm(s);
   if(s.key==='pomods'&&POMOD_PRE){var pp=POMOD_PRE;POMOD_PRE=null;POMOD_CTX=pp.ctx;setTimeout(function(){if(BYKEY[cur]===s)form.fill(pp.vals,pp.rows);},0);}   /* v157 「발주수정」으로 연 때 채움 */
   form.el.addEventListener('submit',function(e){e.preventDefault();save(s);});
@@ -5781,6 +5953,9 @@ function renderStep(){
   if(s.key==='setitems'){var vpFn=vpBoxFn(s,say);tmpChip(form.field('pcode'));   /* v235 벤더피아에서 불러오기 · 임시 = 세트품번 규칙 */
     var vpBtn=h('button',{type:'button',class:'btn imp',on:{click:function(){vpFn.toggle();vpBtn.setAttribute('aria-expanded',String(!vpFn.box.hidden));}}},ico('import'),'벤더피아에서 불러오기');
     impBtn.after(vpBtn);xlQ.before(vpFn.box);vpLoad();}
+  if(BD_STEPS[s.key]){var bdFn=bdBoxFn(s,say);   /* v277 보드/엣지 매입현황에서 불러오기 · 새 줄·바뀐 줄 알림 */
+    var bdBtn=h('button',{type:'button',class:'btn imp','aria-expanded':'false',on:{click:function(){bdFn.toggle();bdBtn.setAttribute('aria-expanded',String(!bdFn.box.hidden));}}},ico('import'),'보드/엣지 매입현황에서 불러오기',bdFn.badgeEl);
+    impBtn.after(bdBtn);xlQ.before(bdFn.box);}
   xlPick=s.xlCols?{fn:inFn||pdFn||prFn||pnFn,box:xlQ}:null;
   sheetDraw=null;
   if(SHEET_STEPS[s.key]){   /* v35 완료 품목 셀 표 */
@@ -8612,7 +8787,7 @@ function staffRepoTable(){
     ['자료 보호','늘지 않음 — 파이어베이스 키는 원래 공개 값, 자료는 저장소 규칙이 지킴','저장소 규칙 배포(위)']]);
 }
 function go(k){if(BYKEY[k]&&BYKEY[k].shownIn)k=BYKEY[k].shownIn;cur=k;wSync();navOpen=NARROW()?'':null;try{history.replaceState(null,'','#'+k);}catch(e){location.hash=k;}renderNav();renderSum();renderStep();}
-function refreshAll(){rateSyncAll();renderNav();renderSum();renderList();refreshLists();if(impDraw)impDraw();if(sheetDraw)sheetDraw();if(ifRefresh)ifRefresh();if(stkDraw)stkDraw();if(vpnDraw&&cur==='vpnames')vpnDraw();if(pdmDraw)pdmDraw();if(vpmDraw)vpmDraw();if(vapDraw)vapDraw();podModSync();}   /* v257 불러온 자재가 들어오면 발주권한 후보 다시 */   /* v227 링크 맞추기 뺌 — 발주수정 자동(구매)만 */
+function refreshAll(){rateSyncAll();renderNav();renderSum();renderList();refreshLists();if(impDraw)impDraw();if(sheetDraw)sheetDraw();if(ifRefresh)ifRefresh();if(stkDraw)stkDraw();if(vpnDraw&&cur==='vpnames')vpnDraw();if(pdmDraw)pdmDraw();if(vpmDraw)vpmDraw();if(vapDraw)vapDraw();bdRedraw();podModSync();}   /* v257 불러온 자재가 들어오면 발주권한 후보 다시 */   /* v227 링크 맞추기 뺌 — 발주수정 자동(구매)만 */
 
 /* ---------- boot ---------- */
 
