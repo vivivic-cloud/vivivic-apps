@@ -494,7 +494,61 @@ const VP_DATA = (() => {
     }
   }
 
-  return { PAGES: PAGES_, list, ymd, prefetch, clearCache, 하나찾기, 받기: 벤더피아받기 };
+  /* ── 발주역입력 실시간 단품 검색 (11-18 [새 지시 단품실시간]) ─────────────────────────────
+     사장님: 재단 세부내역·이룸산업·로앤 출고내역의 「단품 추가」 검색을 창고 사본(`납품내역_단품목록`)이 아니라
+            **벤더피아 단품관리에서 바로** — 확장을 다시 내려받지 않고.
+     길: 깃 페이지(vivivic-cloud.github.io)가 `window.open` 으로 연 벤더피아 탭(이 글은 깃에서 받아 그 탭 MAIN 에서 돈다)과
+         **창끼리 postMessage** 로 주고받는다. 깔린 확장(0.34.53~)의 `불러오기.js`·`bg.js` 가 이 글을 깃에서 넣으니 **덮어쓰기 없음**.
+       · 이 탭 → 연 쪽(opener): `{__vp:"단품창"}` 인사(2초마다 · 물으면 바로). 받는 집은 `https://vivivic-cloud.github.io` 하나.
+       · 연 쪽 → 이 탭: `{__vp:"단품찾기", 표, 낱말:[…]}` → 벤더피아 단품관리 검색 폼(단품명 `tbGoodsNm`, 없으면 단품코드 `tbGoodsCd`)에
+         **조회 POST 한 번**(판매상태 전체·등록기간 2000-01-01~오늘·700줄) → `{__vp:"단품찾기답", 표, 로그인, 줄:[[단품코드, 단품명, 판매상태]], 낱말}`.
+     ⚠ 건네는 것은 단품 **세 칸**과 로그인 여부뿐 — 쿠키·비밀번호·금액·매입처는 안 건넨다. 창고·바깥에 쓰지 않는다. 벤더피아에는 조회만.
+     ⚠ 받는 집을 넓히지 마라. 요청은 `벤더피아받기` 줄(사람)로만 간다. */
+  async function 단품검색(낱말들) {
+    const url = "/System/Master/goods.aspx", cfg = PAGES[url];
+    foreground++;
+    try {
+      const src = await 처음문서(url, "사람");
+      if (!src.getElementById("btnSearch")) { 처음문서들.delete(url); return { 로그인: false, 줄: [] }; }
+      const 틀 = 질문틀(cfg, url, src, "", "사람");
+      const cond = { from: "2000-01-01", to: ymd(new Date()), sel: {} };
+      const 시도 = [];
+      for (const w of 낱말들.slice(0, 3)) {
+        시도.push({ [cfg.lookup.name]: w });
+        if (/^[A-Za-z0-9_-]{3,}$/.test(w)) 시도.push({ [cfg.lookup.code]: w });
+      }
+      let res = null, 쓴 = "";
+      for (const texts of 시도) {
+        res = await 틀.query(cond, 틀.manyRows, texts);
+        if (!res.heads.length && res.doc.getElementById("txtID")) { 처음문서들.delete(url); return { 로그인: false, 줄: [] }; }
+        쓴 = Object.values(texts)[0];
+        if (res.rows.length) break;
+      }
+      const h = res ? res.heads : [], c = h.indexOf("단품코드"), n = h.indexOf("단품명"), s = h.indexOf("판매상태");
+      const 줄 = c < 0 ? [] : res.rows.filter((r) => r[c]).map((r) => [r[c], n >= 0 ? r[n] : "", s >= 0 ? r[s] : ""]);
+      return { 로그인: true, 줄, 쓴, 전체: res ? res.total : 0 };
+    } finally {
+      foreground--;
+    }
+  }
+  if (typeof addEventListener === "function" && typeof location === "object" && /^https:\/\/(www\.)?vendorpia\.com$/.test(location.origin)) {
+    const 깃집 = "https://vivivic-cloud.github.io";
+    const 연쪽 = () => { try { const o = window.top.opener; return o && !o.closed ? o : null; } catch (e) { return null; } };
+    const 인사 = () => { const o = 연쪽(); if (o) try { o.postMessage({ __vp: "단품창" }, 깃집); } catch (e) {} };
+    인사(); setInterval(인사, 2000);
+    addEventListener("message", (e) => {
+      if (e.origin !== 깃집 || !e.data || !e.source) return;
+      if (e.data.__vp === "단품안녕") { try { e.source.postMessage({ __vp: "단품창" }, 깃집); } catch (er) {} return; }
+      if (e.data.__vp !== "단품찾기") return;
+      const 표 = String(e.data.표 || "").slice(0, 40);
+      const 낱말들 = (Array.isArray(e.data.낱말) ? e.data.낱말 : [e.data.낱말]).map((w) => String(w || "").trim().slice(0, 60)).filter(Boolean);
+      const 답 = (x) => { try { e.source.postMessage({ __vp: "단품찾기답", 표, 낱말: 낱말들, ...x }, 깃집); } catch (er) {} };
+      if (!낱말들.length) { 답({ 로그인: null, 줄: [] }); return; }
+      단품검색(낱말들).then(답, (er) => 답({ 로그인: null, 줄: [], 까닭: String(er && er.message || er).slice(0, 80) }));
+    });
+  }
+
+  return { PAGES: PAGES_, list, ymd, prefetch, clearCache, 하나찾기, 단품검색, 받기: 벤더피아받기 };
 })();
 
 /* ── 공용 팝업 부품 `VP팝업(판, {머리, 몸})` (11-01 [새 지시 문의큰팝업]) ──
