@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<!-- 발주역입력 / 로앤 — 로앤 「N월 보링 출고 총내역」(PDF 「26년 N월 총출고내역(로앤-보링)」, 월별)을 달마다 표로 본다.
+     사장님 11-18: 「로앤도 해줘」(이룸산업 출고내역과 똑같이 — 월별 목록만, 기능 없음).
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.0.0
+     v1.0.0(11-18): 첫 판. 월 버튼 → 그 달 표 하나 + 맨 아래 「총 합 계」 줄(PDF 처럼 칸을 합침). 칸 이름·값은 PDF 글자 그대로. 기능 없음(목록만).
+       한 양식: 1~4월에 없는 「PO NO.」 는 제목만 두고 빈칸.
+
+     ⚠ 값은 창고(artifacts/vivivic-4b7ef/public/data/발주역입력_로앤)에서 **읽기만** 한다.
+        창고에 넣는 것은 tools/로앤출고읽기.py(드라이브 PDF → 창고). 공개 저장소라 업무 값은 이 파일에 없다.
+     겉꼴은 이룸산업.html · 재단.html(셀 모양 표 · 월 버튼 · 화면 높이 표 상자)과 같다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>로앤 출고내역 — 발주역입력</title>
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+    const app = initializeApp({
+        apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
+        authDomain: "vivivic-4b7ef.firebaseapp.com",
+        projectId: "vivivic-4b7ef",
+        storageBucket: "vivivic-4b7ef.firebasestorage.app",
+        messagingSenderId: "830175660542",
+        appId: "1:830175660542:web:9054030480c8280af8d8af"
+    });
+    const auth = getAuth(app);
+    window.db = getFirestore(app);
+    window.fbRead = { doc, getDoc };
+    onAuthStateChanged(auth, (u) => {
+        if (!u) { signInAnonymously(auth).catch(e => window.목록못읽음('창고에 들어가지 못했습니다', (e&&(e.code||e.message))||'')); return; }
+        window.목록읽기();
+    });
+</script>
+
+<style>
+/* 재단.html 과 같은 값 — 값을 새로 짓지 마라. */
+:root{
+  --vg-bg:#fff; --vg-ink:#111110; --vg-body:#1A1A19;
+  --vg-muted:#9C9C98; --vg-edge:#E2E2DF; --vg-fill:#F4F4F2; --vg-red:#FF3B30;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--vg-bg);color:var(--vg-body);
+  font:15px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",system-ui,sans-serif;
+  -webkit-text-size-adjust:100%}
+.wrap{max-width:1100px;margin:0 auto;padding:0 16px}
+header{padding:16px 0 2px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.logo{font-size:13px;color:var(--vg-muted)}
+.logo b{font-size:15px;font-weight:800;letter-spacing:3.2px;color:var(--vg-ink);margin-right:4px}
+.badge{font-size:11px;font-weight:800;letter-spacing:1.2px;color:var(--vg-ink);
+  border:1px solid var(--vg-ink);border-radius:999px;padding:3px 9px}
+.쪽길{display:flex;gap:16px;padding:8px 0 0;border-bottom:1px solid var(--vg-edge)}
+.쪽길 a{font-size:13px;font-weight:600;color:var(--vg-muted);text-decoration:none;padding:4px 0 7px;margin-bottom:-1px;border-bottom:2px solid transparent}
+.쪽길 a:hover{color:var(--vg-ink)}
+.쪽길 a.on{color:var(--vg-ink);font-weight:800;border-bottom-color:var(--vg-ink)}
+.쪽길+h1{padding-top:14px}
+h1{font-size:30px;line-height:1.1;letter-spacing:-1.2px;font-weight:700;color:var(--vg-ink);padding:4px 0 12px}
+.months{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border-radius:999px;font-family:inherit;font-size:12px;font-weight:600;line-height:1.45;padding:5px 12px;background:#fff;
+  border:1px solid var(--vg-edge);color:var(--vg-body);cursor:pointer;font-variant-numeric:tabular-nums;transition:all .12s;position:relative}
+.chip::after{content:"";position:absolute;inset:-8px -3px}
+.chip:hover{background:var(--vg-fill)}
+.chip.on{background:var(--vg-ink);border-color:var(--vg-ink);color:#fff}
+/* 쪽은 화면 높이 — 화면 전체 막대 없이 표 상자 안에서만 위아래·옆으로 민다(가로 막대가 늘 보는 화면 아래). */
+html,body{height:100%;overflow:hidden}
+.wrap{height:100%;display:flex;flex-direction:column;overflow-y:auto;scrollbar-width:none}
+.wrap::-webkit-scrollbar{display:none}
+.wrap>*{flex-shrink:0}
+.wrap>#속{flex:1 1 0;min-height:0;display:flex;flex-direction:column;margin-top:12px}
+#속>.표통{flex:1 1 auto;min-height:0}
+@media (max-width:600px),(max-height:600px){.wrap>#속{flex:1 0 auto} #속>.표통{flex:1 0 240px}}
+.표통{overflow:auto;-webkit-overflow-scrolling:touch;background:var(--vg-bg)}
+@supports not selector(::-webkit-scrollbar){.표통{scrollbar-width:thin;scrollbar-color:#C7C7C3 var(--vg-fill)}}
+.표통::-webkit-scrollbar{width:10px;height:10px}
+.표통::-webkit-scrollbar-track,.표통::-webkit-scrollbar-corner{background:var(--vg-fill)}
+.표통::-webkit-scrollbar-thumb{background:#C7C7C3;border-radius:10px}
+/* 표 — 재단.html 셀 모양(v1.1.0) 그대로 */
+.dpr-t{width:max-content;border-collapse:separate;border-spacing:0;font-variant-numeric:tabular-nums;
+  border-top:1px solid #C7C7C3;border-left:1px solid #C7C7C3}
+.dpr-t th,.dpr-t td{border-right:1px solid #D6D6D3;border-bottom:1px solid #D6D6D3;white-space:nowrap}
+.dpr-t th{font-size:11.5px;font-weight:800;line-height:1.3;color:var(--vg-ink);text-align:center;vertical-align:middle;
+  padding:4px 5px;background:var(--vg-fill);border-bottom:1px solid #C7C7C3}
+.dpr-t td{font-size:11.5px;line-height:1.3;color:var(--vg-body);padding:2px 5px;vertical-align:top;background:var(--vg-bg)}
+.dpr-t td.num{text-align:right}
+.dpr-t .dpr-k{position:sticky;left:0;z-index:1;font-weight:700;color:var(--vg-ink)}
+.dpr-t th.dpr-k{background:var(--vg-fill)}
+/* 「총 합 계」 줄 — 머리와 같은 바탕·굵기 */
+.dpr-t tr.합 td{font-weight:800;color:var(--vg-ink);background:var(--vg-fill);border-top:1px solid #C7C7C3}
+.dpr-t tr.합 td.dpr-k{text-align:center}
+.state{background:var(--vg-fill);border-radius:14px;padding:22px 16px;text-align:center;margin-top:12px}
+.state .big{font-size:14px;font-weight:600;color:var(--vg-ink);padding-bottom:6px}
+.state .sub{font-size:12.5px;color:var(--vg-muted);line-height:1.85}
+.state .why{font-size:11.5px;color:var(--vg-red);padding-top:6px;font-family:ui-monospace,monospace}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
+  <div class="badge">v1.0.0</div>
+</header>
+<nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html" class="on">로앤 출고내역</a></nav>
+<h1>로앤 출고내역</h1>
+<div class="months" id="고름"></div>
+<div class="state" id="목상태"><div class="big">창고를 읽는 중입니다…</div></div>
+<div id="속"></div>
+</div>
+
+<!-- 짚어서 지시하는 손잡이 — 바이글 박스에서 열면 켜진다. -->
+<script src="../shared/viggle.js"></script>
+
+<script>
+const 창고자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_로앤'];
+const 숫자칸 = new Set(['보링규격','수량','보링단가','보링 가공비']);
+let 달들 = [], 받은 = {}, 고른 = '', 답했나 = false;
+
+const 글 = v => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+function 목상태(큰,작,까닭){
+  const el=document.getElementById('목상태'); el.style.display='block';
+  el.innerHTML = `<div class="big">${큰}</div>` + (작?`<div class="sub">${작}</div>`:'') + (까닭?`<div class="why">${까닭}</div>`:'');
+}
+window.목록못읽음 = (큰,까닭) => { 답했나=true; 목상태(큰,'',까닭||''); };
+setTimeout(() => { if(!답했나) 목상태('창고에 닿지 못했습니다'); }, 20000);
+
+const 달글 = 달 => (+String(달).slice(5,7)) + '월';
+
+window.목록읽기 = async function(){
+  try{
+    const { doc, getDoc } = window.fbRead;
+    const 목 = await getDoc(doc(window.db, ...창고자리, '_달목록'));
+    답했나 = true;
+    달들 = (목.exists() && 목.data().달들) || [];
+    if(!달들.length){ 목상태('창고에 로앤 출고내역이 없습니다'); return; }
+    document.getElementById('목상태').style.display='none';
+    document.getElementById('고름').innerHTML = 달들.map(d => `<button class="chip" data-m="${d}">${달글(d)}</button>`).join('');
+    document.querySelectorAll('#고름 .chip').forEach(b => b.onclick = () => 달고름(b.dataset.m));
+    달고름(달들[달들.length-1]);
+  }catch(e){ window.목록못읽음('창고를 읽지 못했습니다', (e&&(e.code||e.message))||''); }
+};
+
+async function 달고름(m){
+  고른 = m;
+  document.querySelectorAll('#고름 .chip').forEach(b => b.classList.toggle('on', b.dataset.m===m));
+  const 속 = document.getElementById('속');
+  if(!받은[m]){
+    속.innerHTML = '<div class="state"><div class="big">읽는 중입니다…</div></div>';
+    try{
+      const { doc, getDoc } = window.fbRead;
+      const s = await getDoc(doc(window.db, ...창고자리, m));
+      받은[m] = s.exists() ? s.data() : { 칸:[], 줄:[] };
+    }catch(e){ 속.innerHTML = `<div class="state"><div class="big">창고를 읽지 못했습니다</div><div class="why">${글((e&&(e.code||e.message))||'')}</div></div>`; return; }
+  }
+  if(고른 !== m) return;
+  그리기(받은[m]);
+}
+
+/* 한 양식 — 9달 PDF 칸을 합친 차례. 그 달 PDF 에 없는 칸(1~4월 PO NO.)은 제목만 두고 빈칸. 여기 없는 칸이 창고에 새로 오면 끝에 붙인다. */
+const 한양식 = ['출고일','PO NO.','출고업체명','제품명','품목','보링규격','수량','보링단가','보링 가공비'];
+const 같은칸 = {};
+
+function 그리기(d){
+  const 원칸 = d.칸 || [], 줄 = d.줄 || [], 합계 = d.합계 || [];
+  const 속 = document.getElementById('속');
+  if(!줄.length){ 속.innerHTML = '<div class="state"><div class="big">줄 없음</div></div>'; return; }
+  const 칸 = [...한양식, ...원칸.filter(x => !한양식.includes(같은칸[x]||x))];
+  const 자리 = 칸.map(k => 원칸.findIndex(x => (같은칸[x]||x)===k));   /* -1 = 이 달 PDF 에 없는 칸 */
+  const 제목 = 칸.map((k,i) => 자리[i] < 0 ? k : 원칸[자리[i]]);
+  let h = '<table class="dpr-t"><thead><tr>' +
+    제목.map((k,i) => `<th class="${i===0?'dpr-k':''}">${글(k)}</th>`).join('') + '</tr></thead><tbody>';
+  for(const r of 줄){
+    h += '<tr>' + 칸.map((k,i) => {
+      const cls = (i===0?'dpr-k':'') + (숫자칸.has(제목[i])?' num':'');
+      return `<td${cls.trim()?` class="${cls.trim()}"`:''}>${글(자리[i] < 0 ? '' : r.v[자리[i]])}</td>`;
+    }).join('') + '</tr>';
+  }
+  /* 「총 합 계」 — PDF 처럼 칸을 합친 그대로(첫 칸이 남은 칸을 다 차지 → 금액이 보링단가+보링 가공비 자리에 온다) */
+  if(합계.length){
+    const 뒤 = 합계.slice(1).reduce((a,c) => a + (c.n||1), 0);
+    h += '<tr class="합">' + 합계.map((c,j) => {
+      const n = j===0 ? 칸.length - 뒤 : (c.n||1);
+      return `<td class="${j===0?'dpr-k':'num'}"${n>1?` colspan="${n}"`:''}>${글(c.v)}</td>`;
+    }).join('') + '</tr>';
+  }
+  h += '</tbody></table>';
+  속.innerHTML = '<div class="표통">' + h + '</div>';
+}
+</script>
+</body>
+</html>
