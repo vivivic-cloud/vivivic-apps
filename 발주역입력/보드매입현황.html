@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.20.1
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.20.2
      v1.0.0(11-16): 첫 판. 거래처(시트) 버튼 → 그 시트의 표. 거래처 시트는 「전체 · 1월~10월 · 1~10월 누계 · 1~10월 매입품목」 으로 고른다.
        칸 이름·값은 엑셀 글자(셀 표시 꼴) 그대로. 표 꼴은 재단.html v1.1.0 셀 모양(칸 선 · 11.5px · 여백 2px 5px · 숫자 오른쪽)과 같다.
      v1.1.0(11-16): 거래처 메뉴 끝에 「영림원등록」 — 월별 표에서 납품제품명(품목)을 겹치지 않게 한 줄씩, 칸은 품목 · 규격 · 단가만.
@@ -102,6 +102,7 @@
      v1.20.1(11-18): 분류 드롭목록을 직접 만든 목록으로 — 사장님: 「(오류건에서 분류 칸 드롭목록이) 안 나오잖아.」
        까닭: 크롬 datalist 는 칸 값으로 목록을 걸러서, 값이 이미 있는 칸(오류 줄 「샘플」·「18t용」)은 같은 글자 하나만 남아 목록이 안 떴다.
        이제 칸을 누르면(값이 있어도) 그 대(·중) 아래 분류 전부를 펼치고, 치면 그 글자가 든 것만 · 고르면 칸 값 + 저장(손으로 고친 것과 같은 길).
+     v1.20.2(11-18): 목록 색(초록 = 영림원 · 회색 = 등록 대기)은 경로(대·중·소)가 같을 때만 — 이름만 같은 다른 중분류의 분류로 초록이 되던 것.
 
      ⚠ 값은 창고(artifacts/vivivic-4b7ef/public/data/발주역입력_보드매입)에서 읽는다.
         창고에 넣는 것은 tools/보드매입읽기.py(드라이브 엑셀 → 창고) 또는 v1.9.0 「엑셀 새로 불러오기」(사장님이 확인하고 「바꾸기」 를 누를 때만). 공개 저장소라 업무 값은 이 파일에 없다. -->
@@ -283,7 +284,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.20.1</div>
+  <div class="badge">v1.20.2</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -1113,7 +1114,8 @@ async function 폼그리기(){
     const 층 = { big:0, mid:1, name:2 }[el.dataset.분류];
     const 목 = 분류고를것(el.dataset.분류, el.closest('tr')).filter(o => !거름 || o.toLowerCase().includes(거름.toLowerCase()));
     if(!목.length){ 고름.hidden = true; 고름칸 = null; return; }
-    고름.innerHTML = 목.map(o => { const 영 = 영림원분류.filter(x => x[층]===o), c = 영.length ? (영.some(x => x[3]!=='대기') ? '영' : '대') : '';
+    const 값 = k => { const e = el.closest('tr').querySelector(`input[data-k="${k}"]`); return e ? e.value.trim() : ''; }, 대 = 값('m_big'), 중 = 값('m_mid');
+    고름.innerHTML = 목.map(o => { const 영 = 영림원분류.filter(x => x[층]===o && (층 < 1 || x[0]===대) && (층 < 2 || x[1]===중)), c = 영.length ? (영.some(x => x[3]!=='대기') ? '영' : '대') : '';
       return `<div class="${c}${o===el.value.trim() ? ' 지금' : ''}" data-v="${글(o)}">${글(o)}</div>`; }).join('');
     const r = el.getBoundingClientRect();
     고름.style.left = Math.max(4, Math.min(r.left, innerWidth - 200)) + 'px';
