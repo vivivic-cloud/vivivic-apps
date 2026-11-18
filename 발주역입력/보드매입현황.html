@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.19.2
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.20.0
      v1.0.0(11-16): 첫 판. 거래처(시트) 버튼 → 그 시트의 표. 거래처 시트는 「전체 · 1월~10월 · 1~10월 누계 · 1~10월 매입품목」 으로 고른다.
        칸 이름·값은 엑셀 글자(셀 표시 꼴) 그대로. 표 꼴은 재단.html v1.1.0 셀 모양(칸 선 · 11.5px · 여백 2px 5px · 숫자 오른쪽)과 같다.
      v1.1.0(11-16): 거래처 메뉴 끝에 「영림원등록」 — 월별 표에서 납품제품명(품목)을 겹치지 않게 한 줄씩, 칸은 품목 · 규격 · 단가만.
@@ -96,6 +96,9 @@
        기본값: 기준단위 M · 내외자구분 외자(임시) · 구매 내외자구분 직수입(임시) · 통화 CNY(임시) · 단가·적용시작일 빈칸(원본 단가 비어 있음).
      v1.19.1(11-18): 쪽 이동에 「이룸산업 출고내역」(이룸산업.html) 탭 하나만 더함. 기능·표는 그대로.
      v1.19.2(11-18): 쪽 이동에 「로앤 출고내역」(로앤.html) 탭 하나만 더함. 기능·표는 그대로.
+     v1.20.0(11-18): 분류 드롭목록·겹침 검사 = 입력폼 품목대중소분류정의(erp_classes, 자재) 를 바로 읽음 — 사장님: 「당연히 그걸 하라고 입력폼으로 이걸 편입시킨 거잖아.」
+       입력폼과 같은 사이트·같은 Firebase — 입력폼 앱 이름 'erp-input' 으로 둘째 앱을 열어 입력폼 로그인을 그대로 씀(읽기만, 로그인·로그아웃 안 함, 규칙 그대로).
+       목록 = 완료(영림원 등록) + 대기·진행중·수정대기(곧 들어갈 것) · 오류·ylwGone 뺌. 입력폼 로그인이 없거나 못 읽으면 공개 사본 _분류.영림원 으로.
 
      ⚠ 값은 창고(artifacts/vivivic-4b7ef/public/data/발주역입력_보드매입)에서 읽는다.
         창고에 넣는 것은 tools/보드매입읽기.py(드라이브 엑셀 → 창고) 또는 v1.9.0 「엑셀 새로 불러오기」(사장님이 확인하고 「바꾸기」 를 누를 때만). 공개 저장소라 업무 값은 이 파일에 없다. -->
@@ -107,16 +110,30 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
-    import { getFirestore, doc, getDoc, setDoc, collection, getDocs, onSnapshot } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
-    const app = initializeApp({
+    import { getFirestore, doc, getDoc, setDoc, collection, getDocs, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+    const 설정 = {
         apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
         authDomain: "vivivic-4b7ef.firebaseapp.com",
         projectId: "vivivic-4b7ef",
         storageBucket: "vivivic-4b7ef.firebasestorage.app",
         messagingSenderId: "830175660542",
         appId: "1:830175660542:web:9054030480c8280af8d8af"
-    });
+    };
+    const app = initializeApp(설정);
     const auth = getAuth(app);
+    /* v1.20.0 입력폼(영림원외주입력 — 앱 이름 'erp-input', 같은 사이트·같은 Firebase) 로그인을 같이 씀: 품목대중소분류정의(erp_classes) 읽기만.
+       로그인·로그아웃·쓰기 안 함 · 규칙 그대로(erp_ 읽기 = 담당자) · 로그인이 없거나 못 읽으면 공개 사본(_분류.영림원). */
+    try{
+        const 폼앱 = initializeApp(설정, 'erp-input'), 폼auth = getAuth(폼앱), 폼db = getFirestore(폼앱);
+        let 끄기 = null;
+        onAuthStateChanged(폼auth, (u) => {
+            if (끄기) { 끄기(); 끄기 = null; }
+            const 받음 = (줄, 왜) => { window.폼분류대기 = [줄, 왜]; if (window.폼분류받음) window.폼분류받음(줄, 왜); };
+            if (!u) { 받음(null, '입력폼 로그인 없음'); return; }
+            끄기 = onSnapshot(query(collection(폼db, 'erp_classes'), where('kind', '==', '자재')),
+                s => 받음(s.docs.map(d => d.data()), ''), e => 받음(null, (e && (e.code || e.message)) || ''));
+        });
+    }catch(e){ window.폼분류대기 = [null, String(e && e.message || e)]; }
     window.db = getFirestore(app);
     window.fbRead = { doc, getDoc, setDoc, collection, getDocs, onSnapshot };
     onAuthStateChanged(auth, (u) => {
@@ -257,7 +274,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.19.2</div>
+  <div class="badge">v1.20.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -720,7 +737,8 @@ async function 분류받기(){
   const d = await getDoc(doc(window.db, ...폼자리, '_분류'));
   const v = d.exists() ? d.data() : {};
   분류 = { 줄:v.줄||[], 기억:(v.기억||[]).map(x => [x.big||'', x.mid||'', x.name||'']) };
-  영림원분류 = ((v.영림원 || {}).줄 || []).map(x => [String(x.대분류 ?? '').trim(), String(x.중분류 ?? '').trim(), String(x.소분류 ?? '').trim()]);   /* v1.17.1 입력폼이 올린 영림원 기존 분류(읽기만) */
+  공개영림원분류 = ((v.영림원 || {}).줄 || []).map(x => [String(x.대분류 ?? '').trim(), String(x.중분류 ?? '').trim(), String(x.소분류 ?? '').trim(), '완료']);   /* v1.17.1 입력폼이 올린 영림원 기존 분류(읽기만) — v1.20.0 입력폼 로그인이 없을 때만 */
+  if(!폼분류) 영림원분류 = 공개영림원분류;
   분류저장글 = 고른값({ 줄:v.줄||[], 기억:v.기억||[] });   /* v1.14.1 창고와 같으면 첫 저장 때도 안 씀 */
 }
 function 지금분류(){   // 모든 거래처 줄(삭제 뺌)에서 대·중·소가 다 찬 것
@@ -767,7 +785,17 @@ function 분류고를것(칸, tr){
    ② 소분류 이름이 영림원 기존 분류(_분류.영림원.줄)에 있는데 대·중이 다름
    ③ 숫자 사이 쉼표(0,15t) · 앞뒤 빈칸 · 빈칸(대·중·소 중 하나라도 넣은 줄만 — 셋 다 빈 줄은 아직 안 정한 줄)
    (길이·글자·같은 중/대분류 이름은 확인 못 한 규칙이라 검사 안 함 — 8-1 ④) */
-let 영림원분류 = [];   // [[대, 중, 소]] — _분류.영림원.줄
+let 영림원분류 = [];   // [[대, 중, 소, 상태(완료|대기)]] — v1.20.0 입력폼 erp_classes(로그인 때) 또는 공개 사본 _분류.영림원.줄
+let 공개영림원분류 = [], 폼분류 = null, 폼분류왜 = '';
+/* v1.20.0 입력폼 품목대중소분류정의(자재) — 완료 + 대기·진행중·수정대기(곧 들어갈 것) · 오류·영림원에서 지운 것(ylwGone) 뺌 */
+window.폼분류받음 = (줄, 왜) => {
+  const 트 = v => String(v ?? '').trim();
+  폼분류 = 줄 ? 줄.filter(r => r.status !== '오류' && !(r.ylwGone && r.status==='완료')).map(r => [트(r.big), 트(r.mid), 트(r.name), r.status==='완료' ? '완료' : '대기']) : null;
+  폼분류왜 = 왜 || '';
+  영림원분류 = 폼분류 || 공개영림원분류;
+  const 표 = 볼것==='폼' && document.querySelector('.폼표'); if(표) 분류틀그리기(표, 고른);
+};
+if(window.폼분류대기) window.폼분류받음(...window.폼분류대기);
 const 분류칸 = [['m_big','대분류'], ['m_mid','중분류'], ['m_small','소분류']];
 function 분류검사(){
   const 줄들 = [], 소경로 = new Map();
@@ -799,7 +827,7 @@ function 분류검사(){
       const 영 = 영림원분류.filter(x => x[2]===n);
       /* 영림원에 이미 있는 이름이면 영림원 경로가 맞는 것(8-3 「기존 분류 씀」) — ② 로만 봄 */
       if(!영.length && 다른.length) 이유.m_small = `이름을 바꾸십시오(매입현황에 ${다른.map(([p, a]) => p + ' > ' + n + ' — ' + a.slice(0, 3).join(', ')).join(' / ')} 있음 — 영림원은 소분류 이름 하나뿐)`;
-      else if(영.length && !영.some(x => x[0] + ' > ' + x[1]===경)) 이유.m_small = `이름을 바꾸십시오(영림원에 ${영.map(x => x[0] + ' > ' + x[1] + ' > ' + n).join(' / ')} 있음)`;
+      else if(영.length && !영.some(x => x[0] + ' > ' + x[1]===경)) 이유.m_small = `이름을 바꾸십시오(${영.map(x => (x[3]==='대기' ? '입력폼 등록 대기 ' : '영림원 ') + x[0] + ' > ' + x[1] + ' > ' + n).join(' / ')} 있음)`;
     }
     if(Object.keys(이유).length) 틀.set(s + '\n' + 줄키(m), 이유);
   }
@@ -1067,7 +1095,8 @@ async function 폼그리기(){
     if(el.dataset && el.dataset.k && el.dataset.k!=='x_del') 손달기(el.closest('td'));
     if(!el.dataset || !el.dataset.분류) return;
     const 층 = { big:0, mid:1, name:2 }[el.dataset.분류];
-    목록.innerHTML = 분류고를것(el.dataset.분류, el.closest('tr')).map(o => `<option value="${글(o)}"${영림원분류.some(x => x[층]===o) ? ' label="영림원 기존"' : ''}>`).join('');
+    목록.innerHTML = 분류고를것(el.dataset.분류, el.closest('tr')).map(o => { const 영 = 영림원분류.filter(x => x[층]===o);
+      return `<option value="${글(o)}"${영.length ? ` label="${영.some(x => x[3]!=='대기') ? '영림원' : '등록 대기'}"` : ''}>`; }).join('');   /* v1.20.0 */
     el.setAttribute('list', '분류목록');
   });
 
