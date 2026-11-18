@@ -2,7 +2,10 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.0.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.1.0
+     v2.1.0(11-18): 사장님 「두 자료가 상호 연결되도록 … 영림원품목등록에는 어떤 제품을 추가해야 되는지」 — 시트 단추 끝 「추가할 제품 N」:
+       업체별 단품명(창고 발주역입력_업체별단품) 줄 중 단품코드가 「품목등록업로드」 제품 품번에 없는 줄. 업체 단추(전체·업체별 수) + 표(업체 + 업체별 단품명 칸 이름 합친 차례).
+       두 창고를 onSnapshot 으로 실시간 구독 — 어느 쪽이 바뀌어도 수·표가 따라 바뀜. 품목등록업로드 표도 바뀌면 다시 그림.
      v2.0.0(11-18): 「품목등록업로드.html」 → 「영림원품목등록.html」(이름·탭·메뉴). 시트 셋 단추. 옛 주소는 이리 넘긴다.
      v1.0.1(11-18): 쪽길 탭이 여섯이라 폰 폭에서 탭 이름이 낱말 중간에 끊겨 — 이름은 한 줄(nowrap), 넘치면 탭째 다음 줄.
      v1.0.0(11-18): 첫 판(품목등록업로드 시트 하나).
@@ -19,7 +22,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
-    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
     const app = initializeApp({
         apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
         authDomain: "vivivic-4b7ef.firebaseapp.com",
@@ -30,7 +33,7 @@
     });
     const auth = getAuth(app);
     window.db = getFirestore(app);
-    window.fbRead = { doc, getDoc };
+    window.fbRead = { doc, getDoc, onSnapshot };
     onAuthStateChanged(auth, (u) => {
         if (!u) { signInAnonymously(auth).catch(e => window.목록못읽음('창고에 들어가지 못했습니다', (e&&(e.code||e.message))||'')); return; }
         window.목록읽기();
@@ -88,6 +91,7 @@ html,body{height:100%;overflow:hidden}
 .dpr-t td.num{text-align:right}
 .dpr-t .dpr-k{position:sticky;left:0;z-index:1;font-weight:700;color:var(--vg-ink)}
 .dpr-t th.dpr-k{background:var(--vg-fill)}
+#속>.months{margin-bottom:10px}
 .state{background:var(--vg-fill);border-radius:14px;padding:22px 16px;text-align:center;margin-top:12px}
 .state .big{font-size:14px;font-weight:600;color:var(--vg-ink);padding-bottom:6px}
 .state .sub{font-size:12.5px;color:var(--vg-muted);line-height:1.85}
@@ -98,7 +102,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.0.0</div>
+  <div class="badge">v2.1.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -132,9 +136,11 @@ window.목록읽기 = async function(){
     시트들 = (목.exists() && 목.data().시트들) || [];
     if(!시트들.length){ 목상태('창고에 영림원품목등록이 없습니다'); return; }
     document.getElementById('목상태').style.display='none';
-    document.getElementById('고름').innerHTML = 시트들.map(t => `<button class="chip" data-u="${글(t.이름)}">${글(t.이름)}</button>`).join('');
+    document.getElementById('고름').innerHTML = 시트들.map(t => `<button class="chip" data-u="${글(t.이름)}">${글(t.이름)}</button>`).join('')
+      + `<button class="chip" data-u="${추가}" hidden>${추가}</button>`;
     document.querySelectorAll('#고름 .chip').forEach(b => b.onclick = () => 시트고름(b.dataset.u));
     시트고름(시트들[0].이름);
+    대조구독();
   }catch(e){ window.목록못읽음('창고를 읽지 못했습니다', (e&&(e.code||e.message))||''); }
 };
 
@@ -143,6 +149,7 @@ async function 시트고름(u){
   고른 = u;
   document.querySelectorAll('#고름 .chip').forEach(b => b.classList.toggle('on', b.dataset.u===u));
   const 속 = document.getElementById('속');
+  if(u===추가){ 추가그리기(); return; }
   if(!받은[u]){
     속.innerHTML = '<div class="state"><div class="big">읽는 중입니다…</div></div>';
     try{
@@ -155,6 +162,72 @@ async function 시트고름(u){
   }
   if(고른 !== u) return;
   속.replaceChildren(받은[u]);
+}
+
+/* ── 업체별 단품명 ↔ 품목등록업로드 대조(실시간) ──
+   추가할 제품 = 업체별 단품명 줄 중 단품코드(앞뒤 빈칸 뺌)가 품목등록업로드 「품목자산분류=제품」 줄의 품번에 없는 것. */
+const 추가 = '추가할 제품';
+const 업체자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_업체별단품'];
+const 품목시트 = '품목등록업로드';
+let 품목조각 = [], 품목끊기 = [], 품목칸 = null, 업체순 = [], 업체값 = {}, 업체끊기 = {}, 고른업체 = '', 추가자리 = null;
+function 대조구독(){
+  const { doc, onSnapshot } = window.fbRead;
+  onSnapshot(doc(window.db, ...창고자리, '_시트목록'), m => {
+    const t = ((m.exists() && m.data().시트들) || []).find(x => x.이름===품목시트);
+    품목끊기.forEach(f => f()); 품목끊기 = []; 품목칸 = t ? (t.칸||[]) : [];
+    const n = t ? (t.조각||1) : 0; 품목조각 = Array(n).fill(null);
+    if(!n){ 대조(); return; }
+    for(let k=0;k<n;k++) 품목끊기.push(onSnapshot(doc(window.db, ...창고자리, `${문서이름(품목시트)}_${k+1}`), s => {
+      const 바뀜 = 품목조각.every(x => x);
+      품목조각[k] = s.exists() ? (s.data().줄||[]) : [];
+      if(!품목조각.every(x => x)) return;
+      if(바뀜 && 받은[품목시트]){ 받은[품목시트] = 표만들기(품목칸, [].concat(...품목조각)); if(고른===품목시트) document.getElementById('속').replaceChildren(받은[품목시트]); }
+      대조();
+    }, () => {}));
+  }, () => {});
+  onSnapshot(doc(window.db, ...업체자리, '_업체목록'), m => {
+    업체순 = (m.exists() && m.data().업체들) || [];
+    for(const u of Object.keys(업체끊기)) if(!업체순.includes(u)){ 업체끊기[u](); delete 업체끊기[u]; delete 업체값[u]; }
+    for(const u of 업체순) if(!업체끊기[u]) 업체끊기[u] = onSnapshot(doc(window.db, ...업체자리, 문서이름(u)), s => {
+      업체값[u] = s.exists() ? s.data() : { 칸:[], 줄:[] }; 대조();
+    }, () => {});
+    대조();
+  }, () => {});
+}
+let 추가줄 = null, 추가칸 = [];
+function 대조(){
+  if(품목칸===null || 품목조각.some(x => !x) || !업체순.length || 업체순.some(u => !업체값[u])) return;
+  const pi = 품목칸.indexOf('품번'), ai = 품목칸.indexOf('품목자산분류'), 있음 = new Set();
+  if(pi>=0 && ai>=0) for(const r of [].concat(...품목조각)) if(String(r.v[ai]??'').trim()==='제품'){ const c = String(r.v[pi]??'').trim(); if(c) 있음.add(c); }
+  추가칸 = []; 추가줄 = [];
+  for(const u of 업체순){ for(const k of (업체값[u].칸||[])) if(!추가칸.includes(k)) 추가칸.push(k); }
+  for(const u of 업체순){
+    const 칸 = 업체값[u].칸||[], ci = 칸.indexOf('단품코드');
+    for(const r of (업체값[u].줄||[])){
+      if(ci>=0 && 있음.has(String(r.v[ci]??'').trim())) continue;
+      추가줄.push({ 업체:u, v: 추가칸.map(k => { const i = 칸.indexOf(k); return i>=0 ? r.v[i] : ''; }) });
+    }
+  }
+  const b = document.querySelector(`#고름 .chip[data-u="${추가}"]`);
+  if(b){ b.hidden = false; b.textContent = `${추가} ${추가줄.length.toLocaleString()}`; }
+  if(고른===추가) 추가그리기();
+}
+function 추가그리기(){
+  const 속 = document.getElementById('속');
+  if(!추가줄){ 속.innerHTML = '<div class="state"><div class="big">읽는 중입니다…</div></div>'; return; }
+  if(고른업체 && !업체순.includes(고른업체)) 고른업체 = '';
+  const 수 = u => 추가줄.filter(r => r.업체===u).length;
+  const 단추 = [['', `전체 ${추가줄.length}`]].concat(업체순.map(u => [u, `${u} ${수(u)}`]))
+    .map(([u,t]) => `<button class="chip${u===고른업체?' on':''}" data-e="${글(u)}">${글(t)}</button>`).join('');
+  const 줄 = 고른업체 ? 추가줄.filter(r => r.업체===고른업체) : 추가줄;
+  const 옛통 = 속.querySelector('.표통[data-추가]'), 옛자리 = 옛통 && 추가자리===고른업체 ? [옛통.scrollLeft, 옛통.scrollTop] : null;
+  let h = '<table class="dpr-t"><thead><tr><th class="dpr-k">업체</th>' + 추가칸.map(k => `<th>${글(k)}</th>`).join('') + '</tr></thead><tbody>';
+  for(const r of 줄) h += `<tr><td class="dpr-k">${글(r.업체)}</td>` + r.v.map(v => `<td${typeof v==='number'?' class="num"':''}>${글(v)}</td>`).join('') + '</tr>';
+  h += '</tbody></table>';
+  속.innerHTML = `<div class="months">${단추}</div>` + (줄.length ? `<div class="표통" data-추가="1">${h}</div>` : '<div class="state"><div class="big">줄 없음</div></div>');
+  추가자리 = 고른업체;
+  const 통 = 속.querySelector('.표통'); if(통 && 옛자리){ 통.scrollLeft = 옛자리[0]; 통.scrollTop = 옛자리[1]; }
+  속.querySelectorAll('.months .chip').forEach(b => b.onclick = () => { 고른업체 = b.dataset.e; 추가그리기(); });
 }
 
 function 표만들기(칸, 줄){

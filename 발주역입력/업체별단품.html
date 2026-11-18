@@ -2,7 +2,9 @@
 <!-- 발주역입력 / 업체별 단품명 — 「업체별단품명」 엑셀(시트 「업체별단품코드」)을 A열 업체 표시로 나눠 업체마다 표로 본다.
      사장님 11-18: 「폴더에 업체별단품명 파일의 A열이 조혼가구인 것만 목록으로 보여지게 해줘.」 →
        「폴더에 업체별 단품폴더를 새로만들었어 그안에 있는 구글시트 A열 확인해서 업체별로 목록 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.1.3
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.2.0
+     v1.2.0(11-18): 사장님 「두 자료가 상호 연결되도록」 — 단품코드가 영림원품목등록 「품목등록업로드」 제품(품목자산분류=제품) 품번에 있는 줄은 줄 색(.등록, title).
+       두 창고를 onSnapshot 으로 실시간 구독(한쪽이 바뀌면 색이 따라 바뀜). 대조 = 앞뒤 빈칸 뺀 같은 글자.
      v1.1.3(11-18): 쪽길 여섯째 탭 「품목등록업로드」 → 「영림원품목등록」(영림원품목등록.html).
      v1.1.2(11-18): 쪽길 탭이 여섯이라 폰 폭에서 탭 이름이 낱말 중간에 끊겨 — 이름은 한 줄(nowrap), 넘치면 탭째 다음 줄.
      v1.1.1(11-18): 쪽길에 여섯째 탭 「품목등록업로드」.
@@ -22,7 +24,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
-    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
     const app = initializeApp({
         apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
         authDomain: "vivivic-4b7ef.firebaseapp.com",
@@ -33,7 +35,7 @@
     });
     const auth = getAuth(app);
     window.db = getFirestore(app);
-    window.fbRead = { doc, getDoc };
+    window.fbRead = { doc, getDoc, onSnapshot };
     onAuthStateChanged(auth, (u) => {
         if (!u) { signInAnonymously(auth).catch(e => window.목록못읽음('창고에 들어가지 못했습니다', (e&&(e.code||e.message))||'')); return; }
         window.목록읽기();
@@ -91,6 +93,8 @@ html,body{height:100%;overflow:hidden}
 .dpr-t td.num{text-align:right}
 .dpr-t .dpr-k{position:sticky;left:0;z-index:1;font-weight:700;color:var(--vg-ink)}
 .dpr-t th.dpr-k{background:var(--vg-fill)}
+/* 영림원품목등록 품목등록업로드에 제품으로 있는 줄 */
+.dpr-t tr.등록 td{background:#E8F1FD}
 .state{background:var(--vg-fill);border-radius:14px;padding:22px 16px;text-align:center;margin-top:12px}
 .state .big{font-size:14px;font-weight:600;color:var(--vg-ink);padding-bottom:6px}
 .state .sub{font-size:12.5px;color:var(--vg-muted);line-height:1.85}
@@ -101,7 +105,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.1.3</div>
+  <div class="badge">v1.2.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html" class="on">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a></nav>
 <h1>업체별 단품명</h1>
@@ -139,6 +143,7 @@ window.목록읽기 = async function(){
     document.getElementById('고름').innerHTML = 업체들.map(u => `<button class="chip" data-u="${글(u)}">${글(u)}</button>`).join('');
     document.querySelectorAll('#고름 .chip').forEach(b => b.onclick = () => 업체고름(b.dataset.u));
     업체고름(업체들[0]);
+    영림원구독();
   }catch(e){ window.목록못읽음('창고를 읽지 못했습니다', (e&&(e.code||e.message))||''); }
 };
 
@@ -146,32 +151,68 @@ async function 업체고름(u){
   고른 = u;
   document.querySelectorAll('#고름 .chip').forEach(b => b.classList.toggle('on', b.dataset.u===u));
   const 속 = document.getElementById('속');
-  if(!받은[u]){
-    속.innerHTML = '<div class="state"><div class="big">읽는 중입니다…</div></div>';
-    try{
-      const { doc, getDoc } = window.fbRead;
-      const s = await getDoc(doc(window.db, ...창고자리, 문서이름(u)));
-      받은[u] = s.exists() ? s.data() : { 칸:[], 줄:[] };
-    }catch(e){ 속.innerHTML = `<div class="state"><div class="big">창고를 읽지 못했습니다</div><div class="why">${글((e&&(e.code||e.message))||'')}</div></div>`; return; }
-  }
-  if(고른 !== u) return;
-  그리기(받은[u]);
+  if(받은[u]){ 그리기(받은[u]); return; }
+  속.innerHTML = '<div class="state"><div class="big">읽는 중입니다…</div></div>';
+  const { doc, onSnapshot } = window.fbRead;
+  onSnapshot(doc(window.db, ...창고자리, 문서이름(u)), s => {
+    받은[u] = s.exists() ? s.data() : { 칸:[], 줄:[] };
+    if(고른 === u) 그리기(받은[u]);
+  }, e => { if(고른===u) 속.innerHTML = `<div class="state"><div class="big">창고를 읽지 못했습니다</div><div class="why">${글((e&&(e.code||e.message))||'')}</div></div>`; });
+}
+
+/* 영림원품목등록 창고의 「품목등록업로드」 제품 품번 — 실시간. 바뀌면 색만 다시 칠한다. */
+const 영림원자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_영림원품목등록'];
+const 영림원시트 = '품목등록업로드';
+let 등록품번 = new Set(), 조각값 = [], 조각끊기 = [];
+function 영림원구독(){
+  const { doc, onSnapshot } = window.fbRead;
+  onSnapshot(doc(window.db, ...영림원자리, '_시트목록'), m => {
+    const t = ((m.exists() && m.data().시트들) || []).find(x => x.이름===영림원시트);
+    조각끊기.forEach(f => f()); 조각끊기 = []; 조각값 = [];
+    if(!t){ 품번셈(t); return; }
+    const 칸 = t.칸 || [], n = t.조각 || 1;
+    조각값 = Array(n).fill(null);
+    for(let k=0;k<n;k++){
+      조각끊기.push(onSnapshot(doc(window.db, ...영림원자리, `${문서이름(영림원시트)}_${k+1}`), s => {
+        조각값[k] = s.exists() ? (s.data().줄||[]) : [];
+        if(조각값.every(x => x)) 품번셈(칸);
+      }, () => {}));
+    }
+  }, () => {});
+}
+function 품번셈(칸){
+  const pi = (칸||[]).indexOf('품번'), ai = (칸||[]).indexOf('품목자산분류');
+  등록품번 = new Set();
+  if(pi>=0 && ai>=0) for(const r of [].concat(...조각값)) if(String(r.v[ai]??'').trim()==='제품'){ const c = String(r.v[pi]??'').trim(); if(c) 등록품번.add(c); }
+  색칠();
+}
+function 색칠(){
+  document.querySelectorAll('#속 tr[data-code]').forEach(tr => {
+    const on = 등록품번.has(tr.dataset.code);
+    tr.classList.toggle('등록', on);
+    if(on) tr.title = '영림원품목등록 품목등록업로드'; else tr.removeAttribute('title');
+  });
 }
 
 function 그리기(d){
   const 칸 = d.칸 || [], 줄 = d.줄 || [];
   const 속 = document.getElementById('속');
   if(!줄.length){ 속.innerHTML = '<div class="state"><div class="big">줄 없음</div></div>'; return; }
+  const ci = 칸.indexOf('단품코드');
   let h = '<table class="dpr-t"><thead><tr>' +
     칸.map((k,i) => `<th class="${i===0?'dpr-k':''}">${글(k)}</th>`).join('') + '</tr></thead><tbody>';
   for(const r of 줄){
-    h += '<tr>' + 칸.map((k,i) => {
+    h += (ci>=0 ? `<tr data-code="${글(String(r.v[ci]??'').trim())}">` : '<tr>') + 칸.map((k,i) => {
       const cls = (i===0?'dpr-k':'') + (숫자칸.has(k)?' num':'');
       return `<td${cls.trim()?` class="${cls.trim()}"`:''}>${글(r.v[i])}</td>`;
     }).join('') + '</tr>';
   }
   h += '</tbody></table>';
+  const 옛통 = 속.querySelector('.표통'), 옛자리 = 옛통 && 옛통.dataset.u===고른 ? [옛통.scrollLeft, 옛통.scrollTop] : null;
   속.innerHTML = '<div class="표통">' + h + '</div>';
+  const 통 = 속.querySelector('.표통'); 통.dataset.u = 고른;
+  if(옛자리){ 통.scrollLeft = 옛자리[0]; 통.scrollTop = 옛자리[1]; }
+  색칠();
 }
 </script>
 </body>
