@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.20.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.20.1
      v1.0.0(11-16): 첫 판. 거래처(시트) 버튼 → 그 시트의 표. 거래처 시트는 「전체 · 1월~10월 · 1~10월 누계 · 1~10월 매입품목」 으로 고른다.
        칸 이름·값은 엑셀 글자(셀 표시 꼴) 그대로. 표 꼴은 재단.html v1.1.0 셀 모양(칸 선 · 11.5px · 여백 2px 5px · 숫자 오른쪽)과 같다.
      v1.1.0(11-16): 거래처 메뉴 끝에 「영림원등록」 — 월별 표에서 납품제품명(품목)을 겹치지 않게 한 줄씩, 칸은 품목 · 규격 · 단가만.
@@ -99,6 +99,9 @@
      v1.20.0(11-18): 분류 드롭목록·겹침 검사 = 입력폼 품목대중소분류정의(erp_classes, 자재) 를 바로 읽음 — 사장님: 「당연히 그걸 하라고 입력폼으로 이걸 편입시킨 거잖아.」
        입력폼과 같은 사이트·같은 Firebase — 입력폼 앱 이름 'erp-input' 으로 둘째 앱을 열어 입력폼 로그인을 그대로 씀(읽기만, 로그인·로그아웃 안 함, 규칙 그대로).
        목록 = 완료(영림원 등록) + 대기·진행중·수정대기(곧 들어갈 것) · 오류·ylwGone 뺌. 입력폼 로그인이 없거나 못 읽으면 공개 사본 _분류.영림원 으로.
+     v1.20.1(11-18): 분류 드롭목록을 직접 만든 목록으로 — 사장님: 「(오류건에서 분류 칸 드롭목록이) 안 나오잖아.」
+       까닭: 크롬 datalist 는 칸 값으로 목록을 걸러서, 값이 이미 있는 칸(오류 줄 「샘플」·「18t용」)은 같은 글자 하나만 남아 목록이 안 떴다.
+       이제 칸을 누르면(값이 있어도) 그 대(·중) 아래 분류 전부를 펼치고, 치면 그 글자가 든 것만 · 고르면 칸 값 + 저장(손으로 고친 것과 같은 길).
 
      ⚠ 값은 창고(artifacts/vivivic-4b7ef/public/data/발주역입력_보드매입)에서 읽는다.
         창고에 넣는 것은 tools/보드매입읽기.py(드라이브 엑셀 → 창고) 또는 v1.9.0 「엑셀 새로 불러오기」(사장님이 확인하고 「바꾸기」 를 누를 때만). 공개 저장소라 업무 값은 이 파일에 없다. -->
@@ -259,6 +262,12 @@ html,body{height:100%;overflow:hidden}
 .폼표 td.등록 .점{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:middle}   /* v1.18.1 글 없이 색 점 */
 .폼표 td.등록 .고치기{font:inherit;font-size:10.5px;padding:0 4px;border:1px solid var(--vg-edge);border-radius:3px;background:var(--vg-bg);color:var(--vg-ink);cursor:pointer}
 .폼표 [data-k]:disabled{opacity:1;cursor:default}
+.분류고름{position:fixed;z-index:50;background:var(--vg-bg);border:1px solid #C7C7C3;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.12);
+  max-height:260px;overflow:auto;min-width:120px;padding:3px 0;font-size:12px}   /* v1.20.1 직접 만든 분류 드롭목록 */
+.분류고름 div{padding:4px 10px;white-space:nowrap;cursor:pointer;border-left:3px solid transparent}
+.분류고름 div:hover,.분류고름 div.지금{background:var(--vg-fill)}
+.분류고름 div.영{border-left-color:#2e7d32}
+.분류고름 div.대{border-left-color:#B5B5B0}
 .폼표 td.분류틀,.폼표 td.고칠칸{background:#FFE9E7;box-shadow:inset 0 0 0 2px var(--vg-red)}   /* v1.17.1 분류 규칙 어긋남 · v1.18.0 오류 단계의 고칠 칸 */
 .폼표 td.입:has([data-k]:disabled){background:var(--vg-fill)}   /* v1.18.0 완료 단계 칸 = 잠금 */
 
@@ -274,7 +283,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.20.0</div>
+  <div class="badge">v1.20.1</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -1094,11 +1103,39 @@ async function 폼그리기(){
     const el = e.target;
     if(el.dataset && el.dataset.k && el.dataset.k!=='x_del') 손달기(el.closest('td'));
     if(!el.dataset || !el.dataset.분류) return;
-    const 층 = { big:0, mid:1, name:2 }[el.dataset.분류];
-    목록.innerHTML = 분류고를것(el.dataset.분류, el.closest('tr')).map(o => { const 영 = 영림원분류.filter(x => x[층]===o);
-      return `<option value="${글(o)}"${영.length ? ` label="${영.some(x => x[3]!=='대기') ? '영림원' : '등록 대기'}"` : ''}>`; }).join('');   /* v1.20.0 */
-    el.setAttribute('list', '분류목록');
+    분류펼침(el, '');   /* v1.20.1 크롬 datalist 대신 — 값이 있어도 늘 다 펼침 */
   });
+  /* ---- v1.20.1 직접 만든 분류 드롭목록 — 대(·중) 아래 분류 전부 · 초록 줄 = 영림원 · 회색 줄 = 입력폼 등록 대기 ---- */
+  document.querySelectorAll('.분류고름').forEach(x => x.remove());   /* 다시 그릴 때 옛 목록 지움 */
+  const 고름 = document.createElement('div'); 고름.className = '분류고름'; 고름.hidden = true; document.body.appendChild(고름);
+  let 고름칸 = null;
+  function 분류펼침(el, 거름){
+    const 층 = { big:0, mid:1, name:2 }[el.dataset.분류];
+    const 목 = 분류고를것(el.dataset.분류, el.closest('tr')).filter(o => !거름 || o.toLowerCase().includes(거름.toLowerCase()));
+    if(!목.length){ 고름.hidden = true; 고름칸 = null; return; }
+    고름.innerHTML = 목.map(o => { const 영 = 영림원분류.filter(x => x[층]===o), c = 영.length ? (영.some(x => x[3]!=='대기') ? '영' : '대') : '';
+      return `<div class="${c}${o===el.value.trim() ? ' 지금' : ''}" data-v="${글(o)}">${글(o)}</div>`; }).join('');
+    const r = el.getBoundingClientRect();
+    고름.style.left = Math.max(4, Math.min(r.left, innerWidth - 200)) + 'px';
+    고름.style.minWidth = Math.max(120, r.width) + 'px';
+    const 아래 = innerHeight - r.bottom;
+    if(아래 < 200 && r.top > 아래){ 고름.style.top = ''; 고름.style.bottom = (innerHeight - r.top + 2) + 'px'; }
+    else { 고름.style.bottom = ''; 고름.style.top = (r.bottom + 2) + 'px'; }
+    고름.hidden = false; 고름칸 = el;
+  }
+  const 고름닫기 = () => { 고름.hidden = true; 고름칸 = null; };
+  고름.addEventListener('mousedown', e => e.preventDefault());   /* 칸 포커스 그대로 */
+  고름.addEventListener('click', e => {
+    const d = e.target.closest('[data-v]'); if(!d || !고름칸) return;
+    const el = 고름칸; 고름닫기();
+    if(el.value !== d.dataset.v){ el.value = d.dataset.v; el.dispatchEvent(new Event('change', { bubbles:true })); }
+  });
+  표.addEventListener('input', e => { if(e.target.dataset && e.target.dataset.분류) 분류펼침(e.target, e.target.value.trim()); });
+  표.addEventListener('click', e => { const el = e.target; if(el.dataset && el.dataset.분류 && 고름.hidden) 분류펼침(el, ''); });
+  표.addEventListener('focusout', e => { if(e.target===고름칸) 고름닫기(); });
+  표.addEventListener('keydown', e => { if(e.key==='Escape' && 고름칸) 고름닫기(); });
+  표통.addEventListener('scroll', 고름닫기, { passive:true });
+  const 쪽통 = document.querySelector('.wrap'); if(쪽통) 쪽통.addEventListener('scroll', 고름닫기, { passive:true });
 
   /* ---- v1.10.0 채우기 손잡이 — 사장님 11-17 「엑셀처럼 드래그로 아래로 내려 복사 붙여넣게」 ----
      고른 칸(글·드롭다운·날짜·분류) 오른쪽 아래 네모를 아래로 끌면 범위 점선 → 놓으면 그 아래 줄 같은 칸에 같은 값(칸적용 = 손으로 고친 것과 같은 길).
