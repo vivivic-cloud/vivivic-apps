@@ -1174,12 +1174,16 @@ const 한벌돌리기 = (단품곁다리) => {
   function labelButton(b, name, codes, qty) {
     const shown = [...new Set(codes.map((c) => c.trim()).filter(Boolean))];
     b.replaceChildren(name);
-    if (shown.length) b.appendChild(Object.assign(document.createElement("small"), { className: "vp-code", textContent: shown.join(", ") }));
+    /* 11-19 사장님(그대로) 「코드가 다른거 새로운줄에 보이게 해줘」 — 같은 이름에 코드가 둘 이상이면 첫 코드는 이름 옆, 다른 코드는 한 줄에 하나(.vp-코드줄) */
+    /*    양품 딱지는 첫 줄(첫 코드 뒤)에 — 다른 코드 줄 뒤에 두면 딱지가 혼자 한 줄을 차지한다 */
+    const 코드 = (c, k) => b.appendChild(Object.assign(document.createElement("small"), { className: k ? "vp-code vp-코드줄" : "vp-code", textContent: c }));
+    if (shown.length) 코드(shown[0], 0);
     b.classList.toggle("vp-instock", qty !== undefined);
     b.classList.toggle("vp-서류", 서류연결(codes));   // 판단만 둔다 — 10-22 에 화면 표시는 뺐다 (주황은 카탈로그 점)
     if (qty !== undefined) {
       b.appendChild(Object.assign(document.createElement("small"), { className: "vp-qty", textContent: `양품 ${qty.toLocaleString()}` }));
     }
+    shown.slice(1).forEach((c) => 코드(c, 1));
     // 연동 점 (초록·빨강·주황) — 어느 점이 켜지는지는 위 클래스(vp-instock·vp-johon·vp-ing)를 보고 CSS 가 정한다
     b.appendChild(Object.assign(document.createElement("span"), { className: "vp-점", innerHTML: '<i class="g"></i><i class="r"></i><i class="o"></i><i class="b"></i>' }));
   }

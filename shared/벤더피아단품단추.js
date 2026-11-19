@@ -37,6 +37,7 @@
 .vp-goods-list button:hover,.vp단품뿌리 .vp-chips button:hover{background:none;color:#337ea9;text-decoration:underline}
 .vp-goods-list button.on,.vp단품뿌리 .vp-chips button.on{background:none;color:#337ea9;font-weight:700;text-decoration:underline}
 .vp-goods-list .vp-code,.vp단품뿌리 .vp-code{margin-left:6px;font-size:11px;font-weight:500;color:#787774}
+.vp-code.vp-코드줄{display:block;margin-left:0}
 .vp-goods-list .vp-qty{margin-left:6px;padding:1px 6px;border-radius:999px;background:#eef7e0;color:#3d6b12;font-size:11px;font-weight:700}
 .vp-goods-list .vp-점,.vp단품뿌리 .vp-chips .vp-점{display:flex;gap:3px;min-height:6px;margin-top:2px;line-height:0}
 .vp-점 i{display:none;width:6px;height:6px;border-radius:50%}
@@ -159,7 +160,7 @@
     for (const [이름, 줄들] of [...byName].sort((a, z) => 죽음(a[1]) - 죽음(z[1]))) {
       const b = box.appendChild(document.createElement('button')); b.type = 'button';
       if (죽음(줄들)) { b.classList.add('vp-중지'); b.title = '판매중지 상품(벤더피아 상품관리 판매상태 중지)'; }
-      b.innerHTML = `${글(이름)}<small class="vp-code">${글([...new Set(줄들.map((x) => x.코드))].join(', '))}</small>${점}`;
+      b.innerHTML = `${글(이름)}${[...new Set(줄들.map((x) => x.코드))].map((c, k) => `<small class="vp-code${k ? ' vp-코드줄' : ''}">${글(c)}</small>`).join('')}${점}`;   // 11-19 다른 코드는 새 줄(goods.js labelButton 과 같음)
       b.addEventListener('click', () => 상품창(이름, 줄들));
     }
     return box;
