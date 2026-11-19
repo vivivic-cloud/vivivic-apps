@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.27.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.28.0
+     v1.28.0(11-19): 사장님 「드롭다운 목록 너무 입력부에 붙어있어서 드레그가 힘들다」
+       분류 드롭목록(.분류고름) = 칸에 들어가거나 누르기만 해선 안 열림 · 두 번 누름·Enter/F2/↓·글 치기·칸 오른쪽 ▾(16px) 로 열림 · 칸 옆(오른쪽, 자리 없으면 왼쪽)에 띄움 → 칸 아래 채우기 손잡이 끌기를 안 가림.
      v1.27.0(11-19): 사장님 「작성할때 안보이조 저장 될대만 보이니까 해깔려」
        중·소분류 칸을 쓰는 동안 앞에 붙을 상위 이름(분류이음 결과의 앞부분)을 칸 안 앞쪽에 회색으로 보임(`clsGhost` · text-indent). 값·저장 규칙은 v1.26.0 그대로.
      v1.26.0(11-19): 사장님 「하위 부류가 상위 부류를 포함하고 저장해야 수많은 중소 분류 중복을 막을 수 있어 이제 입력을 이렇게 자동으로 되도록 세팅해줘」(영림원 ed > ed_001-18 > ed_001-18_wt 그림)
@@ -299,6 +301,7 @@ html,body{height:100%;overflow:hidden}
 .분류고름 div:hover,.분류고름 div.지금{background:var(--vg-fill)}
 .분류고름 div.영{border-left-color:#2e7d32}
 .분류고름 div.대{border-left-color:#B5B5B0}
+.폼표 input[data-분류]:focus{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0h8L4 5z' fill='%23999'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 4px center}   /* v1.28.0 ▾ = 열기 */
 .폼표 td.분류틀,.폼표 td.고칠칸{background:#FFE9E7;box-shadow:inset 0 0 0 2px var(--vg-red)}   /* v1.17.1 분류 규칙 어긋남 · v1.18.0 오류 단계의 고칠 칸 */
 .폼표 td.분류새{background:#FFF6E0;box-shadow:inset 0 0 0 2px #f59e0b}   /* v1.25.0 등록완료 분류에 없는 값 */
 .폼표 td.입:has([data-k]:disabled){background:var(--vg-fill)}   /* v1.18.0 완료 단계 칸 = 잠금 */
@@ -333,7 +336,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.27.0</div>
+  <div class="badge">v1.28.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -1237,8 +1240,7 @@ async function 폼그리기(){
   표.addEventListener('focusin', e => {
     const el = e.target;
     if(el.dataset && el.dataset.k && el.dataset.k!=='x_del') 손달기(el.closest('td'));
-    if(!el.dataset || !el.dataset.분류) return;
-    분류펼침(el, '');   /* v1.20.1 크롬 datalist 대신 — 값이 있어도 늘 다 펼침 */
+    /* v1.28.0 들어가기만 해선 안 엶(끌기 자리를 가리지 않게) — 두 번 누름·Enter/F2/↓·글 치기·▾ 로 엶 */
   });
   /* v1.27.0 쓰는 동안 앞에 붙을 상위 이름 회색으로 */
   const 앞보임 = el => {
@@ -1259,13 +1261,14 @@ async function 폼그리기(){
     const 값 = k => { const e = el.closest('tr').querySelector(`input[data-k="${k}"]`); return e ? e.value.trim() : ''; }, 대 = 값('m_big'), 중 = 값('m_mid');
     고름.innerHTML = 목.map(o => { const 영 = 영림원분류.filter(x => x[층]===o && (층 < 1 || x[0]===대) && (층 < 2 || x[1]===중)), c = 영.length ? (영.some(x => x[3]!=='대기') ? '영' : '대') : '';
       return `<div class="${c}${o===el.value.trim() ? ' 지금' : ''}" data-v="${글(o)}">${글(o)}</div>`; }).join('');
+    /* v1.28.0 칸 옆(오른쪽, 자리 없으면 왼쪽)에 띄움 — 칸 아래 채우기 손잡이·끌기 자리를 안 가림. 옆 자리도 없으면(폰) 칸 아래로 12px 띄움 */
     const r = el.getBoundingClientRect();
-    고름.style.left = Math.max(4, Math.min(r.left, innerWidth - 200)) + 'px';
-    고름.style.minWidth = Math.max(120, r.width) + 'px';
-    const 아래 = innerHeight - r.bottom;
-    if(아래 < 200 && r.top > 아래){ 고름.style.top = ''; 고름.style.bottom = (innerHeight - r.top + 2) + 'px'; }
-    else { 고름.style.bottom = ''; 고름.style.top = (r.bottom + 2) + 'px'; }
-    고름.hidden = false; 고름칸 = el;
+    고름.style.minWidth = '120px'; 고름.style.bottom = ''; 고름.hidden = false; 고름칸 = el;
+    const w = 고름.offsetWidth, hh = 고름.offsetHeight;
+    let x = r.right + 8, y = Math.max(4, Math.min(r.top, innerHeight - hh - 4));
+    if(x + w > innerWidth - 4) x = r.left - 8 - w;
+    if(x < 4){ x = Math.max(4, Math.min(r.left, innerWidth - w - 4)); y = r.bottom + 12; if(y + hh > innerHeight - 4) y = Math.max(4, r.top - 12 - hh); }
+    고름.style.left = x + 'px'; 고름.style.top = y + 'px';
   }
   const 고름닫기 = () => { 고름.hidden = true; 고름칸 = null; };
   고름.addEventListener('mousedown', e => e.preventDefault());   /* 칸 포커스 그대로 */
@@ -1275,9 +1278,15 @@ async function 폼그리기(){
     if(el.value !== d.dataset.v){ el.value = d.dataset.v; el.dispatchEvent(new Event('change', { bubbles:true })); }
   });
   표.addEventListener('input', e => { if(e.target.dataset && e.target.dataset.분류) 분류펼침(e.target, e.target.value.trim()); });
-  표.addEventListener('click', e => { const el = e.target; if(el.dataset && el.dataset.분류 && 고름.hidden) 분류펼침(el, ''); });
+  표.addEventListener('click', e => { const el = e.target; if(el.dataset && el.dataset.분류 && 고름.hidden && e.clientX >= el.getBoundingClientRect().right - 16) 분류펼침(el, ''); });   /* v1.28.0 ▾ 자리만 */
+  표.addEventListener('dblclick', e => { const el = e.target; if(el.dataset && el.dataset.분류) 분류펼침(el, ''); });
   표.addEventListener('focusout', e => { if(e.target===고름칸) 고름닫기(); });
-  표.addEventListener('keydown', e => { if(e.key==='Escape' && 고름칸) 고름닫기(); });
+  표.addEventListener('focusin', e => { if(고름칸 && e.target!==고름칸) 고름닫기(); });
+  표.addEventListener('keydown', e => {
+    if(e.key==='Escape' && 고름칸){ 고름닫기(); return; }
+    const el = e.target; if(!el.dataset || !el.dataset.분류 || 고름칸===el) return;
+    if(e.key==='Enter' || e.key==='F2' || e.key==='ArrowDown'){ e.preventDefault(); 분류펼침(el, ''); }   /* v1.28.0 */
+  });
   표통.addEventListener('scroll', 고름닫기, { passive:true });
   const 쪽통 = document.querySelector('.wrap'); if(쪽통) 쪽통.addEventListener('scroll', 고름닫기, { passive:true });
 

@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원 기본정보 입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v14 -->
+<!-- 영림원 기본정보 입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v15 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -191,7 +191,7 @@ input.clsun[data-cls],table.sheet td input.clsun[data-cls]{box-shadow:inset 0 0 
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v14</span>
+    <span class="ver">v15</span>
     <a class="btn small" href="../영림원외주입력/영림원외주입력.html" style="margin-left:8px">입력폼</a>
   </div>
 </header>
@@ -263,7 +263,7 @@ function connectDb(){
 }
 (function(){
 "use strict";
-var VER='v14';
+var VER='v15';
 var GS_MAKER='https://script.google.com/macros/s/AKfycbzxW9K--tKq_uqHnzNdecOA4YbKosK51XVG1MJVFTVTzB5Kz5o7gN1YeYuthCRI4PshOw/exec';   /* 영림원외주입력 v113 웹앱(구글시트양식/양식만들기.gs) — 파일 이름은 「외주입력_」 로 시작해야 받는다 */
 var GS_NAME='외주입력_기본정보_한행입력표';
 var XLSX_URL='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js',xlsxP=null;
@@ -335,7 +335,7 @@ function unreg(opt,v){return CHECKED[opt]&&s(v)&&T.erp_flows&&listOf(opt).indexO
 var CLS_COL={big:0,mid:1,small:2},CLS_SEP=' > ';
 function clsColKind(c){var k='';((SPEC&&SPEC.sheets)||[]).forEach(function(sh){sh.groups.forEach(function(g){if(g.cols.indexOf(c)>=0)k=sh.kind;});});return k;}
 function clsTag(el,c){if(!el||!c||!CLS_COL.hasOwnProperty(c.k)||c.t==='bool')return el;var k=clsColKind(c);if(!k)return el;
-  el.dataset.cls=c.k;el.dataset.ck=k;if(el.getAttribute('list'))el.dataset.l0=el.getAttribute('list');
+  el.dataset.cls=c.k;el.dataset.ck=k;if(el.getAttribute('list')){el.dataset.l0=el.getAttribute('list');el.removeAttribute('list');}   /* v15 브라우저 목록 대신 clsPop */
   requestAnimationFrame(function(){clsMark(el);});return el;}
 function clsDocs(ck,done){return (T.erp_classes||[]).filter(function(d){return d.kind===(ck==='자재'?'자재':'제상품')&&d.status!=='오류'&&(done?d.status==='완료'&&!d.ylwGone:d.status!=='완료');})
   .map(function(d){return [s(d.big),s(d.mid),s(d.name)];});}
@@ -352,10 +352,37 @@ function clsMark(el){var v=s(el.value),L=clsDocs(el.dataset.ck,true),un=!!v&&L.l
   if(un)el.title='등록완료 분류에 없음'+(clsFit(el,clsDocs(el.dataset.ck,false),v)?' — 입력폼 등록 대기':' — 새 분류');else if(/^등록완료 분류/.test(el.title||''))el.removeAttribute('title');}
 function clsMarkBox(el){var b=clsBox(el);(b?[].slice.call(b.querySelectorAll('input[data-cls]')):[el]).forEach(clsMark);}
 function clsMarkAll(){[].forEach.call(document.querySelectorAll('input[data-cls]'),clsMark);}
-document.addEventListener('focusin',function(e){var el=e.target;if(!el||!el.dataset||!el.dataset.cls)return;
-  var d=document.getElementById('dl-cls-pick');if(!d){d=h('datalist',{id:'dl-cls-pick'});document.body.append(d);}
+/* v15 사장님 11-19 「드롭다운 목록 너무 입력부에 붙어있어서 드레그가 힘들다」 — 분류 칸 목록: 누름(고르기)으로는 안 열림 · 두 번 누름·Enter/F2/↓·글 치기·칸 오른쪽 ▾(16px) 로 열림 · 칸 옆(오른쪽, 자리 없으면 왼쪽)에 띄움 → 칸 아래 끌기 자리를 안 가림 */
+var CLS_POP=null,CLS_POP_EL=null;
+function clsPopClose(){if(CLS_POP)CLS_POP.style.display='none';CLS_POP_EL=null;}
+function clsPopOpen(el,opts,filt){
+  if(!CLS_POP){var st=document.createElement('style');st.textContent='.clspop div{padding:4px 10px;white-space:nowrap;cursor:pointer}.clspop div:hover,.clspop div.now{background:#EFEFEC}input.clsdd:focus{background-image:url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'8\' height=\'5\'%3E%3Cpath d=\'M0 0h8L4 5z\' fill=\'%23999\'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 4px center}';document.head.appendChild(st);
+    CLS_POP=document.createElement('div');CLS_POP.className='clspop';CLS_POP.style.cssText='position:fixed;z-index:9998;display:none;background:#fff;color:#222;border:1px solid #C7C7C3;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.12);max-height:260px;overflow:auto;font-size:13px;padding:2px 0';document.body.appendChild(CLS_POP);
+    CLS_POP.addEventListener('mousedown',function(e){e.preventDefault();});
+    CLS_POP.addEventListener('click',function(e){var d=e.target.closest('[data-v]');if(!d||!CLS_POP_EL)return;var el=CLS_POP_EL;clsPopClose();
+      if(el.value!==d.dataset.v){el.value=d.dataset.v;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));}});
+    window.addEventListener('scroll',function(e){if(CLS_POP_EL&&!CLS_POP.contains(e.target))clsPopClose();},true);}
+  var f=String(filt||'').trim().toLowerCase(),cur=String(el.value||'').trim(),L=opts.filter(function(o){return !f||o.toLowerCase().indexOf(f)>=0;});
+  if(!L.length){clsPopClose();return;}
+  CLS_POP.replaceChildren.apply(CLS_POP,L.map(function(o){var d=document.createElement('div');d.dataset.v=o;d.textContent=o;if(o===cur)d.className='now';return d;}));
+  CLS_POP.style.display='block';CLS_POP_EL=el;
+  var r=el.getBoundingClientRect(),w=CLS_POP.offsetWidth,hh=CLS_POP.offsetHeight,x=r.right+8,y=Math.max(4,Math.min(r.top,innerHeight-hh-4));
+  if(x+w>innerWidth-4)x=r.left-8-w;
+  if(x<4){x=Math.max(4,Math.min(r.left,innerWidth-w-4));y=r.bottom+12;if(y+hh>innerHeight-4)y=Math.max(4,r.top-12-hh);}
+  CLS_POP.style.left=x+'px';CLS_POP.style.top=y+'px';}
+function clsPopBind(ok,opts){   /* ok(el) = 이 칸인가 · opts(el) = 목록 */
+  var go=function(el,f){clsPopOpen(el,opts(el),f);},arw=function(el,e){return e.clientX>=el.getBoundingClientRect().right-16;};
+  document.addEventListener('focusin',function(e){var el=e.target;if(CLS_POP_EL&&CLS_POP_EL!==el)clsPopClose();if(ok(el))el.classList.add('clsdd');});
+  document.addEventListener('focusout',function(e){if(e.target===CLS_POP_EL)clsPopClose();});
+  document.addEventListener('dblclick',function(e){if(ok(e.target))go(e.target,'');});
+  document.addEventListener('click',function(e){var el=e.target;if(ok(el)&&arw(el,e)&&CLS_POP_EL!==el)go(el,'');});
+  document.addEventListener('input',function(e){if(ok(e.target)&&e.isTrusted!==false)go(e.target,e.target.value);});
+  document.addEventListener('keydown',function(e){var el=e.target;if(!ok(el))return;
+    if(e.key==='Escape'&&CLS_POP_EL===el){clsPopClose();return;}
+    if((e.key==='Enter'||e.key==='F2'||e.key==='ArrowDown')&&CLS_POP_EL!==el){e.preventDefault();go(el,'');}});}
+clsPopBind(function(el){return !!(el&&el.dataset&&el.dataset.cls&&el.tagName==='INPUT'&&!el.readOnly&&!el.disabled);},function(el){   /* v12 목록(등록완료 → 원래 목록) 그대로 */
   var l0=el.dataset.l0&&document.getElementById(el.dataset.l0),more=l0?[].map.call(l0.options,function(x){return x.value;}):[];
-  d.replaceChildren.apply(d,uniq(clsOpts(el).concat(more)).map(function(v){return h('option',{value:v});}));el.setAttribute('list','dl-cls-pick');});
+  return uniq(clsOpts(el).concat(more));});
 document.addEventListener('input',function(e){var el=e.target;if(el&&el.dataset&&el.dataset.cls)clsMarkBox(el);});
 /* v13 사장님 11-19 「하위 부류가 상위 부류를 포함하고 저장해야 수많은 중소 분류 중복을 막을 수 있어 이제 입력을 이렇게 자동으로 되도록 세팅해줘」(영림원 ed > ed_001-18 > ed_001-18_wt)
    중분류 = 대_중 · 소분류 = 대_중_소 로 바꿈(칸을 떠날 때 change). 이미 붙었거나 등록 분류(오류 뺌)에 그 경로가 그대로 있으면 그대로. 저장된 값은 안 건드림. */
