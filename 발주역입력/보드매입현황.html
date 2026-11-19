@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.23.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.24.0
+     v1.24.0(11-19): 동일품 자재명·자재번호 바로 고침 — 사장님 「동일품에서 변경하여 영림원보내기에도 적용되게 상호 적용되게 할 수 있나 자재명, 자재번호 동일품에서 변경하여 오류 수정되게 할 수 있는것들이 있어서」.
+       동일품 표 두 칸 = 입력 칸 → 영림원보내기 그 줄(확정 묶음 = 대표 줄)에 같은 저장 길(폼값·더럽힘·저장예약, 칸적용과 같은 규칙). 저장되면 창고 구독으로 두 화면 모두 다시 그림(치는 중이면 칸을 떠날 때).
      v1.23.0(11-19): 해피코 동일품 실시간 — 사장님 「영림원보내기에서 자재명을 '자작'에서 '화이트'로 바꿨는데 동일품에서는 변동이 없다. 실시간 연동이 아닌가?」
        까닭: 손댄 제안 묶음이 창고에 굳어 다시 셈하지 않았고, 동일품 화면은 이 기기 기억(폼값)만 봄. 고침: 자재명·품번 = 해피코 영림원폼 문서 지금 값(onSnapshot, 다른 기기 포함) · 바뀌면 동일품 화면 바로 다시 그림 ·
        창고 「제안」 묶음도 지금 값으로 다시 거름(옮기기로 넣은 줄 = 붙임 은 그대로) · 확정은 안 풂. 옵션(색)이 다르면 자재명이 같아도 안 묶음.
@@ -304,6 +306,10 @@ html,body{height:100%;overflow:hidden}
 .동표 tr.제안 button.대표.on{color:#ef8f00}
 .동표 td.참{color:var(--vg-muted)}
 .동표 td.가운데{text-align:center}
+.동표 td.입{padding:0}   /* v1.24.0 자재명·자재번호 바로 고침 */
+.동표 td.입 input{border:0;background:transparent;font:inherit;color:inherit;padding:2px 5px}
+.동표 td.입:focus-within{outline:2px solid var(--vg-ink);outline-offset:-2px}
+.동표 td.입 input.자동{color:var(--vg-muted)}
 .동표 tr.틀 td{background:#FFE9E7}   /* v1.23.0 색 다름 · 자재명 바뀜 */
 .동표 tr.틀 td.dpr-k{color:var(--vg-red)}
 .dpr-t td.동일{color:#2e7d32;font-weight:700}
@@ -319,7 +325,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.23.0</div>
+  <div class="badge">v1.24.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -2050,9 +2056,11 @@ async function 동일품고침(바꿈){
   }catch(e){ 동일품상태('저장하지 못했습니다 ' + ((e && (e.code || e.message)) || ''), true); }
 }
 /* v1.23.0 영림원보내기 해피코 문서가 바뀌면(이 기기·다른 기기) 동일품 화면을 바로 다시 셈 — 고르는 중(옮기기 칸)이면 건너뜀 */
+let 동일품다시미룸 = false;
 function 동일품다시(){
   if(고른!==해피코 || 중국볼것!=='동일품') return;
-  const a = document.activeElement; if(a && a.tagName==='SELECT' && a.closest('.동표')) return;
+  const a = document.activeElement; if(a && (a.tagName==='SELECT' || a.tagName==='INPUT') && a.closest('.동표')){ 동일품다시미룸 = true; return; }   /* v1.24.0 치는 중이면 칸을 떠날 때 */
+  동일품다시미룸 = false;
   동일품그리기();
 }
 async function 동일품그리기(){
@@ -2093,7 +2101,7 @@ async function 동일품그리기(){
         `<td class="dpr-k">${글(r.이름)}</td><td>${글(r.규격)}</td>` +
         `<td class="가운데">${g.상태 ? `<button class="대표${r.키===g.대표 ? ' on' : ''}" data-대표="${gi}:${ri}" title="대표">●</button>` : ''}</td>` +
         `<td class="num">${r.줄수}</td><td class="참">${글(r.달.map(m => parseInt(m.slice(5))).join('·'))}</td>` +
-        `<td${g.상태==='확정' ? ' class="동일"' : ''}>${글(자명)}</td><td${g.상태==='확정' ? ' class="동일"' : ''}>${글(자번)}</td>` +
+        [['m_name', 자명], ['m_code', 자번]].map(([k, v]) => `<td class="입${g.상태==='확정' ? ' 동일' : ''}"><input data-동키="${글(g.상태==='확정' ? g.대표 : r.키)}" data-k="${k}" value="${글(v)}" style="width:${Math.min(Math.max(글너비(v) + 2, 10), 40)}ch"${k==='m_code' && 최신값(g.상태==='확정' ? g.대표 : r.키, 'm_code')===undefined ? ' class="자동"' : ''}></td>`).join('') +
         `<td>${ri===0 && g.상태 ? `<button data-확정="${gi}">${g.상태==='확정' ? '풀기' : '확정'}</button>` : ''}</td>` +
         `<td>${g.상태 ? `<button data-빼기="${gi}:${ri}" title="빼기">×</button>` : ''}</td><td>${옮}</td></tr>`;
     });
@@ -2110,6 +2118,24 @@ async function 동일품그리기(){
     동일품고침((새, 창, 꺼냄) => { 창(g); 꺼냄(k); 새.따로.push(k); }); });
   속.querySelectorAll('[data-옮]').forEach(el => el.onchange = () => { if(el.value==='') return; const [gi, ri] = 둘(el.dataset.옮), k = 묶[gi].줄[ri].키, 대상 = 묶[+el.value];
     동일품고침((새, 창, 꺼냄) => { const s = 창(대상); 꺼냄(k); s.원래.push(k); if(s.상태!=='확정') s.붙임 = [...(s.붙임 || []), k]; }); });
+  /* v1.24.0 자재명·자재번호를 여기서 고치면 영림원보내기 그 줄(확정 묶음 = 대표 줄)에 그대로 — 같은 저장 길(폼값·더럽힘·저장예약) */
+  속.querySelectorAll('input[data-동키]').forEach(el => {
+    el.onkeydown = e => { if(e.key==='Enter') el.blur(); };
+    el.onchange = () => 동일품칸고침(el.dataset.동키, el.dataset.k, el.value);
+    el.addEventListener('blur', () => setTimeout(() => { if(동일품다시미룸 && !(document.activeElement && document.activeElement.closest && document.activeElement.closest('.동표'))) 동일품다시(); }, 0));
+  });
+}
+async function 동일품칸고침(키, k, 값){
+  const s = 해피코;
+  try{
+    await 폼받기(s); await 연결받기(); await 분류받기();   /* 구매거래처 등 기본값이 바뀌지 않게 영림원보내기와 같은 자료를 먼저 */
+    const 월표 = (받은[s].표 || []).find(t => t.이름==='월별'), m = 품목모으기(월표).줄.find(x => 줄키(x)===키); if(!m) return;
+    const v = String(값).trim(), 고친 = { ...(폼값[s].get(키) || {}) }, 전 = 최신값(키, k);
+    if(v === 기본값(k, m, s) && k!=='m_code') delete 고친[k]; else 고친[k] = v;   /* 영림원보내기 칸적용과 같은 규칙(자재번호는 손 값이면 남김) */
+    if((k in 고친 ? 고친[k] : undefined) === 전) return;
+    폼값[s].set(키, 고친); 더럽힘(s, 키, k);
+    동일품상태('저장 중…'); 저장예약(s);
+  }catch(e){ 동일품상태('저장하지 못했습니다 ' + ((e && (e.code || e.message)) || ''), true); }
 }
 /* 해피코 명세 표(원본 칸 그대로) + 옵션 뒤 자재명·자재번호 — 확정 동일품 줄은 대표 값(초록, 마우스 = 대표) */
 function 중국명세표(d, 줄, 제목){
