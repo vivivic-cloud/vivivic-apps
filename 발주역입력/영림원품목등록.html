@@ -2,7 +2,9 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.9.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.10.0
+     v2.10.0(11-19): 사장님 「아니 왜냐면 기본입력된 재단도가 어떤건지 확인이 되어야 해서」 — 재단률 칸 누름 = 재단도 창(오른쪽):
+       기본 재단도(재단률을 셈한 4X8 바둑판 그림·배치·결보호·원장 행·원장명/마감/색) + 그 원장 행의 에이엠티 재단도(cutting_plans, 자동=기본 · 재단편집, boardParts 그림). 마우스 = 가로×세로·재단도 수.
      v2.9.0(11-19): 사장님 「품목등록업로드의 재단율 계산을 깃에 배포된 에이엠티 재단편집의 논리로 계산되게 그부분을 이 입력부와 연결해줄 수 있겠니」 —
        반제품 「재단률」 = shared/원장재단수량.js 원장당(규격 W*D, 결보호) — 에이엠티 재단 편집 기본규칙(4X8 · 전단컷 5 · 톱날 4.5 · 결보호 X 면 돌림) 한 벌.
        결보호 = 원장 엑셀(조혼가구·에이엠티 원장, 읽기만)에서 부속코드2 = 품번 → L·R 뗀 품번 → 단품코드+재단W×D. 저장 안 함. 못 셈 = 엑셀 원래 값 + 주황 바탕, 이유는 마우스.
@@ -167,6 +169,19 @@ html,body{height:100%;overflow:hidden}
 .dpr-t thead th.단서{cursor:pointer}
 .dpr-t td.목록밖{color:#e53935}   /* v2.7.0 목록에서 지운 공정흐름 값 */
 .dpr-t td.재단못{background:#FFF1E0}   /* v2.9.0 재단률 에이엠티 계산 안 됨(엑셀 원래 값) */
+.dpr-t td[data-k="재단률"]{cursor:pointer}
+.재단창{position:fixed;z-index:56;right:16px;top:16px;bottom:16px;width:420px;max-width:calc(100vw - 32px);overflow:auto;background:var(--vg-bg);
+  border:1px solid #C7C7C3;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.16);padding:10px 12px;font-size:12px}
+.재단창 .닫기{float:right;font:inherit;font-size:12px;padding:3px 9px;border:1px solid #C7C7C3;border-radius:6px;background:var(--vg-fill);color:var(--vg-ink);cursor:pointer}
+.재단창 .머{font-size:14px;font-weight:800;color:var(--vg-ink);padding:2px 0 6px}
+.재단창 .소{font-weight:800;color:var(--vg-ink);margin:10px 0 4px}
+.재단창 .못{color:#c2793a;background:#FFF1E0;border-radius:6px;padding:6px 8px}
+.재단창 svg{display:block;width:100%;height:auto;margin:2px 0 4px}
+.재단창 table{border-collapse:collapse;width:100%}
+.재단창 th,.재단창 td{text-align:left;vertical-align:top;padding:2px 4px;border-bottom:1px solid var(--vg-edge);font-size:11.5px}
+.재단창 th{color:var(--vg-muted);font-weight:600;white-space:nowrap;width:1%}
+.재단창 .도{border-top:1px solid #C7C7C3;margin-top:8px;padding-top:6px}
+.재단창 .도머{color:var(--vg-body);padding-bottom:2px}
 .dpr-t td.공자동{color:#A3A39F}   /* v2.8.0 공정흐름 자동 값(부속명 규칙 · 저장 안 된 것) = 옅은 글자 */
 .공정창{position:fixed;z-index:55;background:var(--vg-bg);border:1px solid #C7C7C3;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.16);
   padding:10px;width:230px;max-width:calc(100vw - 32px);font-size:12.5px}
@@ -195,7 +210,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.9.0</div>
+  <div class="badge">v2.10.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -576,15 +591,32 @@ function 원장구독(){
       const D = P.readSheet(X, ab), h = D[0] || [], I = k => h.indexOf(k);
       const iG = I('결보호'), iC = I('부속코드2'), iU = I('ing단품코드'), iW = I('재단W'), iD = I('재단D');
       if(iG<0){ 원장 = null; 원장글 = '원장 엑셀에 결보호 칸 없음'; 재단칠(); return; }
-      const 묶 = new Map(), 넣 = (k,g) => { if(!묶.has(k)) 묶.set(k, new Set()); 묶.get(k).add(g); };
-      for(const r of D.slice(1)){ if(!r) continue; const g = String(r[iG]??'').trim();
-        const c = iC>=0 ? String(r[iC]??'').trim() : ''; if(c) 넣('c\t'+c, g);
+      const 묶 = new Map(), 줄 = new Map(), 넣 = (k,g,i) => { if(!묶.has(k)) 묶.set(k, { g:new Set(), r:[] }); 묶.get(k).g.add(g); 묶.get(k).r.push(i); };
+      const 글칸 = (r,k) => { const i = I(k); return i>=0 ? String(r[i]??'').trim() : ''; };
+      D.forEach((r, i) => { if(!i || !r) return; const g = String(r[iG]??'').trim();
+        const c = iC>=0 ? String(r[iC]??'').trim() : ''; if(c) 넣('c\t'+c, g, i);
         const u = iU>=0 ? String(r[iU]??'').trim() : '', w = parseFloat(r[iW]), d = parseFloat(r[iD]);
-        if(u && w>0 && d>0) 넣('s\t'+u+'\t'+w+'\t'+d, g); }
-      원장 = { 묶, 파일:m.fileName||'' }; 원장글 = '';
+        if(u && w>0 && d>0) 넣('s\t'+u+'\t'+w+'\t'+d, g, i);
+        줄.set(i, { 상품:글칸(r,'ing단품명'), 부속명:글칸(r,'부속명'), 원장명:글칸(r,'원장명'), 마감:글칸(r,'마감'), 색:글칸(r,'마감색상'), 결보호:g, w, d }); });
+      원장 = { 묶, 줄, 파일:m.fileName||'' }; 원장글 = '';   /* v2.10.0 줄 = 원장 행 번호(에이엠티 currentFullData 와 같은 번호) → 재단도 짝 */
     }catch(e){ 원장 = null; 원장주소 = ''; 원장글 = '원장 엑셀을 읽지 못함 ' + ((e&&e.message)||''); }
     재단칠();
   }, e => { 원장 = null; 원장글 = '원장 목록을 읽지 못함 ' + ((e&&(e.code||e.message))||''); 재단칠(); });
+  /* v2.10.0 에이엠티 재단도(cutting_plans) — 읽기만. 짝 = 재단도의 원장 행 번호(pRowIndex · 자동 재단도는 이름 끝 번호)가
+     이 부속의 원장 행이고 그 행 재단W×D = 재단도 cutW×cutD 일 때만(원장이 새로 올라와 행이 밀린 재단도는 안 붙음). */
+  onSnapshot(collection(window.db, 'artifacts','vivivic-4b7ef','public','data','cutting_plans'), q => {
+    재단도 = q.docs.map(d => ({ id:d.id, ...d.data() })); 재단칠(); 재단창그림();
+  }, () => {});
+}
+let 재단도 = [];
+const 재단도행 = p => p.pRowIndex!=null ? +p.pRowIndex : (/^auto_/.test(p.id) ? +String(p.id).split('_').pop() : NaN);
+function 재단도찾기(rs){
+  if(!원장 || !rs) return [];
+  return 재단도.filter(p => { const i = 재단도행(p), z = rs.includes(i) && 원장.줄.get(i);
+    if(!z || +p.cutW!==z.w || +p.cutD!==z.d) return false;
+    const 명 = String(p.pInfoText||'').split(' - ')[1];   /* 「W X D - 부속명 - N EA」 — 같은 크기 다른 부속(상판·지판)이 행 밀림으로 붙는 것 막음 */
+    return !명 || !z.부속명 || 명.trim()===z.부속명; })
+    .sort((a,b) => (b.autoGenerated?1:0)-(a.autoGenerated?1:0) || String(b.confirmId).localeCompare(String(a.confirmId)));
 }
 let 엑셀P = null;
 function 엑셀부품(){
@@ -601,18 +633,72 @@ function 재단셈(번, 모, 규){   /* → {n, 근거} 또는 {왜} */
   const 빼 = 번.replace(/^(.*-[a-z0-9]+?)[LR](_[^_]*)$/, '$1$2');
   const 찾 = [['c\t'+번, '부속코드2 '+번], 빼!==번 && ['c\t'+빼, '부속코드2 '+빼], 모 && ['s\t'+모+'\t'+p.w+'\t'+p.d, `단품코드 ${모} · 재단 ${p.w}×${p.d}`]].filter(Boolean).find(([k]) => 원장.묶.has(k));
   if(!찾) return { 왜:'원장 엑셀에서 이 부속을 못 찾음(부속코드2 · 단품코드+재단W×D)' };
-  const gs = [...원장.묶.get(찾[0])];
+  const 묶 = 원장.묶.get(찾[0]), gs = [...묶.g];
   if(gs.length>1) return { 왜:`원장 엑셀 결보호가 섞임(${gs.map(g => g||'빈칸').join('·')}) — ${찾[1]}` };
   const n = R.원장당(p.w, p.d, gs[0]);
   if(!(n>0)) return { 왜:`부속 ${p.w}×${p.d} 이 원장보다 큼` };
   const 돌 = R.돌려도되나(gs[0]) && R.앉힐방향(p.w, p.d, gs[0], 2440, 1220, R.기본.전단컷, R.기본.톱날).돌림;
-  return { n, 근거:`${재단기본} · 부속 ${p.w}×${p.d} · 결보호 ${gs[0]||'빈칸'}${돌?'(돌려 앉힘)':''} — 원장 엑셀 ${찾[1]}` };
+  const 방 = R.앉힐방향(p.w, p.d, gs[0], 2440, 1220, R.기본.전단컷, R.기본.톱날), 배 = R.배치(방.w, 방.d, 2440, 1220, R.기본.전단컷, R.기본.톱날);
+  return { n, 근거:`${재단기본} · 부속 ${p.w}×${p.d} · 결보호 ${gs[0]||'빈칸'}${돌?'(돌려 앉힘)':''} — 원장 엑셀 ${찾[1]}`,
+    p, 결:gs[0], 방, 배, 행:묶.r, 찾:찾[1] };
 }
+/* ── v2.10.0 재단률 칸 누름 = 재단도 창(.재단창) — 사장님 「기본입력된 재단도가 어떤건지 확인이 되어야 해서」
+   ① 기본 재단도 = 재단률을 셈한 배치(에이엠티 자동 재단도 _autoGenerateCuttingPlansForOrder 와 같은 바둑판: 4X8 · 전단컷 5 · 톱날 4.5 · 결보호 X 면 돌림) 그림 + 원장 행 정보
+   ② 에이엠티 재단도 = cutting_plans 중 이 부속 원장 행의 것(자동 = 기본 재단도 · 재단편집 = 사람이 고친 것) — boardParts 그대로 그림. 에이엠티에 재단도 하나를 바로 여는 주소는 없음. */
+let 재단창td = null;
+function 판그림(BW, BD, 칸들){
+  return `<svg viewBox="0 0 ${BW} ${BD}" preserveAspectRatio="xMidYMid meet"><rect x="0" y="0" width="${BW}" height="${BD}" fill="#FAFAF8" stroke="#9C9C98" stroke-width="6"/>` +
+    칸들.map(c => `<rect x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" fill="${c.bg}" stroke="#1A1A19" stroke-width="3"/>` +
+      (c.글 ? `<text x="${c.x+c.w/2}" y="${c.y+c.h/2}" font-size="${Math.max(40, Math.min(110, c.h/3, c.w/6))}" text-anchor="middle" dominant-baseline="central" fill="#1A1A19">${글(c.글)}</text>` : '')).join('') + '</svg>';
+}
+function 재단창그림(){
+  const 창 = document.querySelector('.재단창'), td = 재단창td; if(!창 || !td) return;
+  const r = 재단셈(td.dataset.번, td.dataset.모, td.dataset.규), R = window.원장재단수량, 줄 = [];
+  줄.push(`<div class="머">${글(td.dataset.번)}</div>`);
+  if(!r.n){ 줄.push(`<div class="못">${글(r.왜)}</div>`); }
+  else {
+    const f = R.기본.전단컷, b = R.기본.톱날, 칸들 = [];
+    for(let c=0;c<r.배.cols;c++) for(let k=0;k<r.배.rows;k++) 칸들.push({ x:f+c*(r.방.w+b), y:f+k*(r.방.d+b), w:r.방.w, h:r.방.d, bg:'#D9E7F7', 글:`${r.방.w}×${r.방.d}` });
+    const z = 원장.줄.get(r.행[0]) || {};
+    줄.push(`<div class="소">기본 재단도</div>${판그림(2440, 1220, 칸들)}`,
+      `<table><tr><th>원장</th><td>4X8 2440×1220</td></tr><tr><th>전단컷·톱날</th><td>${f} · ${b}</td></tr>` +
+      `<tr><th>부속</th><td>${r.p.w}×${r.p.d}${r.방.돌림?` → ${r.방.w}×${r.방.d}(돌림)`:''}</td></tr><tr><th>배치</th><td>가로 ${r.배.cols} × 세로 ${r.배.rows} = ${r.n}</td></tr>` +
+      `<tr><th>결보호</th><td>${글(r.결||'빈칸')}</td></tr><tr><th>원장 행</th><td>${글(r.행.map(i => i+1).join(', '))} · ${글(r.찾)}</td></tr>` +
+      `<tr><th>원장 재단W×D</th><td${z.w===r.p.w && z.d===r.p.d ? '' : ' class="못" title="규격과 다름"'}>${글(z.w)}×${글(z.d)}</td></tr><tr><th>원장명·마감·색</th><td>${글([z.원장명, z.마감, z.색].filter(Boolean).join(' · '))}</td></tr><tr><th>상품·부속명</th><td>${글([z.상품, z.부속명].filter(Boolean).join(' · '))}</td></tr>` +
+      `<tr><th>원장 엑셀</th><td>${글(원장.파일)}</td></tr></table>`);
+    const 도 = 재단도찾기(r.행);
+    줄.push(`<div class="소">에이엠티 재단도 ${도.length}</div>`);
+    for(const p of 도.slice(0, 20)){
+      const BW = +p.boardW || 2440, BD = +p.boardH || 1220;
+      const 칸들2 = (p.boardParts||[]).map(t => ({ x:t.lp*BW, y:t.tp*BD, w:t.wp*BW, h:t.hp*BD, bg:t.bg || '#E2E2DF', 글:t.dw && t.dh ? `${t.dw}×${t.dh}` : '' }));
+      줄.push(`<div class="도"><div class="도머"><b>${p.autoGenerated ? '자동(기본)' : '재단편집'}</b> ${글(p.confirmId ?? p.id)}</div>${판그림(BW, BD, 칸들2)}` +
+        `<table><tr><th>원장</th><td>${BW}×${BD} · ${글([p.baseMaterial, p.coating, p.materialColor].filter(Boolean).join(' · '))}</td></tr>` +
+        `<tr><th>부속</th><td>${글(p.pInfoText||'')}</td></tr><tr><th>원장당·장수</th><td>${글(p.perSheet ?? '-')} · ${글(p.sheets ?? '-')}장</td></tr>` +
+        (p.sInfoText ? `<tr><th>2순위</th><td>${글(p.sInfoText)}</td></tr>` : '') + (p.tInfoText ? `<tr><th>3순위</th><td>${글(p.tInfoText)}</td></tr>` : '') +
+        `<tr><th>발주</th><td>${글((p.pOrderIds||[]).join(', '))}</td></tr></table></div>`);
+    }
+  }
+  창.querySelector('.속').innerHTML = 줄.join('');
+}
+function 재단창열기(td){
+  let 창 = document.querySelector('.재단창');
+  if(창 && 재단창td===td){ 창.remove(); 재단창td = null; return; }
+  if(!창){ 창 = document.createElement('div'); 창.className = '재단창'; 창.innerHTML = '<button type="button" class="닫기">닫기</button><div class="속"></div>'; document.body.appendChild(창);
+    창.querySelector('.닫기').onclick = () => { 창.remove(); 재단창td = null; }; }
+  재단창td = td; 재단창그림();
+}
+document.addEventListener('click', e => {
+  const td = e.target.closest && e.target.closest('td[data-k="재단률"]');
+  if(td){ 재단창열기(td); return; }
+  const 창 = document.querySelector('.재단창'); if(창 && !창.contains(e.target)){ 창.remove(); 재단창td = null; }
+});
+document.addEventListener('keydown', e => { if(e.key==='Escape'){ const 창 = document.querySelector('.재단창'); if(창){ 창.remove(); 재단창td = null; } } });
 function 재단칠(){
   const 통 = 받은[품목시트]; if(!통 || !통.querySelector) return;
   통.querySelectorAll('td[data-k="재단률"]').forEach(td => {
     const r = 재단셈(td.dataset.번, td.dataset.모, td.dataset.규), xl = td.dataset.xl;
-    if(r.n){ td.textContent = r.n; td.classList.remove('재단못'); td.title = r.근거 + (String(r.n)!==xl ? ` · 엑셀 원래 값 ${xl||'빈칸'}` : ''); }
+    if(r.n){ const 도 = 재단도찾기(r.행).length; td.textContent = r.n; td.classList.remove('재단못');
+      td.title = r.근거 + ` · 기본 재단도 가로 ${r.배.cols} × 세로 ${r.배.rows}` + (도 ? ` · 에이엠티 재단도 ${도}` : '') + (String(r.n)!==xl ? ` · 엑셀 원래 값 ${xl||'빈칸'}` : ''); }
     else { td.textContent = xl; td.classList.add('재단못'); td.title = '에이엠티 계산 안 됨 — ' + r.왜 + ' · 지금 값 = 엑셀 원래 값'; }
   });
 }
