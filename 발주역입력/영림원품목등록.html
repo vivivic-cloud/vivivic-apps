@@ -2,7 +2,10 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.10.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.11.0
+     v2.11.0(11-19): 사장님 「사실 현재 비오엠업로드등록에서 공정이 가공인것들은 다 삭제하고 현 공정흐름에 맞게 재배치 해야함」 · 「공정 순서가 이미 공정흐름으로 보이잖아」 —
+       BOM 「가공」 줄 = 품목등록업로드 반제품 것만 남기고(나머지 가공 줄은 표에서 뺌) 공정 칸 = 그 반제품 공정흐름(보이는 값 — 사람·자동)의 공정:
+       합판 줄 = 흐름에서 「재단」 든 첫 공정(없으면 첫 공정) · 필름 줄 = 「엣지」(없으면 엣지 든 공정, 그것도 없으면 첫 공정 + 주황). 흐름 없음 = 빈칸 빨강 바탕. 저장 안 함 · 늘 셈.
      v2.10.0(11-19): 사장님 「아니 왜냐면 기본입력된 재단도가 어떤건지 확인이 되어야 해서」 — 재단률 칸 누름 = 재단도 창(오른쪽):
        기본 재단도(재단률을 셈한 4X8 바둑판 그림·배치·결보호·원장 행·원장명/마감/색) + 그 원장 행의 에이엠티 재단도(cutting_plans, 자동=기본 · 재단편집, boardParts 그림). 마우스 = 가로×세로·재단도 수.
      v2.9.0(11-19): 사장님 「품목등록업로드의 재단율 계산을 깃에 배포된 에이엠티 재단편집의 논리로 계산되게 그부분을 이 입력부와 연결해줄 수 있겠니」 —
@@ -170,6 +173,8 @@ html,body{height:100%;overflow:hidden}
 .dpr-t td.목록밖{color:#e53935}   /* v2.7.0 목록에서 지운 공정흐름 값 */
 .dpr-t td.재단못{background:#FFF1E0}   /* v2.9.0 재단률 에이엠티 계산 안 됨(엑셀 원래 값) */
 .dpr-t td[data-k="재단률"]{cursor:pointer}
+.dpr-t td.흐름없음{background:#FDECEA}   /* v2.11.0 BOM 가공 줄 — 그 반제품 공정흐름 없음 */
+.dpr-t td.엣지없음{background:#FFF1E0}   /* v2.11.0 BOM 필름 줄 — 흐름에 엣지 공정 없음 */
 .재단창{position:fixed;z-index:56;right:16px;top:16px;bottom:16px;width:420px;max-width:calc(100vw - 32px);overflow:auto;background:var(--vg-bg);
   border:1px solid #C7C7C3;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.16);padding:10px 12px;font-size:12px}
 .재단창 .닫기{float:right;font:inherit;font-size:12px;padding:3px 9px;border:1px solid #C7C7C3;border-radius:6px;background:var(--vg-fill);color:var(--vg-ink);cursor:pointer}
@@ -210,7 +215,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.10.0</div>
+  <div class="badge">v2.11.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -293,7 +298,7 @@ function 대조구독(){
       품목조각[k] = s.exists() ? (s.data().줄||[]) : [];
       if(!품목조각.every(x => x)) return;
       if(바뀜 && 받은[품목시트]){ 받은[품목시트] = 표만들기(품목칸, [].concat(...품목조각), 품목시트); if(고른===품목시트) document.getElementById('속').replaceChildren(받은[품목시트]); }
-      대조(); 연동칠();
+      대조(); BOM다시(); 연동칠();
     }, () => {}));
   }, () => {});
   onSnapshot(doc(window.db, ...업체자리, '_업체목록'), m => {
@@ -354,7 +359,7 @@ function 추가그리기(){
      → X 의 입력 합판코드(필름코드)가 있으면 하위품번 = 입력값, 하위품명 = (원래 하위품명이 품번과 같으면) 입력값 / (아니면) 자재명, 하위규격 = 자재 규격(목록에 없으면 원래 값).
      입력값이 빈칸이면 원래 BOM 값 그대로(임시). 원래 필름 줄이 없는 반제품(합판 줄만)에 필름코드를 넣어도 BOM 줄은 생기지 않는다(임시). */
 const 편칸 = ['품목설명','합판코드','필름코드','투입수량','기본구매처'], 고를칸 = { 합판코드:'합판', 필름코드:'필름', 기본구매처:'외주', 공정흐름:'공정' };
-/* v2.6.0 공정흐름 — 품명 앞 덧칸(영림원 시트 칸 아님, 창고 시트에도 없음). 이 9개만 들어감(차례·표기 사장님 그대로). BOM 연동은 아직 없음 */
+/* v2.6.0 공정흐름 — 품명 앞 덧칸(영림원 시트 칸 아님, 창고 시트에도 없음). 이 9개만 들어감(차례·표기 사장님 그대로). v2.11.0 BOM 가공 줄 공정 = 이 흐름(BOM공정칠) */
 const 기본공정 = ['조립','재단-엣지-보링','재단-엣지','재단','재단-NC-곡면엣지','NC','NC멤브레인','오버레이','라미날접착'];
 /* v2.7.0 목록은 창고 _공정목록 {목록[], 고친때} — 없으면 기본공정 9개. 머리 누름 창에서 추가·삭제(모든 기기 같음). 「조립」 = 제품 고정값이라 삭제 막음 */
 let 공정목록 = 기본공정.slice();
@@ -494,6 +499,7 @@ function 공정칠(){
     td.classList.toggle('공자동', !!자);
     td.classList.toggle('목록밖', 밖); if(밖) td.title = '목록에 없는 흐름'; else if(자) td.title = 자.근거; else td.removeAttribute('title');
   });
+  BOM공정칠();
 }
 function 공정목록구독(){
   const { doc, onSnapshot } = window.fbRead;
@@ -543,6 +549,19 @@ function 칸칠(){
   });
   공정칠();
 }
+/* v2.11.0 품목등록업로드 반제품 품번 모음(품목 시트를 다 받기 전엔 null) · BOM 표를 거르지 못하고 만들었으면 받은 뒤 다시 만듦 */
+let BOM거름 = false, BOM원 = null;
+function 반제품들(){
+  if(!품목칸 || !품목조각.length || 품목조각.some(x => !x)) return null;
+  const pi = 품목칸.indexOf('품번'), ai = 품목칸.indexOf('품목자산분류'); if(pi<0 || ai<0) return null;
+  const s = new Set(); for(const r of [].concat(...품목조각)) if(String(r.v[ai]??'').trim()==='반제품') s.add(String(r.v[pi]??'').trim()); return s;
+}
+function BOM다시(){
+  if(BOM거름 || !BOM원 || !받은[BOM시트] || !반제품들()) return;
+  const 옛 = 받은[BOM시트], 자리 = [옛.scrollLeft, 옛.scrollTop];
+  받은[BOM시트] = 표만들기(BOM원.칸, BOM원.줄, BOM시트);
+  if(고른===BOM시트){ document.getElementById('속').replaceChildren(받은[BOM시트]); 받은[BOM시트].scrollLeft = 자리[0]; 받은[BOM시트].scrollTop = 자리[1]; }
+}
 /* 원래(창고 시트) 반제품 합판·필름 코드 — BOM 가공 줄 짝 찾기용 */
 function 원래코드(){
   const m = new Map(); if(!품목칸 || 품목조각.some(x => !x)) return m;
@@ -550,6 +569,34 @@ function 원래코드(){
   if(pi<0) return m;
   for(const r of [].concat(...품목조각)){ const p = String(r.v[pi]??'').trim(); if(p && !m.has(p)) m.set(p, { 합판코드:String(r.v[hi]??'').trim(), 필름코드:String(r.v[fi]??'').trim() }); }
   return m;
+}
+/* ── v2.11.0 BOM 가공 줄 = 공정흐름대로 다시 놓기 — 사장님 11-19 「사실 현재 비오엠업로드등록에서 공정이 가공인것들은 다 삭제하고 현 공정흐름에 맞게 재배치 해야함」 · 「공정 순서가 이미 공정흐름으로 보이잖아」
+   · 표만들기: 「가공」 줄 중 모품목이 품목등록업로드 반제품이 아닌 줄은 표에서 뺌(창고 시트·원본 엑셀은 그대로).
+   · 남은 가공 줄(반제품 → 합판·필름)의 「공정」 칸 = 그 반제품 공정흐름(보이는 값: 사람 값, 없으면 v2.8 자동 값)을 「-」로 나눈 공정 중
+     합판 줄 = 「재단」 든 첫 공정(없으면 첫 공정) · 필름 줄 = 「엣지」 공정(없으면 엣지 든 공정 · 그것도 없으면 첫 공정 + 주황 td.엣지없음).
+     합판/필름 가름 = 원래 코드(원래코드()) — 짝이 없으면 투입단위 M = 필름, 나머지 = 합판. 흐름 없음 = 빈칸 + 빨강 바탕 td.흐름없음.
+   · 사람 값 = 파랑 · 자동 값 = 옅은 글자 · 마우스 = 근거. 저장 안 함(흐름이 바뀌면 바로 따라 바뀜). 제품 → 반제품 「조립」 줄은 그대로. */
+function BOM흐름(p){ const v = 값(p,'공정흐름').trim(); if(v) return { v, 자:false }; const a = 공자동(p); return a ? { v:a.v, 자:true } : { v:'', 자:false }; }
+function BOM공정칠(){
+  if(!연동줄.length) return;
+  공규칙셈();
+  const 원 = 원래코드();
+  for(const z of 연동줄){
+    if(z.gi<0) continue;
+    const td = z.tr.cells[z.gi], o = 원.get(z.m);
+    const 필 = o && z.번 && z.번===o.필름코드 ? true : o && z.번 && z.번===o.합판코드 ? false : /^m$/i.test(z.단);
+    const f = BOM흐름(z.m), 조 = f.v.split('-').map(x => x.trim()).filter(Boolean);
+    let 공 = '', 엣없 = false;
+    if(조.length){
+      if(필){ 공 = 조.find(x => x==='엣지') || 조.find(x => x.includes('엣지')) || ''; if(!공){ 공 = 조[0]; 엣없 = true; } }
+      else 공 = 조.find(x => x.includes('재단')) || 조[0];
+    }
+    td.textContent = 공;
+    td.classList.toggle('흐름없음', !조.length); td.classList.toggle('엣지없음', 엣없);
+    td.classList.toggle('저장값', !!조.length && !f.자 && 파랑(z.m,'공정흐름')); td.classList.toggle('공자동', !!조.length && f.자);
+    td.title = !조.length ? `${품목시트} ${z.m} 공정흐름 없음 (원래 ${z.공})`
+      : `${품목시트} ${z.m} 공정흐름 ${f.v}${f.자?' (자동)':''} — ${필?'필름':'합판'}${엣없?' · 흐름에 엣지 없음':''} (원래 ${z.공})`;
+  }
 }
 function 연동칠(){
   for(const z of 조립줄){   /* v2.3.0 투입수량 → BOM 조립 줄(모품목 z.m → 반제품 z.번) 소요량 */
@@ -559,6 +606,7 @@ function 연동칠(){
     if(z.i모>=0){ c[z.i모].textContent = '1'; c[z.i모].classList.toggle('저장값', 파); c[z.i모].title = `${품목시트} ${z.번} 투입수량`; }
   }
   if(!연동줄.length) return;
+  BOM공정칠();   /* v2.11.0 */
   const 원 = 원래코드();
   for(const z of 연동줄){
     const o = 원.get(z.m); let k = '';
@@ -906,6 +954,12 @@ function 편집달기(통){
 
 function 표만들기(칸, 줄, 이름){
   const 통 = document.createElement('div');
+  if(이름===BOM시트){   /* v2.11.0 가공 줄 = 품목등록업로드 반제품 것만 */
+    const 반 = 반제품들(), gi = 칸.indexOf('공정'), mi = 칸.indexOf('모품목번호');
+    BOM원 = { 칸, 줄 };
+    if(반 && gi>=0 && mi>=0) 줄 = 줄.filter(r => String(r.v[gi]??'').trim()!=='가공' || 반.has(String(r.v[mi]??'').trim()));
+    BOM거름 = !!반;
+  }
   if(!줄.length){ 통.className='state'; 통.innerHTML='<div class="big">줄 없음</div>'; return 통; }
   const 품 = 이름===품목시트, pi = 칸.indexOf('품번'), 편 = 품 ? 편칸.map(k => 칸.indexOf(k)) : [];
   const ai = 칸.indexOf('품목자산분류'), mi0 = 칸.indexOf('모품목(상위 품번)');
@@ -959,7 +1013,8 @@ function 표만들기(칸, 줄, 이름){
     const 몫 = k => 칸.indexOf(k), mi = 몫('모품목번호'), gi = 몫('공정'), i명 = 몫('하위품명'), i번 = 몫('하위품번'), i규 = 몫('하위규격');
     const trs = 통.querySelectorAll('tbody tr'); 연동줄 = [];
     줄.forEach((r, n) => { if(String(r.v[gi]??'').trim()!=='가공') return;
-      연동줄.push({ tr:trs[n], m:String(r.v[mi]??'').trim(), 번:String(r.v[i번]??'').trim(), 명:String(r.v[i명]??''), 규:String(r.v[i규]??''), i명, i번, i규 }); });
+      연동줄.push({ tr:trs[n], m:String(r.v[mi]??'').trim(), 번:String(r.v[i번]??'').trim(), 명:String(r.v[i명]??''), 규:String(r.v[i규]??''), i명, i번, i규,
+        gi, 공:String(r.v[gi]??''), 단:String(r.v[몫('투입단위')]??'').trim() }); });   /* v2.11.0 gi·공·단 = 공정 다시 놓기 */
     const i자 = 몫('소요량(분자)'), i모 = 몫('소요량(분모)'); 조립줄 = [];   /* v2.3.0 투입수량 짝 = 조립 줄 */
     줄.forEach((r, n) => { if(String(r.v[gi]??'').trim()!=='조립') return;
       조립줄.push({ tr:trs[n], m:String(r.v[mi]??'').trim(), 번:String(r.v[i번]??'').trim(), 자:String(r.v[i자]??''), 모:String(r.v[i모]??''), i자, i모 }); });
