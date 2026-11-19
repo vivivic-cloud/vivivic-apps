@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.22.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.22.1
+     v1.22.1(11-19): 사장님 「중복으로 쓴건 명세서에 동일한 제품으로 읽히도록 한건데」 — 해피코 자재번호 겹침 중 자재명이 같은 줄끼리(빈칸·대소문자 무시)는 같은 제품이라 빨강 안 함. 자재명이 다른데 품번이 같으면 그대로 빨강.
      v1.22.0(11-19): 해피코 영림원보내기 자재번호(품번) 기본값 = 자재명을 읽어 「tr_규격_색」 — 사장님 규칙: 수입=tr · 1T*18mm용 → 1*18 · 화이트 wt · 발리오크 bo · 베이지 be · 자작 bi · 블랙 bk · 아이보리 iv.
        저장된(손으로 넣은) 자재번호는 그대로 · 자동 값 = 옅은 글자 · 규칙에 안 맞으면 빈칸 + 빨간 테(마우스 = 까닭) · 같은 품번 두 줄 = 기존 겹침 빨강. 다른 거래처 안 바뀜.
      v1.21.0(11-19): 해피코 「동일품」 — 사장님 「해피코 영림원보내기에서 제품명이 미세하게 다른 여러 제품을, 월별 명세에서 같은 자재명·자재번호로 인식하게 해 줘. … 동일품인 것을 따로 관리하는 메뉴를 해피코에 만들어 주고, 영림원 보내기와 영림원 등록대기 때 알아서 하나만 등록되도록 세팅해 줘.」
@@ -312,7 +313,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.22.0</div>
+  <div class="badge">v1.22.1</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -945,6 +946,14 @@ function 겹침그리기(표, s){
 }
 /* v1.22.0 해피코 자재번호 칸 — 저장 안 된 자동 값 = 옅은 글자 · 규칙에 안 맞음(빈칸) = 빨간 테 + 마우스 까닭. 겹침 빨강·까닭은 겹침그리기 것 그대로 */
 function 해피코번호칠(표){
+  /* v1.22.1 같은 자재명(빈칸·대소문자 무시) = 사장님이 같은 제품으로 쓴 것 — 겹침이 해피코 안에서 자재명 하나뿐이면 빨강 뺌 */
+  const 명 = t => String(t ?? '').normalize('NFKC').replace(/\s+/g, '').toLowerCase();
+  const 같은제품 = new Set();
+  for(const [c, v] of 번호겹침()) if(v.every(x => x.s===해피코) && new Set(v.map(x => 명(칸값({k:'m_name'}, x.m, 해피코)))).size===1) 같은제품.add(c);
+  표.querySelectorAll('tbody tr').forEach(tr => {
+    const 번 = tr.querySelector('input[data-k="m_code"]'), 칸 = 번 && 번.closest('td');
+    if(칸 && 칸.classList.contains('겹') && 같은제품.has(번.value.trim().toLowerCase())){ 칸.classList.remove('겹'); 칸.removeAttribute('title'); }
+  });
   표.querySelectorAll('tbody tr').forEach(tr => {
     const el = tr.querySelector('input[data-k="m_code"]'), td = el && el.closest('td'); if(!td) return;
     const 고친 = (폼값[해피코] && 폼값[해피코].get(tr.dataset.key)) || {}, 손 = 'm_code' in 고친;
