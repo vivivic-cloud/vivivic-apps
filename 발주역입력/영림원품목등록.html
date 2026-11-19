@@ -2,7 +2,9 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.4.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.5.0
+     v2.5.0(11-19): 품목등록업로드 「기본구매처」 — 제품 줄 = 업체별 단품명(단품코드 = 품번) 업체 이름(입력폼 거래처 완료에서 같은 이름, 없으면 업체 이름 그대로), 고칠 수 없음(td.막음, 「제품 — 업체별 단품명 업체」).
+       반제품 줄 = 빈 입력 칸(합판·필름과 같은 길), 드롭 = 입력폼 거래처 완료 중 외주가공거래처. 업체별 단품명에 없는 제품 + 그 반제품 줄 = 표 맨 아래 · 품명 빨강(마우스 「업체별 단품명에 없음」), 열 때마다·자료가 바뀔 때마다 다시 따짐.
      v2.4.0(11-19): 사장님 「BOM등록업로드도 필수 입력 칸을 찾아서 표기해 줘.」 — 품목등록업로드·BOM등록업로드 표 머리에서 영림원 필수 칸(500259·500302 시트 ControlKey NOS = 화면 빨간 머리)을 빨간 글자, 마우스 = 「영림원 필수」.
      v2.3.1(11-19): 사장님 「모든 표의 첫 행을 고정해서 스크롤해도 사라지지 않게 해 줘.」 — 머리 줄(thead) 고정, 붙박이 첫 칸 모서리는 맨 위. 폰·낮은 화면은 표 상자 높이를 화면까지(상자 안에서 밀어야 머리가 남음).
      v2.3.0(11-19): 사장님 「반제품에만 합판코드, 필름코드, 투입수량을 입력할 수 있게 해 줘. 제품의 해당 칸에 입력을 시도하면 제품이라고 경고가 뜨게 해 줘.」 —
@@ -45,15 +47,20 @@
        로그인·로그아웃·쓰기 안 함 · 로그인이 없거나 못 읽으면 공개 사본(발주역입력_영림원폼 결과 자재 완료). */
     try{
         const 폼앱 = initializeApp(설정, 'erp-input'), 폼auth = getAuth(폼앱), 폼db = getFirestore(폼앱);
-        let 끄기 = null;
+        let 끄기 = null, 끄기2 = null;
         onAuthStateChanged(폼auth, (u) => {
             if (끄기) { 끄기(); 끄기 = null; }
+            if (끄기2) { 끄기2(); 끄기2 = null; }
             const 받음 = (줄, 왜) => { window.폼자재대기 = [줄, 왜]; if (window.폼자재받음) window.폼자재받음(줄, 왜); };
-            if (!u) { 받음(null, '입력폼 로그인 없음'); return; }
+            /* v2.5.0 입력폼 거래처등록(erp_vendors) status 완료 — 기본구매처(업체 이름 맞춤 · 반제품 외주가공 드롭) */
+            const 받음2 = (줄, 왜) => { window.폼거래처대기 = [줄, 왜]; if (window.폼거래처받음) window.폼거래처받음(줄, 왜); };
+            if (!u) { 받음(null, '입력폼 로그인 없음'); 받음2(null, '입력폼 로그인 없음'); return; }
             끄기 = onSnapshot(query(collection(폼db, 'erp_materials'), where('status', '==', '완료')),
                 s => 받음(s.docs.map(d => d.data()), ''), e => 받음(null, (e && (e.code || e.message)) || ''));
+            끄기2 = onSnapshot(query(collection(폼db, 'erp_vendors'), where('status', '==', '완료')),
+                s => 받음2(s.docs.map(d => d.data()), ''), e => 받음2(null, (e && (e.code || e.message)) || ''));
         });
-    }catch(e){ window.폼자재대기 = [null, String(e && e.message || e)]; }
+    }catch(e){ window.폼자재대기 = [null, String(e && e.message || e)]; window.폼거래처대기 = [null, String(e && e.message || e)]; }
     window.db = getFirestore(app);
     window.fbRead = { doc, getDoc, setDoc, collection, onSnapshot };
     onAuthStateChanged(auth, (u) => {
@@ -134,6 +141,7 @@ html,body{height:100%;overflow:hidden}
 @media (pointer:coarse){.dpr-t td.편집중 input{font-size:16px}}
 .dpr-t .저장값{color:#1565c0}
 .dpr-t td.막음{cursor:not-allowed}   /* v2.3.0 제품 줄의 합판·필름·투입수량 칸 */
+.dpr-t td.단품없음{color:#e53935}   /* v2.5.0 업체별 단품명에 없는 제품·그 반제품 품명 */
 .막음알림{position:fixed;z-index:60;background:#c62828;color:#fff;font-size:12.5px;font-weight:700;padding:5px 10px;border-radius:6px;pointer-events:none;white-space:nowrap}
 .자재고름{position:fixed;z-index:50;background:var(--vg-bg);border:1px solid #C7C7C3;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.12);
   max-height:260px;overflow:auto;min-width:160px;padding:3px 0;font-size:12px}
@@ -150,7 +158,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.4.0</div>
+  <div class="badge">v2.5.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -249,6 +257,10 @@ function 대조(){
   const pi = 품목칸.indexOf('품번'), ai = 품목칸.indexOf('품목자산분류'), 있음 = new Set();
   if(pi>=0 && ai>=0) for(const r of [].concat(...품목조각)) if(String(r.v[ai]??'').trim()==='제품'){ const c = String(r.v[pi]??'').trim(); if(c) 있음.add(c); }
   추가칸 = []; 추가줄 = [];
+  const 새단품 = new Map();   /* v2.5.0 단품코드 → 업체(앞 업체 먼저) */
+  for(const u of 업체순){ const 칸 = 업체값[u].칸||[], ci = 칸.indexOf('단품코드'); if(ci<0) continue;
+    for(const r of (업체값[u].줄||[])){ const c = String(r.v[ci]??'').trim(); if(c && !새단품.has(c)) 새단품.set(c, u); } }
+  단품업체 = 새단품; 품목다시();
   for(const u of 업체순){ for(const k of (업체값[u].칸||[])) if(!추가칸.includes(k)) 추가칸.push(k); }
   for(const u of 업체순){
     const 칸 = 업체값[u].칸||[], ci = 칸.indexOf('단품코드');
@@ -287,14 +299,14 @@ function 추가그리기(){
    · 연동 = BOM등록업로드 「가공」 줄: 모품목번호 X 의 하위품번이 품목등록업로드 X 줄의 **원래** 합판코드(또는 필름코드)와 같은 줄
      → X 의 입력 합판코드(필름코드)가 있으면 하위품번 = 입력값, 하위품명 = (원래 하위품명이 품번과 같으면) 입력값 / (아니면) 자재명, 하위규격 = 자재 규격(목록에 없으면 원래 값).
      입력값이 빈칸이면 원래 BOM 값 그대로(임시). 원래 필름 줄이 없는 반제품(합판 줄만)에 필름코드를 넣어도 BOM 줄은 생기지 않는다(임시). */
-const 편칸 = ['품목설명','합판코드','필름코드','투입수량'], 고를칸 = { 합판코드:'합판', 필름코드:'필름' };
+const 편칸 = ['품목설명','합판코드','필름코드','투입수량','기본구매처'], 고를칸 = { 합판코드:'합판', 필름코드:'필름', 기본구매처:'외주' };
 /* v2.3.0 반제품만 입력 — 제품 줄의 이 칸은 td.막음(경고만). 투입수량 열쇠 = 「투입수량@모품목」(BOM 조립 줄 짝) */
-const 반제품칸 = new Set(['합판코드','필름코드','투입수량']);
+const 반제품칸 = new Set(['합판코드','필름코드','투입수량','기본구매처']);
 let 막음틀 = null;
-function 막음알림(td){
+function 막음알림(td){   /* v2.5.0 칸마다 글(td data-알림) — 없으면 반제품 글 */
   let el = document.querySelector('.막음알림');
   if(!el){ el = document.createElement('div'); el.className = '막음알림'; document.body.appendChild(el); }
-  el.textContent = '제품 — 반제품만 입력됩니다';
+  el.textContent = (td && td.dataset && td.dataset.알림) || '제품 — 반제품만 입력됩니다';
   const r = td ? td.getBoundingClientRect() : { left:innerWidth/2-90, bottom:innerHeight/2 };
   el.style.left = Math.max(4, Math.min(r.left, innerWidth - 200)) + 'px';
   el.style.top = Math.min(r.bottom + 2, innerHeight - 30) + 'px';
@@ -342,6 +354,40 @@ function 공개자재구독(){
     공개자재 = 목; if(!폼자재) 자재정리();
   }, () => {});
 }
+/* ── v2.5.0 기본구매처 ──
+   거래처 = 입력폼 거래처등록 erp_vendors status 완료(로그인 공유, ylwGone 뺌) · 못 읽으면 공개 사본 발주역입력_영림원폼/_영림원거래처(폐업 뺌).
+   외주목록 = 그중 거래처종류에 외주가공거래처 → 반제품 기본구매처 드롭. 제품 줄 값 = 업체별 단품명 업체 → 같은 거래처명(없으면 업체 이름 그대로 — 임시). */
+let 폼거래처 = null, 공개거래처 = [], 외주목록 = [], 거래처이름 = new Set(), 단품업체 = null, 품목열쇠 = '';
+function 거래처정리(){
+  const 목 = 폼거래처 || 공개거래처, 본 = new Set(); 외주목록 = []; 거래처이름 = new Set();
+  for(const r of 목){ if(!r.name) continue; 거래처이름.add(r.name);
+    if(r.kinds.includes('외주가공거래처') && !본.has(r.name)){ 본.add(r.name); 외주목록.push({ code:r.name, name:r.sangho && r.sangho!==r.name ? r.sangho : '', spec:'' }); } }
+  외주목록.sort((a,b) => a.code.localeCompare(b.code));
+  품목다시();
+}
+window.폼거래처받음 = (줄) => {
+  const 트 = v => String(v ?? '').trim();
+  폼거래처 = 줄 ? 줄.filter(r => !r.ylwGone).map(r => ({ name:트(r.name), sangho:트(r.sangho), kinds:Array.isArray(r.kinds) ? r.kinds : [] })) : null;
+  거래처정리();
+};
+function 공개거래처구독(){
+  const { doc, onSnapshot } = window.fbRead;
+  onSnapshot(doc(window.db, 'artifacts','vivivic-4b7ef','public','data','발주역입력_영림원폼','_영림원거래처'), d => {
+    const 줄 = (d.exists() && d.data().줄) || [], 트 = v => String(v ?? '').trim();
+    공개거래처 = 줄.filter(r => 트(r.거래처상태)!=='폐업').map(r => ({ name:트(r.거래처), sangho:트(r.상호), kinds:Array.isArray(r.거래처종류) ? r.거래처종류 : String(r.거래처종류||'').split(/[,·]/).map(트) }));
+    if(!폼거래처) 거래처정리();
+  }, () => {});
+}
+const 업체거래처 = u => u;   /* 업체 이름 = 거래처명 글자 그대로 맞춤(찾았는지는 거래처이름 Set 으로 봄) */
+/* 업체별 단품명 또는 거래처가 바뀌면 품목등록업로드 표를 다시 만든다(줄 차례·제품 기본구매처가 바뀔 수 있음) */
+function 품목다시(){
+  const 열 = JSON.stringify([단품업체 ? [...단품업체] : null, [...거래처이름].sort()]);
+  if(열===품목열쇠) return; 품목열쇠 = 열;
+  if(!받은[품목시트] || !품목칸 || 품목조각.some(x => !x) || !품목조각.length) return;
+  const 옛 = 받은[품목시트], 자리 = [옛.scrollLeft, 옛.scrollTop];
+  받은[품목시트] = 표만들기(품목칸, [].concat(...품목조각), 품목시트);
+  if(고른===품목시트){ document.getElementById('속').replaceChildren(받은[품목시트]); 받은[품목시트].scrollLeft = 자리[0]; 받은[품목시트].scrollTop = 자리[1]; }
+}
 const 자재찾기 = c => 자재목록.합판.find(m => m.code===c) || 자재목록.필름.find(m => m.code===c) || null;
 
 function 입력구독(){
@@ -349,6 +395,8 @@ function 입력구독(){
   onSnapshot(doc(window.db, ...창고자리, '_입력'), d => { 입력 = (d.exists() && d.data().값) || {}; 칸칠(); 연동칠(); }, () => {});
   공개자재구독();
   if(window.폼자재대기) window.폼자재받음(...window.폼자재대기);
+  공개거래처구독();
+  if(window.폼거래처대기) window.폼거래처받음(...window.폼거래처대기);
 }
 
 /* 품목등록업로드 표의 입력 칸을 지금 값으로 */
@@ -447,7 +495,7 @@ function 편집달기(통){
   const 목록 = document.createElement('div'); 목록.className = '자재고름'; 목록.hidden = true; document.body.appendChild(목록);
   function 펼침(inp, 거름){
     const t = 고를칸[편집 && 편집.td.dataset.k]; if(!t){ 목록.hidden = true; return; }
-    const g = (거름||'').toLowerCase(), 목 = 자재목록[t].filter(m => !g || (m.code + ' ' + m.name).toLowerCase().includes(g));
+    const g = (거름||'').toLowerCase(), 목 = (t==='외주' ? 외주목록 : 자재목록[t]).filter(m => !g || (m.code + ' ' + m.name).toLowerCase().includes(g));
     if(!목.length){ 목록.hidden = true; return; }
     목록.innerHTML = 목.map(m => `<div class="${m.code===inp.value.trim()?'지금':''}" data-v="${글(m.code)}" title="${글(m.spec)}">${글(m.code)}<span>${글(m.name)}</span></div>`).join('');
     const r = inp.getBoundingClientRect();
@@ -566,6 +614,14 @@ function 표만들기(칸, 줄, 이름){
   if(!줄.length){ 통.className='state'; 통.innerHTML='<div class="big">줄 없음</div>'; return 통; }
   const 품 = 이름===품목시트, pi = 칸.indexOf('품번'), 편 = 품 ? 편칸.map(k => 칸.indexOf(k)) : [];
   const ai = 칸.indexOf('품목자산분류'), mi0 = 칸.indexOf('모품목(상위 품번)');
+  /* v2.5.0 업체별 단품명에 없는 제품 + 그 제품의 반제품 줄 = 맨 아래(차례는 그대로), 품명 빨강. 단품업체를 아직 못 받았으면 안 따짐 */
+  let 없음 = new Set();
+  if(품 && 단품업체 && pi>=0 && ai>=0){
+    for(const r of 줄) if(String(r.v[ai]??'').trim()==='제품'){ const c = String(r.v[pi]??'').trim(); if(!단품업체.has(c)) 없음.add(c); }
+    if(없음.size){ const 빠짐 = r => { const a = String(r.v[ai]??'').trim();
+        return a==='제품' ? 없음.has(String(r.v[pi]??'').trim()) : a==='반제품' && 없음.has(String(r.v[mi0]??'').trim()); };
+      줄 = 줄.filter(r => !빠짐(r)).concat(줄.filter(빠짐)); }
+  }
   const h = ['<table class="dpr-t"><thead><tr>' +
     칸.map((k,i) => { const 필 = 필수칸[이름]?.has(String(k).trim());
       return `<th class="${(i===0?'dpr-k':'') + (필?' 필수':'')}"${필?' title="영림원 필수"':''}>${글(k)}</th>`; }).join('') + '</tr></thead><tbody>'];
@@ -573,15 +629,20 @@ function 표만들기(칸, 줄, 이름){
     const p = 품 ? (String(r.v[pi]??'').trim() || '#' + r.행) : '';
     let tr = 품 ? `<tr data-p="${글(p)}">` : '<tr>';
     const 반 = 품 && String(r.v[ai]??'').trim()==='반제품';
+    const 빨 = 없음.size && (반 ? 없음.has(String(r.v[mi0]??'').trim()) : 없음.has(p));
     for(let i=0;i<칸.length;i++){
       const ei = 편.indexOf(i);
       if(ei>=0){ let k = 편칸[ei];
+        if(k==='기본구매처' && !반){   /* v2.5.0 제품 줄 = 업체별 단품명 업체(고칠 수 없음) */
+          const u = 단품업체 && 단품업체.get(p), v = u ? 업체거래처(u) : '';
+          tr += `<td class="막음" data-k="${k}" data-알림="제품 — 업체별 단품명 업체">${글(v)}</td>`; continue; }
         if(반제품칸.has(k) && !반){ tr += `<td class="막음" data-k="${k}"></td>`; continue; }   /* v2.3.0 제품 줄 = 입력 안 됨 */
         if(k==='투입수량') k = '투입수량@' + String(r.v[mi0]??'').trim();
         tr += `<td class="편${k.startsWith('투입수량')?' num':''}${파랑(p,k)?' 저장값':''}" data-k="${글(k)}">${글(값(p,k))}</td>`; continue; }
       const v = r.v[i];
-      const cls = (i===0?'dpr-k':'') + (typeof v==='number'?' num':'');
-      tr += `<td${cls?` class="${cls.trim()}"`:''}${i===0?` title="${글(v)}"`:''}>${글(v)}</td>`;
+      const 빨칸 = 빨 && 칸[i]==='품명';
+      const cls = (i===0?'dpr-k':'') + (typeof v==='number'?' num':'') + (빨칸?' 단품없음':'');
+      tr += `<td${cls?` class="${cls.trim()}"`:''}${빨칸?' title="업체별 단품명에 없음"':(i===0?` title="${글(v)}"`:'')}>${글(v)}</td>`;
     }
     h.push(tr + '</tr>');
   }
