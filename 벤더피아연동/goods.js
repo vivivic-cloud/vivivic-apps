@@ -212,7 +212,29 @@ const 한벌돌리기 = (단품곁다리) => {
     linked = { heads, byCode };
     if (!곁다리 && page.nameCol === "상품명") for (const g of groups.values()) fillRow(g);   // 표 단품명 칸 단추 이름을 단품관리 이름으로 (11-17)
     if (panel.dataset.name) show(panel.dataset.name, ...panel._args);
-    if (상품목록) 상품목록올리기(heads, 상품목록);   // 기다리지 않는다 — 못 올려도 화면은 그대로
+    if (상품목록) {
+      const 첫 = 상품목록올리기(heads, 상품목록, null);   // 기다리지 않는다 — 못 올려도 화면은 그대로
+      중지상품올리기(cfg, url, heads, 상품목록, 첫);       // 11-19 판매중지 상품도(뒤에서, 화면·linked 는 그대로)
+    }
+  }
+  /* 11-19 [새 지시 판매중지흐리게] 사장님(그대로): 「판매중지도 약간 죽은느낌으로 보이게 해줘」 (발주역입력 업체별 단품명 「관련 상품」)
+     연결 목록(`link.status` "1" 판매중)은 그대로 두고 — 단품관리 상세 「관련 상품」·`linked` 는 안 바뀐다 —
+     상품관리 판매상태 **2 = 중지**(벤더피아지도 Master_상품관리 `ddlStatus`: 전체·1 판매중·2 중지·3 품절) 전체 기간을 **뒤에서**(background) 한 번 더 받아
+     판매중 줄과 합쳐 `납품내역_상품목록` 에 다시 올린다(중지 줄은 판매상태 「중지」, 짓기 차례상 맨 뒤). 저장(`vpCache:`)도 같이 써서 두 번째부터는 요청 0.
+     첫 올림(판매중만)은 창고에 있던 중지 줄을 지킨다(`옛중지줄`) — 중지를 받기 전에 단품관리를 떠나도 창고에서 중지 상품이 빠지지 않게. */
+  async function 중지상품올리기(cfg, url, heads, 판매중, 첫) {
+    try {
+      const 중지 = [];
+      await fetchList(cfg, url, "2", { from: "2000-01-01" }, (h, rows) => {
+        if (h.join("\t") !== heads.join("\t")) return;
+        const si = h.indexOf("판매상태");
+        for (const row of rows) { const x = [...row]; if (si >= 0) x[si] = "중지"; 중지.push(x); }
+      }, () => true, null, true);
+      await 첫;
+      await 상품목록올리기(heads, [...판매중, ...중지], []);
+    } catch (e) {
+      window.VP말?.("상품목록:중지 못받음 " + (e && e.message ? e.message : e));
+    }
   }
 
   // 최근 3개월 배송수량이 많은 순서의 이름 목록 (undefined: 불러오는 중, null: 실패)
@@ -805,7 +827,10 @@ const 한벌돌리기 = (단품곁다리) => {
      ⚠ 매출처마다 한 줄인 같은 상품코드는 하나로(단품코드는 첫 줄 것, 판매상태는 중지 아닌 것이 있으면 그것). */
   const 상품목록칸 = "납품내역_상품목록";
   let 상품목록올리는중 = false;
-  function 상품목록짓기(머리, 줄들) {
+  /* 창고에 있던 「중지」 줄 그대로(문자열) */
+  const 옛중지줄 = (옛) => [].concat(...[...옛.entries()].filter(([이름]) => /^상품_\d+$/.test(이름)).map(([, d]) => d.줄 || []))
+    .map((x) => String(x).split("\t")).filter((a) => a[0] && a[2] === "중지");
+  function 상품목록짓기(머리, 줄들, 덧줄 = []) {
     const ci = 머리.indexOf("상품코드"), ni = 머리.indexOf("상품명"), si = 머리.indexOf("판매상태"), di = 머리.indexOf("단품코드");
     if (ci < 0 || ni < 0 || di < 0) return null;
     const 글 = (v) => String(v == null ? "" : v).trim();
@@ -820,16 +845,18 @@ const 한벌돌리기 = (단품곁다리) => {
       if (전[2] === "중지" && 상태 && 상태 !== "중지") 전[2] = 상태;
       if (!전[3] && 단품) 전[3] = 단품;
     }
+    for (const a of 덧줄) if (!m.has(a[0])) m.set(a[0], [a[0], a[1] || "", "중지", a[3] || ""]);
     const 다 = [...m.values()].sort((a, b) => (a[2] === "중지") - (b[2] === "중지")
       || a[1].localeCompare(b[1], "ko", { numeric: true }) || (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
     const 문서들 = [];
     for (let i = 0; i < 다.length; i += 단품목록묶음) 문서들.push(다.slice(i, i + 단품목록묶음).map((a) => a.join("\t")));
     return { 수: 다.length, 문서들 };
   }
-  async function 상품목록올리기(머리, 줄들) {
-    if (상품목록올리는중) return;
+  /* 덧줄: null = 창고의 옛 중지 줄을 지킴 · [] = 받은 줄 그대로(중지까지 받은 때) */
+  async function 상품목록올리기(머리, 줄들, 덧줄 = []) {
+    while (상품목록올리는중) await new Promise((r) => setTimeout(r, 200));
     상품목록올리는중 = true;
-    try { await 창고목록올리기(상품목록짓기(머리, 줄들),
+    try { await 창고목록올리기(덧줄 === null ? (옛) => 상품목록짓기(머리, 줄들, 옛중지줄(옛)) : 상품목록짓기(머리, 줄들, 덧줄),
       { 칸: 상품목록칸, 앞: "상품_", 수칸: "상품수", 파일: "벤더피아연동 상품관리(자동)", 딱: "상품목록", 없음: "상품코드·상품명·단품코드 칸 없음" }); }
     finally { 상품목록올리는중 = false; }
   }

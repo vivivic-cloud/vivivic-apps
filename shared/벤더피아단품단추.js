@@ -11,7 +11,9 @@
      `납품내역_상품목록/상품_N.줄` = "상품코드\t상품명\t판매상태\t단품코드,단품코드,…" — `loadLinked()` 판매중·전체 기간 목록(= 단품 상세 「관련 상품」 과 같은 목록)
      `납품내역_단품목록/단품_N.줄` = "단품코드\t단품명\t판매상태\t양품수"
      짝 = 단품코드 trim + 소문자(벤더피아연동 `codeKey`).
-   관련 상품이 없는 단추 = 색(.vp-관련없음)만, 까닭은 title(마우스 올림).
+   관련 상품이 없는 단추 = 색(.vp-관련없음)만, 까닭은 title(마우스 올림). 「없음」 = 판매중 상품 없음(판매중지에만 든 것도 빨강, title 에 중지 수).
+   11-19 판매중지 상품도 관련 상품에 — 확장 0.35.7 이 판매상태 2(중지)를 따로 받아 같은 `납품내역_상품목록` 에 판매상태 「중지」 로 함께 올림.
+     관련 상품 단추 중 그 이름 상품이 모두 중지 = `.vp-중지`(회색·옅게, 판매중 뒤) + title.
    쓰는 법:
      VP단품단추.읽기({ db, collection, getDocs }) → Promise   (한 번만 받음)
      VP단품단추.단추글(코드, 이름) → HTML 글(통째) — 표 칸 안에 넣는다
@@ -39,6 +41,8 @@
 .vp-goods-list .vp-점,.vp단품뿌리 .vp-chips .vp-점{display:flex;gap:3px;min-height:6px;margin-top:2px;line-height:0}
 .vp-점 i{display:none;width:6px;height:6px;border-radius:50%}
 .vp-instock .vp-점 i.g{display:block;background:#06AED5}
+.vp단품뿌리 .vp-chips button.vp-중지,.vp단품뿌리 .vp-chips button.vp-중지:hover{color:#9C9C98;opacity:.55}
+.vp단품뿌리 .vp-chips button.vp-중지 .vp-code{color:#9C9C98}
 .vp-goods-list button.vp-관련없음,.vp-goods-list button.vp-관련없음:hover{color:#FF3B30}
 .vp단품뿌리{color:#37352f;font:13px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",system-ui,sans-serif}
 .vp단품뿌리 .vp-chips{display:flex;flex-wrap:wrap;gap:6px}
@@ -101,7 +105,8 @@
     if (!다받음) return;
     const 본 = new Set(), 붙 = new Set();
     뿌리.querySelectorAll('button[data-vpc]').forEach((b) => {
-      const k = 키(b.dataset.vpc), d = 단품.get(k), 관련 = (상품.get(k) || []).length;
+      const k = 키(b.dataset.vpc), d = 단품.get(k), 다관련 = 상품.get(k) || [];
+      const 관련 = 다관련.filter((x) => x.상태 !== '중지').length, 중지수 = 다관련.length - 관련;
       const 양 = d && String(d.양품).trim() !== '' && !isNaN(Number(d.양품)) ? Number(d.양품) : undefined;
       b.classList.toggle('vp-instock', 양 !== undefined);
       let q = b.querySelector('.vp-qty');
@@ -112,7 +117,8 @@
       if (k) { 본.add(k); if (관련) 붙.add(k); }
       b.classList.toggle('vp-관련없음', !관련);
       if (관련) b.removeAttribute('title');
-      else b.title = !k ? '단품코드 없음' : !d ? '벤더피아 단품관리에 이 단품코드 없음' : '이 단품이 든 판매중 상품 없음(벤더피아 상품관리)';
+      else b.title = !k ? '단품코드 없음' : !d ? '벤더피아 단품관리에 이 단품코드 없음'
+        : 중지수 ? `이 단품이 든 판매중 상품 없음 — 판매중지 상품 ${중지수}개뿐` : '이 단품이 든 판매중 상품 없음(벤더피아 상품관리)';
     });
     셈값 = { 단품: 본.size, 붙음: 붙.size, 없음: 본.size - 붙.size };
   }
@@ -148,8 +154,11 @@
     const byName = new Map();
     for (const x of 상품.get(키(코드)) || []) { if (!byName.has(x.이름)) byName.set(x.이름, []); byName.get(x.이름).push(x); }
     if (!byName.size) { box.textContent = '없음'; return box; }
-    for (const [이름, 줄들] of byName) {
+    /* 11-19 사장님 「판매중지도 약간 죽은느낌으로 보이게 해줘」 — 판매중 먼저, 판매중지(그 이름 상품이 모두 중지)는 흐리게 · 까닭은 title */
+    const 죽음 = (줄들) => 줄들.every((x) => x.상태 === '중지');
+    for (const [이름, 줄들] of [...byName].sort((a, z) => 죽음(a[1]) - 죽음(z[1]))) {
       const b = box.appendChild(document.createElement('button')); b.type = 'button';
+      if (죽음(줄들)) { b.classList.add('vp-중지'); b.title = '판매중지 상품(벤더피아 상품관리 판매상태 중지)'; }
       b.innerHTML = `${글(이름)}<small class="vp-code">${글([...new Set(줄들.map((x) => x.코드))].join(', '))}</small>${점}`;
       b.addEventListener('click', () => 상품창(이름, 줄들));
     }

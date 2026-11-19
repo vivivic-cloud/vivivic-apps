@@ -29,7 +29,7 @@ const 쪽 = `<html><head><meta charset="utf-8"><title>단품관리</title></head
 <form name="aspnetForm" method="post" action="/System/Master/goods.aspx" id="aspnetForm">
 <input type="hidden" name="__VIEWSTATE" value="x"><select name="ddlStatus" id="ddlStatus"><option value="전체" selected>전체</option></select>
 <input type="image" name="btnSearch" id="btnSearch" src="s.gif"><div id="divGrid"></div></form></body></html>`;
-const VP흉내 = (줄) => `
+const VP흉내 = (줄, 판매중만) => `
 window.__부름 = [];
 var VP_DATA = { PAGES: ${JSON.stringify(PAGES)},
   ymd: function (d) { var z=function(n){return String(n).padStart(2,"0");};
@@ -40,6 +40,9 @@ var VP_DATA = { PAGES: ${JSON.stringify(PAGES)},
       cb(${JSON.stringify(단품머리)}, ${JSON.stringify(단품줄)}, 300, 300);
     } else if (String(url).indexOf("/System/Master/salesGoods.aspx") >= 0) {
       var 줄 = ${JSON.stringify(줄)};
+      /* 11-19 판매상태 2 = 중지만 · 판매중만이면 1 = 판매중만(아니면 옛 시험처럼 섞인 그대로) */
+      if (status === "2") 줄 = 줄.filter(function (x) { return x[6] === "중지"; });
+      else if (${!!판매중만}) 줄 = 줄.filter(function (x) { return x[6] !== "중지"; });
       for (var i = 0; i < 줄.length; i += 700) cb(${JSON.stringify(상품머리)}, 줄.slice(i, i + 700), Math.min(i + 700, 줄.length), 줄.length);
     } else cb(["단품코드","단품명"], [], 0, 0);
     return { cachedAt: null }; },
@@ -59,7 +62,7 @@ const 풀기 = (f) => {
 };
 const 자리들 = { '납품내역_상품목록': 창고, '납품내역_단품목록': 단품창고 };
 
-async function 한번(b, 줄, 제목) {
+async function 한번(b, 줄, 제목, 판매중만) {
   기록 = [];
   const ctx = await b.newContext({ viewport: { width: 1280, height: 900 } });
   await ctx.route('**://vivivic-cloud.github.io/**', (r) => r.abort('blockedbyclient'));
@@ -94,10 +97,10 @@ async function 한번(b, 줄, 제목) {
   await page.goto('https://vendorpia.com/System/Master/goods.aspx');
   await page.addScriptTag({ content: 'window.chrome=window.chrome||{};chrome.runtime={getManifest:()=>({version:"잰것"}),getURL:f=>"/"+f};'
     + 'window.__말=[];window.VP말=function(t){window.__말.push(t);};' });
-  await page.addScriptTag({ content: VP흉내(줄) });
+  await page.addScriptTag({ content: VP흉내(줄, 판매중만) });
   for (const f of ['johon.js', 'amt-draw.js', 'goods.js'])
     await page.addScriptTag({ content: fs.readFileSync(path.join(확장, f), 'utf8') }).catch((e) => 탈.push(f + ' ' + String(e).slice(0, 200)));
-  await page.waitForFunction(() => window.__말.some((t) => /^상품목록:/.test(t)) && window.__말.some((t) => /^단품목록:/.test(t)), null, { timeout: 20000 }).catch(() => {});
+  await page.waitForFunction(() => window.__말.filter((t) => /^상품목록:/.test(t)).length >= 2 && window.__말.some((t) => /^단품목록:/.test(t)), null, { timeout: 20000 }).catch(() => {});
   const 말 = (await page.evaluate(() => window.__말)).filter((t) => /^(상품|단품)목록:/.test(t));
   const 부름 = await page.evaluate(() => window.__부름);
   await ctx.close();
@@ -134,7 +137,7 @@ async function 한번(b, 줄, 제목) {
   못(단품창고.has('단품_1') && 풀기(단품창고.get('_정보')).단품수 === 300, `단품목록 올림 그대로 (${잰.말.filter((t) => /^단품/.test(t))})`);
   못(!기록.some((x) => /^vendorpia/.test(x.길) && x.셈 !== 'GET'), '벤더피아로 POST 0');
   const 상품부름 = 잰.부름.filter((x) => /salesGoods/.test(x));
-  못(상품부름.length === 1 && / 2000-01-01$/.test(상품부름[0]), `상품관리 목록 받기는 원래 있던 연결 목록 한 번뿐 (${JSON.stringify(잰.부름)})`);
+  못(상품부름.length === 2 && 상품부름[0].endsWith(' 1 2000-01-01') && 상품부름[1].endsWith(' 2 2000-01-01'), `상품관리 목록 받기 = 연결 목록(1 판매중) + 중지(2) 한 번씩 (${JSON.stringify(잰.부름)})`);
   못(!잰.탈.length, '화면 탈 0');
 
   잰 = await 한번(b, 첫줄, 'ㄷ 같은 목록으로 다시 열기');
@@ -144,7 +147,8 @@ async function 한번(b, 줄, 제목) {
   const 둘째 = 상품줄짓기(1800, { S00002: "가가가 맨앞 상품" });
   잰 = await 한번(b, 둘째, 'ㄹ 이름 하나 바뀜 · 1,800개로 줆');
   커 = 상품커밋();
-  못(커.length === 1 && !창고.has('상품_3') && 풀기(창고.get('_정보')).상품수 === 1800, `상품_3 지움 · _정보 1800 (${[...창고.keys()].join(',')})`);
+  /* 11-19 첫 올림(판매중)은 창고의 옛 중지 줄을 지켜 1,975 → 중지까지 받은 둘째 올림이 1,800 — :commit 두 번 */
+  못(커.length === 2 && !창고.has('상품_3') && 풀기(창고.get('_정보')).상품수 === 1800, `상품_3 지움 · _정보 1800 (${[...창고.keys()].join(',')} · commit ${커.length})`);
   못(풀기(창고.get('상품_1')).줄[0] === 'S00002\t가가가 맨앞 상품\t판매중\tT00002,T00002,t00003', `맨 앞 ${JSON.stringify(풀기(창고.get('상품_1')).줄[0])}`);
 
   const 셋째 = 상품줄짓기(1800, { S00002: "가가가 맨앞 상품", S01796: "힣힣 끝 중지" });
@@ -155,6 +159,16 @@ async function 한번(b, 줄, 제목) {
 
   잰 = await 한번(b, 상품줄짓기(300), 'ㅁ 300개(절반 아래)');
   못(상품커밋().length === 0 && 창고.has('상품_2'), '안 올림 · 창고 그대로');
+
+  /* 11-19 [새 지시 판매중지흐리게] 연결 목록이 판매중만 줄 때 — 중지(2)를 따로 받아 함께 올림, 다음 열기의 첫 올림은 옛 중지 줄을 지킴 */
+  창고.clear();
+  잰 = await 한번(b, 첫줄, 'ㅅ 빈 창고 · 연결 목록 판매중만 + 중지 따로', true);
+  const ㅅ다 = ['상품_1', '상품_2', '상품_3'].flatMap((k) => (창고.get(k) ? 풀기(창고.get(k)).줄 : []));
+  const ㅅ중지 = ㅅ다.filter((s) => s.split('\t')[2] === '중지');
+  못(ㅅ다.length === 2500 && ㅅ중지.length === 625 && 풀기(창고.get('_정보')).상품수 === 2500, `판매중 1875 + 중지 625 = ${ㅅ다.length} (중지 ${ㅅ중지.length})`);
+  못(ㅅ다.slice(1875).every((s) => s.split('\t')[2] === '중지'), '중지 줄은 맨 뒤');
+  잰 = await 한번(b, 첫줄, 'ㅅ-2 같은 목록 다시 열기(판매중만)', true);
+  못(상품커밋().length === 0, `중지 지킴 → 쓰기 0 (${상품커밋().length}) ${JSON.stringify(잰.말)}`);
 
   창고.clear();
   잰 = await 한번(b, 상품줄짓기(3), 'ㅂ 빈 창고 · 3개');
