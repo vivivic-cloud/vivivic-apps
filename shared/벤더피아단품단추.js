@@ -176,6 +176,7 @@
   }
   document.addEventListener('click', (e) => {
     const b = e.target.closest && e.target.closest('.vp-goods-list button[data-vpc]');
+    if (b && b.classList.contains('vp-관련없음') && window.VP단품단추.빨강누름) { 판닫기(); window.VP단품단추.빨강누름(b); return; }   // 쪽이 정한 일(업체별단품 = 단품 검색·교체)
     if (b) { 단품판(b); return; }
     if (판 && !판.hidden && !e.target.closest('.vp단품뿌리')) 판닫기();     // 바깥 누름 = 닫힘(goods.js 상세 창과 같음)
   });
@@ -184,5 +185,6 @@
     if (!창.hidden) 창.hidden = true; else 판닫기();
   });
 
-  window.VP단품단추 = { 읽기, 단추글, 칠하기, 셈: () => 셈값, 키 };
+  /* 단품목록 = 받은 단품 전부 [{코드, 이름, 상태, 양품}] (단품관리 올린 차례) · 빨강누름 = 쪽이 넣으면 빨간 단추 누름이 상세 창 대신 그것 */
+  window.VP단품단추 = { 읽기, 단추글, 칠하기, 셈: () => 셈값, 키, 단품목록: () => [...단품.values()], 빨강누름: null };
 })();

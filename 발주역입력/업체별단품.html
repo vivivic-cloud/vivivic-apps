@@ -2,7 +2,9 @@
 <!-- 발주역입력 / 업체별 단품명 — 「업체별단품명」 엑셀(시트 「업체별단품코드」)을 A열 업체 표시로 나눠 업체마다 표로 본다.
      사장님 11-18: 「폴더에 업체별단품명 파일의 A열이 조혼가구인 것만 목록으로 보여지게 해줘.」 →
        「폴더에 업체별 단품폴더를 새로만들었어 그안에 있는 구글시트 A열 확인해서 업체별로 목록 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.3.1
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.4.0
+     v1.4.0(11-19): 사장님 「뻘건색 클릭시 해당 단품명 벤더피아 단품검색이 되어 선택시 해당 단품코드로 교체 되게 해주세요. 이전 단품코드는 변동전 자료로 죽은글씨로 남게 해주세요」
+       — 빨간 단품 누름 = 그 칸이 단품 검색(이룸산업 「단품 추가」 와 같은 꼴·목록·실시간) → 고르면 교체(창고 발주역입력_업체별단품교체), 옛 단품코드·단품명은 아래 죽은 글씨(회색 줄그음). 원래 코드를 다시 고르면 교체 풀림.
      v1.3.1(11-19): 사장님 「판매중지도 약간 죽은느낌으로 보이게 해줘」 — 관련 상품에 판매중지 상품도(회색·옅게, 판매중 뒤, 까닭은 title). 자료 = 확장 0.35.7 이 중지까지 올린 납품내역_상품목록.
      v1.3.0(11-19): 사장님 「업체별 단품명에는 이 단품을 포함시키고 있는 상품명을 연결해줘야해 방법은 벤더피아연동의 단품명 버튼이 그대로 지금 이 표의 단품명에 나타나게 하면 된다. 그 단품안에는 관련상품이 연동되어 보이게 해뒀으니 맞지?」
        — 단품명 칸 = 벤더피아연동 단품 단추(shared/벤더피아단품단추.js), 누르면 단품 상세 + 「관련 상품」. 관련 상품 없는 단추는 빨간 글자, 까닭은 title.
@@ -29,7 +31,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
-    import { getFirestore, doc, getDoc, onSnapshot, collection, getDocs } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, onSnapshot, collection, getDocs, setDoc, deleteField } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
     const app = initializeApp({
         apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
         authDomain: "vivivic-4b7ef.firebaseapp.com",
@@ -40,7 +42,7 @@
     });
     const auth = getAuth(app);
     window.db = getFirestore(app);
-    window.fbRead = { doc, getDoc, onSnapshot, collection, getDocs };
+    window.fbRead = { doc, getDoc, onSnapshot, collection, getDocs, setDoc, deleteField };
     onAuthStateChanged(auth, (u) => {
         if (!u) { signInAnonymously(auth).catch(e => window.목록못읽음('창고에 들어가지 못했습니다', (e&&(e.code||e.message))||'')); return; }
         window.목록읽기();
@@ -108,13 +110,25 @@ html,body{height:100%;overflow:hidden}
 .state .big{font-size:14px;font-weight:600;color:var(--vg-ink);padding-bottom:6px}
 .state .sub{font-size:12.5px;color:var(--vg-muted);line-height:1.85}
 .state .why{font-size:11.5px;color:var(--vg-red);padding-top:6px;font-family:ui-monospace,monospace}
+/* v1.4.0 빨간 단품 → 단품 검색(이룸산업.html .vk·.vpd 값 그대로) · 교체 전 값 = 죽은 글씨 */
+.vk input{display:block;width:100%;min-width:180px;height:20px;padding:1px 5px;font:inherit;font-size:11.5px;line-height:16px;
+  border:1px solid var(--vg-ink);border-radius:4px;background:var(--vg-bg);color:var(--vg-body);outline:none}
+.vk input::placeholder{color:var(--vg-muted)}
+.vpd .cd{font-size:10.5px;font-weight:500;color:var(--vg-muted);margin-left:5px}
+.vpd{position:fixed;z-index:50;background:var(--vg-bg);border:1px solid var(--vg-edge);border-radius:6px;
+  box-shadow:0 6px 20px rgba(0,0,0,.12);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.vpd div{padding:4px 8px;font-size:11.5px;line-height:1.3;border-bottom:1px solid #EDEDEA;cursor:pointer;white-space:nowrap}
+.vpd div:hover,.vpd div.on{background:var(--vg-fill)}
+.vpd div.msg{color:var(--vg-muted);cursor:default}
+.vpd div.msg.bad{color:var(--vg-red)}
+.죽음{color:#9C9C98;text-decoration:line-through;font-size:10.5px}
 </style>
 </head>
 <body>
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.3.1</div>
+  <div class="badge">v1.4.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html" class="on">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a></nav>
 <h1>업체별 단품명</h1>
@@ -126,6 +140,7 @@ html,body{height:100%;overflow:hidden}
 <!-- 짚어서 지시하는 손잡이 — 바이글 박스에서 열면 켜진다. -->
 <script src="../shared/viggle.js"></script>
 <script src="../shared/벤더피아단품단추.js"></script>
+<script src="벤더피아실시간.js?v=1.4.0"></script>
 
 <script>
 const 창고자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_업체별단품'];
@@ -157,6 +172,7 @@ window.목록읽기 = async function(){
     업체고름(업체들[0]);
     영림원구독();
     VP단품단추.읽기({ db: window.db, ...window.fbRead }).catch(() => {});
+    교체구독();
   }catch(e){ window.목록못읽음('창고를 읽지 못했습니다', (e&&(e.code||e.message))||''); }
 };
 
@@ -214,12 +230,18 @@ function 그리기(d){
   const ci = 칸.indexOf('단품코드'), ni = 칸.indexOf('단품명');
   let h = '<table class="dpr-t"><thead><tr>' +
     칸.map((k,i) => `<th class="${i===0?'dpr-k':''}">${글(k)}</th>`).join('') + '</tr></thead><tbody>';
+  const 바뀜 = 교체[고른] || {};
   for(const r of 줄){
-    h += (ci>=0 ? `<tr data-code="${글(String(r.v[ci]??'').trim())}">` : '<tr>') + 칸.map((k,i) => {
+    const 옛코드 = ci>=0 ? String(r.v[ci]??'').trim() : '', 옛이름 = ni>=0 ? String(r.v[ni]??'').trim() : '';
+    const x = 옛코드 && 바뀜[VP단품단추.키(옛코드)];   /* v1.4.0 교체된 단품 — 새 코드·이름, 옛 것은 죽은 글씨 */
+    h += (ci>=0 ? `<tr data-code="${글(x ? x.새코드 : 옛코드)}">` : '<tr>') + 칸.map((k,i) => {
       const cls = (i===0?'dpr-k':'') + (숫자칸.has(k)?' num':'');
       /* v1.3.0 단품명 칸 = 벤더피아연동 단품 단추(단품코드가 있는 줄만) */
-      const 값 = i===ni && ci>=0 && String(r.v[ci]??'').trim() && String(r.v[i]??'').trim() ? VP단품단추.단추글(r.v[ci], 별명(r.v[i])) : 글(별명(r.v[i]));
-      return `<td${cls.trim()?` class="${cls.trim()}"`:''}>${값}</td>`;
+      let 값 = i===ni && 옛코드 && 옛이름 ? VP단품단추.단추글(x ? x.새코드 : 옛코드, x ? x.새이름 : 별명(옛이름)) : 글(별명(r.v[i]));
+      if(x && i===ci) 값 = `${글(x.새코드)}<div class="죽음">${글(옛코드)}</div>`;
+      if(x && i===ni) 값 += `<div class="죽음">${글(별명(옛이름))}</div>`;
+      const 표 = i===ni && 옛코드 ? ` data-ok="${글(옛코드)}" data-on="${글(옛이름)}"` : '';
+      return `<td${cls.trim()?` class="${cls.trim()}"`:''}${표}>${값}</td>`;
     }).join('') + '</tr>';
   }
   h += '</tbody></table>';
@@ -230,6 +252,109 @@ function 그리기(d){
   색칠();
   VP단품단추.칠하기(속);
 }
+
+/* ════ v1.4.0 빨간 단품 → 벤더피아 단품 검색 → 교체 ════
+   교체 창고 `발주역입력_업체별단품교체` — 문서 = 업체(`/` → `／`) `{업체, 교체:{원래 단품코드(trim+소문자): {옛코드, 옛이름, 새코드, 새이름, 고친때}}}`.
+   원래 업체별 단품 창고·엑셀은 안 고친다(엑셀을 다시 읽어 올려도 교체는 남음 — 원래 코드로 짝짓기). 원래 코드를 다시 고르면 그 교체를 지움.
+   검색 목록 = 벤더피아연동이 올린 `납품내역_단품목록`(shared 가 이미 받은 것) + 이어진 벤더피아 탭이 있으면 실시간(`벤더피아실시간.js`) — 이룸산업 「단품 추가」 와 같은 길. 「중지」 단품은 후보에서 뺌. */
+const 교체자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_업체별단품교체'];
+let 교체 = {}, 다시그릴것 = false;
+function 교체구독(){
+  const { collection, onSnapshot } = window.fbRead;
+  onSnapshot(collection(window.db, ...교체자리), s => {
+    교체 = {}; s.forEach(d => { const x = d.data() || {}; if(x.업체) 교체[x.업체] = x.교체 || {}; });
+    if(후보칸){ 다시그릴것 = true; return; }      /* 검색 중엔 표를 안 갈아 끼움 — 닫을 때 */
+    if(받은[고른]) 그리기(받은[고른]);
+  }, () => {});
+}
+const 실시간줄 = new Map(), 실시간본 = new Map(); let 실시간시계 = 0;
+function 실시간묻기(input){
+  const V = window.VP실시간; if(!V || !V.이어짐()) return;
+  const 열쇠 = V.낱말(input.value).join('|'); if(!열쇠) return;
+  const 앞 = 실시간본.get(열쇠); if(앞 && Date.now() - 앞 < 20000) return;
+  clearTimeout(실시간시계);
+  실시간시계 = setTimeout(() => {
+    if(후보칸 !== input || V.낱말(input.value).join('|') !== 열쇠) return;
+    실시간본.set(열쇠, Date.now());
+    V.찾기(input.value).then(답 => {
+      if(답 && 답.로그인) for(const [코드,이름='',상태=''] of 답.줄) if(코드) 실시간줄.set(VP단품단추.키(코드), {코드:String(코드), 이름:String(이름), 상태:String(상태)});
+      if(답 && 후보칸 === input) 후보그리기(input);
+    });
+  }, 350);
+}
+if(window.VP실시간) VP실시간.이으면(() => { if(후보칸) 후보그리기(후보칸); });
+function 검색목록(){
+  const 본 = new Set(), 다 = [];
+  for(const d of 실시간줄.values()){ 본.add(VP단품단추.키(d.코드)); 다.push(d); }
+  for(const d of VP단품단추.단품목록()) if(!본.has(VP단품단추.키(d.코드))) 다.push(d);
+  return 다.filter(d => d.상태 !== '중지').map(d => ({...d, 찾글:(d.이름+' '+d.코드).toLowerCase().replace(/\s+/g,'')}));
+}
+let 후보 = null, 후보칸 = null, 후보들 = [];
+function 후보닫기(){
+  if(후보){ 후보.remove(); 후보 = null; }
+  후보칸 = null;
+  다시그릴것 = false;
+  if(받은[고른]) 그리기(받은[고른]);
+}
+const 화면끝 = () => window.visualViewport ? visualViewport.offsetTop + visualViewport.height : innerHeight;
+function 후보자리(input){
+  const 폭 = Math.min(380, innerWidth-16), r = input.getBoundingClientRect();
+  const 왼 = Math.max(8, Math.min(r.left, innerWidth-폭-8)), 위 = r.bottom + 2;
+  Object.assign(후보.style, {left:왼+'px', top:위+'px', width:폭+'px', maxHeight:Math.max(60, Math.min(280, 화면끝()-8-위))+'px'});
+}
+function 후보그리기(input){
+  if(!후보){ 후보 = document.createElement('div'); 후보.className = 'vpd'; document.body.appendChild(후보);
+    후보.addEventListener('pointerdown', e => e.preventDefault());
+    후보.addEventListener('click', e => { const d = e.target.closest('div[data-i]'); if(d && 후보칸) 고르기(후보칸, 후보들[+d.dataset.i]); }); }
+  후보칸 = input; 후보자리(input);
+  const 목 = 검색목록();
+  if(!목.length){ 후보들 = []; 후보.innerHTML = '<div class="msg">단품 목록을 읽는 중…</div>'; return; }
+  실시간묻기(input);
+  const 낱 = input.value.toLowerCase().split(/\s+/).filter(Boolean);
+  후보들 = [];
+  if(낱.length) for(const d of 목){ if(낱.every(w => d.찾글.includes(w))){ 후보들.push(d); if(후보들.length >= 50) break; } }
+  let t = '';
+  if(낱.length && !후보들.length){
+    const 조 = [...new Set(input.value.toLowerCase().match(/[가-힣]+|[0-9]+|[a-z]+/g)||[])].filter(w => w.length >= 2);
+    const 점 = [];
+    목.forEach((d,j) => { let n=0, k=''; for(const w of 조){ const y = d.찾글.includes(w); if(y) n++; k += y?'1':'0'; } if(n) 점.push({d,n,k,j}); });
+    점.sort((a,b) => b.n-a.n || (a.k<b.k?1:a.k>b.k?-1:0) || a.j-b.j);
+    후보들 = 점.slice(0,50).map(x => x.d);
+    if(후보들.length) t += '<div class="msg">다 맞는 단품 없음 — 비슷한 순</div>';
+  }
+  if(!낱.length) t += '<div class="msg">단품명 · 단품코드를 치세요</div>';
+  else if(!후보들.length) t += '<div class="msg">맞는 단품 없음</div>';
+  t += 후보들.map((d,i) => `<div data-i="${i}" class="${i===0?'on':''}">${글(d.이름)}<span class="cd">${글(d.코드)}${d.상태&&d.상태!=='판매중'?' · '+글(d.상태):''}</span></div>`).join('');
+  후보.innerHTML = t;
+}
+function 고르기(input, d){
+  if(!d) return;
+  const td = input.closest('td'), 옛코드 = td.dataset.ok, 옛이름 = td.dataset.on, k = VP단품단추.키(옛코드), u = 고른;
+  const { doc, setDoc, deleteField } = window.fbRead;
+  const 값 = VP단품단추.키(d.코드) === k ? deleteField()
+    : { 옛코드, 옛이름, 새코드: d.코드.trim(), 새이름: d.이름, 고친때: new Date().toISOString() };
+  setDoc(doc(window.db, ...교체자리, 문서이름(u)), { 업체: u, 교체: { [k]: 값 } }, { merge: true })
+    .catch(e => alert('저장하지 못했습니다 ' + ((e && (e.code || e.message)) || '')));
+  후보칸 = null; input.blur(); 후보닫기();
+}
+VP단품단추.빨강누름 = (b) => {
+  const td = b.closest('td'); if(!td || !td.dataset.ok) return;
+  if(window.VP실시간) VP실시간.열기();
+  td.innerHTML = '<div class="vk"><input type="search" placeholder="단품 검색" autocomplete="off" enterkeyhint="search"></div>';
+  const input = td.querySelector('input');
+  input.value = String(b.dataset.vpn || '').replace(/\s+/g,' ').trim();
+  input.focus(); input.select();
+  후보그리기(input);
+};
+document.addEventListener('input', e => { if(e.target.matches('.vk input')) 후보그리기(e.target); });
+document.addEventListener('focusout', e => { if(e.target.matches('.vk input')) setTimeout(() => { if(후보칸 === e.target && document.activeElement !== e.target) 후보닫기(); }, 0); });
+document.addEventListener('keydown', e => {
+  if(!e.target.matches('.vk input')) return;
+  if(e.key === 'Escape'){ 후보칸 = null; e.target.blur(); 후보닫기(); }
+  else if(e.key === 'Enter' && 후보들.length && e.target.value.trim()){ e.preventDefault(); 고르기(e.target, 후보들[0]); }
+});
+window.addEventListener('resize', () => { if(후보칸) 후보칸.blur(); });
+document.addEventListener('scroll', () => { if(후보 && 후보칸) 후보자리(후보칸); }, true);
 </script>
 </body>
 </html>
