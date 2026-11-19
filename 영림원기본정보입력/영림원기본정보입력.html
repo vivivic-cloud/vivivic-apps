@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원 기본정보 입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v12 -->
+<!-- 영림원 기본정보 입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v13 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -191,7 +191,7 @@ input.clsun[data-cls],table.sheet td input.clsun[data-cls]{box-shadow:inset 0 0 
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v12</span>
+    <span class="ver">v13</span>
     <a class="btn small" href="../영림원외주입력/영림원외주입력.html" style="margin-left:8px">입력폼</a>
   </div>
 </header>
@@ -263,7 +263,7 @@ function connectDb(){
 }
 (function(){
 "use strict";
-var VER='v12';
+var VER='v13';
 var GS_MAKER='https://script.google.com/macros/s/AKfycbzxW9K--tKq_uqHnzNdecOA4YbKosK51XVG1MJVFTVTzB5Kz5o7gN1YeYuthCRI4PshOw/exec';   /* 영림원외주입력 v113 웹앱(구글시트양식/양식만들기.gs) — 파일 이름은 「외주입력_」 로 시작해야 받는다 */
 var GS_NAME='외주입력_기본정보_한행입력표';
 var XLSX_URL='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js',xlsxP=null;
@@ -357,6 +357,19 @@ document.addEventListener('focusin',function(e){var el=e.target;if(!el||!el.data
   var l0=el.dataset.l0&&document.getElementById(el.dataset.l0),more=l0?[].map.call(l0.options,function(x){return x.value;}):[];
   d.replaceChildren.apply(d,uniq(clsOpts(el).concat(more)).map(function(v){return h('option',{value:v});}));el.setAttribute('list','dl-cls-pick');});
 document.addEventListener('input',function(e){var el=e.target;if(el&&el.dataset&&el.dataset.cls)clsMarkBox(el);});
+/* v13 사장님 11-19 「하위 부류가 상위 부류를 포함하고 저장해야 수많은 중소 분류 중복을 막을 수 있어 이제 입력을 이렇게 자동으로 되도록 세팅해줘」(영림원 ed > ed_001-18 > ed_001-18_wt)
+   중분류 = 대_중 · 소분류 = 대_중_소 로 바꿈(칸을 떠날 때 change). 이미 붙었거나 등록 분류(오류 뺌)에 그 경로가 그대로 있으면 그대로. 저장된 값은 안 건드림. */
+function clsJoinName(b,m,x,lv,L){b=String(b||'').trim();m=String(m||'').trim();x=String(x||'').trim();if(!x||!b)return x;
+  if(lv===1)return x.indexOf(b+'_')===0||(L||[]).some(function(r){return r[0]===b&&r[1]===x;})?x:b+'_'+x;
+  if(!m||(L||[]).some(function(r){return r[0]===b&&r[1]===m&&r[2]===x;}))return x;
+  var sm=m.indexOf(b+'_')===0?m.slice(b.length+1):m;
+  if(x.indexOf(m+'_')===0)return x;
+  if(sm&&m!==sm&&x.indexOf(sm+'_')===0)return m+x.slice(sm.length);
+  return m+'_'+x;}
+document.addEventListener('change',function(e){var el=e.target;if(!el||!el.dataset||el.dataset.ck==='자재'||(el.dataset.cls!=='mid'&&el.dataset.cls!=='small'))return;
+  var u=clsUp(el),L=(T.erp_classes||[]).filter(function(d){return d.kind==='제상품'&&d.status!=='오류';}).map(function(d){return [s(d.big),s(d.mid),s(d.name)];}),
+    v=clsJoinName(u[0],u[1],el.value,el.dataset.cls==='mid'?1:2,L);
+  if(v!==s(el.value)){el.value=v;el.dispatchEvent(new Event('input',{bubbles:true}));}},true);
 
 /* ---------- 상단 ---------- */
 function rows(){return data.basic||[];}
