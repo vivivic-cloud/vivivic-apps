@@ -1199,6 +1199,7 @@ const 한벌돌리기 = (단품곁다리) => {
   }
 
   function labelGroup(name, group) {
+    name = group.name || name;      // 11-19 이름이 같고 코드가 다른 묶음은 열쇠가 「이름\u0001코드」 — 단추 글은 진짜 이름
     const codes = group.items.map((r) => r[col(page.codeCol)]);
     /* `외` = 곁다리로 배송관리·CS등록 표 칸에 건네준 이름 단추들 — 점이 목록 단추와 늘 같이 바뀐다 */
     for (const x of [group.b, ...(group.외 || [])]) {
@@ -1284,10 +1285,12 @@ const 한벌돌리기 = (단품곁다리) => {
     const 키 = codeKey(코드);
     const 못찾음 = () => alert(`단품관리에서 ${코드 || 이름}를 찾지 못했습니다.`);
     if (page.nameCol === "단품명") {
-      for (const [n, g] of groups) {
-        if (n !== 이름 && !(키 && g.items.some((r) => codeKey(r[col(page.codeCol)]) === 키))) continue;
+      /* 11-19 이름이 같고 코드가 다른 묶음이 따로 있으니 코드로 먼저 찾고, 없으면 이름으로 */
+      const 묶음들 = [...groups.values()];
+      const g = (키 && 묶음들.find((g) => g.items.some((r) => codeKey(r[col(page.codeCol)]) === 키))) || 묶음들.find((g) => g.name === 이름);
+      if (g) {
         modal.hidden = true;
-        show(n, heads, g.items);
+        show(g.name, heads, g.items);
         return;
       }
       if (!곁다리) { 못찾음(); return; }
@@ -1606,7 +1609,7 @@ const 한벌돌리기 = (단품곁다리) => {
         : ranked;
       const rank = new Map(names.map((name, i) => [name, i]));
       const rankAll = new Map(ranked.map((name, i) => [name, i]));
-      for (const [name, { tr }] of groups) tr.hidden = stage !== 2 && !rank.has(name);
+      for (const g of groups.values()) g.tr.hidden = stage !== 2 && !rank.has(g.name);   // 11-19 같은 이름 다른 코드 묶음도 그 이름 차례로
       reorder((g) => (rankAll.has(g.name) ? rankAll.get(g.name) : ranked.length + g.i));
       줄거르개 = null;
       for (const g of groups.values()) if (!g.tr.hidden) 묶음그리기(g);
@@ -1658,11 +1661,18 @@ const 한벌돌리기 = (단품곁다리) => {
       const name = row[col(page.nameCol)];
       if (!row[col(page.codeCol)]?.trim()) continue;  // 합계 줄 (코드 없음)
       if (page.nameCol === "단품명" && unused(name) && !곁다리) continue;   // 곁다리는 목록을 안 그리니 (사용안함)도 이름표에 넣는다
-      if (groups.has(name)) {
-        const group = groups.get(name);
+      /* 11-19 사장님(그대로) 「엄연히 아래 단품코드의 제품이 있는데 왜 상단단품 이곳에 단품코드가 두개가 잡히냐」
+         — 단품관리·재고조회(이름 칸 = 단품명, 곁다리 아님)는 **이름이 같아도 단품코드가 다르면 다른 묶음**(단추·양품·상세 따로).
+         처음 나온 코드의 묶음 열쇠는 이름 그대로(순위·카탈로그 맞춤이 이름으로 찾음), 다른 코드는 「이름\u0001코드」. 같은 코드 여러 줄(창고별)은 전처럼 한 묶음. */
+      const 코드열쇠 = codeKey(row[col(page.codeCol)]);
+      const 코드로 = page.nameCol === "단품명" && !곁다리;
+      let key = name;
+      if (코드로 && groups.has(name) && groups.get(name).코드 !== 코드열쇠) key = name + "\u0001" + 코드열쇠;
+      if (groups.has(key)) {
+        const group = groups.get(key);
         group.items.push(row);
         labelGroup(name, group);
-        noteRow(name, row);
+        noteRow(key, row);
         continue;
       }
       const b = document.createElement("button");
@@ -1670,7 +1680,7 @@ const 한벌돌리기 = (단품곁다리) => {
       const tr = document.createElement("tbody");     // 11-17 — 이름 하나 = 묶음(<tbody>) 하나, 안의 줄은 `묶음그리기` 가
       tr.hidden = true;                               // apply 가 보일지 정한다(그 전엔 숨김 — 다 그리지 않게)
       tr.className = "vp-묶음";
-      const group = { b, items: [row], name, tr, i: groups.size, 더러움: true };
+      const group = { b, items: [row], name, 코드: 코드열쇠, tr, i: groups.size, 더러움: true };
       labelGroup(name, group);
       b.addEventListener("click", () => {
         /* ⚠⚠ 10-14 사장님: 「선택된버튼이 검게 변한후 다른선택시 해제되지않고
@@ -1688,8 +1698,8 @@ const 한벌돌리기 = (단품곁다리) => {
         show(name, heads, group.items);
       });
       목록표.appendChild(tr);
-      groups.set(name, group);
-      noteRow(name, row);
+      groups.set(key, group);
+      noteRow(key, row);
     }
   }
 
@@ -1741,7 +1751,7 @@ const 한벌돌리기 = (단품곁다리) => {
       if (b) { if (줄인줄.has(b)) 줄인겹침.add(b); else 줄인줄.set(b, o); }
     }
     ing표 = { 그대로줄, 줄인줄, 줄인겹침 };
-    const 이름들 = 곁다리 ? [...곁다리표.이름.keys()] : [...groups.keys()];
+    const 이름들 = 곁다리 ? [...곁다리표.이름.keys()] : [...new Set([...groups.values()].map((g) => g.name))];
     let 딱 = 0, 거의 = 0;
     ing맞은것.clear();
     for (const n of 이름들) {
@@ -1752,7 +1762,7 @@ const 한벌돌리기 = (단품곁다리) => {
     }
     /* ③ 링크가 걸린 상품 단추 **한 단에 붉은색 마킹** (조혼가구 붉은 줄과 같은 색·같은 꼴) */
     if (곁다리) 곁다리다시칠하기();
-    for (const [n, g] of groups) { for (const x of [g.b, ...(g.외 || [])]) x.classList.toggle("vp-ing", ing맞은것.has(n)); fillRow(g); }   // 표의 「상품정보」 칸도 채운다
+    for (const g of groups.values()) { for (const x of [g.b, ...(g.외 || [])]) x.classList.toggle("vp-ing", ing맞은것.has(g.name)); fillRow(g); }   // 표의 「상품정보」 칸도 채운다
     if (panel.dataset.name) show(panel.dataset.name, ...panel._args);   // 열려 있으면 상세도 새로
     적기(`inghome 맞춰보기 — 우리 상품 ${이름들.length}개 · inghome ${목록.length}개 · `
        + `이름이 그대로 맞는 것 ${딱}개 · 거의 맞는 것 ${거의}개`
