@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v293 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v294 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -479,7 +479,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v293</span>
+    <span class="ver">v294</span>
     <div class="pick topnav" id="topnav">   <!-- v288 사장님 11-18 「입력폼 상단에 발주역입력 메뉴를 만들어 발주역입력 페이지로 이어지게」 — 이름 = 각 페이지 <title> 앞부분 · 같은 탭 -->
       <button type="button" class="btn small" aria-haspopup="menu" aria-expanded="false">발주역입력</button>
       <div class="pickmenu topnavmenu" role="menu" hidden>
@@ -6993,6 +6993,7 @@ function hbarFor(tw){
 var LSHEET={};   /* 단계 키 → {on,q,k,dir,inp} */
 var LSHEET_STEPS={
   vendors:{more:[['워크센터',function(r){var w=vwcOf(r);return w?(w.status==='완료'?'있음':'보냄'):'';}]]},
+  classes:{first:'소분류'},   /* v294 사장님 「이 완료된 대중소정의를 볼 수 있게 해주세요」 — 분류 저장한 항목(검색으로만 보던 것)을 시트로 모두(완료 포함) · 보기만 */
   workcenters:{more:[['보낸 거래처',function(r){if(r.sentFrom!=='거래처등록')return '';var v=(data.vendors||[]).filter(function(x){return x.id===r.vendorId;})[0];return v?(v.name||v.sangho||''):(r.vendor||'');}]]}};
 function lsheetOn(s){return !!(LSHEET_STEPS[s.key]&&LSHEET[s.key]&&LSHEET[s.key].on);}
 function lsheetBtn(s){
@@ -7001,7 +7002,7 @@ function lsheetBtn(s){
   return h('div',{class:'delbar'},h('button',{type:'button',class:'btn small','aria-pressed':on?'true':'false',on:{click:function(){var o=LSHEET[s.key]||(LSHEET[s.key]={});o.on=!o.on;renderList();}}},on?'카드로 보기':'시트로 보기'));
 }
 function lsheetCols(s){
-  var c=[{lab:s.fields[0]&&s.recTitle?(s.key==='workcenters'?'워크센터':'거래처명'):'이름',v:function(r){return s.recTitle(r)||'';},first:1}];
+  var c=[{lab:LSHEET_STEPS[s.key].first||(s.fields[0]&&s.recTitle?(s.key==='workcenters'?'워크센터':'거래처명'):'이름'),v:function(r){return s.recTitle(r)||'';},first:1}];
   s.fields.forEach(function(f){if(c[0].lab===f.label)return;c.push({lab:f.label,v:function(r){return show(r[f.k]);}});});
   c.push({lab:'상태',v:function(r){return STATUS.indexOf(r.status)>=0?r.status:'대기';},st:1});
   (LSHEET_STEPS[s.key].more||[]).forEach(function(m){c.push({lab:m[0],v:m[1]});});
@@ -7062,7 +7063,7 @@ function renderListIn(s,listBox,title){
   var sorted=a.slice().sort(function(x,y){return (y.createdAt||'')<(x.createdAt||'')?-1:1;});
   if(s.flowCols)sorted=sorted.filter(flowGap).concat(sorted.filter(function(r){return !flowGap(r);}));   /* v53 빈 흐름이 맨 위 */
   var ss=SEARCH_STEPS[s.key],sq=ss?String(LISTQ[s.key]||'').trim().toLowerCase():null;   /* v37: 4 품목(v39: 3 분류도)은 검색어에 맞는 기록만 */
-  if(sq!=null)sorted=sorted.filter(function(r){return EDITING[s.key+'/'+r.id]||(sq&&ss.keys.some(function(k){return String(r[k]==null?'':r[k]).toLowerCase().indexOf(sq)>=0;}));});
+  if(sq!=null&&!lsheetOn(s))sorted=sorted.filter(function(r){return EDITING[s.key+'/'+r.id]||(sq&&ss.keys.some(function(k){return String(r[k]==null?'':r[k]).toLowerCase().indexOf(sq)>=0;}));});
   if(lsheetOn(s)){lsheetDraw(s,listBox,head,sorted,kit,[gbox,obox]);return;}   /* v275 시트로 보기 = 카드 대신 표 */
   var items=sorted.map(function(r){return recCard(s,r,kit,openIds);});
   if(sq!=null){listSearch(s,listBox,head,a,sq,items,gbox);return;}
