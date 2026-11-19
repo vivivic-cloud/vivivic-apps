@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v296 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v297 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -480,7 +480,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v296</span>
+    <span class="ver">v297</span>
     <div class="pick topnav" id="topnav">   <!-- v288 사장님 11-18 「입력폼 상단에 발주역입력 메뉴를 만들어 발주역입력 페이지로 이어지게」 — 이름 = 각 페이지 <title> 앞부분 · 같은 탭 -->
       <button type="button" class="btn small" aria-haspopup="menu" aria-expanded="false">발주역입력</button>
       <div class="pickmenu topnavmenu" role="menu" hidden>
@@ -723,6 +723,21 @@ function clsJoinName(b,m,x,lv,L){b=String(b||'').trim();m=String(m||'').trim();x
   if(x.indexOf(m+'_')===0)return x;
   if(sm&&m!==sm&&x.indexOf(sm+'_')===0)return m+x.slice(sm.length);
   return m+'_'+x;}
+/* v297 사장님 11-19 「작성할때 안보이조 저장 될대만 보이니까 해깔려」 — 중·소분류 칸을 쓰는 동안 앞에 붙을 상위 이름(clsJoinName 과 같은 규칙)을 칸 안 앞쪽에 회색으로 보임.
+   칸 값은 안 바꿈(text-indent 만) · 칸을 떠나면 사라짐 · 이미 붙었거나 등록 경로 그대로면 안 보임. */
+var CLS_GH=null,CLS_GH_EL=null,CLS_GH_PRE='',CLS_GH_X='\u0001';
+function clsGhPre(full,x){x=String(x||'').trim();return full.length>x.length&&full.slice(full.length-x.length)===x?full.slice(0,full.length-x.length):'';}
+function clsGhost(el,pre){
+  if(!CLS_GH){CLS_GH=document.createElement('span');CLS_GH.className='clsgh';CLS_GH.style.cssText='position:fixed;z-index:9999;pointer-events:none;color:#9a9a96;white-space:pre;overflow:hidden;display:none';document.body.appendChild(CLS_GH);
+    window.addEventListener('scroll',function(){if(CLS_GH_EL)clsGhost(CLS_GH_EL,CLS_GH_PRE);},true);window.addEventListener('resize',function(){if(CLS_GH_EL)clsGhost(CLS_GH_EL,CLS_GH_PRE);});}
+  if(CLS_GH_EL&&CLS_GH_EL!==el)CLS_GH_EL.style.textIndent='';
+  if(!pre||!el||el.readOnly||el.disabled||!el.isConnected){CLS_GH.style.display='none';if(el)el.style.textIndent='';CLS_GH_EL=null;CLS_GH_PRE='';return;}
+  CLS_GH_EL=el;CLS_GH_PRE=pre;
+  var cs=getComputedStyle(el),r=el.getBoundingClientRect(),g=CLS_GH;
+  g.style.fontFamily=cs.fontFamily;g.style.fontSize=cs.fontSize;g.style.fontWeight=cs.fontWeight;g.style.letterSpacing=cs.letterSpacing;
+  g.textContent=pre;g.style.display='block';
+  g.style.left=(r.left+(parseFloat(cs.borderLeftWidth)||0)+(parseFloat(cs.paddingLeft)||0))+'px';g.style.top=r.top+'px';g.style.height=r.height+'px';g.style.lineHeight=r.height+'px';
+  g.style.maxWidth=Math.max(0,r.width-12)+'px';el.style.textIndent=g.offsetWidth+'px';}
 var CLS_PICK={kind:'',big:''};   /* 3단계 분류 화면에서 지금 고른 품목구분·대분류 — 대·중분류 드롭다운을 그 아래 것만으로 줄인다 */
 /* 공정·공정흐름(v20): 공정 드롭다운 = 이미 저장된 공정(dl-procs — 공정 기록 중 대기·진행중·완료, 오류 뺌, 같은 이름은 하나).
    목록에 없는 이름(「새 공정 추가」·엑셀에 적은 새 이름)은 흐름을 저장할 때 erp_processes 에 「대기」로 함께 쌓는다(newProcsOf). */
@@ -2071,11 +2086,17 @@ function buildForm(step){
     var cls3Un=function(){var k=kindF.get(),v=[bigF.get(),midF.get(),smallF.get()];clsUnMark(bigF.el,k,v.slice(0,1));clsUnMark(midF.el,k,v.slice(0,2));clsUnMark(smallF.el,k,v);};
     [kindF,bigF,midF,smallF].forEach(function(x){x.el.addEventListener('change',cls3Un);x.el.addEventListener('input',cls3Un);});
     LIVE.push({el:smallF.el,redo:cls3Un});cls3Un();
-    var clsJoin=function(){var k=kindF.get(),tr=function(x){return String(x==null?'':x).trim();},   /* v296 */
-        L=(data.classes||[]).filter(function(r){return r.kind===k&&r.status!=='오류';}).map(function(r){return [tr(r.big),tr(r.mid),tr(r.name)];}),
+    var clsL=function(){var k=kindF.get(),tr=function(x){return String(x==null?'':x).trim();};
+        return (data.classes||[]).filter(function(r){return r.kind===k&&r.status!=='오류';}).map(function(r){return [tr(r.big),tr(r.mid),tr(r.name)];});};
+    var clsJoin=function(){var L=clsL(),   /* v296 */
         b=bigF.get(),m=midF.get(),n=smallF.get(),m2=clsJoinName(b,'',m,1,L),n2=clsJoinName(b,m2,n,2,L);
       if(m2!==m)midF.set(m2);if(n2!==n)smallF.set(n2);if(m2!==m||n2!==n)cls3Un();};
     midF.el.addEventListener('change',clsJoin);smallF.el.addEventListener('change',clsJoin);
+    [[midF,1],[smallF,2]].forEach(function(p){[].forEach.call(p[0].el.querySelectorAll('input[type=text]'),function(inp){   /* v297 쓰는 동안 앞에 붙을 상위 이름 회색으로 */
+      var up=function(){var L=clsL(),b=bigF.get(),x=String(inp.value||'').trim()||CLS_GH_X,m2=p[1]===2?clsJoinName(b,'',midF.get(),1,L):'';
+        clsGhost(inp,clsGhPre(clsJoinName(b,m2,x,p[1],L),x));};
+      ['focus','input'].forEach(function(ev){inp.addEventListener(ev,up);});p[0].el.addEventListener('change',function(){if(inp===CLS_GH_EL)up();});   /* change = clsJoin 다음 */
+      inp.addEventListener('blur',function(){if(inp===CLS_GH_EL)clsGhost(inp,'');});});});
     var sIn=smallF.el.querySelector('input[type=text]');
     if(sIn){sIn.setAttribute('list','dl-cls-name-pick');sIn.addEventListener('focus',function(){var d=document.getElementById('dl-cls-name-pick');if(!d){d=h('datalist',{id:'dl-cls-name-pick'});document.body.append(d);}
       var k=kindF.get(),b=bigF.get(),m=midF.get(),tr=function(x){return String(x==null?'':x).trim();};

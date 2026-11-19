@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원 기본정보 입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v13 -->
+<!-- 영림원 기본정보 입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v14 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -191,7 +191,7 @@ input.clsun[data-cls],table.sheet td input.clsun[data-cls]{box-shadow:inset 0 0 
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v13</span>
+    <span class="ver">v14</span>
     <a class="btn small" href="../영림원외주입력/영림원외주입력.html" style="margin-left:8px">입력폼</a>
   </div>
 </header>
@@ -263,7 +263,7 @@ function connectDb(){
 }
 (function(){
 "use strict";
-var VER='v13';
+var VER='v14';
 var GS_MAKER='https://script.google.com/macros/s/AKfycbzxW9K--tKq_uqHnzNdecOA4YbKosK51XVG1MJVFTVTzB5Kz5o7gN1YeYuthCRI4PshOw/exec';   /* 영림원외주입력 v113 웹앱(구글시트양식/양식만들기.gs) — 파일 이름은 「외주입력_」 로 시작해야 받는다 */
 var GS_NAME='외주입력_기본정보_한행입력표';
 var XLSX_URL='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js',xlsxP=null;
@@ -370,6 +370,27 @@ document.addEventListener('change',function(e){var el=e.target;if(!el||!el.datas
   var u=clsUp(el),L=(T.erp_classes||[]).filter(function(d){return d.kind==='제상품'&&d.status!=='오류';}).map(function(d){return [s(d.big),s(d.mid),s(d.name)];}),
     v=clsJoinName(u[0],u[1],el.value,el.dataset.cls==='mid'?1:2,L);
   if(v!==s(el.value)){el.value=v;el.dispatchEvent(new Event('input',{bubbles:true}));}},true);
+/* v14 사장님 11-19 「작성할때 안보이조 저장 될대만 보이니까 해깔려」 — 중·소분류 칸을 쓰는 동안 앞에 붙을 상위 이름(clsJoinName 과 같은 규칙)을 칸 안 앞쪽에 회색으로 보임.
+   칸 값은 안 바꿈(text-indent 만) · 칸을 떠나면 사라짐 · 이미 붙었거나 등록 경로 그대로면 안 보임. */
+var CLS_GH=null,CLS_GH_EL=null,CLS_GH_PRE='',CLS_GH_X='\u0001';
+function clsGhPre(full,x){x=String(x||'').trim();return full.length>x.length&&full.slice(full.length-x.length)===x?full.slice(0,full.length-x.length):'';}
+function clsGhost(el,pre){
+  if(!CLS_GH){CLS_GH=document.createElement('span');CLS_GH.className='clsgh';CLS_GH.style.cssText='position:fixed;z-index:9999;pointer-events:none;color:#9a9a96;white-space:pre;overflow:hidden;display:none';document.body.appendChild(CLS_GH);
+    window.addEventListener('scroll',function(){if(CLS_GH_EL)clsGhost(CLS_GH_EL,CLS_GH_PRE);},true);window.addEventListener('resize',function(){if(CLS_GH_EL)clsGhost(CLS_GH_EL,CLS_GH_PRE);});}
+  if(CLS_GH_EL&&CLS_GH_EL!==el)CLS_GH_EL.style.textIndent='';
+  if(!pre||!el||el.readOnly||el.disabled||!el.isConnected){CLS_GH.style.display='none';if(el)el.style.textIndent='';CLS_GH_EL=null;CLS_GH_PRE='';return;}
+  CLS_GH_EL=el;CLS_GH_PRE=pre;
+  var cs=getComputedStyle(el),r=el.getBoundingClientRect(),g=CLS_GH;
+  g.style.fontFamily=cs.fontFamily;g.style.fontSize=cs.fontSize;g.style.fontWeight=cs.fontWeight;g.style.letterSpacing=cs.letterSpacing;
+  g.textContent=pre;g.style.display='block';
+  g.style.left=(r.left+(parseFloat(cs.borderLeftWidth)||0)+(parseFloat(cs.paddingLeft)||0))+'px';g.style.top=r.top+'px';g.style.height=r.height+'px';g.style.lineHeight=r.height+'px';
+  g.style.maxWidth=Math.max(0,r.width-12)+'px';el.style.textIndent=g.offsetWidth+'px';}
+function clsGhUp(el){if(!el||!el.dataset||el.dataset.ck==='자재'||(el.dataset.cls!=='mid'&&el.dataset.cls!=='small'))return;
+  var u=clsUp(el),L=(T.erp_classes||[]).filter(function(d){return d.kind==='제상품'&&d.status!=='오류';}).map(function(d){return [s(d.big),s(d.mid),s(d.name)];}),
+    x=s(el.value)||CLS_GH_X;
+  clsGhost(el,clsGhPre(clsJoinName(u[0],u[1],x,el.dataset.cls==='mid'?1:2,L),x));}
+['focusin','input','change'].forEach(function(ev){document.addEventListener(ev,function(e){clsGhUp(e.target);});});
+document.addEventListener('focusout',function(e){if(e.target===CLS_GH_EL)clsGhost(e.target,'');});
 
 /* ---------- 상단 ---------- */
 function rows(){return data.basic||[];}

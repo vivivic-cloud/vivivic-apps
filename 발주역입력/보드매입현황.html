@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.26.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.27.0
+     v1.27.0(11-19): 사장님 「작성할때 안보이조 저장 될대만 보이니까 해깔려」
+       중·소분류 칸을 쓰는 동안 앞에 붙을 상위 이름(분류이음 결과의 앞부분)을 칸 안 앞쪽에 회색으로 보임(`clsGhost` · text-indent). 값·저장 규칙은 v1.26.0 그대로.
      v1.26.0(11-19): 사장님 「하위 부류가 상위 부류를 포함하고 저장해야 수많은 중소 분류 중복을 막을 수 있어 이제 입력을 이렇게 자동으로 되도록 세팅해줘」(영림원 ed > ed_001-18 > ed_001-18_wt 그림)
        중·소분류 칸에 넣으면(치기·고르기·채우기·붙여넣기 = 칸적용) 중 = 대_중 · 소 = 대_중_소 로 바꿔 저장(`분류이음`). 이미 붙었거나 등록 분류에 그 경로가 그대로 있으면 그대로. 저장된 값은 안 건드림.
      v1.25.0(11-19): 사장님 「모든 영림원보내기 등 대중소분류를 입력하는 칸에 이미 등록완료된 목록이 드롭다운으로 보여 해당 대중소를 기존 등록된 것으로 입력할 수 있게 해주세요」
@@ -331,7 +333,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.26.0</div>
+  <div class="badge">v1.27.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -864,6 +866,21 @@ function 분류이음(b, m, x, 층, 목록){
   if(짧 && x.startsWith(짧 + '_') && m!==짧) return m + x.slice(짧.length);
   return m + '_' + x;
 }
+/* v1.27.0 사장님 11-19 「작성할때 안보이조 저장 될대만 보이니까 해깔려」 — 중·소분류 칸을 쓰는 동안 앞에 붙을 상위 이름(clsJoinName 과 같은 규칙)을 칸 안 앞쪽에 회색으로 보임.
+   칸 값은 안 바꿈(text-indent 만) · 칸을 떠나면 사라짐 · 이미 붙었거나 등록 경로 그대로면 안 보임. */
+var CLS_GH=null,CLS_GH_EL=null,CLS_GH_PRE='',CLS_GH_X='\u0001';
+function clsGhPre(full,x){x=String(x||'').trim();return full.length>x.length&&full.slice(full.length-x.length)===x?full.slice(0,full.length-x.length):'';}
+function clsGhost(el,pre){
+  if(!CLS_GH){CLS_GH=document.createElement('span');CLS_GH.className='clsgh';CLS_GH.style.cssText='position:fixed;z-index:9999;pointer-events:none;color:#9a9a96;white-space:pre;overflow:hidden;display:none';document.body.appendChild(CLS_GH);
+    window.addEventListener('scroll',function(){if(CLS_GH_EL)clsGhost(CLS_GH_EL,CLS_GH_PRE);},true);window.addEventListener('resize',function(){if(CLS_GH_EL)clsGhost(CLS_GH_EL,CLS_GH_PRE);});}
+  if(CLS_GH_EL&&CLS_GH_EL!==el)CLS_GH_EL.style.textIndent='';
+  if(!pre||!el||el.readOnly||el.disabled||!el.isConnected){CLS_GH.style.display='none';if(el)el.style.textIndent='';CLS_GH_EL=null;CLS_GH_PRE='';return;}
+  CLS_GH_EL=el;CLS_GH_PRE=pre;
+  var cs=getComputedStyle(el),r=el.getBoundingClientRect(),g=CLS_GH;
+  g.style.fontFamily=cs.fontFamily;g.style.fontSize=cs.fontSize;g.style.fontWeight=cs.fontWeight;g.style.letterSpacing=cs.letterSpacing;
+  g.textContent=pre;g.style.display='block';
+  g.style.left=(r.left+(parseFloat(cs.borderLeftWidth)||0)+(parseFloat(cs.paddingLeft)||0))+'px';g.style.top=r.top+'px';g.style.height=r.height+'px';g.style.lineHeight=r.height+'px';
+  g.style.maxWidth=Math.max(0,r.width-12)+'px';el.style.textIndent=g.offsetWidth+'px';}
 function 분류고를것(칸, tr){
   const 값 = k => { const el = tr.querySelector(`input[data-k="${k}"]`); return el ? el.value.trim() : ''; };
   const 다 = 영림원분류.concat(분류.기억, 지금분류());   /* v1.17.1 영림원 기존 분류도 고를 수 있게(이름 그대로) */
@@ -1223,6 +1240,14 @@ async function 폼그리기(){
     if(!el.dataset || !el.dataset.분류) return;
     분류펼침(el, '');   /* v1.20.1 크롬 datalist 대신 — 값이 있어도 늘 다 펼침 */
   });
+  /* v1.27.0 쓰는 동안 앞에 붙을 상위 이름 회색으로 */
+  const 앞보임 = el => {
+    if(!el.dataset || (el.dataset.k!=='m_mid' && el.dataset.k!=='m_small')) return;
+    const tr = el.closest('tr'), 위 = kk => ((tr.querySelector(`input[data-k="${kk}"]`) || {}).value || '').trim(), x = el.value.trim() || CLS_GH_X;
+    clsGhost(el, clsGhPre(분류이음(위('m_big'), 위('m_mid'), x, el.dataset.k==='m_mid' ? 1 : 2, 영림원분류), x));
+  };
+  ['focusin','input','change'].forEach(ev => 표.addEventListener(ev, e => 앞보임(e.target)));
+  표.addEventListener('focusout', e => { if(e.target===CLS_GH_EL) clsGhost(e.target, ''); });
   /* ---- v1.20.1 직접 만든 분류 드롭목록 — 대(·중) 아래 분류 전부 · 초록 줄 = 영림원 · 회색 줄 = 입력폼 등록 대기 ---- */
   document.querySelectorAll('.분류고름').forEach(x => x.remove());   /* 다시 그릴 때 옛 목록 지움 */
   const 고름 = document.createElement('div'); 고름.className = '분류고름'; 고름.hidden = true; document.body.appendChild(고름);
