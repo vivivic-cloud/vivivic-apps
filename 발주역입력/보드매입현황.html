@@ -1,7 +1,10 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.20.8
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.21.0
+     v1.21.0(11-19): 해피코 「동일품」 — 사장님 「해피코 영림원보내기에서 제품명이 미세하게 다른 여러 제품을, 월별 명세에서 같은 자재명·자재번호로 인식하게 해 줘. … 동일품인 것을 따로 관리하는 메뉴를 해피코에 만들어 주고, 영림원 보내기와 영림원 등록대기 때 알아서 하나만 등록되도록 세팅해 줘.」
+       해피코 둘째 줄 「동일품」 = 묶음 표(제안 주황 · 확정 초록 · 대표 ● · 확정/풀기 · 빼기 · 옮기기). 창고 발주역입력_중국엣지/해피코_동일품. 확정 묶음만 적용: 해피코월표가 묶인 줄의 제품명·옵션을 대표 것으로 바꿔 셈
+       → 영림원보내기 표·`보내기`·연결·기준이 묶음마다 한 줄(입력폼 등록대기도 한 번). 원본 창고·엑셀은 그대로. 월 명세 표에 자재명·자재번호 칸(동일품 줄 = 초록, 마우스 = 대표). 연결 = 원래 표기 → 대표 줄(출처 「동일품」, 보내기 표 +N).
      v1.20.8(11-19): 사장님 「모든 표의 첫 행을 고정해서 스크롤해도 사라지지 않게 해 줘.」 — 머리 줄(thead) 고정, 붙박이 첫 칸 모서리는 맨 위. 폰·낮은 화면은 표 상자 높이를 화면까지(상자 안에서 밀어야 머리가 남음).
      v1.20.7(11-18): 쪽길 여섯째 탭 「품목등록업로드」 → 「영림원품목등록」(영림원품목등록.html).
      v1.20.6(11-18): 쪽길 탭이 여섯이라 폰 폭에서 탭 이름이 낱말 중간에 끊겨 — 이름은 한 줄(nowrap), 넘치면 탭째 다음 줄.
@@ -282,6 +285,18 @@ html,body{height:100%;overflow:hidden}
 .폼표 td.분류틀,.폼표 td.고칠칸{background:#FFE9E7;box-shadow:inset 0 0 0 2px var(--vg-red)}   /* v1.17.1 분류 규칙 어긋남 · v1.18.0 오류 단계의 고칠 칸 */
 .폼표 td.입:has([data-k]:disabled){background:var(--vg-fill)}   /* v1.18.0 완료 단계 칸 = 잠금 */
 
+/* v1.21.0 해피코 동일품 — 제안 주황 · 확정 초록(첫 칸 왼쪽 띠) · 동일품이 적용된 명세 칸 초록 */
+.동표 td.dpr-k{border-left:4px solid transparent}
+.동표 tr.제안 td.dpr-k{border-left-color:#ef8f00}
+.동표 tr.확정 td.dpr-k{border-left-color:#2e7d32}
+.동표 tr.묶끝 td{border-bottom:1px solid #9C9C98}
+.동표 button,.동표 select{font:inherit;font-size:11px;padding:0 4px;border:1px solid var(--vg-edge);border-radius:3px;background:var(--vg-bg);color:var(--vg-ink);cursor:pointer}
+.동표 button.대표{border:0;background:none;font-size:13px;line-height:1;color:#C7C7C3;padding:0 2px}
+.동표 tr.확정 button.대표.on{color:#2e7d32}
+.동표 tr.제안 button.대표.on{color:#ef8f00}
+.동표 td.참{color:var(--vg-muted)}
+.동표 td.가운데{text-align:center}
+.dpr-t td.동일{color:#2e7d32;font-weight:700}
 #오류목록{flex-shrink:0;max-height:30vh;overflow:auto;margin:0 0 8px}
 #오류목록 .chip{margin-left:6px}
 .state{background:var(--vg-fill);border-radius:14px;padding:22px 16px;text-align:center;margin-top:12px}
@@ -294,7 +309,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.20.8</div>
+  <div class="badge">v1.21.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -657,6 +672,11 @@ function 연결모으기(s){
     if(!m || 뺀줄(s, m)) continue;
     const 새 = 한(String(d.품목??''), String(d.규격??''), m, '더한 표기', d.고른때 ? { 고른때:d.고른때 } : {});
     if(!연.some(x => x.열쇠===새.열쇠 && 줄키({이름:x.줄품목, 규격:x.줄규격})===줄키(m))) 연.push(새);
+  }
+  if(s===해피코) for(const [원래, 대표] of 동일품맵){   /* v1.21.0 확정 동일품 — 원래 명세서 표기 → 대표 줄 */
+    const m = 줄들.find(x => 줄키(x)===대표); if(!m || 뺀줄(s, m)) continue;
+    const [품목, 규격] = 원래.split('\t');
+    연.push(한(품목, 규격, m, '동일품', {}));
   }
   const 줄수 = new Map();
   연.forEach(x => { if(!줄수.has(x.열쇠)) 줄수.set(x.열쇠, new Set()); 줄수.get(x.열쇠).add(x.줄품목 + '\t' + x.줄규격); });
@@ -1032,7 +1052,7 @@ async function 폼그리기(){
     '</tr></thead><tbody>';
   for(const m of 줄){
     const 키 = 줄키(m), 뺌 = 뺀줄(s, m);
-    const 덧 = 연.filter(x => x.출처==='더한 표기' && x.줄품목===m.이름 && x.줄규격===m.규격);
+    const 덧 = 연.filter(x => (x.출처==='더한 표기' || x.출처==='동일품') && x.줄품목===m.이름 && x.줄규격===m.규격);
     const 겹 = 연.some(x => x.겹침 && x.줄품목===m.이름 && x.줄규격===m.규격);
     const 덧글 = 덧.length ? `<span class="덧표기" title="${글('다른 명세서 표기: ' + 덧.map(x => x.품목 + (x.규격?' '+x.규격:'')).join(' / '))}">+${덧.length}</span>` : '';
     const 겹글 = 겹 ? `<span class="표시" title="같은 명세서 열쇠가 다른 줄에도 있음 — 명세서 등록 때 사장님께 묻습니다">⚠</span>` : '';
@@ -1379,10 +1399,16 @@ const 거래처시트들 = () => 국내시트들().concat(받은[해피코] ? [�
 function 해피코월표(d){
   const 칸 = d.칸 || [], i = k => 칸.indexOf(k), 고 = ['제품명','옵션','수량(M)','단가'].map(i);
   return { 제목:'2026년 해피코', 표:[{ 이름:'월별', 칸:['월','제품명','옵션','수량(M)','단가'], 수:[0,0,0,1,1],
-    줄:(d.줄 || []).map(z => ({ v:[z.월 ? parseInt(z.월.slice(5)) + '월' : '', ...고.map(j => j < 0 ? '' : String((z.v || [])[j] ?? ''))], 월:z.월 ? parseInt(z.월.slice(5)) + '월' : '', r:z.r })) }] };
+    줄:(d.줄 || []).map(z => {
+      const v = 고.map(j => j < 0 ? '' : String((z.v || [])[j] ?? ''));
+      const 대 = 동일품맵.get(v[0].trim() + '\t' + v[1].trim());   /* v1.21.0 확정 동일품 = 대표 제품명·옵션으로 셈(원본 창고 값은 그대로) */
+      if(대){ const [a, b] = 대.split('\t'); v[0] = a; v[1] = b; }
+      return { v:[z.월 ? parseInt(z.월.slice(5)) + '월' : '', ...v], 월:z.월 ? parseInt(z.월.slice(5)) + '월' : '', r:z.r };
+    }) }] };
 }
 async function 해피코받기(){
   if(!중국){ const { doc, getDoc } = window.fbRead; const d = await getDoc(doc(window.db, ...중국자리, 중국문서)); 중국 = d.exists() ? d.data() : { 줄:[] }; }
+  await 동일품받기();
   if((중국.줄 || []).length) 받은[해피코] = 해피코월표(중국);
 }
 async function 모두받기(){
@@ -1825,6 +1851,7 @@ async function 중국고름(){
       중국 = d.exists() ? d.data() : { 줄:[] };
     }catch(e){ 속.innerHTML = `<div class="state"><div class="big">창고를 읽지 못했습니다</div><div class="why">${글((e&&(e.code||e.message))||'')}</div></div>`; return; }
   }
+  try{ await 동일품받기(); }catch(e){ console.warn('동일품 못 읽음', e); }
   if((중국.줄 || []).length) 받은[해피코] = 해피코월표(중국);
   if(고른 !== 해피코) return;
   중국볼것그리기(); 중국그리기();
@@ -1834,7 +1861,7 @@ function 중국볼것그리기(){
   const el = document.getElementById('볼것'), 줄 = (중국||{}).줄||[];
   const 달들 = [...new Set(줄.map(z => z.월).filter(Boolean))].sort();
   const 여러해 = new Set(달들.map(m => m.slice(0,4))).size > 1;
-  const 버튼 = [['전체','전체'], ...달들.map(m => ['m:'+m, 중국달글(m, 여러해)]), ['폼','영림원보내기'], ['엑셀','엑셀 새로 불러오기']];   /* v1.19.0 영림원보내기 */
+  const 버튼 = [['전체','전체'], ...달들.map(m => ['m:'+m, 중국달글(m, 여러해)]), ['폼','영림원보내기'], ['동일품','동일품'], ['엑셀','엑셀 새로 불러오기']];   /* v1.19.0 영림원보내기 · v1.21.0 동일품 */
   el.innerHTML = 버튼.map(([k,t]) => `<button class="chip${k===중국볼것?' on':''}" data-k="${글(k)}">${글(t)}</button>`).join('');
   el.querySelectorAll('.chip').forEach(b => b.onclick = () => {
     중국볼것 = b.dataset.k; el.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x===b)); 중국그리기();
@@ -1845,11 +1872,174 @@ function 중국그리기(){
   볼것 = 중국볼것==='폼' ? '폼' : '전체';
   if(중국볼것==='폼'){ 폼그리기(); return; }   /* v1.19.0 국내와 같은 영림원보내기 */
   if(중국볼것==='엑셀'){ 중국엑셀그리기(); return; }
+  if(중국볼것==='동일품'){ 동일품그리기(); return; }
   if(!(d.줄||[]).length){ 속.innerHTML = '<div class="state"><div class="big">창고에 해피코 자료가 없습니다</div><div class="sub">「엑셀 새로 불러오기」 에서 엑셀을 고르십시오.</div></div>'; return; }
   const 달 = 중국볼것.startsWith('m:') ? 중국볼것.slice(2) : '';
   const 줄 = d.줄.filter(z => !달 || z.월===달);
-  속.innerHTML = '<div class="표통">' + 표글(d, 줄, `${d.업체||'해피코'} · ${d.시트||''}`) +
+  속.innerHTML = '<div class="표통">' + 중국명세표(d, 줄, `${d.업체||'해피코'} · ${d.시트||''}`) +
     `<div class="글">${줄.length}줄 · ${글(d.파일||'')} · ${글(d.읽은날||'')} 읽음${달 ? ' · 달 = 입고일 기준(임시)' : ''}</div></div>`;
+}
+
+/* ---- v1.21.0 해피코 동일품 — 사장님 11-19 「제품명이 미세하게 다른 여러 제품을 … 같은 자재명·자재번호로 인식 … 동일품인 것을 따로 관리하는 메뉴를 해피코에 만들어 주고,
+   영림원 보내기와 영림원 등록대기 때 알아서 하나만 등록되도록」.
+   창고 발주역입력_중국엣지/해피코_동일품 = {묶음:[{id, 대표:'제품명\t옵션', 원래:['제품명\t옵션'…](대표 포함, 명세 글자 앞뒤 빈칸만 뺌), 상태:'확정'|'제안'}], 따로:[열쇠…](제안에서 뺀 줄), 고친때}.
+   줄 = 제품명+옵션(영림원보내기 줄과 같은 열쇠). 확정 묶음만 적용 — 해피코월표가 묶인 줄의 제품명·옵션을 대표 것으로 바꿔 셈하므로 영림원보내기 표·`보내기`(입력폼 등록대기)·기준·연결이 묶음마다 한 줄.
+   단가 = 묶음의 모든 달을 합친 흐름에서 기존 규칙(마지막 단가) 그대로. 원본 창고(해피코)·엑셀은 안 바꿈. 확정을 바꾸면 이 화면이 해피코 영림원폼 문서를 다시 저장(보내기 판 +1).
+   제안(자동) = 묶이지 않은 줄끼리 ① 제품명의 숫자 차례 + 한글이 같고(띄어쓰기·대소문자·기호·영문 끝 글자 차이는 봄 안 함) 옵션이 같거나 한 글자만 다름 ② 영림원보내기에서 손으로 고친 자재명이 같음. 대표 = 입고 줄이 가장 많은 줄(임시). */
+const 동일품문서 = '해피코_동일품';
+let 동일품 = null, 동일품맵 = new Map(), 동일품듣기 = false, 동일품그린 = [];
+const 동일품꼴 = v => ({
+  묶음:((v || {}).묶음 || []).map(g => ({ id:String(g.id || ''), 대표:String(g.대표 || ''), 원래:(g.원래 || []).map(String), 상태:g.상태==='확정' ? '확정' : '제안' })).filter(g => g.원래.length),
+  따로:((v || {}).따로 || []).map(String) });
+function 동일품맵셈(){
+  const m = new Map();
+  for(const g of (동일품 || {}).묶음 || []) if(g.상태==='확정' && g.원래.length > 1) for(const k of g.원래) if(k !== g.대표) m.set(k, g.대표);
+  동일품맵 = m;
+}
+async function 동일품받기(){
+  if(동일품) return;
+  const { doc, getDoc, onSnapshot } = window.fbRead, 자리 = doc(window.db, ...중국자리, 동일품문서);
+  const d = await getDoc(자리);
+  동일품 = 동일품꼴(d.exists() ? d.data() : null); 동일품맵셈();
+  if(onSnapshot && !동일품듣기){ 동일품듣기 = true;
+    onSnapshot(자리, x => { const 새 = 동일품꼴(x.exists() ? x.data() : null); if(고른값(새)===고른값(동일품)) return; 동일품 = 새; 동일품적용(); }, () => {}); }   /* 다른 기기에서 바꾼 것 */
+}
+/* 묶음이 바뀐 뒤 — 확정 맵이 바뀌었으면 해피코 월별 셈을 다시. 돌려줌 = 확정 맵이 바뀌었나 */
+function 동일품적용(){
+  const 옛 = 고른값([...동일품맵]); 동일품맵셈();
+  const 바뀜 = 옛 !== 고른값([...동일품맵]);
+  if(바뀜 && 중국 && (중국.줄 || []).length) 받은[해피코] = 해피코월표(중국);
+  const a = document.activeElement, 치는중 = a && a.closest && a.closest('.폼표');
+  if(고른===해피코 && !치는중){ if(중국볼것==='동일품') 동일품그리기(); else if(바뀜) 중국그리기(); }
+  return 바뀜;
+}
+/* 해피코 원래 줄(제품명+옵션, 명세 글자 앞뒤 빈칸만 뺌) — 처음 나온 차례 */
+function 해피코원래(){
+  const d = 중국 || {}, 칸 = d.칸 || [], i = 칸.indexOf('제품명'), o = 칸.indexOf('옵션'), 모 = new Map();
+  for(const z of d.줄 || []){
+    const v = z.v || [], 이 = String(v[i] ?? '').trim(), 규 = String(v[o] ?? '').trim(); if(!이) continue;
+    const k = 이 + '\t' + 규; if(!모.has(k)) 모.set(k, { 키:k, 이름:이, 규격:규, 줄수:0, 달:[] });
+    const r = 모.get(k); r.줄수++; if(z.월 && !r.달.includes(z.월)) r.달.push(z.월);
+  }
+  return [...모.values()];
+}
+const 동N = t => String(t ?? '').normalize('NFKC').toLowerCase();
+const 이름뼈 = t => { const s = 동N(t); return (s.match(/\d+(?:\.\d+)?/g) || []).join('/') + '|' + s.replace(/[^가-힣]/g, ''); };
+const 옵뼈 = t => 동N(t).replace(/\s+/g, '');
+const 한글자다름 = (a, b) => { if(a===b) return true; if(a.length!==b.length || a.length < 3) return false; let n = 0; for(let j = 0; j < a.length; j++) if(a[j]!==b[j]) n++; return n <= 1; };
+const 고친자재명 = k => ((폼값[해피코] && 폼값[해피코].get(k)) || {}).m_name;
+/* 두 줄이 같은 물건으로 보이는 까닭('' = 아님) — 마우스 글 */
+function 동일품까닭(x, y){
+  const a = 고친자재명(x.키), b = 고친자재명(y.키);
+  if(a && b && 옵뼈(a)===옵뼈(b)) return '자재명 같음 「' + a + '」';
+  if(이름뼈(x.이름)!==이름뼈(y.이름) || !한글자다름(옵뼈(x.규격), 옵뼈(y.규격))) return '';
+  const 왜 = [옵뼈(x.이름)===옵뼈(y.이름) ? (x.이름===y.이름 ? '' : '띄어쓰기·대소문자') : '기호·끝 글자'];
+  if(옵뼈(x.규격)!==옵뼈(y.규격)) 왜.push('옵션 한 글자');
+  return 왜.filter(Boolean).join(' · ') || '같은 글자';
+}
+/* 그릴 묶음 = 창고 묶음(확정 → 제안) + 자동 제안 + 단독 줄 */
+function 동일품묶음들(){
+  const 원 = 해피코원래(), 모 = new Map(원.map(r => [r.키, r])), 쓴 = new Set(), 따로 = new Set((동일품 || {}).따로 || []);
+  const 빈줄 = k => ({ 키:k, 이름:k.split('\t')[0], 규격:k.split('\t')[1] || '', 줄수:0, 달:[] });
+  const 창 = ((동일품 || {}).묶음 || []).map(g => { const 줄 = g.원래.map(k => 모.get(k) || 빈줄(k)); 줄.forEach(r => 쓴.add(r.키)); return { id:g.id, 상태:g.상태, 대표:g.대표, 줄 }; });
+  창.sort((a, b) => (a.상태==='확정' ? 0 : 1) - (b.상태==='확정' ? 0 : 1));
+  const 남 = 원.filter(r => !쓴.has(r.키) && !따로.has(r.키));
+  const 부 = 남.map((_, j) => j), 뿌 = j => 부[j]===j ? j : (부[j] = 뿌(부[j]));
+  for(let a = 0; a < 남.length; a++) for(let b = a + 1; b < 남.length; b++) if(동일품까닭(남[a], 남[b])) 부[뿌(a)] = 뿌(b);
+  const 모둠 = new Map(); 남.forEach((r, j) => { const k = 뿌(j); if(!모둠.has(k)) 모둠.set(k, []); 모둠.get(k).push(r); });
+  const 자동 = [...모둠.values()].filter(a => a.length > 1).map(줄 => {
+    const 대 = 줄.reduce((x, y) => y.줄수 > x.줄수 ? y : x, 줄[0]);
+    return { id:'', 자동:true, 상태:'제안', 대표:대.키, 줄 };
+  });
+  const 묶인 = new Set([...창, ...자동].flatMap(g => g.줄.map(r => r.키)));
+  const 단독 = 원.filter(r => !묶인.has(r.키)).map(r => ({ id:'', 상태:'', 대표:'', 줄:[r] }));
+  return [...창, ...자동, ...단독];
+}
+const 동일품새id = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+function 동일품상태(t, 나쁨){ const el = document.getElementById('동상태'); if(el){ el.textContent = t; el.classList.toggle('bad', !!나쁨); } }
+/* 묶음 고침 → 정리(한 줄은 한 묶음 · 1줄 묶음 지움 · 대표는 묶음 안) → 창고 저장 → 확정이 바뀌었으면 해피코 영림원폼(보내기) 다시 저장 */
+async function 동일품고침(바꿈){
+  const 새 = 동일품꼴(동일품);
+  const 꺼냄 = k => { 새.묶음.forEach(g => { g.원래 = g.원래.filter(x => x!==k); }); 새.따로 = 새.따로.filter(x => x!==k); };
+  const 창묶음 = g => { let s = g.id && 새.묶음.find(x => x.id===g.id);
+    if(!s){ s = { id:동일품새id(), 대표:g.대표, 원래:g.줄.map(r => r.키), 상태:g.상태==='확정' ? '확정' : '제안' }; 새.묶음.push(s); g.id = s.id; }
+    return s; };
+  바꿈(새, 창묶음, 꺼냄);
+  새.묶음 = 새.묶음.filter(g => g.원래.length > 1);
+  새.묶음.forEach(g => { if(!g.원래.includes(g.대표)) g.대표 = g.원래[0]; });
+  const 묶인 = new Set(새.묶음.flatMap(g => g.원래));
+  새.따로 = [...new Set(새.따로)].filter(k => !묶인.has(k));
+  동일품 = 새;
+  const 바뀜 = 동일품적용();
+  동일품상태('저장 중…');
+  try{
+    const { doc, setDoc } = window.fbRead;
+    await setDoc(doc(window.db, ...중국자리, 동일품문서), { ...새, 고친때:new Date().toISOString() });
+    if(바뀜 && 받은[해피코]){ await 폼받기(해피코); await 연결받기(); await 분류받기(); await 폼저장(해피코); }   /* 보내기·연결·기준 = 묶음마다 한 줄 */
+    동일품상태('저장됨 ' + new Date().toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit' }));
+  }catch(e){ 동일품상태('저장하지 못했습니다 ' + ((e && (e.code || e.message)) || ''), true); }
+}
+async function 동일품그리기(){
+  const 속 = document.getElementById('속');
+  if(!폼값[해피코] && 받은[해피코]){
+    속.innerHTML = '<div class="state"><div class="big">읽는 중입니다…</div></div>';
+    try{ await 폼받기(해피코); }catch(e){}
+    if(고른!==해피코 || 중국볼것!=='동일품') return;
+  }
+  const 묶 = 동일품그린 = 동일품묶음들();
+  const 월표 = 받은[해피코] && (받은[해피코].표 || []).find(t => t.이름==='월별'), 합 = new Map();
+  if(월표 && 폼값[해피코]) for(const m of 품목모으기(월표).줄) 합.set(줄키(m), m);
+  const 자재 = (g, r) => { const m = 합.get(g.상태==='확정' ? g.대표 : r.키); return m ? [칸값({k:'m_name'}, m, 해피코), 칸값({k:'m_code'}, m, 해피코)] : ['', '']; };
+  const 묶은 = 묶.filter(g => g.상태);
+  const 이름 = g => { const r = g.줄.find(x => x.키===g.대표) || g.줄[0]; return (묶은.indexOf(g) + 1) + '. ' + r.이름 + ' ' + r.규격; };
+  let h = `<table class="dpr-t 동표"><thead><tr><th class="dpr-k">제품명</th><th>옵션</th><th>대표</th><th>입고</th><th>달</th><th>자재명</th><th>자재번호</th><th>묶음</th><th></th><th>옮기기</th></tr></thead><tbody>`;
+  묶.forEach((g, gi) => {
+    const 대표줄 = g.줄.find(x => x.키===g.대표);
+    g.줄.forEach((r, ri) => {
+      const 왜 = g.상태 && 대표줄 && r !== 대표줄 ? 동일품까닭(r, 대표줄) : '';
+      const [자명, 자번] = 자재(g, r);
+      const 옮 = `<select data-옮="${gi}:${ri}"><option value=""></option>` + 묶은.filter(x => x!==g).map(x => `<option value="${묶.indexOf(x)}">${글(이름(x))}</option>`).join('') + '</select>';
+      h += `<tr class="${[g.상태==='확정' ? '확정' : g.상태 ? '제안' : '', ri===g.줄.length-1 ? '묶끝' : ''].filter(Boolean).join(' ')}"${g.상태 ? ` title="${글((g.상태==='확정' ? '확정' : '제안') + (왜 ? ' · ' + 왜 : ''))}"` : ''}>` +
+        `<td class="dpr-k">${글(r.이름)}</td><td>${글(r.규격)}</td>` +
+        `<td class="가운데">${g.상태 ? `<button class="대표${r.키===g.대표 ? ' on' : ''}" data-대표="${gi}:${ri}" title="대표">●</button>` : ''}</td>` +
+        `<td class="num">${r.줄수}</td><td class="참">${글(r.달.map(m => parseInt(m.slice(5))).join('·'))}</td>` +
+        `<td${g.상태==='확정' ? ' class="동일"' : ''}>${글(자명)}</td><td${g.상태==='확정' ? ' class="동일"' : ''}>${글(자번)}</td>` +
+        `<td>${ri===0 && g.상태 ? `<button data-확정="${gi}">${g.상태==='확정' ? '풀기' : '확정'}</button>` : ''}</td>` +
+        `<td>${g.상태 ? `<button data-빼기="${gi}:${ri}" title="빼기">×</button>` : ''}</td><td>${옮}</td></tr>`;
+    });
+  });
+  h += '</tbody></table>';
+  const 확 = 묶.filter(g => g.상태==='확정').length, 제 = 묶.filter(g => g.상태==='제안').length;
+  속.innerHTML = `<div class="폼줄"><span id="동상태" class="폼상태"></span></div><div class="표통">${h}<div class="글">확정 ${확} · 제안 ${제} · 단독 ${묶.length - 확 - 제}</div></div>`;
+  const 둘 = t => t.split(':').map(Number);
+  속.querySelectorAll('[data-확정]').forEach(b => b.onclick = () => { const g = 묶[+b.dataset.확정];
+    동일품고침((새, 창) => { const s = 창(g); s.상태 = g.상태==='확정' ? '제안' : '확정'; }); });
+  속.querySelectorAll('[data-대표]').forEach(b => b.onclick = () => { const [gi, ri] = 둘(b.dataset.대표), g = 묶[gi];
+    if(g.줄[ri].키===g.대표) return; 동일품고침((새, 창) => { 창(g).대표 = g.줄[ri].키; }); });
+  속.querySelectorAll('[data-빼기]').forEach(b => b.onclick = () => { const [gi, ri] = 둘(b.dataset.빼기), g = 묶[gi], k = g.줄[ri].키;
+    동일품고침((새, 창, 꺼냄) => { 창(g); 꺼냄(k); 새.따로.push(k); }); });
+  속.querySelectorAll('[data-옮]').forEach(el => el.onchange = () => { if(el.value==='') return; const [gi, ri] = 둘(el.dataset.옮), k = 묶[gi].줄[ri].키, 대상 = 묶[+el.value];
+    동일품고침((새, 창, 꺼냄) => { const s = 창(대상); 꺼냄(k); s.원래.push(k); }); });
+}
+/* 해피코 명세 표(원본 칸 그대로) + 옵션 뒤 자재명·자재번호 — 확정 동일품 줄은 대표 값(초록, 마우스 = 대표) */
+function 중국명세표(d, 줄, 제목){
+  const 칸 = d.칸 || [], 수 = d.수 || [], i = 칸.indexOf('제품명'), o = 칸.indexOf('옵션'), 뒤 = o >= 0 ? o : i;
+  const 월표 = 받은[해피코] && (받은[해피코].표 || []).find(t => t.이름==='월별'), 합 = new Map();
+  if(월표 && 폼값[해피코]) for(const m of 품목모으기(월표).줄) 합.set(줄키(m), m);
+  else if(월표 && 받은[해피코]) 폼받기(해피코).then(() => { if(고른===해피코 && !['폼','엑셀','동일품'].includes(중국볼것)) 중국그리기(); }, () => {});
+  const 덧칸 = (z) => {
+    const 키 = String((z.v || [])[i] ?? '').trim() + '\t' + String((z.v || [])[o] ?? '').trim(), 대 = 동일품맵.get(키), m = 합.get(대 || 키);
+    const 값 = m ? [칸값({k:'m_name'}, m, 해피코), 칸값({k:'m_code'}, m, 해피코)] : ['', ''];
+    const 속성 = 대 ? ` class="동일" title="${글('동일품 — 대표 ' + 대.replace('\t', ' '))}"` : '';
+    return 값.map(x => `<td${속성}>${글(x)}</td>`).join('');
+  };
+  let h = `<div class="표">${제목 ? `<div class="표제목">${글(제목)}</div>` : ''}<table class="dpr-t"><thead><tr>` +
+    칸.map((k, j) => `<th class="${j===0 ? 'dpr-k' : ''}">${글(k)}</th>` + (j===뒤 ? '<th>자재명</th><th>자재번호</th>' : '')).join('') + '</tr></thead><tbody>';
+  for(const z of 줄){
+    h += '<tr>' + 칸.map((k, j) => { const cls = (j===0 ? 'dpr-k' : '') + (수[j] ? ' num' : '');
+      return `<td${cls.trim() ? ` class="${cls.trim()}"` : ''}>${글((z.v || [])[j])}</td>` + (j===뒤 ? 덧칸(z) : ''); }).join('') + '</tr>';
+  }
+  return h + '</tbody></table></div>';
 }
 
 /* ---- 엑셀 새로 불러오기(중국엣지필름) — 고른 엑셀을 브라우저에서 읽어 지금 창고와 견주고, 「바꾸기」 를 눌러야(바뀐 것 있을 때만) 창고에 쓴다 ---- */
