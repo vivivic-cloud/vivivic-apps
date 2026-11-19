@@ -2,7 +2,10 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.2.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.3.0
+     v2.3.0(11-19): 사장님 「반제품에만 합판코드, 필름코드, 투입수량을 입력할 수 있게 해 줘. 제품의 해당 칸에 입력을 시도하면 제품이라고 경고가 뜨게 해 줘.」 —
+       세 칸은 품목자산분류=반제품 줄만 입력 칸(td.편) · 제품 줄은 td.막음(누름·치기·붙여넣기·지우기 = 「제품」 경고, 섞인 붙여넣기는 반제품 줄만 들어감).
+       투입수량도 입력 칸 — 열쇠는 품번 안 「투입수량@모품목」(같은 반제품도 제품마다 수량이 다름) · BOM 조립 줄(모품목 → 그 반제품) 소요량(분자)=입력값, 분모=1.
      v2.2.0(11-19): 사장님 「품목업로드 — 품목설명, 합판코드, 필름코드 빈칸 … 합판코드, 필름코드는 입력폼에 등록 완료된 해당 목록 드롭다운 … BOM등록업로드 등 같은 표기가 되게 연동」 —
        세 칸 = 빈 입력 칸(엑셀처럼 고르기·끌기·Ctrl+C/V·Delete), 창고 _입력 {값:{품번:{칸}}} 바뀐 칸만 merge 저장·파랑, 드롭 = 입력폼 erp_materials 완료(로그인 공유 'erp-input') 또는 공개 사본,
        BOM 가공 줄(원래 합판·필름 코드 짝)이 입력값을 따름. 자세한 규칙은 표만들기 위 주석.
@@ -123,6 +126,8 @@ html,body{height:100%;overflow:hidden}
   padding:2px 5px;margin:0;outline:none;width:100%;min-width:9em}
 @media (pointer:coarse){.dpr-t td.편집중 input{font-size:16px}}
 .dpr-t .저장값{color:#1565c0}
+.dpr-t td.막음{cursor:not-allowed}   /* v2.3.0 제품 줄의 합판·필름·투입수량 칸 */
+.막음알림{position:fixed;z-index:60;background:#c62828;color:#fff;font-size:12.5px;font-weight:700;padding:5px 10px;border-radius:6px;pointer-events:none;white-space:nowrap}
 .자재고름{position:fixed;z-index:50;background:var(--vg-bg);border:1px solid #C7C7C3;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.12);
   max-height:260px;overflow:auto;min-width:160px;padding:3px 0;font-size:12px}
 .자재고름 div{padding:4px 10px;white-space:nowrap;cursor:pointer;border-left:3px solid #2e7d32}
@@ -138,7 +143,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.2.0</div>
+  <div class="badge">v2.3.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -275,9 +280,21 @@ function 추가그리기(){
    · 연동 = BOM등록업로드 「가공」 줄: 모품목번호 X 의 하위품번이 품목등록업로드 X 줄의 **원래** 합판코드(또는 필름코드)와 같은 줄
      → X 의 입력 합판코드(필름코드)가 있으면 하위품번 = 입력값, 하위품명 = (원래 하위품명이 품번과 같으면) 입력값 / (아니면) 자재명, 하위규격 = 자재 규격(목록에 없으면 원래 값).
      입력값이 빈칸이면 원래 BOM 값 그대로(임시). 원래 필름 줄이 없는 반제품(합판 줄만)에 필름코드를 넣어도 BOM 줄은 생기지 않는다(임시). */
-const 편칸 = ['품목설명','합판코드','필름코드'], 고를칸 = { 합판코드:'합판', 필름코드:'필름' };
+const 편칸 = ['품목설명','합판코드','필름코드','투입수량'], 고를칸 = { 합판코드:'합판', 필름코드:'필름' };
+/* v2.3.0 반제품만 입력 — 제품 줄의 이 칸은 td.막음(경고만). 투입수량 열쇠 = 「투입수량@모품목」(BOM 조립 줄 짝) */
+const 반제품칸 = new Set(['합판코드','필름코드','투입수량']);
+let 막음틀 = null;
+function 막음알림(td){
+  let el = document.querySelector('.막음알림');
+  if(!el){ el = document.createElement('div'); el.className = '막음알림'; document.body.appendChild(el); }
+  el.textContent = '제품 — 반제품만 입력됩니다';
+  const r = td ? td.getBoundingClientRect() : { left:innerWidth/2-90, bottom:innerHeight/2 };
+  el.style.left = Math.max(4, Math.min(r.left, innerWidth - 200)) + 'px';
+  el.style.top = Math.min(r.bottom + 2, innerHeight - 30) + 'px';
+  el.hidden = false; clearTimeout(막음틀); 막음틀 = setTimeout(() => { el.hidden = true; }, 1500);
+}
 const BOM시트 = 'BOM등록업로드';
-let 입력 = {}, 더럽 = new Map(), 연동줄 = [];
+let 입력 = {}, 더럽 = new Map(), 연동줄 = [], 조립줄 = [];
 let 자재목록 = { 합판:[], 필름:[] }, 폼자재 = null, 공개자재 = [];
 const 열쇠 = (p,k) => p + '\t' + k;
 const 값 = (p,k) => { const x = 열쇠(p,k); return 더럽.has(x) ? 더럽.get(x) : String(((입력[p]||{})[k]) ?? ''); };
@@ -340,6 +357,12 @@ function 원래코드(){
   return m;
 }
 function 연동칠(){
+  for(const z of 조립줄){   /* v2.3.0 투입수량 → BOM 조립 줄(모품목 z.m → 반제품 z.번) 소요량 */
+    const v = 값(z.번, '투입수량@' + z.m).trim(), c = z.tr.cells, 파 = 파랑(z.번, '투입수량@' + z.m);
+    if(!v){ for(const [i,w] of [[z.i자, z.자],[z.i모, z.모]]){ if(i<0) continue; c[i].textContent = w; c[i].classList.remove('저장값'); c[i].removeAttribute('title'); } continue; }
+    if(z.i자>=0){ c[z.i자].textContent = v; c[z.i자].classList.toggle('저장값', 파); c[z.i자].title = `${품목시트} ${z.번} 투입수량`; }
+    if(z.i모>=0){ c[z.i모].textContent = '1'; c[z.i모].classList.toggle('저장값', 파); c[z.i모].title = `${품목시트} ${z.번} 투입수량`; }
+  }
   if(!연동줄.length) return;
   const 원 = 원래코드();
   for(const z of 연동줄){
@@ -402,6 +425,9 @@ function 편집달기(통){
   }
   const 편칸들 = () => { const b = 범위(), 목 = []; if(!b) return 목;
     for(let r=b[0]; r<=b[2]; r++) for(let c=b[1]; c<=b[3]; c++){ const td = 칸(r,c); if(td && td.classList.contains('편')) 목.push(td); } return 목; };
+  const 막음칸있음 = () => { const b = 범위(); if(!b) return null;
+    for(let r=b[0]; r<=b[2]; r++) for(let c=b[1]; c<=b[3]; c++){ const td = 칸(r,c); if(td && td.classList.contains('막음')) return td; } return null; };
+  const 칸됨 = td => td.classList.contains('편') || td.classList.contains('막음');
   const 줄값 = (td, v) => ({ p:td.parentNode.dataset.p, k:td.dataset.k, v });
 
   /* 자재 드롭목록 — 보드매입현황 v1.20.1 분류고름과 같은 꼴(크롬 datalist 는 값으로 걸러 안 씀) */
@@ -455,14 +481,15 @@ function 편집달기(통){
   몸.addEventListener('mousedown', e => {
     if(e.button!==0 || 거친손) return;
     const td = e.target.closest('td'); if(!td || td.classList.contains('편집중')) return;
-    if(!고름 && !td.classList.contains('편')) return;          /* 입력 칸에서 시작할 때만 고름(그 밖 칸은 예전대로 글 고르기) */
-    if(!td.classList.contains('편') && !e.shiftKey){ 고름 = null; 칠(); return; }
+    if(!고름 && !칸됨(td)) return;          /* 입력 칸에서 시작할 때만 고름(그 밖 칸은 예전대로 글 고르기) */
+    if(!칸됨(td) && !e.shiftKey){ 고름 = null; 칠(); return; }
     e.preventDefault();
     const [r,c] = 자리(td), b = 범위();
     if(e.shiftKey && 고름){ 고름.r1 = r; 고름.c1 = c; 칠(); 통.focus({ preventScroll:true }); return; }
-    if(b && b[0]===r && b[2]===r && b[1]===c && b[3]===c){ 고치기(td); return; }
+    if(b && b[0]===r && b[2]===r && b[1]===c && b[3]===c){ if(td.classList.contains('막음')) 막음알림(td); else 고치기(td); return; }
     if(편집) 끝내기(true, 0);
     고름 = { r0:r, c0:c, r1:r, c1:c }; 끌기 = true; 칠(); 통.focus({ preventScroll:true });
+    if(td.classList.contains('막음')) 막음알림(td);
   });
   몸.addEventListener('mouseover', e => {
     if(!끌기) return; const td = e.target.closest('td'); if(!td) return;
@@ -471,21 +498,25 @@ function 편집달기(통){
   window.addEventListener('mouseup', () => { 끌기 = false; });
   몸.addEventListener('dblclick', e => { const td = e.target.closest('td.편'); if(td && !td.classList.contains('편집중')) 고치기(td); });
   몸.addEventListener('click', e => {   /* 폰·터치 = 누르면 바로 고치기 */
-    if(!거친손) return; const td = e.target.closest('td.편'); if(!td || td.classList.contains('편집중')) return;
+    if(!거친손) return;
+    const 막 = e.target.closest('td.막음'); if(막){ const [r,c] = 자리(막); 고름 = { r0:r, c0:c, r1:r, c1:c }; 칠(); 막음알림(막); return; }
+    const td = e.target.closest('td.편'); if(!td || td.classList.contains('편집중')) return;
     const [r,c] = 자리(td); 고름 = { r0:r, c0:c, r1:r, c1:c }; 칠(); 고치기(td);
   });
   통.addEventListener('keydown', e => {
     if(편집 || !고름 || e.target!==통) return;
     const 머 = 칸(고름.r0, 고름.c0);
-    if(e.key==='Delete' || e.key==='Backspace'){ e.preventDefault(); 바꿈(편칸들().map(td => 줄값(td, ''))); return; }
+    if(e.key==='Delete' || e.key==='Backspace'){ e.preventDefault(); const 막 = 막음칸있음(); if(막) 막음알림(막); 바꿈(편칸들().map(td => 줄값(td, ''))); return; }
     if(e.key==='Escape'){ 고름 = null; 칠(); return; }
     if((e.key==='Enter' || e.key==='F2') && 머 && 머.classList.contains('편')){ e.preventDefault(); 고치기(머); return; }
+    if((e.key==='Enter' || e.key==='F2') && 머 && 머.classList.contains('막음')){ e.preventDefault(); 막음알림(머); return; }
     if((e.ctrlKey || e.metaKey) && (e.key==='v' || e.key==='V')){
       붙임받음 = false;
       setTimeout(() => { if(!붙임받음 && navigator.clipboard && navigator.clipboard.readText) navigator.clipboard.readText().then(붙이기, () => {}); }, 80);
       return;
     }
     if(e.ctrlKey || e.metaKey || e.altKey) return;
+    if(머 && 머.classList.contains('막음') && (e.key.length===1 || e.key==='Process')){ e.preventDefault(); 막음알림(머); return; }
     if(머 && 머.classList.contains('편') && (e.key.length===1 || e.key==='Process')){
       if(e.key==='Process'){ 고치기(머, ''); return; }
       e.preventDefault(); 고치기(머, e.key);
@@ -506,9 +537,11 @@ function 편집달기(통){
   function 붙이기(글자){
     if(!고름 || 글자==null) return;
     const 줄 = String(글자).replace(/\r\n?/g,'\n').replace(/\n$/,'').split('\n').map(l => l.split('\t').map(v => v.replace(/^"(.*)"$/s,'$1').replace(/""/g,'"')));
-    const b = 범위(), 목 = [];
-    if(줄.length===1 && 줄[0].length===1){ for(const td of 편칸들()) 목.push(줄값(td, 줄[0][0])); }   /* 한 값 = 고른 칸 모두 */
-    else for(let i=0; i<줄.length; i++) for(let j=0; j<줄[i].length; j++){ const td = 칸(b[0]+i, b[1]+j); if(td && td.classList.contains('편')) 목.push(줄값(td, 줄[i][j])); }
+    const b = 범위(), 목 = []; let 막 = null;
+    if(줄.length===1 && 줄[0].length===1){ for(const td of 편칸들()) 목.push(줄값(td, 줄[0][0])); 막 = 막음칸있음(); }   /* 한 값 = 고른 칸 모두 */
+    else for(let i=0; i<줄.length; i++) for(let j=0; j<줄[i].length; j++){ const td = 칸(b[0]+i, b[1]+j); if(!td) continue;
+      if(td.classList.contains('편')) 목.push(줄값(td, 줄[i][j])); else if(td.classList.contains('막음') && !막) 막 = td; }   /* 제품 줄은 건너뜀 */
+    if(막) 막음알림(막);
     if(!목.length) return;
     고름 = { r0:b[0], c0:b[1], r1:Math.max(b[2], b[0]+줄.length-1), c1:Math.max(b[3], b[1]+Math.max(...줄.map(l => l.length))-1) }; 칠();
     바꿈(목);
@@ -520,14 +553,19 @@ function 표만들기(칸, 줄, 이름){
   const 통 = document.createElement('div');
   if(!줄.length){ 통.className='state'; 통.innerHTML='<div class="big">줄 없음</div>'; return 통; }
   const 품 = 이름===품목시트, pi = 칸.indexOf('품번'), 편 = 품 ? 편칸.map(k => 칸.indexOf(k)) : [];
+  const ai = 칸.indexOf('품목자산분류'), mi0 = 칸.indexOf('모품목(상위 품번)');
   const h = ['<table class="dpr-t"><thead><tr>' +
     칸.map((k,i) => `<th class="${i===0?'dpr-k':''}">${글(k)}</th>`).join('') + '</tr></thead><tbody>'];
   for(const r of 줄){
     const p = 품 ? (String(r.v[pi]??'').trim() || '#' + r.행) : '';
     let tr = 품 ? `<tr data-p="${글(p)}">` : '<tr>';
+    const 반 = 품 && String(r.v[ai]??'').trim()==='반제품';
     for(let i=0;i<칸.length;i++){
       const ei = 편.indexOf(i);
-      if(ei>=0){ const k = 편칸[ei]; tr += `<td class="편${파랑(p,k)?' 저장값':''}" data-k="${k}">${글(값(p,k))}</td>`; continue; }
+      if(ei>=0){ let k = 편칸[ei];
+        if(반제품칸.has(k) && !반){ tr += `<td class="막음" data-k="${k}"></td>`; continue; }   /* v2.3.0 제품 줄 = 입력 안 됨 */
+        if(k==='투입수량') k = '투입수량@' + String(r.v[mi0]??'').trim();
+        tr += `<td class="편${k.startsWith('투입수량')?' num':''}${파랑(p,k)?' 저장값':''}" data-k="${글(k)}">${글(값(p,k))}</td>`; continue; }
       const v = r.v[i];
       const cls = (i===0?'dpr-k':'') + (typeof v==='number'?' num':'');
       tr += `<td${cls?` class="${cls.trim()}"`:''}${i===0?` title="${글(v)}"`:''}>${글(v)}</td>`;
@@ -542,6 +580,9 @@ function 표만들기(칸, 줄, 이름){
     const trs = 통.querySelectorAll('tbody tr'); 연동줄 = [];
     줄.forEach((r, n) => { if(String(r.v[gi]??'').trim()!=='가공') return;
       연동줄.push({ tr:trs[n], m:String(r.v[mi]??'').trim(), 번:String(r.v[i번]??'').trim(), 명:String(r.v[i명]??''), 규:String(r.v[i규]??''), i명, i번, i규 }); });
+    const i자 = 몫('소요량(분자)'), i모 = 몫('소요량(분모)'); 조립줄 = [];   /* v2.3.0 투입수량 짝 = 조립 줄 */
+    줄.forEach((r, n) => { if(String(r.v[gi]??'').trim()!=='조립') return;
+      조립줄.push({ tr:trs[n], m:String(r.v[mi]??'').trim(), 번:String(r.v[i번]??'').trim(), 자:String(r.v[i자]??''), 모:String(r.v[i모]??''), i자, i모 }); });
     setTimeout(연동칠);
   }
   return 통;
