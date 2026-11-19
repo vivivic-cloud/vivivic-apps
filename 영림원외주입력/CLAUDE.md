@@ -266,6 +266,7 @@
 - 다른 작업자와 같은 파일을 고치는 일이 잦다 — 판 번호가 겹치면 합치고 한 판 올린다. 로컬 시험 서버 포트 8765 는 다른 방이 쓴 적 있다.
 
 ## 알아낸 것 (한 줄씩 — 자세히는 판기록-2 「알아낸 것」)
+- **11-19 반제품 기본구매처 빈칸 가능(조회만)**: 품목등록 500215·품목등록업로드 500259 둘 다 기본구매처는 필수 아님(빨간 글자·`NOS` 없음). 영림원에 반제품 4·제품 1 이 기본구매처 빈 채 등록돼 있음. 외주발주 업체 = 발주 머리 「외주거래처」(외주계획에서 넘어옴·발주마다 바꿀 수 있음, 11-04·11-06 기록) · 자재 기본구매처 빈 채 구매 품의→발주→납품 됨(11-05~06 기록). 반제품 기본구매처가 빈 채 외주·구매발주를 직접 넣어 본 시험은 안 함. → `입력작업자/화면별-요령.md` 품목등록 절.
 - 맥 기본 python3 은 아주 긴 한 줄 .py 를 「Non-UTF-8」로 거절 → `exec(open(...,encoding='utf-8').read())`. Mac 에 `timeout` 없음, `cat > 파일` 같은 입력 대기 명령 금지.
 - 시험 도구: 스크래치에 `npm i playwright-core@1.56.1`, Chromium = `~/Library/Caches/ms-playwright/chromium-1194/chrome-mac/Chromium.app/Contents/MacOS/Chromium`. `goto(주소#단계)` 는 해시만 바뀜 → `reload`. 규칙 시험은 파이어스토어 에뮬레이터 + `@firebase/rules-unit-testing`.
 - 폼 코드는 전역이 아니다(`form`·`data` 를 page.evaluate 로 못 읽음) — 시험은 DOM 으로 읽는다. 가짜 SDK(app·auth·fs) + `addInitScript` 로 `window.__FAKE` 에 자료를 미리 넣으면 artifacts 경로도 그대로 읽힌다(v235).
