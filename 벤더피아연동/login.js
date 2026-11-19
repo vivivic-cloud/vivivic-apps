@@ -29,7 +29,7 @@
      이 고침은 **새로고침만으로** 먹어야 한다. 그게 핵심이다. */
 /* ⚠⚠ 화면글 판은 **여기 한 군데서만** 적는다. `manifest.json` 의 version 과 **늘 같이** 올려라
    (배포 차례에 적어 두었다). 두 군데서 적으면 반드시 어긋난다. */
-const VP_화면글판 = "0.35.5";   // ⚠ manifest.json 의 version 과 **같은 값**
+const VP_화면글판 = "0.35.6";   // ⚠ manifest.json 의 version 과 **같은 값**
 
 /* ⚠⚠ 10-22 「벤더피아」 단추가 여는 **새 창 오리지널**의 표식을 보는 물음. 새 창(`window.name === "vp원본"`)과 그 안 모든 frame 에서는
    우리 글이 **하나도 돌지 않아야** 한다. 1차로 `불러오기.js`·`짚개.js`(확장 안)가 막고, 이 물음은 login.js 가 한 번 더 막는 안전망이다.
@@ -169,11 +169,20 @@ window.VP원본창 = () => {
     if (!주소) 주소 = location.origin + "/index.aspx";
     return 주소.split("#")[0];                              // # 뒤는 뗀다 (CS등록 따위가 저절로 열리지 않게)
   };
+  /* ⚠⚠ 11-19 [새 지시 같은탭] 사장님(그대로): 「벤더피아 원래화면 보기 / 벤더피아 연동으로 돌아오기시 새로운페이지에서 열리지 않도록 해주세요」
+     → 새 창(`window.open`)을 안 연다. **지금 탭**의 맨 위 창에 표식(`window.name="vp원본"` + sessionStorage `vp원본`)을 달고 그 탭을 원래 화면으로 옮긴다.
+       돌아올 곳 = 지금 맨 위 주소(# 포함, 예 `orderMst.aspx#vgCS`) → sessionStorage `vp돌아올곳`. 「벤더피아연동으로」 단추(이 파일 맨 아래)가 표식을 지우고 그리로 간다.
+     ⚠ 표식을 보고 멈추는 것은 깔린 확장의 `불러오기.js`·`짚개.js` 그대로(0.34.90 부터 원래 화면 맨 위에 login.js 하나만 넣음) — 확장 덮어쓰기 없음. */
   const 열기 = () => {
     const 주소 = 원본주소();
-    window.VP원본쉼?.();      // 10-27 [새 지시 오리지날느림] 우리 뒤 요청을 15초 세워 새 창이 벤더피아 줄에서 안 밀리게 (vp-data.js)
-    window.open(주소, "vp원본", "noopener");
-    window.VP말?.("벤더피아:새 창 " + 주소);
+    let 맨위 = window;
+    try { if (window.top.location.href) 맨위 = window.top; } catch (e) {}
+    try { sessionStorage.setItem("vp돌아올곳", 맨위.location.href); } catch (e) {}
+    window.VP원본쉼?.();      // 10-27 [새 지시 오리지날느림] 우리 뒤 요청을 15초 세움 (vp-data.js)
+    try { 맨위.name = "vp원본"; } catch (e) {}
+    try { sessionStorage.setItem("vp원본", "1"); } catch (e) {}
+    window.VP말?.("벤더피아:같은 탭 " + 주소);
+    맨위.location.href = 주소;
   };
 
   /* 쪽 맨 위 빈 띠에 선다. 그 자리에 남의 것이 **겹쳐** 있으면 왼쪽으로 비켜 선다.
@@ -228,7 +237,7 @@ window.VP원본창 = () => {
     단추.type = "button";
     단추.id = "vp-바꾸기";
     단추.textContent = "벤더피아";
-    단추.title = "확장 없는 오리지널 벤더피아를 새 창에 열기 (지금 창은 그대로)";
+    단추.title = "확장 없는 오리지널 벤더피아를 이 탭에서 열기";
     /* 두 번 빠르게 누르면 **속엣말 딱지**를 켜고 끈다 (①). 그때는 새 창을 열지 않는다 —
        그래서 한 번 누른 뒤 0.35초를 기다려 두 번째가 안 오면 그때 연다(클릭 뒤 5초까지는 새 창이 막히지 않는다).
        ⚠ 바이글 안은 「길게 누르기」 였으나 그 손짓은 임자가 있다 — 짚기(손잡이)가
@@ -381,18 +390,27 @@ const ERP계정 = (() => {
   if (document.getElementById("vp-돌아가기")) return;
   const 단추 = document.createElement("a");
   단추.id = "vp-돌아가기";
-  단추.href = "/index.aspx";
-  단추.target = "_blank";
-  단추.rel = "noopener";
+  /* 11-19 [새 지시 같은탭] 새 탭 말고 **이 탭**에서 돌아간다 — 「벤더피아」 단추가 적어 둔 `vp돌아올곳`(같은 출처만), 없으면 메인.
+     누를 때 표식(`window.name`·sessionStorage `vp원본`)을 지워야 돌아간 쪽에서 우리 글이 다시 돈다. */
+  let 돌아올곳 = "/index.aspx";
+  try { const u = new URL(sessionStorage.getItem("vp돌아올곳") || "", location.href); if (u.origin === location.origin && sessionStorage.getItem("vp돌아올곳")) 돌아올곳 = u.href; } catch (e) {}
+  단추.href = 돌아올곳;
   단추.textContent = "벤더피아연동으로";
-  단추.title = "벤더피아연동 메인을 새 탭에 열기 (지금 화면은 그대로)";
+  단추.title = "벤더피아연동 화면으로 이 탭에서 돌아가기";
   단추.style.cssText = "position:fixed;right:22px;bottom:8px;z-index:2147482000;box-sizing:border-box;height:20px;padding:0 9px;margin:0;"
     + "border:1px solid rgba(55,53,47,.28);border-radius:999px;background:rgba(55,53,47,.72);color:#fff !important;"
     + "font:600 11px/18px Inter,-apple-system,'Apple SD Gothic Neo',sans-serif;text-decoration:none !important;white-space:nowrap;cursor:pointer;opacity:.75";
   const 또렷 = (참) => () => { 단추.style.opacity = 참 ? "1" : ".75"; 단추.style.background = 참 ? "rgba(55,53,47,.92)" : "rgba(55,53,47,.72)"; };
   단추.addEventListener("mouseenter", 또렷(true));
   단추.addEventListener("mouseleave", 또렷(false));
-  단추.addEventListener("click", (e) => e.stopPropagation());     // 벤더피아 쪽 클릭 처리에 안 닿게
+  단추.addEventListener("click", (e) => {
+    e.stopPropagation();                                          // 벤더피아 쪽 클릭 처리에 안 닿게
+    if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;   // 사람이 일부러 새 탭으로 연 것은 그대로
+    e.preventDefault();
+    try { if (window.name === "vp원본") window.name = ""; } catch (er) {}
+    try { sessionStorage.removeItem("vp원본"); sessionStorage.removeItem("vp돌아올곳"); } catch (er) {}
+    location.href = 돌아올곳;
+  });
   document.documentElement.appendChild(단추);                     // 몸이 아니라 뿌리에 (`#vp-바꾸기` 와 같다)
 })();
 
