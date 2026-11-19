@@ -2,7 +2,10 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.6.1
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.6.2
+     v2.6.2(11-19): 사장님 「공정흐름 칸에서 드래그·복사·붙여넣기가 안 되는 것 같다 … 흐름을 고르는 동작과 드래그하려는 커서 이동이 겹쳐서 조작이 어렵다」 — 모든 입력 칸 조작 통일:
+       PC 누름 = 고르기만(고른 칸을 다시 눌러도 안 열림 — 예전엔 열려서 그 칸에서 끌기를 시작하면 편집이 열렸음) · 끌기 = 여러 칸 · 열기 = 두 번 누름·Enter/F2·글 치기·고른 칸 오른쪽 ▾ 누름.
+       복사·붙여넣기 = 문서에서 받음(예전엔 이벤트 대상이 표 상자일 때만 받아, 다른 데 글이 골라져 있으면 브라우저 기본 복사로 새 버림). 폰 = 누름 고르기 · 다시 누름/▾/길게 누름 = 열기.
      v2.6.1(11-19): 사장님 「품목자산분류가 제품인 것은 모두 조립.」 — 제품 줄 공정흐름 = 「조립」 고정(td.막음, 「제품 — 조립」 쪽지, 저장 안 함 · 늘 셈). 반제품 줄은 예전대로 드롭 9개.
      v2.6.0(11-19): 사장님 「품목등록업로드의 품명 앞 열에, 영림원 입력 정보와는 관계없지만 BOM등록업로드에 연동 적용될 단서를 입력하는 칸 … 공정흐름 … 드롭다운으로 선택 … 드래그·복사·삭제가 되는 칸」 —
        품명 앞 「공정흐름」 열(영림원 칸 아님, 머리 옅은 초록 · 마우스 「영림원 칸 아님 — BOM 연동용」). 제품·반제품 모든 줄 td.편, 열쇠 _입력.값[품번].공정흐름. 목록 9개 밖 값은 안 들어가고 쪽지. BOM 연동은 아직 없음(값만 저장).
@@ -140,6 +143,9 @@ html,body{height:100%;overflow:hidden}
 .dpr-t td.편[data-k="품목설명"]{min-width:14em}
 .dpr-t td.고름{background:#E8F1FD}
 .dpr-t td.고름머리{box-shadow:inset 0 0 0 2px var(--vg-ink)}
+.dpr-t td.편{-webkit-touch-callout:none}
+.dpr-t td.편.드롭칸.고름머리:not(.편집중){position:relative;padding-right:18px}   /* v2.6.2 고른 드롭 칸 오른쪽 ▾ = 열기 */
+.dpr-t td.편.드롭칸.고름머리:not(.편집중)::after{content:'▾';position:absolute;right:4px;top:50%;transform:translateY(-50%);color:var(--vg-muted);font-size:11px}
 .dpr-t td.편집중{padding:0;box-shadow:inset 0 0 0 2px var(--vg-ink)}
 .dpr-t td.편집중 input{font:inherit;font-size:11.5px;line-height:1.3;color:var(--vg-body);border:0;border-radius:0;background:transparent;
   padding:2px 5px;margin:0;outline:none;width:100%;min-width:9em}
@@ -164,7 +170,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.6.1</div>
+  <div class="badge">v2.6.2</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -493,6 +499,8 @@ function 편집달기(통){
   const 몸 = 표.tBodies[0]; 통.tabIndex = 0;
   let 고름 = null, 끌기 = false, 편집 = null, 붙임받음 = false;
   const 거친손 = matchMedia('(pointer:coarse)').matches;
+  /* v2.6.2 고른 드롭 칸 오른쪽 ▾ 자리를 눌렀나 */
+  const 세모 = (td, e) => td.classList.contains('드롭칸') && td.classList.contains('고름머리') && !td.classList.contains('편집중') && e.clientX >= td.getBoundingClientRect().right - 20;
   const 칸 = (r,c) => (몸.rows[r] || {}).cells ? 몸.rows[r].cells[c] : null;
   const 자리 = td => [td.parentNode.sectionRowIndex, td.cellIndex];
   const 범위 = () => 고름 ? [Math.min(고름.r0,고름.r1), Math.min(고름.c0,고름.c1), Math.max(고름.r0,고름.r1), Math.max(고름.c0,고름.c1)] : null;
@@ -562,10 +570,10 @@ function 편집달기(통){
     const td = e.target.closest('td'); if(!td || td.classList.contains('편집중')) return;
     if(!고름 && !칸됨(td)) return;          /* 입력 칸에서 시작할 때만 고름(그 밖 칸은 예전대로 글 고르기) */
     if(!칸됨(td) && !e.shiftKey){ 고름 = null; 칠(); return; }
-    e.preventDefault();
-    const [r,c] = 자리(td), b = 범위();
+    e.preventDefault(); const 글고름 = getSelection(); if(글고름 && !글고름.isCollapsed) 글고름.removeAllRanges();   /* v2.6.2 남은 글 고름이 복사를 가로채지 않게 */
+    const [r,c] = 자리(td);
     if(e.shiftKey && 고름){ 고름.r1 = r; 고름.c1 = c; 칠(); 통.focus({ preventScroll:true }); return; }
-    if(b && b[0]===r && b[2]===r && b[1]===c && b[3]===c){ if(td.classList.contains('막음')) 막음알림(td); else 고치기(td); return; }
+    if(세모(td, e)){ 고치기(td); return; }   /* v2.6.2 고른 칸 ▾ = 열기. 고른 칸 다시 누름은 안 엶(끌기와 안 겹치게) */
     if(편집) 끝내기(true, 0);
     고름 = { r0:r, c0:c, r1:r, c1:c }; 끌기 = true; 칠(); 통.focus({ preventScroll:true });
     if(td.classList.contains('막음')) 막음알림(td);
@@ -576,12 +584,25 @@ function 편집달기(통){
   });
   window.addEventListener('mouseup', () => { 끌기 = false; });
   몸.addEventListener('dblclick', e => { const td = e.target.closest('td.편'); if(td && !td.classList.contains('편집중')) 고치기(td); });
-  몸.addEventListener('click', e => {   /* 폰·터치 = 누르면 바로 고치기 */
+  /* v2.6.2 폰·터치 = 누름 고르기 · 고른 칸 다시 누름 / ▾ / 길게 누름(0.5초) = 열기 */
+  let 길게틀 = null, 길게됨 = false;
+  몸.addEventListener('click', e => {
     if(!거친손) return;
-    const 막 = e.target.closest('td.막음'); if(막){ const [r,c] = 자리(막); 고름 = { r0:r, c0:c, r1:r, c1:c }; 칠(); 막음알림(막); return; }
+    if(길게됨){ 길게됨 = false; return; }
+    const 막 = e.target.closest('td.막음'); if(막){ if(편집) 끝내기(true, 0, true); const [r,c] = 자리(막); 고름 = { r0:r, c0:c, r1:r, c1:c }; 칠(); 막음알림(막); return; }
     const td = e.target.closest('td.편'); if(!td || td.classList.contains('편집중')) return;
-    const [r,c] = 자리(td); 고름 = { r0:r, c0:c, r1:r, c1:c }; 칠(); 고치기(td);
+    const [r,c] = 자리(td), b = 범위();
+    if((b && b[0]===r && b[2]===r && b[1]===c && b[3]===c) || 세모(td, e)){ 고치기(td); return; }
+    if(편집) 끝내기(true, 0, true);
+    고름 = { r0:r, c0:c, r1:r, c1:c }; 칠(); 통.focus({ preventScroll:true });
   });
+  몸.addEventListener('touchstart', e => {
+    clearTimeout(길게틀); 길게됨 = false;
+    const td = e.target.closest('td.편'); if(!td || td.classList.contains('편집중') || e.touches.length!==1) return;
+    길게틀 = setTimeout(() => { 길게됨 = true; const [r,c] = 자리(td); 고름 = { r0:r, c0:c, r1:r, c1:c }; 칠(); 고치기(td); }, 500);
+  }, { passive:true });
+  for(const t of ['touchend','touchmove','touchcancel']) 몸.addEventListener(t, () => clearTimeout(길게틀), { passive:true });
+  몸.addEventListener('contextmenu', e => { if(거친손 && e.target.closest('td.편,td.막음')) e.preventDefault(); });
   통.addEventListener('keydown', e => {
     if(편집 || !고름 || e.target!==통) return;
     const 머 = 칸(고름.r0, 고름.c0);
@@ -601,16 +622,18 @@ function 편집달기(통){
       e.preventDefault(); 고치기(머, e.key);
     }
   });
-  통.addEventListener('copy', e => {
-    if(편집 || !고름 || e.target!==통) return;
+  /* v2.6.2 복사·붙여넣기는 문서에서 받는다 — 표 상자에 초점이 있고 고른 칸이 있으면(이벤트 대상은 안 봄: 남은 글 고름·브라우저마다 대상이 달라 새던 것) */
+  const 내차례 = () => !편집 && 고름 && document.activeElement===통 && 통.isConnected;
+  document.addEventListener('copy', e => {
+    if(!내차례()) return;
     const b = 범위(), 줄 = [];
     for(let r=b[0]; r<=b[2]; r++){ const 칸들 = [];
       for(let c=b[1]; c<=b[3]; c++){ const td = 칸(r,c); 칸들.push(td ? (td.classList.contains('편') ? 값(td.parentNode.dataset.p, td.dataset.k) : td.textContent).replace(/[\t\r\n]+/g,' ') : ''); }
       줄.push(칸들.join('\t')); }
     e.clipboardData.setData('text/plain', 줄.join('\n')); e.preventDefault();
   });
-  통.addEventListener('paste', e => {
-    if(편집 || !고름 || e.target!==통) return;
+  document.addEventListener('paste', e => {
+    if(!내차례()) return;
     e.preventDefault(); 붙임받음 = true; 붙이기((e.clipboardData || window.clipboardData).getData('text'));
   });
   function 붙이기(글자){
@@ -651,7 +674,7 @@ function 표만들기(칸, 줄, 이름){
     const 반 = 품 && String(r.v[ai]??'').trim()==='반제품';
     const 빨 = 없음.size && (반 ? 없음.has(String(r.v[mi0]??'').trim()) : 없음.has(p));
     if(품) tr += 반 || String(r.v[ai]??'').trim()!=='제품'
-      ? `<td class="편${파랑(p,'공정흐름')?' 저장값':''}" data-k="공정흐름">${글(값(p,'공정흐름'))}</td>`   /* v2.6.0 */
+      ? `<td class="편 드롭칸${파랑(p,'공정흐름')?' 저장값':''}" data-k="공정흐름">${글(값(p,'공정흐름'))}</td>`   /* v2.6.0 */
       : `<td class="막음" data-k="공정흐름" data-알림="제품 — 조립">조립</td>`;   /* v2.6.1 제품 = 조립 고정 */
     for(let i=0;i<칸.length;i++){
       const ei = 편.indexOf(i);
@@ -661,7 +684,7 @@ function 표만들기(칸, 줄, 이름){
           tr += `<td class="막음" data-k="${k}" data-알림="제품 — 업체별 단품명 업체">${글(v)}</td>`; continue; }
         if(반제품칸.has(k) && !반){ tr += `<td class="막음" data-k="${k}"></td>`; continue; }   /* v2.3.0 제품 줄 = 입력 안 됨 */
         if(k==='투입수량') k = '투입수량@' + String(r.v[mi0]??'').trim();
-        tr += `<td class="편${k.startsWith('투입수량')?' num':''}${파랑(p,k)?' 저장값':''}" data-k="${글(k)}">${글(값(p,k))}</td>`; continue; }
+        tr += `<td class="편${k.startsWith('투입수량')?' num':''}${고를칸[k]?' 드롭칸':''}${파랑(p,k)?' 저장값':''}" data-k="${글(k)}">${글(값(p,k))}</td>`; continue; }
       const v = r.v[i];
       const 빨칸 = 빨 && 칸[i]==='품명';
       const cls = (i===0?'dpr-k':'') + (typeof v==='number'?' num':'') + (빨칸?' 단품없음':'');
