@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.20.7
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.20.8
+     v1.20.8(11-19): 사장님 「모든 표의 첫 행을 고정해서 스크롤해도 사라지지 않게 해 줘.」 — 머리 줄(thead) 고정, 붙박이 첫 칸 모서리는 맨 위. 폰·낮은 화면은 표 상자 높이를 화면까지(상자 안에서 밀어야 머리가 남음).
      v1.20.7(11-18): 쪽길 여섯째 탭 「품목등록업로드」 → 「영림원품목등록」(영림원품목등록.html).
      v1.20.6(11-18): 쪽길 탭이 여섯이라 폰 폭에서 탭 이름이 낱말 중간에 끊겨 — 이름은 한 줄(nowrap), 넘치면 탭째 다음 줄.
      v1.20.5(11-18): 쪽길에 여섯째 탭 「품목등록업로드」.
@@ -210,6 +211,10 @@ html,body{height:100%;overflow:hidden}
 .dpr-t td.num{text-align:right}
 .dpr-t .dpr-k{position:sticky;left:0;z-index:1;font-weight:700;color:var(--vg-ink)}
 .dpr-t th.dpr-k{background:var(--vg-fill)}
+/* v1.20.8 머리 줄 고정 — 표 상자(.표통) 안에서 위아래로 밀어도 머리가 맨 위에 남는다. 붙박이 첫 칸 머리(모서리)가 맨 위. */
+.dpr-t thead th{position:sticky;top:0;z-index:2}
+.dpr-t thead th.dpr-k,.dpr-t thead th.열쇠2{z-index:3}
+@media (max-width:600px),(max-height:600px){#속>.표통{max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px)}}
 /* 엑셀의 「[N월 소계]」·「[1~10월 총계]」·「합계」 줄 */
 .dpr-t tr.sub td{background:var(--vg-fill);font-weight:700;color:var(--vg-ink)}
 /* 표 위 작은 제목(엑셀 시트의 표 제목 글자 그대로) · 총괄요약 아래 「※」 글 */
@@ -289,7 +294,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.20.7</div>
+  <div class="badge">v1.20.8</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -1963,6 +1968,20 @@ function 그리기(){
   }
   속.innerHTML = '<div class="표통">' + h + '</div>';
 }
+/* v1.20.8 머리 두 줄(영림원보내기) — 둘째 머리 줄은 첫 줄 높이만큼 아래에 붙는다. 표를 새로 그리거나 화면 폭이 바뀌면 다시 잰다. */
+(function(){
+  let 예약 = 0;
+  const 재기 = () => { 예약 = 0;
+    for(const t of document.querySelectorAll('#속 .dpr-t')){
+      const rs = t.tHead ? t.tHead.rows : []; if(rs.length < 2) continue;
+      let y = 0;
+      for(let i = 0; i < rs.length; i++){ if(i) for(const c of rs[i].cells) c.style.top = y + 'px'; y += rs[i].getBoundingClientRect().height; }
+    }
+  };
+  const 다시 = () => { if(!예약) 예약 = requestAnimationFrame(재기); };
+  new MutationObserver(다시).observe(document.getElementById('속'), {childList:true, subtree:true});
+  addEventListener('resize', 다시);
+})();
 </script>
 </body>
 </html>
