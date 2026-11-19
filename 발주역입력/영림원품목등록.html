@@ -2,7 +2,10 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.8.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.9.0
+     v2.9.0(11-19): 사장님 「품목등록업로드의 재단율 계산을 깃에 배포된 에이엠티 재단편집의 논리로 계산되게 그부분을 이 입력부와 연결해줄 수 있겠니」 —
+       반제품 「재단률」 = shared/원장재단수량.js 원장당(규격 W*D, 결보호) — 에이엠티 재단 편집 기본규칙(4X8 · 전단컷 5 · 톱날 4.5 · 결보호 X 면 돌림) 한 벌.
+       결보호 = 원장 엑셀(조혼가구·에이엠티 원장, 읽기만)에서 부속코드2 = 품번 → L·R 뗀 품번 → 단품코드+재단W×D. 저장 안 함. 못 셈 = 엑셀 원래 값 + 주황 바탕, 이유는 마우스.
      v2.8.0(11-19): 사장님 「영림원품목등록의 공정흐름값을 보면 옆쪽 품명 끝에 _상판 _지판 이런식으로 쓰인 부속명에 따라 공정흐름이 일정한 규칙이 있다는게 보일꺼야 이를 단서로 나머지 자동으로 채워지도록 해줘」 —
        반제품 공정흐름 빈 칸 = 같은 부속명(없으면 끝 영문 뺀 바탕)의 사람 값이 하나로 모이면 그 값을 옅은 글자로(저장 안 함 · 마우스 = 근거). 갈리면 안 채움. 규칙은 늘 지금 입력값에서 셈.
      v2.7.0(11-19): 사장님 「공정흐름 드롭 목록에 들어갈 항목을 추가·삭제하는 창이, 공정흐름 제목(머리)을 누르면 나타나게 해 줘. 거기서 추가·삭제하게.」 —
@@ -42,6 +45,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>영림원품목등록 — 발주역입력</title>
+<script src="../shared/원장재단수량.js"></script>   <!-- v2.9.0 재단률 = 에이엠티 재단 편집과 같은 한 벌 -->
+<script src="../shared/발주상품검색.js"></script>   <!-- v2.9.0 원장 엑셀 읽기(metaPath·latestMeta·readSheet) -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
@@ -161,6 +166,7 @@ html,body{height:100%;overflow:hidden}
 .dpr-t td.단품없음{color:#e53935}   /* v2.5.0 업체별 단품명에 없는 제품·그 반제품 품명 */
 .dpr-t thead th.단서{cursor:pointer}
 .dpr-t td.목록밖{color:#e53935}   /* v2.7.0 목록에서 지운 공정흐름 값 */
+.dpr-t td.재단못{background:#FFF1E0}   /* v2.9.0 재단률 에이엠티 계산 안 됨(엑셀 원래 값) */
 .dpr-t td.공자동{color:#A3A39F}   /* v2.8.0 공정흐름 자동 값(부속명 규칙 · 저장 안 된 것) = 옅은 글자 */
 .공정창{position:fixed;z-index:55;background:var(--vg-bg);border:1px solid #C7C7C3;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.16);
   padding:10px;width:230px;max-width:calc(100vw - 32px);font-size:12.5px}
@@ -189,7 +195,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.8.0</div>
+  <div class="badge">v2.9.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -434,6 +440,7 @@ function 입력구독(){
   if(window.폼자재대기) window.폼자재받음(...window.폼자재대기);
   공개거래처구독();
   공정목록구독();
+  원장구독();   /* v2.9.0 */
   if(window.폼거래처대기) window.폼거래처받음(...window.폼거래처대기);
 }
 
@@ -546,6 +553,68 @@ function 연동칠(){
     const 자 = 자재찾기(v), 새 = { [z.i번]:v, [z.i명]: z.명===z.번 ? v : ((자 && 자.name) || v), [z.i규]: (자 && 자.spec) || z.규 }, 파 = 파랑(z.m,k);
     for(const [i] of 칠){ if(i<0) continue; c[i].textContent = 새[i]; c[i].classList.toggle('저장값', 파); c[i].title = `${품목시트} ${z.m} ${k}`; }
   }
+}
+
+/* ── v2.9.0 재단률 = 에이엠티 재단 편집 기본규칙 — 사장님 11-19 「품목등록업로드의 재단율 계산을 깃에 배포된 에이엠티 재단편집의 논리로 계산되게 그부분을 이 입력부와 연결해줄 수 있겠니」
+   · 계산 = shared/원장재단수량.js 원장당(w,d,결보호) 한 벌(에이엠티 재단 편집·자동계획·부속카드 「원장당 N개」와 같은 함수 — 여기 베끼지 않는다).
+     4X8 원장 2440×1220 · 전단컷 5 · 톱날 4.5 · 결보호 'X' 면 더 많이 앉는 쪽으로 돌림. 부속 크기 = 이 줄 규격(W*D).
+   · 결보호 = 원장 엑셀(excel_metadata 가장 늦은 것 — 조혼가구·에이엠티와 같은 원장, shared/발주상품검색.js 로 읽기만).
+     찾는 차례: ① 부속코드2 = 품번 ② 품번 부속 끝 L·R 뺀 것(…-doL_wt → …-do_wt) = 부속코드2 ③ ing단품코드 = 모품목 · 재단W×D = 규격.
+     찾은 줄들의 결보호가 하나일 때만 셈. 반제품 줄만. 저장 안 함(늘 셈) — 창고 시트 값은 그대로.
+   · 못 셈(원장에 없음·결보호 섞임·규격 없음·원장보다 큼·원장 못 읽음) = 엑셀 원래 값 그대로 + 칸 색(td.재단못), 이유는 마우스. */
+let 원장 = null, 원장글 = '원장 엑셀 읽는 중', 원장주소 = '';
+const 재단기본 = '에이엠티 재단 편집 기본규칙(4X8 2440×1220 · 전단컷 5 · 톱날 4.5)';
+function 원장구독(){
+  const P = window.발주상품검색, { collection, onSnapshot } = window.fbRead;
+  if(!P || !window.원장재단수량){ 원장글 = '계산 부품을 불러오지 못함 — 새로 고침'; 재단칠(); return; }
+  onSnapshot(collection(window.db, ...P.metaPath().split('/')), async s => {
+    const m = P.latestMeta(s.docs.map(d => d.data()));
+    if(!m || !m.downloadURL){ 원장 = null; 원장글 = '올라온 원장 엑셀 없음'; 재단칠(); return; }
+    if(m.downloadURL===원장주소) return; 원장주소 = m.downloadURL;
+    try{
+      const [ab, X] = await Promise.all([fetch(m.downloadURL).then(r => { if(!r.ok) throw new Error('원장 엑셀 받기 ' + r.status); return r.arrayBuffer(); }), 엑셀부품()]);
+      const D = P.readSheet(X, ab), h = D[0] || [], I = k => h.indexOf(k);
+      const iG = I('결보호'), iC = I('부속코드2'), iU = I('ing단품코드'), iW = I('재단W'), iD = I('재단D');
+      if(iG<0){ 원장 = null; 원장글 = '원장 엑셀에 결보호 칸 없음'; 재단칠(); return; }
+      const 묶 = new Map(), 넣 = (k,g) => { if(!묶.has(k)) 묶.set(k, new Set()); 묶.get(k).add(g); };
+      for(const r of D.slice(1)){ if(!r) continue; const g = String(r[iG]??'').trim();
+        const c = iC>=0 ? String(r[iC]??'').trim() : ''; if(c) 넣('c\t'+c, g);
+        const u = iU>=0 ? String(r[iU]??'').trim() : '', w = parseFloat(r[iW]), d = parseFloat(r[iD]);
+        if(u && w>0 && d>0) 넣('s\t'+u+'\t'+w+'\t'+d, g); }
+      원장 = { 묶, 파일:m.fileName||'' }; 원장글 = '';
+    }catch(e){ 원장 = null; 원장주소 = ''; 원장글 = '원장 엑셀을 읽지 못함 ' + ((e&&e.message)||''); }
+    재단칠();
+  }, e => { 원장 = null; 원장글 = '원장 목록을 읽지 못함 ' + ((e&&(e.code||e.message))||''); 재단칠(); });
+}
+let 엑셀P = null;
+function 엑셀부품(){
+  if(window.XLSX) return Promise.resolve(window.XLSX);
+  return 엑셀P ||= new Promise((ok,no) => { const s = document.createElement('script');
+    s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';   /* 영림원외주입력 XLSX_URL 과 같은 판 */
+    s.onload = () => ok(window.XLSX); s.onerror = () => { 엑셀P = null; s.remove(); no(new Error('엑셀 부품')); }; document.head.appendChild(s); });
+}
+function 재단셈(번, 모, 규){   /* → {n, 근거} 또는 {왜} */
+  const R = window.원장재단수량;
+  if(!R) return { 왜:'계산 부품을 불러오지 못함 — 새로 고침' };
+  if(!원장) return { 왜:원장글 };
+  const p = R.크기읽기(규); if(!p) return { 왜:'규격에 W*D 없음' };
+  const 빼 = 번.replace(/^(.*-[a-z0-9]+?)[LR](_[^_]*)$/, '$1$2');
+  const 찾 = [['c\t'+번, '부속코드2 '+번], 빼!==번 && ['c\t'+빼, '부속코드2 '+빼], 모 && ['s\t'+모+'\t'+p.w+'\t'+p.d, `단품코드 ${모} · 재단 ${p.w}×${p.d}`]].filter(Boolean).find(([k]) => 원장.묶.has(k));
+  if(!찾) return { 왜:'원장 엑셀에서 이 부속을 못 찾음(부속코드2 · 단품코드+재단W×D)' };
+  const gs = [...원장.묶.get(찾[0])];
+  if(gs.length>1) return { 왜:`원장 엑셀 결보호가 섞임(${gs.map(g => g||'빈칸').join('·')}) — ${찾[1]}` };
+  const n = R.원장당(p.w, p.d, gs[0]);
+  if(!(n>0)) return { 왜:`부속 ${p.w}×${p.d} 이 원장보다 큼` };
+  const 돌 = R.돌려도되나(gs[0]) && R.앉힐방향(p.w, p.d, gs[0], 2440, 1220, R.기본.전단컷, R.기본.톱날).돌림;
+  return { n, 근거:`${재단기본} · 부속 ${p.w}×${p.d} · 결보호 ${gs[0]||'빈칸'}${돌?'(돌려 앉힘)':''} — 원장 엑셀 ${찾[1]}` };
+}
+function 재단칠(){
+  const 통 = 받은[품목시트]; if(!통 || !통.querySelector) return;
+  통.querySelectorAll('td[data-k="재단률"]').forEach(td => {
+    const r = 재단셈(td.dataset.번, td.dataset.모, td.dataset.규), xl = td.dataset.xl;
+    if(r.n){ td.textContent = r.n; td.classList.remove('재단못'); td.title = r.근거 + (String(r.n)!==xl ? ` · 엑셀 원래 값 ${xl||'빈칸'}` : ''); }
+    else { td.textContent = xl; td.classList.add('재단못'); td.title = '에이엠티 계산 안 됨 — ' + r.왜 + ' · 지금 값 = 엑셀 원래 값'; }
+  });
 }
 
 /* 저장 — 바뀐 칸만 merge */
@@ -788,6 +857,8 @@ function 표만들기(칸, 줄, 이름){
         if(k==='투입수량') k = '투입수량@' + String(r.v[mi0]??'').trim();
         tr += `<td class="편${k.startsWith('투입수량')?' num':''}${고를칸[k]?' 드롭칸':''}${파랑(p,k)?' 저장값':''}" data-k="${글(k)}">${글(값(p,k))}</td>`; continue; }
       const v = r.v[i];
+      if(반 && 칸[i]==='재단률'){   /* v2.9.0 에이엠티 재단 편집 기본규칙 — 재단칠 이 채움 */
+        tr += `<td class="num" data-k="재단률" data-번="${글(p)}" data-모="${글(String(r.v[mi0]??'').trim())}" data-규="${글(String(r.v[칸.indexOf('규격')]??''))}" data-xl="${글(String(v??'').trim())}">${글(v)}</td>`; continue; }
       const 빨칸 = 빨 && 칸[i]==='품명';
       const cls = (i===0?'dpr-k':'') + (typeof v==='number'?' num':'') + (빨칸?' 단품없음':'');
       tr += `<td${cls?` class="${cls.trim()}"`:''}${빨칸?' title="업체별 단품명에 없음"':(i===0?` title="${글(별명(v))}"`:'')}>${글(별명(v))}</td>`;
@@ -796,6 +867,7 @@ function 표만들기(칸, 줄, 이름){
   }
   h.push('</tbody></table>');
   통.className = '표통'; 통.innerHTML = h.join('');
+  if(품) setTimeout(재단칠);   /* v2.9.0 */
   if(품){ 편집달기(통); const 머 = 통.querySelector('th.단서'); if(머) 머.addEventListener('click', 공정창열기); }
   if(이름===BOM시트){
     const 몫 = k => 칸.indexOf(k), mi = 몫('모품목번호'), gi = 몫('공정'), i명 = 몫('하위품명'), i번 = 몫('하위품번'), i규 = 몫('하위규격');

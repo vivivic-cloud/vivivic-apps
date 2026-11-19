@@ -93,3 +93,4 @@
   자리 넷: `renderPendingOrderParts` · `renderTlConfParts` · `renderOrderParts`(각 기본·AMT외 카드) · 재단 편집 `renderPartCard`(`card.dataset.perSheet`). 나머지 셋은 카드 바깥 div `data-per-sheet="N"`. 치수 줄 아래 9px 「원장당 N개」.
   ⚠ 재단 편집 카드의 값은 **기본규칙 값**이다 — 「재단회전」·원장사이즈(3X6)·전단컷/톱날 칸을 바꿔도 카드 값은 안 바뀐다(도면 아래 EA 가 그 판의 실제 값). 재단도면(woc) 카드는 안 건드림(이미 「N매」).
   ⚠ 화이어베이스에는 안 쓴다(partInfoMap·cutting_plans 에 안 넣음). 판 표기 세 자리(머리 주석 · 머리 딱지 · `#amth-ver`). 시험은 이 맥에 플레이라이트가 없어 못 돌림 — 인라인 스크립트 문법·공용 함수 계산만 node 로 잼(784×396 X → 9, 800×448 X → 6, 1200×600 → 4, 자동계획 `앉힐방향().perSheet` 와 같음).
+- (11-19) `shared/원장재단수량.js` `원장당` 을 **발주역입력 `영림원품목등록.html` v2.9.0 품목등록업로드 「재단률」** 도 부른다(결보호는 원장 엑셀). 이 함수를 바꾸면 그 칸도 바뀐다.
