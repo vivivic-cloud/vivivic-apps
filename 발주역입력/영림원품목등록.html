@@ -2,7 +2,8 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.5.1
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.5.2
+     v2.5.2(11-19): 사장님 「유한가구로 되어 있는 모든 거래처를 진아산업으로 바꿔 줘. 유한가구 = 진아산업이야.」 — 표·추가할 제품 단추·제품 기본구매처의 「유한가구」 를 「진아산업」 으로 보임(창고·엑셀은 그대로). 진아산업은 영림원 거래처라 임시 풀림.
      v2.5.1(11-19): 사장님 「T 거래처 빼 줘.」 — 반제품 기본구매처 드롭에서 이름이 T 로 시작하는 거래처를 뺌(로그인·공개 사본 둘 다). 이미 넣은 값은 그대로.
      v2.5.0(11-19): 품목등록업로드 「기본구매처」 — 제품 줄 = 업체별 단품명(단품코드 = 품번) 업체 이름(입력폼 거래처 완료에서 같은 이름, 없으면 업체 이름 그대로), 고칠 수 없음(td.막음, 「제품 — 업체별 단품명 업체」).
        반제품 줄 = 빈 입력 칸(합판·필름과 같은 길), 드롭 = 입력폼 거래처 완료 중 외주가공거래처. 업체별 단품명에 없는 제품 + 그 반제품 줄 = 표 맨 아래 · 품명 빨강(마우스 「업체별 단품명에 없음」), 열 때마다·자료가 바뀔 때마다 다시 따짐.
@@ -159,7 +160,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.5.1</div>
+  <div class="badge">v2.5.2</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -173,6 +174,8 @@ html,body{height:100%;overflow:hidden}
 
 <script>
 const 창고자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_영림원품목등록'];
+/* vv2.5.2 사장님 11-19 「유한가구로 되어 있는 모든 거래처를 진아산업으로 바꿔 줘. 유한가구 = 진아산업이야.」 — 보이는 글만 바꿈(창고·원본 엑셀 사본은 그대로, 비교·열쇠는 원래 글자) */
+const 별명 = v => typeof v==='string' ? v.replace(/유한가구/g,'진아산업') : v;
 let 시트들 = [], 받은 = {}, 고른 = '', 답했나 = false;
 
 const 글 = v => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;').replace(/\n/g,'<br>');
@@ -279,12 +282,12 @@ function 추가그리기(){
   if(!추가줄){ 속.innerHTML = '<div class="state"><div class="big">읽는 중입니다…</div></div>'; return; }
   if(고른업체 && !업체순.includes(고른업체)) 고른업체 = '';
   const 수 = u => 추가줄.filter(r => r.업체===u).length;
-  const 단추 = [['', `전체 ${추가줄.length}`]].concat(업체순.map(u => [u, `${u} ${수(u)}`]))
+  const 단추 = [['', `전체 ${추가줄.length}`]].concat(업체순.map(u => [u, `${별명(u)} ${수(u)}`]))
     .map(([u,t]) => `<button class="chip${u===고른업체?' on':''}" data-e="${글(u)}">${글(t)}</button>`).join('');
   const 줄 = 고른업체 ? 추가줄.filter(r => r.업체===고른업체) : 추가줄;
   const 옛통 = 속.querySelector('.표통[data-추가]'), 옛자리 = 옛통 && 추가자리===고른업체 ? [옛통.scrollLeft, 옛통.scrollTop] : null;
   let h = '<table class="dpr-t"><thead><tr><th class="dpr-k">업체</th>' + 추가칸.map(k => `<th>${글(k)}</th>`).join('') + '</tr></thead><tbody>';
-  for(const r of 줄) h += `<tr><td class="dpr-k">${글(r.업체)}</td>` + r.v.map(v => `<td${typeof v==='number'?' class="num"':''}>${글(v)}</td>`).join('') + '</tr>';
+  for(const r of 줄) h += `<tr><td class="dpr-k">${글(별명(r.업체))}</td>` + r.v.map(v => `<td${typeof v==='number'?' class="num"':''}>${글(별명(v))}</td>`).join('') + '</tr>';
   h += '</tbody></table>';
   속.innerHTML = `<div class="months">${단추}</div>` + (줄.length ? `<div class="표통" data-추가="1">${h}</div>` : '<div class="state"><div class="big">줄 없음</div></div>');
   추가자리 = 고른업체;
@@ -379,7 +382,7 @@ function 공개거래처구독(){
     if(!폼거래처) 거래처정리();
   }, () => {});
 }
-const 업체거래처 = u => u;   /* 업체 이름 = 거래처명 글자 그대로 맞춤(찾았는지는 거래처이름 Set 으로 봄) */
+const 업체거래처 = u => 별명(u);   /* 업체 이름 = 거래처명 글자 그대로 맞춤(찾았는지는 거래처이름 Set 으로 봄) · v2.5.2 유한가구 → 진아산업 */
 /* 업체별 단품명 또는 거래처가 바뀌면 품목등록업로드 표를 다시 만든다(줄 차례·제품 기본구매처가 바뀔 수 있음) */
 function 품목다시(){
   const 열 = JSON.stringify([단품업체 ? [...단품업체] : null, [...거래처이름].sort()]);
@@ -643,7 +646,7 @@ function 표만들기(칸, 줄, 이름){
       const v = r.v[i];
       const 빨칸 = 빨 && 칸[i]==='품명';
       const cls = (i===0?'dpr-k':'') + (typeof v==='number'?' num':'') + (빨칸?' 단품없음':'');
-      tr += `<td${cls?` class="${cls.trim()}"`:''}${빨칸?' title="업체별 단품명에 없음"':(i===0?` title="${글(v)}"`:'')}>${글(v)}</td>`;
+      tr += `<td${cls?` class="${cls.trim()}"`:''}${빨칸?' title="업체별 단품명에 없음"':(i===0?` title="${글(별명(v))}"`:'')}>${글(별명(v))}</td>`;
     }
     h.push(tr + '</tr>');
   }

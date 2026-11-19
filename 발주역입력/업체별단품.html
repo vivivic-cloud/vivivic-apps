@@ -2,7 +2,8 @@
 <!-- 발주역입력 / 업체별 단품명 — 「업체별단품명」 엑셀(시트 「업체별단품코드」)을 A열 업체 표시로 나눠 업체마다 표로 본다.
      사장님 11-18: 「폴더에 업체별단품명 파일의 A열이 조혼가구인 것만 목록으로 보여지게 해줘.」 →
        「폴더에 업체별 단품폴더를 새로만들었어 그안에 있는 구글시트 A열 확인해서 업체별로 목록 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.2.1
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.2.2
+     v1.2.2(11-19): 사장님 「유한가구로 되어 있는 모든 거래처를 진아산업으로 바꿔 줘. 유한가구 = 진아산업이야.」 — 업체 단추·칸 값의 「유한가구」 를 「진아산업」 으로 보임(창고·엑셀은 그대로).
      v1.2.1(11-19): 사장님 「모든 표의 첫 행을 고정해서 스크롤해도 사라지지 않게 해 줘.」 — 머리 줄(thead) 고정, 붙박이 첫 칸 모서리는 맨 위. 폰·낮은 화면은 표 상자 높이를 화면까지(상자 안에서 밀어야 머리가 남음).
      v1.2.0(11-18): 사장님 「두 자료가 상호 연결되도록」 — 단품코드가 영림원품목등록 「품목등록업로드」 제품(품목자산분류=제품) 품번에 있는 줄은 줄 색(.등록, title).
        두 창고를 onSnapshot 으로 실시간 구독(한쪽이 바뀌면 색이 따라 바뀜). 대조 = 앞뒤 빈칸 뺀 같은 글자.
@@ -110,7 +111,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.2.1</div>
+  <div class="badge">v1.2.2</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html" class="on">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a></nav>
 <h1>업체별 단품명</h1>
@@ -124,6 +125,8 @@ html,body{height:100%;overflow:hidden}
 
 <script>
 const 창고자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_업체별단품'];
+/* vv1.2.2 사장님 11-19 「유한가구로 되어 있는 모든 거래처를 진아산업으로 바꿔 줘. 유한가구 = 진아산업이야.」 — 보이는 글만 바꿈(창고·원본 엑셀 사본은 그대로, 비교·열쇠는 원래 글자) */
+const 별명 = v => typeof v==='string' ? v.replace(/유한가구/g,'진아산업') : v;
 const 숫자칸 = new Set(['no']);
 let 업체들 = [], 받은 = {}, 고른 = '', 답했나 = false;
 
@@ -145,7 +148,7 @@ window.목록읽기 = async function(){
     업체들 = (목.exists() && 목.data().업체들) || [];
     if(!업체들.length){ 목상태('창고에 업체별 단품명이 없습니다'); return; }
     document.getElementById('목상태').style.display='none';
-    document.getElementById('고름').innerHTML = 업체들.map(u => `<button class="chip" data-u="${글(u)}">${글(u)}</button>`).join('');
+    document.getElementById('고름').innerHTML = 업체들.map(u => `<button class="chip" data-u="${글(u)}">${글(별명(u))}</button>`).join('');
     document.querySelectorAll('#고름 .chip').forEach(b => b.onclick = () => 업체고름(b.dataset.u));
     업체고름(업체들[0]);
     영림원구독();
@@ -209,7 +212,7 @@ function 그리기(d){
   for(const r of 줄){
     h += (ci>=0 ? `<tr data-code="${글(String(r.v[ci]??'').trim())}">` : '<tr>') + 칸.map((k,i) => {
       const cls = (i===0?'dpr-k':'') + (숫자칸.has(k)?' num':'');
-      return `<td${cls.trim()?` class="${cls.trim()}"`:''}>${글(r.v[i])}</td>`;
+      return `<td${cls.trim()?` class="${cls.trim()}"`:''}>${글(별명(r.v[i]))}</td>`;
     }).join('') + '</tr>';
   }
   h += '</tbody></table>';
