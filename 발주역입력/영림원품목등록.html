@@ -2,7 +2,8 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.3.1
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.4.0
+     v2.4.0(11-19): 사장님 「BOM등록업로드도 필수 입력 칸을 찾아서 표기해 줘.」 — 품목등록업로드·BOM등록업로드 표 머리에서 영림원 필수 칸(500259·500302 시트 ControlKey NOS = 화면 빨간 머리)을 빨간 글자, 마우스 = 「영림원 필수」.
      v2.3.1(11-19): 사장님 「모든 표의 첫 행을 고정해서 스크롤해도 사라지지 않게 해 줘.」 — 머리 줄(thead) 고정, 붙박이 첫 칸 모서리는 맨 위. 폰·낮은 화면은 표 상자 높이를 화면까지(상자 안에서 밀어야 머리가 남음).
      v2.3.0(11-19): 사장님 「반제품에만 합판코드, 필름코드, 투입수량을 입력할 수 있게 해 줘. 제품의 해당 칸에 입력을 시도하면 제품이라고 경고가 뜨게 해 줘.」 —
        세 칸은 품목자산분류=반제품 줄만 입력 칸(td.편) · 제품 줄은 td.막음(누름·치기·붙여넣기·지우기 = 「제품」 경고, 섞인 붙여넣기는 반제품 줄만 들어감).
@@ -115,6 +116,7 @@ html,body{height:100%;overflow:hidden}
 /* v2.3.1 머리 줄 고정 — 표 상자(.표통) 안에서 위아래로 밀어도 머리가 맨 위에 남는다. 붙박이 첫 칸 머리(모서리)가 맨 위. */
 .dpr-t thead th{position:sticky;top:0;z-index:2}
 .dpr-t thead th.dpr-k{z-index:3}
+.dpr-t thead th.필수{color:#e53935}   /* v2.4.0 영림원 필수 칸(영림원 화면 빨간 머리와 같게) */
 @media (max-width:600px),(max-height:600px){#속>.표통{max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px)}}
 @media (max-width:600px){.dpr-t .dpr-k{max-width:42vw;overflow:hidden;text-overflow:ellipsis}}   /* v2.2.0 폰 — 붙박이 품명 칸이 화면을 다 덮어 옆 칸을 못 누름 */
 #속>.months{margin-bottom:10px}
@@ -148,7 +150,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.3.1</div>
+  <div class="badge">v2.4.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -299,6 +301,11 @@ function 막음알림(td){
   el.hidden = false; clearTimeout(막음틀); 막음틀 = setTimeout(() => { el.hidden = true; }, 1500);
 }
 const BOM시트 = 'BOM등록업로드';
+/* v2.4.0 영림원 필수 칸 — 11-19 영림원 테스트서버 조회: 품목등록업로드 500259 SS1 · BOM등록업로드 500302 SSNew 칸 ControlKey 에 NOS(= 화면 빨간 머리) */
+const 필수칸 = {
+  [품목시트]: new Set(['품명','품번','품목자산분류','기준단위','품목소분류','품목상태']),
+  [BOM시트]: new Set(['모품목명','모품목번호','모품목BOM차수','하위품명','하위품번','투입단위','소요량(분자)','소요량(분모)'])
+};
 let 입력 = {}, 더럽 = new Map(), 연동줄 = [], 조립줄 = [];
 let 자재목록 = { 합판:[], 필름:[] }, 폼자재 = null, 공개자재 = [];
 const 열쇠 = (p,k) => p + '\t' + k;
@@ -560,7 +567,8 @@ function 표만들기(칸, 줄, 이름){
   const 품 = 이름===품목시트, pi = 칸.indexOf('품번'), 편 = 품 ? 편칸.map(k => 칸.indexOf(k)) : [];
   const ai = 칸.indexOf('품목자산분류'), mi0 = 칸.indexOf('모품목(상위 품번)');
   const h = ['<table class="dpr-t"><thead><tr>' +
-    칸.map((k,i) => `<th class="${i===0?'dpr-k':''}">${글(k)}</th>`).join('') + '</tr></thead><tbody>'];
+    칸.map((k,i) => { const 필 = 필수칸[이름]?.has(String(k).trim());
+      return `<th class="${(i===0?'dpr-k':'') + (필?' 필수':'')}"${필?' title="영림원 필수"':''}>${글(k)}</th>`; }).join('') + '</tr></thead><tbody>'];
   for(const r of 줄){
     const p = 품 ? (String(r.v[pi]??'').trim() || '#' + r.행) : '';
     let tr = 품 ? `<tr data-p="${글(p)}">` : '<tr>';
