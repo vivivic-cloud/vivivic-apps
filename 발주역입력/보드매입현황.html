@@ -1,7 +1,11 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.22.1
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.23.0
+     v1.23.0(11-19): 해피코 동일품 실시간 — 사장님 「영림원보내기에서 자재명을 '자작'에서 '화이트'로 바꿨는데 동일품에서는 변동이 없다. 실시간 연동이 아닌가?」
+       까닭: 손댄 제안 묶음이 창고에 굳어 다시 셈하지 않았고, 동일품 화면은 이 기기 기억(폼값)만 봄. 고침: 자재명·품번 = 해피코 영림원폼 문서 지금 값(onSnapshot, 다른 기기 포함) · 바뀌면 동일품 화면 바로 다시 그림 ·
+       창고 「제안」 묶음도 지금 값으로 다시 거름(옮기기로 넣은 줄 = 붙임 은 그대로) · 확정은 안 풂. 옵션(색)이 다르면 자재명이 같아도 안 묶음.
+       빨강(줄) = 색 다름(대표와 옵션 다름 · 같은 자재명의 다른 색 줄) · 자재명 바뀜(확정 묶음 안 줄의 손 자재명 ≠ 대표 자재명) — 까닭은 마우스.
      v1.22.1(11-19): 사장님 「중복으로 쓴건 명세서에 동일한 제품으로 읽히도록 한건데」 — 해피코 자재번호 겹침 중 자재명이 같은 줄끼리(빈칸·대소문자 무시)는 같은 제품이라 빨강 안 함. 자재명이 다른데 품번이 같으면 그대로 빨강.
      v1.22.0(11-19): 해피코 영림원보내기 자재번호(품번) 기본값 = 자재명을 읽어 「tr_규격_색」 — 사장님 규칙: 수입=tr · 1T*18mm용 → 1*18 · 화이트 wt · 발리오크 bo · 베이지 be · 자작 bi · 블랙 bk · 아이보리 iv.
        저장된(손으로 넣은) 자재번호는 그대로 · 자동 값 = 옅은 글자 · 규칙에 안 맞으면 빈칸 + 빨간 테(마우스 = 까닭) · 같은 품번 두 줄 = 기존 겹침 빨강. 다른 거래처 안 바뀜.
@@ -300,6 +304,8 @@ html,body{height:100%;overflow:hidden}
 .동표 tr.제안 button.대표.on{color:#ef8f00}
 .동표 td.참{color:var(--vg-muted)}
 .동표 td.가운데{text-align:center}
+.동표 tr.틀 td{background:#FFE9E7}   /* v1.23.0 색 다름 · 자재명 바뀜 */
+.동표 tr.틀 td.dpr-k{color:var(--vg-red)}
 .dpr-t td.동일{color:#2e7d32;font-weight:700}
 #오류목록{flex-shrink:0;max-height:30vh;overflow:auto;margin:0 0 8px}
 #오류목록 .chip{margin-left:6px}
@@ -313,7 +319,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.22.1</div>
+  <div class="badge">v1.23.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -636,7 +642,7 @@ async function 폼받기(s){
   폼보내기[s] = (d.exists() && d.data().보내기) || null;   /* v1.9.0 */
   /* v1.14.0 창고 지금 값을 늘 받아 둠(저장 때 다시 읽지 않음 — 다른 창·기기 값 보호는 그대로) */
   창고본[s] = d.exists() ? d.data() : null;
-  if(window.fbRead.onSnapshot) window.fbRead.onSnapshot(doc(window.db, ...폼자리, s), x => { 창고본[s] = x.exists() ? x.data() : null; 결과칠(s); }, () => { delete 창고본[s]; });   /* v1.17.0 결과가 오면 바로 칠함 */
+  if(window.fbRead.onSnapshot) window.fbRead.onSnapshot(doc(window.db, ...폼자리, s), x => { 창고본[s] = x.exists() ? x.data() : null; 결과칠(s); if(s===해피코) 동일품다시(); }, () => { delete 창고본[s]; });   /* v1.17.0 결과가 오면 바로 칠함 */
 }
 const 창고본 = {};   // 거래처 → 창고 문서 지금 값(onSnapshot) · 없으면(undefined) 저장 때 읽음
 let 준비됨 = false;
@@ -1935,7 +1941,7 @@ function 중국그리기(){
 const 동일품문서 = '해피코_동일품';
 let 동일품 = null, 동일품맵 = new Map(), 동일품듣기 = false, 동일품그린 = [];
 const 동일품꼴 = v => ({
-  묶음:((v || {}).묶음 || []).map(g => ({ id:String(g.id || ''), 대표:String(g.대표 || ''), 원래:(g.원래 || []).map(String), 상태:g.상태==='확정' ? '확정' : '제안' })).filter(g => g.원래.length),
+  묶음:((v || {}).묶음 || []).map(g => ({ id:String(g.id || ''), 대표:String(g.대표 || ''), 원래:(g.원래 || []).map(String), 상태:g.상태==='확정' ? '확정' : '제안', ...((g.붙임 || []).length ? { 붙임:g.붙임.map(String) } : {}) })).filter(g => g.원래.length),
   따로:((v || {}).따로 || []).map(String) });
 function 동일품맵셈(){
   const m = new Map();
@@ -1973,12 +1979,20 @@ const 동N = t => String(t ?? '').normalize('NFKC').toLowerCase();
 const 이름뼈 = t => { const s = 동N(t); return (s.match(/\d+(?:\.\d+)?/g) || []).join('/') + '|' + s.replace(/[^가-힣]/g, ''); };
 const 옵뼈 = t => 동N(t).replace(/\s+/g, '');
 const 한글자다름 = (a, b) => { if(a===b) return true; if(a.length!==b.length || a.length < 3) return false; let n = 0; for(let j = 0; j < a.length; j++) if(a[j]!==b[j]) n++; return n <= 1; };
-const 고친자재명 = k => ((폼값[해피코] && 폼값[해피코].get(k)) || {}).m_name;
-/* 두 줄이 같은 물건으로 보이는 까닭('' = 아님) — 마우스 글 */
+/* v1.23.0 영림원보내기 손 값 = 창고 지금 값(onSnapshot — 다른 기기에서 고친 것도) · 이 화면에서 고치고 아직 저장 전인 칸만 이 화면 값 */
+function 최신값(k, 칸){
+  const 더 = 폼더럽[해피코] && 폼더럽[해피코].get(k), 창 = 창고본[해피코];
+  if(!더 && 창){ const z = (창.줄 || []).find(x => x.품목 + '\t' + x.규격===k); return z ? (z.값 || {})[칸] : undefined; }
+  return ((폼값[해피코] && 폼값[해피코].get(k)) || {})[칸];
+}
+const 고친자재명 = k => 최신값(k, 'm_name');
+const 같은색 = (x, y) => 한글자다름(옵뼈(x.규격), 옵뼈(y.규격));
+/* 두 줄이 같은 물건으로 보이는 까닭('' = 아님) — 마우스 글. v1.23.0 옵션(색)이 다르면 자재명이 같아도 안 묶음 */
 function 동일품까닭(x, y){
+  if(!같은색(x, y)) return '';
   const a = 고친자재명(x.키), b = 고친자재명(y.키);
   if(a && b && 옵뼈(a)===옵뼈(b)) return '자재명 같음 「' + a + '」';
-  if(이름뼈(x.이름)!==이름뼈(y.이름) || !한글자다름(옵뼈(x.규격), 옵뼈(y.규격))) return '';
+  if(이름뼈(x.이름)!==이름뼈(y.이름)) return '';
   const 왜 = [옵뼈(x.이름)===옵뼈(y.이름) ? (x.이름===y.이름 ? '' : '띄어쓰기·대소문자') : '기호·끝 글자'];
   if(옵뼈(x.규격)!==옵뼈(y.규격)) 왜.push('옵션 한 글자');
   return 왜.filter(Boolean).join(' · ') || '같은 글자';
@@ -1987,7 +2001,13 @@ function 동일품까닭(x, y){
 function 동일품묶음들(){
   const 원 = 해피코원래(), 모 = new Map(원.map(r => [r.키, r])), 쓴 = new Set(), 따로 = new Set((동일품 || {}).따로 || []);
   const 빈줄 = k => ({ 키:k, 이름:k.split('\t')[0], 규격:k.split('\t')[1] || '', 줄수:0, 달:[] });
-  const 창 = ((동일품 || {}).묶음 || []).map(g => { const 줄 = g.원래.map(k => 모.get(k) || 빈줄(k)); 줄.forEach(r => 쓴.add(r.키)); return { id:g.id, 상태:g.상태, 대표:g.대표, 줄 }; });
+  /* v1.23.0 창고 「제안」 묶음도 지금 값으로 다시 거름 — 대표와 더는 같아 보이지 않는 줄은 빠져 자동 셈으로(옮기기로 넣은 줄 = 붙임 은 그대로). 확정은 사장님이 정한 것이라 그대로 */
+  const 창 = ((동일품 || {}).묶음 || []).map(g => {
+    let 줄 = g.원래.map(k => 모.get(k) || 빈줄(k));
+    if(g.상태!=='확정'){ const 대 = 줄.find(r => r.키===g.대표) || 줄[0]; 줄 = 줄.filter(r => r===대 || (g.붙임 || []).includes(r.키) || 동일품까닭(r, 대)); }
+    return { id:g.id, 상태:g.상태, 대표:g.대표, 줄 };
+  }).filter(g => g.상태==='확정' || g.줄.length > 1);
+  창.forEach(g => g.줄.forEach(r => 쓴.add(r.키)));
   창.sort((a, b) => (a.상태==='확정' ? 0 : 1) - (b.상태==='확정' ? 0 : 1));
   const 남 = 원.filter(r => !쓴.has(r.키) && !따로.has(r.키));
   const 부 = 남.map((_, j) => j), 뿌 = j => 부[j]===j ? j : (부[j] = 뿌(부[j]));
@@ -2006,11 +2026,15 @@ function 동일품상태(t, 나쁨){ const el = document.getElementById('동상�
 /* 묶음 고침 → 정리(한 줄은 한 묶음 · 1줄 묶음 지움 · 대표는 묶음 안) → 창고 저장 → 확정이 바뀌었으면 해피코 영림원폼(보내기) 다시 저장 */
 async function 동일품고침(바꿈){
   const 새 = 동일품꼴(동일품);
-  const 꺼냄 = k => { 새.묶음.forEach(g => { g.원래 = g.원래.filter(x => x!==k); }); 새.따로 = 새.따로.filter(x => x!==k); };
+  /* v1.23.0 창고 「제안」 묶음 = 지금 보이는 줄로 맞춤(지금 값으로 빠진 줄은 내려놓음) */
+  새.묶음 = 새.묶음.filter(g => { if(g.상태==='확정') return true; const 보 = 동일품그린.find(x => x.id===g.id); if(!보) return false; g.원래 = 보.줄.map(r => r.키); if(g.붙임) g.붙임 = g.붙임.filter(k => g.원래.includes(k)); return true; });
+  const 꺼냄 = k => { 새.묶음.forEach(g => { g.원래 = g.원래.filter(x => x!==k); if(g.붙임) g.붙임 = g.붙임.filter(x => x!==k); }); 새.따로 = 새.따로.filter(x => x!==k); };
   const 창묶음 = g => { let s = g.id && 새.묶음.find(x => x.id===g.id);
     if(!s){ s = { id:동일품새id(), 대표:g.대표, 원래:g.줄.map(r => r.키), 상태:g.상태==='확정' ? '확정' : '제안' }; 새.묶음.push(s); g.id = s.id; }
     return s; };
   바꿈(새, 창묶음, 꺼냄);
+  const 본 = new Set();   /* 한 줄은 한 묶음(앞 묶음 먼저) */
+  새.묶음.forEach(g => { g.원래 = g.원래.filter(k => !본.has(k) && 본.add(k)); });
   새.묶음 = 새.묶음.filter(g => g.원래.length > 1);
   새.묶음.forEach(g => { if(!g.원래.includes(g.대표)) g.대표 = g.원래[0]; });
   const 묶인 = new Set(새.묶음.flatMap(g => g.원래));
@@ -2025,6 +2049,12 @@ async function 동일품고침(바꿈){
     동일품상태('저장됨 ' + new Date().toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit' }));
   }catch(e){ 동일품상태('저장하지 못했습니다 ' + ((e && (e.code || e.message)) || ''), true); }
 }
+/* v1.23.0 영림원보내기 해피코 문서가 바뀌면(이 기기·다른 기기) 동일품 화면을 바로 다시 셈 — 고르는 중(옮기기 칸)이면 건너뜀 */
+function 동일품다시(){
+  if(고른!==해피코 || 중국볼것!=='동일품') return;
+  const a = document.activeElement; if(a && a.tagName==='SELECT' && a.closest('.동표')) return;
+  동일품그리기();
+}
 async function 동일품그리기(){
   const 속 = document.getElementById('속');
   if(!폼값[해피코] && 받은[해피코]){
@@ -2035,7 +2065,20 @@ async function 동일품그리기(){
   const 묶 = 동일품그린 = 동일품묶음들();
   const 월표 = 받은[해피코] && (받은[해피코].표 || []).find(t => t.이름==='월별'), 합 = new Map();
   if(월표 && 폼값[해피코]) for(const m of 품목모으기(월표).줄) 합.set(줄키(m), m);
-  const 자재 = (g, r) => { const m = 합.get(g.상태==='확정' ? g.대표 : r.키); return m ? [칸값({k:'m_name'}, m, 해피코), 칸값({k:'m_code'}, m, 해피코)] : ['', '']; };
+  /* v1.23.0 자재명·자재번호 = 창고 지금 값(다른 기기에서 고친 것도) → 없으면 기본값 */
+  const 자재 = (g, r) => { const k = g.상태==='확정' ? g.대표 : r.키, m = 합.get(k);
+    const 명 = 고친자재명(k) ?? (m ? 칸값({k:'m_name'}, m, 해피코) : ''), 번 = 최신값(k, 'm_code') ?? (m ? 해피코품번(명).번호 : '');
+    return [명, 번]; };
+  /* v1.23.0 빨강 — 색 다름(대표와 옵션이 다름 · 자재명이 같은 다른 색 줄) · 자재명 바뀜(확정 묶음 안 줄의 손 자재명 ≠ 대표 자재명) */
+  const 모든줄 = 묶.flatMap(g => g.줄);
+  const 틀 = (g, r, 대표줄, 대표명) => {
+    const 왜 = [], 명 = 고친자재명(r.키);
+    if(g.상태 && 대표줄 && r!==대표줄 && !같은색(r, 대표줄)) 왜.push('색 다름(대표 ' + 대표줄.규격 + ')');
+    if(명){ const o = 모든줄.find(x => x!==r && !같은색(x, r) && 고친자재명(x.키) && 옵뼈(고친자재명(x.키))===옵뼈(명));
+      if(o && !왜.length) 왜.push('색 다름(같은 자재명 「' + 명 + '」 = ' + o.이름 + ' ' + o.규격 + ')'); }
+    if(g.상태==='확정' && 대표줄 && r!==대표줄 && 명 && 옵뼈(명)!==옵뼈(대표명)) 왜.push('자재명 바뀜(「' + 명 + '」 ≠ 대표 「' + 대표명 + '」)');
+    return 왜.join(' · ');
+  };
   const 묶은 = 묶.filter(g => g.상태);
   const 이름 = g => { const r = g.줄.find(x => x.키===g.대표) || g.줄[0]; return (묶은.indexOf(g) + 1) + '. ' + r.이름 + ' ' + r.규격; };
   let h = `<table class="dpr-t 동표"><thead><tr><th class="dpr-k">제품명</th><th>옵션</th><th>대표</th><th>입고</th><th>달</th><th>자재명</th><th>자재번호</th><th>묶음</th><th></th><th>옮기기</th></tr></thead><tbody>`;
@@ -2043,9 +2086,10 @@ async function 동일품그리기(){
     const 대표줄 = g.줄.find(x => x.키===g.대표);
     g.줄.forEach((r, ri) => {
       const 왜 = g.상태 && 대표줄 && r !== 대표줄 ? 동일품까닭(r, 대표줄) : '';
-      const [자명, 자번] = 자재(g, r);
+      const [자명, 자번] = 자재(g, r), 틀왜 = 틀(g, r, 대표줄, 자명);
       const 옮 = `<select data-옮="${gi}:${ri}"><option value=""></option>` + 묶은.filter(x => x!==g).map(x => `<option value="${묶.indexOf(x)}">${글(이름(x))}</option>`).join('') + '</select>';
-      h += `<tr class="${[g.상태==='확정' ? '확정' : g.상태 ? '제안' : '', ri===g.줄.length-1 ? '묶끝' : ''].filter(Boolean).join(' ')}"${g.상태 ? ` title="${글((g.상태==='확정' ? '확정' : '제안') + (왜 ? ' · ' + 왜 : ''))}"` : ''}>` +
+      const 제목 = [g.상태==='확정' ? '확정' : g.상태 ? '제안' : '', 왜, 틀왜].filter(Boolean).join(' · ');
+      h += `<tr class="${[g.상태==='확정' ? '확정' : g.상태 ? '제안' : '', ri===g.줄.length-1 ? '묶끝' : '', 틀왜 ? '틀' : ''].filter(Boolean).join(' ')}"${제목 ? ` title="${글(제목)}"` : ''}>` +
         `<td class="dpr-k">${글(r.이름)}</td><td>${글(r.규격)}</td>` +
         `<td class="가운데">${g.상태 ? `<button class="대표${r.키===g.대표 ? ' on' : ''}" data-대표="${gi}:${ri}" title="대표">●</button>` : ''}</td>` +
         `<td class="num">${r.줄수}</td><td class="참">${글(r.달.map(m => parseInt(m.slice(5))).join('·'))}</td>` +
@@ -2065,7 +2109,7 @@ async function 동일품그리기(){
   속.querySelectorAll('[data-빼기]').forEach(b => b.onclick = () => { const [gi, ri] = 둘(b.dataset.빼기), g = 묶[gi], k = g.줄[ri].키;
     동일품고침((새, 창, 꺼냄) => { 창(g); 꺼냄(k); 새.따로.push(k); }); });
   속.querySelectorAll('[data-옮]').forEach(el => el.onchange = () => { if(el.value==='') return; const [gi, ri] = 둘(el.dataset.옮), k = 묶[gi].줄[ri].키, 대상 = 묶[+el.value];
-    동일품고침((새, 창, 꺼냄) => { const s = 창(대상); 꺼냄(k); s.원래.push(k); }); });
+    동일품고침((새, 창, 꺼냄) => { const s = 창(대상); 꺼냄(k); s.원래.push(k); if(s.상태!=='확정') s.붙임 = [...(s.붙임 || []), k]; }); });
 }
 /* 해피코 명세 표(원본 칸 그대로) + 옵션 뒤 자재명·자재번호 — 확정 동일품 줄은 대표 값(초록, 마우스 = 대표) */
 function 중국명세표(d, 줄, 제목){
