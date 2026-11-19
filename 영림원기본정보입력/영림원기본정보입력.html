@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원 기본정보 입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v11 -->
+<!-- 영림원 기본정보 입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v12 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -117,6 +117,7 @@ table.sheet td input[type=checkbox]{margin:0 10px}
 table.sheet td.lock{padding:6px 10px;color:var(--muted);background:var(--fill4)}
 table.sheet td.bad{box-shadow:inset 0 0 0 2px var(--red);background:var(--red-bg)}
 table.sheet td.un{box-shadow:inset 0 0 0 2px #f59e0b}
+input.clsun[data-cls],table.sheet td input.clsun[data-cls]{box-shadow:inset 0 0 0 2px #f59e0b;background:#fffbeb}   /* v12 등록완료 분류에 없는 값 */
 .plan td{white-space:normal;vertical-align:top}
 .steps{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:4px 0 6px}
 .stp{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;gap:6px;align-items:center;padding:6px 12px;min-height:36px;border-radius:999px;border:1px solid var(--line);font-size:12.5px;font-weight:800;color:var(--muted)}
@@ -190,7 +191,7 @@ table.sheet td.un{box-shadow:inset 0 0 0 2px #f59e0b}
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v11</span>
+    <span class="ver">v12</span>
     <a class="btn small" href="../영림원외주입력/영림원외주입력.html" style="margin-left:8px">입력폼</a>
   </div>
 </header>
@@ -262,7 +263,7 @@ function connectDb(){
 }
 (function(){
 "use strict";
-var VER='v11';
+var VER='v12';
 var GS_MAKER='https://script.google.com/macros/s/AKfycbzxW9K--tKq_uqHnzNdecOA4YbKosK51XVG1MJVFTVTzB5Kz5o7gN1YeYuthCRI4PshOw/exec';   /* 영림원외주입력 v113 웹앱(구글시트양식/양식만들기.gs) — 파일 이름은 「외주입력_」 로 시작해야 받는다 */
 var GS_NAME='외주입력_기본정보_한행입력표';
 var XLSX_URL='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js',xlsxP=null;
@@ -327,6 +328,35 @@ function refreshDl(){DL_NAMES.forEach(function(n){var id='dl-'+n,d=document.getE
   d.replaceChildren.apply(d,listOf(n).map(function(v){return h('option',{value:v});}));});}
 var CHECKED={flow:1,proc:1,wc:1,vendor:1};   /* 저장소 목록과 대조하는 칸 — 목록 밖이면 「미등록」(값은 그대로 받음) */
 function unreg(opt,v){return CHECKED[opt]&&s(v)&&T.erp_flows&&listOf(opt).indexOf(s(v))<0;}
+/* v12 대·중·소분류 칸 — 사장님 11-19 「모든 영림원보내기 등 대중소분류를 입력하는 칸에 이미 등록완료된 목록이 드롭다운으로 보여 해당 대중소를 기존 등록된 것으로 입력할 수 있게 해주세요」
+   목록 = 입력폼 erp_classes status 완료(ylwGone 뺌) · 품목 칸 = 제상품 · 자재소분류 = 자재(「대 > 중 > 소」 경로).
+   대 → 중 → 소 = 같은 줄(표 줄 · 칸 묶음)에서 위에 넣은 것 아래만. 칸에 들어가면 datalist 를 dl-cls-pick 로 바꿔 채움(원래 목록 값은 뒤에).
+   목록 밖 값 = 막지 않음 · 칸 주황(input.clsun) · 마우스 = 까닭. */
+var CLS_COL={big:0,mid:1,small:2},CLS_SEP=' > ';
+function clsColKind(c){var k='';((SPEC&&SPEC.sheets)||[]).forEach(function(sh){sh.groups.forEach(function(g){if(g.cols.indexOf(c)>=0)k=sh.kind;});});return k;}
+function clsTag(el,c){if(!el||!c||!CLS_COL.hasOwnProperty(c.k)||c.t==='bool')return el;var k=clsColKind(c);if(!k)return el;
+  el.dataset.cls=c.k;el.dataset.ck=k;if(el.getAttribute('list'))el.dataset.l0=el.getAttribute('list');
+  requestAnimationFrame(function(){clsMark(el);});return el;}
+function clsDocs(ck,done){return (T.erp_classes||[]).filter(function(d){return d.kind===(ck==='자재'?'자재':'제상품')&&d.status!=='오류'&&(done?d.status==='완료'&&!d.ylwGone:d.status!=='완료');})
+  .map(function(d){return [s(d.big),s(d.mid),s(d.name)];});}
+function clsBox(el){return el.closest('tr')||el.closest('.grid');}
+function clsUp(el){var b=clsBox(el),g=function(k){var x=b&&b.querySelector('input[data-cls="'+k+'"]');return x?s(x.value):'';};return [g('big'),g('mid')];}
+function clsFit(el,L,v){if(el.dataset.ck==='자재')return L.filter(function(x){return x.join(CLS_SEP)===v||x[2]===v;}).length>0;
+  var i=CLS_COL[el.dataset.cls],u=clsUp(el);return L.some(function(x){return x[i]===v&&(i<1||!u[0]||x[0]===u[0])&&(i<2||!u[1]||x[1]===u[1]);});}
+function clsOpts(el){var L=clsDocs(el.dataset.ck,true),c=function(a,b){return a.localeCompare(b,'ko');};
+  if(el.dataset.ck==='자재')return uniq(L.map(function(x){return x.join(CLS_SEP);})).sort(c);
+  var i=CLS_COL[el.dataset.cls],u=clsUp(el);
+  return uniq(L.filter(function(x){return (i<1||!u[0]||x[0]===u[0])&&(i<2||!u[1]||x[1]===u[1]);}).map(function(x){return x[i];})).sort(c);}
+function clsMark(el){var v=s(el.value),L=clsDocs(el.dataset.ck,true),un=!!v&&L.length>0&&!clsFit(el,L,v);
+  el.classList.toggle('clsun',un);
+  if(un)el.title='등록완료 분류에 없음'+(clsFit(el,clsDocs(el.dataset.ck,false),v)?' — 입력폼 등록 대기':' — 새 분류');else if(/^등록완료 분류/.test(el.title||''))el.removeAttribute('title');}
+function clsMarkBox(el){var b=clsBox(el);(b?[].slice.call(b.querySelectorAll('input[data-cls]')):[el]).forEach(clsMark);}
+function clsMarkAll(){[].forEach.call(document.querySelectorAll('input[data-cls]'),clsMark);}
+document.addEventListener('focusin',function(e){var el=e.target;if(!el||!el.dataset||!el.dataset.cls)return;
+  var d=document.getElementById('dl-cls-pick');if(!d){d=h('datalist',{id:'dl-cls-pick'});document.body.append(d);}
+  var l0=el.dataset.l0&&document.getElementById(el.dataset.l0),more=l0?[].map.call(l0.options,function(x){return x.value;}):[];
+  d.replaceChildren.apply(d,uniq(clsOpts(el).concat(more)).map(function(v){return h('option',{value:v});}));el.setAttribute('list','dl-cls-pick');});
+document.addEventListener('input',function(e){var el=e.target;if(el&&el.dataset&&el.dataset.cls)clsMarkBox(el);});
 
 /* ---------- 상단 ---------- */
 function rows(){return data.basic||[];}
@@ -418,7 +448,7 @@ function editor(r0){
     if(c.t==='bool'){var cb=h('input',{type:'checkbox',checked:v===true||v==='O'||v==='true',on:{change:function(e){dirty=true;set(e.target.checked);untest(key);}}});return cb;}
     var inp=h('input',{type:c.t==='date'?'date':'text',value:s(v),list:c.opts?'dl-'+c.opts:null,inputmode:c.t==='num'?'decimal':null,
       on:{input:function(e){dirty=true;set(e.target.value);untest(key);var p=e.target.closest('.f,td');if(p)p.classList.remove('test');}}});
-    return inp;
+    return clsTag(inp,c);
   };
   sh.groups.forEach(function(g){
     if(g.k==='확인'||g.g==='확인')return;
@@ -808,6 +838,7 @@ function fld(o,c,after,ro,noNm){
   if(c.t==='bool'){var cb=h('input',{type:'checkbox',checked:!!o[c.k],disabled:!!ro,on:{change:function(e){o[c.k]=e.target.checked;dirty=true;if(after)after();}}});f.append(h('label',{},cb,' ',c.l));return f;}
   var inp=h('input',{type:c.t==='date'?'date':'text',value:s(o[c.k]),list:c.opts?'dl-'+c.opts:(!noNm&&NM_COL[c.k]?'dl-nm-'+NM_COL[c.k]:null),inputmode:c.t==='num'?'decimal':null,readonly:ro?true:null,
     on:{input:function(e){o[c.k]=e.target.value;dirty=true;},change:function(){if(after)after();}}});
+  clsTag(inp,c);
   f.append(h('label',{},c.l,c.req?h('span',{class:'req'},'*'):''),inp);
   if(c.opts&&unreg(c.opts,o[c.k]))f.append(h('span',{class:'unreg'},'미등록'));
   return f;
@@ -1062,7 +1093,7 @@ function subSheet(re){
   groups.forEach(function(g){var cs=colsOf('품목',g);gh.push(h('th',{class:'g1',colspan:cs.length},g));cs.forEach(function(c){cols.push(c);});});
   var cells=[];   /* cells[r][c] = 입력 요소 */
   var listId=function(c){return c.opts?'dl-'+c.opts:(NM_COL[c.k]?'dl-nm-'+NM_COL[c.k]:null);};
-  var mark=function(td,c,v){if(c.opts)td.classList.toggle('un',!!unreg(c.opts,v));};
+  var mark=function(td,c,v){if(c.opts)td.classList.toggle('un',!!unreg(c.opts,v));var x=td.querySelector('input[data-cls]');if(x)clsMarkBox(x);};
   var setv=function(r,c,v){var it=subs[r],col=cols[c],el=cells[r][c];
     if(col.t==='bool'){var b=boolIn(v);it[col.k]=b;el.checked=b;}else{it[col.k]=v;el.value=v;mark(el.parentNode,col,v);}dirty=true;};
   var move=function(r,c){if(r<0||r>=subs.length)return;var el=cells[r][c];el.focus();if(el.select)el.select();};
@@ -1086,7 +1117,7 @@ function subSheet(re){
             e.preventDefault();var g=tsvParse(t),n=0,skip=0;
             g.forEach(function(row,dr){row.forEach(function(v,dc){var R=r+dr,C=ci+dc;if(R>=subs.length||C>=cols.length){skip++;return;}setv(R,C,s(v));n++;});});
             say(n+'칸 붙여넣음'+(skip?' · 표 밖 '+skip+'칸 버림':''));}}});
-      mark(td,c,it[c.k]);cells[r].push(el);td.append(el);tr.append(td);
+      clsTag(el,c);mark(td,c,it[c.k]);cells[r].push(el);td.append(el);tr.append(td);
     });
     tr.append(h('td',{},h('button',{type:'button',class:'btn small danger',on:{click:function(){if(s(it.name)&&s(it.name)!==s(it.comp)&&!confirm(s(it.name)+' 을(를) 뺍니다.'))return;W.items.splice(r+1,1);var ci2=W.comp.indexOf(s(it.comp));if(ci2>=0)W.comp.splice(ci2,1);re();}}},'빼기')));
     tb.append(tr);
@@ -1409,7 +1440,7 @@ connectDb().then(function(d){
   db.seen().catch(function(){});
   db.me(function(m){ME=m||{};if(!can('w')&&!(ME.admin||ME.ok))bannerEl.replaceChildren(h('div',{class:'banner'},'권한이 없습니다. 담당자 관리에서 권한을 받아야 합니다.'));else if(!can('w'))bannerEl.replaceChildren(h('div',{class:'banner'},'저장 권한이 없습니다(보기만). 담당자 관리에서 「영림원 기본정보 입력」 권한을 받아야 합니다.'));else bannerEl.replaceChildren();draw();},function(){});
   db.watch(COL,function(a){data.basic=a;soft();},function(e){data.basic=[];bannerEl.replaceChildren(h('div',{class:'banner'},'자료를 읽지 못했습니다. '+errText(e)));draw();});
-  TCOLS.forEach(function(c){db.watch(c,function(a){T[c]=a;refreshDl();soft();},function(){T[c]=[];});});
+  TCOLS.forEach(function(c){db.watch(c,function(a){T[c]=a;refreshDl();soft();if(c==='erp_classes')clsMarkAll();},function(){T[c]=[];});});
 }).catch(function(e){bannerEl.replaceChildren(h('div',{class:'banner'},'저장소에 연결하지 못했습니다. '+errText(e)));});
 })();
 </script>

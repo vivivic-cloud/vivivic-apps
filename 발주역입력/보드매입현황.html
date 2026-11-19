@@ -1,7 +1,10 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.24.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.25.0
+     v1.25.0(11-19): 사장님 「모든 영림원보내기 등 대중소분류를 입력하는 칸에 이미 등록완료된 목록이 드롭다운으로 보여 해당 대중소를 기존 등록된 것으로 입력할 수 있게 해주세요」
+       드롭목록은 v1.20.x 그대로(입력폼 erp_classes 자재 — 완료 = 초록 줄). 더한 것: 대·중·소 칸 값이 등록완료(status 완료) 분류에 없으면 칸 주황(`td.분류새`),
+       마우스 = 「등록완료 분류에 없음 — 새 분류 / 입력폼 등록 대기」. 대 = 대 이름 · 중 = 대>중 · 소 = 대>중>소 경로로 봄. 분류 규칙 빨강이 있으면 빨강이 먼저.
      v1.24.0(11-19): 동일품 자재명·자재번호 바로 고침 — 사장님 「동일품에서 변경하여 영림원보내기에도 적용되게 상호 적용되게 할 수 있나 자재명, 자재번호 동일품에서 변경하여 오류 수정되게 할 수 있는것들이 있어서」.
        동일품 표 두 칸 = 입력 칸 → 영림원보내기 그 줄(확정 묶음 = 대표 줄)에 같은 저장 길(폼값·더럽힘·저장예약, 칸적용과 같은 규칙). 저장되면 창고 구독으로 두 화면 모두 다시 그림(치는 중이면 칸을 떠날 때).
      v1.23.0(11-19): 해피코 동일품 실시간 — 사장님 「영림원보내기에서 자재명을 '자작'에서 '화이트'로 바꿨는데 동일품에서는 변동이 없다. 실시간 연동이 아닌가?」
@@ -293,6 +296,7 @@ html,body{height:100%;overflow:hidden}
 .분류고름 div.영{border-left-color:#2e7d32}
 .분류고름 div.대{border-left-color:#B5B5B0}
 .폼표 td.분류틀,.폼표 td.고칠칸{background:#FFE9E7;box-shadow:inset 0 0 0 2px var(--vg-red)}   /* v1.17.1 분류 규칙 어긋남 · v1.18.0 오류 단계의 고칠 칸 */
+.폼표 td.분류새{background:#FFF6E0;box-shadow:inset 0 0 0 2px #f59e0b}   /* v1.25.0 등록완료 분류에 없는 값 */
 .폼표 td.입:has([data-k]:disabled){background:var(--vg-fill)}   /* v1.18.0 완료 단계 칸 = 잠금 */
 
 /* v1.21.0 해피코 동일품 — 제안 주황 · 확정 초록(첫 칸 왼쪽 띠) · 동일품이 적용된 명세 칸 초록 */
@@ -325,7 +329,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.24.0</div>
+  <div class="badge">v1.25.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -911,13 +915,20 @@ function 분류검사(){
 }
 function 분류틀그리기(표, s){
   const 틀 = 분류검사(); let 수 = 0;
+  const 완 = 영림원분류.filter(x => x[3]==='완료'), 대기 = 영림원분류.filter(x => x[3]==='대기');   /* v1.25.0 등록완료 분류에 없는 값 = 주황(마우스 = 까닭) */
+  const 맞음 = (목, v, i) => 목.some(x => v.slice(0, i + 1).every((y, j) => x[j]===y));
   표.querySelectorAll('tbody tr').forEach(tr => {
     const 이유 = 틀.get(s + '\n' + tr.dataset.key) || {};
     if(Object.keys(이유).length) 수++;
-    분류칸.forEach(([k]) => {
+    const v = 분류칸.map(([k]) => ((tr.querySelector(`input[data-k="${k}"]`) || {}).value || '').trim());
+    분류칸.forEach(([k], i) => {
       const td = tr.querySelector(`input[data-k="${k}"]`)?.closest('td'); if(!td) return;
       td.classList.toggle('분류틀', !!이유[k]);
-      if(이유[k]) td.title = '분류 규칙: ' + 이유[k]; else if(td.title.startsWith('분류 규칙')) td.removeAttribute('title');
+      const 새 = !이유[k] && 완.length > 0 && !!v[i] && !맞음(완, v, i);
+      td.classList.toggle('분류새', 새);
+      if(이유[k]) td.title = '분류 규칙: ' + 이유[k];
+      else if(새) td.title = '등록완료 분류에 없음' + (맞음(대기, v, i) ? ' — 입력폼 등록 대기' : ' — 새 분류');
+      else if(td.title.startsWith('분류 규칙') || td.title.startsWith('등록완료 분류')) td.removeAttribute('title');
     });
   });
   const el = document.getElementById('분류틀알림');
