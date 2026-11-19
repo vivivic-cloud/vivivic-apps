@@ -2,7 +2,9 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.7.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.8.0
+     v2.8.0(11-19): 사장님 「영림원품목등록의 공정흐름값을 보면 옆쪽 품명 끝에 _상판 _지판 이런식으로 쓰인 부속명에 따라 공정흐름이 일정한 규칙이 있다는게 보일꺼야 이를 단서로 나머지 자동으로 채워지도록 해줘」 —
+       반제품 공정흐름 빈 칸 = 같은 부속명(없으면 끝 영문 뺀 바탕)의 사람 값이 하나로 모이면 그 값을 옅은 글자로(저장 안 함 · 마우스 = 근거). 갈리면 안 채움. 규칙은 늘 지금 입력값에서 셈.
      v2.7.0(11-19): 사장님 「공정흐름 드롭 목록에 들어갈 항목을 추가·삭제하는 창이, 공정흐름 제목(머리)을 누르면 나타나게 해 줘. 거기서 추가·삭제하게.」 —
        공정흐름 머리 누름 = 작은 창(목록·항목마다 삭제·새 이름 + 추가·닫기, 같은 이름 막음, 「조립」 삭제 막음). 목록 = 창고 _공정목록 {목록[], 고친때}(없으면 처음 9개) · onSnapshot.
        목록에서 지운 흐름이 저장된 칸 = 값은 그대로, 빨간 글자 + 마우스 「목록에 없는 흐름」(다시 넣으면 풀림).
@@ -159,6 +161,7 @@ html,body{height:100%;overflow:hidden}
 .dpr-t td.단품없음{color:#e53935}   /* v2.5.0 업체별 단품명에 없는 제품·그 반제품 품명 */
 .dpr-t thead th.단서{cursor:pointer}
 .dpr-t td.목록밖{color:#e53935}   /* v2.7.0 목록에서 지운 공정흐름 값 */
+.dpr-t td.공자동{color:#A3A39F}   /* v2.8.0 공정흐름 자동 값(부속명 규칙 · 저장 안 된 것) = 옅은 글자 */
 .공정창{position:fixed;z-index:55;background:var(--vg-bg);border:1px solid #C7C7C3;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.16);
   padding:10px;width:230px;max-width:calc(100vw - 32px);font-size:12.5px}
 .공정창 .줄{display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid var(--vg-edge)}
@@ -186,7 +189,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.7.0</div>
+  <div class="badge">v2.8.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -435,13 +438,39 @@ function 입력구독(){
 }
 
 /* 품목등록업로드 표의 입력 칸을 지금 값으로 */
+/* ── v2.8.0 공정흐름 자동 — 사장님 11-19 「품명 끝에 _상판 _지판 이런식으로 쓰인 부속명에 따라 공정흐름이 일정한 규칙이 있다는게 보일꺼야 이를 단서로 나머지 자동으로 채워지도록 해줘」
+   · 부속명 = 반제품 품명의 마지막 「_」 뒤(예 _상판 · _도어L · _백판넬(2.7t)). 바탕 = 부속명 끝 영문 대문자 뺀 것(도어L·도어R·도어 → 도어, 이동선반L/S → 이동선반).
+   · 규칙은 늘 지금 사람이 넣은 값(_입력 · 저장 중 값 포함)에서 셈 — 고정표 없음. 같은 부속명 값이 하나로 모이면 그 값,
+     그 부속명 값이 없으면 같은 바탕 값이 하나로 모일 때 그 값. 값이 갈리면(둘 이상) 안 채움. 목록 밖 값은 규칙에 안 씀.
+   · 빈 칸에만 보임(옅은 글자, 마우스 = 근거) · 저장 안 함 → 사람 값이 바뀌면 바로 따라 바뀜. 드롭에서 고르거나 붙여넣으면 사람 값(파랑)이 됨. 복사 = 보이는 값. */
+let 공꼬리 = new Map();   /* 반제품 품번 → 부속명 */
+const 바탕 = t => t.replace(/[A-Z]+$/, '') || t;
+let 공규칙 = null;
+function 공규칙셈(){
+  const 꼬 = new Map(), 바 = new Map(), 넣 = (m,k,v,p) => { if(!m.has(k)) m.set(k, new Map()); const x = m.get(k); x.set(v, (x.get(v)||new Set()).add(p)); };
+  for(const [p,t] of 공꼬리){ const v = 값(p,'공정흐름').trim(); if(!v || !공정목록.includes(v)) continue; 넣(꼬,t,v,p); 넣(바,바탕(t),v,p); }
+  공규칙 = { 꼬, 바 };
+}
+function 공자동(p){   /* → {v, 근거} 또는 null */
+  if(값(p,'공정흐름').trim()) return null;
+  const t = 공꼬리.get(p); if(!t) return null;
+  if(!공규칙) 공규칙셈();
+  const 하나 = (x, 이름) => x && x.size===1 ? (([v,ps]) => ({ v, 근거:`자동 — _${이름} ${ps.size}줄` }))([...x][0]) : null;
+  const 꼬 = 공규칙.꼬.get(t);
+  if(꼬) return 하나(꼬, t);
+  return 하나(공규칙.바.get(바탕(t)), 바탕(t));
+}
 /* v2.7.0 목록에 없는 공정흐름 값 = 빨강 + title (값은 그대로) */
 const 공밖 = p => { const v = 값(p,'공정흐름').trim(); return !!v && !공정목록.includes(v); };
 function 공정칠(){
   const 통 = 받은[품목시트]; if(!통 || !통.querySelector) return;
+  공규칙셈();
   통.querySelectorAll('td.편[data-k="공정흐름"]').forEach(td => {
     const v = 값(td.parentNode.dataset.p, '공정흐름').trim(), 밖 = !!v && !공정목록.includes(v) && !td.classList.contains('편집중');
-    td.classList.toggle('목록밖', 밖); if(밖) td.title = '목록에 없는 흐름'; else td.removeAttribute('title');
+    const 자 = !td.classList.contains('편집중') && 공자동(td.parentNode.dataset.p);   /* v2.8.0 */
+    if(!td.classList.contains('편집중')) td.textContent = 자 ? 자.v : 값(td.parentNode.dataset.p, '공정흐름');
+    td.classList.toggle('공자동', !!자);
+    td.classList.toggle('목록밖', 밖); if(밖) td.title = '목록에 없는 흐름'; else if(자) td.title = 자.근거; else td.removeAttribute('title');
   });
 }
 function 공정목록구독(){
@@ -627,6 +656,7 @@ function 편집달기(통){
     const v = inp.value;
     td.classList.remove('편집중'); td.textContent = 값(td.parentNode.dataset.p, td.dataset.k);
     td.classList.toggle('저장값', 파랑(td.parentNode.dataset.p, td.dataset.k));
+    if(td.dataset.k==='공정흐름') 공정칠();   /* v2.8.0 자동 값 다시 보임 */
     if(넣기) 바꿈([줄값(td, v)]);
     if(흐림) return;
     if(내림){ const [r,c] = 자리(td), 다음 = 칸(r+1,c); if(다음){ 고름 = { r0:r+1, c0:c, r1:r+1, c1:c }; 칠(); } }
@@ -696,7 +726,7 @@ function 편집달기(통){
     if(!내차례()) return;
     const b = 범위(), 줄 = [];
     for(let r=b[0]; r<=b[2]; r++){ const 칸들 = [];
-      for(let c=b[1]; c<=b[3]; c++){ const td = 칸(r,c); 칸들.push(td ? (td.classList.contains('편') ? 값(td.parentNode.dataset.p, td.dataset.k) : td.textContent).replace(/[\t\r\n]+/g,' ') : ''); }
+      for(let c=b[1]; c<=b[3]; c++){ const td = 칸(r,c); 칸들.push(td ? (td.classList.contains('편') && !td.classList.contains('공자동') ? 값(td.parentNode.dataset.p, td.dataset.k) : td.textContent).replace(/[\t\r\n]+/g,' ') : ''); }
       줄.push(칸들.join('\t')); }
     e.clipboardData.setData('text/plain', 줄.join('\n')); e.preventDefault();
   });
@@ -732,6 +762,10 @@ function 표만들기(칸, 줄, 이름){
         return a==='제품' ? 없음.has(String(r.v[pi]??'').trim()) : a==='반제품' && 없음.has(String(r.v[mi0]??'').trim()); };
       줄 = 줄.filter(r => !빠짐(r)).concat(줄.filter(빠짐)); }
   }
+  if(품){ const ni = 칸.indexOf('품명'); 공꼬리 = new Map();   /* v2.8.0 */
+    if(ni>=0 && pi>=0) for(const r of 줄) if(String(r.v[ai]??'').trim()==='반제품'){ const p = String(r.v[pi]??'').trim(), n = String(r.v[ni]??'').trim(), j = n.lastIndexOf('_');
+      if(p && j>=0 && n.slice(j+1)) 공꼬리.set(p, n.slice(j+1)); }
+    공규칙셈(); }
   const h = ['<table class="dpr-t"><thead><tr>' +
     칸.map((k,i) => { const 필 = 필수칸[이름]?.has(String(k).trim());
       return `<th class="${(i===0?'dpr-k':'') + (필?' 필수':'')}"${필?' title="영림원 필수"':''}>${글(k)}</th>`; }).join('') + '</tr></thead><tbody>'];
@@ -742,7 +776,7 @@ function 표만들기(칸, 줄, 이름){
     const 반 = 품 && String(r.v[ai]??'').trim()==='반제품';
     const 빨 = 없음.size && (반 ? 없음.has(String(r.v[mi0]??'').trim()) : 없음.has(p));
     if(품) tr += 반 || String(r.v[ai]??'').trim()!=='제품'
-      ? `<td class="편 드롭칸${파랑(p,'공정흐름')?' 저장값':''}${공밖(p)?' 목록밖" title="목록에 없는 흐름':''}" data-k="공정흐름">${글(값(p,'공정흐름'))}</td>`   /* v2.6.0 */
+      ? ((자) => `<td class="편 드롭칸${파랑(p,'공정흐름')?' 저장값':''}${공밖(p)?' 목록밖" title="목록에 없는 흐름':자?` 공자동" title="${글(자.근거)}`:''}" data-k="공정흐름">${글(자 ? 자.v : 값(p,'공정흐름'))}</td>`)(반 && 공자동(p))   /* v2.6.0 · v2.8.0 자동 */
       : `<td class="막음" data-k="공정흐름" data-알림="제품 — 조립">조립</td>`;   /* v2.6.1 제품 = 조립 고정 */
     for(let i=0;i<칸.length;i++){
       const ei = 편.indexOf(i);
