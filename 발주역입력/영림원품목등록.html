@@ -2,7 +2,9 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.11.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.12.0
+     v2.12.0(11-19): 사장님 「품목등록업로드 품명이 BOM등록업로드의 모품목명에 없다면 해당 모품목명이 붉게 보이게 해주세요」 —
+       BOM 표 모품목명(앞뒤 빈칸 뺀 글자)이 품목등록업로드 품명에 없으면 그 칸 빨간 글자(마우스 「품목등록업로드에 없음」). 품목이 바뀌면 바로 다시 따짐. 저장 없음.
      v2.11.0(11-19): 사장님 「사실 현재 비오엠업로드등록에서 공정이 가공인것들은 다 삭제하고 현 공정흐름에 맞게 재배치 해야함」 · 「공정 순서가 이미 공정흐름으로 보이잖아」 —
        BOM 「가공」 줄 = 품목등록업로드 반제품 것만 남기고(나머지 가공 줄은 표에서 뺌) 공정 칸 = 그 반제품 공정흐름(보이는 값 — 사람·자동)의 공정:
        합판 줄 = 흐름에서 「재단」 든 첫 공정(없으면 첫 공정) · 필름 줄 = 「엣지」(없으면 엣지 든 공정, 그것도 없으면 첫 공정 + 주황). 흐름 없음 = 빈칸 빨강 바탕. 저장 안 함 · 늘 셈.
@@ -173,6 +175,7 @@ html,body{height:100%;overflow:hidden}
 .dpr-t td.목록밖{color:#e53935}   /* v2.7.0 목록에서 지운 공정흐름 값 */
 .dpr-t td.재단못{background:#FFF1E0}   /* v2.9.0 재단률 에이엠티 계산 안 됨(엑셀 원래 값) */
 .dpr-t td[data-k="재단률"]{cursor:pointer}
+.dpr-t td.모없음{color:#e53935}   /* v2.12.0 BOM 모품목명 — 품목등록업로드 품명에 없음 */
 .dpr-t td.흐름없음{background:#FDECEA}   /* v2.11.0 BOM 가공 줄 — 그 반제품 공정흐름 없음 */
 .dpr-t td.엣지없음{background:#FFF1E0}   /* v2.11.0 BOM 필름 줄 — 흐름에 엣지 공정 없음 */
 .재단창{position:fixed;z-index:56;right:16px;top:16px;bottom:16px;width:420px;max-width:calc(100vw - 32px);overflow:auto;background:var(--vg-bg);
@@ -215,7 +218,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.11.0</div>
+  <div class="badge">v2.12.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -381,7 +384,7 @@ const 필수칸 = {
   [품목시트]: new Set(['품명','품번','품목자산분류','기준단위','품목소분류','품목상태']),
   [BOM시트]: new Set(['모품목명','모품목번호','모품목BOM차수','하위품명','하위품번','투입단위','소요량(분자)','소요량(분모)'])
 };
-let 입력 = {}, 더럽 = new Map(), 연동줄 = [], 조립줄 = [];
+let 입력 = {}, 더럽 = new Map(), 연동줄 = [], 조립줄 = [], 모줄 = [];
 let 자재목록 = { 합판:[], 필름:[] }, 폼자재 = null, 공개자재 = [];
 const 열쇠 = (p,k) => p + '\t' + k;
 const 값 = (p,k) => { const x = 열쇠(p,k); return 더럽.has(x) ? 더럽.get(x) : String(((입력[p]||{})[k]) ?? ''); };
@@ -598,7 +601,15 @@ function BOM공정칠(){
       : `${품목시트} ${z.m} 공정흐름 ${f.v}${f.자?' (자동)':''} — ${필?'필름':'합판'}${엣없?' · 흐름에 엣지 없음':''} (원래 ${z.공})`;
   }
 }
+/* v2.12.0 BOM 모품목명이 품목등록업로드 품명에 없으면 빨강 — 품목 시트를 다 받기 전엔 안 따짐 */
+function BOM모칠(){
+  if(!모줄.length || !품목칸 || !품목조각.length || 품목조각.some(x => !x)) return;
+  const ni = 품목칸.indexOf('품명'); if(ni<0) return;
+  const s = new Set(); for(const r of [].concat(...품목조각)) s.add(String(r.v[ni]??'').trim());
+  for(const z of 모줄){ const 없 = !s.has(z.명); z.td.classList.toggle('모없음', 없); z.td.title = 없 ? '품목등록업로드에 없음' : z.원; }
+}
 function 연동칠(){
+  BOM모칠();   /* v2.12.0 */
   for(const z of 조립줄){   /* v2.3.0 투입수량 → BOM 조립 줄(모품목 z.m → 반제품 z.번) 소요량 */
     const v = 값(z.번, '투입수량@' + z.m).trim(), c = z.tr.cells, 파 = 파랑(z.번, '투입수량@' + z.m);
     if(!v){ for(const [i,w] of [[z.i자, z.자],[z.i모, z.모]]){ if(i<0) continue; c[i].textContent = w; c[i].classList.remove('저장값'); c[i].removeAttribute('title'); } continue; }
@@ -1015,6 +1026,8 @@ function 표만들기(칸, 줄, 이름){
     줄.forEach((r, n) => { if(String(r.v[gi]??'').trim()!=='가공') return;
       연동줄.push({ tr:trs[n], m:String(r.v[mi]??'').trim(), 번:String(r.v[i번]??'').trim(), 명:String(r.v[i명]??''), 규:String(r.v[i규]??''), i명, i번, i규,
         gi, 공:String(r.v[gi]??''), 단:String(r.v[몫('투입단위')]??'').trim() }); });   /* v2.11.0 gi·공·단 = 공정 다시 놓기 */
+    const i모명 = 몫('모품목명'); 모줄 = [];   /* v2.12.0 */
+    if(i모명>=0) 줄.forEach((r, n) => { const td = trs[n].cells[i모명]; 모줄.push({ td, 명:String(r.v[i모명]??'').trim(), 원:td.getAttribute('title')||'' }); });
     const i자 = 몫('소요량(분자)'), i모 = 몫('소요량(분모)'); 조립줄 = [];   /* v2.3.0 투입수량 짝 = 조립 줄 */
     줄.forEach((r, n) => { if(String(r.v[gi]??'').trim()!=='조립') return;
       조립줄.push({ tr:trs[n], m:String(r.v[mi]??'').trim(), 번:String(r.v[i번]??'').trim(), 자:String(r.v[i자]??''), 모:String(r.v[i모]??''), i자, i모 }); });
