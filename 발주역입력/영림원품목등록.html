@@ -2,7 +2,10 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.17.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.18.0
+     v2.18.0(11-20): 사장님 — BOM 이 품목등록업로드 화면에 보이는 값만 쓰게. 원본 시트 값을 읽던 곳: 반제품값() 합판코드·필름코드·재단률, 조립짜기() 투입수량.
+       이제 합판·필름코드·투입수량 = 사람 입력값(_입력) · 재단률 = 화면 재단률 칸 값(에이엠티 셈, 못 셈이면 엑셀 값). 빈 입력이면 BOM 그 칸 빈칸(v2.17 규칙).
+       입력·재단률 셈이 바뀌면 BOM 표를 다시 만듦(연동칠·재단칠 앞에서 BOM다시). 화면만 — 창고 그대로.
      v2.17.0(11-20): 사장님 「BOM등록업로드는 자동으로 된 부분만 표기하고, 자동으로 되지 못한 곳은 일단 빈칸으로 보이게 해봐」 —
        BOM 표 칸 = 프로그램이 만든 값만: 조립 줄(v2.14 품목등록업로드로 짠 줄) = 모두 · 가공 줄 = 모품목번호·공정(공정흐름)·품목등록업로드 값으로 정해진 칸
        (모품목명·규격·단위 · 하위품번 = 합판/필름코드 · 하위품명 = 그 코드/자재 이름 · 필름 하위규격 · 합판 분모 = 재단률 · 비고 「원장 1매에서 N개」 · 필름 분자 = 필름 소요량).
@@ -236,7 +239,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.17.0</div>
+  <div class="badge">v2.18.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -604,7 +607,8 @@ function 조립짜기(칸){
     if(String(r.v[ai]??'').trim()!=='반제품') continue;
     const m = String(r.v[mi]??'').trim(), p = 제.get(m); if(!p) continue;
     순.set(m, (순.get(m)||0) + 1);
-    const v = Array(칸.length).fill(null), 둠 = (k, x) => { const i = J(k); if(i>=0) v[i] = x; }, [자, 모] = 분수(r.v[qi]);
+    const 투 = 값(String(r.v[pi]??'').trim(), '투입수량@' + m).trim();   /* v2.18.0 화면에 보이는 투입수량(사람 값)만 — 원본 시트 값 안 씀 */
+    const v = Array(칸.length).fill(null), 둠 = (k, x) => { const i = J(k); if(i>=0) v[i] = x; }, [자, 모] = 투 ? 분수(투) : [null, null];
     둠('모품목명', p[ni]); 둠('모품목번호', m); 둠('모품목규격', gi>=0 ? p[gi] : null); 둠('모품목BOM차수', '00'); 둠('모품목단위', ui>=0 ? p[ui] : null);
     둠('공정', '조립'); 둠('표시순서', 순.get(m)); 둠('하위품명', r.v[ni]); 둠('하위품번', r.v[pi]); 둠('하위규격', gi>=0 ? r.v[gi] : null);
     둠('하위BOM차수', '00'); 둠('투입단위', ui>=0 ? r.v[ui] : null); 둠('소요량(분자)', 자); 둠('소요량(분모)', 모);
@@ -620,7 +624,9 @@ function 반제품값(){
   const ai = I('품목자산분류'), pi = I('품번');
   for(const r of [].concat(...품목조각)){ const p = 글(r.v, pi); if(!p || m.has(p) || 글(r.v, ai)!=='반제품') continue;
     const 원값 = k => { const i = I(k); return i<0 ? null : r.v[i]; };
-    m.set(p, { 명:원값('품명'), 규:원값('규격'), 단:원값('기준단위'), 합:글(r.v, I('합판코드')), 필:글(r.v, I('필름코드')), 재:원값('재단률'), 필량:원값('필름 소요량(M)') }); }
+    /* v2.18.0 화면에 보이는 값만: 합판·필름코드 = 사람 입력값(화면 입력 칸) · 재단률 = 화면 재단률 칸 값(에이엠티 셈, 못 셈이면 엑셀 값 — 재단칠 과 같음) */
+    const 재 = 재단셈(p, 글(r.v, I('모품목(상위 품번)')), 글(r.v, I('규격')));
+    m.set(p, { 명:원값('품명'), 규:원값('규격'), 단:원값('기준단위'), 합:값(p,'합판코드').trim(), 필:값(p,'필름코드').trim(), 재:재.n || 원값('재단률'), 필량:원값('필름 소요량(M)') }); }
   return m;
 }
 let 자재이름 = new Map();   /* v2.15.0 원부자재 탭 품번 → 품명(코드가 바뀐 줄 하위품명) */
@@ -646,7 +652,7 @@ function 가공짜기(칸, 줄, 반값){
     if(코 && 코!==String(r.v[bi]??'').trim()){
       v[ni] = String(r.v[ni]??'').trim()===String(r.v[bi]??'').trim() ? 코 : (자재이름.get(코) || 코); v[bi] = 코; }
     if(코){ 자칸.add(bi); const 명 = String(v[ni]??'').trim(); if(명===코 || 명===자재이름.get(코)) 자칸.add(ni); }
-    if(필){ 둠(J('소요량(분자)'), s.필량); const w = /^ed_[^_]+_(\d+)_/.exec(String(v[bi]??'')); if(w && si>=0 && /^\d+mm$/.test(String(r.v[si]??'').trim())){ v[si] = `${+w[1]}mm`; 자칸.add(si); } }
+    if(필){ 둠(J('소요량(분자)'), s.필량); const w = /^ed_[^_]+_(\d+)_/.exec(String(v[bi]??'')); if(코 && w && si>=0 && /^\d+mm$/.test(String(r.v[si]??'').trim())){ v[si] = `${+w[1]}mm`; 자칸.add(si); } }
     else { 둠(J('소요량(분모)'), s.재); if(ri>=0 && !빈(s.재) && /^원장 1매에서 \d+개$/.test(String(r.v[ri]??'').trim())){ v[ri] = `원장 1매에서 ${s.재}개`; 자칸.add(ri); } }
     return v.some((x, i) => String(x??'')!==String(r.v[i]??'')) ? { ...r, v, 원:r.v, 가자동:true, 자칸 } : { ...r, 자칸 };
   });
@@ -703,6 +709,7 @@ function BOM모칠(){
   for(const z of 모줄){ const 없 = !s.has(z.명); z.td.classList.toggle('모없음', 없); z.td.title = 없 ? '품목등록업로드에 없음' : z.원; }
 }
 function 연동칠(){
+  BOM다시();   /* v2.18.0 BOM 자동 값 = 사람 입력값·재단률 셈을 따름 — 바뀌었을 때만 다시 만듦 */
   BOM모칠();   /* v2.12.0 */
   for(const z of 조립줄){   /* v2.3.0 투입수량 → BOM 조립 줄(모품목 z.m → 반제품 z.번) 소요량 */
     const v = 값(z.번, '투입수량@' + z.m).trim(), c = z.tr.cells, 파 = 파랑(z.번, '투입수량@' + z.m);
@@ -847,6 +854,7 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('keydown', e => { if(e.key==='Escape'){ const 창 = document.querySelector('.재단창'); if(창){ 창.remove(); 재단창td = null; } } });
 function 재단칠(){
+  BOM다시();   /* v2.18.0 */
   const 통 = 받은[품목시트]; if(!통 || !통.querySelector) return;
   통.querySelectorAll('td[data-k="재단률"]').forEach(td => {
     const r = 재단셈(td.dataset.번, td.dataset.모, td.dataset.규), xl = td.dataset.xl;
