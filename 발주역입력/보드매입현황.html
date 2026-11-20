@@ -1,7 +1,10 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.28.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.29.0
+     v1.29.0(11-20): 사장님 「입력폼에 완료된 대중소분류에 따라 중복 등으로 등록이 안 되는 건 빨간색-오류, 신규등록으로 작성된 건 이 오류 가능성을 분석하고 가능하면 노란색-신규 이렇게 구분되게 해줘」
+       분류 칸 = 지금 값으로만 판단(8절 규칙 그대로): 규칙 어긋남(① 같은 소분류 이름 · ② 입력폼 완료 분류에 같은 소분류 이름·다른 대>중 · ③ 쉼표·빈칸) = 빨강 「오류」 ·
+       규칙 통과 + 입력폼 완료 분류에 없음 = 노랑 「신규」(v1.25.0 주황 → 노랑). ② 는 완료 분류만 봄(전엔 대기도). 분류 칸엔 11-17 결과 오류 고칠칸(빨강)을 안 얹음 — 줄 오류 점·오류건은 그대로. 이유는 마우스만.
      v1.28.0(11-19): 사장님 「드롭다운 목록 너무 입력부에 붙어있어서 드레그가 힘들다」
        분류 드롭목록(.분류고름) = 칸에 들어가거나 누르기만 해선 안 열림 · 두 번 누름·Enter/F2/↓·글 치기·칸 오른쪽 ▾(16px) 로 열림 · 칸 옆(오른쪽, 자리 없으면 왼쪽)에 띄움 → 칸 아래 채우기 손잡이 끌기를 안 가림.
      v1.27.0(11-19): 사장님 「작성할때 안보이조 저장 될대만 보이니까 해깔려」
@@ -303,7 +306,7 @@ html,body{height:100%;overflow:hidden}
 .분류고름 div.대{border-left-color:#B5B5B0}
 .폼표 input[data-분류]:focus{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0h8L4 5z' fill='%23999'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 4px center}   /* v1.28.0 ▾ = 열기 */
 .폼표 td.분류틀,.폼표 td.고칠칸{background:#FFE9E7;box-shadow:inset 0 0 0 2px var(--vg-red)}   /* v1.17.1 분류 규칙 어긋남 · v1.18.0 오류 단계의 고칠 칸 */
-.폼표 td.분류새{background:#FFF6E0;box-shadow:inset 0 0 0 2px #f59e0b}   /* v1.25.0 등록완료 분류에 없는 값 */
+.폼표 td.분류새{background:#FFF7C2;box-shadow:inset 0 0 0 2px #E5B800}   /* v1.25.0 등록완료 분류에 없는 값 · v1.29.0 노랑 = 신규(규칙 통과) */
 .폼표 td.입:has([data-k]:disabled){background:var(--vg-fill)}   /* v1.18.0 완료 단계 칸 = 잠금 */
 
 /* v1.21.0 해피코 동일품 — 제안 주황 · 확정 초록(첫 칸 왼쪽 띠) · 동일품이 적용된 명세 칸 초록 */
@@ -336,7 +339,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.28.0</div>
+  <div class="badge">v1.29.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -938,7 +941,7 @@ function 분류검사(){
     const n = v[2].trim(), 경 = v[0].trim() + ' > ' + v[1].trim();
     if(n && !이유.m_small){
       const 다른 = [...(소경로.get(n) || new Map())].filter(([p]) => p !== 경);
-      const 영 = 영림원분류.filter(x => x[2]===n);
+      const 영 = 영림원분류.filter(x => x[2]===n && x[3]==='완료');   /* v1.29.0 입력폼 완료 분류만(8-1 · 8-3 _분류.영림원 = 완료) */
       /* 영림원에 이미 있는 이름이면 영림원 경로가 맞는 것(8-3 「기존 분류 씀」) — ② 로만 봄 */
       if(!영.length && 다른.length) 이유.m_small = `이름을 바꾸십시오(매입현황에 ${다른.map(([p, a]) => p + ' > ' + n + ' — ' + a.slice(0, 3).join(', ')).join(' / ')} 있음 — 영림원은 소분류 이름 하나뿐)`;
       else if(영.length && !영.some(x => x[0] + ' > ' + x[1]===경)) 이유.m_small = `이름을 바꾸십시오(${영.map(x => (x[3]==='대기' ? '입력폼 등록 대기 ' : '영림원 ') + x[0] + ' > ' + x[1] + ' > ' + n).join(' / ')} 있음)`;
@@ -960,9 +963,9 @@ function 분류틀그리기(표, s){
       td.classList.toggle('분류틀', !!이유[k]);
       const 새 = !이유[k] && 완.length > 0 && !!v[i] && !맞음(완, v, i);
       td.classList.toggle('분류새', 새);
-      if(이유[k]) td.title = '분류 규칙: ' + 이유[k];
-      else if(새) td.title = '등록완료 분류에 없음' + (맞음(대기, v, i) ? ' — 입력폼 등록 대기' : ' — 새 분류');
-      else if(td.title.startsWith('분류 규칙') || td.title.startsWith('등록완료 분류')) td.removeAttribute('title');
+      if(이유[k]) td.title = '오류 — ' + 이유[k];   /* v1.29.0 빨강 = 오류 · 노랑 = 신규 */
+      else if(새) td.title = '신규 — 입력폼 완료 분류에 없음 · 분류 규칙(8절) 통과' + (맞음(대기, v, i) ? ' · 입력폼 등록 대기' : '');
+      else if(/^(오류 — |신규 — |분류 규칙|등록완료 분류)/.test(td.title)) td.removeAttribute('title');
     });
   });
   const el = document.getElementById('분류틀알림');
@@ -1075,7 +1078,7 @@ function 결과칠(s){
     tr.querySelectorAll('[data-k]').forEach(el => {
       const k = el.dataset.k, 잠 = !풀 && (k==='x_del' ? r && r.상태==='완료' : 단계(단계칸(k))==='완료');   /* 일부만 완료 = 완료 단계 칸 잠금 */
       if(el.disabled !== 잠) el.disabled = 잠;
-      const c = el.closest('td'); if(c && k!=='x_del') c.classList.toggle('고칠칸', 고칠.has(k));
+      const c = el.closest('td'); if(c && k!=='x_del') c.classList.toggle('고칠칸', 고칠.has(k) && !f분류(k));   /* v1.29.0 분류 칸 = 지금 값 분석(분류틀그리기)이 색을 정함 */
     });
     if(!td) return;
     /* v1.18.1 글 없이 색 점만(완료 초록 · 오류 빨강 · 고침 주황 · 대기·진행중 회색), 이유는 마우스에만 */
