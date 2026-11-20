@@ -2,7 +2,8 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.28.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.29.0
+     v2.29.0(11-21): 분배 방 지시 — 합판·필름 드롭 같은 묶음 안 차례 = 매입 누계 순위(shared/자재매입순위.js 자료실 구독, 필름 = 해피코 먼저) · 순위 없는 자재 = 묶음 끝 이름순.
      v2.28.0(11-21): 사장님 「재단률 클릭시 나타나는 재단도의 형식이 에이엠티프로그램의 재단편집과 다릅니다. … 제가 의도한것은 해당 프로그램과 연결되어 편집에 따라 이곳의 숫자가 변할 수 있도록 하는것입니다.」 →
        반제품 재단률 = 그 부속 에이엠티 재단도(cutting_plans 실시간) 원장당 — 재단편집(사람) 먼저 → 자동 → 없으면 기본규칙(원장당). 셈 = shared/원장재단수량.js 재단도한장(에이엠티 _cuttingPerSheet 와 한 벌). BOM 재단 분모도 따라감.
        칸 누름 = 에이엠티 재단편집 화면(새 창, ?재단도=id — 에이엠티 v1.66.0) · 재단도 없으면 ?재단=1. v2.10.0 따로 그린 재단도 창 뺌.
@@ -115,6 +116,7 @@
 <title>영림원품목등록 — 발주역입력</title>
 <script src="../shared/원장재단수량.js?v=11-21-1"></script>   <!-- v2.9.0 재단률 = 에이엠티 재단 편집과 같은 한 벌 -->
 <script src="../shared/발주상품검색.js"></script>   <!-- v2.9.0 원장 엑셀 읽기(metaPath·latestMeta·readSheet) -->
+<script src="../shared/자재매입순위.js"></script>   <!-- v2.29.0 합판·필름 드롭 차례 = 매입 누계 순위(자료실만 읽음) -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
@@ -281,7 +283,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.28.0</div>
+  <div class="badge">v2.29.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -792,9 +794,14 @@ const 끝숫자 = m => { const x = String(m.sm||'').match(/(\d+(?:\.\d+)?)(?!.*\
 function 두께맞음(m, 두께, t){ if(!String(두께||'').trim()) return false;
   const a = 두께값들(두께, t), b = 두께값들(끝숫자(m), t); return a.some(v => b.includes(v)); }
 /* v2.27.0 매입 누계 순위 자리 — shared 공통 파일이 올라오면 여기서 이음(지금은 순위 없음 = 이름순). 작을수록 위 */
-function 매입순위(m, t){ return Infinity; }
+/* v2.29.0 매입 누계 순위 = shared/자재매입순위.js 자료실(발주역입력_자재매입순위/누계) — 필름은 해피코 무리 먼저. 순위 없는 자재 = 묶음 끝 이름순 */
+function 매입순위표(목, t){
+  const 순 = window.자재매입순위 ? window.자재매입순위.자재순위(목, { 해피코먼저: t==='필름' }) : new Map();
+  return m => { const x = 순.get(m.code); return x ? x.순위 : Infinity; };
+}
 function 자재차례(목, 두께, t){
-  const 셈 = m => [두께맞음(m, 두께, t) ? 0 : 1, 매입순위(m, t)];
+  const 매입순위 = 매입순위표(목, t);
+  const 셈 = m => [두께맞음(m, 두께, t) ? 0 : 1, 매입순위(m)];
   return 목.map(m => ({ m, k:셈(m) })).sort((a,b) => a.k[0]-b.k[0] || (a.k[1]===b.k[1] ? 0 : a.k[1] < b.k[1] ? -1 : 1) || (a.m.name||a.m.code).localeCompare(b.m.name||b.m.code) || a.m.code.localeCompare(b.m.code))
     .map(x => Object.assign({}, x.m, { 맞음: x.k[0]===0 }));
 }
@@ -870,6 +877,7 @@ function 입력구독(){
   공정목록구독();
   if(window.폼공정대기) window.폼공정받음(...window.폼공정대기);   /* v2.22.0 */
   원장구독();   /* v2.9.0 */
+  if(window.자재매입순위) window.자재매입순위.구독(window.db, window.fbRead, () => {});   /* v2.29.0 드롭을 열 때 정렬 */
   if(window.폼거래처대기) window.폼거래처받음(...window.폼거래처대기);
 }
 
