@@ -2,7 +2,10 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.15.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.16.0
+     v2.16.0(11-20): 사장님 「처음부터 복잡하게 품목업로드 품명을 다 넣어놓고 작업하지 말고, 방금 테스트한 제품 하나만 이 프로그램에 나타나게 하고 작업해보자. 이 상태부터 먼저 만들어줘」 —
+       품목등록업로드 표 = 「(KRW) 알렉스 1200 높은 수납장 올화이트」 제품 줄 + 모품목(상위 품번)이 그 제품인 반제품 줄만 · BOM등록업로드 표 = 모품목번호가 그 품번들인 줄만.
+       화면만 거름(표 그리기 직전) — 창고 시트·_입력·다른 품목 값은 그대로, 계산(공정흐름 자동·조립/가공 짜기·재단률)은 전체 줄로 예전대로. 원부자재·추가할 제품은 그대로.
      v2.15.0(11-20): 사장님 「품목등록 업로드에 이미 있는 정보는 무조건 품목등록의 정보 우선으로 처리해줘」 —
        BOM 가공 줄(반제품 → 합판·필름)도 품목등록업로드 그 반제품 줄 값으로: 모품목명·규격·단위 · 합판 줄 하위품번 = 합판코드 · 분모 = 재단률 · 비고 「원장 1매에서 N개」 ·
        필름 줄 하위품번 = 필름코드 · 하위규격 = 필름코드 폭(ed_…_31_… → 31mm) · 분자 = 필름 소요량(M). 코드가 바뀌면 하위품명 = 코드(원래 품명이 자재 이름이면 원부자재 탭 이름).
@@ -229,7 +232,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.15.0</div>
+  <div class="badge">v2.16.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -1048,6 +1051,25 @@ function 편집달기(통){
   통.addEventListener('scroll', () => { if(편집 && !목록.hidden) 펼침(편집.inp, 편집.inp.value.trim()); }, { passive:true });
 }
 
+/* v2.16.0 사장님 11-20 「처음부터 복잡하게 품목업로드 품명을 다 넣어놓고 작업하지 말고, 방금 테스트한 제품 하나만 이 프로그램에 나타나게 하고 작업해보자」
+   품목등록업로드·BOM등록업로드 표에 이 제품 + 「모품목(상위 품번)」 이 그 제품인 반제품만 보임. 화면만 거름 —
+   창고 시트·_입력·계산(공정흐름 자동 규칙·조립/가공 짜기·재단률·대조)은 전체 줄로 그대로 하고, 표를 그리기 직전에만 거름. 원부자재·추가할 제품은 안 거름. */
+const 한제품명 = '(KRW) 알렉스 1200 높은 수납장 올화이트';
+function 한제품번호(칸 = 품목칸, 줄0 = null){   /* 품목 줄 → 제품 품번 + 그 반제품 품번 · 줄을 안 주면 품목조각(다 받기 전엔 null) */
+  if(!줄0 && (!칸 || !품목조각.length || 품목조각.some(x => !x))) return null;
+  const I = k => 칸.indexOf(k), ni = I('품명'), pi = I('품번'), ai = I('품목자산분류'), mi = I('모품목(상위 품번)'), 글 = (v, i) => i<0 ? '' : String(v[i]??'').trim();
+  const 줄 = 줄0 || [].concat(...품목조각), s = new Set();
+  for(const r of 줄) if(글(r.v, ai)==='제품' && 글(r.v, ni)===한제품명 && 글(r.v, pi)) s.add(글(r.v, pi));
+  const 제 = new Set(s);
+  for(const r of 줄) if(글(r.v, ai)==='반제품' && 제.has(글(r.v, mi)) && 글(r.v, pi)) s.add(글(r.v, pi));
+  return s;
+}
+function BOM한제품(칸, 줄){   /* 품목을 아직 못 받았을 때: BOM 모품목명 = 이 제품 → 그 번호 + 조립 하위품번 */
+  const J = k => 칸.indexOf(k), ni = J('모품목명'), mi = J('모품목번호'), gi = J('공정'), bi = J('하위품번'), 글 = (v, i) => i<0 ? '' : String(v[i]??'').trim(), s = new Set();
+  for(const r of 줄) if(글(r.v, ni)===한제품명) s.add(글(r.v, mi));
+  for(const r of 줄) if(글(r.v, gi)==='조립' && s.has(글(r.v, mi)) && 글(r.v, bi)) s.add(글(r.v, bi));
+  return s;
+}
 function 표만들기(칸, 줄, 이름){
   const 통 = document.createElement('div');
   if(이름===BOM시트){   /* v2.11.0 가공 줄 = 품목등록업로드 반제품 것만 */
@@ -1077,6 +1099,7 @@ function 표만들기(칸, 줄, 이름){
     const 반값 = 반 && 명 ? 반제품값() : null;   /* v2.15.0 가공 줄 = 품목등록업로드 값 우선 */
     if(반값) 줄 = 가공짜기(칸, 줄, 반값);
     BOM거름 = 품목표지(반, 명) && 품목표지(반, 명) + '\n' + (조 ? JSON.stringify(조.줄.map(r => r.v)) : '') + '\n' + JSON.stringify([...(반값||[])]) + JSON.stringify([...자재이름]);
+    const 보일 = 한제품번호() || BOM한제품(칸, 줄); 줄 = 줄.filter(r => 보일.has(String(r.v[mi]??'').trim()));   /* v2.16.0 한 제품만 — 짜기 뒤에 거름 */
   }
   if(!줄.length){ 통.className='state'; 통.innerHTML='<div class="big">줄 없음</div>'; return 통; }
   const 품 = 이름===품목시트, pi = 칸.indexOf('품번'), 편 = 품 ? 편칸.map(k => 칸.indexOf(k)) : [];
@@ -1092,7 +1115,8 @@ function 표만들기(칸, 줄, 이름){
   if(품){ const ni = 칸.indexOf('품명'); 공꼬리 = new Map();   /* v2.8.0 */
     if(ni>=0 && pi>=0) for(const r of 줄) if(String(r.v[ai]??'').trim()==='반제품'){ const p = String(r.v[pi]??'').trim(), n = String(r.v[ni]??'').trim(), j = n.lastIndexOf('_');
       if(p && j>=0 && n.slice(j+1)) 공꼬리.set(p, n.slice(j+1)); }
-    공규칙셈(); }
+    공규칙셈();
+    const 보일 = 한제품번호(칸, 줄); 줄 = 줄.filter(r => 보일.has(String(r.v[pi]??'').trim()) && (String(r.v[ai]??'').trim()!=='반제품' || 보일.has(String(r.v[mi0]??'').trim()))); }   /* v2.16.0 한 제품만 — 계산(공꼬리·공규칙) 뒤에 거름 */
   const h = ['<table class="dpr-t"><thead><tr>' +
     칸.map((k,i) => { const 필 = 필수칸[이름]?.has(String(k).trim());
       return `<th class="${(i===0?'dpr-k':'') + (필?' 필수':'')}"${필?' title="영림원 필수"':''}>${글(k)}</th>`; }).join('') + '</tr></thead><tbody>'];
