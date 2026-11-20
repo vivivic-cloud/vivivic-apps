@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.35.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.36.0
+     v1.36.0(11-20): 사장님 「각 월별명세서가 자동으로 변경되도록 해줘 기존 월별명세서에 등록된 영림원 자재명/자재번호가 납품제품명 옆에 오게하면 되겠지? 이곳이 빈칸이면 아직 등록안되었다는 표시도되고」 — 월별 명세서(전체·달) 납품제품명 옆 「자재명·자재번호」 = 연결표(26년 기록·더한 표기·동일품)로 이어진 줄이 영림원 자재 등록완료일 때만, 아니면 빈칸. 결과·연결이 바뀌면(onSnapshot) 그 칸만 다시.
      v1.35.0(11-20): 사장님 「여기 이름이 삭제 보다는 납품제품명연결 이 맞겠다」 — 영림원보내기 「삭제(등록 안 함)」 칸 머리·「삭제 N」 단추 글자 → 「납품제품명연결」(화면 글자만).
      v1.34.0(11-20): 사장님 「삭제된건은 … 등록완료된 자재명과 이건들을 연결하여 … 근거를 남기는거야」 · 「영림원 등록완료가 된건에서 드롭다운 형태로 자재명을 고르게 해서」 — 삭제 줄 「영림원 등록」 칸 = 등록완료 자재 드롭다운 → 창고 더한표기 → 연결.
      v1.33.0(11-20): 사장님 「소분류칸 마지막 _소분류가 잘안보여」 — 칸 값(마지막 _ 뒤 이름)이 얇은 글자라 진해진 앞 상위 이름에 묻힘 → 칸 값 진하게(font-weight 700).
@@ -360,7 +361,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.35.0</div>
+  <div class="badge">v1.36.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -456,6 +457,42 @@ function 표글(t, 줄, 제목){
     h += `<tr${z.소?' class="sub"':''}>` + 칸.map((k,i) => {
       const cls = (i===0?'dpr-k':'') + (수[i]?' num':'');
       return `<td${cls.trim()?` class="${cls.trim()}"`:''}>${글((z.v||[])[i])}</td>`;
+    }).join('') + '</tr>';
+  }
+  return h + '</tbody></table></div>';
+}
+/* v1.36.0 월별 명세서 「자재명·자재번호」 — 사장님 11-20 「기존 월별명세서에 등록된 영림원 자재명/자재번호가 납품제품명 옆에 오게하면 되겠지? 이곳이 빈칸이면 아직 등록안되었다는 표시도되고」.
+   명세서 줄 납품제품명+규격 → 표기열쇠 → 연결표(연결모으기: 26년 기록 · 더한 표기(납품제품명연결) · 해피코 동일품) → 이어진 영림원보내기 줄의 결과.자재 가 완료일 때만
+   자재명(그 줄 값) · 자재번호(결과 자재번호 우선). 아니면 빈칸 = 아직 등록 안 됨. 보여 주기만(명세서·창고 안 바꿈). */
+function 등록자재표(s){
+  const 표 = new Map(); if(!폼값[s]) return 표;
+  const 결 = ((창고본[s] || {}).결과) || {};
+  for(const x of 연결모으기(s)){
+    const 자 = (결[x.줄품목 + '\t' + x.줄규격] || {}).자재;
+    if(!자 || 자.상태!=='완료' || 표.has(x.열쇠)) continue;
+    표.set(x.열쇠, [x.자재명, 자.자재번호 || x.자재번호]);
+  }
+  return 표;
+}
+function 명세칠(s){
+  if(고른!==s) return;
+  const 줄들 = document.querySelectorAll('#속 tr[data-열]'); if(!줄들.length) return;
+  const 표 = 등록자재표(s);
+  줄들.forEach(tr => { const v = 표.get(tr.dataset.열) || ['', ''];
+    tr.querySelectorAll('td.영자').forEach((td, i) => { if(td.textContent !== (v[i] || '')) td.textContent = v[i] || ''; }); });
+}
+function 명세준비(s){ if(폼값[s]) 명세칠(s); else 폼받기(s).then(() => 명세칠(s), e => console.warn('영림원폼 못 읽음', e)); }
+function 월명세표(s, t, 줄, 제목){
+  const 칸 = t.칸||[], 수 = t.수||[], 찾 = (...a) => a.map(k => 칸.indexOf(k)).find(i => i >= 0) ?? -1;
+  const 품 = 찾('납품제품명(품목)','제품명'), 규 = 찾('규격','옵션');
+  if(품 < 0) return 표글(t, 줄, 제목);
+  let h = `<div class="표">${제목?`<div class="표제목">${글(제목)}</div>`:''}<table class="dpr-t"><thead><tr>` +
+    칸.map((k,i) => `<th class="${i===0?'dpr-k':''}">${글(k)}</th>` + (i===품 ? '<th>자재명</th><th>자재번호</th>' : '')).join('') + '</tr></thead><tbody>';
+  for(const z of 줄){
+    const v = z.v||[], 이름 = String(v[품]??'').trim(), 품목줄 = !z.소 && 이름 && 이름!=='(구매내역 없음)' && !/^\[.*(소계|총계)\]$/.test(이름);
+    h += `<tr${z.소?' class="sub"':''}${품목줄?` data-열="${글(표기열쇠(이름, 규 >= 0 ? String(v[규]??'').trim() : ''))}"`:''}>` + 칸.map((k,i) => {
+      const cls = (i===0?'dpr-k':'') + (수[i]?' num':'');
+      return `<td${cls.trim()?` class="${cls.trim()}"`:''}>${글(v[i])}</td>` + (i===품 ? '<td class="영자"></td><td class="영자"></td>' : '');
     }).join('') + '</tr>';
   }
   return h + '</tbody></table></div>';
@@ -684,7 +721,7 @@ async function 폼받기(s){
   폼보내기[s] = (d.exists() && d.data().보내기) || null;   /* v1.9.0 */
   /* v1.14.0 창고 지금 값을 늘 받아 둠(저장 때 다시 읽지 않음 — 다른 창·기기 값 보호는 그대로) */
   창고본[s] = d.exists() ? d.data() : null;
-  if(window.fbRead.onSnapshot) window.fbRead.onSnapshot(doc(window.db, ...폼자리, s), x => { 창고본[s] = x.exists() ? x.data() : null; 폼더한[s] = (x.exists() && x.data().더한표기) || [];   /* v1.34.0 다른 창·기기에서 고른 같은 자재도 */ 결과칠(s); if(s===해피코) 동일품다시(); }, () => { delete 창고본[s]; });   /* v1.17.0 결과가 오면 바로 칠함 */
+  if(window.fbRead.onSnapshot) window.fbRead.onSnapshot(doc(window.db, ...폼자리, s), x => { 창고본[s] = x.exists() ? x.data() : null; 폼더한[s] = (x.exists() && x.data().더한표기) || [];   /* v1.34.0 다른 창·기기에서 고른 같은 자재도 */ 결과칠(s); 명세칠(s); if(s===해피코) 동일품다시(); }, () => { delete 창고본[s]; });   /* v1.17.0 결과가 오면 바로 칠함 */
 }
 const 창고본 = {};   // 거래처 → 창고 문서 지금 값(onSnapshot) · 없으면(undefined) 저장 때 읽음
 let 준비됨 = false;
@@ -2134,6 +2171,7 @@ function 중국그리기(){
   const 줄 = d.줄.filter(z => !달 || z.월===달);
   속.innerHTML = '<div class="표통">' + 중국명세표(d, 줄, `${d.업체||'해피코'} · ${d.시트||''}`) +
     `<div class="글">${줄.length}줄 · ${글(d.파일||'')} · ${글(d.읽은날||'')} 읽음${달 ? ' · 달 = 입고일 기준(임시)' : ''}</div></div>`;
+  if(받은[해피코]) 명세준비(해피코);
 }
 
 /* ---- v1.21.0 해피코 동일품 — 사장님 11-19 「제품명이 미세하게 다른 여러 제품을 … 같은 자재명·자재번호로 인식 … 동일품인 것을 따로 관리하는 메뉴를 해피코에 만들어 주고,
@@ -2338,19 +2376,17 @@ async function 동일품칸고침(키, k, 값){
 /* 해피코 명세 표(원본 칸 그대로) + 옵션 뒤 자재명·자재번호 — 확정 동일품 줄은 대표 값(초록, 마우스 = 대표) */
 function 중국명세표(d, 줄, 제목){
   const 칸 = d.칸 || [], 수 = d.수 || [], i = 칸.indexOf('제품명'), o = 칸.indexOf('옵션'), 뒤 = o >= 0 ? o : i;
-  const 월표 = 받은[해피코] && (받은[해피코].표 || []).find(t => t.이름==='월별'), 합 = new Map();
-  if(월표 && 폼값[해피코]) for(const m of 품목모으기(월표).줄) 합.set(줄키(m), m);
-  else if(월표 && 받은[해피코]) 폼받기(해피코).then(() => { if(고른===해피코 && !['폼','엑셀','동일품'].includes(중국볼것)) 중국그리기(); }, () => {});
+  /* v1.36.0 자재명·자재번호 = 영림원 자재 등록완료일 때만(명세칠 — 연결표·동일품 거쳐), 아니면 빈칸. 전엔 영림원보내기 값 */
+  const 열 = z => 표기열쇠(String((z.v || [])[i] ?? '').trim(), String((z.v || [])[o] ?? '').trim());
   const 덧칸 = (z) => {
-    const 키 = String((z.v || [])[i] ?? '').trim() + '\t' + String((z.v || [])[o] ?? '').trim(), 대 = 동일품맵.get(키), m = 합.get(대 || 키);
-    const 값 = m ? [칸값({k:'m_name'}, m, 해피코), 칸값({k:'m_code'}, m, 해피코)] : ['', ''];
-    const 속성 = 대 ? ` class="동일" title="${글('동일품 — 대표 ' + 대.replace('\t', ' '))}"` : '';
-    return 값.map(x => `<td${속성}>${글(x)}</td>`).join('');
+    const 키 = String((z.v || [])[i] ?? '').trim() + '\t' + String((z.v || [])[o] ?? '').trim(), 대 = 동일품맵.get(키);
+    const 속성 = 대 ? ` class="영자 동일" title="${글('동일품 — 대표 ' + 대.replace('\t', ' '))}"` : ' class="영자"';
+    return `<td${속성}></td><td${속성}></td>`;
   };
   let h = `<div class="표">${제목 ? `<div class="표제목">${글(제목)}</div>` : ''}<table class="dpr-t"><thead><tr>` +
     칸.map((k, j) => `<th class="${j===0 ? 'dpr-k' : ''}">${글(k)}</th>` + (j===뒤 ? '<th>자재명</th><th>자재번호</th>' : '')).join('') + '</tr></thead><tbody>';
   for(const z of 줄){
-    h += '<tr>' + 칸.map((k, j) => { const cls = (j===0 ? 'dpr-k' : '') + (수[j] ? ' num' : '');
+    h += `<tr data-열="${글(열(z))}">` + 칸.map((k, j) => { const cls = (j===0 ? 'dpr-k' : '') + (수[j] ? ' num' : '');
       return `<td${cls.trim() ? ` class="${cls.trim()}"` : ''}>${글((z.v || [])[j])}</td>` + (j===뒤 ? 덧칸(z) : ''); }).join('') + '</tr>';
   }
   return h + '</tbody></table></div>';
@@ -2468,9 +2504,10 @@ function 그리기(){
     const t = 표들.find(t => t.이름==='매입품목'); h = 표글(t, t.줄||[], d.제목);
   }else{
     const 달 = 볼것.startsWith('m:') ? 볼것.slice(2) : '';
-    h = 표글(월표, (월표.줄||[]).filter(z => !달 || z.월===달), d.제목);
+    h = 월명세표(고른, 월표, (월표.줄||[]).filter(z => !달 || z.월===달), d.제목);   /* v1.36.0 자재명·자재번호 */
   }
   속.innerHTML = '<div class="표통">' + h + '</div>';
+  if(월표 && !['누계','영림원','매입품목'].includes(볼것)) 명세준비(고른);
 }
 /* v1.20.8 머리 두 줄(영림원보내기) — 둘째 머리 줄은 첫 줄 높이만큼 아래에 붙는다. 표를 새로 그리거나 화면 폭이 바뀌면 다시 잰다. */
 (function(){
