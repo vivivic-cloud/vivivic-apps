@@ -1,7 +1,10 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.29.1
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.30.0
+     v1.30.0(11-20): 사장님 「표기가 일단 대-중-소 분류로 나오게 고치고, 이게 영림원 등록이 되는 건지 안 되는 건지를 판단해야 될 거 아니야」
+       중·소분류 칸 = 입력폼 clsName(11-03 「T보드_T엘피엠_T201양면」) 꼴로 보임 — 칸 앞에 회색 상위 이름(`분류앞` span, 값은 안 바꿈) · 입력폼 완료 분류에 그 경로가 그대로 있으면(영림원 이름) 그대로.
+       빨강·노랑 판단(① ② · 신규)도 이 보이는 이름으로. ③ 쉼표·빈칸은 칸 값 그대로. ⚠ 보내기 분류 값은 칸 값(짧은 이름) 그대로 — 화면 이름과 다를 수 있음(고치지 않음).
      v1.29.1(11-20): 오류 줄(빨간 바탕 tr.오류 td)이 노랑 칸 바탕을 덮던 것 — 노랑이 이김.
      v1.29.0(11-20): 사장님 「입력폼에 완료된 대중소분류에 따라 중복 등으로 등록이 안 되는 건 빨간색-오류, 신규등록으로 작성된 건 이 오류 가능성을 분석하고 가능하면 노란색-신규 이렇게 구분되게 해줘」
        분류 칸 = 지금 값으로만 판단(8절 규칙 그대로): 규칙 어긋남(① 같은 소분류 이름 · ② 입력폼 완료 분류에 같은 소분류 이름·다른 대>중 · ③ 쉼표·빈칸) = 빨강 「오류」 ·
@@ -307,6 +310,8 @@ html,body{height:100%;overflow:hidden}
 .분류고름 div.대{border-left-color:#B5B5B0}
 .폼표 input[data-분류]:focus{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0h8L4 5z' fill='%23999'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 4px center}   /* v1.28.0 ▾ = 열기 */
 .폼표 td.분류틀,.폼표 td.고칠칸{background:#FFE9E7;box-shadow:inset 0 0 0 2px var(--vg-red)}   /* v1.17.1 분류 규칙 어긋남 · v1.18.0 오류 단계의 고칠 칸 */
+.폼표 td .분류앞{color:#9a9a96;padding:2px 0 2px 5px;pointer-events:none}   /* v1.30.0 보이는 상위 이름(clsName 꼴) — 값 아님 */
+.폼표 td .분류앞+input{padding-left:0}
 .폼표 td.분류새,.폼표 tr.오류 td.분류새{background:#FFF7C2;box-shadow:inset 0 0 0 2px #E5B800}   /* v1.25.0 등록완료 분류에 없는 값 · v1.29.0 노랑 = 신규(규칙 통과) */
 .폼표 td.입:has([data-k]:disabled){background:var(--vg-fill)}   /* v1.18.0 완료 단계 칸 = 잠금 */
 
@@ -340,7 +345,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.29.1</div>
+  <div class="badge">v1.30.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -915,6 +920,14 @@ window.폼분류받음 = (줄, 왜) => {
 };
 if(window.폼분류대기) window.폼분류받음(...window.폼분류대기);
 const 분류칸 = [['m_big','대분류'], ['m_mid','중분류'], ['m_small','소분류']];
+/* v1.30.0 보이는 이름 = 입력폼 clsName 그대로(중 = 대_중 · 소 = 대_중_소, 이미 붙었으면 그대로) — 입력폼 완료 분류에 그 경로가 그대로 있으면 그 이름(영림원 이름) 그대로 */
+function 분류표기(v){
+  const [b, m, x] = v.map(t => String(t ?? '').trim()), 완 = 영림원분류.filter(r => r[3]==='완료');
+  if(!b || !m) return [b, m, x];
+  const 중있음 = 완.some(r => r[0]===b && r[1]===m), jm = 중있음 || m.startsWith(b + '_') ? m : b + '_' + m;
+  if(!x || 완.some(r => r[0]===b && r[1]===m && r[2]===x)) return [b, 중있음 ? m : jm, x];
+  return [b, jm, x.startsWith(m + '_') ? jm + x.slice(m.length) : x.startsWith(jm + '_') ? x : jm + '_' + x];
+}
 function 분류검사(){
   const 줄들 = [], 소경로 = new Map();
   for(const s of 거래처시트들()){
@@ -924,14 +937,15 @@ function 분류검사(){
       if(뺀줄(s, m)) continue;
       const v = 분류칸.map(([k]) => String(칸값({k}, m, s) ?? ''));
       if(!v.some(x => x.trim())) continue;
-      줄들.push({ s, m, v });
-      const n = v[2].trim(); if(!n) continue;
+      const 표 = 분류표기(v);   /* v1.30.0 ① ② = 보이는 이름으로 */
+      줄들.push({ s, m, v, 표 });
+      const n = 표[2]; if(!n) continue;
       if(!소경로.has(n)) 소경로.set(n, new Map());
-      소경로.get(n).set(v[0].trim() + ' > ' + v[1].trim(), (소경로.get(n).get(v[0].trim() + ' > ' + v[1].trim()) || []).concat(s + ' ' + m.이름));
+      소경로.get(n).set(표[0] + ' > ' + 표[1], (소경로.get(n).get(표[0] + ' > ' + 표[1]) || []).concat(s + ' ' + m.이름));
     }
   }
   const 틀 = new Map();   // 거래처 \n 키 → {칸키: 이유}
-  for(const { s, m, v } of 줄들){
+  for(const { s, m, v, 표 } of 줄들){
     const 이유 = {};
     분류칸.forEach(([k, l], i) => {
       const x = v[i];
@@ -939,7 +953,7 @@ function 분류검사(){
       else if(x !== x.trim()) 이유[k] = '앞뒤 빈칸';
       else if(/\d,\d/.test(x)) 이유[k] = '숫자 사이 쉼표 — 점(.)으로';
     });
-    const n = v[2].trim(), 경 = v[0].trim() + ' > ' + v[1].trim();
+    const n = 표[2], 경 = 표[0] + ' > ' + 표[1];
     if(n && !이유.m_small){
       const 다른 = [...(소경로.get(n) || new Map())].filter(([p]) => p !== 경);
       const 영 = 영림원분류.filter(x => x[2]===n && x[3]==='완료');   /* v1.29.0 입력폼 완료 분류만(8-1 · 8-3 _분류.영림원 = 완료) */
@@ -958,9 +972,13 @@ function 분류틀그리기(표, s){
   표.querySelectorAll('tbody tr').forEach(tr => {
     const 이유 = 틀.get(s + '\n' + tr.dataset.key) || {};
     if(Object.keys(이유).length) 수++;
-    const v = 분류칸.map(([k]) => ((tr.querySelector(`input[data-k="${k}"]`) || {}).value || '').trim());
+    const 원 = 분류칸.map(([k]) => ((tr.querySelector(`input[data-k="${k}"]`) || {}).value || '').trim()), v = 분류표기(원);   /* v1.30.0 보이는 이름으로 판단 */
     분류칸.forEach(([k], i) => {
       const td = tr.querySelector(`input[data-k="${k}"]`)?.closest('td'); if(!td) return;
+      const 앞 = v[i] && v[i]!==원[i] && v[i].endsWith(원[i]) ? v[i].slice(0, v[i].length - 원[i].length) : '';   /* v1.30.0 칸 앞 회색 상위 이름 */
+      let sp = td.querySelector('.분류앞');
+      if(앞){ if(!sp){ sp = document.createElement('span'); sp.className = '분류앞'; td.insertBefore(sp, td.querySelector('input')); } sp.textContent = 앞; }
+      else if(sp) sp.remove();
       td.classList.toggle('분류틀', !!이유[k]);
       const 새 = !이유[k] && 완.length > 0 && !!v[i] && !맞음(완, v, i);
       td.classList.toggle('분류새', 새);
@@ -1249,6 +1267,7 @@ async function 폼그리기(){
   /* v1.27.0 쓰는 동안 앞에 붙을 상위 이름 회색으로 */
   const 앞보임 = el => {
     if(!el.dataset || (el.dataset.k!=='m_mid' && el.dataset.k!=='m_small')) return;
+    if(el.closest('td').querySelector('.분류앞')){ if(el===CLS_GH_EL) clsGhost(el, ''); return; }   /* v1.30.0 보이는 상위 이름이 이미 있음 */
     const tr = el.closest('tr'), 위 = kk => ((tr.querySelector(`input[data-k="${kk}"]`) || {}).value || '').trim(), x = el.value.trim() || CLS_GH_X;
     clsGhost(el, clsGhPre(분류이음(위('m_big'), 위('m_mid'), x, el.dataset.k==='m_mid' ? 1 : 2, 영림원분류), x));
   };
