@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원 기본정보 입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v15 -->
+<!-- 영림원 기본정보 입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v16 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -118,6 +118,8 @@ table.sheet td.lock{padding:6px 10px;color:var(--muted);background:var(--fill4)}
 table.sheet td.bad{box-shadow:inset 0 0 0 2px var(--red);background:var(--red-bg)}
 table.sheet td.un{box-shadow:inset 0 0 0 2px #f59e0b}
 input.clsun[data-cls],table.sheet td input.clsun[data-cls]{box-shadow:inset 0 0 0 2px #f59e0b;background:#fffbeb}   /* v12 등록완료 분류에 없는 값 */
+input.clserr[data-cls],table.sheet td input.clserr[data-cls]{box-shadow:inset 0 0 0 2px #e03e3e;background:#FFE9E7}   /* v16 자재 분류 빨강 = 오류 */
+input.clsnew[data-cls],table.sheet td input.clsnew[data-cls]{box-shadow:inset 0 0 0 2px #E5B800;background:#FFF7C2}   /* v16 자재 분류 노랑 = 신규 */
 .plan td{white-space:normal;vertical-align:top}
 .steps{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:4px 0 6px}
 .stp{all:unset;box-sizing:border-box;cursor:pointer;display:inline-flex;gap:6px;align-items:center;padding:6px 12px;min-height:36px;border-radius:999px;border:1px solid var(--line);font-size:12.5px;font-weight:800;color:var(--muted)}
@@ -191,7 +193,7 @@ input.clsun[data-cls],table.sheet td input.clsun[data-cls]{box-shadow:inset 0 0 
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v15</span>
+    <span class="ver">v16</span>
     <a class="btn small" href="../영림원외주입력/영림원외주입력.html" style="margin-left:8px">입력폼</a>
   </div>
 </header>
@@ -263,7 +265,7 @@ function connectDb(){
 }
 (function(){
 "use strict";
-var VER='v15';
+var VER='v16';
 var GS_MAKER='https://script.google.com/macros/s/AKfycbzxW9K--tKq_uqHnzNdecOA4YbKosK51XVG1MJVFTVTzB5Kz5o7gN1YeYuthCRI4PshOw/exec';   /* 영림원외주입력 v113 웹앱(구글시트양식/양식만들기.gs) — 파일 이름은 「외주입력_」 로 시작해야 받는다 */
 var GS_NAME='외주입력_기본정보_한행입력표';
 var XLSX_URL='https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js',xlsxP=null;
@@ -347,9 +349,23 @@ function clsOpts(el){var L=clsDocs(el.dataset.ck,true),c=function(a,b){return a.
   if(el.dataset.ck==='자재')return uniq(L.map(function(x){return x.join(CLS_SEP);})).sort(c);
   var i=CLS_COL[el.dataset.cls],u=clsUp(el);
   return uniq(L.filter(function(x){return (i<1||!u[0]||x[0]===u[0])&&(i<2||!u[1]||x[1]===u[1]);}).map(function(x){return x[i];})).sort(c);}
-function clsMark(el){var v=s(el.value),L=clsDocs(el.dataset.ck,true),un=!!v&&L.length>0&&!clsFit(el,L,v);
-  el.classList.toggle('clsun',un);
-  if(un)el.title='등록완료 분류에 없음'+(clsFit(el,clsDocs(el.dataset.ck,false),v)?' — 입력폼 등록 대기':' — 새 분류');else if(/^등록완료 분류/.test(el.title||''))el.removeAttribute('title');}
+/* v16 사장님 11-20 「…중복 등으로 등록이 안 되는 건 빨간색-오류, 신규등록으로 작성된 건 … 노란색-신규 …」 · 「보드뿐만 아니라 모든 대중소분류 선택하는 곳」
+   자재소분류(자재)만 — 규칙 = 영림원외주입력/입력작업자/전달-보드매입현황-기준정보폼.md 8절(같은 소분류 이름 거절은 자재에서만 확인됨):
+   빨강 clserr 「오류 — 까닭」 = 숫자 사이 쉼표 · 앞뒤 빈칸 · 소분류 이름이 입력폼 완료 분류에 다른 대>중으로 있음 / 노랑 clsnew 「신규 — …」 = 완료에 없고 규칙 통과.
+   품목 대·중·소(제상품)는 규칙 확인 못 해 v12 주황 그대로. */
+function clsMark(el){var raw=String(el.value==null?'':el.value),v=s(el.value),L=clsDocs(el.dataset.ck,true),un=!!v&&L.length>0&&!clsFit(el,L,v),wait=un&&clsFit(el,clsDocs(el.dataset.ck,false),v);
+  el.classList.remove('clsun','clserr','clsnew');
+  if(/^(등록완료 분류|오류 — |신규 — )/.test(el.title||''))el.removeAttribute('title');
+  if(!un)return;
+  if(el.dataset.ck!=='자재'){el.classList.add('clsun');el.title='등록완료 분류에 없음'+(wait?' — 입력폼 등록 대기':' — 새 분류');return;}
+  var p=v.split(/\s*>\s*/),n=p[p.length-1],err='';
+  if(/\d,\d/.test(v))err='숫자 사이 쉼표 — 점(.)으로';
+  else if(raw!==v)err='앞뒤 빈칸';
+  else if(p.some(function(x){return !x;}))err='빈칸';
+  else{var o=L.filter(function(x){return x[2]===n&&!(p.length===3&&x[0]===p[0]&&x[1]===p[1]);});
+    if(o.length)err='이름을 바꾸십시오(입력폼 완료 분류에 '+o.map(function(x){return x.join(CLS_SEP);}).join(' / ')+' 있음 — 영림원은 소분류 이름 하나뿐)';}
+  el.classList.add(err?'clserr':'clsnew');
+  el.title=err?'오류 — '+err:'신규 — 입력폼 완료 분류에 없음 · 분류 규칙(8절) 통과'+(wait?' · 입력폼 등록 대기':'');}
 function clsMarkBox(el){var b=clsBox(el);(b?[].slice.call(b.querySelectorAll('input[data-cls]')):[el]).forEach(clsMark);}
 function clsMarkAll(){[].forEach.call(document.querySelectorAll('input[data-cls]'),clsMark);}
 /* v15 사장님 11-19 「드롭다운 목록 너무 입력부에 붙어있어서 드레그가 힘들다」 — 분류 칸 목록: 누름(고르기)으로는 안 열림 · 두 번 누름·Enter/F2/↓·글 치기·칸 오른쪽 ▾(16px) 로 열림 · 칸 옆(오른쪽, 자리 없으면 왼쪽)에 띄움 → 칸 아래 끌기 자리를 안 가림 */

@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v300 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v301 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -127,6 +127,8 @@ input.bad,select.bad{border-color:var(--red)}
 .chip.diff{background:var(--amber-bg);color:var(--amber);border-color:#fde68a}
 .unreg{font-size:11px;color:#b45309;font-weight:700}
 .clsun select,.clsun input[type=text]{box-shadow:inset 0 0 0 2px #f59e0b;background:#fffbeb}   /* v295 등록완료 분류에 없는 값 — 마우스 = 까닭 */
+.clserr select,.clserr input[type=text]{box-shadow:inset 0 0 0 2px #e03e3e;background:#FFE9E7}   /* v301 자재 분류 빨강 = 오류(8절 규칙 어긋남) */
+.clsnew select,.clsnew input[type=text]{box-shadow:inset 0 0 0 2px #E5B800;background:#FFF7C2}   /* v301 자재 분류 노랑 = 신규(완료 분류에 없음 · 규칙 통과) */
 /* v235 세트구성품등록 — 임시 칩 · 벤더피아에서 불러오기 목록(세로 목록, 가로로 안 밀림) */
 .chip.tmp{background:var(--amber-bg);color:var(--amber);border-color:#fde68a;margin-left:4px;vertical-align:1px}
 .bdreg .bdvn{margin:8px 0 10px}.bdreg td.bdwhy{white-space:normal;min-width:180px;font-size:12px}.bdreg td.bdwhy.bad,.bdreg .bdbad{color:var(--red)}.bdreg .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}.bdreg .bdrfail{margin:10px 0;padding:12px 14px;border:2px solid var(--red);border-radius:10px;background:var(--red-bg);color:var(--red);font-weight:800;font-size:14px}.bdreg .bdrh{font-size:14px;font-weight:800;margin:14px 0 2px}.bdreg td{white-space:nowrap}.bdreg td .chip{vertical-align:1px}   /* v281 구매자재 일괄등록 */
@@ -481,7 +483,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v300</span>
+    <span class="ver">v301</span>
     <div class="pick topnav" id="topnav">   <!-- v288 사장님 11-18 「입력폼 상단에 발주역입력 메뉴를 만들어 발주역입력 페이지로 이어지게」 — 이름 = 각 페이지 <title> 앞부분 · 같은 탭 -->
       <button type="button" class="btn small" aria-haspopup="menu" aria-expanded="false">발주역입력</button>
       <div class="pickmenu topnavmenu" role="menu" hidden>
@@ -711,10 +713,23 @@ function cls3Path(kind,v){var r=cls3Rows(kind).filter(function(x){return x.b===v
 function clsDoneRows(kind,done){return (data.classes||[]).filter(function(r){return r.kind===kind&&r.status!=='오류'&&(done?r.status==='완료'&&!ylwGone(r):r.status!=='완료');});}
 function clsHas(kind,v,done){var tr=function(x){return String(x==null?'':x).trim();};
   return clsDoneRows(kind,done).some(function(r){var a=[tr(r.big),tr(r.mid),tr(r.name)];return v.every(function(x,i){return a[i]===x;});});}
-function clsUnMark(el,kind,v){v=v.map(function(x){return String(x==null?'':x).trim();});
-  var un=!!kind&&!!v[v.length-1]&&clsDoneRows(kind,true).length>0&&!clsHas(kind,v,true);
-  el.classList.toggle('clsun',un);
-  if(un)el.title='등록완료 분류에 없음'+(clsHas(kind,v,false)?' — 입력폼 등록 대기':' — 새 분류');else if(/^등록완료 분류/.test(el.title||''))el.removeAttribute('title');}
+/* v301 사장님 11-20 「입력폼에 완료된 대중소분류에 따라 중복 등으로 등록이 안 되는 건 빨간색-오류, 신규등록으로 작성된 건 이 오류 가능성을 분석하고 가능하면 노란색-신규 이렇게 구분되게 해줘」 · 「보드뿐만 아니라 모든 대중소분류 선택하는 곳」
+   자재 분류만(규칙 = 입력작업자/전달-보드매입현황-기준정보폼.md 8절, 같은 소분류 이름 거절은 자재에서만 확인됨): 빨강 clserr 「오류 — 까닭」 = 숫자 사이 쉼표 · 앞뒤 빈칸 · 소분류 이름이 완료 분류에 다른 대>중으로 있음 /
+   노랑 clsnew 「신규 — …」 = 완료 분류에 없고 규칙 통과. 제상품은 규칙 확인 못 해 v295 주황 그대로. whole = 경로 칸(자재소분류) — 대·중·소 셋을 못 가르면 주황 그대로. */
+function clsUnMark(el,kind,v,whole){var raw=v.map(function(x){return String(x==null?'':x);});v=raw.map(function(x){return x.trim();});
+  var n=v.length,last=v[n-1],done=clsDoneRows(kind,true),wait=clsHas(kind,v,false);
+  el.classList.remove('clsun','clserr','clsnew');
+  if(/^(등록완료 분류|오류 — |신규 — )/.test(el.title||''))el.removeAttribute('title');
+  if(!kind||!last||!done.length)return;
+  var tr=function(x){return String(x==null?'':x).trim();},err='',ja=kind==='자재'&&!(whole&&n!==3);
+  if(ja&&/\d,\d/.test(last))err='숫자 사이 쉼표 — 점(.)으로';
+  else if(ja&&raw[n-1]!==last)err='앞뒤 빈칸';
+  else if(clsHas(kind,v,true))return;
+  else if(!ja){el.classList.add('clsun');el.title='등록완료 분류에 없음'+(wait?' — 입력폼 등록 대기':' — 새 분류');return;}
+  else if(n===3){var o=done.filter(function(r){return tr(r.name)===last&&!(tr(r.big)===v[0]&&tr(r.mid)===v[1]);});
+    if(o.length)err='이름을 바꾸십시오(입력폼 완료 분류에 '+o.map(function(r){return tr(r.big)+' > '+tr(r.mid)+' > '+tr(r.name);}).join(' / ')+' 있음 — 영림원은 소분류 이름 하나뿐)';}
+  el.classList.add(err?'clserr':'clsnew');
+  el.title=err?'오류 — '+err:'신규 — 입력폼 완료 분류에 없음 · 분류 규칙(8절) 통과'+(wait?' · 입력폼 등록 대기':'');}
 /* v296 사장님 11-19 「하위 부류가 상위 부류를 포함하고 저장해야 수많은 중소 분류 중복을 막을 수 있어 이제 입력을 이렇게 자동으로 되도록 세팅해줘」(영림원 ed > ed_001-18 > ed_001-18_wt)
    중분류 = 대_중 · 소분류 = 대_중_소 로 바꿈(칸을 떠날 때 change). 이미 붙었거나 등록 분류(오류 뺌)에 그 경로가 그대로 있으면 그대로. 저장된 값은 안 건드림. */
 function clsJoinName(b,m,x,lv,L){b=String(b||'').trim();m=String(m||'').trim();x=String(x||'').trim();if(!x||!b)return x;
@@ -1915,7 +1930,7 @@ function makeField(f,scope){
     var set0=setter;setter=function(v,x){set0(v,x);clsShow();};
     wrap.addEventListener('change',clsShow);wrap.addEventListener('input',clsShow);
     LIVE.push({el:wrap,redo:clsShow});
-    var clsUn=function(){var p=String(getter()||'').trim(),c=clsOf(f.clsKind,p);clsUnMark(wrap,f.clsKind,c?[c.big,c.mid,c.name]:[p]);};   /* v295 */
+    var clsUn=function(){var p=String(getter()||'').trim(),c=clsOf(f.clsKind,p);clsUnMark(wrap,f.clsKind,c?[c.big,c.mid,c.name]:p.split(/\s*>\s*/),1);};   /* v295 · v301 경로 칸 */
     var set1=setter;setter=function(v,x){set1(v,x);clsUn();};
     wrap.addEventListener('change',clsUn);wrap.addEventListener('input',clsUn);
     LIVE.push({el:wrap,redo:clsUn});
