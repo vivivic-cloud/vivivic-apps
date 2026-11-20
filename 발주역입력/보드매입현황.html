@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.32.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.33.0
+     v1.33.0(11-20): 사장님 「소분류칸 마지막 _소분류가 잘안보여」 — 칸 값(마지막 _ 뒤 이름)이 얇은 글자라 진해진 앞 상위 이름에 묻힘 → 칸 값 진하게(font-weight 700).
+       열을 좁히면 입력 칸이 먼저 줄어 뒤 이름이 잘렸음 → 칸 값은 다 보이고 앞 상위 이름(`분류앞`)이 줄어듦(…). 값·저장은 그대로.
      v1.32.0(11-20): 사장님 「영림원 보내기 자재소분류 텍스트좀 잘보이게 하고 각 셀 가로넓이 조절되게해 가로조절에 이곳에 나타나는 모든 표에 적용시켜」
        ① 중·소분류 칸 앞 상위 이름(`분류앞`, 쓰는 중 `clsGhost`) 회색 #9a9a96 → 칸 글자색(노랑 바탕에서 안 보이던 것). 값·저장은 그대로.
        ② 영림원보내기 표(.폼표 — 오류건·등록완료·삭제 보기·해피코 모두 같은 표) 머리 칸 오른쪽 끝을 끌어 열 너비 조절(`열손`·`열너비맞춤`). 이 기기에만 기억(localStorage).
@@ -315,8 +317,8 @@ html,body{height:100%;overflow:hidden}
 .분류고름 div.대{border-left-color:#B5B5B0}
 .폼표 input[data-분류]:focus{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0h8L4 5z' fill='%23999'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 4px center}   /* v1.28.0 ▾ = 열기 */
 .폼표 td.분류틀,.폼표 td.고칠칸{background:#FFE9E7;box-shadow:inset 0 0 0 2px var(--vg-red)}   /* v1.17.1 분류 규칙 어긋남 · v1.18.0 오류 단계의 고칠 칸 */
-.폼표 td .분류앞{color:var(--vg-body);padding:2px 0 2px 5px;pointer-events:none}   /* v1.30.0 보이는 상위 이름(clsName 꼴) — 값 아님 */
-.폼표 td .분류앞+input{padding-left:0}
+.폼표 td .분류앞{color:var(--vg-body);padding:2px 0 2px 5px;pointer-events:none;display:inline-block;box-sizing:border-box;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom}   /* v1.30.0 보이는 상위 이름(clsName 꼴) — 값 아님 · v1.33.0 좁으면 이것이 줄어듦 */
+.폼표 td .분류앞+input{padding-left:0;font-weight:700}   /* v1.33.0 마지막 _ 뒤 이름(칸 값) 진하게 */
 .폼표 td.분류새,.폼표 tr.오류 td.분류새{background:#FFF7C2;box-shadow:inset 0 0 0 2px #E5B800}   /* v1.25.0 등록완료 분류에 없는 값 · v1.29.0 노랑 = 신규(규칙 통과) */
 .폼표 td.입:has([data-k]:disabled){background:var(--vg-fill)}   /* v1.18.0 완료 단계 칸 = 잠금 */
 /* v1.32.0 열 너비 끌기 — 머리 칸 오른쪽 끝 */
@@ -354,7 +356,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.32.0</div>
+  <div class="badge">v1.33.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -1018,13 +1020,23 @@ function 열너비맞춤(표, 만){
     if(만 != null && 만 !== i) return;
     const w = 열너비[열이름(th)]; if(!w) return;
     const 칸들 = 몸.map(tr => tr.cells[i]).filter(Boolean);
-    const 앞 = 칸들.map(c => { const sp = c.querySelector('.분류앞'); return sp ? sp.offsetWidth : 0; });   /* 읽기 먼저(다시 그림 한 번) */
+    const 앞 = 칸들.map(c => { const sp = c.querySelector('.분류앞'); if(!sp) return 0; sp.style.maxWidth = ''; return sp.offsetWidth; });   /* 읽기 먼저(다시 그림 한 번) */
     [th].concat(칸들).forEach((c, n) => {
       c.style.width = c.style.minWidth = c.style.maxWidth = w + 'px'; c.style.overflow = 'hidden';
-      const el = n && c.querySelector('input:not([type=checkbox]),select'); if(el) el.style.width = Math.max(10, w - 1 - 앞[n - 1]) + 'px';
+      const el = n && c.querySelector('input:not([type=checkbox]),select'); if(!el) return;
+      const sp = 앞[n - 1] && c.querySelector('.분류앞');
+      if(!sp){ el.style.width = Math.max(10, w - 1) + 'px'; return; }
+      /* v1.33.0 칸 값(마지막 _ 뒤 소분류 이름)은 늘 다 보임 — 모자라면 앞 상위 이름이 줄어듦(…) */
+      const iw = Math.min(w - 1, Math.max(16, 글너비(el) + 8, w - 1 - 앞[n - 1]));
+      el.style.width = iw + 'px'; sp.style.maxWidth = Math.max(0, w - 1 - iw) + 'px';
     });
   });
   const 첫 = 표.tHead.rows[0].cells[0]; if(첫) 표.style.setProperty('--열쇠1', 첫.getBoundingClientRect().width + 'px');
+}
+let 글자자 = null;
+function 글너비(el){   /* v1.33.0 입력 칸 값 글자 너비(px) */
+  글자자 = 글자자 || document.createElement('canvas').getContext('2d');
+  const c = getComputedStyle(el); 글자자.font = `${c.fontStyle} ${c.fontWeight} ${c.fontSize} ${c.fontFamily}`; return Math.ceil(글자자.measureText(el.value || '').width);
 }
 function 열손달기(표){
   열머리들(표).forEach((th, i) => {
