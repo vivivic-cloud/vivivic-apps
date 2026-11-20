@@ -1,7 +1,11 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 로앤 — 로앤 「N월 보링 출고 총내역」(PDF 「26년 N월 총출고내역(로앤-보링)」, 월별)을 달마다 표로 본다.
      사장님 11-18: 「로앤도 해줘」(이룸산업 출고내역과 똑같이 — 월별 목록만, 기능 없음).
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.2.7
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.3.0
+     v1.3.0(11-21): 사장님 「로앤출고내역을 보면 출고업체명 값을 볼 수 있습니다. 이는 업체별단품명의 거래처 단서가 됩니다. … 업체별단품명 안에서 해당거래처 단품으로만 한정되는 드롭다운 목록 … 로앤/이룸 출고내역에서 출고업체명을 업체별단품명 기준으로 변경」
+       + 「모든 총계를 계산하여 합계단가 상위 순으로 제품명중복없이 보여지는 누계페이지 … 같은 논리의 단품명 검색 … 동일 제품명에 동시에 선택되는 논리를 유지」
+       — 출고업체명 = 업체별 단품명 거래처 이름(화면만, `업체단품목록.js`) · 단품 드롭 = 그 거래처 업체별 단품명 단품만(벤더피아 전체 검색·실시간 탭 뺌) · 짝 없는 칸 주황(까닭 = 마우스) ·
+         달 단추 끝 「누계」(주소 #누계) = 9달 제품명별 합, 보링 가공비 큰 차례, 단품 저장은 달 표와 같은 창고.
      v1.2.7(11-21): 사장님 「드롭다운칸이 입력칸과 약간의 거리를 두어야」 — 후보 목록(.vpd) = 검색 칸 아래 10px 띄움(전 2px) · 테두리·그림자 = 보드·영림원품목등록 드롭과 같은 꼴(#C7C7C3 · 0 4px 14px).
      v1.2.6(11-19): 사장님 「모든 표의 첫 행을 고정해서 스크롤해도 사라지지 않게 해 줘.」 — 머리 줄(thead) 고정, 붙박이 첫 칸 모서리는 맨 위. 폰·낮은 화면은 표 상자 높이를 화면까지(상자 안에서 밀어야 머리가 남음).
      v1.2.5(11-18): 쪽길 여섯째 탭 「품목등록업로드」 → 「영림원품목등록」(영림원품목등록.html).
@@ -25,7 +29,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>로앤 출고내역 — 발주역입력</title>
-<script src="벤더피아실시간.js?v=1.2.0"></script>
+<script src="업체단품목록.js?v=11-21"></script>
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
@@ -128,6 +132,8 @@ html,body{height:100%;overflow:hidden}
 .vk .더{margin-top:2px}
 .vk .추가{font-weight:600;color:var(--vg-muted);background:var(--vg-fill);border-color:var(--vg-edge)}
 .vpd div.got{color:var(--vg-muted)}
+/* 출고업체명이 업체별 단품명 거래처와 짝이 없음 — 까닭은 마우스 */
+.dpr-t td.업체없음{background:#FFF1E0}
 .띠{position:fixed;top:0;left:0;right:0;z-index:60;background:var(--vg-red);color:#fff;font-size:12.5px;font-weight:600;padding:6px 16px;text-align:center}
 @media (max-width:600px){.vk input{font-size:16px;height:26px}}
 .state{background:var(--vg-fill);border-radius:14px;padding:22px 16px;text-align:center;margin-top:12px}
@@ -141,7 +147,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.2.7</div>
+  <div class="badge">v1.3.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html" class="on">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a></nav>
 <h1>로앤 출고내역</h1>
@@ -176,15 +182,18 @@ window.목록읽기 = async function(){
     달들 = (목.exists() && 목.data().달들) || [];
     if(!달들.length){ 목상태('창고에 로앤 출고내역이 없습니다'); return; }
     document.getElementById('목상태').style.display='none';
-    document.getElementById('고름').innerHTML = 달들.map(d => `<button class="chip" data-m="${d}">${달글(d)}</button>`).join('');
+    document.getElementById('고름').innerHTML = 달들.map(d => `<button class="chip" data-m="${d}">${달글(d)}</button>`).join('') + '<button class="chip" data-m="누계">누계</button>';
     document.querySelectorAll('#고름 .chip').forEach(b => b.onclick = () => 달고름(b.dataset.m));
-    달고름(달들[달들.length-1]);
+    업체단품.듣기(window.db, window.fbRead, () => { if(후보칸) 후보그리기(후보칸); });
+    달고름(decodeURIComponent(location.hash.slice(1)) === '누계' ? '누계' : 달들[달들.length-1]);
   }catch(e){ window.목록못읽음('창고를 읽지 못했습니다', (e&&(e.code||e.message))||''); }
 };
 
 async function 달고름(m){
   고른 = m;
   document.querySelectorAll('#고름 .chip').forEach(b => b.classList.toggle('on', b.dataset.m===m));
+  try{ history.replaceState(null, '', m === '누계' ? '#누계' : location.pathname + location.search); }catch(e){}
+  if(m === '누계'){ 누계고름(); return; }
   const 속 = document.getElementById('속');
   if(!받은[m]){
     속.innerHTML = '<div class="state"><div class="big">읽는 중입니다…</div></div>';
@@ -209,13 +218,16 @@ function 그리기(d){
   const 칸 = [...한양식, ...원칸.filter(x => !한양식.includes(같은칸[x]||x))];
   const 자리 = 칸.map(k => 원칸.findIndex(x => (같은칸[x]||x)===k));   /* -1 = 이 달 PDF 에 없는 칸 */
   const 제목 = 칸.map((k,i) => 자리[i] < 0 ? k : 원칸[자리[i]]);
+  const 업자리 = 자리[칸.indexOf('출고업체명')] ?? -1;
   let h = '<table class="dpr-t"><thead><tr>' +
     제목.map((k,i) => `<th class="${i===0?'dpr-k':''}">${글(k)}</th>`).join('') + '</tr></thead><tbody>';
   for(const r of 줄){
+    const 업원 = 업자리 >= 0 ? String(r.v[업자리]??'').trim() : '', 업 = 업체단품.맞춤(업원);
     h += '<tr>' + 칸.map((k,i) => {
+      if(k==='출고업체명') return 업 ? `<td title="${글('출고업체명 '+업원)}">${글(업.이름)}</td>` : `<td class="업체없음" title="${글('업체별 단품명 거래처 없음 — 출고업체명 '+업원)}">${글(업원)}</td>`;
       const 이름 = k==='제품명' && 자리[i] >= 0 ? String(r.v[자리[i]]??'').trim() : '';
       const cls = (i===0?'dpr-k':'') + (숫자칸.has(제목[i])?' num':'') + (이름?' pc':'');
-      return `<td${cls.trim()?` class="${cls.trim()}"`:''}>${글(자리[i] < 0 ? '' : r.v[자리[i]])}${이름?단품칸(이름):''}</td>`;
+      return `<td${cls.trim()?` class="${cls.trim()}"`:''}>${글(자리[i] < 0 ? '' : r.v[자리[i]])}${이름?단품칸(이름, 업?[업.문서]:[]):''}</td>`;
     }).join('') + '</tr>';
   }
   /* 「총 합 계」 — PDF 처럼 칸을 합친 그대로(첫 칸이 남은 칸을 다 차지 → 금액이 보링단가+보링 가공비 자리에 온다) */
@@ -232,15 +244,68 @@ function 그리기(d){
   속.querySelector('.표통').addEventListener('scroll', () => { if(후보 && 후보칸) 후보자리(후보칸); });   /* 표를 밀면 후보 목록이 칸을 따라간다 */
 }
 
-/* ════ 제품명 ↔ 벤더피아 단품 (v1.2.0) — 재단.html 단품 검색과 같은 방식(검색·고르기까지만, 품목 연결·공통 숫자·분할 없음) ════
+/* ════ v1.3.0 누계 — 9달 출고내역을 제품명(앞뒤 빈칸 뺀 글자)마다 한 줄. 보링 가공비 합이 큰 차례(같으면 수량 · 제품명).
+   칸 = 제품명 · 출고업체명(업체별 단품명 이름, 여럿이면 「 · 」, 짝 없으면 원래 글자 주황) · 출고내역 숫자 칸 합. 단가 칸은 더하지 않음.
+   제품명 칸 = 달 표와 같은 단품칸(같은 창고 · 같은 제품명이면 같은 단품) — 드롭 = 그 제품 출고업체들의 업체별 단품명 단품. ════ */
+const 누계숫자 = [['수량','수량'],['보링 가공비','보링 가공비']];
+const 수 = v => { const t = String(v ?? '').replace(/[,\s]/g,''); return /^-?\d+(\.\d+)?$/.test(t) ? +t : null; };
+const 수글 = x => (Math.round(x*100)/100).toLocaleString('ko-KR', {maximumFractionDigits:2});
+async function 누계고름(){
+  const 속 = document.getElementById('속');
+  const 없음 = 달들.filter(m => !받은[m]);
+  if(없음.length){
+    속.innerHTML = '<div class="state"><div class="big">읽는 중입니다…</div></div>';
+    try{
+      const { doc, getDoc } = window.fbRead;
+      await Promise.all(없음.map(async m => { const s = await getDoc(doc(window.db, ...창고자리, m)); 받은[m] = s.exists() ? s.data() : { 칸:[], 줄:[] }; }));
+    }catch(e){ if(고른==='누계') 속.innerHTML = `<div class="state"><div class="big">창고를 읽지 못했습니다</div><div class="why">${글((e&&(e.code||e.message))||'')}</div></div>`; return; }
+  }
+  if(고른 !== '누계') return;
+  누계그리기();
+}
+function 누계그리기(){
+  const 묶 = new Map();
+  for(const m of 달들){
+    const d = 받은[m]; if(!d) continue;
+    const 원칸 = d.칸 || [], at = k => 원칸.findIndex(x => (같은칸[x]||x)===k);
+    const pi = at('제품명'), ui = at('출고업체명'), ni = 누계숫자.map(([k]) => at(k));
+    for(const r of d.줄 || []){
+      const p = pi >= 0 ? String(r.v[pi]??'').trim() : ''; if(!p) continue;
+      let g = 묶.get(p); if(!g){ g = {p, 업:new Map(), 합:누계숫자.map(() => 0)}; 묶.set(p, g); }
+      const 원 = ui >= 0 ? String(r.v[ui]??'').trim() : '';
+      if(원 && !g.업.has(원)) g.업.set(원, 업체단품.맞춤(원));
+      ni.forEach((i,j) => { if(i < 0) return; const x = 수(r.v[i]); if(x !== null) g.합[j] += x; });
+    }
+  }
+  const 금 = 누계숫자.findIndex(([k]) => k === '보링 가공비');
+  const 줄들 = [...묶.values()].sort((a,b) => b.합[금]-a.합[금] || b.합[0]-a.합[0] || a.p.localeCompare(b.p, 'ko'));
+  const 총 = 누계숫자.map((_,j) => 줄들.reduce((a,g) => a + g.합[j], 0));
+  let h = '<table class="dpr-t"><thead><tr><th class="dpr-k">제품명</th><th>출고업체명</th>' + 누계숫자.map(([,t]) => `<th>${글(t)}</th>`).join('') + '</tr></thead><tbody>';
+  for(const g of 줄들){
+    const 업들 = [...g.업.entries()], 없 = 업들.filter(([,x]) => !x).map(([원]) => 원);
+    const 문서 = [...new Set(업들.filter(([,x]) => x).map(([,x]) => x.문서))];
+    const 업글 = 업들.map(([원,x]) => x ? x.이름 : 원).join(' · ');
+    const 업td = 없.length ? `<td class="업체없음" title="${글('업체별 단품명 거래처 없음 — 출고업체명 '+없.join(', '))}">${글(업글)}</td>`
+                          : `<td title="${글('출고업체명 '+업들.map(([원]) => 원).join(', '))}">${글(업글)}</td>`;
+    h += `<tr><td class="dpr-k pc">${글(g.p)}${단품칸(g.p, 문서)}</td>${업td}` + g.합.map(x => `<td class="num">${수글(x)}</td>`).join('') + '</tr>';
+  }
+  h += '<tr class="합"><td class="dpr-k" colspan="2">총 합 계</td>' + 총.map(x => `<td class="num">${수글(x)}</td>`).join('') + '</tr>';
+  h += '</tbody></table>';
+  const 속 = document.getElementById('속');
+  속.innerHTML = '<div class="표통">' + h + '</div>';
+  후보닫기();
+  속.querySelector('.표통').addEventListener('scroll', () => { if(후보 && 후보칸) 후보자리(후보칸); });
+}
+
+/* ════ v1.3.0 단품 목록 = 그 줄 출고업체의 업체별 단품명 단품(`업체단품목록.js`) — 아래 옛 설명의 벤더피아 목록·실시간은 뺌. 저장은 그대로.
+   ════ 제품명 ↔ 벤더피아 단품 (v1.2.0) — 재단.html 단품 검색과 같은 방식(검색·고르기까지만, 품목 연결·공통 숫자·분할 없음) ════
    단품 목록 = 창고 `납품내역_단품목록`(벤더피아연동 단품관리 화면이 받을 때마다 저절로 올리는 사본, 읽기만).
      이 크롬에 벤더피아연동 0.35.x 다리(`data-벤더피아단품`)가 있으면 재단.html v1.6.0 처럼 확장 목록 그대로.
    고른 것 = 창고 `발주역입력_로앤_단품`(이 페이지만의 칸 — 재단 `발주역입력_단품연결` 과 따로), 문서 하나 = PDF 제품명 하나(그대로)
      {제품명, 단품들:[{단품코드,단품명}], 단품코드, 단품명(= 첫 단품), 고친때}. 같은 제품명이면 어느 달이든 같은 단품.
    저장 = 바뀐 것만 setDoc merge, onSnapshot 으로 받아 다른 창·기기에서 바꾼 것도 바로. 실패 = 맨 위 빨간 띠. */
-const 단품자리 = ['artifacts','vivivic-4b7ef','public','data','납품내역_단품목록'];
 const 연결자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_로앤_단품'];
-let 연결 = {}, 단품들 = null, 단품받기 = null;
+let 연결 = {};
 const 문이름 = p => p.replace(/\//g,'／') || '_빈이름';
 function 문해석(x){
   return {단품들: Array.isArray(x.단품들) ? x.단품들.filter(d => d && d.단품코드).map(d => ({코드:String(d.단품코드), 이름:String(d.단품명||'')}))
@@ -286,94 +351,12 @@ function 제품다시(p){
 function 단품더하기(p, d){ if(단품있나(p, d.코드)) return; 바꾸기(p, s => { s.단품들.push({코드:d.코드, 이름:d.이름}); }); }
 function 단품빼기(p, 코드){ 바꾸기(p, s => { s.단품들 = s.단품들.filter(d => d.코드!==코드); }); }
 
-let 단품출처 = '', 단품말 = null, 단품받은때 = null;
-const 벤더피아로그인주소 = 'https://vendorpia.com/';
-const 단품관리주소 = 'https://vendorpia.com/System/Master/goods.aspx';
-let 단품관리열었나 = false;
-const 다리있나 = async () => { for(let i=0;i<15;i++){ if(document.documentElement.hasAttribute('data-벤더피아단품')) return true; await new Promise(r=>setTimeout(r,100)); } return false; };
-function 확장묻기(다시){
-  return new Promise(풀 => {
-    const 표 = Math.random().toString(36).slice(2);
-    const 받 = e => { if(e.source!==window || !e.data || e.data.__vp!=='단품목록답' || e.data.표!==표) return; 끝(e.data.답 || {}); };
-    const 시 = setTimeout(() => 끝({로그인:null, 까닭:'벤더피아연동 답 없음(3분)'}), 180000);
-    function 끝(답){ removeEventListener('message', 받); clearTimeout(시); 풀(답); }
-    addEventListener('message', 받);
-    postMessage({__vp:'단품목록', 표, 다시:!!다시}, location.origin);
-  });
-}
-const 단품하나 = (코드,이름,상태) => ({코드, 이름, 상태, 찾글:(이름+' '+코드).toLowerCase().replace(/\s+/g,'')});
-function 단품읽기(다시){
-  if(단품받기 && !다시) return 단품받기;
-  단품들 = null; 단품말 = null;
-  const 이번 = 단품받기 = (async () => {
-    if(await 다리있나()){
-      단품출처 = 'vp';
-      const 답 = await 확장묻기(다시);
-      if(이번 !== 단품받기) return;
-      if(답.로그인 === true && Array.isArray(답.줄)){
-        단품받은때 = 답.받은때 || null;
-        단품들 = 답.줄.filter(x => x && x[0]).map(([코드,이름='',상태='']) => 단품하나(String(코드), String(이름), String(상태)));
-        return;
-      }
-      단품말 = 답.로그인 === false ? {로그인:true, 글:'벤더피아 로그인 필요', 막힘:true}
-            : 답.로그인 === null ? {로그인:true, 글:'벤더피아 로그인을 확인하지 못했습니다' + (답.까닭?' · '+답.까닭:''), 막힘:true}
-            : {글:'벤더피아연동 단품관리 목록을 받지 못했습니다' + (답.까닭?' · '+답.까닭:''), 막힘:true};
-      return;
-    }
-    단품출처 = '창고'; 단품받은때 = null; 단품말 = null;
-    const { collection, getDocs } = window.fbRead;
-    const 눈 = await getDocs(collection(window.db, ...단품자리));
-    if(이번 !== 단품받기) return;
-    const 문들 = [];
-    눈.forEach(d => { if(/^단품_\d+$/.test(d.id)) 문들.push([Number(d.id.slice(3)), d.data().줄||[]]);
-      else if(d.id === '_정보'){ const x = d.data()||{}; 단품받은때 = x.올린때 || null; 단품말 = {자동:/벤더피아연동/.test(x.파일||'')}; } });
-    문들.sort((a,b)=>a[0]-b[0]);
-    const 들 = [];
-    for(const [,줄] of 문들) for(const s of 줄){
-      const [코드='',이름='',상태=''] = String(s).split('\t');
-      if(코드) 들.push(단품하나(코드, 이름, 상태));
-    }
-    단품들 = 들;
-  })();
-  이번.catch(() => { if(단품받기 === 이번) 단품받기 = null; });
-  return 이번;
-}
-const 때글 = t => { if(!t) return ''; const d = new Date(t); return `${d.getMonth()+1}-${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')} 받음`; };
 const 추가단추 = '<button type="button" class="추가">단품 추가</button>';
 function 단품줄(p){
   const e = 연결[p]; if(!e) return '';
   return e.단품들.map(d => `<div class="dp"><button type="button" class="dn" data-c="${글(d.코드)}" title="${글(d.이름)} ${글(d.코드)}">${글(d.이름||d.코드)}<span class="cd">${글(d.코드)}</span></button><button type="button" class="dx" data-c="${글(d.코드)}" title="삭제">×</button></div>`).join('');
 }
-function 단품칸(p){ return `<div class="vk" data-p="${글(p)}"><div class="dl">${단품줄(p)}</div><div class="더">${추가단추}</div></div>`; }
-
-/* v1.2.0 실시간 — 벤더피아 단품관리에 바로 물은 줄(`벤더피아실시간.js`)을 목록에 덮는다. 새 단품은 맨 앞, 있는 단품은 이름·판매상태를 새것으로. */
-const 실시간줄 = new Map(), 실시간본 = new Map();
-let 실시간시계 = 0;
-function 실시간덮기(){
-  if(!단품들 || !실시간줄.size) return;
-  const 자리 = new Map(단품들.map((d,i) => [d.코드, i])), 새 = [];
-  for(const [코드,이름,상태] of 실시간줄.values()){
-    const i = 자리.get(코드);
-    if(i === undefined) 새.push(단품하나(코드, 이름, 상태));
-    else { const d = 단품들[i]; if(d.이름 !== (이름||d.이름) || d.상태 !== 상태) 단품들[i] = 단품하나(코드, 이름||d.이름, 상태); }
-  }
-  if(새.length) 단품들 = 새.concat(단품들);
-}
-function 실시간묻기(input){
-  const V = window.VP실시간; if(!V || !V.이어짐()) return;
-  const 열쇠 = V.낱말(input.value).join('|'); if(!열쇠) return;
-  const 앞 = 실시간본.get(열쇠); if(앞 && Date.now() - 앞 < 20000) return;
-  clearTimeout(실시간시계);
-  실시간시계 = setTimeout(() => {
-    if(후보칸 !== input || V.낱말(input.value).join('|') !== 열쇠) return;
-    실시간본.set(열쇠, Date.now());
-    V.찾기(input.value).then(답 => {
-      if(답 && 답.로그인) for(const [코드,이름='',상태=''] of 답.줄) if(코드) 실시간줄.set(String(코드), [String(코드), String(이름), String(상태)]);
-      if(답 && 후보칸 === input) 후보그리기(input);
-    });
-  }, 350);
-}
-if(window.VP실시간) VP실시간.이으면(() => { if(후보칸) 후보그리기(후보칸); });
+function 단품칸(p, 업들){ return `<div class="vk" data-p="${글(p)}" data-u="${글((업들||[]).join('|'))}"><div class="dl">${단품줄(p)}</div><div class="더">${추가단추}</div></div>`; }
 
 let 후보 = null, 후보칸 = null, 후보들 = [];
 function 후보닫기(){
@@ -395,59 +378,32 @@ function 후보자리(input, 맞추기){
   Object.assign(후보.style,{left:왼+'px',top:위+'px',width:폭+'px',maxHeight:높+'px'});
 }
 function 후보그리기(input){
-  const p = input.closest('.vk').dataset.p;
+  const vk = input.closest('.vk'), p = vk.dataset.p, 업들 = (vk.dataset.u||'').split('|').filter(Boolean);
   if(!후보){ 후보 = document.createElement('div'); 후보.className='vpd'; document.body.appendChild(후보);
     후보.addEventListener('pointerdown', e => e.preventDefault());
-    후보.addEventListener('click', e => {
-      const a = e.target.closest('div[data-act]');
-      if(a){ 단품단추(a.dataset.act); return; }
-      const d = e.target.closest('div[data-i]'); if(d && 후보칸) 고르기(후보칸, d.dataset.i); }); }
+    후보.addEventListener('click', e => { const d = e.target.closest('div[data-i]'); if(d && 후보칸) 고르기(후보칸, d.dataset.i); }); }
   const 새로 = 후보칸 !== input; 후보칸 = input; 후보자리(input, 새로);
-  let t = '';
-  if(!단품들 && 단품말 && 단품말.막힘){ 후보들 = [];
-    후보.innerHTML = t + `<div class="msg bad">${글(단품말.글)}</div>` +
-      (단품말.로그인 ? '<div class="act" data-act="login">벤더피아 로그인 화면 열기</div><div class="msg">로그인한 뒤 이 칸을 다시 누르세요</div>' : '') +
-      '<div class="act" data-act="new">단품 새로 받기</div>';
-    return;
-  }
-  if(!단품들){
-    후보들 = [];
-    후보.innerHTML = t + `<div class="msg">${단품출처==='vp' || document.documentElement.hasAttribute('data-벤더피아단품') ? '벤더피아연동 단품관리 목록을 받는 중… (처음엔 수십 초 걸릴 수 있음)' : '단품 목록을 읽는 중…'}</div>`;
-    단품읽기().then(() => { if(후보칸===input) 후보그리기(input); }, e => { if(후보) 후보.innerHTML = t + `<div class="msg bad">단품 목록을 읽지 못했습니다 ${글((e&&(e.code||e.message))||'')}</div>`; });
-    return;
-  }
-  실시간덮기(); 실시간묻기(input);   /* v1.2.0 */
-  const 실됨 = !!(window.VP실시간 && VP실시간.됨()), 실표 = 실됨 ? ' · 실시간' : '';
-  t += 단품출처==='vp' ? `<div class="act" data-act="new">단품 새로 받기<span class="cd">벤더피아연동 단품관리 ${단품들.length.toLocaleString()}개${단품받은때?' · '+때글(단품받은때):''}${실표}</span></div>`
-     : `<div class="act" data-act="new">단품 새로 받기<span class="cd">${단품말&&단품말.자동?'벤더피아연동 단품관리 ':'단품 목록 '}${단품들.length.toLocaleString()}개${단품받은때?' · '+때글(단품받은때).replace('받음','올림'):''}${실표}</span></div>`
-       + (단품관리열었나 && !실됨 ? '<div class="msg">벤더피아연동 단품관리 탭에서 F5 → 다 받으면 이 탭으로 돌아오세요(목록을 다시 읽습니다)</div>' : '');
-  if(window.VP실시간 && VP실시간.로그인필요()) t += '<div class="act" data-act="login">벤더피아 로그인 화면 열기</div>';
-  const 낱 = input.value.toLowerCase().split(/\s+/).filter(Boolean);
-  const 보일 = 단품들.filter(d => d.상태 !== '중지');   /* 판매상태 「중지」 단품은 후보에서 뺌(이미 고른 단품은 그대로) */
   후보들 = [];
-  if(낱.length) for(const d of 보일){ if(낱.every(w=>d.찾글.includes(w))){ 후보들.push(d); if(후보들.length>=50) break; } }
-  let 비슷 = false;
-  if(낱.length && !후보들.length){
+  if(!업들.length){ 후보.innerHTML = '<div class="msg bad">업체별 단품명 거래처 없음</div>'; return; }
+  const 목 = 업체단품.목록(업들);
+  if(!목){ 후보.innerHTML = '<div class="msg">업체별 단품명을 읽는 중…</div>'; return; }
+  const 찾글 = d => (d.이름+' '+d.코드).toLowerCase().replace(/\s+/g,'');
+  const 낱 = input.value.toLowerCase().split(/\s+/).filter(Boolean);
+  let t = '', 비슷 = false;
+  if(!낱.length) 후보들 = 목.slice();
+  else 후보들 = 목.filter(d => 낱.every(w => 찾글(d).includes(w)));
+  if(낱.length && !후보들.length){   /* 다 맞는 것 없음 — 비슷한 순(전과 같은 셈) */
     const 조 = [...new Set(input.value.toLowerCase().match(/[가-힣]+|[0-9]+|[a-z]+/g)||[])].filter(w=>w.length>=2);
     const 점 = [];
-    보일.forEach((d,j) => { let n=0, k=''; for(const w of 조){ const y=d.찾글.includes(w); if(y) n++; k+=y?'1':'0'; } if(n) 점.push({d,n,k,j}); });
+    목.forEach((d,j) => { const g = 찾글(d); let n=0, k=''; for(const w of 조){ const y=g.includes(w); if(y) n++; k+=y?'1':'0'; } if(n) 점.push({d,n,k,j}); });
     점.sort((a,b) => b.n-a.n || (a.k<b.k?1:a.k>b.k?-1:0) || a.j-b.j);
-    후보들 = 점.slice(0,50).map(x=>x.d); 비슷 = 후보들.length > 0;
+    후보들 = 점.map(x=>x.d); 비슷 = 후보들.length > 0;
+    if(!비슷) 후보들 = 목.slice();
   }
   if(비슷) t += '<div class="msg">다 맞는 단품 없음 — 비슷한 순</div>';
-  if(!낱.length) t += '<div class="msg">단품명 · 단품코드를 치세요</div>';
-  else if(!후보들.length) t += '<div class="msg">맞는 단품 없음</div>';
-  t += 후보들.map((d,i) => `<div data-i="${i}" class="${i===0?'on':''}${단품있나(p,d.코드)?' got':''}">${단품있나(p,d.코드)?'✓ ':''}${글(d.이름)}<span class="cd">${글(d.코드)}${d.상태&&d.상태!=='판매중'?' · '+글(d.상태):''}</span></div>`).join('');
+  if(!후보들.length) t += '<div class="msg">맞는 단품 없음</div>';
+  t += 후보들.map((d,i) => `<div data-i="${i}" class="${i===0?'on':''}${단품있나(p,d.코드)?' got':''}">${단품있나(p,d.코드)?'✓ ':''}${글(d.이름)}<span class="cd">${글(d.코드)}${업들.length>1?' · '+글(d.업체):''}</span></div>`).join('');
   후보.innerHTML = t;
-}
-document.addEventListener('visibilitychange', () => {
-  if(document.visibilityState !== 'visible' || !단품관리열었나 || 단품출처 !== '창고') return;
-  const input = 후보칸; 단품읽기(true).then(() => { if(input && 후보칸 === input) 후보그리기(input); }, () => {});
-});
-function 단품단추(일){
-  if(일 === 'login'){ window.open(벤더피아로그인주소, '_blank'); return; }
-  if(일 === 'new' && 단품출처 === '창고'){ 단품관리열었나 = true; window.open(단품관리주소, 'vp단품관리'); if(후보칸) 후보그리기(후보칸); return; }
-  if(일 === 'new'){ const input = 후보칸; 단품읽기(true); if(input) 후보그리기(input); }
 }
 function 고르기(input, i){
   const p = input.closest('.vk').dataset.p, x = 후보들[+i]; if(!x) return;
@@ -458,7 +414,6 @@ document.addEventListener('click', e => {
   const t = e.target;
   const 추 = t.closest('.vk .추가');
   if(추){ const 더 = 추.parentElement;
-    if(window.VP실시간) VP실시간.열기();   /* v1.2.0 이어진 벤더피아 탭이 없으면 단품관리 탭을 한 번 연다 */
     더.innerHTML = '<input type="search" placeholder="단품 검색" autocomplete="off" enterkeyhint="search">';
     더.querySelector('input').focus(); return; }
   const x = t.closest('.vk .dx');
@@ -474,8 +429,7 @@ document.addEventListener('focusin', e => {
     const 막기 = ev => ev.preventDefault();
     input.addEventListener('mouseup', 막기, {once:true}); setTimeout(() => input.removeEventListener('mouseup', 막기), 600);
   }
-  if(단품말 && 단품말.막힘){ 단품말 = null; 단품받기 = null; }
-  단품읽기(); 후보그리기(input);
+  후보그리기(input);
 });
 document.addEventListener('input', e => { if(e.target.matches('.vk input')) 후보그리기(e.target); });
 document.addEventListener('focusout', e => { if(e.target.matches('.vk input')) setTimeout(() => { if(후보칸===e.target && document.activeElement!==e.target) 후보닫기(); }, 0); });
