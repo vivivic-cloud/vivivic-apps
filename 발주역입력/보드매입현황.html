@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.33.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.34.0
+     v1.34.0(11-20): 사장님 「삭제된건은 … 등록완료된 자재명과 이건들을 연결하여 … 근거를 남기는거야」 · 「영림원 등록완료가 된건에서 드롭다운 형태로 자재명을 고르게 해서」 — 삭제 줄 「영림원 등록」 칸 = 등록완료 자재 드롭다운 → 창고 더한표기 → 연결.
      v1.33.0(11-20): 사장님 「소분류칸 마지막 _소분류가 잘안보여」 — 칸 값(마지막 _ 뒤 이름)이 얇은 글자라 진해진 앞 상위 이름에 묻힘 → 칸 값 진하게(font-weight 700).
        열을 좁히면 입력 칸이 먼저 줄어 뒤 이름이 잘렸음 → 칸 값은 다 보이고 앞 상위 이름(`분류앞`)이 줄어듦(…). 값·저장은 그대로.
      v1.32.0(11-20): 사장님 「영림원 보내기 자재소분류 텍스트좀 잘보이게 하고 각 셀 가로넓이 조절되게해 가로조절에 이곳에 나타나는 모든 표에 적용시켜」
@@ -307,6 +308,8 @@ html,body{height:100%;overflow:hidden}
 .폼표 td.등록 .작{color:var(--vg-muted);font-size:10.5px}
 .폼표 td.등록{text-align:center}
 .폼표 td.등록 .점{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:middle}   /* v1.18.1 글 없이 색 점 */
+.폼표 tr.뺌 td.등록{opacity:1}
+.폼표 td.등록 select.같은자재{font:inherit;font-size:11px;max-width:22em}   /* v1.34.0 삭제 줄 같은 자재 */
 .폼표 td.등록 .고치기{font:inherit;font-size:10.5px;padding:0 4px;border:1px solid var(--vg-edge);border-radius:3px;background:var(--vg-bg);color:var(--vg-ink);cursor:pointer}
 .폼표 [data-k]:disabled{opacity:1;cursor:default}
 .분류고름{position:fixed;z-index:50;background:var(--vg-bg);border:1px solid #C7C7C3;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.12);
@@ -356,7 +359,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.33.0</div>
+  <div class="badge">v1.34.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -679,7 +682,7 @@ async function 폼받기(s){
   폼보내기[s] = (d.exists() && d.data().보내기) || null;   /* v1.9.0 */
   /* v1.14.0 창고 지금 값을 늘 받아 둠(저장 때 다시 읽지 않음 — 다른 창·기기 값 보호는 그대로) */
   창고본[s] = d.exists() ? d.data() : null;
-  if(window.fbRead.onSnapshot) window.fbRead.onSnapshot(doc(window.db, ...폼자리, s), x => { 창고본[s] = x.exists() ? x.data() : null; 결과칠(s); if(s===해피코) 동일품다시(); }, () => { delete 창고본[s]; });   /* v1.17.0 결과가 오면 바로 칠함 */
+  if(window.fbRead.onSnapshot) window.fbRead.onSnapshot(doc(window.db, ...폼자리, s), x => { 창고본[s] = x.exists() ? x.data() : null; 폼더한[s] = (x.exists() && x.data().더한표기) || [];   /* v1.34.0 다른 창·기기에서 고른 같은 자재도 */ 결과칠(s); if(s===해피코) 동일품다시(); }, () => { delete 창고본[s]; });   /* v1.17.0 결과가 오면 바로 칠함 */
 }
 const 창고본 = {};   // 거래처 → 창고 문서 지금 값(onSnapshot) · 없으면(undefined) 저장 때 읽음
 let 준비됨 = false;
@@ -1155,6 +1158,7 @@ const 완료줄 = (s, 키) => { const r = 등록상태(s, 키); return !!r && r.
 function 결과칠(s){
   if(볼것!=='폼') return;
   const 표 = 고른===s && document.querySelector('.폼표');
+  const 월표 = ((받은[s] || {}).표 || []).find(t => t.이름==='월별'), 모든줄 = 표 && 월표 ? 품목모으기(월표).줄 : [];
   if(표) 표.querySelectorAll('tbody tr').forEach(tr => {
     const 키 = tr.dataset.key, r = 등록상태(s, 키), td = tr.querySelector('td.등록');
     const 뺌 = 뺀키(s, 키), 오 = !!r && r.상태==='오류' && !뺌, 풀 = 풀린.has(s + '\n' + 키);
@@ -1168,6 +1172,8 @@ function 결과칠(s){
       const c = el.closest('td'); if(c && k!=='x_del') c.classList.toggle('고칠칸', 고칠.has(k) && !f분류(k));   /* v1.29.0 분류 칸 = 지금 값 분석(분류틀그리기)이 색을 정함 */
     });
     if(!td) return;
+    if(뺌){ const h = 같은자재칸(s, 키, 모든줄); if(td.dataset.h !== h){ td.innerHTML = h; td.dataset.h = h; } td.removeAttribute('title'); return; }   /* v1.34.0 삭제 줄 = 같은 자재 고름 */
+    delete td.dataset.h;
     /* v1.18.1 글 없이 색 점만(완료 초록 · 오류 빨강 · 고침 주황 · 대기·진행중 회색), 이유는 마우스에만 */
     const 점 = c => `<span class="점" style="background:${c}"></span>`;
     if(!r){ td.innerHTML = ''; td.removeAttribute('title'); }
@@ -1183,6 +1189,33 @@ function 결과칠(s){
   const 남 = document.getElementById('남은줄'); if(남 && 표) 남.textContent = [...표.querySelectorAll('tbody tr')].filter(x => !x.hidden).length;
   if(표){ const th = 표.querySelector('thead th'); if(th) 표.style.setProperty('--열쇠1', th.getBoundingClientRect().width + 'px'); }   /* v1.18.3 둘째 고정 칸 자리(줄을 거르면 첫 칸 너비가 바뀜) */
   오류목록그리기();
+}
+/* v1.34.0 삭제 줄 → 영림원 등록완료 자재 연결 — 사장님 11-20: 「삭제된건은 명세서에 이름이 들죽날죽 들어와서 같은 제품인데 이렇게 표기가 된건 같은건이다 봐야 하는거야
+   이제 등록완료된 자재명과 이건들을 연결하여 해당거래처 각명세서에 이납품제품명으로 들어온건 같은 자재명이라고 봐야한다는 근거를 남기는거야」 · 「근거는 이제 영림원 등록완료가 된건에서 드롭다운 형태로 자재명을 고르게 해서」.
+   삭제 줄의 「영림원 등록」 칸 = 드롭다운(그 거래처 결과 완료 줄의 자재명, 마우스 = 자재번호·규격). 고르면 창고 `더한표기` 에 {품목, 규격(삭제 줄 명세서 글자), 줄품목, 줄규격(고른 등록완료 줄), 고른때, 삭제줄:true}
+   → 폼저장이 `연결` 에 「더한 표기」 로 넣음(전달 글 6-0절 길 그대로 — 명세서에 이 표기로 오면 그 자재번호). 같은 열쇠의 옛 표기는 바꿈 · 빈칸 = 지움. 삭제 줄은 그대로 등록 안 함. */
+function 같은자재칸(s, 키, 모든줄){
+  const [품, 규] = 키.split('\t'), 열 = 표기열쇠(품, 규);
+  const d = (폼더한[s] || []).find(x => 표기열쇠(x.품목, x.규격)===열), 고른키 = d ? d.줄품목 + '\t' + d.줄규격 : '';
+  const 후보 = 모든줄.filter(m => { const k = 줄키(m), r = 등록상태(s, k); return k===고른키 || (!!r && r.상태==='완료' && !뺀줄(s, m)); });
+  const 말 = m => { const r = 등록상태(s, 줄키(m)) || {}; return [r.자재번호 || 칸값({k:'m_code'}, m, s), 칸값({k:'m_spec'}, m, s)].filter(Boolean).join(' · '); };
+  const 고른줄 = 후보.find(m => 줄키(m)===고른키);
+  return `<select class="같은자재${고른키?' 저장값':''}" title="${글(고른줄 ? '같은 자재 — ' + 말(고른줄) : '같은 자재(영림원 등록완료)')}"><option value=""></option>` +
+    후보.map(m => { const k = 줄키(m); return `<option value="${글(k)}" title="${글(말(m))}"${k===고른키?' selected':''}>${글(칸값({k:'m_name'}, m, s))}</option>`; }).join('') + '</select>';
+}
+async function 같은자재저장(s, 키, 목표){
+  const { doc, setDoc } = window.fbRead;
+  const [품목, 규격] = 키.split('\t'), 열 = 표기열쇠(품목, 규격);
+  const 지금 = 창고본[s] ? (창고본[s].더한표기 || []) : (폼더한[s] || []);
+  const 새 = 지금.filter(x => 표기열쇠(x.품목, x.규격)!==열);
+  if(목표){ const [줄품목, 줄규격] = 목표.split('\t'); 새.push({ 품목, 규격, 줄품목, 줄규격, 고른때:new Date().toISOString(), 삭제줄:true }); }
+  폼상태('저장 중…'); 미저장.add(s);
+  try{
+    폼더한[s] = 새;
+    await setDoc(doc(window.db, ...폼자리, s), { 더한표기:새 }, { merge:true });
+    await 폼저장(s); 미저장.delete(s); 저장알림();
+  }catch(e){ 못저장(e); }
+  결과칠(s);
 }
 /* v1.18.0 등록완료 표 — 읽기만. 「고치기」 → 한 번 묻고 그 줄을 영림원보내기 표로 돌림(고치면 지문이 바뀌어 입력폼이 다시 넘김) */
 let 완료보기 = false;   /* v1.18.2 등록완료 보기 = 같은 표, 완료 줄만 */
@@ -1325,6 +1358,7 @@ async function 폼그리기(){
     저장예약(s);
   };
   표.addEventListener('change', 바꿈);
+  표.addEventListener('change', e => { const el = e.target; if(el.classList && el.classList.contains('같은자재')) 같은자재저장(s, el.closest('tr').dataset.key, el.value); });   /* v1.34.0 */
   표.addEventListener('input', () => { 입력중 = true; });
   표.addEventListener('focusout', () => { 입력중 = false; });
   표.addEventListener('focusin', e => {
