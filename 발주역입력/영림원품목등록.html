@@ -2,7 +2,10 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.26.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.27.0
+     v2.27.0(11-21): 분배 방 지시(사장님 확인) — 공정흐름 앞 덧칸 「보드두께」·「엣지두께」(반제품만, 글자 입력·끌기·복사·지우기·저장 = 다른 입력 칸과 같음).
+       합판코드 = 입력폼 자재 완료 중 대분류 md·pb · 필름코드 = ed(대소문자 같음). 드롭 차례 = 그 줄 두께와 소분류 끝 숫자가 맞는 자재 위(파랑 띠) → 나머지 전부,
+       같은 묶음 안 = 매입순위()(지금 비어 있음 — shared 공통 파일이 오면 이음) → 이름순. 두께 같음: 27 = 2.7 = 3 · 045 = 0.45 = 06 = 0.6. 목록은 칸 옆(오른쪽/왼쪽/아래 12px).
      v2.26.0(11-20): 사장님 「…BOM업로드등록,제품별공정별소요자재등록, 이 맞는구성인지 여부 확인해주고 이런 형태로 더 많들어 져야할 메뉴를 추가 구성해줘 입력별 필수입력자리를 영림원을 직접확인하여 표시해주고,
        현재품목등록업로드 정보만으로 다른 메뉴 또는 생성될 메뉴에 부족한 정보를 채울 수 있도록 페이지에 명시해줘.」 — 계산 시트 다섯(등록 방법 8~12단계):
        품목별공정흐름유형등록 500272 · 제품별공정별소요자재등록 500299(고침: 공정차수·사업단위 머리 · 공정품(중간 공정) · 앞 공정 재공품 줄 · 「표준 작업시간」 글자) · 자재등록(재공품) 500251 ·
@@ -257,6 +260,7 @@ html,body{height:100%;overflow:hidden}
 .자재고름{position:fixed;z-index:50;background:var(--vg-bg);border:1px solid #C7C7C3;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.12);
   max-height:260px;overflow:auto;min-width:160px;padding:3px 0;font-size:12px}
 .자재고름 div{padding:4px 10px;white-space:nowrap;cursor:pointer;border-left:3px solid #2e7d32}
+.자재고름 div.맞음{border-left-color:#1565c0;background:#EEF4FC}   /* v2.27.0 두께 맞는 자재(위 묶음) */
 .자재고름 div:hover,.자재고름 div.지금{background:var(--vg-fill)}
 .자재고름 div span{color:var(--vg-muted);margin-left:8px}
 /* v2.25.0 「등록 방법」 — 단계마다 설명 + 예시 표(표는 .표통 안에서만 옆으로 민다) */
@@ -285,7 +289,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.26.0</div>
+  <div class="badge">v2.27.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -752,6 +756,8 @@ const 편칸 = ['품목설명','합판코드','필름코드','투입수량','기
 let 공정목록 = [], 공정읽음 = false;
 /* v2.3.0 반제품만 입력 — 제품 줄의 이 칸은 td.막음(경고만). 투입수량 열쇠 = 「투입수량@모품목」(BOM 조립 줄 짝) */
 const 반제품칸 = new Set(['합판코드','필름코드','투입수량','기본구매처']);
+/* v2.27.0 공정흐름 앞 덧칸 「보드두께」·「엣지두께」(반제품만, 글자 그대로) — 합판·필름 드롭 차례의 단서 */
+const 두께칸 = ['보드두께','엣지두께'], 두께짝 = { 합판:'보드두께', 필름:'엣지두께' };
 let 막음틀 = null;
 function 막음알림(td, 따로){   /* v2.5.0 칸마다 글(td data-알림) — 없으면 반제품 글 · v2.6.0 따로 = 그 글 */
   let el = document.querySelector('.막음알림');
@@ -776,16 +782,39 @@ const 파랑 = (p,k) => !더럽.has(열쇠(p,k)) && String(((입력[p]||{})[k]) 
 function 폼상태(t, 나쁨){ const el = document.getElementById('폼상태'); if(el){ el.textContent = t; el.classList.toggle('bad', !!나쁨); } }
 
 /* 자재 목록 — 입력폼 자재등록 완료(로그인 때) 또는 공개 사본. 합판 = 대분류 pb·md(보드) · 필름 = 대분류 엣지필름 (시트지 등 그 밖은 뺌 — 임시) */
-const 자재종류 = big => /엣지|필름/.test(big) ? '필름' : (/^(pb|md)/i.test(big) || /합판|보드|mdf/i.test(big)) ? '합판' : '';
+/* v2.27.0 입력폼 분류 대분류 그대로: 합판 = md·pb · 필름 = ed (대소문자 같음) */
+const 자재종류 = big => { const b = String(big||'').trim().toLowerCase(); return b==='ed' ? '필름' : (b==='md' || b==='pb') ? '합판' : ''; };
+/* v2.27.0 두께 맞춤 — 소분류 끝 숫자. 소수점 없이 적힌 숫자는 첫 자리 뒤 소수점으로도 읽음(27 → 2.7 · 045 → 0.45 · 06 → 0.6).
+   보드 2.7 = 3 · 엣지 0.45 = 0.6 (사장님 11-21) */
+const 두께같음 = { 합판:[[2.7,3]], 필름:[[0.45,0.6]] };
+function 두께값들(글자, t){
+  const g = String(글자||'').trim(); if(!g) return [];
+  const 목 = new Set(), n = parseFloat(g); if(!isNaN(n)) 목.add(n);
+  if(/^\d{2,}$/.test(g)) 목.add(parseFloat(g[0] + '.' + g.slice(1)));
+  const 끝 = new Set();
+  for(const v of 목){ const r = Math.round(v*1000)/1000; 끝.add(r);
+    for(const 짝 of (두께같음[t]||[])) if(짝.includes(r)) 짝.forEach(x => 끝.add(x)); }
+  return [...끝];
+}
+const 끝숫자 = m => { const x = String(m.sm||'').match(/(\d+(?:\.\d+)?)(?!.*\d)/); return x ? x[1] : ''; };
+function 두께맞음(m, 두께, t){ if(!String(두께||'').trim()) return false;
+  const a = 두께값들(두께, t), b = 두께값들(끝숫자(m), t); return a.some(v => b.includes(v)); }
+/* v2.27.0 매입 누계 순위 자리 — shared 공통 파일이 올라오면 여기서 이음(지금은 순위 없음 = 이름순). 작을수록 위 */
+function 매입순위(m, t){ return Infinity; }
+function 자재차례(목, 두께, t){
+  const 셈 = m => [두께맞음(m, 두께, t) ? 0 : 1, 매입순위(m, t)];
+  return 목.map(m => ({ m, k:셈(m) })).sort((a,b) => a.k[0]-b.k[0] || (a.k[1]===b.k[1] ? 0 : a.k[1] < b.k[1] ? -1 : 1) || (a.m.name||a.m.code).localeCompare(b.m.name||b.m.code) || a.m.code.localeCompare(b.m.code))
+    .map(x => Object.assign({}, x.m, { 맞음: x.k[0]===0 }));
+}
 function 자재정리(){
   const 목 = 폼자재 || 공개자재, 본 = new Set(); 자재목록 = { 합판:[], 필름:[] };
   for(const m of 목){ const t = 자재종류(m.big); if(!t || !m.code || 본.has(m.code)) continue; 본.add(m.code); 자재목록[t].push(m); }
-  for(const t in 자재목록) 자재목록[t].sort((a,b) => a.code.localeCompare(b.code));
+  for(const t in 자재목록) 자재목록[t].sort((a,b) => (a.name||a.code).localeCompare(b.name||b.code) || a.code.localeCompare(b.code));
   연동칠();
 }
 window.폼자재받음 = (줄) => {
   const 트 = v => String(v ?? '').trim();
-  폼자재 = 줄 ? 줄.filter(r => !r.ylwGone).map(r => ({ code:트(r.code), name:트(r.name), spec:트(r.spec), big:트(String(r.small||'').split('>')[0]) })) : null;
+  폼자재 = 줄 ? 줄.filter(r => !r.ylwGone).map(r => { const 길 = String(r.small||'').split('>').map(트); return { code:트(r.code), name:트(r.name), spec:트(r.spec), big:길[0], sm:길[길.length-1] }; }) : null;
   자재정리();
 };
 function 공개자재구독(){
@@ -798,7 +827,7 @@ function 공개자재구독(){
       for(const z of 줄){
         const r = 결[z.열쇠], 자 = r && r.자재; if(!자 || 자.상태!=='완료') continue;
         const 등 = z.자재등록 || {};
-        목.push({ code:String(자.자재번호 || 등.자재번호 || '').trim(), name:String(등.자재명||'').trim(), spec:String(등.규격||'').trim(), big:String(((z.분류||{}).대분류)||'').trim() });
+        목.push({ code:String(자.자재번호 || 등.자재번호 || '').trim(), name:String(등.자재명||'').trim(), spec:String(등.규격||'').trim(), big:String(((z.분류||{}).대분류)||'').trim(), sm:String(((z.분류||{}).소분류)||'').trim() });
       }
     }
     공개자재 = 목; if(!폼자재) 자재정리();
@@ -887,7 +916,7 @@ function 공정칠(){
     td.classList.toggle('공자동', !!자);
     td.classList.toggle('목록밖', 밖); if(밖) td.title = '입력폼 공정흐름에 없음'; else if(자) td.title = 자.근거; else td.removeAttribute('title');
   });
-  const 머 = 통.querySelector('th.단서:not(.소요)');   /* v2.22.0 입력폼 공정흐름을 못 읽음 = 주황 머리 */
+  const 머 = 통.querySelector('th.단서:not(.소요):not(.두께)');   /* v2.22.0 입력폼 공정흐름을 못 읽음 = 주황 머리 */
   if(머){ 머.classList.toggle('공정못', !!공정못); 머.title = 공정못 ? '입력폼 공정흐름을 읽지 못함 — ' + 공정못 : '영림원 칸 아님 — BOM 연동용 · 목록 = 입력폼 공정흐름 완료'; }
   BOM공정칠();
 }
@@ -1267,15 +1296,20 @@ function 편집달기(통){
   const 목록 = document.createElement('div'); 목록.className = '자재고름'; 목록.hidden = true; document.body.appendChild(목록);
   function 펼침(inp, 거름){
     const t = 고를칸[편집 && 편집.td.dataset.k]; if(!t){ 목록.hidden = true; return; }
-    const g = (거름||'').toLowerCase(), 목 = (t==='공정' ? 공정목록.map(c => ({ code:c, name:'', spec:'' })) : t==='외주' ? 외주목록 : 자재목록[t]).filter(m => !g || (m.code + ' ' + m.name).toLowerCase().includes(g));
+    const 두 = 두께짝[t] ? 값(편집.td.parentNode.dataset.p, 두께짝[t]) : '';
+    let 원 = t==='공정' ? 공정목록.map(c => ({ code:c, name:'', spec:'' })) : t==='외주' ? 외주목록 : 자재차례(자재목록[t], 두, t);   /* v2.27.0 두께 맞는 자재 위 · 나머지 전부 아래 */
+    const g = (거름||'').toLowerCase(), 목 = 원.filter(m => !g || (m.code + ' ' + m.name).toLowerCase().includes(g));
     if(!목.length){ 목록.hidden = true; return; }
-    목록.innerHTML = 목.map(m => `<div class="${m.code===inp.value.trim()?'지금':''}" data-v="${글(m.code)}" title="${글(m.spec)}">${글(m.code)}<span>${글(m.name)}</span></div>`).join('');
-    const r = inp.getBoundingClientRect();
-    목록.style.left = Math.max(4, Math.min(r.left, innerWidth - 240)) + 'px';
-    const 아래 = innerHeight - r.bottom;
-    if(아래 < 200 && r.top > 아래){ 목록.style.top = ''; 목록.style.bottom = (innerHeight - r.top + 2) + 'px'; }
-    else { 목록.style.bottom = ''; 목록.style.top = (r.bottom + 2) + 'px'; }
-    목록.hidden = false;
+    목록.innerHTML = 목.map(m => `<div class="${m.code===inp.value.trim()?'지금':''}${m.맞음?' 맞음':''}" data-v="${글(m.code)}" title="${글((m.맞음 ? 두께짝[t] + ' ' + 두 + ' 맞음 · ' : '') + (m.sm ? '소분류 ' + m.sm + ' · ' : '') + (m.spec||''))}">${글(m.code)}<span>${글(m.name)}</span></div>`).join('');
+    /* v2.27.0 목록 = 칸 옆(오른쪽, 자리 없으면 왼쪽, 그것도 없으면 칸 아래 12px) — 칸 아래 끌기 자리를 안 가림 */
+    const r = 편집.td.getBoundingClientRect(); 목록.hidden = false; const w = 목록.offsetWidth, hgt = 목록.offsetHeight;
+    목록.style.bottom = '';
+    if(r.right + 10 + w <= innerWidth){ 목록.style.left = (r.right + 10) + 'px'; 목록.style.top = Math.max(4, Math.min(r.top, innerHeight - hgt - 4)) + 'px'; }
+    else if(r.left - 10 - w >= 0){ 목록.style.left = (r.left - 10 - w) + 'px'; 목록.style.top = Math.max(4, Math.min(r.top, innerHeight - hgt - 4)) + 'px'; }
+    else { 목록.style.left = Math.max(4, Math.min(r.left, innerWidth - w - 4)) + 'px';
+      const 아래 = innerHeight - r.bottom;
+      if(아래 < 200 && r.top > 아래){ 목록.style.top = ''; 목록.style.bottom = (innerHeight - r.top + 12) + 'px'; }
+      else 목록.style.top = (r.bottom + 12) + 'px'; }
   }
   목록.addEventListener('mousedown', e => e.preventDefault());
   목록.addEventListener('click', e => { const d = e.target.closest('[data-v]'); if(!d || !편집) return; 편집.inp.value = d.dataset.v; 끝내기(true); });
@@ -1436,12 +1470,14 @@ function 표만들기(칸, 줄, 이름){
   const h = ['<table class="dpr-t"><thead><tr>' +
     칸.map((k,i) => { const 필 = 필수칸[이름]?.has(String(k).trim());
       return `<th class="${(i===0?'dpr-k':'') + (필?' 필수':'')}"${필?' title="영림원 필수"':''}>${글(k)}</th>`; }).join('') + '</tr></thead><tbody>'];
-  if(품) h[0] = h[0].replace('<thead><tr>', `<thead><tr><th class="단서${공정못?' 공정못':''}" title="${글(공정못 ? '입력폼 공정흐름을 읽지 못함 — ' + 공정못 : '영림원 칸 아님 — BOM 연동용 · 목록 = 입력폼 공정흐름 완료')}">공정흐름</th><th class="단서 소요" title="영림원 칸 아님 — BOM 연동용">소요량</th>`);   /* v2.19.0 소요량 덧칸 */   /* v2.6.0 품명 앞 덧칸 */
+  if(품) h[0] = h[0].replace('<thead><tr>', `<thead><tr><th class="단서 두께" title="영림원 칸 아님 — 합판코드 드롭 차례">보드두께</th><th class="단서 두께" title="영림원 칸 아님 — 필름코드 드롭 차례">엣지두께</th><th class="단서${공정못?' 공정못':''}" title="${글(공정못 ? '입력폼 공정흐름을 읽지 못함 — ' + 공정못 : '영림원 칸 아님 — BOM 연동용 · 목록 = 입력폼 공정흐름 완료')}">공정흐름</th><th class="단서 소요" title="영림원 칸 아님 — BOM 연동용">소요량</th>`);   /* v2.19.0 소요량 덧칸 */   /* v2.6.0 품명 앞 덧칸 */
   for(const r of 줄){
     const p = 품 ? (String(r.v[pi]??'').trim() || '#' + r.행) : '';
     let tr = 품 ? `<tr data-p="${글(p)}">` : '<tr>';
     const 반 = 품 && String(r.v[ai]??'').trim()==='반제품';
     const 빨 = 없음.size && (반 ? 없음.has(String(r.v[mi0]??'').trim()) : 없음.has(p));
+    if(품) for(const k of 두께칸)   /* v2.27.0 공정흐름 앞 두께 두 칸 — 반제품만 */
+      tr += 반 ? `<td class="편 num${파랑(p,k)?' 저장값':''}" data-k="${k}">${글(값(p,k))}</td>` : `<td class="막음" data-k="${k}"></td>`;
     if(품) tr += 반 || String(r.v[ai]??'').trim()!=='제품'
       ? ((자) => `<td class="편 드롭칸${파랑(p,'공정흐름')?' 저장값':''}${공밖(p)?' 목록밖" title="입력폼 공정흐름에 없음':자?` 공자동" title="${글(자.근거)}`:''}" data-k="공정흐름">${글(자 ? 자.v : 값(p,'공정흐름'))}</td>`)(반 && 공자동(p))   /* v2.6.0 · v2.8.0 자동 */
       : `<td class="막음" data-k="공정흐름" data-알림="제품 — 조립">조립</td>`;   /* v2.6.1 제품 = 조립 고정 */
