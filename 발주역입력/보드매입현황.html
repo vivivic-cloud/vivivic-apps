@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.38.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.39.0
+     v1.39.0(11-21): 사장님 「매번세지 않아도 이를 위해 알수 있는 실시간 연동되는 자료실을 따로 만들어 두어도 좋습니다.」 —
+       이 쪽을 열어 두면 shared/자재매입순위.js 자료실지킴 이 명세·영림원폼(연결·결과)을 받아 자재별 순위를 셈해 발주역입력_자재매입순위/누계 에 씀(다를 때만, 금액 없음). 화면 그대로.
      v1.38.0(11-20): 사장님 「현진산업 영림원보내기에 나타나는 목록 앞부분에 이 해당목록이 구매인지 가공인지 구분하는 체크를 만들어주고 가공인 경우 더이상 구매로서 입력폼에 도착하지 못하게 일단 조치해줘.」
        영림원보내기 표 맨 앞(납품제품명 앞) 「구매/가공」 드롭다운(기본 구매, 저장 = 줄 값 x_kind:'가공') · 채우기 손잡이·⌘C/⌘V·Delete(= 구매) ·
        가공 줄 = 보내기 상태 「가공」(입력폼·결과맞추기.py 는 「보냄」 줄만 넘김) · 자재등록·구매단가 칸 잠금(값 그대로) · 칸 주황, 마우스 「가공 — 입력폼에 안 보냄」 · 대기·진행중·완료 줄은 이 칸도 잠금.
@@ -192,6 +194,8 @@
     onAuthStateChanged(auth, (u) => {
         if (!u) { signInAnonymously(auth).catch(e => window.목록못읽음('창고에 들어가지 못했습니다', (e&&(e.code||e.message))||'')); return; }
         window.목록읽기();
+        /* v1.39.0 자재별 매입 누계 순위 자료실(발주역입력_자재매입순위/누계) 갱신 — shared/자재매입순위.js. 화면엔 안 보임 */
+        try { if (window.자재매입순위) window.자재매입순위.자료실지킴(window.db, window.fbRead); } catch (e) { console.warn('자재매입순위', e); }
     });
 </script>
 
@@ -301,9 +305,9 @@ html,body{height:100%;overflow:hidden}
 .폼표 td.임칸{box-shadow:inset 0 0 0 1px var(--vg-red)}
 /* v1.10.0 채우기 손잡이(엑셀처럼 아래로 끌어 같은 값) — 고른 칸 오른쪽 아래 작은 네모 · 끄는 동안 범위 점선 */
 .폼표 td.손자리{position:relative}
-.채움손{position:absolute;right:-4px;bottom:-4px;width:7px;height:7px;box-sizing:border-box;background:var(--vg-ink);border:1px solid var(--vg-bg);
-  z-index:0;cursor:crosshair;touch-action:none}
-@media (pointer:coarse){.채움손{width:14px;height:14px;right:-7px;bottom:-7px}}
+.채움손{position:absolute;right:0;bottom:0;width:7px;height:7px;box-sizing:border-box;background:var(--vg-ink);border:1px solid var(--vg-bg);
+  z-index:1;cursor:crosshair;touch-action:none}   /* v1.39.0 칸 안 오른쪽 아래 — 옆 고정 칸(납품제품명)·색칸에 안 가림 */
+@media (pointer:coarse){.채움손{width:14px;height:14px}}
 .폼표 td.채움범위{outline:1px dashed var(--vg-ink);outline-offset:-2px;background:var(--vg-fill)}
 /* v1.17.0 영림원 등록 결과 — 완료 줄 초록 · 오류 줄 빨강 · 대기·진행중 작게 */
 .폼표 tr.완료 td{background:#EDF7EE}
@@ -369,7 +373,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.38.0</div>
+  <div class="badge">v1.39.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -381,6 +385,7 @@ html,body{height:100%;overflow:hidden}
 
 <!-- 짚어서 지시하는 손잡이 — 바이글 박스에서 열면 켜진다. -->
 <script src="../shared/viggle.js"></script>
+<script src="../shared/자재매입순위.js"></script>   <!-- v1.39.0 자재 매입 순위 자료실 갱신 -->
 
 <script>
 const 창고자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_보드매입'];
@@ -1480,9 +1485,9 @@ async function 폼그리기(){
     const r = el.getBoundingClientRect();
     고름.style.minWidth = '120px'; 고름.style.bottom = ''; 고름.hidden = false; 고름칸 = el;
     const w = 고름.offsetWidth, hh = 고름.offsetHeight;
-    let x = r.right + 8, y = Math.max(4, Math.min(r.top, innerHeight - hh - 4));
-    if(x + w > innerWidth - 4) x = r.left - 8 - w;
-    if(x < 4){ x = Math.max(4, Math.min(r.left, innerWidth - w - 4)); y = r.bottom + 12; if(y + hh > innerHeight - 4) y = Math.max(4, r.top - 12 - hh); }
+    let x = r.right + 10, y = Math.max(4, Math.min(r.top, innerHeight - hh - 4));
+    if(x + w > innerWidth - 4) x = r.left - 10 - w;
+    if(x < 4){ x = Math.max(4, Math.min(r.left, innerWidth - w - 4)); y = r.bottom + 10; if(y + hh > innerHeight - 4) y = Math.max(4, r.top - 10 - hh); }
     고름.style.left = x + 'px'; 고름.style.top = y + 'px';
   }
   const 고름닫기 = () => { 고름.hidden = true; 고름칸 = null; };
