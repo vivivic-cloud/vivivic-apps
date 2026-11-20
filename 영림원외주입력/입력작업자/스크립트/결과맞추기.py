@@ -107,7 +107,9 @@ def doc_of(key, vn, e, data):
                 if r.get('status') == '완료' and not gone(r) and tr(r.get('code')) == cd and tr(r.get('name')) == nm: return r
         return None
     k = pur_key(e['vals'])
-    return first([r for r in a if pur_key(r) == k and (r.get('status') != '오류' or mine(r))])
+    hi = e.get('hi')
+    return first([r for r in a if pur_key(r) == k and (r.get('status') != '오류' or mine(r))]) \
+        or first([r for r in a if mine(r) and r['bd'].get('이력') == hi])   # 폼 v312 품번으로 못 찾으면 줄 열쇠로
 
 
 def res_of(dd, mat=False):
