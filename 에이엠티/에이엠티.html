@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.66.0 (2026-11-21) — 주소 ?재단도=<id> 로 재단편집 바로 열기 · _cuttingPerSheet = shared/원장재단수량.js 재단도한장(식 그대로)
+     버전: v1.67.0 (2026-11-21) — 주소 ?재단크기=<크기> 로 새 재단도 재단편집(결과 = 영림원품목등록 _재단도) · _cuttingPerSheet = shared 재단도한장(식 그대로)
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -2718,7 +2718,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.66.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.67.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2858,7 +2858,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.66.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.67.0</b></p>
         </div>
     </div>
 
@@ -3504,7 +3504,7 @@
             if (typeof renderProcessTimeline === 'function') renderProcessTimeline();
             // 주소에 큐알 글이 실려 왔으면 발주가 온 뒤 한 번 펴 본다 (10-11 지시)
             if (typeof window._주소명세열기 === 'function') window._주소명세열기();
-            if (typeof window._주소재단도열기 === 'function') window._주소재단도열기();   // v1.66.0
+            if (typeof window._주소새재단열기 === 'function') window._주소새재단열기();   // v1.67.0
         };
         window._자료탈났다 = function (무엇, 까닭) {
             window._자료탈[무엇] = String((까닭 && (까닭.code ||까닭.message)) || 까닭 || '못 받음');
@@ -10234,33 +10234,67 @@
             setTimeout(() => { try { window._명세서열기(날, '납기', 파, 발키, 글); } catch (e) {} }, 60);
         };
 
-        /* v1.66.0(11-21) 주소로 재단도 하나를 재단편집으로 연다 — 사장님 「제가 의도한것은 해당 프로그램과 연결되어 편집에 따라 이곳의 숫자가 변할 수 있도록 하는것입니다.」
-           ?재단도=<재단도 id>[,<다음 id>…] → 자료가 다 온 뒤 타임라인 재단 카드 중 그 재단도(planId)를 앞 차례부터 찾아 woEditCuttingPlan(카드에서 「편집」 누른 것과 같은 화면·같은 저장).
-           ?재단=1 → 재단발주 화면(새 재단도를 만드는 곳)으로. 영림원품목등록 「재단률」 칸이 이 주소로 연다.
-           · 열쇠가 없으면 아무 일도 안 한다. 못 찾으면 한 줄로 알린다. 열기만 — 저장은 편집 화면의 「재단확정」 그대로. */
-        window._주소재단도했다 = false;
-        window._주소재단도열기 = function () {
-            if (window._주소재단도했다) return;
-            let 글 = '', 새 = '';
-            try { const q = new URLSearchParams(location.search); 글 = q.get('재단도') || ''; 새 = q.get('재단') || ''; } catch (e) {}
-            if (!글 && !새) return;
-            if (!window._자료다옴 || !window._자료다옴()) return;    // 다 온 뒤 — 다음에 다시
-            window._주소재단도했다 = true;
-            if (!글) { try { switchPage('cutting'); } catch (e) {} return; }
-            const 들 = 글.split(',').map(x => x.trim()).filter(Boolean);
-            // 재단도는 발주마다 부를 때만 받는다(3단계) — 살아 있는 발주 도면을 지금 부른다(읽기만)
-            try { if (typeof window._도면확보모두 === 'function') window._도면확보모두(); } catch (e) {}
-            let 번 = 0;
-            const 찾기 = () => {
-                try { Object.values(window._cuttingPlans || {}).forEach(pl => { if (들.includes(String(pl.confirmId))) _ensureCuttingPlanInTimeline(pl); }); } catch (e) {}
-                for (const id of 들) for (const sk of Object.keys(window._woBoringParts || {})) {
-                    const p = (window._woBoringParts[sk] || []).find(pp => pp.isCuttingCard && String(pp.planId) === id);
-                    if (p) { try { switchPage('process'); } catch (e) {} window.woEditCuttingPlan(p.cKey, sk); return; }
-                }
-                if (++번 < 40) return setTimeout(찾기, 500);            // 타임라인 카드가 그려지는 중일 수 있다
-                if (typeof showToastMessage === 'function') showToastMessage('그 재단도가 타임라인에 없습니다');
+        /* v1.67.0(11-21) 주소로 「크기만 준 새 재단도」 를 재단편집으로 연다 — 사장님 「비오엠등록 업로드의 하위규격 값을 이곳에서 새로 계산하여 보여지게 하는것 입니다.」 ·
+           「기존 에이엠티프로그램 사용에 변화가 생기면 안되니」. 영림원품목등록 「재단률」 칸이 연다.
+           ?재단크기=<JSON {번, 이름, w, d, 결보호, 원장:{w,d}, 행, 수, 원장명, 마감, 색, boardParts?}>
+           → 자료가 다 온 뒤 woEditCuttingPlan(…, 직접 카드) — 카드 「편집」 과 같은 화면·같은 편집기. 발주·타임라인·cutting_plans 는 안 건드림.
+           「재단확정」 = _woSizeConfirm: 원장당(재단도한장 — 놓인 조각 중 이 크기) → 창고 발주역입력_영림원품목등록/_재단도 {값:{품번:{…}}} merge. cutting_plans 에 안 씀.
+           주소 값이 없으면 아무 일도 안 한다(예전 화면 그대로). v1.66.0 의 ?재단도=<저장 재단도 id> 길은 뺌(사장님 정정). */
+        window._주소새재단했다 = false;
+        window._woSizeEdit = null;
+        window._주소새재단열기 = function () {
+            if (window._주소새재단했다) return;
+            let 글 = '';
+            try { 글 = new URLSearchParams(location.search).get('재단크기') || ''; } catch (e) {}
+            if (!글) return;
+            if (!window._자료다옴 || !window._자료다옴()) return;
+            window._주소새재단했다 = true;
+            let q = null; try { q = JSON.parse(글); } catch (e) {}
+            const w = q && parseFloat(q.w), d = q && parseFloat(q.d);
+            if (!q || !(w > 0) || !(d > 0) || !q.번) { if (typeof showToastMessage === 'function') showToastMessage('재단 크기를 읽지 못했습니다'); return; }
+            const 원 = q.원장 && q.원장.w === 1840 && q.원장.d === 920 ? '3X6' : '4X8';
+            const 카드 = {
+                cKey: 'size_' + q.번, isCuttingCard: true, rw: w, rd: d, dq: parseInt(q.수, 10) || 0,
+                nm: q.이름 || q.번, plateName: q.원장명 || '', coating: q.마감 || '', finish: q.색 || '',
+                pRowIndex: (q.행 != null && q.행 !== '' && !isNaN(parseInt(q.행, 10))) ? parseInt(q.행, 10) : -1,
+                결보호: q.결보호 != null ? String(q.결보호) : '',
+                boardParts: Array.isArray(q.boardParts) ? q.boardParts : null
             };
-            setTimeout(찾기, 300);
+            window._woSizeEdit = { 번: String(q.번), w, d, 결보호: 카드.결보호 };
+            window.woEditCuttingPlan(카드.cKey, '', 카드);
+            const s = document.getElementById('setting-board-size');
+            if (s && 원 !== '4X8') { s.value = 원; if (typeof updateBoardVisual === 'function') updateBoardVisual(); }
+            if (카드.boardParts && typeof _woRenderActualBoardParts === 'function') _woRenderActualBoardParts(카드);
+            const 단추 = document.getElementById('btn-confirm-cutting');
+            if (단추) 단추.setAttribute('onclick', '_woSizeConfirm()');   // 닫을 때 _woCloseInlineEdit 가 원래 것으로 되돌림
+        };
+        window._woSizeConfirm = async function () {
+            const 지 = window._woSizeEdit; if (!지) return;
+            if (!primarySelectedCardId) { showToastMessage('원장에 배치할 부속을 먼저 선택해주세요.'); return; }
+            const board = document.getElementById('board-rect');
+            const 조각 = Array.from(board.querySelectorAll('.placed-part')).map(el => ({
+                lp: parseFloat(el.style.left) / parseFloat(board.style.width),
+                tp: parseFloat(el.style.top) / parseFloat(board.style.height),
+                wp: parseFloat(el.style.width) / parseFloat(board.style.width),
+                hp: parseFloat(el.style.height) / parseFloat(board.style.height),
+                bg: el.style.backgroundColor || '',
+                dw: el.querySelector('.dim-w-label')?.textContent || '',
+                dh: el.querySelector('.dim-d-label')?.textContent || ''
+            }));
+            const 크 = 원장재단수량.원장크기(document.getElementById('setting-board-size').value);
+            const 한장 = 원장재단수량.재단도한장({ boardParts: 조각 }, 지.w, 지.d);
+            try {
+                const { doc, setDoc } = window.fbFirestore;
+                await setDoc(doc(window.db, 'artifacts', 'vivivic-4b7ef', 'public', 'data', '발주역입력_영림원품목등록', '_재단도'),
+                    { 값: { [지.번]: { 원장당: 한장, 부속: { w: 지.w, d: 지.d }, 원장: { w: 크.w, d: 크.d }, 결보호: 지.결보호,
+                        전단컷: parseFloat(document.getElementById('setting-front-cut').value) || 0,
+                        톱날: parseFloat(document.getElementById('setting-blade-t').value) || 0,
+                        boardParts: 조각, 고친때: new Date().toISOString() } }, 고친때: new Date().toISOString() }, { merge: true });
+                showToastMessage('원장당 ' + 한장 + '개 — 영림원품목등록 재단률에 저장');
+                _woCloseInlineEdit();
+            } catch (e) {
+                showToastMessage('저장하지 못했습니다: ' + ((e && (e.code || e.message)) || ''));
+            }
         };
 
         /* 10-11 사장님: 「발급 버튼을 삭제하고 각 버튼 누르면 **자동발급**되어 다음 동작을
@@ -12149,8 +12183,9 @@
         // 팝업을 닫을 때 원래 있던 자리로 되돌려놓는다.
         window._woInlineEditState = null;
 
-        window.woEditCuttingPlan = function(cKey, sk) {
-            const p = (window._woBoringParts[sk] || []).find(pp => pp.cKey === cKey);
+        window.woEditCuttingPlan = function(cKey, sk, 직접) {
+            // v1.67.0 직접 = 주소 ?재단크기= 로 연 「크기만 준 새 재단도」 카드(_주소새재단열기). 없으면 예전 그대로.
+            const p = 직접 || (window._woBoringParts[sk] || []).find(pp => pp.cKey === cKey);
             if (!p || !p.isCuttingCard) { showToastMessage('편집할 수 있는 카드가 아닙니다.'); return; }
             // 완료된 카드는 여기서도 막는다 — 단추를 죽여도 이 길로 들어올 수 있다.
             if (window._woCut완료됨(cKey, sk, p)) { showToastMessage('완료된 카드입니다.'); return; }
@@ -12158,7 +12193,7 @@
             const orderIds = (p.coveredOrderIds && p.coveredOrderIds.length) ? p.coveredOrderIds
                 : (p.orderIdNum != null ? [p.orderIdNum] : []);
             const orders = orderIds.map(id => confirmedOrders.find(o => o.idNum === id)).filter(Boolean);
-            if (orders.length === 0) { showToastMessage('연결된 발주 정보를 찾을 수 없어 편집할 수 없습니다.'); return; }
+            if (orders.length === 0 && !직접) { showToastMessage('연결된 발주 정보를 찾을 수 없어 편집할 수 없습니다.'); return; }
 
             const box = document.getElementById('cutting-edit-box');
             if (!box) { showToastMessage('재단편집 도구를 찾을 수 없습니다.'); return; }
@@ -12308,6 +12343,7 @@
                 grain = _row[_h0.indexOf('결보호')] || '';
                 partName = _row[_h0.indexOf('부속명')] || partName;
             }
+            if (직접 && 직접.결보호 != null) grain = 직접.결보호;   // v1.67.0 크기만 — 결보호는 부른 쪽 값
 
             let normalArea = document.getElementById('id302-normal-section');
             if (!normalArea) {
