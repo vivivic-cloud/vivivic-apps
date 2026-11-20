@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v302 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v303 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -164,6 +164,7 @@ details.gonebox{margin-top:10px;font-size:13px}details.gonebox>summary{cursor:po
 .delbar{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap;letter-spacing:0}
 .hbar{position:relative;height:12px;margin:8px 0 -4px;border-radius:10px;background:var(--fill4);border:1px solid var(--line2);cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none}.hbar[hidden]{display:none}.hbar-t{position:absolute;top:1px;bottom:1px;left:0;border-radius:10px;background:var(--thumb);min-width:36px}.hbar:hover .hbar-t{background:var(--muted)}   /* v276 표 위 가로 스크롤 줄 */
 .lsheet .lsearch input{font:inherit;font-size:13px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:8px;padding:9px 12px;min-height:40px;min-width:0;flex:1 1 auto;max-width:420px;box-sizing:border-box}.lsheet .lsearch input:focus{outline:none;border-color:var(--ink)}.lsheetbox td{vertical-align:middle}.lsheetbox td.w{white-space:normal;min-width:160px;max-width:320px;overflow-wrap:anywhere}.lsheetbox th.lsh-m,.lsheetbox td.lsh-m{position:sticky;left:0;z-index:1;background:#fff;box-shadow:inset -1px 0 0 var(--line)}.lsheetbox thead th.lsh-m{z-index:3;background:var(--fill2)}.lsheetbox td.lsh-m{white-space:normal;min-width:110px;max-width:min(220px,44vw)}.lsh-mw{display:flex;align-items:center;gap:8px;overflow-wrap:anywhere}.lsh-mw input.pk{flex:none;margin:0}.lsh-sort{all:unset;cursor:pointer;display:inline-block;white-space:nowrap}.lsh-sort:focus-visible{outline:2px solid var(--ink);outline-offset:2px}.lsheetbox .chip{display:inline-block}   /* v275 저장한 항목 시트로 보기 */
+.clstabs{margin:0 0 8px}.clstreebox td{vertical-align:top;white-space:normal;overflow-wrap:anywhere;min-width:96px}.clstreebox td.clsb{font-weight:800}.clstreebox td.clsb,.clstreebox td.clsm{background:#fff;box-shadow:inset -1px 0 0 var(--rowline)}.clstreebox tr.clsnb td{border-top:1px solid var(--line)}.clsc{margin-left:8px;color:var(--muted);font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}   /* v303 분류 대→중→소 층 표 */
 .vwcall{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;min-height:32px}.vwcall input.pk{margin:0}.chip.vwc{background:#ecfdf5;color:#047857;border-color:#a7f3d0}   /* v274 거래처 → 워크센터 보내기 */
 details.rec>summary .rt{flex:1}
 details.rec>summary input.pk{flex:none;margin:0}
@@ -483,7 +484,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v302</span>
+    <span class="ver">v303</span>
     <div class="pick topnav" id="topnav">   <!-- v288 사장님 11-18 「입력폼 상단에 발주역입력 메뉴를 만들어 발주역입력 페이지로 이어지게」 — 이름 = 각 페이지 <title> 앞부분 · 같은 탭 -->
       <button type="button" class="btn small" aria-haspopup="menu" aria-expanded="false">발주역입력</button>
       <div class="pickmenu topnavmenu" role="menu" hidden>
@@ -7174,6 +7175,44 @@ function lsheetDraw(s,listBox,head,rows,kit,tail){
   hb._sync();
   if(foc){o.inp.focus();try{o.inp.setSelectionRange(ss,ss);}catch(e){}}
 }
+/* v303 사장님 11-20 「완료된 대중소분류가 왜 ㅈ따위 화면구성인지 모르겠다 완료된 대중소 보는 화면구성 좀 상식적으로 바꿔줘」
+   → 분류 「시트로 보기」 = 품목구분 탭(제상품·자재, 옆 숫자 = 건수) · 찾기 칸 하나 · 표 대분류 → 중분류 → 소분류(같은 대·중분류는 한 칸으로 묶음, 이름 옆 영림원 코드, 코드 순).
+   완료만(v302 only). 코드 = ylwCode 「대/중/소」, 비었으면(11-17 보드매입현황 6건) agentNote 「… 2006008 > … 2005023 > … 2004073」, 대·중 코드는 같은 이름 문서에서 빌림. */
+var CLST={kind:'제상품',q:'',inp:null};
+function clsCodes(r){var c=clsT(r.ylwCode).split('/');if(c.length===3&&c.every(function(x){return /^\d+$/.test(clsT(x));}))return c.map(clsT);
+  var m=String(r.agentNote||'').match(/(\d{7})\s*>[^>]*?(\d{7})\s*>[^>]*?(\d{7})/);return m?[m[1],m[2],m[3]]:['','',''];}
+function clsTreeDraw(listBox,head,rows,tail){
+  var o=CLST;
+  var old=listBox.querySelector('.clstree .tw'),sx=old?old.scrollLeft:0,sy=old?old.scrollTop:0;
+  var foc=!!o.inp&&document.activeElement===o.inp,ss=foc?o.inp.selectionStart:0;
+  if(!o.inp)o.inp=h('input',{type:'search',autocomplete:'off',placeholder:'찾기','aria-label':'분류 찾기',on:{input:function(){o.q=o.inp.value;renderList();}}});
+  var q=String(o.q||'').trim().toLowerCase();
+  var L=rows.map(function(r){var c=clsCodes(r);return {k:clsT(r.kind),b:clsT(r.big),m:clsT(r.mid),n:clsT(r.name),c:c};});
+  var bc={},mc={};
+  L.forEach(function(x){if(x.c[0])bc[x.k+'|'+x.b]=x.c[0];if(x.c[1])mc[x.k+'|'+x.b+'|'+x.m]=x.c[1];});
+  L.forEach(function(x){x.cb=x.c[0]||bc[x.k+'|'+x.b]||'';x.cm=x.c[1]||mc[x.k+'|'+x.b+'|'+x.m]||'';x.cs=x.c[2]||'';});
+  function hit(x){return !q||[x.b,x.m,x.n,x.cb,x.cm,x.cs].some(function(v){return v.toLowerCase().indexOf(q)>=0;});}
+  var tabs=h('div',{class:'wcpicks clstabs',role:'tablist','aria-label':'품목구분'},['제상품','자재'].map(function(k){var on=k===o.kind,n=L.filter(function(x){return x.k===k&&hit(x);}).length;
+    return h('button',{type:'button',role:'tab',class:'btn small'+(on?' primary':''),'aria-selected':on?'true':'false',on:{click:function(){if(!on){o.kind=k;renderList();}}}},k+' '+n);}));
+  function cc(a,b){return a===b?0:!a?1:!b?-1:a<b?-1:1;}
+  var V=L.filter(function(x){return x.k===o.kind&&hit(x);}).sort(function(x,y){
+    return cc(x.cb,y.cb)||x.b.localeCompare(y.b,'ko')||cc(x.cm,y.cm)||x.m.localeCompare(y.m,'ko')||cc(x.cs,y.cs)||x.n.localeCompare(y.n,'ko');});
+  function cell(cls,name,code,span){return h('td',{class:cls,rowspan:span>1?String(span):null},h('span',{class:'clsn'},name||'(이름 없음)'),code?h('span',{class:'clsc'},code):null);}
+  var trs=[];
+  V.forEach(function(x,i){var p=V[i-1],nb=!p||p.b!==x.b,nm=nb||p.m!==x.m,tds=[],j;
+    if(nb){for(j=i+1;j<V.length&&V[j].b===x.b;j++);tds.push(cell('clsb',x.b,x.cb,j-i));}
+    if(nm){for(j=i+1;j<V.length&&V[j].b===x.b&&V[j].m===x.m;j++);tds.push(cell('clsm',x.m,x.cm,j-i));}
+    tds.push(cell('clss',x.n,x.cs,1));
+    trs.push(h('tr',{class:i&&nb?'clsnb':(i&&nm?'clsnm':null)},tds));});
+  var tw=h('div',{class:'tw clstreebox'},h('table',{},h('thead',{},h('tr',{},h('th',{},'대분류'),h('th',{},'중분류'),h('th',{},'소분류'))),
+    h('tbody',{},trs.length?trs:[h('tr',{},h('td',{colspan:'3'},q?'「'+o.q.trim()+'」에 맞는 줄이 없습니다.':'없습니다.'))])));
+  var hb=hbarFor(tw);
+  var box=h('div',{class:'lsheet clstree'},tabs,h('div',{class:'lsearch'},o.inp),hb,tw);
+  listBox.replaceChildren.apply(listBox,[head,box].concat(tail.filter(Boolean)));
+  tw.scrollLeft=sx;tw.scrollTop=sy;
+  hb._sync();
+  if(foc){o.inp.focus();try{o.inp.setSelectionRange(ss,ss);}catch(e){}}
+}
 function renderList(){
   if(!listBox)return;
   var s=BYKEY[cur];
@@ -7204,6 +7243,7 @@ function renderListIn(s,listBox,title){
   if(s.flowCols)sorted=sorted.filter(flowGap).concat(sorted.filter(function(r){return !flowGap(r);}));   /* v53 빈 흐름이 맨 위 */
   var ss=SEARCH_STEPS[s.key],sq=ss?String(LISTQ[s.key]||'').trim().toLowerCase():null;   /* v37: 4 품목(v39: 3 분류도)은 검색어에 맞는 기록만 */
   if(sq!=null&&!lsheetOn(s))sorted=sorted.filter(function(r){return EDITING[s.key+'/'+r.id]||(sq&&ss.keys.some(function(k){return String(r[k]==null?'':r[k]).toLowerCase().indexOf(sq)>=0;}));});
+  if(lsheetOn(s)&&s.key==='classes'){clsTreeDraw(listBox,head,sorted.filter(LSHEET_STEPS.classes.only),[gbox,obox]);return;}   /* v303 분류 = 품목구분 탭 + 대→중→소 층 표 */
   if(lsheetOn(s)){lsheetDraw(s,listBox,head,LSHEET_STEPS[s.key].only?sorted.filter(LSHEET_STEPS[s.key].only):sorted,kit,[gbox,obox]);return;}   /* v275 시트로 보기 = 카드 대신 표 · v302 only = 그 단계 시트에 보일 문서만(분류 = 완료만) */
   var items=sorted.map(function(r){return recCard(s,r,kit,openIds);});
   if(sq!=null){listSearch(s,listBox,head,a,sq,items,gbox);return;}
