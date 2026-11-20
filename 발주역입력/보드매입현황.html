@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.34.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.35.0
+     v1.35.0(11-20): 사장님 「여기 이름이 삭제 보다는 납품제품명연결 이 맞겠다」 — 영림원보내기 「삭제(등록 안 함)」 칸 머리·「삭제 N」 단추 글자 → 「납품제품명연결」(화면 글자만).
      v1.34.0(11-20): 사장님 「삭제된건은 … 등록완료된 자재명과 이건들을 연결하여 … 근거를 남기는거야」 · 「영림원 등록완료가 된건에서 드롭다운 형태로 자재명을 고르게 해서」 — 삭제 줄 「영림원 등록」 칸 = 등록완료 자재 드롭다운 → 창고 더한표기 → 연결.
      v1.33.0(11-20): 사장님 「소분류칸 마지막 _소분류가 잘안보여」 — 칸 값(마지막 _ 뒤 이름)이 얇은 글자라 진해진 앞 상위 이름에 묻힘 → 칸 값 진하게(font-weight 700).
        열을 좁히면 입력 칸이 먼저 줄어 뒤 이름이 잘렸음 → 칸 값은 다 보이고 앞 상위 이름(`분류앞`)이 줄어듦(…). 값·저장은 그대로.
@@ -359,7 +360,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.34.0</div>
+  <div class="badge">v1.35.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -559,6 +560,7 @@ const 폼칸 = [
 ];
 const 폼묶음 = ['자재등록','구매단가등록'];
 const 삭제글 = '삭제(등록 안 함)';
+const 연결이름 = '납품제품명연결';   /* v1.35.0 사장님 「여기 이름이 삭제 보다는 납품제품명연결 이 맞겠다」 — 영림원보내기 화면 글자만(저장 x_del·양식 엑셀 머리 「삭제(등록 안 함)」 은 그대로) */
 const 이력글머리 = '단가이력(참고)';   /* v1.12.0 「(적용시작일)」 → 「(참고)」 — 영림원엔 마지막 단가 하나만 */
 const 폼값 = {};            // 거래처 → Map(키 → {칸키:값})
 const 폼이력 = {};          // 거래처 → 창고에 있는 이력 JSON 글(같으면 다시 안 씀)
@@ -1271,7 +1273,7 @@ async function 폼그리기(){
   const 열쇠말 = '명세서 연결 열쇠 — 명세서 줄의 납품제품명(품목)+규격 글자로 이 줄(영림원 자재번호·자재명)을 찾습니다. 자재명을 고쳐도 열쇠는 명세서 글자 그대로.';
   const 연 = 연결모으기(s);
   let h = `<table class="dpr-t 폼표"><thead><tr><th class="dpr-k" rowspan="2" title="${글(열쇠말)}">${글(칸[품])}<span class="열쇠">명세서 열쇠</span></th><th class="열쇠2" rowspan="2" title="${글(열쇠말)}">${글(칸[규])}<span class="열쇠">명세서 열쇠</span></th>` +
-    `<th rowspan="2" class="묶">${글(삭제글)}</th><th rowspan="2" class="묶" title="영림원 입력폼이 되돌려 쓴 등록 결과(읽기만)">영림원 등록</th>` +
+    `<th rowspan="2" class="묶">${글(연결이름)}</th><th rowspan="2" class="묶" title="영림원 입력폼이 되돌려 쓴 등록 결과(읽기만)">영림원 등록</th>` +
     폼묶음.map(g => `<th class="묶" colspan="${폼칸.filter(f => f.g===g).length}">${글(g)}</th>`).join('') +
     `<th class="묶" rowspan="2">${글(이력글머리)}<span class="임">임시</span></th></tr><tr>` +
     폼칸.map((f,i) => `<th class="${i===0||폼칸[i-1].g!==f.g?'묶':''}">${글(f.l)}${f.req?'<span class="별">*</span>':''}${f.임시?'<span class="임">임시</span>':''}</th>`).join('') +
@@ -1311,7 +1313,7 @@ async function 폼그리기(){
     `<button class="chip${오류만?' on':''}" id="오류만" title="이 거래처의 영림원 등록 오류 줄만 봅니다">오류건 <b id="오류수">0</b></button>` +
     `<button class="chip${전체오류보기?' on':''}" id="전체오류" title="모든 거래처의 영림원 등록 오류 줄">전체 오류건 <b id="전체오류수">0</b></button>` +
     `<button class="chip${완료보기?' on':''}" id="완료만" title="영림원 등록 완료 줄만(같은 표, 잠금)">등록완료 <b id="완료수">0</b></button>` +
-    `<button class="chip${삭제보기?' on':''}" id="삭제만" title="${글(삭제글)} 체크 줄만(체크를 풀면 영림원보내기로)">삭제 <b id="삭제수">0</b></button>` +
+    `<button class="chip${삭제보기?' on':''}" id="삭제만" title="${글(연결이름)} 체크 줄만(체크를 풀면 영림원보내기로)">${글(연결이름)} <b id="삭제수">0</b></button>` +
     `<input type="file" id="양식파일" accept=".xlsx,.xls" hidden><span id="폼상태" class="폼상태"></span><span id="겹침" class="폼상태 bad"></span><span id="분류틀알림" class="폼상태 bad"></span></div><div id="오류목록" class="글" hidden></div><div class="표통">${h}</div>`;
   const 표 = 속.querySelector('.폼표'), 목록 = 속.querySelector('#분류목록'), 표통 = 속.querySelector('.표통');
   /* 칸 하나에 값 넣기 — 손으로 고친 것(change)과 v1.10.0 채우기·되돌리기가 같은 길. 겹침 다시 그림·저장예약은 부르는 쪽이 한 번에 */
