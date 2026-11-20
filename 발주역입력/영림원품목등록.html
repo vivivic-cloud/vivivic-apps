@@ -2,7 +2,10 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.18.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.19.0
+     v2.19.0(11-20): 사장님 「품목등록에서 공정흐름 옆에 소요량 입력 가능하게 해서, 이 입력이 BOM 분자에 적용되도록 해줘」 —
+       품목등록업로드 공정흐름 바로 오른쪽 덧칸 「소요량」(영림원 칸 아님, 머리 옅은 초록). 반제품 줄만 입력(제품 줄 td.막음).
+       열쇠 = 투입수량 칸과 같은 「투입수량@모품목」 → 두 칸이 늘 같은 값 · BOM 조립 줄 소요량(분자) = 이 값(v2.3·v2.18 길 그대로, 분모 규칙 그대로).
      v2.18.0(11-20): 사장님 — BOM 이 품목등록업로드 화면에 보이는 값만 쓰게. 원본 시트 값을 읽던 곳: 반제품값() 합판코드·필름코드·재단률, 조립짜기() 투입수량.
        이제 합판·필름코드·투입수량 = 사람 입력값(_입력) · 재단률 = 화면 재단률 칸 값(에이엠티 셈, 못 셈이면 엑셀 값). 빈 입력이면 BOM 그 칸 빈칸(v2.17 규칙).
        입력·재단률 셈이 바뀌면 BOM 표를 다시 만듦(연동칠·재단칠 앞에서 BOM다시). 화면만 — 창고 그대로.
@@ -192,6 +195,7 @@ html,body{height:100%;overflow:hidden}
 .dpr-t td.막음{cursor:not-allowed}   /* v2.3.0 제품 줄의 합판·필름·투입수량 칸 */
 .dpr-t td.단품없음{color:#e53935}   /* v2.5.0 업체별 단품명에 없는 제품·그 반제품 품명 */
 .dpr-t thead th.단서{cursor:pointer}
+.dpr-t thead th.단서.소요{cursor:auto}   /* v2.19.0 소요량 머리는 누름 없음 */
 .dpr-t td.목록밖{color:#e53935}   /* v2.7.0 목록에서 지운 공정흐름 값 */
 .dpr-t td.재단못{background:#FFF1E0}   /* v2.9.0 재단률 에이엠티 계산 안 됨(엑셀 원래 값) */
 .dpr-t td[data-k="재단률"]{cursor:pointer}
@@ -239,7 +243,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.18.0</div>
+  <div class="badge">v2.19.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -1136,7 +1140,7 @@ function 표만들기(칸, 줄, 이름){
   const h = ['<table class="dpr-t"><thead><tr>' +
     칸.map((k,i) => { const 필 = 필수칸[이름]?.has(String(k).trim());
       return `<th class="${(i===0?'dpr-k':'') + (필?' 필수':'')}"${필?' title="영림원 필수"':''}>${글(k)}</th>`; }).join('') + '</tr></thead><tbody>'];
-  if(품) h[0] = h[0].replace('<thead><tr>', '<thead><tr><th class="단서" title="영림원 칸 아님 — BOM 연동용">공정흐름</th>');   /* v2.6.0 품명 앞 덧칸 */
+  if(품) h[0] = h[0].replace('<thead><tr>', '<thead><tr><th class="단서" title="영림원 칸 아님 — BOM 연동용">공정흐름</th><th class="단서 소요" title="영림원 칸 아님 — BOM 연동용">소요량</th>');   /* v2.19.0 소요량 덧칸 */   /* v2.6.0 품명 앞 덧칸 */
   for(const r of 줄){
     const p = 품 ? (String(r.v[pi]??'').trim() || '#' + r.행) : '';
     let tr = 품 ? `<tr data-p="${글(p)}">` : '<tr>';
@@ -1145,6 +1149,8 @@ function 표만들기(칸, 줄, 이름){
     if(품) tr += 반 || String(r.v[ai]??'').trim()!=='제품'
       ? ((자) => `<td class="편 드롭칸${파랑(p,'공정흐름')?' 저장값':''}${공밖(p)?' 목록밖" title="목록에 없는 흐름':자?` 공자동" title="${글(자.근거)}`:''}" data-k="공정흐름">${글(자 ? 자.v : 값(p,'공정흐름'))}</td>`)(반 && 공자동(p))   /* v2.6.0 · v2.8.0 자동 */
       : `<td class="막음" data-k="공정흐름" data-알림="제품 — 조립">조립</td>`;   /* v2.6.1 제품 = 조립 고정 */
+    if(품){ const k = '투입수량@' + String(r.v[mi0]??'').trim();   /* v2.19.0 공정흐름 옆 「소요량」 = 투입수량 칸과 같은 열쇠(같은 값) → BOM 조립 줄 분자 */
+      tr += 반 ? `<td class="편 num${파랑(p,k)?' 저장값':''}" data-k="${글(k)}">${글(값(p,k))}</td>` : `<td class="막음" data-k="${글(k)}"></td>`; }
     for(let i=0;i<칸.length;i++){
       const ei = 편.indexOf(i);
       if(ei>=0){ let k = 편칸[ei];
