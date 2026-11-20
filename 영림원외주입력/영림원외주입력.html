@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v309 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v310 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -131,7 +131,7 @@ input.bad,select.bad{border-color:var(--red)}
 .clsnew select,.clsnew input[type=text]{box-shadow:inset 0 0 0 2px #E5B800;background:#FFF7C2}   /* v301 자재 분류 노랑 = 신규(완료 분류에 없음 · 규칙 통과) */
 /* v235 세트구성품등록 — 임시 칩 · 벤더피아에서 불러오기 목록(세로 목록, 가로로 안 밀림) */
 .chip.tmp{background:var(--amber-bg);color:var(--amber);border-color:#fde68a;margin-left:4px;vertical-align:1px}
-.bdreg .bdvn{margin:8px 0 10px}.bdreg td.bdwhy{white-space:normal;min-width:180px;font-size:12px}.bdreg td.bdwhy.bad,.bdreg .bdbad{color:var(--red)}.bdreg .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}.bdreg .bdrfail{margin:10px 0;padding:12px 14px;border:2px solid var(--red);border-radius:10px;background:var(--red-bg);color:var(--red);font-weight:800;font-size:14px}.bdreg .bdrh{font-size:14px;font-weight:800;margin:14px 0 2px}.bdreg td{white-space:nowrap}.bdreg td .chip{vertical-align:1px}.bdreg .bdfold{cursor:pointer;user-select:none}   /* v281 구매자재 일괄등록 · v306 완료 접힘 */
+.bdreg .bdvn{margin:8px 0 10px}.bdreg td.bdwhy{white-space:normal;min-width:180px;font-size:12px}.bdreg td.bdwhy.bad,.bdreg .bdbad{color:var(--red)}.bdreg .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}.bdreg .bdrfail{margin:10px 0;padding:12px 14px;border:2px solid var(--red);border-radius:10px;background:var(--red-bg);color:var(--red);font-weight:800;font-size:14px}.bdreg .bdrh{font-size:14px;font-weight:800;margin:14px 0 2px}.bdreg td{white-space:nowrap}.bdreg td .chip{vertical-align:1px}.bdreg .bdfold{cursor:pointer;user-select:none}.bdreg tr.bded td{background:#fef9c3}.bdreg td.bdedc{width:1%}   /* v281 구매자재 일괄등록 · v306 완료 접힘 · v310 줄 수정 */
 .bdreg .bdhave,.bdreg td.bdhave{color:var(--green)}.bdreg tr.bdturn td{background:#eff6ff}.bdreg tr.bdwait td{color:var(--muted)}.bdreg .bdstep{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 6px}.bdreg .bdstep>span{padding:4px 10px;border:1px solid var(--line2);border-radius:999px;font-size:13px;color:var(--muted);background:#fff}.bdreg .bdstep>span.on{background:#2383e2;border-color:#2383e2;color:#fff;font-weight:800}.bdreg .bdstep small{margin-left:6px;font-size:12px}.bdreg .bdstep small b{font-weight:400;margin-left:4px}.bdreg .bdstep small b.on{font-weight:900;text-decoration:underline}   /* v299 있음·차례 */
 .vpbox{flex-basis:100%;min-width:0;border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:6px;background:#fff}
 .vpbox input[type=search]{flex:1 1 200px;min-width:0}
@@ -484,7 +484,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v309</span>
+    <span class="ver">v310</span>
     <div class="pick topnav" id="topnav">   <!-- v288 사장님 11-18 「입력폼 상단에 발주역입력 메뉴를 만들어 발주역입력 페이지로 이어지게」 — 이름 = 각 페이지 <title> 앞부분 · 같은 탭 -->
       <button type="button" class="btn small" aria-haspopup="menu" aria-expanded="false">발주역입력</button>
       <div class="pickmenu topnavmenu" role="menu" hidden>
@@ -4276,6 +4276,45 @@ function bdRun(V,P){   /* 돌려줌 = {n} · 실패면 reject(아무것도 안 �
   });
 }
 var bdrDraw=null;
+/* v310 사장님 11-20 「아 그러지말고 일괄등록에서 일어난 일이니까 일괄등록에서 수정 할 수 있게 해줘」(MDF3T_N!26 오타) — 등록 상태 표(대기·오류·완료) 줄 「수정」.
+   완료 = 저장한 항목 「수정」과 같은 길(editOpen → editSave: 분류 clsEditSave · 자재번호 matEditSave · 그 밖 editPatch → 수정대기 · edit · editLog) — 구매단가도 이 길(품번 잠금).
+   대기·오류 = 이 메뉴 bdPushOne 의 대기·오류 문서 고침과 같은 값 고침(normVals · fillDoc · status 대기 · agentNote 비움, bd 칸 그대로) · 진행중·수정대기·수정 오류는 못 고침(까닭 = 마우스).
+   열린 수정 칸 = EDITING(저장한 항목과 같은 자리) — 저장·닫기 뒤 renderList 가 이 화면을 다시 그림. */
+function bdEdWhy(k,dd){var st=dd.status||'대기';
+  if(ylwGone(dd))return '영림원에 없음';
+  if(!canCol('erp_'+k,'w'))return '수정 권한 없음';
+  if(hasEdit(dd))return st==='오류'?'수정 오류 — 저장한 항목에서 되돌리기·취소':'수정대기 — 입력 작업자 처리 전';
+  if(st==='진행중')return '진행중 — 입력 작업자가 넣는 중';
+  return st==='완료'||st==='대기'||st==='오류'?'':st;}
+function bdEdOpen(k,dd){
+  var s=BYKEY[k],key=k+'/'+dd.id;
+  if(EDITING[key]){delete EDITING[key];renderList();return;}
+  if(dd.status==='완료')editOpen(s,dd);
+  else{var fm=buildForm(s),head={};fm._bdw=1;fm.submit.textContent='수정 저장';
+    s.fields.forEach(function(f){if(f.k in dd)head[f.k]=dd[f.k];});fm.fill(head,[]);
+    fm.el.classList.add('editform');
+    fm.submit.after(h('button',{type:'button',class:'btn',on:{click:function(){delete EDITING[key];renderList();}}},'닫기'));
+    fm.el.addEventListener('submit',function(e){e.preventDefault();bdWaitSave(s,dd.id,fm);});
+    EDITING[key]=fm;renderList();}
+  var f=EDITING[key];if(f)setTimeout(function(){if(f.el.isConnected)f.el.scrollIntoView({block:'nearest'});},0);
+}
+function bdWaitSave(s,id,fm){
+  var say=function(t,bad){fm.msg.textContent=t;fm.msg.className='msg'+(bad?' bad':'');};
+  if(!db){say('저장소에 연결되지 않아 저장할 수 없습니다.',true);return;}
+  var res=fm.collect();
+  if(!res.ok){say(res.fmt?res.fmt:'필수 항목 '+res.count+'곳이 비어 있습니다.',true);if(res.first)res.first.focus();return;}
+  var nv=normVals(s,res.value);
+  var dupM=s.saveCheck?s.saveCheck(nv,id):'';if(dupM){say(dupM,true);return;}
+  fm.submit.disabled=true;
+  db.collection('erp_'+s.key).doc(id).updateIf(function(cur){
+    if(!(cur.status==='대기'||cur.status==='오류')||hasEdit(cur))return null;
+    var o=Object.assign({},nv);if(s.fillDoc)s.fillDoc(o);o.status='대기';o.agentNote='';return o;
+  }).then(function(ok){
+    fm.submit.disabled=false;
+    if(!ok){say('그 사이 입력 작업자가 처리를 시작해 저장하지 않았습니다.',true);return;}
+    delete EDITING[s.key+'/'+id];renderList();flash('저장했습니다. 대기 상태로 쌓였습니다.');
+  },function(e){fm.submit.disabled=false;say('저장하지 못했습니다. '+errText(e),true);});
+}
 function renderBdReg(){
   BDR.done=false;   /* v306 화면 다시 열면 완료 접힘 */
   bulk=null;listBox=null;listBox2=null;sheetDraw=null;ifRefresh=null;form=null;
@@ -4332,10 +4371,16 @@ function renderBdReg(){
           parts.push(h('div',{class:'bdstep'},BD_ORDER.map(function(k,i){var on=T.cur===k,c=T.n[k];
             return h('span',{class:on?'on':'',title:'차례 '+c.ok+' · 기다림 '+c.wait},(i+1)+'. '+BYKEY[k].title+' '+c.ok,
               k==='classes'&&c.ok?h('small',{},BD_LV.map(function(n,j){return h('b',{class:on&&T.lv===j?'on':''},n+' '+T.lvn[j]);})):'');})));}
-        parts=parts.concat(tbl(bad?['단계','내용','이유']:['단계','내용','상태'],rs.map(function(o){var dd=o.d;
+        var eds=[];   /* v310 이 묶음에서 열린 수정 칸(표 아래) */
+        parts=parts.concat(tbl((bad?['단계','내용','이유']:['단계','내용','상태']).concat(['']),rs.map(function(o){var dd=o.d;
           var ta=wt?{class:o.turn?'bdturn':'bdwait','data-turn':o.turn?'1':'0',title:o.turn?'차례'+(o.k==='classes'?' — '+BD_LV[o.g.lv]:''):(o.g.why||'기다림')}:{};
+          var ek=o.k+'/'+dd.id,why=bdEdWhy(o.k,dd),fm=EDITING[ek];
+          if(fm&&(why||!!fm._bdw!==(dd.status!=='완료'))){delete EDITING[ek];fm=null;}   /* 그 사이 상태가 바뀌면 수정 칸을 닫는다 */
+          if(fm){eds.push(fm.el);ta=Object.assign({},ta,{class:((ta.class||'')+' bded').trim()});}
           return h('tr',ta,h('td',{},BYKEY[o.k].title),h('td',{},STC[o.k].map(function(c){return bdTr(dd[c]);}).filter(Boolean).join(' · ')),
-            bad?h('td',{class:'bdwhy bad'},dd.agentNote||''):h('td',{},h('span',{class:'chip '+o.st},o.st)));})));});}
+            bad?h('td',{class:'bdwhy bad'},dd.agentNote||''):h('td',{},h('span',{class:'chip '+o.st},o.st)),
+            h('td',{class:'bdedc',title:why||null},h('button',{type:'button',class:'btn small'+(fm?' primary':''),disabled:!!why,'aria-pressed':fm?'true':'false',on:{click:function(){bdEdOpen(o.k,dd);}}},'수정')));})));
+        parts=parts.concat(eds);});}
     res.replaceChildren.apply(res,parts);
     var noPerm=bdNoPerm();   /* v284 권한 없는 단계가 있으면 누르기 전에 막음 */
     if(noPerm.length)res.prepend(h('div',{class:'bdrfail'},'이 계정은 '+noPerm.join(' · ')+' 등록 권한이 없음 — 등록대기를 할 수 없습니다(담당자 관리에서 권한).'));
@@ -7251,7 +7296,7 @@ function clsTreeDraw(listBox,head,rows,tail){
   if(foc){o.inp.focus();try{o.inp.setSelectionRange(ss,ss);}catch(e){}}
 }
 function renderList(){
-  if(!listBox)return;
+  if(!listBox){if(cur==='bdreg'&&bdrDraw)bdrDraw();return;}   /* v310 구매자재 일괄등록 줄 수정 — 저장·닫기 뒤 다시 그림 */
   var s=BYKEY[cur];
   renderListIn(s,listBox,'저장한 항목');
   if(s.alsoList&&listBox2)renderListIn(BYKEY[s.alsoList],listBox2,s.alsoTitle||'저장한 공정');
