@@ -8,6 +8,8 @@
   python3 결과맞추기.py            모든 거래처 맞춤(바뀐 칸만 씀) · 끝에 「어긋남 0」
   python3 결과맞추기.py 양지데코   그 거래처만
   python3 결과맞추기.py 보기       쓰지 않고 어긋난 칸만 보임
+v313(11-20) 공정흐름 사본도: `발주역입력_영림원폼/_공정흐름` = 공정흐름(erp_flows) 완료 이름(폼 bdFlowPub 와 같은 셈)
+  → 발주역입력/영림원품목등록 공정흐름 드롭(로그인 없는 기기). **흐름 status 를 바꾼 뒤에도 이 스크립트를 돌린다.**
 토큰 = 작업자표.py. 출력엔 거래처·열쇠·단계·상태만(단가·토큰 안 적음).
 """
 import json, os, sys, time, urllib.request, urllib.parse, urllib.error
@@ -203,8 +205,27 @@ def cls_pub(docs, data, dry):   # 폼 bdClsPub — _분류.영림원
     return 1
 
 
+def flow_rows(flows):   # 폼 bdFlowRows — 공정흐름 완료·ylwGone 아님, createdAt 차례
+    out, seen = [], set()
+    for r in sorted((r for r in flows if r.get('status') == '완료' and not gone(r) and tr(r.get('name'))),
+                    key=lambda r: (str(r.get('createdAt') or ''), tr(r.get('name')))):
+        n = tr(r.get('name'))
+        if n not in seen: seen.add(n); out.append(n)
+    return out
+
+
+def flow_pub(docs, data, dry):   # 폼 bdFlowPub (v313) — _공정흐름 = 영림원품목등록 공정흐름 드롭(로그인 없을 때)
+    rows = flow_rows(data['flows'])
+    cd = next((x for x in docs if x['id'] == '_공정흐름'), None)
+    if cd and cd.get('줄') == rows: return 0
+    if not dry:
+        body = {'fields': {'줄': enc(rows), '올린때': enc(time.strftime('%Y-%m-%dT%H:%M:%S.000Z', time.gmtime())), '출처': enc('입력폼 공정흐름유형등록(완료)')}}
+        req('PATCH', DB + q(BD + '/_공정흐름'), body)   # 없으면 만듦 · 통째
+    return 1
+
+
 def run(only=None, dry=False):
-    data = {k: col('erp_' + k) for k in ('classes', 'materials', 'purprices')}
+    data = {k: col('erp_' + k) for k in ('classes', 'materials', 'purprices', 'flows')}
     docs = col(BD)
     vendors = sorted([d for d in docs if not d['id'].startswith('_') and isinstance((d.get('보내기') or {}).get('줄'), list)], key=lambda d: d['id'])
     left = 0
@@ -218,11 +239,15 @@ def run(only=None, dry=False):
         else: write(d['id'], ch)
     c = cls_pub(docs, data, dry)
     if c: print('_분류.영림원 ' + ('다름' if dry else '올림'))
+    f = flow_pub(docs, data, dry)
+    if f: print('_공정흐름 ' + ('다름' if dry else '올림'))
     if not dry:   # 다시 읽어 확인
         docs = col(BD)
         for d in docs:
             if d['id'].startswith('_') or not isinstance((d.get('보내기') or {}).get('줄'), list) or (only and d['id'] != only): continue
             left += len(diff(d, want(d, data)))
+        if flow_pub(docs, data, True): left += 1
+    elif f: left += 1
     print('어긋남 %d' % left)
     return left
 

@@ -6,6 +6,7 @@
 | 화면(번호) | 파일 | 받는 것(폼 자료) | 함수 | 한 번에 여러 건 | 확인 |
 |---|---|---|---|---|---|
 | (터미널, 영림원 화면 아님) 매입현황 줄 상태 맞추기 | `결과맞추기.py` | `erp_classes`·`erp_materials`·`erp_purprices` 의 `bd` 문서 → 공개 `발주역입력_영림원폼/{거래처}.결과`·`_분류.영림원` | `python3 결과맞추기.py [거래처] [보기]` — `bd` 문서 status 를 바꿀 때마다 그 직후(v305) | 예(모든 거래처) | 11-20 실제 어긋남 0 · T 시험 대기→진행중→완료→오류→수정대기→지움 |
+| (터미널, v313) 공정흐름 사본 맞추기 | `결과맞추기.py`(같은 실행) | `erp_flows` 완료(ylwGone 뺌) 이름 → 공개 `발주역입력_영림원폼/_공정흐름` = 영림원품목등록 공정흐름 드롭. 흐름 status 를 바꾼 뒤 돌림 | `flow_rows`·`flow_pub` | 통째 | 끝에 「어긋남 0」 |
 | (모든 표 화면) | `공통.js` | — | `ylw.paste`·`ylw.setChk`·`ylw.check`·`ylw.rows`·`ylw.fs`·`ylw.reopen`·`ylw.dateGuard`(11-08) | — | 11-01 |
 | 거래처등록(500347) | `거래처등록-채우기.js` | `erp_vendors` 한 건 `{sangho,name,corp,rep,tel,biztype,bizitem,kinds,…}` | `ylwFill(v)` · `ylwKinds(종류들)` · `ylwRead()` · `ylwCheck(v)` | 아니오(한 화면 한 건) | 10-31 저장 8건 · 11-01 칸 id·종류 체크(저장 없음) |
 | 구매 정산 서류 담기(501596 · 전표입력(자동전표) · 527278) | `정산서류-읽기.js` | `erp_purcalcs` 완료 문서 한 건 | `ylw.cdoc.calc(입고번호)`·`slip()`·`tax()`·`img(input)`·`save(id, 종류, 값)`·`done(id)` | 한 건씩(읽기만) | 11-14 같은 꼴로 3건(관리자 계정으로 씀) |

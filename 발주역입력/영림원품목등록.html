@@ -2,7 +2,12 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.21.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.22.0
+     v2.22.0(11-20): 사장님 「입력폼에 있는지 확인하고 확인된것들 드롭선택하게 해줘 중요한건 이번 한번이 아니라 이걸 계속 유지 할 수 있는 장치를 만들어야 한다는거야 예를 들면 새로고침하면 입력폼이랑 동기화를 한번 한다던가 아니면 입력폼이 바뀔때 같이 바뀌도록 연결해 놓는 다던가」 —
+       공정흐름 드롭 목록 = 입력폼 공정흐름(erp_flows) status 완료(ylwGone 뺌)만, 처음 저장한 차례. 입력폼 로그인 있으면 erp_flows 직접 onSnapshot ·
+       없으면 공개 사본 발주역입력_영림원폼/_공정흐름 {줄[]} onSnapshot(입력폼 v313 bdFlowPub · 입력작업자/스크립트/결과맞추기.py 가 흐름이 바뀔 때마다 씀) → 새로고침 없이 따라 바뀜.
+       코드 속 기본 9개·이 화면 전용 _공정목록·머리 누름 추가/삭제 창 = 뺌(새 흐름은 입력폼 6단계에서만). 둘 다 못 읽으면 빈 목록 + 머리 주황(마우스 = 이유).
+       목록 밖 값 = 그대로 두고 빨간 글자 · 마우스 「입력폼 공정흐름에 없음」 · 부속명 자동(v2.8)·BOM 가공 줄(v2.11·v2.21)에 안 씀. 제품 줄 「조립」 고정 그대로.
      v2.21.0(11-20): 사장님 「공정흐름을 넣은 이유가 이거야. 이렇게 되게 해」(= v2.11.0 「현 공정흐름에 맞게 재배치」) —
        BOM 가공 줄이 생기는 조건 = 반제품 공정흐름(화면 값 — 사람·자동). v2.20.0 의 「코드가 있어야 줄」 뺌.
        v2.11.0 규칙 그대로: 합판 줄 = 「재단」 든 첫 공정(없으면 첫 공정) · 필름 줄 = 「엣지」 공정(엣지 든 공정). 흐름에 엣지가 없으면 필름 줄 없음 · 흐름이 없으면 가공 줄 없음.
@@ -103,20 +108,25 @@
        로그인·로그아웃·쓰기 안 함 · 로그인이 없거나 못 읽으면 공개 사본(발주역입력_영림원폼 결과 자재 완료). */
     try{
         const 폼앱 = initializeApp(설정, 'erp-input'), 폼auth = getAuth(폼앱), 폼db = getFirestore(폼앱);
-        let 끄기 = null, 끄기2 = null;
+        let 끄기 = null, 끄기2 = null, 끄기3 = null;
         onAuthStateChanged(폼auth, (u) => {
             if (끄기) { 끄기(); 끄기 = null; }
             if (끄기2) { 끄기2(); 끄기2 = null; }
+            if (끄기3) { 끄기3(); 끄기3 = null; }
             const 받음 = (줄, 왜) => { window.폼자재대기 = [줄, 왜]; if (window.폼자재받음) window.폼자재받음(줄, 왜); };
             /* v2.5.0 입력폼 거래처등록(erp_vendors) status 완료 — 기본구매처(업체 이름 맞춤 · 반제품 외주가공 드롭) */
             const 받음2 = (줄, 왜) => { window.폼거래처대기 = [줄, 왜]; if (window.폼거래처받음) window.폼거래처받음(줄, 왜); };
-            if (!u) { 받음(null, '입력폼 로그인 없음'); 받음2(null, '입력폼 로그인 없음'); return; }
+            /* v2.22.0 입력폼 공정흐름(erp_flows) status 완료 — 공정흐름 드롭 */
+            const 받음3 = (줄, 왜) => { window.폼공정대기 = [줄, 왜]; if (window.폼공정받음) window.폼공정받음(줄, 왜); };
+            if (!u) { 받음(null, '입력폼 로그인 없음'); 받음2(null, '입력폼 로그인 없음'); 받음3(null, '입력폼 로그인 없음'); return; }
             끄기 = onSnapshot(query(collection(폼db, 'erp_materials'), where('status', '==', '완료')),
                 s => 받음(s.docs.map(d => d.data()), ''), e => 받음(null, (e && (e.code || e.message)) || ''));
             끄기2 = onSnapshot(query(collection(폼db, 'erp_vendors'), where('status', '==', '완료')),
                 s => 받음2(s.docs.map(d => d.data()), ''), e => 받음2(null, (e && (e.code || e.message)) || ''));
+            끄기3 = onSnapshot(query(collection(폼db, 'erp_flows'), where('status', '==', '완료')),
+                s => 받음3(s.docs.map(d => d.data()), ''), e => 받음3(null, (e && (e.code || e.message)) || ''));
         });
-    }catch(e){ window.폼자재대기 = [null, String(e && e.message || e)]; window.폼거래처대기 = [null, String(e && e.message || e)]; }
+    }catch(e){ window.폼자재대기 = [null, String(e && e.message || e)]; window.폼거래처대기 = [null, String(e && e.message || e)]; window.폼공정대기 = [null, String(e && e.message || e)]; }
     window.db = getFirestore(app);
     window.fbRead = { doc, getDoc, setDoc, collection, onSnapshot };
     onAuthStateChanged(auth, (u) => {
@@ -202,9 +212,8 @@ html,body{height:100%;overflow:hidden}
 .dpr-t thead th.단서{background:#EAF3E6}   /* v2.6.0 영림원 칸 아님(공정흐름 — BOM 연동 단서) */
 .dpr-t td.막음{cursor:not-allowed}   /* v2.3.0 제품 줄의 합판·필름·투입수량 칸 */
 .dpr-t td.단품없음{color:#e53935}   /* v2.5.0 업체별 단품명에 없는 제품·그 반제품 품명 */
-.dpr-t thead th.단서{cursor:pointer}
-.dpr-t thead th.단서.소요{cursor:auto}   /* v2.19.0 소요량 머리는 누름 없음 */
-.dpr-t td.목록밖{color:#e53935}   /* v2.7.0 목록에서 지운 공정흐름 값 */
+.dpr-t thead th.단서.공정못{background:#FFE0B2}   /* v2.22.0 입력폼 공정흐름 못 읽음 */
+.dpr-t td.목록밖{color:#e53935}   /* v2.7.0 · v2.22.0 입력폼 공정흐름에 없는 값 */
 .dpr-t td.재단못{background:#FFF1E0}   /* v2.9.0 재단률 에이엠티 계산 안 됨(엑셀 원래 값) */
 .dpr-t td[data-k="재단률"]{cursor:pointer}
 .dpr-t td.조립바뀜{background:#FFF6CC}   /* v2.14.0 자동 조립 줄 — 원본 BOM 과 다른 칸 */
@@ -224,17 +233,6 @@ html,body{height:100%;overflow:hidden}
 .재단창 .도{border-top:1px solid #C7C7C3;margin-top:8px;padding-top:6px}
 .재단창 .도머{color:var(--vg-body);padding-bottom:2px}
 .dpr-t td.공자동{color:#A3A39F}   /* v2.8.0 공정흐름 자동 값(부속명 규칙 · 저장 안 된 것) = 옅은 글자 */
-.공정창{position:fixed;z-index:55;background:var(--vg-bg);border:1px solid #C7C7C3;border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.16);
-  padding:10px;width:230px;max-width:calc(100vw - 32px);font-size:12.5px}
-.공정창 .줄{display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid var(--vg-edge)}
-.공정창 .줄 span{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.공정창 button{font:inherit;font-size:12px;padding:3px 9px;border:1px solid #C7C7C3;border-radius:6px;background:var(--vg-fill);color:var(--vg-ink);cursor:pointer}
-.공정창 button:disabled{opacity:.35;cursor:not-allowed}
-.공정창 .목{max-height:260px;overflow:auto}
-.공정창 .넣기{display:flex;gap:6px;margin-top:8px}
-.공정창 .넣기 input{flex:1;min-width:0;font:inherit;font-size:13px;padding:4px 6px;border:1px solid #C7C7C3;border-radius:6px}
-@media (pointer:coarse){.공정창 .넣기 input{font-size:16px}}
-.공정창 .닫기{display:block;margin:8px 0 0 auto}
 .막음알림{position:fixed;z-index:60;background:#c62828;color:#fff;font-size:12.5px;font-weight:700;padding:5px 10px;border-radius:6px;pointer-events:none;white-space:nowrap}
 .자재고름{position:fixed;z-index:50;background:var(--vg-bg);border:1px solid #C7C7C3;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.12);
   max-height:260px;overflow:auto;min-width:160px;padding:3px 0;font-size:12px}
@@ -251,7 +249,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.21.0</div>
+  <div class="badge">v2.22.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -395,10 +393,9 @@ function 추가그리기(){
      → X 의 입력 합판코드(필름코드)가 있으면 하위품번 = 입력값, 하위품명 = (원래 하위품명이 품번과 같으면) 입력값 / (아니면) 자재명, 하위규격 = 자재 규격(목록에 없으면 원래 값).
      입력값이 빈칸이면 원래 BOM 값 그대로(임시). 원래 필름 줄이 없는 반제품(합판 줄만)에 필름코드를 넣어도 BOM 줄은 생기지 않는다(임시). */
 const 편칸 = ['품목설명','합판코드','필름코드','투입수량','기본구매처'], 고를칸 = { 합판코드:'합판', 필름코드:'필름', 기본구매처:'외주', 공정흐름:'공정' };
-/* v2.6.0 공정흐름 — 품명 앞 덧칸(영림원 시트 칸 아님, 창고 시트에도 없음). 이 9개만 들어감(차례·표기 사장님 그대로). v2.11.0 BOM 가공 줄 공정 = 이 흐름(BOM공정칠) */
-const 기본공정 = ['조립','재단-엣지-보링','재단-엣지','재단','재단-NC-곡면엣지','NC','NC멤브레인','오버레이','라미날접착'];
-/* v2.7.0 목록은 창고 _공정목록 {목록[], 고친때} — 없으면 기본공정 9개. 머리 누름 창에서 추가·삭제(모든 기기 같음). 「조립」 = 제품 고정값이라 삭제 막음 */
-let 공정목록 = 기본공정.slice();
+/* v2.6.0 공정흐름 — 품명 앞 덧칸(영림원 시트 칸 아님, 창고 시트에도 없음). 목록 안 값만 들어감. v2.11.0 BOM 가공 줄 공정 = 이 흐름(BOM공정칠)
+   v2.22.0 목록 = 입력폼 공정흐름 완료(공정목록받기) — 코드 속 목록·화면 전용 _공정목록·추가/삭제 창 없음. 공정읽음 전엔 목록 밖 빨강 안 칠함 */
+let 공정목록 = [], 공정읽음 = false;
 /* v2.3.0 반제품만 입력 — 제품 줄의 이 칸은 td.막음(경고만). 투입수량 열쇠 = 「투입수량@모품목」(BOM 조립 줄 짝) */
 const 반제품칸 = new Set(['합판코드','필름코드','투입수량','기본구매처']);
 let 막음틀 = null;
@@ -496,6 +493,7 @@ function 입력구독(){
   if(window.폼자재대기) window.폼자재받음(...window.폼자재대기);
   공개거래처구독();
   공정목록구독();
+  if(window.폼공정대기) window.폼공정받음(...window.폼공정대기);   /* v2.22.0 */
   원장구독();   /* v2.9.0 */
   if(window.폼거래처대기) window.폼거래처받음(...window.폼거래처대기);
 }
@@ -524,56 +522,42 @@ function 공자동(p){   /* → {v, 근거} 또는 null */
   return 하나(공규칙.바.get(바탕(t)), 바탕(t));
 }
 /* v2.7.0 목록에 없는 공정흐름 값 = 빨강 + title (값은 그대로) */
-const 공밖 = p => { const v = 값(p,'공정흐름').trim(); return !!v && !공정목록.includes(v); };
+const 공밖 = p => { const v = 값(p,'공정흐름').trim(); return 공정읽음 && !!v && !공정목록.includes(v); };
 function 공정칠(){
   const 통 = 받은[품목시트]; if(!통 || !통.querySelector) return;
   공규칙셈();
   통.querySelectorAll('td.편[data-k="공정흐름"]').forEach(td => {
-    const v = 값(td.parentNode.dataset.p, '공정흐름').trim(), 밖 = !!v && !공정목록.includes(v) && !td.classList.contains('편집중');
+    const 밖 = 공밖(td.parentNode.dataset.p) && !td.classList.contains('편집중');
     const 자 = !td.classList.contains('편집중') && 공자동(td.parentNode.dataset.p);   /* v2.8.0 */
     if(!td.classList.contains('편집중')) td.textContent = 자 ? 자.v : 값(td.parentNode.dataset.p, '공정흐름');
     td.classList.toggle('공자동', !!자);
-    td.classList.toggle('목록밖', 밖); if(밖) td.title = '목록에 없는 흐름'; else if(자) td.title = 자.근거; else td.removeAttribute('title');
+    td.classList.toggle('목록밖', 밖); if(밖) td.title = '입력폼 공정흐름에 없음'; else if(자) td.title = 자.근거; else td.removeAttribute('title');
   });
+  const 머 = 통.querySelector('th.단서:not(.소요)');   /* v2.22.0 입력폼 공정흐름을 못 읽음 = 주황 머리 */
+  if(머){ 머.classList.toggle('공정못', !!공정못); 머.title = 공정못 ? '입력폼 공정흐름을 읽지 못함 — ' + 공정못 : '영림원 칸 아님 — BOM 연동용 · 목록 = 입력폼 공정흐름 완료'; }
   BOM공정칠();
 }
+/* v2.22.0 목록 = 입력폼 공정흐름 완료 — 로그인 있으면 erp_flows(폼공정), 없거나 못 읽으면 공개 사본 발주역입력_영림원폼/_공정흐름(공개공정, 입력폼·결과맞추기.py 가 씀) */
+let 폼공정 = null, 공개공정 = null, 폼공정왜 = '', 공개공정왜 = '', 공정못 = '';
+function 공정목록받기(){
+  const 목 = 폼공정 || 공개공정;
+  공정읽음 = !!목; 공정목록 = 목 ? [...new Set(목)] : [];
+  공정못 = !목 && 폼공정왜 && 공개공정왜 ? 폼공정왜 + ' · ' + 공개공정왜 : '';   /* 둘 다 못 읽었을 때만 */
+  공정칠();
+}
+window.폼공정받음 = (줄, 왜) => {
+  const 트 = v => String(v ?? '').trim();
+  폼공정 = 줄 ? 줄.filter(r => !r.ylwGone && 트(r.name)).sort((a,b) => String(a.createdAt||'').localeCompare(String(b.createdAt||'')) || 트(a.name).localeCompare(트(b.name))).map(r => 트(r.name)) : null;
+  폼공정왜 = 줄 ? '' : (왜 || '입력폼 못 읽음');
+  공정목록받기();
+};
 function 공정목록구독(){
   const { doc, onSnapshot } = window.fbRead;
-  onSnapshot(doc(window.db, ...창고자리, '_공정목록'), d => {
-    const 목 = d.exists() && Array.isArray(d.data().목록) ? d.data().목록.map(x => String(x).trim()).filter(Boolean) : null;
-    공정목록 = 목 && 목.length ? [...new Set(목)] : 기본공정.slice();
-    공정칠(); 공정창그림();
-  }, () => {});
-}
-async function 공정목록저장(새){
-  try{ const { doc, setDoc } = window.fbRead;
-    await setDoc(doc(window.db, ...창고자리, '_공정목록'), { 목록:새, 고친때:new Date().toISOString() });
-    공정목록 = 새; 공정칠(); 공정창그림(); 큰알림(null);
-  }catch(e){ 큰알림('⚠ 공정흐름 목록을 저장하지 못했습니다 — 인터넷을 확인하고 다시 하십시오. ' + ((e&&(e.code||e.message))||'')); }
-}
-function 공정창그림(){
-  const 창 = document.querySelector('.공정창'); if(!창) return;
-  창.querySelector('.목').innerHTML = 공정목록.map((c,i) => `<div class="줄"><span title="${글(c)}">${글(c)}</span><button type="button" data-i="${i}"${c==='조립'?' disabled title="제품 고정값"':''}>삭제</button></div>`).join('');
-}
-function 공정창열기(e){
-  e.stopPropagation();
-  let 창 = document.querySelector('.공정창');
-  if(창){ 창.remove(); return; }
-  창 = document.createElement('div'); 창.className = '공정창';
-  창.innerHTML = '<div class="목"></div><div class="넣기"><input type="text" autocomplete="off" maxlength="30"><button type="button" class="추가">추가</button></div><button type="button" class="닫기">닫기</button>';
-  document.body.appendChild(창); 공정창그림();
-  const r = e.currentTarget.getBoundingClientRect();
-  창.style.left = Math.max(8, Math.min(r.left, innerWidth - 창.offsetWidth - 8)) + 'px';
-  창.style.top = Math.max(8, Math.min(r.bottom + 4, innerHeight - 창.offsetHeight - 8)) + 'px';
-  const inp = 창.querySelector('input');
-  const 추가 = () => { const v = inp.value.trim(); if(!v) return;
-    if(공정목록.includes(v)){ 막음알림(inp, '이미 있는 흐름'); return; }
-    inp.value = ''; 공정목록저장(공정목록.concat(v)); };
-  창.querySelector('.추가').onclick = 추가;
-  inp.addEventListener('keydown', ev => { if(ev.isComposing) return; if(ev.key==='Enter'){ ev.preventDefault(); 추가(); } else if(ev.key==='Escape') 창.remove(); });
-  창.querySelector('.닫기').onclick = () => 창.remove();
-  창.querySelector('.목').addEventListener('click', ev => { const b = ev.target.closest('button[data-i]'); if(!b || b.disabled) return;
-    const c = 공정목록[+b.dataset.i]; if(c==='조립') return; 공정목록저장(공정목록.filter(x => x!==c)); });
+  onSnapshot(doc(window.db, 'artifacts','vivivic-4b7ef','public','data','발주역입력_영림원폼','_공정흐름'), d => {
+    const 줄 = d.exists() && Array.isArray(d.data().줄) ? d.data().줄.map(x => String(x).trim()).filter(Boolean) : null;
+    공개공정 = 줄; 공개공정왜 = 줄 ? '' : '공개 사본 없음';
+    공정목록받기();
+  }, e => { 공개공정 = null; 공개공정왜 = '공개 사본 못 읽음 ' + ((e&&(e.code||e.message))||''); 공정목록받기(); });
 }
 
 function 칸칠(){
@@ -673,7 +657,8 @@ function BOM다시(){
      합판 줄 = 「재단」 든 첫 공정(없으면 첫 공정) · 필름 줄 = 「엣지」 공정(없으면 엣지 든 공정 · 그것도 없으면 첫 공정 + 주황 td.엣지없음).
      합판/필름 가름 = v2.20.0 부터 그 줄을 만든 코드 칸(합판코드 → 재단 쪽 · 필름코드 → 엣지 쪽). 흐름 없음 = 빈칸 + 빨강 바탕 td.흐름없음.
    · 사람 값 = 파랑 · 자동 값 = 옅은 글자 · 마우스 = 근거. 저장 안 함(흐름이 바뀌면 바로 따라 바뀜). 제품 → 반제품 「조립」 줄은 그대로. */
-function BOM흐름(p){ const v = 값(p,'공정흐름').trim(); if(v) return { v, 자:false }; const a = 공자동(p); return a ? { v:a.v, 자:true } : { v:'', 자:false }; }
+function BOM흐름(p){ const v = 값(p,'공정흐름').trim(); if(v) return 공정목록.includes(v) ? { v, 자:false } : { v:'', 자:false, 밖:true };   /* v2.22.0 입력폼 공정흐름에 없는 값 = 안 씀 */
+  const a = 공자동(p); return a ? { v:a.v, 자:true } : { v:'', 자:false }; }
 function BOM공정칠(){
   BOM다시();   /* v2.21.0 공정흐름이 바뀌면 가공 줄 수도 바뀜 */
   if(!연동줄.length) return;
@@ -690,7 +675,7 @@ function BOM공정칠(){
     td.textContent = 공;
     td.classList.toggle('흐름없음', !조.length); td.classList.toggle('엣지없음', 엣없);
     td.classList.toggle('저장값', !!조.length && !f.자 && 파랑(z.m,'공정흐름')); td.classList.toggle('공자동', !!조.length && f.자);
-    td.title = !조.length ? `${품목시트} ${z.m} 공정흐름 없음`
+    td.title = !조.length ? `${품목시트} ${z.m} 공정흐름 ${f.밖?'입력폼 공정흐름에 없음':'없음'}`
       : `${품목시트} ${z.m} 공정흐름 ${f.v}${f.자?' (자동)':''} — ${필?'필름':'합판'}${엣없?' · 흐름에 엣지 없음':''}`;
   }
 }
@@ -851,7 +836,7 @@ function 재단칠(){
 let 저장틀 = null;
 function 바꿈(목){
   let n = 0, 틀림 = null;
-  목 = 목.filter(x => {   /* v2.6.0 공정흐름 = 목록 9개(또는 빈칸)만 */
+  목 = 목.filter(x => {   /* v2.6.0 공정흐름 = 목록 안 값(또는 빈칸)만 · v2.22.0 목록 = 입력폼 공정흐름 */
     if(x.k!=='공정흐름') return true;
     x.v = String(x.v ?? '').trim();
     if(!x.v || 공정목록.includes(x.v)) return true;
@@ -1087,14 +1072,14 @@ function 표만들기(칸, 줄, 이름){
   const h = ['<table class="dpr-t"><thead><tr>' +
     칸.map((k,i) => { const 필 = 필수칸[이름]?.has(String(k).trim());
       return `<th class="${(i===0?'dpr-k':'') + (필?' 필수':'')}"${필?' title="영림원 필수"':''}>${글(k)}</th>`; }).join('') + '</tr></thead><tbody>'];
-  if(품) h[0] = h[0].replace('<thead><tr>', '<thead><tr><th class="단서" title="영림원 칸 아님 — BOM 연동용">공정흐름</th><th class="단서 소요" title="영림원 칸 아님 — BOM 연동용">소요량</th>');   /* v2.19.0 소요량 덧칸 */   /* v2.6.0 품명 앞 덧칸 */
+  if(품) h[0] = h[0].replace('<thead><tr>', `<thead><tr><th class="단서${공정못?' 공정못':''}" title="${글(공정못 ? '입력폼 공정흐름을 읽지 못함 — ' + 공정못 : '영림원 칸 아님 — BOM 연동용 · 목록 = 입력폼 공정흐름 완료')}">공정흐름</th><th class="단서 소요" title="영림원 칸 아님 — BOM 연동용">소요량</th>`);   /* v2.19.0 소요량 덧칸 */   /* v2.6.0 품명 앞 덧칸 */
   for(const r of 줄){
     const p = 품 ? (String(r.v[pi]??'').trim() || '#' + r.행) : '';
     let tr = 품 ? `<tr data-p="${글(p)}">` : '<tr>';
     const 반 = 품 && String(r.v[ai]??'').trim()==='반제품';
     const 빨 = 없음.size && (반 ? 없음.has(String(r.v[mi0]??'').trim()) : 없음.has(p));
     if(품) tr += 반 || String(r.v[ai]??'').trim()!=='제품'
-      ? ((자) => `<td class="편 드롭칸${파랑(p,'공정흐름')?' 저장값':''}${공밖(p)?' 목록밖" title="목록에 없는 흐름':자?` 공자동" title="${글(자.근거)}`:''}" data-k="공정흐름">${글(자 ? 자.v : 값(p,'공정흐름'))}</td>`)(반 && 공자동(p))   /* v2.6.0 · v2.8.0 자동 */
+      ? ((자) => `<td class="편 드롭칸${파랑(p,'공정흐름')?' 저장값':''}${공밖(p)?' 목록밖" title="입력폼 공정흐름에 없음':자?` 공자동" title="${글(자.근거)}`:''}" data-k="공정흐름">${글(자 ? 자.v : 값(p,'공정흐름'))}</td>`)(반 && 공자동(p))   /* v2.6.0 · v2.8.0 자동 */
       : `<td class="막음" data-k="공정흐름" data-알림="제품 — 조립">조립</td>`;   /* v2.6.1 제품 = 조립 고정 */
     if(품){ const k = '투입수량@' + String(r.v[mi0]??'').trim();   /* v2.19.0 공정흐름 옆 「소요량」 = 투입수량 칸과 같은 열쇠(같은 값) → BOM 조립 줄 분자 */
       tr += 반 ? `<td class="편 num${파랑(p,k)?' 저장값':''}" data-k="${글(k)}">${글(값(p,k))}</td>` : `<td class="막음" data-k="${글(k)}"></td>`; }
@@ -1119,7 +1104,7 @@ function 표만들기(칸, 줄, 이름){
   h.push('</tbody></table>');
   통.className = '표통'; 통.innerHTML = h.join('');
   if(품) setTimeout(재단칠);   /* v2.9.0 */
-  if(품){ 편집달기(통); const 머 = 통.querySelector('th.단서'); if(머) 머.addEventListener('click', 공정창열기); }
+  if(품) 편집달기(통);
   if(이름===BOM시트){
     const 몫 = k => 칸.indexOf(k), mi = 몫('모품목번호'), gi = 몫('공정'), i번 = 몫('하위품번');
     const trs = 통.querySelectorAll('tbody tr'); 연동줄 = [];

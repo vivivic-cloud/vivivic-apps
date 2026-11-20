@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v312 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v313 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -484,7 +484,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v312</span>
+    <span class="ver">v313</span>
     <div class="pick topnav" id="topnav">   <!-- v288 사장님 11-18 「입력폼 상단에 발주역입력 메뉴를 만들어 발주역입력 페이지로 이어지게」 — 이름 = 각 페이지 <title> 앞부분 · 같은 탭 -->
       <button type="button" class="btn small" aria-haspopup="menu" aria-expanded="false">발주역입력</button>
       <div class="pickmenu topnavmenu" role="menu" hidden>
@@ -635,6 +635,7 @@ function connectDb(){
       countEq:function(name,field,v){return F.getCountFromServer(F.query(F.collection(fs,name),F.where(field,'==',v))).then(function(sn){return sn.data().count;});},
       readCol:function(path){return F.getDocs(F.collection(fs,path)).then(function(sn){return sn.docs.map(function(d){return Object.assign({id:d.id},d.data());});});},
       pubSet:function(path,pairs){var a=[];pairs.forEach(function(x){a.push(new (Function.prototype.bind.apply(F.FieldPath,[null].concat(x[0])))(),x[1]===undefined?F.deleteField():x[1]);});   /* v304 값 undefined = 그 칸 지움 */return F.updateDoc.apply(null,[F.doc(fs,path)].concat(a));},   /* v287 공개 창고(artifacts) 문서 — 칸 경로([칸,…])마다 값, 바뀐 칸만 · 문서 없으면 실패 */   /* v235 벤더피아 자료 읽기만(세트구성품등록) */
+      pubPut:function(path,o){return F.setDoc(F.doc(fs,path),o);},   /* v313 공개 창고 문서 통째 씀(없으면 만듦) — 공정흐름 사본 */
       pubTx:function(path,make){var ref=F.doc(fs,path);return F.runTransaction(fs,function(t){return t.get(ref).then(function(d){var o=d.exists()?make(d.data()):null;if(!o)return false;t.update(ref,o);return true;});});},   /* v311 공개 창고 문서 한 장 읽고 고쳐 씀(보내기 줄 원본 맞춤) */
       range:function(name,field,a,b){return F.getDocs(F.query(F.collection(fs,name),F.where(field,'>=',a),F.where(field,'<',b))).then(function(sn){return sn.docs.map(function(d){return Object.assign({id:d.id},d.data());});});},
       staffMe:function(next,err){return F.onSnapshot(staffRef(user.uid),function(d){next(d.exists()?d.data():null);},err);},
@@ -4160,7 +4161,7 @@ function bdTurns(rs){   /* rs = 대기 표 줄 [{k,d,st}] → 줄마다 o.g·o.t
     if(!o.turn&&o.g.ok)o.g.why=o.k===cur?BD_LV[lv]+' 먼저':BYKEY[cur].title+' 먼저';});
   return {cur:cur,lv:lv,n:n,lvn:lvs.map(function(x){return Object.keys(x).length;})};
 }
-function bdRedraw(){if(bdrDraw&&cur==='bdreg')bdrDraw();bdResSync();bdClsPub();}   /* v287 결과·분류 목록 올리기 · v305 어느 메뉴에서든(읽힌 단계만) */
+function bdRedraw(){if(bdrDraw&&cur==='bdreg')bdrDraw();bdResSync();bdClsPub();bdFlowPub();}   /* v287 결과·분류 목록 올리기 · v305 어느 메뉴에서든(읽힌 단계만) */
 /* v279 사장님 「이거 하나 연결로 모두 입력되게 입력폼에 준비해 달라」 — 거래처 하나 → 분류 → 자재등록 → 구매단가등록 대기를 한 번에.
    미리 보기(bdPlan) = 앞 단계에서 넘길 줄을 「있는 것」으로 치고(ctx.virt) 뒤 단계 빨간 줄을 셈 → 앞 단계가 빠진 줄은 뒤 단계에서도 빠짐(분류 없음·자재 없음).
    넘기기(bdRunAll) = 단계마다 실제 자료로 다시 셈해 차례로 넘김(dataPut 으로 앞 단계 문서가 바로 보임). 메뉴별 단추·알림은 그대로. */
@@ -4251,6 +4252,21 @@ function bdClsPub(){
   if(sig===BD_CLS_SIG||(old&&JSON.stringify(old)===sig))return;
   BD_CLS_SIG=sig;
   db.pubSet(BD_PATH+'/_분류',[[['영림원'],{'줄':rows,'올린때':new Date().toISOString(),'출처':'입력폼 품목대중소분류정의(자재·완료)'}]]).catch(function(e){BD_CLS_SIG='';console.warn('분류 목록 못 씀',e);});
+}
+/* v313 사장님 11-20 「입력폼에 있는지 확인하고 확인된것들 드롭선택하게 해줘 중요한건 이번 한번이 아니라 이걸 계속 유지 할 수 있는 장치를 만들어야 한다는거야 …」
+   공개 사본 BD_PATH/_공정흐름 = {줄:[흐름 이름], 올린때, 출처} — 공정흐름(erp_flows) status 완료·ylwGone 아님, 처음 저장한 차례(createdAt).
+   발주역입력/영림원품목등록.html 공정흐름 드롭이 로그인 없을 때 이것을 onSnapshot 으로 읽음. 흐름이 바뀔 때마다(어느 메뉴에서든 refreshAll → bdRedraw) 다르면 씀.
+   ⚠ 입력 작업자가 흐름 status 를 바꾸면 입력작업자/스크립트/결과맞추기.py 가 같은 셈으로 맞춤 — 셈을 바꾸면 거기도. 이름만(민감정보 없음). */
+var BD_FLOW_SIG='';
+function bdFlowRows(fl){var seen={};return (fl||[]).filter(function(r){return r.status==='완료'&&!ylwGone(r)&&bdTr(r.name);})
+  .sort(function(a,b){return String(a.createdAt||'').localeCompare(String(b.createdAt||''))||bdTr(a.name).localeCompare(bdTr(b.name),'ko');})
+  .map(function(r){return bdTr(r.name);}).filter(function(n){if(seen[n])return false;seen[n]=1;return true;});}
+function bdFlowPub(){
+  if(!db||!db.pubPut||data.flows==null||WERR.flows||!BD.docs)return;
+  var rows=bdFlowRows(data.flows),sig=JSON.stringify(rows),cd=BD.docs.filter(function(x){return x.id==='_공정흐름';})[0];
+  if((cd&&JSON.stringify(cd['줄'])===sig)||sig===BD_FLOW_SIG)return;   /* 사본과 같음 · 같은 값을 쓰는 중 */
+  BD_FLOW_SIG=sig;
+  db.pubPut(BD_PATH+'/_공정흐름',{'줄':rows,'올린때':new Date().toISOString(),'출처':'입력폼 공정흐름유형등록(완료)'}).then(function(){BD_FLOW_SIG='';},function(e){BD_FLOW_SIG='';console.warn('공정흐름 사본 못 씀',e);});
 }
 function bdNoPerm(){   /* 등록대기를 누를 수 없는 단계(쓰기 권한 없음) 이름들 */
   return BD_ORDER.filter(function(k){return window.ERP_CAN&&!window.ERP_CAN('erp_'+k,'w');}).map(function(k){return BYKEY[k].title;});
