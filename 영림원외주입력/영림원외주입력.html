@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v310 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v311 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -484,7 +484,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v310</span>
+    <span class="ver">v311</span>
     <div class="pick topnav" id="topnav">   <!-- v288 사장님 11-18 「입력폼 상단에 발주역입력 메뉴를 만들어 발주역입력 페이지로 이어지게」 — 이름 = 각 페이지 <title> 앞부분 · 같은 탭 -->
       <button type="button" class="btn small" aria-haspopup="menu" aria-expanded="false">발주역입력</button>
       <div class="pickmenu topnavmenu" role="menu" hidden>
@@ -635,6 +635,7 @@ function connectDb(){
       countEq:function(name,field,v){return F.getCountFromServer(F.query(F.collection(fs,name),F.where(field,'==',v))).then(function(sn){return sn.data().count;});},
       readCol:function(path){return F.getDocs(F.collection(fs,path)).then(function(sn){return sn.docs.map(function(d){return Object.assign({id:d.id},d.data());});});},
       pubSet:function(path,pairs){var a=[];pairs.forEach(function(x){a.push(new (Function.prototype.bind.apply(F.FieldPath,[null].concat(x[0])))(),x[1]===undefined?F.deleteField():x[1]);});   /* v304 값 undefined = 그 칸 지움 */return F.updateDoc.apply(null,[F.doc(fs,path)].concat(a));},   /* v287 공개 창고(artifacts) 문서 — 칸 경로([칸,…])마다 값, 바뀐 칸만 · 문서 없으면 실패 */   /* v235 벤더피아 자료 읽기만(세트구성품등록) */
+      pubTx:function(path,make){var ref=F.doc(fs,path);return F.runTransaction(fs,function(t){return t.get(ref).then(function(d){var o=d.exists()?make(d.data()):null;if(!o)return false;t.update(ref,o);return true;});});},   /* v311 공개 창고 문서 한 장 읽고 고쳐 씀(보내기 줄 원본 맞춤) */
       range:function(name,field,a,b){return F.getDocs(F.query(F.collection(fs,name),F.where(field,'>=',a),F.where(field,'<',b))).then(function(sn){return sn.docs.map(function(d){return Object.assign({id:d.id},d.data());});});},
       staffMe:function(next,err){return F.onSnapshot(staffRef(user.uid),function(d){next(d.exists()?d.data():null);},err);},
       staffAll:function(next,err){return F.onSnapshot(F.collection(fs,'erp_staff'),function(s){next(s.docs.map(function(d){return Object.assign({uid:d.id},d.data());}));},err);},
@@ -4287,19 +4288,56 @@ function bdEdWhy(k,dd){var st=dd.status||'대기';
   if(hasEdit(dd))return st==='오류'?'수정 오류 — 저장한 항목에서 되돌리기·취소':'수정대기 — 입력 작업자 처리 전';
   if(st==='진행중')return '진행중 — 입력 작업자가 넣는 중';
   return st==='완료'||st==='대기'||st==='오류'?'':st;}
+/* v311 사장님(분배 방 전달) — 일괄등록 「수정」으로 자재번호·품번을 고치면 매입현황 원본 줄도 같이: 공개 `발주역입력_영림원폼/{bd.거래처}`
+   ① `보내기.줄`(열쇠 = bd.열쇠) 자재등록.자재번호(자재만)·구매단가등록.품번 = 옛 번호면 새 번호 → 그 줄 지문(보드매입현황 지문셈과 같은 셈, 11-20 140줄 모두 같음 확인)·고친때 · 보내기 판 +1·고친때
+   ② `줄`(보드매입현황 고친 칸, 품목\t규격) 값.m_code = 새 번호(자재만 — 그쪽 품번은 자재번호를 따름) — 안 하면 보드매입현황이 다음 저장 때 옛 번호로 다시 셈.
+   옛 번호와 다른 값이 이미 들어 있으면 안 건드림 · 한 트랜잭션(db.pubTx) · 수정 취소 때는 되돌리지 않음. 실패해도 폼 저장은 그대로(알림만). */
+var BD_FP_M=['자재명','자재번호','규격','영문명','품목자산분류','자재상태','내외자구분','중요도','기준단위','자재소분류'],
+    BD_FP_P=['구매거래처','품명','품번','규격','단위','내외자구분','통화','단가','구매최소수량','구매간격수량','적용시작일','특이사항','제조사','조달일수'];
+function bdFpOrd(o,ks){o=o||{};var r={};ks.forEach(function(k){if(k in o)r[k]=o[k];});Object.keys(o).forEach(function(k){if(!(k in r))r[k]=o[k];});return r;}
+function bdFp(z){
+  var g=z['거래처']||{},c=z['분류']||{};
+  var v={'열쇠':z['열쇠'],'상태':z['상태'],'거래처':{'영림원거래처명':g['영림원거래처명']},'분류':{'대분류':c['대분류'],'중분류':c['중분류'],'소분류':c['소분류']},
+    '자재등록':bdFpOrd(z['자재등록'],BD_FP_M),'구매단가등록':bdFpOrd(z['구매단가등록'],BD_FP_P),
+    '단가이력':(z['단가이력']||[]).map(function(x){return bdFpOrd(x,['단가','적용시작일','첫달','끝달']);})};
+  var t=JSON.stringify(v),h1=0xdeadbeef,h2=0x41c6ce57;
+  for(var i=0;i<t.length;i++){var ch=t.charCodeAt(i);h1=Math.imul(h1^ch,2654435761);h2=Math.imul(h2^ch,1597334677);}
+  h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);
+  h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);
+  return (4294967296*(2097151&h2)+(h1>>>0)).toString(16).padStart(14,'0');
+}
+function bdSrcCode(k,dd,nv){
+  var b=dd&&dd.bd,vn=b&&b['거래처'],key=b&&b['열쇠'],oc=bdTr(dd&&dd.code),nc=bdTr(nv&&nv.code);
+  if(!db||!db.pubTx||!vn||typeof key!=='string'||(k!=='materials'&&k!=='purprices')||!oc||!nc||oc===nc)return;
+  var now=new Date().toISOString();
+  db.pubTx(BD_PATH+'/'+vn,function(D){
+    var B=D['보내기'];if(!B||!Array.isArray(B['줄']))return null;var hit=false;
+    var zs=B['줄'].map(function(z){if(!z||z['열쇠']!==key)return z;var c=JSON.parse(JSON.stringify(z)),m=c['자재등록']||{},p=c['구매단가등록']||{},on=false;
+      if(k==='materials'&&bdTr(m['자재번호'])===oc){m['자재번호']=nc;on=true;}
+      if(bdTr(p['품번'])===oc){p['품번']=nc;on=true;}
+      if(!on)return z;hit=true;c['지문']=bdFp(c);c['고친때']=now;return c;});
+    if(!hit)return null;
+    var o={'보내기':Object.assign({},B,{'줄':zs,'판':(Number(B['판'])||0)+1,'고친때':now})};
+    if(k==='materials'){var i=key.indexOf('\t'),pm=i<0?key:key.slice(0,i),gy=i<0?'':key.slice(i+1),J=(D['줄']||[]).map(function(z){return JSON.parse(JSON.stringify(z));});
+      var r=J.filter(function(z){return z&&z['품목']+'\t'+z['규격']===pm+'\t'+gy;})[0];
+      if(!r){r={'품목':pm,'규격':gy,'값':{}};J.push(r);}r['값']=r['값']||{};
+      if(!('m_code' in r['값'])||bdTr(r['값'].m_code)===oc){r['값'].m_code=nc;o['줄']=J;o['고친때']=now;}}
+    return o;
+  }).then(function(ok){if(ok)flash('매입현황 영림원보내기 그 줄도 '+nc+' 로 맞췄습니다.');},function(e){flash('매입현황 영림원보내기 줄은 못 맞췄습니다. '+errText(e),true);});
+}
 function bdEdOpen(k,dd){
   var s=BYKEY[k],key=k+'/'+dd.id;
   if(EDITING[key]){delete EDITING[key];renderList();return;}
-  if(dd.status==='완료')editOpen(s,dd);
+  if(dd.status==='완료'){editOpen(s,dd);if(EDITING[key])EDITING[key].onSaved=function(nv){bdSrcCode(k,dd,nv);};}
   else{var fm=buildForm(s),head={};fm._bdw=1;fm.submit.textContent='수정 저장';
     s.fields.forEach(function(f){if(f.k in dd)head[f.k]=dd[f.k];});fm.fill(head,[]);
     fm.el.classList.add('editform');
     fm.submit.after(h('button',{type:'button',class:'btn',on:{click:function(){delete EDITING[key];renderList();}}},'닫기'));
-    fm.el.addEventListener('submit',function(e){e.preventDefault();bdWaitSave(s,dd.id,fm);});
+    fm.el.addEventListener('submit',function(e){e.preventDefault();bdWaitSave(s,dd.id,fm,dd);});
     EDITING[key]=fm;renderList();}
   var f=EDITING[key];if(f)setTimeout(function(){if(f.el.isConnected)f.el.scrollIntoView({block:'nearest'});},0);
 }
-function bdWaitSave(s,id,fm){
+function bdWaitSave(s,id,fm,od){
   var say=function(t,bad){fm.msg.textContent=t;fm.msg.className='msg'+(bad?' bad':'');};
   if(!db){say('저장소에 연결되지 않아 저장할 수 없습니다.',true);return;}
   var res=fm.collect();
@@ -4313,6 +4351,7 @@ function bdWaitSave(s,id,fm){
   }).then(function(ok){
     fm.submit.disabled=false;
     if(!ok){say('그 사이 입력 작업자가 처리를 시작해 저장하지 않았습니다.',true);return;}
+    if(od)bdSrcCode(s.key,od,nv);   /* v311 옛 번호 = 연 때 문서 */
     delete EDITING[s.key+'/'+id];renderList();flash('저장했습니다. 대기 상태로 쌓였습니다.');
   },function(e){fm.submit.disabled=false;say('저장하지 못했습니다. '+errText(e),true);});
 }
@@ -7540,6 +7579,7 @@ function editSave(s,id,fm){
   }).then(function(ok){
     fm.submit.disabled=false;
     if(!ok){say(out.why||'저장하지 못했습니다.',!/바뀐 칸이 없어/.test(out.why||''));return;}
+    if(fm.onSaved)fm.onSaved(nv);   /* v311 */
     delete EDITING[s.key+'/'+id];renderList();flash(s.flowCols?'수정 대기로 저장했습니다. 입력 작업자가 영림원 공정흐름유형등록 상세를 채웁니다.':'수정 대기로 저장했습니다. 바뀐 칸 '+out.n+'개.');
   },function(e){fm.submit.disabled=false;say('저장하지 못했습니다. '+errText(e),true);});
 }
@@ -7643,6 +7683,7 @@ function matEditSave(s,rep,fm,nv,say){
   }).then(function(ok){
     fm.submit.disabled=false;
     if(!ok){say(out.why||'저장하지 못했습니다.',!/바뀐 칸이 없어/.test(out.why||''));return;}
+    if(fm.onSaved)fm.onSaved(nv);   /* v311 */
     delete EDITING[s.key+'/'+id];renderList();flash('수정 대기로 저장했습니다. 바뀐 칸 '+out.n+'개 · 함께 바뀜: '+matImpactText(P.n)+(P.merge?' · 불러온 문서 합침':'')+'.');
   },function(e){fm.submit.disabled=false;say('저장하지 못했습니다. '+errText(e),true);});
 }
