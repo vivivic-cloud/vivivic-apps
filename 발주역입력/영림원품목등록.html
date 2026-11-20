@@ -2,7 +2,11 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.23.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.24.0
+     v2.24.0(11-20): 영림원 시험 — BOM등록업로드 하위품명 빈 공정 줄은 「[ 하위품명 ] 필수항목이 누락되었습니다.」로 전체 저장 막힘 →
+       사장님 「해당 기능이 되도록 비오엠옆에 시트하나 더 만들어서 내용에 맞게 구성되게 해줘」 —
+       BOM 가공 줄 = 재단(합판)·엣지(필름) 줄만(자재 없는 공정 줄 안 만듦). 새 시트 단추 「제품별공정별소요자재등록」(BOM등록업로드 옆) =
+       영림원 500299 공정 표(모든 공정, 마지막 = 최종공정여부) · 소요자재 표(BOM 줄 그대로, 투입공정 = BOM 공정). 칸 이름 = 500299 화면 글자. 화면만 · 저장 없음.
      v2.23.0(11-20): 사장님 「품목등록업로드 공정흐름이 변경되었는데 비오엠등록업로드가 이에따라 변경되지 않고 있다」 → 「공정흐름에 있는 모든 공정이 나타나야함」 · 「현재 재단/엣지만 생성」 —
        BOM 가공 줄 = 반제품 공정흐름의 공정마다 1줄(흐름 차례, 표시순서 1·2·3…). 합판 줄 = 「재단」 든 첫 공정(없으면 첫 공정) · 필름 줄 = 「엣지」(엣지 든) 공정 — 자리 규칙은 v2.11 그대로.
        그 밖 공정(보링·경첩보링·백색코 등) 줄 = 모품목 칸·BOM차수 00·공정·표시순서·Loss 0 만, 하위품번·품명·규격·투입단위·소요량·비고 빈칸. 흐름 없으면 가공 줄 없음.
@@ -253,7 +257,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.23.0</div>
+  <div class="badge">v2.24.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -289,7 +293,7 @@ window.목록읽기 = async function(){
     시트들 = (목.exists() && 목.data().시트들) || [];
     if(!시트들.length){ 목상태('창고에 영림원품목등록이 없습니다'); return; }
     document.getElementById('목상태').style.display='none';
-    document.getElementById('고름').innerHTML = 시트들.map(t => `<button class="chip" data-u="${글(t.이름)}">${글(t.이름)}</button>`).join('')
+    document.getElementById('고름').innerHTML = 시트들.map(t => `<button class="chip" data-u="${글(t.이름)}">${글(t.이름)}</button>` + (t.이름===BOM시트 ? `<button class="chip" data-u="${공소시트}">${공소시트}</button>` : '')).join('')
       + `<button class="chip" data-u="${추가}" hidden>${추가}</button><span id="폼상태" class="폼상태"></span>`;
     document.querySelectorAll('#고름 .chip').forEach(b => b.onclick = () => 시트고름(b.dataset.u));
     시트고름(시트들[0].이름);
@@ -304,6 +308,7 @@ async function 시트고름(u){
   document.querySelectorAll('#고름 .chip').forEach(b => b.classList.toggle('on', b.dataset.u===u));
   const 속 = document.getElementById('속');
   if(u===추가){ 추가그리기(); return; }
+  if(u===공소시트){ 공소그리기(); return; }   /* v2.24.0 */
   if(!받은[u]){
     속.innerHTML = '<div class="state"><div class="big">읽는 중입니다…</div></div>';
     try{
@@ -386,6 +391,50 @@ function 추가그리기(){
   추가자리 = 고른업체;
   const 통 = 속.querySelector('.표통'); if(통 && 옛자리){ 통.scrollLeft = 옛자리[0]; 통.scrollTop = 옛자리[1]; }
   속.querySelectorAll('.months .chip').forEach(b => b.onclick = () => { 고른업체 = b.dataset.e; 추가그리기(); });
+}
+
+/* ── v2.24.0 제품별공정별소요자재등록 시트 — 사장님 11-20 「해당 기능이 되도록 비오엠옆에 시트하나 더 만들어서 내용에 맞게 구성되게 해줘」
+   영림원 500299 화면(11-20 테스트서버에서 열어 봄, 저장 없음) 두 표를 그대로: 공정 13칸 · 소요자재 15칸 + 앞에 머리 칸(제품명·제품번호·규격·단위·BOM차수·공정흐름유형).
+   · 공정 = 그 품목 공정흐름의 모든 공정(자재 없는 보링·경첩보링 등 포함) — 반제품 = 화면 공정흐름(BOM흐름, 사람·자동) · 제품 = 「조립」.
+     공정순서 1·2·3… · 후속공정순서 = 다음 공정순서, 마지막 공정 = 자기 공정순서 + 최종공정여부 ✓(500228 규칙). 워크센터·시간단위·표준작업시간·공정품·공정검사·제조방법 = 빈칸(정해진 값 없음).
+   · 소요자재 = BOM등록업로드 줄(BOM줄짜기) 그대로 — 투입공정 = BOM 「공정」 · 자재명/번호/규격 = 하위품명/품번/규격 · 투입단위·소요량 · 표시순서 · 내부/외부Loss율 = 사내/사외Loss율. 조달구분·품목자산분류·반제품공정차수·조립위치·특이사항 = 빈칸.
+   · 화면만 · 저장 없음 · 한 제품 거름(v2.16)은 BOM 과 같음. */
+const 공소시트 = '제품별공정별소요자재등록';
+const 공소칸 = { 공정:['공정순서','공정','후속공정순서','워크센터','시간단위','표준작업시간','공정품명','공정품번','규격','단위','공정검사여부','최종공정여부','제조방법등록여부'],
+  소요자재:['표시순서','투입공정','자재명','자재번호','규격','투입단위','소요량(분자)','소요량(분모)','조달구분','품목자산분류','반제품공정차수','내부Loss율','외부Loss율','조립위치','특이사항'] };
+const 공소머리 = ['제품명','제품번호','규격','단위','BOM차수','공정흐름유형'];
+let 공소탭 = '공정', 공소자리 = null;
+function 공소짜기(){
+  const t = 시트들.find(x => x.이름===BOM시트); if(!t) return null;
+  const 칸 = t.칸||[], 짠 = BOM줄짜기(칸); if(!짠) return null;
+  const 보일 = 한제품번호() || new Set(), J = k => 칸.indexOf(k), g = (r, k) => { const i = J(k); return i<0 ? '' : (r.v[i] ?? ''); };
+  const 모 = new Map();
+  for(const r of 짠){ const m = String(g(r,'모품목번호')).trim(); if(!m || !보일.has(m)) continue;
+    if(!모.has(m)) 모.set(m, { 명:g(r,'모품목명'), 규:g(r,'모품목규격'), 단:g(r,'모품목단위'), 반:r.행==='가공', 줄:[] });
+    모.get(m).줄.push(r); }
+  const 공정 = [], 소요자재 = [];
+  for(const [m, o] of 모){
+    const f = o.반 ? BOM흐름(m) : { v:'조립' }, 공들 = f.v.split('-').map(x => x.trim()).filter(Boolean), 머리 = [o.명, m, o.규, o.단, '00', f.v];
+    공들.forEach((공, i) => { const 끝 = i===공들.length-1;
+      공정.push(머리.concat([i+1, 공, 끝 ? i+1 : i+2, '', '', '', '', '', '', '', '', 끝 ? '✓' : '', ''])); });
+    for(const r of o.줄) 소요자재.push(머리.concat([g(r,'표시순서'), g(r,'공정'), g(r,'하위품명'), g(r,'하위품번'), g(r,'하위규격'), g(r,'투입단위'),
+      g(r,'소요량(분자)'), g(r,'소요량(분모)'), '', '', '', g(r,'사내Loss율'), g(r,'사외Loss율'), '', '']));
+  }
+  return { 공정, 소요자재 };
+}
+function 공소그리기(){
+  const 속 = document.getElementById('속'), 짠 = 공소짜기();
+  if(!짠){ 속.innerHTML = '<div class="state"><div class="big">읽는 중입니다…</div></div>'; return; }
+  const 옛통 = 속.querySelector('.표통[data-공소]'), 옛자리 = 옛통 && 공소자리===공소탭 ? [옛통.scrollLeft, 옛통.scrollTop] : null;
+  const 단추 = ['공정','소요자재'].map(k => `<button class="chip${k===공소탭?' on':''}" data-t="${k}">${k} ${짠[k].length}</button>`).join('');
+  const 줄 = 짠[공소탭], 칸 = 공소머리.concat(공소칸[공소탭]);
+  let h = '<table class="dpr-t"><thead><tr>' + 칸.map((k, i) => `<th${i===0?' class="dpr-k"':''}>${글(k)}</th>`).join('') + '</tr></thead><tbody>';
+  for(const r of 줄) h += '<tr>' + r.map((v, i) => `<td${i===0?' class="dpr-k"':typeof v==='number'?' class="num"':''}>${글(v)}</td>`).join('') + '</tr>';
+  h += '</tbody></table>';
+  속.innerHTML = `<div class="months">${단추}</div>` + (줄.length ? `<div class="표통" data-공소="1">${h}</div>` : '<div class="state"><div class="big">줄 없음</div></div>');
+  공소자리 = 공소탭;
+  const 통 = 속.querySelector('.표통'); if(통 && 옛자리){ 통.scrollLeft = 옛자리[0]; 통.scrollTop = 옛자리[1]; }
+  속.querySelectorAll('.months .chip').forEach(b => b.onclick = () => { 공소탭 = b.dataset.t; 공소그리기(); });
 }
 
 /* ── v2.2.0 품목등록업로드 입력 칸 · BOM등록업로드 연동 ──
@@ -639,7 +688,7 @@ function 가공만들기(칸){   /* → Map 반제품 품번 → [줄] (품목�
     공들.forEach((공, i) => {
       if(i===합i) 새(합, false, 공);
       if(i===엣i) 새(필, true, 공);
-      if(i!==합i && i!==엣i) 새(null, false, 공, true);
+      /* v2.24.0 자재 없는 공정 줄은 BOM 에 안 만듦(영림원 500302 「[ 하위품명 ] 필수항목이 누락되었습니다.」로 전체 저장 막힘) — 그 공정은 제품별공정별소요자재 시트에 */
     });
     out.set(p, 줄);
   }
@@ -672,6 +721,7 @@ function BOM흐름(p){ const v = 값(p,'공정흐름').trim(); if(v) return 공�
   const a = 공자동(p); return a ? { v:a.v, 자:true } : { v:'', 자:false }; }
 function BOM공정칠(){
   BOM다시();   /* v2.21.0 공정흐름이 바뀌면 가공 줄 수도 바뀜 */
+  if(고른===공소시트) 공소그리기();   /* v2.24.0 공정흐름·입력이 바뀌면 따라 그림 */
   if(!연동줄.length) return;
   공규칙셈();
   for(const z of 연동줄){
@@ -695,6 +745,7 @@ function BOM모칠(){
 }
 function 연동칠(){
   BOM다시();   /* v2.18.0 BOM 자동 값 = 사람 입력값·재단률 셈을 따름 — 바뀌었을 때만 다시 만듦 */
+  if(고른===공소시트) 공소그리기();   /* v2.24.0 */
   BOM모칠();   /* v2.12.0 */
   for(const z of 조립줄){   /* v2.3.0 투입수량 → BOM 조립 줄(모품목 z.m → 반제품 z.번) 소요량 */
     const v = 값(z.번, '투입수량@' + z.m).trim(), c = z.tr.cells, 파 = 파랑(z.번, '투입수량@' + z.m);
