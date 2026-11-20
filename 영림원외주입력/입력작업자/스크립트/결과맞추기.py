@@ -1,4 +1,4 @@
-"""보드/엣지 매입현황 「영림원보내기」 줄 상태 맞추기 — 폼 문서 상태 → 공개 `발주역입력_영림원폼/{거래처}.결과` (폼 v305).
+"""보드/엣지 매입현황 「영림원보내기」 줄 상태 맞추기 — 폼 문서 상태 → 공개 `발주역입력_영림원폼/{거래처}.결과` (폼 v305 · v307 넘긴 줄만).
 
 사장님 11-20 「영림원에서 영림원 등록 대기중 되면 얘도 대기중되고 영림원 입력완료되면 얘도 입력완료되고 이렇게」
 폼 `bdResSync`·`bdClsPub`(영림원외주입력.html) 와 **같은 셈**을 터미널에서 한다 — 폼 창이 안 열려 있어도 맞게.
@@ -118,11 +118,24 @@ def res_of(dd, mat=False):
     return o
 
 
+def sent_keys(vn, data):   # 폼 bdSentKeys(v307) — 등록대기로 넘긴 줄 열쇠 = bd 문서(거래처 같음)의 열쇠
+    o = set()
+    for k in ('classes', 'materials', 'purprices'):
+        for r in data[k]:
+            b = r.get('bd')
+            if not isinstance(b, dict) or b.get('거래처') != vn: continue
+            x = b.get('열쇠')
+            for y in (x if isinstance(x, list) else [x]):
+                if y is not None: o.add(y)
+    return o
+
+
 def want(d, data):
-    """{열쇠: {단계: 결과}} — 폼 bdResSync 의 R"""
+    """{열쇠: {단계: 결과}} — 폼 bdResSync 의 R · v307 넘긴 줄만(사장님 11-20 「입력폼 신호는 대기 입력을 했을때 부터 받아오는거야」)"""
     R = {}
+    sent = sent_keys(d['id'], data)
     def put(k, st, v):
-        if v: R.setdefault(k, {})[st] = v
+        if v and k in sent: R.setdefault(k, {})[st] = v
     g, order = {}, []
     for r in live(d):
         c = r.get('분류') or {}
@@ -145,7 +158,7 @@ def want(d, data):
 
 
 def diff(d, R):
-    """[(열쇠, 단계, 새 값|None=지움, 옛 값)] — 바뀐 칸 + 보낼 줄인데 문서가 없어진 단계(v304)"""
+    """[(열쇠, 단계, 새 값|None=지움, 옛 값)] — 바뀐 칸 + 보낼 줄인데 문서가 없어진 단계(v304)·안 넘긴 줄(v307)"""
     old = d.get('결과') if isinstance(d.get('결과'), dict) else {}
     out = []
     for k, sts in R.items():

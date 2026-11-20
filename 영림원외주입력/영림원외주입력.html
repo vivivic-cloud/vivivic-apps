@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v306 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v307 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -484,7 +484,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v306</span>
+    <span class="ver">v307</span>
     <div class="pick topnav" id="topnav">   <!-- v288 사장님 11-18 「입력폼 상단에 발주역입력 메뉴를 만들어 발주역입력 페이지로 이어지게」 — 이름 = 각 페이지 <title> 앞부분 · 같은 탭 -->
       <button type="button" class="btn small" aria-haspopup="menu" aria-expanded="false">발주역입력</button>
       <div class="pickmenu topnavmenu" role="menu" hidden>
@@ -4197,20 +4197,27 @@ function bdResOf(dd,mat){if(!dd)return null;var o={'상태':BD_RES_ST[dd.status]
    이 메뉴를 안 열어도: 보내기를 늘 지켜보고, 어느 메뉴에서든 읽힌 단계(data 있음·읽기 실패 WERR 아님)만 맞춤(안 읽힌 단계 칸은 안 건드림).
    폼 창이 없을 때 = 입력 작업자가 상태를 바꾼 뒤 입력작업자/스크립트/결과맞추기.py(이 셈과 같음 — 바꾸면 둘 다). */
 var BD_ST_KEY={'분류':'classes','자재':'materials','구매단가':'purprices'};
+function bdSentKeys(vn){   /* v307 등록대기로 넘긴 줄 열쇠 {열쇠:1} = 읽힌 단계의 bd 문서(거래처 같음) 열쇠 */
+  var o={};BD_ORDER.forEach(function(k){(data[k]||[]).forEach(function(r){if(!r.bd||r.bd['거래처']!==vn)return;var x=r.bd['열쇠'];(Array.isArray(x)?x:[x]).forEach(function(y){if(y!=null)o[y]=1;});});});
+  return o;
+}
 function bdResSync(){
   var on={};Object.keys(BD_ST_KEY).forEach(function(st){var k=BD_ST_KEY[st];if(data[k]!=null&&!WERR[k])on[st]=1;});
   if(!db||!db.pubSet||!BD.docs||!Object.keys(on).length)return;
   bdVendors().forEach(function(d){
     if(BD_RES_BUSY[d.id])return;
-    var R={},put=function(k,st,v){if(!v)return;(R[k]=R[k]||{})[st]=v;};
+    /* v307 사장님 11-20 「입력폼 신호는 대기 입력을 했을때 부터 받아오는거야」「고쳐」 — 결과는 이 메뉴에서 등록대기로 넘긴 줄(그 줄 열쇠가 든 bd 문서가 있는 줄)만.
+       넘긴 적 없는 줄은 같은 분류·자재가 폼에 완료로 있어도 결과 없음(옛 칸 지움). 세 단계가 다 읽혔을 때만 「안 넘김」으로 가름(아니면 그 줄은 안 건드림) */
+    var sent=bdSentKeys(d.id),all=Object.keys(on).length===3;
+    var R={},put=function(k,st,v){if(!v||!sent[k])return;(R[k]=R[k]||{})[st]=v;};
     if(on['분류'])bdEntries('classes',d).forEach(function(e){var v=bdResOf(bdDocOf('classes',d.id,e));(e.keys||[]).forEach(function(k){put(k,'분류',v);});});
     if(on['자재'])bdEntries('materials',d).forEach(function(e){put(e.key,'자재',bdResOf(bdDocOf('materials',d.id,e),1));});
     if(on['구매단가'])bdEntries('purprices',d).forEach(function(e){put(e.key,'구매단가',bdResOf(bdDocOf('purprices',d.id,e)));});
     var old=d['결과']||{},pairs=[];
     Object.keys(R).forEach(function(k){Object.keys(R[k]).forEach(function(st){if(JSON.stringify((old[k]||{})[st]||null)!==JSON.stringify(R[k][st]))pairs.push([['결과',k,st],R[k][st]]);});});
     /* v304 사장님 11-20 「고쳐」(양지데코 영림원·폼 문서를 지웠는데 매입현황은 등록완료 14·오류건 3 그대로) — 보낼 줄인데 그 단계 폼 문서가 없으면 옛 결과 칸을 지움(= 아직 안 넣음) */
-    bdLive(d).forEach(function(r){var k=r['열쇠'],o=old[k];if(!o||typeof o!=='object')return;
-      ['분류','자재','구매단가'].forEach(function(st){if(on[st]&&o[st]&&!(R[k]&&R[k][st]))pairs.push([['결과',k,st],undefined]);});});
+    bdLive(d).forEach(function(r){var k=r['열쇠'],o=old[k];if(!o||typeof o!=='object')return;if(!sent[k]&&!all)return;   /* v307 안 넘긴 줄 = 세 단계 다 읽혔을 때 모두 지움 */
+      ['분류','자재','구매단가'].forEach(function(st){if((on[st]||!sent[k])&&o[st]&&!(R[k]&&R[k][st]))pairs.push([['결과',k,st],undefined]);});});
     if(!pairs.length)return;
     BD_RES_BUSY[d.id]=1;
     db.pubSet(BD_PATH+'/'+d.id,pairs).then(function(){var o=d['결과']=d['결과']||{};pairs.forEach(function(x){var q=o[x[0][1]]=o[x[0][1]]||{};if(x[1]===undefined)delete q[x[0][2]];else q[x[0][2]]=x[1];});BD_RES_BUSY[d.id]=0;},function(e){BD_RES_BUSY[d.id]=0;console.warn('결과 못 씀',d.id,e);});
