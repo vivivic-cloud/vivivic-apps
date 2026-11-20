@@ -2,7 +2,11 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.19.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.20.0
+     v2.20.0(11-20): 사장님 「지금 내가 엑셀 업로드해서 만들어 놓은 것 외에 다른 자료를 엑셀에서 보고 추정하지 마. 헷갈려」 —
+       BOM 표 = 품목등록업로드 화면 값만으로 짬. 원본 BOM 시트 줄(받지도 않음)·원부자재 탭 이름·숨은 원래 합판/필름 코드·원본 대조 노랑을 뺌.
+       가공 줄 = 반제품 합판코드 입력 → 재단 줄 1 · 필름코드 입력 → 엣지 줄 1(없으면 줄 없음). 하위품명·규격 = 입력폼 자재 완료(없으면 빈칸).
+       고정 규칙: BOM차수 00 · Loss 0 · 표시순서 = 반제품 안 차례 · 투입단위 EA/M · 재단 분자 1 / 분모 재단률(화면 값) · 엣지 분자 필름 소요량 / 분모 1. 자세한 것은 가공만들기 위 주석.
      v2.19.0(11-20): 사장님 「품목등록에서 공정흐름 옆에 소요량 입력 가능하게 해서, 이 입력이 BOM 분자에 적용되도록 해줘」 —
        품목등록업로드 공정흐름 바로 오른쪽 덧칸 「소요량」(영림원 칸 아님, 머리 옅은 초록). 반제품 줄만 입력(제품 줄 td.막음).
        열쇠 = 투입수량 칸과 같은 「투입수량@모품목」 → 두 칸이 늘 같은 값 · BOM 조립 줄 소요량(분자) = 이 값(v2.3·v2.18 길 그대로, 분모 규칙 그대로).
@@ -243,7 +247,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.19.0</div>
+  <div class="badge">v2.20.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -285,7 +289,6 @@ window.목록읽기 = async function(){
     시트고름(시트들[0].이름);
     대조구독();
     입력구독();
-    자재이름받기();   /* v2.15.0 */
   }catch(e){ window.목록못읽음('창고를 읽지 못했습니다', (e&&(e.code||e.message))||''); }
 };
 
@@ -300,7 +303,7 @@ async function 시트고름(u){
     try{
       const t = 시트들.find(x => x.이름===u);
       const { doc, getDoc } = window.fbRead;
-      const 조각 = await Promise.all(Array.from({length:t.조각||1}, (_,k) => getDoc(doc(window.db, ...창고자리, `${문서이름(u)}_${k+1}`))));
+      const 조각 = u===BOM시트 ? [] : await Promise.all(Array.from({length:t.조각||1}, (_,k) => getDoc(doc(window.db, ...창고자리, `${문서이름(u)}_${k+1}`))));   /* v2.20.0 BOM 시트 줄은 안 받음(품목으로 짬) */
       const 줄 = [].concat(...조각.map(s => s.exists() ? (s.data().줄||[]) : []));
       받은[u] = 표만들기(t.칸||[], 줄, u);
     }catch(e){ if(고른===u) 속.innerHTML = `<div class="state"><div class="big">창고를 읽지 못했습니다</div><div class="why">${글((e&&(e.code||e.message))||'')}</div></div>`; return; }
@@ -578,20 +581,7 @@ function 칸칠(){
   });
   공정칠();
 }
-/* v2.11.0 품목등록업로드 반제품 품번 모음(품목 시트를 다 받기 전엔 null) · BOM 표를 거르지 못하고 만들었으면 받은 뒤 다시 만듦 */
-let BOM거름 = '', BOM원 = null;   /* v2.13.0 BOM거름 = 걸러 만든 때의 품목 표지(반제품·품명) — 다르면 다시 만듦 */
-/* v2.13.0 품목등록업로드 품명 모음(다 받기 전엔 null) — 사장님 11-20 「품목등록업로드에 없는 BOM등록업로드 빨간글씨 모두 삭제 해줘」 */
-function 품명들(){
-  if(!품목칸 || !품목조각.length || 품목조각.some(x => !x)) return null;
-  const ni = 품목칸.indexOf('품명'); if(ni<0) return null;
-  const s = new Set(); for(const r of [].concat(...품목조각)) s.add(String(r.v[ni]??'').trim()); return s;
-}
-const 품목표지 = (반, 명) => 반 && 명 ? [...반].sort().join('\t') + '\n' + [...명].sort().join('\t') : '';
-function 반제품들(){
-  if(!품목칸 || !품목조각.length || 품목조각.some(x => !x)) return null;
-  const pi = 품목칸.indexOf('품번'), ai = 품목칸.indexOf('품목자산분류'); if(pi<0 || ai<0) return null;
-  const s = new Set(); for(const r of [].concat(...품목조각)) if(String(r.v[ai]??'').trim()==='반제품') s.add(String(r.v[pi]??'').trim()); return s;
-}
+let BOM거름 = '', BOM원 = null;   /* v2.20.0 BOM거름 = 지금 BOM 표를 짠 줄 값(JSON) — 다르면 BOM다시 가 다시 만듦 */
 /* v2.14.0 사장님 「자동으로 고」 — 조립 줄 = 품목등록업로드 반제품 줄(모품목(상위 품번) · 투입수량)로 짬. 다 받기 전엔 null.
    1116-2 236줄 · 1119 386줄 모두 원본 BOM 조립 줄과 30칸이 같음(소수 투입수량 0.111… = 분자 1 / 분모 9 꼴로 바꿔 같게 함). */
 function 분수(q){
@@ -621,77 +611,66 @@ function 조립짜기(칸){
   }
   return { 줄:out, 제 };
 }
-/* v2.15.0 가공 줄 = 품목등록업로드 반제품 값 우선. 반제품 품번 → 값 */
-function 반제품값(){
+/* ── v2.20.0 사장님 11-20 「지금 내가 엑셀 업로드해서 만들어 놓은 것 외에 다른 자료를 엑셀에서 보고 추정하지 마. 헷갈려」
+   BOM 표 = 품목등록업로드 화면에 보이는 값만으로 짬. 원본 BOM 시트 줄·원부자재 탭·숨은 원래 합판/필름 코드는 안 씀(창고에는 그대로).
+   · 조립 줄 = 조립짜기()(v2.14 · v2.18 그대로 — 품명·품번·규격·기준단위·모품목·소요량(투입수량) 입력).
+   · 가공 줄 = 반제품 품번마다(처음 줄) 합판코드 입력이 있으면 「재단」 줄 1 · 필름코드 입력이 있으면 「엣지」 줄 1. 코드 없으면 그 줄 없음.
+     모품목명·번호·규격·단위 = 그 반제품 줄 · BOM차수 00 · 표시순서 = 그 반제품 안 차례(재단 1 · 엣지 2, 재단 없으면 엣지 1) · 하위BOM차수 00 · Loss 0 0 ·
+     하위품번 = 코드 · 하위품명·하위규격 = 입력폼 자재 완료(드롭 목록 자재찾기) 이름·규격, 못 찾으면 빈칸 ·
+     재단: 투입단위 EA · 분자 1 · 분모 = 화면 재단률 칸 값(에이엠티 셈, 못 셈이면 화면이 보이는 엑셀 값) · 비고 「원장 1매에서 N개」 · 재단률 없으면 분자·분모·비고 빈칸.
+     엣지: 투입단위 M · 분자 = 화면 「필름 소요량(M)」 · 분모 1 · 소요량 없으면 분자·분모 빈칸 · 비고 빈칸.
+     공정 칸은 BOM공정칠 이 공정흐름으로 채움(v2.11 규칙, 재단/엣지 가름 = 이 줄이 합판 줄인지 필름 줄인지). */
+function 가공만들기(칸){   /* → Map 반제품 품번 → [줄] (품목을 다 받기 전엔 null) */
   if(!품목칸 || !품목조각.length || 품목조각.some(x => !x)) return null;
-  const I = k => 품목칸.indexOf(k), m = new Map(), 글 = (v, i) => i<0 ? '' : String(v[i]??'').trim();
-  const ai = I('품목자산분류'), pi = I('품번');
-  for(const r of [].concat(...품목조각)){ const p = 글(r.v, pi); if(!p || m.has(p) || 글(r.v, ai)!=='반제품') continue;
-    const 원값 = k => { const i = I(k); return i<0 ? null : r.v[i]; };
-    /* v2.18.0 화면에 보이는 값만: 합판·필름코드 = 사람 입력값(화면 입력 칸) · 재단률 = 화면 재단률 칸 값(에이엠티 셈, 못 셈이면 엑셀 값 — 재단칠 과 같음) */
-    const 재 = 재단셈(p, 글(r.v, I('모품목(상위 품번)')), 글(r.v, I('규격')));
-    m.set(p, { 명:원값('품명'), 규:원값('규격'), 단:원값('기준단위'), 합:값(p,'합판코드').trim(), 필:값(p,'필름코드').trim(), 재:재.n || 원값('재단률'), 필량:원값('필름 소요량(M)') }); }
-  return m;
+  const I = k => 품목칸.indexOf(k), J = k => 칸.indexOf(k), 글 = (v, i) => i<0 ? '' : String(v[i]??'').trim(), out = new Map();
+  const ni = I('품명'), pi = I('품번'), ai = I('품목자산분류'), gi = I('규격'), ui = I('기준단위'), mi = I('모품목(상위 품번)'), ri = I('재단률'), li = I('필름 소요량(M)');
+  for(const r of [].concat(...품목조각)){
+    const p = 글(r.v, pi); if(!p || out.has(p) || 글(r.v, ai)!=='반제품') continue;
+    const 줄 = [], 합 = 값(p,'합판코드').trim(), 필 = 값(p,'필름코드').trim();
+    const 새 = (코, 필줄) => { const v = Array(칸.length).fill(null), 둠 = (k, x) => { const i = J(k); if(i>=0) v[i] = x; }, 자 = 자재찾기(코);
+      둠('모품목명', ni>=0 ? r.v[ni] : null); 둠('모품목번호', p); 둠('모품목규격', gi>=0 ? r.v[gi] : null); 둠('모품목BOM차수', '00'); 둠('모품목단위', ui>=0 ? r.v[ui] : null);
+      둠('표시순서', 줄.length + 1); 둠('하위품명', 자 && 자.name || null); 둠('하위품번', 코); 둠('하위규격', 자 && 자.spec || null); 둠('하위BOM차수', '00');
+      둠('투입단위', 필줄 ? 'M' : 'EA'); 둠('사내Loss율', 0); 둠('사외Loss율', 0);
+      if(필줄){ const 량 = li>=0 ? r.v[li] : null; if(량!=null && String(량).trim()!==''){ 둠('소요량(분자)', 량); 둠('소요량(분모)', 1); } }
+      else { const 재 = 재단셈(p, 글(r.v, mi), 글(r.v, gi)), n = 재.n || 글(r.v, ri);   /* 화면 재단률 칸과 같은 값(재단칠) */
+        if(n){ 둠('소요량(분자)', 1); 둠('소요량(분모)', 재.n || r.v[ri]); 둠('비고', `원장 1매에서 ${n}개`); } }
+      줄.push({ 행:'가공', v, 가공:true, 필:필줄, m:p }); };
+    if(합) 새(합, false);
+    if(필) 새(필, true);
+    out.set(p, 줄);
+  }
+  return out;
 }
-let 자재이름 = new Map();   /* v2.15.0 원부자재 탭 품번 → 품명(코드가 바뀐 줄 하위품명) */
-async function 자재이름받기(){
-  try{
-    const t = 시트들.find(x => x.이름==='원부자재'); if(!t) return;
-    const { doc, getDoc } = window.fbRead, ni = (t.칸||[]).indexOf('품명'), pi = (t.칸||[]).indexOf('품번'); if(ni<0 || pi<0) return;
-    const 조각 = await Promise.all(Array.from({length:t.조각||1}, (_,k) => getDoc(doc(window.db, ...창고자리, `${문서이름('원부자재')}_${k+1}`))));
-    const m = new Map(); for(const s of 조각) for(const r of (s.exists() ? (s.data().줄||[]) : [])){ const p = String(r.v[pi]??'').trim(); if(p && !m.has(p)) m.set(p, String(r.v[ni]??'').trim()); }
-    자재이름 = m; BOM다시();
-  }catch(e){}
-}
-function 가공짜기(칸, 줄, 반값){
-  const J = k => 칸.indexOf(k), gi = J('공정'), mi = J('모품목번호'), ui = J('투입단위'), bi = J('하위품번'), ni = J('하위품명'), si = J('하위규격'), ri = J('비고');
-  const 빈 = x => x==null || String(x).trim()==='';
-  return 줄.map(r => {
-    if(String(r.v[gi]??'').trim()!=='가공') return r;
-    const s = 반값.get(String(r.v[mi]??'').trim()); if(!s) return r;
-    const 자칸 = new Set([mi]);   /* v2.17.0 품목등록업로드에서 정해진 칸(모품목번호 = 반제품 품번) — 나머지는 빈칸으로 보임 */
-    const v = r.v.slice(), 둠 = (i, x) => { if(i>=0 && !빈(x)){ v[i] = x; 자칸.add(i); } }, 필 = String(r.v[ui]??'').trim()==='M';
-    둠(J('모품목명'), s.명); 둠(J('모품목규격'), s.규); 둠(J('모품목단위'), s.단);
-    const 코 = 필 ? s.필 : s.합;
-    if(코 && 코!==String(r.v[bi]??'').trim()){
-      v[ni] = String(r.v[ni]??'').trim()===String(r.v[bi]??'').trim() ? 코 : (자재이름.get(코) || 코); v[bi] = 코; }
-    if(코){ 자칸.add(bi); const 명 = String(v[ni]??'').trim(); if(명===코 || 명===자재이름.get(코)) 자칸.add(ni); }
-    if(필){ 둠(J('소요량(분자)'), s.필량); const w = /^ed_[^_]+_(\d+)_/.exec(String(v[bi]??'')); if(코 && w && si>=0 && /^\d+mm$/.test(String(r.v[si]??'').trim())){ v[si] = `${+w[1]}mm`; 자칸.add(si); } }
-    else { 둠(J('소요량(분모)'), s.재); if(ri>=0 && !빈(s.재) && /^원장 1매에서 \d+개$/.test(String(r.v[ri]??'').trim())){ v[ri] = `원장 1매에서 ${s.재}개`; 자칸.add(ri); } }
-    return v.some((x, i) => String(x??'')!==String(r.v[i]??'')) ? { ...r, v, 원:r.v, 가자동:true, 자칸 } : { ...r, 자칸 };
-  });
+function BOM줄짜기(칸){   /* 조립 줄(제품마다) 뒤에 그 반제품들의 가공 줄 · 제품 없는 반제품 가공 줄은 끝 */
+  const 조 = 조립짜기(칸), 가 = 조 && 가공만들기(칸); if(!조 || !가) return null;
+  const mi = 칸.indexOf('모품목번호'), bi = 칸.indexOf('하위품번'), 묶 = new Map(), 놓음 = new Set(), 줄 = [];
+  for(const r of 조.줄){ const m = String(r.v[mi]??''); if(!묶.has(m)) 묶.set(m, []); 묶.get(m).push(r); }
+  for(const rs of 묶.values()){ 줄.push(...rs);
+    for(const r of rs){ const s = String(r.v[bi]??'').trim(); if(!놓음.has(s) && 가.has(s)){ 놓음.add(s); 줄.push(...가.get(s)); } } }
+  for(const [s, rs] of 가) if(!놓음.has(s)) 줄.push(...rs);
+  return 줄;
 }
 function BOM다시(){
   if(!BOM원 || !받은[BOM시트]) return;
-  const 조 = 조립짜기(BOM원.칸), 표지 = 품목표지(반제품들(), 품명들()) && 품목표지(반제품들(), 품명들()) + '\n' + (조 ? JSON.stringify(조.줄.map(r => r.v)) : '') + '\n' + JSON.stringify([...(반제품값()||[])]) + JSON.stringify([...자재이름]);
-  if(!표지 || 표지===BOM거름) return;   /* v2.13.0 · v2.14.0 조립 줄까지 */
+  const 짠 = BOM줄짜기(BOM원.칸); if(!짠) return;
+  if(JSON.stringify(짠.map(r => r.v))===BOM거름) return;   /* 같으면 안 만듦 */
   const 옛 = 받은[BOM시트], 자리 = [옛.scrollLeft, 옛.scrollTop];
-  받은[BOM시트] = 표만들기(BOM원.칸, BOM원.줄, BOM시트);
+  받은[BOM시트] = 표만들기(BOM원.칸, [], BOM시트);
   if(고른===BOM시트){ document.getElementById('속').replaceChildren(받은[BOM시트]); 받은[BOM시트].scrollLeft = 자리[0]; 받은[BOM시트].scrollTop = 자리[1]; }
-}
-/* 원래(창고 시트) 반제품 합판·필름 코드 — BOM 가공 줄 짝 찾기용 */
-function 원래코드(){
-  const m = new Map(); if(!품목칸 || 품목조각.some(x => !x)) return m;
-  const pi = 품목칸.indexOf('품번'), hi = 품목칸.indexOf('합판코드'), fi = 품목칸.indexOf('필름코드');
-  if(pi<0) return m;
-  for(const r of [].concat(...품목조각)){ const p = String(r.v[pi]??'').trim(); if(p && !m.has(p)) m.set(p, { 합판코드:String(r.v[hi]??'').trim(), 필름코드:String(r.v[fi]??'').trim() }); }
-  return m;
 }
 /* ── v2.11.0 BOM 가공 줄 = 공정흐름대로 다시 놓기 — 사장님 11-19 「사실 현재 비오엠업로드등록에서 공정이 가공인것들은 다 삭제하고 현 공정흐름에 맞게 재배치 해야함」 · 「공정 순서가 이미 공정흐름으로 보이잖아」
    · 표만들기: 「가공」 줄 중 모품목이 품목등록업로드 반제품이 아닌 줄은 표에서 뺌(창고 시트·원본 엑셀은 그대로).
    · 남은 가공 줄(반제품 → 합판·필름)의 「공정」 칸 = 그 반제품 공정흐름(보이는 값: 사람 값, 없으면 v2.8 자동 값)을 「-」로 나눈 공정 중
      합판 줄 = 「재단」 든 첫 공정(없으면 첫 공정) · 필름 줄 = 「엣지」 공정(없으면 엣지 든 공정 · 그것도 없으면 첫 공정 + 주황 td.엣지없음).
-     합판/필름 가름 = 원래 코드(원래코드()) — 짝이 없으면 투입단위 M = 필름, 나머지 = 합판. 흐름 없음 = 빈칸 + 빨강 바탕 td.흐름없음.
+     합판/필름 가름 = v2.20.0 부터 그 줄을 만든 코드 칸(합판코드 → 재단 쪽 · 필름코드 → 엣지 쪽). 흐름 없음 = 빈칸 + 빨강 바탕 td.흐름없음.
    · 사람 값 = 파랑 · 자동 값 = 옅은 글자 · 마우스 = 근거. 저장 안 함(흐름이 바뀌면 바로 따라 바뀜). 제품 → 반제품 「조립」 줄은 그대로. */
 function BOM흐름(p){ const v = 값(p,'공정흐름').trim(); if(v) return { v, 자:false }; const a = 공자동(p); return a ? { v:a.v, 자:true } : { v:'', 자:false }; }
 function BOM공정칠(){
   if(!연동줄.length) return;
   공규칙셈();
-  const 원 = 원래코드();
   for(const z of 연동줄){
     if(z.gi<0) continue;
-    const td = z.tr.cells[z.gi], o = 원.get(z.m);
-    const 필 = o && z.번 && z.번===o.필름코드 ? true : o && z.번 && z.번===o.합판코드 ? false : /^m$/i.test(z.단);
+    const td = z.tr.cells[z.gi], 필 = z.필;   /* v2.20.0 합판/필름 = 이 줄을 만든 코드 칸(원래 코드 안 봄) */
     const f = BOM흐름(z.m), 조 = f.v.split('-').map(x => x.trim()).filter(Boolean);
     let 공 = '', 엣없 = false;
     if(조.length){
@@ -701,8 +680,8 @@ function BOM공정칠(){
     td.textContent = 공;
     td.classList.toggle('흐름없음', !조.length); td.classList.toggle('엣지없음', 엣없);
     td.classList.toggle('저장값', !!조.length && !f.자 && 파랑(z.m,'공정흐름')); td.classList.toggle('공자동', !!조.length && f.자);
-    td.title = !조.length ? `${품목시트} ${z.m} 공정흐름 없음 (원래 ${z.공})`
-      : `${품목시트} ${z.m} 공정흐름 ${f.v}${f.자?' (자동)':''} — ${필?'필름':'합판'}${엣없?' · 흐름에 엣지 없음':''} (원래 ${z.공})`;
+    td.title = !조.length ? `${품목시트} ${z.m} 공정흐름 없음`
+      : `${품목시트} ${z.m} 공정흐름 ${f.v}${f.자?' (자동)':''} — ${필?'필름':'합판'}${엣없?' · 흐름에 엣지 없음':''}`;
   }
 }
 /* v2.12.0 BOM 모품목명이 품목등록업로드 품명에 없으면 빨강 — 품목 시트를 다 받기 전엔 안 따짐 */
@@ -721,17 +700,7 @@ function 연동칠(){
     if(z.i자>=0){ c[z.i자].textContent = v; c[z.i자].classList.toggle('저장값', 파); c[z.i자].title = `${품목시트} ${z.번} 투입수량`; }
     if(z.i모>=0){ c[z.i모].textContent = '1'; c[z.i모].classList.toggle('저장값', 파); c[z.i모].title = `${품목시트} ${z.번} 투입수량`; }
   }
-  if(!연동줄.length) return;
-  BOM공정칠();   /* v2.11.0 */
-  const 원 = 원래코드();
-  for(const z of 연동줄){
-    const o = 원.get(z.m); let k = '';
-    if(o && z.번){ if(z.번===o.합판코드) k = '합판코드'; else if(z.번===o.필름코드) k = '필름코드'; }
-    const v = k ? 값(z.m,k).trim() : '', c = z.tr.cells, 칠 = z.보 ? [[z.i번, z.보[0]], [z.i명, z.보[1]], [z.i규, z.보[2]]] : [[z.i번, z.번], [z.i명, z.명], [z.i규, z.규]];
-    if(!v){ for(const [i,w] of 칠){ if(i<0) continue; c[i].textContent = w; c[i].classList.remove('저장값'); c[i].removeAttribute('title'); } continue; }
-    const 자 = 자재찾기(v), 새 = { [z.i번]:v, [z.i명]: z.명===z.번 ? v : ((자 && 자.name) || v), [z.i규]: (자 && 자.spec) || z.규 }, 파 = 파랑(z.m,k);
-    for(const [i] of 칠){ if(i<0) continue; c[i].textContent = 새[i]; c[i].classList.toggle('저장값', 파); c[i].title = `${품목시트} ${z.m} ${k}`; }
-  }
+  if(연동줄.length) BOM공정칠();   /* v2.11.0 · v2.20.0 가공 줄 하위품번·품명·규격은 BOM줄짜기 가 입력 코드로 이미 만듦(덧씀 없음) */
 }
 
 /* ── v2.9.0 재단률 = 에이엠티 재단 편집 기본규칙 — 사장님 11-19 「품목등록업로드의 재단율 계산을 깃에 배포된 에이엠티 재단편집의 논리로 계산되게 그부분을 이 입력부와 연결해줄 수 있겠니」
@@ -1082,44 +1051,12 @@ function 한제품번호(칸 = 품목칸, 줄0 = null){   /* 품목 줄 → 제�
   for(const r of 줄) if(글(r.v, ai)==='반제품' && 제.has(글(r.v, mi)) && 글(r.v, pi)) s.add(글(r.v, pi));
   return s;
 }
-function BOM한제품(칸, 줄){   /* 품목을 아직 못 받았을 때: BOM 모품목명 = 이 제품 → 그 번호 + 조립 하위품번 */
-  const J = k => 칸.indexOf(k), ni = J('모품목명'), mi = J('모품목번호'), gi = J('공정'), bi = J('하위품번'), 글 = (v, i) => i<0 ? '' : String(v[i]??'').trim(), s = new Set();
-  for(const r of 줄) if(글(r.v, ni)===한제품명) s.add(글(r.v, mi));
-  for(const r of 줄) if(글(r.v, gi)==='조립' && s.has(글(r.v, mi)) && 글(r.v, bi)) s.add(글(r.v, bi));
-  return s;
-}
 function 표만들기(칸, 줄, 이름){
   const 통 = document.createElement('div');
-  if(이름===BOM시트){   /* v2.11.0 가공 줄 = 품목등록업로드 반제품 것만 */
-    const 반 = 반제품들(), gi = 칸.indexOf('공정'), mi = 칸.indexOf('모품목번호');
-    BOM원 = { 칸, 줄 };
-    if(반 && gi>=0 && mi>=0) 줄 = 줄.filter(r => String(r.v[gi]??'').trim()!=='가공' || 반.has(String(r.v[mi]??'').trim()));
-    const 명 = 품명들(), ni = 칸.indexOf('모품목명');   /* v2.13.0 모품목명이 품목등록업로드 품명에 없는 모품목 = 그 줄 모두 뺌 */
-    if(반 && 명 && ni>=0) 줄 = 줄.filter(r => 명.has(String(r.v[ni]??'').trim()));
-    /* v2.14.0 조립 줄 = 품목등록업로드로 짬: 품목 제품의 원본 조립 줄은 빼고, 그 제품 첫 원본 조립 줄 자리(없으면 그 반제품 첫 가공 줄 앞, 그것도 없으면 끝)에 넣음 */
-    const 조 = 반 && 명 ? 조립짜기(칸) : null;
-    if(조){
-      const bi = 칸.indexOf('하위품번'), 원조 = new Map();
-      for(const r of 줄) if(String(r.v[gi]??'').trim()==='조립') 원조.set(String(r.v[mi]??'').trim() + '\t' + String(r.v[bi]??'').trim(), r.v);
-      const 묶 = new Map(), 반모 = new Map();
-      for(const r of 조.줄){ const m = String(r.v[mi]); if(!묶.has(m)) 묶.set(m, []); 묶.get(m).push(r); 반모.set(String(r.v[bi]).trim(), m);
-        r.원 = 원조.get(m + '\t' + String(r.v[bi]??'').trim()) || null; }
-      const 새 = [], 놓음 = new Set(), 넣기 = m => { if(!놓음.has(m)){ 놓음.add(m); 새.push(...묶.get(m)); } };
-      for(const r of 줄){
-        const m = String(r.v[mi]??'').trim(), 공 = String(r.v[gi]??'').trim();
-        if(공==='조립' && 조.제.has(m)){ if(묶.has(m)) 넣기(m); continue; }
-        if(공!=='조립' && 반모.has(m)) 넣기(반모.get(m));
-        새.push(r);
-      }
-      for(const m of 묶.keys()) 넣기(m);
-      줄 = 새;
-    }
-    const 반값 = 반 && 명 ? 반제품값() : null;   /* v2.15.0 가공 줄 = 품목등록업로드 값 우선 */
-    if(반값) 줄 = 가공짜기(칸, 줄, 반값);
-    BOM거름 = 품목표지(반, 명) && 품목표지(반, 명) + '\n' + (조 ? JSON.stringify(조.줄.map(r => r.v)) : '') + '\n' + JSON.stringify([...(반값||[])]) + JSON.stringify([...자재이름]);
-    const 보일 = 한제품번호() || BOM한제품(칸, 줄); 줄 = 줄.filter(r => 보일.has(String(r.v[mi]??'').trim()));   /* v2.16.0 한 제품만 — 짜기 뒤에 거름 */
-    /* v2.17.0 자동으로 된 칸만 보임: 조립 짜기 줄 = 모두 · 가공 줄 = 자칸(품목등록업로드 값) + 공정(BOM공정칠 이 공정흐름으로 채움) · 그 밖(원본 값) = 빈칸. 계산·연동은 r.v(원래 값) 그대로 씀 */
-    줄 = 줄.map(r => r.자동 ? r : { ...r, 보:r.v.map((x, i) => r.자칸 && r.자칸.has(i) ? x : null) });
+  if(이름===BOM시트){   /* v2.20.0 줄 = BOM줄짜기(품목등록업로드 화면 값만) — 받은 BOM 시트 줄은 안 씀 */
+    const mi = 칸.indexOf('모품목번호'), 짠 = BOM줄짜기(칸);
+    BOM원 = { 칸 }; 줄 = 짠 || []; BOM거름 = 짠 ? JSON.stringify(짠.map(r => r.v)) : '';
+    const 보일 = 한제품번호() || new Set(); 줄 = 줄.filter(r => 보일.has(String(r.v[mi]??'').trim()));   /* v2.16.0 한 제품만 — 짜기 뒤에 거름 */
   }
   if(!줄.length){ 통.className='state'; 통.innerHTML='<div class="big">줄 없음</div>'; return 통; }
   const 품 = 이름===품목시트, pi = 칸.indexOf('품번'), 편 = 품 ? 편칸.map(k => 칸.indexOf(k)) : [];
@@ -1160,7 +1097,7 @@ function 표만들기(칸, 줄, 이름){
         if(반제품칸.has(k) && !반){ tr += `<td class="막음" data-k="${k}"></td>`; continue; }   /* v2.3.0 제품 줄 = 입력 안 됨 */
         if(k==='투입수량') k = '투입수량@' + String(r.v[mi0]??'').trim();
         tr += `<td class="편${k.startsWith('투입수량')?' num':''}${고를칸[k]?' 드롭칸':''}${파랑(p,k)?' 저장값':''}" data-k="${글(k)}">${글(값(p,k))}</td>`; continue; }
-      const v = r.보 ? r.보[i] : r.v[i];   /* v2.17.0 */
+      const v = r.v[i];
       if(반 && 칸[i]==='재단률'){   /* v2.9.0 에이엠티 재단 편집 기본규칙 — 재단칠 이 채움 */
         tr += `<td class="num" data-k="재단률" data-번="${글(p)}" data-모="${글(String(r.v[mi0]??'').trim())}" data-규="${글(String(r.v[칸.indexOf('규격')]??''))}" data-xl="${글(String(v??'').trim())}">${글(v)}</td>`; continue; }
       const 빨칸 = 빨 && 칸[i]==='품명';
@@ -1174,21 +1111,14 @@ function 표만들기(칸, 줄, 이름){
   if(품) setTimeout(재단칠);   /* v2.9.0 */
   if(품){ 편집달기(통); const 머 = 통.querySelector('th.단서'); if(머) 머.addEventListener('click', 공정창열기); }
   if(이름===BOM시트){
-    const 몫 = k => 칸.indexOf(k), mi = 몫('모품목번호'), gi = 몫('공정'), i명 = 몫('하위품명'), i번 = 몫('하위품번'), i규 = 몫('하위규격');
+    const 몫 = k => 칸.indexOf(k), mi = 몫('모품목번호'), gi = 몫('공정'), i번 = 몫('하위품번');
     const trs = 통.querySelectorAll('tbody tr'); 연동줄 = [];
-    줄.forEach((r, n) => { if(String(r.v[gi]??'').trim()!=='가공') return;
-      연동줄.push({ tr:trs[n], m:String(r.v[mi]??'').trim(), 번:String(r.v[i번]??'').trim(), 명:String(r.v[i명]??''), 규:String(r.v[i규]??''), i명, i번, i규,
-        보:r.보 ? [i번, i명, i규].map(i => i<0 ? '' : String(r.보[i]??'')) : null,   /* v2.17.0 입력값 없을 때 되돌릴 보이는 값 */
-        gi, 공:String(r.v[gi]??''), 단:String(r.v[몫('투입단위')]??'').trim() }); });   /* v2.11.0 gi·공·단 = 공정 다시 놓기 */
+    줄.forEach((r, n) => { if(r.가공) 연동줄.push({ tr:trs[n], m:r.m, gi, 필:r.필 }); });   /* v2.11.0 공정 칸 · v2.20.0 필 = 필름 줄 */
     const i모명 = 몫('모품목명'); 모줄 = [];   /* v2.12.0 */
     if(i모명>=0) 줄.forEach((r, n) => { const td = trs[n].cells[i모명]; 모줄.push({ td, 명:String(r.v[i모명]??'').trim(), 원:td.getAttribute('title')||'' }); });
     const i자 = 몫('소요량(분자)'), i모 = 몫('소요량(분모)'); 조립줄 = [];   /* v2.3.0 투입수량 짝 = 조립 줄 */
     줄.forEach((r, n) => { if(String(r.v[gi]??'').trim()!=='조립') return;
       조립줄.push({ tr:trs[n], m:String(r.v[mi]??'').trim(), 번:String(r.v[i번]??'').trim(), 자:String(r.v[i자]??''), 모:String(r.v[i모]??''), i자, i모 }); });
-    줄.forEach((r, n) => { if(!r.자동 && !r.가자동) return;   /* v2.15.0 가공 줄도 */   /* v2.14.0 원본 조립 줄과 다른 칸 = 노랑 · 마우스 = 원본 값 */
-      const c = trs[n].cells;
-      if(!r.원){ c[i번].classList.add('조립바뀜'); c[i번].title = '원본 BOM 에 없던 조립 줄 — 품목등록업로드로 짬'; return; }
-      for(let i=0;i<칸.length;i++) if(String(r.v[i]??'')!==String(r.원[i]??'')){ c[i].classList.add('조립바뀜'); c[i].title = `원본 BOM: ${String(r.원[i]??'') || '빈칸'}`; } });
     setTimeout(연동칠);
   }
   return 통;
