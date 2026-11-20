@@ -2,7 +2,10 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.13.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.14.0
+     v2.14.0(11-20): 사장님 「자동으로 고」 — BOM 조립 줄(제품 → 반제품)을 원본 BOM 시트 대신 품목등록업로드 반제품 줄(모품목(상위 품번)·투입수량)로 짬.
+       모품목명·규격·단위 = 품목등록업로드 그 제품 줄 · 하위 = 반제품 줄 · 표시순서 = 제품마다 품목 차례 · 소요량 = 투입수량(소수면 분수 1/9 꼴) · 비고 「반제품 투입」.
+       원본 조립 줄과 다른 칸 = 옅은 노랑 바탕(마우스 = 원본 값) · 원본에 없던 줄 = 하위품번 칸 노랑. 가공 줄은 그대로. 저장 없음 · 품목이 바뀌면 다시 짬.
      v2.13.0(11-20): 사장님 「품목등록업로드에 없는 BOM등록업로드 빨간글씨 모두 삭제 해줘」 —
        BOM 표에서 모품목명(앞뒤 빈칸 뺀 글자)이 품목등록업로드 품명에 없는 모품목의 줄을 모두 뺌(화면만 · 창고 시트·원본 엑셀은 그대로).
        품목 시트를 다 받은 뒤에만 거름 · 품목 품명·반제품이 바뀌면 BOM 표를 다시 만듦(그 품명이 생기면 줄이 돌아옴).
@@ -178,6 +181,7 @@ html,body{height:100%;overflow:hidden}
 .dpr-t td.목록밖{color:#e53935}   /* v2.7.0 목록에서 지운 공정흐름 값 */
 .dpr-t td.재단못{background:#FFF1E0}   /* v2.9.0 재단률 에이엠티 계산 안 됨(엑셀 원래 값) */
 .dpr-t td[data-k="재단률"]{cursor:pointer}
+.dpr-t td.조립바뀜{background:#FFF6CC}   /* v2.14.0 자동 조립 줄 — 원본 BOM 과 다른 칸 */
 .dpr-t td.모없음{color:#e53935}   /* v2.12.0 BOM 모품목명 — 품목등록업로드 품명에 없음 */
 .dpr-t td.흐름없음{background:#FDECEA}   /* v2.11.0 BOM 가공 줄 — 그 반제품 공정흐름 없음 */
 .dpr-t td.엣지없음{background:#FFF1E0}   /* v2.11.0 BOM 필름 줄 — 흐름에 엣지 공정 없음 */
@@ -221,7 +225,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.13.0</div>
+  <div class="badge">v2.14.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -569,9 +573,38 @@ function 반제품들(){
   const pi = 품목칸.indexOf('품번'), ai = 품목칸.indexOf('품목자산분류'); if(pi<0 || ai<0) return null;
   const s = new Set(); for(const r of [].concat(...품목조각)) if(String(r.v[ai]??'').trim()==='반제품') s.add(String(r.v[pi]??'').trim()); return s;
 }
+/* v2.14.0 사장님 「자동으로 고」 — 조립 줄 = 품목등록업로드 반제품 줄(모품목(상위 품번) · 투입수량)로 짬. 다 받기 전엔 null.
+   1116-2 236줄 · 1119 386줄 모두 원본 BOM 조립 줄과 30칸이 같음(소수 투입수량 0.111… = 분자 1 / 분모 9 꼴로 바꿔 같게 함). */
+function 분수(q){
+  const n = Number(q); if(q==null || String(q).trim()==='' || !isFinite(n)) return [q, 1];
+  if(Number.isInteger(n)) return [n, 1];
+  for(let d=2; d<=1000; d++){ const a = Math.round(n*d); if(Math.abs(n*d - a) < 1e-6) return [a, d]; }
+  return [n, 1];
+}
+function 조립짜기(칸){
+  if(!품목칸 || !품목조각.length || 품목조각.some(x => !x)) return null;
+  const I = k => 품목칸.indexOf(k), J = k => 칸.indexOf(k);
+  const ni = I('품명'), pi = I('품번'), ai = I('품목자산분류'), gi = I('규격'), ui = I('기준단위'), mi = I('모품목(상위 품번)'), qi = I('투입수량');
+  if([ni,pi,ai,mi,qi].some(i => i<0)) return null;
+  const 줄 = [].concat(...품목조각), 제 = new Map(), 순 = new Map(), out = [];
+  for(const r of 줄){ const p = String(r.v[pi]??'').trim(); if(p && !제.has(p) && String(r.v[ai]??'').trim()==='제품') 제.set(p, r.v); }
+  for(const r of 줄){
+    if(String(r.v[ai]??'').trim()!=='반제품') continue;
+    const m = String(r.v[mi]??'').trim(), p = 제.get(m); if(!p) continue;
+    순.set(m, (순.get(m)||0) + 1);
+    const v = Array(칸.length).fill(null), 둠 = (k, x) => { const i = J(k); if(i>=0) v[i] = x; }, [자, 모] = 분수(r.v[qi]);
+    둠('모품목명', p[ni]); 둠('모품목번호', m); 둠('모품목규격', gi>=0 ? p[gi] : null); 둠('모품목BOM차수', '00'); 둠('모품목단위', ui>=0 ? p[ui] : null);
+    둠('공정', '조립'); 둠('표시순서', 순.get(m)); 둠('하위품명', r.v[ni]); 둠('하위품번', r.v[pi]); 둠('하위규격', gi>=0 ? r.v[gi] : null);
+    둠('하위BOM차수', '00'); 둠('투입단위', ui>=0 ? r.v[ui] : null); 둠('소요량(분자)', 자); 둠('소요량(분모)', 모);
+    둠('사내Loss율', 0); 둠('사외Loss율', 0); 둠('비고', '반제품 투입');
+    out.push({ 행:'조립', v, 자동:true });
+  }
+  return { 줄:out, 제 };
+}
 function BOM다시(){
   if(!BOM원 || !받은[BOM시트]) return;
-  const 표지 = 품목표지(반제품들(), 품명들()); if(!표지 || 표지===BOM거름) return;   /* v2.13.0 */
+  const 조 = 조립짜기(BOM원.칸), 표지 = 품목표지(반제품들(), 품명들()) && 품목표지(반제품들(), 품명들()) + '\n' + (조 ? JSON.stringify(조.줄.map(r => r.v)) : '');
+  if(!표지 || 표지===BOM거름) return;   /* v2.13.0 · v2.14.0 조립 줄까지 */
   const 옛 = 받은[BOM시트], 자리 = [옛.scrollLeft, 옛.scrollTop];
   받은[BOM시트] = 표만들기(BOM원.칸, BOM원.줄, BOM시트);
   if(고른===BOM시트){ document.getElementById('속').replaceChildren(받은[BOM시트]); 받은[BOM시트].scrollLeft = 자리[0]; 받은[BOM시트].scrollTop = 자리[1]; }
@@ -982,7 +1015,25 @@ function 표만들기(칸, 줄, 이름){
     if(반 && gi>=0 && mi>=0) 줄 = 줄.filter(r => String(r.v[gi]??'').trim()!=='가공' || 반.has(String(r.v[mi]??'').trim()));
     const 명 = 품명들(), ni = 칸.indexOf('모품목명');   /* v2.13.0 모품목명이 품목등록업로드 품명에 없는 모품목 = 그 줄 모두 뺌 */
     if(반 && 명 && ni>=0) 줄 = 줄.filter(r => 명.has(String(r.v[ni]??'').trim()));
-    BOM거름 = 품목표지(반, 명);
+    /* v2.14.0 조립 줄 = 품목등록업로드로 짬: 품목 제품의 원본 조립 줄은 빼고, 그 제품 첫 원본 조립 줄 자리(없으면 그 반제품 첫 가공 줄 앞, 그것도 없으면 끝)에 넣음 */
+    const 조 = 반 && 명 ? 조립짜기(칸) : null;
+    if(조){
+      const bi = 칸.indexOf('하위품번'), 원조 = new Map();
+      for(const r of 줄) if(String(r.v[gi]??'').trim()==='조립') 원조.set(String(r.v[mi]??'').trim() + '\t' + String(r.v[bi]??'').trim(), r.v);
+      const 묶 = new Map(), 반모 = new Map();
+      for(const r of 조.줄){ const m = String(r.v[mi]); if(!묶.has(m)) 묶.set(m, []); 묶.get(m).push(r); 반모.set(String(r.v[bi]).trim(), m);
+        r.원 = 원조.get(m + '\t' + String(r.v[bi]??'').trim()) || null; }
+      const 새 = [], 놓음 = new Set(), 넣기 = m => { if(!놓음.has(m)){ 놓음.add(m); 새.push(...묶.get(m)); } };
+      for(const r of 줄){
+        const m = String(r.v[mi]??'').trim(), 공 = String(r.v[gi]??'').trim();
+        if(공==='조립' && 조.제.has(m)){ if(묶.has(m)) 넣기(m); continue; }
+        if(공!=='조립' && 반모.has(m)) 넣기(반모.get(m));
+        새.push(r);
+      }
+      for(const m of 묶.keys()) 넣기(m);
+      줄 = 새;
+    }
+    BOM거름 = 품목표지(반, 명) && 품목표지(반, 명) + '\n' + (조 ? JSON.stringify(조.줄.map(r => r.v)) : '');
   }
   if(!줄.length){ 통.className='state'; 통.innerHTML='<div class="big">줄 없음</div>'; return 통; }
   const 품 = 이름===품목시트, pi = 칸.indexOf('품번'), 편 = 품 ? 편칸.map(k => 칸.indexOf(k)) : [];
@@ -1044,6 +1095,10 @@ function 표만들기(칸, 줄, 이름){
     const i자 = 몫('소요량(분자)'), i모 = 몫('소요량(분모)'); 조립줄 = [];   /* v2.3.0 투입수량 짝 = 조립 줄 */
     줄.forEach((r, n) => { if(String(r.v[gi]??'').trim()!=='조립') return;
       조립줄.push({ tr:trs[n], m:String(r.v[mi]??'').trim(), 번:String(r.v[i번]??'').trim(), 자:String(r.v[i자]??''), 모:String(r.v[i모]??''), i자, i모 }); });
+    줄.forEach((r, n) => { if(!r.자동) return;   /* v2.14.0 원본 조립 줄과 다른 칸 = 노랑 · 마우스 = 원본 값 */
+      const c = trs[n].cells;
+      if(!r.원){ c[i번].classList.add('조립바뀜'); c[i번].title = '원본 BOM 에 없던 조립 줄 — 품목등록업로드로 짬'; return; }
+      for(let i=0;i<칸.length;i++) if(String(r.v[i]??'')!==String(r.원[i]??'')){ c[i].classList.add('조립바뀜'); c[i].title = `원본 BOM: ${String(r.원[i]??'') || '빈칸'}`; } });
     setTimeout(연동칠);
   }
   return 통;
