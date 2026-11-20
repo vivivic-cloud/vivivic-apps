@@ -82,6 +82,70 @@
         return 소요량({ 부속: { w: parseFloat(w), d: parseFloat(d) }, 원장: 원장크기(기본.원장), 결보호: grain }).n;
     }
 
+    // 재단도(cutting_plans 한 장) 원장 한 장에 '이 부속'이 몇 개 — 에이엠티 _cuttingPerSheet 를 그대로 옮김(11-21, 에이엠티는 이것을 부른다).
+    // 재단편집에서 확정한 계획은 perSheet 를 그대로, 없으면 도면 조각 치수(dw·dh)가 이 부속(w×d, 돌린 것 포함)과 같은 것만 센다.
+    // 영림원품목등록 「재단률」 도 이 값을 쓴다 — 에이엠티에서 재단도를 고치면 같이 바뀐다.
+    function 재단도한장(p, w, d) {
+        if (p.perSheet > 0) return p.perSheet;
+        const bps = p.boardParts || [];
+        if (!bps.length) return 0;
+        w = w || 0; d = d || 0;
+        if (!w || !d) return bps.length;
+        const 같다 = (a, b) => isFinite(a) && Math.abs(a - b) < 0.5;
+        const 내것 = bps.filter(pt => {
+            const dw = parseFloat(pt.dw), dh = parseFloat(pt.dh);
+            // 돌려서 앉혔을 수 있으니 가로·세로를 바꾼 것도 이 부속으로 본다
+            return (같다(dw, w) && 같다(dh, d)) || (같다(dw, d) && 같다(dh, w));
+        });
+        return 내것.length || bps.length;   // 치수가 안 적힌 옛 도면은 예전대로
+    }
+
+    // 재단도의 주인 발주 — 에이엠티 _cutPlanMadeAt·_cutPlanRows·_orderPartRows·_cutPlanOwner 를 그대로 옮김(11-21, 에이엠티는 이것을 부른다).
+    // 발주번호는 다시 쓰이므로 행·확정 시각으로 가린다. 주인이 없는 재단도 = 취소·지워진 옛 발주의 것(타임라인에 안 올라감).
+    function 재단도만든때(plan) {
+        const m = String((plan && plan.confirmId) || '').match(/(\d{13})/);
+        return m ? parseInt(m[1], 10) : null;
+    }
+    function 재단도행들(plan) {
+        const rows = new Set();
+        ['pRowIndex', 'sRowIndex', 'tRowIndex'].forEach(k => {
+            const v = plan && plan[k];
+            if (v != null && v !== '') { const n = parseInt(v, 10); if (!isNaN(n)) rows.add(n); }
+        });
+        return rows;
+    }
+    function 발주부속행들(order) {
+        const rows = new Set();
+        Object.entries((order && order.partInfoMap) || {}).forEach(([k, v]) => {
+            if (!v || v.isDeleted) return;
+            const n = parseInt(String(k).split('-')[2], 10);
+            if (!isNaN(n)) rows.add(n);
+        });
+        return rows;
+    }
+    function 재단도주인(발주들, idNum, 만든때, plan) {
+        const 확정 = (발주들 || []).filter(o =>
+            o.idNum === idNum && o.amtTimeline === true && !o.amtConfirmedCancel);
+        if (!확정.length) return null;
+        const 행 = 재단도행들(plan);
+        if (행.size) {
+            const 행맞음 = 확정.filter(o => {
+                const r = 발주부속행들(o);
+                for (const x of 행) if (r.has(x)) return true;
+                return false;
+            });
+            if (!행맞음.length) return null;
+            확정.length = 0; 확정.push(...행맞음);
+        }
+        if (만든때 == null) return 확정[0];
+        let 주인 = null;
+        확정.forEach(o => {
+            const b = o.batchId || 0;
+            if (b <= 만든때 && (!주인 || (주인.batchId || 0) < b)) 주인 = o;
+        });
+        return 주인;
+    }
+
     /* ── 끼울 자리 ─────────────────────────────────────────────
        계산 결과를 다른 집이 받아 가는 길. 부품은 저장하지 않는다.
        예) 나중에 에이엠티 재단 편집이 확정할 때 결과보내기({부속코드, 원장, n, …}) →
@@ -96,5 +160,5 @@
         받는곳.slice().forEach(function (fn) { try { fn(결과); } catch (e) { console.error(e); } });
     }
 
-    window.원장재단수량 = { 기본, 원장크기, 배치, 한장수량, 돌려도되나, 앉힐방향, 크기읽기, 소요량, 원장당, 결과받기, 결과보내기 };
+    window.원장재단수량 = { 기본, 원장크기, 배치, 한장수량, 돌려도되나, 앉힐방향, 크기읽기, 소요량, 원장당, 재단도한장, 재단도만든때, 재단도행들, 발주부속행들, 재단도주인, 결과받기, 결과보내기 };
 })();

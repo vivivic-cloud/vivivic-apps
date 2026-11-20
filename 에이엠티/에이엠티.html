@@ -1,6 +1,6 @@
 <!-- ==========================================
      에이엠티.html
-     버전: v1.65.0 (2026-11-02) — 부속카드마다 「원장당 N개」(재단 편집 기본규칙, shared/원장재단수량.js 원장당)
+     버전: v1.66.0 (2026-11-21) — 주소 ?재단도=<id> 로 재단편집 바로 열기 · _cuttingPerSheet = shared/원장재단수량.js 재단도한장(식 그대로)
      (자세한 내력은 git 에)
      ========================================== -->
 <!DOCTYPE html>
@@ -18,7 +18,7 @@
     <script src="../shared/거래명세표.js"></script>
     <!-- 원장 한 장에 부속이 몇 개 나오나 — 영림원외주입력 BOM 소요량과 **같은 한 벌**(v1.64.0).
          재단 편집·재단 자동계획이 이것을 부른다. 여기 베껴 두지 않는다. -->
-    <script src="../shared/원장재단수량.js"></script>
+    <script src="../shared/원장재단수량.js?v=11-21-1"></script>
     
     <!-- Firebase SDK (Modular) -->
     <script type="module">
@@ -2718,7 +2718,7 @@
             <div class="flex items-center gap-4">
                 <div class="flex items-center gap-2 mr-4">
                     <div class="font-black text-xl tracking-tighter text-[#37352f]">VIVIVIC</div>
-                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.65.0</span>
+                    <span style="font-size:9px;font-weight:700;color:#b0aeaa;background:#f1f0ef;padding:1px 6px;border-radius:4px;letter-spacing:0.04em;font-family:ui-monospace,monospace;">v1.66.0</span>
                 </div>
                 <nav class="flex items-center gap-1">
                     <div id="nav-order" class="nav-link" onclick="switchPage('order')">발주서</div>
@@ -2858,7 +2858,7 @@
             <div class="amth-sec"><b>내 박스</b><span id="amth-mine-n">0개</span></div>
             <div class="amth-tiles" id="amth-mine"></div>
 
-            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.65.0</b></p>
+            <p class="amth-foot">박스를 누르면 지금 쓰던 그 화면이 그대로 나옵니다.<br><b id="amth-ver">v1.66.0</b></p>
         </div>
     </div>
 
@@ -3504,6 +3504,7 @@
             if (typeof renderProcessTimeline === 'function') renderProcessTimeline();
             // 주소에 큐알 글이 실려 왔으면 발주가 온 뒤 한 번 펴 본다 (10-11 지시)
             if (typeof window._주소명세열기 === 'function') window._주소명세열기();
+            if (typeof window._주소재단도열기 === 'function') window._주소재단도열기();   // v1.66.0
         };
         window._자료탈났다 = function (무엇, 까닭) {
             window._자료탈[무엇] = String((까닭 && (까닭.code ||까닭.message)) || 까닭 || '못 받음');
@@ -4087,19 +4088,9 @@
         //  앉아 있었는데 8개를 전부 가와로 셌다)
         // 재단편집에서 확정한 계획은 perSheet 를 그대로 적어 두고, 그 값이 없는
         // 예전 계획은 도면 조각의 치수(dw·dh)가 이 부속과 같은 것만 센다.
+        // v1.66.0(11-21) 셈은 shared/원장재단수량.js 재단도한장 한 벌 — 영림원품목등록 「재단률」 이 같은 셈으로 재단도를 따른다(식 그대로 옮김)
         function _cuttingPerSheet(p) {
-            if (p.perSheet > 0) return p.perSheet;
-            const bps = p.boardParts || [];
-            if (!bps.length) return 0;
-            const w = p.rw || 0, d = p.rd || 0;
-            if (!w || !d) return bps.length;
-            const 같다 = (a, b) => isFinite(a) && Math.abs(a - b) < 0.5;
-            const 내것 = bps.filter(pt => {
-                const dw = parseFloat(pt.dw), dh = parseFloat(pt.dh);
-                // 돌려서 앉혔을 수 있으니 가로·세로를 바꾼 것도 이 부속으로 본다
-                return (같다(dw, w) && 같다(dh, d)) || (같다(dw, d) && 같다(dh, w));
-            });
-            return 내것.length || bps.length;   // 치수가 안 적힌 옛 도면은 예전대로
+            return 원장재단수량.재단도한장(p, p.rw, p.rd);
         }
         // 이 재단계획으로 실제로 나오는 개수(총작업수량)
         function _cuttingYield(p) { return _cuttingPerSheet(p) * (p.sheets || 0); }
@@ -4255,10 +4246,8 @@
         }
 
         // 재단도가 만들어진 시각 — confirmId 에 박혀 있다 (auto_{시각}_{발주}_{행}).
-        function _cutPlanMadeAt(plan) {
-            const m = String((plan && plan.confirmId) || '').match(/(\d{13})/);
-            return m ? parseInt(m[1], 10) : null;
-        }
+        // v1.66.0(11-21) 넷 다 shared/원장재단수량.js 한 벌(식 그대로 옮김) — 영림원품목등록 「재단률」 이 같은 규칙으로 살아 있는 재단도를 고른다
+        function _cutPlanMadeAt(plan) { return 원장재단수량.재단도만든때(plan); }
 
         // 이 번호로 불리는 발주 가운데 이 재단도의 주인.
         // 발주번호(idNum)는 화면을 열 때마다 1401 부터 다시 매겨진다(orderCount).
@@ -4272,52 +4261,12 @@
            두세 발주에 걸쳐 있고 그중에는 취소된 것도 있다. 번호만 보면 취소된
            발주의 도면이 살아 있는 발주에 붙는다 — 사장님이 겪으신 그것이다.
            행은 발주마다 다르므로 이것으로 가른다. */
-        function _cutPlanRows(plan) {
-            const rows = new Set();
-            ['pRowIndex', 'sRowIndex', 'tRowIndex'].forEach(k => {
-                const v = plan && plan[k];
-                if (v != null && v !== '') { const n = parseInt(v, 10); if (!isNaN(n)) rows.add(n); }
-            });
-            return rows;
-        }
+        function _cutPlanRows(plan) { return 원장재단수량.재단도행들(plan); }
 
         // 이 발주가 지금 들고 있는(안 지워진) 부속의 원장 행들
-        function _orderPartRows(order) {
-            const rows = new Set();
-            Object.entries((order && order.partInfoMap) || {}).forEach(([k, v]) => {
-                if (!v || v.isDeleted) return;
-                const n = parseInt(String(k).split('-')[2], 10);
-                if (!isNaN(n)) rows.add(n);
-            });
-            return rows;
-        }
+        function _orderPartRows(order) { return 원장재단수량.발주부속행들(order); }
 
-        function _cutPlanOwner(idNum, 만든때, plan) {
-            const 확정 = confirmedOrders.filter(o =>
-                o.idNum === idNum && o.amtTimeline === true && !o.amtConfirmedCancel);
-            if (!확정.length) return null;                 // 발주확정목록에 없다 → 재단도가 아니다
-            // 행이 적힌 도면은 행으로 가린다. 행이 맞는 발주가 없으면 주인이 없는
-            // 것이다(취소·삭제된 옛 발주의 도면) — 번호가 같다고 남에게 붙이지 않는다.
-            const 행 = _cutPlanRows(plan);
-            if (행.size) {
-                const 행맞음 = 확정.filter(o => {
-                    const r = _orderPartRows(o);
-                    for (const x of 행) if (r.has(x)) return true;
-                    return false;
-                });
-                if (!행맞음.length) return null;
-                // 행이 맞아도 시각 규칙은 그대로 거친다. 같은 상품을 두 번 발주하면
-                // 행이 같아, 행만 보면 옛 발주(취소된 것까지)의 도면이 딸려 온다.
-                확정.length = 0; 확정.push(...행맞음);
-            }
-            if (만든때 == null) return 확정[0];             // 시각을 못 읽는 옛 도면은 예전대로
-            let 주인 = null;
-            확정.forEach(o => {
-                const b = o.batchId || 0;
-                if (b <= 만든때 && (!주인 || (주인.batchId || 0) < b)) 주인 = o;
-            });
-            return 주인;                                   // 확정보다 먼저 만들어졌으면 null
-        }
+        function _cutPlanOwner(idNum, 만든때, plan) { return 원장재단수량.재단도주인(confirmedOrders, idNum, 만든때, plan); }
 
         /* 재단도 한 장에는 기본 부속(1순위) 말고 자투리에 함께 앉힌 부속이
            더 있을 수 있다. 재단계획은 그것을 2·3순위(s*·t*)로 들고 있고,
@@ -10283,6 +10232,35 @@
             // 찍은 큐알 **하나치**만 편다 — 그 날 전체가 아니다 (10-11 지시)
             const 발키 = String(집힌.발주.docId || 집힌.발주.idNum || '');
             setTimeout(() => { try { window._명세서열기(날, '납기', 파, 발키, 글); } catch (e) {} }, 60);
+        };
+
+        /* v1.66.0(11-21) 주소로 재단도 하나를 재단편집으로 연다 — 사장님 「제가 의도한것은 해당 프로그램과 연결되어 편집에 따라 이곳의 숫자가 변할 수 있도록 하는것입니다.」
+           ?재단도=<재단도 id>[,<다음 id>…] → 자료가 다 온 뒤 타임라인 재단 카드 중 그 재단도(planId)를 앞 차례부터 찾아 woEditCuttingPlan(카드에서 「편집」 누른 것과 같은 화면·같은 저장).
+           ?재단=1 → 재단발주 화면(새 재단도를 만드는 곳)으로. 영림원품목등록 「재단률」 칸이 이 주소로 연다.
+           · 열쇠가 없으면 아무 일도 안 한다. 못 찾으면 한 줄로 알린다. 열기만 — 저장은 편집 화면의 「재단확정」 그대로. */
+        window._주소재단도했다 = false;
+        window._주소재단도열기 = function () {
+            if (window._주소재단도했다) return;
+            let 글 = '', 새 = '';
+            try { const q = new URLSearchParams(location.search); 글 = q.get('재단도') || ''; 새 = q.get('재단') || ''; } catch (e) {}
+            if (!글 && !새) return;
+            if (!window._자료다옴 || !window._자료다옴()) return;    // 다 온 뒤 — 다음에 다시
+            window._주소재단도했다 = true;
+            if (!글) { try { switchPage('cutting'); } catch (e) {} return; }
+            const 들 = 글.split(',').map(x => x.trim()).filter(Boolean);
+            // 재단도는 발주마다 부를 때만 받는다(3단계) — 살아 있는 발주 도면을 지금 부른다(읽기만)
+            try { if (typeof window._도면확보모두 === 'function') window._도면확보모두(); } catch (e) {}
+            let 번 = 0;
+            const 찾기 = () => {
+                try { Object.values(window._cuttingPlans || {}).forEach(pl => { if (들.includes(String(pl.confirmId))) _ensureCuttingPlanInTimeline(pl); }); } catch (e) {}
+                for (const id of 들) for (const sk of Object.keys(window._woBoringParts || {})) {
+                    const p = (window._woBoringParts[sk] || []).find(pp => pp.isCuttingCard && String(pp.planId) === id);
+                    if (p) { try { switchPage('process'); } catch (e) {} window.woEditCuttingPlan(p.cKey, sk); return; }
+                }
+                if (++번 < 40) return setTimeout(찾기, 500);            // 타임라인 카드가 그려지는 중일 수 있다
+                if (typeof showToastMessage === 'function') showToastMessage('그 재단도가 타임라인에 없습니다');
+            };
+            setTimeout(찾기, 300);
         };
 
         /* 10-11 사장님: 「발급 버튼을 삭제하고 각 버튼 누르면 **자동발급**되어 다음 동작을
