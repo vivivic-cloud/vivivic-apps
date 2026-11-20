@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.39.1
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.40.0
+     v1.40.0(11-21): 사장님 「모바일 환경에서는 복사드레그도 안되는듯합니다」 → 「추천방식을 적용해 주세요」 — 영림원보내기 표 폰(터치) = 공용 터치범위.js(누름 고름 · 동그라미 손잡이 끌어 범위 · 복사·붙여넣기·채우기·지우기 띠).
+       쓰기 = 채우기 손잡이와 같은 길(칸적용·저장예약·되돌리기). 폰에선 옛 네모 채우기 손잡이를 숨김. PC 는 그대로.
      v1.39.1(11-21): 사장님 「드롭다운칸이 입력칸과 약간의 거리를 … 색상변경이 된후에는 복사드레그가 먹히지 않는 곳」 — 채우기 손잡이 = 칸 안 오른쪽 아래(z-index 1, 전엔 칸 밖 -4px·z 0 이라 「구매/가공」 칸 손잡이가 옆 고정 칸 납품제품명 밑에 깔려 못 잡음) · 분류 드롭 = 칸 옆 10px(전 8·12) — 이 둘은 8111e0a(v1.39.0)에 같이 실림 ·
        끄는 범위(td.채움범위) 바탕·점선이 색칸(노랑·빨강·주황·초록·회색) 바탕에 묻히지 않게 맨 뒤 규칙으로.
      v1.39.0(11-21): 사장님 「매번세지 않아도 이를 위해 알수 있는 실시간 연동되는 자료실을 따로 만들어 두어도 좋습니다.」 —
@@ -309,7 +311,7 @@ html,body{height:100%;overflow:hidden}
 .폼표 td.손자리{position:relative}
 .채움손{position:absolute;right:0;bottom:0;width:7px;height:7px;box-sizing:border-box;background:var(--vg-ink);border:1px solid var(--vg-bg);
   z-index:1;cursor:crosshair;touch-action:none}   /* v1.39.0 칸 안 오른쪽 아래 — 옆 고정 칸(납품제품명)·색칸에 안 가림 */
-@media (pointer:coarse){.채움손{width:14px;height:14px}}
+@media (pointer:coarse){.채움손{display:none}}   /* v1.40.0 폰 = 터치범위.js 동그라미 손잡이 */
 .폼표 td.채움범위{outline:1px dashed var(--vg-ink);outline-offset:-2px;background:var(--vg-fill)}
 /* v1.17.0 영림원 등록 결과 — 완료 줄 초록 · 오류 줄 빨강 · 대기·진행중 작게 */
 .폼표 tr.완료 td{background:#EDF7EE}
@@ -376,7 +378,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.39.1</div>
+  <div class="badge">v1.40.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -388,6 +390,7 @@ html,body{height:100%;overflow:hidden}
 
 <!-- 짚어서 지시하는 손잡이 — 바이글 박스에서 열면 켜진다. -->
 <script src="../shared/viggle.js"></script>
+<script src="터치범위.js?v=1"></script>   <!-- v1.40.0 폰 범위·복사·붙여넣기·채우기·지우기 -->
 <script src="../shared/자재매입순위.js"></script>   <!-- v1.39.0 자재 매입 순위 자료실 갱신 -->
 
 <script>
@@ -1603,6 +1606,29 @@ async function 폼그리기(){
   };
   손.addEventListener('pointerup', () => 끌기끝(true));
   손.addEventListener('pointercancel', () => 끌기끝(false));
+  /* v1.40.0 폰(터치) 범위 · 복사 · 붙여넣기 · 채우기 · 지우기 = 공용 터치범위.js — 쓰기는 채우기 손잡이와 같은 길(칸적용 → 저장예약 · 되돌리기) */
+  if(window.터치범위) 터치범위.표(표, {
+    칸: td => { const el = td.classList.contains('입') && td.querySelector('[data-k]'); return !!el && el.type!=='checkbox' && !el.disabled; },
+    읽기: td => { const el = td.querySelector('[data-k]'); return el ? el.value : td.textContent.trim(); },
+    쓰기: 목 => {
+      const 되 = []; let 바뀐수 = 0;
+      for(const [td, v0] of 목){
+        const el = td.querySelector('[data-k]'); if(!el || el.disabled) continue;
+        let v = String(v0 ?? ''); const f = 폼칸.find(x => x.k===el.dataset.k);
+        if(el.dataset.k==='x_kind') v = /가공/.test(v) ? '가공' : '구매';
+        else if(el.tagName==='SELECT' && v && ![...el.options].some(o => o.value===v)) continue;   /* 목록 밖 글은 드롭다운에 안 넣음 */
+        if(f && f.n && v.trim() && isNaN(Number(숫자글(v)))) continue;   /* 숫자 칸엔 숫자만 */
+        if(el.value===v) continue;
+        되.push({ 키:td.closest('tr').dataset.key, k:el.dataset.k, 전:el.value });
+        값넣기(el, v); if(칸적용(el)) 바뀐수++;
+      }
+      if(!되.length) return;
+      겹침그리기(표, s); 분류틀그리기(표, s); 결과칠(s);
+      if(바뀐수) 저장예약(s);
+      되돌릴것(되);
+      폼상태(`${되.length}칸 · 저장 중…`);
+    }
+  });
   열손달기(표);   /* v1.32.0 */
   겹침그리기(표, s); 분류틀그리기(표, s);
   /* v1.17.0 영림원 등록 결과 · 오류건 · 완료 줄 잠금 */
