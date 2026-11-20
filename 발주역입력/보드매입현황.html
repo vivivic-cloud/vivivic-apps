@@ -1,7 +1,10 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.31.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.32.0
+     v1.32.0(11-20): 사장님 「영림원 보내기 자재소분류 텍스트좀 잘보이게 하고 각 셀 가로넓이 조절되게해 가로조절에 이곳에 나타나는 모든 표에 적용시켜」
+       ① 중·소분류 칸 앞 상위 이름(`분류앞`, 쓰는 중 `clsGhost`) 회색 #9a9a96 → 칸 글자색(노랑 바탕에서 안 보이던 것). 값·저장은 그대로.
+       ② 영림원보내기 표(.폼표 — 오류건·등록완료·삭제 보기·해피코 모두 같은 표) 머리 칸 오른쪽 끝을 끌어 열 너비 조절(`열손`·`열너비맞춤`). 이 기기에만 기억(localStorage).
      v1.31.0(11-20): 사장님 「입력된 게 영림원에 보내지는 게 정상 아니냐」 → 「고쳐」 — 보내기 분류(대·중·소분류)·자재등록 자재소분류 = 화면 이름(분류표기, clsName 꼴).
        입력폼 완료 분류에 그 경로가 그대로 있으면 그 이름 그대로(완료 분류 안 바꿈). 완료 분류 목록을 못 받았으면(0개) 칸 값 그대로 보냄(완료 줄이 이어 붙어 바뀌지 않게). 칸·저장 값(줄)은 그대로.
      v1.30.0(11-20): 사장님 「표기가 일단 대-중-소 분류로 나오게 고치고, 이게 영림원 등록이 되는 건지 안 되는 건지를 판단해야 될 거 아니야」
@@ -264,7 +267,7 @@ html,body{height:100%;overflow:hidden}
 .폼표 td.dpr-k.참{color:var(--vg-ink)}
 .폼표 .열쇠2{position:sticky;left:var(--열쇠1, 0px);z-index:1}   /* v1.18.3 명세서 열쇠 둘째 칸(규격)도 왼쪽 고정 */
 .폼표 th.열쇠2{background:var(--vg-fill)}
-@media (max-width:600px){.폼표 .열쇠2{position:static}}   /* 폰은 두 칸 고정이면 화면 대부분을 덮어 첫 칸만 */
+@media (max-width:600px){.폼표 .열쇠2{position:static}.폼표 thead th.열쇠2{position:sticky;left:auto}}   /* 폰은 두 칸 고정이면 화면 대부분을 덮어 첫 칸만 */
 .폼표 td.따{color:var(--vg-muted);background:var(--vg-fill)}
 .폼표 td.입{padding:0;white-space:nowrap}
 .폼표 td.입:focus-within{outline:2px solid var(--vg-ink);outline-offset:-2px}
@@ -312,10 +315,14 @@ html,body{height:100%;overflow:hidden}
 .분류고름 div.대{border-left-color:#B5B5B0}
 .폼표 input[data-분류]:focus{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0h8L4 5z' fill='%23999'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 4px center}   /* v1.28.0 ▾ = 열기 */
 .폼표 td.분류틀,.폼표 td.고칠칸{background:#FFE9E7;box-shadow:inset 0 0 0 2px var(--vg-red)}   /* v1.17.1 분류 규칙 어긋남 · v1.18.0 오류 단계의 고칠 칸 */
-.폼표 td .분류앞{color:#9a9a96;padding:2px 0 2px 5px;pointer-events:none}   /* v1.30.0 보이는 상위 이름(clsName 꼴) — 값 아님 */
+.폼표 td .분류앞{color:var(--vg-body);padding:2px 0 2px 5px;pointer-events:none}   /* v1.30.0 보이는 상위 이름(clsName 꼴) — 값 아님 */
 .폼표 td .분류앞+input{padding-left:0}
 .폼표 td.분류새,.폼표 tr.오류 td.분류새{background:#FFF7C2;box-shadow:inset 0 0 0 2px #E5B800}   /* v1.25.0 등록완료 분류에 없는 값 · v1.29.0 노랑 = 신규(규칙 통과) */
 .폼표 td.입:has([data-k]:disabled){background:var(--vg-fill)}   /* v1.18.0 완료 단계 칸 = 잠금 */
+/* v1.32.0 열 너비 끌기 — 머리 칸 오른쪽 끝 */
+.폼표 thead th .열손{position:absolute;top:0;right:0;width:7px;height:100%;cursor:col-resize;touch-action:none;z-index:1}
+.폼표 thead th .열손:hover,.폼표 thead th .열손.끄는중{background:#C7C7C3}
+@media (pointer:coarse){.폼표 thead th .열손{width:14px}}
 
 /* v1.21.0 해피코 동일품 — 제안 주황 · 확정 초록(첫 칸 왼쪽 띠) · 동일품이 적용된 명세 칸 초록 */
 .동표 td.dpr-k{border-left:4px solid transparent}
@@ -347,7 +354,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.31.0</div>
+  <div class="badge">v1.32.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -885,7 +892,7 @@ function 분류이음(b, m, x, 층, 목록){
 var CLS_GH=null,CLS_GH_EL=null,CLS_GH_PRE='',CLS_GH_X='\u0001';
 function clsGhPre(full,x){x=String(x||'').trim();return full.length>x.length&&full.slice(full.length-x.length)===x?full.slice(0,full.length-x.length):'';}
 function clsGhost(el,pre){
-  if(!CLS_GH){CLS_GH=document.createElement('span');CLS_GH.className='clsgh';CLS_GH.style.cssText='position:fixed;z-index:9999;pointer-events:none;color:#9a9a96;white-space:pre;overflow:hidden;display:none';document.body.appendChild(CLS_GH);
+  if(!CLS_GH){CLS_GH=document.createElement('span');CLS_GH.className='clsgh';CLS_GH.style.cssText='position:fixed;z-index:9999;pointer-events:none;color:#1A1A19;white-space:pre;overflow:hidden;display:none';document.body.appendChild(CLS_GH);
     window.addEventListener('scroll',function(){if(CLS_GH_EL)clsGhost(CLS_GH_EL,CLS_GH_PRE);},true);window.addEventListener('resize',function(){if(CLS_GH_EL)clsGhost(CLS_GH_EL,CLS_GH_PRE);});}
   if(CLS_GH_EL&&CLS_GH_EL!==el)CLS_GH_EL.style.textIndent='';
   if(!pre||!el||el.readOnly||el.disabled||!el.isConnected){CLS_GH.style.display='none';if(el)el.style.textIndent='';CLS_GH_EL=null;CLS_GH_PRE='';return;}
@@ -991,6 +998,53 @@ function 분류틀그리기(표, s){
   });
   const el = document.getElementById('분류틀알림');
   if(el) el.textContent = '';   /* v1.18.1 글 없음 — 빨간 칸 + 마우스 */
+  열너비맞춤(표);   /* v1.32.0 상위 이름이 바뀌면 칸 안 입력 너비 다시 */
+}
+
+/* ---- v1.32.0 열 너비 끌기(영림원보내기 표) — 사장님 11-20 「각 셀 가로넓이 조절되게해 가로조절에 이곳에 나타나는 모든 표에 적용시켜」
+   머리 칸 오른쪽 끝(.열손)을 끌면 그 열(머리·모든 줄)이 그 너비. 열쇠 = 머리 글자. 이 기기에만 기억(localStorage — 못 쓰면 이 창에서만). ---- */
+const 열너비키 = '보드매입현황_영림원보내기_열너비';
+let 열너비 = {}; try{ 열너비 = JSON.parse(localStorage.getItem(열너비키) || '{}') || {}; }catch(e){ 열너비 = {}; }
+function 열머리들(표){   /* 몸 줄 칸 차례와 같은 머리 칸(합친 머리는 그 아래 칸들) */
+  const r1 = 표.tHead.rows[0], r2 = 표.tHead.rows[1], 모 = []; let j = 0;
+  for(const th of r1.cells){ if(th.rowSpan > 1 || !r2) 모.push(th); else for(let n = 0; n < th.colSpan; n++) 모.push(r2.cells[j++]); }
+  return 모.filter(Boolean);
+}
+const 열이름 = th => th.dataset.열 || (th.dataset.열 = th.textContent.trim());
+function 열너비맞춤(표, 만){
+  if(!표 || !표.tHead) return;
+  const 몸 = [...표.tBodies[0].rows];
+  열머리들(표).forEach((th, i) => {
+    if(만 != null && 만 !== i) return;
+    const w = 열너비[열이름(th)]; if(!w) return;
+    const 칸들 = 몸.map(tr => tr.cells[i]).filter(Boolean);
+    const 앞 = 칸들.map(c => { const sp = c.querySelector('.분류앞'); return sp ? sp.offsetWidth : 0; });   /* 읽기 먼저(다시 그림 한 번) */
+    [th].concat(칸들).forEach((c, n) => {
+      c.style.width = c.style.minWidth = c.style.maxWidth = w + 'px'; c.style.overflow = 'hidden';
+      const el = n && c.querySelector('input:not([type=checkbox]),select'); if(el) el.style.width = Math.max(10, w - 1 - 앞[n - 1]) + 'px';
+    });
+  });
+  const 첫 = 표.tHead.rows[0].cells[0]; if(첫) 표.style.setProperty('--열쇠1', 첫.getBoundingClientRect().width + 'px');
+}
+function 열손달기(표){
+  열머리들(표).forEach((th, i) => {
+    열이름(th);
+    const h = document.createElement('span'); h.className = '열손'; th.appendChild(h);
+    h.addEventListener('pointerdown', e => {
+      if(e.button) return;
+      e.preventDefault(); e.stopPropagation();
+      try{ h.setPointerCapture(e.pointerId); }catch(_){}
+      const x0 = e.clientX, w0 = th.getBoundingClientRect().width, 이름 = 열이름(th); let 틀 = 0;
+      h.classList.add('끄는중');
+      const 옮김 = ev => { 열너비[이름] = Math.max(24, Math.round(w0 + ev.clientX - x0)); if(!틀) 틀 = requestAnimationFrame(() => { 틀 = 0; 열너비맞춤(표, i); }); };
+      const 끝 = () => {
+        h.classList.remove('끄는중'); ['pointermove','pointerup','pointercancel'].forEach((t, n) => h.removeEventListener(t, n ? 끝 : 옮김));
+        try{ localStorage.setItem(열너비키, JSON.stringify(열너비)); }catch(_){}
+      };
+      h.addEventListener('pointermove', 옮김); h.addEventListener('pointerup', 끝); h.addEventListener('pointercancel', 끝);
+    });
+    h.addEventListener('click', e => e.stopPropagation());
+  });
 }
 
 /* ---- 자재번호 겹침 — 모든 거래처(삭제 줄 뺌)에서 같은 자재번호 ---- */
@@ -1405,6 +1459,7 @@ async function 폼그리기(){
   };
   손.addEventListener('pointerup', () => 끌기끝(true));
   손.addEventListener('pointercancel', () => 끌기끝(false));
+  열손달기(표);   /* v1.32.0 */
   겹침그리기(표, s); 분류틀그리기(표, s);
   /* v1.17.0 영림원 등록 결과 · 오류건 · 완료 줄 잠금 */
   /* v1.18.5 보기 셋(오류건·등록완료·삭제)은 하나만 켜짐 — 다 끄면 영림원보내기 */
