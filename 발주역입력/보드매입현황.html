@@ -1,7 +1,10 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.37.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.38.0
+     v1.38.0(11-20): 사장님 「현진산업 영림원보내기에 나타나는 목록 앞부분에 이 해당목록이 구매인지 가공인지 구분하는 체크를 만들어주고 가공인 경우 더이상 구매로서 입력폼에 도착하지 못하게 일단 조치해줘.」
+       영림원보내기 표 맨 앞(납품제품명 앞) 「구매/가공」 드롭다운(기본 구매, 저장 = 줄 값 x_kind:'가공') · 채우기 손잡이·⌘C/⌘V·Delete(= 구매) ·
+       가공 줄 = 보내기 상태 「가공」(입력폼·결과맞추기.py 는 「보냄」 줄만 넘김) · 자재등록·구매단가 칸 잠금(값 그대로) · 칸 주황, 마우스 「가공 — 입력폼에 안 보냄」 · 대기·진행중·완료 줄은 이 칸도 잠금.
      v1.37.0(11-20): 사장님 「대기중에도 칸 못고치게 해줘」 — 영림원보내기 표에서 입력폼에 등록대기로 넘어간 줄(결과 대기·진행중, 회색 점)도 완료 줄처럼 모든 칸 잠금(회색) · 채우기·양식 올리기도 안 바꿈(알림 「등록 대기라 안 바꾼 줄 N」) · 납품제품명연결 체크·드롭다운도. 풀기 단추 없음. 오류·완료 줄 동작 그대로.
      v1.36.1(11-20): 사장님 「왜 어제부터 해피코 단가 입력때만 이렇게 될까요?」 — 해피코처럼 원본 단가가 없는 줄에 단가를 넣으면 보내기.단가이력 첫달·끝달이 undefined → Firestore invalid-argument 로 저장 실패. 없으면 그 칸을 안 넣음(다른 거래처 꼴 그대로).
      v1.36.0(11-20): 사장님 「각 월별명세서가 자동으로 변경되도록 해줘 기존 월별명세서에 등록된 영림원 자재명/자재번호가 납품제품명 옆에 오게하면 되겠지? 이곳이 빈칸이면 아직 등록안되었다는 표시도되고」 — 월별 명세서(전체·달) 납품제품명 옆 「자재명·자재번호」 = 연결표(26년 기록·더한 표기·동일품)로 이어진 줄이 영림원 자재 등록완료일 때만, 아니면 빈칸. 결과·연결이 바뀌면(onSnapshot) 그 칸만 다시.
@@ -288,8 +291,10 @@ html,body{height:100%;overflow:hidden}
 .폼표 input[type=date]{width:11em}
 /* v1.5.0 삭제(등록 안 함) 줄 · 자재번호 겹침 · 줄마다 임시 칸 */
 .폼표 tr.뺌 td{background:var(--vg-fill)}
-.폼표 tr.뺌 td:not(:nth-child(3)){opacity:.45}
-.폼표 tr.뺌 td.dpr-k,.폼표 tr.뺌 td:nth-child(2){text-decoration:line-through}
+.폼표 tr.뺌 td:not(:nth-child(4)){opacity:.45}   /* v1.38.0 맨 앞 구매/가공 칸이 생겨 한 칸씩 밀림 */
+.폼표 tr.뺌 td.dpr-k,.폼표 tr.뺌 td:nth-child(3){text-decoration:line-through}
+.폼표 td.구분.가공,.폼표 tr.오류 td.구분.가공,.폼표 tr.완료 td.구분.가공{background:#FDE3C4;box-shadow:inset 0 0 0 1px #E08A1E}   /* v1.38.0 가공 = 입력폼에 안 보냄 */
+.폼표 td.구분.가공 select{color:#9A4F00;font-weight:700}
 .폼표 td.가운데{text-align:center;padding:0 5px}
 .폼표 input[type=checkbox]{width:auto;margin:3px 2px;vertical-align:middle;cursor:pointer}
 .폼표 td.겹{background:#FFE9E7;box-shadow:inset 0 0 0 1px var(--vg-red)}
@@ -364,7 +369,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.37.0</div>
+  <div class="badge">v1.38.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -708,6 +713,10 @@ function 칸값(f, m, 거래처){
 }
 const f분류 = k => k==='m_big' || k==='m_mid' || k==='m_small';
 const 뺀줄 = (s, m) => !!(((폼값[s] && 폼값[s].get(줄키(m))) || {}).x_del);
+/* v1.38.0 구매/가공 — 줄 값 x_kind:'가공'(없으면 구매). 가공 줄 = 보내기 상태 「가공」(입력폼에 구매로 안 감) */
+const 가공키 = (s, 키) => (((폼값[s] && 폼값[s].get(키)) || {}).x_kind) === '가공';
+const 가공줄 = (s, m) => 가공키(s, 줄키(m));
+const 가공말 = '가공 — 입력폼에 안 보냄';
 const 글너비 = t => [...String(t||'')].reduce((a,c) => a + (c.charCodeAt(0) > 0x2000 ? 2 : 1), 0);
 
 async function 폼받기(s){
@@ -1076,7 +1085,7 @@ function 열너비맞춤(표, 만){
       el.style.width = iw + 'px'; sp.style.maxWidth = Math.max(0, w - 1 - iw) + 'px';
     });
   });
-  const 첫 = 표.tHead.rows[0].cells[0]; if(첫) 표.style.setProperty('--열쇠1', 첫.getBoundingClientRect().width + 'px');
+  const 첫 = 표.tHead.querySelector('th.dpr-k'); if(첫) 표.style.setProperty('--열쇠1', 첫.getBoundingClientRect().width + 'px');
 }
 let 글자자 = null;
 function 값글너비(el){   /* v1.33.0 입력 칸 값 글자 너비(px) */
@@ -1207,13 +1216,15 @@ function 결과칠(s){
     const 뺌 = 뺀키(s, 키), 오 = !!r && r.상태==='오류' && !뺌, 풀 = 풀린.has(s + '\n' + 키);
     const 단계 = k => ((((창고본[s] || {}).결과 || {})[키] || {})[k] || {}).상태;
     const 대기잠 = 대기줄(r);   /* v1.37.0 입력폼에 등록대기로 넘어간 줄(대기·진행중) = 잠금, 풀기 없음 */
+    const 가 = 가공키(s, 키), 구 = tr.querySelector('td.구분');   /* v1.38.0 가공 줄 = 자재등록·구매단가 칸 잠금(값 그대로) */
+    if(구){ 구.classList.toggle('가공', 가); if(가) 구.title = 가공말; else 구.removeAttribute('title'); }
     tr.classList.toggle('오류', 오); tr.classList.toggle('완료', false);
     tr.hidden = 삭제보기 ? !뺌 : 완료보기 ? !완료줄(s, 키) : (완료줄(s, 키) || 뺌 || (오류만 && !오));   /* v1.18.5 기본 보기·오류건에서 삭제 줄 뺌 */   /* v1.18.2 같은 표에서 줄만 거름 — 등록완료 보기 = 완료 줄만 · 영림원보내기 = 완료 줄 뺌 */
     const 고칠 = new Set(오 && !r.고침 ? r.오.flatMap(고칠칸) : []);
     tr.querySelectorAll('[data-k]').forEach(el => {
-      const k = el.dataset.k, 잠 = 대기잠 || (!풀 && (k==='x_del' ? r && r.상태==='완료' : 단계(단계칸(k))==='완료'));   /* 일부만 완료 = 완료 단계 칸 잠금 · v1.37.0 대기·진행중 줄 = 모든 칸 잠금 */
+      const k = el.dataset.k, 잠 = 대기잠 || (k==='x_del' || k==='x_kind' ? !풀 && !!r && r.상태==='완료' : 가 || (!풀 && 단계(단계칸(k))==='완료'));   /* 일부만 완료 = 완료 단계 칸 잠금 · v1.37.0 대기·진행중 줄 = 모든 칸 잠금 */
       if(el.disabled !== 잠) el.disabled = 잠;
-      const c = el.closest('td'); if(c && k!=='x_del') c.classList.toggle('고칠칸', 고칠.has(k) && !f분류(k));   /* v1.29.0 분류 칸 = 지금 값 분석(분류틀그리기)이 색을 정함 */
+      const c = el.closest('td'); if(c && k!=='x_del' && k!=='x_kind') c.classList.toggle('고칠칸', 고칠.has(k) && !f분류(k));   /* v1.29.0 분류 칸 = 지금 값 분석(분류틀그리기)이 색을 정함 */
     });
     if(!td) return;
     if(뺌){ const h = 같은자재칸(s, 키, 모든줄); if(td.dataset.h !== h){ td.innerHTML = h; td.dataset.h = h; } td.removeAttribute('title'); const 고 = td.querySelector('select.같은자재'); if(고) 고.disabled = 대기잠; return; }   /* v1.34.0 삭제 줄 = 같은 자재 고름 */
@@ -1231,7 +1242,7 @@ function 결과칠(s){
   if(c) c.textContent = 완료줄들(고른).length;
   const d = document.getElementById('삭제수'); if(d && 표) d.textContent = [...표.tBodies[0].rows].filter(x => 뺀키(s, x.dataset.key)).length;
   const 남 = document.getElementById('남은줄'); if(남 && 표) 남.textContent = [...표.querySelectorAll('tbody tr')].filter(x => !x.hidden).length;
-  if(표){ const th = 표.querySelector('thead th'); if(th) 표.style.setProperty('--열쇠1', th.getBoundingClientRect().width + 'px'); }   /* v1.18.3 둘째 고정 칸 자리(줄을 거르면 첫 칸 너비가 바뀜) */
+  if(표){ const th = 표.querySelector('thead th.dpr-k'); if(th) 표.style.setProperty('--열쇠1', th.getBoundingClientRect().width + 'px'); }   /* v1.18.3 둘째 고정 칸 자리(줄을 거르면 첫 칸 너비가 바뀜) */
   오류목록그리기();
 }
 /* v1.34.0 삭제 줄 → 영림원 등록완료 자재 연결 — 사장님 11-20: 「삭제된건은 명세서에 이름이 들죽날죽 들어와서 같은 제품인데 이렇게 표기가 된건 같은건이다 봐야 하는거야
@@ -1293,8 +1304,19 @@ document.addEventListener('keydown', e => {
   if(!채움되돌림 || 입력중 || 볼것!=='폼') return;
   e.preventDefault(); 채움되돌림();
 });
+/* v1.38.0 구매/가공 칸 복사·붙여넣기 — 드롭다운엔 글 고름이 없어 문서에서 받음(지금 그린 표의 처리만) */
+let 구분일 = null;
+const 구분칸 = () => { const el = document.activeElement; return el && el.matches && el.matches('.폼표 select[data-k="x_kind"]') ? el : null; };
+document.addEventListener('copy', e => { const el = 구분칸(); if(!el || !e.clipboardData) return; e.clipboardData.setData('text/plain', el.value); e.preventDefault(); });
+document.addEventListener('paste', e => {
+  const el = 구분칸(); if(!el || !구분일 || !e.clipboardData) return;
+  e.preventDefault();
+  const 글들 = String(e.clipboardData.getData('text/plain') || '').replace(/\r/g, '').replace(/\n+$/, '').split('\n');
+  구분일(el, 글들);
+});
 async function 폼그리기(){
   const s = 고른, 속 = document.getElementById('속');
+  구분일 = null;
   채움되돌림 = null; 입력중 = false;
   if(!준비됨){
     속.innerHTML = '<div class="state"><div class="big">읽는 중입니다…</div></div>';
@@ -1314,7 +1336,7 @@ async function 폼그리기(){
   }
   const 열쇠말 = '명세서 연결 열쇠 — 명세서 줄의 납품제품명(품목)+규격 글자로 이 줄(영림원 자재번호·자재명)을 찾습니다. 자재명을 고쳐도 열쇠는 명세서 글자 그대로.';
   const 연 = 연결모으기(s);
-  let h = `<table class="dpr-t 폼표"><thead><tr><th class="dpr-k" rowspan="2" title="${글(열쇠말)}">${글(칸[품])}<span class="열쇠">명세서 열쇠</span></th><th class="열쇠2" rowspan="2" title="${글(열쇠말)}">${글(칸[규])}<span class="열쇠">명세서 열쇠</span></th>` +
+  let h = `<table class="dpr-t 폼표"><thead><tr><th rowspan="2">구매/가공</th><th class="dpr-k" rowspan="2" title="${글(열쇠말)}">${글(칸[품])}<span class="열쇠">명세서 열쇠</span></th><th class="열쇠2" rowspan="2" title="${글(열쇠말)}">${글(칸[규])}<span class="열쇠">명세서 열쇠</span></th>` +
     `<th rowspan="2" class="묶">${글(연결이름)}</th><th rowspan="2" class="묶" title="영림원 입력폼이 되돌려 쓴 등록 결과(읽기만)">영림원 등록</th>` +
     폼묶음.map(g => `<th class="묶" colspan="${폼칸.filter(f => f.g===g).length}">${글(g)}</th>`).join('') +
     `<th class="묶" rowspan="2">${글(이력글머리)}<span class="임">임시</span></th></tr><tr>` +
@@ -1326,7 +1348,8 @@ async function 폼그리기(){
     const 겹 = 연.some(x => x.겹침 && x.줄품목===m.이름 && x.줄규격===m.규격);
     const 덧글 = 덧.length ? `<span class="덧표기" title="${글('다른 명세서 표기: ' + 덧.map(x => x.품목 + (x.규격?' '+x.규격:'')).join(' / '))}">+${덧.length}</span>` : '';
     const 겹글 = 겹 ? `<span class="표시" title="같은 명세서 열쇠가 다른 줄에도 있음 — 명세서 등록 때 사장님께 묻습니다">⚠</span>` : '';
-    h += `<tr data-key="${글(키)}"${뺌?' class="뺌"':''}><td class="dpr-k 참">${글(m.이름)}${덧글}${겹글}</td><td class="참 열쇠2">${글(m.규격)}</td>` +
+    const 가 = 가공줄(s, m);
+    h += `<tr data-key="${글(키)}"${뺌?' class="뺌"':''}><td class="입 구분${가?' 가공':''}"${가?` title="${글(가공말)}"`:''}><select data-k="x_kind"${(가 && 파랑(s, 키, 'x_kind'))?' class="저장값"':''}><option${가?'':' selected'}>구매</option><option${가?' selected':''}>가공</option></select></td><td class="dpr-k 참">${글(m.이름)}${덧글}${겹글}</td><td class="참 열쇠2">${글(m.규격)}</td>` +
       `<td class="입 묶 가운데"><input type="checkbox" data-k="x_del"${뺌?' checked':''} title="체크 = 이번 등록에서 뺌(원본은 그대로, 풀면 살아남)"></td><td class="등록 묶"></td>`;
     폼칸.forEach((f,i) => {
       const 묶 = i===0||폼칸[i-1].g!==f.g ? ' 묶' : '', v = 칸값(f, m, s);
@@ -1362,6 +1385,14 @@ async function 폼그리기(){
   const 칸적용 = el => {
     const k = el.dataset.k, tr = el.closest('tr'), 키 = tr.dataset.key, m = 줄.find(x => 줄키(x)===키); if(!m) return false;
     const 고친 = 폼값[s].get(키) || {};
+    if(k==='x_kind'){   /* v1.38.0 구매/가공 — 가공만 남김(구매 = 기본, 지움) */
+      if(el.value!=='가공' && el.value!=='구매') el.value = '구매';
+      const 전 = 고친.x_kind || '';
+      if(el.value==='가공') 고친.x_kind = '가공'; else delete 고친.x_kind;
+      if(전 === (고친.x_kind || '')) return 0;
+      폼값[s].set(키, 고친); 더럽힘(s, 키, 'x_kind'); el.classList.remove('저장값');
+      return true;
+    }
     const f = 폼칸.find(x => x.k===k);
     let v = f.n ? 숫자글(el.value) : String(el.value).trim();
     if(k==='m_mid' || k==='m_small'){   /* v1.26.0 하위 분류 = 위 분류 이름을 「_」 로 앞에 붙임(영림원 꼴 ed > ed_001-18 > ed_001-18_wt) */
@@ -1397,6 +1428,7 @@ async function 폼그리기(){
       겹침그리기(표, s); 분류틀그리기(표, s); 결과칠(s); 저장예약(s); return;   /* v1.18.5 체크 → 삭제 보기로 · 풀면 영림원보내기로 */
     }
     if(!칸적용(el)) return;
+    if(k==='x_kind') 결과칠(s);   /* v1.38.0 가공 줄 잠금·색 */
     if(k==='m_code' || k==='m_name') 겹침그리기(표, s);   /* v1.11.0 자재명 → 엘데코 자재번호 기본값 */
     if(f분류(k)) 분류틀그리기(표, s);   /* v1.17.1 */
     저장예약(s);
@@ -1409,6 +1441,20 @@ async function 폼그리기(){
     const el = e.target;
     if(el.dataset && el.dataset.k && el.dataset.k!=='x_del') 손달기(el.closest('td'));
     /* v1.28.0 들어가기만 해선 안 엶(끌기 자리를 가리지 않게) — 두 번 누름·Enter/F2/↓·글 치기·▾ 로 엶 */
+  });
+  /* v1.38.0 구매/가공 칸 — 붙여넣기(여러 줄이면 아래 보이는 줄로, 「가공」 글이면 가공·아니면 구매) · Delete/Backspace = 구매. 잠긴 줄은 건너뜀 */
+  구분일 = (시작, 글들) => {
+    const 줄들 = [...표.tBodies[0].rows].filter(tr => !tr.hidden), i0 = 줄들.indexOf(시작.closest('tr')); let 바뀐수 = 0;
+    if(i0 < 0) return;
+    for(let i = 0; i < 글들.length && i0 + i < 줄들.length; i++){
+      const el = 줄들[i0 + i].querySelector('select[data-k="x_kind"]'); if(!el || el.disabled) continue;
+      el.value = /가공/.test(글들[i]) ? '가공' : '구매'; if(칸적용(el)) 바뀐수++;
+    }
+    if(바뀐수){ 되돌릴것(null); 결과칠(s); 저장예약(s); }
+  };
+  표.addEventListener('keydown', e => {
+    const el = e.target; if(!el.matches || !el.matches('select[data-k="x_kind"]') || el.disabled) return;
+    if(e.key==='Delete' || e.key==='Backspace'){ e.preventDefault(); 구분일(el, ['구매']); }
   });
   /* v1.27.0 쓰는 동안 앞에 붙을 상위 이름 회색으로 */
   const 앞보임 = el => {
@@ -1479,7 +1525,7 @@ async function 폼그리기(){
       const tr = 줄들.find(r => r.dataset.key===x.키), el = tr && tr.querySelector(`[data-k="${x.k}"]`); if(!el) continue;
       값넣기(el, x.전); if(칸적용(el)) 바뀐수++;
     }
-    겹침그리기(표, s); 분류틀그리기(표, s); if(바뀐수) 저장예약(s);
+    겹침그리기(표, s); 분류틀그리기(표, s); 결과칠(s); if(바뀐수) 저장예약(s);
     폼상태(`채우기 되돌림 ${목.length}칸 · 저장 중…`);
   }
   되돌리기단추.onclick = () => { if(채움되돌림) 채움되돌림(); };
@@ -1532,7 +1578,7 @@ async function 폼그리기(){
     const { 처음, 끝, 칸, 원, 틀 } = 끌기;
     cancelAnimationFrame(틀); 끌기 = null; 범위그리기(-1);
     if(!채울까 || 끝 <= 처음) return;
-    const f = 폼칸.find(x => x.k===원.dataset.k), v = 원.value;
+    const f = 폼칸.find(x => x.k===원.dataset.k) || { l:'구매/가공' }, v = 원.value;   /* v1.38.0 구매/가공 칸도 */
     if(f.n && v.trim() && isNaN(Number(숫자글(v)))){ 폼상태(`「${f.l}」 에는 숫자만 넣을 수 있습니다 — 채우지 않았습니다`, true); return; }
     const 줄들 = 몸줄(), 목 = []; let 바뀐수 = 0;
     for(let i = 처음 + 1; i <= 끝; i++){
@@ -1542,7 +1588,7 @@ async function 폼그리기(){
       값넣기(el, v); if(칸적용(el)) 바뀐수++;
     }
     if(!목.length){ 폼상태('채울 칸이 없습니다(이미 같은 값)'); return; }
-    겹침그리기(표, s); 분류틀그리기(표, s);
+    겹침그리기(표, s); 분류틀그리기(표, s); 결과칠(s);
     if(바뀐수) 저장예약(s);
     되돌릴것(목);
     폼상태(`${f.l} ${목.length}칸 채움 · 저장 중…`);
@@ -1776,6 +1822,7 @@ async function 양식올리기(file){
         const m = 찾.get(이름+'\t'+규격); if(!m){ 없++; continue; }
         const 고친 = {};
         if(예(r[2])) 고친.x_del = '1';
+        if(((폼값[s].get(줄키(m)) || {}).x_kind) === '가공') 고친.x_kind = '가공';   /* v1.38.0 양식엔 구매/가공 칸이 없음 — 그대로 둠 */
         폼칸.forEach((f,i) => {
           if(f.따라) return;
           let v = String(r[i+3]??'').trim();
@@ -1802,7 +1849,7 @@ async function 양식올리기(file){
    창고 발주역입력_영림원폼/{거래처}.보내기 = {판, 고친때, 줄:[{열쇠, 상태, 지문, 고친때, 거래처:{영림원거래처명}, 분류:{대분류,중분류,소분류},
      자재등록:{영림원 칸 이름: 값 — 10칸}, 구매단가등록:{영림원 칸 이름: 값 — 14칸, 마지막 단가}, 단가이력:[{단가, 적용시작일, 첫달, 끝달}]}]}
    · 값 = 영림원보내기 화면에 보이는 값(미리 채운 값 + 고친 값) 그대로, 모두 글자. 단가이력 = `기준` 의 묶음(고친 단가는 마지막 묶음에 — 기준과 같음).
-   · 상태 = 보냄 | 등록안함(「삭제(등록 안 함)」 체크). 엑셀에서 사라진 줄은 `줄` 에서 빠진다.
+   · 상태 = 보냄 | 등록안함(「삭제(등록 안 함)」 체크) | 가공(v1.38.0 구매/가공 칸 「가공」 — 입력폼이 구매로 안 넘김). 엑셀에서 사라진 줄은 `줄` 에서 빠진다.
    · 지문 = 열쇠·상태·거래처·분류·자재등록·구매단가등록·단가이력 JSON 글의 해시(cyrb53, 16진 14자리). 줄 고친때 = 그 줄 지문이 바뀐 때.
    · 판 = 줄이 생기거나 빠지거나 지문이 바뀔 때마다 +1 (줄 차례만 바뀐 것은 안 셈). 꼴 = 영림원외주입력/입력작업자/전달-보드매입현황-기준정보폼.md 7절. */
 const 폼보내기 = {};   // 거래처 → 창고 보내기
@@ -1827,7 +1874,7 @@ function 보낼줄들(s){
   const 기 = new Map(기준모으기(s).map(x => [x.품목 + '\t' + x.규격, x])), 이 = 연결된(s);
   const 칸모 = (fs, m) => Object.fromEntries(fs.map(f => [f.l, 칸값(f, m, s)]));
   return 품목모으기(월표).줄.map(m => {
-    const 값 = { 열쇠:줄키(m), 상태:뺀줄(s, m) ? '등록안함' : '보냄', 거래처:{ 영림원거래처명:이 ? 이.거래처 : '' },
+    const 값 = { 열쇠:줄키(m), 상태:뺀줄(s, m) ? '등록안함' : 가공줄(s, m) ? '가공' : '보냄',   /* v1.38.0 가공 = 입력폼이 안 넘김(「보냄」 줄만 읽음) */ 거래처:{ 영림원거래처명:이 ? 이.거래처 : '' },
       분류:(([a, b, c]) => ({ 대분류:a, 중분류:b, 소분류:c }))(보낼분류(m, s)),   /* v1.31.0 화면 이름 그대로 */
       자재등록:{ ...칸모(자재칸, m), 자재소분류:보낼분류(m, s)[2] }, 구매단가등록:칸모(구매칸, m),
       /* v1.12.0 「마지막 단가로 통일」 — 단가이력은 한 줄만: 구매단가등록 단가·적용시작일(고친 값 우선) + 마지막 묶음의 첫달·끝달. 꼴 그대로 */
