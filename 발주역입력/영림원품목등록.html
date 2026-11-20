@@ -2,7 +2,8 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.30.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.32.0
+     v2.32.0(11-21): 사장님 「모든표에 필수입력이 아니며 모든열이 비워져 있다면 기본보기 상태가 모두 접혀져 있게 … 펼쳐보기 상태일때만 모든열이 보이게」 — 열접기()(#속 MutationObserver) · 시트 단추 끝 「펼쳐보기」.
      v2.30.0(11-21): 사장님 정정 「에이엠티의 재단도를 명칭으로 찾아오는것이 아닙니다. 비오엠등록 업로드의 하위규격 값을 이곳에서 새로 계산하여 보여지게 하는것 입니다.」 →
        재단률 = 여기서 새로 셈(부속 = 규격 · 원장 = BOM 재단 하위규격, 없으면 4X8 · 결보호 = 원장 엑셀 · shared 소요량) · v2.28 저장 재단도·발주확정 읽기 뺌.
        칸 누름 = 에이엠티 재단편집이 이 크기로 새 재단도(?재단크기=, 에이엠티 v1.67.0) → 확정 = _재단도[품번].원장당 → 재단률이 그 값(편집 없으면 새로 센 값).
@@ -221,6 +222,7 @@ html,body{height:100%;overflow:hidden}
 .dpr-t thead th.dpr-k{z-index:3}
 .dpr-t thead th.필수{color:#e53935}   /* v2.4.0 영림원 필수 칸(영림원 화면 빨간 머리와 같게) */
 .dpr-t td.모자람{background:#FFE3BF}   /* v2.26.0 품목등록업로드만으로 못 채움 — 마우스 = 무엇으로 채우나 */
+body:not(.펼침) .dpr-t .접힘{display:none}   /* v2.32.0 빈 열 접힘 — 펼쳐보기면 보임 */
 .dpr-t td.영채움{background:#E9EEF5}   /* v2.26.0 영림원이 기본값·단추로 채움 — 마우스 = 어떻게 */
 @media (max-width:600px),(max-height:600px){#속>.표통{max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px)}}
 @media (max-width:600px){.dpr-t .dpr-k{max-width:42vw;overflow:hidden;text-overflow:ellipsis}}   /* v2.2.0 폰 — 붙박이 품명 칸이 화면을 다 덮어 옆 칸을 못 누름 */
@@ -286,7 +288,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.30.0</div>
+  <div class="badge">v2.32.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -314,6 +316,27 @@ setTimeout(() => { if(!답했나) 목상태('창고에 닿지 못했습니다');
 
 const 문서이름 = u => String(u).replace(/\//g,'／');
 
+/* ── v2.32.0 빈 열 접기 — 사장님 11-21 「모든표에 필수입력이 아니며 모든열이 비워져 있다면 기본보기 상태가 모두 접혀져 있게 해주세요. 보기옵션에 펼쳐보기 상태일때만 모든열이 보이게」
+   #속 안 모든 .dpr-t: 머리가 필수(th.필수 빨강)가 아니고, 그 열 모든 줄 칸이 빈 글자면 th·td 에 .접힘(화면에서만 숨김 — 표·값·복사·저장은 그대로).
+   남기는 열: 필수 · 값 있는 칸 · 입력 칸(td.편 — 숨기면 입력을 못 함) · 모자람 칸(주황 = 채울 자리 표시). 펼쳐보기(body.펼침) = 모두 보임.
+   #속 이 바뀌면(시트 바꿈·입력·편집·자료 갱신) 다시 셈 → 값이 생긴 열은 저절로 풀림. */
+function 열접기(){
+  const 속 = document.getElementById('속'); if(!속) return;
+  for(const t of 속.querySelectorAll('table.dpr-t')){
+    const 머 = t.tHead && t.tHead.rows[t.tHead.rows.length-1]; if(!머) continue;
+    const n = 머.cells.length, 둠 = new Array(n).fill(false), 줄 = [...t.tBodies].flatMap(b => [...b.rows]);
+    if(줄.some(r => r.cells.length !== n)) continue;   /* 칸 수가 다른 표(합친 칸)는 안 건드림 */
+    for(let i=0;i<n;i++) if(머.cells[i].classList.contains('필수')) 둠[i] = true;
+    for(const r of 줄) for(let i=0;i<n;i++){ if(둠[i]) continue; const c = r.cells[i];
+      if(c.textContent.trim() || c.querySelector('input,select,textarea') || c.classList.contains('편') || c.classList.contains('모자람')) 둠[i] = true; }
+    for(let i=0;i<n;i++){ const 접 = !둠[i];
+      if(머.cells[i].classList.contains('접힘') !== 접){ 머.cells[i].classList.toggle('접힘', 접); for(const r of 줄) r.cells[i].classList.toggle('접힘', 접); } }
+  }
+}
+let 접기틀 = 0;
+new MutationObserver(() => { if(!접기틀) 접기틀 = requestAnimationFrame(() => { 접기틀 = 0; 열접기(); }); })
+  .observe(document.getElementById('속'), { childList:true, subtree:true, characterData:true });
+
 window.목록읽기 = async function(){
   try{
     const { doc, getDoc } = window.fbRead;
@@ -323,8 +346,9 @@ window.목록읽기 = async function(){
     if(!시트들.length){ 목상태('창고에 영림원품목등록이 없습니다'); return; }
     document.getElementById('목상태').style.display='none';
     document.getElementById('고름').innerHTML = 시트들.map(t => `<button class="chip" data-u="${글(t.이름)}">${글(t.이름)}</button>` + (t.이름===BOM시트 ? 계산순.map(u => `<button class="chip" data-u="${글(u)}">${글(u)}</button>`).join('') : '')).join('')   /* v2.26.0 등록 방법 7~12단계 계산 시트 */
-      + `<button class="chip" data-u="${추가}" hidden>${추가}</button><button class="chip" data-u="${방법}">${방법}</button><span id="폼상태" class="폼상태"></span>`;
-    document.querySelectorAll('#고름 .chip').forEach(b => b.onclick = () => 시트고름(b.dataset.u));
+      + `<button class="chip" data-u="${추가}" hidden>${추가}</button><button class="chip" data-u="${방법}">${방법}</button><button class="chip" id="펼쳐보기">펼쳐보기</button><span id="폼상태" class="폼상태"></span>`;
+    document.querySelectorAll('#고름 .chip[data-u]').forEach(b => b.onclick = () => 시트고름(b.dataset.u));
+    document.getElementById('펼쳐보기').onclick = e => { const on = document.body.classList.toggle('펼침'); e.currentTarget.classList.toggle('on', on); };   /* v2.32.0 */
     시트고름((()=>{ try{ return decodeURIComponent(location.hash); }catch(e){ return location.hash; } })()==='#등록방법' ? 방법 : 시트들[0].이름);   /* v2.25.1 주소 #등록방법 = 등록 방법 바로 열기(AI 작업자용) */
     대조구독();
     입력구독();
@@ -334,7 +358,7 @@ window.목록읽기 = async function(){
 /* 시트마다 표를 한 번만 만들어 두고(받은[이름] = 표통 요소), 단추를 누르면 바꿔 끼우기만 한다. */
 async function 시트고름(u){
   고른 = u;
-  document.querySelectorAll('#고름 .chip').forEach(b => b.classList.toggle('on', b.dataset.u===u));
+  document.querySelectorAll('#고름 .chip[data-u]').forEach(b => b.classList.toggle('on', b.dataset.u===u));
   const 속 = document.getElementById('속');
   if(u===추가){ 추가그리기(); return; }
   if(계산시트[u]){ 계산그리기(u); return; }   /* v2.24.0 · v2.26.0 */
