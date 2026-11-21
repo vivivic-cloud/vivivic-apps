@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v314 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v315 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -135,6 +135,7 @@ input.bad,select.bad{border-color:var(--red)}
 .bdreg .bdhave,.bdreg td.bdhave{color:var(--green)}.bdreg tr.bdturn td{background:#eff6ff}.bdreg tr.bdwait td{color:var(--muted)}.bdreg .bdstep{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 6px}.bdreg .bdstep>span{padding:4px 10px;border:1px solid var(--line2);border-radius:999px;font-size:13px;color:var(--muted);background:#fff}.bdreg .bdstep>span.on{background:#2383e2;border-color:#2383e2;color:#fff;font-weight:800}.bdreg .bdstep small{margin-left:6px;font-size:12px}.bdreg .bdstep small b{font-weight:400;margin-left:4px}.bdreg .bdstep small b.on{font-weight:900;text-decoration:underline}   /* v299 있음·차례 */
 .bdreg .mixf{margin:12px 0;padding:10px 12px;border:1px solid var(--line2);border-radius:10px;background:#fff}.bdreg .mixl{display:inline-flex;flex-direction:column;gap:2px;font-size:12px;color:var(--muted)}.bdreg .mixl input,.bdreg .mixl select{min-width:120px}.bdreg .mixl.mixtmp input,.bdreg .mixl.mixtmp select{box-shadow:inset 0 0 0 1px var(--red)}   /* v314 구매+가공품목 묶음 발주 칸 · 빨간 테 = 임시 */
 .bdreg td.bdwhy.bad:empty{box-shadow:inset 0 0 0 1px var(--red)}   /* v314 임시 빈칸 = 빨간 테 */
+.bdreg td.bdnew{background:#FFF7C2;box-shadow:inset 0 0 0 1px #E5B800}   /* v315 신규(입력폼 완료에 없음 — 등록대기로 넘김) = 노랑 */
 .vpbox{flex-basis:100%;min-width:0;border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:6px;background:#fff}
 .vpbox input[type=search]{flex:1 1 200px;min-width:0}
 .vplist{max-height:50vh;overflow-y:auto;overflow-x:hidden}
@@ -486,7 +487,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v314</span>
+    <span class="ver">v315</span>
     <div class="pick topnav" id="topnav">   <!-- v288 사장님 11-18 「입력폼 상단에 발주역입력 메뉴를 만들어 발주역입력 페이지로 이어지게」 — 이름 = 각 페이지 <title> 앞부분 · 같은 탭 -->
       <button type="button" class="btn small" aria-haspopup="menu" aria-expanded="false">발주역입력</button>
       <div class="pickmenu topnavmenu" role="menu" hidden>
@@ -4164,7 +4165,7 @@ function bdTurns(rs){   /* rs = 대기 표 줄 [{k,d,st}] → 줄마다 o.g·o.t
     if(!o.turn&&o.g.ok)o.g.why=o.k===cur?BD_LV[lv]+' 먼저':BYKEY[cur].title+' 먼저';});
   return {cur:cur,lv:lv,n:n,lvn:lvs.map(function(x){return Object.keys(x).length;})};
 }
-function bdRedraw(){if(bdrDraw&&cur==='bdreg')bdrDraw();if(mixDraw&&cur==='bdmix')mixDraw();bdResSync();bdClsPub();bdFlowPub();}   /* v287 결과·분류 목록 올리기 · v305 어느 메뉴에서든(읽힌 단계만) */
+function bdRedraw(){if(bdrDraw&&cur==='bdreg')bdrDraw();if(mixDraw&&cur==='bdmix')mixDraw();mixResSync();bdCopyPub();bdResSync();bdClsPub();bdFlowPub();}   /* v287 결과·분류 목록 올리기 · v305 어느 메뉴에서든(읽힌 단계만) */
 /* v279 사장님 「이거 하나 연결로 모두 입력되게 입력폼에 준비해 달라」 — 거래처 하나 → 분류 → 자재등록 → 구매단가등록 대기를 한 번에.
    미리 보기(bdPlan) = 앞 단계에서 넘길 줄을 「있는 것」으로 치고(ctx.virt) 뒤 단계 빨간 줄을 셈 → 앞 단계가 빠진 줄은 뒤 단계에서도 빠짐(분류 없음·자재 없음).
    넘기기(bdRunAll) = 단계마다 실제 자료로 다시 셈해 차례로 넘김(dataPut 으로 앞 단계 문서가 바로 보임). 메뉴별 단추·알림은 그대로. */
@@ -4281,6 +4282,7 @@ function bdRun(V,P){   /* 돌려줌 = {n} · 실패면 reject(아무것도 안 �
   var docs=items.map(function(it,i){
     var s=BYKEY[it.k],e=it.x.e,now=new Date(t0+i).toISOString(),bd={'출처':V.src||BD_SRC,'거래처':V.vn,'판':V.pan,'받은때':now};if(V.kind)bd['거래처종류']=V.kind;
     if(it.k==='classes'){bd['열쇠']=e.keys;bd['지문']=e.fps;}else{bd['열쇠']=e.key;bd['지문']=e.fp;if(e.hi!=null)bd['이력']=e.hi;}
+    if(it.x.stage)bd['단계']=it.x.stage;   /* v315 구매+가공품목 단계(원장분류·원장·공정·공정흐름·분류·자재) */
     var o=Object.assign(normVals(s,e.vals),{bd:bd,status:'대기',agentNote:''});
     if(it.nw){o.createdAt=now;o.route=routeOf(s);}
     if(s.fillDoc)s.fillDoc(o);
@@ -4470,42 +4472,96 @@ function renderBdReg(){
     vRow,res,h('div',{class:'row'},goBtn,msg)));
   draw();
 }
-/* ---------- v314 「구매+가공품목」 (기본입력 · 구매자재 일괄등록 다음) ----------
-   사장님 11-21 「좋아 그럼 구매+가공품목이라는 등록을 각 거래처에 따로 두고, 이곳에서 출발한 발주는 그렇게 처리되도록 현재 가공품목등록의 제목을 바꾸고 페이지를 개선해봐. 입력폼에도 지금 내용을 받아줄 수 있게 해주고」.
+/* ---------- v314 「구매+가공품목」 (기본입력 · 구매자재 일괄등록 다음) · v315 신규 받기 · 상태 돌려줌 · 완료 사본 ----------
+   v314 사장님 11-21 「좋아 그럼 구매+가공품목이라는 등록을 각 거래처에 따로 두고, 이곳에서 출발한 발주는 그렇게 처리되도록 현재 가공품목등록의 제목을 바꾸고 페이지를 개선해봐. 입력폼에도 지금 내용을 받아줄 수 있게 해주고」.
+   v315 사장님 11-21(분배 방에서 맞춘 것): 원장·분류·공정·공정흐름 칸이 입력폼 완료가 아니면 노랑(신규) → 입력폼이 「등록해야 할 것」으로 알아서 받음 · 상태(등록대기·진행중·등록완료·오류)를 매입현황에 똑같이 · 완료 정보는 늘 실시간.
    구매+가공품목 = 거래처가 원장(민판 등)을 스스로 대고 가공(예: 백색코)해서 납품 · 명세서엔 원장 줄·가공 줄이 따로 · 가공품 = 재공품(11-21 영림원 시험).
-   읽는 곳(읽기만) = 공개 창고 BD_PATH/_가공품목_{거래처} 의 `보내기` {판,고친때,줄:[{열쇠,상태,지문,가공{납품제품명,규격,구매거래처,단가},원장{열쇠,자재번호,자재명,규격,기준단위,단가,구매거래처}|null,
-     공정흐름,분류{품목구분,대분류,중분류,소분류},자재등록{자재명,자재번호,규격,품목자산분류,자재상태,기준단위,자재소분류},임시[]}]} — 보드/엣지 매입현황 v1.44.0 이 씀(BD 지켜보기 그대로, 새 읽기 없음).
-   ① 「등록대기」 = 가공품(재공품) 분류 → 자재등록 대기(구매자재 일괄등록 bdRun 같은 길 · 한 트랜잭션 · bd.출처 「구매+가공품목」) — 임시 빈칸(분류·자재번호·자재명)이 있으면 못 넘김.
-   ② 「묶음 발주」 = 같은 날 이 순서: 1 원장 구매발주·구매납품(그 거래처 창고) → 2 가공 외주발주·외주납품(가공품 재공품 생김) → 3 자재이동(재단업체 창고).
-      폼 문서 = erp_purchases(구매요청·품의·발주 한 화면) 대기 한 장 + `mix` 칸(묶음 2·3 값) — 입력 작업자가 이 문서에서 1→2→3 을 같은 날 넣음(AGENTS 3-10 · 사장님-규칙).
-      새 컬렉션·규칙 바꿈 없음(구매 메뉴 쓰기 권한). ⚠ 임시: 원장 창고 = 거래처 이름(등록 방법 1단계 「같은 이름의 창고」) · 재단업체 창고 = PUR_WHS 에서 고름 · 반제품 품번(외주발주 공정의 제품) = 손으로 · 원장·가공 수량 따로. */
+   읽는 곳(읽기만) = 공개 창고 BD_PATH/_가공품목_{거래처} 의 `보내기` {판,고친때,줄:[{열쇠,상태,지문,가공{납품제품명,규격,구매거래처,단가},
+     원장{자재번호,자재명,규격,기준단위,대분류,중분류,소분류,단가,구매거래처,신규},공정{공정명,신규},공정흐름{이름,신규},
+     분류{품목구분,대분류,중분류,소분류,신규},자재등록{자재명,자재번호,규격,품목자산분류,자재상태,기준단위,자재소분류},임시[]}]} — 보드/엣지 매입현황 v1.45.0 이 씀.
+   ① 「등록대기」 = 신규만 차례로 한 트랜잭션(bdRun): 원장분류 → 원장(자재 원자재) → 공정 → 공정흐름(이름을 「-」로 나눈 공정 — 흐름 칸 규칙 그대로) → 분류 → 자재(재공품). 문서 bd = {출처 「구매+가공품목」, 거래처, 판, 열쇠, 지문, 단계}.
+   ② 결과 = 공개 _가공품목_{거래처}.결과.{열쇠}.{원장분류|원장|공정|공정흐름|분류|자재} = {상태,이유,때} (mixResSync — 어느 메뉴에서든, 결과맞추기.py 도 같은 셈).
+   ③ 완료 사본(매입현황이 로그인 없을 때 실시간으로 받음): _자재 {줄:[{자재번호,자재명,규격,기준단위,품목자산분류,대분류,중분류,소분류}]} · _공정 {줄:[공정명]} (· 이미 있는 _분류.영림원 · _공정흐름).
+   ④ 「묶음 발주」 = 같은 날 이 순서: 1 원장 구매발주·구매납품(그 거래처 창고) → 2 가공 외주발주·외주납품(가공품 재공품 생김) → 3 자재이동(재단업체 창고).
+      폼 문서 = erp_purchases 대기 한 장 + `mix` 칸 — 입력 작업자가 이 문서에서 1→2→3 을 같은 날 넣음(AGENTS 3-10 · 사장님-규칙). 새 컬렉션·규칙 바꿈 없음.
+      ⚠ 임시: 원장 창고 = 거래처 이름(등록 방법 1단계 「같은 이름의 창고」) · 재단업체 창고 = PUR_WHS · 반제품 품번 = 손으로 · 원장·가공 수량 따로. */
 var MIX_PRE='_가공품목_',MIX_SRC='구매+가공품목';
 var MIX={vn:'',busy:false,msg:'',bad:false,fail:'',open:'',f:{}};
+var MIX_ST=['원장분류','원장','공정','공정흐름','분류','자재'],MIX_KEY={'원장분류':'classes','원장':'materials','공정':'processes','공정흐름':'flows','분류':'classes','자재':'materials'};
 var mixDraw=null;
 function mixVendors(){return (BD.docs||[]).filter(function(d){return d.id.indexOf(MIX_PRE)===0&&d['보내기']&&Array.isArray(d['보내기']['줄']);}).map(function(d){return {vn:d.id.slice(MIX_PRE.length),d:d};}).sort(function(a,b){return a.vn.localeCompare(b.vn,'ko');});}
-function mixMine(key,vn,r){return (data[key]||[]).filter(function(x){return x.bd&&x.bd['출처']===MIX_SRC&&x.bd['거래처']===vn&&x.bd['열쇠']===r['열쇠'];}).sort(bdOld)[0]||null;}
+function mixRows(d){return d['보내기']['줄'].filter(function(r){return r&&r['상태']==='보냄';});}
+function mixDoc(st,vn,k){return (data[MIX_KEY[st]]||[]).filter(function(x){var b=x.bd;if(!b||b['출처']!==MIX_SRC||b['거래처']!==vn||(b['단계']||'')!==st)return false;var y=b['열쇠'];return Array.isArray(y)?y.indexOf(k)>=0:y===k;}).sort(bdOld)[0]||null;}
+/* 단계 문서 — 이 줄이 넘긴 문서, 없으면 같은 값(분류 경로·자재번호·공정·흐름 이름)의 문서(오류 뺌 — 다른 줄·다른 곳에서 넘긴 것) */
+function mixStageDoc(st,vn,r){var d=mixDoc(st,vn,r['열쇠']);if(d)return d;var o=r['원장']||{},k=MIX_KEY[st],ok=function(x){return x.status!=='오류'&&!ylwGone(x);};
+  if(st==='원장분류')return o['신규']?mixClsHave(o):null;if(st==='분류')return mixClsHave(r['분류']||{});
+  var v=st==='원장'?bdTr(o['자재번호']):st==='자재'?bdTr((r['자재등록']||{})['자재번호']):st==='공정'?bdTr((r['공정']||{})['공정명']):bdTr((r['공정흐름']||{})['이름']);if(!v)return null;
+  return (data[k]||[]).filter(function(x){return ok(x)&&bdTr(k==='materials'?x.code:x.name)===v;}).sort(bdOld)[0]||null;}
 function mixMatDone(code){code=bdTr(code);return code?(data.materials||[]).filter(function(x){return x.status==='완료'&&!ylwGone(x)&&bdTr(x.code)===code;})[0]||null:null;}
-function mixFlowDone(n){n=bdTr(n);return n?(data.flows||[]).filter(function(x){return x.status==='완료'&&!ylwGone(x)&&bdTr(x.name)===n;})[0]||null:null;}
-/* 한 줄 → {cls:{e,st}|null, mat:{e,st}, why:[]} — st.t = new | upd(대기·오류 문서 고침) | have(같음) | done(완료 — 자재등록 「수정」으로) */
+function mixNameDone(key,n){n=bdTr(n);return n?(data[key]||[]).filter(function(x){return x.status==='완료'&&!ylwGone(x)&&bdTr(x.name)===n;})[0]||null:null;}
+function mixClsHave(c){var v={big:bdTr(c['대분류']),mid:bdTr(c['중분류']),name:bdTr(c['소분류'])},p=clsPath(v);if(!v.big||!v.mid||!v.name)return null;return (data.classes||[]).filter(function(x){return x.kind==='자재'&&x.status!=='오류'&&!ylwGone(x)&&clsPath(x)===p;}).sort(function(a,b){return (b.status==='완료')-(a.status==='완료');})[0]||null;}
+/* 한 줄 → {go:[{st,k,e,x}], have:{단계:문서}, why:[]} — 신규 단계만 넘김. 이미 넘긴 문서: 대기·오류 + 지문 다름 = 고쳐 다시 대기 · 완료·진행중 = 그대로 */
 function mixPlan(vn,r){
-  var c=r['분류']||{},m=r['자재등록']||{},why=[],tmp=(r['임시']||[]).filter(function(x){return ['대분류','중분류','소분류','자재번호','자재명'].indexOf(x)>=0;});
+  var why=[],go=[],have={},tmp=r['임시']||[],o=r['원장']||{},pc=r['공정']||{},fl=r['공정흐름']||{},c=r['분류']||{},m=r['자재등록']||{};
   if(tmp.length)why.push('임시 빈칸 — '+tmp.join(' · '));
-  var cv={kind:'자재',big:bdTr(c['대분류']),mid:bdTr(c['중분류']),name:bdTr(c['소분류']),use:true},p=clsPath(cv),cls=null;
-  if(cv.big&&cv.mid&&cv.name){var cd=(data.classes||[]).filter(function(x){return x.kind==='자재'&&x.status!=='오류'&&clsPath(x)===p;})[0];
-    cls={e:{id:'c|'+p,c:c,keys:[r['열쇠']],fps:[r['지문']],vals:cv},st:cd?{t:'have',doc:cd}:{t:'new'}};}
-  var mv={};BYKEY.materials.fields.forEach(function(f){mv[f.k]=f.k==='small'?bdPath(c):bdTr(m[f.label]);});
-  var cur=mixMine('materials',vn,r),st;
-  if(!cur)st={t:'new'};else if(cur.bd['지문']===r['지문'])st={t:'have',doc:cur};else if(cur.status==='대기'||cur.status==='오류')st={t:'upd',doc:cur};else st={t:'done',doc:cur};
-  if(st.t==='done')why.push('자재등록 '+(cur.status||'')+' — 바뀐 값은 자재등록 「수정」으로');
-  if(st.t==='new'&&mv.code){var dup=(data.materials||[]).filter(function(x){return x.status!=='오류'&&bdTr(x.code)===mv.code;})[0];if(dup)why.push('자재번호 「'+mv.code+'」 가 이미 있음');}
-  return {cls:cls,mat:{e:{id:'m|'+r['열쇠'],c:c,key:r['열쇠'],fp:r['지문'],vals:mv},st:st,doc:cur},why:why};
+  var add=function(st,vals,e){var cur=mixDoc(st,vn,r['열쇠']),t;
+    if(!cur)t={t:'new'};else if(cur.bd['지문']===r['지문']||!(cur.status==='대기'||cur.status==='오류')){have[st]=cur;return;}else t={t:'old',doc:cur};
+    go.push({st:st,k:MIX_KEY[st],x:{e:Object.assign({id:st+'|'+r['열쇠'],key:r['열쇠'],keys:[r['열쇠']],fp:r['지문'],fps:[r['지문']],vals:vals},e||{}),st:t,stage:st}});};
+  var clsV=function(x){return {kind:'자재',big:bdTr(x['대분류']),mid:bdTr(x['중분류']),name:bdTr(x['소분류']),use:true};};
+  var matV=function(x,asset,state){var v={};BYKEY.materials.fields.forEach(function(f){v[f.k]=fieldDef(f);});
+    return Object.assign(v,{name:bdTr(x['자재명']),code:bdTr(x['자재번호']),spec:bdTr(x['규격']),asset:asset,state:state,unit:bdTr(x['기준단위']),small:bdPath(x)});};
+  if(o['신규']){
+    if(!mixClsHave(o))add('원장분류',clsV(o));
+    if(!mixMatDone(o['자재번호']))add('원장',matV(o,'원자재','사용'));}
+  if(pc['신규']&&!mixNameDone('processes',pc['공정명']))add('공정',{name:bdTr(pc['공정명']),memo:'',inspect:false});
+  if(fl['신규']&&!mixNameDone('flows',fl['이름']))add('공정흐름',{name:bdTr(fl['이름']),memo:'',rows:flowRows(splitFlow(fl['이름']).map(function(p){return {proc:p};}))});
+  if(!mixClsHave(c))add('분류',clsV(c));
+  if(!mixMatDone(m['자재번호']))add('자재',matV(Object.assign({},m,{'대분류':c['대분류'],'중분류':c['중분류'],'소분류':c['소분류']}),bdTr(m['품목자산분류'])||'재공품',bdTr(m['자재상태'])||'사용'));
+  go.forEach(function(g){if(g.k!=='materials'||g.x.st.t!=='new')return;var cd=g.x.e.vals.code,d=cd&&(data.materials||[]).filter(function(x){return x.status!=='오류'&&bdTr(x.code)===cd;})[0];
+    if(d)why.push(g.st+' 자재번호 「'+cd+'」 가 이미 있음');});
+  return {go:why.length?[]:go,have:have,why:why};
+}
+/* 단계 상태 — 완료 자료에 있으면 완료 · 넘긴 문서 상태 · 아니면 '' */
+function mixState(st,vn,r){
+  var o=r['원장']||{},c=r['분류']||{},m=r['자재등록']||{},done=false;
+  if(st==='원장')done=!!mixMatDone(o['자재번호']);else if(st==='원장분류'){var h0=mixClsHave(o);done=!o['신규']||(!!h0&&h0.status==='완료');}
+  else if(st==='공정')done=!!mixNameDone('processes',(r['공정']||{})['공정명']);else if(st==='공정흐름')done=!!mixNameDone('flows',(r['공정흐름']||{})['이름']);
+  else if(st==='분류'){var h=mixClsHave(c);done=!!h&&h.status==='완료';}else if(st==='자재')done=!!mixMatDone(m['자재번호']);
+  if(done)return {t:'완료'};var d=mixStageDoc(st,vn,r);return d?{t:d.status||'대기',doc:d}:{t:''};
+}
+/* 결과 돌려줌 — 공개 _가공품목_{거래처}.결과.{열쇠}.{단계} = {상태,이유,때} (바뀐 칸만) */
+var MIX_RES_BUSY={};
+function mixResSync(){
+  if(!db||!db.pubSet||!BD.docs||['classes','materials','processes','flows'].some(function(k){return data[k]==null||WERR[k];}))return;
+  mixVendors().forEach(function(V){var id=MIX_PRE+V.vn;if(MIX_RES_BUSY[id])return;
+    var old=V.d['결과']||{},pairs=[];
+    mixRows(V.d).forEach(function(r){var k=r['열쇠'];MIX_ST.forEach(function(st){var d=mixStageDoc(st,V.vn,r),v=d?bdResOf(d):null,ov=(old[k]||{})[st]||null;
+      if(JSON.stringify(ov)!==JSON.stringify(v))pairs.push([['결과',k,st],v||undefined]);});});
+    if(!pairs.length)return;
+    MIX_RES_BUSY[id]=1;
+    db.pubSet(BD_PATH+'/'+id,pairs).then(function(){var o=V.d['결과']=V.d['결과']||{};pairs.forEach(function(x){var q=o[x[0][1]]=o[x[0][1]]||{};if(x[1]===undefined)delete q[x[0][2]];else q[x[0][2]]=x[1];});MIX_RES_BUSY[id]=0;},function(e){MIX_RES_BUSY[id]=0;console.warn('구매+가공품목 결과 못 씀',id,e);});
+  });
+}
+/* 완료 사본 — _자재 · _공정 (다를 때만 통째) · 결과맞추기.py 도 같은 셈 */
+var BD_MAT_SIG='',BD_PROC_SIG='';
+function bdMatRows(a){var seen={};return (a||[]).filter(function(r){return r.status==='완료'&&!ylwGone(r)&&bdTr(r.code);})
+  .map(function(r){var p=String(r.small||'').split(CLS_SEP).map(bdTr);return {'자재번호':bdTr(r.code),'자재명':bdTr(r.name),'규격':bdTr(r.spec),'기준단위':bdTr(r.unit),'품목자산분류':bdTr(r.asset),'대분류':p.length===3?p[0]:'','중분류':p.length===3?p[1]:'','소분류':p.length===3?p[2]:bdTr(r.small)};})
+  .sort(function(a,b){return a['자재번호'].localeCompare(b['자재번호'],'ko');}).filter(function(x){if(seen[x['자재번호']])return false;seen[x['자재번호']]=1;return true;});}
+function bdProcRows(a){var seen={};return (a||[]).filter(function(r){return r.status==='완료'&&!ylwGone(r)&&bdTr(r.name);})
+  .sort(function(a,b){return String(a.createdAt||'').localeCompare(String(b.createdAt||''))||bdTr(a.name).localeCompare(bdTr(b.name),'ko');})
+  .map(function(r){return bdTr(r.name);}).filter(function(n){if(seen[n])return false;seen[n]=1;return true;});}
+function bdCopyPub(){
+  if(!db||!db.pubPut||!BD.docs)return;
+  [['materials','_자재',bdMatRows,'입력폼 자재등록(완료)','m'],['processes','_공정',bdProcRows,'입력폼 공정등록(완료)','p']].forEach(function(x){
+    if(data[x[0]]==null||WERR[x[0]])return;
+    var rows=x[2](data[x[0]]),sig=JSON.stringify(rows),cd=BD.docs.filter(function(d){return d.id===x[1];})[0],cur=x[4]==='m'?BD_MAT_SIG:BD_PROC_SIG;
+    if((cd&&JSON.stringify(cd['줄'])===sig)||sig===cur)return;
+    if(x[4]==='m')BD_MAT_SIG=sig;else BD_PROC_SIG=sig;
+    db.pubPut(BD_PATH+'/'+x[1],{'줄':rows,'올린때':new Date().toISOString(),'출처':x[3]}).then(function(){},function(e){if(x[4]==='m')BD_MAT_SIG='';else BD_PROC_SIG='';console.warn(x[1]+' 사본 못 씀',e);});});
 }
 /* 묶음 발주를 누를 수 있나 — 못 누르면 까닭 */
-function mixOrdWhy(vn,r,pl){
-  var w=[],o=r['원장'];
-  if(!o)w.push('원장(등록 구매자재) 안 고름');else if(!mixMatDone(o['자재번호']))w.push('원장 자재 「'+o['자재번호']+'」 이 자재등록 완료 아님');
-  if(!bdTr(r['공정흐름']))w.push('공정흐름 안 고름');else if(!mixFlowDone(r['공정흐름']))w.push('공정흐름 「'+r['공정흐름']+'」 이 완료 아님');
-  if(!pl.mat.doc||pl.mat.doc.status!=='완료')w.push('가공품(재공품) 자재등록 완료 아님');
+function mixOrdWhy(vn,r){
+  var w=[];['원장','공정','공정흐름','자재'].forEach(function(st){if(mixState(st,vn,r).t!=='완료')w.push(st+' 등록완료 아님');});
   if(!canCol('erp_purchases','w'))w.push('구매 입력 쓰기 권한 없음');
   return w;
 }
@@ -4514,32 +4570,29 @@ function renderMix(){
   var vRow=h('div',{class:'wcpicks bdvn',role:'group','aria-label':'거래처'}),res=h('div',{}),msg=h('span',{class:'msg','aria-live':'polite'});
   var goBtn=h('button',{type:'button',class:'btn primary'},'등록대기');
   var tbl=function(heads,rows){var tw=h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},heads.map(function(x){return h('th',{},x);}))),h('tbody',{},rows)));return [hbarFor(tw),tw];};
-  var td=function(v,ok,why){return h('td',ok==null?{}:{class:ok?'bdhave':'bdwhy bad',title:why||null},bdTr(v));};
+  var STC={'완료':'bdhave','오류':'bdwhy bad'};
   function draw(){
     if(BD.err){vRow.replaceChildren();res.replaceChildren(BD.err);goBtn.hidden=true;return;}
     if(!BD.docs){vRow.replaceChildren();res.replaceChildren('불러오는 중');goBtn.hidden=true;return;}
     var vs=mixVendors();
     vRow.replaceChildren.apply(vRow,vs.map(function(x){var on=x.vn===MIX.vn;
-      return h('button',{type:'button',class:'btn small wcpick'+(on?' primary':''),'aria-pressed':on?'true':'false',disabled:MIX.busy,on:{click:function(){MIX.vn=on?'':x.vn;MIX.msg='';MIX.fail='';MIX.open='';draw();}}},x.vn+' '+x.d['보내기']['줄'].length);}));
+      return h('button',{type:'button',class:'btn small wcpick'+(on?' primary':''),'aria-pressed':on?'true':'false',disabled:MIX.busy,on:{click:function(){MIX.vn=on?'':x.vn;MIX.msg='';MIX.fail='';MIX.open='';draw();}}},x.vn+' '+mixRows(x.d).length);}));
     msg.textContent=MIX.msg;msg.className='msg'+(MIX.bad?' bad':'');
     var V=vs.filter(function(x){return x.vn===MIX.vn;})[0];
     if(!V){res.replaceChildren();goBtn.hidden=true;return;}
-    var rows=V.d['보내기']['줄'].filter(function(r){return r&&r['상태']==='보냄';}),go=[],parts=[];
-    var pls=rows.map(function(r){var pl=mixPlan(V.vn,r);if(!pl.why.length&&(pl.mat.st.t==='new'||pl.mat.st.t==='upd'))go.push(pl);return pl;});
+    var rows=mixRows(V.d),parts=[],go=[];
+    var pls=rows.map(function(r){var pl=mixPlan(V.vn,r);go=go.concat(pl.go);return pl;});
     parts.push(h('div',{class:'lsinfo bdrcnt'},h('span',{},'넘길 '+go.length),h('span',{class:pls.some(function(p){return p.why.length;})?'bdbad':''},'못 넘길 '+pls.filter(function(p){return p.why.length;}).length)));
-    var heads=['가공','규격','원장 자재번호','원장 자재명','공정흐름','대분류','중분류','소분류','자재번호','자재명','규격','품목자산분류','자재상태','기준단위','자재등록','묶음 발주'];
-    parts=parts.concat(tbl(heads,rows.map(function(r,i){var pl=pls[i],g=r['가공']||{},o=r['원장']||{},c=r['분류']||{},m=r['자재등록']||{},tm=r['임시']||[];
-      var T=function(n,v){return td(v,tm.indexOf(n)>=0?false:null,tm.indexOf(n)>=0?'임시 — 매입현황 구매+가공품목에서 정함':null);};
-      var od=mixMatDone(o['자재번호']),fd=mixFlowDone(r['공정흐름']),md=pl.mat.doc,ow=mixOrdWhy(V.vn,r,pl);
-      var stCell=md?h('td',{title:md.agentNote||null},h('span',{class:'chip '+(md.status||'대기')},md.status||'대기'),pl.mat.st.t==='upd'?' 바뀜':''):h('td',{class:pl.why.length?'bdwhy bad':'',title:pl.why.join(' · ')||null},pl.why.length?'못 넘김':'새');
-      return h('tr',{class:MIX.open===r['열쇠']?'bded':''},td(g['납품제품명']),td(g['규격']),
-        td(o['자재번호'],!!od,od?'자재등록 완료':(r['원장']?'자재등록 완료 아님':'임시 — 원장 안 고름')),td(o['자재명']),
-        td(r['공정흐름'],!!fd,fd?'공정흐름유형 완료':'임시 — 공정흐름 안 고름 또는 완료 아님'),
-        T('대분류',c['대분류']),T('중분류',c['중분류']),T('소분류',c['소분류']),T('자재번호',m['자재번호']),T('자재명',m['자재명']),td(m['규격']),td(m['품목자산분류']),td(m['자재상태']),td(m['기준단위']),
-        stCell,h('td',{title:ow.join(' · ')||null},h('button',{type:'button',class:'btn small'+(MIX.open===r['열쇠']?' primary':''),disabled:!!ow.length,on:{click:function(){MIX.open=MIX.open===r['열쇠']?'':r['열쇠'];MIX.f={};draw();}}},'묶음 발주')));})));
+    var cell=function(st,r,txt){var s=mixState(st,V.vn,r),d=s.doc;return h('td',{class:STC[s.t]||(s.t?'':'bdnew'),title:[s.t||'신규 — 등록대기로 넘김',d&&d.agentNote].filter(Boolean).join(' · ')},bdTr(txt));};
+    var heads=['가공','원장 자재번호','원장 자재명','원장 분류','공정','공정흐름','분류(대 > 중 > 소)','자재번호','자재명','규격','품목자산분류','기준단위','넘김','묶음 발주'];
+    parts=parts.concat(tbl(heads,rows.map(function(r,i){var pl=pls[i],g=r['가공']||{},o=r['원장']||{},c=r['분류']||{},m=r['자재등록']||{},ow=mixOrdWhy(V.vn,r);
+      return h('tr',{class:MIX.open===r['열쇠']?'bded':''},h('td',{},[g['납품제품명'],g['규격']].filter(Boolean).join(' ')),
+        cell('원장',r,o['자재번호']),h('td',{},bdTr(o['자재명'])),cell('원장분류',r,bdPath(o)),cell('공정',r,(r['공정']||{})['공정명']),cell('공정흐름',r,(r['공정흐름']||{})['이름']),
+        cell('분류',r,bdPath(c)),cell('자재',r,m['자재번호']),h('td',{},bdTr(m['자재명'])),h('td',{},bdTr(m['규격'])),h('td',{},bdTr(m['품목자산분류'])),h('td',{},bdTr(m['기준단위'])),
+        h('td',{class:pl.why.length?'bdwhy bad':'',title:pl.why.join(' · ')||pl.go.map(function(g){return g.st;}).join(' · ')||null},pl.why.length?'못 넘김':String(pl.go.length)),
+        h('td',{title:ow.join(' · ')||null},h('button',{type:'button',class:'btn small'+(MIX.open===r['열쇠']?' primary':''),disabled:!!ow.length,on:{click:function(){MIX.open=MIX.open===r['열쇠']?'':r['열쇠'];MIX.f={};draw();}}},'묶음 발주')));})));
     var orow=rows.filter(function(r){return r['열쇠']===MIX.open;})[0];
     if(orow)parts.push(mixOrdForm(V.vn,orow));
-    /* 이 거래처 묶음 발주(erp_purchases mix) */
     var ords=(data.purchases||[]).filter(function(x){return x.mix&&x.mix['거래처']===V.vn;}).sort(function(a,b){return String(b.createdAt||'')<String(a.createdAt||'')?-1:1;});
     if(ords.length){parts.push(h('h3',{class:'bdrh'},'묶음 발주 '+ords.length));
       parts=parts.concat(tbl(['요청일','가공','원장','원장 수량','가공 수량','반제품','재단업체 창고','상태'],ords.map(function(x){var a=(x.rows||[])[0]||{},mx=x.mix;
@@ -4548,19 +4601,21 @@ function renderMix(){
           h('td',{title:x.agentNote||null},h('span',{class:'chip '+(x.status||'대기')},x.status||'대기')));})));}
     res.replaceChildren.apply(res,parts);
     if(MIX.fail)res.prepend(h('div',{class:'bdrfail'},MIX.fail));
-    var noPerm=['classes','materials'].filter(function(k){return !canCol('erp_'+k,'w');});
+    var need={};go.forEach(function(g){need[g.k]=1;});
+    var noPerm=Object.keys(need).filter(function(k){return !canCol('erp_'+k,'w');});
     if(noPerm.length)res.prepend(h('div',{class:'bdrfail'},'이 계정은 '+noPerm.map(function(k){return BYKEY[k].title;}).join(' · ')+' 등록 권한이 없음 — 등록대기를 할 수 없습니다(담당자 관리에서 권한).'));
     goBtn.hidden=false;goBtn.disabled=!go.length||MIX.busy||noPerm.length>0;goBtn.textContent=go.length?'등록대기 '+go.length+'건':'등록대기';
     goBtn.onclick=function(){
       if(MIX.busy||!go.length)return;
       if(!db){MIX.msg='저장소에 연결되지 않아 넘기지 못했습니다.';MIX.bad=true;draw();return;}
-      if(data.classes==null||data.materials==null){MIX.msg='분류·자재 자료를 읽는 중입니다. 잠시 뒤 다시 눌러 주세요.';MIX.bad=true;draw();return;}
-      var P=[{key:'classes',go:[]},{key:'materials',go:[]}],seen={};
-      go.forEach(function(pl){if(pl.cls&&pl.cls.st.t==='new'&&!seen[pl.cls.e.id]){seen[pl.cls.e.id]=1;P[0].go.push(pl.cls);}
-        P[1].go.push({e:pl.mat.e,st:pl.mat.st.t==='upd'?{t:'old',doc:pl.mat.doc}:{t:'new'}});});
+      if(['classes','materials','processes','flows'].some(function(k){return data[k]==null;})){MIX.msg='분류·자재·공정 자료를 읽는 중입니다. 잠시 뒤 다시 눌러 주세요.';MIX.bad=true;draw();return;}
+      /* 차례 = 단계 차례(원장분류 → 원장 → 공정 → 공정흐름 → 분류 → 자재) · 같은 분류 경로·같은 이름은 한 번만 */
+      var P=[],seen={};MIX_ST.forEach(function(st){var g={key:MIX_KEY[st],go:[]};
+        pls.forEach(function(pl){pl.go.forEach(function(x){if(x.st!==st)return;var v=x.x.e.vals,id=x.k+'|'+(x.k==='classes'?clsPath(v):x.k==='materials'?v.code:v.name);if(x.x.st.t==='new'&&seen[id])return;seen[id]=1;g.go.push(x.x);});});
+        if(g.go.length)P.push(g);});
       MIX.busy=true;MIX.msg='넘기는 중';MIX.bad=false;MIX.fail='';draw();
       freshCheck().then(function(old){if(old)return {old:old};return bdRun({vn:V.vn,pan:V.d['보내기']['판'],src:MIX_SRC},P);}).then(function(r){
-        MIX.busy=false;if(r.old){MIX.msg=r.old;MIX.bad=true;}else{MIX.msg=r.n+'건 등록대기 (분류 → 자재등록)';MIX.bad=false;}draw();renderNav();renderSum();
+        MIX.busy=false;if(r.old){MIX.msg=r.old;MIX.bad=true;}else{MIX.msg=r.n+'건 등록대기';MIX.bad=false;}draw();renderNav();renderSum();mixResSync();
       },function(e){MIX.busy=false;MIX.msg='';MIX.fail='하나도 등록대기되지 않았습니다 — '+errText(e);draw();});
     };
   }
@@ -4584,7 +4639,7 @@ function mixOrdForm(vn,r){
     var v={reqdate:f.date,rows:[{ccode:o['자재번호'],qty:q,duedate:f.date,wh:vend,vendor:vend,io:'내수',cur:'KRW',price:Number(String(o['단가']||'').replace(/,/g,''))||0}],
       mix:{'출처':MIX_SRC,'거래처':vn,'열쇠':r['열쇠'],'지문':r['지문'],'차례':['원장 구매발주·구매납품(그 거래처 창고)','가공 외주발주·외주납품(가공품 재공품 생김)','자재이동(재단업체 창고)'],
         '같은날':f.date,'원장':{'자재번호':o['자재번호'],'자재명':o['자재명'],'창고':vend},'가공품':{'자재번호':bdTr(m['자재번호']),'자재명':bdTr(m['자재명'])},'가공수량':pq,
-        '반제품':bdTr(f.item),'공정흐름':bdTr(r['공정흐름']),'외주거래처':vend,'이동창고':f.wh,
+        '반제품':bdTr(f.item),'공정흐름':bdTr((r['공정흐름']||{})['이름']),'외주거래처':vend,'이동창고':f.wh,
         '임시':['원장 창고 = 거래처 이름(등록 방법 1단계 같은 이름 창고)','재단업체 창고 = 구매 창고 목록','반제품 품번 = 손으로','원장·가공 수량 따로']}};
     save.disabled=true;MIX.msg='넘기는 중';MIX.bad=false;
     freshCheck().then(function(old){if(old)return {old:old};return stepAdd(BYKEY.purchases,v);}).then(function(x){

@@ -10,6 +10,9 @@
   python3 결과맞추기.py 보기       쓰지 않고 어긋난 칸만 보임
 v313(11-20) 공정흐름 사본도: `발주역입력_영림원폼/_공정흐름` = 공정흐름(erp_flows) 완료 이름(폼 bdFlowPub 와 같은 셈)
   → 발주역입력/영림원품목등록 공정흐름 드롭(로그인 없는 기기). **흐름 status 를 바꾼 뒤에도 이 스크립트를 돌린다.**
+v315(11-21) 구매+가공품목: `_가공품목_{거래처}.결과.{열쇠}.{원장분류|원장|공정|공정흐름|분류|자재}` = 폼 mixResSync 같은 셈(bd.출처 「구매+가공품목」·거래처·열쇠·단계 문서)
+  + 완료 사본 `_자재`(erp_materials 완료) · `_공정`(erp_processes 완료) = 폼 bdCopyPub 같은 셈 → 보드매입현황 「구매+가공품목」 이 로그인 없을 때 실시간으로 받음.
+  **자재·분류·공정·공정흐름 status 를 바꾼 뒤에도 이 스크립트를 돌린다.**
 토큰 = 작업자표.py. 출력엔 거래처·열쇠·단계·상태만(단가·토큰 안 적음).
 """
 import json, os, sys, time, urllib.request, urllib.parse, urllib.error
@@ -224,8 +227,88 @@ def flow_pub(docs, data, dry):   # 폼 bdFlowPub (v313) — _공정흐름 = 영�
     return 1
 
 
+MIX_PRE, MIX_SRC = '_가공품목_', '구매+가공품목'
+MIX_ST = ['원장분류', '원장', '공정', '공정흐름', '분류', '자재']
+MIX_KEY = {'원장분류': 'classes', '원장': 'materials', '공정': 'processes', '공정흐름': 'flows', '분류': 'classes', '자재': 'materials'}
+
+
+def mix_doc(st, vn, k, data):   # 폼 mixDoc
+    rows = []
+    for x in data[MIX_KEY[st]]:
+        b = x.get('bd')
+        if not isinstance(b, dict) or b.get('출처') != MIX_SRC or b.get('거래처') != vn or (b.get('단계') or '') != st: continue
+        y = b.get('열쇠')
+        if (k in y) if isinstance(y, list) else (y == k): rows.append(x)
+    return first(rows)
+
+
+def mix_stage_doc(st, vn, r, data):   # 폼 mixStageDoc — 이 줄이 넘긴 문서, 없으면 같은 값 문서(오류·영림원에 없음 뺌)
+    d = mix_doc(st, vn, r.get('열쇠'), data)
+    if d: return d
+    o = r.get('원장') or {}
+    ok = lambda x: x.get('status') != '오류' and not gone(x)
+    if st in ('원장분류', '분류'):
+        c = o if st == '원장분류' else (r.get('분류') or {})
+        if st == '원장분류' and not o.get('신규'): return None
+        p = [tr(c.get(k)) for k in ('대분류', '중분류', '소분류')]
+        if not all(p): return None
+        rows = sorted([x for x in data['classes'] if x.get('kind') == '자재' and ok(x) and cls_path(x) == SEP.join(p)], key=lambda x: x.get('status') != '완료')
+        return rows[0] if rows else None
+    k = MIX_KEY[st]
+    v = tr(o.get('자재번호')) if st == '원장' else tr((r.get('자재등록') or {}).get('자재번호')) if st == '자재' else tr((r.get('공정') or {}).get('공정명')) if st == '공정' else tr((r.get('공정흐름') or {}).get('이름'))
+    if not v: return None
+    return first([x for x in data[k] if ok(x) and tr(x.get('code') if k == 'materials' else x.get('name')) == v])
+
+
+def mix_pub(docs, data, dry):   # 폼 mixResSync — 바뀐 칸만 · 문서 없어진 단계 지움
+    n = 0
+    for d in docs:
+        if not d['id'].startswith(MIX_PRE) or not isinstance((d.get('보내기') or {}).get('줄'), list): continue
+        vn, old, ch = d['id'][len(MIX_PRE):], d.get('결과') if isinstance(d.get('결과'), dict) else {}, []
+        for r in d['보내기']['줄']:
+            if not isinstance(r, dict) or r.get('상태') != '보냄': continue
+            k = r.get('열쇠')
+            for st in MIX_ST:
+                v = res_of(mix_stage_doc(st, vn, r, data))
+                o = (old.get(k) or {}).get(st) if isinstance(old.get(k), dict) else None
+                if o != v: ch.append((k, st, v, o))
+        for k, st, v, o in ch:
+            print('%s  %s  %s: %s → %s' % (d['id'], str(k).replace('\t', ' ').strip(), st, (o or {}).get('상태', '없음'), (v or {}).get('상태', '지움')))
+        if ch and not dry: write(d['id'], ch)
+        n += len(ch)
+    return n
+
+
+def mat_rows(a):   # 폼 bdMatRows
+    out, seen = [], set()
+    for r in a:
+        if r.get('status') != '완료' or gone(r) or not tr(r.get('code')): continue
+        p = [tr(x) for x in str(r.get('small') or '').split(SEP)]
+        out.append({'자재번호': tr(r.get('code')), '자재명': tr(r.get('name')), '규격': tr(r.get('spec')), '기준단위': tr(r.get('unit')), '품목자산분류': tr(r.get('asset')),
+                    '대분류': p[0] if len(p) == 3 else '', '중분류': p[1] if len(p) == 3 else '', '소분류': p[2] if len(p) == 3 else tr(r.get('small'))})
+    out.sort(key=lambda x: x['자재번호'])
+    res = []
+    for x in out:
+        if x['자재번호'] in seen: continue
+        seen.add(x['자재번호']); res.append(x)
+    return res
+
+
+def copy_pub(docs, data, dry):   # 폼 bdCopyPub — _자재 · _공정 (다를 때만 통째)
+    n = 0
+    for name, rows, src in (('_자재', mat_rows(data['materials']), '입력폼 자재등록(완료)'), ('_공정', flow_rows(data['processes']), '입력폼 공정등록(완료)')):
+        cd = next((x for x in docs if x['id'] == name), None)
+        if cd and cd.get('줄') == rows: continue
+        n += 1
+        print(name + (' 다름' if dry else ' 올림'))
+        if not dry:
+            body = {'fields': {'줄': enc(rows), '올린때': enc(time.strftime('%Y-%m-%dT%H:%M:%S.000Z', time.gmtime())), '출처': enc(src)}}
+            req('PATCH', DB + q(BD + '/' + name), body)
+    return n
+
+
 def run(only=None, dry=False):
-    data = {k: col('erp_' + k) for k in ('classes', 'materials', 'purprices', 'flows')}
+    data = {k: col('erp_' + k) for k in ('classes', 'materials', 'purprices', 'flows', 'processes')}
     docs = col(BD)
     vendors = sorted([d for d in docs if not d['id'].startswith('_') and isinstance((d.get('보내기') or {}).get('줄'), list)], key=lambda d: d['id'])
     left = 0
@@ -241,13 +324,16 @@ def run(only=None, dry=False):
     if c: print('_분류.영림원 ' + ('다름' if dry else '올림'))
     f = flow_pub(docs, data, dry)
     if f: print('_공정흐름 ' + ('다름' if dry else '올림'))
+    mx = mix_pub(docs, data, dry)
+    cp = copy_pub(docs, data, dry)
     if not dry:   # 다시 읽어 확인
         docs = col(BD)
         for d in docs:
             if d['id'].startswith('_') or not isinstance((d.get('보내기') or {}).get('줄'), list) or (only and d['id'] != only): continue
             left += len(diff(d, want(d, data)))
         if flow_pub(docs, data, True): left += 1
-    elif f: left += 1
+        left += mix_pub(docs, data, True) + copy_pub(docs, data, True)
+    else: left += (1 if f else 0) + mx + cp
     print('어긋남 %d' % left)
     return left
 
