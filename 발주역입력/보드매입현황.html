@@ -1,7 +1,10 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.41.2
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.42.0
+     v1.42.0(11-21): 사장님 「현진산업의 영림원보내기 구매/가공 열에서 가공으로 선택된 가공을 통해 이 소요자재를 품목등록하는 가공품목등록 메뉴를 현진산업 페이지에 만들어줘」 —
+       현진산업 둘째 줄 「영림원보내기」 다음 「가공품목등록」 = 영림원보내기 가공 줄마다 한 줄: 가공(그 줄 화면 값) · 원장(구매 줄 고름 → 그 줄 화면 값) · 가공품목(등록할 값, 모두 빈칸 「임시」).
+       저장 = 창고 발주역입력_영림원폼/_가공품목_현진산업 {거래처, 줄:[{가공, 원장, 값}], 고친때}(통째). 입력폼으로 넘기는 길 없음.
      v1.41.2(11-21): 사장님 「드레그랑 드롭다운박스랑 클릭 겹쳐서 개같아요」 — 표입력.js 받기(?v=3): 누름 = 고름만 · 드롭 = ▾(칸 오른쪽 위, + 와 안 겹침)·글 치기·Alt+↓ 때만 · 칸 끌기 = 범위만 · + 끌기 중 드롭·▾ 없음 · 칸 밖 누름·끌기·Esc = 드롭 닫힘.
      v1.41.1(11-21): 표입력.js 고침 받기(?v=2) — 폰 누름 뒤 흉내 마우스 이벤트는 PC 고름이 안 받음(폰 = 터치범위) · 상자 끝 칸도 + 손잡이 보임 · 방금 넣은 값 바로 드롭에.
      v1.41.0(11-21): 사장님 「그냥 입력값 플러스 버튼으로 드레그 하면 복사되게 하고 방향키로 이동시 즉시 입력가능 상황 만들어 주세요. 그리고 한번 입련된건 기억해서 드롭다운 목록에 나타나게 해주세요」 —
@@ -370,6 +373,8 @@ html,body{height:100%;overflow:hidden}
 .동표 tr.틀 td{background:#FFE9E7}   /* v1.23.0 색 다름 · 자재명 바뀜 */
 .동표 tr.틀 td.dpr-k{color:var(--vg-red)}
 .dpr-t td.동일{color:#2e7d32;font-weight:700}
+/* v1.42.0 가공품목등록 — 빈 임시 칸 = 빨간 테(폼표 임칸) · 저장된 값 = 파랑(폼표 저장값) */
+.가공표 td.입 input{width:12ch}
 #오류목록{flex-shrink:0;max-height:30vh;overflow:auto;margin:0 0 8px}
 #오류목록 .chip{margin-left:6px}
 .state{background:var(--vg-fill);border-radius:14px;padding:22px 16px;text-align:center;margin-top:12px}
@@ -382,7 +387,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.41.2</div>
+  <div class="badge">v1.42.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -468,6 +473,7 @@ function 볼것그리기(){
   if(목표) 버튼.push(['매입품목', 목표.칸[0] || '매입품목']);
   버튼.push(['영림원', '영림원등록']);
   버튼.push(['폼', '영림원보내기']);   /* v1.4.0 「영림원 입력폼」 → v1.8.1 「영림원보내기」 */
+  if(가공품목거래처.includes(고른)) 버튼.push(['가공품목', '가공품목등록']);   /* v1.42.0 */
   el.innerHTML = 버튼.map(([k,t]) => `<button class="chip${k===볼것?' on':''}" data-k="${글(k)}">${글(t)}</button>`).join('');
   el.querySelectorAll('.chip').forEach(b => b.onclick = () => {
     볼것 = b.dataset.k; el.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x===b)); 그리기();
@@ -2597,6 +2603,111 @@ function 중국엑셀읽기(X, buf){
 /* ==== 중국엑셀읽기 끝 ==== */
 
 
+/* ==== 가공품목등록 (v1.42.0, 11-21) — 사장님: 「현진산업의 영림원보내기 구매/가공 열에서 가공으로 선택된 가공을 통해 이 소요자재를 품목등록하는 가공품목등록 메뉴를 현진산업 페이지에 만들어줘」
+   (백판넬 원장 = 2.7 합판(현진 구매) + 백색코 가공(현진) — 명세서엔 둘이 따로, 둘을 거친 합판은 명세서에 없지만 재단에 들어가 영림원에 등록해야 함. 반제품 아님, 보드처럼 구매+가공 자재.)
+   줄 = 영림원보내기에서 「가공」 인 줄(납품제품명연결 체크 줄 뺌)마다 하나. 칸:
+     가공 = 그 줄 화면 값(납품제품명·규격·구매거래처·단가) · 원장 = 사장님이 고르는 구매 줄(영림원보내기 구매 줄 목록, 기본 빈칸 — 이어짐을 짓지 않음) → 그 줄 화면 값(자재번호·자재명·규격·기준단위·단가)
+     가공품목 = 등록할 값 — 영림원 화면 · 품목자산분류 · 자재명 · 자재번호 · 규격 · 기준단위 · 자재대·중·소분류. 모두 빈칸(「임시」, 짓지 않음 — 사장님이 정함).
+   색: 빈 임시 칸·안 고른 원장 = 빨간 테 · 저장된 값 = 파랑. 이유는 마우스(title)에만.
+   저장 = 창고 발주역입력_영림원폼/_가공품목_{거래처} = {거래처, 줄:[{가공:'품목\t규격', 원장:'품목\t규격'|'', 값:{칸키:값}}], 고친때} — 통째로 씀(0.4초 묶음).
+   「_」 로 시작해 입력폼(bdVendors)·결과맞추기.py 는 거래처로 안 읽음. 입력폼 등록대기로 넘기는 길은 아직 없음(시키지 않음). */
+const 가공품목거래처 = ['현진산업'];
+const 가공품목칸 = [
+  {k:'x_screen', l:'영림원 화면'}, {k:'m_asset', l:'품목자산분류'}, {k:'m_name', l:'자재명'}, {k:'m_code', l:'자재번호'}, {k:'m_spec', l:'규격'},
+  {k:'m_unit', l:'기준단위'}, {k:'m_big', l:'자재대분류'}, {k:'m_mid', l:'자재중분류'}, {k:'m_small', l:'자재소분류'}
+];
+const 가공품목원장칸 = [['m_code','자재번호'], ['m_name','자재명'], ['m_spec','규격'], ['m_unit','기준단위'], ['p_price','단가']];
+const 가공품목임시말 = '임시 — 아직 정하지 않은 값(사장님이 정함)';
+const 가공품목 = {};        // 거래처 → Map(가공 줄키 → {원장, 값}) — 창고 값
+const 가공품목듣기 = {};
+const 가공품목문서 = s => '_가공품목_' + s;
+const 원장글 = m => m.이름 + (m.규격 ? ' / ' + m.규격 : '');
+async function 가공품목받기(s){
+  if(가공품목[s]) return;
+  const { doc, getDoc, onSnapshot } = window.fbRead, 자리 = doc(window.db, ...폼자리, 가공품목문서(s));
+  const 꼴 = d => { const 모 = new Map(); for(const z of ((d && d.줄) || [])) if(z && z.가공) 모.set(String(z.가공), { 원장:String(z.원장 || ''), 값:{ ...(z.값 || {}) } }); return 모; };
+  const d = await getDoc(자리);
+  가공품목[s] = 꼴(d.exists() ? d.data() : null);
+  if(onSnapshot && !가공품목듣기[s]){ 가공품목듣기[s] = true;
+    onSnapshot(자리, x => { if(가공품목저장중[s]) return; const 새 = 꼴(x.exists() ? x.data() : null);
+      if(고른값([...새]) === 고른값([...가공품목[s]])) return; 가공품목[s] = 새;
+      const a = document.activeElement; if(고른===s && 볼것==='가공품목' && !(a && a.closest && a.closest('.가공표'))) 가공품목그리기(); }, () => {}); }   /* 다른 창·기기에서 고친 것 */
+}
+const 가공품목저장중 = {}, 가공품목예약 = {};
+function 가공품목상태(t, 나쁨){ const el = document.getElementById('가공상태'); if(el){ el.textContent = t; el.classList.toggle('bad', !!나쁨); } }
+function 가공품목저장(s){
+  clearTimeout(가공품목예약[s]); 미저장.add('가공품목:' + s); 가공품목상태('저장 중…');
+  가공품목예약[s] = setTimeout(async () => {
+    가공품목저장중[s] = true;
+    try{
+      const { doc, setDoc } = window.fbRead;
+      const 줄 = [...가공품목[s]].filter(([, v]) => v.원장 || Object.keys(v.값).length).map(([가공, v]) => ({ 가공, 원장:v.원장, 값:v.값 }));
+      await setDoc(doc(window.db, ...폼자리, 가공품목문서(s)), { 거래처:s, 줄, 고친때:new Date().toISOString() });
+      미저장.delete('가공품목:' + s); 큰알림(null);
+      가공품목상태('저장됨 ' + new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}));
+    }catch(e){ 큰알림('가공품목등록을 저장하지 못했습니다 — ' + ((e && (e.code || e.message)) || '')); 가공품목상태('저장하지 못했습니다', true); }
+    finally{ 가공품목저장중[s] = false; }
+  }, 400);
+}
+async function 가공품목그리기(){
+  const s = 고른, 속 = document.getElementById('속');
+  if(!가공품목[s] || !폼값[s]) 속.innerHTML = '<div class="state"><div class="big">읽는 중입니다…</div></div>';
+  try{ await 폼받기(s); await 연결받기(); await 가공품목받기(s); }
+  catch(e){ 속.innerHTML = `<div class="state"><div class="big">창고를 읽지 못했습니다</div><div class="why">${글((e&&(e.code||e.message))||'')}</div></div>`; return; }
+  if(고른!==s || 볼것!=='가공품목') return;
+  const 월표 = (받은[s].표 || []).find(t => t.이름==='월별'), { 칸, 품, 규, 줄 } = 품목모으기(월표);
+  const 가공들 = 줄.filter(m => 가공줄(s, m) && !뺀줄(s, m)), 구매들 = 줄.filter(m => !가공줄(s, m) && !뺀줄(s, m));
+  const 구매맵 = new Map(구매들.map(m => [줄키(m), m]));
+  const 값 = (m, k) => 칸값(폼칸.find(f => f.k===k), m, s);
+  const 묶 = ' class="묶"';
+  let h = `<table class="dpr-t 폼표 가공표"><thead><tr><th class="묶" colspan="4">가공</th><th class="묶" colspan="${1 + 가공품목원장칸.length}">원장</th><th class="묶" colspan="${가공품목칸.length}">가공품목</th></tr><tr>` +
+    `<th class="dpr-k">${글(칸[품])}</th><th>${글(칸[규])}</th><th>구매거래처</th><th>단가</th>` +
+    `<th${묶}>${글(칸[품])}<span class="별">*</span></th>` + 가공품목원장칸.map(([, l]) => `<th>${글(l)}</th>`).join('') +
+    가공품목칸.map((f, i) => `<th${i===0 ? 묶 : ''}>${글(f.l)}<span class="임">임시</span></th>`).join('') + '</tr></thead><tbody>';
+  for(const m of 가공들){
+    const 키 = 줄키(m), 저 = 가공품목[s].get(키) || { 원장:'', 값:{} }, 원 = 구매맵.get(저.원장);
+    const 원장없음 = 저.원장 && !원 ? '고른 원장 줄이 영림원보내기 구매 줄에 없음: ' + 저.원장.replace('\t', ' / ') : '';
+    h += `<tr data-key="${글(키)}" title="${글(가공말)}"><td class="dpr-k 참">${글(m.이름)}</td><td class="참">${글(m.규격)}</td><td class="참">${글(값(m, 'p_vendor'))}</td><td class="참 num">${글(값(m, 'p_price'))}</td>`;
+    const 고를 = [['', '']].concat(구매들.map(x => [줄키(x), 원장글(x)]));
+    if(원장없음) 고를.push([저.원장, 저.원장.replace('\t', ' / ')]);
+    h += `<td class="입 묶${원 ? '' : ' 임칸'}"${원장없음 ? ` title="${글(원장없음)}"` : 원 ? '' : ` title="${글('원장(구매 합판)을 고르세요')}"`}><select data-가="원장"${원 ? ' class="저장값"' : ''}>` +
+      고를.map(([v, t], i) => `<option value="${i > 구매들.length ? '그대로' : i}"${v===저.원장 ? ' selected' : ''}>${글(t)}</option>`).join('') + '</select></td>';   /* 값 = 차례(줄키의 탭은 option.value 가 지움) */
+    h += 가공품목원장칸.map(([k]) => `<td class="참${k==='p_price' ? ' num' : ''}">${원 ? 글(값(원, k)) : ''}</td>`).join('');
+    h += 가공품목칸.map((f, i) => { const v = 저.값[f.k] || '';
+      return `<td class="입${i===0 ? ' 묶' : ''}${v ? '' : ' 임칸'}" title="${글(가공품목임시말)}"><input data-가="${f.k}" value="${글(v)}"${v ? ' class="저장값"' : ''} autocomplete="off"></td>`; }).join('');
+    h += '</tr>';
+  }
+  h += '</tbody></table>';
+  속.innerHTML = `<div class="폼줄"><span id="가공상태" class="폼상태"></span></div><div class="표통">${h}<div class="글">${가공들.length}줄</div></div>`;
+  const 표 = 속.querySelector('.가공표');
+  const 원장키 = [''].concat(구매들.map(줄키));
+  const 고침 = el => {
+    const tr = el.closest('tr'), 키 = tr.dataset.key, k = el.dataset.가, v = String(el.value || '').trim();
+    const 저 = 가공품목[s].get(키) || { 원장:'', 값:{} }, 새 = { 원장:저.원장, 값:{ ...저.값 } };
+    if(k==='원장'){ if(el.value!=='그대로') 새.원장 = 원장키[+el.value] || ''; } else if(v) 새.값[k] = v; else delete 새.값[k];
+    if(고른값(새) === 고른값(저)) return;
+    가공품목[s].set(키, 새); 가공품목저장(s);
+    if(k==='원장'){ 가공품목그리기(); return; }
+    el.classList.toggle('저장값', !!v); el.closest('td').classList.toggle('임칸', !v);
+  };
+  표.querySelectorAll('[data-가]').forEach(el => {
+    el.onchange = () => 고침(el);
+    if(el.tagName==='INPUT') el.onkeydown = e => { if(e.key==='Enter') el.blur(); };
+  });
+  (window.표입력 ? 표입력.표 : (t, 어) => window.터치범위 && 터치범위.표(t, 어))(표, {
+    이름:'가공품목',
+    열: td => { const el = td.querySelector('[data-가]'); return el ? '가공품목_' + el.dataset.가 : ''; },
+    목록: td => { const el = td.querySelector('select[data-가]'); return el ? [...el.options].filter(o => o.value).map(o => ({ v:o.textContent })) : []; },
+    목록만: td => !!td.querySelector('select[data-가]'),
+    칸: td => !!td.querySelector('[data-가]:not(:disabled)'),
+    읽기: td => { const el = td.querySelector('[data-가]'); return !el ? '' : el.tagName==='SELECT' ? (el.selectedOptions[0] || {}).textContent || '' : el.value; },
+    쓰기: 목 => { for(const [td, v0] of 목){ const el = td.querySelector('[data-가]'); if(!el) continue; const v = String(v0 ?? '');
+      if(el.tagName==='SELECT'){ const o = [...el.options].find(x => x.textContent===v.trim() || x.value===v); if(!o && v.trim()) continue; if(el.value===(o ? o.value : '')) continue; el.value = o ? o.value : ''; }
+      else{ if(el.value===v) continue; el.value = v; }
+      el.dispatchEvent(new Event('change', { bubbles:true })); } }
+  });
+}
+
 function 그리기(){
   const d = 받은[고른], 속 = document.getElementById('속');
   const 표들 = d.표||[];
@@ -2612,6 +2723,8 @@ function 그리기(){
     h = 영림원목록(월표, d.제목);
   }else if(볼것==='폼'){
     폼그리기(); return;
+  }else if(볼것==='가공품목'){
+    가공품목그리기(); return;
   }else if(볼것==='매입품목'){
     const t = 표들.find(t => t.이름==='매입품목'); h = 표글(t, t.줄||[], d.제목);
   }else{
