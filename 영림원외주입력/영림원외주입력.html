@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v325 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v326 -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -476,7 +476,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v325</span>
+    <span class="ver">v326</span>
     <div class="pick topnav" id="topnav">   <!-- v288 사장님 11-18 「입력폼 상단에 발주역입력 메뉴를 만들어 발주역입력 페이지로 이어지게」 — 이름 = 각 페이지 <title> 앞부분 · 같은 탭 -->
       <button type="button" class="btn small" aria-haspopup="menu" aria-expanded="false">발주역입력</button>
       <div class="pickmenu topnavmenu" role="menu" hidden>
@@ -877,7 +877,7 @@ var STEPS=[
   F('name','창고명','text',{req:1}),
   F('group','창고그룹','text'),
   F('dept','현장부서','text'),
-  F('cust','외주거래처','combo',{dl:'dl-vendors',valid:vendorErr,badLab:'외주거래처 미등록'}),
+  F('cust','외주거래처','combo',{dl:'dl-whvendors',valid:vendorErr,badLab:'외주거래처 미등록'}),   /* 1 거래처등록 완료 · 외주가공거래처만(영림원에 없음 뺌) */
   F('consign','위탁거래처','text'),
   F('emp','담당자','text'),
   F('type','창고구분','combo',{req:1,opts:WH_TYPES,listOnly:1,valid:optsErr('창고구분',WH_TYPES),badLab:'목록 밖 값'}),
@@ -2383,7 +2383,7 @@ function datalist(id,vals){
 /* v105 영림원에 있다고 확인된 거래처도 거래처 목록에 더한다(종류가 달라도). 확인 = ① 1 거래처 문서가 완료이고 영림원에서 불러왔거나(source 영림원) 불러오기에서 비교됨(ylwCheckedAt)
    ② 영림원에서 불러온 문서(source 영림원·완료)에 그 칸의 거래처로 나온 이름. 「영림원에 없음」(v104)·대기·오류는 뺀다. 기존 조건(완료 + 종류)은 그대로 앞에. */
 function vendSure(r){return r.status==='완료'&&!ylwGone(r)&&(r.source==='영림원'||!!r.ylwCheckedAt);}
-var VEND_FROM={'dl-vendors':[['workcenters',function(d){return [d.vendor];}],['warehouses',function(d){return [d.cust];}]],   /* v325 창고 외주거래처 */
+var VEND_FROM={'dl-vendors':[['workcenters',function(d){return [d.vendor];}]],
   'dl-impvendors':['imporders','imppays','impinvs','impbls','impins'].map(function(k){return [k,function(d){return [d.vendor];}];}),
   'dl-purvendors':[['purprices',function(d){return [d.vendor];}],['purreqs',function(d){return (d.rows||[]).map(function(x){return x&&x.vendor;});}],['purapprs',function(d){return (d.rows||[]).map(function(x){return x&&x.vendor;});}],['purchases',function(d){return (d.rows||[]).map(function(x){return x&&x.vendor;}).concat((d.pos||[]).map(function(x){return x&&x.vendor;}));}]]};
 function vendList(id,kind){
@@ -2424,6 +2424,7 @@ function refreshLists(){
   var vend=vendList('dl-vendors','외주가공거래처');
   var wc=(data.workcenters||[]).filter(function(r){return r.kind==='사외외주';}).map(function(r){return r.name;});
   datalist('dl-vendors',vend);
+  datalist('dl-whvendors',(data.vendors||[]).filter(function(r){return r.status==='완료'&&!ylwGone(r)&&(r.kinds||[]).indexOf('외주가공거래처')>=0;}).map(function(r){return String(r.name||'').trim();}));   /* v325 창고 외주거래처 */
   var whs=whDone();PUR_WHS.length=0;Array.prototype.push.apply(PUR_WHS,whs);datalist('dl-whs',whs);   /* v325 2 창고등록 완료 창고 = 워크센터 창고 칸·구매 창고(PUR_WHS 같은 배열을 그 자리에서) */
   datalist('dl-wc',dlMore('dl-wc',KNOWN_WC.concat(wc)));
   datalist('dl-procs',dlMore('dl-procs',(data.processes||[]).filter(function(r){return r.status!=='오류';}).map(function(r){return String(r.name||'').trim();})));
