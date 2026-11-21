@@ -245,7 +245,7 @@ def mix_doc(st, vn, k, data):   # 폼 mixDoc
 def mix_stage_doc(st, vn, r, data):   # 폼 mixStageDoc — 이 줄이 넘긴 문서, 없으면 같은 값 문서(오류·영림원에 없음 뺌)
     d = mix_doc(st, vn, r.get('열쇠'), data)
     if d: return d
-    o = r.get('원장') or {}
+    o = r.get('원장') if isinstance(r.get('원장'), dict) else {}
     ok = lambda x: x.get('status') != '오류' and not gone(x)
     if st in ('원장분류', '분류'):
         c = o if st == '원장분류' else (r.get('분류') or {})
@@ -255,7 +255,8 @@ def mix_stage_doc(st, vn, r, data):   # 폼 mixStageDoc — 이 줄이 넘긴 �
         rows = sorted([x for x in data['classes'] if x.get('kind') == '자재' and ok(x) and cls_path(x) == SEP.join(p)], key=lambda x: x.get('status') != '완료')
         return rows[0] if rows else None
     k = MIX_KEY[st]
-    v = tr(o.get('자재번호')) if st == '원장' else tr((r.get('자재등록') or {}).get('자재번호')) if st == '자재' else tr((r.get('공정') or {}).get('공정명')) if st == '공정' else tr((r.get('공정흐름') or {}).get('이름'))
+    g = lambda x, k: x.get(k) if isinstance(x, dict) else (x if isinstance(x, str) and k in ('이름', '공정명') else None)   # v1.44 옛 꼴(공정흐름 = 글)도
+    v = tr(g(o, '자재번호')) if st == '원장' else tr(g(r.get('자재등록'), '자재번호')) if st == '자재' else tr(g(r.get('공정'), '공정명')) if st == '공정' else tr(g(r.get('공정흐름'), '이름'))
     if not v: return None
     return first([x for x in data[k] if ok(x) and tr(x.get('code') if k == 'materials' else x.get('name')) == v])
 
