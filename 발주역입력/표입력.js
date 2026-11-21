@@ -277,8 +277,11 @@
   /* ── 마우스: 누름 = 고름 · 끌기 = 범위 · 두 번 = 고치기 ── */
   const 내표칸 = el => { const td = el && el.closest && el.closest('td'); const t = td && td.closest('table'); return t && 어들.has(t) && t.tBodies[0] && t.tBodies[0].contains(td) ? td : null; };
   const 쓸칸 = td => { const 어 = 어들.get(td.closest('table')); return 어.칸(td) || (어.막음 && 어.막음(td)); };
+  let 최근톡 = 0;   /* 폰 누름 뒤 따라오는 흉내 마우스 이벤트는 무시(폰 = 터치범위가 맡음) */
+  document.addEventListener('pointerdown', e => { if(e.pointerType === 'touch') 최근톡 = Date.now(); }, true);
+  const 톡뒤 = () => Date.now() - 최근톡 < 1200;
   document.addEventListener('mousedown', e => {
-    if(e.button !== 0) return;
+    if(e.button !== 0 || 톡뒤()) return;
     if(e.target === 칸 || 목록.contains(e.target) || e.target === 손) return;
     const td = 내표칸(e.target);
     if(!td || !쓸칸(td) || (e.target.closest('input[type=checkbox],button,a,.칸끈'))){
@@ -297,8 +300,8 @@
     지금.r1 = r; 지금.c1 = c; 그리기();
   }, true);
   addEventListener('mouseup', () => { 끌기 = null; });
-  document.addEventListener('dblclick', e => { const td = 내표칸(e.target); if(!td || !쓸칸(td)) return; e.preventDefault(); e.stopPropagation(); 고르기(td); 고치기('F2'); }, true);
-  document.addEventListener('click', e => { if(e.pointerType === 'touch') return; const td = 내표칸(e.target); if(td && 쓸칸(td) && !e.target.closest('input[type=checkbox],button,a')){ e.stopPropagation(); } }, true);
+  document.addEventListener('dblclick', e => { if(톡뒤()) return; const td = 내표칸(e.target); if(!td || !쓸칸(td)) return; e.preventDefault(); e.stopPropagation(); 고르기(td); 고치기('F2'); }, true);
+  document.addEventListener('click', e => { if(e.pointerType === 'touch' || 톡뒤()) return; const td = 내표칸(e.target); if(td && 쓸칸(td) && !e.target.closest('input[type=checkbox],button,a')){ e.stopPropagation(); } }, true);
 
   /* ── + 끌기 = 복사(위·아래, 옆) ── */
   손.addEventListener('pointerdown', e => {

@@ -2,7 +2,9 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.36.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.37.0
+     v2.37.0(11-21): 사장님 「그냥 입력값 플러스 버튼으로 드레그 하면 복사되게 하고 방향키로 이동시 즉시 입력가능 상황 만들어 주세요. 그리고 한번 입련된건 기억해서 드롭다운 목록에 나타나게 해주세요」 —
+       품목등록업로드 입력 칸 = 공용 표입력.js 하나(누름 고름 · + 끌기 복사 · 방향키·Enter·Tab 옮김 · 바로 치기 · F2/두 번 누름 · Shift 범위 · ⌘C/V · Delete · 기억 드롭 — 창고 발주역입력_입력기억/영림원품목등록). 옛 편집달기 PC·폰 손잡이는 표입력.js 없을 때만. 저장 = 바꿈() 그대로.
      v2.36.0(11-21): 사장님 「합판이나 엣지필름 고를때 드롭값옆에 해당 자재 구매처 또는 생산처 나타나게 해줘」 — 합판·필름 드롭 줄 끝 구매처(구매단가등록 erp_purprices → 없으면 매입 순위 자료실 거래처 · 여럿 = 「첫 곳 외 N」, 마우스 = 전체 · 모름 = 흐린 빈 칸). 자재차례 결과에 구처·구처전체.
      v2.34.0(11-21): 사장님 「모바일 환경에서는 복사드레그도 안되는듯합니다」 → 「추천방식을 적용해 주세요」 — 품목등록업로드 입력 칸 폰(터치) = 공용 터치범위.js(누름 고름 · 동그라미 손잡이 끌어 범위 · 복사·붙여넣기·채우기·지우기 띠). 쓰기 = PC 와 같은 바꿈(). 막음 칸은 그대로(알림). PC 그대로.
      v2.33.0(11-21): 사장님 「영림원 품목등록 표에서 셀의 가로 넓이 조정이 모바일환경에서 작동하지 않고 있습니다. 모든표 확인하여 이를 작동되게 해주세요」 — 이 쪽엔 칸 넓이 조정이 아예 없었음 →
@@ -299,7 +301,7 @@ body:not(.펼침) .dpr-t .접힘{display:none}   /* v2.32.0 빈 열 접힘 — �
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.36.0</div>
+  <div class="badge">v2.37.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -311,6 +313,8 @@ body:not(.펼침) .dpr-t .접힘{display:none}   /* v2.32.0 빈 열 접힘 — �
 <!-- 짚어서 지시하는 손잡이 — 바이글 박스에서 열면 켜진다. -->
 <script src="../shared/viggle.js"></script>
 <script src="터치범위.js?v=1"></script>   <!-- v2.34.0 폰 범위·복사·붙여넣기·채우기·지우기 -->
+<script src="표입력.js?v=2"></script>   <!-- v2.37.0 모든 입력 표 공통 -->
+<script>표입력.쪽('영림원품목등록');</script>
 <script src="칸넓이.js?v=1"></script>   <!-- v2.33.0 모든 표 칸 넓이 조정(마우스·손가락) -->
 <script>칸넓이.달기(document.getElementById('속'), { 열쇠:'영림원품목등록_칸넓이', 묶음: () => { const b = document.querySelector('#고름 .chip.on'); return b ? b.dataset.u : ''; } });</script>
 
@@ -1292,6 +1296,25 @@ window.addEventListener('beforeunload', e => { if(더럽.size || document.queryS
 function 편집달기(통){
   const 표 = 통.querySelector('table'); if(!표) return;
   const 몸 = 표.tBodies[0]; 통.tabIndex = 0;
+  /* v2.37.0 PC·폰 입력 = 공용 표입력.js 하나(고름·+ 끌기 복사·방향키·바로 치기·⌘C/V·Delete·입력값 기억 드롭·폰 터치범위).
+     아래 옛 고르기·끌기·글쇠·복사·붙여넣기·폰 누름은 표입력.js 가 없을 때만 돈다. 저장은 그대로 바꿈() — 막음·공정흐름 목록 거름 그대로. */
+  if(window.표입력){
+    표입력.표(표, {
+      이름:'품목등록업로드',
+      열: td => String(td.dataset.k || '').split('@')[0],
+      칸: td => td.classList.contains('편'),
+      막음: td => td.classList.contains('막음'),
+      알림: (td, 글) => 막음알림(td, 글),
+      읽기: td => td.classList.contains('공자동') ? td.textContent.trim() : 값(td.parentNode.dataset.p, td.dataset.k),
+      쓰기: 목 => 바꿈(목.map(([td, v]) => ({ p:td.parentNode.dataset.p, k:td.dataset.k, v }))),
+      목록: td => { const t = 고를칸[td.dataset.k]; if(!t) return [];
+        const 두 = 두께짝[t] ? 값(td.parentNode.dataset.p, 두께짝[t]) : '';
+        const 원 = t==='공정' ? 공정목록.map(c => ({ code:c, name:'' })) : t==='외주' ? 외주목록 : 자재차례(자재목록[t], 두, t);
+        return 원.map(m => ({ v:m.code, 글:m.name, 덧:m.구처, 맞음:m.맞음, title:[m.spec, m.구처전체].filter(Boolean).join(' · ') })); },
+      목록만: td => td.dataset.k === '공정흐름'
+    });
+    return;
+  }
   let 고름 = null, 끌기 = false, 편집 = null, 붙임받음 = false;
   const 거친손 = matchMedia('(pointer:coarse)').matches;
   /* v2.6.2 고른 드롭 칸 오른쪽 ▾ 자리를 눌렀나 */
