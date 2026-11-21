@@ -242,23 +242,8 @@ def mix_doc(st, vn, k, data):   # 폼 mixDoc
     return first(rows)
 
 
-def mix_stage_doc(st, vn, r, data):   # 폼 mixStageDoc — 이 줄이 넘긴 문서, 없으면 같은 값 문서(오류·영림원에 없음 뺌)
-    d = mix_doc(st, vn, r.get('열쇠'), data)
-    if d: return d
-    o = r.get('원장') if isinstance(r.get('원장'), dict) else {}
-    ok = lambda x: x.get('status') != '오류' and not gone(x)
-    if st in ('원장분류', '분류'):
-        c = o if st == '원장분류' else (r.get('분류') or {})
-        if st == '원장분류' and not o.get('신규'): return None
-        p = [tr(c.get(k)) for k in ('대분류', '중분류', '소분류')]
-        if not all(p): return None
-        rows = sorted([x for x in data['classes'] if x.get('kind') == '자재' and ok(x) and cls_path(x) == SEP.join(p)], key=lambda x: x.get('status') != '완료')
-        return rows[0] if rows else None
-    k = MIX_KEY[st]
-    g = lambda x, k: x.get(k) if isinstance(x, dict) else (x if isinstance(x, str) and k in ('이름', '공정명') else None)   # v1.44 옛 꼴(공정흐름 = 글)도
-    v = tr(g(o, '자재번호')) if st == '원장' else tr(g(r.get('자재등록'), '자재번호')) if st == '자재' else tr(g(r.get('공정'), '공정명')) if st == '공정' else tr(g(r.get('공정흐름'), '이름'))
-    if not v: return None
-    return first([x for x in data[k] if ok(x) and tr(x.get('code') if k == 'materials' else x.get('name')) == v])
+def mix_stage_doc(st, vn, r, data):   # 폼 mixStageDoc (v316) — 이 줄이 넘긴 문서만
+    return mix_doc(st, vn, r.get('열쇠'), data)
 
 
 def mix_pub(docs, data, dry):   # 폼 mixResSync — 바뀐 칸만 · 문서 없어진 단계 지움
