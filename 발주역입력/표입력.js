@@ -1,7 +1,8 @@
 /* 발주역입력 표 입력 — 모든 입력 표가 같게 움직이는 공통 파일(11-21 — 보드매입현황 v1.41.0 · 영림원품목등록 v2.35.0 부터)
    사장님(그대로): 「그냥 입력값 플러스 버튼으로 드레그 하면 복사되게 하고 방향키로 이동시 즉시 입력가능 상황 만들어 주세요.
                   그리고 한번 입련된건 기억해서 드롭다운 목록에 나타나게 해주세요」
-   ① 누름 = 칸 고름(파란 틀) · 끌기·Shift+누름 = 범위 · 고른 칸 오른쪽 아래 「+」 를 위·아래·옆으로 끌면 그 값(범위면 그 차례대로 되풀이) 복사.
+   ① 누름 = 칸 고름만(파란 틀 — 드롭 안 열림) · 칸 안 끌기·Shift+누름 = 범위만 · 고른 칸 오른쪽 아래 모서리 「+」 를 위·아래·옆으로 끌면 그 값(범위면 그 차례대로 되풀이) 복사.
+      드롭 목록은 셋일 때만 열림: 칸 오른쪽 위 작은 ▾(목록이 있는 칸, + 와 안 겹침) · 글자 치기(친 글로 거름) · Alt+↓. 칸 밖 누름·끌기 시작·+ 끌기·Esc = 바로 닫힘(사장님 11-21 「드레그랑 드롭다운박스랑 클릭 겹쳐서」).
    ② 방향키·Enter·Tab = 칸 옮김(Shift = 반대·범위) · 옮긴 칸에서 바로 글자를 치면 그 칸 입력(한글 조합 포함) · Enter = 넣고 아래 · Tab = 넣고 옆 ·
       Esc = 취소 · Delete/Backspace = 범위 지움 · F2·두 번 누름 = 지금 값 고치기 · Ctrl/⌘+C·V = 범위 복사·붙여넣기(엑셀 탭 글 그대로).
    ③ 입력한 값 기억 → 고칠 때 드롭 목록: 그 열 원래 목록(있으면 그 차례 그대로) 뒤에 기억 값(자주 쓴 차례). 원래 목록이 없던 칸도 기억 값으로 드롭이 생김.
@@ -17,10 +18,12 @@
   꼴.textContent =
     '.표입력틀{position:fixed;z-index:30;border:2px solid #1565c0;background:rgba(21,101,192,.07);pointer-events:none;box-sizing:border-box;display:none}' +
     '.표입력채움{position:fixed;z-index:31;border:1px dashed #1565c0;pointer-events:none;box-sizing:border-box;display:none}' +
-    '.표입력손{position:fixed;z-index:33;width:15px;height:15px;margin:-8px 0 0 -8px;display:none;align-items:center;justify-content:center;background:#1565c0;color:#fff;border:1px solid #fff;border-radius:3px;font:700 12px/1 -apple-system,sans-serif;cursor:crosshair;user-select:none;-webkit-user-select:none}' +
+    '.표입력손{position:fixed;z-index:33;width:11px;height:11px;margin:-6px 0 0 -6px;display:none;align-items:center;justify-content:center;background:#1565c0;color:#fff;border:1px solid #fff;border-radius:3px;font:700 10px/1 -apple-system,sans-serif;cursor:crosshair;user-select:none;-webkit-user-select:none}' +
     '.표입력칸{position:fixed;z-index:34;box-sizing:border-box;margin:0;border:2px solid #1565c0;border-radius:0;outline:none;background:#fff;color:#1A1A19;font:11.5px/1.3 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",system-ui,sans-serif;padding:1px 4px}' +
     '.표입력칸.숨음{opacity:0;caret-color:transparent;pointer-events:none}' +
     '@media (pointer:coarse){.표입력칸{font-size:16px}}' +
+    '.표입력세모{position:fixed;z-index:35;width:15px;height:12px;display:none;align-items:center;justify-content:center;background:#fff;color:#1565c0;border:1px solid #1565c0;border-radius:3px;font:700 9px/1 -apple-system,sans-serif;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}' +
+    '@media (pointer:coarse){.표입력세모{width:22px;height:18px;font-size:12px}}' +
     '.표입력목록{position:fixed;z-index:50;background:#fff;border:1px solid #C7C7C3;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.12);max-height:260px;overflow:auto;min-width:140px;padding:3px 0;font-size:12px;display:none}' +
     '.표입력목록 div{padding:4px 10px;white-space:nowrap;cursor:pointer;border-left:3px solid transparent}' +
     '.표입력목록 div:hover,.표입력목록 div.지금{background:#F4F4F2}' +
@@ -30,10 +33,11 @@
     '.표입력목록 div .덧{color:#2e5a1e;font-weight:600;margin-left:8px}';
   document.head.appendChild(꼴);
   const 만들 = (tag, cls) => { const e = document.createElement(tag); e.className = cls; return e; };
-  const 틀 = 만들('div', '표입력틀'), 채틀 = 만들('div', '표입력채움'), 손 = 만들('div', '표입력손'), 목록 = 만들('div', '표입력목록');
+  const 틀 = 만들('div', '표입력틀'), 채틀 = 만들('div', '표입력채움'), 손 = 만들('div', '표입력손'), 목록 = 만들('div', '표입력목록'), 세모 = 만들('div', '표입력세모');
+  세모.textContent = '▾';
   const 칸 = 만들('input', '표입력칸 숨음'); 칸.autocomplete = 'off'; 칸.spellcheck = false; 칸.setAttribute('autocapitalize', 'off');
   손.textContent = '+';
-  const 붙임 = () => { if(!틀.isConnected) document.body.append(틀, 채틀, 손, 칸, 목록); };
+  const 붙임 = () => { if(!틀.isConnected) document.body.append(틀, 채틀, 손, 칸, 세모, 목록); };
   if(document.body) 붙임(); else document.addEventListener('DOMContentLoaded', 붙임);
 
   /* ── 표 등록 ── */
@@ -102,7 +106,7 @@
     else 지금 = { 표:t, 어, r0:r, c0:c, r1:r, c1:c };
     그리기(); 초점();
   }
-  function 풀기(){ if(편집) 끝내기(true); 지금 = null; [틀, 채틀, 손, 목록].forEach(e => e.style.display = 'none'); 칸.classList.add('숨음'); if(document.activeElement === 칸) 칸.blur(); }
+  function 풀기(){ if(편집) 끝내기(true); 지금 = null; [틀, 채틀, 손, 세모, 목록].forEach(e => e.style.display = 'none'); 칸.classList.add('숨음'); if(document.activeElement === 칸) 칸.blur(); }
   function 초점(){ if(!지금) return; 칸위치(); if(document.activeElement !== 칸) 칸.focus({ preventScroll:true }); }
   const 머칸 = () => 칸at(지금.r0, 지금.c0);
 
@@ -127,6 +131,7 @@
       Object.assign(틀.style, { display:'block', left:보.l + 'px', top:보.t + 'px', width:(보.r - 보.l) + 'px', height:(보.b - 보.t) + 'px' });
       Object.assign(손.style, { display:편집 ? 'none' : 'flex', left:Math.min(R, 보.r - 6) + 'px', top:Math.min(B, 보.b - 6) + 'px' });   /* 범위 끝이 상자 밖이면 보이는 끝에 */
     }
+    세모그리기();
     if(채우기){ const [cl, ct, cr, cb] = 둘레(칸판(채우기.b)), 보2 = 보이는틀(cl, ct, cr, cb);
       Object.assign(채틀.style, { display:'block', left:보2.l + 'px', top:보2.t + 'px', width:Math.max(0, 보2.r - 보2.l) + 'px', height:Math.max(0, 보2.b - 보2.t) + 'px' }); }
     else 채틀.style.display = 'none';
@@ -137,6 +142,16 @@
     const q = td.getBoundingClientRect();
     Object.assign(칸.style, { left:q.left + 'px', top:q.top + 'px', width:Math.max(q.width, 편집 ? 80 : 0) + 'px', height:q.height + 'px' });
     if(편집 && 목록.style.display !== 'none') 목록자리();
+  }
+  let 세모난때 = 0;   /* ▾ 가 막 나타난 직후의 누름(같은 손가락의 뒤따른 click)은 무시 */
+  function 세모그리기(){   /* 고른 칸 하나(또는 고치는 중) + 그 칸에 목록이 있을 때만 · 끌기 중엔 숨김 */
+    const td = 지금 && 머칸(), 하나 = 지금 && 지금.r0 === 지금.r1 && 지금.c0 === 지금.c1;
+    if(!td || (!하나 && !편집) || 끌기 || 채우기 || !지금.어.칸(td) || !목록들(td).length){ 세모.style.display = 'none'; return; }
+    const q = td.getBoundingClientRect(), 보 = 보이는틀(q.left, q.top, q.right, q.bottom), 거 = matchMedia('(pointer:coarse)').matches;
+    const w = 거 ? 22 : 15, h = 거 ? 18 : 12, x = Math.min(q.right, 보.r - 6) - 6 - w - 3, y = q.top + 1;   /* + 손잡이 실제 자리(모서리 ±6px, 상자 끝이면 안쪽으로 당김)보다 3px 왼쪽 */
+    if(x < 보.l || y < 보.t - 1 || y + h > 보.b + 2){ 세모.style.display = 'none'; return; }
+    if(세모.style.display !== 'flex') 세모난때 = Date.now();
+    Object.assign(세모.style, { display:'flex', left:x + 'px', top:y + 'px' });
   }
   const 다시 = () => { if(지금 && !그림틀) 그림틀 = requestAnimationFrame(그리기); };
   addEventListener('scroll', 다시, true); addEventListener('resize', 다시);
@@ -192,17 +207,17 @@
     else { x = Math.max(4, Math.min(q.left, innerWidth - w - 4)); y = q.bottom + 10 + h <= 끝 ? q.bottom + 10 : Math.max(4, q.top - 10 - h); }
     목록.style.left = x + 'px'; 목록.style.top = y + 'px';
   }
-  function 고치기(방식, 첫글){   /* 방식 'F2' = 지금 값(←→ 글자 사이) · '친' = 친 글로 바꿈(←→ = 넣고 옮김) */
+  function 고치기(방식, 첫글, 열기){   /* 방식 'F2' = 지금 값(←→ 글자 사이) · '친' = 친 글로 바꿈(←→ = 넣고 옮김) */
     if(!지금) return false;
     const td = 머칸(), 어 = 지금.어;
     if(!td) return false;
     if(!어.칸(td)){ if(어.막음 && 어.막음(td) && 어.알림) 어.알림(td); return false; }
-    편집 = { td, 방식, 원:어.읽기(td), 목록:목록들(td), 처음글:방식 === 'F2' };
+    편집 = { td, 방식, 원:어.읽기(td), 목록:목록들(td), 처음글:!!열기 };
     칸.classList.remove('숨음'); 칸.readOnly = !!(어.목록만 && 어.목록만(td) && matchMedia('(pointer:coarse)').matches);
     if(방식 === 'F2'){ 칸.value = 편집.원; } else if(첫글 != null){ 칸.value = 첫글; }
     목록고름 = -1; 칸위치(); 그리기(); 칸.focus({ preventScroll:true });
     if(방식 === 'F2') 칸.setSelectionRange(칸.value.length, 칸.value.length);
-    목록그리기();
+    if(방식 === '친' || 열기) 목록그리기(); else 목록.style.display = 'none';   /* F2·두 번 누름 = 고치기만, 목록은 ▾·Alt+↓·글 치기 */
     return true;
   }
   function 끝내기(넣기, 값){
@@ -216,8 +231,16 @@
     }
     다시();
   }
-  목록.addEventListener('mousedown', e => e.preventDefault());
-  목록.addEventListener('click', e => { const d = e.target.closest('[data-i]'); if(!d || !편집) return; 끝내기(true, String(목록줄[+d.dataset.i].v)); 초점(); });
+  function 목록닫기(){ 목록.style.display = 'none'; 목록고름 = -1; }
+  function 목록열닫(){   /* ▾ · Alt+↓ */
+    if(!지금) return;
+    if(편집){ if(목록.style.display !== 'none') 목록닫기(); else { 편집.처음글 = true; 목록그리기(); } 칸.focus({ preventScroll:true }); return; }
+    고치기('F2', null, true);
+  }
+  let 누르는중 = false;   /* 목록·▾ 를 누르는 동안 입력 칸이 초점을 잃어도 고치기를 끝내지 않음(폰) */
+  [목록, 세모].forEach(el => { el.addEventListener('pointerdown', e => { 누르는중 = true; if(el === 세모) e.preventDefault(); }); el.addEventListener('mousedown', e => e.preventDefault()); });
+  세모.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); 누르는중 = false; if(Date.now() - 세모난때 < 400 && 톡뒤()) return; 목록열닫(); });
+  목록.addEventListener('click', e => { 누르는중 = false; const d = e.target.closest('[data-i]'); if(!d || !편집) return; 끝내기(true, String(목록줄[+d.dataset.i].v)); 초점(); });
 
   /* ── 글쇠 ── */
   칸.addEventListener('keydown', e => {
@@ -225,7 +248,8 @@
     const 명 = e.ctrlKey || e.metaKey;
     if(편집){
       const 목보임 = 목록.style.display !== 'none' && 목록줄.length;
-      if(e.key === 'Escape'){ e.preventDefault(); 끝내기(false); 초점(); return; }
+      if(e.key === 'Escape'){ e.preventDefault(); if(목록.style.display !== 'none'){ 목록닫기(); return; } 끝내기(false); 초점(); return; }
+      if(e.altKey && e.key === 'ArrowDown'){ e.preventDefault(); 목록열닫(); return; }
       if(e.key === 'Enter'){ e.preventDefault(); const 고른 = 목보임 && 목록고름 >= 0 ? String(목록줄[목록고름].v) : null; 끝내기(true, 고른); 옮김(e.shiftKey ? -1 : 1, 0); return; }
       if(e.key === 'Tab'){ e.preventDefault(); 끝내기(true); 옮김(0, e.shiftKey ? -1 : 1); return; }
       if((e.key === 'ArrowDown' || e.key === 'ArrowUp') && 목보임){ e.preventDefault(); 목록고름 = Math.max(0, Math.min(목록줄.length - 1, 목록고름 + (e.key === 'ArrowDown' ? 1 : -1))); 목록그리기(); const 고 = 목록.querySelector('.지금'); if(고) 고.scrollIntoView({ block:'nearest' }); return; }
@@ -235,10 +259,11 @@
     }
     /* 고름 상태 */
     const 화 = { ArrowUp:[-1,0], ArrowDown:[1,0], ArrowLeft:[0,-1], ArrowRight:[0,1] }[e.key];
-    if(화 && !명){ e.preventDefault(); 옮김(화[0], 화[1], e.shiftKey); return; }
+    if(화 && !명 && !e.altKey){ e.preventDefault(); 옮김(화[0], 화[1], e.shiftKey); return; }
     if(e.key === 'Enter'){ e.preventDefault(); 옮김(e.shiftKey ? -1 : 1, 0); return; }
     if(e.key === 'Tab'){ e.preventDefault(); 옮김(0, e.shiftKey ? -1 : 1); return; }
-    if(e.key === 'F2' || (e.altKey && e.key === 'ArrowDown')){ e.preventDefault(); 고치기('F2'); return; }
+    if(e.altKey && e.key === 'ArrowDown'){ e.preventDefault(); 목록열닫(); return; }
+    if(e.key === 'F2'){ e.preventDefault(); 고치기('F2'); return; }
     if(e.key === 'Escape'){ e.preventDefault(); 풀기(); return; }
     if(e.key === 'Delete' || e.key === 'Backspace'){ e.preventDefault(); 지우기(); return; }
     if(명 && (e.key === 'a' || e.key === 'A')){ e.preventDefault(); const 줄 = 줄들(지금.표); 지금.r0 = 0; 지금.r1 = 줄.length - 1; 그리기(); return; }
@@ -249,7 +274,7 @@
   });
   칸.addEventListener('compositionstart', () => { if(지금 && !편집) 고치기('친'); });
   칸.addEventListener('input', () => { if(편집) 목록그리기(); else if(지금 && 칸.value){ const v = 칸.value; if(!고치기('친', v)) 칸.value = ''; } });
-  칸.addEventListener('blur', () => { setTimeout(() => { if(편집 && document.activeElement !== 칸) 끝내기(true); }, 0); });
+  칸.addEventListener('blur', () => { setTimeout(() => { if(누르는중){ 누르는중 = false; return; } if(편집 && document.activeElement !== 칸) 끝내기(true); }, 0); });
 
   /* ── 복사·붙여넣기·지우기 ── */
   const 칸값 = td => String(지금.어.칸(td) ? 지금.어.읽기(td) : td.textContent.trim()).replace(/[\t\r\n]+/g, ' ');
@@ -282,11 +307,11 @@
   const 톡뒤 = () => Date.now() - 최근톡 < 1200;
   document.addEventListener('mousedown', e => {
     if(e.button !== 0 || 톡뒤()) return;
-    if(e.target === 칸 || 목록.contains(e.target) || e.target === 손) return;
+    if(e.target === 칸 || 목록.contains(e.target) || e.target === 손 || e.target === 세모) return;
     const td = 내표칸(e.target);
     if(!td || !쓸칸(td) || (e.target.closest('input[type=checkbox],button,a,.칸끈'))){
       if(편집) 끝내기(true);
-      if(!td && !e.target.closest('.터치띠,.터치손,.표입력목록')) 풀기();
+      if(!td && !e.target.closest('.터치띠,.터치손,.표입력목록,.표입력세모')) 풀기();
       return;
     }
     e.preventDefault(); e.stopPropagation();   /* 쪽의 옛 누름·끌기 고르기·네이티브 칸 초점을 막음 — 이 파일 하나가 맡음 */
@@ -299,7 +324,7 @@
     const r = 줄들(지금.표).indexOf(td.parentNode), c = td.cellIndex; if(r === 지금.r1 && c === 지금.c1) return;
     지금.r1 = r; 지금.c1 = c; 그리기();
   }, true);
-  addEventListener('mouseup', () => { 끌기 = null; });
+  addEventListener('mouseup', () => { if(끌기){ 끌기 = null; 다시(); } });
   document.addEventListener('dblclick', e => { if(톡뒤()) return; const td = 내표칸(e.target); if(!td || !쓸칸(td)) return; e.preventDefault(); e.stopPropagation(); 고르기(td); 고치기('F2'); }, true);
   document.addEventListener('click', e => { if(e.pointerType === 'touch' || 톡뒤()) return; const td = 내표칸(e.target); if(td && 쓸칸(td) && !e.target.closest('input[type=checkbox],button,a')){ e.stopPropagation(); } }, true);
 
@@ -307,6 +332,7 @@
   손.addEventListener('pointerdown', e => {
     if(!지금 || e.pointerType === 'touch') return;
     e.preventDefault(); e.stopPropagation(); try{ 손.setPointerCapture(e.pointerId); }catch(_){}
+    목록닫기(); 세모.style.display = 'none';
     채우기 = { id:e.pointerId, x:e.clientX, y:e.clientY, b:범위() }; 채우기.원 = 채우기.b.slice();
     채우기.틀 = requestAnimationFrame(채우며밀기);
   });
@@ -365,7 +391,7 @@
     앞톡 = td;
     if(같음 && 쓸칸(td)){ 앞톡 = null; 지금 = { 표:td.closest('table'), 어:어들.get(td.closest('table')), r0:0, c0:0, r1:0, c1:0 };
       const r = 줄들(지금.표).indexOf(td.parentNode); 지금.r0 = 지금.r1 = r; 지금.c0 = 지금.c1 = td.cellIndex;
-      if(window.터치범위) 터치범위.끝(); 그리기(); 고치기('F2'); }
+      if(window.터치범위) 터치범위.끝(); 그리기(); 고치기('F2'); }   /* 목록은 ▾·글 치기로 */
   }, true);
   document.addEventListener('click', e => { if(e.pointerType === 'touch' && 내표칸(e.target) && 쓸칸(내표칸(e.target))) { e.stopPropagation(); e.preventDefault(); } }, true);   /* 쪽 옛 폰 누름 동작 대신 */
 
