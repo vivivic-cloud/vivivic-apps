@@ -2,7 +2,8 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.34.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.36.0
+     v2.36.0(11-21): 사장님 「합판이나 엣지필름 고를때 드롭값옆에 해당 자재 구매처 또는 생산처 나타나게 해줘」 — 합판·필름 드롭 줄 끝 구매처(구매단가등록 erp_purprices → 없으면 매입 순위 자료실 거래처 · 여럿 = 「첫 곳 외 N」, 마우스 = 전체 · 모름 = 흐린 빈 칸). 자재차례 결과에 구처·구처전체.
      v2.34.0(11-21): 사장님 「모바일 환경에서는 복사드레그도 안되는듯합니다」 → 「추천방식을 적용해 주세요」 — 품목등록업로드 입력 칸 폰(터치) = 공용 터치범위.js(누름 고름 · 동그라미 손잡이 끌어 범위 · 복사·붙여넣기·채우기·지우기 띠). 쓰기 = PC 와 같은 바꿈(). 막음 칸은 그대로(알림). PC 그대로.
      v2.33.0(11-21): 사장님 「영림원 품목등록 표에서 셀의 가로 넓이 조정이 모바일환경에서 작동하지 않고 있습니다. 모든표 확인하여 이를 작동되게 해주세요」 — 이 쪽엔 칸 넓이 조정이 아예 없었음 →
        공용 칸넓이.js(재단 v1.4.0 과 같은 꼴: 머리 칸 오른쪽 끝 끌기 · 마우스·손가락 · 두 번 누름 = 원래대로 · 이 기기 기억)를 모든 표(시트 셋·계산 시트·추가할 제품·등록 방법)에 붙임.
@@ -142,7 +143,7 @@
        로그인·로그아웃·쓰기 안 함 · 로그인이 없거나 못 읽으면 공개 사본(발주역입력_영림원폼 결과 자재 완료). */
     try{
         const 폼앱 = initializeApp(설정, 'erp-input'), 폼auth = getAuth(폼앱), 폼db = getFirestore(폼앱);
-        let 끄기 = null, 끄기2 = null, 끄기3 = null;
+        let 끄기 = null, 끄기2 = null, 끄기3 = null, 끄기4 = null;
         onAuthStateChanged(폼auth, (u) => {
             if (끄기) { 끄기(); 끄기 = null; }
             if (끄기2) { 끄기2(); 끄기2 = null; }
@@ -152,11 +153,16 @@
             const 받음2 = (줄, 왜) => { window.폼거래처대기 = [줄, 왜]; if (window.폼거래처받음) window.폼거래처받음(줄, 왜); };
             /* v2.22.0 입력폼 공정흐름(erp_flows) status 완료 — 공정흐름 드롭 */
             const 받음3 = (줄, 왜) => { window.폼공정대기 = [줄, 왜]; if (window.폼공정받음) window.폼공정받음(줄, 왜); };
-            if (!u) { 받음(null, '입력폼 로그인 없음'); 받음2(null, '입력폼 로그인 없음'); 받음3(null, '입력폼 로그인 없음'); return; }
+            /* v2.36.0 입력폼 구매단가등록(erp_purprices) status 완료 — 합판·필름 드롭 구매처 */
+            const 받음4 = (줄, 왜) => { window.폼구매단가대기 = [줄, 왜]; if (window.폼구매단가받음) window.폼구매단가받음(줄, 왜); };
+            if (!u) { 받음(null, '입력폼 로그인 없음'); 받음2(null, '입력폼 로그인 없음'); 받음3(null, '입력폼 로그인 없음'); 받음4(null, '입력폼 로그인 없음'); return; }
             끄기 = onSnapshot(query(collection(폼db, 'erp_materials'), where('status', '==', '완료')),
                 s => 받음(s.docs.map(d => d.data()), ''), e => 받음(null, (e && (e.code || e.message)) || ''));
             끄기2 = onSnapshot(query(collection(폼db, 'erp_vendors'), where('status', '==', '완료')),
                 s => 받음2(s.docs.map(d => d.data()), ''), e => 받음2(null, (e && (e.code || e.message)) || ''));
+            if (끄기4) { 끄기4(); 끄기4 = null; }
+            끄기4 = onSnapshot(query(collection(폼db, 'erp_purprices'), where('status', '==', '완료')),
+                s => 받음4(s.docs.map(d => d.data()), ''), e => 받음4(null, (e && (e.code || e.message)) || ''));
             끄기3 = onSnapshot(query(collection(폼db, 'erp_flows'), where('status', '==', '완료')),
                 s => 받음3(s.docs.map(d => d.data()), ''), e => 받음3(null, (e && (e.code || e.message)) || ''));
         });
@@ -265,6 +271,8 @@ body:not(.펼침) .dpr-t .접힘{display:none}   /* v2.32.0 빈 열 접힘 — �
 .자재고름 div.맞음{border-left-color:#1565c0;background:#EEF4FC}   /* v2.27.0 두께 맞는 자재(위 묶음) */
 .자재고름 div:hover,.자재고름 div.지금{background:var(--vg-fill)}
 .자재고름 div span{color:var(--vg-muted);margin-left:8px}
+.자재고름 div span.구처{color:#2e5a1e;font-weight:600}   /* v2.36.0 구매처(생산처) */
+.자재고름 div span.구처.모름{display:inline-block;width:3em;height:.85em;vertical-align:middle;background:#EEEEEC;border-radius:2px}
 /* v2.25.0 「등록 방법」 — 단계마다 설명 + 예시 표(표는 .표통 안에서만 옆으로 민다) */
 .방법{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:28px}
 .방법 .머글{font-size:13px;line-height:1.6;color:var(--vg-body);padding-bottom:8px}
@@ -291,7 +299,7 @@ body:not(.펼침) .dpr-t .접힘{display:none}   /* v2.32.0 빈 열 접힘 — �
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.34.0</div>
+  <div class="badge">v2.36.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -832,11 +840,30 @@ function 매입순위표(목, t){
   const 순 = window.자재매입순위 ? window.자재매입순위.자재순위(목, { 해피코먼저: t==='필름' }) : new Map();
   return m => { const x = 순.get(m.code); return x ? x.순위 : Infinity; };
 }
+/* v2.36.0 구매처 — 사장님 11-21 「합판이나 엣지필름 고를때 드롭값옆에 해당 자재 구매처 또는 생산처 나타나게 해줘」
+   ① 입력폼 구매단가등록(erp_purprices 완료, ylwGone 뺌) 그 품번 구매거래처 ② 없으면 매입 누계 순위 자료실(자재매입순위.통계) 거래처.
+   여럿이면 자료실 거래처 차례(먼저 = 그 자재를 많이 산 쪽 아님 — 자료실은 금액을 안 담음, 명세 차례) → 이름순. 별명(유한가구 → 진아산업). 모름 = 빈 흐린 칸 */
+let 구매단가처 = new Map();
+window.폼구매단가받음 = (줄) => {
+  구매단가처 = new Map();
+  for(const r of (줄 || [])){ if(!r || r.ylwGone) continue; const c = String(r.code ?? '').trim().toLowerCase(), v = String(r.vendor ?? '').trim(); if(!c || !v) continue;
+    if(!구매단가처.has(c)) 구매단가처.set(c, []); if(!구매단가처.get(c).includes(v)) 구매단가처.get(c).push(v); }
+};
+if(window.폼구매단가대기) window.폼구매단가받음(...window.폼구매단가대기);
+function 구매처(m){
+  const 통 = window.자재매입순위 ? window.자재매입순위.통계({ code:m.code, name:m.name }) : null;
+  const 순 = 통 && 통.거래처 ? String(통.거래처).split('·').map(x => x.trim()).filter(Boolean) : [];
+  let 목 = 구매단가처.get(String(m.code||'').trim().toLowerCase()) || [];
+  if(!목.length) 목 = 순;
+  const 자리 = x => { const i = 순.indexOf(x); return i < 0 ? 1e9 : i; };
+  목 = [...new Set(목.map(별명))].sort((a,b) => 자리(a)-자리(b) || a.localeCompare(b));
+  return { 구처: 목.length ? 목[0] + (목.length > 1 ? ` 외 ${목.length-1}` : '') : '', 구처전체: 목.join(', ') };
+}
 function 자재차례(목, 두께, t){
   const 매입순위 = 매입순위표(목, t);
   const 셈 = m => [두께맞음(m, 두께, t) ? 0 : 1, 매입순위(m)];
   return 목.map(m => ({ m, k:셈(m) })).sort((a,b) => a.k[0]-b.k[0] || (a.k[1]===b.k[1] ? 0 : a.k[1] < b.k[1] ? -1 : 1) || (a.m.name||a.m.code).localeCompare(b.m.name||b.m.code) || a.m.code.localeCompare(b.m.code))
-    .map(x => Object.assign({}, x.m, { 맞음: x.k[0]===0 }));
+    .map(x => Object.assign({}, x.m, { 맞음: x.k[0]===0 }, 구매처(x.m)));   /* v2.36.0 구처·구처전체 */
 }
 function 자재정리(){
   const 목 = 폼자재 || 공개자재, 본 = new Set(); 자재목록 = { 합판:[], 필름:[] };
@@ -1294,7 +1321,7 @@ function 편집달기(통){
     let 원 = t==='공정' ? 공정목록.map(c => ({ code:c, name:'', spec:'' })) : t==='외주' ? 외주목록 : 자재차례(자재목록[t], 두, t);   /* v2.27.0 두께 맞는 자재 위 · 나머지 전부 아래 */
     const g = (거름||'').toLowerCase(), 목 = 원.filter(m => !g || (m.code + ' ' + m.name).toLowerCase().includes(g));
     if(!목.length){ 목록.hidden = true; return; }
-    목록.innerHTML = 목.map(m => `<div class="${m.code===inp.value.trim()?'지금':''}${m.맞음?' 맞음':''}" data-v="${글(m.code)}" title="${글((m.맞음 ? 두께짝[t] + ' ' + 두 + ' 맞음 · ' : '') + (m.sm ? '소분류 ' + m.sm + ' · ' : '') + (m.spec||''))}">${글(m.code)}<span>${글(m.name)}</span></div>`).join('');
+    목록.innerHTML = 목.map(m => `<div class="${m.code===inp.value.trim()?'지금':''}${m.맞음?' 맞음':''}" data-v="${글(m.code)}" title="${글((m.맞음 ? 두께짝[t] + ' ' + 두 + ' 맞음 · ' : '') + (m.sm ? '소분류 ' + m.sm + ' · ' : '') + (m.spec||''))}">${글(m.code)}<span>${글(m.name)}</span>${'구처' in m ? `<span class="구처${m.구처?'':' 모름'}"${m.구처전체?` title="${글(m.구처전체)}"`:''}>${글(m.구처)}</span>` : ''}</div>`).join('');
     /* v2.27.0 목록 = 칸 옆(오른쪽, 자리 없으면 왼쪽, 그것도 없으면 칸 아래 12px) — 칸 아래 끌기 자리를 안 가림 */
     const r = 편집.td.getBoundingClientRect(); 목록.hidden = false; const w = 목록.offsetWidth, hgt = 목록.offsetHeight;
     목록.style.bottom = '';
