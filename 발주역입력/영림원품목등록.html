@@ -2,7 +2,8 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.53.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.54.0
+     v2.54.0(11-23): 사장님 「자재등록 - 자재소분류는 재공품-재공품-재공품이지만, 이곳에도 대중소분류 각각 입력을 통해 영림원 등록완료 여부를 확인할 수 있는 칸이 필요합니다」 — 자재등록(재공품) 자재소분류 옆 대·중·소분류 입력 칸(기본 재공품·재공품·재공품, 표입력·드롭 = 입력폼 분류 완료) · 보드매입현황 분류 규칙 그대로(빨강 오류·노랑 신규) · 자재소분류·보내기 = 「대_중_소」.
      v2.53.0(11-23): 제품별공정별워크센터 → 입력폼으로 넘길 자료 = 공개 발주역입력_영림원폼/_워크센터_영림원품목등록.보내기(재공품 보내기와 같은 꼴, 쓰기지킴 거침) · 한 줄 = 품목+공정+워크센터+우선순위 · 칸 = 입력폼 v328 11 제품별공정별워크센터등록 칸 글자.
      v2.52.0(11-23): 사장님 「제품별공정별워크센터등록에 워크센터를 복수로 입력할 수 없고, 우선순위도 정할 수 없는데요?」 — 500865 탭 = 공정마다 워크센터 여러 줄(입력폼 워크센터 완료 드롭) + 우선순위(차례대로, 손으로 바꿈, 겹치면 빨강) · 맨 끝 빈 줄 = 더하기 · 지우면 빠짐 · 저장 _입력 wc@공정@n · 500299 공정 표 워크센터 = 우선순위 1 · 계산 탭 칸 고침은 표를 다시 안 만듦.
      v2.51.0(11-23): 사장님 「백판넬에는 백색코 재공품이 소요되는데요?」 — 공정 「재공품재단」 단계도 합판코드 칸 자재(구매+가공 재공품)를 하위로(재단률 규칙) · 재단/재공품재단 흐름 반제품의 빈 합판코드 = 빨강 · 로그인 없을 때 합판·필름 드롭에 입력폼 완료 사본 _자재 도.
@@ -183,8 +184,11 @@
             const 받음4 = (줄, 왜) => { window.폼구매단가대기 = [줄, 왜]; if (window.폼구매단가받음) window.폼구매단가받음(줄, 왜); };
             /* v2.52.0 입력폼 워크센터등록(erp_workcenters) status 완료 — 제품별공정별워크센터등록 워크센터 드롭 */
             const 받음5 = (줄, 왜) => { window.폼워크센터대기 = [줄, 왜]; if (window.폼워크센터받음) window.폼워크센터받음(줄, 왜); };
+            /* v2.54.0 입력폼 품목대중소분류정의(erp_classes) status 완료 — 자재등록(재공품) 대·중·소 대조 */
+            const 받음6 = (줄, 왜) => { window.폼분류대기 = [줄, 왜]; if (window.폼분류받음) window.폼분류받음(줄, 왜); };
+            if (window.__끄기6) { window.__끄기6(); window.__끄기6 = null; }
             if (window.__끄기5) { window.__끄기5(); window.__끄기5 = null; }
-            if (!u) { 받음(null, '입력폼 로그인 없음'); 받음2(null, '입력폼 로그인 없음'); 받음3(null, '입력폼 로그인 없음'); 받음4(null, '입력폼 로그인 없음'); 받음5(null, '입력폼 로그인 없음'); return; }
+            if (!u) { 받음(null, '입력폼 로그인 없음'); 받음2(null, '입력폼 로그인 없음'); 받음3(null, '입력폼 로그인 없음'); 받음4(null, '입력폼 로그인 없음'); 받음5(null, '입력폼 로그인 없음'); 받음6(null, '입력폼 로그인 없음'); return; }
             끄기 = onSnapshot(query(collection(폼db, 'erp_materials'), where('status', '==', '완료')),
                 s => 받음(s.docs.map(d => d.data()), ''), e => 받음(null, (e && (e.code || e.message)) || ''));
             끄기2 = onSnapshot(query(collection(폼db, 'erp_vendors'), where('status', '==', '완료')),
@@ -192,6 +196,8 @@
             if (끄기4) { 끄기4(); 끄기4 = null; }
             끄기4 = onSnapshot(query(collection(폼db, 'erp_purprices'), where('status', '==', '완료')),
                 s => 받음4(s.docs.map(d => d.data()), ''), e => 받음4(null, (e && (e.code || e.message)) || ''));
+            window.__끄기6 = onSnapshot(query(collection(폼db, 'erp_classes'), where('status', '==', '완료')),
+                s => 받음6(s.docs.map(d => d.data()), ''), e => 받음6(null, (e && (e.code || e.message)) || ''));
             window.__끄기5 = onSnapshot(query(collection(폼db, 'erp_workcenters'), where('status', '==', '완료')),
                 s => 받음5(s.docs.map(d => d.data()), ''), e => 받음5(null, (e && (e.code || e.message)) || ''));
             끄기3 = onSnapshot(query(collection(폼db, 'erp_flows'), where('status', '==', '완료')),
@@ -266,6 +272,7 @@ html,body{height:100%;overflow:hidden}
 .dpr-t td.꼭{background:#FFCDD2;box-shadow:inset 0 0 0 1px #e53935}   /* v2.45.0 꼭 채울 빈칸 = 빨강(T 시험에서 비면 저장·출고가 막힌 칸) — 마우스 = 까닭 */
 body:not(.펼침) .dpr-t .접힘{display:none}   /* v2.32.0 빈 열 접힘 — 펼쳐보기면 보임 */
 .dpr-t td.영채움{background:#E9EEF5}
+.dpr-t td.신규{background:#FFF59D}   /* v2.54.0 분류 신규(입력폼 완료에 없음, 규칙 통과) = 노랑 */
 .dpr-t td.등완{color:#2e7d32;font-weight:700}   /* v2.43.0 입력폼 자재등록 완료(자재번호 같음) */   /* v2.26.0 영림원이 기본값·단추로 채움 — 마우스 = 어떻게 */
 @media (max-width:600px),(max-height:600px){#속>.표통{max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px)}}
 @media (max-width:600px){.dpr-t .dpr-k{max-width:42vw;overflow:hidden;text-overflow:ellipsis}}   /* v2.2.0 폰 — 붙박이 품명 칸이 화면을 다 덮어 옆 칸을 못 누름 */
@@ -335,7 +342,7 @@ body:not(.펼침) .dpr-t .접힘{display:none}   /* v2.32.0 빈 열 접힘 — �
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.53.0</div>
+  <div class="badge">v2.54.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -719,6 +726,35 @@ const 접미열쇠 = 공 => String(공||'').replace(/\s+/g,'').toLowerCase();
 const 재공번 = (p, 공) => { const x = 공정접미[접미열쇠(공)]; return x ? p + x : ''; };
 const 재공번없말 = 공 => `공정 「${공}」 은 재공품 품번 접미사 표에 없음(재단 _c · 엣지 _ed · 보링 _br · 곡면엣지 _re · nc _nc · nc멤브레인 _nm · 도어보링 _dr) — 사장님이 정하면 채워짐`;
 const 재공번칸 = (p, 공, 완) => { const v = 재공번(p, 공); return v ? (완 ? 완(v) : 설(v, '사장님 규칙 — 반제품 품번 + 공정 접미사')) : 꼭('', 재공번없말(공)); };
+/* v2.54.0 재공품 대·중·소분류 — 보드매입현황 v1.29~v1.31 분류 규칙(전달 글 8절) 그대로: 보이는 이름 = 중 「대_중」 · 소 「대_중_소」(이미 붙었거나 완료 분류에 그 경로 그대로면 그대로)
+   빨강(td.꼭) = 빈칸·앞뒤 빈칸·숫자 사이 쉼표 · 같은 소분류 이름이 다른 대>중(이 탭 안) · 완료 분류에 같은 소분류 이름·다른 대>중 / 노랑(td.신규) = 완료 분류에 없음(규칙 통과) / 표시 없음 = 등록됨.
+   완료 분류 = 입력폼 erp_classes 완료(품목구분 자재, 로그인) · 없으면 공개 _분류.영림원(입력폼 bdClsPub). 기본값 재공품·재공품·재공품(저장 안 함 — 고치면 _입력 분류대·분류중·분류소). */
+let 폼분류 = null, 공개분류 = null;
+const 분류완료 = () => 폼분류 || 공개분류 || [];
+window.폼분류받음 = 줄 => { const 트 = v => String(v ?? '').trim();
+  폼분류 = 줄 ? 줄.filter(r => r.kind==='자재' && !r.ylwGone).map(r => [트(r.big), 트(r.mid), 트(r.name)]) : null; try{ 연동칠(); }catch(e){} };
+function 분류표기(v){   /* 보드매입현황 분류표기 그대로 */
+  const [b, m, x] = v.map(t => String(t ?? '').trim()), 완 = 분류완료();
+  if(!b || !m) return [b, m, x];
+  const 중있음 = 완.some(r => r[0]===b && r[1]===m), jm = 중있음 || m.startsWith(b + '_') ? m : b + '_' + m;
+  if(!x || 완.some(r => r[0]===b && r[1]===m && r[2]===x)) return [b, 중있음 ? m : jm, x];
+  return [b, jm, x.startsWith(m + '_') ? jm + x.slice(m.length) : x.startsWith(jm + '_') ? x : jm + '_' + x];
+}
+const 분류키 = ['분류대','분류중','분류소'];
+function 분류값(p, k){ const x = p + '\t' + k; if(더럽.has(x)) return 더럽.get(x); const 입 = 입력[p]; return 입 && k in 입 ? String(입[k] ?? '') : '재공품'; }
+function 분류판정(목){   /* 목 = [{q, 원:[대,중,소]}] → Map q → {표, 틀:[이유×3], 새:[bool×3]} */
+  const 완 = 분류완료(), 소경로 = new Map(), 결 = new Map(), 맞음 = (v, i) => 완.some(x => v.slice(0, i + 1).every((y, j) => x[j]===y));
+  for(const z of 목){ z.표 = 분류표기(z.원); const n = z.표[2]; if(n){ if(!소경로.has(n)) 소경로.set(n, new Set()); 소경로.get(n).add(z.표[0] + ' > ' + z.표[1]); } }
+  for(const z of 목){ const 틀 = ['','',''], 새 = [false,false,false];
+    z.원.forEach((x, i) => { if(!x.trim()) 틀[i] = '빈칸'; else if(x !== x.trim()) 틀[i] = '앞뒤 빈칸'; else if(/\d,\d/.test(x)) 틀[i] = '숫자 사이 쉼표 — 점(.)으로'; });
+    const n = z.표[2], 경 = z.표[0] + ' > ' + z.표[1];
+    if(n && !틀[2]){ const 다른 = [...(소경로.get(n) || [])].filter(p => p !== 경), 영 = 완.filter(x => x[2]===n);
+      if(!영.length && 다른.length) 틀[2] = `이름을 바꾸십시오(이 탭에 ${다른.map(p => p + ' > ' + n).join(' / ')} 있음 — 영림원은 소분류 이름 하나뿐)`;
+      else if(영.length && !영.some(x => x[0] + ' > ' + x[1]===경)) 틀[2] = `이름을 바꾸십시오(영림원에 ${영.map(x => x[0] + ' > ' + x[1] + ' > ' + n).join(' / ')} 있음)`; }
+    z.표.forEach((v, i) => { 새[i] = !틀[i] && 완.length > 0 && !!v && !맞음(z.표, i); });
+    결.set(z.q, { 표:z.표, 틀, 새 }); }
+  return 결;
+}
 const 재공칸 = ['자재명','자재번호','규격','영문명','품목자산분류','자재상태','내외자구분','중요도','기준단위','자재소분류'];
 function 재공품들(){
   const 품 = 보일품목(); if(!품) return null; const 줄 = [];
@@ -797,15 +833,19 @@ const 계산시트 = {
       }
       return { 공정, 소요자재 }; } },
   /* 10단계 ① */
-  '자재등록(재공품)': { 화:'500251', 영:true,   /* v2.43.0 칸 = 영림원 자재등록 500251 칸 이름·차례(입력폼 자재등록 칸 = 11-03 화면) — 머리 덧칸(부속품번·공정순서·공정) 뺌 */
-    탭:{ '':{ 칸:재공칸, 필:['자재명','자재번호','품목자산분류','자재상태','기준단위','자재소분류'] } },
+  '자재등록(재공품)': { 화:'500251', 영칸:new Set(재공칸),   /* v2.43.0 칸 = 영림원 자재등록 500251 칸 이름·차례(입력폼 자재등록 칸 = 11-03 화면) — 머리 덧칸(부속품번·공정순서·공정) 뺌 */
+    탭:{ '':{ 칸:재공칸.concat(분류키.map(k => k.replace('분류','') + '분류')), 필:['자재명','자재번호','품목자산분류','자재상태','기준단위','자재소분류'] } },
     짜(){ const 줄 = 재공품들(); if(!줄) return null;
-      return { '': 줄.map(z => { const 완 = 완료자재(z.번);
+      const 판 = 분류판정(줄.map(z => ({ q:z.번 || '#' + z.명, 원:분류키.map(k => 분류값(z.번 || '#' + z.명, k)) })));
+      return { '': 줄.map(z => { const 완 = 완료자재(z.번), q = z.번 || '#' + z.명, 분 = 판.get(q), 다 = 분.표.every(Boolean);
         const 표 = (v, 왜) => 완 ? { v, 완:'입력폼 자재등록 완료' + (완===true ? '' : ' — ' + 완) } : 설(v, 왜);
         return [표(z.명, `사장님 규칙 — 반제품 품명 + _가공명(공정흐름 ${z.흐름}의 ${z.순}번째 공정 「${z.공}」, 마지막 공정 앞까지)`),
           z.번 ? 표(z.번, '사장님 규칙 — 반제품 품번 + 공정 접미사') : 꼭('', 재공번없말(z.공)),   /* v2.46.0 */ 설('', '임시 — 기록에 재공품 규격 없음'), '', '재공품',
           영('사용', '영림원 화면 기본값 · 10단계 기록 사용'), 영('내자', '영림원 화면 기본값'), 영('A등급', '영림원 화면 기본값(저장 때 A등급)'), 설('EA', '기록 — 10단계 재공품 단위 EA(11-21 「백판넬 1개 몫」)'),
-          꼭('', '영림원 500251 필수 — 비면 저장 안 됨. 임시 — 재공품 분류 정하지 않음. 기록: T 시험 T재공품 > T재공품 > T재공품 · 11-21 현진 md > md_27 > md_27_wtc')]; }) }; } },
+          다 ? 설(분.표[2], '대_중_소 — 영림원으로 보내는 자재소분류') : 꼭('', '영림원 500251 필수 — 대·중·소분류를 넣으면 「대_중_소」'),
+          ...분류키.map((k, i) => { const c = { v:분류값(q, k), 편:{ p:q, k }, 드롭:1 };
+            if(분.틀[i]) Object.assign(c, { 꼭:1, 모:'오류 — ' + 분.틀[i] }); else if(분.새[i]) c.신 = '신규 — 입력폼 완료 분류에 없음 · 분류 규칙(8절) 통과';
+            return c; })]; }) }; } },
   /* 11단계 */
   '제품별공정별워크센터등록': { 화:'500865', 영:'탭', 머리:['제품명','제품번호','사업단위','규격','공정차수'], 머리필:['사업단위','제품명','공정차수'],   /* v2.52.0 칸 = 500865 위 표 + 가운데 표(11-04 화면) */
     탭:{ '':{ 칸:['공정순서','공정','후속공정순서','공정검사여부','최종공정여부','워크센터','워크센터구분','외주거래처','시간단위','표준 작업시간','우선순위'], 필:['워크센터','시간단위','표준 작업시간'] } },
@@ -880,8 +920,8 @@ function 계산그리기(u){
     return `<th class="${(i===0?'dpr-k':'') + (p?' 필수':'') + (연?' 영열':'')}"${t2?` title="${t2}"`:''}>${글(k)}</th>`; }).join('') + '</tr></thead><tbody>';
   /* v2.52.0 칸 = {v, 편:{p,k}(입력 칸 — 표입력), 드롭, 모, 꼭, 영, 완, t} · 같은 탭·같은 꼴이면 표를 다시 만들지 않고 칸만 고침(고른 칸·민 자리 그대로) */
   const 칸들 = 줄.map(r => r.map((c, i) => { const v = 칸값(c), o = c && typeof c==='object' ? c : {};
-    const cls = ((i===0?'dpr-k':'') + (typeof v==='number'?' num':'') + (o.편?' 편':'') + (o.드롭?' 드롭칸':'') + (o.편 && o.편.p && 파랑(o.편.p, o.편.k)?' 저장값':'') + (o.모?' 모자람':'') + (o.꼭?' 꼭':'') + (o.영?' 영채움':'') + (o.완?' 등완':'')).trim();
-    return { v, cls, 말:o.모 || o.영 || o.완 || o.t || '', p:o.편 ? o.편.p : '', k:o.편 ? o.편.k : '' }; }));
+    const cls = ((i===0?'dpr-k':'') + (typeof v==='number'?' num':'') + (o.편?' 편':'') + (o.드롭?' 드롭칸':'') + (o.편 && o.편.p && 파랑(o.편.p, o.편.k)?' 저장값':'') + (o.모?' 모자람':'') + (o.꼭?' 꼭':'') + (o.영?' 영채움':'') + (o.완?' 등완':'') + (o.신?' 신규':'')).trim();
+    return { v, cls, 말:o.모 || o.영 || o.완 || o.신 || o.t || '', p:o.편 ? o.편.p : '', k:o.편 ? o.편.k : '' }; }));
   const 옛표 = 옛통 && 계산자리===자 && 옛통.querySelector('table');
   if(옛표 && 옛표.tHead.rows[0].cells.length===칸.length && 옛표.tBodies[0].rows.length===칸들.length){
     칸들.forEach((r, n) => r.forEach((d, i) => { const td = 옛표.tBodies[0].rows[n].cells[i]; if(!td) return;
@@ -901,7 +941,11 @@ function 계산그리기(u){
   if(새표 && window.표입력 && 새표.querySelector('td.편')){ 통.tabIndex = 0;   /* v2.52.0 입력 칸 = 다른 입력 칸과 같은 공용 표입력.js */
     표입력.표(새표, { 이름:u, 열: td => String(td.dataset.k || '').split('@')[0], 칸: td => td.classList.contains('편'), 막음: () => false, 알림: (td, 글자) => 막음알림(td, 글자),
       읽기: td => td.textContent.trim(), 쓰기: 목 => 바꿈(목.map(([td, v]) => ({ p:td.dataset.p, k:td.dataset.k, v }))),
-      목록: td => String(td.dataset.k||'').startsWith('wc@') ? 워크센터목록.map(w => ({ v:w.이름, 글:w.구분, 덧:w.거래처 })) : [],
+      목록: td => { const k = String(td.dataset.k||''), p = td.dataset.p;
+        if(k.startsWith('wc@')) return 워크센터목록.map(w => ({ v:w.이름, 글:w.구분, 덧:w.거래처 }));
+        if(분류키.includes(k)){ const 완 = 분류완료(), 대 = 분류값(p,'분류대').trim(), 중 = 분류표기([대, 분류값(p,'분류중'), ''])[1], 유 = a => [...new Set(a.filter(Boolean))].map(v => ({ v }));   /* v2.54.0 */
+          return k==='분류대' ? 유(완.map(x => x[0])) : k==='분류중' ? 유(완.filter(x => x[0]===대).map(x => x[1])) : 유(완.filter(x => x[0]===대 && x[1]===중).map(x => x[2])); }
+        return []; },
       목록만: td => String(td.dataset.k||'').startsWith('wc@') }); }
   속.querySelectorAll('.months .chip').forEach(b => b.onclick = () => { 계산탭[u] = b.dataset.t; 계산그리기(u); });
 }
@@ -1074,6 +1118,8 @@ let 재공품창고 = undefined, 재공품쓰는중 = false, 재공품쓴 = ''; 
 function 재공품구독(){
   const { doc, onSnapshot } = window.fbRead;
   onSnapshot(doc(window.db, ...재공품문서), d => { 재공품창고 = d.exists() ? d.data() : null; 재공품보내기(); }, () => {});
+  onSnapshot(doc(window.db, 'artifacts','vivivic-4b7ef','public','data','발주역입력_영림원폼','_분류'), d => { const 트 = v => String(v ?? '').trim();   /* v2.54.0 로그인 없을 때 분류 완료 사본 */
+    공개분류 = d.exists() ? (((d.data().영림원)||{}).줄 || []).map(x => [트(x.대분류), 트(x.중분류), 트(x.소분류)]) : []; if(!폼분류) 연동칠(); }, () => {});
   onSnapshot(doc(window.db, 'artifacts','vivivic-4b7ef','public','data','발주역입력_영림원폼','_자재'), d => {
     const 트 = v => String(v ?? '').trim();
     공개완료원 = d.exists() ? ((d.data().줄)||[]) : [];
@@ -1082,11 +1128,13 @@ function 재공품구독(){
 }
 function 재공품줄들(){
   const 목 = 재공품들(); if(!목 || !공정읽음 || 목.some(z => !z.확)) return null;
+  const 판 = 분류판정(목.map(z => ({ q:z.번 || '#' + z.명, 원:분류키.map(k => 분류값(z.번 || '#' + z.명, k)) })));   /* v2.54.0 */
+  목.forEach(z => { z.분 = 판.get(z.번 || '#' + z.명).표; });
   return 목.filter(z => z.번).map(   /* v2.46.0 품번 없는 줄(접미사 표 밖 공정) = 안 보냄 */z => { const 줄 = { 열쇠:z.번, 상태:'보냄', 반제품:{ 품번:z.p, 공정흐름:z.흐름, 공정순서:z.순, 공정:z.공 },
       원장:null, 공정:{}, 공정흐름:{},
-      분류:{ 품목구분:'자재', 대분류:'', 중분류:'', 소분류:'' },
-      자재등록:{ 자재명:z.명, 자재번호:z.번, 규격:'', 품목자산분류:'재공품', 자재상태:'사용', 기준단위:'EA', 자재소분류:'' },
-      임시:['대분류','중분류','소분류'] };
+      분류:{ 품목구분:'자재', 대분류:z.분[0], 중분류:z.분[1], 소분류:z.분[2] },   /* v2.54.0 보이는 이름(대_중_소) */
+      자재등록:{ 자재명:z.명, 자재번호:z.번, 규격:'', 품목자산분류:'재공품', 자재상태:'사용', 기준단위:'EA', 자재소분류:z.분[2] },
+      임시:['대분류','중분류','소분류'].filter((x, i) => !z.분[i]) };
     줄.지문 = JSON.stringify(줄); return 줄; });
 }
 function 재공품보내기(){
