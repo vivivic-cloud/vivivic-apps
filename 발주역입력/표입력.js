@@ -200,11 +200,13 @@
   }
   const 글 = v => String(v ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
   function 목록자리(){   /* 다른 드롭과 같게: 칸 옆 10px(오른쪽, 자리 없으면 왼쪽, 그것도 없으면 아래·위 10px) */
-    const q = 칸.getBoundingClientRect(), w = 목록.offsetWidth, h = 목록.offsetHeight, 끝 = window.visualViewport ? visualViewport.offsetTop + visualViewport.height : innerHeight;
+    const 끝 = window.visualViewport ? visualViewport.offsetTop + visualViewport.height : innerHeight;
+    목록.style.maxHeight = Math.max(80, Math.min(260, 끝 - 8)) + 'px';   /* 11-23 화면보다 길면 잘렸음 — 보이는 높이 안으로 */
+    const q = 칸.getBoundingClientRect(), w = 목록.offsetWidth, h = 목록.offsetHeight;
     let x, y = Math.max(4, Math.min(q.top, 끝 - h - 4));
     if(q.right + 10 + w <= innerWidth) x = q.right + 10;
     else if(q.left - 10 - w >= 0) x = q.left - 10 - w;
-    else { x = Math.max(4, Math.min(q.left, innerWidth - w - 4)); y = q.bottom + 10 + h <= 끝 ? q.bottom + 10 : Math.max(4, q.top - 10 - h); }
+    else { x = Math.max(4, Math.min(q.left, innerWidth - w - 4)); y = q.bottom + 10 + h <= 끝 ? q.bottom + 10 : q.top - 10 - h >= 4 ? q.top - 10 - h : Math.max(4, 끝 - h - 4); }   /* 아래 자리 없으면 위 · 위도 없으면 화면 안 끝에 붙임 */
     목록.style.left = x + 'px'; 목록.style.top = y + 'px';
   }
   function 고치기(방식, 첫글, 열기){   /* 방식 'F2' = 지금 값(←→ 글자 사이) · '친' = 친 글로 바꿈(←→ = 넣고 옮김) */
