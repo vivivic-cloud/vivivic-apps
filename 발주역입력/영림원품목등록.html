@@ -2,7 +2,8 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.51.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.52.0
+     v2.52.0(11-23): 사장님 「제품별공정별워크센터등록에 워크센터를 복수로 입력할 수 없고, 우선순위도 정할 수 없는데요?」 — 500865 탭 = 공정마다 워크센터 여러 줄(입력폼 워크센터 완료 드롭) + 우선순위(차례대로, 손으로 바꿈, 겹치면 빨강) · 맨 끝 빈 줄 = 더하기 · 지우면 빠짐 · 저장 _입력 wc@공정@n · 500299 공정 표 워크센터 = 우선순위 1 · 계산 탭 칸 고침은 표를 다시 안 만듦.
      v2.51.0(11-23): 사장님 「백판넬에는 백색코 재공품이 소요되는데요?」 — 공정 「재공품재단」 단계도 합판코드 칸 자재(구매+가공 재공품)를 하위로(재단률 규칙) · 재단/재공품재단 흐름 반제품의 빈 합판코드 = 빨강 · 로그인 없을 때 합판·필름 드롭에 입력폼 완료 사본 _자재 도.
      v2.50.0(11-23): 사장님 「BOM등록업로드에서 공정이 재단인 품목들의 하위품명이 맞지 않아요」 — BOM 가공 줄 = 공정 단계별: 모품목 = 그 공정에서 나오는 물건(재공품 품명_가공명·접미사 품번 / 마지막 = 반제품) · 하위 = 앞 재공품(1/1 임시) + 재단 원장 · 엣지 필름. 품번 빈 재공품 빨강. 500299 시트 출력은 그대로.
      v2.49.0(11-23): 사장님 탭 차례 = 앞 단계 등록이 끝나야 다음 단계 — 품목등록업로드 → 자재등록(재공품) → BOM등록업로드 → 품목별공정흐름유형등록 → 제품별공정별소요자재등록 → 제품별공정별워크센터등록 → 외주계약등록 → 원부자재(참고) · 추가할 제품 · 등록 방법.
@@ -179,7 +180,10 @@
             const 받음3 = (줄, 왜) => { window.폼공정대기 = [줄, 왜]; if (window.폼공정받음) window.폼공정받음(줄, 왜); };
             /* v2.36.0 입력폼 구매단가등록(erp_purprices) status 완료 — 합판·필름 드롭 구매처 */
             const 받음4 = (줄, 왜) => { window.폼구매단가대기 = [줄, 왜]; if (window.폼구매단가받음) window.폼구매단가받음(줄, 왜); };
-            if (!u) { 받음(null, '입력폼 로그인 없음'); 받음2(null, '입력폼 로그인 없음'); 받음3(null, '입력폼 로그인 없음'); 받음4(null, '입력폼 로그인 없음'); return; }
+            /* v2.52.0 입력폼 워크센터등록(erp_workcenters) status 완료 — 제품별공정별워크센터등록 워크센터 드롭 */
+            const 받음5 = (줄, 왜) => { window.폼워크센터대기 = [줄, 왜]; if (window.폼워크센터받음) window.폼워크센터받음(줄, 왜); };
+            if (window.__끄기5) { window.__끄기5(); window.__끄기5 = null; }
+            if (!u) { 받음(null, '입력폼 로그인 없음'); 받음2(null, '입력폼 로그인 없음'); 받음3(null, '입력폼 로그인 없음'); 받음4(null, '입력폼 로그인 없음'); 받음5(null, '입력폼 로그인 없음'); return; }
             끄기 = onSnapshot(query(collection(폼db, 'erp_materials'), where('status', '==', '완료')),
                 s => 받음(s.docs.map(d => d.data()), ''), e => 받음(null, (e && (e.code || e.message)) || ''));
             끄기2 = onSnapshot(query(collection(폼db, 'erp_vendors'), where('status', '==', '완료')),
@@ -187,6 +191,8 @@
             if (끄기4) { 끄기4(); 끄기4 = null; }
             끄기4 = onSnapshot(query(collection(폼db, 'erp_purprices'), where('status', '==', '완료')),
                 s => 받음4(s.docs.map(d => d.data()), ''), e => 받음4(null, (e && (e.code || e.message)) || ''));
+            window.__끄기5 = onSnapshot(query(collection(폼db, 'erp_workcenters'), where('status', '==', '완료')),
+                s => 받음5(s.docs.map(d => d.data()), ''), e => 받음5(null, (e && (e.code || e.message)) || ''));
             끄기3 = onSnapshot(query(collection(폼db, 'erp_flows'), where('status', '==', '완료')),
                 s => 받음3(s.docs.map(d => d.data()), ''), e => 받음3(null, (e && (e.code || e.message)) || ''));
         });
@@ -328,7 +334,7 @@ body:not(.펼침) .dpr-t .접힘{display:none}   /* v2.32.0 빈 열 접힘 — �
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.51.0</div>
+  <div class="badge">v2.52.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -724,6 +730,22 @@ function 완료자재(번){   /* → true | 글(자재명이 다름) | false */
   const 목 = 폼자재 || 공개완료자재 || []; const m = 목.find(x => x.code===번); if(!m) return false;
   return true;
 }
+/* ── v2.52.0 제품별공정별워크센터(500865) — 공정 하나에 워크센터 여러 줄 + 우선순위(영림원 가운데 표, 11-04 저장 시험: 한 공정 3줄·우선순위 1·2·3 저장됨)
+   저장 = _입력.값[품번]['wc@공정@n'] = 워크센터 이름 · ['wcr@공정@n'] = 우선순위(손으로 바꾼 것만). n = 줄 자리(1부터). 빈 워크센터 줄은 안 보임(맨 끝 빈 줄 하나 = 더하기).
+   우선순위 = 손 값 없으면 채운 차례(1·2·3…) · 같은 공정에 같은 우선순위 = 빨강. 목록 = 입력폼 워크센터 완료(erp_workcenters — 로그인 기기만). */
+let 워크센터목록 = [], 워크센터읽음 = false;
+window.폼워크센터받음 = 줄 => { 워크센터읽음 = !!줄; 워크센터목록 = (줄 || []).filter(r => !r.ylwGone && String(r.name||'').trim()).map(r => ({ 이름:String(r.name).trim(), 구분:String(r.kind||'').trim(), 거래처:String(r.vendor||'').trim() }));
+  워크센터목록.sort((a,b) => a.이름.localeCompare(b.이름)); try{ if(계산시트[고른]) 계산그리기(고른); }catch(e){} };
+function 워크센터들(p, 공){   /* → [{n, wc, r(우선순위 — 손 값 또는 차례), 손}] (n 차례) */
+  const 다 = Object.assign({}, 입력[p] || {}), 목 = [];
+  for(const [x, v] of 더럽){ const [pp, k] = x.split('\t'); if(pp===p) 다[k] = v; }
+  const 앞 = 'wc@' + 공 + '@';
+  for(const k of Object.keys(다)) if(k.startsWith(앞)){ const n = +k.slice(앞.length), wc = String(다[k]||'').trim(); if(n && wc) 목.push({ n, wc }); }
+  목.sort((a,b) => a.n - b.n);
+  목.forEach((z, i) => { const 손 = String(다['wcr@' + 공 + '@' + z.n] || '').trim(); z.손 = !!손; z.r = 손 ? +손 : i + 1; });
+  return 목;
+}
+const 일순위 = (p, 공) => { const 목 = 워크센터들(p, 공); return 목.length ? 목.slice().sort((a,b) => a.r - b.r || a.n - b.n)[0] : null; };
 const 계산시트 = {
   /* v2.48.0 원부자재 = 영림원에 등록된 자재 참고 목록 — 입력폼 자재등록(erp_materials) status 완료(영림원과 1:1, ylwGone 뺌)만.
      로그인 없으면 공개 사본 발주역입력_영림원폼/_자재(입력폼 bdCopyPub 이 씀). 창고 원부자재 시트(옛 엑셀)는 안 읽음 · 등록 기능 없음(보기만). */
@@ -751,7 +773,8 @@ const 계산시트 = {
         const 머리 = [o.명, o.p, 모('', 화면없말('사업단위')), o.규, o.단, 모('', 화면없말('공정차수')), 설('00', 'BOM등록업로드 탭 BOM차수'), o.f.v || 모('', 흐름없말(o))];   /* v2.44.0 화면 자료만 — 사업단위·공정차수 = 화면에 없음 */
         if(!o.공들.length) 공정.push(머리.concat([모('', 흐름없말(o)), 모('', 흐름없말(o)), 모('', 흐름없말(o)), '', '', '', '', '', '', '', '', '', '']));
         o.공들.forEach((공, i) => { const 끝 = i===o.공들.length-1, 중간 = !끝;
-          공정.push(머리.concat([i+1, 공정글(o, 공), 끝 ? i+1 : i+2, 꼭('', 워크말(o, 공, 중간) + ' · T 시험: 비면 「[ 워크센터 ] 필수항목이 누락되었습니다.」로 저장 막힘(11-05 · 11-22)'), 모('', 시간말), 모('', 표준말),
+          const 일 = 일순위(o.p, 공);   /* v2.52.0 워크센터 = 제품별공정별워크센터등록 우선순위 1 */
+          공정.push(머리.concat([i+1, 공정글(o, 공), 끝 ? i+1 : i+2, 일 ? 설(일.wc, '제품별공정별워크센터등록 우선순위 ' + 일.r) : 꼭('', 워크말(o, 공, 중간) + ' · T 시험: 비면 「[ 워크센터 ] 필수항목이 누락되었습니다.」로 저장 막힘(11-05 · 11-22)'), 모('', 시간말), 모('', 표준말),
             중간 ? 설(`${o.명}_${공}`, '자재등록(재공품) 탭 자재명') : 설(o.명, '마지막 공정 공정품 = 이 품목(품목등록업로드 품명)'),
             중간 ? 재공번칸(o.p, 공) : 설(o.p, '마지막 공정 공정품 = 이 품목(품목등록업로드 품번)'),
             중간 ? 모('', '재공품 규격 — 화면에 없음(자재등록(재공품) 탭 규격 빈칸)') : o.규, 중간 ? 설('EA', '자재등록(재공품) 탭 기준단위') : o.단, '', 끝 ? '✓' : '', ''])); });
@@ -783,14 +806,24 @@ const 계산시트 = {
           영('사용', '영림원 화면 기본값 · 10단계 기록 사용'), 영('내자', '영림원 화면 기본값'), 영('A등급', '영림원 화면 기본값(저장 때 A등급)'), 설('EA', '기록 — 10단계 재공품 단위 EA(11-21 「백판넬 1개 몫」)'),
           꼭('', '영림원 500251 필수 — 비면 저장 안 됨. 임시 — 재공품 분류 정하지 않음. 기록: T 시험 T재공품 > T재공품 > T재공품 · 11-21 현진 md > md_27 > md_27_wtc')]; }) }; } },
   /* 11단계 */
-  '제품별공정별워크센터등록': { 화:'500865', 머리:['제품명','제품번호','사업단위','규격','공정차수'], 머리필:['사업단위','제품명','공정차수'],
-    탭:{ '':{ 칸:['공정순서','공정','후속공정순서','최종공정여부','워크센터','시간단위','표준 작업시간','우선순위'], 필:['워크센터','시간단위','표준 작업시간'] } },
+  '제품별공정별워크센터등록': { 화:'500865', 영:'탭', 머리:['제품명','제품번호','사업단위','규격','공정차수'], 머리필:['사업단위','제품명','공정차수'],   /* v2.52.0 칸 = 500865 위 표 + 가운데 표(11-04 화면) */
+    탭:{ '':{ 칸:['공정순서','공정','후속공정순서','공정검사여부','최종공정여부','워크센터','워크센터구분','외주거래처','시간단위','표준 작업시간','우선순위'], 필:['워크센터','시간단위','표준 작업시간'] } },
     짜(){ const 품 = 보일품목(); if(!품) return null; const 줄 = [];
-      for(const o of 품){ const 머리 = [o.명, o.p, 영('본사', '영림원 화면 기본값'), o.규, 영('00', '영림원 화면 기본값')];
-        if(!o.공들.length){ 줄.push(머리.concat([모('', 흐름없말(o)), 모('', 흐름없말(o)), '', '', '', '', '', ''])); continue; }
-        o.공들.forEach((공, i) => { const 끝 = i===o.공들.length-1;
-          줄.push(머리.concat([영(i+1, '500299 공정 표에서 옴'), 공정글(o, 공), 영(끝 ? i+1 : i+2, '500299 공정 표에서 옴'), 영(끝 ? '✓' : '', '500299 공정 표에서 옴'),
-            모('', 워크말(o, 공, !끝) + ' · 업체가 여럿이면 줄을 더 넣고 우선순위 2 · 3'), 모('', 시간말), 모('', 표준말), 설(1, '우선순위 1 = 500299 공정 표 워크센터(저장하면 여기 저절로 생김, 11-05)')])); }); }
+      for(const o of 품){ const 머리 = [o.명, o.p, 모('', 화면없말('사업단위')), o.규, 모('', 화면없말('공정차수'))];
+        if(!o.공들.length){ 줄.push(머리.concat([모('', 흐름없말(o)), 모('', 흐름없말(o)), '', '', '', '', '', '', '', '', ''])); continue; }
+        o.공들.forEach((공, i) => { const 끝 = i===o.공들.length-1, 위 = [i+1, 공정글(o, 공), 끝 ? i+1 : i+2, '', 끝 ? '✓' : ''];
+          const 목 = 워크센터들(o.p, 공), 겹 = new Set(목.map(z => z.r).filter((r, k, a) => a.indexOf(r)!==k));
+          const 빈n = (목.length ? Math.max(...목.map(z => z.n)) : 0) + 1;
+          for(const z of 목.concat([{ n:빈n, wc:'', r:'' }])){
+            const 워 = 워크센터목록.find(w => w.이름===z.wc), 빈 = !z.wc;
+            const 워칸 = { v:z.wc, 편:{ p:o.p, k:'wc@' + 공 + '@' + z.n }, 드롭:1 };
+            if(빈 && !목.length) Object.assign(워칸, { 모:'꼭 채울 칸 — ' + 워크말(o, 공, !끝), 꼭:1 });
+            else if(빈) 워칸.t = '워크센터를 더 넣으려면 여기서 고름';
+            else if(워크센터읽음 && !워) Object.assign(워칸, { 모:'입력폼 워크센터등록 완료에 없음', 꼭:1 });
+            const 순칸 = 빈 ? { v:'', t:'워크센터를 고르면 차례대로 1 · 2 · 3' } : { v:z.r, 편:{ p:o.p, k:'wcr@' + 공 + '@' + z.n }, t:z.손 ? '손으로 정한 우선순위' : '고른 차례(손으로 바꿀 수 있음)' };
+            if(!빈 && 겹.has(z.r)) Object.assign(순칸, { 모:'같은 공정에 같은 우선순위', 꼭:1 });
+            줄.push(머리.concat(위, [워칸, 워 ? 설(워.구분, '입력폼 워크센터등록 값') : '', 워 ? 설(워.거래처, '입력폼 워크센터등록 값') : '', 빈 ? '' : 모('', 시간말), 빈 ? '' : 모('', 표준말), 순칸]));
+          } }); }
       return { '': 줄 }; } },
   /* 12단계 */
   '외주계약등록': { 화:'501605', 머리:['제품명','제품번호','사업단위','외주거래처'], 머리필:['사업단위','외주거래처'],
@@ -844,14 +877,31 @@ function 계산그리기(u){
     const 연 = d.영===true || (d.영==='탭' && i >= (d.머리||[]).length) || (d.영칸 && i >= (d.머리||[]).length && d.영칸.has(k));   /* v2.48.0 영칸 = 그 이름 열만 */   /* v2.44.0 '탭' = 화면 머리 칸 뒤 표 칸만 */
     const t2 = [연 ? `영림원 ${d.화} 열` : '', p ? `영림원 필수(${d.화})` : ''].filter(Boolean).join(' · ');   /* v2.43.0 d.영 = 칸 모두 영림원 열(연두) */
     return `<th class="${(i===0?'dpr-k':'') + (p?' 필수':'') + (연?' 영열':'')}"${t2?` title="${t2}"`:''}>${글(k)}</th>`; }).join('') + '</tr></thead><tbody>';
-  for(const r of 줄) h += '<tr>' + r.map((c, i) => { const v = 칸값(c), o = c && typeof c==='object' ? c : {};
-    const cls = (i===0?'dpr-k':'') + (typeof v==='number'?' num':'') + (o.모?' 모자람':'') + (o.꼭?' 꼭':'') + (o.영?' 영채움':'') + (o.완?' 등완':'');
-    const 말 = o.모 || o.영 || o.완 || o.t;
-    return `<td${cls?` class="${cls.trim()}"`:''}${말?` title="${글(말)}"`:''}>${글(v)}</td>`; }).join('') + '</tr>';
+  /* v2.52.0 칸 = {v, 편:{p,k}(입력 칸 — 표입력), 드롭, 모, 꼭, 영, 완, t} · 같은 탭·같은 꼴이면 표를 다시 만들지 않고 칸만 고침(고른 칸·민 자리 그대로) */
+  const 칸들 = 줄.map(r => r.map((c, i) => { const v = 칸값(c), o = c && typeof c==='object' ? c : {};
+    const cls = ((i===0?'dpr-k':'') + (typeof v==='number'?' num':'') + (o.편?' 편':'') + (o.드롭?' 드롭칸':'') + (o.편 && o.편.p && 파랑(o.편.p, o.편.k)?' 저장값':'') + (o.모?' 모자람':'') + (o.꼭?' 꼭':'') + (o.영?' 영채움':'') + (o.완?' 등완':'')).trim();
+    return { v, cls, 말:o.모 || o.영 || o.완 || o.t || '', p:o.편 ? o.편.p : '', k:o.편 ? o.편.k : '' }; }));
+  const 옛표 = 옛통 && 계산자리===자 && 옛통.querySelector('table');
+  if(옛표 && 옛표.tHead.rows[0].cells.length===칸.length && 옛표.tBodies[0].rows.length===칸들.length){
+    칸들.forEach((r, n) => r.forEach((d, i) => { const td = 옛표.tBodies[0].rows[n].cells[i]; if(!td) return;
+      const 편집 = td.classList.contains('편집중'), 고 = [...td.classList].filter(x => /^고름|^표입력/.test(x));
+      td.className = [d.cls, ...고, 편집 ? '편집중' : ''].filter(Boolean).join(' ');
+      if(d.말) td.title = d.말; else td.removeAttribute('title');
+      if(d.k){ td.dataset.p = d.p; td.dataset.k = d.k; } else { delete td.dataset.p; delete td.dataset.k; }
+      if(!편집 && td.textContent !== String(d.v ?? '')) td.textContent = d.v ?? ''; }));
+    return;
+  }
+  for(const r of 칸들) h += '<tr>' + r.map(d => `<td${d.cls?` class="${d.cls}"`:''}${d.말?` title="${글(d.말)}"`:''}${d.k?` data-p="${글(d.p)}" data-k="${글(d.k)}"`:''}>${글(d.v)}</td>`).join('') + '</tr>';
   h += '</tbody></table>';
   속.innerHTML = 단추 + (줄.length ? `<div class="표통" data-계산="1">${h}</div>` : '<div class="state"><div class="big">줄 없음</div></div>');
   계산자리 = 자;
   const 통 = 속.querySelector('.표통'); if(통 && 옛자리){ 통.scrollLeft = 옛자리[0]; 통.scrollTop = 옛자리[1]; }
+  const 새표 = 통 && 통.querySelector('table');
+  if(새표 && window.표입력 && 새표.querySelector('td.편')){ 통.tabIndex = 0;   /* v2.52.0 입력 칸 = 다른 입력 칸과 같은 공용 표입력.js */
+    표입력.표(새표, { 이름:u, 열: td => String(td.dataset.k || '').split('@')[0], 칸: td => td.classList.contains('편'), 막음: () => false, 알림: (td, 글자) => 막음알림(td, 글자),
+      읽기: td => td.textContent.trim(), 쓰기: 목 => 바꿈(목.map(([td, v]) => ({ p:td.dataset.p, k:td.dataset.k, v }))),
+      목록: td => String(td.dataset.k||'').startsWith('wc@') ? 워크센터목록.map(w => ({ v:w.이름, 글:w.구분, 덧:w.거래처 })) : [],
+      목록만: td => String(td.dataset.k||'').startsWith('wc@') }); }
   속.querySelectorAll('.months .chip').forEach(b => b.onclick = () => { 계산탭[u] = b.dataset.t; 계산그리기(u); });
 }
 
@@ -1433,6 +1483,7 @@ let 저장틀 = null;
 function 바꿈(목){
   let n = 0, 틀림 = null;
   목 = 목.filter(x => {   /* v2.6.0 공정흐름 = 목록 안 값(또는 빈칸)만 · v2.22.0 목록 = 입력폼 공정흐름 */
+    if(String(x.k).startsWith('wcr@')){ x.v = String(x.v ?? '').trim(); if(x.v && !/^[1-9][0-9]*$/.test(x.v)){ 막음알림(null, '우선순위 = 1 · 2 · 3 …'); return false; } return true; }   /* v2.52.0 */
     if(엣지칸.includes(x.k)){ x.v = String(x.v ?? '').trim();   /* v2.40.0 엣지W·D = 켜진 줄 · 0·1·2(또는 빈칸)만 */
       const 통 = 받은[품목시트], td = 통 && 통.querySelector ? [...통.querySelectorAll(`td[data-k="${x.k}"]`)].find(t => t.parentNode.dataset.p===x.p) : null;
       if(!td || !td.classList.contains('편')){ if(td) 막음알림(td); return false; }
