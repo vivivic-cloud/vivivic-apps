@@ -2,7 +2,8 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.46.2
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.47.0
+     v2.47.0(11-23): 사장님 「영림원품목등록의 구성도 등록 순차로 구성해 주세요」 — 탭 차례 = 등록 방법(T 시험 실제 차례): 품목등록업로드 → 원부자재 → BOM등록업로드 → 품목별공정흐름유형등록 → 제품별공정별소요자재등록 → 자재등록(재공품) → 제품별공정별워크센터등록 → 외주계약등록 → 추가할 제품 · 등록 방법(맨 뒤 그대로).
      v2.46.2(11-23): 재공품 보내기 = 한 창이 같은 내용은 한 번만 씀 — 옛 판 창(품번 _1 꼴)이 열려 있으면 두 창이 서로 되써 판이 계속 올랐음.
      v2.46.1(11-23): 재공품 보내기 쓰기가 끝없이 돌던 것 고침 — 창고가 맵 칸을 이름 차례로 돌려줘 JSON 통째 비교가 늘 달랐음(v2.43.0 부터, 판 8611 까지 감) → 줄 지문 글자로 견줌.
      v2.46.0(11-23): 사장님 재공품 품번 규칙 — 반제품 품번 + 공정 접미사(재단 _c · 엣지 _ed · 보링 _br · 곡면엣지 _re · nc _nc · nc멤브레인 _nm · 도어보링 _dr, 대소문자·띄어쓰기 무시). 표에 없는 공정 = 품번 빈칸 빨강(td.꼭) · 보내기에서 뺌. 자재등록(재공품)·500299 공정품번·재공품 소요자재·외주계약 외주품번 같이.
@@ -321,7 +322,7 @@ body:not(.펼침) .dpr-t .접힘{display:none}   /* v2.32.0 빈 열 접힘 — �
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.46.2</div>
+  <div class="badge">v2.47.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -383,7 +384,8 @@ window.목록읽기 = async function(){
     시트들 = (목.exists() && 목.data().시트들) || [];
     if(!시트들.length){ 목상태('창고에 영림원품목등록이 없습니다'); return; }
     document.getElementById('목상태').style.display='none';
-    document.getElementById('고름').innerHTML = 시트들.map(t => `<button class="chip" data-u="${글(t.이름)}">${글(t.이름)}</button>` + (t.이름===BOM시트 ? 계산순.map(u => `<button class="chip" data-u="${글(u)}">${글(u)}</button>`).join('') : '')).join('')   /* v2.26.0 등록 방법 7~12단계 계산 시트 */
+    const 등록차례 = n => n===품목시트 ? 0 : n==='원부자재' ? 1 : n===BOM시트 ? 2 : 3;   /* v2.47.0 등록 방법 5 품목 → 6 자재(원부자재) → 7 BOM → 8~12 계산 시트(T 시험 10-31~11-09 차례) */
+    document.getElementById('고름').innerHTML = 시트들.slice().sort((a,b) => 등록차례(a.이름) - 등록차례(b.이름)).map(t => `<button class="chip" data-u="${글(t.이름)}">${글(t.이름)}</button>` + (t.이름===BOM시트 ? 계산순.map(u => `<button class="chip" data-u="${글(u)}">${글(u)}</button>`).join('') : '')).join('')   /* v2.26.0 등록 방법 7~12단계 계산 시트 */
       + `<button class="chip" data-u="${추가}" hidden>${추가}</button><button class="chip" data-u="${방법}">${방법}</button><button class="chip" id="펼쳐보기">펼쳐보기</button><span id="폼상태" class="폼상태"></span>`;
     document.querySelectorAll('#고름 .chip[data-u]').forEach(b => b.onclick = () => 시트고름(b.dataset.u));
     document.getElementById('펼쳐보기').onclick = e => { const on = document.body.classList.toggle('펼침'); e.currentTarget.classList.toggle('on', on); };   /* v2.32.0 */
