@@ -1,5 +1,6 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v328 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v329 -->
+<!-- v329(11-23): 11 제품별공정별워크센터 — 영림원품목등록 v2.53.0 보내기(_워크센터_영림원품목등록, 품목+공정+워크센터+우선순위) 받기 → erp_itemwcs 등록대기 · 같은 공정 같은 우선순위 = 「중복된 우선순위 (n)이(가) 입력되었습니다.」(500865 11-23 시험) 저장 막음·빨강. -->
 <!-- v328(11-23): 기본입력 5~11 영림원 입력 방식 맞춤 — BOM 공정 = 모품목 머리 칸 하나(500145·500302, 필수 아님, 줄마다 다르면 「같은 모품목에 서로 다른 공정을(를) 등록 할 수 없습니다.」) · 9~11 제품 목록 = 제품·반제품 · 10·11 칸 차례 = 영림원 머리 차례 · 11 시간단위 초·분·시·일 · 6 자재등록에 영림원품목등록 재공품 받기(_재공품_영림원품목등록 → 분류·자재 등록대기). -->
 <!-- v327(11-23): 공용 쓰기 안전장치 ../shared/쓰기지킴.js 부름 — 옛 판 창이면 저장 멈춤(위 빨간 띠) · 같은 문서 10초 50번 넘게 쓰면 멈춤(주황) · 같은 내용 10초 안 다시 쓰기 건너뜀. 사장님 「이 앱은 앞으로 여러 사람이 계속 쓰게 될 앱인데, 이런 문제(옛 판 창이 공개 문서를 끝없이 덮어쓰기)는 발생 안 해야 되는 거 아닌가요?」 -->
 <html lang="ko">
@@ -480,7 +481,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v328</span>
+    <span class="ver">v329</span>
     <div class="pick topnav" id="topnav">   <!-- v288 사장님 11-18 「입력폼 상단에 발주역입력 메뉴를 만들어 발주역입력 페이지로 이어지게」 — 이름 = 각 페이지 <title> 앞부분 · 같은 탭 -->
       <button type="button" class="btn small" aria-haspopup="menu" aria-expanded="false">발주역입력</button>
       <div class="pickmenu topnavmenu" role="menu" hidden>
@@ -840,6 +841,11 @@ function iwOptions(proc){
 }
 function iwKey(r){var t=function(k){return String(r[k]==null?'':r[k]).trim();};return [t('code'),verPad(t('rev'))||'00',t('seq'),t('proc'),t('wc')].join('|');}
 function iwDup(v,id){return (data.itemwcs||[]).some(function(r){return r.id!==id&&r.status!=='오류'&&iwKey(r)===iwKey(v);})?'같은 공정에 같은 워크센터가 이미 저장되어 있습니다. 저장하지 않았습니다.':'';}
+/* v329 500865 같은 공정에 같은 우선순위 = 「중복된 우선순위 (1)이(가) 입력되었습니다.」(11-23 화면 시험, 저장 안 됨) — 우선순위 빈칸 = 1 */
+function iwRank(r){var t=String(r&&r.rank==null?'':r.rank).trim();return t===''?'1':String(Number(t)||t);}
+function iwProcKey(r){var t=function(k){return String(r[k]==null?'':r[k]).trim();};return [t('code'),verPad(t('rev'))||'00',t('seq'),t('proc')].join('|');}
+function iwRankDup(v,id){var pk=iwProcKey(v),rk=iwRank(v),wc=String(v.wc==null?'':v.wc).trim();
+  return (data.itemwcs||[]).some(function(r){return r.id!==id&&r.status!=='오류'&&!ylwGone(r)&&iwProcKey(r)===pk&&iwRank(r)===rk&&String(r.wc==null?'':r.wc).trim()!==wc;})?'중복된 우선순위 ('+rk+')이(가) 입력되었습니다.':'';}
 /* v57 9 제품별공정별소요자재. 열쇠 = 품번|공정차수 — 영림원 공정차수 하나에 공정 표 하나 */
 function imKey(r){return String(r.code==null?'':r.code).trim()+'|'+(verPad(String(r.rev==null?'':r.rev).trim())||'00');}
 function imDup(v,id){return (data.itemmats||[]).some(function(r){return r.id!==id&&r.status!=='오류'&&imKey(r)===imKey(v);})?'같은 품번·공정차수가 이미 저장되어 있습니다. 저장하지 않았습니다.':'';}
@@ -3278,7 +3284,7 @@ function iwCheck(v){
 }
 function iwSaveCheck(v,id){
   var o=id?Object.assign({},(data.itemwcs||[]).filter(function(r){return r.id===id;})[0],v):v;   /* 수정 칸에는 공정이 없다 — 문서에서 */
-  return iwCheck(o)||iwDup(o,id);
+  return iwCheck(o)||iwDup(o,id)||iwRankDup(o,id);   /* v329 */
 }
 function iwFill(o){   /* 양식에 품번·공정만 적어도 나머지를 채움 */
   var it=ifItem(o.code);if(it){if(isEmpty(o.name))o.name=it.name||'';if(isEmpty(o.spec))o.spec=it.spec||'';}
@@ -4194,7 +4200,7 @@ function bdTurns(rs){   /* rs = 대기 표 줄 [{k,d,st}] → 줄마다 o.g·o.t
     if(!o.turn&&o.g.ok)o.g.why=o.k===cur?BD_LV[lv]+' 먼저':BYKEY[cur].title+' 먼저';});
   return {cur:cur,lv:lv,n:n,lvn:lvs.map(function(x){return Object.keys(x).length;})};
 }
-function bdRedraw(){if(bdrDraw&&cur==='bdreg')bdrDraw();if(mixDraw&&cur==='bdmix')mixDraw();if(wipDraw&&cur==='materials')wipDraw();mixResSync();bdCopyPub();bdResSync();bdClsPub();bdFlowPub();}   /* v287 결과·분류 목록 올리기 · v305 어느 메뉴에서든(읽힌 단계만) */
+function bdRedraw(){if(bdrDraw&&cur==='bdreg')bdrDraw();if(mixDraw&&cur==='bdmix')mixDraw();if(wipDraw&&cur==='materials')wipDraw();if(iwInDraw&&cur==='itemwcs')iwInDraw();mixResSync();iwResSync();bdCopyPub();bdResSync();bdClsPub();bdFlowPub();}   /* v287 결과·분류 목록 올리기 · v305 어느 메뉴에서든(읽힌 단계만) */
 /* v279 사장님 「이거 하나 연결로 모두 입력되게 입력폼에 준비해 달라」 — 거래처 하나 → 분류 → 자재등록 → 구매단가등록 대기를 한 번에.
    미리 보기(bdPlan) = 앞 단계에서 넘길 줄을 「있는 것」으로 치고(ctx.virt) 뒤 단계 빨간 줄을 셈 → 앞 단계가 빠진 줄은 뒤 단계에서도 빠짐(분류 없음·자재 없음).
    넘기기(bdRunAll) = 단계마다 실제 자료로 다시 셈해 차례로 넘김(dataPut 으로 앞 단계 문서가 바로 보임). 메뉴별 단추·알림은 그대로. */
@@ -4737,6 +4743,77 @@ function wipInBox(){
     box.replaceChildren.apply(box,parts);
   }
   wipDraw=draw;draw();
+  return box;
+}
+/* v329 11 제품별공정별워크센터 — 영림원품목등록 v2.53.0 보내기 받기(공개 _워크센터_영림원품목등록.보내기 · 줄 = 품목+공정+워크센터+우선순위, 칸 = 이 메뉴 칸 글자).
+   줄 → erp_itemwcs 대기 한 장(bd 출처 영림원품목등록 · 열쇠 · 지문 — 구매+가공품목 받기와 같은 꼴, bdRun). 이미 넘긴 문서: 대기·오류 + 지문 다름 = 고쳐 다시 대기 · 완료·진행중 = 그대로.
+   임시 칸(공정차수·시간단위·표준작업시간 — 보내는 쪽 화면에 없음) = 이 메뉴 칸 처음 값(00·분·1) + 노랑(임시, 마우스). 같은 공정 같은 우선순위 = 「중복된 우선순위 (n)이(가) 입력되었습니다.」 못 넘김(빨강).
+   결과 = 같은 문서 결과.{열쇠} = {상태,이유,때} (iwResSync). */
+var IWIN_ID='_워크센터_영림원품목등록',IWIN_SRC='영림원품목등록',IWIN_K={'제품명':'name','제품번호':'code','공정차수':'rev','규격':'spec','공정순서':'seq','공정':'proc','워크센터':'wc','시간단위':'tunit','표준작업시간':'time','우선순위':'rank'};
+var iwInDraw=null,IWIN={busy:false,msg:'',bad:false,done:false};
+function iwInDocOf(){return (BD.docs||[]).filter(function(d){return d.id===IWIN_ID&&d['보내기']&&Array.isArray(d['보내기']['줄']);})[0]||null;}
+function iwInMine(k){return (data.itemwcs||[]).filter(function(x){var b=x.bd;return b&&b['출처']===IWIN_SRC&&b['열쇠']===k;}).sort(bdOld)[0]||null;}
+function iwInPlan(){
+  var D=iwInDocOf();if(!D||data.itemwcs==null)return null;
+  var s=BYKEY.itemwcs,out={D:D,go:[],skip:[],have:0,rows:[]};
+  var rows=mixRows(D).map(function(r){var src=r['제품별공정별워크센터등록']||{},v={},tmp=[];
+    s.fields.forEach(function(f){v[f.k]=fieldDef(f);});
+    Object.keys(IWIN_K).forEach(function(n){var k=IWIN_K[n],t=bdTr(src[n]);if(t!=='')v[k]=t;else if((r['임시']||[]).indexOf(n)>=0&&!isEmpty(v[k]))tmp.push(n);});
+    (r['임시']||[]).forEach(function(n){if(tmp.indexOf(n)<0&&bdTr(src[n])===''&&isEmpty(v[IWIN_K[n]]))tmp.push(n);});
+    v=normVals(s,v);return {r:r,v:v,tmp:tmp,cur:iwInMine(r['열쇠'])};});
+  rows.forEach(function(o){
+    var why=[],cur=o.cur;
+    if(cur&&(cur.bd['지문']===o.r['지문']||!(cur.status==='대기'||cur.status==='오류'))){o.st=cur.status||'대기';if(cur.status==='완료')out.have++;out.rows.push(o);return;}
+    var miss=recNeedMiss(s,o.v).map(function(f){return f.label;});if(miss.length)why.push('필수 빠짐: '+miss.join('·'));
+    var ck=iwCheck(o.v);if(ck)why.push(ck);
+    var other=(data.itemwcs||[]).filter(function(x){return (!cur||x.id!==cur.id)&&x.status!=='오류'&&!ylwGone(x)&&iwKey(x)===iwKey(o.v);})[0];
+    if(other&&!cur){o.st=other.status||'대기';if(other.status==='완료')out.have++;out.rows.push(o);return;}   /* 다른 길로 이미 있음 */
+    var rd=iwRankDup(o.v,cur?cur.id:null);if(!rd)rows.forEach(function(y){if(y!==o&&iwProcKey(y.v)===iwProcKey(o.v)&&iwRank(y.v)===iwRank(o.v)&&bdTr(y.v.wc)!==bdTr(o.v.wc))rd='중복된 우선순위 ('+iwRank(o.v)+')이(가) 입력되었습니다.';});
+    if(rd)why.push(rd);
+    o.why=why;out.rows.push(o);
+    if(why.length){out.skip.push(o);return;}
+    out.go.push({e:{id:'iw|'+o.r['열쇠'],key:o.r['열쇠'],keys:[o.r['열쇠']],fp:o.r['지문'],fps:[o.r['지문']],vals:o.v},st:cur?{t:'old',doc:cur}:{t:'new'}});
+  });
+  return out;
+}
+var IWIN_RES_BUSY=0;
+function iwResSync(){
+  if(!db||!db.pubSet||IWIN_RES_BUSY||data.itemwcs==null||WERR.itemwcs)return;
+  var D=iwInDocOf();if(!D)return;
+  var old=D['결과']||{},pairs=[];
+  mixRows(D).forEach(function(r){var k=r['열쇠'],d=iwInMine(k),v=d?bdResOf(d):null,ov=old[k]||null;if(JSON.stringify(ov)!==JSON.stringify(v))pairs.push([['결과',k],v||undefined]);});
+  if(!pairs.length)return;
+  IWIN_RES_BUSY=1;
+  db.pubSet(BD_PATH+'/'+IWIN_ID,pairs).then(function(){var o=D['결과']=D['결과']||{};pairs.forEach(function(x){if(x[1]===undefined)delete o[x[0][1]];else o[x[0][1]]=x[1];});IWIN_RES_BUSY=0;},function(e){IWIN_RES_BUSY=0;console.warn('워크센터 결과 못 씀',e);});
+}
+function iwInBox(){
+  var box=h('div',{class:'card bdreg wipin'}),msg=h('span',{class:'msg','aria-live':'polite'}),goBtn=h('button',{type:'button',class:'btn primary'},'등록대기');
+  var COLS=['name','code','rev','spec','seq','proc','wc','tunit','time','rank'],lab=function(k){return (BYKEY.itemwcs.fields.filter(function(f){return f.k===k;})[0]||{}).label||k;};
+  var KN={};Object.keys(IWIN_K).forEach(function(n){KN[IWIN_K[n]]=n;});
+  function draw(){
+    var P=BD.err||!BD.docs?null:iwInPlan();
+    if(!P){box.hidden=true;return;}
+    box.hidden=false;
+    var parts=[h('h3',{class:'bdrh'},IWIN_SRC),h('div',{class:'lsinfo bdrcnt'},h('span',{},'넘길 '+P.go.length),h('span',{class:P.skip.length?'bdbad':''},'못 넘길 '+P.skip.length),h('span',{class:P.have?'bdhave':''},'있음 '+P.have))];
+    var tw=h('div',{class:'tw'},h('table',{},h('thead',{},h('tr',{},COLS.map(function(k){return h('th',{},lab(k));}).concat([h('th',{},'상태')]))),
+      h('tbody',{},P.rows.map(function(o){var bad=o.why&&o.why.length,stt=o.st||(bad?'못 넘김':'넘길');
+        return h('tr',{class:bad?'bdbadrow':'',title:bad?o.why.join(' · '):null},COLS.map(function(k){var t=o.tmp.indexOf(KN[k])>=0;return h('td',t?{class:'bdnew',title:'임시 — 영림원품목등록 화면에 없는 칸, 이 메뉴 처음 값'}:{},bdTr(o.v[k]));})
+          .concat([h('td',{},STATUS.indexOf(stt)>=0?h('span',{class:'chip '+stt},stt):stt)]));}))));
+    parts.push(hbarFor(tw),tw);
+    var np=!canCol('erp_itemwcs','w');
+    msg.textContent=IWIN.msg;msg.className='msg'+(IWIN.bad?' bad':'');
+    goBtn.disabled=!P.go.length||IWIN.busy||np;goBtn.textContent=P.go.length?'등록대기 '+P.go.length+'건':'등록대기';goBtn.title=np?'제품별공정별워크센터등록 쓰기 권한 없음':null;
+    goBtn.onclick=function(){
+      if(IWIN.busy||!P.go.length||!db)return;
+      IWIN.busy=true;IWIN.msg='';IWIN.bad=false;draw();
+      freshCheck().then(function(old){if(old)return {old:old};return bdRun({vn:IWIN_SRC,pan:P.D['보내기']['판'],src:IWIN_SRC},[{key:'itemwcs',go:P.go}]);}).then(function(r){
+        IWIN.busy=false;if(r.old){IWIN.msg=r.old;IWIN.bad=true;}else{IWIN.msg=r.n+'건 등록대기';IWIN.bad=false;}draw();renderNav();renderSum();renderList();iwResSync();
+      },function(e){IWIN.busy=false;IWIN.msg=errText(e);IWIN.bad=true;draw();});
+    };
+    parts.push(h('div',{class:'row'},goBtn,msg));
+    box.replaceChildren.apply(box,parts);
+  }
+  iwInDraw=draw;draw();
   return box;
 }
 /* 묶음 발주 칸 — 요청일(오늘) · 원장 수량 · 가공 수량 · 반제품 품번 · 재단업체 창고 → erp_purchases 대기 한 장 + mix */
@@ -6509,7 +6586,7 @@ function renderStep(){
   if(cur==='bdreg'){renderBdReg();return;}   /* v281 구매자재 일괄등록 */
   if(cur==='bdmix'){renderMix();return;}   /* v314 구매+가공품목 */
   if(cur==='pdm'){renderPdm();return;}   /* v230 */
-  var s=BYKEY[cur];bulk=null;wipDraw=null;
+  var s=BYKEY[cur];bulk=null;wipDraw=null;iwInDraw=null;
   form=buildForm(s);
   if(s.key==='pomods'&&POMOD_PRE){var pp=POMOD_PRE;POMOD_PRE=null;POMOD_CTX=pp.ctx;setTimeout(function(){if(BYKEY[cur]===s)form.fill(pp.vals,pp.rows);},0);}   /* v157 「발주수정」으로 연 때 채움 */
   form.el.addEventListener('submit',function(e){e.preventDefault();save(s);});
@@ -6599,7 +6676,7 @@ function renderStep(){
       bomFn?bomFn.edge.box:'',
       bomFn?bomFn.swap.box:'',   /* v97 엣지필름 바꾸기 */   /* v32 모품목 고르기 = 조혼가구 상품검색 → 부속 줄 채우기 · v48 제품 고르기 → 줄마다 흐름 */
       s.noForm?'':form.el),
-    s.key==='materials'?wipInBox():'',   /* v328 영림원품목등록 재공품 받기 */
+    s.key==='materials'?wipInBox():s.key==='itemwcs'?iwInBox():'',   /* v328 영림원품목등록 재공품 받기 · v329 워크센터 받기 */
     listBox,listBox2||'');   /* v24: 「저장한 공정」 목록이 없는 단계에서 「null」 글자가 찍히던 것 */
   var ip=s.key==='items'?itemPicker():null;   /* v33 품명 = 조혼가구 상품검색 */
   if(cnFn)cnFn.refresh();
@@ -7577,7 +7654,7 @@ function clsTreeDraw(listBox,head,rows,tail){
   if(foc){o.inp.focus();try{o.inp.setSelectionRange(ss,ss);}catch(e){}}
 }
 function renderList(){
-  if(wipDraw&&cur==='materials')wipDraw();   /* v328 */
+  if(wipDraw&&cur==='materials')wipDraw();if(iwInDraw&&cur==='itemwcs')iwInDraw();   /* v328 · v329 */
   if(!listBox){if(cur==='bdreg'&&bdrDraw)bdrDraw();return;}   /* v310 구매자재 일괄등록 줄 수정 — 저장·닫기 뒤 다시 그림 */
   var s=BYKEY[cur];
   renderListIn(s,listBox,'저장한 항목');
@@ -7657,6 +7734,7 @@ function recCard(s,r,kit,openIds){
         (function(){var u=st!=='완료'?unregLabs(s,r):[];return u.length?h('span',{class:'chip unreg',title:'미등록: '+u.join('·')},'미등록'):null;})(),   /* v117 목록 밖 값 */
         ylwGone(r)?h('span',{class:'chip gone',title:'영림원 불러오기('+r.ylwGone+')에서 영림원에 없음'},'영림원에 없음'):null,   /* v104 */
         s.key==='vendors'?vwcChip(r):null,   /* v274 워크센터 있음/보냄 */
+        (function(){var w=s.key==='itemwcs'&&r.status!=='오류'?iwRankDup(r,r.id):'';return w?h('span',{class:'chip 오류',title:w},'우선순위 겹침'):null;})(),   /* v329 같은 공정 같은 우선순위 = 빨강 */
         h('span',{class:'chip '+st},st)),
       h('div',{class:'recbody'},
         gap?h('div',{class:'gapnote'},gap==='공정 없음'?'안에 공정이 없어 9단계에서 고를 수 없습니다. 「공정 채우기」로 공정을 넣고 저장하면 입력 작업자가 영림원 상세를 채웁니다.':'공정을 읽지 못해 9단계에서 고를 수 없습니다. 위 「영림원에서 불러오기」를 다시 눌러 주세요.'):null,
