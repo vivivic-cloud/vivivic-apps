@@ -2,7 +2,8 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.47.1
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.48.0
+     v2.48.0(11-23): 사장님 「원부자재 탭은 실제로 영림원에 등록된 부자재 목록이 보이는 참고 페이지」 「이전 엑셀 내용을 추측하여 끌고 들어오지 마세요」 — 원부자재 탭 = 입력폼 자재등록 완료(erp_materials, 로그인 없으면 공개 _자재 사본)만, 창고 옛 엑셀 시트 안 읽음 · 칸 = 500251 10칸(연두) + 구매처 · 자재코드 · 보기만.
      v2.47.1(11-23): 사장님 「이 앱은 앞으로 여러 사람이 계속 쓰게 될 앱인데, 이런 문제(옛 판 창이 공개 문서를 끝없이 덮어쓰기)는 발생 안 해야 되는 거 아닌가요?」 — 공용 ../shared/쓰기지킴.js 부름(모듈보다 먼저): 옛 판이면 저장 멈춤·배지 빨강 · 같은 문서 10초 50번 넘게 쓰면 멈춤·배지 주황 · 같은 내용 10초 안 다시 쓰기 건너뜀. 페이지 코드는 그대로.
      v2.47.0(11-23): 사장님 「영림원품목등록의 구성도 등록 순차로 구성해 주세요」 — 탭 차례 = 등록 방법(T 시험 실제 차례): 품목등록업로드 → 원부자재 → BOM등록업로드 → 품목별공정흐름유형등록 → 제품별공정별소요자재등록 → 자재등록(재공품) → 제품별공정별워크센터등록 → 외주계약등록 → 추가할 제품 · 등록 방법(맨 뒤 그대로).
      v2.46.2(11-23): 재공품 보내기 = 한 창이 같은 내용은 한 번만 씀 — 옛 판 창(품번 _1 꼴)이 열려 있으면 두 창이 서로 되써 판이 계속 올랐음.
@@ -324,7 +325,7 @@ body:not(.펼침) .dpr-t .접힘{display:none}   /* v2.32.0 빈 열 접힘 — �
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.47.1</div>
+  <div class="badge">v2.48.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -712,12 +713,21 @@ function 재공품들(){
     줄.push({ p:o.p, 명:`${o.명}_${공}`, 번:재공번(o.p, 공), 공, 순:i+1, 흐름:o.f.v, 확:o.확 }); });   /* v2.46.0 품번 = 접미사 규칙 */
   return 줄;
 }
-let 공개완료자재 = null;   /* 공개 사본 발주역입력_영림원폼/_자재(입력폼 v315 bdCopyPub) — 입력폼 로그인 없을 때 */
+let 공개완료자재 = null, 공개완료원 = null, 폼자재원 = null;   /* 공개 사본 발주역입력_영림원폼/_자재(입력폼 v315 bdCopyPub) — 입력폼 로그인 없을 때 */
 function 완료자재(번){   /* → true | 글(자재명이 다름) | false */
   const 목 = 폼자재 || 공개완료자재 || []; const m = 목.find(x => x.code===번); if(!m) return false;
   return true;
 }
 const 계산시트 = {
+  /* v2.48.0 원부자재 = 영림원에 등록된 자재 참고 목록 — 입력폼 자재등록(erp_materials) status 완료(영림원과 1:1, ylwGone 뺌)만.
+     로그인 없으면 공개 사본 발주역입력_영림원폼/_자재(입력폼 bdCopyPub 이 씀). 창고 원부자재 시트(옛 엑셀)는 안 읽음 · 등록 기능 없음(보기만). */
+  '원부자재': { 화:'500251', 영칸:new Set(재공칸), 탭:{ '':{ 칸:재공칸.concat(['구매처','자재코드']), 필:[] } },
+    짜(){ const 트 = v => String(v ?? '').trim(), 구단 = c => [...new Set((구매단가처.get(트(c).toLowerCase()) || []).map(별명))].join(', ');   /* 구매처 = 입력폼 구매단가등록 완료만 */
+      if(폼자재원) return { '': 폼자재원.map(r => [트(r.name), 트(r.code), 트(r.spec), 트(r.eng), 트(r.asset), 트(r.state), 트(r.io), 트(r.imp), 트(r.unit), 트(r.small),
+          구단(r.code), 트(r.ylwCode || r.ylwSeq || '')]).sort((a,b) => a[1].localeCompare(b[1])) };
+      if(공개완료원) return { '': 공개완료원.map(x => [트(x.자재명), 트(x.자재번호), 트(x.규격), '', 트(x.품목자산분류), '', '', '', 트(x.기준단위), [x.대분류,x.중분류,x.소분류].map(트).filter(Boolean).join(' > '),
+          구단(x.자재번호), '']).sort((a,b) => a[1].localeCompare(b[1])) };
+      return null; } },
   /* 8단계 */
   '품목별공정흐름유형등록': { 화:'500272', 영:true, 탭:{ '':{ 칸:['품명','품번','규격','공정흐름유형'], 필:['품명','공정흐름유형'] } },
     짜(){ const 품 = 보일품목(); if(!품) return null;
@@ -824,7 +834,7 @@ function 계산그리기(u){
   const 단추 = 탭들.length>1 ? '<div class="months">' + 탭들.map(k => `<button class="chip${k===t?' on':''}" data-t="${k}">${k} ${짠[k].length}</button>`).join('') + '</div>' : '';
   const 줄 = 짠[t];
   let h = '<table class="dpr-t"><thead><tr>' + 칸.map((k, i) => { const p = 필.has(k);
-    const 연 = d.영===true || (d.영==='탭' && i >= (d.머리||[]).length);   /* v2.44.0 '탭' = 화면 머리 칸 뒤 표 칸만 */
+    const 연 = d.영===true || (d.영==='탭' && i >= (d.머리||[]).length) || (d.영칸 && i >= (d.머리||[]).length && d.영칸.has(k));   /* v2.48.0 영칸 = 그 이름 열만 */   /* v2.44.0 '탭' = 화면 머리 칸 뒤 표 칸만 */
     const t2 = [연 ? `영림원 ${d.화} 열` : '', p ? `영림원 필수(${d.화})` : ''].filter(Boolean).join(' · ');   /* v2.43.0 d.영 = 칸 모두 영림원 열(연두) */
     return `<th class="${(i===0?'dpr-k':'') + (p?' 필수':'') + (연?' 영열':'')}"${t2?` title="${t2}"`:''}>${글(k)}</th>`; }).join('') + '</tr></thead><tbody>';
   for(const r of 줄) h += '<tr>' + r.map((c, i) => { const v = 칸값(c), o = c && typeof c==='object' ? c : {};
@@ -981,6 +991,7 @@ function 자재정리(){
 }
 window.폼자재받음 = (줄) => {
   const 트 = v => String(v ?? '').trim();
+  폼자재원 = 줄 ? 줄.filter(r => !r.ylwGone) : null;   /* v2.48.0 원부자재 탭 = 입력폼 자재등록 완료 그대로 */
   폼자재 = 줄 ? 줄.filter(r => !r.ylwGone).map(r => { const 길 = String(r.small||'').split('>').map(트); return { code:트(r.code), name:트(r.name), spec:트(r.spec), big:길[0], sm:길[길.length-1] }; }) : null;
   자재정리();
 };
@@ -996,7 +1007,8 @@ function 재공품구독(){
   onSnapshot(doc(window.db, ...재공품문서), d => { 재공품창고 = d.exists() ? d.data() : null; 재공품보내기(); }, () => {});
   onSnapshot(doc(window.db, 'artifacts','vivivic-4b7ef','public','data','발주역입력_영림원폼','_자재'), d => {
     const 트 = v => String(v ?? '').trim();
-    공개완료자재 = d.exists() ? ((d.data().줄)||[]).map(x => ({ code:트(x.자재번호), name:트(x.자재명) })) : [];
+    공개완료원 = d.exists() ? ((d.data().줄)||[]) : [];
+    공개완료자재 = 공개완료원.map(x => ({ code:트(x.자재번호), name:트(x.자재명) }));
     if(!폼자재) 연동칠(); }, () => {});
 }
 function 재공품줄들(){
