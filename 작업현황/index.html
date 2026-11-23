@@ -12,9 +12,11 @@
      v1.2.0 (11-16) 사장님: 「모든 박스(줄)에 삭제 버튼 … 삭제하면 그 알림을 만들기 위해 기록된 모든 기록이 같이 지워져야」
        → 줄마다 [삭제] → 「삭제하면 되돌릴 수 없습니다」 확인창 → 파이어스토어 `ws_deleted` 에 **지문(해시)만** 적고 화면에서 바로 뺀다.
          글·요약은 어디에도 안 적는다. 갱신(예약 작업)은 올리기 전에 이 목록을 읽어 그 줄을 data.json 에서 빼고 다시 안 만든다.
-     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.2.0 -->
+     판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v1.2.1 -->
+<!-- v1.2.1(11-23): 공용 쓰기 안전장치 ../shared/쓰기지킴.js 부름 — 옛 판 창이면 저장 멈춤(위 빨간 띠) · 같은 문서 10초 50번 넘게 쓰면 멈춤(주황) · 같은 내용 10초 안 다시 쓰기 건너뜀. 사장님 「이 앱은 앞으로 여러 사람이 계속 쓰게 될 앱인데, 이런 문제(옛 판 창이 공개 문서를 끝없이 덮어쓰기)는 발생 안 해야 되는 거 아닌가요?」 -->
 <html lang="ko">
 <head>
+<script src="../shared/쓰기지킴.js?v=11-23b"></script>   <!-- 쓰기 안전장치 — 파이어베이스보다 먼저 -->
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>작업현황 · VIVIVIC</title>
@@ -91,7 +93,7 @@
 <header>
     <div class="머리">
         <span class="로고">VIVIVIC</span>
-        <span class="판">v1.2.0</span>
+        <span class="판">v1.2.1</span>
         <span class="딱지" id="딱지">읽는 중</span>
     </div>
 </header>
@@ -246,7 +248,7 @@ try {
     await new Promise((ok, no) => onAuthStateChanged(auth, u => { if (u) ok(); else signInAnonymously(auth).catch(no); }));
     window.__묘비끝({
         목록: async () => (await getDocs(collection(db, 'artifacts', 앱, 'public', 'data', 칸이름))).docs.map(d => d.data()),
-        쓰기: async 표 => setDoc(doc(db, 'artifacts', 앱, 'public', 'data', 칸이름, 표.종류 + '-' + 표.id), 표)
+        쓰기: async 표 => (window.쓰기지킴 ? window.쓰기지킴.감쌈(setDoc, 'setDoc') : setDoc)(doc(db, 'artifacts', 앱, 'public', 'data', 칸이름, 표.종류 + '-' + 표.id), 표)
     });
 } catch (e) { window.__묘비끝(null); }
 </script>

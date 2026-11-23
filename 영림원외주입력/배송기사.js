@@ -59,7 +59,7 @@ function draw(){
     h('div',{class:'actions'},bt,h('span',{class:'msg'+(MSG.bad?' bad':''),role:'status'},MSG.t))));
 }
 Promise.all([import(V+'firebase-app.js'),import(V+'firebase-firestore.js')]).then(function(m){
-  F=m[1];fs=F.getFirestore(m[0].initializeApp(FB_CONFIG,'pur-ship'));
+  F=(window.쓰기지킴?window.쓰기지킴.덮개(Object.assign({},m[1])):m[1]);fs=F.getFirestore(m[0].initializeApp(FB_CONFIG,'pur-ship'));
   var first=true;
   F.onSnapshot(F.doc(fs,'erp_purship',KEY),function(d){
     if(!d.exists()||!t(d.data().pono)){if(first)fail('링크를 열 수 없습니다.');first=false;return;}
