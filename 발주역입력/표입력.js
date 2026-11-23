@@ -201,7 +201,7 @@
   const 글 = v => String(v ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
   function 목록자리(){   /* 다른 드롭과 같게: 칸 옆 10px(오른쪽, 자리 없으면 왼쪽, 그것도 없으면 아래·위 10px) */
     const 끝 = window.visualViewport ? visualViewport.offsetTop + visualViewport.height : innerHeight;
-    목록.style.maxHeight = Math.max(80, Math.min(260, 끝 - 8)) + 'px';   /* 11-23 화면보다 길면 잘렸음 — 보이는 높이 안으로 */
+    목록.style.maxHeight = Math.max(80, Math.min(420, 끝 - 8)) + 'px';   /* 11-23 화면보다 길면 잘렸음 — 보이는 높이 안으로(자리 있으면 420px 까지 = 워크센터 10곳이 한눈에) */
     const q = 칸.getBoundingClientRect(), w = 목록.offsetWidth, h = 목록.offsetHeight;
     let x, y = Math.max(4, Math.min(q.top, 끝 - h - 4));
     if(q.right + 10 + w <= innerWidth) x = q.right + 10;
