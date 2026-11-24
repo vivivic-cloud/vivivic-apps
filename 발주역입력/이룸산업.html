@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 이룸산업 — 이룸산업 「N월 이룸 엣지 출고 총내역」(PDF, 월별)을 달마다 표로 본다.
      사장님 11-18: 「폴더에 이룸산업 파일도 월별로 목록이 나타나게 해줘. 기능 넣지 말고 목록만 일단 나타나게 해줘.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.6.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.6.1
+     v1.6.1(11-24): 사장님 「…등록대기 대기중인 것, 이후 등록완료된 것으로 목록 작성해줘」 — 부속명 목록 = 입력폼 품목등록 받기 자료(영림원품목등록 보내기 반제품) + erp_items 대기·진행중 + 11-24 이후 새로 완료(영림원 불러오기 뺌). 옛 완료 4건(11-17 불러오기) 뺌.
      v1.6.0(11-24): 사장님 「…누계의 품목명을 입력폼과 통일…부속명을 드롭다운선택…월별명세의 해당품목명이 동시에 변경」 · 「응 거기서 가져와. 차후에 등록완료된 곳에서도 가져오게 미리 세팅해줘」 · 「이곳에 품목명 분할이 필요해. 분할 방식은 이미 재단세부내역에 참고하면 된다. 분할된 칸에서도 부속명통일이 되게 칸 만들어줘」 — 누계 품목명 「분할」(재단.html 그대로) · 칸마다 아래 부속명 드롭(입력폼 품목등록 반제품 품명 「_」 뒤, 대기·완료) · 월별 명세 품목명 따라 바뀜. 저장 = 발주역입력_이룸_품목명.
      v1.5.0(11-24): 사장님 「이룸출고내역 누계에 엣지규격, 엣지단가가 나타나야 합니다」 — 누계 칸 엣지규격(출고업체명 뒤) · 엣지단가(수량 뒤) = 명세 줄 값 그대로, 묶음 안 값이 다르면 주황 + 가장 많은 값, 마우스 = 모두.
      v1.4.4(11-24): 사장님 「발주역입력에서 입력폼으로 돌아가는 길이 없습니다」 — 쪽길 끝에 「외주자료 입력폼」(../영림원외주입력/영림원외주입력.html, 입력폼 제목 글자 그대로) 탭.
@@ -184,7 +185,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.6.0</div>
+  <div class="badge">v1.6.1</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html" class="on">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="../영림원외주입력/영림원외주입력.html">외주자료 입력폼</a></nav>
 <h1>이룸산업 출고내역</h1>
@@ -223,6 +224,7 @@ window.목록읽기 = async function(){
     document.querySelectorAll('#고름 .chip').forEach(b => b.onclick = () => 달고름(b.dataset.m));
     업체단품.듣기(window.db, window.fbRead, () => { if(후보칸) 후보그리기(후보칸); });
     품명듣기();   /* v1.6.0 */
+    받기듣기();   /* v1.6.1 */
     달고름(decodeURIComponent(location.hash.slice(1)) === '누계' ? '누계' : 달들[달들.length-1]);
   }catch(e){ window.목록못읽음('창고를 읽지 못했습니다', (e&&(e.code||e.message))||''); }
 };
@@ -367,14 +369,30 @@ function 누계그리기(){
    월별 명세 「품목명」 = 같은 제품명·품목명 이면: 나뉘었으면 위·아래 두 이름(고른 부속명 또는 나눈이름) · 아니면 고른 부속명 · 없으면 그대로. 원본·PDF 그대로. ════ */
 const 품명자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_이룸_품목명'];
 let 품명값 = {}, 부속목록 = [], 부속읽음 = false, 부속왜 = '';
-window.폼품목받음 = (줄, 왜) => {
-  부속읽음 = !!줄; 부속왜 = 왜 || '';
+/* v1.6.1 사장님 「…입력폼에 등록대기 대기중인 부속명을 써야해 … 현재 완료건은 맞는 부속명이 아니니 등록대기 대기중인 것, 이후 등록완료된 것으로 목록 작성해줘... 오늘 이후 완료건, 현재 등록대기 대기중인 것」
+   목록 = ① 입력폼 품목등록 받기 자료(공개 `발주역입력_영림원폼/_품목_영림원품목등록` 보내기 줄 — 영림원품목등록이 넘겨 입력폼 「품목등록」 받기 상자에 대기 중) 반제품
+        ② 입력폼 erp_items(로그인 기기) 상태 대기·진행중·수정대기 반제품 ③ erp_items 완료 중 만든 때(createdAt)가 「이후컷」 뒤이고 영림원 불러오기(importedAt) 아닌 반제품.
+   11-24 v1.6.0 이 쓰던 「erp_items 반제품 모두」 = 11-17 영림원에서 불러온 완료 4건뿐(맞는 부속명 아님) → 뺌. 이름 = 품명 마지막 「_」 뒤 · 같은 이름 하나. */
+const 이후컷 = '2026-11-24T13:50:00Z';
+let 폼품목줄 = null, 받기줄 = null;
+const 꼬리 = n => { n = String(n || ''); const i = n.lastIndexOf('_'); return i >= 0 ? n.slice(i+1).trim() : ''; };
+function 부속셈(){
+  부속읽음 = 폼품목줄 != null || 받기줄 != null;
   const 다 = new Set();
-  for(const x of 줄 || []){ if(!x || x.ylwGone || x.status==='오류' || String(x.asset||'').trim()!=='반제품') continue;
-    const n = String(x.name||''), i = n.lastIndexOf('_'); const t = i >= 0 ? n.slice(i+1).trim() : ''; if(t) 다.add(t); }
+  for(const z of 받기줄 || []){ const 품 = z && z.품목등록 || {}; if(String(품.품목자산분류||'').trim()==='반제품'){ const t = 꼬리(품.품명); if(t) 다.add(t); } }
+  for(const x of 폼품목줄 || []){ if(!x || x.ylwGone || String(x.asset||'').trim()!=='반제품') continue;
+    const st = String(x.status||''), 새완료 = st==='완료' && !x.importedAt && String(x.createdAt||'') >= 이후컷;
+    if(!['대기','진행중','수정대기'].includes(st) && !새완료) continue;
+    const t = 꼬리(x.name); if(t) 다.add(t); }
   부속목록 = [...다].sort((a,b) => a.localeCompare(b, 'ko'));
   if(고른==='누계') 누계그리기();
-};
+}
+window.폼품목받음 = (줄, 왜) => { 폼품목줄 = 줄; 부속왜 = 왜 || ''; 부속셈(); };
+function 받기듣기(){
+  const { doc, onSnapshot } = window.fbRead;
+  onSnapshot(doc(window.db, 'artifacts','vivivic-4b7ef','public','data','발주역입력_영림원폼','_품목_영림원품목등록'), d => {
+    받기줄 = (d.exists() && d.data().보내기 && d.data().보내기.줄) || []; 부속셈(); }, () => {});
+}
 if(window.폼품목대기) window.폼품목받음(...window.폼품목대기);
 const 나눔이름표 = { '상지판':['상판','지판'] };   /* 재단.html v1.8.5 그대로 */
 const 나눈이름 = m => 나눔이름표[String(m).trim()] || [m + 'R', m + 'L'];
@@ -392,7 +410,7 @@ const 품값 = p => 품명값[p] || {분할:{}, 부속:{}};
 const 나뉨 = (p, k) => 품값(p).분할[k];
 function 속명단추(p, k){
   const v = 품값(p).부속[k] || '';
-  if(!부속읽음 || !부속목록.length) return `<button type="button" class="속명 없음${v?' on':''}" data-p="${글(p)}" data-k="${글(k)}" title="${글(부속읽음 ? '입력폼 품목등록 반제품 부속명 0건' : '입력폼 로그인 없음 — 부속명 목록 없음' + (부속왜 && 부속왜!=='입력폼 로그인 없음' ? ' (' + 부속왜 + ')' : ''))}">${v ? 글(v) : '▾'}</button>`;
+  if(!부속읽음 || !부속목록.length) return `<button type="button" class="속명 없음${v?' on':''}" data-p="${글(p)}" data-k="${글(k)}" title="${글(부속읽음 ? '입력폼 등록대기·받기 반제품 부속명 0건' : '부속명 목록을 아직 못 읽음')}">${v ? 글(v) : '▾'}</button>`;
   return `<button type="button" class="속명${v?' on':''}" data-p="${글(p)}" data-k="${글(k)}"${v?` title="${글('입력폼 부속명 ' + v)}"`:''}>${v ? 글(v) : '▾'}</button>`;
 }
 function 누품목칸(p, m){
