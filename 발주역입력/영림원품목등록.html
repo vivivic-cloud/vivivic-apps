@@ -2,7 +2,8 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.72.1
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.73.0
+     v2.73.0(11-24): 사장님 「영림원품목등록 영림원 입력흐름과 관계없는 기타메뉴를 기존등록흐름과 혼돈이 없도록 메뉴버튼위치를 정리해 주세요. 기존흐름관련 메뉴에 화살표 순서표시를 두어 입력자가 순서를 한눈에 알 수 있도록 해주세요」 — 탭 단추 첫 줄 = 등록 흐름 7개(품목등록업로드 → … → 외주계약등록, 사이 →, 한 줄·넘치면 그 줄 안 가로 밀기) · 둘째 줄 = 기타(공정별 워크센터 기본값 · 본사창고관리 · 원부자재 · 추가할 제품 · 등록 방법 · 펼쳐보기 · 저장 상태).
      v2.72.1(11-24): 사장님 「발주역입력에서 입력폼으로 돌아가는 길이 없습니다」 — 쪽길 끝에 「외주자료 입력폼」(../영림원외주입력/영림원외주입력.html, 입력폼 제목 글자 그대로) 탭.
      v2.72.0(11-24): 사장님 「제품도 기본값 따름」 — 제품 공정 워크센터도 공정별 워크센터 기본값 줄 먼저 + 자기 줄 중 기본값에 없는 것만 뒤(반제품과 같음) · 그 공정 기본값이 없을 때만 예전대로(자기 줄 → 업체별 단품명 업체).
      v2.71.0(11-24): 사장님 「이곳(외주계약등록)의 통화 입력부가 드롭다운형식이 아닙니다 영림원의 통화표기를 이곳의 드롭다운 선택 목록으로 만들어야 합니다. 기본적으로 내자인 것들은 영림원의 대한민국 원화 표기로 자동 입력되게 해주세요」 — 통화 = 드롭 KRW·USD·JPY·EUR·GBP·CAD·CNY(501605 코드도움, 목록만) · 외주품목(외주품번)의 화면 내외자구분이 내자면 기본 KRW(손 값 먼저, 저장 안 함) — 마지막 공정 = 품목등록업로드 내외자구분 · 중간 공정 = 자재등록(재공품) 내외자구분 · 내자 아님·빈칸 = 빈칸 주황.
@@ -258,6 +259,11 @@ header{padding:16px 0 2px;display:flex;align-items:center;gap:10px;flex-wrap:wra
 .쪽길+h1{padding-top:14px}
 h1{font-size:30px;line-height:1.1;letter-spacing:-1.2px;font-weight:700;color:var(--vg-ink);padding:4px 0 12px}
 .months{display:flex;flex-wrap:wrap;gap:6px}
+#고름{flex-direction:column;flex-wrap:nowrap}   /* v2.73.0 등록 흐름 줄 + 기타 줄 */
+#고름>.흐름줄{display:flex;flex-wrap:nowrap;align-items:center;gap:4px;overflow-x:auto;max-width:100%;padding-bottom:2px}
+#고름>.흐름줄 .chip{flex:none}
+#고름 .흐름화살{flex:none;color:var(--vg-muted);font-size:13px;font-weight:700}
+#고름>.기타줄{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
 .chip{border-radius:999px;font-family:inherit;font-size:12px;font-weight:600;line-height:1.45;padding:5px 12px;background:#fff;
   border:1px solid var(--vg-edge);color:var(--vg-body);cursor:pointer;font-variant-numeric:tabular-nums;transition:all .12s;position:relative}
 .chip::after{content:"";position:absolute;inset:-8px -3px}
@@ -369,7 +375,7 @@ body:not(.펼침) .dpr-t .접힘{display:none}   /* v2.32.0 빈 열 접힘 — �
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.72.1</div>
+  <div class="badge">v2.73.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a><a href="../영림원외주입력/영림원외주입력.html">외주자료 입력폼</a></nav>
 <h1>영림원품목등록</h1>
@@ -435,8 +441,9 @@ window.목록읽기 = async function(){
     const 차례 = [품목시트, '자재등록(재공품)', BOM시트, '품목별공정흐름유형등록', 공소시트, '제품별공정별워크센터등록', '외주계약등록', '공정별 워크센터 기본값', '본사창고관리'];   /* v2.60.0 설정 탭 = 등록 탭 뒤 · 원부자재 앞 */
     const 창이름 = 시트들.map(t => t.이름), 뒤 = 창이름.filter(n => !차례.includes(n) && n!=='원부자재').concat(['원부자재']);
     const 탭들 = 차례.concat(뒤).filter((n, k, a) => a.indexOf(n)===k && (창이름.includes(n) || 계산시트[n]));
-    document.getElementById('고름').innerHTML = 탭들.map(u => `<button class="chip" data-u="${글(u)}">${글(u)}</button>`).join('')
-      + `<button class="chip" data-u="${추가}" hidden>${추가}</button><button class="chip" data-u="${방법}">${방법}</button><button class="chip" id="펼쳐보기">펼쳐보기</button><span id="폼상태" class="폼상태"></span>`;
+    const 흐름탭 = 차례.slice(0, 차례.indexOf('외주계약등록') + 1), 단추 = u => `<button class="chip" data-u="${글(u)}">${글(u)}</button>`;   /* v2.73.0 등록 흐름 한 줄(→ 차례) · 기타 메뉴 다음 줄 */
+    document.getElementById('고름').innerHTML = '<div class="흐름줄">' + 탭들.filter(u => 흐름탭.includes(u)).map(단추).join('<span class="흐름화살">→</span>') + '</div><div class="기타줄">' + 탭들.filter(u => !흐름탭.includes(u)).map(단추).join('')
+      + `<button class="chip" data-u="${추가}" hidden>${추가}</button><button class="chip" data-u="${방법}">${방법}</button><button class="chip" id="펼쳐보기">펼쳐보기</button><span id="폼상태" class="폼상태"></span></div>`;
     document.querySelectorAll('#고름 .chip[data-u]').forEach(b => b.onclick = () => 시트고름(b.dataset.u));
     document.getElementById('펼쳐보기').onclick = e => { const on = document.body.classList.toggle('펼침'); e.currentTarget.classList.toggle('on', on); };   /* v2.32.0 */
     시트고름((()=>{ try{ return decodeURIComponent(location.hash); }catch(e){ return location.hash; } })()==='#등록방법' ? 방법 : 시트들[0].이름);   /* v2.25.1 주소 #등록방법 = 등록 방법 바로 열기(AI 작업자용) */
