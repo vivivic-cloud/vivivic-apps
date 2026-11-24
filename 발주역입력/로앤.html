@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 로앤 — 로앤 「N월 보링 출고 총내역」(PDF 「26년 N월 총출고내역(로앤-보링)」, 월별)을 달마다 표로 본다.
      사장님 11-18: 「로앤도 해줘」(이룸산업 출고내역과 똑같이 — 월별 목록만, 기능 없음).
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.5.1
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.6.0
+     v1.6.0(11-24): 사장님 「로앤출고내역의 품목명도 이룸산업의 그것과 동일하게 만들어줘」 — 공용 부속명통일.js: 누계 품목명 분할·부속명 드롭·수량 나눔 · 월별 명세 품목명·수량·보링 가공비 따라감 · 저장 발주역입력_로앤_품목명/_전체.
      v1.5.1(11-24): 쪽길에 「조혼가구부속명」 탭(업체별 단품명 다음)만 더함.
      v1.5.0(11-24): 사장님 「로앤출고내역 월별 명세에 품목의 부속명을 빼서 따로 보이도록 해주세요 이룸산업출고내역의 해당부분을 참고하세요」 — 이룸산업 v1.1.0 과 같게 품목 칸 바로 왼쪽 「품목명」 열(품목 글자의 첫 사이즈(숫자*숫자) 앞, 없으면 품목 그대로). 총 합 계 첫 칸은 저절로 한 칸 더 넓어짐.
      v1.4.0(11-24): 사장님 「로앤출고내역 누계에 명세에 있는 규격, 보링단가가 나타나야 하고」 — 누계 칸 보링규격(출고업체명 뒤) · 보링단가(수량 뒤) = 명세 줄 값 그대로, 묶음 안 값이 다르면 주황 + 가장 많은 값, 마우스 = 모두.
@@ -43,15 +44,27 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
     import { getFirestore, doc, getDoc, collection, getDocs, setDoc, onSnapshot, deleteField } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
-    const app = initializeApp({
+    const 설정 = {
         apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
         authDomain: "vivivic-4b7ef.firebaseapp.com",
         projectId: "vivivic-4b7ef",
         storageBucket: "vivivic-4b7ef.firebasestorage.app",
         messagingSenderId: "830175660542",
         appId: "1:830175660542:web:9054030480c8280af8d8af"
-    });
+    };
+    const app = initializeApp(설정);
     const auth = getAuth(app);
+    /* v1.6.0 입력폼(앱 이름 'erp-input') 로그인을 같이 씀(영림원품목등록과 같은 길, 읽기만) — 5 품목등록 erp_items 오류 뺀 전부(대기·진행중·완료…) → 반제품 품명 마지막 「_」 뒤 = 부속명 목록 */
+    try{
+        const 폼앱 = initializeApp(설정, 'erp-input'), 폼auth = getAuth(폼앱), 폼db = getFirestore(폼앱);
+        let 끄기 = null;
+        const 받음 = (줄, 왜) => { window.폼품목대기 = [줄, 왜]; if (window.폼품목받음) window.폼품목받음(줄, 왜); };
+        onAuthStateChanged(폼auth, (u) => {
+            if (끄기) { 끄기(); 끄기 = null; }
+            if (!u) { 받음(null, '입력폼 로그인 없음'); return; }
+            끄기 = onSnapshot(collection(폼db, 'erp_items'), s => 받음(s.docs.map(d => d.data()), ''), e => 받음(null, (e && (e.code || e.message)) || ''));
+        });
+    }catch(e){ window.폼품목대기 = [null, String(e && e.message || e)]; }
     window.db = getFirestore(app);
     window.fbRead = { doc, getDoc, collection, getDocs, setDoc, onSnapshot, deleteField };
     onAuthStateChanged(auth, (u) => {
@@ -157,7 +170,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.5.1</div>
+  <div class="badge">v1.6.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html" class="on">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="../영림원외주입력/영림원외주입력.html">외주자료 입력폼</a></nav>
 <h1>로앤 출고내역</h1>
@@ -168,6 +181,7 @@ html,body{height:100%;overflow:hidden}
 
 <!-- 짚어서 지시하는 손잡이 — 바이글 박스에서 열면 켜진다. -->
 <script src="../shared/viggle.js"></script>
+<script src="부속명통일.js?v=1"></script>   <!-- v1.6.0 품목명 분할·부속명 드롭 공용(이룸산업·조혼가구부속명과 같은 코드) -->
 
 <script>
 const 창고자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_로앤'];
@@ -195,6 +209,7 @@ window.목록읽기 = async function(){
     document.getElementById('고름').innerHTML = 달들.map(d => `<button class="chip" data-m="${d}">${달글(d)}</button>`).join('') + '<button class="chip" data-m="누계">누계</button>';
     document.querySelectorAll('#고름 .chip').forEach(b => b.onclick = () => 달고름(b.dataset.m));
     업체단품.듣기(window.db, window.fbRead, () => { if(후보칸) 후보그리기(후보칸); });
+    부통.시작(window.db, window.fbRead);   /* v1.6.0 */
     달고름(decodeURIComponent(location.hash.slice(1)) === '누계' ? '누계' : 달들[달들.length-1]);
   }catch(e){ window.목록못읽음('창고를 읽지 못했습니다', (e&&(e.code||e.message))||''); }
 };
@@ -229,12 +244,19 @@ function 그리기(d){
   const 자리 = 칸.map(k => 원칸.findIndex(x => (같은칸[x]||x)===k));   /* -1 = 이 달 PDF 에 없는 칸 */
   const 제목 = 칸.map((k,i) => 자리[i] < 0 ? k : 원칸[자리[i]]);
   const 업자리 = 자리[칸.indexOf('출고업체명')] ?? -1;
+  const 수i = 자리[칸.indexOf('수량')], 금i = 자리[칸.indexOf('보링 가공비')];
   const 품자리 = 원칸.indexOf('품목');   /* v1.5.0 「품목명」 = 이룸산업.html v1.1.0 과 같은 셈(화면에서, 창고에 없음) */
   let h = '<table class="dpr-t"><thead><tr>' +
     제목.map((k,i) => `<th class="${i===0?'dpr-k':''}">${글(k)}</th>`).join('') + '</tr></thead><tbody>';
   for(const r of 줄){
     const 업원 = 업자리 >= 0 ? String(r.v[업자리]??'').trim() : '', 업 = 업체단품.맞춤(업원);
+    /* v1.6.0 이룸산업 v1.6.4 와 같게 — 누계에서 나눈 품목명이면 수량 n = 위수/나머지 · 보링 가공비 = 원래 × 위/n(원 단위 반올림)/나머지 — 합 = 원래. 표시만. */
+    const 나수 = 품자리 >= 0 && 수i >= 0 ? 부통.나눈수(품목명(r.v[품자리]), 수(r.v[수i])) : null, n = 나수 ? 나수[0] + 나수[1] : null, 나눔 = 나수 ? 나수[0] : null;
+    const 반칸 = (위, 아래, t) => `<td class="num"${t?` title="${글(t)}"`:''}><div class="반 위">${글(위)}</div><div class="반 아래">${글(아래)}</div></td>`;
     h += '<tr>' + 칸.map((k,i) => {
+      if(나눔 != null && k==='수량') return 반칸(나눔.toLocaleString('ko-KR'), (n-나눔).toLocaleString('ko-KR'), '원래 ' + r.v[수i]);
+      if(나눔 != null && k==='보링 가공비' && 금i >= 0 && 수(r.v[금i]) != null){ const 금 = 수(r.v[금i]), 위금 = Math.round(금 * 나눔 / n); return 반칸(위금.toLocaleString('ko-KR'), (금-위금).toLocaleString('ko-KR'), '원래 ' + r.v[금i]); }
+      if(k==='품목명' && 품자리 >= 0) return 부통.월품목칸(품목명(r.v[품자리]));   /* v1.6.0 부속명 통일·분할 */
       if(k==='출고업체명') return 업 ? `<td title="${글('출고업체명 '+업원)}">${글(업.이름)}</td>` : `<td class="업체없음" title="${글('업체별 단품명 거래처 없음 — 출고업체명 '+업원)}">${글(업원)}</td>`;
       const 이름 = k==='제품명' && 자리[i] >= 0 ? String(r.v[자리[i]]??'').trim() : '';
       const cls = (i===0?'dpr-k':'') + (숫자칸.has(제목[i])?' num':'') + (이름?' pc':'');
@@ -318,14 +340,22 @@ function 누계그리기(){
     const 업글 = 업들.map(([원,x]) => x ? x.이름 : 원).join(' · ');
     const 업td = 없.length ? `<td class="업체없음" title="${글('업체별 단품명 거래처 없음 — 출고업체명 '+없.join(', '))}">${글(업글)}</td>`
                           : `<td title="${글('출고업체명 '+업들.map(([원]) => 원).join(', '))}">${글(업글)}</td>`;
-    h += `<tr><td class="dpr-k pc">${글(g.p)}${단품칸(g.p, 문서)}</td><td>${글(g.품)}</td>${사이즈칸(g.사)}${업td}${명세칸(g.규)}<td class="num">${수글(g.합[0])}</td>${명세칸(g.단, 1)}` + g.합.slice(1).map(x => `<td class="num">${수글(x)}</td>`).join('') + '</tr>';
+    h += `<tr><td class="dpr-k pc">${글(g.p)}${단품칸(g.p, 문서)}</td>${부통.품목칸(g.품)}${사이즈칸(g.사)}${업td}${명세칸(g.규)}${부통.수량칸(g.품, g.합[0], 수글)}${명세칸(g.단, 1)}` + g.합.slice(1).map(x => `<td class="num">${수글(x)}</td>`).join('') + '</tr>';
   }
   h += '<tr class="합"><td class="dpr-k" colspan="5">총 합 계</td><td class="num">' + 수글(총[0]) + '</td><td></td>' + 총.slice(1).map(x => `<td class="num">${수글(x)}</td>`).join('') + '</tr>';
   h += '</tbody></table>';
-  const 속 = document.getElementById('속');
+  const 속 = document.getElementById('속'), 옛 = 속.querySelector('.표통'), 자 = 옛 ? [옛.scrollLeft, 옛.scrollTop] : null;
   속.innerHTML = '<div class="표통">' + h + '</div>';
-  후보닫기();
-  속.querySelector('.표통').addEventListener('scroll', () => { if(후보 && 후보칸) 후보자리(후보칸); });
+  후보닫기(); 부통.닫기();
+  const 통 = 속.querySelector('.표통'); if(자){ 통.scrollLeft = 자[0]; 통.scrollTop = 자[1]; }
+  통.addEventListener('scroll', () => { if(후보 && 후보칸) 후보자리(후보칸); 부통.닫기(); });
+}
+/* v1.6.0 사장님 「로앤출고내역의 품목명도 이룸산업의 그것과 동일하게 만들어줘」 — 공용 부속명통일.js(이룸산업 v1.6.5 와 같은 코드): 누계 품목명 분할·부속명 드롭·수량 나눔 · 월별 명세 품목명·수량·보링 가공비 따라감.
+   저장 = 창고 `발주역입력_로앤_품목명/_전체`(이룸과 따로, 같은 꼴) · 같은 품목명 = 모든 제품. 원본·PDF 그대로. */
+const 부통 = 부속통일.만들기({ 자리:['artifacts','vivivic-4b7ef','public','data','발주역입력_로앤_품목명'], 다시그림: () => 다시그림(), 띠: 말 => 띠(말) });
+function 다시그림(){
+  if(고른==='누계'){ if(달들.every(m => 받은[m])) 누계그리기(); }
+  else if(받은[고른]){ const 통 = document.querySelector('#속 .표통'), 자 = 통 ? [통.scrollLeft, 통.scrollTop] : null; 그리기(받은[고른]); const 새 = document.querySelector('#속 .표통'); if(새 && 자){ 새.scrollLeft = 자[0]; 새.scrollTop = 자[1]; } }
 }
 
 /* ════ v1.3.0 단품 목록 = 그 줄 출고업체의 업체별 단품명 단품(`업체단품목록.js`) — 아래 옛 설명의 벤더피아 목록·실시간은 뺌. 저장은 그대로.
