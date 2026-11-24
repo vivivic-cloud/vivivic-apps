@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 이룸산업 — 이룸산업 「N월 이룸 엣지 출고 총내역」(PDF, 월별)을 달마다 표로 본다.
      사장님 11-18: 「폴더에 이룸산업 파일도 월별로 목록이 나타나게 해줘. 기능 넣지 말고 목록만 일단 나타나게 해줘.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.4.4
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.5.0
+     v1.5.0(11-24): 사장님 「이룸출고내역 누계에 엣지규격, 엣지단가가 나타나야 합니다」 — 누계 칸 엣지규격(출고업체명 뒤) · 엣지단가(수량 뒤) = 명세 줄 값 그대로, 묶음 안 값이 다르면 주황 + 가장 많은 값, 마우스 = 모두.
      v1.4.4(11-24): 사장님 「발주역입력에서 입력폼으로 돌아가는 길이 없습니다」 — 쪽길 끝에 「외주자료 입력폼」(../영림원외주입력/영림원외주입력.html, 입력폼 제목 글자 그대로) 탭.
      v1.4.3(11-23): 사장님 「이 앱은 앞으로 여러 사람이 계속 쓰게 될 앱인데, 이런 문제(옛 판 창이 공개 문서를 끝없이 덮어쓰기)는 발생 안 해야 되는 거 아닌가요?」 — 공용 ../shared/쓰기지킴.js 부름(모듈보다 먼저): 옛 판이면 저장 멈춤·배지 빨강 · 같은 문서 10초 50번 넘게 쓰면 멈춤·배지 주황 · 같은 내용 10초 안 다시 쓰기 건너뜀. 페이지 코드는 그대로.
      v1.4.2(11-21): 사장님 「로앤 이룸 출고내역 누계에 숫자정보인 사이즈도 나타나게 해주세요」 — 누계 「사이즈」 칸(품목명 오른쪽) = 품목 글자의 첫 사이즈(숫자*숫자)부터 끝까지. 묶음 안에 여럿이면 가장 많이 나온 값, 나머지는 마우스.
@@ -143,6 +144,7 @@ html,body{height:100%;overflow:hidden}
 .vpd div.got{color:var(--vg-muted)}
 /* 출고업체명이 업체별 단품명 거래처와 짝이 없음 — 까닭은 마우스 */
 .dpr-t td.업체없음{background:#FFF1E0}
+.dpr-t td.여럿{background:#FFF1E0}
 .띠{position:fixed;top:0;left:0;right:0;z-index:60;background:var(--vg-red);color:#fff;font-size:12.5px;font-weight:600;padding:6px 16px;text-align:center}
 @media (max-width:600px){.vk input{font-size:16px;height:26px}}
 .state{background:var(--vg-fill);border-radius:14px;padding:22px 16px;text-align:center;margin-top:12px}
@@ -156,7 +158,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.4.4</div>
+  <div class="badge">v1.5.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html" class="on">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="../영림원외주입력/영림원외주입력.html">외주자료 입력폼</a></nav>
 <h1>이룸산업 출고내역</h1>
@@ -284,35 +286,43 @@ function 사이즈칸(m){
   if(!들.length) return '<td></td>';
   return `<td${들.length>1?` title="${글(들.map(([v,n]) => v+' ×'+n).join('\n'))}"`:''}>${글(들[0][0])}</td>`;
 }
+/* 엣지규격·엣지단가 = 명세 칸 값 그대로 — 하나면 그 값 · 다르면 주황(td.여럿) + 가장 많이 나온 값, 마우스 = 모두 「값 ×횟수」 */
+function 명세칸(m, 수칸){
+  const 들 = [...m.entries()].sort((a,b) => b[1]-a[1]), c = 수칸 ? 'num' : '';
+  if(!들.length) return `<td${c?` class="${c}"`:''}></td>`;
+  if(들.length===1) return `<td${c?` class="${c}"`:''}>${글(들[0][0])}</td>`;
+  return `<td class="${(c+' 여럿').trim()}" title="${글(들.map(([v,n]) => v+' ×'+n).join('\n'))}">${글(들[0][0])}</td>`;
+}
 function 누계그리기(){
   const 묶 = new Map();
   for(const m of 달들){
     const d = 받은[m]; if(!d) continue;
     const 원칸 = d.칸 || [], at = k => 원칸.findIndex(x => (같은칸[x]||x)===k);
-    const pi = at('제품명'), qi = at('품목'), ui = at('출고업체명'), ni = 누계숫자.map(([k]) => at(k));
+    const pi = at('제품명'), qi = at('품목'), ui = at('출고업체명'), ni = 누계숫자.map(([k]) => at(k)), 규i = at('엣지규격'), 단i = at('엣지단가');
     for(const r of d.줄 || []){
       const p = pi >= 0 ? String(r.v[pi]??'').trim() : ''; if(!p) continue;
       const 품 = qi >= 0 ? 품목명(r.v[qi]) : '', 열 = p + '\t' + 품;
-      let g = 묶.get(열); if(!g){ g = {p, 품, 사:new Map(), 업:new Map(), 합:누계숫자.map(() => 0)}; 묶.set(열, g); }
+      let g = 묶.get(열); if(!g){ g = {p, 품, 사:new Map(), 업:new Map(), 규:new Map(), 단:new Map(), 합:누계숫자.map(() => 0)}; 묶.set(열, g); }
       const 사 = qi >= 0 ? 사이즈(r.v[qi]) : ''; if(사) g.사.set(사, (g.사.get(사)||0) + 1);
       const 원 = ui >= 0 ? String(r.v[ui]??'').trim() : '';
       if(원 && !g.업.has(원)) g.업.set(원, 업체단품.맞춤(원));
+      for(const [i, mm] of [[규i, g.규], [단i, g.단]]){ const v = i >= 0 ? String(r.v[i]??'').trim() : ''; if(v) mm.set(v, (mm.get(v)||0) + 1); }   /* 명세 칸 값 그대로 */
       ni.forEach((i,j) => { if(i < 0) return; const x = 수(r.v[i]); if(x !== null) g.합[j] += x; });
     }
   }
   const 금 = 누계숫자.findIndex(([k]) => k === '엣지가공합계');
   const 줄들 = [...묶.values()].sort((a,b) => b.합[금]-a.합[금] || b.합[0]-a.합[0] || a.p.localeCompare(b.p, 'ko') || a.품.localeCompare(b.품, 'ko'));
   const 총 = 누계숫자.map((_,j) => 줄들.reduce((a,g) => a + g.합[j], 0));
-  let h = '<table class="dpr-t"><thead><tr><th class="dpr-k">제품명</th><th>품목명</th><th>사이즈</th><th>출고업체명</th>' + 누계숫자.map(([,t]) => `<th>${글(t)}</th>`).join('') + '</tr></thead><tbody>';
+  let h = '<table class="dpr-t"><thead><tr><th class="dpr-k">제품명</th><th>품목명</th><th>사이즈</th><th>출고업체명</th><th>엣지규격</th><th>' + 글(누계숫자[0][1]) + '</th><th>엣지단가</th>' + 누계숫자.slice(1).map(([,t]) => `<th>${글(t)}</th>`).join('') + '</tr></thead><tbody>';
   for(const g of 줄들){
     const 업들 = [...g.업.entries()], 없 = 업들.filter(([,x]) => !x).map(([원]) => 원);
     const 문서 = [...new Set(업들.filter(([,x]) => x).map(([,x]) => x.문서))];
     const 업글 = 업들.map(([원,x]) => x ? x.이름 : 원).join(' · ');
     const 업td = 없.length ? `<td class="업체없음" title="${글('업체별 단품명 거래처 없음 — 출고업체명 '+없.join(', '))}">${글(업글)}</td>`
                           : `<td title="${글('출고업체명 '+업들.map(([원]) => 원).join(', '))}">${글(업글)}</td>`;
-    h += `<tr><td class="dpr-k pc">${글(g.p)}${단품칸(g.p, 문서)}</td><td>${글(g.품)}</td>${사이즈칸(g.사)}${업td}` + g.합.map(x => `<td class="num">${수글(x)}</td>`).join('') + '</tr>';
+    h += `<tr><td class="dpr-k pc">${글(g.p)}${단품칸(g.p, 문서)}</td><td>${글(g.품)}</td>${사이즈칸(g.사)}${업td}${명세칸(g.규)}<td class="num">${수글(g.합[0])}</td>${명세칸(g.단, 1)}` + g.합.slice(1).map(x => `<td class="num">${수글(x)}</td>`).join('') + '</tr>';
   }
-  h += '<tr class="합"><td class="dpr-k" colspan="4">총 합 계</td>' + 총.map(x => `<td class="num">${수글(x)}</td>`).join('') + '</tr>';
+  h += '<tr class="합"><td class="dpr-k" colspan="5">총 합 계</td><td class="num">' + 수글(총[0]) + '</td><td></td>' + 총.slice(1).map(x => `<td class="num">${수글(x)}</td>`).join('') + '</tr>';
   h += '</tbody></table>';
   const 속 = document.getElementById('속');
   속.innerHTML = '<div class="표통">' + h + '</div>';
