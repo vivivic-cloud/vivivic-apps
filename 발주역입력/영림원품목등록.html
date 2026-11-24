@@ -2,7 +2,7 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.67.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.68.0
      v2.65.0(11-23): 시간단위 빈칸 · 표준 작업시간 빈칸/0 = 빨강(td.꼭) — 공정별 워크센터 기본값 · 제품별공정별워크센터등록 · 소요자재 공정 표. 근거 = 입력작업자 11-23 T 시험(94a73b3): 「[ 시간단위 ] / [ 표준 작업시간 ] 필수항목이 누락되었습니다.」 저장 막힘. 필말 「임시」 → 확정. 값은 짓지 않음.
      v2.64.0(11-23): 사장님 「모든 입력부에서, 영림원에 이미 선택 제한이 있는 칸이면 해당 드롭다운이 되게 해 주세요. 그게 아니면 살구색으로 표기하고 텍스트 입력이라도 되게 해 주세요.」 — 계산 탭·품목 덧칸 입력 칸 = 드롭(고를목록·입력폼 완료) 또는 살구(td.살구, 점선 · 마우스 = 선택 목록 기록 없음). 새 입력 칸: 공정검사여부(✓) · 재공품 소요량 · 반제품공정차수 · 조립위치 · 특이사항 · 재공품 규격·영문명·자재상태·내외자구분·중요도·기준단위 · 외주 통화·부가세포함여부·외주단가·적용시작일.
      v2.63.1(11-23): 표입력.js ?v=5 — 드롭 목록 최대 높이 260 → 420px(보이는 높이 안) — 워크센터 10곳이 안 밀리고 다 보임.
@@ -358,7 +358,7 @@ body:not(.펼침) .dpr-t .접힘{display:none}   /* v2.32.0 빈 열 접힘 — �
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.67.0</div>
+  <div class="badge">v2.68.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a></nav>
 <h1>영림원품목등록</h1>
@@ -973,10 +973,9 @@ function BOM빈칠(){   /* BOM등록업로드 표 — 필수 칸이 비면 주�
       if(빈){ td.classList.add('모자람'); td.title = BOM모자말(행, k, { v:[...tr.cells].map(c => c.textContent) }, 칸); }
       else if(td.classList.contains('모자람')){ td.classList.remove('모자람'); td.removeAttribute('title'); } });
     const hi = 칸.indexOf('하위유무'), td = hi<0 ? null : tr.cells[hi];   /* v2.45.0 조립 줄 하위유무 = 꼭(T 시험: 제품 BOM 은 올린 뒤 표에서 켬 — 11-03) */
-    if(td){ const 꼭칸 = 행==='조립' && td.textContent.trim()==='';
-      td.classList.toggle('꼭', 꼭칸); td.classList.toggle('모자람', 꼭칸);
-      if(꼭칸) td.title = '꼭 채울 칸 — 하위 반제품에 BOM 이 있음. T 시험: 500302 에 올린 뒤 표에서 하위유무를 켬(붙여넣기로 안 켜짐, 11-03)';
-      else if(td.title.startsWith('꼭 채울 칸')) td.removeAttribute('title'); } });
+    if(td){ const v = td.textContent.trim(), bi = 칸.indexOf('하위품번'), s = bi<0 ? '' : tr.cells[bi].textContent.trim();   /* v2.68.0 자동값 — 빨강 걷음 */
+      td.classList.remove('꼭', '모자람');
+      if(v) td.title = '자동 — 하위품번 ' + s + (v==='1' ? ' 이 이 BOM 모품목에 있음(하위 BOM 있음)' : ' 이 이 BOM 모품목에 없음(자재)'); } });
 }
 let 계산탭 = {}, 계산자리 = null;
 function 계산그리기(u){
@@ -1307,7 +1306,7 @@ const 보내기들 = {
     const 줄 = [];
     for(const [m, rs] of 묶){ if(rs.some(r => r.꼭 && r.꼭.size)) continue;   /* 빨강(품번 빈 재공품) */
       const 머 = { 모품목명:g(rs[0],'모품목명'), 모품목번호:g(rs[0],'모품목번호'), 모품목규격:g(rs[0],'모품목규격'), 모품목BOM차수:g(rs[0],'모품목BOM차수'), 공정:g(rs[0],'공정') };
-      const 하 = rs.map(r => ({ 표시순서:g(r,'표시순서'), 하위품명:g(r,'하위품명'), 하위품번:g(r,'하위품번'), 하위규격:g(r,'하위규격'), 하위BOM차수:g(r,'하위BOM차수'), 투입단위:g(r,'투입단위'), '소요량(분자)':g(r,'소요량(분자)'), '소요량(분모)':g(r,'소요량(분모)') }));
+      const 하 = rs.map(r => ({ 표시순서:g(r,'표시순서'), 하위품명:g(r,'하위품명'), 하위품번:g(r,'하위품번'), 하위규격:g(r,'하위규격'), 하위BOM차수:g(r,'하위BOM차수'), 투입단위:g(r,'투입단위'), '소요량(분자)':g(r,'소요량(분자)'), '소요량(분모)':g(r,'소요량(분모)'), 하위유무:g(r,'하위유무') }));   /* v2.68.0 하위유무 1/0 → 입력폼 hasSub(check) */
       줄.push({ 열쇠:m, 상태:'보냄', BOM등록업로드:Object.assign(머, { 하위:하 }), 임시:[...new Set([].concat(임시들(머, ['모품목명','모품목번호','모품목BOM차수']), ...하.map(h => 임시들(h, ['하위품명','하위품번','투입단위','소요량(분자)','소요량(분모)']))))] }); }
     return 줄; }),
   /* 9 품목별공정흐름유형등록 — 한 건 = 품목 하나 */
@@ -1559,6 +1558,10 @@ function BOM줄짜기(칸){   /* 조립 줄(제품마다) 뒤에 그 반제품�
   for(const rs of 묶.values()){ 줄.push(...rs);
     for(const r of rs){ const s = String(r.v[bi]??'').trim(); if(!놓음.has(s) && 가.has(s)){ 놓음.add(s); 줄.push(...가.get(s)); } } }
   for(const [s, rs] of 가) if(!놓음.has(s)) 줄.push(...rs);
+  /* v2.68.0 사장님 「자동표기로 해주세요」 — 하위유무 = 하위품번이 이 BOM 에 모품목으로 있으면 1(반제품·재공품), 없으면 0(원장·필름 등 자재). 하위품번 빈 줄 = 빈칸 */
+  const hi = 칸.indexOf('하위유무');
+  if(hi>=0){ const 모들 = new Set(줄.map(r => String(r.v[mi]??'').trim()).filter(Boolean));
+    for(const r of 줄){ const s = String(r.v[bi]??'').trim(); r.v = r.v.slice(); r.v[hi] = s ? (모들.has(s) ? '1' : '0') : ''; } }
   return 줄;
 }
 function BOM다시(){
