@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <!-- 조혼가구부속명 — 드라이브 「하준이형」 엑셀(조혼가구 발주서 시트들) 목록. 사장님 11-24 「발주역입력 메뉴에 조혼가구부속명 메뉴를 만들고 폴더에 하준이형 파일을 목록으로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.1.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.2.0
+     v1.2.0(11-24): 사장님 「조혼가구부속명의 모든 단품코드, 단품명이 업체별단품명의 그것과 일치하는지를 보여주는 표시 — 해당 단품코드와 단품명이 파랗게 변하게 해줘」 — 단품코드가 업체별 단품명에 있으면 파랑 · 단품명이 그 코드 단품명과 같으면 파랑(실시간). 킨포크 = 값 모양으로 칸 찾음.
      v1.1.0(11-24): 사장님 「조혼가구 부속명도 이룸가구와 동일하게 입력할 수 있도록 해줘」 — 품목 칸 분할·부속명 드롭·품목수량 나눔(공용 부속명통일.js, 이룸산업과 같은 코드) · 저장 발주역입력_조혼가구_품목명/_전체.
      v1.0.0(11-24): 첫 판 — 시트 단추(엑셀 차례) · 그 시트 표(칸 = 8행+9행 머리 글 그대로, B~N) · 표 위 한 줄 = 그 시트 발주날짜·업체(엑셀 K1·K3 값). 목록만(기능 없음).
        「킨포크」 시트는 머리 줄이 없어 칸 이름 = 엑셀 열 글자(머리 주황, 마우스 = 까닭) — 짓지 않음.
@@ -108,6 +109,7 @@ html,body{height:100%;overflow:hidden}
 .표통>table{margin-bottom:240px}
 .dpr-t th.머리없음{background:#FFF1E0}
 .덧{font-size:12px;color:var(--vg-muted);padding:8px 0 0}
+.dpr-t td.맞음{color:#1565c0;font-weight:700}   /* v1.2.0 업체별 단품명과 맞음 */
 .띠{position:fixed;top:0;left:0;right:0;z-index:60;background:var(--vg-red);color:#fff;font-size:12.5px;font-weight:600;padding:6px 16px;text-align:center}
 </style>
 </head>
@@ -116,7 +118,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.1.0</div>
+  <div class="badge">v1.2.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="조혼가구부속명.html" class="on">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="../영림원외주입력/영림원외주입력.html">외주자료 입력폼</a></nav>
 <h1>조혼가구부속명</h1>
@@ -159,6 +161,7 @@ window.목록읽기 = async function(){
     document.querySelectorAll('#고름 .chip').forEach(b => b.onclick = () => 시트고름(b.dataset.u));
     시트고름(시트들[0]);
     부통.시작(window.db, window.fbRead);
+    업단품구독();   /* v1.2.0 */
   }catch(e){ window.목록못읽음('창고를 읽지 못했습니다', (e&&(e.code||e.message))||''); }
 };
 
@@ -175,17 +178,49 @@ async function 시트고름(u){
   그리기(받은[u]);
 }
 
+/* v1.2.0 사장님 「조혼가구부속명의 모든 단품코드, 단품명이 업체별단품명의 그것과 일치하는지를 보여주는 표시 — 해당 단품코드와 단품명이 파랗게 변하게 해줘」
+   업체별 단품명 창고(`발주역입력_업체별단품` 업체 문서 전부, onSnapshot) 단품코드 → 단품명(앞뒤 빈칸 뗌). 이 쪽 단품코드 칸 값이 그 코드에 있으면 코드 글자 파랑 · 단품명 칸 값이 그 코드의 단품명과 같으면 단품명 글자 파랑(td.맞음). 까닭 = 마우스.
+   칸 = 머리 「…벤더 단품코드」·「…단품명」 · 머리 없는 시트(킨포크) = 값 모양으로: 업체별 단품코드와 맞는 값이 가장 많은 칸 = 단품코드, 그 오른쪽 칸 = 단품명(맞는 값 0 이면 표시 안 함). */
+const 업자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_업체별단품'];
+let 업단품 = new Map(), 업값 = {}, 업끊기 = {};
+function 업단품구독(){
+  const { doc, onSnapshot } = window.fbRead;
+  onSnapshot(doc(window.db, ...업자리, '_업체목록'), m => {
+    const 들 = (m.exists() && m.data().업체들) || [];
+    for(const u of Object.keys(업끊기)) if(!들.includes(u)){ 업끊기[u](); delete 업끊기[u]; delete 업값[u]; }
+    for(const u of 들) if(!업끊기[u]) 업끊기[u] = onSnapshot(doc(window.db, ...업자리, 문서이름(u)), s => { 업값[u] = s.exists() ? s.data() : { 칸:[], 줄:[] }; 업셈(); }, () => {});
+    업셈();
+  }, () => {});
+}
+function 업셈(){
+  const 새 = new Map();
+  for(const [u, d] of Object.entries(업값)){ const 칸 = d.칸 || [], ci = 칸.indexOf('단품코드'), ni = 칸.indexOf('단품명'); if(ci < 0) continue;
+    for(const r of d.줄 || []){ const c = String(r.v[ci] ?? '').trim(); if(c && !새.has(c)) 새.set(c, { 이름:ni >= 0 ? String(r.v[ni] ?? '').trim() : '', 업체:u }); } }
+  업단품 = 새;
+  if(받은[고른]){ const 통 = document.querySelector('#속 .표통'), 자 = 통 ? [통.scrollLeft, 통.scrollTop] : null; 그리기(받은[고른]); const 새통 = document.querySelector('#속 .표통'); if(새통 && 자){ 새통.scrollLeft = 자[0]; 새통.scrollTop = 자[1]; } }
+}
+function 단품칸찾기(d){
+  const 칸 = d.칸 || [];
+  if(!d.머리없음){ const ci = 칸.findIndex(k => String(k).split('\n').map(x => x.trim()).includes('벤더 단품코드')), ni = 칸.findIndex(k => String(k).split('\n').map(x => x.trim()).includes('단품명')); return [ci, ni]; }
+  if(!업단품.size) return [-1, -1];
+  let 최 = -1, 최수 = 0;
+  칸.forEach((_, i) => { const n = (d.줄 || []).filter(r => 업단품.has(String(r.v[i] ?? '').trim())).length; if(n > 최수){ 최수 = n; 최 = i; } });
+  return 최 < 0 ? [-1, -1] : [최, 최 + 1 < 칸.length ? 최 + 1 : -1];
+}
 function 그리기(d){
   const 칸 = d.칸 || [], 줄 = d.줄 || [], 속 = document.getElementById('속'), 덧 = document.getElementById('덧');
   덧.hidden = !(d.발주날짜 || d.업체); 덧.textContent = [d.발주날짜 ? '발주날짜 ' + d.발주날짜 : '', d.업체 ? '업체 ' + d.업체 : ''].filter(Boolean).join(' · ');
   if(!줄.length){ 속.innerHTML = '<div class="state"><div class="big">줄 없음</div></div>'; return; }
   const 없 = !!d.머리없음;
   let h = '<table class="dpr-t"><thead><tr>' + 칸.map((k,i) => `<th class="${[i===0?'dpr-k':'', 없?'머리없음':''].join(' ').trim()}"${없?' title="이 시트엔 머리 줄이 없음 — 엑셀 열 글자"':''}>${글(k)}</th>`).join('') + '</tr></thead><tbody>';
-  const 품i = 칸.indexOf(없 ? 'J' : '품목'), 수i = 칸.indexOf(없 ? 'K' : '품목수량');
-  for(const r of 줄) h += '<tr>' + 칸.map((k,i) => { const v = r.v[i];
+  const 품i = 칸.indexOf(없 ? 'J' : '품목'), 수i = 칸.indexOf(없 ? 'K' : '품목수량'), [ci, ni] = 단품칸찾기(d);
+  for(const r of 줄){ const 코 = ci >= 0 ? String(r.v[ci] ?? '').trim() : '', 짝 = 코 && 업단품.get(코);
+   h += '<tr>' + 칸.map((k,i) => { const v = r.v[i];
+    if(i===ci && 코) return 짝 ? `<td class="맞음${i===0?' dpr-k':''}" title="${글('업체별 단품명 ' + 짝.업체 + ' 에 있음')}">${글(v)}</td>` : `<td${i===0?' class="dpr-k"':''} title="업체별 단품명에 없는 단품코드">${글(v)}</td>`;
+    if(i===ni && 코 && String(v ?? '').trim()){ const 같 = 짝 && 짝.이름 === String(v).trim(); return `<td class="${[같?'맞음':'', i===0?'dpr-k':''].join(' ').trim()}" title="${글(같 ? '업체별 단품명 단품명과 같음' : 짝 ? '업체별 단품명 단품명: ' + 짝.이름 : '업체별 단품명에 없는 단품코드')}">${글(v)}</td>`; }
     if(i===품i && String(v ?? '').trim()) return 부통.품목칸(String(v).trim(), i===0 ? 'dpr-k' : '');
     if(i===수i && typeof v==='number' && 품i >= 0 && String(r.v[품i] ?? '').trim()) return 부통.수량칸(String(r.v[품i]).trim(), v, x => x.toLocaleString('ko-KR'));
-    return `<td class="${[i===0?'dpr-k':'', typeof v==='number'?'num':''].join(' ').trim()}">${글(typeof v==='number' ? v.toLocaleString('ko-KR') : v)}</td>`; }).join('') + '</tr>';
+    return `<td class="${[i===0?'dpr-k':'', typeof v==='number'?'num':''].join(' ').trim()}">${글(typeof v==='number' ? v.toLocaleString('ko-KR') : v)}</td>`; }).join('') + '</tr>'; }
   h += '</tbody></table>';
   속.innerHTML = '<div class="표통">' + h + '</div>';
   부통.닫기(); 속.querySelector('.표통').addEventListener('scroll', () => 부통.닫기());
