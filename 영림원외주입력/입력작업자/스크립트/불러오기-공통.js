@@ -108,6 +108,7 @@
   //   ⚠ 새 단계를 더하면 t 도 꼭 단다. t 가 없으면 T 요청에서 「영림원에 없음」을 못 가려 안 지운다(I.apply). 비교 칸 = 읽기 스크립트가 화면에서 읽는 칸만(확인 못 한 칸은 비교 안 함).
   I.STEPS = {
     vendors: { coll: 'erp_vendors', title: '거래처', key: (d) => R.s(d.name), t: (d) => R.isT(d.name), fields: ['sangho', 'name', 'state', 'credit', 'bizno', 'rep', 'tel', 'biztype', 'bizitem', 'kinds'] },
+    depts: { coll: 'erp_depts', title: '부서', key: (d) => R.s(d.name), t: (d) => R.isT(d.name), fields: ['name', 'short', 'eng', 'engShort', 'start', 'end', 'level', 'type', 'tel', 'fax', 'tax', 'unit', 'local', 'email', 'memo', 'sort'] },   // v333 폼 1 부서등록
     warehouses: { coll: 'erp_warehouses', title: '창고', key: (d) => R.s(d.name), t: (d) => R.isT(d.name), fields: ['name', 'group', 'dept', 'cust', 'consign', 'emp', 'type', 'notUse'] },   // v325 폼 2 창고등록
     workcenters: { coll: 'erp_workcenters', title: '워크센터', key: (d) => R.s(d.name), t: (d) => R.isT(d.name), fields: ['name', 'dept', 'kind', 'vendor', 'capa', 'start', 'end', 'whMat', 'whProd', 'whDeliv', 'whSite', 'whIn', 'whSemi'] },
     classes: { coll: 'erp_classes', title: '분류', key: (d) => [d.kind, d.big, d.mid, d.name].map(R.s).join('>'), t: (d) => R.isT(d.big) || R.isT(d.mid) || R.isT(d.name), fields: ['kind', 'big', 'mid', 'name', 'use'] },
