@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 이룸산업 — 이룸산업 「N월 이룸 엣지 출고 총내역」(PDF, 월별)을 달마다 표로 본다.
      사장님 11-18: 「폴더에 이룸산업 파일도 월별로 목록이 나타나게 해줘. 기능 넣지 말고 목록만 일단 나타나게 해줘.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.5.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.6.0
+     v1.6.0(11-24): 사장님 「…누계의 품목명을 입력폼과 통일…부속명을 드롭다운선택…월별명세의 해당품목명이 동시에 변경」 · 「응 거기서 가져와. 차후에 등록완료된 곳에서도 가져오게 미리 세팅해줘」 · 「이곳에 품목명 분할이 필요해. 분할 방식은 이미 재단세부내역에 참고하면 된다. 분할된 칸에서도 부속명통일이 되게 칸 만들어줘」 — 누계 품목명 「분할」(재단.html 그대로) · 칸마다 아래 부속명 드롭(입력폼 품목등록 반제품 품명 「_」 뒤, 대기·완료) · 월별 명세 품목명 따라 바뀜. 저장 = 발주역입력_이룸_품목명.
      v1.5.0(11-24): 사장님 「이룸출고내역 누계에 엣지규격, 엣지단가가 나타나야 합니다」 — 누계 칸 엣지규격(출고업체명 뒤) · 엣지단가(수량 뒤) = 명세 줄 값 그대로, 묶음 안 값이 다르면 주황 + 가장 많은 값, 마우스 = 모두.
      v1.4.4(11-24): 사장님 「발주역입력에서 입력폼으로 돌아가는 길이 없습니다」 — 쪽길 끝에 「외주자료 입력폼」(../영림원외주입력/영림원외주입력.html, 입력폼 제목 글자 그대로) 탭.
      v1.4.3(11-23): 사장님 「이 앱은 앞으로 여러 사람이 계속 쓰게 될 앱인데, 이런 문제(옛 판 창이 공개 문서를 끝없이 덮어쓰기)는 발생 안 해야 되는 거 아닌가요?」 — 공용 ../shared/쓰기지킴.js 부름(모듈보다 먼저): 옛 판이면 저장 멈춤·배지 빨강 · 같은 문서 10초 50번 넘게 쓰면 멈춤·배지 주황 · 같은 내용 10초 안 다시 쓰기 건너뜀. 페이지 코드는 그대로.
@@ -44,15 +45,27 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
     import { getFirestore, doc, getDoc, collection, getDocs, setDoc, onSnapshot, deleteField } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
-    const app = initializeApp({
+    const 설정 = {
         apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
         authDomain: "vivivic-4b7ef.firebaseapp.com",
         projectId: "vivivic-4b7ef",
         storageBucket: "vivivic-4b7ef.firebasestorage.app",
         messagingSenderId: "830175660542",
         appId: "1:830175660542:web:9054030480c8280af8d8af"
-    });
+    };
+    const app = initializeApp(설정);
     const auth = getAuth(app);
+    /* v1.6.0 입력폼(앱 이름 'erp-input') 로그인을 같이 씀(영림원품목등록과 같은 길, 읽기만) — 5 품목등록 erp_items 오류 뺀 전부(대기·진행중·완료…) → 반제품 품명 마지막 「_」 뒤 = 부속명 목록 */
+    try{
+        const 폼앱 = initializeApp(설정, 'erp-input'), 폼auth = getAuth(폼앱), 폼db = getFirestore(폼앱);
+        let 끄기 = null;
+        const 받음 = (줄, 왜) => { window.폼품목대기 = [줄, 왜]; if (window.폼품목받음) window.폼품목받음(줄, 왜); };
+        onAuthStateChanged(폼auth, (u) => {
+            if (끄기) { 끄기(); 끄기 = null; }
+            if (!u) { 받음(null, '입력폼 로그인 없음'); return; }
+            끄기 = onSnapshot(collection(폼db, 'erp_items'), s => 받음(s.docs.map(d => d.data()), ''), e => 받음(null, (e && (e.code || e.message)) || ''));
+        });
+    }catch(e){ window.폼품목대기 = [null, String(e && e.message || e)]; }
     window.db = getFirestore(app);
     window.fbRead = { doc, getDoc, collection, getDocs, setDoc, onSnapshot, deleteField };
     onAuthStateChanged(auth, (u) => {
@@ -145,6 +158,19 @@ html,body{height:100%;overflow:hidden}
 /* 출고업체명이 업체별 단품명 거래처와 짝이 없음 — 까닭은 마우스 */
 .dpr-t td.업체없음{background:#FFF1E0}
 .dpr-t td.여럿{background:#FFF1E0}
+/* v1.6.0 누계 품목명 분할(재단.html v1.8.0 과 같은 꼴) · 부속명 통일 드롭 */
+.dpr-t td.pm .품줄{display:flex;align-items:center}
+.dpr-t td .작{font:inherit;font-size:10.5px;line-height:14px;height:16px;padding:0 4px;margin-left:6px;border:1px solid var(--vg-edge);border-radius:4px;background:var(--vg-bg);color:var(--vg-muted);cursor:pointer;flex:0 0 auto}
+.dpr-t td .작:hover{color:var(--vg-ink);border-color:var(--vg-ink)}
+.dpr-t td.qy .작{margin:0}
+.dpr-t td .반{display:block;min-height:20px;margin:0 -5px;padding:1px 5px}
+.dpr-t td .반.위{border-bottom:1px solid #D6D6D3}
+.dpr-t td .반 .품줄{display:flex;align-items:center}
+.dpr-t td.qy .반{display:flex;align-items:center;justify-content:flex-end;gap:4px}
+.dpr-t td.qy input.수{width:52px;height:18px;padding:0 4px;font:inherit;font-size:11.5px;text-align:right;border:1px solid #C7C7C3;border-radius:4px}
+.속명{display:block;min-width:90px;height:18px;margin:2px 0 1px;padding:0 5px;font:inherit;font-size:11px;line-height:16px;text-align:left;border:1px dashed #C7C7C3;border-radius:4px;background:var(--vg-bg);color:var(--vg-muted);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.속명.on{border-style:solid;color:#1565c0;font-weight:700}
+.속명.없음{background:#FFF1E0;cursor:default}
 .띠{position:fixed;top:0;left:0;right:0;z-index:60;background:var(--vg-red);color:#fff;font-size:12.5px;font-weight:600;padding:6px 16px;text-align:center}
 @media (max-width:600px){.vk input{font-size:16px;height:26px}}
 .state{background:var(--vg-fill);border-radius:14px;padding:22px 16px;text-align:center;margin-top:12px}
@@ -158,7 +184,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.5.0</div>
+  <div class="badge">v1.6.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html" class="on">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="../영림원외주입력/영림원외주입력.html">외주자료 입력폼</a></nav>
 <h1>이룸산업 출고내역</h1>
@@ -196,6 +222,7 @@ window.목록읽기 = async function(){
     document.getElementById('고름').innerHTML = 달들.map(d => `<button class="chip" data-m="${d}">${달글(d)}</button>`).join('') + '<button class="chip" data-m="누계">누계</button>';
     document.querySelectorAll('#고름 .chip').forEach(b => b.onclick = () => 달고름(b.dataset.m));
     업체단품.듣기(window.db, window.fbRead, () => { if(후보칸) 후보그리기(후보칸); });
+    품명듣기();   /* v1.6.0 */
     달고름(decodeURIComponent(location.hash.slice(1)) === '누계' ? '누계' : 달들[달들.length-1]);
   }catch(e){ window.목록못읽음('창고를 읽지 못했습니다', (e&&(e.code||e.message))||''); }
 };
@@ -233,7 +260,7 @@ function 그리기(d){
   const 자리 = 칸.map(k => 원칸.findIndex(x => (같은칸[x]||x)===k));   /* -1 = 이 달 PDF 에 없는 칸 */
   const 제목 = 칸.map((k,i) => 자리[i] < 0 ? k : 원칸[자리[i]]);
   const 업자리 = 자리[칸.indexOf('출고업체명')] ?? -1;
-  const 품자리 = 원칸.indexOf('품목');
+  const 품자리 = 원칸.indexOf('품목'), 제자리 = 원칸.indexOf('제품명');
   let h = '<table class="dpr-t"><thead><tr>' +
     제목.map((k,i) => `<th class="${i===0?'dpr-k':''}">${글(k)}</th>`).join('') + '</tr></thead><tbody>';
   for(const r of 줄){
@@ -242,7 +269,8 @@ function 그리기(d){
       if(k==='출고업체명') return 업 ? `<td title="${글('출고업체명 '+업원)}">${글(업.이름)}</td>` : `<td class="업체없음" title="${글('업체별 단품명 거래처 없음 — 출고업체명 '+업원)}">${글(업원)}</td>`;
       const 이름 = k==='제품명' && 자리[i] >= 0 ? String(r.v[자리[i]]??'').trim() : '';
       const cls = (i===0?'dpr-k':'') + (숫자칸.has(제목[i])?' num':'') + (이름?' pc':'');
-      return `<td${cls.trim()?` class="${cls.trim()}"`:''}>${글(k==='품목명' && 품자리 >= 0 ? 품목명(r.v[품자리]) : 자리[i] < 0 ? '' : r.v[자리[i]])}${이름?단품칸(이름, 업?[업.문서]:[]):''}</td>`;
+      if(k==='품목명' && 품자리 >= 0){ const 제 = 제자리 >= 0 ? String(r.v[제자리]??'').trim() : ''; return 월품목명칸(제, 품목명(r.v[품자리])); }   /* v1.6.0 부속명 통일·분할 */
+      return `<td${cls.trim()?` class="${cls.trim()}"`:''}>${글(자리[i] < 0 ? '' : r.v[자리[i]])}${이름?단품칸(이름, 업?[업.문서]:[]):''}</td>`;
     }).join('') + '</tr>';
   }
   /* 「총 합 계」 — PDF 처럼 칸을 합친 그대로(첫 칸이 남은 칸을 다 차지 → 금액·필름 칸이 제자리에 온다) */
@@ -320,15 +348,139 @@ function 누계그리기(){
     const 업글 = 업들.map(([원,x]) => x ? x.이름 : 원).join(' · ');
     const 업td = 없.length ? `<td class="업체없음" title="${글('업체별 단품명 거래처 없음 — 출고업체명 '+없.join(', '))}">${글(업글)}</td>`
                           : `<td title="${글('출고업체명 '+업들.map(([원]) => 원).join(', '))}">${글(업글)}</td>`;
-    h += `<tr><td class="dpr-k pc">${글(g.p)}${단품칸(g.p, 문서)}</td><td>${글(g.품)}</td>${사이즈칸(g.사)}${업td}${명세칸(g.규)}<td class="num">${수글(g.합[0])}</td>${명세칸(g.단, 1)}` + g.합.slice(1).map(x => `<td class="num">${수글(x)}</td>`).join('') + '</tr>';
+    h += `<tr><td class="dpr-k pc">${글(g.p)}${단품칸(g.p, 문서)}</td>${누품목칸(g.p, g.품)}${사이즈칸(g.사)}${업td}${명세칸(g.규)}${누수량칸(g.p, g.품, g.합[0])}${명세칸(g.단, 1)}` + g.합.slice(1).map(x => `<td class="num">${수글(x)}</td>`).join('') + '</tr>';
   }
   h += '<tr class="합"><td class="dpr-k" colspan="5">총 합 계</td><td class="num">' + 수글(총[0]) + '</td><td></td>' + 총.slice(1).map(x => `<td class="num">${수글(x)}</td>`).join('') + '</tr>';
   h += '</tbody></table>';
-  const 속 = document.getElementById('속');
+  const 속 = document.getElementById('속'), 옛 = 속.querySelector('.표통'), 자 = 옛 ? [옛.scrollLeft, 옛.scrollTop] : null;
   속.innerHTML = '<div class="표통">' + h + '</div>';
-  후보닫기();
-  속.querySelector('.표통').addEventListener('scroll', () => { if(후보 && 후보칸) 후보자리(후보칸); });
+  후보닫기(); 속명닫기();
+  const 통 = 속.querySelector('.표통'); if(자){ 통.scrollLeft = 자[0]; 통.scrollTop = 자[1]; }
+  통.addEventListener('scroll', () => { if(후보 && 후보칸) 후보자리(후보칸); 속명닫기(); });
 }
+
+/* ════ v1.6.0 사장님 「이룸산업 출고내역 누계의 품목명을 입력폼과 통일하기 위해 현재 입력폼상태에서 등록대기중인 부속명을 드롭다운선택하여 선택할 수 있도록 각 품목명 하단에 해당기능을 넣어 주세요. 이렇게 품목이 입력폼의 부속명과 매칭된 품목은 월별명세의 해당품목명이 동시에 변경 되어야 합니다」
+   + 「응 거기서 가져와. 차후에 등록완료된 곳에서도 가져오게 미리 세팅해줘」 + 「이곳에 품목명 분할이 필요해. 분할 방식은 이미 재단세부내역에 참고하면 된다. 분할된 칸에서도 부속명통일이 되게 칸 만들어줘」
+   부속명 목록 = 입력폼 5 품목등록(erp_items, 'erp-input' 로그인 기기) 오류·ylwGone 뺀 전부(대기·진행중·완료) 중 품목자산분류 반제품 · 품명 마지막 「_」 뒤 글자 · 같은 이름 하나.
+   분할 = 재단.html v1.8.0~v1.8.5 그대로: 「분할」 → 위(나눈이름 앞)·아래, 수량 위 = 반반(홀수면 위 +1) · 「3」 · 직접 · 「⋈」 합치기 · 나눔이름표(상지판 → 상판/지판, 그 밖 품목명R/품목명L).
+   저장 = 창고 `발주역입력_이룸_품목명`, 문서 하나 = 제품명(`/` → `／`) {제품명, 분할:{품목명:{방식,위,원}}, 부속:{품목명 | 품목명\t위 | 품목명\t아래: 부속명}, 고친때} · 바뀐 열쇠만 setDoc merge · onSnapshot.
+   월별 명세 「품목명」 = 같은 제품명·품목명 이면: 나뉘었으면 위·아래 두 이름(고른 부속명 또는 나눈이름) · 아니면 고른 부속명 · 없으면 그대로. 원본·PDF 그대로. ════ */
+const 품명자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_이룸_품목명'];
+let 품명값 = {}, 부속목록 = [], 부속읽음 = false, 부속왜 = '';
+window.폼품목받음 = (줄, 왜) => {
+  부속읽음 = !!줄; 부속왜 = 왜 || '';
+  const 다 = new Set();
+  for(const x of 줄 || []){ if(!x || x.ylwGone || x.status==='오류' || String(x.asset||'').trim()!=='반제품') continue;
+    const n = String(x.name||''), i = n.lastIndexOf('_'); const t = i >= 0 ? n.slice(i+1).trim() : ''; if(t) 다.add(t); }
+  부속목록 = [...다].sort((a,b) => a.localeCompare(b, 'ko'));
+  if(고른==='누계') 누계그리기();
+};
+if(window.폼품목대기) window.폼품목받음(...window.폼품목대기);
+const 나눔이름표 = { '상지판':['상판','지판'] };   /* 재단.html v1.8.5 그대로 */
+const 나눈이름 = m => 나눔이름표[String(m).trim()] || [m + 'R', m + 'L'];
+function 위수(나, n){
+  switch(나 && 나.방식){
+    case '위3': return Math.ceil(n/3);
+    case '아래3': return n - Math.floor(n/3);
+    case '직접': { if(!(나.원 > 0)) return Math.ceil(n/2);
+      const w = 나.원 === n ? 나.위 : Math.round(나.위 * n / 나.원);
+      return Math.max(0, Math.min(n, Math.round(w) || 0)); }
+    default: return Math.ceil(n/2);
+  }
+}
+const 품값 = p => 품명값[p] || {분할:{}, 부속:{}};
+const 나뉨 = (p, k) => 품값(p).분할[k];
+function 속명단추(p, k){
+  const v = 품값(p).부속[k] || '';
+  if(!부속읽음 || !부속목록.length) return `<button type="button" class="속명 없음${v?' on':''}" data-p="${글(p)}" data-k="${글(k)}" title="${글(부속읽음 ? '입력폼 품목등록 반제품 부속명 0건' : '입력폼 로그인 없음 — 부속명 목록 없음' + (부속왜 && 부속왜!=='입력폼 로그인 없음' ? ' (' + 부속왜 + ')' : ''))}">${v ? 글(v) : '▾'}</button>`;
+  return `<button type="button" class="속명${v?' on':''}" data-p="${글(p)}" data-k="${글(k)}"${v?` title="${글('입력폼 부속명 ' + v)}"`:''}>${v ? 글(v) : '▾'}</button>`;
+}
+function 누품목칸(p, m){
+  if(나뉨(p, m)){ const [위, 아래] = 나눈이름(m);
+    return `<td class="pm" data-p="${글(p)}" data-k="${글(m)}"><div class="반 위"><div class="품줄"><span class="pn">${글(위)}</span><button type="button" class="작 합" title="합치기">⋈</button></div>${속명단추(p, m + '\t위')}</div><div class="반 아래"><div class="품줄"><span class="pn">${글(아래)}</span></div>${속명단추(p, m + '\t아래')}</div></td>`; }
+  return `<td class="pm" data-p="${글(p)}" data-k="${글(m)}"><div class="품줄"><span class="pn">${글(m)}</span><button type="button" class="작 나눔">분할</button></div>${속명단추(p, m)}</td>`;
+}
+function 누수량칸(p, m, 합){
+  const 나 = 나뉨(p, m), n = Math.round(합);
+  if(!나 || n !== 합) return `<td class="num">${수글(합)}</td>`;
+  const 위 = 위수(나, n);
+  return `<td class="num qy" data-p="${글(p)}" data-k="${글(m)}" data-n="${n}"><div class="반 위"><button type="button" class="작 셋" data-w="위">3</button><input class="수" type="text" inputmode="numeric" data-w="위" value="${위}"></div>`
+       + `<div class="반 아래"><button type="button" class="작 셋" data-w="아래">3</button><input class="수" type="text" inputmode="numeric" data-w="아래" value="${n-위}"></div></td>`;
+}
+function 월품목명칸(p, m){
+  const 값 = 품값(p), 나 = 값.분할[m];
+  if(나){ const [위, 아래] = 나눈이름(m), a = 값.부속[m + '\t위'], b = 값.부속[m + '\t아래'];
+    return `<td title="${글('품목명 ' + m + ' — 누계에서 나눔')}"><div class="반 위">${글(a || 위)}</div><div class="반 아래">${글(b || 아래)}</div></td>`; }
+  const v = 값.부속[m];
+  return v ? `<td title="${글('품목명 ' + m + ' → 입력폼 부속명')}">${글(v)}</td>` : `<td>${글(m)}</td>`;
+}
+function 품명듣기(){
+  const { collection, onSnapshot } = window.fbRead;
+  onSnapshot(collection(window.db, ...품명자리), 눈 => {
+    눈.docs.forEach(d => { const x = d.data() || {}; if(!x.제품명) return; 품명값[x.제품명] = {분할:(x.분할 && typeof x.분할==='object') ? x.분할 : {}, 부속:(x.부속 && typeof x.부속==='object') ? x.부속 : {}}; });
+    const 있음 = new Set(눈.docs.map(d => (d.data()||{}).제품명)); for(const p of Object.keys(품명값)) if(!있음.has(p)) delete 품명값[p];
+    다시그림();
+  }, () => {});
+}
+function 다시그림(){
+  if(document.activeElement && document.activeElement.matches && document.activeElement.matches('#속 input.수')) return;   /* 치는 중 */
+  if(고른==='누계'){ if(달들.every(m => 받은[m])) 누계그리기(); }
+  else if(받은[고른]){ const 통 = document.querySelector('#속 .표통'), 자 = 통 ? [통.scrollLeft, 통.scrollTop] : null; 그리기(받은[고른]); const 새 = document.querySelector('#속 .표통'); if(새 && 자){ 새.scrollLeft = 자[0]; 새.scrollTop = 자[1]; } }
+}
+function 품명쓰기(p, 칸, k, v){
+  const { deleteField, doc, setDoc } = window.fbRead;
+  const 새 = JSON.parse(JSON.stringify(품값(p)));
+  if(v == null) delete 새[칸][k]; else 새[칸][k] = v;
+  if(JSON.stringify(새[칸][k] ?? null) === JSON.stringify(품값(p)[칸][k] ?? null)) return;
+  품명값[p] = 새; 다시그림();
+  setDoc(doc(window.db, ...품명자리, 문이름(p)), {제품명:p, [칸]:{[k]: v == null ? deleteField() : v}, 고친때:new Date().toISOString()}, {merge:true})
+    .then(() => 띠(''), e => 띠('저장하지 못했습니다 — 새로고침 뒤 다시 해 보십시오 ' + ((e&&(e.code||e.message))||'')));
+}
+function 분할바꾸기(p, k, 나){
+  품명쓰기(p, '분할', k, 나);
+  if(!나){ const 부 = 품값(p).부속; if(부[k + '\t위'] != null) 품명쓰기(p, '부속', k + '\t위', null); if(부[k + '\t아래'] != null) 품명쓰기(p, '부속', k + '\t아래', null); }
+}
+let 속명창 = null;
+function 속명닫기(){ if(속명창){ 속명창.remove(); 속명창 = null; } }
+function 속명열기(b){
+  속명닫기();
+  const p = b.dataset.p, k = b.dataset.k, 지금 = 품값(p).부속[k] || '';
+  const d = document.createElement('div'); d.className = 'vpd';
+  d.innerHTML = (지금 ? `<div class="act" data-v="" title="풀기">×</div>` : '') + 부속목록.map(v => `<div data-v="${글(v)}"${v===지금?' class="on"':''}>${글(v)}</div>`).join('');
+  document.body.appendChild(d); 속명창 = d;
+  const q = b.getBoundingClientRect(), 끝 = 화면끝(); d.style.maxHeight = Math.max(80, Math.min(360, 끝 - 8)) + 'px';
+  const w = d.offsetWidth, h = d.offsetHeight;
+  let x = q.right + 10, y = Math.max(4, Math.min(q.top, 끝 - h - 4));   /* 칸 옆 10px(오른쪽, 자리 없으면 왼쪽) */
+  if(x + w > innerWidth - 4) x = q.left - 10 - w >= 4 ? q.left - 10 - w : Math.max(4, innerWidth - w - 4);
+  d.style.left = x + 'px'; d.style.top = y + 'px';
+  d.addEventListener('mousedown', e => e.preventDefault());
+  d.addEventListener('click', e => { const it = e.target.closest('[data-v]'); if(!it) return; 속명닫기(); 품명쓰기(p, '부속', k, it.dataset.v || null); });
+}
+document.addEventListener('click', e => {
+  const t = e.target;
+  if(속명창 && !t.closest('.vpd') && !t.closest('.속명')) 속명닫기();
+  const b = t.closest('#속 .속명'); if(b){ if(b.classList.contains('없음')) return; if(속명창 && 속명창.dataset.k === b.dataset.k) { 속명닫기(); return; } 속명열기(b); 속명창.dataset.k = b.dataset.k; return; }
+  const pm = t.closest('#속 td.pm');
+  if(pm){ if(t.closest('.나눔')) 분할바꾸기(pm.dataset.p, pm.dataset.k, {방식:'반'}); else if(t.closest('.합')) 분할바꾸기(pm.dataset.p, pm.dataset.k, null); return; }
+  const 셋 = t.closest('#속 td.qy .셋');
+  if(셋){ const td = 셋.closest('td'); 품명쓰기(td.dataset.p, '분할', td.dataset.k, {방식: 셋.dataset.w==='위' ? '위3' : '아래3'}); }
+});
+document.addEventListener('keydown', e => { if(e.key==='Escape') 속명닫기(); });
+function 수량고침(input, 저장){
+  const td = input.closest('td.qy'), n = +td.dataset.n;
+  let v = parseInt(String(input.value).replace(/[^\d]/g,''), 10); if(isNaN(v)) v = 0;
+  v = Math.max(0, Math.min(n, v));
+  const 남 = td.querySelector(`input.수[data-w="${input.dataset.w==='위'?'아래':'위'}"]`); if(남) 남.value = n - v;
+  if(!저장) return;
+  input.value = v;
+  const 위 = input.dataset.w==='위' ? v : n - v, 나 = 나뉨(td.dataset.p, td.dataset.k);
+  if(나 && 위수(나, n) === 위) return;
+  input.blur();
+  품명쓰기(td.dataset.p, '분할', td.dataset.k, {방식:'직접', 위, 원:n});
+}
+document.addEventListener('input', e => { if(e.target.matches('#속 td.qy input.수')) 수량고침(e.target, false); });
+document.addEventListener('change', e => { if(e.target.matches('#속 td.qy input.수')) 수량고침(e.target, true); });
+document.addEventListener('keydown', e => { if(e.key==='Enter' && e.target.matches('#속 td.qy input.수')){ e.preventDefault(); 수량고침(e.target, true); } });
 
 /* ════ v1.4.0 단품 목록 = 그 줄 출고업체의 업체별 단품명 단품(`업체단품목록.js`) — 아래 옛 설명의 벤더피아 목록·실시간은 뺌. 저장은 그대로.
    ════ 제품명 ↔ 벤더피아 단품 (v1.2.0) — 재단.html 단품 검색과 같은 방식(검색·고르기까지만, 품목 연결·공통 숫자·분할 없음) ════
