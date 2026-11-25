@@ -2,7 +2,8 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.118.2
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.119.0
+     v2.119.0(11-26): 사장님 「품목명 입력되면 열 변동 생기네 … 가만히 있어야 안 헷갈리지. 시키지 않은 짓거리 좀 하지 마라」 · 「칸 선택도 느리고, 엄한 곳에 복사되고, 입력감이 영 구리다」 — ① 빈 열 접기(v2.32 열접기 · 펼쳐보기 단추 · #속 MutationObserver) 없앰 = 열은 늘 그 자리 ② 느림 = 공통반자재 값 찾기(공통번묶 → 공통묶음들)가 값 하나 읽을 때마다 _입력 전체를 다시 훑음(칸 한 번 고침 = 공통묶음들 55만 번 · 보일품목 1,700번 · 약 20초) → 공통묶음들 · 보일품목 = 한 차례(같은 일 묶음) 안에서 한 번 셈(캐시, 입력이 바뀌면 비움).
      v2.118.2(11-26): 공통반자재 품목명을 넣으면 품명 꼬리(부속명 _도어L 등)가 사라져 공정흐름 자동·보링 부속명이 끊기던 것 → 꼬리는 원래 품명(r.원명)에서.
      v2.118.1(11-26): 공통반자재 품목명을 넣으면 동일속성 짝(부속명 = 품명 마지막 _ 뒤)이 끊겨 합판코드·결보호 등이 비던 것 → 동일짝셈 = 원래 줄(품목원) 품명·품번 · 공통 품번 값 = 묶인 줄의 손 값 또는 동일속성 받은 값.
      v2.118.0(11-26): 사장님 정정 「품명·품번을 아래로 나열해야 한눈에 보이지」 — 공통반자재 탭 칸 = 규격 · 원장 · 새 품목명 · 새 품번 · 제품 · 품명 · 품번 · 묶인 반제품마다 한 줄(위아래) · 앞 다섯 칸 = 묶음 합친 칸(rowspan) · 묶음 사이 굵은 선 · 「묶인 반제품」 긴 칸 없앰(풀기 = 품목등록업로드 「공통」 칸 누름 → 묻고 풂). 계산 표에 합친 칸(rs)·숨은 칸(숨)·묶음 선(선) 받음.
@@ -480,7 +481,7 @@ body:not(.펼침) .dpr-t .접힘{display:none}   /* v2.32.0 빈 열 접힘 — �
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.118.2</div>
+  <div class="badge">v2.119.0</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <div class="머리줄"><h1>영림원품목등록</h1><div id="설정" class="탭단추" hidden><div class="설정이름">입력설정</div><div class="기타줄"></div></div></div>
@@ -517,7 +518,7 @@ const 문서이름 = u => String(u).replace(/\//g,'／');
    #속 안 모든 .dpr-t: 머리가 필수(th.필수 빨강)가 아니고, 그 열 모든 줄 칸이 빈 글자면 th·td 에 .접힘(화면에서만 숨김 — 표·값·복사·저장은 그대로).
    남기는 열: 필수 · 값 있는 칸 · 입력 칸(td.편 — 숨기면 입력을 못 함) · 모자람 칸(주황 = 채울 자리 표시). 펼쳐보기(body.펼침) = 모두 보임.
    #속 이 바뀌면(시트 바꿈·입력·편집·자료 갱신) 다시 셈 → 값이 생긴 열은 저절로 풀림. */
-function 열접기(){
+function 열접기(){ return;   /* v2.119.0 빈 열 접기 없앰 — 열은 늘 그 자리(사장님 「시키지 않은 짓거리 좀 하지 마라」) */
   const 속 = document.getElementById('속'); if(!속) return;
   for(const t of 속.querySelectorAll('table.dpr-t')){
     const 머 = t.tHead && t.tHead.rows[t.tHead.rows.length-1]; if(!머) continue;
@@ -531,8 +532,7 @@ function 열접기(){
   }
 }
 let 접기틀 = 0;
-new MutationObserver(() => { if(!접기틀) 접기틀 = requestAnimationFrame(() => { 접기틀 = 0; 열접기(); }); })
-  .observe(document.getElementById('속'), { childList:true, subtree:true, characterData:true });
+/* v2.119.0 빈 열 접기 지켜보기 없앰 */
 
 window.목록읽기 = async function(){
   try{
@@ -550,10 +550,10 @@ window.목록읽기 = async function(){
     const 흐름단추 = u => { const 갈 = 계산시트[u] && Object.keys(계산시트[u].탭); return 갈 && 갈.length > 1 ? `<span class="갈래">${단추(u)}<span class="갈래선"></span><span class="갈래목">${갈.map(t => `<button class="chip" data-u="${글(u)}" data-t="${글(t)}">${글(t)}</button>`).join('')}</span></span>` : 단추(u); };   /* v2.84.0 하위 탭 = 흐름 안 두 갈래 */
     document.getElementById('고름').innerHTML = '<div class="흐름줄">' + 탭들.filter(u => 흐름탭.includes(u)).map(흐름단추).join('<span class="흐름화살">→</span>') + '</div>';
     document.querySelector('#설정 .기타줄').innerHTML = 탭들.filter(u => !흐름탭.includes(u)).map(단추).join('')
-      + `<button class="chip" data-u="${추가}" hidden>${추가}</button><button class="chip" data-u="${방법}">${방법}</button><button class="chip" id="펼쳐보기">펼쳐보기</button><span id="폼상태" class="폼상태"></span>`; document.getElementById('설정').hidden = false;
+      + `<button class="chip" data-u="${추가}" hidden>${추가}</button><button class="chip" data-u="${방법}">${방법}</button><span id="폼상태" class="폼상태"></span>`; document.getElementById('설정').hidden = false;
     document.querySelectorAll('.탭단추 .chip[data-u]').forEach(b => b.onclick = () => { if(b.dataset.t) 계산탭[b.dataset.u] = b.dataset.t; 시트고름(b.dataset.u); });
     흐름상태예약();   /* v2.81.0 */
-    document.getElementById('펼쳐보기').onclick = e => { const on = document.body.classList.toggle('펼침'); e.currentTarget.classList.toggle('on', on); };   /* v2.32.0 */
+
     시트고름((()=>{ try{ return decodeURIComponent(location.hash); }catch(e){ return location.hash; } })()==='#등록방법' ? 방법 : 시트들[0].이름);   /* v2.25.1 주소 #등록방법 = 등록 방법 바로 열기(AI 작업자용) */
     대조구독();
     조립단가구독();   /* v2.87.0 */
@@ -599,7 +599,7 @@ function 대조구독(){
     if(!n){ 대조(); return; }
     for(let k=0;k<n;k++) 품목끊기.push(onSnapshot(doc(window.db, ...창고자리, `${문서이름(품목시트)}_${k+1}`), s => {
       const 바뀜 = 품목조각.every(x => x);
-      품목원[k] = s.exists() ? (s.data().줄||[]) : []; 품목조각 = 공통적용();   /* v2.115.0 공통반자재 = 이름·번호 바꿔 셈 */
+      품목원[k] = s.exists() ? (s.data().줄||[]) : []; 캐시비움(); 품목조각 = 공통적용();   /* v2.115.0 공통반자재 = 이름·번호 바꿔 셈 */
       if(!품목조각.every(x => x)) return;
       if(바뀜 && 받은[품목시트]){ 받은[품목시트] = 표만들기(품목칸, [].concat(...품목조각), 품목시트); if(고른===품목시트) document.getElementById('속').replaceChildren(받은[품목시트]); }
       대조(); BOM다시(); 연동칠();
@@ -858,7 +858,8 @@ function 흐름공정(v){
 const 모 = (v, 왜) => ({ v, 모:왜 }), 꼭 = (v, 왜) => ({ v, 모:'꼭 채울 칸 — ' + 왜, 꼭:1 }), 영 = (v, 왜) => ({ v, 영:왜 }), 설 = (v, 왜) => ({ v, t:왜 });
 const 칸값 = c => c && typeof c==='object' ? c.v : c;
 const 공정글 = (o, 공) => o.확 ? 공 : 모(공, `입력폼 공정흐름 상세를 못 읽음(로그인 필요) — 흐름 이름 「${o.f.v}」을 나눈 값. 영림원 공정 이름과 다를 수 있음(예: 흐름 백색코(2.7(E0))-재단 의 공정 = 백색코(M2.7(E0)))`);
-function 보일품목(){   /* 한 제품 + 그 반제품(품목등록업로드 차례) — 다 받기 전엔 null */
+function 보일품목(){ if(보일캐시) return 보일캐시; const r = 보일품목셈(); if(r){ 캐시예약(); 보일캐시 = r; } return r; }   /* v2.119.0 */
+function 보일품목셈(){   /* 한 제품 + 그 반제품(품목등록업로드 차례) — 다 받기 전엔 null */
   if(!품목칸 || !품목조각.length || 품목조각.some(x => !x)) return null;
   공규칙셈();
   const I = k => 품목칸.indexOf(k), 트 = (v, i) => i<0 ? '' : String(v[i]??'').trim();
@@ -1593,7 +1594,11 @@ const 동일칸 = new Set(['보드두께','엣지두께','공정흐름','엣지W
 let 동일묶음 = {}, 동일짝 = new Map();
 /* v2.115.0 공통반자재 — 저장 _입력 #공통 {줄@id: '원품번|…', 명@id, 번@id} */
 const 공통자리 = '#공통';
-function 공통묶음들(){
+let 공통캐시 = null, 보일캐시 = null, 캐시틀 = 0;   /* v2.119.0 한 차례 안에서 한 번 셈 */
+function 캐시비움(){ 공통캐시 = null; 보일캐시 = null; }
+function 캐시예약(){ if(!캐시틀) 캐시틀 = setTimeout(() => { 캐시틀 = 0; 캐시비움(); }, 0); }
+function 공통묶음들(){ if(공통캐시) return 공통캐시; 캐시예약(); return 공통캐시 = 공통묶음셈(); }
+function 공통묶음셈(){
   const 키 = new Set(Object.keys(입력[공통자리] || {})); for(const x of 더럽.keys()) if(x.startsWith(공통자리 + '\t')) 키.add(x.slice(공통자리.length + 1));
   return [...키].filter(k => k.startsWith('줄@')).map(k => { const id = k.slice(2), 줄 = [...new Set(원값(공통자리, k).split('|').map(x => x.trim()).filter(Boolean))];
     return { id, 줄, 명:원값(공통자리, '명@' + id).trim(), 번:원값(공통자리, '번@' + id).trim() }; }).filter(g => g.줄.length >= 2);
@@ -1609,7 +1614,7 @@ function 공통적용(){
 function 공통확인(){   /* 묶음·이름·번호가 바뀌면 품목 줄을 다시 셈 → 모든 탭 */
   const 판 = JSON.stringify(공통묶음들()); if(판 === 공통판) return; 공통판 = 판;
   if(!품목원.length || 품목원.some(x => !x)) return;
-  품목조각 = 공통적용(); try{ if(받은[품목시트]) 받은[품목시트] = 표만들기(품목칸, [].concat(...품목조각), 품목시트); if(고른===품목시트) document.getElementById('속').replaceChildren(받은[품목시트]); }catch(e){}
+  캐시비움(); 품목조각 = 공통적용(); 캐시비움(); try{ if(받은[품목시트]) 받은[품목시트] = 표만들기(품목칸, [].concat(...품목조각), 품목시트); if(고른===품목시트) document.getElementById('속').replaceChildren(받은[품목시트]); }catch(e){}
   try{ 고른제품바뀜(); }catch(e){}
 }
 const 공통번묶 = p => 공통묶음들().find(g => g.번 && g.번 === p) || null;
@@ -2367,6 +2372,7 @@ function 재단칠(){
 /* 저장 — 바뀐 칸만 merge */
 let 저장틀 = null;
 function 바꿈(목){
+  캐시비움();   /* v2.119.0 */
   let n = 0, 틀림 = null;
   { const 앞줄 = [], 본 = new Set();   /* v2.60.0 품목이 기본값을 쓰던 공정을 고치면 → 기본값 줄을 먼저 그 품목 값으로 옮기고 고침을 얹음 */
     for(const x of 목){ const m = /^(wc|wcr|wct|wctm)@(.+)@(\d+)$/.exec(String(x.k)); if(!m || x.p===공정기본 || 본.has(x.p + '\t' + m[2])) continue; 본.add(x.p + '\t' + m[2]);
@@ -2391,7 +2397,7 @@ function 바꿈(목){
   });
   if(틀림){ const 통 = 받은[품목시트], td = 통 && 통.querySelector ? [...통.querySelectorAll('td[data-k="공정흐름"]')].find(t => t.parentNode.dataset.p===틀림.p) : null;
     막음알림(td, '공정흐름 목록에 없음 — 드롭에서 고르세요'); }
-  for(const x of 목){ if(원값(x.p,x.k)===x.v) continue;   /* v2.96.0 손 값과 견줌 */ 더럽.set(열쇠(x.p,x.k), x.v); n++; }
+  for(const x of 목){ if(원값(x.p,x.k)===x.v) continue;   /* v2.96.0 손 값과 견줌 */ 더럽.set(열쇠(x.p,x.k), x.v); n++; } 캐시비움();
   if(!n) return;
   칸칠(); 연동칠(); 폼상태('저장 중…');
   clearTimeout(저장틀); 저장틀 = setTimeout(저장, 300);
@@ -2408,7 +2414,7 @@ function 입력지도(){
   return m; }
 function 입력조각(p){ p = String(p); if(p.startsWith('#')) return '_공통'; const m = 입력지도(); if(m.has(p)) return 조각이름(m.get(p));
   let 큰 = ''; for(const q of m.keys()) if(q.length > 큰.length && p.startsWith(q + '_')) 큰 = q; return 큰 ? 조각이름(m.get(큰)) : '_공통'; }
-function 입력모음(){ if(입력새 === null) return; if(!입력새.size && 입력옛) { 입력 = JSON.parse(JSON.stringify(입력옛)); 입력옮기기(); }
+function 입력모음(){ 캐시비움(); if(입력새 === null) return; if(!입력새.size && 입력옛) { 입력 = JSON.parse(JSON.stringify(입력옛)); 입력옮기기(); }
   else { const 모 = {}; for(const v of 입력새.values()) for(const [p, o] of Object.entries((v && v.값) || {})) 모[p] = Object.assign(모[p] || {}, o); 입력 = 모; }
   칸칠(); 연동칠(); }
 function 입력나눔구독(){
@@ -2433,7 +2439,7 @@ async function 저장(){
     const { doc, setDoc } = window.fbRead;
     { const 조 = new Map(), 지금 = new Date().toISOString(); for(const [p, o] of Object.entries(묶음)){ const k = 입력조각(p); if(!조.has(k)) 조.set(k, {}); 조.get(k)[p] = o; }   /* v2.105.0 조각마다 */
       await Promise.all([...조].map(([k, 값]) => setDoc(doc(window.db, ...입력자리, k), { 값, 고친때:지금 }, { merge:true }))); }
-    for(const [x,v] of 보낼){ const [p,k] = x.split('\t'); (입력[p] ||= {})[k] = v; if(더럽.get(x)===v) 더럽.delete(x); }
+    for(const [x,v] of 보낼){ const [p,k] = x.split('\t'); (입력[p] ||= {})[k] = v; if(더럽.get(x)===v) 더럽.delete(x); } 캐시비움();
     큰알림(null); 폼상태('저장됨 ' + new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}));
     칸칠(); 연동칠();
   }catch(e){
@@ -2650,6 +2656,7 @@ const 한제품명 = '(KRW) 알렉스 1200 높은 수납장 올화이트';
 /* v2.94.0 보이는 제품 = 「품목등록test서버용」 쪽 체크(창고 _고른제품 {제품:[제품 품번…]}) · 문서가 없으면(null) 위 한제품명 제품 하나(처음 값) */
 let 고른제품 = null, 고른제품글 = 'null';
 function 고른제품바뀜(){
+  캐시비움();   /* v2.119.0 */
   품목열쇠 = ''; 품목다시();
   if(BOM원 && 받은[BOM시트]){ BOM거름 = ''; BOM다시(); }
   try{ if(계산시트[고른]) 계산그리기(고른); }catch(e){} try{ 흐름상태예약(); }catch(e){} try{ 모두보내기(); }catch(e){}
