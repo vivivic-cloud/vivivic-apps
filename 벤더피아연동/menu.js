@@ -30,6 +30,16 @@
     { name: "하우저", url: "/System/Sales/orderMst.aspx#vgHau" },
   ];
 
+  /* 11-25 [새 지시 지난작업보기] 사장님(그대로): 「메인에 작게 지난작업보기 버튼을 만들어 현재 비요크선불비변경을 그쪽으로 옮겨주세요. 해당 작업은 일회성 메뉴이기 때문에 차후 비슷한 작업이 발생했을때 꺼내 활용할 수 있어야 하니 이 메뉴의 기능이 무엇이고 어떤작업을 했는지 기록해 주세요.」
+     일회성 메뉴는 여기에 한 줄 넣는다 → 메인 맨 아래 작은 「지난작업보기」 를 누르면 펼쳐지는 목록에 단추로 나온다(누르면 새 탭, PAGES 와 같음).
+     무엇을 했는지 = `지난작업/<이름>.md` · 목록 = CLAUDE.md 「지난작업보기」. */
+  const 지난작업 = [
+    /* 11-25 [새 지시 비요크선불비변경] 「메인에 이파일을 목록화한 페이지 만들어줘 - 메뉴이름 비요크선불비변경」
+       — 주문관리 쪽 + `#vgByk` → search.js 가 표를 세우고 비요크.js 가 올린 .xlsx 를 브라우저 안에서만 읽어 그린다.
+       기록 `지난작업/비요크선불비변경.md` */
+    { name: "비요크선불비변경", url: "/System/Sales/orderMst.aspx#vgByk" },
+  ];
+
   /* 10-26 [새 지시 새창] 사장님: 「현재 페이지에서 어떤방식으로든 단품관리 상품관리등 링크를 타고 넘어갈때 화면 전환이 아닌 새페이지로 나타나게 해줘」
      → 메뉴 단추는 `target="_blank"` 로 **새 탭**에 연다 (이 메뉴 화면은 그대로 남는다). */
 
@@ -43,6 +53,9 @@
     <div class="box">
       <h1>벤더피아</h1>
       ${PAGES.map((p) => `<a class="vp-btn" href="${p.url}" target="_blank" rel="noopener">${p.name}</a>`).join("")}
+      ${지난작업.length ? `<details class="vp-지난"><summary>지난작업보기</summary>
+        ${지난작업.map((p) => `<a class="vp-지난btn" href="${p.url}" target="_blank" rel="noopener">${p.name}</a>`).join("")}
+      </details>` : ""}
     </div>`;
   document.body.appendChild(root);
   document.documentElement.classList.add("vp-clean");

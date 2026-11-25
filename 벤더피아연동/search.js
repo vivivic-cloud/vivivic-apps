@@ -270,7 +270,11 @@
      메인 메뉴 「하우저」 = `orderMst.aspx#vgHau` — CS정산과 같은 길: 이 글이 쪽 틀과 표(`머리알기`+`addRows`)를 세우고 형제 `하우저.js` 가
      상품관리(salesGoods.aspx)를 배송사 하우저로 조회만 해 이 표에 그린다(확장 안 글은 그대로 → 덮어쓰기 없음). */
   const 하우저보기 = CS전용 && /(^|[#&])vgHau\b/i.test(location.hash || "");
-  const 따로보기 = 정산보기 || 하우저보기;            // 주문관리 목록·검색창 대신 다른 글이 표를 채우는 쪽
+  /* 11-25 [새 지시 비요크선불비변경] 사장님(그대로): 「메인에 이파일을 목록화한 페이지 만들어줘 - 메뉴이름 비요크선불비변경」
+     메인 메뉴 「비요크선불비변경」 = `orderMst.aspx#vgByk` — 하우저와 같은 길: 이 글이 쪽 틀과 표를 세우고 형제 `비요크.js` 가
+     사장님이 올린 .xlsx 를 브라우저 안에서만 읽어 이 표에 그린다(벤더피아 쓰기 0, 확장 안 글 그대로 → 덮어쓰기 없음). */
+  const 비요크보기 = CS전용 && /(^|[#&])vgByk\b/i.test(location.hash || "");
+  const 따로보기 = 정산보기 || 하우저보기 || 비요크보기;   // 주문관리 목록·검색창 대신 다른 글이 표를 채우는 쪽
   function 상담내용보기() {
     const 주소 = "/System/CS/inquiryList.aspx";
     const 숨은칸 = new Set(["", "주문번호", "ctCd", "inquiryCd", "매출처", "매출처주문번호", "매출처상품코드", "주문자", "주문자전화",
@@ -505,7 +509,7 @@
   root.innerHTML = CS전용 ? `
     <div class="vp-search">
       <a class="vp-home" href="/index.aspx">← 메인</a>
-      ${정산보기 ? "<h1>CS정산</h1>" : 하우저보기 ? "<h1>하우저</h1>" : `<div class="vp-머리줄"><h1>CS등록</h1><a class="vp-머리단추" href="/System/Sales/orderMst.aspx#vgInq" target="_blank" rel="noopener">상담내용보기</a><button type="button" class="vp-머리단추 vp-모든랙단추">모든랙주문확인</button></div>`}
+      ${정산보기 ? "<h1>CS정산</h1>" : 하우저보기 ? "<h1>하우저</h1>" : 비요크보기 ? "<h1>비요크선불비변경</h1>" : `<div class="vp-머리줄"><h1>CS등록</h1><a class="vp-머리단추" href="/System/Sales/orderMst.aspx#vgInq" target="_blank" rel="noopener">상담내용보기</a><button type="button" class="vp-머리단추 vp-모든랙단추">모든랙주문확인</button></div>`}
       <form class="vp-bar"${따로보기 ? ' style="display:none"' : ""}>
         <input type="date" name="from" required>
         <span>~</span>
@@ -1983,19 +1987,25 @@
        확인하여 각 데이터 열의 넓이를 조정할 수 있게 하고 최대한 벤더피아의 실제 화면과 최대한 비슷한 모습으로 보이도록 텍스트 사이즈 등을 조정해 주세요.」
      칸 넓이는 `<col>` 이 정한다(table-layout: fixed). 처음 넓이 = 글 너비에 맞춤(받은 줄을 볼 때마다 넓어지기만, `자동`) · 끌어 바꾼 칸은 그 값(`둠`).
      저장 = localStorage 「vp열넓이:배송」·「vp열넓이:CS」 `{칸이름: px}`(같은 이름 둘째 칸은 「이름#2」). 경계를 두 번 누르면 그 칸만 처음 넓이로. */
-  const 넓이열쇠 = "vp열넓이:" + (하우저보기 ? "하우저" : CS전용 ? "CS" : "배송");
+  const 넓이열쇠 = "vp열넓이:" + (하우저보기 ? "하우저" : 비요크보기 ? "비요크" : CS전용 ? "CS" : "배송");
   /* 11-17 [새 지시 모든표 통일] 넓이 틀·글 맞춤은 공용 부품 `VP표`(vp-data.js)로 옮겼다 — 단품·상품·재고·상담내용보기 표와 **같은 코드**.
      여기는 배송·CS 표만의 규칙(끝값·더함)만 넘긴다. 숫자는 옮기기 전과 같다(일반 130 · 상품명·단품명·단품구성·옵션 200 · 이름 단추 칸 280(+110) · 주문칸 200(+40)). */
   const 여유 = 8, 끝넓이 = 130, 긴칸끝 = 200, 이름칸끝 = 280;
   const 긴칸 = /상품명|단품명|단품구성|옵션/;
   let 넓이판 = null;
+  /* 11-25 [새 지시 비요크연결] 고름 칸(체크상자) — 따로보기 표가 `그리기(…, {고름:true})` 로 켤 때만. 그린머리 밖 맨 앞 칸이라 칸 자리(상품칸자리 등)는 그대로, 셀만 하나 밀린다. */
+  let 고름칸 = false;
+  const 첫칸 = (i) => i === 0 && !고름칸;
   function 넓이틀(t, heads) {
+    if (고름칸) heads = ["고름", ...heads];
     넓이판 = window.VP표 ? window.VP표.넓이틀(t, heads, 넓이열쇠) : null;   // vp-data.js 를 안 싣는 옛 흉내 시험에서는 넓이 없이 그린다
   }
   /* 받은 줄의 글에 맞춰 처음 넓이를 넓힌다 — 끝값까지만. 이름 칸은 단추 뒤 코드·양품, 주문칸은 상담 알약 자리를 더 둔다. */
   function 넓이맞춤(rows) {
     if (!넓이판) return;
+    if (고름칸) rows = rows.map((r) => ["", ...r]);
     넓이판.맞춤(rows, (i, h) => {
+      if (고름칸) { if (i === 0) return { 끝: 30, 더함: 0, 굵게: false }; i--; }
       const 이름칸 = i === 상품칸자리 || i === 단품칸자리 || i === 단품구성자리;
       return { 끝: 이름칸 ? 이름칸끝 : i === 주문칸자리 || 긴칸.test(h) ? 긴칸끝 : 끝넓이,
         더함: 여유 + (이름칸 ? 110 : i === 주문칸자리 ? 40 : 0), 굵게: 이름칸 };
@@ -2009,10 +2019,21 @@
       const t = document.createElement("table");
       t.className = "vp-촘촘";
       const head = t.createTHead().insertRow();
+      if (고름칸) {
+        /* 11-25 [새 지시 비요크연결] 사장님(그대로): 「선변경목록 cs 앞에 체크박스를 만들어주세요 전체 체크해제 가능해야 합니다.」 — 머리 칸 = 전체 체크·전체 해제 */
+        const th = head.appendChild(document.createElement("th"));
+        th.className = "vp-first vp-고름칸";
+        const 다 = th.appendChild(document.createElement("input"));
+        다.type = "checkbox"; 다.className = "vp-다고름"; 다.title = "전체 체크 · 전체 해제";
+        다.addEventListener("change", () => {
+          for (const c of t.querySelectorAll("tbody input.vp-줄고름")) c.checked = 다.checked;
+          다.indeterminate = false;
+        });
+      }
       그린머리.forEach((c, i) => {
         const th = head.appendChild(document.createElement("th"));
         th.textContent = c;
-        if (i === 0) th.className = "vp-first";        // 첫 칸은 가로로 밀어도 붙어 있는다
+        if (첫칸(i)) th.className = "vp-first";        // 첫 칸은 가로로 밀어도 붙어 있는다
       });
       tbody = t.createTBody();
       table.replaceChildren(t);
@@ -2021,16 +2042,28 @@
     넓이맞춤(rows);
     for (const row of rows) {
       const tr = tbody.insertRow();
+      if (고름칸) {
+        const td = tr.insertCell();
+        td.className = "vp-first vp-고름칸";
+        const 칸 = td.appendChild(document.createElement("label")).appendChild(document.createElement("input"));
+        칸.type = "checkbox"; 칸.className = "vp-줄고름";
+        칸.addEventListener("change", () => {
+          const 표 = tr.closest("table"), 다 = 표 && 표.querySelector("input.vp-다고름");
+          if (!다) return;
+          const 모두 = [...표.querySelectorAll("tbody input.vp-줄고름")], 켠 = 모두.filter((c) => c.checked).length;
+          다.checked = 켠 > 0 && 켠 === 모두.length; 다.indeterminate = 켠 > 0 && 켠 < 모두.length;
+        });
+      }
       const 주문 = 주문칸자리 >= 0 ? String(row[주문칸자리] == null ? "" : row[주문칸자리]).trim() : "";
       /* 11-04 [새 지시 취소줄색] 사장님(그대로): 「CS등록 목록에서 CS값이 취소 인 주문은 일반 주문과 구분되게 배경색 변경등을 적용해 주세요」
          CS등록 목록만 · 칸 이름 정확히 「CS」 · 값 정확히 「취소」(꼴은 search.css `tr.vp-취소줄`). */
-      if (CS전용 && String(row[그린머리.indexOf("CS")] == null ? "" : row[그린머리.indexOf("CS")]).trim() === "취소") tr.classList.add("vp-취소줄");
+      if (CS전용 && !비요크보기 && String(row[그린머리.indexOf("CS")] == null ? "" : row[그린머리.indexOf("CS")]).trim() === "취소") tr.classList.add("vp-취소줄");
       그린머리.forEach((c, i) => {
         const td = tr.insertCell();
         const 값 = row[i] === undefined ? "" : row[i];
         /* 11-07 [새 지시 CS상세단품단추] 단품구성 칸·「a + b」 인 단품명 칸 = 단추 여럿을 한 줄로(`.vp-표단품들`, 넘치면 칸 끌기) */
         if ((i === 단품구성자리 || (i === 단품칸자리 && String(값).includes("+") && String(row[단품코드자리] == null ? "" : row[단품코드자리]).includes("+"))) && String(값).trim()) {
-          td.className = "vp-상품칸 vp-단품칸" + (i === 0 ? " vp-first" : "");
+          td.className = "vp-상품칸 vp-단품칸" + (첫칸(i) ? " vp-first" : "");
           const 통 = td.appendChild(document.createElement("div"));
           /* 11-17 [새 지시 단품줄바꿈·가로스크롤] 사장님(그대로): 「cs등록 메뉴의 데이터화면의 단품명도 열바뀜으로 표기되게 해주세요」
              CS등록(주문관리 화면, CS정산·하우저 빼고)만 단추를 단품 하나에 한 줄로(`.vp-단품줄`, 꼴은 vp-data.js `VP표`) — 단추·누름은 그대로 */
@@ -2050,7 +2083,7 @@
              (옛 기록: 10-15 에 상품명 누름을 잡는 결로 가로채 상담 판을 같이 열었다가 상세를 덮어 「잘못된 작동」 이라 하셨다.
               지금은 같은 일이 안 생긴다 — 단추가 `stopPropagation` 하고, 줄의 누름은 단추·링크 위에서는 건너뛴다.) */
           const 종류 = i === 상품칸자리 ? "상품" : "단품";
-          td.className = "vp-상품칸" + (종류 === "단품" ? " vp-단품칸" : "") + (i === 0 ? " vp-first" : "");
+          td.className = "vp-상품칸" + (종류 === "단품" ? " vp-단품칸" : "") + (첫칸(i) ? " vp-first" : "");
           const 코드자리 = 종류 === "단품" ? 단품코드자리 : 상품코드자리;
           const 코드 = 코드자리 >= 0 && row[코드자리] != null ? String(row[코드자리]).trim() : "";
           상품칸들.push([td, 값, 종류, 코드]);
@@ -2059,7 +2092,7 @@
           return;
         }
         td.textContent = 값;
-        if (i === 0) td.className = "vp-first";
+        if (첫칸(i)) td.className = "vp-first";
         /* 상담 이력 단추 — **그 칸 안에** 작게 붙인다. 칸을 새로 내지 않는다
            (배송관리 23칸을 밀어내지 않는다 — 사장님이 그 칸을 다 보셔야 한다). */
         if (i === 주문칸자리 && String(값).trim()) {
@@ -2071,13 +2104,15 @@
       });
       /* 10-24 줄 자체를 누르면 「상담」 단추와 **같은 판**(고객정보·이력·교환·반품·AS 접수)이 열린다.
          이름 단추·상담 단추·링크 위의 누름은 그것들이 따로 처리한다. 글자를 끌어 고르던 중이면 안 연다(복사하실 때). */
-      if (주문) {
-        tr.classList.add("vp-줄상담");
-        tr.title = "줄을 누르면 상담 이력 · 교환 · 반품 · AS 접수";
+      if (주문 || 고름칸) {
+        if (주문) { tr.classList.add("vp-줄상담"); tr.title = "줄을 누르면 상담 이력 · 교환 · 반품 · AS 접수"; }
         tr.addEventListener("click", (e) => {
           if (e.target.closest && e.target.closest("button, a, input, select, textarea, label")) return;
           if (String(window.getSelection ? window.getSelection() : "").trim()) return;
-          상담판열기(주문, 상품칸자리 >= 0 ? String(row[상품칸자리] == null ? "" : row[상품칸자리]).trim() : "", row, 그린머리);
+          /* 11-25 [새 지시 비요크연결] 이은 줄은 이은 주문관리 주문(그 줄·그 머리)으로 연다 */
+          const 이음 = tr.vp이음;
+          if (이음) 상담판열기(이음.주문, 이음.상품명, 이음.줄, 이음.머리);
+          else if (주문) 상담판열기(주문, 상품칸자리 >= 0 ? String(row[상품칸자리] == null ? "" : row[상품칸자리]).trim() : "", row, 그린머리);
         });
       }
     }
@@ -2232,14 +2267,33 @@
     let 굿즈부름 = false;
     const 비우기 = () => {
       상담판닫기();
-      tbody = null; 그린머리 = null; 상품칸들 = []; 채울자리 = 0; 단추된것 = 0; 머리본것 = null; 상담칸들.length = 0;
+      tbody = null; 그린머리 = null; 상품칸들 = []; 채울자리 = 0; 단추된것 = 0; 머리본것 = null; 상담칸들.length = 0; 고름칸 = false;
       table.replaceChildren();
     };
+    /* 11-25 [새 지시 비요크연결] 그린 줄 i 를 주문관리 주문 하나와 잇는다 — 노란 줄(`tr.vp-이은줄`) + 줄 누름·상담 단추 = 그 주문.
+       이음 = {주문(몰 주문번호), 상품명, 줄, 머리}(줄·머리 = 주문관리 표에 보이는 칸 그대로, CS등록 줄과 같은 꼴). */
+    function 잇기(i, 이음) {
+      const tr = tbody && tbody.rows[i];
+      if (!tr || !이음 || !이음.주문) return false;
+      tr.vp이음 = 이음;
+      tr.classList.add("vp-이은줄", "vp-줄상담");
+      tr.title = "줄을 누르면 상담 이력 · 교환 · 반품 · AS 접수";
+      const td = 주문칸자리 >= 0 ? tr.cells[주문칸자리 + (고름칸 ? 1 : 0)] : null;
+      if (td) {
+        const 옛 = td.querySelector(".vp-상담알");
+        if (옛) { 옛.remove(); const k = 상담칸들.findIndex((x) => x[0] === td); if (k >= 0) 상담칸들.splice(k, 1); }
+        td.classList.add("vp-주문칸");
+        상담단추(td, 이음.주문, 이음.상품명, 이음.줄, 이음.머리);
+      }
+      return true;
+    }
     window.VP정산표 = {
       읽기: 목록고르기,
       비우기,
-      async 그리기(heads, rows) {
+      잇기,
+      async 그리기(heads, rows, 덧 = {}) {
         비우기();
+        고름칸 = !!덧.고름;
         머리알기(heads);
         const 숨김 = rows.length > 160;
         if (숨김) table.style.display = "none";
@@ -2253,9 +2307,11 @@
       },
     };
     if (하우저보기) window.VP하우저표 = window.VP정산표;   // 같은 표 — 이름만 하나 더
+    if (비요크보기) window.VP비요크표 = window.VP정산표;   // 같은 표 — 이름만 하나 더
+    const 글이름 = 하우저보기 ? "하우저" : 비요크보기 ? "비요크" : "cs정산";
     const sc = document.createElement("script");
-    sc.src = 형제(하우저보기 ? "하우저.js" : "cs정산.js");
-    sc.addEventListener("error", () => window.VP말?.((하우저보기 ? "하우저" : "CS정산") + ":글 못 받음"));
+    sc.src = 형제(글이름 + ".js");
+    sc.addEventListener("error", () => window.VP말?.((하우저보기 ? "하우저" : 비요크보기 ? "비요크" : "CS정산") + ":글 못 받음"));
     document.head.appendChild(sc);
   } else if (CS전용) CS목록보이기();
 })();

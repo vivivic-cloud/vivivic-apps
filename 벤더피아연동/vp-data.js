@@ -179,7 +179,7 @@ const VP_DATA = (() => {
     if (i < 0) { if (!깨움) 깨움 = setTimeout(() => { 깨움 = 0; 돌리기(); }, 200); return; }
     const x = 줄.splice(i, 1)[0];
     나감++; 나간것.add(x);
-    fetch(x.url, x.opt).then(x.됨, x.안됨).finally(() => { 나감--; 나간것.delete(x); 마지막끝 = Date.now(); 돌리기(); });
+    (x.일 ? Promise.resolve().then(x.일) : fetch(x.url, x.opt)).then(x.됨, x.안됨).finally(() => { 나감--; 나간것.delete(x); 마지막끝 = Date.now(); 돌리기(); });
   }
   const 벤더피아받기 = (url, opt = {}, 급 = "사람") => new Promise((됨, 안됨) => {
     const 끊개 = new AbortController();
@@ -187,6 +187,9 @@ const VP_DATA = (() => {
     줄.push({ url, opt: { ...opt, signal: 끊개.signal }, 급, n: 번호++, 끊개, 됨, 안됨 });
     돌리기();
   });
+  /* [새 지시 비요크저장안됨] 줄을 통째로 잡고 일(async)을 돌린다 — 그동안 이 문서의 다른 벤더피아 요청은 안 나간다(보호 급, 이미 나간 것은 끝난 뒤).
+     숨은 틀처럼 줄을 못 타는 요청(쪽이 직접 보내는 GET·저장 제출)이 우리 요청 뒤로 세션 잠금을 놓치지 않게. */
+  const 잡기 = (일) => new Promise((됨, 안됨) => { 줄.push({ url: "", 일, opt: {}, 급: "보호", n: 번호++, 끊개: new AbortController(), 됨, 안됨 }); 돌리기(); });
   const 올리기 = (url) => { for (const x of 줄) if (x.url === url && x.급 === "뒤") x.급 = "사람"; 돌리기(); };   // 누른 것이 기다리는 뒤 요청은 사람으로
   const 끊기 = () => {
     for (const x of 줄.splice(0)) { if (x.급 === "보호") 줄.push(x); else x.안됨(new DOMException("떠남", "AbortError")); }
@@ -548,7 +551,7 @@ const VP_DATA = (() => {
     });
   }
 
-  return { PAGES: PAGES_, list, ymd, prefetch, clearCache, 하나찾기, 단품검색, 받기: 벤더피아받기 };
+  return { PAGES: PAGES_, list, ymd, prefetch, clearCache, 하나찾기, 단품검색, 받기: 벤더피아받기, 잡기 };
 })();
 
 /* ── 공용 팝업 부품 `VP팝업(판, {머리, 몸})` (11-01 [새 지시 문의큰팝업]) ──

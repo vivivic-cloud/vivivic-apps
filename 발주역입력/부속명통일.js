@@ -10,6 +10,8 @@
      ② 입력폼 erp_items(페이지 모듈이 'erp-input' 로그인으로 읽어 window.폼품목받음(줄) 로 넘김) 대기·진행중·수정대기 반제품
      ③ erp_items 완료 중 createdAt ≥ 이후컷 이고 importedAt 없음. 이름 = 품명 마지막 「_」 뒤 · 같은 이름 하나.
    저장 = 창고 `<자리>/_전체` {분할:{품목명:{방식,위,원}}, 부속:{품목명 | 품목명\t위 | 품목명\t아래: 부속명}, 고친때} · 바뀐 열쇠만 setDoc merge · onSnapshot.
+   11-25 사장님 「부속명이 실시간 공유되어야 합니다」 — ②③(입력폼 erp_items 에서 뽑은 이름만)을 공개 사본 `발주역입력_부속명목록/_전체` {이름:[…], 고친때}에:
+     입력폼 로그인이 있는 쪽(이 파일을 쓰는 쪽 — 재단·이룸산업·로앤·조혼가구부속명)이 erp_items 를 받을 때마다 이름이 달라졌으면 씀 · 로그인 없는 쪽은 이 사본을 onSnapshot 으로 ②③ 대신 씀(①은 원래 공개). 이름 말고는 안 넣음.
    ⚠ 이벤트는 문서 전체에 한 번(#속 안 td.pm · td.qy · .속명) — 한 쪽에 만들기 하나만. */
 (function(){
   if(window.부속통일) return;
@@ -29,25 +31,45 @@
     }
   }
   /* ── 부속명 목록 ── */
-  let 목록 = [], 읽음 = false, 폼줄 = null, 받기줄 = null, 받기켬 = false;
+  let 목록 = [], 읽음 = false, 폼줄 = null, 받기줄 = null, 받기켬 = false, 사본 = null, 사본글 = '', 공db = null, 공fb = null;
+  const 사본자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_부속명목록'];
   const 듣는이 = [];
-  function 셈(){
-    읽음 = 폼줄 != null || 받기줄 != null;
+  function 폼이름(){   /* ②③ — 입력폼 erp_items 에서 뽑은 부속명 */
     const 다 = new Set();
-    for(const z of 받기줄 || []){ const 품 = z && z.품목등록 || {}; if(String(품.품목자산분류||'').trim()==='반제품'){ const t = 꼬리(품.품명); if(t) 다.add(t); } }
     for(const x of 폼줄 || []){ if(!x || x.ylwGone || String(x.asset||'').trim()!=='반제품') continue;
       const st = String(x.status||''), 새완료 = st==='완료' && !x.importedAt && String(x.createdAt||'') >= 이후컷;
       if(!['대기','진행중','수정대기'].includes(st) && !새완료) continue;
       const t = 꼬리(x.name); if(t) 다.add(t); }
+    return [...다].sort((a,b) => a.localeCompare(b, 'ko'));
+  }
+  function 사본쓰기(이름){   /* 로그인 쪽 — 달라졌을 때만 */
+    if(!공fb || !공db) return; const 글 = JSON.stringify(이름); if(글 === 사본글) return; 사본글 = 글;
+    공fb.setDoc(공fb.doc(공db, ...사본자리, '_전체'), { 이름, 고친때:new Date().toISOString() }).catch(() => { 사본글 = ''; });
+  }
+  function 셈(){
+    읽음 = 폼줄 != null || 받기줄 != null || 사본 != null;
+    const 다 = new Set();
+    for(const z of 받기줄 || []){ const 품 = z && z.품목등록 || {}; if(String(품.품목자산분류||'').trim()==='반제품'){ const t = 꼬리(품.품명); if(t) 다.add(t); } }
+    if(폼줄 != null){ const 이 = 폼이름(); 이.forEach(t => 다.add(t)); 사본쓰기(이); }   /* 로그인 있음 = 입력폼 그대로 + 사본 고침 */
+    else for(const t of 사본 || []) 다.add(t);   /* 로그인 없음 = 공개 사본 */
     목록 = [...다].sort((a,b) => a.localeCompare(b, 'ko'));
     듣는이.forEach(f => { try{ f(); }catch(e){} });
   }
   window.폼품목받음 = (줄) => { 폼줄 = 줄; 셈(); };
   if(window.폼품목대기) window.폼품목받음(...window.폼품목대기);
   function 받기듣기(db, fb){
-    if(받기켬) return; 받기켬 = true;
-    fb.onSnapshot(fb.doc(db, 'artifacts','vivivic-4b7ef','public','data','발주역입력_영림원폼','_품목_영림원품목등록'), d => {
-      받기줄 = (d.exists() && d.data().보내기 && d.data().보내기.줄) || []; 셈(); }, () => {});
+    if(받기켬) return; 받기켬 = true; 공db = db; 공fb = fb;
+    fb.onSnapshot(fb.doc(db, ...사본자리, '_전체'), d => { const x = d.exists() ? d.data() : null;
+      사본 = x && Array.isArray(x.이름) ? x.이름.map(String) : []; 사본글 = JSON.stringify(사본); 셈(); }, () => {});
+    /* 11-25 영림원품목등록 v2.105.0 보내기 나눔 — 발주역입력_영림원품목등록_보내기/품목(머리 제품들) + /품목/제품/{조각}(줄·차례) 를 모아 읽음. 머리가 없으면 옛 문서 */
+    const 자 = ['artifacts','vivivic-4b7ef','public','data'], 받 = { 옛:[], 머:undefined, 조:null };
+    const 모 = () => { const b = 받.머 && 받.머.보내기;
+      if(b && b.나눔 && 받.조){ const 쌍 = []; for(const k of (b.제품들 || [])){ const x = 받.조.get(k); if(x) (x.줄 || []).forEach((r, i) => 쌍.push([(x.차례 || [])[i] ?? 0, r])); }
+        받기줄 = 쌍.sort((a, c) => a[0] - c[0]).map(z => z[1]); }
+      else 받기줄 = 받.옛; 셈(); };
+    fb.onSnapshot(fb.doc(db, ...자, '발주역입력_영림원폼', '_품목_영림원품목등록'), d => { 받.옛 = (d.exists() && d.data().보내기 && d.data().보내기.줄) || []; 모(); }, () => {});
+    if(fb.collection){ fb.onSnapshot(fb.doc(db, ...자, '발주역입력_영림원품목등록_보내기', '품목'), d => { 받.머 = d.exists() ? d.data() : null; 모(); }, () => {});
+      fb.onSnapshot(fb.collection(db, ...자, '발주역입력_영림원품목등록_보내기', '품목', '제품'), q => { 받.조 = new Map(q.docs.map(d => [d.id, d.data()])); 모(); }, () => {}); }
   }
   /* ── 모양(한 번) ── */
   function 모양(){
