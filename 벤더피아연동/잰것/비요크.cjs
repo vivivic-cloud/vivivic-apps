@@ -190,6 +190,7 @@ document.getElementById('btnSave').addEventListener('click', function (e) { if (
     const 저장끝 = () => p.waitForFunction(() => !document.querySelector('#vp-root .vp-선불저장').disabled, null, { timeout: 30000 });
     const 체크 = (ks) => p.evaluate((ks) => { const 줄 = [...document.querySelectorAll('#vp-root tbody tr')]; 줄.forEach((tr, k) => { const c = tr.querySelector('input.vp-줄고름'); if (c.checked !== ks.includes(k)) c.click(); }); }, ks);
     await 체크([]);
+    재(await p.evaluate(() => document.querySelector('#vp-root .vp-비요크상태').hidden), '누르기 전 현황 칸 = 숨음(빈 칸 안 보임)');
     await p.click('#vp-root .vp-선불저장');
     { const 판 = await 판읽기(p);
       재(/체크해 주세요/.test(판.상태) && /vp-탈/.test(판.상태꼴) && !상세.보냄.length && !상세.열림.length, '체크 없이 저장 = 단추 밑 붉은 현황 글 · 벤더피아 0: ' + 판.상태);

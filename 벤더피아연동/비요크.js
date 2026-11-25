@@ -143,7 +143,7 @@
   function 상태(칸들, 꼴 = "") {
     상태틀.classList.toggle("vp-하는중", 꼴 === "하는중");
     상태틀.classList.toggle("vp-탈", 꼴 === "탈");
-    상태틀.innerHTML = (Array.isArray(칸들) ? 칸들 : [[칸들]]).map(([이름, 값]) => "<span>" + 글막(이름) + (값 == null ? "" : " <b>" + 글막(값) + "</b>") + "</span>").join("");
+    상태틀.innerHTML = (Array.isArray(칸들) ? 칸들 : 칸들 ? [[칸들]] : []).map(([이름, 값]) => "<span>" + 글막(이름) + (값 == null ? "" : " <b>" + 글막(값) + "</b>") + "</span>").join("");
     상태틀.hidden = !상태틀.innerHTML;
   }
   const 파일칸 = 줄틀.querySelector("input"), 파일글 = 줄틀.querySelector(".vp-비요크파일"), 지우기단추 = 줄틀.querySelector(".vp-지우기:not(.vp-선불저장)"), 저장단추 = 줄틀.querySelector(".vp-선불저장");
