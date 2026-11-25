@@ -69,13 +69,25 @@ function 폼값(q) {
 function 주문관리응답(폼) {
   const 번 = (폼.match(/tbSOrderNo=(\S*)/) || [])[1] || '';
   const k = Number(번.slice(-1));
-  const 이름 = ['', '주문번호', 'CS', '주문번호', '상품명', '수취인', '송장번호'];
+  const 이름 = ['', '주문번호', 'CS', '주문번호', '상품명', '수취인', '송장번호', '매출처코드', '매출처', '상품코드'];
   while (이름.length < 60) 이름.push('덤' + 이름.length);
   const 보임 = (i) => i !== 0 && i !== 1 && i < 10;   // 체크·안 번호·덤 50칸은 숨김(인라인 width 없음)
   const th = 이름.map((h, i) => `<th class="igg_HeaderCaption"${보임(i) ? ' style="width: 40px;"' : ''}>${h}</th>`).join('');
-  const 줄 = (송장, j) => '<tr>' + 이름.map((h, i) => `<td>${i === 0 ? '<input type="checkbox">' : i === 1 ? '77' + k + j : h === '주문번호' ? 번 : h === '상품명' ? '주문관리 협탁 ' + k : h === '수취인' ? '주문관리수취인' + k : h === '송장번호' ? 송장 : ''}</td>`).join('') + '</tr>';
+  const 줄 = (송장, j) => '<tr>' + 이름.map((h, i) => `<td>${i === 0 ? '<input type="checkbox">' : i === 1 ? '77' + k + j : h === '주문번호' ? 번 : h === '상품명' ? '주문관리 협탁 ' + k : h === '수취인' ? '주문관리수취인' + k : h === '송장번호' ? 송장 : h === '매출처코드' ? '55' : h === '매출처' ? '가상몰' : h === '상품코드' ? 'GAZZA' + k : ''}</td>`).join('') + '</tr>';
   const 몸 = k === 0 || k === 1 ? 줄('9999', 0) + 줄('6000000000' + k, 1) : k === 2 ? 줄('5555', 0) : '';
-  return `<html><body><form id="aspnetForm" action="./orderMst.aspx"></form><div id="oGrid"><table><tr>${th}</tr></table><table>${몸}</table></div><span>행수: ${k < 2 ? 2 : k === 2 ? 1 : 0}건</span></body></html>`;
+  return `<html><head><script>var 길 = "orderDetl.aspx?vendorCd=12&x=1";</script></head><body><form id="aspnetForm" action="./orderMst.aspx"></form><div id="oGrid"><table><tr>${th}</tr></table><table>${몸}</table></div><span>행수: ${k < 2 ? 2 : k === 2 ? 1 : 0}건</span></body></html>`;
+}
+
+/* 주문 상세 흉내(orderDetl.aspx) — 배송정보 dGrid 한 줄(송장·선불비) · 저장 = 그림 단추 전체 제출(cost 칸에 그리드 값이 실림) */
+const 상세 = { 값: {}, 안먹음: false, 보냄: [], 열림: [] };
+function 상세쪽(주소) {
+  const q = new URL(주소).searchParams, 번 = q.get('orderNo'), k = 번.slice(2, 3);
+  const 값 = 상세.값[번] == null ? 15000 : 상세.값[번];
+  return `<html><body><form id="aspnetForm" method="post"><input type="hidden" name="cost" id="cost" value="${값}"><input type="image" name="ctl00$Contents$btnSave" id="btnSave" alt="저장"></form>
+<script>document.forms[0].action = location.href; var 값 = ${값}, 송 = '6000000000${k}';
+window.$find = function (id) { if (id !== 'dGrid') return null; return { get_rows: function () { return { get_length: function () { return 1; }, get_row: function () { return { get_cellByColumnKey: function (c) {
+  return c === 'invoiceNo' ? { get_value: function () { return 송; } } : { get_value: function () { return 값; }, set_value: function (v) { 값 = v; document.getElementById('cost').value = v; } }; } }; } }; } }; };
+document.getElementById('btnSave').addEventListener('click', function (e) { if (!document.getElementById('cost').value) { e.preventDefault(); alert('빈 값'); } });</script></body></html>`;
 }
 
 (async () => {
@@ -97,6 +109,15 @@ function 주문관리응답(폼) {
         const 실림 = q.url() + ' ' + (q.postData() || '');
         if (/googleapis\.com$/.test(u.hostname) && !/홍가짜|9000000000|가짜 협탁|가상몰/.test(decodeURIComponent(실림))) return r.abort();
         밖.push(q.method() + ' ' + u.hostname); return r.abort();
+      }
+      if (/orderDetl/i.test(u.pathname)) {
+        const 번 = u.searchParams.get('orderNo');
+        if (q.method() === 'POST') {
+          const 값 = new URLSearchParams(q.postData() || '').get('cost');
+          상세.보냄.push(번 + '=' + 값 + ' ' + ['sCd', 'sNm', 'sGoodsCd', 'vendorCd'].map((x) => u.searchParams.get(x)).join(','));
+          if (!상세.안먹음) 상세.값[번] = Number(값);
+        } else 상세.열림.push(번);
+        return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: 상세쪽(q.url()) });
       }
       if (q.method() !== 'GET' || !/orderMst/i.test(u.pathname)) 보낸.push(q.method() + ' ' + u.pathname + (q.method() === 'POST' ? ' ' + 폼값(q) : ''));
       if (q.method() === 'POST' && /orderMst/i.test(u.pathname)) return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: 주문관리응답(폼값(q)) });
@@ -163,6 +184,42 @@ function 주문관리응답(폼) {
     const 상담 = await p.evaluate(() => { const d = document.querySelector('.vp-상담판'); return d ? d.querySelector('.vp-상담머리').textContent + ' | ' + d.querySelector('.vp-고객정보').textContent : ''; });
     재(/주문관리 협탁 0/.test(상담) && /주문관리수취인0/.test(상담), '이은 줄 누름 = 이은 주문관리 주문의 상담 판(상품명·고객정보 = 주문관리 줄)');
     await p.keyboard.press('Escape');
+    /* ── [비요크선불저장] 체크 줄 선불비 저장 ── 흉내 상세: 7701(줄0) = 5000(같음) · 7711(줄1) = 15000 */
+    Object.assign(상세, { 값: { 7701: 5000 }, 안먹음: false, 보냄: [], 열림: [] });
+    const 저장셈 = () => p.evaluate(() => document.querySelector('#vp-root .vp-비요크셈').textContent);
+    const 저장끝 = () => p.waitForFunction(() => !document.querySelector('#vp-root .vp-선불저장').disabled, null, { timeout: 30000 });
+    const 체크 = (ks) => p.evaluate((ks) => { const 줄 = [...document.querySelectorAll('#vp-root tbody tr')]; 줄.forEach((tr, k) => { const c = tr.querySelector('input.vp-줄고름'); if (c.checked !== ks.includes(k)) c.click(); }); }, ks);
+    await 체크([]);
+    await p.click('#vp-root .vp-선불저장');
+    재(/체크/.test((await 판읽기(p)).알림) && !상세.보냄.length && !상세.열림.length, '체크 없이 저장 = 알림만 · 벤더피아 0');
+    await 체크([0, 1, 2]);
+    p.once('dialog', (d) => d.dismiss());
+    await p.click('#vp-root .vp-선불저장');
+    await p.waitForTimeout(300);
+    재(!상세.보냄.length && !상세.열림.length, '확인 창 「취소」 = 아무것도 안 함');
+    let 창글 = '';
+    p.once('dialog', (d) => { 창글 = d.message(); d.accept(); });
+    await p.click('#vp-root .vp-선불저장');
+    await 저장끝();
+    let 셈글 = await 저장셈();
+    재(/2줄/.test(창글) && /1줄은 뺍니다/.test(창글), '확인 창 = 저장할 2줄 · 연결 안 된 1줄 뺌');
+    재(/저장\s*1\/2/.test(셈글) && /같음\s*1/.test(셈글) && !/실패/.test(셈글), '셈 = 저장 1/2 · 같음 1: ' + 셈글);
+    재(상세.보냄.length === 1 && /^7711=5000 55,가상몰,GAZZA1,12$/.test(상세.보냄[0]), '상세 저장 제출 1번(같은 줄은 안 누름) · 금액 5000 · 여는 값 다섯(안 번호·매출처코드·매출처·상품코드·vendorCd): ' + 상세.보냄.join(' | '));
+    재(상세.값[7711] === 5000, '흉내 벤더피아 선불비 = 5000');
+    재(await p.evaluate(() => [...document.querySelectorAll('#vp-root tbody tr')].map((tr) => tr.querySelector('input.vp-줄고름').checked).join()) === 'false,false,true,false,false', '저장된 줄은 체크 풀림(뺀 줄은 그대로)');
+    재(!(await p.evaluate(() => document.querySelectorAll('iframe').length)), '숨은 틀 지움');
+    /* 실패하면 멈춤: 줄0 = 9000 인데 저장이 안 먹음 → 줄1 은 안 함 */
+    Object.assign(상세, { 값: { 7701: 9000, 7711: 15000 }, 안먹음: true, 보냄: [], 열림: [] });
+    await 체크([0, 1]);
+    p.once('dialog', (d) => d.accept());
+    await p.click('#vp-root .vp-선불저장');
+    await 저장끝();
+    셈글 = await 저장셈();
+    const 멈춘글 = (await 판읽기(p)).알림;
+    재(/실패\s*1/.test(셈글) && /1번째 줄/.test(멈춘글) && /9,000/.test(멈춘글) && /멈췄/.test(멈춘글), '저장 뒤 값이 그대로면 실패 · 까닭 · 멈춤: ' + 멈춘글);
+    재(상세.보냄.length === 1 && 상세.열림.every((x) => x === '7701'), '실패한 뒤 줄(줄1)은 안 열고 안 보냄');
+    상세.안먹음 = false;
+    await 체크([]);
     재(판.메모 && 판.메모.includes('가짜 메모 3건/ 37000원') && 판.메모.includes('62000>25000'), '맨 위 메모 글 보임');
     재(/선불비\s*62,000/.test(판.셈) && /선불 수정\s*25,000/.test(판.셈), '셈 합: ' + 판.셈);
     재(JSON.stringify(판.선불) === JSON.stringify(['15000', '10000', '12000', '15000', '10000']), '숫자 「15000.0」 → 15000: ' + 판.선불.join(','));
@@ -189,7 +246,7 @@ function 주문관리응답(폼) {
     await p2.setInputFiles('#vp-root .vp-비요크줄 input[type=file]', { name: '깨짐.xlsx', mimeType: 'application/octet-stream', buffer: Buffer.from('아님') });
     await p2.waitForFunction(() => /읽지 못/.test(document.querySelector('#vp-root .vp-note').textContent), null, { timeout: 5000 }).catch(() => {});
     재(/읽지 못/.test((await 판읽기(p2)).알림), '깨진 파일 = 알림 한 줄');
-    재([...보낸, ...보낸2].every((x) => x.startsWith('GET') || (/^POST \/System\/Sales\/orderMst\.aspx tbSOrderNo=9/.test(x) && !/쓰기단추/.test(x))), '벤더피아 = 주문관리 조회만(쓰기 단추 0)');
+    재([...보낸, ...보낸2].every((x) => x.startsWith('GET') || (/^POST \/System\/Sales\/orderMst\.aspx tbSOrderNo=9/.test(x) && !/쓰기단추/.test(x))), '주문관리 = 조회만(쓰기 단추 0) · 쓰기는 「저장」 누른 상세 저장뿐');
     재(!밖.length, '파일 값이 밖으로 안 나감(구글 익명 표 길에도 안 실림) ' + 밖.join(','));
     재(!쪽오류.length && !오류2.length, '쪽 오류 없음 ' + [...쪽오류, ...오류2].join(' | '));
     await ctx.close();

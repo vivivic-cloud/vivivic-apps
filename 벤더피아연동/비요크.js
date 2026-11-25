@@ -11,7 +11,17 @@
      잇기: 주문관리 조회 폼엔 송장번호 칸이 없다(11-25 실제 화면 — 주문번호·고유번호는 있음) → 줄의 「주문번호」(몰 주문번호)로 주문관리를
      조회(`tbSOrderNo`, 등록일 = 파일 「주문등록일」 가장 이른 날 − 7일 ~ 오늘)하고, 받은 줄 중 「송장번호」 가 파일 송장번호와 같은 줄과 잇는다.
      이은 줄 = 노랑(`tr.vp-이은줄`) + 줄 누름·상담 단추 = 그 주문관리 줄. 요청 = 공용 줄 `VP_DATA.받기(…, "뒤")` 하나씩(같은 주문번호는 한 번).
-     잇기 결과는 파일 기억(`vp비요크`)에 같이 둔다(임시 — 다시 열면 요청 없이 노랑, 못 이은 줄만 다시 찾음). */
+     잇기 결과는 파일 기억(`vp비요크`)에 같이 둔다(임시 — 다시 열면 요청 없이 노랑, 못 이은 줄만 다시 찾음).
+   11-25 [새 지시 비요크선불저장] ⚠⚠ **벤더피아 쓰기 예외 다섯 번째: 주문 선불비 저장**(이 기능만) — 사장님(그대로):
+     「체크된 주문은 해당목록의 선불비수정 값으로 해당 연결된 주문관리 목록의 선불비를 수정해야 합니다. 수정방법은 주문관리의 해당 주문목록을 클릭하여
+       들어가면 해당 주문의 배송정보 섹션이 있습니다. 이섹션의 선불비 칸에 수정요청된 금액을 입력후 상단에 있는 저정 버튼을 눌러야 수정이 완료됩니다. …
+       현재 비요크선불변경에 나타나는 목록에 체크후 저장 버튼을 누르면 이것이 실행되게 해야 합니다. 연속/일괄 작업이 가능한지 여부를 판단하여 신중하게 작업해 주세요」
+   → 「저장」 단추(체크된 이은 줄만, 확인 창 뒤) — 줄마다 **하나씩**(벤더피아에 한꺼번에 고치는 길 없음 · 세션 잠금):
+     ① 주문관리 다시 조회(주문번호) → 송장번호 같은 줄의 안 번호·매출처코드·매출처·상품코드 + 쪽 글의 vendorCd
+     ② 숨은 틀(sandbox, 화면 밖)에 사람이 줄을 누를 때 여는 `orderDetl.aspx?orderNo&sCd&sNm&sGoodsCd&vendorCd`(이 다섯이 있어야 내용이 찬다 — 잼)
+     ③ 「배송정보」 그리드 `dGrid` 에서 송장번호(invoiceNo) 같은 줄의 선불비(deliveryCost) — 이미 그 금액이면 안 누름(같음)
+     ④ `set_value(금액)` → 위 「저장」(`btnSave`, 쪽 검사 `isFieldValid` 뒤 전체 제출) → 틀이 다시 뜨면 그 줄 선불비가 금액인지 읽어 확인
+     ⑤ 하나라도 어긋나면 **거기서 멈춤**(뒤 줄 안 함). 알림 창은 가로채 까닭에 붙임. */
 (() => {
   if (window.__vp비요크돌았나) return;
   window.__vp비요크돌았나 = true;
@@ -112,11 +122,11 @@
   }
   const 줄틀 = document.createElement("div");
   줄틀.className = "vp-비요크줄";
-  줄틀.innerHTML = `<label class="vp-올리기">파일 올리기<input type="file" accept=".xlsx"></label><span class="vp-비요크파일"></span><button type="button" class="vp-지우기" hidden>지우기</button>`;
+  줄틀.innerHTML = `<label class="vp-올리기">파일 올리기<input type="file" accept=".xlsx"></label><span class="vp-비요크파일"></span><button type="button" class="vp-지우기" hidden>지우기</button><button type="button" class="vp-지우기 vp-선불저장" hidden>저장</button>`;
   const 메모틀 = document.createElement("div"); 메모틀.className = "vp-비요크메모";
   const 셈틀 = document.createElement("div"); 셈틀.className = "vp-비요크셈";
   알림.before(줄틀, 메모틀, 셈틀);
-  const 파일칸 = 줄틀.querySelector("input"), 파일글 = 줄틀.querySelector(".vp-비요크파일"), 지우기단추 = 줄틀.querySelector(".vp-지우기");
+  const 파일칸 = 줄틀.querySelector("input"), 파일글 = 줄틀.querySelector(".vp-비요크파일"), 지우기단추 = 줄틀.querySelector(".vp-지우기:not(.vp-선불저장)"), 저장단추 = 줄틀.querySelector(".vp-선불저장");
 
   const 수 = (x) => { const n = Number(String(x || "").replace(/,/g, "")); return Number.isFinite(n) ? n : 0; };
   const 돈 = (n) => n.toLocaleString("ko-KR");
@@ -127,6 +137,7 @@
     const 칸 = (이름, 값) => `<span>${이름} <b>${값}</b></span>`;
     셈틀.innerHTML = 칸("줄", 돈(자료.줄.length)) + 칸("연결", 돈(Object.keys(자료.이음 || {}).length))
       + (자료.찾는중 ? 칸("확인", 돈(자료.찾는중[0]) + "/" + 돈(자료.찾는중[1])) : "")
+      + (자료.저장셈 ? 칸("저장", 돈(자료.저장셈.됨) + "/" + 돈(자료.저장셈.모두)) + (자료.저장셈.같음 ? 칸("같음", 돈(자료.저장셈.같음)) : "") + (자료.저장셈.실패 ? 칸("실패", 돈(자료.저장셈.실패)) : "") : "")
       + (선불 >= 0 ? 칸("선불비", 돈(합(선불))) : "") + (수정 >= 0 ? 칸("선불 수정", 돈(합(수정))) : "");
   }
   function 기억하기(자료) {
@@ -138,6 +149,7 @@
     자료.이음 = 자료.이음 || {};
     파일글.textContent = 자료.파일 + (자료.때 ? " · " + new Date(자료.때).toLocaleString("ko-KR") : "");
     지우기단추.hidden = false;
+    저장단추.hidden = false;
     메모틀.replaceChildren(...자료.메모.map((m) => Object.assign(document.createElement("span"), { textContent: m })));
     셈그리기(자료);
     알림.textContent = "";
@@ -171,7 +183,7 @@
     const d = new Date((m[1].length === 2 ? 2000 + Number(m[1]) : Number(m[1])), Number(m[2]) - 1, Number(m[3]));
     return isNaN(d) ? null : d;
   }
-  async function 주문묻기(주문번호, 시작) {
+  async function 주문묻기(주문번호, 시작, 급 = "뒤") {
     const fd = new FormData(폼);
     for (const k of [...fd.keys()]) if (k.includes("chkItem")) fd.delete(k);
     const 단추 = 폼.querySelector('input[type=image][name$="btnSearch"]');   // ⚠ 그림 단추는 form.elements 에 없다
@@ -181,9 +193,11 @@
     fd.set(폼이름("ddlRowCnt"), "50");
     if (시작) fd.set(폼이름("dcStartDt"), 시작);
     fd.set(폼이름("dcEndDt"), 날글(new Date()));
-    const res = await VP_DATA.받기(폼.action, { method: "POST", body: fd, credentials: "include", cache: "no-store" }, "뒤");
+    const res = await VP_DATA.받기(폼.action, { method: "POST", body: fd, credentials: "include", cache: "no-store" }, 급);
     if (!res.ok) throw new Error("HTTP " + res.status);
-    const 글 = (await res.text()).replace(/<script\b[\s\S]*?<\/script>/gi, "");
+    const 원글 = await res.text();
+    const 업체 = (원글.match(/[?&]vendorCd=(\d+)/) || [])[1] || "";   // 줄 누름이 여는 주소에 쓰는 값 — 쪽 글에서 그때 읽음(코드에 안 박음)
+    const 글 = 원글.replace(/<script\b[\s\S]*?<\/script>/gi, "");
     const doc = new DOMParser().parseFromString(글, "text/html");
     if (doc.querySelector("input[type=password]")) throw new 탈("벤더피아 로그인이 끊겼습니다. 다시 로그인한 뒤 이 화면을 새로 열어 주세요.");
     const g = doc.getElementById("oGrid");
@@ -197,8 +211,10 @@
     const 표 = window.VP비요크표.읽기(doc);              // 주문관리 표에 보이는 칸 그대로(CS등록과 같은 읽기) — 줄 차례는 위 몸과 같다
     if (!표 || 표.rows.length !== 몸.length) throw new 탈("주문관리 표 줄을 맞추지 못했습니다. 주문관리 화면이 바뀌었는지 확인이 필요합니다.");
     const 주자리 = 표.heads.indexOf("주문번호"), 상자리 = 표.heads.indexOf("상품명");
+    const 원칸 = (tr, 이름) => { const i = 이름들.indexOf(이름); return i >= 0 ? (tr.cells[i].textContent || "").trim() : ""; };   // 같은 이름 둘이면 앞엣것(주문번호 = 안 번호)
     return 몸.map((tr, j) => ({
       송장: 송장맞춤(tr.cells[송자리].textContent),
+      열기: { orderNo: 원칸(tr, "주문번호"), sCd: 원칸(tr, "매출처코드"), sNm: 원칸(tr, "매출처"), sGoodsCd: 원칸(tr, "상품코드"), vendorCd: 업체 },
       주문: 주자리 >= 0 ? String(표.rows[j][주자리] || "").trim() : "",
       상품명: 상자리 >= 0 ? String(표.rows[j][상자리] || "").trim() : "",
       줄: 표.rows[j], 머리: 표.heads,
@@ -245,6 +261,119 @@
     window.VP말?.(앞줄 + "잇기 물음" + 물음 + " 새연결" + 새로 + " 연결" + Object.keys(자료.이음).length + " " + ((performance.now() - t0) / 1000).toFixed(1) + "초 시작" + (시작 ? "있음" : "기본"));
   }
 
+  /* ── [새 지시 비요크선불저장] 체크된 이은 줄의 선불비를 「선불 수정」 값으로 벤더피아에 저장 (쓰기 예외 다섯 번째) ── */
+  const 쉼 = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  function 틀열기(주소) {
+    const 틀 = document.createElement("iframe");
+    틀.setAttribute("sandbox", "allow-same-origin allow-scripts allow-forms");   // allow-modals 없음 → 벤더피아 알림 창이 화면에 안 뜸
+    틀.setAttribute("aria-hidden", "true");
+    틀.style.cssText = "position:fixed;left:-3000px;top:0;width:1280px;height:900px;border:0;visibility:hidden";
+    const 실림 = () => new Promise((ok, 안됨) => {
+      const 끝 = setTimeout(() => 안됨(new 탈("주문 상세가 20초 안에 안 열렸습니다.")), 20000);
+      틀.addEventListener("load", () => { clearTimeout(끝); ok(); }, { once: true });
+    });
+    const 첫 = 실림();
+    틀.src = 주소;
+    document.body.appendChild(틀);
+    return { 틀, 첫, 실림 };
+  }
+  /* 틀 안 배송정보 그리드에서 송장 같은 줄의 선불비 칸 */
+  async function 선불칸(틀, 송장) {
+    for (let 번 = 0; 번 < 40; 번++) {
+      const w = 틀.contentWindow, d = 틀.contentDocument;
+      if (d && d.querySelector("input[type=password]")) throw new 탈("벤더피아 로그인이 끊겼습니다. 다시 로그인한 뒤 이 화면을 새로 열어 주세요.");
+      const g = w && w.$find && w.$find("dGrid");
+      if (g) {
+        const 줄들 = g.get_rows();
+        const 맞은 = [];
+        for (let i = 0; i < 줄들.get_length(); i++) {
+          const 줄 = 줄들.get_row(i);
+          if (송장맞춤(줄.get_cellByColumnKey("invoiceNo").get_value()) === 송장) 맞은.push(줄.get_cellByColumnKey("deliveryCost"));
+        }
+        if (맞은.length !== 1) throw new 탈("주문 상세 배송정보에서 송장번호 줄을 " + (맞은.length ? "여럿" : "못") + " 찾았습니다.");
+        return 맞은[0];
+      }
+      await 쉼(250);
+    }
+    throw new 탈("주문 상세의 배송정보 표를 읽지 못했습니다.");
+  }
+  async function 선불비저장한줄(이음, 금액, 시작) {
+    const 받은 = await 주문묻기(이음.주문, 시작, "보호");
+    const 맞은 = 받은.filter((x) => x.송장 === 이음.송장);
+    if (맞은.length !== 1) throw new 탈("주문관리에서 송장번호 줄을 " + (맞은.length ? "여럿" : "못") + " 찾았습니다.");
+    const 열기 = 맞은[0].열기;
+    if (Object.values(열기).some((v) => !v)) throw new 탈("주문 상세를 여는 값을 못 읽었습니다.");
+    const 주소 = "/System/Sales/orderDetl.aspx?" + new URLSearchParams(열기).toString();
+    const { 틀, 첫, 실림 } = 틀열기(주소);
+    try {
+      await 첫;
+      const 칸 = await 선불칸(틀, 이음.송장);
+      const 전 = 수(칸.get_value());
+      if (전 === 금액) return { 결과: "같음", 새줄: 맞은[0] };
+      const w = 틀.contentWindow, 알림들 = [];
+      w.alert = (m) => { 알림들.push(String(m)); };
+      w.confirm = (m) => { 알림들.push(String(m)); return false; };   // 뜻밖의 확인 창이면 「아니오」 — 저장 안 됨으로 멈춘다
+      칸.set_value(금액);
+      if (수(칸.get_value()) !== 금액) throw new 탈("선불비 칸에 금액이 안 들어갔습니다.");
+      const 다시 = 실림();
+      const 단추 = 틀.contentDocument.querySelector('input[name$="btnSave"]');
+      if (!단추) throw new 탈("주문 상세의 저장 단추를 찾지 못했습니다.");
+      window.VP말?.(앞줄 + "저장 누름");
+      단추.click();
+      const 넘어감 = await Promise.race([다시.then(() => true), 쉼(4000).then(() => false)]);
+      if (!넘어감) throw new 탈("저장이 안 됐습니다" + (알림들.length ? " — 벤더피아 알림 「" + 알림들.join(" / ").slice(0, 80) + "」" : "") + ".");
+      const 후 = 수((await 선불칸(틀, 이음.송장)).get_value());
+      if (후 !== 금액) throw new 탈("저장 뒤 선불비가 " + 돈(후) + "원입니다(바라던 값 " + 돈(금액) + "원)" + (알림들.length ? " — 「" + 알림들.join(" / ").slice(0, 80) + "」" : "") + ".");
+      return { 결과: "됨", 새줄: 맞은[0] };
+    } finally { 틀.remove(); }
+  }
+  let 저장중 = false;
+  저장단추.addEventListener("click", async () => {
+    const 자료 = 지금;
+    if (!자료 || 저장중) return;
+    const 수정 = 자료.머리.findIndex((h) => h.replace(/\s/g, "") === "선불수정");
+    if (수정 < 0) { 알림.textContent = "「선불 수정」 칸이 없습니다."; return; }
+    const 몸줄 = [...(r.querySelector(".vp-table table.vp-촘촘 tbody") || { rows: [] }).rows];
+    const 고른 = 몸줄.map((tr, k) => (tr.querySelector("input.vp-줄고름:checked") ? k : -1)).filter((k) => k >= 0);
+    const 할 = 고른.filter((k) => 자료.이음[k] && String(자료.줄[k][수정] || "").trim() !== "" && Number.isFinite(Number(String(자료.줄[k][수정]).replace(/,/g, ""))));
+    if (!할.length) { 알림.textContent = 고른.length ? "체크한 줄 중 연결되고 「선불 수정」 값이 있는 줄이 없습니다." : "저장할 줄을 체크해 주세요."; return; }
+    const 뺀 = 고른.length - 할.length;
+    if (!window.confirm("체크한 " + 할.length + "줄의 선불비를 「선불 수정」 값으로 벤더피아 주문에 저장합니다." + (뺀 ? "\n(연결 안 됐거나 값이 없는 " + 뺀 + "줄은 뺍니다)" : ""))) return;
+    저장중 = true; 저장단추.disabled = true; 지우기단추.disabled = true;
+    const 날 = 자료.머리.indexOf("주문등록일");
+    const 날들 = 날 >= 0 ? 자료.줄.map((x) => 날읽기(x[날])).filter(Boolean) : [];
+    const 시작 = 날들.length ? 날글(new Date(Math.min(...날들) - 7 * 864e5)) : "";
+    자료.저장셈 = { 됨: 0, 같음: 0, 실패: 0, 모두: 할.length };
+    알림.textContent = "";
+    셈그리기(자료);
+    const t0 = performance.now();
+    try {
+      for (const k of 할) {
+        if (지금 !== 자료) return;
+        const 금액 = 수(자료.줄[k][수정]);
+        const tr = 몸줄[k];
+        try {
+          const 답 = await 선불비저장한줄(자료.이음[k], 금액, 시작);
+          if (답.결과 === "같음") 자료.저장셈.같음++; else 자료.저장셈.됨++;
+          const 이음 = { ...자료.이음[k], 상품명: 답.새줄.상품명 || 자료.이음[k].상품명, 줄: 답.새줄.줄, 머리: 답.새줄.머리 };
+          자료.이음[k] = 이음; window.VP비요크표.잇기(k, 이음);
+          if (tr) { const c = tr.querySelector("input.vp-줄고름"); if (c) { c.checked = false; c.dispatchEvent(new Event("change")); } }
+          셈그리기(자료);
+        } catch (e) {
+          자료.저장셈.실패++; 셈그리기(자료);
+          알림.textContent = (k + 1) + "번째 줄: " + (e instanceof 탈 ? e.message : "저장하지 못했습니다.") + " 여기서 멈췄습니다.";
+          window.VP말?.(앞줄 + "저장 탈 " + (k + 1) + "줄 " + (e && e.message ? e.message : e));
+          if (tr) tr.scrollIntoView({ block: "center" });
+          break;
+        }
+      }
+    } finally {
+      저장중 = false; 저장단추.disabled = false; 지우기단추.disabled = false;
+      기억하기(자료);
+      window.VP말?.(앞줄 + "저장 됨" + 자료.저장셈.됨 + " 같음" + 자료.저장셈.같음 + " 실패" + 자료.저장셈.실패 + "/" + 할.length + " " + ((performance.now() - t0) / 1000).toFixed(1) + "초");
+    }
+  });
+
   파일칸.addEventListener("change", async () => {
     const 파일 = 파일칸.files && 파일칸.files[0];
     파일칸.value = "";
@@ -266,6 +395,7 @@
     window.VP비요크표.비우기();
     파일글.textContent = ""; 메모틀.replaceChildren(); 셈틀.replaceChildren(); 알림.textContent = "";
     지우기단추.hidden = true;
+    저장단추.hidden = true;
   });
 
   let 기억 = null;
