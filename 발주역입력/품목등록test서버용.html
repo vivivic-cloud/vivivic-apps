@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 품목등록test서버용 — 영림원품목등록 「품목등록업로드」 의 기본 자료(엑셀 「품목등록test서버용」 의 품목등록업로드 줄, 창고 발주역입력_영림원품목등록 그대로)를 제품마다 묶어 본다.
      사장님 11-25(그대로): 「품목등록업로드의 기본자료가되는 엑셀자료를 새페이지로 만들어 주세요 해주세요. 각제품 이하 반제품들은 제품의 하위 토글로 접혀있게 만들어 주세요 제품명 앞에 체크표시를 두어 체크시 해당 제품에대한 반제품 등의 정보가 품목등록업로드에 나타나게 해주세요. 품목등록업로드에 매칭시 불필요한 자료는 임의로 참고 하지 않습니다.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.0.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.1.0
+     v1.1.0(11-25): 사장님 「테스트서버용에 나타나는 제품명이 업체별단품명과 연결되어 일치성을 확인해 주어야 합니다. 단품명(품명),단품코드(품번)의 일치여부를 실시간 확인하여 해당 품명과 품번이 파랑헤 변하게 해주세요, 둘중 하나만 일치하면 일치하는 속성만 파랑게 변합니다」 — 제품 줄 품명 = 업체별 단품명 단품명과 같으면 · 품번 = 단품코드와 같으면 파랑(td.맞음, 조혼가구부속명 v1.2 와 같은 색) · 마우스 = 짝 업체·단품 · 업체별 단품명 onSnapshot.
      줄 = 창고 품목등록업로드 조각(읽기만) · 제품 줄 아래 「모품목(상위 품번)」 = 그 제품 품번인 줄(반제품)을 접어 둠(▸ 누르면 펼침, 이 화면만) ·
      체크 = 창고 발주역입력_영림원품목등록/_고른제품 {제품:[제품 품번…], 고친때} 통째 setDoc · onSnapshot(영림원품목등록이 같이 읽어 품목등록업로드·BOM·계산 탭을 이 제품들로 거름).
      문서가 없으면 처음 값 = 영림원품목등록 v2.16.0 한 제품(품명 「(KRW) 알렉스 1200 높은 수납장 올화이트」). -->
@@ -97,6 +98,7 @@ html,body{height:100%;overflow:hidden}
 .dpr-t td .토글{font:inherit;font-size:10.5px;width:18px;height:16px;padding:0;margin-right:4px;border:1px solid var(--vg-edge);border-radius:4px;background:var(--vg-bg);color:var(--vg-muted);cursor:pointer;vertical-align:middle}
 .dpr-t td .토글:hover{color:var(--vg-ink);border-color:#C7C7C3}
 .dpr-t tr.제품 td{background:var(--vg-fill)}
+.dpr-t td.맞음{color:#1565c0;font-weight:700}   /* v1.1.0 업체별 단품명과 같음(조혼가구부속명 v1.2 와 같은 값) */
 .dpr-t tr.제품.켬 td{background:#E8F1FD}
 .dpr-t tr.하위 td.dpr-k{padding-left:46px;font-weight:500}
 .dpr-t tr.하위[hidden]{display:none}
@@ -112,7 +114,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.0.0</div>
+  <div class="badge">v1.1.0</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html" class="on">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>품목등록test서버용</h1>
@@ -142,9 +144,32 @@ window.목록읽기 = function(){
     칸 = s.칸 || []; 끊기.forEach(f => f()); 끊기 = []; 조각 = new Array(s.조각 || 1).fill(null);
     for(let k = 0; k < 조각.length; k++) 끊기.push(onSnapshot(doc(window.db, ...창고자리, `${문서이름(품목시트)}_${k+1}`), d => { 조각[k] = (d.exists() && d.data().줄) || []; 그리기(); }, e => 목록못읽음('창고를 읽지 못했습니다', e && (e.code || e.message))));
   }, e => 목록못읽음('창고를 읽지 못했습니다', e && (e.code || e.message)));
+  업단품구독();   /* v1.1.0 */
   onSnapshot(doc(window.db, ...창고자리, '_고른제품'), d => { 고른 = d.exists() && Array.isArray(d.data().제품) ? new Set(d.data().제품.map(String)) : null; 그리기(); }, () => {});
 };
 
+/* v1.1.0 업체별 단품명(`발주역입력_업체별단품` 업체 문서 전부, onSnapshot — 조혼가구부속명 v1.2 와 같은 읽기) → 단품코드 · 단품명(앞뒤 빈칸 뗌, 원래 글자로 견줌) */
+const 업자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_업체별단품'];
+const 별명 = v => String(v ?? '').replace(/유한가구/g, '진아산업');
+let 업코드 = new Map(), 업이름 = new Map(), 업값 = {}, 업끊기 = {};
+function 업단품구독(){
+  const { doc, onSnapshot } = window.fbRead;
+  onSnapshot(doc(window.db, ...업자리, '_업체목록'), m => {
+    const 들 = (m.exists() && m.data().업체들) || [];
+    for(const u of Object.keys(업끊기)) if(!들.includes(u)){ 업끊기[u](); delete 업끊기[u]; delete 업값[u]; }
+    for(const u of 들) if(!업끊기[u]) 업끊기[u] = onSnapshot(doc(window.db, ...업자리, 문서이름(u)), s => { 업값[u] = s.exists() ? s.data() : { 칸:[], 줄:[] }; 업셈(); }, () => {});
+    업셈();
+  }, () => {});
+}
+function 업셈(){
+  const 코 = new Map(), 이 = new Map();
+  for(const [u, d] of Object.entries(업값)){ const 칸 = d.칸 || [], ci = 칸.indexOf('단품코드'), ni = 칸.indexOf('단품명'); if(ci < 0) continue;
+    for(const r of d.줄 || []){ const c = String(r.v[ci] ?? '').trim(), n = ni >= 0 ? String(r.v[ni] ?? '').trim() : '';
+      if(c) (코.get(c) || 코.set(c, []).get(c)).push({ 업체:u, 이름:n });
+      if(n) (이.get(n) || 이.set(n, []).get(n)).push({ 업체:u, 코드:c }); } }
+  업코드 = 코; 업이름 = 이; 그리기();
+}
+const 짝글 = 들 => 들.map(x => `${별명(x.업체)} · ${x.코드 !== undefined ? x.코드 : x.이름}`).join('\n');
 function 묶음(){   /* 제품마다 [제품 줄, 하위 줄…] — 엑셀 차례 · 제품 없는 하위 줄은 끝에 */
   const I = k => 칸.indexOf(k), pi = I('품번'), ai = I('품목자산분류'), mi = I('모품목(상위 품번)'), ni = I('품명');
   const 트 = (r, i) => i < 0 ? '' : String(r.v[i] ?? '').trim();
@@ -160,10 +185,12 @@ function 그리기(){
   document.getElementById('목상태').style.display = 'none';
   const b = 묶음(), 켠 = 고른 || 처음고른(b);
   let h = '<table class="dpr-t"><thead><tr>' + 칸.map((k, i) => `<th class="${i===0?'dpr-k':''}">${글(k)}</th>`).join('') + '</tr></thead><tbody>';
-  const 칸들 = (r, 첫) => 칸.map((k, i) => i === 0 ? 첫 : `<td${typeof r.v[i]==='number'?' class="num"':''}>${글(r.v[i])}</td>`).join('');
+  const 칸들 = (r, 첫, 번칸) => 칸.map((k, i) => i === 0 ? 첫 : i === b.pi && 번칸 ? 번칸 : `<td${typeof r.v[i]==='number'?' class="num"':''}>${글(r.v[i])}</td>`).join('');
   for(const r of b.제){
     const p = b.트(r, b.pi), 하 = b.아래.get(p) || [], 열 = 열림.has(p), 체 = 켠.has(p);
-    h += `<tr class="제품${체?' 켬':''}" data-p="${글(p)}">` + 칸들(r, `<td class="dpr-k 고름칸"><input type="checkbox" data-p="${글(p)}"${체?' checked':''}>${하.length ? `<button type="button" class="토글" data-p="${글(p)}" title="반제품 ${하.length}">${열?'▾':'▸'}</button>` : ''}${글(r.v[0])}</td>`) + '</tr>';
+    const 명짝 = 업이름.get(b.트(r, b.ni)) || null, 번짝 = 업코드.get(p) || null;   /* v1.1.0 */
+    const 번칸 = `<td${번짝 ? ` class="맞음" title="${글('업체별 단품명 단품코드 — ' + 짝글(번짝.map(x => ({ 업체:x.업체, 이름:x.이름 }))))}"` : ''}>${글(r.v[b.pi])}</td>`;
+    h += `<tr class="제품${체?' 켬':''}" data-p="${글(p)}">` + 칸들(r, `<td class="dpr-k 고름칸${명짝?' 맞음':''}"${명짝 ? ` title="${글('업체별 단품명 단품명 — ' + 짝글(명짝))}"` : ''}><input type="checkbox" data-p="${글(p)}"${체?' checked':''}>${하.length ? `<button type="button" class="토글" data-p="${글(p)}" title="반제품 ${하.length}">${열?'▾':'▸'}</button>` : ''}${글(r.v[0])}</td>`, 번칸) + '</tr>';
     for(const x of 하) h += `<tr class="하위" data-m="${글(p)}"${열?'':' hidden'}>` + 칸들(x, `<td class="dpr-k">${글(x.v[0])}</td>`) + '</tr>';
   }
   for(const x of b.남) h += '<tr class="하위">' + 칸들(x, `<td class="dpr-k">${글(x.v[0])}</td>`) + '</tr>';
