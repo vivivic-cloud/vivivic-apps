@@ -139,7 +139,7 @@ document.getElementById('btnSave').addEventListener('click', function (e) { if (
       고름: 몸.map((tr) => !!tr.cells[0].querySelector('input.vp-줄고름')), 머리고름: !!(t && t.tHead.rows[0].cells[0].querySelector('input.vp-다고름')),
       첫붙음: 몸[0] && getComputedStyle(몸[0].cells[0]).position === 'sticky' && getComputedStyle(몸[0].cells[1]).position !== 'sticky' && t.tHead.rows[0].cells[0].classList.contains('vp-first') && !t.tHead.rows[0].cells[1].classList.contains('vp-first'),
       메모: document.querySelector('#vp-root .vp-비요크메모')?.textContent, 셈: document.querySelector('#vp-root .vp-비요크셈')?.textContent,
-      파일: document.querySelector('#vp-root .vp-비요크파일')?.textContent, 알림: document.querySelector('#vp-root .vp-note')?.textContent,
+      파일: document.querySelector('#vp-root .vp-비요크파일')?.textContent, 알림: document.querySelector('#vp-root .vp-note')?.textContent, 상태: (() => { const e = document.querySelector('#vp-root .vp-비요크상태'); return e && !e.hidden ? e.textContent : ''; })(), 상태꼴: document.querySelector('#vp-root .vp-비요크상태')?.className,
       선불: 몸.map((tr) => tr.cells[22].textContent), 글: cs && cs.fontSize, 높이: 몸[0] && 몸[0].getBoundingClientRect().height,
       손: t ? t.querySelectorAll('.vp-열손').length : 0, th: t && [...t.tHead.rows[0].cells].slice(1).map((c) => c.firstChild.textContent), 검색창숨김: getComputedStyle(document.querySelector('#vp-root .vp-bar')).display === 'none',
       쪽가로: document.documentElement.scrollWidth > innerWidth + 1, 기억: !!localStorage.getItem('vp비요크'), 상품칸: document.querySelectorAll('#vp-root td.vp-상품칸').length,
@@ -191,17 +191,27 @@ document.getElementById('btnSave').addEventListener('click', function (e) { if (
     const 체크 = (ks) => p.evaluate((ks) => { const 줄 = [...document.querySelectorAll('#vp-root tbody tr')]; 줄.forEach((tr, k) => { const c = tr.querySelector('input.vp-줄고름'); if (c.checked !== ks.includes(k)) c.click(); }); }, ks);
     await 체크([]);
     await p.click('#vp-root .vp-선불저장');
-    재(/체크/.test((await 판읽기(p)).알림) && !상세.보냄.length && !상세.열림.length, '체크 없이 저장 = 알림만 · 벤더피아 0');
+    { const 판 = await 판읽기(p);
+      재(/체크해 주세요/.test(판.상태) && /vp-탈/.test(판.상태꼴) && !상세.보냄.length && !상세.열림.length, '체크 없이 저장 = 단추 밑 붉은 현황 글 · 벤더피아 0: ' + 판.상태);
+      const 자리 = await p.evaluate(() => { const a = document.querySelector('#vp-root .vp-선불저장').getBoundingClientRect(), b = document.querySelector('#vp-root .vp-비요크상태').getBoundingClientRect(); return b.top - a.bottom; });
+      재(자리 >= 0 && 자리 < 30, '현황 글 = 저장 단추 바로 밑: ' + Math.round(자리) + 'px'); }
     await 체크([0, 1, 2]);
-    p.once('dialog', (d) => d.dismiss());
+    p.once('dialog', (d) => setTimeout(() => d.dismiss(), 150));   // 사람처럼 잠깐 뒤 「취소」(바로 돌아오면 「막힘」 으로 본다)
     await p.click('#vp-root .vp-선불저장');
     await p.waitForTimeout(300);
-    재(!상세.보냄.length && !상세.열림.length, '확인 창 「취소」 = 아무것도 안 함');
+    재(!상세.보냄.length && !상세.열림.length && /취소/.test((await 판읽기(p)).상태), '확인 창 「취소」 = 벤더피아 0 · 「저장 안 함(취소)」 보임: ' + (await 판읽기(p)).상태);
+    /* 하는 동안 = 「저장 중 k/n · m번째 줄 · 지금 단계」 + 그 줄 테두리 */
+    const 본상태 = [];
+    const 엿보기 = setInterval(() => p.evaluate(() => { const e = document.querySelector('#vp-root .vp-비요크상태'); return [e.textContent, document.querySelectorAll('#vp-root tr.vp-저장중줄').length, e.className]; }).then((x) => 본상태.push(x)).catch(() => {}), 40);
     let 창글 = '';
     p.once('dialog', (d) => { 창글 = d.message(); d.accept(); });
     await p.click('#vp-root .vp-선불저장');
     await 저장끝();
+    clearInterval(엿보기);
     let 셈글 = await 저장셈();
+    재(본상태.some(([t, n, c]) => /저장 중\s*1\/2/.test(t) && /번째 줄/.test(t) && /(찾는|여는|확인|누름)/.test(t) && n === 1 && /vp-하는중/.test(c)) && 본상태.some(([t]) => /저장 중\s*2\/2/.test(t)), '하는 동안 = 저장 중 1/2 → 2/2 · 몇 번째 줄 · 단계 · 그 줄 테두리: ' + [...new Set(본상태.map((x) => x[0]))].slice(0, 4).join(' | '));
+    const 끝상태 = (await 판읽기(p)).상태;
+    재(/저장 끝/.test(끝상태) && /저장됨\s*1/.test(끝상태) && /이미 같음\s*1/.test(끝상태) && /실패\s*0/.test(끝상태) && !(await p.evaluate(() => document.querySelectorAll('#vp-root tr.vp-저장중줄').length)), '끝 현황 = 저장됨 1 · 이미 같음 1 · 실패 0 · 테두리 걷힘: ' + 끝상태);
     재(/2줄/.test(창글) && /1줄은 뺍니다/.test(창글), '확인 창 = 저장할 2줄 · 연결 안 된 1줄 뺌');
     재(/저장\s*1\/2/.test(셈글) && /같음\s*1/.test(셈글) && !/실패/.test(셈글), '셈 = 저장 1/2 · 같음 1: ' + 셈글);
     재(상세.보냄.length === 1 && /^7711=5000 55,가상몰,GAZZA1,12$/.test(상세.보냄[0]), '상세 저장 제출 1번(같은 줄은 안 누름) · 금액 5000 · 여는 값 다섯(안 번호·매출처코드·매출처·상품코드·vendorCd): ' + 상세.보냄.join(' | '));
@@ -218,7 +228,8 @@ document.getElementById('btnSave').addEventListener('click', function (e) { if (
     await p.click('#vp-root .vp-선불저장');
     await 저장끝();
     셈글 = await 저장셈();
-    const 멈춘글 = (await 판읽기(p)).알림;
+    const 멈춘글 = (await 판읽기(p)).상태;
+    재(/실패\s*1/.test(멈춘글) && /안 함\s*1/.test(멈춘글) && /vp-탈/.test((await 판읽기(p)).상태꼴), '멈춘 현황 = 실패 1 · 안 함 1 · 붉게: ' + 멈춘글);
     재(/실패\s*1/.test(셈글) && /1번째 줄/.test(멈춘글) && /9,000/.test(멈춘글) && /멈췄/.test(멈춘글), '저장 뒤 값이 그대로면 실패 · 까닭 · 멈춤: ' + 멈춘글);
     재(상세.보냄.length === 1 && 상세.열림.every((x) => x === '7701'), '실패한 뒤 줄(줄1)은 안 열고 안 보냄');
     색들 = (await 판읽기(p)).칠;

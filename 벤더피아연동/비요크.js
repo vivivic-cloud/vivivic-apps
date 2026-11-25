@@ -120,7 +120,14 @@
       #vp-root .vp-비요크줄 button.vp-지우기{width:auto;margin:0;height:auto;min-height:0;line-height:normal;font-weight:400;font-family:inherit;padding:3px 10px;border:1px solid #c0c0c0;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;color:#5f5e5a}
       #vp-root .vp-비요크메모{display:flex;flex-wrap:wrap;gap:4px 16px;margin:4px 0;font-size:12px;color:#1a1a19;white-space:pre-wrap}
       #vp-root .vp-비요크셈{display:flex;flex-wrap:wrap;gap:4px 16px;margin:4px 0 6px;font-size:12px;font-variant-numeric:tabular-nums}
-      #vp-root .vp-비요크셈 b{font-weight:700}`;
+      #vp-root .vp-비요크셈 b{font-weight:700}
+      #vp-root .vp-비요크상태{display:flex;flex-wrap:wrap;gap:4px 16px;margin:0 0 4px;font-size:12px;font-variant-numeric:tabular-nums}
+      #vp-root .vp-비요크상태[hidden]{display:none}
+      #vp-root .vp-비요크상태 b{font-weight:700}
+      #vp-root .vp-비요크상태.vp-하는중{color:#086788}
+      #vp-root .vp-비요크상태.vp-탈{color:#c0392b}
+      #vp-root .vp-비요크상태.vp-탈 b,#vp-root .vp-비요크상태.vp-하는중 b{color:inherit}
+      #vp-root tr.vp-저장중줄 > td{box-shadow:inset 0 2px 0 #086788,inset 0 -2px 0 #086788}`;
     document.head.appendChild(st);
   }
   const 줄틀 = document.createElement("div");
@@ -128,7 +135,17 @@
   줄틀.innerHTML = `<label class="vp-올리기">파일 올리기<input type="file" accept=".xlsx"></label><span class="vp-비요크파일"></span><button type="button" class="vp-지우기" hidden>지우기</button><button type="button" class="vp-지우기 vp-선불저장" hidden>저장</button>`;
   const 메모틀 = document.createElement("div"); 메모틀.className = "vp-비요크메모";
   const 셈틀 = document.createElement("div"); 셈틀.className = "vp-비요크셈";
-  알림.before(줄틀, 메모틀, 셈틀);
+  /* 11-25 [새 지시 비요크저장현황] 저장 단추 바로 아래 — 지금 하는 일·끝난 뒤 현황(표 위 숫자 칸과 같은 꼴) */
+  const 상태틀 = document.createElement("div"); 상태틀.className = "vp-비요크상태"; 상태틀.hidden = true;
+  알림.before(줄틀, 상태틀, 메모틀, 셈틀);
+  const 글막 = (x) => String(x).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  /* 칸들 = [[이름, 값], …] 또는 글 — 꼴: "" 보통 · "하는중" · "탈" */
+  function 상태(칸들, 꼴 = "") {
+    상태틀.classList.toggle("vp-하는중", 꼴 === "하는중");
+    상태틀.classList.toggle("vp-탈", 꼴 === "탈");
+    상태틀.innerHTML = (Array.isArray(칸들) ? 칸들 : [[칸들]]).map(([이름, 값]) => "<span>" + 글막(이름) + (값 == null ? "" : " <b>" + 글막(값) + "</b>") + "</span>").join("");
+    상태틀.hidden = !상태틀.innerHTML;
+  }
   const 파일칸 = 줄틀.querySelector("input"), 파일글 = 줄틀.querySelector(".vp-비요크파일"), 지우기단추 = 줄틀.querySelector(".vp-지우기:not(.vp-선불저장)"), 저장단추 = 줄틀.querySelector(".vp-선불저장");
 
   const 수 = (x) => { const n = Number(String(x || "").replace(/,/g, "")); return Number.isFinite(n) ? n : 0; };
@@ -156,7 +173,7 @@
     저장단추.hidden = false;
     메모틀.replaceChildren(...자료.메모.map((m) => Object.assign(document.createElement("span"), { textContent: m })));
     셈그리기(자료);
-    알림.textContent = "";
+    알림.textContent = ""; 상태("");
     if (!자료.줄.length) { window.VP비요크표.비우기(); return; }
     await window.VP비요크표.그리기(자료.머리, 자료.줄, { 고름: true });
     if (지금 !== 자료) return;
@@ -311,13 +328,15 @@
     }
     throw new 탈("주문 상세의 배송정보 표를 읽지 못했습니다.");
   }
-  async function 선불비저장한줄(이음, 금액, 시작) {
+  async function 선불비저장한줄(이음, 금액, 시작, 단계 = () => {}) {
+    단계("주문 찾는 중");
     const 받은 = await 주문묻기(이음.주문, 시작, "보호");
     const 맞은 = 받은.filter((x) => x.송장 === 이음.송장);
     if (맞은.length !== 1) throw new 탈("주문관리에서 송장번호 줄을 " + (맞은.length ? "여럿" : "못") + " 찾았습니다.");
     const 열기 = 맞은[0].열기;
     if (Object.values(열기).some((v) => !v)) throw new 탈("주문 상세를 여는 값을 못 읽었습니다.");
     const 주소 = "/System/Sales/orderDetl.aspx?" + new URLSearchParams(열기).toString();
+    단계("주문 상세 여는 중");
     const { 틀, 첫, 실림 } = 틀열기(주소);
     try {
       await 첫;
@@ -333,9 +352,11 @@
       const 단추 = 틀.contentDocument.querySelector('input[name$="btnSave"]');
       if (!단추) throw new 탈("주문 상세의 저장 단추를 찾지 못했습니다.");
       window.VP말?.(앞줄 + "저장 누름");
+      단계("저장 누름 · 벤더피아 답 기다리는 중");
       단추.click();
       const 넘어감 = await Promise.race([다시.then(() => true), 쉼(4000).then(() => false)]);
       if (!넘어감) throw new 탈("저장이 안 됐습니다" + (알림들.length ? " — 벤더피아 알림 「" + 알림들.join(" / ").slice(0, 80) + "」" : "") + ".");
+      단계("저장 확인 중");
       const 후 = 수((await 선불칸(틀, 이음.송장)).get_value());
       if (후 !== 금액) throw new 탈("저장 뒤 선불비가 " + 돈(후) + "원입니다(바라던 값 " + 돈(금액) + "원)" + (알림들.length ? " — 「" + 알림들.join(" / ").slice(0, 80) + "」" : "") + ".");
       return { 결과: "됨", 새줄: 맞은[0] };
@@ -346,13 +367,21 @@
     const 자료 = 지금;
     if (!자료 || 저장중) return;
     const 수정 = 자료.머리.findIndex((h) => h.replace(/\s/g, "") === "선불수정");
-    if (수정 < 0) { 알림.textContent = "「선불 수정」 칸이 없습니다."; return; }
+    if (수정 < 0) { 상태("저장 못 함 — 「선불 수정」 칸이 없습니다.", "탈"); return; }
     const 몸줄 = [...(r.querySelector(".vp-table table.vp-촘촘 tbody") || { rows: [] }).rows];
     const 고른 = 몸줄.map((tr, k) => (tr.querySelector("input.vp-줄고름:checked") ? k : -1)).filter((k) => k >= 0);
     const 할 = 고른.filter((k) => 자료.이음[k] && String(자료.줄[k][수정] || "").trim() !== "" && Number.isFinite(Number(String(자료.줄[k][수정]).replace(/,/g, ""))));
-    if (!할.length) { 알림.textContent = 고른.length ? "체크한 줄 중 연결되고 「선불 수정」 값이 있는 줄이 없습니다." : "저장할 줄을 체크해 주세요."; return; }
+    if (!할.length) {
+      상태(고른.length ? [["저장할 줄 없음 — 체크", 고른.length + "줄"], ["연결·「선불 수정」 값 있는 줄", "0"]] : "저장할 줄을 체크해 주세요 (CS 앞 체크 칸).", "탈");
+      return;
+    }
     const 뺀 = 고른.length - 할.length;
-    if (!window.confirm("체크한 " + 할.length + "줄의 선불비를 「선불 수정」 값으로 벤더피아 주문에 저장합니다." + (뺀 ? "\n(연결 안 됐거나 값이 없는 " + 뺀 + "줄은 뺍니다)" : ""))) return;
+    const 물은때 = performance.now();
+    if (!window.confirm("체크한 " + 할.length + "줄의 선불비를 「선불 수정」 값으로 벤더피아 주문에 저장합니다." + (뺀 ? "\n(연결 안 됐거나 값이 없는 " + 뺀 + "줄은 뺍니다)" : ""))) {
+      /* 확인 창이 눈 깜짝할 새 「취소」 로 돌아오면 크롬이 이 화면의 확인 창을 막은 것 */
+      상태(performance.now() - 물은때 < 50 ? "저장 안 함 — 확인 창이 막혔습니다. 이 화면을 새로고침(F5)한 뒤 다시 눌러 주세요." : "저장 안 함 (확인 창에서 취소)", performance.now() - 물은때 < 50 ? "탈" : "");
+      return;
+    }
     저장중 = true; 저장단추.disabled = true; 지우기단추.disabled = true;
     const 날 = 자료.머리.indexOf("주문등록일");
     const 날들 = 날 >= 0 ? 자료.줄.map((x) => 날읽기(x[날])).filter(Boolean) : [];
@@ -361,13 +390,19 @@
     알림.textContent = "";
     셈그리기(자료);
     const t0 = performance.now();
+    let 탈글 = "", 차례 = 0;
+    const 셈칸 = () => [["저장됨", 자료.저장셈.됨], ["이미 같음", 자료.저장셈.같음], ["실패", 자료.저장셈.실패]];
+    상태([["저장 중", "0/" + 할.length]], "하는중");
     try {
       for (const k of 할) {
         if (지금 !== 자료) return;
         const 금액 = 수(자료.줄[k][수정]);
         const tr = 몸줄[k];
+        차례++;
+        if (tr) { tr.classList.add("vp-저장중줄"); tr.scrollIntoView({ block: "nearest" }); }
+        const 단계 = (글) => 상태([["저장 중", 차례 + "/" + 할.length], [(k + 1) + "번째 줄", 돈(금액) + "원"], [글]], "하는중");
         try {
-          const 답 = await 선불비저장한줄(자료.이음[k], 금액, 시작);
+          const 답 = await 선불비저장한줄(자료.이음[k], 금액, 시작, 단계);
           if (답.결과 === "같음") 자료.저장셈.같음++; else 자료.저장셈.됨++;
           자료.완료[k] = 금액;
           const 이음 = { ...자료.이음[k], 상품명: 답.새줄.상품명 || 자료.이음[k].상품명, 줄: 답.새줄.줄, 머리: 답.새줄.머리 };
@@ -377,13 +412,17 @@
         } catch (e) {
           자료.저장셈.실패++; 셈그리기(자료);
           delete 자료.완료[k]; if (tr) tr.classList.remove("vp-완료줄");   // 확인 못 한 줄은 연두 아님
-          알림.textContent = (k + 1) + "번째 줄: " + (e instanceof 탈 ? e.message : "저장하지 못했습니다.") + " 여기서 멈췄습니다.";
+          탈글 = (k + 1) + "번째 줄: " + (e instanceof 탈 ? e.message : "저장하지 못했습니다.") + " 여기서 멈췄습니다.";
           window.VP말?.(앞줄 + "저장 탈 " + (k + 1) + "줄 " + (e && e.message ? e.message : e));
           if (tr) tr.scrollIntoView({ block: "center" });
           break;
-        }
+        } finally { if (tr) tr.classList.remove("vp-저장중줄"); }
       }
     } finally {
+      if (지금 === 자료) {
+        const 남음 = 할.length - 자료.저장셈.됨 - 자료.저장셈.같음 - 자료.저장셈.실패;
+        상태([["저장 끝", ((performance.now() - t0) / 1000).toFixed(0) + "초"], ...셈칸(), ...(남음 ? [["안 함", 남음]] : []), ...(탈글 ? [[탈글]] : [])], 탈글 ? "탈" : "");
+      }
       저장중 = false; 저장단추.disabled = false; 지우기단추.disabled = false;
       기억하기(자료);
       window.VP말?.(앞줄 + "저장 됨" + 자료.저장셈.됨 + " 같음" + 자료.저장셈.같음 + " 실패" + 자료.저장셈.실패 + "/" + 할.length + " " + ((performance.now() - t0) / 1000).toFixed(1) + "초");
@@ -409,7 +448,7 @@
     try { localStorage.removeItem(열쇠); } catch (e) { /* 없음 */ }
     지금 = null;
     window.VP비요크표.비우기();
-    파일글.textContent = ""; 메모틀.replaceChildren(); 셈틀.replaceChildren(); 알림.textContent = "";
+    파일글.textContent = ""; 메모틀.replaceChildren(); 셈틀.replaceChildren(); 알림.textContent = ""; 상태("");
     지우기단추.hidden = true;
     저장단추.hidden = true;
   });
