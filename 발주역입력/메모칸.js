@@ -3,6 +3,7 @@
    쓰는 법: <script src="메모칸.js?v=1"></script> · const 메모 = 메모칸.만들기({ 자리:[…창고 모음 길…], 띠: 글 => … }) · 메모.시작(window.db, window.fbRead) · 메모.칸('제품'|'품목', 열쇠, 덧속성)
    열쇠: 제품 = 제품명(앞뒤 빈칸 뺀 글자) · 품목 = 제품명 + 탭 + 품목명 — 같은 열쇠면 모든 달·누계에 같은 메모.
    11-25 사장님 「에이엠티출고조사 메모는 메모량에 따라 열바뀜이 되어 해당칸의 높이가 자동조절되어야 합니다.」 — 칸 = textarea(cols 20, 열 너비 그대로) · 글이 길면 줄바꿈 · 높이 = 글만큼(치는 동안·저장된 글 모두, 표가 새로 그려지면 저절로) · Enter = 저장(줄은 저절로 바뀜).
+   v3(11-25): 잠김(덧, 말) = 입력 없는 회색 칸(제품 메모는 그 제품 첫 줄에만 — 쓰는 쪽이 고름).
    저장 = 창고 `<자리>/_전체` {제품:{열쇠:글}, 품목:{열쇠:글}, 고친때} · 바뀐 열쇠만 setDoc merge(빈칸 = 지움) · onSnapshot 으로 다른 창·기기 것도 바로(치는 칸은 그대로). */
 (function(){
   if(window.메모칸) return;
@@ -14,6 +15,7 @@
 .dpr-t td.메모칸{padding:1px 3px;vertical-align:middle}
 .dpr-t td.메모칸 textarea.메모{display:block;width:100%;min-width:90px;height:20px;min-height:20px;resize:none;overflow:hidden;white-space:pre-wrap;word-break:break-all;overflow-wrap:anywhere;padding:1px 5px;font:inherit;font-size:11.5px;line-height:16px;color:var(--vg-body);border:1px solid var(--vg-edge);border-radius:4px;background:var(--vg-fill);outline:none;-webkit-appearance:none}
 .dpr-t td.메모칸 textarea.메모:focus{border-color:var(--vg-ink);background:var(--vg-bg)}
+.dpr-t td.메모칸.메모잠김{background:#EFEFEC;cursor:not-allowed}
 .dpr-t td.메모칸 textarea.메모.있음{background:var(--vg-bg);color:#1565c0;font-weight:700}
 @media (max-width:600px){.dpr-t td.메모칸 textarea.메모{font-size:16px;height:26px;min-height:26px;line-height:22px}}`;
     document.head.appendChild(st);
@@ -51,6 +53,7 @@
       시작(d, f){ db = d; fb = f;
         f.onSnapshot(f.doc(d, ...o.자리, '_전체'), s => { const x = (s.exists() && s.data()) || {};
           값 = { 제품:(x.제품 && typeof x.제품==='object') ? x.제품 : {}, 품목:(x.품목 && typeof x.품목==='object') ? x.품목 : {} }; 칠(); }, () => {}); },
+      잠김(덧, 말){ return `<td class="메모칸 메모잠김"${덧||''}${말 ? ` title="${글(말)}"` : ''}></td>`; },   /* v3 같은 제품 둘째 줄부터 — 입력 막음·회색 */
       칸(z, k, 덧){
         if(!k) return `<td class="메모칸"${덧||''}></td>`;
         const v = (값[z] || {})[k] || '';
