@@ -101,6 +101,9 @@ img.glyph{height:1.05em;width:auto;vertical-align:-.15em;background:var(--fig);b
 .ch:hover{background:var(--sel)}
 .ch .tx{min-width:0;flex:1}
 .mk{flex:none;width:1.55em;height:1.55em;margin-top:.08em;border:1.5px solid var(--ink);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-family:var(--f-ui);font-size:.82em;font-weight:600;font-variant-numeric:tabular-nums;transition:background .12s,color .12s}
+.ch{touch-action:manipulation}
+.ch.x .tx{text-decoration:line-through;opacity:.4}
+.ch.x .mk{opacity:.4}
 .ch[aria-pressed="true"]{background:var(--sel);border-color:var(--rule)}
 .ch[aria-pressed="true"] .mk{background:var(--ink);color:var(--sheet)}
 .choices.compact{flex-direction:row;flex-wrap:wrap;gap:8px;align-items:center}
@@ -1082,8 +1085,8 @@ img.glyph{height:1.05em;width:auto;vertical-align:-.15em;background:var(--fig);b
 <script>
 (function(){
   var KEY='suneung2026-kor-v1';
-  var st={ans:{},timer:{left:4800,run:false,at:0}};
-  try{var s=JSON.parse(localStorage.getItem(KEY)||'null'); if(s&&s.ans){st.ans=s.ans; if(s.timer) st.timer=s.timer;}}catch(e){}
+  var st={ans:{},x:{},timer:{left:4800,run:false,at:0}};
+  try{var s=JSON.parse(localStorage.getItem(KEY)||'null'); if(s&&s.ans){st.ans=s.ans; if(s.timer) st.timer=s.timer; if(s.x) st.x=s.x;}}catch(e){}
   function save(){try{localStorage.setItem(KEY,JSON.stringify(st));}catch(e){}}
 
   var secs=[].slice.call(document.querySelectorAll('.sec'));
@@ -1106,14 +1109,21 @@ img.glyph{height:1.05em;width:auto;vertical-align:-.15em;background:var(--fig);b
   function paint(qid){
     var a=st.ans[qid]; var el=document.getElementById('q-'+qid); if(!el) return;
     el.classList.toggle('done',!!a);
-    [].forEach.call(el.querySelectorAll('.ch'),function(b){b.setAttribute('aria-pressed',String(+b.dataset.n===a))});
+    [].forEach.call(el.querySelectorAll('.ch'),function(b){b.setAttribute('aria-pressed',String(+b.dataset.n===a)); b.classList.toggle('x',(st.x[qid]||[]).indexOf(+b.dataset.n)>=0)});
     [].forEach.call(document.querySelectorAll('.bub[data-q="'+qid+'"]'),function(b){b.classList.toggle('on',+b.dataset.n===a)});
   }
   function setAns(qid,n){ if(st.ans[qid]===n) delete st.ans[qid]; else st.ans[qid]=n; save(); paint(qid); count(); }
+  // one tap: exclude toggle, double tap: fix as answer
+  function setX(qid,n){ var x=st.x[qid]||[], i=x.indexOf(n); if(i>=0) x.splice(i,1); else { x.push(n); if(st.ans[qid]===n){ delete st.ans[qid]; count(); } } if(x.length) st.x[qid]=x; else delete st.x[qid]; save(); paint(qid); }
+  function fix(qid,n){ var x=st.x[qid]; if(x&&x.indexOf(n)>=0){ x.splice(x.indexOf(n),1); if(!x.length) delete st.x[qid]; } setAns(qid,n); }
+  var tapT=null, tapB=null;
   document.getElementById('main').addEventListener('click',function(e){
     var b=e.target.closest('.ch'); if(!b) return;
+    var qid=b.closest('.q').dataset.q, n=+b.dataset.n;
+    if(tapB===b&&tapT){ clearTimeout(tapT); tapT=null; tapB=null; try{window.getSelection().removeAllRanges();}catch(_){} fix(qid,n); return; }
     var sl=window.getSelection(); if(sl&&!sl.isCollapsed&&String(sl).trim()) return;
-    setAns(b.closest('.q').dataset.q,+b.dataset.n);
+    if(tapT){ clearTimeout(tapT); }
+    tapB=b; tapT=setTimeout(function(){ tapT=null; tapB=null; setX(qid,n); },300);
   });
 
   // answer sheet
