@@ -143,7 +143,7 @@
       #vp-root .vp-비요크줄{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:6px 0;font-size:12px}
       #vp-root .vp-비요크줄 label.vp-올리기{display:inline-block;padding:3px 10px;border:1px solid #c0c0c0;border-radius:4px;background:#f5f5f5;cursor:pointer;font-size:12px}
       #vp-root .vp-비요크줄 label.vp-올리기 input{display:none}
-      #vp-root .vp-비요크줄 button.vp-지우기{padding:3px 10px;border:1px solid #c0c0c0;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;color:#5f5e5a}
+      #vp-root .vp-비요크줄 button.vp-지우기{width:auto;margin:0;height:auto;min-height:0;line-height:normal;font-weight:400;font-family:inherit;padding:3px 10px;border:1px solid #c0c0c0;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;color:#5f5e5a}
       #vp-root .vp-비요크메모{display:flex;flex-wrap:wrap;gap:4px 16px;margin:4px 0;font-size:12px;color:#1a1a19;white-space:pre-wrap}
       #vp-root .vp-비요크셈{display:flex;flex-wrap:wrap;gap:4px 16px;margin:4px 0 6px;font-size:12px;font-variant-numeric:tabular-nums}
       #vp-root .vp-비요크셈 b{font-weight:700}

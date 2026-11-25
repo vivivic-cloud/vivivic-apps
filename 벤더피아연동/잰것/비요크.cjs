@@ -100,7 +100,7 @@ function 가짜파일() {
       선불: 몸.map((tr) => tr.cells[21].textContent), 글: cs && cs.fontSize, 높이: 몸[0] && 몸[0].getBoundingClientRect().height,
       손: t ? t.querySelectorAll('.vp-열손').length : 0, 검색창숨김: getComputedStyle(document.querySelector('#vp-root .vp-bar')).display === 'none',
       쪽가로: document.documentElement.scrollWidth > innerWidth + 1, 기억: !!localStorage.getItem('vp비요크'), 상품칸: document.querySelectorAll('#vp-root td.vp-상품칸').length,
-      줄누름: 몸.filter((tr) => tr.classList.contains('vp-줄상담')).length };
+      줄누름: 몸.filter((tr) => tr.classList.contains('vp-줄상담')).length, 지우기넓이: document.querySelector('#vp-root .vp-지우기')?.getBoundingClientRect().width };
   });
 
   for (const 너비 of [1280, 375]) {
@@ -124,6 +124,7 @@ function 가짜파일() {
     재(판.상품칸 === 5, '상품명 칸 = 이름 단추 자리 5: ' + 판.상품칸);
     재(판.줄누름 === 5, '줄 누름(상담) = 다른 표와 같음 5: ' + 판.줄누름);
     재(!판.쪽가로, '쪽 전체 가로 스크롤 없음');
+    재(판.지우기넓이 > 0 && 판.지우기넓이 < 100, '「지우기」 단추 = 작은 단추(쪽 너비로 안 늘어남): ' + Math.round(판.지우기넓이));
     재(판.기억 && 판.파일.startsWith('가짜.xlsx'), '브라우저 안에 기억 · 파일 이름: ' + 판.파일);
     /* 다시 열기 → 기억으로 그대로 */
     const { p: p2, 보낸: 보낸2, 쪽오류: 오류2 } = await 쪽열기(ctx);
