@@ -102,6 +102,7 @@
     }
     것.msgs.push({ who: '나', text: 글, at: Math.floor(Date.now() / 1000), sent: true });
     것['잰때'] = Date.now();
+    if (window.쓰기지킴 && window.쓰기지킴.상태.멈춤) throw new Error('이 창은 저장을 멈췄습니다 — 새로고침해 주세요');   /* 11-23 쓰기지킴(옛 판·잦은 쓰기) */
     const w = await fetch(길, { method: 'PATCH', headers: 머리,
       body: JSON.stringify({ fields: Object.fromEntries(Object.entries(것).map(([k, v]) => [k, 값(v)])) }) });
     if (!w.ok) throw new Error('보내지 못했습니다 (' + w.status + ')');
@@ -165,6 +166,7 @@
     // 이미 있으면 덮지 않는다 — 관리자가 적어 둔 상태·결과를 지우면 안 된다
     const 봄 = await fetch(길, { headers: { Authorization: 'Bearer ' + tok } });
     if (봄.ok) return;
+    if (window.쓰기지킴 && window.쓰기지킴.상태.멈춤) throw new Error('이 창은 저장을 멈췄습니다 — 새로고침해 주세요');   /* 11-23 쓰기지킴(옛 판·잦은 쓰기) */
     const w = await fetch(길, { method: 'PATCH', headers: 머리,
       body: JSON.stringify({ fields: Object.fromEntries(Object.entries(몸).map(([k, v]) => [k, 값(v)])) }) });
     if (!w.ok) throw new Error('내가 시킨 것에 못 적었습니다 (' + w.status + ')');

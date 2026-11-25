@@ -270,7 +270,11 @@
      메인 메뉴 「하우저」 = `orderMst.aspx#vgHau` — CS정산과 같은 길: 이 글이 쪽 틀과 표(`머리알기`+`addRows`)를 세우고 형제 `하우저.js` 가
      상품관리(salesGoods.aspx)를 배송사 하우저로 조회만 해 이 표에 그린다(확장 안 글은 그대로 → 덮어쓰기 없음). */
   const 하우저보기 = CS전용 && /(^|[#&])vgHau\b/i.test(location.hash || "");
-  const 따로보기 = 정산보기 || 하우저보기;            // 주문관리 목록·검색창 대신 다른 글이 표를 채우는 쪽
+  /* 11-25 [새 지시 비요크선불비변경] 사장님(그대로): 「메인에 이파일을 목록화한 페이지 만들어줘 - 메뉴이름 비요크선불비변경」
+     메인 메뉴 「비요크선불비변경」 = `orderMst.aspx#vgByk` — 하우저와 같은 길: 이 글이 쪽 틀과 표를 세우고 형제 `비요크.js` 가
+     사장님이 올린 .xlsx 를 브라우저 안에서만 읽어 이 표에 그린다(벤더피아 쓰기 0, 확장 안 글 그대로 → 덮어쓰기 없음). */
+  const 비요크보기 = CS전용 && /(^|[#&])vgByk\b/i.test(location.hash || "");
+  const 따로보기 = 정산보기 || 하우저보기 || 비요크보기;   // 주문관리 목록·검색창 대신 다른 글이 표를 채우는 쪽
   function 상담내용보기() {
     const 주소 = "/System/CS/inquiryList.aspx";
     const 숨은칸 = new Set(["", "주문번호", "ctCd", "inquiryCd", "매출처", "매출처주문번호", "매출처상품코드", "주문자", "주문자전화",
@@ -505,7 +509,7 @@
   root.innerHTML = CS전용 ? `
     <div class="vp-search">
       <a class="vp-home" href="/index.aspx">← 메인</a>
-      ${정산보기 ? "<h1>CS정산</h1>" : 하우저보기 ? "<h1>하우저</h1>" : `<div class="vp-머리줄"><h1>CS등록</h1><a class="vp-머리단추" href="/System/Sales/orderMst.aspx#vgInq" target="_blank" rel="noopener">상담내용보기</a><button type="button" class="vp-머리단추 vp-모든랙단추">모든랙주문확인</button></div>`}
+      ${정산보기 ? "<h1>CS정산</h1>" : 하우저보기 ? "<h1>하우저</h1>" : 비요크보기 ? "<h1>비요크선불비변경</h1>" : `<div class="vp-머리줄"><h1>CS등록</h1><a class="vp-머리단추" href="/System/Sales/orderMst.aspx#vgInq" target="_blank" rel="noopener">상담내용보기</a><button type="button" class="vp-머리단추 vp-모든랙단추">모든랙주문확인</button></div>`}
       <form class="vp-bar"${따로보기 ? ' style="display:none"' : ""}>
         <input type="date" name="from" required>
         <span>~</span>
@@ -1983,7 +1987,7 @@
        확인하여 각 데이터 열의 넓이를 조정할 수 있게 하고 최대한 벤더피아의 실제 화면과 최대한 비슷한 모습으로 보이도록 텍스트 사이즈 등을 조정해 주세요.」
      칸 넓이는 `<col>` 이 정한다(table-layout: fixed). 처음 넓이 = 글 너비에 맞춤(받은 줄을 볼 때마다 넓어지기만, `자동`) · 끌어 바꾼 칸은 그 값(`둠`).
      저장 = localStorage 「vp열넓이:배송」·「vp열넓이:CS」 `{칸이름: px}`(같은 이름 둘째 칸은 「이름#2」). 경계를 두 번 누르면 그 칸만 처음 넓이로. */
-  const 넓이열쇠 = "vp열넓이:" + (하우저보기 ? "하우저" : CS전용 ? "CS" : "배송");
+  const 넓이열쇠 = "vp열넓이:" + (하우저보기 ? "하우저" : 비요크보기 ? "비요크" : CS전용 ? "CS" : "배송");
   /* 11-17 [새 지시 모든표 통일] 넓이 틀·글 맞춤은 공용 부품 `VP표`(vp-data.js)로 옮겼다 — 단품·상품·재고·상담내용보기 표와 **같은 코드**.
      여기는 배송·CS 표만의 규칙(끝값·더함)만 넘긴다. 숫자는 옮기기 전과 같다(일반 130 · 상품명·단품명·단품구성·옵션 200 · 이름 단추 칸 280(+110) · 주문칸 200(+40)). */
   const 여유 = 8, 끝넓이 = 130, 긴칸끝 = 200, 이름칸끝 = 280;
@@ -2253,9 +2257,11 @@
       },
     };
     if (하우저보기) window.VP하우저표 = window.VP정산표;   // 같은 표 — 이름만 하나 더
+    if (비요크보기) window.VP비요크표 = window.VP정산표;   // 같은 표 — 이름만 하나 더
+    const 글이름 = 하우저보기 ? "하우저" : 비요크보기 ? "비요크" : "cs정산";
     const sc = document.createElement("script");
-    sc.src = 형제(하우저보기 ? "하우저.js" : "cs정산.js");
-    sc.addEventListener("error", () => window.VP말?.((하우저보기 ? "하우저" : "CS정산") + ":글 못 받음"));
+    sc.src = 형제(글이름 + ".js");
+    sc.addEventListener("error", () => window.VP말?.((하우저보기 ? "하우저" : 비요크보기 ? "비요크" : "CS정산") + ":글 못 받음"));
     document.head.appendChild(sc);
   } else if (CS전용) CS목록보이기();
 })();
