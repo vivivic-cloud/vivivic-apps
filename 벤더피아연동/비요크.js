@@ -25,7 +25,11 @@
      ⑤ 하나라도 어긋나면 **거기서 멈춤**(뒤 줄 안 함). 알림 창은 가로채 까닭에 붙임.
    11-25 [새 지시 비요크완료색] 사장님(그대로): 「완료됨이 확인되면 연두색줄로 변경되게 해주세요」
    → ⑤ 에서 벤더피아 선불비 = 「선불 수정」 이 확인된 줄(저장됨·이미 같음) = 연두 줄(search.css `tr.vp-완료줄`). 파일 기억에 `완료:{줄번호:금액}` 로 같이 둬
-     다시 열어도 연두(이음이 그대로이고 「선불 수정」 값이 그 금액일 때만). */
+     다시 열어도 연두(이음이 그대로이고 「선불 수정」 값이 그 금액일 때만).
+   11-25 [새 지시 비요크완료공유] 사장님(그대로): 「비요크선불비 변경 다른 사용자가 수정완료 작업시 이미 수정 완료된 정보가 초록색변경이 안되어 있습니다.」
+   → 연두 기준 = 이 브라우저 기억이 아니라 **벤더피아 주문관리 목록 「선불비」 = 그 줄 「선불 수정」**(누가 어디서 저장했든 같게).
+     목록 선불비 = 상세 배송정보 dGrid 선불비(11-25 잼 14줄 같음) → 상세는 안 엶(요청 안 늘림).
+     다시 열 때(임시): 기억한 이음·연두로 먼저 칠하고, **연두 아닌 이은 줄만** 주문관리를 다시 물어 새 선불비로 고쳐 칠함(연두 줄은 안 물음). */
 (() => {
   if (window.__vp비요크돌았나) return;
   window.__vp비요크돌았나 = true;
@@ -183,12 +187,9 @@
     for (const [k, v] of Object.entries(자료.이음)) {
       if (!v || 송장맞춤(자료.줄[k] && 자료.줄[k][송]) !== v.송장 || !window.VP비요크표.잇기(Number(k), v)) delete 자료.이음[k];
     }
-    /* 완료(벤더피아 선불비 = 선불 수정 확인) — 이음이 남아 있고 선불 수정 값이 그대로인 줄만 연두 */
-    const 수정칸 = 자료.머리.findIndex((h) => h.replace(/\s/g, "") === "선불수정");
-    for (const [k, 금액] of Object.entries(자료.완료)) {
-      if (자료.이음[k] && 수정칸 >= 0 && 수(자료.줄[k][수정칸]) === 금액) 완료칠하기(Number(k));
-      else delete 자료.완료[k];
-    }
+    /* 완료 = 이은 주문관리 줄의 선불비가 「선불 수정」 과 같음(또는 이 브라우저 저장 확인) — 기억한 값으로 먼저 칠함, 아래 잇기가 다시 확인 */
+    for (const k of Object.keys(자료.완료)) if (!자료.이음[k]) delete 자료.완료[k];
+    for (const k of Object.keys(자료.이음)) 완료판정(자료, Number(k));
     셈그리기(자료);
     window.VP말?.(앞줄 + "줄" + 자료.줄.length + " 기억연결" + Object.keys(자료.이음).length);
     잇기(자료).catch((e) => {
@@ -257,7 +258,7 @@
     /* 묻을 것 = 못 이은 줄(송장·주문번호 있음)을 주문번호로 묶음 */
     const 묶음 = new Map();
     자료.줄.forEach((r, k) => {
-      if (자료.이음[k]) return;
+      if (자료.이음[k] && 자료.완료[k] != null) return;   // [새 지시 비요크완료공유] 연두 아닌 이은 줄은 벤더피아 선불비를 다시 본다
       const 송장 = 송장맞춤(r[송]), 주문 = String(r[주] || "").trim();
       if (!송장 || !주문) return;
       if (!묶음.has(주문)) 묶음.set(주문, []);
@@ -272,25 +273,41 @@
     for (const [주문, 줄들] of 묶음) {
       if (지금 !== 자료) return;
       let 받은;
+      const 전완료 = 줄들.map(([k]) => 자료.완료[k]);
       for (let 번 = 1; ; 번++) {
         try { 받은 = await 주문묻기(주문, 시작); break; }
         catch (e) { if (e instanceof 탈 || 번 >= 2) throw e; await new Promise((ok) => setTimeout(ok, 3000)); }
       }
       물음++;
       if (지금 !== 자료) return;
-      for (const [k, 송장] of 줄들) {
+      for (const [j, [k, 송장]] of 줄들.entries()) {
         const 맞은 = 받은.find((x) => x.송장 === 송장);
         if (!맞은) continue;
+        if (자료.완료[k] !== 전완료[j]) continue;   // 묻는 동안 이 화면에서 저장된 줄 — 저장 확인이 이긴다
         const 이음 = { 송장, 주문: 맞은.주문 || 주문, 상품명: 맞은.상품명, 줄: 맞은.줄, 머리: 맞은.머리 };
-        if (window.VP비요크표.잇기(k, 이음)) { 자료.이음[k] = 이음; 새로++; }
+        const 옛 = 자료.이음[k];
+        if (window.VP비요크표.잇기(k, 이음)) { 자료.이음[k] = 이음; if (!옛) 새로++; delete 자료.완료[k]; 완료판정(자료, k); }
       }
       자료.찾는중[0] = 물음; 셈그리기(자료);
     }
     자료.찾는중 = null; 셈그리기(자료);
     기억하기(자료);
-    window.VP말?.(앞줄 + "잇기 물음" + 물음 + " 새연결" + 새로 + " 연결" + Object.keys(자료.이음).length + " " + ((performance.now() - t0) / 1000).toFixed(1) + "초 시작" + (시작 ? "있음" : "기본"));
+    window.VP말?.(앞줄 + "잇기 물음" + 물음 + " 새연결" + 새로 + " 연결" + Object.keys(자료.이음).length + " 완료" + Object.keys(자료.완료).length + " " + ((performance.now() - t0) / 1000).toFixed(1) + "초 시작" + (시작 ? "있음" : "기본"));
   }
 
+  /* [새 지시 비요크완료공유] 줄 k 가 완료(연두)인가 — 이은 주문관리 줄 「선불비」 = 「선불 수정」, 또는 이 화면 저장 확인(완료 기억) */
+  function 완료판정(자료, k) {
+    const 수정칸 = 자료.머리.findIndex((h) => h.replace(/\s/g, "") === "선불수정");
+    const v = 자료.이음[k], 값 = 수정칸 >= 0 && 자료.줄[k] ? String(자료.줄[k][수정칸] || "").trim() : "";
+    const 선 = v && Array.isArray(v.머리) ? v.머리.indexOf("선불비") : -1;
+    const 벤더 = 선 >= 0 && Array.isArray(v.줄) ? String(v.줄[선] == null ? "" : v.줄[선]).trim() : "";
+    const 금액 = 수(값);
+    const 맞음 = !!v && /\d/.test(값) && (자료.완료[k] === 금액 || (벤더 !== "" && 수(벤더) === 금액));
+    if (맞음) 자료.완료[k] = 금액; else delete 자료.완료[k];
+    const tr = (r.querySelector(".vp-table table.vp-촘촘 tbody") || { rows: [] }).rows[k];
+    if (tr) tr.classList.toggle("vp-완료줄", 맞음);
+    return 맞음;
+  }
   function 완료칠하기(k) {
     const tr = (r.querySelector(".vp-table table.vp-촘촘 tbody") || { rows: [] }).rows[k];
     if (tr) tr.classList.add("vp-완료줄");

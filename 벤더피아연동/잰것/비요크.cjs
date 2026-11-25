@@ -66,14 +66,15 @@ function 폼값(q) {
   const 값 = (이름) => { const m = 글.match(new RegExp('name="[^"]*' + 이름.replace(/\$/g, '\\$') + '"\r\n\r\n([^\r]*)')); return m ? m[1] : ''; };
   return 'tbSOrderNo=' + 값('tbSOrderNo') + ' dcStartDt=' + 값('dcStartDt') + ' ddlRowCnt=' + 값('ddlRowCnt') + ' 단추=' + (/btnSearch\.x/.test(글) ? 1 : 0) + (/btnSave|btnDelete|btnInsert/.test(글) ? ' 쓰기단추!' : '');
 }
+const 목록선불 = {};   // [비요크완료공유] 주문관리 목록 「선불비」 흉내 — k → 글(비면 빈 칸)
 function 주문관리응답(폼) {
   const 번 = (폼.match(/tbSOrderNo=(\S*)/) || [])[1] || '';
   const k = Number(번.slice(-1));
-  const 이름 = ['', '주문번호', 'CS', '주문번호', '상품명', '수취인', '송장번호', '매출처코드', '매출처', '상품코드'];
+  const 이름 = ['', '주문번호', 'CS', '주문번호', '상품명', '수취인', '송장번호', '매출처코드', '매출처', '상품코드', '선불비'];
   while (이름.length < 60) 이름.push('덤' + 이름.length);
-  const 보임 = (i) => i !== 0 && i !== 1 && i < 10;   // 체크·안 번호·덤 50칸은 숨김(인라인 width 없음)
+  const 보임 = (i) => i !== 0 && i !== 1 && i < 11;   // 체크·안 번호·덤 50칸은 숨김(인라인 width 없음)
   const th = 이름.map((h, i) => `<th class="igg_HeaderCaption"${보임(i) ? ' style="width: 40px;"' : ''}>${h}</th>`).join('');
-  const 줄 = (송장, j) => '<tr>' + 이름.map((h, i) => `<td>${i === 0 ? '<input type="checkbox">' : i === 1 ? '77' + k + j : h === '주문번호' ? 번 : h === '상품명' ? '주문관리 협탁 ' + k : h === '수취인' ? '주문관리수취인' + k : h === '송장번호' ? 송장 : h === '매출처코드' ? '55' : h === '매출처' ? '가상몰' : h === '상품코드' ? 'GAZZA' + k : ''}</td>`).join('') + '</tr>';
+  const 줄 = (송장, j) => '<tr>' + 이름.map((h, i) => `<td>${i === 0 ? '<input type="checkbox">' : i === 1 ? '77' + k + j : h === '주문번호' ? 번 : h === '상품명' ? '주문관리 협탁 ' + k : h === '수취인' ? '주문관리수취인' + k : h === '송장번호' ? 송장 : h === '매출처코드' ? '55' : h === '매출처' ? '가상몰' : h === '상품코드' ? 'GAZZA' + k : h === '선불비' && j === 1 ? (목록선불[k] || '') : ''}</td>`).join('') + '</tr>';
   const 몸 = k === 0 || k === 1 ? 줄('9999', 0) + 줄('6000000000' + k, 1) : k === 2 ? 줄('5555', 0) : '';
   return `<html><head><script>var vendorCd = getServerCookie('VP_Cookie', 'LOGON_EMP_VCD'); var 길 = "orderDetl.aspx?x=1&vendorCd=" + vendorCd;</script></head><body><form id="aspnetForm" action="./orderMst.aspx"></form><div id="oGrid"><table><tr>${th}</tr></table><table>${몸}</table></div><span>행수: ${k < 2 ? 2 : k === 2 ? 1 : 0}건</span></body></html>`;
 }
@@ -150,7 +151,7 @@ document.getElementById('btnSave').addEventListener('click', function (e) { if (
   });
 
   for (const 너비 of [1280, 375]) {
-    console.log('\n■ ' + 너비);
+    console.log('\n■ ' + 너비); for (const x of Object.keys(목록선불)) delete 목록선불[x];
     const ctx = await b.newContext({ viewport: { width: 너비, height: 900 } });
     const { p, 보낸, 쪽오류, 밖 } = await 쪽열기(ctx);
     재((await 판읽기(p)).h1 === '비요크선불비변경', '제목 「비요크선불비변경」');
@@ -290,6 +291,9 @@ document.getElementById('btnSave').addEventListener('click', function (e) { if (
     재(!판.쪽가로, '쪽 전체 가로 스크롤 없음');
     재(판.지우기넓이 > 0 && 판.지우기넓이 < 100, '「지우기」 단추 = 작은 단추(쪽 너비로 안 늘어남): ' + Math.round(판.지우기넓이));
     재(판.기억 && 판.파일.startsWith('가짜.xlsx'), '브라우저 안에 기억 · 파일 이름: ' + 판.파일);
+    /* [비요크완료공유] 다른 사람이 벤더피아에서 고침 — 이 브라우저 완료 기억은 없고(다른 컴퓨터처럼) 목록 선불비: 줄0 = 5,000(고쳐짐) · 줄1 = 15,000(안 고쳐짐) */
+    Object.assign(목록선불, { 0: '5,000', 1: '15,000' });
+    await p.evaluate(() => { const k = JSON.parse(localStorage.getItem('vp비요크')); k.완료 = {}; localStorage.setItem('vp비요크', JSON.stringify(k)); });
     /* 다시 열기 → 기억으로 그대로 */
     const { p: p2, 보낸: 보낸2, 쪽오류: 오류2 } = await 쪽열기(ctx);
     await p2.waitForFunction(() => document.querySelectorAll('#vp-root table.vp-촘촘 tbody tr').length > 0, null, { timeout: 15000 });
@@ -297,8 +301,17 @@ document.getElementById('btnSave').addEventListener('click', function (e) { if (
     await p2.waitForFunction(() => !/확인/.test(document.querySelector('#vp-root .vp-비요크셈').textContent), null, { timeout: 15000 }).catch(() => {});
     const 판2b = await 판읽기(p2);
     const 물은2 = 보낸2.filter((x) => x.startsWith('POST'));
-    재(판2b.줄 === 5 && 판2b.칠[0] === 'rgb(255, 243, 191)' && 판2b.칠[1] === 'rgb(221, 243, 192)' && /연결\s*2/.test(판2b.셈) && 판2.메모.includes('가짜 메모'), '다시 열어도 그대로(줄 5·노랑 1·연두 1(완료 기억)·메모): ' + 판2b.칠.slice(0, 2).join(' / '));
-    재(물은2.length === 2 && !물은2.some((x) => /900000000[01] /.test(x)), '다시 열 때 = 기억한 이음은 안 묻고 못 이은 줄만 2번: ' + 물은2.length);
+    재(판2b.줄 === 5 && 판2b.칠[0] === 'rgb(221, 243, 192)' && 판2b.칠[1] === 'rgb(255, 243, 191)' && 판2b.칠[2] !== 'rgb(221, 243, 192)' && /연결\s*2/.test(판2b.셈) && 판2.메모.includes('가짜 메모'), '다시 열면 벤더피아 목록 선불비로: 남이 고친 줄0 = 연두 · 안 고쳐진 줄1 = 노랑(기억 없어도) · 못 이은 줄 흰색: ' + 판2b.칠.slice(0, 3).join(' / '));
+    재(물은2.length === 4, '다시 열 때 = 연두 아닌 이은 줄 2 + 못 이은 줄 2 = 4번: ' + 물은2.length);
+    재(await p2.evaluate(() => JSON.stringify(JSON.parse(localStorage.getItem('vp비요크')).완료)) === '{"0":5000}', '확인된 연두는 기억에도(다음엔 안 물음)');
+    /* 한 번 더 열기 → 연두 줄0 은 안 묻고, 노랑 줄1 은 다시 물음 — 그사이 남이 고쳤으면 연두 */
+    목록선불[1] = '5,000';
+    const { p: p2c, 보낸: 보낸2c } = await 쪽열기(ctx);
+    await p2c.waitForFunction(() => document.querySelectorAll('#vp-root table.vp-촘촘 tbody tr').length > 0, null, { timeout: 15000 });
+    await p2c.waitForFunction(() => !/확인/.test(document.querySelector('#vp-root .vp-비요크셈').textContent), null, { timeout: 15000 }).catch(() => {});
+    const 판2c = await 판읽기(p2c), 물은2c = 보낸2c.filter((x) => x.startsWith('POST'));
+    재(판2c.칠[0] === 'rgb(221, 243, 192)' && 판2c.칠[1] === 'rgb(221, 243, 192)' && 물은2c.length === 3 && !물은2c.some((x) => /90000000000 /.test(x)), '또 열면 = 연두 줄은 안 묻고(3번) · 그사이 고쳐진 줄1 도 연두: ' + 판2c.칠.slice(0, 2).join(' / ') + ' 물음 ' + 물은2c.length);
+    await p2c.close();
     await p2.click('#vp-root .vp-지우기');
     const 판3 = await 판읽기(p2);
     재(!판3.기억 && 판3.줄 === 0 && !판3.셈 && !판3.메모, '지우기 = 기억·표·메모·셈 지움');
