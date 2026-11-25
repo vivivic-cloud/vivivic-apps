@@ -2,7 +2,8 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.104.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.105.0
+     v2.105.0(11-25): 사장님 「그럴경우를 지금부터 대비해야 합니다. 지금 현재 영림원품목등록에 나타난 제품이 다가 아닙니다 이를 영림원에 한번에 등록해야 하는데 지금부터 지금 이 첫등록부터 대비해야 하지 않을까요?」 — 보내기 8가지(창고·품목·BOM·품목별공정흐름·소요자재·외주계약·워크센터·재공품)를 제품마다 문서로 나눔: 새 컬렉션 발주역입력_영림원품목등록_보내기/{이름} = 머리(판·제품 차례) + /{이름}/제품/{제품 품번} = 그 제품 줄(창고 = 창고명마다 · 외주계약 = 거래처 머리는 머리 문서, 계약 줄은 제품 문서) · 손 값 _입력 = 발주역입력_영림원품목등록_입력/{제품 품번 | _공통} 로 나눔(처음 한 번 옛 _입력을 옮김). 옛 문서는 안 지우고 안 읽음.
      v2.104.0(11-25): 사장님 「현진 구매+가공품 의경우 단가가 가공별로 상이하니 이곳에 단가를 넣어 주세요」 — 가공단가관리 단가 기본 = 보드/엣지 매입현황 현진산업 영림원보내기 「가공」 줄의 월별 명세 단가(그 가공 줄 공정 = 구매+가공 완료보관 공정 · 고른 공정 · 납품제품명) · 가장 최근 달 값(보라, 마우스 = 출처·달별) · 달마다 다르면 주황 · 손 값 먼저 · 창고 실시간 · 외주계약 외주단가도 이 값.
      v2.103.0(11-25): 사장님 「제품별공정별소요자재등록 확인필요 표기를 공정/소요자재 해당부분에 나타나게 해주세요」 — 흐름 줄 갈래 단추(공정 · 소요자재)마다 「확인필요/등록가능」(그 탭 빨강 칸 수) · 바깥 단추는 그대로(두 탭 합).
      v2.102.0(11-25): 사장님 「입력폼에 등록완료된 모든 가공값도 이곳에 보여주세요」 — 가공단가관리 줄 = 입력폼 공정 완료(공개 _공정 사본, 실시간) 전부 더함(이름 그대로 · 가공코드·단가 빈칸) · 손으로 더한 공정 중 입력폼 완료에 없는 줄 = 공정 칸 주황.
@@ -448,7 +449,7 @@ body:not(.펼침) .dpr-t .접힘{display:none}   /* v2.32.0 빈 열 접힘 — �
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.104.0</div>
+  <div class="badge">v2.105.0</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <div class="머리줄"><h1>영림원품목등록</h1><div id="설정" class="탭단추" hidden><div class="설정이름">입력설정</div><div class="기타줄"></div></div></div>
@@ -1626,7 +1627,6 @@ const 재공품문서 = ['artifacts','vivivic-4b7ef','public','data','발주역�
 let 재공품창고 = undefined, 재공품쓰는중 = false, 재공품쓴 = null;   /* v2.57.1 null — '' 이면 0줄 내용(지문 '')과 같아 0줄로 못 바꿨음 */   /* v2.46.2 이 창이 마지막으로 쓴 지문들 — 같은 내용은 한 번만 씀(다른 창과 맞서 되쓰지 않게) */
 function 재공품구독(){
   const { doc, onSnapshot } = window.fbRead;
-  onSnapshot(doc(window.db, ...재공품문서), d => { 재공품창고 = d.exists() ? d.data() : null; 재공품보내기(); }, () => {});
   onSnapshot(doc(window.db, 'artifacts','vivivic-4b7ef','public','data','발주역입력_영림원폼','_공정'), d => { 공정완료목록 = d.exists() ? [...new Set(((d.data().줄)||[]).map(x => String(x ?? '').trim()).filter(Boolean))] : [];   /* v2.60.0 */
     try{ if(계산시트[고른]) 계산그리기(고른); }catch(e){} }, () => {});
   onSnapshot(doc(window.db, 'artifacts','vivivic-4b7ef','public','data','발주역입력_영림원폼','_분류'), d => { const 트 = v => String(v ?? '').trim();   /* v2.54.0 로그인 없을 때 분류 완료 사본 */
@@ -1674,7 +1674,6 @@ const 워크센터문서 = ['artifacts','vivivic-4b7ef','public','data','발주�
 let 워크센터창고 = undefined, 워크센터쓰는중 = false, 워크센터쓴 = null;
 function 워크센터구독(){
   const { doc, onSnapshot } = window.fbRead;
-  onSnapshot(doc(window.db, ...워크센터문서), d => { 워크센터창고 = d.exists() ? d.data() : null; 워크센터보내기(); }, () => {});
 }
 function 워크센터줄들(){
   const 품 = 보일품목(); if(!품 || !공정읽음 || 품.some(o => !o.확)) return null;
@@ -1706,24 +1705,61 @@ function 워크센터보내기(){
    빨강(꼭 채울 칸)이 남은 단위는 안 넣음(BOM 조립 줄 하위유무 빨강은 뺌 — 영림원에 올린 뒤 표에서 켜는 칸). 칸 이름 = 입력폼 v330 그 메뉴 칸 글자. */
 const 꼭있음 = 줄 => 줄.some(c => c && typeof c==='object' && c.꼭);
 const 칸글 = c => String(칸값(c) ?? '').trim();
+/* v2.105.0 보내기 나눔 — 새 컬렉션 발주역입력_영림원품목등록_보내기
+   머리 = /{이름} {보내기:{판, 고친때, 나눔:true, 제품들:[조각 이름 차례], (외주계약) 머리:[{열쇠,상태,사업단위,임시,지문,차례}]}, 결과(외주계약 = 거래처 열쇠, 입력폼이 씀)}
+   조각 = /{이름}/제품/{조각} {줄:[줄…], 차례:[전체 차례 번호…], (외주계약) 선:[{열쇠, 줄, i}], 결과(입력폼이 씀)}
+   조각 = 제품 품번(그 제품 · 반제품 · 재공품 줄) · 창고 = 창고명 · 모르는 것 = _기타. 줄·지문은 예전 한 문서 보내기와 글자까지 같음(입력폼이 모아 같은 꼴로 읽음). 옛 문서(발주역입력_영림원폼/_{이름}_영림원품목등록)는 안 지우고 안 씀. */
+const 보내기자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_영림원품목등록_보내기'];
+const 조각이름 = k => (String(k ?? '').trim() || '_기타').replace(/\//g, '／');
+function 제품지도(){ const m = new Map(), 품 = 보일품목(); if(!품) return m;
+  for(const o of 품) m.set(o.p, o.반 ? (o.모 || o.p) : o.p);
+  try{ for(const z of (재공품들() || [])) if(z.번) m.set(z.번, m.get(z.p) || z.p); }catch(e){}
+  return m; }
+const 나눔키 = { 창고:r => r.열쇠, 품목:(r, 지) => 지.get(r.열쇠), BOM:(r, 지) => 지.get(r.열쇠), 품목별공정흐름:(r, 지) => 지.get(r.열쇠), 소요자재:(r, 지) => 지.get(r.열쇠),
+  워크센터:(r, 지) => 지.get(String(r.열쇠).split('\t')[0]), 재공품:(r, 지) => 지.get(((r.반제품 || {}).품번)) || ((r.반제품 || {}).품번) };
+const 짧은지문 = t => { let h1 = 0xdeadbeef, h2 = 0x41c6ce57; for(let i = 0; i < t.length; i++){ const c = t.charCodeAt(i); h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677); }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909); h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return 'h' + (h2 >>> 0).toString(16) + (h1 >>> 0).toString(16) + ':' + t.length; };   /* v2.105.0 외주계약 지문 */
+function 보내기모음(이름, 머, 조){   /* 머리 + 조각 → 예전 꼴 줄(입력폼 nwAssemble 과 같은 셈) */
+  const b = 머 && 머.보내기; if(!b || !b.나눔) return null;
+  const 목 = (b.제품들 || []).map(k => 조.get(k)).filter(Boolean);
+  if(이름==='외주계약'){ const 선 = [].concat(...목.map(x => x.선 || [])).sort((a, c) => a.i - c.i);
+    return (b.머리 || []).slice().sort((a, c) => a.차례 - c.차례).map(h => ({ 열쇠:h.열쇠, 상태:h.상태, 외주계약등록:{ 사업단위:h.사업단위, 외주거래처:h.열쇠, 공정별계약:선.filter(x => x.열쇠===h.열쇠).map(x => x.줄) }, 임시:h.임시, 지문:h.지문 })); }
+  const 쌍 = []; for(const x of 목) (x.줄 || []).forEach((r, i) => 쌍.push([(x.차례 || [])[i] ?? 0, r]));
+  return 쌍.sort((a, c) => a[0] - c[0]).map(x => x[1]);
+}
 function 보내기틀(이름, 짜기){
-  const 문서 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_영림원폼','_' + 이름 + '_영림원품목등록'], S = { 창고:undefined, 쓰는중:false, 쓴:null };
+  const S = { 머:undefined, 조:null, 쓰는중:false, 쓴:null, 옛판:undefined };
   const 지문들 = 목 => (목||[]).map(z => z.지문).join('\n');
-  return { S, 구독(){ const { doc, onSnapshot } = window.fbRead; onSnapshot(doc(window.db, ...문서), d => { S.창고 = d.exists() ? d.data() : null; this.쓰기(); }, () => {}); },
-    쓰기(){ if(S.창고===undefined || S.쓰는중 || !window.fbRead || !window.fbRead.setDoc) return;
+  return { S, 구독(){ const { doc, getDoc, collection, onSnapshot } = window.fbRead;
+      getDoc(doc(window.db, 'artifacts','vivivic-4b7ef','public','data','발주역입력_영림원폼','_' + 이름 + '_영림원품목등록')).then(d => { S.옛판 = (d.exists() && d.data().보내기 && d.data().보내기.판) || 0; this.쓰기(); }, () => { S.옛판 = 0; this.쓰기(); });
+      onSnapshot(doc(window.db, ...보내기자리, 이름), d => { S.머 = d.exists() ? d.data() : null; this.쓰기(); }, () => {});
+      onSnapshot(collection(window.db, ...보내기자리, 이름, '제품'), q => { S.조 = new Map(q.docs.map(d => [d.id, d.data()])); this.쓰기(); }, () => {}); },
+    모음(){ return S.머 === undefined || S.조 === null ? undefined : 보내기모음(이름, S.머, S.조); },
+    쓰기(){ if(S.머===undefined || S.조===null || S.옛판===undefined || S.쓰는중 || !window.fbRead || !window.fbRead.setDoc) return;
       let 줄; try{ 줄 = 짜기(); }catch(e){ console.warn('보내기 셈 못 함', 이름, e); return; } if(!줄) return;
-      줄.forEach(r => { r.지문 = JSON.stringify(Object.assign({}, r, { 지문:undefined })); });
-      const 옛 = (S.창고 && S.창고.보내기) || null;
-      if(옛 && 지문들(옛.줄)===지문들(줄)) return; if(!옛 && !줄.length) return; if(지문들(줄)===S.쓴) return;
-      const 지금 = new Date().toISOString(), 새 = { 판:((옛 && 옛.판) || 0) + 1, 고친때:지금, 줄 };
+      줄.forEach(r => { r.지문 = JSON.stringify(Object.assign({}, r, { 지문:undefined })); if(이름==='외주계약') r.지문 = 짧은지문(r.지문); });   /* 외주계약 = 거래처 한 줄에 모든 제품 계약이 들어 지문(줄 JSON)이 머리 문서를 키움 → 짧게 */
+      const 옛 = 보내기모음(이름, S.머, S.조);
+      if(옛 && 지문들(옛)===지문들(줄)) return; if(!옛 && !줄.length) return; if(지문들(줄)===S.쓴) return;
+      const 지 = 제품지도(), 조각 = new Map(), 차례 = [], 넣 = k => { if(!조각.has(k)){ 조각.set(k, 이름==='외주계약' ? { 선:[] } : { 줄:[], 차례:[] }); 차례.push(k); } return 조각.get(k); };
+      let 머리 = null;
+      if(이름==='외주계약'){ 머리 = 줄.map((r, i) => ({ 열쇠:r.열쇠, 상태:r.상태, 사업단위:r.외주계약등록.사업단위, 임시:r.임시, 지문:r.지문, 차례:i })); let n = 0;
+        줄.forEach(r => r.외주계약등록.공정별계약.forEach(x => { 넣(조각이름(지.get(x.제품번호) || x.제품번호)).선.push({ 열쇠:r.열쇠, 줄:x, i:n++ }); })); }
+      else 줄.forEach((r, i) => { const z = 넣(조각이름(나눔키[이름](r, 지))); z.줄.push(r); z.차례.push(i); });
+      const 판옛 = S.머 && S.머.보내기 ? (S.머.보내기.판 || 0) : S.옛판;
+      const 지금 = new Date().toISOString(), 새 = { 판:판옛 + 1, 고친때:지금, 나눔:true, 제품들:차례 }; if(머리) 새.머리 = 머리;
       S.쓰는중 = true; S.쓴 = 지문들(줄);
-      const { doc, setDoc } = window.fbRead;
-      setDoc(doc(window.db, ...문서), { 보내기:새, 고친때:지금, 출처:'발주역입력 영림원품목등록' }, { mergeFields:['보내기','고친때','출처'] })
-        .then(() => { S.창고 = Object.assign({}, S.창고, { 보내기:새 }); }, e => console.warn('보내기 못 씀', 이름, e)).finally(() => { S.쓰는중 = false; }); } };
+      const { doc, setDoc } = window.fbRead, 칸들 = 이름==='외주계약' ? ['선'] : ['줄','차례'];
+      const 쓸 = [...조각].filter(([k, v]) => { const o = S.조.get(k); return !o || 칸들.some(f => JSON.stringify(o[f] ?? null) !== JSON.stringify(v[f])); })
+        .map(([k, v]) => setDoc(doc(window.db, ...보내기자리, 이름, '제품', k), Object.assign({}, v, { 고친때:지금 }), { mergeFields:칸들.concat(['고친때']) }));   /* 결과(입력폼이 씀) 칸은 안 건드림 */
+      Promise.all(쓸).then(() => setDoc(doc(window.db, ...보내기자리, 이름), { 보내기:새, 고친때:지금, 출처:'발주역입력 영림원품목등록' }, { mergeFields:['보내기','고친때','출처'] }))
+        .then(() => {}, e => console.warn('보내기 못 씀', 이름, e)).finally(() => { S.쓰는중 = false; }); } };
 }
 const 임시들 = (o, 필) => 필.filter(k => !String(o[k] ?? '').trim());
 const 확정 = () => { const 품 = 보일품목(); return 품 && 공정읽음 && !품.some(o => !o.확) ? 품 : null; };
 const 보내기들 = {
+  재공품:보내기틀('재공품', () => 재공품줄들()),   /* v2.105.0 나눔 문서로 */
+  워크센터:보내기틀('워크센터', () => 워크센터줄들()),
   /* v2.69.0 2 창고등록 — 한 건 = 본사창고관리 줄 하나(창고명) · 칸 이름 = 입력폼 v331 창고등록 칸 글자 · 빨강(창고명·창고구분 빈칸) 줄은 안 넣음 · 입력폼 로그인 기기만 */
   창고:보내기틀('창고', () => { if(!창고읽음) return null;
     return 창고줄들().map(n => { const 값들 = {}; 창고칸.forEach(([k, 이름]) => { 값들[이름] = String(저값(본사창고, k + '@' + n, '') ?? '').trim(); });
@@ -1831,7 +1867,7 @@ function 입력구독(){
     if(JSON.stringify(새) === JSON.stringify(동일묶음)) return; 동일묶음 = 새; 동일짝셈(); 고른제품바뀜(); 칸칠(); }, () => {});
   onSnapshot(doc(window.db, ...창고자리, '_고른제품'), d => { const 새 = d.exists() && Array.isArray(d.data().제품) ? d.data().제품.map(String) : null, 글자 = JSON.stringify(새);   /* v2.94.0 */
     if(글자 === 고른제품글) return; 고른제품글 = 글자; 고른제품 = 새 ? new Set(새) : null; 고른제품바뀜(); }, () => {});
-  onSnapshot(doc(window.db, ...창고자리, '_입력'), d => { 입력 = (d.exists() && d.data().값) || {}; 칸칠(); 연동칠(); }, () => {});
+  입력나눔구독();   /* v2.105.0 _입력 → 발주역입력_영림원품목등록_입력/{조각} */
   공개자재구독(); 재공품구독(); 워크센터구독();   /* v2.43.0 · v2.53.0 */
   for(const k in 보내기들) 보내기들[k].구독();   /* v2.56.0 */
   if(window.폼자재대기) window.폼자재받음(...window.폼자재대기);
@@ -2028,8 +2064,6 @@ function BOM흐름(p){ const v = 값(p,'공정흐름').trim(); if(v) return 공�
 function BOM공정칠(){
   BOM다시();   /* v2.21.0 공정흐름이 바뀌면 가공 줄 수도 바뀜 */
   if(계산시트[고른]) 계산그리기(고른);   /* v2.24.0 · v2.26.0 공정흐름·입력이 바뀌면 따라 그림 */
-  재공품보내기();   /* v2.43.0 */
-  워크센터보내기();   /* v2.53.0 */
   모두보내기();   /* v2.56.0 */
   if(!연동줄.length) return;
   공규칙셈();
@@ -2192,13 +2226,43 @@ function 바꿈(목){
   칸칠(); 연동칠(); 폼상태('저장 중…');
   clearTimeout(저장틀); 저장틀 = setTimeout(저장, 300);
 }
+/* v2.105.0 손 값 나눔 — 발주역입력_영림원품목등록_입력/{조각} {값:{품번:{칸:값}}} · 조각 = 품목등록업로드 시트(엑셀 전체)로 정함: 제품 = 그 품번 · 반제품 = 모품목 · 재공품(반제품 품번_…) = 그 반제품의 모품목 · # 로 시작·모름 = _공통.
+   처음 한 번: 새 컬렉션이 비었고 옛 _입력 이 있으면 옛 값을 나눠 옮김(지우지 않음). 옮긴 뒤엔 옛 _입력 은 안 읽음. */
+const 입력자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_영림원품목등록_입력'];
+let 입력지도판 = null, 입력지도값 = new Map(), 입력새 = null, 입력옛 = undefined, 입력옮기는중 = false;
+function 입력지도(){
+  if(입력지도판 === 품목조각) return 입력지도값; const m = new Map();
+  if(품목칸 && 품목조각.length && 품목조각.every(x => x)){ const I = k => 품목칸.indexOf(k), pi = I('품번'), ai = I('품목자산분류'), mi = I('모품목(상위 품번)'), 트 = (v, i) => i < 0 ? '' : String(v[i] ?? '').trim();
+    for(const r of [].concat(...품목조각)){ const p = 트(r.v, pi); if(!p || m.has(p)) continue; m.set(p, 트(r.v, ai)==='반제품' ? (트(r.v, mi) || p) : p); }
+    입력지도판 = 품목조각; 입력지도값 = m; }
+  return m; }
+function 입력조각(p){ p = String(p); if(p.startsWith('#')) return '_공통'; const m = 입력지도(); if(m.has(p)) return 조각이름(m.get(p));
+  let 큰 = ''; for(const q of m.keys()) if(q.length > 큰.length && p.startsWith(q + '_')) 큰 = q; return 큰 ? 조각이름(m.get(큰)) : '_공통'; }
+function 입력모음(){ if(입력새 === null) return; if(!입력새.size && 입력옛) { 입력 = JSON.parse(JSON.stringify(입력옛)); 입력옮기기(); }
+  else { const 모 = {}; for(const v of 입력새.values()) for(const [p, o] of Object.entries((v && v.값) || {})) 모[p] = Object.assign(모[p] || {}, o); 입력 = 모; }
+  칸칠(); 연동칠(); }
+function 입력나눔구독(){
+  const { doc, getDoc, collection, onSnapshot } = window.fbRead;
+  getDoc(doc(window.db, ...창고자리, '_입력')).then(d => { 입력옛 = (d.exists() && d.data().값) || null; 입력모음(); }, () => { 입력옛 = null; 입력모음(); });
+  onSnapshot(collection(window.db, ...입력자리), q => { 입력새 = new Map(q.docs.map(d => [d.id, d.data()])); if(입력옛 !== undefined) 입력모음(); }, () => {});
+}
+function 입력옮기기(){
+  if(입력옮기는중 || !입력옛 || (입력새 && 입력새.size) || !window.fbRead.setDoc) return;
+  if(!(품목칸 && 품목조각.length && 품목조각.every(x => x))){ setTimeout(입력옮기기, 2000); return; }   /* 시트(조각 기준)를 받은 뒤 */
+  입력옮기는중 = true; const 묶 = new Map();
+  for(const [p, o] of Object.entries(입력옛)){ const k = 입력조각(p); if(!묶.has(k)) 묶.set(k, {}); 묶.get(k)[p] = o; }
+  const { doc, setDoc } = window.fbRead, 지금 = new Date().toISOString();
+  Promise.all([...묶].map(([k, 값]) => setDoc(doc(window.db, ...입력자리, k), { 값, 고친때:지금, 출처:'옛 _입력 옮김' }, { merge:true })))
+    .then(() => {}, e => console.warn('_입력 옮기기 못 함', e)).finally(() => { 입력옮기는중 = false; });
+}
 async function 저장(){
   if(!더럽.size) return;
   const 보낼 = new Map(더럽), 묶음 = {};
   for(const [x,v] of 보낼){ const [p,k] = x.split('\t'); (묶음[p] ||= {})[k] = v; }
   try{
     const { doc, setDoc } = window.fbRead;
-    await setDoc(doc(window.db, ...창고자리, '_입력'), { 값:묶음, 고친때:new Date().toISOString() }, { merge:true });
+    { const 조 = new Map(), 지금 = new Date().toISOString(); for(const [p, o] of Object.entries(묶음)){ const k = 입력조각(p); if(!조.has(k)) 조.set(k, {}); 조.get(k)[p] = o; }   /* v2.105.0 조각마다 */
+      await Promise.all([...조].map(([k, 값]) => setDoc(doc(window.db, ...입력자리, k), { 값, 고친때:지금 }, { merge:true }))); }
     for(const [x,v] of 보낼){ const [p,k] = x.split('\t'); (입력[p] ||= {})[k] = v; if(더럽.get(x)===v) 더럽.delete(x); }
     큰알림(null); 폼상태('저장됨 ' + new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}));
     칸칠(); 연동칠();

@@ -61,8 +61,15 @@
     if(받기켬) return; 받기켬 = true; 공db = db; 공fb = fb;
     fb.onSnapshot(fb.doc(db, ...사본자리, '_전체'), d => { const x = d.exists() ? d.data() : null;
       사본 = x && Array.isArray(x.이름) ? x.이름.map(String) : []; 사본글 = JSON.stringify(사본); 셈(); }, () => {});
-    fb.onSnapshot(fb.doc(db, 'artifacts','vivivic-4b7ef','public','data','발주역입력_영림원폼','_품목_영림원품목등록'), d => {
-      받기줄 = (d.exists() && d.data().보내기 && d.data().보내기.줄) || []; 셈(); }, () => {});
+    /* 11-25 영림원품목등록 v2.105.0 보내기 나눔 — 발주역입력_영림원품목등록_보내기/품목(머리 제품들) + /품목/제품/{조각}(줄·차례) 를 모아 읽음. 머리가 없으면 옛 문서 */
+    const 자 = ['artifacts','vivivic-4b7ef','public','data'], 받 = { 옛:[], 머:undefined, 조:null };
+    const 모 = () => { const b = 받.머 && 받.머.보내기;
+      if(b && b.나눔 && 받.조){ const 쌍 = []; for(const k of (b.제품들 || [])){ const x = 받.조.get(k); if(x) (x.줄 || []).forEach((r, i) => 쌍.push([(x.차례 || [])[i] ?? 0, r])); }
+        받기줄 = 쌍.sort((a, c) => a[0] - c[0]).map(z => z[1]); }
+      else 받기줄 = 받.옛; 셈(); };
+    fb.onSnapshot(fb.doc(db, ...자, '발주역입력_영림원폼', '_품목_영림원품목등록'), d => { 받.옛 = (d.exists() && d.data().보내기 && d.data().보내기.줄) || []; 모(); }, () => {});
+    if(fb.collection){ fb.onSnapshot(fb.doc(db, ...자, '발주역입력_영림원품목등록_보내기', '품목'), d => { 받.머 = d.exists() ? d.data() : null; 모(); }, () => {});
+      fb.onSnapshot(fb.collection(db, ...자, '발주역입력_영림원품목등록_보내기', '품목', '제품'), q => { 받.조 = new Map(q.docs.map(d => [d.id, d.data()])); 모(); }, () => {}); }
   }
   /* ── 모양(한 번) ── */
   function 모양(){
