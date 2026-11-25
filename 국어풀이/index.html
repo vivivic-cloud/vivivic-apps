@@ -8,17 +8,17 @@
 /* 시험지(지문) + 컴퓨터용 사인펜 마킹: 지문은 명조, 조작부는 고딕. 넓은 화면에서는 지문 왼쪽 고정, 문제 오른쪽 */
 :root{
   --paper:#f4f5f7; --sheet:#ffffff; --ink:#15181c; --muted:#5d6470; --rule:#d3d8df; --rule-strong:#9aa3ae;
-  --mark:#c2304a; --mark-soft:#fbe9ec; --sel:#eef1f5; --fig:#ffffff;
+  --mark:#c2304a; --mark-soft:#fbe9ec; --sel:#eef1f5; --fig:#ffffff; --hl:rgba(255,213,0,.5); --pen:#2a64d6;
   --f-text:"Noto Serif KR","Nanum Myeongjo","Batang",serif;
   --f-ui:"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
   --hdr:0px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --paper:#0f1114; --sheet:#171a1e; --ink:#e6e8eb; --muted:#9aa2ad; --rule:#2b3037; --rule-strong:#4a525d;
-  --mark:#e46a80; --mark-soft:#3a1f26; --sel:#20252b; --fig:#f3f3f3; color-scheme:dark}}
+  --mark:#e46a80; --mark-soft:#3a1f26; --sel:#20252b; --fig:#f3f3f3; --hl:rgba(235,190,0,.38); --pen:#7aa7ff; color-scheme:dark}}
 :root[data-theme="dark"]{
   --paper:#0f1114; --sheet:#171a1e; --ink:#e6e8eb; --muted:#9aa2ad; --rule:#2b3037; --rule-strong:#4a525d;
-  --mark:#e46a80; --mark-soft:#3a1f26; --sel:#20252b; --fig:#f3f3f3; color-scheme:dark}
+  --mark:#e46a80; --mark-soft:#3a1f26; --sel:#20252b; --fig:#f3f3f3; --hl:rgba(235,190,0,.38); --pen:#7aa7ff; color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html{scroll-padding-top:calc(var(--hdr) + 12px)}
@@ -105,6 +105,15 @@ img.glyph{height:1.05em;width:auto;vertical-align:-.15em;background:var(--fig);b
 .ch[aria-pressed="true"] .mk{background:var(--ink);color:var(--sheet)}
 .choices.compact{flex-direction:row;flex-wrap:wrap;gap:8px;align-items:center}
 .choices.compact .ch{width:auto;padding:6px}
+.ch .tx{-webkit-user-select:text;user-select:text}
+.hlx{background:var(--hl);border-radius:2px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.ulx{text-decoration:underline;text-decoration-color:var(--pen);text-decoration-thickness:2px;text-underline-offset:.25em}
+.penbar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(72px + env(safe-area-inset-bottom,0px));z-index:26;display:flex;gap:4px;padding:5px;border-radius:12px;background:var(--ink);box-shadow:0 6px 18px rgba(0,0,0,.22)}
+.penbar button{border:0;border-radius:8px;padding:9px 14px;background:transparent;color:var(--paper);font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;font-size:.9rem}
+.penbar button:hover{background:rgba(127,127,127,.25)}
+.penbar .sw{display:inline-block;width:1em;height:1em;border-radius:3px}
+.penbar .sw-h{background:#ffd500}
+.penbar .sw-u{border-bottom:2.5px solid var(--pen);height:.8em;border-radius:0}
 .choices.compact .mk{width:2em;height:2em;margin:0}
 
 /* answer sheet */
@@ -989,6 +998,11 @@ img.glyph{height:1.05em;width:auto;vertical-align:-.15em;background:var(--fig);b
 <p class="sec-note" style="border:0;padding:0">출처: 2026학년도 대학수학능력시험 국어 영역 문제지. 이 문제지에 관한 저작권은 한국교육과정평가원에 있습니다.</p>
 </main>
 
+<div class="penbar" id="penbar" role="toolbar" aria-label="표시하기" hidden>
+  <button type="button" data-pen="hl"><span class="sw sw-h"></span>형광펜</button>
+  <button type="button" data-pen="ul"><span class="sw sw-u"></span>밑줄</button>
+  <button type="button" data-pen="x">지우기</button>
+</div>
 <button type="button" class="sheet-btn" id="sheetBtn">답안지 <b id="cnt">0/45</b></button>
 <div class="ov" id="ov" hidden>
   <div class="panel" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
@@ -1032,6 +1046,7 @@ img.glyph{height:1.05em;width:auto;vertical-align:-.15em;background:var(--fig);b
   function setAns(qid,n){ if(st.ans[qid]===n) delete st.ans[qid]; else st.ans[qid]=n; save(); paint(qid); count(); }
   document.getElementById('main').addEventListener('click',function(e){
     var b=e.target.closest('.ch'); if(!b) return;
+    var sl=window.getSelection(); if(sl&&!sl.isCollapsed&&String(sl).trim()) return;
     setAns(b.closest('.q').dataset.q,+b.dataset.n);
   });
 
@@ -1069,6 +1084,58 @@ img.glyph{height:1.05em;width:auto;vertical-align:-.15em;background:var(--fig);b
     var ks=Object.keys(st.ans); st.ans={}; save(); ks.forEach(paint); count(); ca.classList.remove('arm'); ca.textContent='모두 지웠습니다';
     setTimeout(function(){ca.textContent='표시한 답 모두 지우기'},1800);
   });
+
+
+  // highlight / underline
+  var MK=KEY+'-marks', marks={};
+  try{marks=JSON.parse(localStorage.getItem(MK)||'{}')||{};}catch(e){marks={};}
+  function boxes(){return [].slice.call(document.querySelectorAll('.passage,.q'));}
+  function keyOf(c){return c.classList.contains('q')?c.id:c.closest('.group').id+'-p';}
+  function texts(c){var w=document.createTreeWalker(c,NodeFilter.SHOW_TEXT,null),a=[],n;while(n=w.nextNode())a.push(n);return a;}
+  function wrapNode(n,s,e,cls){
+    if(e<=s) return;
+    if(e<n.length) n.splitText(e);
+    var m=s>0?n.splitText(s):n;
+    var sp=document.createElement('span'); sp.className=cls; m.parentNode.insertBefore(sp,m); sp.appendChild(m);
+  }
+  function applyRange(c,s,e,cls){
+    var pos=0; texts(c).forEach(function(n){var L=n.length,a=Math.max(s,pos),b=Math.min(e,pos+L); if(a<b) wrapNode(n,a-pos,b-pos,cls); pos+=L;});
+  }
+  function saveBox(c){
+    var list=[],pos=0;
+    texts(c).forEach(function(n){var p=n.parentNode;
+      var h=p.closest('.hlx'), u=p.closest('.ulx');
+      if(h&&c.contains(h)) list.push([pos,pos+n.length,'h']);
+      if(u&&c.contains(u)) list.push([pos,pos+n.length,'u']);
+      pos+=n.length;});
+    var k=keyOf(c); if(list.length) marks[k]=list; else delete marks[k];
+    try{localStorage.setItem(MK,JSON.stringify(marks));}catch(e){}
+  }
+  boxes().forEach(function(c){var l=marks[keyOf(c)]; if(l) l.forEach(function(m){applyRange(c,m[0],m[1],m[2]==='h'?'hlx':'ulx');});});
+
+  var bar=document.getElementById('penbar'), saved=null;
+  function curRange(){
+    var sl=window.getSelection(); if(!sl||sl.isCollapsed||!sl.rangeCount||!String(sl).trim()) return null;
+    var r=sl.getRangeAt(0); var a=r.startContainer.nodeType===1?r.startContainer:r.startContainer.parentNode;
+    var c=a.closest&&a.closest('.passage,.q'); if(!c||!c.contains(r.endContainer)) return null; return {r:r.cloneRange(),c:c};
+  }
+  document.addEventListener('selectionchange',function(){var x=curRange(); if(x){saved=x;bar.hidden=false;} else {setTimeout(function(){if(!curRange()){bar.hidden=true;}},250);} });
+  bar.addEventListener('mousedown',function(e){e.preventDefault();});
+  bar.addEventListener('touchstart',function(e){if(e.target.closest('button'))e.preventDefault(); var b=e.target.closest('button'); if(b) act(b.dataset.pen);},{passive:false});
+  bar.addEventListener('click',function(e){var b=e.target.closest('button'); if(b) act(b.dataset.pen);});
+  function act(kind){
+    var x=curRange()||saved; if(!x) return; var c=x.c, r=x.r;
+    var ns=texts(c).filter(function(n){return r.intersectsNode(n);});
+    if(kind==='x'){
+      var set=[]; ns.forEach(function(n){var p=n.parentNode; while(p&&p!==c){ if(p.classList&&(p.classList.contains('hlx')||p.classList.contains('ulx'))&&set.indexOf(p)<0) set.push(p); p=p.parentNode;}});
+      set.forEach(function(sp){var par=sp.parentNode; while(sp.firstChild) par.insertBefore(sp.firstChild,sp); par.removeChild(sp);}); c.normalize();
+    }else{
+      var cls=kind==='hl'?'hlx':'ulx';
+      ns.forEach(function(n){var s=n===r.startContainer?r.startOffset:0, e=n===r.endContainer?r.endOffset:n.length; wrapNode(n,s,e,cls);});
+    }
+    saveBox(c); saved=null; bar.hidden=true;
+    try{window.getSelection().removeAllRanges();}catch(e){}
+  }
 
   // timer (80 minutes)
   var clock=document.getElementById('clock'), tS=document.getElementById('tStart'), tick;
