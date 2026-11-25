@@ -2,7 +2,8 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.107.1
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.108.0
+     v2.108.0(11-25): 사장님 「입력이 막힌 칸은 모두 같은 회색 비활성 표시로 통일」 — `잠김칠(표)` 한 규칙(품목등록업로드 · 모든 계산 탭(흐름·설정)): ① td.막음 ② 입력 칸(td.편)이 하나라도 있는 열의 입력 안 되는 칸 ③ 품목등록업로드 재단률·필름 소요량(계산 칸) → td.잠김(회색 #EFEFEC · not-allowed) · 까닭 = 마우스(title)만 · 막힌 칸 누름·치기 빨간 쪽지 없앰(title 로). 빨강·주황·노랑 등 바탕 표시가 있는 칸은 안 칠함.
      v2.107.0(11-25): 사장님 「품목등록업로드 표에서 제품과 반제품 구분 표시」 — 제품 줄 품명 굵게 · 반제품 품명 보통 · 다음 제품이 시작되는 줄 위 굵은 선(제품 + 그 아래 반제품 = 한 묶음). CSS·줄 class 만.
      v2.107.1(11-25): 반제품 품명이 붙박이 칸 굵기(.dpr-k 700)로 굵게 보이던 것 → 보통(400).
      v2.106.1(11-25): 사장님 「품목등록업로드 보링수량이 로앤에서 도착한것 같으나 해당칸이 빨간색 입니다」 — 로앤 자료가 늦게 오면 보링칠만 다시 돌아 값은 채우고 앞서 칠한 빈칸 빨강(기본꼭칠)은 남았음 → 로앤 받음·보링수량 고침 뒤에도 기본꼭칠 다시.
@@ -364,6 +365,7 @@ html,body{height:100%;overflow:hidden}
   padding:4px 5px;background:var(--vg-fill);border-bottom:1px solid #C7C7C3}
 .dpr-t td{font-size:11.5px;line-height:1.3;color:var(--vg-body);padding:2px 5px;vertical-align:top;background:var(--vg-bg)}
 .dpr-t td.num{text-align:right}
+.dpr-t td.잠김{background:#EFEFEC;cursor:not-allowed}   /* v2.108.0 입력 막힌 칸 = 한 회색(까닭 = 마우스) — 뒤 색 표시(꼭·모자람·신규 …)가 먼저 */
 .dpr-t tr.제품줄 td.품명칸{font-weight:700}.dpr-t tr:not(.제품줄) td.품명칸{font-weight:400}   /* v2.107.0 제품 품명 굵게 · 반제품 보통(붙박이 칸 굵기 .dpr-k 700 을 덮음) */
 .dpr-t tbody tr.제품줄:not(:first-child) td{border-top:2px solid #1A1A19}   /* v2.107.0 제품 묶음 경계 굵은 선 */
 .dpr-t .dpr-k{position:sticky;left:0;z-index:1;font-weight:700;color:var(--vg-ink)}
@@ -455,7 +457,7 @@ body:not(.펼침) .dpr-t .접힘{display:none}   /* v2.32.0 빈 열 접힘 — �
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.107.1</div>
+  <div class="badge">v2.108.0</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <div class="머리줄"><h1>영림원품목등록</h1><div id="설정" class="탭단추" hidden><div class="설정이름">입력설정</div><div class="기타줄"></div></div></div>
@@ -1308,6 +1310,7 @@ function 계산그리기(u){
       if(d.말) td.title = d.말; else td.removeAttribute('title');
       if(d.k){ td.dataset.p = d.p; td.dataset.k = d.k; } else { delete td.dataset.p; delete td.dataset.k; }
       if(!편집 && td.textContent !== String(d.v ?? '')) td.textContent = d.v ?? ''; }));
+    잠김칠(옛표);   /* v2.108.0 */
     return;
   }
   for(const r of 칸들) h += '<tr>' + r.map(d => `<td${d.cls?` class="${d.cls}"`:''}${d.말?` title="${글(d.말)}"`:''}${d.k?` data-p="${글(d.p)}" data-k="${글(d.k)}"`:''}>${글(d.v)}</td>`).join('') + '</tr>';
@@ -1316,6 +1319,7 @@ function 계산그리기(u){
   계산자리 = 자;
   const 통 = 속.querySelector('.표통'); if(통 && 옛자리){ 통.scrollLeft = 옛자리[0]; 통.scrollTop = 옛자리[1]; }
   const 새표 = 통 && 통.querySelector('table');
+  잠김칠(새표);   /* v2.108.0 */
   if(새표 && window.표입력 && 새표.querySelector('td.편')){ 통.tabIndex = 0;   /* v2.52.0 입력 칸 = 다른 입력 칸과 같은 공용 표입력.js */
     표입력.표(새표, { 이름:u, 열: td => String(td.dataset.k || '').split('@')[0], 칸: td => td.classList.contains('편'), 막음: () => false, 알림: (td, 글자) => 막음알림(td, 글자),
       읽기: td => td.textContent.trim(), 쓰기: 목 => 바꿈(목.map(([td, v]) => ({ p:td.dataset.p, k:td.dataset.k, v }))),
@@ -1467,6 +1471,7 @@ function 보링칠(){
     td.title = `자동 — 로앤 ${[...new Set(후.map(x => x.제))].join(' · ')} · 부속명 「${부속명}」\n` + 들.map(([v,n]) => `보링규격 ${v} ×${n}`).join('\n')
       + (차들.length ? `\n사이즈 차이(규격 ${td.dataset.규}) — ${차들.join(' · ')}` : '');
   });
+  잠김칠(통);   /* v2.108.0 */
 }
 function 엣지칠(){   /* 공정흐름이 바뀌면 그 줄 엣지W·D 를 켜고 끔 */
   const 통 = 받은[품목시트]; if(!통 || !통.querySelector) return;
@@ -1479,9 +1484,11 @@ function 엣지칠(){   /* 공정흐름이 바뀌면 그 줄 엣지W·D 를 켜�
     if(켬){ delete td.dataset.알림; td.removeAttribute('title'); td.textContent = 값(p,k); }
     else { td.dataset.알림 = td.title = 엣지막글(반); td.textContent = ''; }
   });
+  잠김칠(통);   /* v2.108.0 */
 }
 let 막음틀 = null;
 function 막음알림(td, 따로){   /* v2.5.0 칸마다 글(td data-알림) — 없으면 반제품 글 · v2.6.0 따로 = 그 글 */
+  if(td && td.classList && (td.classList.contains('막음') || td.classList.contains('잠김'))){ if(!td.title) td.title = 따로 || td.dataset.알림 || '제품 — 반제품만 입력됩니다'; return; }   /* v2.108.0 막힌 칸 = 쪽지 없이 마우스만 */
   let el = document.querySelector('.막음알림');
   if(!el){ el = document.createElement('div'); el.className = '막음알림'; document.body.appendChild(el); }
   el.textContent = 따로 || (td && td.dataset && td.dataset.알림) || '제품 — 반제품만 입력됩니다';
@@ -1549,6 +1556,23 @@ function 동일값(p, k){   /* → null(묶음 아님) | {v, 온:[품번], 다�
 }
 /* v2.99.0 품목등록업로드 기본 입력 — 반제품 줄, 보이는 값(손 값 · 자동 · 동일속성 받은 값)이 비면 빨강(td.꼭, data-기꼭). 막음 칸 · 제품 줄은 안 셈.
    공정흐름 · 소요량(덧칸 하나만) = 늘 · 흐름에 재단·재공품재단 → 보드두께 · 흐름에 엣지 든 공정 → 엣지두께 · 필름코드 · 엣지W · 엣지D · 흐름에 보링 든 공정 → 보링수량. 합판코드는 합판칠(v2.51). */
+/* v2.108.0 입력 막힌 칸 = 한 회색(td.잠김) — 표 하나를 받아 다시 셈(전에 칠한 것 걷고).
+   ① td.막음 ② 입력 칸(td.편)이 있는 열의 입력 안 되는 칸(붙박이 첫 칸 빼고) ③ 품목등록업로드 계산 칸(재단률 · 필름 소요량).
+   바탕 색 표시가 있는 칸(빨강 꼭 · 주황 · 노랑 · 연한 파랑 영채움 …)은 그 표시가 먼저라 안 칠함. 까닭 = title(없으면 기본 글). */
+const 잠김뺌 = ['꼭','모자람','영채움','신규','재단못','필름못','흐름없음','엣지없음','동일다름','보링여럿','보링없음','조립바뀜','편집중'];
+function 잠김칠(표){
+  if(!표 || !표.querySelectorAll) return; if(표.tagName !== 'TABLE') 표 = 표.querySelector('table'); if(!표 || !표.tBodies[0]) return;
+  const 줄들 = [...표.tBodies[0].rows], 입력열 = new Set();
+  줄들.forEach(tr => [...tr.cells].forEach((td, i) => { if(td.classList.contains('편')) 입력열.add(i); }));
+  줄들.forEach(tr => [...tr.cells].forEach((td, i) => {
+    const 계 = td.dataset.k==='재단률' || td.dataset.k==='필름소요';
+    const 막 = !td.classList.contains('편') && (td.classList.contains('막음') || 계 || (입력열.has(i) && !td.classList.contains('dpr-k')));
+    const 칠 = 막 && !잠김뺌.some(c => td.classList.contains(c));
+    if(칠){ td.classList.add('잠김');
+      if(!td.title){ td.title = td.dataset.알림 || (계 ? '계산 값 — 입력 칸 아님' : td.classList.contains('막음') ? '제품 — 반제품만 입력됩니다' : '입력 칸 아님 — 계산·고정 값'); td.dataset.잠말 = '1'; } }
+    else if(td.classList.contains('잠김') || td.dataset.잠말){ td.classList.remove('잠김'); if(td.dataset.잠말){ delete td.dataset.잠말; if(td.classList.contains('편')) td.removeAttribute('title'); } }
+  }));
+}
 function 기본꼭칠(통 = 받은[품목시트]){
   if(!통 || !통.querySelector) return;
   통.querySelectorAll('tbody tr[data-p]').forEach(tr => {
@@ -1567,6 +1591,7 @@ function 기본꼭칠(통 = 받은[품목시트]){
       else if(td.dataset.기꼭){ delete td.dataset.기꼭; if(!(k==='합판코드' && td.title.startsWith('공정흐름 「'))) td.classList.remove('꼭'); if(td.title.startsWith('꼭 채울 칸 — ')) td.removeAttribute('title'); }
     });
   });
+  잠김칠(통);   /* v2.108.0 */
 }
 function 동일칠(통 = 받은[품목시트]){
   if(!통 || !통.querySelector) return;
