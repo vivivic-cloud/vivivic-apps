@@ -117,6 +117,26 @@ img.glyph{height:1.05em;width:auto;vertical-align:-.15em;background:var(--fig);b
 .guide summary::after{content:" ▾"}
 .guide[open] summary::after{content:" ▴"}
 .rguide{margin:-4px 0 14px}
+/* reading practice */
+.pbar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:-4px 0 14px;font-size:.86rem}
+.pbar button{border:1.5px solid var(--ink);border-radius:999px;padding:4px 12px;background:transparent;color:var(--ink);font-weight:600;cursor:pointer;font-family:var(--f-ui);font-size:.86rem}
+.pbar .pt{font-variant-numeric:tabular-nums;font-weight:700;padding:0 4px}
+.pbar .on-only{display:none}
+.group.prac .pbar .on-only{display:inline-flex}
+.group.prac .pbar .off-only{display:none}
+.pnote{flex-basis:100%;color:var(--muted);font-size:.8rem;line-height:1.5}
+.sum{display:none;margin:2px 0 12px}
+.group.prac .sum{display:block}
+.sum input{width:100%;box-sizing:border-box;border:1px dashed var(--rule-strong);border-radius:6px;padding:6px 9px;background:var(--sheet);color:var(--ink);font-family:var(--f-ui);font-size:.86rem}
+.sumlist{flex-basis:100%;margin:6px 0 0;padding:10px 12px 10px 30px;background:var(--sel);border-radius:8px;line-height:1.7}
+.sumlist li.empty{color:var(--muted)}
+.why{display:none}
+.group.prac .why{display:block}
+.why summary::before{content:none}
+.why textarea{width:100%;box-sizing:border-box;margin-top:8px;min-height:70px;border:1px solid var(--rule-strong);border-radius:8px;padding:8px 10px;background:var(--sheet);color:var(--ink);font-family:var(--f-ui);font-size:.88rem;line-height:1.6}
+.group.prac .q:not(.done) .guide:not(.why) summary{opacity:.45;pointer-events:none}
+.group.prac .q:not(.done) .guide:not(.why) summary::after{content:" · 먼저 풀어 보세요"}
+.group.prac .q:not(.done) .guide:not(.why)[open] > p{display:none}
 .guide p{margin:8px 0 0;padding:10px 12px;background:var(--sel);border-radius:8px;line-height:1.7;color:var(--ink)}
 .ch .tx{-webkit-user-select:text;user-select:text}
 .hlx{background:var(--hl);border-radius:2px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
@@ -1221,6 +1241,50 @@ img.glyph{height:1.05em;width:auto;vertical-align:-.15em;background:var(--fig);b
   tS.addEventListener('click',function(){ if(st.timer.run){st.timer.left=left();st.timer.run=false;} else if(st.timer.left>0){st.timer.run=true;st.timer.at=Date.now();} save(); draw(); });
   document.getElementById('tReset').addEventListener('click',function(){st.timer={left:4800,run:false,at:0};save();draw();});
   tick=setInterval(draw,500); draw();
+
+  // reading practice: paragraph summaries, wrong-answer reasons, per-passage timer
+  var PK=KEY+'-prac', pr={sum:{},why:{},t:{},on:{},run:{}};
+  try{var ps=JSON.parse(localStorage.getItem(PK)||'null'); if(ps) for(var k in pr) if(ps[k]) pr[k]=ps[k];}catch(e){}
+  function psave(){try{localStorage.setItem(PK,JSON.stringify(pr));}catch(e){}}
+  function fmt(s){s=Math.floor(s);var m=Math.floor(s/60);s=s%60;return m+':'+(s<10?'0':'')+s}
+  function el(t,c,x){var e=document.createElement(t); if(c) e.className=c; if(x) e.textContent=x; return e}
+  [].forEach.call(document.querySelectorAll('.group'),function(g){
+    var gid=g.id, body=g.querySelector('.g-body'); if(!body) return;
+    var paras=[].filter.call(g.querySelectorAll('.passage p, .passage .brk-c p'),function(p){return !p.matches('.src,.center,.label,.note')&&p.textContent.trim().length>20});
+    var bar=el('div','pbar');
+    var go=el('button','off-only','📝 독해 연습 시작'); go.type='button';
+    var tm=el('span','pt on-only','⏱ 0:00');
+    var pz=el('button','on-only','멈춤'); pz.type='button';
+    var sl=el('button','on-only','요약 모아보기'); sl.type='button';
+    var end=el('button','on-only','연습 끝내기'); end.type='button';
+    var note=el('p','pnote on-only',(paras.length?'문단마다 아래 칸에 핵심을 10자 안팎으로 적어 보세요. ':'')+'문제를 먼저 풀어야 도움말이 열려요. 채점 뒤 틀린 문제는 「틀린 이유 적기」에 지문 어디 때문인지 적어 보세요.');
+    bar.appendChild(go); bar.appendChild(tm); bar.appendChild(pz); if(paras.length) bar.appendChild(sl); bar.appendChild(end); bar.appendChild(note);
+    if(!paras.length) sl.style.display='none';
+    g.insertBefore(bar,body);
+    var sums=pr.sum[gid]||[];
+    paras.forEach(function(p,i){
+      var w=el('div','sum'), inp=document.createElement('input'); inp.type='text'; inp.placeholder=(i+1)+'문단 한 줄 요약'; inp.value=sums[i]||'';
+      inp.addEventListener('input',function(){ var a=pr.sum[gid]||[]; a[i]=inp.value; pr.sum[gid]=a; psave(); if(lst) drawList(); });
+      w.appendChild(inp); p.parentNode.insertBefore(w,p.nextSibling);
+    });
+    var lst=null;
+    function drawList(){ lst.innerHTML=''; paras.forEach(function(_,i){ var v=(pr.sum[gid]||[])[i]; var li=el('li',v?'':'empty',v||'(아직 안 적음)'); lst.appendChild(li); }); }
+    sl.addEventListener('click',function(){ if(lst){lst.remove();lst=null;sl.textContent='요약 모아보기';return;} lst=el('ol','sumlist'); drawList(); bar.appendChild(lst); sl.textContent='요약 접기'; });
+    [].forEach.call(g.querySelectorAll('.q'),function(q){
+      var qid=q.dataset.q, d=el('details','guide why'), sm=el('summary',null,'✎ 틀린 이유 적기'), ta=document.createElement('textarea');
+      ta.placeholder='채점 뒤 틀렸다면: 지문 몇째 문단, 어느 문장 때문에 틀렸는지 적어 보세요'; ta.value=pr.why[qid]||''; if(ta.value) d.open=true;
+      ta.addEventListener('input',function(){ if(ta.value) pr.why[qid]=ta.value; else delete pr.why[qid]; psave(); });
+      d.appendChild(sm); d.appendChild(ta); q.appendChild(d);
+    });
+    function cur(){ var t=pr.t[gid]||0; if(pr.run[gid]) t+= (Date.now()-pr.run[gid])/1000; return t }
+    function drawT(){ tm.textContent='⏱ '+fmt(cur()); pz.textContent=pr.run[gid]?'멈춤':'계속'; }
+    function stop(){ if(pr.run[gid]){ pr.t[gid]=cur(); delete pr.run[gid]; } }
+    go.addEventListener('click',function(){ pr.on[gid]=true; if(!pr.run[gid]) pr.run[gid]=Date.now(); psave(); g.classList.add('prac'); drawT(); });
+    pz.addEventListener('click',function(){ if(pr.run[gid]) stop(); else pr.run[gid]=Date.now(); psave(); drawT(); });
+    end.addEventListener('click',function(){ stop(); delete pr.on[gid]; psave(); g.classList.remove('prac'); drawT(); go.textContent='📝 독해 연습 다시 ('+fmt(pr.t[gid]||0)+')'; });
+    if(pr.on[gid]) g.classList.add('prac'); else if(pr.t[gid]) go.textContent='📝 독해 연습 다시 ('+fmt(pr.t[gid])+')';
+    drawT(); setInterval(function(){ if(pr.run[gid]) drawT(); },1000);
+  });
 
   Object.keys(st.ans).forEach(paint); count();
   show(location.hash.slice(1)||'common',false);
