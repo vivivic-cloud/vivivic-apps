@@ -1,4 +1,5 @@
-/* **비요크선불비변경** 메뉴를 재는 자 (11-25 [새 지시 비요크선불비변경]). 자료는 전부 지어낸 값이다 — 진짜 파일을 여기 넣지 마라(고객 정보).
+/* **비요크선불비변경** 메뉴를 재는 자 (11-25 [새 지시 비요크선불비변경] · [새 지시 비요크연결]). 자료는 전부 지어낸 값이다 — 진짜 파일을 여기 넣지 마라(고객 정보).
+   [비요크연결] 파일 셀 색은 안 칠함(흰 바탕) · 고름 칸 · 송장번호로 주문관리 흉내(#oGrid 60칸)와 이음 = 노랑.
    흉내 = 사장님 파일 꼴: 1줄 메모(병합 칸) · 2줄 제목(배송관리 칸 + 「선불 수정 」) · 칠한 줄(채움 FFF2CB) · 흰 채움(theme 0) · 채움 없음 · 숫자 「15000.0」 꼴.
    돌리기: NODE_PATH=<playwright(-core) 있는 node_modules> VP_EXE=<크로미움> node 잰것/비요크.cjs
    (VP_REAL=<저장소 밖 .xlsx> 를 주면 그 파일도 올려 줄 수·칠한 줄 수·합만 찍는다 — 값은 안 찍는다) */
@@ -43,7 +44,7 @@ function 가짜파일() {
       if (h === '선불비') return 수칸(r, i, 선불, s);
       if (h === '선불 수정 ') return 수칸(r, i, 5000, s);
       if (h === '수량' || h === '박스') return 수칸(r, i, 1, s);
-      const 값 = { CS: k === 0 ? '취소' : '', 매출처: '가상몰', 몰: '가짜', 수취인: '홍가짜' + k, 주문번호: '9000000000' + k, 고유번호: '100' + k, 배송상태: '주문확정', 상품명: '가짜 협탁 ' + k, 옵션값: '(가짜) 협탁', 배송사: '가짜물류', 주문등록일: '26.11.20  ' }[h];
+      const 값 = { CS: k === 0 ? '취소' : '', 매출처: '가상몰', 몰: '가짜', 수취인: '홍가짜' + k, 주문번호: '9000000000' + k, 고유번호: '100' + k, 배송상태: '주문확정', 상품명: '가짜 협탁 ' + k, 옵션값: '(가짜) 협탁', 배송사: '가짜물류', 주문등록일: '26.11.20  ', 송장번호: k < 4 ? '6000000000' + k : '' }[h];
       return 값 ? 글칸(r, i, 값, s) : `<c r="${열(i)}${r}" s="${s}"/>`;
     }).join('')}</row>`;
   });
@@ -57,6 +58,24 @@ function 가짜파일() {
     ['xl/_rels/workbook.xml.rels', '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId3" Target="worksheets/sheet1.xml"/></Relationships>'],
     ['xl/sharedStrings.xml', 공유글], ['xl/styles.xml', 꼴], ['xl/theme/theme1.xml', 테마], ['xl/worksheets/sheet1.xml', 시트],
   ]);
+}
+
+/* 주문관리 조회 흉내 — 주문번호 9000000000k: k=0·1 = 송장 같음(이음) · k=2 = 송장 다름 · k=3 = 줄 없음. k=4 는 파일 송장이 비어 안 물음 */
+function 폼값(q) {
+  const 글 = q.postDataBuffer() ? q.postDataBuffer().toString('utf8') : '';
+  const 값 = (이름) => { const m = 글.match(new RegExp('name="[^"]*' + 이름.replace(/\$/g, '\\$') + '"\r\n\r\n([^\r]*)')); return m ? m[1] : ''; };
+  return 'tbSOrderNo=' + 값('tbSOrderNo') + ' dcStartDt=' + 값('dcStartDt') + ' ddlRowCnt=' + 값('ddlRowCnt') + ' 단추=' + (/btnSearch\.x/.test(글) ? 1 : 0) + (/btnSave|btnDelete|btnInsert/.test(글) ? ' 쓰기단추!' : '');
+}
+function 주문관리응답(폼) {
+  const 번 = (폼.match(/tbSOrderNo=(\S*)/) || [])[1] || '';
+  const k = Number(번.slice(-1));
+  const 이름 = ['', '주문번호', 'CS', '주문번호', '상품명', '수취인', '송장번호'];
+  while (이름.length < 60) 이름.push('덤' + 이름.length);
+  const 보임 = (i) => i !== 0 && i !== 1 && i < 10;   // 체크·안 번호·덤 50칸은 숨김(인라인 width 없음)
+  const th = 이름.map((h, i) => `<th class="igg_HeaderCaption"${보임(i) ? ' style="width: 40px;"' : ''}>${h}</th>`).join('');
+  const 줄 = (송장, j) => '<tr>' + 이름.map((h, i) => `<td>${i === 0 ? '<input type="checkbox">' : i === 1 ? '77' + k + j : h === '주문번호' ? 번 : h === '상품명' ? '주문관리 협탁 ' + k : h === '수취인' ? '주문관리수취인' + k : h === '송장번호' ? 송장 : ''}</td>`).join('') + '</tr>';
+  const 몸 = k === 0 || k === 1 ? 줄('9999', 0) + 줄('6000000000' + k, 1) : k === 2 ? 줄('5555', 0) : '';
+  return `<html><body><form id="aspnetForm" action="./orderMst.aspx"></form><div id="oGrid"><table><tr>${th}</tr></table><table>${몸}</table></div><span>행수: ${k < 2 ? 2 : k === 2 ? 1 : 0}건</span></body></html>`;
 }
 
 (async () => {
@@ -79,8 +98,9 @@ function 가짜파일() {
         if (/googleapis\.com$/.test(u.hostname) && !/홍가짜|9000000000|가짜 협탁|가상몰/.test(decodeURIComponent(실림))) return r.abort();
         밖.push(q.method() + ' ' + u.hostname); return r.abort();
       }
-      if (q.method() !== 'GET' || !/orderMst/i.test(u.pathname)) 보낸.push(q.method() + ' ' + u.pathname);
-      return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: '<html><body><form id="aspnetForm" action="./orderMst.aspx"><input type="image" id="btnSearch" name="ctl00$Contents$btnSearch"><input id="dcStartDt" value="2026-10-25"><input id="dcEndDt" value="2026-11-25"></form></body></html>' });
+      if (q.method() !== 'GET' || !/orderMst/i.test(u.pathname)) 보낸.push(q.method() + ' ' + u.pathname + (q.method() === 'POST' ? ' ' + 폼값(q) : ''));
+      if (q.method() === 'POST' && /orderMst/i.test(u.pathname)) return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: 주문관리응답(폼값(q)) });
+      return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: '<html><body><form id="aspnetForm" action="./orderMst.aspx"><input type="image" id="btnSearch" name="ctl00$Contents$btnSearch"><input name="ctl00$Contents$tbSOrderNo" value=""><input name="ctl00$Contents$ddlRowCnt" value="50"><input name="ctl00$Contents$dcStartDt" value="2026-10-25"><input name="ctl00$Contents$dcEndDt" value="2026-11-25"></form></body></html>' });
     });
     await p.goto('https://vendorpia.com/System/Sales/orderMst.aspx#vgByk');
     await p.addStyleTag({ content: fs.readFileSync(path.join(확장, 'login.css'), 'utf8') + fs.readFileSync(path.join(확장, 'search.css'), 'utf8') });
@@ -92,13 +112,15 @@ function 가짜파일() {
   const 판읽기 = (p) => p.evaluate(() => {
     const t = document.querySelector('#vp-root table.vp-촘촘');
     const 몸 = t ? [...t.tBodies[0].rows] : [];
-    const cs = 몸[0] && getComputedStyle(몸[0].cells[1]);
-    return { h1: document.querySelector('#vp-root h1')?.textContent, th: t && [...t.tHead.rows[0].cells].map((c) => c.firstChild.textContent), 줄: 몸.length,
-      칠: 몸.map((tr) => getComputedStyle(tr.cells[3]).backgroundColor), 칠첫칸: 몸[0] && getComputedStyle(몸[0].cells[0]).backgroundColor,
+    const cs = 몸[0] && getComputedStyle(몸[0].cells[2]);
+    return { h1: document.querySelector('#vp-root h1')?.textContent, 줄: 몸.length,
+      칠: 몸.map((tr) => getComputedStyle(tr.cells[3]).backgroundColor), 칠첫칸: 몸.map((tr) => getComputedStyle(tr.cells[0]).backgroundColor),
+      고름: 몸.map((tr) => !!tr.cells[0].querySelector('input.vp-줄고름')), 머리고름: !!(t && t.tHead.rows[0].cells[0].querySelector('input.vp-다고름')),
+      첫붙음: 몸[0] && getComputedStyle(몸[0].cells[0]).position === 'sticky' && getComputedStyle(몸[0].cells[1]).position !== 'sticky' && t.tHead.rows[0].cells[0].classList.contains('vp-first') && !t.tHead.rows[0].cells[1].classList.contains('vp-first'),
       메모: document.querySelector('#vp-root .vp-비요크메모')?.textContent, 셈: document.querySelector('#vp-root .vp-비요크셈')?.textContent,
       파일: document.querySelector('#vp-root .vp-비요크파일')?.textContent, 알림: document.querySelector('#vp-root .vp-note')?.textContent,
-      선불: 몸.map((tr) => tr.cells[21].textContent), 글: cs && cs.fontSize, 높이: 몸[0] && 몸[0].getBoundingClientRect().height,
-      손: t ? t.querySelectorAll('.vp-열손').length : 0, 검색창숨김: getComputedStyle(document.querySelector('#vp-root .vp-bar')).display === 'none',
+      선불: 몸.map((tr) => tr.cells[22].textContent), 글: cs && cs.fontSize, 높이: 몸[0] && 몸[0].getBoundingClientRect().height,
+      손: t ? t.querySelectorAll('.vp-열손').length : 0, th: t && [...t.tHead.rows[0].cells].slice(1).map((c) => c.firstChild.textContent), 검색창숨김: getComputedStyle(document.querySelector('#vp-root .vp-bar')).display === 'none',
       쪽가로: document.documentElement.scrollWidth > innerWidth + 1, 기억: !!localStorage.getItem('vp비요크'), 상품칸: document.querySelectorAll('#vp-root td.vp-상품칸').length,
       줄누름: 몸.filter((tr) => tr.classList.contains('vp-줄상담')).length, 지우기넓이: document.querySelector('#vp-root .vp-지우기')?.getBoundingClientRect().width };
   });
@@ -114,15 +136,40 @@ function 가짜파일() {
     재(판.검색창숨김, '주문관리 검색창은 숨김');
     재(JSON.stringify(판.th) === JSON.stringify(머리.map((h) => h.trim())), '칸 = 파일 칸 그대로 39칸(선불비·선불 수정 포함): ' + (판.th || []).length);
     재(판.줄 === 5, '줄 = 글 있는 줄 5(꼴만 있는 빈 줄 뺌): ' + 판.줄);
-    재(JSON.stringify(판.칠) === JSON.stringify(['rgb(255, 242, 203)', 'rgb(255, 242, 203)', 'rgb(255, 242, 203)', 'rgba(0, 0, 0, 0)', 'rgba(0, 0, 0, 0)']), '칠한 줄 3 = 파일 색(FFF2CB) · 흰 채움·채움 없음은 안 칠함: ' + 판.칠.join(' / '));
-    재(판.칠첫칸 === 'rgb(255, 242, 203)', '붙박이 첫 칸도 칠함');
+    재(판.머리고름 && 판.고름.every(Boolean) && 판.th[0] === 'CS', 'CS 앞 고름 칸(머리·줄마다 체크상자)');
+    재(판.첫붙음, '고름 칸이 붙박이 첫 칸(CS 칸은 안 붙음)');
+    await p.waitForFunction(() => /연결\s*2/.test(document.querySelector('#vp-root .vp-비요크셈').textContent) && !/확인/.test(document.querySelector('#vp-root .vp-비요크셈').textContent), null, { timeout: 15000 }).catch(() => {});
+    판 = await 판읽기(p);
+    const 노랑 = 'rgb(255, 243, 191)', 흰 = (c) => c === 'rgba(0, 0, 0, 0)' || c === 'rgb(255, 255, 255)';
+    재(판.칠[0] === 노랑 && 판.칠[1] === 노랑 && 판.칠.slice(2).every(흰), '송장 같은 줄 2 = 노랑 · 나머지(송장 다름·줄 없음·송장 빔·파일 색 칠한 줄도) = 흰: ' + 판.칠.join(' / '));
+    재(판.칠첫칸[0] === 노랑 && 흰(판.칠첫칸[2]), '붙박이 고름 칸도 같은 색: ' + 판.칠첫칸.join(' / '));
+    재(/줄\s*5/.test(판.셈) && /연결\s*2/.test(판.셈) && !/칠한/.test(판.셈), '셈 = 줄 5 · 연결 2: ' + 판.셈);
+    const 물은 = 보낸.filter((x) => x.startsWith('POST'));
+    재(물은.length === 4 && 물은.every((x) => /dcStartDt=2026-11-13 ddlRowCnt=50 단추=1$/.test(x)), '주문관리 조회 4번(주문번호마다, 송장 빈 줄은 안 물음, 등록일 = 가장 이른 주문등록일 − 7일, 쓰기 단추 없음): ' + 물은.length);
+    /* 고름: 머리 = 전체 체크·해제, 줄 하나 풀면 머리는 반쯤 */
+    const 고름셈 = () => p.evaluate(() => ({ 켬: document.querySelectorAll('#vp-root input.vp-줄고름:checked').length, 다: document.querySelector('#vp-root input.vp-다고름').checked, 반: document.querySelector('#vp-root input.vp-다고름').indeterminate, 상담: !!document.querySelector('.vp-상담판') }));
+    await p.click('#vp-root input.vp-다고름');
+    const ㄱ = await 고름셈();
+    await p.click('#vp-root tbody tr:nth-child(2) td.vp-고름칸');
+    const ㄴ = await 고름셈();
+    await p.click('#vp-root input.vp-다고름');
+    const ㄷ = await 고름셈();
+    await p.click('#vp-root input.vp-다고름');
+    const ㄹ = await 고름셈();
+    재(ㄱ.켬 === 5 && ㄱ.다 && ㄴ.켬 === 4 && ㄴ.반 && !ㄴ.상담 && ㄷ.켬 === 5 && ㄹ.켬 === 0 && !ㄹ.다, '전체 체크 5 → 줄 하나 풂 4(머리 반쯤·상담 안 뜸) → 전체 5 → 전체 해제 0');
+    /* 이은 줄 누름 = 이은 주문관리 줄로 상담 판 */
+    await p.click('#vp-root tbody tr:nth-child(1) td:nth-child(5)');
+    await p.waitForSelector('.vp-상담판', { timeout: 5000 }).catch(() => {});
+    const 상담 = await p.evaluate(() => { const d = document.querySelector('.vp-상담판'); return d ? d.querySelector('.vp-상담머리').textContent + ' | ' + d.querySelector('.vp-고객정보').textContent : ''; });
+    재(/주문관리 협탁 0/.test(상담) && /주문관리수취인0/.test(상담), '이은 줄 누름 = 이은 주문관리 주문의 상담 판(상품명·고객정보 = 주문관리 줄)');
+    await p.keyboard.press('Escape');
     재(판.메모 && 판.메모.includes('가짜 메모 3건/ 37000원') && 판.메모.includes('62000>25000'), '맨 위 메모 글 보임');
-    재(/줄\s*5/.test(판.셈) && /칠한 줄\s*3/.test(판.셈) && /선불비\s*62,000/.test(판.셈) && /선불 수정\s*25,000/.test(판.셈) && /칠한 줄 선불비\s*37,000/.test(판.셈) && /칠한 줄 선불 수정\s*15,000/.test(판.셈), '셈: ' + 판.셈);
+    재(/선불비\s*62,000/.test(판.셈) && /선불 수정\s*25,000/.test(판.셈), '셈 합: ' + 판.셈);
     재(JSON.stringify(판.선불) === JSON.stringify(['15000', '10000', '12000', '15000', '10000']), '숫자 「15000.0」 → 15000: ' + 판.선불.join(','));
     재(판.글 === '11px' && Math.round(판.높이) === 25, '꼴 11px · 줄 25px: ' + 판.글 + ' ' + 판.높이);
-    재(판.손 === 39, '열 끌기 손잡이 39: ' + 판.손);
+    재(판.손 === 40, '열 끌기 손잡이 40(고름 칸 + 39): ' + 판.손);
     재(판.상품칸 === 5, '상품명 칸 = 이름 단추 자리 5: ' + 판.상품칸);
-    재(판.줄누름 === 5, '줄 누름(상담) = 다른 표와 같음 5: ' + 판.줄누름);
+    재(판.줄누름 === 5, '줄 누름(상담) 5: ' + 판.줄누름);
     재(!판.쪽가로, '쪽 전체 가로 스크롤 없음');
     재(판.지우기넓이 > 0 && 판.지우기넓이 < 100, '「지우기」 단추 = 작은 단추(쪽 너비로 안 늘어남): ' + Math.round(판.지우기넓이));
     재(판.기억 && 판.파일.startsWith('가짜.xlsx'), '브라우저 안에 기억 · 파일 이름: ' + 판.파일);
@@ -130,7 +177,11 @@ function 가짜파일() {
     const { p: p2, 보낸: 보낸2, 쪽오류: 오류2 } = await 쪽열기(ctx);
     await p2.waitForFunction(() => document.querySelectorAll('#vp-root table.vp-촘촘 tbody tr').length > 0, null, { timeout: 15000 });
     const 판2 = await 판읽기(p2);
-    재(판2.줄 === 5 && 판2.칠.filter((c) => c === 'rgb(255, 242, 203)').length === 3 && 판2.메모.includes('가짜 메모'), '다시 열어도 그대로(줄 5·칠 3·메모)');
+    await p2.waitForFunction(() => !/확인/.test(document.querySelector('#vp-root .vp-비요크셈').textContent), null, { timeout: 15000 }).catch(() => {});
+    const 판2b = await 판읽기(p2);
+    const 물은2 = 보낸2.filter((x) => x.startsWith('POST'));
+    재(판2b.줄 === 5 && 판2b.칠.filter((c) => c === 'rgb(255, 243, 191)').length === 2 && /연결\s*2/.test(판2b.셈) && 판2.메모.includes('가짜 메모'), '다시 열어도 그대로(줄 5·노랑 2·메모)');
+    재(물은2.length === 2 && !물은2.some((x) => /900000000[01] /.test(x)), '다시 열 때 = 기억한 이음은 안 묻고 못 이은 줄만 2번: ' + 물은2.length);
     await p2.click('#vp-root .vp-지우기');
     const 판3 = await 판읽기(p2);
     재(!판3.기억 && 판3.줄 === 0 && !판3.셈 && !판3.메모, '지우기 = 기억·표·메모·셈 지움');
@@ -138,7 +189,7 @@ function 가짜파일() {
     await p2.setInputFiles('#vp-root .vp-비요크줄 input[type=file]', { name: '깨짐.xlsx', mimeType: 'application/octet-stream', buffer: Buffer.from('아님') });
     await p2.waitForFunction(() => /읽지 못/.test(document.querySelector('#vp-root .vp-note').textContent), null, { timeout: 5000 }).catch(() => {});
     재(/읽지 못/.test((await 판읽기(p2)).알림), '깨진 파일 = 알림 한 줄');
-    재(![...보낸, ...보낸2].some((x) => !x.startsWith('GET')), '벤더피아 POST 0: ' + [...보낸, ...보낸2].join(','));
+    재([...보낸, ...보낸2].every((x) => x.startsWith('GET') || (/^POST \/System\/Sales\/orderMst\.aspx tbSOrderNo=9/.test(x) && !/쓰기단추/.test(x))), '벤더피아 = 주문관리 조회만(쓰기 단추 0)');
     재(!밖.length, '파일 값이 밖으로 안 나감(구글 익명 표 길에도 안 실림) ' + 밖.join(','));
     재(!쪽오류.length && !오류2.length, '쪽 오류 없음 ' + [...쪽오류, ...오류2].join(' | '));
     await ctx.close();
@@ -150,7 +201,7 @@ function 가짜파일() {
     await p.setInputFiles('#vp-root .vp-비요크줄 input[type=file]', process.env.VP_REAL);
     await p.waitForFunction(() => document.querySelectorAll('#vp-root table.vp-촘촘 tbody tr').length > 0, null, { timeout: 15000 });
     const 판 = await 판읽기(p);
-    console.log('  칸 ' + 판.th.length + ' · 줄 ' + 판.줄 + ' · 칠한 줄 ' + 판.칠.filter((c) => !/rgba\(0, 0, 0, 0\)/.test(c)).length + ' · 색 ' + [...new Set(판.칠)].join(',') + ' · 셈 「' + 판.셈 + '」 · 메모 칸 ' + (await p.evaluate(() => document.querySelectorAll('#vp-root .vp-비요크메모 span').length)));
+    console.log('  칸 ' + 판.th.length + ' · 줄 ' + 판.줄 + ' · 칠 ' + [...new Set(판.칠)].join(',') + ' · 셈 「' + 판.셈 + '」 · 메모 칸 ' + (await p.evaluate(() => document.querySelectorAll('#vp-root .vp-비요크메모 span').length)));
     await ctx.close();
   }
   await b.close();
