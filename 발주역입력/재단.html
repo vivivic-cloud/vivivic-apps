@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 재단 — 에이엠티 「재단 세부내역」(상세내역서 PDF, 월별)을 달마다 표로 본다.
      사장님 11-16: 「월별 재단내역이 목록으로 보이는 페이지를 만들어라.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.10.8
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.10.9
+     v1.10.9(11-25): 사장님 누계 제품 메모가 그 제품의 모든 줄에 되풀이됨(「메모가 동일하게 복사 적용되나」) → 누계에서 제품 메모 칸 = 그 제품이 처음 나오는 줄 한 번만(나머지 줄은 빈 칸) · 품목 메모·저장(이름 열쇠)·월별 명세 그대로.
      v1.10.8(11-25): 사장님 「재단 세부내역에도 적용해 주세요」 — 누계 표 위 공용 단품찾기.js(로앤·이룸산업 v1.8.0 과 같음): 검색 칸 · n/전체 · ‹ › · Enter/Shift+Enter → 고른 단품 칸으로 이동·강조.
      v1.10.7(11-25): 공용 부속명통일.js v3 — 영림원품목등록 v2.105.0 보내기 나눔(발주역입력_영림원품목등록_보내기/품목) 에서 받기 자료 반제품 이름을 읽음(머리 없으면 옛 문서). 이 쪽 코드는 그대로.
      v1.10.6(11-25): 사장님 「조혼이 조혼가구 입니다」 — 재단 입고처 짝 「조혼」 → 조혼가구 · 「조흔」(오타) → 조혼가구(마우스 = 원래 글자).
@@ -256,7 +257,7 @@ body.칸끄는중{cursor:col-resize;user-select:none;-webkit-user-select:none}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.10.8</div>
+  <div class="badge">v1.10.9</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html" class="on">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>재단 세부내역</h1>
@@ -432,13 +433,14 @@ function 누계그리기(){
   const 줄들 = [...묶.values()].sort((a,b) => b.합-a.합 || a.p.localeCompare(b.p, 'ko') || a.품.localeCompare(b.품, 'ko'));
   const 총 = 줄들.reduce((a,g) => a + g.합, 0);
   let h = '<table class="dpr-t"><thead><tr><th class="dpr-k">제품명</th><th>메모</th><th>품목명</th><th>메모</th><th>사이즈</th><th>입고처</th><th>재단수량</th></tr></thead><tbody>';
+  const 본메모 = new Set();   /* v1.10.9 제품 메모 = 그 제품 첫 줄 한 번 */
   for(const g of 줄들){
     const 업들 = [...g.업.entries()], 없 = 업들.filter(([,x]) => !x).map(([원]) => 원);
     const 문서 = [...new Set(업들.filter(([,x]) => x).map(([,x]) => x.문서))];
     const 업글 = 업들.map(([원,x]) => x ? x.이름 : 원).join(' · ');
     const 업td = 없.length ? `<td class="업체없음" title="${글('업체별 단품명 거래처 없음 — 입고처 '+없.join(', '))}">${글(업글)}</td>`
                           : `<td title="${글('입고처 '+업들.map(([원]) => 원).join(', '))}">${글(업글)}</td>`;
-    h += `<tr><td class="dpr-k pc">${글(g.p)}${단품칸(g.p, 문서)}</td>${메모.칸('제품', g.p)}${부통.품목칸(g.품)}${메모.칸('품목', g.p + '\t' + g.품)}${사이즈칸(g.사)}${업td}${부통.수량칸(g.품, g.합, 수글)}</tr>`;
+    h += `<tr><td class="dpr-k pc">${글(g.p)}${단품칸(g.p, 문서)}</td>${본메모.has(g.p) ? 메모.칸('제품', '') : (본메모.add(g.p), 메모.칸('제품', g.p))}${부통.품목칸(g.품)}${메모.칸('품목', g.p + '\t' + g.품)}${사이즈칸(g.사)}${업td}${부통.수량칸(g.품, g.합, 수글)}</tr>`;
   }
   h += '<tr class="합"><td class="dpr-k" colspan="6">총 합 계</td><td class="num">' + 수글(총) + '</td></tr>';
   h += '</tbody></table>';
