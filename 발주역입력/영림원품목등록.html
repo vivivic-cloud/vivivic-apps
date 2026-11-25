@@ -2,7 +2,8 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.119.2
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.119.3
+     v2.119.3(11-26): 사장님 「품번 넣으면 열 변경된다」 — 합친 칸(rowspan) 표(공통반자재 탭)는 값을 고칠 때마다 표를 통째로 새로 만들어 고른 칸·치는 자리가 풀림 → 줄·합친 칸 꼴(data-꼴)이 같으면 새로 만들지 않고 칸 글자만 고침(다른 계산 탭과 같은 길).
      v2.119.2(11-26): 분배 방 정정 「업체별 단품명에 없는 줄을 끝으로 옮기는 기능은 없애지 마세요」 → v2.119.1 의 ⓪(그 기능 없앰)만 되돌림. 입력 뒤 열 너비·민 자리·공통 묶음 차례 고정(①②③)은 그대로.
      v2.119.1(11-26): 사장님 「입력 후 열 변동이 왜 생기냐고」 「입력 열의 순서 변동이 생기잖아. 그냥 가만히 있게 코드 수정하라고」 — ⓪ 업체별 단품명에 없는 제품 줄을 표 끝으로 옮기던 것(v2.5) 없앰 = 줄 차례 엑셀 그대로 · ① 공통반자재 품목명·품번을 넣으면 품목등록업로드 표를 새로 만들며 스크롤이 맨 위·왼쪽으로(공통확인 · 조각 받음) → 품목표다시 = 민 자리 그대로 ② 표를 새로 만들 때 열 너비가 글 길이 따라 줄고 늚 → 열마다 전 너비를 최소 너비로(품목등록업로드 · 계산 탭 새로 만들 때) ③ 공통반자재 탭 묶음 차례가 저장 뒤 바뀜(창고 맵 열쇠 차례) → 묶인 줄의 품목등록업로드 차례로 고정.
      v2.119.0(11-26): 사장님 「품목명 입력되면 열 변동 생기네 … 가만히 있어야 안 헷갈리지. 시키지 않은 짓거리 좀 하지 마라」 · 「칸 선택도 느리고, 엄한 곳에 복사되고, 입력감이 영 구리다」 — ① 빈 열 접기(v2.32 열접기 · 펼쳐보기 단추 · #속 MutationObserver) 없앰 = 열은 늘 그 자리 ② 느림 = 공통반자재 값 찾기(공통번묶 → 공통묶음들)가 값 하나 읽을 때마다 _입력 전체를 다시 훑음(칸 한 번 고침 = 공통묶음들 55만 번 · 보일품목 1,700번 · 약 20초) → 공통묶음들 · 보일품목 = 한 차례(같은 일 묶음) 안에서 한 번 셈(캐시, 입력이 바뀌면 비움).
@@ -483,7 +484,7 @@ body:not(.펼침) .dpr-t .접힘{display:none}   /* v2.32.0 빈 열 접힘 — �
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.119.2</div>
+  <div class="badge">v2.119.3</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <div class="머리줄"><h1>영림원품목등록</h1><div id="설정" class="탭단추" hidden><div class="설정이름">입력설정</div><div class="기타줄"></div></div></div>
@@ -1380,13 +1381,14 @@ function 계산그리기(u){
     const cls = ((i===0?'dpr-k':'') + (typeof v==='number'?' num':'') + (o.편?' 편':'') + (o.드롭?' 드롭칸':'') + (o.살?' 살구':'') + (o.편 && o.편.p && 파랑(o.편.p, o.편.k)?' 저장값':'') + (o.모?' 모자람':'') + (o.꼭?' 꼭':'') + (o.영?' 영채움':'') + (o.참?' 참고':'') + (o.선?' 묶선':'') + (o.완?' 등완':'') + (o.신?' 신규':'') + (o.기?' 기본값':'') + (o.밖?' 목록밖':'')).trim();
     return { v, cls, 말:o.모 || o.영 || o.완 || o.신 || o.기 || o.t || '', p:o.편 ? o.편.p : '', k:o.편 ? o.편.k : '', rs:o.rs || 0, 숨:!!o.숨 }; }));   /* v2.118.0 rs = 합친 칸 · 숨 = 위 칸에 합쳐짐 */
   const 옛표 = 옛통 && 계산자리===자 && 옛통.querySelector('table');
-  if(옛표 && 옛표.tHead.rows[0].cells.length===칸.length && 옛표.tBodies[0].rows.length===칸들.length && !칸들.some(r => r.some(d => d.숨 || d.rs))){
-    칸들.forEach((r, n) => r.forEach((d, i) => { const td = 옛표.tBodies[0].rows[n].cells[i]; if(!td) return;
+  const 꼴 = 칸들.map(r => r.map(d => d.숨 ? '-' : (d.rs || 1)).join(',')).join(';');   /* v2.119.3 합친 칸 꼴 */
+  if(옛표 && 옛표.tHead.rows[0].cells.length===칸.length && 옛표.tBodies[0].rows.length===칸들.length && (옛표.dataset.꼴 || '') === 꼴){
+    칸들.forEach((r, n) => { let j = 0; r.forEach(d => { if(d.숨) return; const td = 옛표.tBodies[0].rows[n].cells[j++]; if(!td) return;
       const 편집 = td.classList.contains('편집중'), 고 = [...td.classList].filter(x => /^고름|^표입력/.test(x));
       td.className = [d.cls, ...고, 편집 ? '편집중' : ''].filter(Boolean).join(' ');
       if(d.말) td.title = d.말; else td.removeAttribute('title');
       if(d.k){ td.dataset.p = d.p; td.dataset.k = d.k; } else { delete td.dataset.p; delete td.dataset.k; }
-      if(!편집 && td.textContent !== String(d.v ?? '')) td.textContent = d.v ?? ''; }));
+      if(!편집 && td.textContent !== String(d.v ?? '')) td.textContent = d.v ?? ''; }); });
     잠김칠(옛표);   /* v2.108.0 */
     return;
   }
@@ -1395,6 +1397,7 @@ function 계산그리기(u){
   const 옛너 = 옛통 && 계산자리===자 ? 너비읽기(옛통) : null;   /* v2.119.1 */
   속.innerHTML = 단추 + (줄.length ? `<div class="표통" data-계산="1">${h}</div>` : '<div class="state"><div class="big">줄 없음</div></div>');
   if(옛너) 너비지킴(속.querySelector('.표통'), 옛너);
+  { const 새t = 속.querySelector('.표통 table'); if(새t) 새t.dataset.꼴 = 꼴; }   /* v2.119.3 */
   계산자리 = 자;
   const 통 = 속.querySelector('.표통'); if(통 && 옛자리){ 통.scrollLeft = 옛자리[0]; 통.scrollTop = 옛자리[1]; }
   const 새표 = 통 && 통.querySelector('table');
