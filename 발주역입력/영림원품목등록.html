@@ -2,7 +2,8 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.114.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.115.0
+     v2.115.0(11-25): 사장님 「품목명은 내가 직접 써넣을 테니, 공통반자재로 묶을 수 있는 장치를 해줘. 묶이면 품목명·번호 변경 가능하게.」 — 품목등록업로드 덧칸 「공통」(품명 바로 앞): 후보(같은 동일속성 묶음 · 다른 제품 · 원장(합판코드) 같음 · 규격 ±2mm) = 청록 「묶기」 → 누르면 묶음 · 묶인 줄 = 「공통」(마우스 = 여러 제품에 중복되는 공통반자재 · 제품 목록) · 입력설정 「공통반자재」 탭 = 묶음마다 품목명·품번(사람이 씀, 비면 빨강) · 묶인 반제품(지우면 풂). 저장 _입력 #공통 {줄@id, 명@id, 번@id}. 품목명·품번이 들어가면 묶인 줄 모두 그 이름·번호(화면 품목 줄을 바꿔 셈) → 품목·자재(재공품)·품목별흐름·소요자재·워크센터·외주계약·보내기는 한 번 · BOM 은 제품마다 그 번호를 하위로 · 손 값 = 공통 번호 값, 없으면 묶인 줄 손 값이 하나일 때 그 값 · 다르면 빨강.
      v2.114.0(11-25): 사장님 「입력폼에 문제가 있으면 이곳 등록흐름에도 문제를 보여줘야지」 — 대조 자료(입력폼 분류·자재·공정흐름·공정·거래처·워크센터·창고·부서 · 업체별 단품명 · 로앤)를 못 읽음/읽는 중이면 그 자료와 대조하는 칸 = 빨강(td.꼭, 마우스 「입력폼 자료 못 읽음 — …」) → 흐름 「확인필요」 · 자료가 오면 다시 셈(흐름상태 때 자료 상태가 바뀌면 품목등록업로드·지금 계산 탭 다시 칠함).
      v2.113.0(11-25): 사장님 「입력흐름 확인필요 표기 시 확인필요한 입력이 있는 품목 줄에 하이라이트하여 찾아가서 입력하게 해주세요. 입력완료 시 하이라이트 꺼짐」 — 빨강 칸(td.꼭 · td.목록밖)이 든 줄 = 연보라 덧칠 + 첫 칸 왼쪽 보라 띠(CSS :has — 칸이 채워지면 늦게 온 자료로도 바로 꺼짐) · 흐름 줄 「확인필요」 누름 = 그 탭(갈래)으로 가서 첫 줄 → 다시 누르면 다음 줄(표 상자 안에서만 위아래·옆으로 밂, 지금 줄 = 진한 덧칠).
      v2.112.0(11-25): 사장님 「사이즈 넣으면 이미 재단편집이 최적 수량을 주잖아」 — 재단률 = ① 재단확정(_재단도) ② 없으면 에이엠티 재단편집과 같은 셈(shared/원장재단수량.js 소요량: 규격 W×D · 결보호 칸 · 원장 = 합판코드 자재 규격, 없으면 4X8) 자동 · 결보호 빈칸·규격 없음·원장보다 큼 = 빈칸 빨강 · 엑셀·원장 엑셀 대체 없음(v2.109 그대로).
@@ -374,6 +375,7 @@ html,body{height:100%;overflow:hidden}
   padding:4px 5px;background:var(--vg-fill);border-bottom:1px solid #C7C7C3}
 .dpr-t td{font-size:11.5px;line-height:1.3;color:var(--vg-body);padding:2px 5px;vertical-align:top;background:var(--vg-bg)}
 .dpr-t td.num{text-align:right}
+.dpr-t td.공후보{background:#E0F2F1;color:#00695C;font-weight:700;cursor:pointer;text-align:center}.dpr-t td.공묶{color:#00695C;font-weight:700;text-align:center}   /* v2.115.0 공통반자재 */
 .dpr-t tbody tr:has(> td.꼭, > td.목록밖) > td{background-image:linear-gradient(rgba(126,87,194,.13),rgba(126,87,194,.13))}   /* v2.113.0 확인필요 줄 = 연보라 덧칠(제 색 위에) */
 .dpr-t tbody tr:has(> td.꼭, > td.목록밖) > td.dpr-k:not(.꼭){box-shadow:inset 4px 0 0 #7E57C2}
 .dpr-t tbody tr.확인지금:has(> td.꼭, > td.목록밖) > td{background-image:linear-gradient(rgba(126,87,194,.30),rgba(126,87,194,.30))}
@@ -469,7 +471,7 @@ body:not(.펼침) .dpr-t .접힘{display:none}   /* v2.32.0 빈 열 접힘 — �
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.114.0</div>
+  <div class="badge">v2.115.0</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <div class="머리줄"><h1>영림원품목등록</h1><div id="설정" class="탭단추" hidden><div class="설정이름">입력설정</div><div class="기타줄"></div></div></div>
@@ -532,7 +534,7 @@ window.목록읽기 = async function(){
     if(!시트들.length){ 목상태('창고에 영림원품목등록이 없습니다'); return; }
     document.getElementById('목상태').style.display='none';
     /* v2.49.0 탭 차례 = 앞 단계 등록이 끝나야 다음 단계를 등록할 수 있는 차례(사장님 11-23) — 재공품이 BOM 모품목이라 BOM 앞 · 원부자재(참고)는 뒤 */
-    const 차례 = [품목시트, '자재등록(재공품)', BOM시트, '품목별공정흐름유형등록', 공소시트, '제품별공정별워크센터등록', '외주계약등록', '공정별 워크센터 기본값', '본사창고관리', '가공단가관리'];   /* v2.60.0 설정 탭 = 등록 탭 뒤 · 원부자재 앞 */
+    const 차례 = [품목시트, '자재등록(재공품)', BOM시트, '품목별공정흐름유형등록', 공소시트, '제품별공정별워크센터등록', '외주계약등록', '공정별 워크센터 기본값', '본사창고관리', '가공단가관리', '공통반자재'];   /* v2.60.0 설정 탭 = 등록 탭 뒤 · 원부자재 앞 */
     const 창이름 = 시트들.map(t => t.이름), 뒤 = 창이름.filter(n => !차례.includes(n) && n!=='원부자재').concat(['원부자재']);
     const 탭들 = 차례.concat(뒤).filter((n, k, a) => a.indexOf(n)===k && (창이름.includes(n) || 계산시트[n]));
     const 흐름탭 = 차례.slice(0, 차례.indexOf('외주계약등록') + 1), 단추 = u => `<button class="chip" data-u="${글(u)}">${글(u)}</button>`;   /* v2.73.0 등록 흐름 한 줄(→ 차례) · 기타 메뉴 다음 줄 */
@@ -578,17 +580,17 @@ async function 시트고름(u){
 const 추가 = '추가할 제품';
 const 업체자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_업체별단품'];
 const 품목시트 = '품목등록업로드';
-let 품목조각 = [], 품목끊기 = [], 품목칸 = null, 업체순 = [], 업체값 = {}, 업체끊기 = {}, 고른업체 = '', 추가자리 = null;
+let 품목원 = [], 품목조각 = [], 품목끊기 = [], 품목칸 = null, 업체순 = [], 업체값 = {}, 업체끊기 = {}, 고른업체 = '', 추가자리 = null;
 function 대조구독(){
   const { doc, onSnapshot } = window.fbRead;
   onSnapshot(doc(window.db, ...창고자리, '_시트목록'), m => {
     const t = ((m.exists() && m.data().시트들) || []).find(x => x.이름===품목시트);
     품목끊기.forEach(f => f()); 품목끊기 = []; 품목칸 = t ? (t.칸||[]) : [];
-    const n = t ? (t.조각||1) : 0; 품목조각 = Array(n).fill(null);
+    const n = t ? (t.조각||1) : 0; 품목원 = Array(n).fill(null); 품목조각 = Array(n).fill(null);
     if(!n){ 대조(); return; }
     for(let k=0;k<n;k++) 품목끊기.push(onSnapshot(doc(window.db, ...창고자리, `${문서이름(품목시트)}_${k+1}`), s => {
       const 바뀜 = 품목조각.every(x => x);
-      품목조각[k] = s.exists() ? (s.data().줄||[]) : [];
+      품목원[k] = s.exists() ? (s.data().줄||[]) : []; 품목조각 = 공통적용();   /* v2.115.0 공통반자재 = 이름·번호 바꿔 셈 */
       if(!품목조각.every(x => x)) return;
       if(바뀜 && 받은[품목시트]){ 받은[품목시트] = 표만들기(품목칸, [].concat(...품목조각), 품목시트); if(고른===품목시트) document.getElementById('속').replaceChildren(받은[품목시트]); }
       대조(); BOM다시(); 연동칠();
@@ -1210,6 +1212,19 @@ const 계산시트 = {
       return { '': 줄 }; } },
   /* v2.74.0 사장님 「영림원품목등록 기타메뉴에 가공단가관리 메뉴를 두어 단가관련 입력부의 단가가 자동으로 입력되는 단서를 작성할 수 있게 해주고 이의 변동으로 해당 입력의 단가도 자동 변동되게 해주세요 --- 단가관리는 입력된 모든 공정이 기본적으로 나타납니다. 현재 필름소요량과 재단시 원장 소요량을 계산하는 논리를 해당 공정에 기본적으로 이곳에 보여지게 해주세요. 페이지상태를 보고 수정하겠습니다」
      줄 = 화면 품목(보일품목) 공정흐름의 공정 전부(나온 차례) · 저장 = _입력.값['#가공단가']['단가@공정'|'기준@공정'] · 단가 → 외주계약등록 외주단가 기본값(손 값 먼저) · 계산 논리 = 코드 식 그대로 글자로(엣지 = 필름셈 · 재단 = 재단셈/원장재단수량) */
+  /* v2.115.0 공통반자재 — 묶음마다 품목명·품번(사람) · 묶인 반제품(지우면 풂) */
+  '공통반자재': { 화:'설정',
+    탭:{ '':{ 칸:['공통반자재 품목명','공통반자재 품번','묶인 반제품','제품'], 필:['공통반자재 품목명','공통반자재 품번'] } },
+    짜(){ if(!품목칸 || !품목원.length || 품목원.some(x => !x)) return null;
+      const I = k => 품목칸.indexOf(k), pi = I('품번'), ni = I('품명'), mi = I('모품목(상위 품번)'), 원줄 = [].concat(...품목원);
+      return { '': 공통묶음들().map(g => { const 들 = 원줄.filter(z => g.줄.includes(String(z.v[pi] ?? '').trim()));
+        const 모 = [...new Set(들.map(z => String(z.v[mi] ?? '').trim()))], 명들 = [...new Set(들.map(z => String(z.v[ni] ?? '').trim()))];
+        const 번겹 = g.번 && 원줄.some(z => String(z.v[pi] ?? '').trim()===g.번 && !g.줄.includes(g.번));
+        const 번칸 = 글칸(공통자리, '번@' + g.id, '', '공통반자재 품번 — 묶인 줄 모두 이 품번', '공통반자재 품번');
+        if(번겹) Object.assign(번칸, { 꼭:1, 모:'같은 품번이 다른 품목에 있음 — ' + g.번 });
+        return [글칸(공통자리, '명@' + g.id, '', '공통반자재 품목명 — 묶인 줄 모두 이 품명', '공통반자재 품목명'), 번칸,
+          Object.assign(글칸(공통자리, '줄@' + g.id, '', '묶인 반제품 원래 품번(| 로 나눔) — 지우면 묶음 풂'), { t:'원래 품명 — ' + 명들.join(' · ') + ' · 지우면 묶음 풂' }),
+          { v:String(모.length), t:모.join(' · ') }]; }) }; } },
   '가공단가관리': { 화:'설정',
     탭:{ '':{ 칸:['공정','가공코드','단가','단가 기준','소요량 계산 논리'], 필:[] } },
     짜(){ const 품 = 보일품목(); if(!품) return null; const 공들 = [];
@@ -1552,7 +1567,62 @@ const 원값 = (p,k) => { const x = 열쇠(p,k); return 더럽.has(x) ? 더럽.g
 /* v2.96.0 동일속성 — 손 값이 빈 칸이면 같은 묶음 짝 반제품의 손 값(값이 하나일 때 · 여럿이면 가장 많은 값) */
 const 동일칸 = new Set(['보드두께','엣지두께','공정흐름','엣지W','엣지D','합판코드','필름코드','결보호']);   /* v2.98.1 사람이 넣는 속성 칸만 — 보링수량 뺌 · v2.111.0 결보호 더함 */
 let 동일묶음 = {}, 동일짝 = new Map();
+/* v2.115.0 공통반자재 — 저장 _입력 #공통 {줄@id: '원품번|…', 명@id, 번@id} */
+const 공통자리 = '#공통';
+function 공통묶음들(){
+  const 키 = new Set(Object.keys(입력[공통자리] || {})); for(const x of 더럽.keys()) if(x.startsWith(공통자리 + '\t')) 키.add(x.slice(공통자리.length + 1));
+  return [...키].filter(k => k.startsWith('줄@')).map(k => { const id = k.slice(2), 줄 = [...new Set(원값(공통자리, k).split('|').map(x => x.trim()).filter(Boolean))];
+    return { id, 줄, 명:원값(공통자리, '명@' + id).trim(), 번:원값(공통자리, '번@' + id).trim() }; }).filter(g => g.줄.length >= 2);
+}
+let 공통판 = '';
+function 공통적용(){
+  if(!품목칸) return 품목원.slice();
+  const ni = 품목칸.indexOf('품명'), pi = 품목칸.indexOf('품번'), ai = 품목칸.indexOf('품목자산분류'), m = new Map();
+  for(const g of 공통묶음들()) for(const q of g.줄) if(!m.has(q)) m.set(q, g);
+  return 품목원.map(z => z && z.map(r => { const q = String(r.v[pi] ?? '').trim(), g = String(r.v[ai] ?? '').trim()==='반제품' && m.get(q); if(!g) return r;
+    const v = r.v.slice(); if(g.명) v[ni] = g.명; if(g.번) v[pi] = g.번; return Object.assign({}, r, { v, 공원:q, 공묶:g.id }); }));
+}
+function 공통확인(){   /* 묶음·이름·번호가 바뀌면 품목 줄을 다시 셈 → 모든 탭 */
+  const 판 = JSON.stringify(공통묶음들()); if(판 === 공통판) return; 공통판 = 판;
+  if(!품목원.length || 품목원.some(x => !x)) return;
+  품목조각 = 공통적용(); try{ if(받은[품목시트]) 받은[품목시트] = 표만들기(품목칸, [].concat(...품목조각), 품목시트); if(고른===품목시트) document.getElementById('속').replaceChildren(받은[품목시트]); }catch(e){}
+  try{ 고른제품바뀜(); }catch(e){}
+}
+const 공통번묶 = p => 공통묶음들().find(g => g.번 && g.번 === p) || null;
+const 공통비교칸 = ['공정흐름','결보호','보링수량','보드두께','엣지두께','합판코드','필름코드','엣지W','엣지D'];
+function 공통다름(p, k){ const g = 공통번묶(p); if(!g) return null; const 들 = [...new Set(g.줄.map(q => 원값(q, k).trim()).filter(Boolean))]; return 들.length > 1 ? 들 : null; }
+function 공통후보(){   /* 같은 동일속성 묶음 · 다른 제품 · 합판코드 같음 · 규격 ±2mm — 아직 안 묶인 반제품 */
+  if(!품목칸) return new Map();
+  const I = k => 품목칸.indexOf(k), pi = I('품번'), ni = I('품명'), ai = I('품목자산분류'), mi = I('모품목(상위 품번)'), gi = I('규격'), 트 = (r, i) => String(r.v[i] ?? '').trim();
+  const 묶인 = new Set(공통묶음들().flatMap(g => g.줄)), 통 = new Map();
+  for(const r of [].concat(...품목원.filter(Boolean))){ if(트(r, ai)!=='반제품') continue; const q = 트(r, pi), 모 = 트(r, mi), 묶 = 동일묶음[모]; if(!q || !묶 || 묶인.has(q)) continue;
+    const 합 = 값(q, '합판코드').trim(), 크 = (트(r, gi).match(/(\d+(?:\.\d+)?)\s*\*\s*(\d+(?:\.\d+)?)/) || []).slice(1).map(Number); if(!합 || 크.length < 2) continue;
+    const 열 = 묶 + '\t' + 합; if(!통.has(열)) 통.set(열, []); 통.get(열).push({ q, 모, 명:트(r, ni), w:크[0], d:크[1], 묶, 합 }); }
+  const 결 = new Map();
+  for(const 들 of 통.values()){ const 위 = 들.map((_, i) => i), 뿌 = i => 위[i]===i ? i : (위[i] = 뿌(위[i]));
+    const 맞 = (a, b) => (Math.abs(a.w-b.w) <= 2 && Math.abs(a.d-b.d) <= 2) || (Math.abs(a.w-b.d) <= 2 && Math.abs(a.d-b.w) <= 2);
+    for(let i=0;i<들.length;i++) for(let j=i+1;j<들.length;j++) if(들[i].모 !== 들[j].모 && 맞(들[i], 들[j])) 위[뿌(i)] = 뿌(j);
+    const 무리 = new Map(); 들.forEach((x, i) => { const k = 뿌(i); if(!무리.has(k)) 무리.set(k, []); 무리.get(k).push(x); });
+    for(const 줄 of 무리.values()){ const 모들 = [...new Set(줄.map(x => x.모))]; if(모들.length < 2) continue;
+      const g = { id:줄[0].q, 줄:[...new Set(줄.map(x => x.q))], 모들, 묶:줄[0].묶, 합:줄[0].합, 규:줄.map(x => x.w + '*' + x.d) };
+      for(const x of 줄) 결.set(x.q, g); } }
+  return 결;
+}
+let 후보캐시 = null; const 후보들 = () => { if(!후보캐시){ 후보캐시 = 공통후보(); setTimeout(() => { 후보캐시 = null; }, 0); } return 후보캐시; };
+function 공통td(r, p, 반){
+  if(!반) return '<td class="막음" data-k="공통"></td>';
+  if(r.공묶){ const g = 공통묶음들().find(x => x.id===r.공묶); if(!g) return '<td></td>';
+    const 모 = [...new Set([].concat(...품목원.filter(Boolean)).filter(z => g.줄.includes(String(z.v[품목칸.indexOf('품번')] ?? '').trim())).map(z => String(z.v[품목칸.indexOf('모품목(상위 품번)')] ?? '').trim()))];
+    const 빈 = !g.명 || !g.번, 말 = `여러 제품에 중복되는 공통반자재 — 제품 ${모.length}: ${모.join(' · ')}` + (빈 ? ' · 꼭 채울 칸 — 공통반자재 품목명·품번 빈칸(입력설정 공통반자재)' : '');
+    return `<td class="공묶${빈 ? ' 꼭' : ''}" data-k="공통" title="${글(말)}">공통</td>`; }
+  const c = 후보들().get(p);
+  if(c) return `<td class="공후보" data-k="공통" data-후보="${글(c.id)}" title="${글(`공통반자재 후보 — 동일속성 「${c.묶}」 · 원장 ${c.합} · 규격 ${[...new Set(c.규)].join(' / ')} — 제품 ${c.모들.length}: ${c.모들.join(' · ')}`)}">묶기</td>`;
+  return '<td data-k="공통"></td>';
+}
+document.addEventListener('click', e => { const td = e.target.closest && e.target.closest('td.공후보[data-후보]'); if(!td) return;
+  const c = 공통후보().get(td.dataset.후보); if(!c) return; 바꿈([{ p:공통자리, k:'줄@' + c.id, v:c.줄.join('|') }]); });
 const 값 = (p,k) => { const v = 원값(p,k); if(v !== '') return v;
+  if(!k.startsWith('투입수량@')){ const g = 공통번묶(p); if(g){ const 들 = [...new Set(g.줄.map(q => 원값(q, k).trim()).filter(Boolean))]; if(들.length === 1) return 들[0]; if(들.length > 1) return ''; } }   /* v2.115.0 공통 번호 = 묶인 줄 손 값이 하나일 때 */
   if(k.startsWith('투입수량@')) return 시트투입(p, k.slice(5));   /* v2.100.0 품목등록test서버용 투입수량 */
   if(!동일칸.has(k)) return v; const d = 동일값(p,k); return d && d.v ? d.v : ''; };
 /* v2.100.0 품목등록test서버용 화면 = 창고 품목등록업로드 줄 그대로 → 그 반제품 줄(품번 + 모품목(상위 품번))의 「투입수량」 칸 값. 조각이 바뀌면 다시 셈 */
@@ -1626,6 +1696,7 @@ function 기본꼭칠(통 = 받은[품목시트]){
         else if(k==='보링수량' && 보) 왜 = '보링수량 — 흐름에 보링(외주계약 보링 단가)';
       } else if(k.startsWith('투입수량@')) 소본 = true;
       else if(k==='재단률'){ 재단률칠(td); return; }   /* v2.109.0 */
+      if(!왜 && td.classList.contains('편') && 공통비교칸.includes(k) && !원값(p, k).trim()){ const 다 = 공통다름(p, k); if(다) 왜 = '공통반자재 묶인 줄 값이 다름 — ' + 다.join(' · '); }   /* v2.115.0 */
       if(!왜 && 품목의존[k] && !td.classList.contains('편집중') && (td.classList.contains('편') || (k==='기본구매처' && td.textContent.trim()))
         && (k!=='보링수량' || (보 && !원값(p, k).trim()))){ const 못 = 품목의존[k].filter(x => !자료읽음[x]()); if(못.length) 왜 = 못읽음글(못); }   /* v2.114.0 */
       if(왜){ td.classList.add('꼭'); td.dataset.기꼭 = '1'; td.title = '꼭 채울 칸 — ' + 왜; }
@@ -2181,6 +2252,7 @@ function BOM모칠(){
   for(const z of 모줄){ const 없 = !s.has(z.명); z.td.classList.toggle('모없음', 없); z.td.title = 없 ? '품목등록업로드에 없음' : z.원; }
 }
 function 연동칠(){
+  공통확인();   /* v2.115.0 */
   BOM다시();   /* v2.18.0 BOM 자동 값 = 사람 입력값·재단률 셈을 따름 — 바뀌었을 때만 다시 만듦 */
   if(계산시트[고른]) 계산그리기(고른);   /* v2.24.0 · v2.26.0 */
   BOM모칠();   /* v2.12.0 */
@@ -2594,7 +2666,7 @@ function 표만들기(칸, 줄, 이름){
     칸.map((k,i) => { const 필 = 필수칸[이름]?.has(String(k).trim()), 영 = (품 && 영림원열.has(String(k).trim())) || 이름===BOM시트;   /* v2.39.0 · v2.44.0 BOM = 500302 30칸(11-23 대조 같음) */
       const t = [영?(품?'영림원 품목등록업로드(500259) 열':'영림원 BOM등록업로드(500302) 열'):'', 필?'영림원 필수':''].filter(Boolean).join(' · ');
       return `<th class="${(i===0?'dpr-k':'') + (필?' 필수':'') + (영?' 영열':'')}"${t?` title="${t}"`:''}>${글(k)}</th>`; }).join('') + '</tr></thead><tbody>'];
-  if(품) h[0] = h[0].replace('<thead><tr>', `<thead><tr><th class="단서 두께" title="영림원 칸 아님 — 합판코드 드롭 차례">보드두께</th><th class="단서 두께" title="영림원 칸 아님 — 필름코드 드롭 차례">엣지두께</th><th class="단서 보링" title="영림원 칸 아님 — 로앤 출고내역 보링규격">보링수량</th><th class="단서${공정못?' 공정못':''}" title="${글(공정못 ? '입력폼 공정흐름을 읽지 못함 — ' + 공정못 : '영림원 칸 아님 — BOM 연동용 · 목록 = 입력폼 공정흐름 완료')}">공정흐름</th><th class="단서 소요" title="영림원 칸 아님 — BOM 연동용">소요량</th>` + 엣지칸.map(e => `<th class="단서 엣지" title="영림원 칸 아님 — 공정흐름에 엣지가 있는 반제품만 · 0 · 1 · 2">${e}</th>`).join('') + '<th class="단서 결보호" title="영림원 칸 아님 — 재단률 셈(에이엠티 재단편집 기본규칙) · O · X">결보호</th>');   /* v2.110.0 품명 바로 앞 */   /* v2.40.1 엣지W·D = 품명 왼쪽(영림원 45열 한 덩어리) */   /* v2.19.0 소요량 덧칸 */   /* v2.6.0 품명 앞 덧칸 */
+  if(품) h[0] = h[0].replace('<thead><tr>', `<thead><tr><th class="단서 두께" title="영림원 칸 아님 — 합판코드 드롭 차례">보드두께</th><th class="단서 두께" title="영림원 칸 아님 — 필름코드 드롭 차례">엣지두께</th><th class="단서 보링" title="영림원 칸 아님 — 로앤 출고내역 보링규격">보링수량</th><th class="단서${공정못?' 공정못':''}" title="${글(공정못 ? '입력폼 공정흐름을 읽지 못함 — ' + 공정못 : '영림원 칸 아님 — BOM 연동용 · 목록 = 입력폼 공정흐름 완료')}">공정흐름</th><th class="단서 소요" title="영림원 칸 아님 — BOM 연동용">소요량</th>` + 엣지칸.map(e => `<th class="단서 엣지" title="영림원 칸 아님 — 공정흐름에 엣지가 있는 반제품만 · 0 · 1 · 2">${e}</th>`).join('') + '<th class="단서 결보호" title="영림원 칸 아님 — 재단률 셈(에이엠티 재단편집 기본규칙) · O · X">결보호</th><th class="단서" title="공통반자재 — 여러 제품에 같은 반제품(입력설정 공통반자재)">공통</th>');   /* v2.110.0 품명 바로 앞 */   /* v2.40.1 엣지W·D = 품명 왼쪽(영림원 45열 한 덩어리) */   /* v2.19.0 소요량 덧칸 */   /* v2.6.0 품명 앞 덧칸 */
   for(const r of 줄){
     const p = 품 ? (String(r.v[pi]??'').trim() || '#' + r.행) : '';
     let tr = 품 ? `<tr data-p="${글(p)}"${String(r.v[ai]??'').trim()==='제품'?' class="제품줄"':''}>` : '<tr>';   /* v2.107.0 */
@@ -2610,6 +2682,7 @@ function 표만들기(칸, 줄, 이름){
       tr += 반 ? `<td class="편 num 살구${파랑(p,k)?' 저장값':''}" data-k="${글(k)}" title="${살말}">${글(값(p,k))}</td>` : `<td class="막음" data-k="${글(k)}"></td>`; }   /* v2.64.0 살구 */
     if(품) for(const k of 엣지칸) tr += 엣지td(p, 반, k);
     if(품) tr += 반 ? `<td class="편 드롭칸${파랑(p,'결보호')?' 저장값':''}" data-k="결보호">${글(값(p,'결보호'))}</td>` : `<td class="막음" data-k="결보호" data-알림="제품 — 반제품만 입력됩니다"></td>`;   /* v2.110.0 */   /* v2.40.1 품명 왼쪽 */
+    if(품) tr += 공통td(r, p, 반);   /* v2.115.0 */
     for(let i=0;i<칸.length;i++){
       const ei = 편.indexOf(i);
       if(ei>=0){ let k = 편칸[ei];
