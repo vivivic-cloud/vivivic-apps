@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 재단 — 에이엠티 「재단 세부내역」(상세내역서 PDF, 월별)을 달마다 표로 본다.
      사장님 11-16: 「월별 재단내역이 목록으로 보이는 페이지를 만들어라.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.10.10
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.10.11
+     v1.10.11(11-25): 사장님 「메모는 그냥 메모한 자리만 유일하면 됩니다」 — 메모 = 입력한 그 줄 하나: 누계 = 누계제품·누계품목 {제품명⇥품목명}(누계 한 줄) · 월별 = 월제품·월품목 {달⇥그 달 문서 줄 번호⇥제품명}(재단은 합친 칸 첫 줄 번호) · v1.8.1~ 첫 줄만·회색 걷음 · 옛 이름 열쇠 메모 → 누계 그 줄로 옮김.
      v1.10.10(11-25): 정정 — 제품 메모 = 누계·월별 명세 모두 그 제품 첫 줄에만 입력 · 같은 제품 나머지 줄 = 빈 회색 잠김 칸(메모칸.js v3 잠김) · 품목 메모·저장(이름 열쇠) 그대로.
      v1.10.9(11-25): 사장님 누계 제품 메모가 그 제품의 모든 줄에 되풀이됨(「메모가 동일하게 복사 적용되나」) → 누계에서 제품 메모 칸 = 그 제품이 처음 나오는 줄 한 번만(나머지 줄은 빈 칸) · 품목 메모·저장(이름 열쇠)·월별 명세 그대로.
      v1.10.8(11-25): 사장님 「재단 세부내역에도 적용해 주세요」 — 누계 표 위 공용 단품찾기.js(로앤·이룸산업 v1.8.0 과 같음): 검색 칸 · n/전체 · ‹ › · Enter/Shift+Enter → 고른 단품 칸으로 이동·강조.
@@ -258,7 +259,7 @@ body.칸끄는중{cursor:col-resize;user-select:none;-webkit-user-select:none}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.10.10</div>
+  <div class="badge">v1.10.11</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html" class="on">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>재단 세부내역</h1>
@@ -270,7 +271,7 @@ body.칸끄는중{cursor:col-resize;user-select:none;-webkit-user-select:none}
 <!-- 짚어서 지시하는 손잡이 — 바이글 박스에서 열면 켜진다. -->
 <script src="../shared/viggle.js"></script>
 <script src="부속명통일.js?v=3"></script>   <!-- v1.10.0 품목명 분할·부속명 드롭 공용(이룸산업·로앤과 같은 코드) -->
-<script src="메모칸.js?v=3"></script>
+<script src="메모칸.js?v=4"></script>
 <script src="단품찾기.js?v=1"></script>   <!-- v1.10.8 누계 단품 찾기 -->   <!-- v1.10.0 메모 열 공용(재단·이룸산업·로앤) -->
 
 <script>
@@ -362,7 +363,6 @@ function 그리기(d){
   const 줄P = 이은값(pi), 줄M = 이은값(mi), 줄S = 이은값(si), 줄Q = 이은값(qi);
   let h = '<table class="dpr-t"><thead><tr>' +
     칸.map((k,i) => `<th class="${i===0?'dpr-k':''}${숫자칸.has(k)?' num':''}" data-k="${글(k)}">${글(메모열[k] ? '메모' : k)}<span class="칸끈"></span></th>`).join('') + '</tr></thead><tbody>';
-  const 본메모월 = new Set();   /* v1.10.10 제품 메모 = 첫 줄 한 번 */
   for(let n=0; n<줄.length; n++){
     const r = 줄[n];
     h += '<tr>';
@@ -373,8 +373,7 @@ function 그리기(d){
       남은[i] = span-1;
       const rs = span>1 ? ` rowspan="${span}"` : '';
       if(메모열[칸[i]]){ const z = 메모열[칸[i]][0];   /* v1.10.0 메모 */
-        if(z==='제품' && 줄P[n] && 본메모월.has(줄P[n])){ h += 메모.잠김(rs, '제품 메모 — 이 제품 첫 줄에'); continue; } if(z==='제품' && 줄P[n]) 본메모월.add(줄P[n]);
-        h += 메모.칸(z, z==='제품' ? 줄P[n] : (줄P[n] && 줄M[n] ? 줄P[n] + '\t' + 줄M[n] : ''), rs); continue; }
+        h += 메모.칸(z==='제품' ? '월제품' : '월품목', 줄P[n] ? d.달 + '\t' + n + '\t' + 줄P[n] : '', rs); continue; }   /* v1.10.11 그 줄(합친 칸 첫 줄) 하나 */
       const 이름 = i===pi ? String(값(r,i)??'').trim() : '';
       /* v1.10.0 그 제품명 칸이 덮는 줄들의 입고처 → 업체별 단품명 거래처(드롭 = 그 거래처 단품만) */
       const 업들 = 이름 ? [...new Set(줄업.slice(n, n+span).map(u => 업맞춤(u)).filter(Boolean).map(x => x.문서))] : [];
@@ -436,14 +435,13 @@ function 누계그리기(){
   const 줄들 = [...묶.values()].sort((a,b) => b.합-a.합 || a.p.localeCompare(b.p, 'ko') || a.품.localeCompare(b.품, 'ko'));
   const 총 = 줄들.reduce((a,g) => a + g.합, 0);
   let h = '<table class="dpr-t"><thead><tr><th class="dpr-k">제품명</th><th>메모</th><th>품목명</th><th>메모</th><th>사이즈</th><th>입고처</th><th>재단수량</th></tr></thead><tbody>';
-  const 본메모 = new Set();   /* v1.10.9 제품 메모 = 그 제품 첫 줄 한 번 */
   for(const g of 줄들){
     const 업들 = [...g.업.entries()], 없 = 업들.filter(([,x]) => !x).map(([원]) => 원);
     const 문서 = [...new Set(업들.filter(([,x]) => x).map(([,x]) => x.문서))];
     const 업글 = 업들.map(([원,x]) => x ? x.이름 : 원).join(' · ');
     const 업td = 없.length ? `<td class="업체없음" title="${글('업체별 단품명 거래처 없음 — 입고처 '+없.join(', '))}">${글(업글)}</td>`
                           : `<td title="${글('입고처 '+업들.map(([원]) => 원).join(', '))}">${글(업글)}</td>`;
-    h += `<tr><td class="dpr-k pc">${글(g.p)}${단품칸(g.p, 문서)}</td>${본메모.has(g.p) ? 메모.잠김('', '제품 메모 — 이 제품 첫 줄에') : (본메모.add(g.p), 메모.칸('제품', g.p))}${부통.품목칸(g.품)}${메모.칸('품목', g.p + '\t' + g.품)}${사이즈칸(g.사)}${업td}${부통.수량칸(g.품, g.합, 수글)}</tr>`;
+    h += `<tr><td class="dpr-k pc">${글(g.p)}${단품칸(g.p, 문서)}</td>${메모.칸('누계제품', g.p + '\t' + g.품)}${부통.품목칸(g.품)}${메모.칸('누계품목', g.p + '\t' + g.품)}${사이즈칸(g.사)}${업td}${부통.수량칸(g.품, g.합, 수글)}</tr>`;
   }
   h += '<tr class="합"><td class="dpr-k" colspan="6">총 합 계</td><td class="num">' + 수글(총) + '</td></tr>';
   h += '</tbody></table>';
