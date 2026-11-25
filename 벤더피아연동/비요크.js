@@ -223,7 +223,9 @@
     const res = await VP_DATA.받기(폼.action, { method: "POST", body: fd, credentials: "include", cache: "no-store" }, 급);
     if (!res.ok) throw new Error("HTTP " + res.status);
     const 원글 = await res.text();
-    const 업체 = (원글.match(/[?&]vendorCd=(\d+)/) || [])[1] || "";   // 줄 누름이 여는 주소에 쓰는 값 — 쪽 글에서 그때 읽음(코드에 안 박음)
+    /* [새 지시 비요크저장실패] vendorCd 는 응답 글에 숫자로 없다(11-25 잼 — 쪽 스크립트가 `'&vendorCd=' + vendorCd` 로 붙이고
+       vendorCd = getServerCookie('VP_Cookie','LOGON_EMP_VCD')). 벤더피아 쪽 함수 그대로 그때 꺼냄(코드에 안 박음). 옛 길은 뒤로. */
+    const 업체 = String((typeof window.getServerCookie === "function" && window.getServerCookie("VP_Cookie", "LOGON_EMP_VCD")) || (원글.match(/[?&]vendorCd=(\d+)/) || [])[1] || "").trim();
     const 글 = 원글.replace(/<script\b[\s\S]*?<\/script>/gi, "");
     const doc = new DOMParser().parseFromString(글, "text/html");
     if (doc.querySelector("input[type=password]")) throw new 탈("벤더피아 로그인이 끊겼습니다. 다시 로그인한 뒤 이 화면을 새로 열어 주세요.");
@@ -334,7 +336,8 @@
     const 맞은 = 받은.filter((x) => x.송장 === 이음.송장);
     if (맞은.length !== 1) throw new 탈("주문관리에서 송장번호 줄을 " + (맞은.length ? "여럿" : "못") + " 찾았습니다.");
     const 열기 = 맞은[0].열기;
-    if (Object.values(열기).some((v) => !v)) throw new 탈("주문 상세를 여는 값을 못 읽었습니다.");
+    const 빈값 = Object.entries(열기).filter(([, v]) => !v).map(([k]) => ({ orderNo: "주문번호", sCd: "매출처코드", sNm: "매출처", sGoodsCd: "상품코드", vendorCd: "업체코드" })[k] || k);
+    if (빈값.length) throw new 탈("주문 상세를 여는 값을 못 읽었습니다(빈 값: " + 빈값.join("·") + ").");
     const 주소 = "/System/Sales/orderDetl.aspx?" + new URLSearchParams(열기).toString();
     단계("주문 상세 여는 중");
     const { 틀, 첫, 실림 } = 틀열기(주소);

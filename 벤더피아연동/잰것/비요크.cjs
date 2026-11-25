@@ -75,7 +75,7 @@ function 주문관리응답(폼) {
   const th = 이름.map((h, i) => `<th class="igg_HeaderCaption"${보임(i) ? ' style="width: 40px;"' : ''}>${h}</th>`).join('');
   const 줄 = (송장, j) => '<tr>' + 이름.map((h, i) => `<td>${i === 0 ? '<input type="checkbox">' : i === 1 ? '77' + k + j : h === '주문번호' ? 번 : h === '상품명' ? '주문관리 협탁 ' + k : h === '수취인' ? '주문관리수취인' + k : h === '송장번호' ? 송장 : h === '매출처코드' ? '55' : h === '매출처' ? '가상몰' : h === '상품코드' ? 'GAZZA' + k : ''}</td>`).join('') + '</tr>';
   const 몸 = k === 0 || k === 1 ? 줄('9999', 0) + 줄('6000000000' + k, 1) : k === 2 ? 줄('5555', 0) : '';
-  return `<html><head><script>var 길 = "orderDetl.aspx?vendorCd=12&x=1";</script></head><body><form id="aspnetForm" action="./orderMst.aspx"></form><div id="oGrid"><table><tr>${th}</tr></table><table>${몸}</table></div><span>행수: ${k < 2 ? 2 : k === 2 ? 1 : 0}건</span></body></html>`;
+  return `<html><head><script>var vendorCd = getServerCookie('VP_Cookie', 'LOGON_EMP_VCD'); var 길 = "orderDetl.aspx?x=1&vendorCd=" + vendorCd;</script></head><body><form id="aspnetForm" action="./orderMst.aspx"></form><div id="oGrid"><table><tr>${th}</tr></table><table>${몸}</table></div><span>행수: ${k < 2 ? 2 : k === 2 ? 1 : 0}건</span></body></html>`;
 }
 
 /* 주문 상세 흉내(orderDetl.aspx) — 배송정보 dGrid 한 줄(송장·선불비) · 저장 = 그림 단추 전체 제출(cost 칸에 그리드 값이 실림) */
@@ -121,7 +121,7 @@ document.getElementById('btnSave').addEventListener('click', function (e) { if (
       }
       if (q.method() !== 'GET' || !/orderMst/i.test(u.pathname)) 보낸.push(q.method() + ' ' + u.pathname + (q.method() === 'POST' ? ' ' + 폼값(q) : ''));
       if (q.method() === 'POST' && /orderMst/i.test(u.pathname)) return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: 주문관리응답(폼값(q)) });
-      return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: '<html><body><form id="aspnetForm" action="./orderMst.aspx"><input type="image" id="btnSearch" name="ctl00$Contents$btnSearch"><input name="ctl00$Contents$tbSOrderNo" value=""><input name="ctl00$Contents$ddlRowCnt" value="50"><input name="ctl00$Contents$dcStartDt" value="2026-10-25"><input name="ctl00$Contents$dcEndDt" value="2026-11-25"></form></body></html>' });
+      return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: '<html><head><script>window.getServerCookie = function (c, k) { return c === "VP_Cookie" && k === "LOGON_EMP_VCD" ? (window.흉내업체 == null ? "12" : window.흉내업체) : ""; };</script></head><body><form id="aspnetForm" action="./orderMst.aspx"><input type="image" id="btnSearch" name="ctl00$Contents$btnSearch"><input name="ctl00$Contents$tbSOrderNo" value=""><input name="ctl00$Contents$ddlRowCnt" value="50"><input name="ctl00$Contents$dcStartDt" value="2026-10-25"><input name="ctl00$Contents$dcEndDt" value="2026-11-25"></form></body></html>' });
     });
     await p.goto('https://vendorpia.com/System/Sales/orderMst.aspx#vgByk');
     await p.addStyleTag({ content: fs.readFileSync(path.join(확장, 'login.css'), 'utf8') + fs.readFileSync(path.join(확장, 'search.css'), 'utf8') });
@@ -236,6 +236,20 @@ document.getElementById('btnSave').addEventListener('click', function (e) { if (
     색들 = (await 판읽기(p)).칠;
     재(색들[0] === 노랑 && 색들[1] === 연두, '실패한 줄은 연두 풀림(노랑) · 앞서 완료된 줄은 연두 그대로');
     상세.안먹음 = false;
+    /* [비요크저장실패] 업체코드(vendorCd)를 못 읽으면 = 빈 값 이름을 보이고 상세 안 엶 */
+    Object.assign(상세, { 값: { 7711: 15000 }, 보냄: [], 열림: [] });
+    await p.evaluate(() => { window.흉내업체 = ""; });
+    await 체크([1]);
+    p.once('dialog', (d) => d.accept());
+    await p.click('#vp-root .vp-선불저장');
+    await 저장끝();
+    const 빈값글 = (await 판읽기(p)).상태;
+    재(/빈 값: 업체코드/.test(빈값글) && !/주문번호|매출처코드|상품코드/.test(빈값글.replace(/.*빈 값:/, '')) && !상세.열림.length && !상세.보냄.length, '여는 값이 비면 = 어느 값이 비었는지 보임 · 상세 안 엶: ' + 빈값글);
+    await p.evaluate(() => { window.흉내업체 = null; });
+    p.once('dialog', (d) => d.accept());   // 업체코드가 돌아오면 같은 줄이 다시 저장됨(연두 되돌림 — 뒤 「다시 열기」 검사 그대로)
+    await p.click('#vp-root .vp-선불저장');
+    await 저장끝();
+    재(/저장됨\s*1/.test((await 판읽기(p)).상태) && 상세.보냄.length === 1, '값이 돌아오면 같은 줄 저장됨: ' + (await 판읽기(p)).상태);
     await 체크([]);
     재(판.메모 && 판.메모.includes('가짜 메모 3건/ 37000원') && 판.메모.includes('62000>25000'), '맨 위 메모 글 보임');
     재(/선불비\s*62,000/.test(판.셈) && /선불 수정\s*25,000/.test(판.셈), '셈 합: ' + 판.셈);
