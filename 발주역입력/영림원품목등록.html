@@ -2,7 +2,8 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.119.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.119.1
+     v2.119.1(11-26): 사장님 「입력 후 열 변동이 왜 생기냐고」 「입력 열의 순서 변동이 생기잖아. 그냥 가만히 있게 코드 수정하라고」 — ⓪ 업체별 단품명에 없는 제품 줄을 표 끝으로 옮기던 것(v2.5) 없앰 = 줄 차례 엑셀 그대로 · ① 공통반자재 품목명·품번을 넣으면 품목등록업로드 표를 새로 만들며 스크롤이 맨 위·왼쪽으로(공통확인 · 조각 받음) → 품목표다시 = 민 자리 그대로 ② 표를 새로 만들 때 열 너비가 글 길이 따라 줄고 늚 → 열마다 전 너비를 최소 너비로(품목등록업로드 · 계산 탭 새로 만들 때) ③ 공통반자재 탭 묶음 차례가 저장 뒤 바뀜(창고 맵 열쇠 차례) → 묶인 줄의 품목등록업로드 차례로 고정.
      v2.119.0(11-26): 사장님 「품목명 입력되면 열 변동 생기네 … 가만히 있어야 안 헷갈리지. 시키지 않은 짓거리 좀 하지 마라」 · 「칸 선택도 느리고, 엄한 곳에 복사되고, 입력감이 영 구리다」 — ① 빈 열 접기(v2.32 열접기 · 펼쳐보기 단추 · #속 MutationObserver) 없앰 = 열은 늘 그 자리 ② 느림 = 공통반자재 값 찾기(공통번묶 → 공통묶음들)가 값 하나 읽을 때마다 _입력 전체를 다시 훑음(칸 한 번 고침 = 공통묶음들 55만 번 · 보일품목 1,700번 · 약 20초) → 공통묶음들 · 보일품목 = 한 차례(같은 일 묶음) 안에서 한 번 셈(캐시, 입력이 바뀌면 비움).
      v2.118.2(11-26): 공통반자재 품목명을 넣으면 품명 꼬리(부속명 _도어L 등)가 사라져 공정흐름 자동·보링 부속명이 끊기던 것 → 꼬리는 원래 품명(r.원명)에서.
      v2.118.1(11-26): 공통반자재 품목명을 넣으면 동일속성 짝(부속명 = 품명 마지막 _ 뒤)이 끊겨 합판코드·결보호 등이 비던 것 → 동일짝셈 = 원래 줄(품목원) 품명·품번 · 공통 품번 값 = 묶인 줄의 손 값 또는 동일속성 받은 값.
@@ -481,7 +482,7 @@ body:not(.펼침) .dpr-t .접힘{display:none}   /* v2.32.0 빈 열 접힘 — �
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.119.0</div>
+  <div class="badge">v2.119.1</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <div class="머리줄"><h1>영림원품목등록</h1><div id="설정" class="탭단추" hidden><div class="설정이름">입력설정</div><div class="기타줄"></div></div></div>
@@ -601,7 +602,7 @@ function 대조구독(){
       const 바뀜 = 품목조각.every(x => x);
       품목원[k] = s.exists() ? (s.data().줄||[]) : []; 캐시비움(); 품목조각 = 공통적용();   /* v2.115.0 공통반자재 = 이름·번호 바꿔 셈 */
       if(!품목조각.every(x => x)) return;
-      if(바뀜 && 받은[품목시트]){ 받은[품목시트] = 표만들기(품목칸, [].concat(...품목조각), 품목시트); if(고른===품목시트) document.getElementById('속').replaceChildren(받은[품목시트]); }
+      if(바뀜 && 받은[품목시트]) 품목표다시();   /* v2.119.1 */
       대조(); BOM다시(); 연동칠();
     }, () => {}));
   }, () => {});
@@ -1390,7 +1391,9 @@ function 계산그리기(u){
   }
   for(const r of 칸들) h += '<tr>' + r.map(d => d.숨 ? '' : `<td${d.rs > 1 ? ` rowspan="${d.rs}"` : ''}${d.cls?` class="${d.cls}"`:''}${d.말?` title="${글(d.말)}"`:''}${d.k?` data-p="${글(d.p)}" data-k="${글(d.k)}"`:''}>${글(d.v)}</td>`).join('') + '</tr>';
   h += '</tbody></table>';
+  const 옛너 = 옛통 && 계산자리===자 ? 너비읽기(옛통) : null;   /* v2.119.1 */
   속.innerHTML = 단추 + (줄.length ? `<div class="표통" data-계산="1">${h}</div>` : '<div class="state"><div class="big">줄 없음</div></div>');
+  if(옛너) 너비지킴(속.querySelector('.표통'), 옛너);
   계산자리 = 자;
   const 통 = 속.querySelector('.표통'); if(통 && 옛자리){ 통.scrollLeft = 옛자리[0]; 통.scrollTop = 옛자리[1]; }
   const 새표 = 통 && 통.querySelector('table');
@@ -1601,8 +1604,18 @@ function 공통묶음들(){ if(공통캐시) return 공통캐시; 캐시예약()
 function 공통묶음셈(){
   const 키 = new Set(Object.keys(입력[공통자리] || {})); for(const x of 더럽.keys()) if(x.startsWith(공통자리 + '\t')) 키.add(x.slice(공통자리.length + 1));
   return [...키].filter(k => k.startsWith('줄@')).map(k => { const id = k.slice(2), 줄 = [...new Set(원값(공통자리, k).split('|').map(x => x.trim()).filter(Boolean))];
-    return { id, 줄, 명:원값(공통자리, '명@' + id).trim(), 번:원값(공통자리, '번@' + id).trim() }; }).filter(g => g.줄.length >= 2);
+    return { id, 줄, 명:원값(공통자리, '명@' + id).trim(), 번:원값(공통자리, '번@' + id).trim() }; }).filter(g => g.줄.length >= 2)
+    .sort((a, b) => 공통차례(a) - 공통차례(b) || (a.id < b.id ? -1 : 1));   /* v2.119.1 저장 뒤에도 같은 차례 */
 }
+function 공통차례(g){ if(!품목칸) return 0; const pi = 품목칸.indexOf('품번'); let i = 0; for(const z of 품목원){ for(const r of (z || [])){ if(g.줄.includes(String(r.v[pi] ?? '').trim())) return i; i++; } } return i; }
+/* v2.119.1 표를 새로 만들어도 열 너비·민 자리 그대로 */
+function 너비읽기(통){ const t = 통 && 통.isConnected && 통.querySelector && 통.querySelector('table'); if(!t || !t.tHead) return null; const 머 = t.tHead.rows[t.tHead.rows.length - 1];
+  return [...머.cells].map(c => [c.textContent, c.getBoundingClientRect().width]); }
+function 너비지킴(통, 너){ const t = 통 && 통.querySelector && 통.querySelector('table'); if(!너 || !t || !t.tHead) return; const 머 = t.tHead.rows[t.tHead.rows.length - 1];
+  [...머.cells].forEach((c, i) => { const x = 너[i]; if(x && x[0] === c.textContent && x[1] > 0) c.style.minWidth = Math.round(x[1]) + 'px'; }); }
+function 품목표다시(){ const 옛 = 받은[품목시트], 자리 = 옛 && 옛.isConnected ? [옛.scrollLeft, 옛.scrollTop] : null, 너 = 너비읽기(옛);
+  받은[품목시트] = 표만들기(품목칸, [].concat(...품목조각), 품목시트); 너비지킴(받은[품목시트], 너);
+  if(고른===품목시트){ document.getElementById('속').replaceChildren(받은[품목시트]); if(자리){ 받은[품목시트].scrollLeft = 자리[0]; 받은[품목시트].scrollTop = 자리[1]; } } }
 let 공통판 = '';
 function 공통적용(){
   if(!품목칸) return 품목원.slice();
@@ -1614,7 +1627,7 @@ function 공통적용(){
 function 공통확인(){   /* 묶음·이름·번호가 바뀌면 품목 줄을 다시 셈 → 모든 탭 */
   const 판 = JSON.stringify(공통묶음들()); if(판 === 공통판) return; 공통판 = 판;
   if(!품목원.length || 품목원.some(x => !x)) return;
-  캐시비움(); 품목조각 = 공통적용(); 캐시비움(); try{ if(받은[품목시트]) 받은[품목시트] = 표만들기(품목칸, [].concat(...품목조각), 품목시트); if(고른===품목시트) document.getElementById('속').replaceChildren(받은[품목시트]); }catch(e){}
+  캐시비움(); 품목조각 = 공통적용(); 캐시비움(); try{ if(받은[품목시트]) 품목표다시(); }catch(e){}   /* v2.119.1 민 자리·너비 그대로 */
   try{ 고른제품바뀜(); }catch(e){}
 }
 const 공통번묶 = p => 공통묶음들().find(g => g.번 && g.번 === p) || null;
@@ -2050,9 +2063,7 @@ function 품목다시(){
   const 열 = JSON.stringify([단품업체 ? [...단품업체] : null, [...거래처이름].sort()]);
   if(열===품목열쇠) return; 품목열쇠 = 열;
   if(!받은[품목시트] || !품목칸 || 품목조각.some(x => !x) || !품목조각.length) return;
-  const 옛 = 받은[품목시트], 자리 = [옛.scrollLeft, 옛.scrollTop];
-  받은[품목시트] = 표만들기(품목칸, [].concat(...품목조각), 품목시트);
-  if(고른===품목시트){ document.getElementById('속').replaceChildren(받은[품목시트]); 받은[품목시트].scrollLeft = 자리[0]; 받은[품목시트].scrollTop = 자리[1]; }
+  품목표다시();   /* v2.119.1 */
 }
 const 자재찾기 = c => 자재목록.합판.find(m => m.code===c) || 자재목록.필름.find(m => m.code===c) || null;
 
@@ -2686,7 +2697,7 @@ function 표만들기(칸, 줄, 이름){
     for(const r of 줄) if(String(r.v[ai]??'').trim()==='제품'){ const c = String(r.v[pi]??'').trim(); if(!단품업체.has(c)) 없음.add(c); }
     if(없음.size){ const 빠짐 = r => { const a = String(r.v[ai]??'').trim();
         return a==='제품' ? 없음.has(String(r.v[pi]??'').trim()) : a==='반제품' && 없음.has(String(r.v[mi0]??'').trim()); };
-      줄 = 줄.filter(r => !빠짐(r)).concat(줄.filter(빠짐)); }
+      /* v2.119.1 줄 차례 = 엑셀 차례 그대로(없는 제품 줄을 끝으로 옮기지 않음 — 빨간 글자 표시만) */ }
   }
   if(품){ const ni = 칸.indexOf('품명'); 공꼬리 = new Map();   /* v2.8.0 */
     if(ni>=0 && pi>=0) for(const r of 줄) if(String(r.v[ai]??'').trim()==='반제품'){ const p = String(r.v[pi]??'').trim(), n = String(r.원명 ?? r.v[ni]??'').trim(), j = n.lastIndexOf('_');   /* v2.118.2 공통반자재 = 원래 품명 꼬리 */
