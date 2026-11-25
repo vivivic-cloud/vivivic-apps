@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 로앤 — 로앤 「N월 보링 출고 총내역」(PDF 「26년 N월 총출고내역(로앤-보링)」, 월별)을 달마다 표로 본다.
      사장님 11-18: 「로앤도 해줘」(이룸산업 출고내역과 똑같이 — 월별 목록만, 기능 없음).
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.6.1
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.7.0
+     v1.7.0(11-25): 사장님 「세메뉴모두 제품명 우측옆에 메모 열 하나, 품목명 옆에 메모열 하나를 만들어 텍스트 입력이 가능하게 해주세요.」 — 공용 메모칸.js: 월별 명세·누계 제품명 오른쪽 「메모」(열쇠 = 제품명) · 품목명 오른쪽 「메모」(열쇠 = 제품명+품목명) · 저장 `발주역입력_로앤_메모/_전체`.
      v1.6.0(11-24): 사장님 「로앤출고내역의 품목명도 이룸산업의 그것과 동일하게 만들어줘」 — 공용 부속명통일.js: 누계 품목명 분할·부속명 드롭·수량 나눔 · 월별 명세 품목명·수량·보링 가공비 따라감 · 저장 발주역입력_로앤_품목명/_전체.
      v1.5.1(11-24): 쪽길에 「조혼가구부속명」 탭(업체별 단품명 다음)만 더함.
      v1.5.0(11-24): 사장님 「로앤출고내역 월별 명세에 품목의 부속명을 빼서 따로 보이도록 해주세요 이룸산업출고내역의 해당부분을 참고하세요」 — 이룸산업 v1.1.0 과 같게 품목 칸 바로 왼쪽 「품목명」 열(품목 글자의 첫 사이즈(숫자*숫자) 앞, 없으면 품목 그대로). 총 합 계 첫 칸은 저절로 한 칸 더 넓어짐.
@@ -171,7 +172,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.6.1</div>
+  <div class="badge">v1.7.0</div>
 </header>
 <nav class="쪽길"><a href="재단.html">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html" class="on">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>로앤 출고내역</h1>
@@ -183,6 +184,7 @@ html,body{height:100%;overflow:hidden}
 <!-- 짚어서 지시하는 손잡이 — 바이글 박스에서 열면 켜진다. -->
 <script src="../shared/viggle.js"></script>
 <script src="부속명통일.js?v=1"></script>   <!-- v1.6.0 품목명 분할·부속명 드롭 공용(이룸산업·조혼가구부속명과 같은 코드) -->
+<script src="메모칸.js?v=1"></script>   <!-- v1.7.0 메모 열 공용(재단·이룸산업·로앤) -->
 
 <script>
 const 창고자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_로앤'];
@@ -210,7 +212,8 @@ window.목록읽기 = async function(){
     document.getElementById('고름').innerHTML = 달들.map(d => `<button class="chip" data-m="${d}">${달글(d)}</button>`).join('') + '<button class="chip" data-m="누계">누계</button>';
     document.querySelectorAll('#고름 .chip').forEach(b => b.onclick = () => 달고름(b.dataset.m));
     업체단품.듣기(window.db, window.fbRead, () => { if(후보칸) 후보그리기(후보칸); });
-    부통.시작(window.db, window.fbRead);   /* v1.6.0 */
+    부통.시작(window.db, window.fbRead);
+    메모.시작(window.db, window.fbRead);   /* v1.7.0 */   /* v1.6.0 */
     달고름(decodeURIComponent(location.hash.slice(1)) === '누계' ? '누계' : 달들[달들.length-1]);
   }catch(e){ window.목록못읽음('창고를 읽지 못했습니다', (e&&(e.code||e.message))||''); }
 };
@@ -234,8 +237,9 @@ async function 달고름(m){
 }
 
 /* 한 양식 — 9달 PDF 칸을 합친 차례. 그 달 PDF 에 없는 칸(1~4월 PO NO.)은 제목만 두고 빈칸. 여기 없는 칸이 창고에 새로 오면 끝에 붙인다. */
-const 한양식 = ['출고일','PO NO.','출고업체명','제품명','품목명','품목','보링규격','수량','보링단가','보링 가공비'];
+const 한양식 = ['출고일','PO NO.','출고업체명','제품명','제품명 메모','품목명','품목명 메모','품목','보링규격','수량','보링단가','보링 가공비'];
 const 같은칸 = {};
+const 메모열 = { '제품명 메모':'제품', '품목명 메모':'품목' };   /* v1.7.0 메모 열(화면 머리 = 「메모」) */
 
 function 그리기(d){
   const 원칸 = d.칸 || [], 줄 = d.줄 || [], 합계 = d.합계 || [];
@@ -243,7 +247,7 @@ function 그리기(d){
   if(!줄.length){ 속.innerHTML = '<div class="state"><div class="big">줄 없음</div></div>'; return; }
   const 칸 = [...한양식, ...원칸.filter(x => !한양식.includes(같은칸[x]||x))];
   const 자리 = 칸.map(k => 원칸.findIndex(x => (같은칸[x]||x)===k));   /* -1 = 이 달 PDF 에 없는 칸 */
-  const 제목 = 칸.map((k,i) => 자리[i] < 0 ? k : 원칸[자리[i]]);
+  const 제목 = 칸.map((k,i) => 자리[i] < 0 ? (메모열[k] ? '메모' : k) : 원칸[자리[i]]);
   const 업자리 = 자리[칸.indexOf('출고업체명')] ?? -1;
   const 수i = 자리[칸.indexOf('수량')], 금i = 자리[칸.indexOf('보링 가공비')];
   const 품자리 = 원칸.indexOf('품목');   /* v1.5.0 「품목명」 = 이룸산업.html v1.1.0 과 같은 셈(화면에서, 창고에 없음) */
@@ -255,6 +259,7 @@ function 그리기(d){
     const 나수 = 품자리 >= 0 && 수i >= 0 ? 부통.나눈수(품목명(r.v[품자리]), 수(r.v[수i])) : null, n = 나수 ? 나수[0] + 나수[1] : null, 나눔 = 나수 ? 나수[0] : null;
     const 반칸 = (위, 아래, t) => `<td class="num"${t?` title="${글(t)}"`:''}><div class="반 위">${글(위)}</div><div class="반 아래">${글(아래)}</div></td>`;
     h += '<tr>' + 칸.map((k,i) => {
+      if(메모열[k]){ const 제 = String(r.v[원칸.indexOf('제품명')]??'').trim(); return k==='제품명 메모' ? 메모.칸('제품', 제) : 메모.칸('품목', 제 && 품자리 >= 0 ? 제 + '\t' + 품목명(r.v[품자리]) : ''); }   /* v1.7.0 메모 */
       if(나눔 != null && k==='수량') return 반칸(나눔.toLocaleString('ko-KR'), (n-나눔).toLocaleString('ko-KR'), '원래 ' + r.v[수i]);
       if(나눔 != null && k==='보링 가공비' && 금i >= 0 && 수(r.v[금i]) != null){ const 금 = 수(r.v[금i]), 위금 = Math.round(금 * 나눔 / n); return 반칸(위금.toLocaleString('ko-KR'), (금-위금).toLocaleString('ko-KR'), '원래 ' + r.v[금i]); }
       if(k==='품목명' && 품자리 >= 0) return 부통.월품목칸(품목명(r.v[품자리]));   /* v1.6.0 부속명 통일·분할 */
@@ -334,16 +339,16 @@ function 누계그리기(){
   const 금 = 누계숫자.findIndex(([k]) => k === '보링 가공비');
   const 줄들 = [...묶.values()].sort((a,b) => b.합[금]-a.합[금] || b.합[0]-a.합[0] || a.p.localeCompare(b.p, 'ko') || a.품.localeCompare(b.품, 'ko'));
   const 총 = 누계숫자.map((_,j) => 줄들.reduce((a,g) => a + g.합[j], 0));
-  let h = '<table class="dpr-t"><thead><tr><th class="dpr-k">제품명</th><th>품목명</th><th>사이즈</th><th>출고업체명</th><th>보링규격</th><th>' + 글(누계숫자[0][1]) + '</th><th>보링단가</th>' + 누계숫자.slice(1).map(([,t]) => `<th>${글(t)}</th>`).join('') + '</tr></thead><tbody>';
+  let h = '<table class="dpr-t"><thead><tr><th class="dpr-k">제품명</th><th>메모</th><th>품목명</th><th>메모</th><th>사이즈</th><th>출고업체명</th><th>보링규격</th><th>' + 글(누계숫자[0][1]) + '</th><th>보링단가</th>' + 누계숫자.slice(1).map(([,t]) => `<th>${글(t)}</th>`).join('') + '</tr></thead><tbody>';
   for(const g of 줄들){
     const 업들 = [...g.업.entries()], 없 = 업들.filter(([,x]) => !x).map(([원]) => 원);
     const 문서 = [...new Set(업들.filter(([,x]) => x).map(([,x]) => x.문서))];
     const 업글 = 업들.map(([원,x]) => x ? x.이름 : 원).join(' · ');
     const 업td = 없.length ? `<td class="업체없음" title="${글('업체별 단품명 거래처 없음 — 출고업체명 '+없.join(', '))}">${글(업글)}</td>`
                           : `<td title="${글('출고업체명 '+업들.map(([원]) => 원).join(', '))}">${글(업글)}</td>`;
-    h += `<tr><td class="dpr-k pc">${글(g.p)}${단품칸(g.p, 문서)}</td>${부통.품목칸(g.품)}${사이즈칸(g.사)}${업td}${명세칸(g.규)}${부통.수량칸(g.품, g.합[0], 수글)}${명세칸(g.단, 1)}` + g.합.slice(1).map(x => `<td class="num">${수글(x)}</td>`).join('') + '</tr>';
+    h += `<tr><td class="dpr-k pc">${글(g.p)}${단품칸(g.p, 문서)}</td>${메모.칸('제품', g.p)}${부통.품목칸(g.품)}${메모.칸('품목', g.p + '\t' + g.품)}${사이즈칸(g.사)}${업td}${명세칸(g.규)}${부통.수량칸(g.품, g.합[0], 수글)}${명세칸(g.단, 1)}` + g.합.slice(1).map(x => `<td class="num">${수글(x)}</td>`).join('') + '</tr>';
   }
-  h += '<tr class="합"><td class="dpr-k" colspan="5">총 합 계</td><td class="num">' + 수글(총[0]) + '</td><td></td>' + 총.slice(1).map(x => `<td class="num">${수글(x)}</td>`).join('') + '</tr>';
+  h += '<tr class="합"><td class="dpr-k" colspan="7">총 합 계</td><td class="num">' + 수글(총[0]) + '</td><td></td>' + 총.slice(1).map(x => `<td class="num">${수글(x)}</td>`).join('') + '</tr>';
   h += '</tbody></table>';
   const 속 = document.getElementById('속'), 옛 = 속.querySelector('.표통'), 자 = 옛 ? [옛.scrollLeft, 옛.scrollTop] : null;
   속.innerHTML = '<div class="표통">' + h + '</div>';
@@ -354,6 +359,7 @@ function 누계그리기(){
 /* v1.6.0 사장님 「로앤출고내역의 품목명도 이룸산업의 그것과 동일하게 만들어줘」 — 공용 부속명통일.js(이룸산업 v1.6.5 와 같은 코드): 누계 품목명 분할·부속명 드롭·수량 나눔 · 월별 명세 품목명·수량·보링 가공비 따라감.
    저장 = 창고 `발주역입력_로앤_품목명/_전체`(이룸과 따로, 같은 꼴) · 같은 품목명 = 모든 제품. 원본·PDF 그대로. */
 const 부통 = 부속통일.만들기({ 자리:['artifacts','vivivic-4b7ef','public','data','발주역입력_로앤_품목명'], 다시그림: () => 다시그림(), 띠: 말 => 띠(말) });
+const 메모 = 메모칸.만들기({ 자리:['artifacts','vivivic-4b7ef','public','data','발주역입력_로앤_메모'], 띠: 말 => 띠(말) });   /* v1.7.0 */
 function 다시그림(){
   if(고른==='누계'){ if(달들.every(m => 받은[m])) 누계그리기(); }
   else if(받은[고른]){ const 통 = document.querySelector('#속 .표통'), 자 = 통 ? [통.scrollLeft, 통.scrollTop] : null; 그리기(받은[고른]); const 새 = document.querySelector('#속 .표통'); if(새 && 자){ 새.scrollLeft = 자[0]; 새.scrollTop = 자[1]; } }
