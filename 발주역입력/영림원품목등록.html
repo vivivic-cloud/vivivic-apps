@@ -2,7 +2,8 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.96.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.97.0
+     v2.97.0(11-25): 사장님 BOM등록업로드 하위품명·하위품번이 비었는데 「등록가능」 → 「수정해주세요」 — BOM등록업로드 영림원 필수 칸 빈칸 = 빨강(전엔 주황) · 계산 탭도 영림원 필수 칸이 주황 빈칸이면 빨강(`필수빨강`, 화면·흐름 상태만 — 보내기 그대로) · 흐름 단추 「확인필요」 에 셈.
      v2.96.0(11-25): 사장님 「품목등록test서버용 체크앞에 동일속성을 설정 할 수 있게 해주세요 - 동일속성이란 같은 시리즈의 제품으로 동일속성이 된 그룹의 제품들은 원장,엣지필름, 보드두께,엣지두께,엣지W,엣지D,공정흐름,합판코드,필름코드 등이 품목등록업로드에서 자동으로 입력됩니다.」 — 창고 _동일속성(제품 → 묶음 이름) · 같은 묶음 제품들의 반제품끼리(짝 = 품명 마지막 「_」 뒤 부속명, 사이즈 숫자*숫자 빼고 · 빈칸 무시) 보드두께·엣지두께·공정흐름·엣지W·엣지D·합판코드(원장)·필름코드(엣지필름)·보링수량 값을 받음(손 값 먼저, 보라 · 짝 없음·값 다름 주황).
      v2.95.0(11-25): 사장님 「지금까지 확인된 입력흐름에 대해 정보를 정리하여 등록방법을 재정리하여 작성해 주세요」 — 「등록 방법」 1~12단계(번호 그대로)마다 앞 단계 조건 · 필수 칸 · 누를 순서 · 저장 뒤 확인 · 막힘(10-31~11-25 기록) · 탭 ↔ 단계 짝 · 설정 탭 · 확인 안 됨 11.
      v2.94.0(11-25): 사장님 「…제품명 앞에 체크표시를 두어 체크시 해당 제품에대한 반제품 등의 정보가 품목등록업로드에 나타나게 해주세요. 품목등록업로드에 매칭시 불필요한 자료는 임의로 참고 하지 않습니다.」 — 보이는 제품 = 새 쪽 「품목등록test서버용」 체크(창고 _고른제품, onSnapshot) · 문서 없으면 v2.16.0 한 제품 그대로.
@@ -434,7 +435,7 @@ body:not(.펼침) .dpr-t .접힘{display:none}   /* v2.32.0 빈 열 접힘 — �
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.96.0</div>
+  <div class="badge">v2.97.0</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <div class="머리줄"><h1>영림원품목등록</h1><div id="설정" class="탭단추" hidden><div class="설정이름">입력설정</div><div class="기타줄"></div></div></div>
@@ -1161,22 +1162,32 @@ function BOM모자말(행, k, r, 칸){
   if(k==='투입단위') return '품목등록업로드 그 반제품 기준단위';
   return '품목등록업로드에 값 없음';
 }
-function BOM빈칠(){   /* BOM등록업로드 표 — 필수 칸이 비면 주황 + 까닭(마우스) */
+function BOM빈칠(){   /* BOM등록업로드 표 — 필수 칸이 비면 빨강(v2.97.0, 전엔 주황) + 까닭(마우스) */
   const 통 = 받은[BOM시트], t = 시트들.find(x => x.이름===BOM시트); if(!통 || !통.querySelector || !t) return;
   const 칸 = t.칸||[], 필 = 필수칸[BOM시트];
   통.querySelectorAll('tbody tr').forEach(tr => { const 행 = tr.dataset.행; if(!행) return;
     칸.forEach((k, i) => { if(!필.has(k)) return; const td = tr.cells[i]; if(!td) return;
       const 빈 = td.textContent.trim()==='';
-      if(빈){ td.classList.add('모자람'); td.title = BOM모자말(행, k, { v:[...tr.cells].map(c => c.textContent) }, 칸); }
-      else if(td.classList.contains('모자람')){ td.classList.remove('모자람'); td.removeAttribute('title'); } });
+      if(빈){ td.classList.remove('모자람'); td.classList.add('꼭'); td.dataset.빈꼭 = '1'; td.title = BOM모자말(행, k, { v:[...tr.cells].map(c => c.textContent) }, 칸); }   /* v2.97.0 영림원 필수 빈칸 = 빨강(흐름 「확인필요」 에 셈) */
+      else if(td.dataset.빈꼭){ td.classList.remove('꼭', '모자람'); delete td.dataset.빈꼭; td.removeAttribute('title'); } });
     const hi = 칸.indexOf('하위유무'), td = hi<0 ? null : tr.cells[hi];   /* v2.45.0 조립 줄 하위유무 = 꼭(T 시험: 제품 BOM 은 올린 뒤 표에서 켬 — 11-03) */
     if(td){ const v = td.textContent.trim(), bi = 칸.indexOf('하위품번'), s = bi<0 ? '' : tr.cells[bi].textContent.trim();   /* v2.68.0 자동값 — 빨강 걷음 */
       td.classList.remove('꼭', '모자람');
       if(v) td.title = '자동 — 하위품번 ' + s + (v==='1' ? ' 이 이 BOM 모품목에 있음(하위 BOM 있음)' : ' 이 이 BOM 모품목에 없음(자재)'); } });
 }
 let 계산탭 = {}, 계산자리 = null;
+/* v2.97.0 영림원 필수 칸(머리 빨강)이 비고 주황(모)뿐이면 빨강(꼭)으로 — 화면·흐름 상태만(보내기는 d.짜() 그대로).
+   뺌: 영림원이 채우는 칸(영) · 외주계약 외주거래처를 입력폼 워크센터 목록 없이(로그인 없음) 못 셀 때(v2.86 그대로) · 「더하기」 빈 줄(모 없음). */
+function 필수빨강(u, 짠){
+  const d = 계산시트[u]; if(!d || !짠) return 짠;
+  for(const t of Object.keys(d.탭)){ const 열 = d.탭[t], 칸 = (d.머리||[]).concat(열.칸), 필 = new Set((d.머리필||[]).concat(열.필));
+    for(const r of 짠[t] || []) r.forEach((c, i) => { if(!c || typeof c!=='object' || !필.has(칸[i]) || c.꼭 || c.영 || !c.모 || String(c.v ?? '').trim()) return;
+      if(u==='외주계약등록' && 칸[i]==='외주거래처' && !워크센터읽음) return;
+      c.꼭 = 1; }); }
+  return 짠;
+}
 function 계산그리기(u){
-  const 속 = document.getElementById('속'), d = 계산시트[u], 짠 = d.짜();
+  const 속 = document.getElementById('속'), d = 계산시트[u], 짠 = 필수빨강(u, d.짜());   /* v2.97.0 */
   if(!짠){ 속.innerHTML = '<div class="state"><div class="big">읽는 중입니다…</div></div>'; return; }
   const 탭들 = Object.keys(d.탭); if(!탭들.includes(계산탭[u])) 계산탭[u] = 탭들[0];
   const t = 계산탭[u], 열 = d.탭[t], 칸 = (d.머리||[]).concat(열.칸), 필 = new Set((d.머리필||[]).concat(열.필)), 자 = u + '\t' + t;
@@ -2396,10 +2407,10 @@ let 흐름틀 = 0;
 function 흐름상태예약(){ clearTimeout(흐름틀); 흐름틀 = setTimeout(흐름상태, 300); }
 function 흐름센(u){
   const d = 계산시트[u];
-  if(d){ let 짠 = null; try{ 짠 = d.짜(); }catch(e){ return null; } if(!짠) return null;
+  if(d){ let 짠 = null; try{ 짠 = 필수빨강(u, d.짜()); }catch(e){ return null; } if(!짠) return null;   /* v2.97.0 */
     let n = 0; for(const k in 짠) for(const 줄 of 짠[k] || []) for(const c of 줄 || []) if(c && typeof c==='object' && (c.꼭 || c.밖)) n++;
     return n; }
-  if(u===BOM시트 && !받은[u] && 받은[품목시트] && 품목조각.length && 품목조각.every(x => x)){ const t = 시트들.find(x => x.이름===u); if(t){ try{ 받은[u] = 표만들기(t.칸||[], [], u); }catch(e){} return null; } }
+  if(u===BOM시트 && !받은[u] && 받은[품목시트] && 품목조각.length && 품목조각.every(x => x)){ const t = 시트들.find(x => x.이름===u); if(t){ try{ 받은[u] = 표만들기(t.칸||[], [], u); BOM빈칠(); }catch(e){} return null; } }
   const 통 = 받은[u]; if(!통 || !통.querySelectorAll) return null;
   return 통.querySelectorAll('td.꼭, td.목록밖').length;
 }
