@@ -208,6 +208,9 @@ document.getElementById('btnSave').addEventListener('click', function (e) { if (
     재(상세.값[7711] === 5000, '흉내 벤더피아 선불비 = 5000');
     재(await p.evaluate(() => [...document.querySelectorAll('#vp-root tbody tr')].map((tr) => tr.querySelector('input.vp-줄고름').checked).join()) === 'false,false,true,false,false', '저장된 줄은 체크 풀림(뺀 줄은 그대로)');
     재(!(await p.evaluate(() => document.querySelectorAll('iframe').length)), '숨은 틀 지움');
+    const 연두 = 'rgb(221, 243, 192)';
+    let 색들 = (await 판읽기(p)).칠;
+    재(색들[0] === 연두 && 색들[1] === 연두 && 색들[2] !== 연두 && (await 판읽기(p)).칠첫칸[1] === 연두, '완료 확인된 줄(저장됨·이미 같음) = 연두 · 고름 칸까지 · 뺀 줄은 아님: ' + 색들.slice(0, 3).join(' / '));
     /* 실패하면 멈춤: 줄0 = 9000 인데 저장이 안 먹음 → 줄1 은 안 함 */
     Object.assign(상세, { 값: { 7701: 9000, 7711: 15000 }, 안먹음: true, 보냄: [], 열림: [] });
     await 체크([0, 1]);
@@ -218,6 +221,8 @@ document.getElementById('btnSave').addEventListener('click', function (e) { if (
     const 멈춘글 = (await 판읽기(p)).알림;
     재(/실패\s*1/.test(셈글) && /1번째 줄/.test(멈춘글) && /9,000/.test(멈춘글) && /멈췄/.test(멈춘글), '저장 뒤 값이 그대로면 실패 · 까닭 · 멈춤: ' + 멈춘글);
     재(상세.보냄.length === 1 && 상세.열림.every((x) => x === '7701'), '실패한 뒤 줄(줄1)은 안 열고 안 보냄');
+    색들 = (await 판읽기(p)).칠;
+    재(색들[0] === 노랑 && 색들[1] === 연두, '실패한 줄은 연두 풀림(노랑) · 앞서 완료된 줄은 연두 그대로');
     상세.안먹음 = false;
     await 체크([]);
     재(판.메모 && 판.메모.includes('가짜 메모 3건/ 37000원') && 판.메모.includes('62000>25000'), '맨 위 메모 글 보임');
@@ -237,7 +242,7 @@ document.getElementById('btnSave').addEventListener('click', function (e) { if (
     await p2.waitForFunction(() => !/확인/.test(document.querySelector('#vp-root .vp-비요크셈').textContent), null, { timeout: 15000 }).catch(() => {});
     const 판2b = await 판읽기(p2);
     const 물은2 = 보낸2.filter((x) => x.startsWith('POST'));
-    재(판2b.줄 === 5 && 판2b.칠.filter((c) => c === 'rgb(255, 243, 191)').length === 2 && /연결\s*2/.test(판2b.셈) && 판2.메모.includes('가짜 메모'), '다시 열어도 그대로(줄 5·노랑 2·메모)');
+    재(판2b.줄 === 5 && 판2b.칠[0] === 'rgb(255, 243, 191)' && 판2b.칠[1] === 'rgb(221, 243, 192)' && /연결\s*2/.test(판2b.셈) && 판2.메모.includes('가짜 메모'), '다시 열어도 그대로(줄 5·노랑 1·연두 1(완료 기억)·메모): ' + 판2b.칠.slice(0, 2).join(' / '));
     재(물은2.length === 2 && !물은2.some((x) => /900000000[01] /.test(x)), '다시 열 때 = 기억한 이음은 안 묻고 못 이은 줄만 2번: ' + 물은2.length);
     await p2.click('#vp-root .vp-지우기');
     const 판3 = await 판읽기(p2);

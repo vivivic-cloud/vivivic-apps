@@ -21,7 +21,10 @@
      ② 숨은 틀(sandbox, 화면 밖)에 사람이 줄을 누를 때 여는 `orderDetl.aspx?orderNo&sCd&sNm&sGoodsCd&vendorCd`(이 다섯이 있어야 내용이 찬다 — 잼)
      ③ 「배송정보」 그리드 `dGrid` 에서 송장번호(invoiceNo) 같은 줄의 선불비(deliveryCost) — 이미 그 금액이면 안 누름(같음)
      ④ `set_value(금액)` → 위 「저장」(`btnSave`, 쪽 검사 `isFieldValid` 뒤 전체 제출) → 틀이 다시 뜨면 그 줄 선불비가 금액인지 읽어 확인
-     ⑤ 하나라도 어긋나면 **거기서 멈춤**(뒤 줄 안 함). 알림 창은 가로채 까닭에 붙임. */
+     ⑤ 하나라도 어긋나면 **거기서 멈춤**(뒤 줄 안 함). 알림 창은 가로채 까닭에 붙임.
+   11-25 [새 지시 비요크완료색] 사장님(그대로): 「완료됨이 확인되면 연두색줄로 변경되게 해주세요」
+   → ⑤ 에서 벤더피아 선불비 = 「선불 수정」 이 확인된 줄(저장됨·이미 같음) = 연두 줄(search.css `tr.vp-완료줄`). 파일 기억에 `완료:{줄번호:금액}` 로 같이 둬
+     다시 열어도 연두(이음이 그대로이고 「선불 수정」 값이 그 금액일 때만). */
 (() => {
   if (window.__vp비요크돌았나) return;
   window.__vp비요크돌았나 = true;
@@ -141,12 +144,13 @@
       + (선불 >= 0 ? 칸("선불비", 돈(합(선불))) : "") + (수정 >= 0 ? 칸("선불 수정", 돈(합(수정))) : "");
   }
   function 기억하기(자료) {
-    try { localStorage.setItem(열쇠, JSON.stringify({ 파일: 자료.파일, 때: 자료.때, 머리: 자료.머리, 메모: 자료.메모, 줄: 자료.줄, 이음: 자료.이음 || {} })); }
+    try { localStorage.setItem(열쇠, JSON.stringify({ 파일: 자료.파일, 때: 자료.때, 머리: 자료.머리, 메모: 자료.메모, 줄: 자료.줄, 이음: 자료.이음 || {}, 완료: 자료.완료 || {} })); }
     catch (e) { window.VP말?.(앞줄 + "기억 못 함"); }
   }
   async function 그리기(자료) {
     지금 = 자료;
     자료.이음 = 자료.이음 || {};
+    자료.완료 = 자료.완료 || {};
     파일글.textContent = 자료.파일 + (자료.때 ? " · " + new Date(자료.때).toLocaleString("ko-KR") : "");
     지우기단추.hidden = false;
     저장단추.hidden = false;
@@ -160,6 +164,12 @@
     const 송 = 자료.머리.indexOf("송장번호");
     for (const [k, v] of Object.entries(자료.이음)) {
       if (!v || 송장맞춤(자료.줄[k] && 자료.줄[k][송]) !== v.송장 || !window.VP비요크표.잇기(Number(k), v)) delete 자료.이음[k];
+    }
+    /* 완료(벤더피아 선불비 = 선불 수정 확인) — 이음이 남아 있고 선불 수정 값이 그대로인 줄만 연두 */
+    const 수정칸 = 자료.머리.findIndex((h) => h.replace(/\s/g, "") === "선불수정");
+    for (const [k, 금액] of Object.entries(자료.완료)) {
+      if (자료.이음[k] && 수정칸 >= 0 && 수(자료.줄[k][수정칸]) === 금액) 완료칠하기(Number(k));
+      else delete 자료.완료[k];
     }
     셈그리기(자료);
     window.VP말?.(앞줄 + "줄" + 자료.줄.length + " 기억연결" + Object.keys(자료.이음).length);
@@ -261,6 +271,10 @@
     window.VP말?.(앞줄 + "잇기 물음" + 물음 + " 새연결" + 새로 + " 연결" + Object.keys(자료.이음).length + " " + ((performance.now() - t0) / 1000).toFixed(1) + "초 시작" + (시작 ? "있음" : "기본"));
   }
 
+  function 완료칠하기(k) {
+    const tr = (r.querySelector(".vp-table table.vp-촘촘 tbody") || { rows: [] }).rows[k];
+    if (tr) tr.classList.add("vp-완료줄");
+  }
   /* ── [새 지시 비요크선불저장] 체크된 이은 줄의 선불비를 「선불 수정」 값으로 벤더피아에 저장 (쓰기 예외 다섯 번째) ── */
   const 쉼 = (ms) => new Promise((ok) => setTimeout(ok, ms));
   function 틀열기(주소) {
@@ -355,12 +369,14 @@
         try {
           const 답 = await 선불비저장한줄(자료.이음[k], 금액, 시작);
           if (답.결과 === "같음") 자료.저장셈.같음++; else 자료.저장셈.됨++;
+          자료.완료[k] = 금액;
           const 이음 = { ...자료.이음[k], 상품명: 답.새줄.상품명 || 자료.이음[k].상품명, 줄: 답.새줄.줄, 머리: 답.새줄.머리 };
-          자료.이음[k] = 이음; window.VP비요크표.잇기(k, 이음);
+          자료.이음[k] = 이음; window.VP비요크표.잇기(k, 이음); 완료칠하기(k);
           if (tr) { const c = tr.querySelector("input.vp-줄고름"); if (c) { c.checked = false; c.dispatchEvent(new Event("change")); } }
           셈그리기(자료);
         } catch (e) {
           자료.저장셈.실패++; 셈그리기(자료);
+          delete 자료.완료[k]; if (tr) tr.classList.remove("vp-완료줄");   // 확인 못 한 줄은 연두 아님
           알림.textContent = (k + 1) + "번째 줄: " + (e instanceof 탈 ? e.message : "저장하지 못했습니다.") + " 여기서 멈췄습니다.";
           window.VP말?.(앞줄 + "저장 탈 " + (k + 1) + "줄 " + (e && e.message ? e.message : e));
           if (tr) tr.scrollIntoView({ block: "center" });
