@@ -79,7 +79,7 @@ function 주문관리응답(폼) {
 }
 
 /* 주문 상세 흉내(orderDetl.aspx) — 배송정보 dGrid 한 줄(송장·선불비) · 저장 = 그림 단추 전체 제출(cost 칸에 그리드 값이 실림) */
-const 상세 = { 값: {}, 안먹음: false, 보냄: [], 열림: [] };
+const 상세 = { 값: {}, 안먹음: false, 보냄: [], 열림: [], 늦음: 0, 막음: false, 끼어듦: [] };
 function 상세쪽(주소) {
   const q = new URL(주소).searchParams, 번 = q.get('orderNo'), k = 번.slice(2, 3);
   const 값 = 상세.값[번] == null ? 15000 : 상세.값[번];
@@ -87,7 +87,8 @@ function 상세쪽(주소) {
 <script>document.forms[0].action = location.href; var 값 = ${값}, 송 = '6000000000${k}';
 window.$find = function (id) { if (id !== 'dGrid') return null; return { get_rows: function () { return { get_length: function () { return 1; }, get_row: function () { return { get_cellByColumnKey: function (c) {
   return c === 'invoiceNo' ? { get_value: function () { return 송; } } : { get_value: function () { return 값; }, set_value: function (v) { 값 = v; document.getElementById('cost').value = v; } }; } }; } }; } }; };
-document.getElementById('btnSave').addEventListener('click', function (e) { if (!document.getElementById('cost').value) { e.preventDefault(); alert('빈 값'); } });</script></body></html>`;
+document.getElementById('btnSave').addEventListener('click', function (e) { getGridInfo(); });
+document.getElementById('btnSave').addEventListener('click', function (e) { if (!document.getElementById('cost').value || ${상세.막음}) { e.preventDefault(); alert(${상세.막음} ? '막음 시험' : '빈 값'); } });</script></body></html>`;
 }
 
 (async () => {
@@ -97,7 +98,7 @@ document.getElementById('btnSave').addEventListener('click', function (e) { if (
   async function 쪽열기(ctx) {
     const p = await ctx.newPage();
     const 보낸 = [], 쪽오류 = [], 밖 = [];
-    p.on('pageerror', (e) => 쪽오류.push(String(e)));
+    p.on('pageerror', (e) => { if (!/getGridInfo/.test(String(e))) 쪽오류.push(String(e)); });   // getGridInfo 없음 = 진짜 벤더피아 상세 쪽 글 오류를 흉내에 그대로 둠
     await p.route('**/*', async (r) => {
       const q = r.request(), u = new URL(q.url());
       if (u.hostname === 'vivivic-cloud.github.io') {
@@ -116,10 +117,12 @@ document.getElementById('btnSave').addEventListener('click', function (e) { if (
           const 값 = new URLSearchParams(q.postData() || '').get('cost');
           상세.보냄.push(번 + '=' + 값 + ' ' + ['sCd', 'sNm', 'sGoodsCd', 'vendorCd'].map((x) => u.searchParams.get(x)).join(','));
           if (!상세.안먹음) 상세.값[번] = Number(값);
+          if (상세.늦음) await new Promise((ok) => setTimeout(ok, 상세.늦음));
         } else 상세.열림.push(번);
         return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: 상세쪽(q.url()) });
       }
       if (q.method() !== 'GET' || !/orderMst/i.test(u.pathname)) 보낸.push(q.method() + ' ' + u.pathname + (q.method() === 'POST' ? ' ' + 폼값(q) : ''));
+      if (상세.사이) 상세.끼어듦.push(q.method() + ' ' + u.pathname);
       if (q.method() === 'POST' && /orderMst/i.test(u.pathname)) return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: 주문관리응답(폼값(q)) });
       return r.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: '<html><head><script>window.getServerCookie = function (c, k) { return c === "VP_Cookie" && k === "LOGON_EMP_VCD" ? (window.흉내업체 == null ? "12" : window.흉내업체) : ""; };</script></head><body><form id="aspnetForm" action="./orderMst.aspx"><input type="image" id="btnSearch" name="ctl00$Contents$btnSearch"><input name="ctl00$Contents$tbSOrderNo" value=""><input name="ctl00$Contents$ddlRowCnt" value="50"><input name="ctl00$Contents$dcStartDt" value="2026-10-25"><input name="ctl00$Contents$dcEndDt" value="2026-11-25"></form></body></html>' });
     });
@@ -246,6 +249,32 @@ document.getElementById('btnSave').addEventListener('click', function (e) { if (
     const 빈값글 = (await 판읽기(p)).상태;
     재(/빈 값: 업체코드/.test(빈값글) && !/주문번호|매출처코드|상품코드/.test(빈값글.replace(/.*빈 값:/, '')) && !상세.열림.length && !상세.보냄.length, '여는 값이 비면 = 어느 값이 비었는지 보임 · 상세 안 엶: ' + 빈값글);
     await p.evaluate(() => { window.흉내업체 = null; });
+    /* [비요크저장안됨] 답이 4초보다 늦어도(6초) 기다려 저장됨 · 그동안 「…초」 보임 · 우리 다른 요청은 안 끼어듦 */
+    Object.assign(상세, { 값: { 7711: 15000 }, 보냄: [], 열림: [], 늦음: 6000, 끼어듦: [] });
+    await 체크([1]);
+    const 늦은상태 = [];
+    const 엿보기2 = setInterval(() => p.evaluate(() => document.querySelector('#vp-root .vp-비요크상태').textContent).then((x) => 늦은상태.push(x)).catch(() => {}), 200);
+    p.once('dialog', (d) => d.accept());
+    await p.click('#vp-root .vp-선불저장');
+    await p.waitForFunction(() => /저장 보냄/.test(document.querySelector('#vp-root .vp-비요크상태').textContent), null, { timeout: 10000 }).catch(() => {});
+    상세.사이 = true;
+    await p.evaluate(() => { window.__끼움 = VP_DATA.받기('/System/Sales/orderMst.aspx?끼움=1', { method: 'GET' }, '사람').then(() => Date.now()); });
+    await 저장끝();
+    상세.사이 = false;
+    clearInterval(엿보기2);
+    재(/저장됨\s*1/.test((await 판읽기(p)).상태) && 상세.값[7711] === 5000, '답 6초 = 기다려 저장됨: ' + (await 판읽기(p)).상태);
+    재(늦은상태.some((x) => /답 기다리는 중\s*[3-9]초/.test(x)), '기다리는 동안 초 보임: ' + [...new Set(늦은상태)].filter((x) => /초/.test(x)).slice(-1)[0]);
+    재(상세.끼어듦.length === 1 && 상세.열림.length === 2, '저장 하는 동안 우리 다른 요청은 기다림(끝난 뒤 1번) · 저장 뒤 상세 다시 엶: 끼어듦 ' + 상세.끼어듦.length + ' 열림 ' + 상세.열림.length);
+    /* 쪽 검사가 막으면 = 「저장을 보내지 않았습니다」 + 알림 · 보냄 0 · 멈춤 */
+    Object.assign(상세, { 값: { 7711: 15000 }, 보냄: [], 열림: [], 늦음: 0, 막음: true });
+    await 체크([1]);
+    p.once('dialog', (d) => d.accept());
+    await p.click('#vp-root .vp-선불저장');
+    await 저장끝();
+    const 막은글 = (await 판읽기(p)).상태;
+    재(/보내지 않았습니다/.test(막은글) && /막음 시험/.test(막은글) && !/getGridInfo/.test(막은글) && !상세.보냄.length, '쪽 검사가 막음 = 단계·알림 보임 · 제출 0: ' + 막은글);
+    상세.막음 = false;
+    Object.assign(상세, { 값: { 7711: 15000 }, 보냄: [], 열림: [] });
     p.once('dialog', (d) => d.accept());   // 업체코드가 돌아오면 같은 줄이 다시 저장됨(연두 되돌림 — 뒤 「다시 열기」 검사 그대로)
     await p.click('#vp-root .vp-선불저장');
     await 저장끝();

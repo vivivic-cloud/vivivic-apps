@@ -21,6 +21,7 @@
      ② 숨은 틀(sandbox, 화면 밖)에 사람이 줄을 누를 때 여는 `orderDetl.aspx?orderNo&sCd&sNm&sGoodsCd&vendorCd`(이 다섯이 있어야 내용이 찬다 — 잼)
      ③ 「배송정보」 그리드 `dGrid` 에서 송장번호(invoiceNo) 같은 줄의 선불비(deliveryCost) — 이미 그 금액이면 안 누름(같음)
      ④ `set_value(금액)` → 위 「저장」(`btnSave`, 쪽 검사 `isFieldValid` 뒤 전체 제출) → 틀이 다시 뜨면 그 줄 선불비가 금액인지 읽어 확인
+       [새 지시 비요크저장안됨] ②~④ 는 공용 줄을 잡고(`VP_DATA.잡기`) 한다 · 제출이 정말 나갔는지 봄 · 답은 60초까지 · 확인은 상세를 새로 열어서
      ⑤ 하나라도 어긋나면 **거기서 멈춤**(뒤 줄 안 함). 알림 창은 가로채 까닭에 붙임.
    11-25 [새 지시 비요크완료색] 사장님(그대로): 「완료됨이 확인되면 연두색줄로 변경되게 해주세요」
    → ⑤ 에서 벤더피아 선불비 = 「선불 수정」 이 확인된 줄(저장됨·이미 같음) = 연두 줄(search.css `tr.vp-완료줄`). 파일 기억에 `완료:{줄번호:금액}` 로 같이 둬
@@ -301,8 +302,8 @@
     틀.setAttribute("sandbox", "allow-same-origin allow-scripts allow-forms");   // allow-modals 없음 → 벤더피아 알림 창이 화면에 안 뜸
     틀.setAttribute("aria-hidden", "true");
     틀.style.cssText = "position:fixed;left:-3000px;top:0;width:1280px;height:900px;border:0;visibility:hidden";
-    const 실림 = () => new Promise((ok, 안됨) => {
-      const 끝 = setTimeout(() => 안됨(new 탈("주문 상세가 20초 안에 안 열렸습니다.")), 20000);
+    const 실림 = (ms = 20000) => new Promise((ok, 안됨) => {
+      const 끝 = setTimeout(() => 안됨(new 탈("주문 상세가 " + ms / 1000 + "초 안에 안 열렸습니다.")), ms);
       틀.addEventListener("load", () => { clearTimeout(끝); ok(); }, { once: true });
     });
     const 첫 = 실림();
@@ -339,30 +340,55 @@
     const 빈값 = Object.entries(열기).filter(([, v]) => !v).map(([k]) => ({ orderNo: "주문번호", sCd: "매출처코드", sNm: "매출처", sGoodsCd: "상품코드", vendorCd: "업체코드" })[k] || k);
     if (빈값.length) throw new 탈("주문 상세를 여는 값을 못 읽었습니다(빈 값: " + 빈값.join("·") + ").");
     const 주소 = "/System/Sales/orderDetl.aspx?" + new URLSearchParams(열기).toString();
+    /* [새 지시 비요크저장안됨] 숨은 틀이 하는 요청(상세 GET·저장 제출)은 공용 줄을 못 탄다 → 그동안 줄을 통째로 잡고(이 탭의 우리 요청 0)
+       다른 우리 탭의 뒤 요청도 쉬게 한다(VP원본쉼 15초). 벤더피아는 한 로그인 요청을 하나씩 처리해, 안 그러면 저장 제출이 우리 요청 뒤로 밀린다. */
+    window.VP원본쉼?.();
+    const 잡기 = (window.VP_DATA && window.VP_DATA.잡기) || ((일) => 일());
+    return 잡기(() => 상세저장(주소, 이음, 금액, 맞은[0], 단계));
+  }
+  async function 상세저장(주소, 이음, 금액, 새줄, 단계) {
     단계("주문 상세 여는 중");
     const { 틀, 첫, 실림 } = 틀열기(주소);
     try {
       await 첫;
       const 칸 = await 선불칸(틀, 이음.송장);
       const 전 = 수(칸.get_value());
-      if (전 === 금액) return { 결과: "같음", 새줄: 맞은[0] };
-      const w = 틀.contentWindow, 알림들 = [];
+      if (전 === 금액) return { 결과: "같음", 새줄 };
+      const w = 틀.contentWindow, 알림들 = [], 오류들 = [];
       w.alert = (m) => { 알림들.push(String(m)); };
       w.confirm = (m) => { 알림들.push(String(m)); return false; };   // 뜻밖의 확인 창이면 「아니오」 — 저장 안 됨으로 멈춘다
+      w.addEventListener("error", (e) => { 오류들.push(String(e.message || "")); });
+      /* 제출이 실제로 일어났는지 — window 거품(맨 끝)에서 본다. 쪽이 막았으면 defaultPrevented */
+      let 제출 = null;
+      w.addEventListener("submit", (e) => { 제출 = { 막힘: e.defaultPrevented }; });
       칸.set_value(금액);
-      if (수(칸.get_value()) !== 금액) throw new 탈("선불비 칸에 금액이 안 들어갔습니다.");
-      const 다시 = 실림();
+      if (수(칸.get_value()) !== 금액) throw new 탈("선불비 칸에 금액이 안 들어갔습니다(주문 상세 배송정보).");
+      const 다시 = 실림(60000);
       const 단추 = 틀.contentDocument.querySelector('input[name$="btnSave"]');
       if (!단추) throw new 탈("주문 상세의 저장 단추를 찾지 못했습니다.");
       window.VP말?.(앞줄 + "저장 누름");
       단계("저장 누름 · 벤더피아 답 기다리는 중");
       단추.click();
-      const 넘어감 = await Promise.race([다시.then(() => true), 쉼(4000).then(() => false)]);
-      if (!넘어감) throw new 탈("저장이 안 됐습니다" + (알림들.length ? " — 벤더피아 알림 「" + 알림들.join(" / ").slice(0, 80) + "」" : "") + ".");
-      단계("저장 확인 중");
+      await 쉼(0);
+      const 알림글 = () => (알림들.length ? " — 벤더피아 알림 「" + 알림들.join(" / ").slice(0, 80) + "」" : "");
+      if (!제출 || 제출.막힘) {
+        const 쪽오류 = 오류들.filter((x) => !/getGridInfo/.test(x));   // getGridInfo 없음 = 벤더피아 쪽 글 자체 오류(사람이 눌러도 남, 제출은 안 막음 — 11-25 잼)
+        throw new 탈("저장 단추를 눌렀지만 벤더피아가 저장을 보내지 않았습니다(쪽 검사에서 멈춤)" + 알림글() + (쪽오류.length ? " — 쪽 오류 「" + 쪽오류[0].slice(0, 60) + "」" : "") + ".");
+      }
+      const t0 = performance.now();
+      const 초셈 = setInterval(() => 단계("저장 보냄 · 벤더피아 답 기다리는 중 " + Math.round((performance.now() - t0) / 1000) + "초"), 1000);
+      try { await 다시; } catch (e) {
+        throw new 탈("저장을 보냈는데 60초 안에 벤더피아 답이 없습니다 — 저장됐는지 주문관리에서 선불비를 확인해 주세요.");
+      } finally { clearInterval(초셈); }
+      window.VP말?.(앞줄 + "저장 답 " + ((performance.now() - t0) / 1000).toFixed(1) + "초" + (알림들.length ? " 알림[" + 알림들.join(" / ").slice(0, 80) + "]" : ""));
+      /* 저장 답 쪽이 무엇이든(같은 쪽·목록·알림) 상세를 새로 열어 벤더피아에 실제로 들어간 값을 읽는다 */
+      단계("저장 확인 중 (주문 상세 다시 엶)");
+      const 확인 = 실림();
+      틀.src = 주소;
+      await 확인;
       const 후 = 수((await 선불칸(틀, 이음.송장)).get_value());
-      if (후 !== 금액) throw new 탈("저장 뒤 선불비가 " + 돈(후) + "원입니다(바라던 값 " + 돈(금액) + "원)" + (알림들.length ? " — 「" + 알림들.join(" / ").slice(0, 80) + "」" : "") + ".");
-      return { 결과: "됨", 새줄: 맞은[0] };
+      if (후 !== 금액) throw new 탈("저장을 보냈지만 다시 열어 보니 선불비가 " + 돈(후) + "원입니다(바라던 값 " + 돈(금액) + "원)" + 알림글() + ".");
+      return { 결과: "됨", 새줄 };
     } finally { 틀.remove(); }
   }
   let 저장중 = false;
