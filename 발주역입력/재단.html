@@ -1,7 +1,12 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 재단 — 에이엠티 「재단 세부내역」(상세내역서 PDF, 월별)을 달마다 표로 본다.
      사장님 11-16: 「월별 재단내역이 목록으로 보이는 페이지를 만들어라.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.9.10
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.10.2
+     v1.10.2(11-25): 쪽길 「영림원품목등록」 다음 탭 「품목등록test서버용」(새 쪽).
+     v1.10.1(11-25): 사장님 「재단세부내역,이룸산업출고내역,로앤출고내역,업체별단품명 을 에이엠티출고조사 라는 그룹으로 만들어 주세요」 — 쪽길 앞 「에이엠티출고조사」 묶음(재단 세부내역·이룸산업 출고내역·로앤 출고내역·업체별 단품명) · 나머지 탭 그 뒤.
+     v1.10.0(11-25): 사장님 「재단세부내역에 누계 만들어 주시고 부속명분할 / 제품명선택을 이룸산업 로앤출고내역의 구조와 동일하게 만들어 주세요. 현재 구조가 미세하게 달라보입니다. 또한 재단세부내역에 선택될 수 있는 단품명이 업체별단품명의 목록에서 불러오는지 여부를 확인하여 벤더피아연동에서 오는것이라면 이부분 로앤이룸출고와 동일하게 업체별단품명에서 제한하여 불러오는것으로 한정해 주세요. 세메뉴모두 제품명 우측옆에 메모 열 하나, 품목명 옆에 메모열 하나를 만들어 텍스트 입력이 가능하게 해주세요.」
+       — 달 단추 끝 「누계」(제품명+품목 묶음, 재단수량 합 큰 차례) · 품목 분할·부속명 드롭 = 공용 부속명통일.js(저장 `발주역입력_재단_품목명/_전체`, 같은 품목명 = 모든 제품) · 월별 품목·재단수량 = 누계 분할 따라감(보기만) · 이 쪽 옛 분할(제품명마다 `발주역입력_단품연결.분할`)은 안 씀 ·
+       단품 드롭 = 업체별 단품명(`업체단품목록.js`, 입고처 = 1~4월 출고예정일 괄호 · 5~9월 PO NO. 앞 글자) — 벤더피아 목록·실시간 뺌 · 메모 열 둘(공용 메모칸.js, `발주역입력_재단_메모/_전체`).
      v1.9.10(11-24): 쪽길에 「조혼가구부속명」 탭(업체별 단품명 다음)만 더함.
      v1.9.9(11-24): 사장님 「발주역입력에서 입력폼으로 돌아가는 길이 없습니다」 — 쪽길 끝에 「외주자료 입력폼」(../영림원외주입력/영림원외주입력.html, 입력폼 제목 글자 그대로) 탭.
      v1.9.8(11-23): 사장님 「이 앱은 앞으로 여러 사람이 계속 쓰게 될 앱인데, 이런 문제(옛 판 창이 공개 문서를 끝없이 덮어쓰기)는 발생 안 해야 되는 거 아닌가요?」 — 공용 ../shared/쓰기지킴.js 부름(모듈보다 먼저): 옛 판이면 저장 멈춤·배지 빨강 · 같은 문서 10초 50번 넘게 쓰면 멈춤·배지 주황 · 같은 내용 10초 안 다시 쓰기 건너뜀. 페이지 코드는 그대로.
@@ -66,21 +71,33 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>재단 — 발주역입력</title>
-<script src="벤더피아실시간.js?v=1.9.0"></script>
+<script src="업체단품목록.js?v=11-21"></script>
 <script src="../shared/쓰기지킴.js?v=11-23b"></script>   <!-- 쓰기 안전장치(옛 판·잦은 쓰기 멈춤) — 모듈보다 먼저 -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
     import { getFirestore, doc, getDoc, collection, getDocs, setDoc, deleteDoc, onSnapshot, deleteField } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
-    const app = initializeApp({
+    const 설정 = {
         apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
         authDomain: "vivivic-4b7ef.firebaseapp.com",
         projectId: "vivivic-4b7ef",
         storageBucket: "vivivic-4b7ef.firebasestorage.app",
         messagingSenderId: "830175660542",
         appId: "1:830175660542:web:9054030480c8280af8d8af"
-    });
+    };
+    const app = initializeApp(설정);
     const auth = getAuth(app);
+    /* v1.10.0 입력폼(앱 이름 'erp-input') 로그인을 같이 씀(이룸산업·로앤과 같은 길, 읽기만) — erp_items → 부속명 목록(부속명통일.js) */
+    try{
+        const 폼앱 = initializeApp(설정, 'erp-input'), 폼auth = getAuth(폼앱), 폼db = getFirestore(폼앱);
+        let 끄기 = null;
+        const 받음 = (줄, 왜) => { window.폼품목대기 = [줄, 왜]; if (window.폼품목받음) window.폼품목받음(줄, 왜); };
+        onAuthStateChanged(폼auth, (u) => {
+            if (끄기) { 끄기(); 끄기 = null; }
+            if (!u) { 받음(null, '입력폼 로그인 없음'); return; }
+            끄기 = onSnapshot(collection(폼db, 'erp_items'), s => 받음(s.docs.map(d => d.data()), ''), e => 받음(null, (e && (e.code || e.message)) || ''));
+        });
+    }catch(e){ window.폼품목대기 = [null, String(e && e.message || e)]; }
     window.db = getFirestore(app);
     window.fbRead = { doc, getDoc, collection, getDocs, setDoc, deleteDoc, onSnapshot, deleteField };
     onAuthStateChanged(auth, (u) => {
@@ -110,6 +127,8 @@ header{padding:16px 0 2px;display:flex;align-items:center;gap:10px;flex-wrap:wra
 .쪽길 a{white-space:nowrap;font-size:13px;font-weight:600;color:var(--vg-muted);text-decoration:none;padding:4px 0 7px;margin-bottom:-1px;border-bottom:2px solid transparent}
 .쪽길 a:hover{color:var(--vg-ink)}
 .쪽길 a.on{color:var(--vg-ink);font-weight:800;border-bottom-color:var(--vg-ink)}
+.쪽길 .묶음{display:flex;flex-wrap:wrap;column-gap:16px;align-items:flex-end;padding:0 10px;background:var(--vg-fill);border-radius:6px 6px 0 0}.쪽길 .묶음>b{align-self:center;font-size:11px;font-weight:800;color:var(--vg-ink);padding:4px 0 6px}   /* 11-25 에이엠티출고조사 묶음 */
+.쪽길 a.폼길{margin-left:auto;align-self:center;color:#fff;background:var(--vg-ink);border-radius:4px;padding:3px 10px;margin-bottom:3px;border-bottom:0}.쪽길 a.폼길:hover{color:#fff;opacity:.85}   /* 11-25 입력폼 가는 길 한눈에 */
 .쪽길+h1{padding-top:14px}
 h1{font-size:30px;line-height:1.1;letter-spacing:-1.2px;font-weight:700;color:var(--vg-ink);padding:4px 0 12px}
 .months{display:flex;flex-wrap:wrap;gap:6px}
@@ -212,6 +231,10 @@ body.칸끄는중{cursor:col-resize;user-select:none;-webkit-user-select:none}
   border:1px solid var(--vg-edge);border-radius:3px;background:var(--vg-bg);outline:none}
 .dpr-t td.qy input.수:focus{border-color:var(--vg-ink)}
 .dpr-t td.qy .단위{margin-left:-2px}
+/* v1.10.0 누계 — 로앤.html 과 같은 값 */
+.dpr-t tr.합 td{font-weight:800;color:var(--vg-ink);background:var(--vg-fill);border-top:1px solid #C7C7C3}
+.dpr-t tr.합 td.dpr-k{text-align:center}
+.dpr-t td.업체없음{background:#FFF1E0}
 .띠{position:fixed;top:0;left:0;right:0;z-index:60;background:var(--vg-red);color:#fff;font-size:12.5px;font-weight:600;padding:6px 16px;text-align:center}
 /* 폰은 16px 아래 글씨 칸을 누르면 화면이 커진다 — 검색 칸·수량 칸만 16px */
 @media (max-width:600px){.vk input{font-size:16px;height:26px} .dpr-t td.qy input.수{font-size:16px;height:24px;width:56px}}
@@ -226,9 +249,9 @@ body.칸끄는중{cursor:col-resize;user-select:none;-webkit-user-select:none}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.9.10</div>
+  <div class="badge">v1.10.2</div>
 </header>
-<nav class="쪽길"><a href="재단.html" class="on">재단 세부내역</a><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="../영림원외주입력/영림원외주입력.html">외주자료 입력폼</a></nav>
+<nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html" class="on">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>재단 세부내역</h1>
 <div class="months" id="고름"></div>
 <div class="state" id="목상태"><div class="big">창고를 읽는 중입니다…</div></div>
@@ -237,6 +260,8 @@ body.칸끄는중{cursor:col-resize;user-select:none;-webkit-user-select:none}
 
 <!-- 짚어서 지시하는 손잡이 — 바이글 박스에서 열면 켜진다. -->
 <script src="../shared/viggle.js"></script>
+<script src="부속명통일.js?v=1"></script>   <!-- v1.10.0 품목명 분할·부속명 드롭 공용(이룸산업·로앤과 같은 코드) -->
+<script src="메모칸.js?v=1"></script>   <!-- v1.10.0 메모 열 공용(재단·이룸산업·로앤) -->
 
 <script>
 const 창고자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_재단'];
@@ -262,15 +287,19 @@ window.목록읽기 = async function(){
     달들 = (목.exists() && 목.data().달들) || [];
     if(!달들.length){ 목상태('창고에 재단 세부내역이 없습니다'); return; }
     document.getElementById('목상태').style.display='none';
-    document.getElementById('고름').innerHTML = 달들.map(d => `<button class="chip" data-m="${d}">${달글(d)}</button>`).join('');
+    document.getElementById('고름').innerHTML = 달들.map(d => `<button class="chip" data-m="${d}">${달글(d)}</button>`).join('') + '<button class="chip" data-m="누계">누계</button>';
     document.querySelectorAll('#고름 .chip').forEach(b => b.onclick = () => 달고름(b.dataset.m));
-    달고름(달들[달들.length-1]);
+    업체단품.듣기(window.db, window.fbRead, () => { if(후보칸) 후보그리기(후보칸); });   /* v1.10.0 */
+    부통.시작(window.db, window.fbRead); 메모.시작(window.db, window.fbRead);   /* v1.10.0 */
+    달고름(decodeURIComponent(location.hash.slice(1)) === '누계' ? '누계' : 달들[달들.length-1]);
   }catch(e){ window.목록못읽음('창고를 읽지 못했습니다', (e&&(e.code||e.message))||''); }
 };
 
 async function 달고름(m){
   고른 = m;
   document.querySelectorAll('#고름 .chip').forEach(b => b.classList.toggle('on', b.dataset.m===m));
+  try{ history.replaceState(null, '', m === '누계' ? '#누계' : location.pathname + location.search); }catch(e){}
+  if(m === '누계'){ 누계고름(); return; }
   const 속 = document.getElementById('속');
   if(!받은[m]){
     속.innerHTML = '<div class="state"><div class="big">읽는 중입니다…</div></div>';
@@ -288,25 +317,38 @@ async function 달고름(m){
    9달 PDF 칸을 모두 합친 차례. 그 달 PDF 에 없는 칸은 제목만 두고 칸은 빈칸. 창고 값은 그대로(보이는 차례만 맞춤).
    5월 「출고예정일」 = 1~4월 「출고예정일(입고처)」 같은 칸(입고처 괄호만 빠짐). 6~9월 「출고일」 도 같은 칸(v1.3.1, 사장님 「한 칸으로 합치기」). 칸 제목은 두 이름을 이어 「출고예정일(입고처) / 출고일」.
    여기 없는 칸이 창고에 새로 오면 끝에 붙여 보인다(빠뜨리지 않게). */
-const 한양식 = ['재단일','제품명','품목','사이즈','재단수량','PO NO.','종류','색상','모델명','출고처','원장입고일','원장수량','재단금액','출고예정일(입고처) / 출고일','비고'];   /* v1.8.0 재단수량을 사이즈 옆으로 */
+const 한양식 = ['재단일','제품명','제품명 메모','품목','품목 메모','사이즈','재단수량','PO NO.','종류','색상','모델명','출고처','원장입고일','원장수량','재단금액','출고예정일(입고처) / 출고일','비고'];   /* v1.8.0 재단수량을 사이즈 옆으로 */
 const 같은칸 = { '출고예정일(입고처)':'출고예정일(입고처) / 출고일', '출고예정일':'출고예정일(입고처) / 출고일', '출고일':'출고예정일(입고처) / 출고일' };
 
-function 그리기(d){
+/* v1.10.0 메모 열(화면 머리 「메모」) — 칸 너비·묶음(rowspan)은 옆 칸(제품명·품목)을 따름 */
+const 메모열 = { '제품명 메모':['제품','제품명'], '품목 메모':['품목','품목'] };
+/* v1.10.0 입고처(업체별 단품명 거래처 단서) = 5~9월 PO NO. 의 첫 숫자 넷 앞 글자(아인2605… → 아인) · 없으면 1~4월 출고예정일(입고처) 괄호 안(1/28 (바른) → 바른) */
+const 입고처 = (po, 출) => { const a = String(po ?? '').match(/([가-힣A-Za-z]+)\d{4}/); if(a) return a[1]; const b = String(출 ?? '').match(/\(([^)]+)\)/); return b && b[1].trim() !== '입고처' ? b[1].trim() : ''; };   /* PDF 머리 글 「(입고처)」 는 뺌 */
+/* 한 달 문서 → 칸·자리·묶음 열쇠·이은 값(합친 칸이면 그 칸 값) — 그리기·누계 같이 씀 */
+function 달틀(d){
   const 원칸 = d.칸 || [], 줄 = d.줄 || [];
-  const 속 = document.getElementById('속');
-  if(!줄.length){ 속.innerHTML = '<div class="state"><div class="big">줄 없음</div></div>'; return; }
   const 칸 = [...한양식, ...원칸.filter(x => !한양식.includes(같은칸[x]||x))];
   const 자리 = 칸.map(k => 원칸.findIndex(x => (같은칸[x]||x)===k));   /* -1 = 이 달 PDF 에 없는 칸 */
   const 값 = (r,i) => 자리[i] < 0 ? '' : r.v[자리[i]];
-  const di = 칸.indexOf('재단일'), pi = 칸.indexOf('제품명'), mi = 칸.indexOf('품목'), si = 칸.indexOf('사이즈'), qi = 칸.indexOf('재단수량');
-  /* 칸마다 묶음 열쇠: 재단일은 값(이어진 같은 날), 나머지는 PDF 의 합친 칸 번호 g. 없는 칸은 줄마다 따로(빈칸) */
-  const 열쇠 = (r,i,n) => 자리[i] < 0 ? 'x:'+n : i===di ? 'd:'+값(r,i) : 'g:'+r.g[자리[i]];
+  const di = 칸.indexOf('재단일');
+  /* 칸마다 묶음 열쇠: 재단일은 값(이어진 같은 날), 나머지는 PDF 의 합친 칸 번호 g. 없는 칸은 줄마다 따로(빈칸) · 메모 열 = 옆 칸 열쇠 */
+  const 열쇠 = (r,i,n) => 메모열[칸[i]] ? 열쇠(r, 칸.indexOf(메모열[칸[i]][1]), n) : 자리[i] < 0 ? 'x:'+n : i===di ? 'd:'+값(r,i) : 'g:'+r.g[자리[i]];
+  const 이은값 = i => { const a = []; if(i < 0) return 줄.map(() => ''); for(let n=0;n<줄.length;n++) a[n] = (n>0 && 열쇠(줄[n],i,n)===열쇠(줄[n-1],i,n-1)) ? a[n-1] : String(값(줄[n],i)??'').trim(); return a; };
+  const 첫 = i => 줄.map((r,n) => !(n>0 && 열쇠(줄[n],i,n)===열쇠(줄[n-1],i,n-1)));
+  const I = k => 칸.indexOf(k);
+  const 줄업 = (() => { const po = 이은값(I('PO NO.')), 출 = 이은값(I('출고예정일(입고처) / 출고일')); return 줄.map((r,n) => 입고처(po[n], 출[n])); })();
+  return { 원칸, 줄, 칸, 자리, 값, 열쇠, 이은값, 첫, I, 줄업 };
+}
+function 그리기(d){
+  const 속 = document.getElementById('속');
+  if(!(d.줄 || []).length){ 속.innerHTML = '<div class="state"><div class="big">줄 없음</div></div>'; return; }
+  const { 줄, 칸, 값, 열쇠, 이은값, I, 줄업 } = 달틀(d);
+  const pi = I('제품명'), mi = I('품목'), si = I('사이즈'), qi = I('재단수량');
   const 남은 = 칸.map(()=>0);
-  /* v1.8.0 줄마다 제품명·품목·사이즈·재단수량(합친 칸이면 그 칸 값) — 품목 연결·분할 열쇠 */
-  const 이은값 = i => { const a = []; for(let n=0;n<줄.length;n++) a[n] = (n>0 && 열쇠(줄[n],i,n)===열쇠(줄[n-1],i,n-1)) ? a[n-1] : String(값(줄[n],i)??'').trim(); return a; };
+  /* v1.8.0 줄마다 제품명·품목·사이즈·재단수량(합친 칸이면 그 칸 값) — 품목 연결 열쇠 · v1.10.0 분할 = 품목명(부통) */
   const 줄P = 이은값(pi), 줄M = 이은값(mi), 줄S = 이은값(si), 줄Q = 이은값(qi);
   let h = '<table class="dpr-t"><thead><tr>' +
-    칸.map((k,i) => `<th class="${i===0?'dpr-k':''}${숫자칸.has(k)?' num':''}" data-k="${글(k)}">${글(k)}<span class="칸끈"></span></th>`).join('') + '</tr></thead><tbody>';
+    칸.map((k,i) => `<th class="${i===0?'dpr-k':''}${숫자칸.has(k)?' num':''}" data-k="${글(k)}">${글(메모열[k] ? '메모' : k)}<span class="칸끈"></span></th>`).join('') + '</tr></thead><tbody>';
   for(let n=0; n<줄.length; n++){
     const r = 줄[n];
     h += '<tr>';
@@ -315,21 +357,93 @@ function 그리기(d){
       let span = 1; const k = 열쇠(r,i,n);
       while(n+span < 줄.length && 열쇠(줄[n+span],i,n+span)===k) span++;
       남은[i] = span-1;
+      const rs = span>1 ? ` rowspan="${span}"` : '';
+      if(메모열[칸[i]]){ const z = 메모열[칸[i]][0];   /* v1.10.0 메모 */
+        h += 메모.칸(z, z==='제품' ? 줄P[n] : (줄P[n] && 줄M[n] ? 줄P[n] + '\t' + 줄M[n] : ''), rs); continue; }
       const 이름 = i===pi ? String(값(r,i)??'').trim() : '';
-      /* v1.8.0 품목(연결·분할) · 재단수량(분할) 칸 — 제품명이 있는 줄만 */
-      const 품 = (i===mi || i===qi) && 줄P[n] && 줄M[n] ? ` data-p="${글(줄P[n])}" data-m="${글(줄M[n])}" data-k="${글(줄M[n]+'\t'+줄S[n])}"` + (i===qi?` data-q="${글(줄Q[n])}"`:'') : '';
-      const cls = (i===0?'dpr-k':'') + (숫자칸.has(칸[i])?' num':'') + (이름?' pc':'') + (품?(i===mi?' pm':' qy'):'');
-      const 속글 = !품 ? 글(값(r,i)) : i===mi ? 품목속(줄P[n], 줄M[n], 줄M[n]+'\t'+줄S[n]) : 수량속(줄P[n], 줄M[n]+'\t'+줄S[n], 줄Q[n]);
-      h += `<td${cls.trim()?` class="${cls.trim()}"`:''}${span>1?` rowspan="${span}"`:''}${품}>${속글}${이름?단품칸(이름):''}</td>`;
+      /* v1.10.0 그 제품명 칸이 덮는 줄들의 입고처 → 업체별 단품명 거래처(드롭 = 그 거래처 단품만) */
+      const 업들 = 이름 ? [...new Set(줄업.slice(n, n+span).map(u => 업체단품.맞춤(u)).filter(Boolean).map(x => x.문서))] : [];
+      if(i===mi && 줄P[n] && 줄M[n]){   /* v1.8.0 품목 칸(연결) · v1.10.0 이름 = 누계 분할·부속명 */
+        h += `<td class="pm${i===0?' dpr-k':''}"${rs} data-p="${글(줄P[n])}" data-m="${글(줄M[n])}" data-k="${글(줄M[n]+'\t'+줄S[n])}">${품목속(줄P[n], 줄M[n], 줄M[n]+'\t'+줄S[n])}</td>`; continue; }
+      if(i===qi && 줄M[n]){ h += 수량td(줄Q[n], 줄M[n], rs); continue; }   /* v1.10.0 누계에서 나눈 품목명이면 위·아래 수(보기만) */
+      const cls = (i===0?'dpr-k':'') + (숫자칸.has(칸[i])?' num':'') + (이름?' pc':'');
+      h += `<td${cls.trim()?` class="${cls.trim()}"`:''}${rs}>${글(값(r,i))}${이름?단품칸(이름, 업들):''}</td>`;
     }
     h += '</tr>';
   }
   h += '</tbody></table>';
+  const 옛 = 속.querySelector('.표통'), 자 = 옛 && 옛.dataset.m === 고른 ? [옛.scrollLeft, 옛.scrollTop] : null;
   속.innerHTML = '<div class="표통">' + h + '</div>';
-  속.querySelector('.표통').addEventListener('scroll', () => { if(후보 && 후보칸) 후보자리(후보칸); });   /* 표를 밀면 후보 목록이 칸을 따라간다 */
+  후보닫기(); 부통.닫기();
+  const 통 = 속.querySelector('.표통'); 통.dataset.m = 고른; if(자){ 통.scrollLeft = 자[0]; 통.scrollTop = 자[1]; }
+  통.addEventListener('scroll', () => { if(후보 && 후보칸) 후보자리(후보칸); 부통.닫기(); });   /* 표를 밀면 후보 목록이 칸을 따라간다 */
   너비맞추기(속.querySelector('.dpr-t'));
   if(활성 && !단품있나(활성.p, 활성.코드)) 활성 = null;
   활성칠();
+}
+
+/* ════ v1.10.0 누계 — 이룸산업·로앤 출고내역과 같은 구조. 9달 재단 내역을 제품명(앞뒤 빈칸 뺀 글자) + 품목(= 품목명)마다 한 줄 — 둘 다 같아야 한 줄.
+   칸 = 제품명(단품칸 — 드롭 = 그 묶음 입고처들의 업체별 단품명) · 메모 · 품목명(분할·부속명 드롭, 부통) · 메모 · 사이즈(여럿이면 가장 많은 값, 마우스 = 모두) · 입고처(업체별 단품명 이름, 짝 없으면 원래 글자 주황) · 재단수량(합친 칸은 한 번만, 「N개·N매」 숫자만 더함, 분할이면 위·아래).
+   차례 = 재단수량 합 큰 순 → 제품명 → 품목명. 원장수량·재단금액은 원장 묶음 칸이라 품목마다 못 나눠 안 넣음. ════ */
+const 수글 = x => (Math.round(x*100)/100).toLocaleString('ko-KR', {maximumFractionDigits:2});
+async function 누계고름(){
+  const 속 = document.getElementById('속');
+  const 없음 = 달들.filter(m => !받은[m]);
+  if(없음.length){
+    속.innerHTML = '<div class="state"><div class="big">읽는 중입니다…</div></div>';
+    try{
+      const { doc, getDoc } = window.fbRead;
+      await Promise.all(없음.map(async m => { const s = await getDoc(doc(window.db, ...창고자리, m)); 받은[m] = s.exists() ? s.data() : { 칸:[], 줄:[] }; }));
+    }catch(e){ if(고른==='누계') 속.innerHTML = `<div class="state"><div class="big">창고를 읽지 못했습니다</div><div class="why">${글((e&&(e.code||e.message))||'')}</div></div>`; return; }
+  }
+  if(고른 !== '누계') return;
+  누계그리기();
+}
+function 사이즈칸(m){
+  const 들 = [...m.entries()].sort((a,b) => b[1]-a[1]);
+  if(!들.length) return '<td></td>';
+  return `<td${들.length>1?` title="${글(들.map(([v,n]) => v+' ×'+n).join('\n'))}"`:''}>${글(들[0][0])}</td>`;
+}
+function 누계그리기(){
+  const 묶 = new Map();
+  for(const m of 달들){
+    const d = 받은[m]; if(!d) continue;
+    const t = 달틀(d), P = t.이은값(t.I('제품명')), M = t.이은값(t.I('품목')), S = t.이은값(t.I('사이즈')), Q = t.이은값(t.I('재단수량')), Q첫 = t.첫(t.I('재단수량'));
+    t.줄.forEach((r, n) => {
+      const p = P[n]; if(!p) return;
+      const 품 = M[n], 열 = p + '\t' + 품;
+      let g = 묶.get(열); if(!g){ g = { p, 품, 사:new Map(), 업:new Map(), 합:0 }; 묶.set(열, g); }
+      if(S[n]) g.사.set(S[n], (g.사.get(S[n])||0) + 1);
+      const 원 = t.줄업[n]; if(원 && !g.업.has(원)) g.업.set(원, 업체단품.맞춤(원));
+      if(Q첫[n]){ const x = 수량수(Q[n]); if(x !== null) g.합 += x; }
+    });
+  }
+  const 줄들 = [...묶.values()].sort((a,b) => b.합-a.합 || a.p.localeCompare(b.p, 'ko') || a.품.localeCompare(b.품, 'ko'));
+  const 총 = 줄들.reduce((a,g) => a + g.합, 0);
+  let h = '<table class="dpr-t"><thead><tr><th class="dpr-k">제품명</th><th>메모</th><th>품목명</th><th>메모</th><th>사이즈</th><th>입고처</th><th>재단수량</th></tr></thead><tbody>';
+  for(const g of 줄들){
+    const 업들 = [...g.업.entries()], 없 = 업들.filter(([,x]) => !x).map(([원]) => 원);
+    const 문서 = [...new Set(업들.filter(([,x]) => x).map(([,x]) => x.문서))];
+    const 업글 = 업들.map(([원,x]) => x ? x.이름 : 원).join(' · ');
+    const 업td = 없.length ? `<td class="업체없음" title="${글('업체별 단품명 거래처 없음 — 입고처 '+없.join(', '))}">${글(업글)}</td>`
+                          : `<td title="${글('입고처 '+업들.map(([원]) => 원).join(', '))}">${글(업글)}</td>`;
+    h += `<tr><td class="dpr-k pc">${글(g.p)}${단품칸(g.p, 문서)}</td>${메모.칸('제품', g.p)}${부통.품목칸(g.품)}${메모.칸('품목', g.p + '\t' + g.품)}${사이즈칸(g.사)}${업td}${부통.수량칸(g.품, g.합, 수글)}</tr>`;
+  }
+  h += '<tr class="합"><td class="dpr-k" colspan="6">총 합 계</td><td class="num">' + 수글(총) + '</td></tr>';
+  h += '</tbody></table>';
+  const 속 = document.getElementById('속'), 옛 = 속.querySelector('.표통'), 자 = 옛 && 옛.dataset.m === '누계' ? [옛.scrollLeft, 옛.scrollTop] : null;
+  속.innerHTML = '<div class="표통">' + h + '</div>';
+  후보닫기(); 부통.닫기();
+  const 통 = 속.querySelector('.표통'); 통.dataset.m = '누계'; if(자){ 통.scrollLeft = 자[0]; 통.scrollTop = 자[1]; }
+  통.addEventListener('scroll', () => { if(후보 && 후보칸) 후보자리(후보칸); 부통.닫기(); });
+}
+/* v1.10.0 공용 부속명통일.js(이룸산업·로앤과 같은 코드) — 누계 품목명 분할·부속명 드롭·수량 나눔 · 월별 품목·재단수량 따라감. 저장 = `발주역입력_재단_품목명/_전체` · 같은 품목명 = 모든 제품 */
+const 부통 = 부속통일.만들기({ 자리:['artifacts','vivivic-4b7ef','public','data','발주역입력_재단_품목명'], 다시그림: () => 다시그림(), 띠: 말 => 띠(말) });
+const 메모 = 메모칸.만들기({ 자리:['artifacts','vivivic-4b7ef','public','data','발주역입력_재단_메모'], 띠: 말 => 띠(말) });
+function 다시그림(){
+  if(document.activeElement && document.activeElement.matches && document.activeElement.matches('input.메모')) return;
+  if(고른==='누계'){ if(달들.every(m => 받은[m])) 누계그리기(); }
+  else if(받은[고른]) 그리기(받은[고른]);
 }
 
 /* ════ 칸 너비 조절 (v1.4.0) ════
@@ -382,14 +496,14 @@ document.addEventListener('pointerdown', e => {
   끈.addEventListener('pointermove', 움); 끈.addEventListener('pointerup', 끝); 끈.addEventListener('pointercancel', 끝);
 });
 
-/* ════ 벤더피아 단품 연결 (v1.2.0) ════
+/* ════ v1.10.0 단품 목록 = 그 제품명 칸 입고처의 업체별 단품명 단품(`업체단품목록.js`, 이룸산업·로앤과 같음) — 아래 옛 설명의 벤더피아 목록(창고 `납품내역_단품목록`·확장 다리·실시간)은 뺌. 고른 것 저장(`발주역입력_단품연결`)은 그대로.
+   ════ 벤더피아 단품 연결 (v1.2.0) ════
    단품 목록 = 창고 `납품내역_단품목록` 의 `단품_N` 문서들, 칸 `줄` = ["단품코드\t단품명\t판매상태", …] (판매중 먼저).
      납품내역 제품목록이 쓰는 것과 같다(벤더피아 단품관리 엑셀을 그쪽 「단품 목록 올리기」 로 채움). 여기선 읽기만.
    고른 것 = 창고 `발주역입력_단품연결`, 문서 하나 = PDF 제품명 하나 {제품명, 단품코드, 단품명, 고른때}. 지우면 문서를 지운다.
      PDF 제품명 글자 그대로 붙는다 — 같은 글자면 어느 달이든 같은 연결. */
-const 단품자리 = ['artifacts','vivivic-4b7ef','public','data','납품내역_단품목록'];
 const 연결자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_단품연결'];
-let 연결 = {}, 단품들 = null, 단품받기 = null;
+let 연결 = {};
 const 문이름 = p => p.replace(/\//g,'／') || '_빈이름';   /* 문서 이름에 / 는 못 쓴다 */
 
 /* ════ v1.8.0 단품 여러 개 · 품목(부속) 연결 · 품목 분할 ════
@@ -469,55 +583,31 @@ function 띠(말){ const el = document.getElementById('띠'); if(!el) return; el
 /* 그 제품명의 칸들만 다시 그린다(표를 다시 그리지 않아 민 자리·열린 검색 칸이 그대로) */
 function 제품다시(p){
   document.querySelectorAll('#속 .vk').forEach(v => { if(v.dataset.p===p){ const dl = v.querySelector('.dl'); if(dl) dl.innerHTML = 단품줄(p); } });
-  document.querySelectorAll('#속 td.pm, #속 td.qy').forEach(td => {
-    const 친 = document.activeElement;
-    if(td.dataset.p!==p || (친 && 친.matches('input.수') && td.contains(친))) return;   /* 치는 중인 수량 칸은 그대로 */
-    td.innerHTML = td.classList.contains('pm') ? 품목속(p, td.dataset.m, td.dataset.k) : 수량속(p, td.dataset.k, td.dataset.q);
-  });
+  document.querySelectorAll('#속 td.pm[data-p]').forEach(td => { if(td.dataset.p===p) td.innerHTML = 품목속(p, td.dataset.m, td.dataset.k); });
   if(활성 && !단품있나(활성.p, 활성.코드)) 활성 = null;
   활성칠();
 }
-/* 품목 칸 속: 품목명 · 공통 숫자(단품 2개부터) · 「분할」. 나뉜 칸이면 위 품목명R(+합치기) / 아래 품목명L */
+/* 품목 칸 속(월별): 품목명 · 공통 숫자(단품 2개부터). v1.10.0 이름 = 누계에서 고른 부속명 · 나눈 품목명이면 위·아래(부속명 또는 나눈이름) — 분할은 누계에서(부통) */
 function 품목속(p, m, k){
-  const 수 = 연결된(p, k).length, 표 = 수 > 1 ? `<span class="ox">${동그라미(수)}</span>` : '';
-  if(연결[p] && 연결[p].분할[k]){ const [위이름, 아래이름] = 나눈이름(m);
-    return `<div class="반 위"><span class="pn">${글(위이름)}</span>${표}<button type="button" class="작 합" title="합치기">⋈</button></div><div class="반 아래"><span class="pn">${글(아래이름)}</span>${표}</div>`; }
-  return `<div class="품줄"><span class="pn">${글(m)}</span>${표}<button type="button" class="작 나눔">분할</button></div>`;
+  const 수 = 연결된(p, k).length, 표 = 수 > 1 ? `<span class="ox">${동그라미(수)}</span>` : '', v = 부통.값();
+  if(v.분할[m]){ const [위, 아래] = 부속통일.나눈이름(m);
+    return `<div class="반 위"><div class="품줄"><span class="pn">${글(v.부속[m+'\t위'] || 위)}</span>${표}</div></div><div class="반 아래"><div class="품줄"><span class="pn">${글(v.부속[m+'\t아래'] || 아래)}</span>${표}</div></div>`; }
+  return `<div class="품줄"><span class="pn">${글(v.부속[m] || m)}</span>${표}</div>`;
 }
-/* v1.8.4 사장님 「상지판 분할 시 상판/지판으로 분할되게 해주고, 수량 논리는 동일함.」 — 위 = 상판, 아래 = 지판. 그 밖 품목은 품목명R/품목명L. */
-/* v1.8.5 사장님 「상지판만 시켰잖아. 다른 건 그대로 두고 …」 — 정확히 「상지판」(앞뒤 빈칸 무시)만. 이름마다 사장님이 따로 시킨다 — 시킨 이름만 여기 더한다. */
-const 나눔이름표 = { '상지판':['상판','지판'] };
-function 나눈이름(m){
-  return 나눔이름표[String(m).trim()] || [m + 'R', m + 'L'];
-}
-/* 재단수량 칸 속: 나뉜 칸이면 위·아래 수량(고칠 수 있음) + 「3」 */
 /* v1.8.1 실제 재단수량은 「30개」「20매」 꼴 — 숫자 뒤 단위(개·매)를 떼어 수량으로 읽고, 단위는 나뉜 칸 숫자 뒤에 그대로 보인다. 「-」「₩ 110」 은 숫자 아님 */
 const 수량꼴 = q => { const m = String(q??'').replace(/[,\s]/g,'').match(/^(\d+)(개|매)?$/); return m ? {n:+m[1], 단위:m[2]||''} : null; };
 const 수량수 = q => { const x = 수량꼴(q); return x ? x.n : null; };
-function 위수(나, n){
-  switch(나 && 나.방식){
-    case '위3': return Math.ceil(n/3);              /* 위 = 1/3, 정수가 아니면 위를 늘림 */
-    case '아래3': return n - Math.floor(n/3);       /* 아래 = 1/3(내림), 나머지 위 */
-    case '직접': { if(!(나.원 > 0)) return Math.ceil(n/2);
-      const w = 나.원 === n ? 나.위 : Math.round(나.위 * n / 나.원);   /* 「임시」 원래 수량이 다른 줄은 같은 비율 */
-      return Math.max(0, Math.min(n, Math.round(w) || 0)); }
-    default: return Math.ceil(n/2);                 /* 반반, 홀수면 위가 1 많음 */
-  }
-}
-function 수량속(p, k, q){
-  const 나 = 연결[p] && 연결[p].분할[k];
-  if(!나) return 글(q);
-  const n = 수량수(q);
-  if(n === null) return `<div class="반 위">${글(q)}</div><div class="반 아래">&nbsp;</div>`;
-  const 위 = 위수(나, n), 단 = 수량꼴(q).단위 ? `<span class="단위">${글(수량꼴(q).단위)}</span>` : '';
-  return `<div class="반 위"><button type="button" class="작 셋" data-w="위">3</button><input class="수" type="text" inputmode="numeric" data-w="위" value="${위}">${단}</div>`
-       + `<div class="반 아래"><button type="button" class="작 셋" data-w="아래">3</button><input class="수" type="text" inputmode="numeric" data-w="아래" value="${n-위}">${단}</div>`;
+/* v1.10.0 재단수량(월별) — 누계에서 나눈 품목명이면 위수/나머지(이룸산업·로앤 월별 수량과 같은 셈, 보기만) */
+function 수량td(q, m, rs){
+  const x = 수량꼴(q), 나 = x ? 부통.나눈수(m, x.n) : null;
+  if(!나) return `<td class="num"${rs}>${글(q)}</td>`;
+  return `<td class="num"${rs} title="${글('원래 ' + q)}"><div class="반 위">${글(나[0] + x.단위)}</div><div class="반 아래">${글(나[1] + x.단위)}</div></td>`;
 }
 /* 연결 상태 — 단품명을 누르면 그 단품(활성). 그 제품명 줄의 품목을 누르면 연결/해제. 같은 단품명을 다시 누르거나 Esc = 끝 */
 let 활성 = null;
 function 활성칠(){
   document.querySelectorAll('#속 .vk .dn').forEach(b => b.classList.toggle('on', !!활성 && b.closest('.vk').dataset.p===활성.p && b.dataset.c===활성.코드));
-  document.querySelectorAll('#속 td.pm').forEach(td => {
+  document.querySelectorAll('#속 td.pm[data-p]').forEach(td => {
     const 고 = !!활성 && td.dataset.p===활성.p;
     td.classList.toggle('고름', 고);
     td.classList.toggle('이음', 고 && 연결된(td.dataset.p, td.dataset.k).includes(활성.코드));
@@ -539,107 +629,15 @@ function 단품빼기(p, 코드){
     if(!s.단품들.length) s.연결 = {};
   });
 }
-function 분할바꾸기(p, k, 나){ 바꾸기(p, s => { if(나) s.분할[k] = 나; else delete s.분할[k]; }); }
-/* ════ v1.6.0 벤더피아연동 단품관리 다리 ════
-   이 크롬에 벤더피아연동 확장(0.35.0~)이 있으면 확장의 `단품다리.js` 가 문서 뿌리에 `data-벤더피아단품` 을 단다.
-   그러면 단품 후보는 창고가 아니라 **확장의 단품관리 목록 그대로**: postMessage {__vp:"단품목록", 표, 다시} → {__vp:"단품목록답", 표, 답}.
-     답 = {로그인:true, 줄:[[단품코드, 단품명, 판매상태], …], 받은때} · {로그인:false} = 벤더피아 로그인 안 됨 · {로그인:null, 까닭} = 확인 못 함.
-     확장이 로그인 확인(벤더피아 /index.aspx 조회) → 단품관리 화면과 같은 저장(오늘 받은 것) → 없으면 벤더피아에 새로 묻는다(몇 초~수십 초).
-   받은 목록은 이 쪽 메모리에만 — 창고·바깥에 쓰지 않는다(고른 연결 `발주역입력_단품연결` 만 여태처럼 창고에).
-   다리가 없으면(폰·확장 없는 PC·확장 옛 판) 창고 `납품내역_단품목록` 사본으로 찾고 목록 위에 「임시 목록」 이라고 적는다(「임시」). */
-let 단품출처 = '', 단품말 = null, 단품받은때 = null;
-const 벤더피아로그인주소 = 'https://vendorpia.com/';
-const 단품관리주소 = 'https://vendorpia.com/System/Master/goods.aspx';   /* v1.6.1 벤더피아연동 단품관리 화면(확장이 이 주소에서 단품관리를 그린다) */
-let 단품관리열었나 = false;
-const 다리있나 = async () => { for(let i=0;i<15;i++){ if(document.documentElement.hasAttribute('data-벤더피아단품')) return true; await new Promise(r=>setTimeout(r,100)); } return false; };
-function 확장묻기(다시){
-  return new Promise(풀 => {
-    const 표 = Math.random().toString(36).slice(2);
-    const 받 = e => { if(e.source!==window || !e.data || e.data.__vp!=='단품목록답' || e.data.표!==표) return; 끝(e.data.답 || {}); };
-    const 시 = setTimeout(() => 끝({로그인:null, 까닭:'벤더피아연동 답 없음(3분)'}), 180000);
-    function 끝(답){ removeEventListener('message', 받); clearTimeout(시); 풀(답); }
-    addEventListener('message', 받);
-    postMessage({__vp:'단품목록', 표, 다시:!!다시}, location.origin);
-  });
-}
-const 단품하나 = (코드,이름,상태) => ({코드, 이름, 상태, 찾글:(이름+' '+코드).toLowerCase().replace(/\s+/g,'')});
-function 단품읽기(다시){
-  if(단품받기 && !다시) return 단품받기;
-  단품들 = null; 단품말 = null;
-  const 이번 = 단품받기 = (async () => {
-    if(await 다리있나()){
-      단품출처 = 'vp';
-      const 답 = await 확장묻기(다시);
-      if(이번 !== 단품받기) return;
-      if(답.로그인 === true && Array.isArray(답.줄)){
-        단품받은때 = 답.받은때 || null;
-        단품들 = 답.줄.filter(x => x && x[0]).map(([코드,이름='',상태='']) => 단품하나(String(코드), String(이름), String(상태)));
-        return;
-      }
-      /* 로그인 안 됨·확인 못 함·목록 빔 — 목록 없이 까닭만. 다음에 칸을 열면 다시 묻는다(막힘). */
-      단품말 = 답.로그인 === false ? {로그인:true, 글:'벤더피아 로그인 필요', 막힘:true}
-            : 답.로그인 === null ? {로그인:true, 글:'벤더피아 로그인을 확인하지 못했습니다' + (답.까닭?' · '+답.까닭:''), 막힘:true}
-            : {글:'벤더피아연동 단품관리 목록을 받지 못했습니다' + (답.까닭?' · '+답.까닭:''), 막힘:true};
-      return;
-    }
-    /* v1.6.1 지금 깔린 확장: 단품관리 화면이 받을 때마다 올린 창고 사본(`_정보.올린때`·`파일`) */
-    단품출처 = '창고'; 단품받은때 = null; 단품말 = null;
-    const { collection, getDocs } = window.fbRead;
-    const 눈 = await getDocs(collection(window.db, ...단품자리));
-    if(이번 !== 단품받기) return;
-    const 문들 = [];
-    눈.forEach(d => { if(/^단품_\d+$/.test(d.id)) 문들.push([Number(d.id.slice(3)), d.data().줄||[]]);
-      else if(d.id === '_정보'){ const x = d.data()||{}; 단품받은때 = x.올린때 || null; 단품말 = {자동:/벤더피아연동/.test(x.파일||'')}; } });
-    문들.sort((a,b)=>a[0]-b[0]);
-    const 들 = [];
-    for(const [,줄] of 문들) for(const s of 줄){
-      const [코드='',이름='',상태=''] = String(s).split('\t');
-      if(코드) 들.push(단품하나(코드, 이름, 상태));
-    }
-    단품들 = 들;
-  })();
-  이번.catch(() => { if(단품받기 === 이번) 단품받기 = null; });
-  return 이번;
-}
-const 때글 = t => { if(!t) return ''; const d = new Date(t); return `${d.getMonth()+1}-${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')} 받음`; };
 /* v1.8.0 제품명 칸: 고른 단품 한 줄씩(단품명 + 작은 코드 · 떨어진 「×」) + 맨 아래 「단품 추가」 */
 const 추가단추 = '<button type="button" class="추가">단품 추가</button>';
 function 단품줄(p){
   const e = 연결[p]; if(!e) return '';
   return e.단품들.map(d => `<div class="dp"><button type="button" class="dn${활성&&활성.p===p&&활성.코드===d.코드?' on':''}" data-c="${글(d.코드)}" title="${글(d.이름)} ${글(d.코드)}">${글(d.이름||d.코드)}<span class="cd">${글(d.코드)}</span></button><button type="button" class="dx" data-c="${글(d.코드)}" title="삭제">×</button></div>`).join('');
 }
-function 단품칸(p){
-  return `<div class="vk" data-p="${글(p)}"><div class="dl">${단품줄(p)}</div><div class="더">${추가단추}</div></div>`;
+function 단품칸(p, 업들){   /* v1.10.0 data-u = 드롭에 쓸 업체별 단품명 거래처 */
+  return `<div class="vk" data-p="${글(p)}" data-u="${글((업들||[]).join('|'))}"><div class="dl">${단품줄(p)}</div><div class="더">${추가단추}</div></div>`;
 }
-
-/* v1.9.0 실시간 — 벤더피아 단품관리에 바로 물은 줄(`벤더피아실시간.js`)을 목록에 덮는다. 새 단품은 맨 앞, 있는 단품은 이름·판매상태를 새것으로. */
-const 실시간줄 = new Map(), 실시간본 = new Map();
-let 실시간시계 = 0;
-function 실시간덮기(){
-  if(!단품들 || !실시간줄.size) return;
-  const 자리 = new Map(단품들.map((d,i) => [d.코드, i])), 새 = [];
-  for(const [코드,이름,상태] of 실시간줄.values()){
-    const i = 자리.get(코드);
-    if(i === undefined) 새.push(단품하나(코드, 이름, 상태));
-    else { const d = 단품들[i]; if(d.이름 !== (이름||d.이름) || d.상태 !== 상태) 단품들[i] = 단품하나(코드, 이름||d.이름, 상태); }
-  }
-  if(새.length) 단품들 = 새.concat(단품들);
-}
-function 실시간묻기(input){
-  const V = window.VP실시간; if(!V || !V.이어짐()) return;
-  const 열쇠 = V.낱말(input.value).join('|'); if(!열쇠) return;
-  const 앞 = 실시간본.get(열쇠); if(앞 && Date.now() - 앞 < 20000) return;
-  clearTimeout(실시간시계);
-  실시간시계 = setTimeout(() => {
-    if(후보칸 !== input || V.낱말(input.value).join('|') !== 열쇠) return;
-    실시간본.set(열쇠, Date.now());
-    V.찾기(input.value).then(답 => {
-      if(답 && 답.로그인) for(const [코드,이름='',상태=''] of 답.줄) if(코드) 실시간줄.set(String(코드), [String(코드), String(이름), String(상태)]);
-      if(답 && 후보칸 === input) 후보그리기(input);
-    });
-  }, 350);
-}
-if(window.VP실시간) VP실시간.이으면(() => { if(후보칸) 후보그리기(후보칸); });
 
 let 후보 = null, 후보칸 = null, 후보들 = [];
 function 후보닫기(){
@@ -662,69 +660,34 @@ function 후보자리(input, 맞추기){
   const 높 = Math.max(60, Math.min(바랄, 화면끝() - 8 - 위));
   Object.assign(후보.style,{left:왼+'px',top:위+'px',width:폭+'px',maxHeight:높+'px'});
 }
-/* 낱말을 띄어 쓰면 낱말마다 다 들어 있는 단품만(띄어쓰기·대소문자 무시). 판매중이 먼저(목록 차례). 50개까지. */
+/* v1.10.0 후보 = 그 칸 입고처의 업체별 단품명 단품(로앤.html 과 같은 셈) — 낱말이 다 든 것, 없으면 비슷한 순, 그것도 없으면 그 거래처 단품 전부 · 검색 칸이 비면 전부 */
 function 후보그리기(input){
-  const p = input.closest('.vk').dataset.p;
+  const vk = input.closest('.vk'), p = vk.dataset.p, 업들 = (vk.dataset.u||'').split('|').filter(Boolean);
   if(!후보){ 후보 = document.createElement('div'); 후보.className='vpd'; document.body.appendChild(후보);
     후보.addEventListener('pointerdown', e => e.preventDefault());   /* 칸 글쇠(포커스)가 안 빠지게 */
-    후보.addEventListener('click', e => {
-      const a = e.target.closest('div[data-act]');
-      if(a){ 단품단추(a.dataset.act); return; }
-      const d = e.target.closest('div[data-i]'); if(d && 후보칸) 고르기(후보칸, d.dataset.i); }); }
+    후보.addEventListener('click', e => { const d = e.target.closest('div[data-i]'); if(d && 후보칸) 고르기(후보칸, d.dataset.i); }); }
   const 새로 = 후보칸 !== input; 후보칸 = input; 후보자리(input, 새로);
-  let t = '';   /* v1.8.0 지우기는 칸의 「×」 로 — 목록 위 「연결 지우기」 걷음 */
-  if(!단품들 && 단품말 && 단품말.막힘){ 후보들 = [];   /* v1.6.0 로그인 필요·받지 못함 */
-    후보.innerHTML = t + `<div class="msg bad">${글(단품말.글)}</div>` +
-      (단품말.로그인 ? '<div class="act" data-act="login">벤더피아 로그인 화면 열기</div><div class="msg">로그인한 뒤 이 칸을 다시 누르세요</div>' : '') +
-      '<div class="act" data-act="new">단품 새로 받기</div>';
-    return;
-  }
-  if(!단품들){
-    후보들 = [];
-    후보.innerHTML = t + `<div class="msg">${단품출처==='vp' || document.documentElement.hasAttribute('data-벤더피아단품') ? '벤더피아연동 단품관리 목록을 받는 중… (처음엔 수십 초 걸릴 수 있음)' : '단품 목록을 읽는 중…'}</div>`;
-    단품읽기().then(() => { if(후보칸===input) 후보그리기(input); }, e => { if(후보) 후보.innerHTML = t + `<div class="msg bad">단품 목록을 읽지 못했습니다 ${글((e&&(e.code||e.message))||'')}</div>`; });
-    return;
-  }
-  실시간덮기(); 실시간묻기(input);   /* v1.9.0 */
-  const 실됨 = !!(window.VP실시간 && VP실시간.됨()), 실표 = 실됨 ? ' · 실시간' : '';
-  /* v1.6.0 목록 위: 확장이면 「단품 새로 받기」(받은 때), 창고 사본이면 「임시 목록」 */
-  t += 단품출처==='vp' ? `<div class="act" data-act="new">단품 새로 받기<span class="cd">벤더피아연동 단품관리 ${단품들.length.toLocaleString()}개${단품받은때?' · '+때글(단품받은때):''}${실표}</span></div>`
-     : `<div class="act" data-act="new">단품 새로 받기<span class="cd">${단품말&&단품말.자동?'벤더피아연동 단품관리 ':'단품 목록 '}${단품들.length.toLocaleString()}개${단품받은때?' · '+때글(단품받은때).replace('받음','올림'):''}${실표}</span></div>`
-       + (단품관리열었나 && !실됨 ? '<div class="msg">벤더피아연동 단품관리 탭에서 F5 → 다 받으면 이 탭으로 돌아오세요(목록을 다시 읽습니다)</div>' : '');
-  if(window.VP실시간 && VP실시간.로그인필요()) t += '<div class="act" data-act="login">벤더피아 로그인 화면 열기</div>';
-  const 낱 = input.value.toLowerCase().split(/\s+/).filter(Boolean);
-  /* v1.8.3 사장님 「벤더피아 단품 중 판매중단 단품은 보이지 않게 해주세요.」 — 판매상태 「중지」(벤더피아 단품관리 표기 그대로) 단품은 후보에서 뺀다.
-     이미 제품명 칸에 고른 단품은 그대로 둔다(목록에서만 안 보임). */
-  const 보일 = 단품들.filter(d => d.상태 !== '중지');
   후보들 = [];
-  if(낱.length) for(const d of 보일){ if(낱.every(w=>d.찾글.includes(w))){ 후보들.push(d); if(후보들.length>=50) break; } }
-  /* v1.5.0 「임시」: 다 들어 있는 단품이 없으면(제품명 전체를 넣으면 거의 늘 그렇다 — 「(W)」 같은 색 꼬리, 붙여 쓴 낱말) 비슷한 순으로.
-     검색어를 한글·숫자·영문 조각(두 글자 이상)으로 나눠, 들어 있는 조각이 많은 단품 먼저 · 같으면 앞 조각이 든 것 먼저 · 그다음 목록 차례(판매중 먼저). */
-  let 비슷 = false;
+  if(!업들.length){ 후보.innerHTML = '<div class="msg bad">업체별 단품명 거래처 없음</div>'; return; }
+  const 목 = 업체단품.목록(업들);
+  if(!목){ 후보.innerHTML = '<div class="msg">업체별 단품명을 읽는 중…</div>'; return; }
+  const 찾글 = d => (d.이름+' '+d.코드).toLowerCase().replace(/\s+/g,'');
+  const 낱 = input.value.toLowerCase().split(/\s+/).filter(Boolean);
+  let t = '', 비슷 = false;
+  if(!낱.length) 후보들 = 목.slice();
+  else 후보들 = 목.filter(d => 낱.every(w => 찾글(d).includes(w)));
   if(낱.length && !후보들.length){
     const 조 = [...new Set(input.value.toLowerCase().match(/[가-힣]+|[0-9]+|[a-z]+/g)||[])].filter(w=>w.length>=2);
     const 점 = [];
-    보일.forEach((d,j) => { let n=0, k=''; for(const w of 조){ const y=d.찾글.includes(w); if(y) n++; k+=y?'1':'0'; } if(n) 점.push({d,n,k,j}); });
+    목.forEach((d,j) => { const g = 찾글(d); let n=0, k=''; for(const w of 조){ const y=g.includes(w); if(y) n++; k+=y?'1':'0'; } if(n) 점.push({d,n,k,j}); });
     점.sort((a,b) => b.n-a.n || (a.k<b.k?1:a.k>b.k?-1:0) || a.j-b.j);
-    후보들 = 점.slice(0,50).map(x=>x.d); 비슷 = 후보들.length > 0;
+    후보들 = 점.map(x=>x.d); 비슷 = 후보들.length > 0;
+    if(!비슷) 후보들 = 목.slice();
   }
   if(비슷) t += '<div class="msg">다 맞는 단품 없음 — 비슷한 순</div>';
-  if(!낱.length) t += '<div class="msg">단품명 · 단품코드를 치세요</div>';
-  else if(!후보들.length) t += '<div class="msg">맞는 단품 없음</div>';
-  t += 후보들.map((d,i) => `<div data-i="${i}" class="${i===0?'on':''}${단품있나(p,d.코드)?' got':''}">${단품있나(p,d.코드)?'✓ ':''}${글(d.이름)}<span class="cd">${글(d.코드)}${d.상태&&d.상태!=='판매중'?' · '+글(d.상태):''}</span></div>`).join('');
+  if(!후보들.length) t += '<div class="msg">맞는 단품 없음</div>';
+  t += 후보들.map((d,i) => `<div data-i="${i}" class="${i===0?'on':''}${단품있나(p,d.코드)?' got':''}">${단품있나(p,d.코드)?'✓ ':''}${글(d.이름)}<span class="cd">${글(d.코드)}${업들.length>1?' · '+글(d.업체):''}</span></div>`).join('');
   후보.innerHTML = t;
-}
-/* v1.6.0 목록 위 단추 — 로그인은 벤더피아 자기 로그인 화면(새 탭)에서. 아이디·비밀번호는 여기서 받지 않는다. */
-/* v1.6.1 단품관리 탭에서 돌아오면 창고 사본을 다시 읽는다(열린 후보 목록도 새로) */
-document.addEventListener('visibilitychange', () => {
-  if(document.visibilityState !== 'visible' || !단품관리열었나 || 단품출처 !== '창고') return;
-  const input = 후보칸; 단품읽기(true).then(() => { if(input && 후보칸 === input) 후보그리기(input); }, () => {});
-});
-function 단품단추(일){
-  if(일 === 'login'){ window.open(벤더피아로그인주소, '_blank'); return; }
-  if(일 === 'new' && 단품출처 === '창고'){   /* v1.6.1 깔린 확장 그대로: 단품관리 화면을 열어 거기서 받게 한다(받으면 창고 사본이 저절로 바뀜) */
-    단품관리열었나 = true; window.open(단품관리주소, 'vp단품관리'); if(후보칸) 후보그리기(후보칸); return; }
-  if(일 === 'new'){ const input = 후보칸; 단품읽기(true); if(input) 후보그리기(input); }
 }
 /* v1.8.0 후보를 누르면 그 단품을 더하고 목록은 열린 채(여러 개 고르기). 이미 든 단품은 ✓ — 다시 눌러도 그대로 */
 function 고르기(input, i){
@@ -737,7 +700,6 @@ document.addEventListener('click', e => {
   const t = e.target;
   const 추 = t.closest('.vk .추가');
   if(추){ const 더 = 추.parentElement;
-    if(window.VP실시간) VP실시간.열기();   /* v1.9.0 이어진 벤더피아 탭이 없으면 단품관리 탭을 한 번 연다(누름 안에서만 열린다) */
     더.innerHTML = '<input type="search" placeholder="단품 검색" autocomplete="off" enterkeyhint="search">';
     const input = 더.querySelector('input'); input.focus(); return; }
   const x = t.closest('.vk .dx');
@@ -745,36 +707,10 @@ document.addEventListener('click', e => {
   const dn = t.closest('.vk .dn');
   if(dn){ const p = dn.closest('.vk').dataset.p, c = dn.dataset.c;
     활성 = (활성 && 활성.p===p && 활성.코드===c) ? null : {p, 코드:c}; 활성칠(); return; }
-  const pm = t.closest('#속 td.pm');
-  if(pm){
-    const p = pm.dataset.p, k = pm.dataset.k;
-    if(t.closest('.나눔')){ 분할바꾸기(p, k, {방식:'반'}); return; }
-    if(t.closest('.합')){ 분할바꾸기(p, k, null); return; }
-    if(활성 && 활성.p===p) 연결토글(p, k, 활성.코드);
-    return;
-  }
-  const 셋 = t.closest('#속 td.qy .셋');
-  if(셋){ const td = 셋.closest('td'); 분할바꾸기(td.dataset.p, td.dataset.k, {방식: 셋.dataset.w==='위' ? '위3' : '아래3'}); }
+  const pm = t.closest('#속 td.pm[data-p]');   /* v1.10.0 분할은 누계(부통) — 여기는 연결만 */
+  if(pm){ const p = pm.dataset.p, k = pm.dataset.k; if(활성 && 활성.p===p) 연결토글(p, k, 활성.코드); }
 });
 document.addEventListener('keydown', e => { if(e.key==='Escape' && 활성 && !e.target.matches('input')){ 활성 = null; 활성칠(); } });
-/* 나뉜 수량을 고치면 다른 칸 = 원래 − 고친 값(치는 동안 바로), 칸을 떠나면 저장 */
-function 수량고침(input, 저장){
-  const td = input.closest('td.qy'), n = 수량수(td.dataset.q); if(n === null) return;
-  let v = parseInt(String(input.value).replace(/[^\d]/g,''), 10); if(isNaN(v)) v = 0;
-  v = Math.max(0, Math.min(n, v));
-  const 남 = td.querySelector(`input.수[data-w="${input.dataset.w==='위'?'아래':'위'}"]`);
-  if(남) 남.value = n - v;
-  if(!저장) return;
-  input.value = v;
-  const 위 = input.dataset.w==='위' ? v : n - v, p = td.dataset.p, k = td.dataset.k;
-  const 나 = 연결[p] && 연결[p].분할[k];
-  if(나 && 위수(나, n) === 위) return;   /* 그대로면 안 씀 */
-  input.blur();
-  분할바꾸기(p, k, {방식:'직접', 위, 원:n});
-}
-document.addEventListener('input', e => { if(e.target.matches('#속 td.qy input.수')) 수량고침(e.target, false); });
-document.addEventListener('change', e => { if(e.target.matches('#속 td.qy input.수')) 수량고침(e.target, true); });
-document.addEventListener('keydown', e => { if(e.key==='Enter' && e.target.matches('#속 td.qy input.수')){ e.preventDefault(); 수량고침(e.target, true); } });
 /* 검색 칸을 열면(v1.2.3) 그 줄 PDF 제품명을 미리 넣고 전체 선택 — 바로 지우거나 고쳐 칠 수 있다.
    칸이 비어 있을 때만 넣는다(친 글은 덮지 않음). */
 /* v1.5.0: 앞 네 글자 → 제품명 전체(줄바꿈·겹친 빈칸은 띄어쓰기 하나). */
@@ -788,8 +724,7 @@ document.addEventListener('focusin', e => {
     const 막기 = ev => ev.preventDefault();   /* 누른 손을 뗄 때 선택이 풀리지 않게(한 번만) */
     input.addEventListener('mouseup', 막기, {once:true}); setTimeout(() => input.removeEventListener('mouseup', 막기), 600);
   }
-  if(단품말 && 단품말.막힘){ 단품말 = null; 단품받기 = null; }   /* v1.6.0 로그인 필요였으면 칸을 열 때마다 다시 묻는다 */
-  단품읽기(); 후보그리기(input);
+  후보그리기(input);
 });
 document.addEventListener('input', e => { if(e.target.matches('.vk input')) 후보그리기(e.target); });
 document.addEventListener('focusout', e => { if(e.target.matches('.vk input')) setTimeout(() => { if(후보칸===e.target && document.activeElement!==e.target) 후보닫기(); }, 0); });

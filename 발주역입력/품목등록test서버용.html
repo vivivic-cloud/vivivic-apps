@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<!-- 발주역입력 / 품목등록test서버용 — 영림원품목등록 「품목등록업로드」 의 기본 자료(엑셀 「품목등록test서버용」 의 품목등록업로드 줄, 창고 발주역입력_영림원품목등록 그대로)를 제품마다 묶어 본다.
+     사장님 11-25(그대로): 「품목등록업로드의 기본자료가되는 엑셀자료를 새페이지로 만들어 주세요 해주세요. 각제품 이하 반제품들은 제품의 하위 토글로 접혀있게 만들어 주세요 제품명 앞에 체크표시를 두어 체크시 해당 제품에대한 반제품 등의 정보가 품목등록업로드에 나타나게 해주세요. 품목등록업로드에 매칭시 불필요한 자료는 임의로 참고 하지 않습니다.」
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.0.0
+     줄 = 창고 품목등록업로드 조각(읽기만) · 제품 줄 아래 「모품목(상위 품번)」 = 그 제품 품번인 줄(반제품)을 접어 둠(▸ 누르면 펼침, 이 화면만) ·
+     체크 = 창고 발주역입력_영림원품목등록/_고른제품 {제품:[제품 품번…], 고친때} 통째 setDoc · onSnapshot(영림원품목등록이 같이 읽어 품목등록업로드·BOM·계산 탭을 이 제품들로 거름).
+     문서가 없으면 처음 값 = 영림원품목등록 v2.16.0 한 제품(품명 「(KRW) 알렉스 1200 높은 수납장 올화이트」). -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>품목등록test서버용 — 발주역입력</title>
+<script src="../shared/쓰기지킴.js?v=11-23b"></script>   <!-- 쓰기 안전장치(옛 판·잦은 쓰기 멈춤) — 모듈보다 먼저 -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
+    import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
+    import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+    const app = initializeApp({
+        apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
+        authDomain: "vivivic-4b7ef.firebaseapp.com",
+        projectId: "vivivic-4b7ef",
+        storageBucket: "vivivic-4b7ef.firebasestorage.app",
+        messagingSenderId: "830175660542",
+        appId: "1:830175660542:web:9054030480c8280af8d8af"
+    });
+    const auth = getAuth(app);
+    window.db = getFirestore(app);
+    window.fbRead = { doc, getDoc, setDoc, onSnapshot };
+    onAuthStateChanged(auth, (u) => {
+        if (!u) { signInAnonymously(auth).catch(e => window.목록못읽음('창고에 들어가지 못했습니다', (e&&(e.code||e.message))||'')); return; }
+        window.목록읽기();
+    });
+</script>
+
+<style>
+/* 재단.html 과 같은 값 — 값을 새로 짓지 마라. */
+:root{
+  --vg-bg:#fff; --vg-ink:#111110; --vg-body:#1A1A19;
+  --vg-muted:#9C9C98; --vg-edge:#E2E2DF; --vg-fill:#F4F4F2; --vg-red:#FF3B30;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--vg-bg);color:var(--vg-body);
+  font:15px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",system-ui,sans-serif;
+  -webkit-text-size-adjust:100%}
+.wrap{max-width:1100px;margin:0 auto;padding:0 16px}
+header{padding:16px 0 2px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.logo{font-size:13px;color:var(--vg-muted)}
+.logo b{font-size:15px;font-weight:800;letter-spacing:3.2px;color:var(--vg-ink);margin-right:4px}
+.badge{font-size:11px;font-weight:800;letter-spacing:1.2px;color:var(--vg-ink);
+  border:1px solid var(--vg-ink);border-radius:999px;padding:3px 9px}
+.쪽길{display:flex;flex-wrap:wrap;column-gap:16px;row-gap:0;padding:8px 0 0;border-bottom:1px solid var(--vg-edge)}
+.쪽길 a{white-space:nowrap;font-size:13px;font-weight:600;color:var(--vg-muted);text-decoration:none;padding:4px 0 7px;margin-bottom:-1px;border-bottom:2px solid transparent}
+.쪽길 a:hover{color:var(--vg-ink)}
+.쪽길 a.on{color:var(--vg-ink);font-weight:800;border-bottom-color:var(--vg-ink)}
+.쪽길 .묶음{display:flex;flex-wrap:wrap;column-gap:16px;align-items:flex-end;padding:0 10px;background:var(--vg-fill);border-radius:6px 6px 0 0}.쪽길 .묶음>b{align-self:center;font-size:11px;font-weight:800;color:var(--vg-ink);padding:4px 0 6px}   /* 11-25 에이엠티출고조사 묶음 */
+.쪽길 a.폼길{margin-left:auto;align-self:center;color:#fff;background:var(--vg-ink);border-radius:4px;padding:3px 10px;margin-bottom:3px;border-bottom:0}.쪽길 a.폼길:hover{color:#fff;opacity:.85}   /* 11-25 입력폼 가는 길 한눈에 */
+.쪽길+h1{padding-top:14px}
+h1{font-size:30px;line-height:1.1;letter-spacing:-1.2px;font-weight:700;color:var(--vg-ink);padding:4px 0 12px}
+.months{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border-radius:999px;font-family:inherit;font-size:12px;font-weight:600;line-height:1.45;padding:5px 12px;background:#fff;
+  border:1px solid var(--vg-edge);color:var(--vg-body);cursor:pointer;font-variant-numeric:tabular-nums;transition:all .12s;position:relative}
+.chip::after{content:"";position:absolute;inset:-8px -3px}
+.chip:hover{background:var(--vg-fill)}
+.chip.on{background:var(--vg-ink);border-color:var(--vg-ink);color:#fff}
+/* 쪽은 화면 높이 — 화면 전체 막대 없이 표 상자 안에서만 위아래·옆으로 민다(가로 막대가 늘 보는 화면 아래). */
+html,body{height:100%;overflow:hidden}
+.wrap{height:100%;display:flex;flex-direction:column;overflow-y:auto;scrollbar-width:none}
+.wrap::-webkit-scrollbar{display:none}
+.wrap>*{flex-shrink:0}
+.wrap>#속{flex:1 1 0;min-height:0;display:flex;flex-direction:column;margin-top:12px}
+#속>.표통{flex:1 1 auto;min-height:0}
+@media (max-width:600px),(max-height:600px){.wrap>#속{flex:1 0 auto} #속>.표통{flex:1 0 240px}}
+.표통{overflow:auto;-webkit-overflow-scrolling:touch;background:var(--vg-bg)}
+@supports not selector(::-webkit-scrollbar){.표통{scrollbar-width:thin;scrollbar-color:#C7C7C3 var(--vg-fill)}}
+.표통::-webkit-scrollbar{width:10px;height:10px}
+.표통::-webkit-scrollbar-track,.표통::-webkit-scrollbar-corner{background:var(--vg-fill)}
+.표통::-webkit-scrollbar-thumb{background:#C7C7C3;border-radius:10px}
+/* 표 — 재단.html 셀 모양(v1.1.0) 그대로 */
+.dpr-t{width:max-content;border-collapse:separate;border-spacing:0;font-variant-numeric:tabular-nums;
+  border-top:1px solid #C7C7C3;border-left:1px solid #C7C7C3}
+.dpr-t th,.dpr-t td{border-right:1px solid #D6D6D3;border-bottom:1px solid #D6D6D3;white-space:nowrap}
+.dpr-t th{font-size:11.5px;font-weight:800;line-height:1.3;color:var(--vg-ink);text-align:center;vertical-align:middle;
+  padding:4px 5px;background:var(--vg-fill);border-bottom:1px solid #C7C7C3}
+.dpr-t td{font-size:11.5px;line-height:1.3;color:var(--vg-body);padding:2px 5px;vertical-align:top;background:var(--vg-bg)}
+.dpr-t td.num{text-align:right}
+.dpr-t .dpr-k{position:sticky;left:0;z-index:1;font-weight:700;color:var(--vg-ink)}
+.dpr-t th.dpr-k{background:var(--vg-fill)}
+/* v1.2.6 머리 줄 고정 — 표 상자(.표통) 안에서 위아래로 밀어도 머리가 맨 위에 남는다. 붙박이 첫 칸 머리(모서리)가 맨 위. */
+.dpr-t thead th{position:sticky;top:0;z-index:2}
+.dpr-t thead th.dpr-k{z-index:3}
+@media (max-width:600px),(max-height:600px){#속>.표통{max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px)}}
+/* 「총 합 계」 줄 — 머리와 같은 바탕·굵기 */
+.dpr-t tr.합 td{font-weight:800;color:var(--vg-ink);background:var(--vg-fill);border-top:1px solid #C7C7C3}
+.dpr-t tr.합 td.dpr-k{text-align:center}
+.dpr-t td.고름칸{white-space:nowrap}
+.dpr-t td.고름칸 input{vertical-align:middle;margin:0 4px 0 0;width:14px;height:14px;cursor:pointer}
+.dpr-t td .토글{font:inherit;font-size:10.5px;width:18px;height:16px;padding:0;margin-right:4px;border:1px solid var(--vg-edge);border-radius:4px;background:var(--vg-bg);color:var(--vg-muted);cursor:pointer;vertical-align:middle}
+.dpr-t td .토글:hover{color:var(--vg-ink);border-color:#C7C7C3}
+.dpr-t tr.제품 td{background:var(--vg-fill)}
+.dpr-t tr.제품.켬 td{background:#E8F1FD}
+.dpr-t tr.하위 td.dpr-k{padding-left:46px;font-weight:500}
+.dpr-t tr.하위[hidden]{display:none}
+.띠{position:fixed;top:0;left:0;right:0;z-index:60;background:var(--vg-red);color:#fff;font-size:12.5px;font-weight:600;padding:6px 16px;text-align:center}
+.state{background:var(--vg-fill);border-radius:14px;padding:22px 16px;text-align:center;margin-top:12px}
+.state .big{font-size:14px;font-weight:600;color:var(--vg-ink);padding-bottom:6px}
+.state .why{font-size:11.5px;color:var(--vg-red);padding-top:6px;font-family:ui-monospace,monospace}
+@media (max-width:600px){.dpr-t td.고름칸 input{width:18px;height:18px}.dpr-t td .토글{width:24px;height:22px}}
+</style>
+</head>
+<body>
+<div class="띠" id="띠" hidden></div>
+<div class="wrap">
+<header>
+  <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
+  <div class="badge">v1.0.0</div>
+</header>
+<nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html" class="on">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
+<h1>품목등록test서버용</h1>
+<div class="state" id="목상태"><div class="big">창고를 읽는 중입니다…</div></div>
+<div id="속"></div>
+</div>
+
+<script src="../shared/viggle.js"></script>
+<script>
+const 창고자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_영림원품목등록'];
+const 품목시트 = '품목등록업로드';
+const 기본제품명 = '(KRW) 알렉스 1200 높은 수납장 올화이트';   /* 영림원품목등록 v2.16.0 한제품명 — _고른제품 문서가 없을 때 처음 값 */
+let 칸 = null, 조각 = [], 끊기 = [], 고른 = null, 열림 = new Set(), 답했나 = false;
+const 글 = v => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+const 문서이름 = s => String(s).replace(/\//g, '／');
+function 목상태(큰, 까닭){ const el = document.getElementById('목상태'); el.style.display = 'block'; el.innerHTML = `<div class="big">${큰}</div>` + (까닭 ? `<div class="why">${글(까닭)}</div>` : ''); }
+window.목록못읽음 = (큰, 까닭) => { 답했나 = true; 목상태(큰, 까닭); };
+setTimeout(() => { if(!답했나) 목상태('창고에 닿지 못했습니다'); }, 20000);
+function 띠(말){ const el = document.getElementById('띠'); el.textContent = 말; el.hidden = !말; }
+
+window.목록읽기 = function(){
+  const { doc, onSnapshot } = window.fbRead;
+  onSnapshot(doc(window.db, ...창고자리, '_시트목록'), m => {
+    답했나 = true;
+    const s = ((m.exists() && m.data().시트들) || []).find(x => x.이름 === 품목시트);
+    if(!s){ 목상태('창고에 품목등록업로드가 없습니다'); return; }
+    칸 = s.칸 || []; 끊기.forEach(f => f()); 끊기 = []; 조각 = new Array(s.조각 || 1).fill(null);
+    for(let k = 0; k < 조각.length; k++) 끊기.push(onSnapshot(doc(window.db, ...창고자리, `${문서이름(품목시트)}_${k+1}`), d => { 조각[k] = (d.exists() && d.data().줄) || []; 그리기(); }, e => 목록못읽음('창고를 읽지 못했습니다', e && (e.code || e.message))));
+  }, e => 목록못읽음('창고를 읽지 못했습니다', e && (e.code || e.message)));
+  onSnapshot(doc(window.db, ...창고자리, '_고른제품'), d => { 고른 = d.exists() && Array.isArray(d.data().제품) ? new Set(d.data().제품.map(String)) : null; 그리기(); }, () => {});
+};
+
+function 묶음(){   /* 제품마다 [제품 줄, 하위 줄…] — 엑셀 차례 · 제품 없는 하위 줄은 끝에 */
+  const I = k => 칸.indexOf(k), pi = I('품번'), ai = I('품목자산분류'), mi = I('모품목(상위 품번)'), ni = I('품명');
+  const 트 = (r, i) => i < 0 ? '' : String(r.v[i] ?? '').trim();
+  const 줄 = [].concat(...조각), 제 = [], 아래 = new Map(), 붙음 = new Set();
+  for(const r of 줄) if(트(r, ai) === '제품'){ 제.push(r); 아래.set(트(r, pi), []); }
+  const 남 = [];
+  for(const r of 줄){ if(트(r, ai) === '제품') continue; const m = 트(r, mi); if(아래.has(m)) 아래.get(m).push(r); else 남.push(r); }
+  return { 제, 아래, 남, 트, pi, ni };
+}
+function 처음고른(b){ return new Set(b.제.filter(r => b.트(r, b.ni) === 기본제품명).map(r => b.트(r, b.pi))); }
+function 그리기(){
+  if(!칸 || !조각.length || 조각.some(x => !x)) return;
+  document.getElementById('목상태').style.display = 'none';
+  const b = 묶음(), 켠 = 고른 || 처음고른(b);
+  let h = '<table class="dpr-t"><thead><tr>' + 칸.map((k, i) => `<th class="${i===0?'dpr-k':''}">${글(k)}</th>`).join('') + '</tr></thead><tbody>';
+  const 칸들 = (r, 첫) => 칸.map((k, i) => i === 0 ? 첫 : `<td${typeof r.v[i]==='number'?' class="num"':''}>${글(r.v[i])}</td>`).join('');
+  for(const r of b.제){
+    const p = b.트(r, b.pi), 하 = b.아래.get(p) || [], 열 = 열림.has(p), 체 = 켠.has(p);
+    h += `<tr class="제품${체?' 켬':''}" data-p="${글(p)}">` + 칸들(r, `<td class="dpr-k 고름칸"><input type="checkbox" data-p="${글(p)}"${체?' checked':''}>${하.length ? `<button type="button" class="토글" data-p="${글(p)}" title="반제품 ${하.length}">${열?'▾':'▸'}</button>` : ''}${글(r.v[0])}</td>`) + '</tr>';
+    for(const x of 하) h += `<tr class="하위" data-m="${글(p)}"${열?'':' hidden'}>` + 칸들(x, `<td class="dpr-k">${글(x.v[0])}</td>`) + '</tr>';
+  }
+  for(const x of b.남) h += '<tr class="하위">' + 칸들(x, `<td class="dpr-k">${글(x.v[0])}</td>`) + '</tr>';
+  h += '</tbody></table>';
+  const 속 = document.getElementById('속'), 옛 = 속.querySelector('.표통'), 자 = 옛 ? [옛.scrollLeft, 옛.scrollTop] : null;
+  속.innerHTML = '<div class="표통">' + h + '</div>';
+  const 통 = 속.querySelector('.표통'); if(자){ 통.scrollLeft = 자[0]; 통.scrollTop = 자[1]; }
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('#속 .토글'); if(!t) return;
+  const p = t.dataset.p, 열 = !열림.has(p); if(열) 열림.add(p); else 열림.delete(p);
+  t.textContent = 열 ? '▾' : '▸';
+  document.querySelectorAll('#속 tr.하위').forEach(tr => { if(tr.dataset.m === p) tr.hidden = !열; });
+});
+document.addEventListener('change', e => {
+  const c = e.target.closest('#속 input[type=checkbox][data-p]'); if(!c) return;
+  const b = 묶음(), 새 = new Set(고른 || 처음고른(b));
+  if(c.checked) 새.add(c.dataset.p); else 새.delete(c.dataset.p);
+  고른 = 새; c.closest('tr').classList.toggle('켬', c.checked);
+  const 차례 = b.제.map(r => b.트(r, b.pi)).filter(p => 새.has(p));
+  const { doc, setDoc } = window.fbRead;
+  setDoc(doc(window.db, ...창고자리, '_고른제품'), { 제품:차례, 고친때:new Date().toISOString() })
+    .then(() => 띠(''), er => 띠('저장하지 못했습니다 — 새로고침 뒤 다시 해 보십시오 ' + ((er&&(er.code||er.message))||'')));
+});
+</script>
+</body>
+</html>
