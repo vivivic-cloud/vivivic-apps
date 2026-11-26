@@ -2,22 +2,27 @@
    사장님(그대로): 「로앤 이룸 출고내역 누계에서 선택된 단품을 검색하여 해당칸으로 이동가능하게 하는 검색창을 만들어 주세요. 해당 단품명이 선택된 각 칸으로 이동가능해야 합니다」
    쓰는 법: 누계 표를 그린 뒤 단품찾기.달기(속) — 속 맨 앞에 찾기 줄(검색 칸 · n/전체 · ‹ ›)을 넣고, 지난 검색어가 있으면 다시 찾음.
    찾는 칸 = 표 안 고른 단품 단추(.vk .dn) 중 단품명·단품코드에 검색 낱말이 모두 든 것(띄어쓰기·대소문자 무시).
+   v2(11-26 로앤·이룸 — 달기(속, {전체:true})): 사장님 「로앤/이룸 출고내역 검색창 현재 검색조건 + 누계 목록 안에 나타나는 모든 텍스트 검색 가능하게 해줘」 — 위 단품 단추에 더해 누계 표 모든 칸 글자(입력·메모 칸 값 포함)로도 찾음(단품 단추가 든 칸은 단추로 한 번만). 재단은 v1 그대로.
    Enter = 다음 · Shift+Enter = 이전 · 이동 = 표 상자 안에서 그 칸으로 밀고 굵은 테. 검색 칸 드롭 = 표에 나온 거래처들의 업체별 단품명(업체단품목록.js — 같은 검색·비슷한 순, 칸 10px 아래). */
 (function(){
   if(window.단품찾기) return;
   const 글 = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
   const 찾글 = s => String(s ?? '').toLowerCase().replace(/\s+/g, '');
-  let 말 = '', 지금 = -1, 맞은 = [], 줄 = null, 드 = null, 드목 = [];
+  let 말 = '', 지금 = -1, 맞은 = [], 줄 = null, 드 = null, 드목 = [], 전체 = false;
   const st = document.createElement('style');
   st.textContent = '.단찾{display:flex;align-items:center;gap:6px;margin:0 0 8px}.단찾 input{width:240px;max-width:60vw;height:24px;padding:1px 6px;font:inherit;font-size:12px;border:1px solid #C7C7C3;border-radius:4px}'
     + '.단찾 .n{font-size:12px;color:var(--vg-muted);min-width:44px;text-align:center}.단찾 button{height:24px;min-width:26px;padding:0 6px;font:inherit;font-size:13px;border:1px solid #C7C7C3;border-radius:4px;background:var(--vg-bg);cursor:pointer}'
-    + '.vk .dn.찾은{box-shadow:inset 0 0 0 2px #E5B800}.vk .dn.찾음{box-shadow:inset 0 0 0 2px var(--vg-ink);background:#FFF59D}'
+    + '.vk .dn.찾은,#속 td.찾은{box-shadow:inset 0 0 0 2px #E5B800}.vk .dn.찾음,#속 td.찾음{box-shadow:inset 0 0 0 2px var(--vg-ink);background:#FFF59D}'
     + '@media (max-width:600px){.단찾 input{font-size:16px;height:28px}}';
   document.head.appendChild(st);
   function 찾기(){
-    document.querySelectorAll('.vk .dn.찾은, .vk .dn.찾음').forEach(b => b.classList.remove('찾은', '찾음'));
+    document.querySelectorAll('.vk .dn.찾은, .vk .dn.찾음, #속 td.찾은, #속 td.찾음').forEach(b => b.classList.remove('찾은', '찾음'));
     const 낱 = 말.toLowerCase().split(/\s+/).filter(Boolean);
-    맞은 = 낱.length ? [...document.querySelectorAll('#속 .vk .dn')].filter(b => { const g = 찾글(b.textContent + ' ' + (b.dataset.c || '')); return 낱.every(w => g.includes(w)); }) : [];
+    const 맞 = g => 낱.every(w => g.includes(w));
+    맞은 = 낱.length ? [...document.querySelectorAll('#속 .vk .dn')].filter(b => 맞(찾글(b.textContent + ' ' + (b.dataset.c || '')))) : [];
+    if(전체 && 낱.length){ const 단추칸 = new Set(맞은.map(b => b.closest('td')));   /* v2 누계 표 모든 칸 글자 */
+      const 칸들 = [...document.querySelectorAll('#속 .표통 tbody td')].filter(td => !단추칸.has(td) && 맞(찾글(td.textContent + ' ' + [...td.querySelectorAll('input,textarea')].map(x => x.value).join(' '))));
+      const 모 = new Set([...맞은, ...칸들]); 맞은 = [...document.querySelectorAll('#속 .vk .dn, #속 .표통 tbody td')].filter(x => 모.has(x)); }
     맞은.forEach(b => b.classList.add('찾은'));
     if(지금 >= 맞은.length) 지금 = 맞은.length ? 0 : -1;
     표시();
@@ -48,7 +53,7 @@
     드.innerHTML = (비슷 ? '<div class="msg">다 맞는 단품 없음 — 비슷한 순</div>' : '') + (드목.length ? '' : '<div class="msg">맞는 단품 없음</div>')
       + 드목.slice(0, 200).map((d, i) => `<div data-i="${i}">${글(d.이름)}<span class="cd">${글(d.코드)}${업들.length > 1 ? ' · ' + 글(d.업체 || '') : ''}</span></div>`).join('');
   }
-  function 달기(속){
+  function 달기(속, 옵){ 전체 = !!(옵 && 옵.전체);
     if(!속) return; const 통 = 속.querySelector('.표통'); if(!통) return;
     줄 = document.createElement('div'); 줄.className = '단찾';
     줄.innerHTML = '<input type="search" placeholder="단품 찾기" autocomplete="off" enterkeyhint="search"><span class="n">0/0</span><button type="button" data-d="-1" title="이전">‹</button><button type="button" data-d="1" title="다음">›</button>';
