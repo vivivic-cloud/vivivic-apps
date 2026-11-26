@@ -22,7 +22,8 @@ iw = {}
 for w in L('erp_itemwcs'): iw.setdefault((w['code'], int(w['seq'])), []).append(w)
 ct = {}
 for k in L('erp_contracts'):
-    for r in k['rows']: ct.setdefault((r['pcode'], int(r['pseq'])), []).append((k, r))
+    if k.get('__part'): continue   # 11-26 나눔 저장 조각(저장소읽기.py 가 이미 모음 — 옛 JSON 대비)
+    for r in k.get('rows') or []: ct.setdefault((r['pcode'], int(r['pseq'])), []).append((k, r))
 
 PROD = ['T-al12h', 'T-al12mh', 'T-al80h', 'T-al8mh']
 parts = sorted({r['ccode'] for p in PROD for r in boms[p]['rows']})

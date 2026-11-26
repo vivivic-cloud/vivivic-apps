@@ -99,9 +99,49 @@
       out = out.concat((j.documents || []).map(Y.fs));
       pt = j.nextPageToken || '';
     } while (pt);
-    return out;
+    return I.join(out);
   };
-  I.add = (coll, o) => call('POST', coll, { fields: Object.fromEntries(Object.entries(o).map(([k, v]) => [k, enc(v)])) });
+  // 11-26 폼 v344 나눔 저장(전달-외주계약-나눔저장.md): 머리 문서 {…, __parts:['c0',…], __n} + 조각 문서 {id}~{열쇠} = {__part:1, head, key, rows, i}.
+  //   I.join = 조각을 빼고, 머리에 __parts 가 있으면 조각 rows 를 i 차례로 모아 rows 를 만들고 __parts·__n 을 지운다(예전 꼴 문서는 그대로). 지금은 erp_contracts 만 — 다른 컬렉션도 같은 꼴이면 그대로 맞음.
+  I.join = (docs) => {
+    const P = {};
+    docs.filter((d) => d.__part).forEach((d) => ((P[d.head] = P[d.head] || {})[d.key] = d));
+    return docs.filter((d) => !d.__part).map((h) => {
+      if (!Array.isArray(h.__parts)) return h;
+      const a = [];
+      h.__parts.forEach((k) => { const p = (P[h.id] || {})[k]; if (p) (p.rows || []).forEach((r, j) => a.push([(p.i || [])[j], r])); });
+      a.sort((x, y) => x[0] - y[0]);
+      const o = Object.assign({}, h, { rows: a.map((x) => x[1]) });
+      delete o.__parts; delete o.__n;
+      return o;
+    });
+  };
+  // 한 문서만(머리 + 조각 모아서). 없으면 null.
+  I.getJoined = async (coll, id) => {
+    const h = Y.fs(await I.get(coll, id));
+    if (!h || !Array.isArray(h.__parts)) return h;
+    const parts = [];
+    for (const k of h.__parts) { try { parts.push(Y.fs(await I.get(coll, id + '~' + k))); } catch (e) { /* 없는 조각은 건너뜀 */ } }
+    return I.join([h].concat(parts))[0];
+  };
+  I.PART = { rowsMax: 150000, prods: 40 };   // rows JSON 이 이보다 크면 나눔 · 조각 = 제품번호(pcode) 처음 나온 차례 40제품씩(폼 v344 와 같음)
+  const addOne = (coll, o) => call('POST', coll, { fields: Object.fromEntries(Object.entries(o).map(([k, v]) => [k, enc(v)])) });
+  // 새 문서. rows 가 크면 머리(rows 없이 __parts·__n) + 조각 문서로 나눠 쓴다. 작으면 예전처럼 한 문서.
+  I.add = async (coll, o) => {
+    const rows = Array.isArray(o.rows) ? o.rows : null;
+    if (!rows || JSON.stringify(rows).length < I.PART.rowsMax) return addOne(coll, o);
+    const order = [], grp = {};
+    rows.forEach((r, i) => { const pc = R.s(r && r.pcode); if (!(pc in grp)) { grp[pc] = Math.floor(order.length / I.PART.prods); order.push(pc); } });
+    const chunks = [];
+    rows.forEach((r, i) => { const c = grp[R.s(r && r.pcode)]; (chunks[c] = chunks[c] || { rows: [], i: [] }).rows.push(r); chunks[c].i.push(i); });
+    const keys = chunks.map((_, n) => 'c' + n);
+    const head = Object.assign({}, o, { __parts: keys, __n: rows.length });
+    delete head.rows;
+    const j = await addOne(coll, head), id = j.name.split('/').pop();
+    for (let n = 0; n < chunks.length; n++)
+      await call('PATCH', coll + '/' + encodeURIComponent(id + '~' + keys[n]), { fields: Object.fromEntries(Object.entries({ __part: 1, head: id, key: keys[n], rows: chunks[n].rows, i: chunks[n].i }).map(([k, v]) => [k, enc(v)])) });
+    return j;
+  };
   I.patch = (coll, id, o) => call('PATCH', coll + '/' + id + '?' + Object.keys(o).map((k) => 'updateMask.fieldPaths=' + k).join('&'), { fields: Object.fromEntries(Object.entries(o).map(([k, v]) => [k, enc(v)])) });
 
   // 단계별: 컬렉션 · 열쇠(같은 것으로 보는 값) · t(폼 문서가 「T로 시작하는 것만」 범위인지 — 그 단계 *-읽기.js 의 T 거르기와 같은 칸) · 비교 칸(머리) · 비교 칸(행).
@@ -230,6 +270,7 @@
     const j = await I.get(coll, id), d = Y.fs(j);
     if (!d || d.status !== '완료') return false;
     await call('DELETE', coll + '/' + id + '?currentDocument.updateTime=' + encodeURIComponent(j.updateTime));
+    for (const k of Array.isArray(d.__parts) ? d.__parts : []) await call('DELETE', coll + '/' + encodeURIComponent(id + '~' + k));   // 나눔 저장 조각도 함께(11-26)
     return true;
   };
   // cand = [{coll,id,key,step}] → 묶음 검사 뒤 지움. 돌려줌 {지움:[…], 남김:[{…, 까닭}]}
