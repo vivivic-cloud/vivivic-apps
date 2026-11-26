@@ -13,12 +13,20 @@
   const PAGE = '500302';
   const AUTO = ['ItemUnitName', 'UnitName', 'AssetName'];
   const num = (x) => (x == null || x === '' ? '' : String(Number(x)));
+  const yes = (x) => /^(1|true|y|예|✓)$/i.test(String(x == null ? '' : x).trim());
+  const S0 = (x) => (x == null ? '' : String(x).trim());
+  const day = (x) => S0(x).replace(/\D/g, '');   // 날짜는 숫자만(2026-11-26 → 20261126)
   const lines = (list) => list.flatMap((b) => b.rows.map((r) => ({ b, r })));
   const formCols = ({ b, r }) => ({
     ItemName: b.pname, ItemNo: b.pcode, ItemSpec: b.pspec || '', ItemBomRevName: b.pver,
     ProcName: r.proc, UserSeq: num(r.order), SubItemName: r.cname, SubItemNo: r.ccode, SubItemSpec: r.cspec || '', SubItemBomRevName: r.cver || '',
     SubUnitName: r.inunit, NeedQtyNumerator: num(r.qn), NeedQtyDenominator: num(r.qd), HaveChild: r.hasSub ? '1' : '0',
+    // 폼 v345(11-26): 줄 칸 더함 — 꼴 = 화면별-요령 5-2(체크 BOM조회용·하위공정소요자재포함 · 숫자 Loss율 · 날짜 적용일 · 글 조립위치·비고·비고1~5)
+    IsBOMOnly: yes(r.bomView) ? '1' : '0', IsIncludeProcMat: yes(r.subProcMat) ? '1' : '0', InLossRate: num(r.inLoss), OutLossRate: num(r.outLoss),
+    FrApplyDate: day(r.from), ToApplyDate: day(r.to), Location: S0(r.pos), Remark: S0(r.note), Remark1: S0(r.note1), Remark2: S0(r.note2), Remark3: S0(r.note3), Remark4: S0(r.note4), Remark5: S0(r.note5),
   });
+  const EXTRA = ['InLossRate', 'OutLossRate', 'FrApplyDate', 'ToApplyDate', 'Location', 'Remark', 'Remark1', 'Remark2', 'Remark3', 'Remark4', 'Remark5'];   // 화면 차례대로 이어진 칸
+  const DATES = ['FrApplyDate', 'ToApplyDate'];
   const spec = (sh) => {
     const S = sh.Sheet, o = sh.objOriSheetData || [], out = [];
     for (let i = 0; i < S.getColumnCount(); i++) { if (!S.getColumnVisible(i) || !(S.getColumnWidth(i) > 0)) continue; out.push({ col: o[i] ? o[i].DataField : '', label: String(S.getValue(0, i, 1)) }); }
@@ -62,6 +70,9 @@
         await Y.paste(sh, i, 'SubUnitName', [f.SubUnitName, f.NeedQtyNumerator, f.NeedQtyDenominator], 1500);
         await Y.paste(sh, i, 'NeedQtyNumerator', [f.NeedQtyNumerator, f.NeedQtyDenominator], 1200);   // ⚠ 코드도움이 분자·분모를 0 으로 되돌릴 때가 있다(11-03) → 한 번 더
         Y.setChk(sh, i, 'HaveChild', f.HaveChild === '1');
+        if (EXTRA.some((c) => f[c] !== '')) await Y.paste(sh, i, 'InLossRate', EXTRA.map((c) => f[c]), 1200);
+        if (f.IsBOMOnly === '1') Y.setChk(sh, i, 'IsBOMOnly', true);
+        if (f.IsIncludeProcMat === '1') Y.setChk(sh, i, 'IsIncludeProcMat', true);
       }
       await Y.sleep(500);
       return this.check(list);
@@ -75,7 +86,7 @@
           const got = r[c.col] == null ? '' : String(r[c.col]);
           if (AUTO.includes(c.col)) { auto.push(c.label + '=' + got); continue; }
           // 하위BOM차수: 폼이 빈칸(원장 자재)이면 영림원이 00 을 넣는다(11-03) → 00 도 맞음
-          const ok = c.col === 'SubItemBomRevName' && !f[c.col] ? got === '' || got === '00' : c.col in f ? same(String(f[c.col]), got) : blank(got);
+          const ok = c.col === 'SubItemBomRevName' && !f[c.col] ? got === '' || got === '00' : DATES.includes(c.col) ? day(got) === f[c.col] : c.col in f ? (f[c.col] === '' ? blank(got) : same(String(f[c.col]), got)) : blank(got);
           if (!ok) table.push({ 행: i + 1, 칸: c.label, 폼: c.col in f ? String(f[c.col]) || '(빈칸)' : '(빈칸)', 화면: got });
         }
         for (const k of ['ItemSeq', 'SubItemSeq']) if (blank(r[k])) table.push({ 행: i + 1, 칸: k + '(코드)', 폼: '잡혀야 함', 화면: String(r[k]) });   // ProcSeq 는 업로드 길에서 저장 때 채워짐

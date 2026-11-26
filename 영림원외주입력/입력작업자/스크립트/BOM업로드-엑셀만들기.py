@@ -45,6 +45,15 @@ def num(x):
     return int(f) if f == int(f) else f
 
 
+def yes(x):
+    return str(x if x is not None else '').strip().lower() in ('1', 'true', 'y', '예', '✓')
+
+
+def day(x):
+    d = ''.join(ch for ch in str(x or '') if ch.isdigit())
+    return d or None
+
+
 def main():
     args = [a for a in sys.argv[1:] if a != '--추가']
     add = '--추가' in sys.argv
@@ -72,9 +81,14 @@ def main():
             row = {'IDX_NO': n, 'ItemName': b['pname'], 'ItemNo': b['pcode'], 'ItemSpec': b.get('pspec') or None, 'ItemBomRevName': b['pver'],
                    'ProcName': r['proc'], 'UserSeq': num(r.get('order')), 'SubItemName': r['cname'], 'SubItemNo': r['ccode'], 'SubItemSpec': r.get('cspec') or None,
                    'SubItemBomRevName': r.get('cver') or '00', 'SubUnitName': r['inunit'], 'NeedQtyNumerator': num(r['qn']), 'NeedQtyDenominator': num(r['qd']),
-                   'HaveChild': 1 if r.get('hasSub') else 0}
+                   'HaveChild': 1 if r.get('hasSub') else 0,
+                   # 폼 v345(11-26) 줄 칸 — 꼴 = 화면별-요령 5-2. 날짜는 숫자 8자리 글(엑셀에서 영림원이 받는 날짜 꼴은 확인 안 됨)
+                   'IsBOMOnly': 1 if yes(r.get('bomView')) else 0, 'IsIncludeProcMat': 1 if yes(r.get('subProcMat')) else 0,
+                   'InLossRate': num(r.get('inLoss')), 'OutLossRate': num(r.get('outLoss')), 'FrApplyDate': day(r.get('from')), 'ToApplyDate': day(r.get('to')),
+                   'Location': r.get('pos') or None, 'Remark': r.get('note') or None, 'Remark1': r.get('note1') or None, 'Remark2': r.get('note2') or None,
+                   'Remark3': r.get('note3') or None, 'Remark4': r.get('note4') or None, 'Remark5': r.get('note5') or None}
             ws.append([row.get(c[0]) for c in COLS])
-    for col in ('E', 'L'):   # 차수는 글자로
+    for col in ('E', 'L', 'T', 'U'):   # 차수·적용일은 글자로
         for c in ws[col][2:]:
             c.number_format = '@'
     wb.save(out)

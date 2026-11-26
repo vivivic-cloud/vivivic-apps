@@ -43,11 +43,13 @@
         rows: kids.map((x) => ({
           proc, order: R.s(x.UserSeq), cname: R.s(x.SubItemName), ccode: R.s(x.SubItemNo), cspec: R.s(x.Spec), cver: R.s(x.SubItemBomRevName),
           inunit: R.s(x.UnitName), qn: R.s(x.NeedQtyNumerator), qd: R.s(x.NeedQtyDenominator), hasSub: R.bool(x.HaveChild),
+          // 폼 v345(11-26) 줄 칸 — 500145 에 보이는 것만(하위공정소요자재포함·비고1~5 는 이 화면에 없음)
+          bomView: R.bool(x.IsBOMOnly), inLoss: R.s(x.InLossRate), outLoss: R.s(x.OutLossRate), from: R.s(x.FrApplyDate), to: R.s(x.ToApplyDate), pos: R.s(x.Location), note: R.s(x.Remark), baseUnit: R.s(x.StkUnitName), asset: R.s(x.AssetName),
         })),
       });
     }
     return { rows, 읽음: rows.length, 화면전체: Y.rows(ls).length, 확인못함: skipped, screen: 'BOM등록',
-      labels: { pname: '모품목명', pcode: '모품목번호', pspec: '모품목규격', pver: '모품목BOM차수', proc: '공정', order: '표시순서', cname: '하위품명', ccode: '하위품번', cspec: '하위규격', cver: '하위BOM차수', inunit: '투입단위', qn: '소요량(분자)', qd: '소요량(분모)', hasSub: '하위유무' } };
+      labels: { pname: '모품목명', pcode: '모품목번호', pspec: '모품목규격', pver: '모품목BOM차수', proc: '공정', order: '표시순서', cname: '하위품명', ccode: '하위품번', cspec: '하위규격', cver: '하위BOM차수', inunit: '투입단위', qn: '소요량(분자)', qd: '소요량(분모)', hasSub: '하위유무', bomView: 'BOM조회용', inLoss: '사내Loss율', outLoss: '사외Loss율', from: '적용시작일', to: '적용종료일', pos: '조립위치', note: '비고', baseUnit: '기준단위', asset: '품목자산분류' } };
   };
   return 'BOM 읽기 준비됨';
 })();

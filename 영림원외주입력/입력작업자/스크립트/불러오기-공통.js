@@ -152,11 +152,11 @@
     warehouses: { coll: 'erp_warehouses', title: '창고', key: (d) => R.s(d.name), t: (d) => R.isT(d.name), fields: ['name', 'group', 'dept', 'cust', 'consign', 'emp', 'type', 'notUse'] },   // v325 폼 2 창고등록
     workcenters: { coll: 'erp_workcenters', title: '워크센터', key: (d) => R.s(d.name), t: (d) => R.isT(d.name), fields: ['name', 'dept', 'kind', 'vendor', 'capa', 'start', 'end', 'whMat', 'whProd', 'whDeliv', 'whSite', 'whIn', 'whSemi'] },
     classes: { coll: 'erp_classes', title: '분류', key: (d) => [d.kind, d.big, d.mid, d.name].map(R.s).join('>'), t: (d) => R.isT(d.big) || R.isT(d.mid) || R.isT(d.name), fields: ['kind', 'big', 'mid', 'name', 'use'] },
-    items: { coll: 'erp_items', title: '품목', key: (d) => R.s(d.code), t: (d) => R.isT(d.name), fields: ['name', 'code', 'spec', 'eng', 'asset', 'state', 'unit', 'small', 'io', 'imp', 'rep'] },
+    items: { coll: 'erp_items', title: '품목', key: (d) => R.s(d.code), t: (d) => R.isT(d.name), fields: ['name', 'code', 'spec', 'eng', 'asset', 'state', 'unit', 'small', 'io', 'imp', 'rep', 'dept', 'emp', 'desc', 'buyVendor', 'vatKind', 'saleVat', 'outKind', 'lotYn', 'serialYn', 'expKind', 'setYn'] },   // v345 새 칸은 500260 에 보이는 것만
     materials: { coll: 'erp_materials', title: '자재', key: (d) => R.s(d.code), t: (d) => R.isT(d.name) || R.isT(d.code), fields: ['name', 'code', 'spec', 'eng', 'asset', 'state', 'io', 'imp', 'unit', 'small'] },
     processes: { coll: 'erp_processes', title: '공정', key: (d) => R.s(d.name), t: (d) => R.isT(d.name), fields: ['name', 'memo', 'inspect'] },
     flows: { coll: 'erp_flows', title: '공정흐름', key: (d) => R.s(d.name), t: (d) => R.isT(d.name), fields: ['name', 'memo'], rows: ['seq', 'proc', 'next', 'last'] },
-    boms: { coll: 'erp_boms', title: 'BOM', key: (d) => R.s(d.pcode) + '|' + R.s(d.pver), t: (d) => R.isT(d.pname), fields: ['pname', 'pcode', 'pspec', 'pver'], rows: ['proc', 'order', 'cname', 'ccode', 'cspec', 'cver', 'inunit', 'qn', 'qd', 'hasSub'] },
+    boms: { coll: 'erp_boms', title: 'BOM', key: (d) => R.s(d.pcode) + '|' + R.s(d.pver), t: (d) => R.isT(d.pname), fields: ['pname', 'pcode', 'pspec', 'pver'], rows: ['proc', 'order', 'cname', 'ccode', 'cspec', 'cver', 'inunit', 'qn', 'qd', 'hasSub', 'bomView', 'inLoss', 'outLoss', 'from', 'to', 'pos', 'note', 'baseUnit', 'asset'] },   // v345 줄 칸은 500145 에 보이는 것만
     itemflows: { coll: 'erp_itemflows', title: '품목별 공정흐름', key: (d) => R.s(d.code) + '|' + R.s(d.flow), t: (d) => R.isT(d.name) || R.isT(d.code), fields: ['name', 'code', 'spec', 'flow'] },
     itemmats: { coll: 'erp_itemmats', title: '제품별공정별소요자재', key: (d) => R.s(d.code) + '|' + R.s(d.rev), t: (d) => R.isT(d.name) || R.isT(d.code), fields: ['name', 'code', 'spec', 'rev'] },
     itemwcs: { coll: 'erp_itemwcs', title: '제품별공정별워크센터', key: (d) => [d.code, d.rev, d.proc, d.wc].map(R.s).join('|'), t: (d) => R.isT(d.name) || R.isT(d.code), fields: ['name', 'code', 'spec', 'rev', 'proc', 'wc', 'tunit', 'time', 'rank'] },
@@ -165,6 +165,7 @@
   };
   const nv = (v) => {
     if (v === true || v === false) return v ? '1' : '0';
+    if (/^(true|false)$/i.test(String(v == null ? '' : v).trim())) return /^true$/i.test(String(v).trim()) ? '1' : '0';   // v345 폼 체크 칸 글(True/False)
     if (Array.isArray(v)) return v.map(R.s).filter(Boolean).sort().join(', ');
     const s = R.s(v);
     if (/^\d{4}-?\d{2}-?\d{2}$/.test(s)) return s.replace(/\D/g, '');

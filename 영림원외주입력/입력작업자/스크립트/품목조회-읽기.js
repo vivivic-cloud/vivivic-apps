@@ -28,9 +28,14 @@
     const rows = all.filter((r) => only !== 'T' || R.isT(r.ItemName)).map((r) => ({
       name: R.s(r.ItemName), code: R.s(r.ItemNo), spec: R.s(r.Spec), eng: R.s(r.ItemEngName), asset: R.s(r.AssetName), state: R.s(r.SMStatusName),
       unit: R.s(r.UnitName), small: R.s(r.ItemClassSName), io: R.s(r.SMInOutKindName), imp: R.s(r.SMABCName), rep: R.bool(r.IsSTDItem),
+      // 폼 v345(11-26) 새 칸 가운데 500260 에 보이는 것만(관리부서=부서 · 관리자=담당자 · 품목설명 · 기본구매처 · 부가세구분 · 판매단가에 부가세포함여부 · 출고구분 · Lot·Serial · 유통기한구분 · 세트품목).
+      //   유통기간(화면 DataField SMLimitTermKind)은 값 꼴을 확인 못 해 안 읽음. 나머지 새 칸(Loss율·구매수량 …)은 이 화면에 없음.
+      dept: R.s(r.DeptName), emp: R.s(r.EmpName), desc: R.s(r.Remark), buyVendor: R.s(r.PurCustName), vatKind: R.s(r.SMVatKindName), saleVat: R.bool(r.PriceInVat),
+      outKind: R.s(r.SMOutKindName), lotYn: R.bool(r.IsLotMng), serialYn: R.bool(r.IsSerialMng), expKind: R.s(r.SMLimitTermKindName), setYn: R.bool(r.IsSet),
     }));
     return { rows, 읽음: rows.length, 화면전체: all.length, 확인못함: [], screen: '품목조회(품목상태 전체)',
-      labels: { name: '품명', code: '품번', spec: '규격', eng: '영문명', asset: '품목자산분류', state: '품목상태', unit: '기준단위', small: '품목소분류', io: '내외자구분', imp: '중요도', rep: '대표품목' } };
+      labels: { name: '품명', code: '품번', spec: '규격', eng: '영문명', asset: '품목자산분류', state: '품목상태', unit: '기준단위', small: '품목소분류', io: '내외자구분', imp: '중요도', rep: '대표품목',
+        dept: '부서(관리부서)', emp: '담당자(관리자)', desc: '품목설명', buyVendor: '기본구매처', vatKind: '부가세구분', saleVat: '판매단가에 부가세포함여부', outKind: '출고구분', lotYn: 'Lot 관리 여부', serialYn: 'Serial 관리 여부', expKind: '유통기한구분', setYn: '세트품목여부' } };
   };
   return '품목조회 읽기 준비됨';
 })();

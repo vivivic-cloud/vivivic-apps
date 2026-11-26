@@ -1,4 +1,4 @@
-// 제품별공정별소요자재 — 폼 erp_itemmats 대기 처리. 일괄등록(525162) → 500299 대조·투입공정 고침 → 폼 완료. 먼저 공통.js → 불러오기-공통.js. 두 화면을 열어 둔다(Home.OpenPageSeq).
+// 제품별공정별소요자재 — 폼 erp_itemmats 대기 처리. ★ 폼 v345(11-26)부터 = 500299 에 procs·mats 를 그대로(ylw.im.fillProcs → 「저장」 → ylw.im.fillMats → 「저장」). 옛 길: 일괄등록(525162) → 500299 대조·투입공정 고침 → 폼 완료. 먼저 공통.js → 불러오기-공통.js. 두 화면을 열어 둔다(Home.OpenPageSeq).
 // 요령 = 화면별-요령.md 「일괄등록·500299 실제 시험」 · 순서 = AGENTS.md 3-5. ⚠ 「BOM에서 가져오기」·일괄삭제(btn_del_btn)는 절대 안 누른다.
 // 쓰는 법: await ylw.im.go('T-al-p03') 한 번 = 대기 확인 → 진행중 → 일괄등록 → 500299 조회 → 투입공정 고침·저장 → 다시 조회·대조 → 폼 완료. 틀리면 throw(폼 진행중으로 남음, 멈춰서 사람이 본다).
 //   한 건 약 20초 — 도구 시간 제한(45초) 때문에 go 는 window.__g 에 결과를 두는 꼴로 돌린다: ylw.im.bg(['품번',…]) 뒤 window.__g 를 읽는다.
@@ -66,8 +66,68 @@
     });
     return { bad, 자재: r2.map((r) => [r.UserNo, r.ProcName, r.MatItemNo, r.NeedQtyNumerator + '/' + r.NeedQtyDenominator, r.UnitName, r.SMDelvTypeName, r.SubItemProcRevName].join(' ')), 공정: r1.map((r) => [r.ProcNo, r.ProcName, r.ToProcNo, r.WorkCenterName, r.AssyItemNo, r.IsLastProc].join('/')) };
   };
+  // ── 폼 v345(11-26 사장님 「영림원과 맞춰주세요」): 문서 procs(13칸)·mats(15칸)를 500299 공정 표(SS1)·소요자재 표(SS2)에 그대로 넣는다(525162 일괄등록 대신).
+  //   칸 = 화면 그대로(11-26 화면 칸 정의): SS1 공정순서 ProcNo · 공정 ProcName · 후속공정순서 ToProcNo · 워크센터 WorkCenterName · 시간단위 TimeUnitName(목록) · 표준 작업시간 WorkHour ·
+  //     공정품명 AssyItemName · 공정품번 AssyItemNo · 규격 AssySpec · 단위 UnitName(보기만) · 공정검사여부 IsProcQC(체크) · 최종공정여부 IsLastProc(체크, 보기만) · 제조방법등록여부 IsItemProcMethod(보기만)
+  //   SS2 표시순서 UserNo · 투입공정 ProcName · 자재명 MatItemName · 자재번호 MatItemNo · 규격 MatSpec · 투입단위 UnitName · 소요량(분자)·(분모) · 조달구분 SMDelvTypeName(목록) ·
+  //     품목자산분류 AssetName(보기만) · 반제품공정차수 SubItemProcRevName · 내부Loss율 InLossRate · 외부Loss율 OutLossRate · 조립위치 Location · 특이사항 Remark
+  //   여러 줄 = Y.pasteRows(\r\n). 이름·규격 코드도움 칸은 번호(공정품번·자재번호)만 붙여 창이 안 뜨게 한다(BOM 업로드와 같은 까닭). 저장은 누르지 않는다 → fillProcs → 「저장」 → fillMats → 모두맞음 → 「저장」 → check2 다시.
+  //   ⚠ 11-26 스크립트만 — 500299 에 실제로 붙여 본 범위는 작업일지 11-26 「v345」 절(새 제품 고르기·저장은 시험 안 함).
+  const yes = (x) => x === true || /^(1|true|y|예|✓)$/i.test(S(x).trim());
+  const n0 = (x) => (S(x).trim() === '' ? 0 : Number(x));
+  const P1 = (p) => ({ ProcNo: S(p.seq), ProcName: S(p.proc), ToProcNo: S(p.next), WorkCenterName: S(p.wc), TimeUnitName: S(p.tunit), WorkHour: S(p.time), AssyItemName: S(p.pname), AssyItemNo: S(p.pcode), AssySpec: S(p.pspec), UnitName: S(p.punit), IsProcQC: yes(p.insp) ? '1' : '0', IsLastProc: yes(p.last) ? '1' : '0', IsItemProcMethod: yes(p.method) ? '1' : '0' });
+  const P2 = (m) => ({ UserNo: S(m.order), ProcName: S(m.proc), MatItemName: S(m.cname), MatItemNo: S(m.ccode), MatSpec: S(m.cspec), UnitName: S(m.inunit), NeedQtyNumerator: S(m.qn), NeedQtyDenominator: S(m.qd), SMDelvTypeName: S(m.supply), AssetName: S(m.asset), SubItemProcRevName: S(m.srev), InLossRate: S(m.inLoss), OutLossRate: S(m.outLoss), Location: S(m.pos), Remark: S(m.note) });
+  const NUM = ['ProcNo', 'ToProcNo', 'WorkHour', 'UserNo', 'NeedQtyNumerator', 'NeedQtyDenominator', 'InLossRate', 'OutLossRate'], CHK = ['IsProcQC', 'IsLastProc', 'IsItemProcMethod'];
+  // ⚠ 11-26 시험: 투입공정 코드도움은 **저장된 공정만** 찾는다 — 공정 표를 저장하기 전에 소요자재 표를 넣으면 투입공정 코드(ProcSeq)가 0 으로 남고
+  //   「저장」 = 「[ 공정내부코드 ] 필수항목이 누락되었습니다.」 → 두 번에 나눈다: fillProcs → check2(공정 표) → 사람 「저장」 → fillMats → check2 → 사람 「저장」.
+  const fillProcs = async (v) => {
+    const d = Y.win('500299').document, s1 = d.getElementById('SS1'), s2 = d.getElementById('SS2');
+    if (d.getElementById('txtItemNo_txt').value !== v.code) throw new Error('500299 머리 제품번호가 ' + v.code + ' 아님 — 「신규」 → 제품을 고른 뒤');
+    if (Y.rows(s1).length || Y.rows(s2).length) throw new Error('500299 표가 비어 있지 않음(이미 등록된 제품?) — 넣지 않음');
+    const A = (v.procs || []).map(P1);
+    await Y.pasteRows(s1, 0, 'ProcNo', A.map((r) => [r.ProcNo, r.ProcName, r.ToProcNo, r.WorkCenterName]));
+    await Y.pasteRows(s1, 0, 'TimeUnitName', A.map((r) => [r.TimeUnitName, r.WorkHour]));   // 워크센터를 고르면 「분 · 0」이 저절로 들어가므로 그 뒤에 한 번 더
+    if (A.some((r) => r.AssyItemNo)) await Y.pasteRows(s1, 0, 'AssyItemNo', A.map((r) => [r.AssyItemNo]));
+    A.forEach((r, i) => { if (r.IsProcQC === '1') Y.setChk(s1, i, 'IsProcQC', true); if (r.IsLastProc === '1') Y.setChk(s1, i, 'IsLastProc', true); });
+    return check2(v, 'procs');
+  };
+  const fillMats = async (v) => {
+    const d = Y.win('500299').document, s1 = d.getElementById('SS1'), s2 = d.getElementById('SS2');
+    if (d.getElementById('txtItemNo_txt').value !== v.code) throw new Error('500299 머리 제품번호가 ' + v.code + ' 아님');
+    if (!Y.rows(s1).length || Y.rows(s1).some((r) => r.WorkingTag || !+r.ProcSeq)) throw new Error('공정 표를 먼저 「저장」(투입공정은 저장된 공정만 잡힘)');
+    if (Y.rows(s2).length) throw new Error('소요자재 표가 비어 있지 않음 — 넣지 않음');
+    const B = (v.mats || []).map(P2);
+    // ⚠ 11-26 시험: [표시순서, 투입공정] 를 여러 줄 한 번에 붙이면 둘째 줄부터 안 들어감(0·빈칸) → 이 덩이만 한 줄씩
+    for (let i = 0; i < B.length; i++) await Y.paste(s2, i, 'UserNo', [B[i].UserNo, B[i].ProcName], 1500);
+    await Y.pasteRows(s2, 0, 'MatItemNo', B.map((r) => [r.MatItemNo]));
+    await Y.pasteRows(s2, 0, 'UnitName', B.map((r) => [r.UnitName, r.NeedQtyNumerator, r.NeedQtyDenominator, r.SMDelvTypeName]));
+    await Y.pasteRows(s2, 0, 'NeedQtyNumerator', B.map((r) => [r.NeedQtyNumerator, r.NeedQtyDenominator]));   // 코드도움이 소요량을 되돌릴 때 대비(BOM 과 같은 꼴)
+    if (B.some((r) => r.SubItemProcRevName || r.InLossRate || r.OutLossRate || r.Location || r.Remark)) await Y.pasteRows(s2, 0, 'SubItemProcRevName', B.map((r) => [r.SubItemProcRevName, r.InLossRate, r.OutLossRate, r.Location, r.Remark]));
+    const bad = Y.rows(s2).filter((r) => !+r.ProcSeq).map((r) => r.IDX_NO);
+    const c = check2(v);
+    if (bad.length) { c.모두맞음 = false; c.틀린칸.push('소요자재 표 ' + bad.join('·') + '행 투입공정 코드(ProcSeq) 0 — 코드도움이 안 잡힘'); }
+    return c;
+  };
+  // 화면 두 표의 보이는 칸 전부 ↔ 문서. 숫자는 수로(빈칸 = 0), 체크는 1/0. 보기만 칸(단위·품목자산분류·제조방법등록여부)도 문서 값과 맞춤(영림원이 채운 값).
+  const check2 = (v, only) => {
+    const d = Y.win('500299').document, bad = [];
+    const one = (sh, want, name) => {
+      const rows = Y.rows(sh);
+      if (rows.length !== want.length) bad.push(name + ' 줄 수 문서 ' + want.length + ' / 화면 ' + rows.length);
+      want.forEach((f, i) => { const r = rows.find((x) => +x.IDX_NO === i + 1) || {}; for (const k of Object.keys(f)) {
+        const a = S(r[k]).trim(), b = f[k];
+        const ok = CHK.includes(k) ? (yes(a) ? '1' : '0') === b : NUM.includes(k) ? n0(a) === n0(b) : a === b;
+        if (!ok) bad.push(name + ' ' + (i + 1) + '행 ' + k + ': 문서 ' + (b || '(빈칸)') + ' / 화면 ' + (a || '(빈칸)'));
+      } });
+    };
+    one(d.getElementById('SS1'), (v.procs || []).map(P1), '공정 표');
+    if (only !== 'procs') one(d.getElementById('SS2'), (v.mats || []).map(P2), '소요자재 표');
+    const unit = d.querySelector('select[id*=BizUnit],select[id*=Unit]');
+    if (v.unit && unit && unit.selectedIndex >= 0 && unit.options[unit.selectedIndex].text !== v.unit) bad.push('사업단위 문서 ' + v.unit + ' / 화면 ' + unit.options[unit.selectedIndex].text);
+    return { 모두맞음: !bad.length, 틀린칸: bad };
+  };
   Y.im = {
-    cmp, open,
+    cmp, open, fillProcs, fillMats, check2,
     async go(code, again) {   // again = 진행중으로 멈춘 건 이어서(일괄등록이 이미 됐으면 건너뜀)
       const l = await Y.imp.list('erp_itemmats'), v = l.find((x) => x.code === code);
       if (!v || !(v.status === '대기' || (again && v.status === '진행중'))) throw new Error(code + ' 대기 아님: ' + (v && v.status));
