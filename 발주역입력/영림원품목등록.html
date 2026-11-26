@@ -2,7 +2,7 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.128.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.129.0
      v2.123.0(11-26): 사장님 「워크센터 기본값 품목별 — 품목이 미리 나타날 필요 없습니다. 영림원품목등록에 있는 제품 또는 입력폼에 등록완료된 품목을 검색하여 선택할 수 있게 해주세요. 제품별 자재별 칸은 현재 표가 비정상 상태입니다. 이곳도 같은 조건의 해당 속성을 검색하게 하면 됩니다.」 — 품목별 = 고른 품목만(검색 드롭 = 영림원품목등록 품목 + 입력폼 품목등록 완료) · 제품별·자재별 검색 = 같은 조건 · 빈 표 더하기 줄 높이(5px 로 눌려 안 보이던 것).
      v2.122.0(11-26): 사장님 「아, 제품별 설정도 필요합니다.」 — 워크센터 기본값 탭 안 「제품별」 표(제품 = 입력폼 품목등록 완료 제품 드롭 × 그 제품 반제품 공정) · 그 제품의 반제품 기본값 = 제품별. 차례(임시 — 사장님 미정): 품목 직접 → 품목별 → 제품별 → 자재별 → 공정별.
      v2.121.0(11-26): 사장님 「특정 자재에 대한 워크센터 자동입력을 설정해야겠어요. 흐름을 보니 자재에 따라 워크센터 순위가 변경되네요」 → 「네, 자재별 공정에 대한 워크센터를 이곳에서 설정하면 우선 표기가 되게 해주세요」 — 공정별/품목별 워크센터 기본값 탭 안 「자재별」 표(자재 = 입력폼 자재 완료 드롭 × 그 자재가 든 화면 반제품 공정) · 반제품 합판코드·필름코드가 그 자재면 기본값 = 자재별(차례: 품목 직접 → 품목별 → 자재별 → 공정별).
@@ -498,7 +498,7 @@ body:not(.펼침) .dpr-t .접힘{display:none}   /* v2.32.0 빈 열 접힘 — �
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.128.0</div>
+  <div class="badge">v2.129.0</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <div class="머리줄"><h1>영림원품목등록</h1><div id="설정" class="탭단추" hidden><div class="설정이름">입력설정</div><div class="기타줄"></div></div></div>
@@ -1754,6 +1754,18 @@ function 공통후보(){   /* 같은 동일속성 묶음 · 다른 제품 · 합
     for(const 줄 of 무리.values()){ const 모들 = [...new Set(줄.map(x => x.모))]; if(모들.length < 2) continue;
       const g = { id:줄[0].q, 줄:[...new Set(줄.map(x => x.q))], 모들, 묶:줄[0].묶, 합:줄[0].합, 규:줄.map(x => x.w + '*' + x.d) };
       for(const x of 줄) 결.set(x.q, g); } }
+  /* v2.129.0 사장님 「사이즈와 소모원장이 같다면 한 번 완료된 공통자재라도 묶을 수 있는 기회를 주는 건 어떤가요?」 — 품목명·품번이 들어간 공통 묶음과 합판코드 같고 규격 ±2mm 인
+     안 묶인 반제품(동일속성 묶음 상관없음, 위 새 후보가 아닌 것) = 그 묶음에 더할 후보 · 「묶기」 = 그 묶음 줄@id 에 더함(이름·번호 그대로) */
+  const 원줄 = [].concat(...품목원.filter(Boolean)), 줄찾 = q => 원줄.find(z => 트(z, pi)===q), 크기 = r => (트(r, gi).match(/(\d+(?:\.\d+)?)\s*\*\s*(\d+(?:\.\d+)?)/) || []).slice(1).map(Number);
+  const 맞2 = (a, b) => (Math.abs(a[0]-b[0]) <= 2 && Math.abs(a[1]-b[1]) <= 2) || (Math.abs(a[0]-b[1]) <= 2 && Math.abs(a[1]-b[0]) <= 2);
+  const 기존 = 공통묶음들().filter(g => g.명 && g.번).map(g => { const 들 = g.줄.map(줄찾).filter(Boolean); return { g, 합:들.length ? 값(트(들[0], pi), '합판코드').trim() : '', 크:들.map(크기).filter(x => x.length >= 2), 모:들.map(z => 트(z, mi)) }; }).filter(x => x.합 && x.크.length);
+  const 더 = new Map();
+  for(const r of 원줄){ if(트(r, ai)!=='반제품') continue; const q = 트(r, pi); if(!q || 묶인.has(q) || 결.has(q)) continue;
+    const 합 = 값(q, '합판코드').trim(), 크 = 크기(r); if(!합 || 크.length < 2) continue;
+    const e = 기존.find(x => x.합===합 && x.크.some(k => 맞2(k, 크))); if(!e) continue;
+    if(!더.has(e.g.id)) 더.set(e.g.id, { e, 새:[] }); 더.get(e.g.id).새.push({ q, 모:트(r, mi), 규:크.join('*') }); }
+  for(const { e, 새 } of 더.values()){ const c = { id:e.g.id, 줄:[...new Set(e.g.줄.concat(새.map(x => x.q)))], 모들:[...new Set(e.모.concat(새.map(x => x.모)))], 합:e.합, 규:e.크.map(k => k.join('*')).concat(새.map(x => x.규)), 기존:e.g };
+    결.set(e.g.id, c); for(const x of 새) 결.set(x.q, c); }
   return 결;
 }
 let 후보캐시 = null; const 후보들 = () => { if(!후보캐시){ 후보캐시 = 공통후보(); setTimeout(() => { 후보캐시 = null; }, 0); } return 후보캐시; };
@@ -1764,6 +1776,7 @@ function 공통td(r, p, 반){
     const 빈 = !g.명 || !g.번, 말 = `여러 제품에 중복되는 공통반자재 — 제품 ${모.length}: ${모.join(' · ')}` + (빈 ? ' · 꼭 채울 칸 — 공통반자재 품목명·품번 빈칸(입력설정 공통반자재)' : '');
     return `<td class="공묶${빈 ? ' 꼭' : ''}" data-k="공통" data-묶="${글(g.id)}" title="${글(말)}">공통</td>`; }
   const c = 후보들().get(p);
+  if(c && c.기존) return `<td class="공후보" data-k="공통" data-후보="${글(c.id)}" title="${글(`공통반자재 후보 — 공통 묶음 「${c.기존.명}」(${c.기존.번}) 에 더함 · 원장 ${c.합} · 규격 ${[...new Set(c.규)].join(' / ')} — 제품 ${c.모들.length}: ${c.모들.join(' · ')}`)}">묶기</td>`;   /* v2.129.0 */
   if(c) return `<td class="공후보" data-k="공통" data-후보="${글(c.id)}" title="${글(`공통반자재 후보 — 동일속성 「${c.묶}」 · 원장 ${c.합} · 규격 ${[...new Set(c.규)].join(' / ')} — 제품 ${c.모들.length}: ${c.모들.join(' · ')}`)}">묶기</td>`;
   return '<td data-k="공통"></td>';
 }
