@@ -2,7 +2,8 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.158.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.158.1
+     v2.158.1(11-26): 부속명 자동 표시(회색) = 실제 쓰는 값(`값`)이 규칙 값일 때만 — 공통반자재 묶인 줄 손 값이 쓰이는 줄(이동선반 6줄 1/0)에 규칙 값 1/1 이 잘못 보이던 것.
      v2.158.0(11-26): 사장님 「모든 이동선반 엣지W-1 엣지D-1 이 기본값입니다」 — 부속명(원래 품명 마지막 _ 뒤)이 「이동선반」 으로 시작(이동선반 · 이동선반L · 이동선반S …) = 엣지W 1 · 엣지D 1(손 값·동일속성 값이 빌 때, 회색 자동 — 상판·지판·도어 규칙과 같은 길).
      v2.157.0(11-26): 사장님 「공정흐름에 엣지 없으면 엣지 관련 입력 제한 — 엣지 관련 입력 제한 관련 중복되는 코드 삭제」 — 한 규칙 `엣지관련칸`(엣지두께 · 엣지W · 엣지D · 필름코드): 반제품 줄 공정흐름에 엣지 공정이 없으면 막음(회색 · 값 그대로 보임) · `엣지칠` 한 곳(표 만들 때 · 흐름 바뀔 때) · `바꿈` 한 곳에서 거절. 따로 있던 v2.40 엣지W·D(값 숨김) · v2.155 엣지두께 코드 걷음. 필름코드 = 새로 막힘.
      v2.156.0(11-26): 사장님 「공정흐름 엔씨멤브레인 - 결보호 입력제한」 — 공정흐름이 「NC멤브레인」 인 반제품 줄 = 결보호 칸 막음(회색 · 마우스) · 든 값(손 값·동일속성 받은 값)은 그대로 보임·그대로 씀(재단률 안 바뀜) · 흐름 바뀌면 바로. 「엣지W, D도 입력제한」 = v2.40 그대로(엣지 없는 69줄 이미 막힘 — 고친 것 없음).
@@ -517,7 +518,7 @@ body.받는중 #속 .표통,body.받는중 #고름 .흐름표{visibility:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.158.0</div>
+  <div class="badge">v2.158.1</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <div class="머리줄"><h1>영림원품목등록</h1><div id="설정" class="탭단추" hidden><div class="설정이름">입력설정</div><div class="기타줄"></div></div></div>
@@ -2063,7 +2064,7 @@ function 동일칠(통 = 받은[품목시트]){
     if(td.dataset.부속){ delete td.dataset.부속; td.classList.remove('공자동'); if(td.title.startsWith('자동 — ')) td.title = td.classList.contains('살구') ? 살말 : ''; }   /* v2.139.0 */
     const p = td.parentNode.dataset.p; if(원값(p, k) !== '') return;
     const d = 동일값(p, k);
-    if(!(d && (d.v || d.다름)) || (k==='공정흐름' && 공꼬리.get(p)==='중측판')){ const a = 부속규칙(p, k); if(a){ td.dataset.부속 = '1'; td.classList.add('공자동'); td.title = a.근거; if(td.textContent !== a.v) td.textContent = a.v; return; } }   /* v2.139.0 부속명 규칙 = 회색(자동) · 출처 마우스 */
+    if(!(d && (d.v || d.다름)) || (k==='공정흐름' && 공꼬리.get(p)==='중측판')){ const a = 부속규칙(p, k); if(a && 값(p, k)===a.v){ td.dataset.부속 = '1'; td.classList.add('공자동'); td.title = a.근거; if(td.textContent !== a.v) td.textContent = a.v; return; } }   /* v2.139.0 부속명 규칙 = 회색(자동) · 출처 마우스 */
     if(!d) return;
     if(d.없음){ td.classList.add('동일다름'); td.title = `동일속성 「${d.e.g}」 — 같은 부속(${d.e.k}) 짝 없음`; return; }
     if(!d.v && !d.다름) return;
