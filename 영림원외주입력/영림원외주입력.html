@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v343 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v344 -->
 <!-- v336(11-25): 상단 「발주역입력」 메뉴 끝에 「품목등록test서버용」(발주역입력 새 쪽). -->
 <!-- v335(11-25): 상단 「발주역입력」 메뉴 맨 위 「에이엠티출고조사」 묶음(재단·이룸산업 출고내역·로앤 출고내역·업체별 단품명 — 발주역입력 쪽길과 같은 차례) · 나머지 그 아래. -->
 <!-- v334(11-25): 상단 「발주역입력」 메뉴에 「조혼가구부속명」(업체별 단품명 다음 — 발주역입력 쪽길 차례와 같게). -->
@@ -490,7 +490,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v343</span>
+    <span class="ver">v344</span>
     <div class="pick topnav" id="topnav">   <!-- v288 사장님 11-18 「입력폼 상단에 발주역입력 메뉴를 만들어 발주역입력 페이지로 이어지게」 — 이름 = 각 페이지 <title> 앞부분 · 같은 탭 -->
       <button type="button" class="btn small" aria-haspopup="menu" aria-expanded="false">발주역입력</button>
       <div class="pickmenu topnavmenu" role="menu" hidden>
@@ -606,6 +606,66 @@ function erpSignIn(A,auth,F,fs){return new Promise(function(res){var done=false,
 /* 화면 쪽 권한 막음 — 저장소 규칙이 배포되기 전에도 폼 안에서는 막힌다. ERP_CAN 은 아래 화면 코드가 채운다. */
 function erpPermErr(){var e=new Error('권한이 없습니다.');e.code='erp-perm';return e;}
 function erpGuard(name,op){return window.ERP_CAN&&!window.ERP_CAN(name,op)?Promise.reject(erpPermErr()):null;}
+/* v344 사장님 11-26 「지금 등록량이 전체의 10%에도 못 미칩니다 — 장기적인 해결방안을 결정하여 지금부터 실행합시다」 — 1MB 한도 나눔(영림원품목등록 v2.105.0 보내기와 같은 꼴).
+   SPL 컬렉션 = 등록 한 건(영림원 화면 1건)은 머리 문서 그대로, 줄 배열(rows)만 같은 컬렉션 조각 문서 {__part:1, head, key, rows, i(원래 줄 차례)} 로 나눔 · 문서 id = 머리id~c{n}.
+   조각 = 제품번호(pcode) 차례대로 40제품씩(한 트랜잭션 500쓰기 한도 안 — 제품 2만개까지) · 머리 = 다른 칸 + __parts(조각 열쇠) + __n(줄 수). 같은 컬렉션이라 저장소 규칙 그대로.
+   읽기(onSnapshot·watch·get·트랜잭션) = 조각을 모아 예전 꼴(rows 하나, __parts·__n 뺌)로 넘김 · 쓰기(add·update·create·updateIf·updateAll·delete·deleteIf) = rows 가 있으면 나눠 씀(지난 조각 지움, 한 묶음/트랜잭션).
+   예전 꼴 문서(rows 안에 있음)도 그대로 읽힘 — 다음에 rows 를 고칠 때 나눔. 조각 문서는 status 가 없어 대기 질의·건수에 안 잡힘.
+   셈 근거(11-26): 영림원품목등록 보내기 외주계약 = 17제품 973줄 342KB(거래처 5) → 거래처 한 문서에 모든 제품 줄 · 제품 약 120~150개에서 1MB. 다른 erp_ 컬렉션은 문서 = 한 품목·한 줄·한 발주라 제품 수와 안 늚(11-26 최대 1.4KB). */
+var SPL={erp_contracts:{f:'rows',k:function(r){return String((r&&r.pcode)||'').trim();}}},SPL_N=40;
+function spPid(id,k){return id+'~'+k;}
+function spCut(name,o){var S=SPL[name],rows=o[S.f]||[],ord=[],grp={},parts={},keys=[];
+  rows.forEach(function(r){var k=S.k(r);if(!(k in grp)){grp[k]='c'+Math.floor(ord.length/SPL_N);ord.push(k);}});
+  rows.forEach(function(r,i){var k=grp[S.k(r)];if(!parts[k]){parts[k]={__part:1,head:'',key:k,rows:[],i:[]};keys.push(k);}parts[k].rows.push(r);parts[k].i.push(i);});
+  var head=Object.assign({},o);delete head[S.f];head.__parts=keys;head.__n=rows.length;return {head:head,parts:parts,keys:keys};}
+function spJoin(name,head,pd){var S=SPL[name];if(!head||!Array.isArray(head.__parts))return head;var a=[];
+  pd.forEach(function(p){if(!p)return;(p.rows||[]).forEach(function(r,j){a.push([(p.i||[])[j],r]);});});a.sort(function(x,y){return x[0]-y[0];});
+  var o=Object.assign({},head);o[S.f]=a.map(function(x){return x[1];});delete o.__parts;delete o.__n;return o;}
+function spGroup(name,docs){var P={},H=[];docs.forEach(function(d){var x=d.data();if(x&&x.__part)(P[x.head]=P[x.head]||{})[x.key]=x;else H.push(d);});
+  return H.map(function(d){var x=d.data();if(!x||!Array.isArray(x.__parts))return d;var j=spJoin(name,x,x.__parts.map(function(k){return (P[d.id]||{})[k]||null;}));return {id:d.id,data:function(){return j;}};});}
+function spWrap(api,F,fs,pingQ){
+  function wr(t,name,id,o,old,mode){var c=spCut(name,o),ref=F.doc(fs,name,id);
+    if(mode==='set')t.set(ref,c.head);else{var u=Object.assign({},c.head);u[SPL[name].f]=F.deleteField();t.update(ref,u);}
+    c.keys.forEach(function(k){var x=c.parts[k];x.head=id;t.set(F.doc(fs,name,spPid(id,k)),x);});
+    (old||[]).forEach(function(k){if(c.keys.indexOf(k)<0)t.delete(F.doc(fs,name,spPid(id,k)));});}
+  function dropOld(t,name,id,old){(old||[]).forEach(function(k){t.delete(F.doc(fs,name,spPid(id,k)));});}
+  function full(t,name,id){var g=function(r){return t?t.get(r):F.getDoc(r);};
+    return g(F.doc(fs,name,id)).then(function(d){if(!d.exists())return {x:null,keys:[]};var x=d.data(),ks=Array.isArray(x.__parts)?x.__parts:[];if(!ks.length)return {x:x,keys:[]};
+      return Promise.all(ks.map(function(k){return g(F.doc(fs,name,spPid(id,k)));})).then(function(ps){return {x:spJoin(name,x,ps.map(function(q){return q.exists()?q.data():null;})),keys:ks};});});}
+  var col0=api.collection,watch0=api.watch,ua0=api.updateAll,range0=api.range;
+  api.collection=function(name){var c=col0(name);if(!SPL[name])return c;var f=SPL[name].f;
+    return {onSnapshot:function(next,err){return c.onSnapshot(function(sn){next({docs:spGroup(name,sn.docs)});},err);},
+      add:function(data){if(!data||!Array.isArray(data[f]))return c.add(data);var g=erpGuard(name,'w');if(g)return g;
+        var ref=F.doc(F.collection(fs,name)),b=F.writeBatch(fs);wr(b,name,ref.id,data,[],'set');return b.commit().then(function(){pingQ(name,data);return ref;});},
+      doc:function(id){var d0=c.doc(id);return {
+        get:function(){return full(null,name,id).then(function(r){return r.x;});},
+        delete:function(){var g=erpGuard(name,'d');if(g)return g;return full(null,name,id).then(function(r){var b=F.writeBatch(fs);b.delete(F.doc(fs,name,id));dropOld(b,name,id,r.keys);return b.commit();});},
+        update:function(o){if(!o||!(f in o))return d0.update(o);var g=erpGuard(name,'w');if(g)return g;
+          return full(null,name,id).then(function(r){var b=F.writeBatch(fs);wr(b,name,id,o,r.keys,'update');return b.commit();}).then(function(x){pingQ(name,o);return x;});},
+        deleteIf:function(ok){var g=erpGuard(name,'d');if(g)return g;return F.runTransaction(fs,function(t){return full(t,name,id).then(function(r){if(!r.x||!ok(r.x))return false;t.delete(F.doc(fs,name,id));dropOld(t,name,id,r.keys);return true;});});},
+        create:function(o){var g=erpGuard(name,'w');if(g)return g;return F.runTransaction(fs,function(t){return t.get(F.doc(fs,name,id)).then(function(d){if(d.exists())return false;
+          if(Array.isArray(o[f]))wr(t,name,id,o,[],'set');else t.set(F.doc(fs,name,id),o);return true;});}).then(function(ok){if(ok)pingQ(name,o);return ok;});},
+        updateIf:function(make){var g=erpGuard(name,'w');if(g)return g;var po=null;return F.runTransaction(fs,function(t){return full(t,name,id).then(function(r){var o=r.x?make(r.x):null;if(!o)return false;
+          if(f in o)wr(t,name,id,o,r.keys,'update');else t.update(F.doc(fs,name,id),o);po=o;return true;});}).then(function(ok){if(ok)pingQ(name,po);return ok;});}};}};};
+  api.watch=function(name,spec,next,err){if(!SPL[name])return watch0(name,spec,next,err);
+    var heads=null,parts=null,fail=false,emit=function(){if(heads&&parts)next({docs:spGroup(name,heads.concat(parts))});};
+    var u1=watch0(name,spec,function(sn){heads=sn.docs.filter(function(d){var x=d.data();return !(x&&x.__part);});if(!spec)parts=sn.docs.filter(function(d){var x=d.data();return x&&x.__part;});emit();},function(e){if(!fail){fail=true;if(err)err(e);}});
+    var u2=spec?F.onSnapshot(F.query(F.collection(fs,name),F.where('__part','==',1)),function(sn){parts=sn.docs.map(function(d){return {id:d.id,data:function(){return d.data();}};});emit();},function(e){if(!fail){fail=true;if(err)err(e);}}):null;
+    return function(){u1();if(u2)u2();};};
+  api.range=function(name,field,a,b){if(!SPL[name])return range0(name,field,a,b);
+    return range0(name,field,a,b).then(function(l){return Promise.all(l.map(function(x){return full(null,name,x.id).then(function(r){return Object.assign({id:x.id},r.x||x);});}));});};
+  api.updateAll=function(list,decide){if(!list.some(function(x){return SPL[x.c];}))return ua0(list,decide);
+    for(var gi=0;gi<list.length;gi++){var g=erpGuard(list[gi].c,'w');if(g)return g;}var sig=null;
+    return F.runTransaction(fs,function(t){return Promise.all(list.map(function(x){return SPL[x.c]?full(t,x.c,x.id):t.get(F.doc(fs,x.c,x.id)).then(function(d){return {x:d.exists()?d.data():null,keys:[]};});})).then(function(rs){
+      var o=decide(rs.map(function(r){return r.x;}));if(!o)return false;
+      o.forEach(function(p,i){if(p&&p.$delete&&window.ERP_CAN&&!window.ERP_CAN(list[i].c,'d'))throw erpPermErr();});
+      o.forEach(function(p,i){if(!p)return;var x=list[i],sp=SPL[x.c],ref=F.doc(fs,x.c,x.id);
+        if(p.$delete){t.delete(ref);dropOld(t,x.c,x.id,rs[i].keys);}
+        else if(p.$set){if(sp&&Array.isArray(p.$set[sp.f]))wr(t,x.c,x.id,p.$set,rs[i].keys,'set');else{t.set(ref,p.$set);if(sp)dropOld(t,x.c,x.id,rs[i].keys);}}
+        else{if(sp&&(sp.f in p))wr(t,x.c,x.id,p,rs[i].keys,'update');else t.update(ref,p);}});
+      sig=o;return true;});}).then(function(ok){if(ok)(sig||[]).forEach(function(p,i){if(p&&!p.$delete)pingQ(list[i].c,p.$set||p);});return ok;});};
+  return api;
+}
 function connectDb(){
   var V='https://www.gstatic.com/firebasejs/11.2.0/';
   return Promise.all([import(V+'firebase-app.js'),import(V+'firebase-auth.js'),import(V+'firebase-firestore.js')]).then(function(m){
@@ -619,7 +679,7 @@ function connectDb(){
       var pingQ=function(name,o){if(!o||(o.status!=='대기'&&o.status!=='수정대기')||!/^erp_/.test(name)||name==='erp_agentq'||(window.ERP_CAN&&!window.ERP_CAN('erp_agentq','w')))return;try{F.setDoc(F.doc(fs,'erp_agentq','ping'),{n:F.increment(1),at:new Date().toISOString()},{merge:true}).catch(function(){});}catch(e){}};
       var pingAny=function(name,o){if(o&&o.status)pingQ(name,o);};
       /* 화면 코드가 쓰는 모양(collection/doc/add/update/delete/onSnapshot)만 맞춘 얇은 껍데기 */
-      return {collection:function(name){return {
+      return spWrap({collection:function(name){return {
         onSnapshot:function(next,err){return F.onSnapshot(F.collection(fs,name),function(s){next({docs:s.docs.map(function(d){return {id:d.id,data:function(){return d.data();}};})});},err);},
         add:function(data){return erpGuard(name,'w')||F.addDoc(F.collection(fs,name),data).then(function(r){pingQ(name,data);return r;});},
         doc:function(id){return {delete:function(){return erpGuard(name,'d')||F.deleteDoc(F.doc(fs,name,id));},update:function(o){return erpGuard(name,'w')||F.updateDoc(F.doc(fs,name,id),o).then(function(r){pingQ(name,o);return r;});},
@@ -657,7 +717,7 @@ function connectDb(){
       gokSet:function(em,o){return F.setDoc(F.doc(fs,'erp_gok',em),o,{merge:true});},
       updateAll:function(list,decide){for(var gi=0;gi<list.length;gi++){var g=erpGuard(list[gi].c,'w');if(g)return g;}var refs=list.map(function(x){return F.doc(fs,x.c,x.id);}),sig=null;return F.runTransaction(fs,function(t){
         return Promise.all(refs.map(function(r){return t.get(r);})).then(function(ds){var o=decide(ds.map(function(d){return d.exists()?d.data():null;}));if(!o)return false;
-          o.forEach(function(p,i){if(p&&p.$delete&&window.ERP_CAN&&!window.ERP_CAN(list[i].c,'d'))throw erpPermErr();});o.forEach(function(p,i){if(!p)return;if(p.$delete)t.delete(refs[i]);else if(p.$set)t.set(refs[i],p.$set);else t.update(refs[i],p);});sig=o;return true;});}).then(function(ok){if(ok)(sig||[]).forEach(function(p,i){if(p&&!p.$delete)pingQ(list[i].c,p.$set||p);});return ok;});}};   /* v96 $delete·$set = 5 자재 합치기·되돌리기 */
+          o.forEach(function(p,i){if(p&&p.$delete&&window.ERP_CAN&&!window.ERP_CAN(list[i].c,'d'))throw erpPermErr();});o.forEach(function(p,i){if(!p)return;if(p.$delete)t.delete(refs[i]);else if(p.$set)t.set(refs[i],p.$set);else t.update(refs[i],p);});sig=o;return true;});}).then(function(ok){if(ok)(sig||[]).forEach(function(p,i){if(p&&!p.$delete)pingQ(list[i].c,p.$set||p);});return ok;});}},F,fs,pingQ);   /* v344 1MB 나눔 · v96 $delete·$set = 5 자재 합치기·되돌리기 */
     });
   }).catch(function(e){console.warn('파이어베이스 연결 실패',e);return null;});
 }
