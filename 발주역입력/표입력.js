@@ -87,7 +87,8 @@
   }
 
   /* ── 고름 ── */
-  let 지금 = null, 편집 = null, 끌기 = null, 채우기 = null, 그림틀 = 0;   // 지금 = {표, 어, r0,c0,r1,c1, ar,ac(머리 칸)}
+  let 지금 = null, 편집 = null, 끌기 = null, 채우기 = null, 그림틀 = 0, 고른줄 = null;   /* v7 고른 칸 줄 = tr.표입력줄(모양은 쪽 CSS) */
+  const 줄표시 = tr => { if(tr === 고른줄) return; if(고른줄) 고른줄.classList.remove('표입력줄'); if(tr) tr.classList.add('표입력줄'); 고른줄 = tr || null; };   // 지금 = {표, 어, r0,c0,r1,c1, ar,ac(머리 칸)}
   const 줄들 = t => t.tBodies[0] ? [...t.tBodies[0].rows] : [];
   const 보임 = td => !!td && td.offsetParent !== null && !td.parentNode.hidden;
   /* 11-26 합친 칸(rowspan) 표 = 보이는 열 자리로 셈(영림원품목등록 공통반자재 탭) — 사장님 「입력될 때마다 화면 꺼떡거리는 게 입력 내용이 다른 위치에 적용되면서 그런 거지?」.
@@ -116,7 +117,7 @@
     else 지금 = { 표:t, 어, r0:r, c0:c, r1:r, c1:c };
     그리기(); 초점();
   }
-  function 풀기(){ if(편집) 끝내기(true); 지금 = null; [틀, 채틀, 손, 세모, 목록].forEach(e => e.style.display = 'none'); 칸.classList.add('숨음'); if(document.activeElement === 칸) 칸.blur(); }
+  function 풀기(){ if(편집) 끝내기(true); 지금 = null; 줄표시(null); [틀, 채틀, 손, 세모, 목록].forEach(e => e.style.display = 'none'); 칸.classList.add('숨음'); if(document.activeElement === 칸) 칸.blur(); }
   function 초점(){ if(!지금) return; 칸위치(); if(document.activeElement !== 칸) 칸.focus({ preventScroll:true }); }
   const 머칸 = () => 칸at(지금.r0, 지금.c0);
 
@@ -134,6 +135,7 @@
     그림틀 = 0;
     if(!지금) return;
     if(!지금.표.isConnected){ const 새 = 지금.어 && 지금.어.이름 && 이름표.get(지금.어.이름); if(새 && 새.isConnected && 새 !== 지금.표){ 지금.표 = 새; 지금.어 = 어들.get(새); } else { 풀기(); return; } }
+    줄표시(줄들(지금.표)[지금.r1] || null);   /* v7 */
     const 판 = 칸판(); if(!판.length){ 틀.style.display = 손.style.display = 'none'; return; }
     const [L, T, R, B] = 둘레(판), 보 = 보이는틀(L, T, R, B);
     if(보.r <= 보.l || 보.b <= 보.t){ 틀.style.display = 손.style.display = 'none'; }
