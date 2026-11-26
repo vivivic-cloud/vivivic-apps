@@ -2,7 +2,8 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.119.3
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.120.0
+     v2.120.0(11-26): 사장님 「기본값으로 하는 논리는 맞는데 특정 제품에 대한 변동을 등록해야 한다면 이 워크센터 입력부에서 드롭 선택으로 변경 가능해야 하지 않을까요?」 — 제품별공정별워크센터등록 기본값 줄 워크센터 칸 = 드롭(고르면 그 품목 값 `wcb@공정@기본값 n` — 그 자리 기본값보다 먼저 · 비우면 기본값으로) · 우선순위·시간·표준은 그대로 기본값.
      v2.119.3(11-26): 사장님 「품번 넣으면 열 변경된다」 — 합친 칸(rowspan) 표(공통반자재 탭)는 값을 고칠 때마다 표를 통째로 새로 만들어 고른 칸·치는 자리가 풀림 → 줄·합친 칸 꼴(data-꼴)이 같으면 새로 만들지 않고 칸 글자만 고침(다른 계산 탭과 같은 길).
      v2.119.2(11-26): 분배 방 정정 「업체별 단품명에 없는 줄을 끝으로 옮기는 기능은 없애지 마세요」 → v2.119.1 의 ⓪(그 기능 없앰)만 되돌림. 입력 뒤 열 너비·민 자리·공통 묶음 차례 고정(①②③)은 그대로.
      v2.119.1(11-26): 사장님 「입력 후 열 변동이 왜 생기냐고」 「입력 열의 순서 변동이 생기잖아. 그냥 가만히 있게 코드 수정하라고」 — ⓪ 업체별 단품명에 없는 제품 줄을 표 끝으로 옮기던 것(v2.5) 없앰 = 줄 차례 엑셀 그대로 · ① 공통반자재 품목명·품번을 넣으면 품목등록업로드 표를 새로 만들며 스크롤이 맨 위·왼쪽으로(공통확인 · 조각 받음) → 품목표다시 = 민 자리 그대로 ② 표를 새로 만들 때 열 너비가 글 길이 따라 줄고 늚 → 열마다 전 너비를 최소 너비로(품목등록업로드 · 계산 탭 새로 만들 때) ③ 공통반자재 탭 묶음 차례가 저장 뒤 바뀜(창고 맵 열쇠 차례) → 묶인 줄의 품목등록업로드 차례로 고정.
@@ -484,7 +485,7 @@ body:not(.펼침) .dpr-t .접힘{display:none}   /* v2.32.0 빈 열 접힘 — �
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.119.3</div>
+  <div class="badge">v2.120.0</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <div class="머리줄"><h1>영림원품목등록</h1><div id="설정" class="탭단추" hidden><div class="설정이름">입력설정</div><div class="기타줄"></div></div></div>
@@ -959,7 +960,9 @@ function 워크센터원(p, 공){   /* 그 품번이 저장한 줄만 → [{n, w
 function 워크센터들(p, 공){ const 목 = 워크센터원(p, 공); if(p===공정기본) return 목;
   /* v2.70.0 사장님 「따로 고른것과 상관없이 기본값기준 우선으로 작성되게 해주세요」 — 반제품·재공품 = 기본값 줄 먼저(기본값 우선순위 그대로) · 품목에 따로 고른 줄은 기본값에 없는 워크센터만 그 뒤(우선순위 = 기본값 다음 번호) · 겹치면 기본값 것 */
   const 품g = 공통번묶(p), 품목 = 품g ? 워크센터원(품목기본 + 품g.id, 공) : [];   /* v2.116.0 공통반자재 = 품목별 기본값 먼저 */
-  const 기 = (품목.length ? 품목 : 워크센터원(공정기본, 공)).slice().sort((a,b) => a.r - b.r || a.n - b.n).map(z => Object.assign({}, z, { 기본:true, 품기본:!!품목.length }));
+  const 다 = Object.assign({}, 입력[p] || {}); for(const [x, v] of 더럽){ const [pp, k] = x.split('\t'); if(pp===p) 다[k] = v; }
+  const 기 = (품목.length ? 품목 : 워크센터원(공정기본, 공)).slice().sort((a,b) => a.r - b.r || a.n - b.n).map(z => { const 바 = String(다['wcb@' + 공 + '@' + z.n] || '').trim();   /* v2.120.0 기본값 자리를 이 품목이 고른 워크센터 */
+    return Object.assign({}, z, { 기본:true, 품기본:!!품목.length }, 바 ? { 기wc:z.wc, wc:바, 바꿈:true } : {}); });
   /* v2.72.0 사장님 「제품도 기본값 따름」 — 제품도 기본값 줄 먼저(위와 같음) · 그 공정 기본값이 없을 때만 예전대로 자기 줄 → 없으면 업체별 단품명 업체(v2.61.0) */
   if(제품번호들.has(p) && !기.length) return 목.length ? 목 : (단품업체들.get(p) || []).map((u, i) => ({ n:i+1, wc:별명(u), r:i+1, 손:false, t:'', tm:'', 기본:true, 업체:u }));
   const 있 = new Set(기.map(z => z.wc)), 끝r = 기.reduce((m, z) => Math.max(m, z.r), 0);
@@ -1185,7 +1188,8 @@ const 계산시트 = {
             else if(워크센터읽음 && !워) Object.assign(워칸, { 모:'입력폼 워크센터등록 완료에 없음', 꼭:1 });
             const 순칸 = 빈 ? { v:'', t:'워크센터를 고르면 차례대로 1 · 2 · 3' } : { v:z.r, 편:{ p:o.p, k:'wcr@' + 공 + '@' + z.n }, 살:1, t:(z.손 ? '손으로 정한 우선순위' : '고른 차례(손으로 바꿀 수 있음)') + ' · ' + 살말, 기:z.업체 ? '임시 — 업체별 단품명 업체 목록 차례(우선순위 기준 없음)' : z.기본 ? '공정별 워크센터 기본값에서 옴' : '' };
             if(!빈 && 겹.has(z.r)) Object.assign(순칸, { 모:'같은 공정에 같은 우선순위', 꼭:1 });
-            if(잠){ delete 워칸.편; delete 워칸.드롭; 워칸.기 = '공정별 워크센터 기본값에서 옴'; delete 순칸.편; delete 순칸.살; 순칸.t = ''; }
+            if(잠){ 워칸.편 = { p:o.p, k:'wcb@' + 공 + '@' + z.n };   /* v2.120.0 기본값 줄도 워크센터 드롭 — 고르면 이 품목 값 */
+              if(z.바꿈){ delete 워칸.기; 워칸.t = `이 품목 값 — 기본값 「${z.기wc}」 대신 · 지우면 기본값`; } else 워칸.기 = (z.품기본 ? '품목별' : '공정별') + ' 워크센터 기본값에서 옴 — 고르면 이 품목 값이 됨'; delete 순칸.편; delete 순칸.살; 순칸.t = ''; }
             const 시칸 = c => { if(잠){ delete c.편; delete c.드롭; delete c.살; } return c; };
             줄.push(머리.concat(위, [워칸, 워 ? 설(워.구분, '입력폼 워크센터등록 값') : '', 워 ? 설(워.거래처, '입력폼 워크센터등록 값') : '', 빈 ? '' : 시칸(기칸(시간칸(o.p, 'wct@' + 공 + '@' + z.n), z, 'wct')), 빈 ? '' : 시칸(기칸(표준칸(o.p, 'wctm@' + 공 + '@' + z.n), z, 'wctm')), 순칸]));   /* v2.55.0 시간단위 드롭(초·분·시·일) · 표준 작업시간 입력 · v2.60.0 기본값 줄 = 기본값 시간 */
           } }); }
@@ -1406,7 +1410,7 @@ function 계산그리기(u){
     표입력.표(새표, { 이름:u, 열: td => String(td.dataset.k || '').split('@')[0], 칸: td => td.classList.contains('편'), 막음: () => false, 알림: (td, 글자) => 막음알림(td, 글자),
       읽기: td => td.textContent.trim(), 쓰기: 목 => 바꿈(목.map(([td, v]) => ({ p:td.dataset.p, k:td.dataset.k, v }))),
       목록: td => { const k = String(td.dataset.k||''), p = td.dataset.p;
-        if(k.startsWith('wc@')) return 워크센터목록.map(w => ({ v:w.이름, 글:w.구분, 덧:w.거래처 }));
+        if(k.startsWith('wc@') || k.startsWith('wcb@')) return 워크센터목록.map(w => ({ v:w.이름, 글:w.구분, 덧:w.거래처 }));
         if(k.startsWith('창외주@') || k.startsWith('외주처@')) return 외주목록.map(x => ({ v:x.code, 글:x.name }));   /* v2.93.0 외주계약 외주거래처 */
         if(k.startsWith('창그룹@')) return 창고그룹목록.map(v => ({ v }));
         if(k.startsWith('창부서@')) return 창고부서목록.map(v => ({ v }));   /* v2.78.0 */
@@ -1416,7 +1420,7 @@ function 계산그리기(u){
         if(분류키.includes(k)){ const 완 = 분류완료(), 대 = 분류값(p,'분류대').trim(), 중 = 분류표기([대, 분류값(p,'분류중'), ''])[1], 유 = a => [...new Set(a.filter(Boolean))].map(v => ({ v }));   /* v2.54.0 */
           return k==='분류대' ? 유(완.map(x => x[0])) : k==='분류중' ? 유(완.filter(x => x[0]===대).map(x => x[1])) : 유(완.filter(x => x[0]===대 && x[1]===중).map(x => x[2])); }
         return []; },
-      목록만: td => { const k = String(td.dataset.k||''); return k.startsWith('wc@') || k.startsWith('창외주@') || k.startsWith('외주처@') || k.startsWith('창그룹@') || (!!목록고름(k) && !k.startsWith('정산@')); } }); }
+      목록만: td => { const k = String(td.dataset.k||''); return k.startsWith('wc@') || k.startsWith('wcb@') || k.startsWith('창외주@') || k.startsWith('외주처@') || k.startsWith('창그룹@') || (!!목록고름(k) && !k.startsWith('정산@')); } }); }
   속.querySelectorAll('.months .chip').forEach(b => b.onclick = () => { 계산탭[u] = b.dataset.t; 계산그리기(u); });
 }
 
