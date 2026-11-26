@@ -5,7 +5,8 @@
 //   - 저장·삭제·조회는 누르지 않는다(사람/작업자가 대조표를 보고 누른다).
 // 확인: 2026-11-01 공정등록(500173)에서 — 붙여넣기 이벤트는 시트 안 contenteditable DIV 가 받는다.
 //   SetFocus() → SetActiveCell(0부터 센 행, 열 이름) → 그 DIV 에 ClipboardEvent('paste') 를 보내면 그 칸부터 탭으로 나뉘어 들어간다.
-//   ⚠ 여러 줄(\n·\r\n)을 한 번에 보내면 **아무것도 안 들어간다** → 한 줄씩 보낸다(줄마다 0.8초 기다림).
+//   여러 줄 = Y.pasteRows — 줄 사이 \r\n(CRLF)으로 이어 붙여넣기 이벤트 하나로 보낸다(11-26 500259·502829·500226 시험).
+//   ⚠ \n(LF)만 쓰면 안 된다(첫 줄만 들어가거나 한 칸에 붙음). 시험 안 한 화면은 Y.paste 한 줄씩(README 「여러 줄 한 번에」 목록).
 //   ⚠ 체크 칸은 붙여넣기(1·True)로 안 켜진다 → Y.setChk(시트, 행0, 열, true) = 시트 SetText(행0, 열, '1')(화면 체크도 켜짐 확인).
 //     SetText 는 코드도움을 안 거치므로 **글·코드 칸에는 쓰지 않는다**(체크 칸 전용).
 (function () {
@@ -94,6 +95,19 @@
     dt.setData('text/plain', cells.map(Y.cell).join('\t'));
     pd.dispatchEvent(new w.ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
     await Y.sleep(wait);
+  };
+  // 여러 줄 한 번에(11-26): row0 행부터 rows(줄마다 칸 배열)를 칸은 \t · 줄은 \r\n 으로 이어 이벤트 하나로. \n 금지.
+  //   README 「여러 줄 한 번에」 목록의 화면에서만 쓴다. 넣은 뒤 줄 수·모든 칸을 읽어 대조하는 것은 그대로.
+  Y.pasteRows = async (sh, row0, col, rows, wait = 2500) => {
+    const w = sh.ownerDocument.defaultView;
+    const pd = sh.querySelector('[contenteditable]');
+    if (!pd) throw new Error('붙여넣기 칸(contenteditable)을 못 찾음');
+    sh.SetFocus();
+    sh.SetActiveCell(row0, col);
+    const dt = new w.DataTransfer();
+    dt.setData('text/plain', rows.map((cells) => cells.map(Y.cell).join('\t')).join('\r\n') + '\r\n');
+    pd.dispatchEvent(new w.ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+    await Y.sleep(wait + 300 * rows.length);
   };
   // 체크 칸 켜기/끄기(행0 = 0부터 센 행)
   Y.setChk = (sh, row0, col, on) => { sh.SetText(row0, col, on ? '1' : '0'); };

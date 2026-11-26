@@ -2,7 +2,7 @@
 // 메뉴: 도입 › STEP1 거래처/품목/물류 초기설정 › 품목관리 「품목등록 업로드」.
 // 받는 것: 폼 erp_items 문서 배열 [{name, code, spec, eng, asset, state, io, imp, unit, small('대 > 중 > 소' 경로)}].
 // 쓰는 법: 화면 열고(빈 표) → await ylw.itemUp.fill(목록) → 대조표 모두맞음 → 「저장」 → 품목조회(500260) 「조회」 → ylw.itemUp.verify(목록).
-// 줄마다 붙여넣기 둘: ItemName 부터 [품명, 품번, 규격, 영문명, 품목자산분류, 기준단위] + ItemClassSName 부터 [소분류 이름, 품목상태, 내외자구분, 중요도].
+// 붙여넣기 둘(여러 줄 한 번에 \r\n, 11-26): ItemName 부터 [품명, 품번, 규격, 영문명, 품목자산분류, 기준단위] + ItemClassSName 부터 [소분류 이름, 품목상태, 내외자구분, 중요도].
 //   기준단위·소분류·자산분류·상태·내외자·중요도 모두 이름으로 코드가 잡히고 대·중분류는 저절로(11-01).
 // 대조: 보이는 45칸 전부 — 폼 칸 10개는 폼 값, 나머지(세트품목여부·부서·담당자·부가세·소요량계산방식·출고구분 …)는 빈칸/0 이어야 맞음(폼에 없는 칸).
 //   ⚠ 품목등록(500215)으로 넣으면 저장 때 부서 대표이사·담당자·과세·MRP·작업지시별 출고요청이 들어가지만, 이 표는 그 칸이 빈칸이다(11-01).
@@ -24,11 +24,10 @@
     async fill(list) {
       const sh = Y.sheet(PAGE, 'SS1');
       if (Y.rows(sh).length) throw new Error('표가 비어 있지 않음 — 「신규」로 비우고 다시');
-      for (let i = 0; i < list.length; i++) {
-        const v = list[i];
-        await Y.paste(sh, i, 'ItemName', [v.name, v.code, v.spec, v.eng, v.asset, v.unit], 1200);
-        await Y.paste(sh, i, 'ItemClassSName', [path(v)[2], v.state || '사용', v.io || '내자', v.imp || 'A등급'], 1200);
-      }
+      // 11-26 부터 여러 줄 한 번에(\r\n) — 앞 덩이(품명~기준단위) 전체 → 뒤 덩이(소분류~중요도) 전체. 줄 수가 모자라면 멈춤.
+      await Y.pasteRows(sh, 0, 'ItemName', list.map((v) => [v.name, v.code, v.spec, v.eng, v.asset, v.unit]));
+      if (Y.rows(sh).length !== list.length) throw new Error('붙인 줄 ' + Y.rows(sh).length + ' / 목록 ' + list.length + ' — 「신규」로 비우고 다시(신규 직후 바로 붙이면 빠진 적 있음)');
+      await Y.pasteRows(sh, 0, 'ItemClassSName', list.map((v) => [path(v)[2], v.state || '사용', v.io || '내자', v.imp || 'A등급']));
       return this.check(list);
     },
     check(list) {
