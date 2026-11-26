@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.53.1
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.54.0
+     v1.54.0(11-26): 사장님 「그러니까 내가 영림원보내기 완료 건이 아니라 각 거래처별 완료 건 만들라고 했잖아」 — 거래처 둘째 줄 「거래처별 완료 건」 = 입력폼 실제 완료(구매단가 완료 · 구매거래처 = 그 거래처(거래처 연결) + 그 자재 자재등록 완료) 전부 · bd 유무 상관없음 · 실시간 · 영림원보내기 그대로.
      v1.53.1(11-26): 사장님 「아… 왜 입력완료 건 연동 안 되냐」 — 월별 명세 자재명·자재번호 칸이 공개 결과(자재 완료)만 보고 영림원보내기 「등록완료」(입력폼 완료 · 완료보관 · 구매+가공 여섯 단계) 줄을 빈칸으로 두던 것 → 같은 `등록상태` 로 셈(가공 줄 = 가공완료품 자재번호·입력폼 자재명).
      v1.53.0(11-26): 사장님 「그럼 이거 켤 때 무조건 입력폼 로그인하게 해」 — 입력폼(erp-input) 로그인이 없으면(확인 전 포함) 거래처·표 안 보임 · 「외주자료 입력폼 로그인」 단추만(입력폼 쪽에서 로그인) · 로그인되면 보임 · 풀리면 다시 가림. 이 쪽 로그인 길은 그대로(새 로그인 없음).
      v1.52.1(11-25): 보관된 구매+가공 줄은 고른 줄(창고 줄)에 없어도 보이고 보냄(백색코 줄이 17:11 에 고른 줄에서 지워져 있었음).
@@ -435,7 +436,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.53.1</div>
+  <div class="badge">v1.54.0</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -523,7 +524,8 @@ function 볼것그리기(){
   if(목표) 버튼.push(['매입품목', 목표.칸[0] || '매입품목']);
   버튼.push(['영림원', '영림원등록']);
   버튼.push(['폼', '영림원보내기']);   /* v1.4.0 「영림원 입력폼」 → v1.8.1 「영림원보내기」 */
-  버튼.push(['가공품목', 가공품목메뉴]);   /* v1.42.0 현진 「가공품목등록」 → v1.44.0 모든 거래처 「구매+가공품목」 */
+  버튼.push(['가공품목', 가공품목메뉴]);
+  버튼.push(['완료건', 완료건메뉴]);   /* v1.54.0 */   /* v1.42.0 현진 「가공품목등록」 → v1.44.0 모든 거래처 「구매+가공품목」 */
   el.innerHTML = 버튼.map(([k,t]) => `<button class="chip${k===볼것?' on':''}" data-k="${글(k)}">${글(t)}</button>`).join('');
   el.querySelectorAll('.chip').forEach(b => b.onclick = () => {
     볼것 = b.dataset.k; el.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x===b)); 그리기();
@@ -2358,7 +2360,7 @@ function 중국볼것그리기(){
   const el = document.getElementById('볼것'), 줄 = (중국||{}).줄||[];
   const 달들 = [...new Set(줄.map(z => z.월).filter(Boolean))].sort();
   const 여러해 = new Set(달들.map(m => m.slice(0,4))).size > 1;
-  const 버튼 = [['전체','전체'], ...달들.map(m => ['m:'+m, 중국달글(m, 여러해)]), ['폼','영림원보내기'], ['가공품목', 가공품목메뉴], ['동일품','동일품'], ['엑셀','엑셀 새로 불러오기']];   /* v1.19.0 영림원보내기 · v1.21.0 동일품 */
+  const 버튼 = [['전체','전체'], ...달들.map(m => ['m:'+m, 중국달글(m, 여러해)]), ['폼','영림원보내기'], ['가공품목', 가공품목메뉴], ['완료건', 완료건메뉴], ['동일품','동일품'], ['엑셀','엑셀 새로 불러오기']];   /* v1.19.0 영림원보내기 · v1.21.0 동일품 */
   el.innerHTML = 버튼.map(([k,t]) => `<button class="chip${k===중국볼것?' on':''}" data-k="${글(k)}">${글(t)}</button>`).join('');
   el.querySelectorAll('.chip').forEach(b => b.onclick = () => {
     중국볼것 = b.dataset.k; el.querySelectorAll('.chip').forEach(x => x.classList.toggle('on', x===b)); 중국그리기();
@@ -2368,7 +2370,8 @@ function 중국그리기(){
   const 속 = document.getElementById('속'), d = 중국||{};
   볼것 = 중국볼것==='폼' ? '폼' : 중국볼것==='가공품목' ? '가공품목' : '전체';
   if(중국볼것==='폼'){ 폼그리기(); return; }
-  if(중국볼것==='가공품목'){ 가공품목그리기(); return; }   /* v1.44.0 */   /* v1.19.0 국내와 같은 영림원보내기 */
+  if(중국볼것==='가공품목'){ 가공품목그리기(); return; }
+  if(중국볼것==='완료건'){ 볼것 = '완료건'; 완료건그리기(); return; }   /* v1.54.0 */   /* v1.44.0 */   /* v1.19.0 국내와 같은 영림원보내기 */
   if(중국볼것==='엑셀'){ 중국엑셀그리기(); return; }
   if(중국볼것==='동일품'){ 동일품그리기(); return; }
   if(!(d.줄||[]).length){ 속.innerHTML = '<div class="state"><div class="big">창고에 해피코 자료가 없습니다</div><div class="sub">「엑셀 새로 불러오기」 에서 엑셀을 고르십시오.</div></div>'; return; }
@@ -2707,6 +2710,28 @@ function 중국엑셀읽기(X, buf){
    줄 = 영림원보내기 「가공」 줄(납품제품명연결 체크 뺌)마다. 색 = 초록 완료 · 노랑 신규 · 빨간 테 빈칸(임시) · 파랑 저장값. 까닭은 마우스.
    저장 = 창고 발주역입력_영림원폼/_가공품목_{거래처} = {거래처, 줄:[{가공, 원장(옛), 값}], 보내기:{판, 고친때, 줄}, 고친때} — 통째로(0.4초 묶음). 결과 = 입력폼 mixResSync·결과맞추기.py 가 씀(이 쪽은 읽기만). */
 const 가공품목메뉴 = '구매+가공품목';
+/* v1.54.0 거래처별 완료 건 — 입력폼 실제 완료 기준(어디서 넘겼는지·bd 상관없음): 구매단가등록 완료 중 구매거래처 = 이 거래처(거래처 연결 영림원 거래처, 없으면 시트 이름) ·
+   그 품번의 자재등록 완료(자재번호 같음, 대소문자 무시) · 같은 품번 = 한 줄(적용시작일 가장 늦은 구매단가). 칸 = 입력폼 칸 이름 그대로. 읽기만 · 입력폼 로그인 자료(window.폼완료대기) 실시간. */
+const 완료건메뉴 = '거래처별 완료 건';
+const 완료건자재칸 = [['name','자재명'],['code','자재번호'],['spec','규격'],['asset','품목자산분류'],['state','자재상태'],['io','내외자구분'],['unit','기준단위'],['small','자재소분류']];
+const 완료건단가칸 = [['vendor','구매거래처'],['io','내외자구분'],['cur','통화'],['price','단가'],['from','적용시작일']];
+function 완료건줄(s){
+  const W = window.폼완료대기 || {}, 단 = W.구매단가, 자 = W.자재; if(!단 || !자) return null;
+  const 연 = 연결된(s), v = 트((연 && 연.거래처) || s), 살 = r => r.status==='완료' && !r.ylwGone, 맵 = new Map();
+  for(const r of 단){ if(!살(r) || 트(r.vendor)!==v) continue; const k = 트(r.code).toLowerCase(); if(!k) continue; const o = 맵.get(k); if(!o || String(r.from || '') > String(o.from || '')) 맵.set(k, r); }
+  return [...맵.entries()].map(([k, p]) => ({ p, m:자.find(r => 살(r) && 트(r.code).toLowerCase()===k) || null }));
+}
+async function 완료건그리기(){
+  const s = 고른, 속 = document.getElementById('속');
+  if(연결===null){ try{ await 연결받기(); }catch(e){} if(고른!==s || 볼것!=='완료건') return; }
+  const 줄 = 완료건줄(s);
+  if(!줄){ 속.innerHTML = '<div class="state"><div class="big">입력폼 자료를 읽는 중입니다…</div></div>'; return; }
+  const 값 = (r, k) => { const x = r ? r[k] : ''; return x == null ? '' : typeof x==='boolean' ? (x ? '✓' : '') : String(x); };
+  const 머 = `<tr><th class="dpr-k" colspan="${완료건자재칸.length}">자재등록</th><th colspan="${완료건단가칸.length}">구매단가등록</th></tr><tr>` + 완료건자재칸.concat(완료건단가칸).map(([, t], i) => `<th${i===0 ? ' class="dpr-k"' : ''}>${글(t)}</th>`).join('') + '</tr>';
+  const 몸 = 줄.map(({ p, m }) => '<tr>' + 완료건자재칸.map(([k], i) => `<td${i===0 ? ' class="dpr-k"' : ''}${!m ? ' title="입력폼 자재등록 완료 없음"' : ''}>${글(m ? 값(m, k) : (k==='name' ? 값(p, 'name') : k==='code' ? 값(p, 'code') : ''))}</td>`).join('')
+    + 완료건단가칸.map(([k]) => `<td${k==='price' ? ' class="num"' : ''}>${글(값(p, k))}</td>`).join('') + '</tr>').join('');
+  속.innerHTML = `<div class="표통"><div class="표"><table class="dpr-t"><thead>${머}</thead><tbody>${몸}</tbody></table></div><div class="글">${줄.length}줄</div></div>`;
+}
 const 가공품목 = {}, 가공품목보내기 = {}, 가공품목결과 = {}, 가공품목듣기 = {}, 가공품목보관 = {}, 가공풀린 = new Set();   /* v1.52.0 완료보관 · 고치기로 푼 줄(거래처 \n 열쇠, 이 화면 동안) */
 /* v1.52.0 구매+가공 등록완료 보관 — 여섯 단계 모두 입력폼 완료가 된 때의 값을 _가공품목_{거래처}.완료보관.{열쇠} 에(통째 mergeFields) */
 async function 가공보관바꿈(s, 더, 뺄){
@@ -2740,7 +2765,7 @@ const 폼등록 = { 자재:null, 구매단가:null, 공정:null };
 const 현진 = '현진산업';
 window.폼완료받음 = (k, 줄) => {
   if(k==='구매단가' || k==='자재'){ 폼등록[k] = 줄 ? new Set(줄.filter(r => r.status==='완료' && !r.ylwGone && 트(r.code)).map(r => k==='자재' ? 트(r.code).toLowerCase() : 트(r.code).toLowerCase() + '\t' + 트(r.vendor))) : null;
-    try{ if(볼것==='폼' && 고른) 결과칠(고른); }catch(e){} try{ if(고른) 명세칠(고른); }catch(e){} }   /* v1.53.1 */
+    try{ if(볼것==='폼' && 고른) 결과칠(고른); }catch(e){} try{ if(고른) 명세칠(고른); }catch(e){} try{ if(볼것==='완료건' && 고른) 완료건그리기(); }catch(e){} }   /* v1.53.1 · v1.54.0 */
   if(k==='공정') 폼등록.공정 = 줄 ? new Set(줄.filter(r => r.status==='완료' && !r.ylwGone).map(r => 트(r.name)).filter(Boolean)) : null;   /* v1.48.0 */
   if(k==='구매단가') return;
   if(!줄){ delete 폼완료[k]; 완료갈음(); return; }
@@ -3037,6 +3062,8 @@ function 그리기(){
     폼그리기(); return;
   }else if(볼것==='가공품목'){
     가공품목그리기(); return;
+  }else if(볼것==='완료건'){
+    완료건그리기(); return;   /* v1.54.0 */
   }else if(볼것==='매입품목'){
     const t = 표들.find(t => t.이름==='매입품목'); h = 표글(t, t.줄||[], d.제목);
   }else{
