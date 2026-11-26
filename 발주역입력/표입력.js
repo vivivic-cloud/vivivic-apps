@@ -90,18 +90,28 @@
   let 지금 = null, 편집 = null, 끌기 = null, 채우기 = null, 그림틀 = 0;   // 지금 = {표, 어, r0,c0,r1,c1, ar,ac(머리 칸)}
   const 줄들 = t => t.tBodies[0] ? [...t.tBodies[0].rows] : [];
   const 보임 = td => !!td && td.offsetParent !== null && !td.parentNode.hidden;
-  const 칸at = (r, c) => { const tr = 줄들(지금.표)[r]; return tr ? tr.cells[c] : null; };
+  /* 11-26 합친 칸(rowspan) 표 = 보이는 열 자리로 셈(영림원품목등록 공통반자재 탭) — 사장님 「입력될 때마다 화면 꺼떡거리는 게 입력 내용이 다른 위치에 적용되면서 그런 거지?」.
+     전엔 칸 번호(cellIndex)로 세어 합친 칸이 있는 줄에선 Enter·방향키·붙여넣기·채우기가 다른 열로 갔음. 합친 칸 없는 표는 전과 같음(열 자리 = 칸 번호). */
+  const 격자표 = new WeakMap();
+  function 격자(t){ const 줄 = 줄들(t), 열쇠 = 줄.length + ':' + (t.tBodies[0] ? t.tBodies[0].children.length : 0) + ':' + (t.dataset.꼴 || '');
+    const 옛 = 격자표.get(t); if(옛 && 옛.열쇠 === 열쇠 && 옛.줄[0] === 줄[0] && 옛.줄[줄.length - 1] === 줄[줄.length - 1]) return 옛;
+    const g = [], 자리 = new Map();
+    줄.forEach((tr, r) => { g[r] = g[r] || []; let c = 0; for(const td of tr.cells){ while(g[r][c]) c++; const rs = Math.max(1, td.rowSpan || 1), cs = Math.max(1, td.colSpan || 1);
+      for(let i = 0; i < rs; i++){ g[r + i] = g[r + i] || []; for(let j = 0; j < cs; j++) g[r + i][c + j] = td; } 자리.set(td, [r, c]); c += cs; } });
+    const o = { 열쇠, 줄, g, 자리 }; 격자표.set(t, o); return o; }
+  const 열of = td => { const t = td.closest('table'), x = 격자(t).자리.get(td); return x ? x[1] : td.cellIndex; };
+  const 칸at = (r, c) => { const x = 격자(지금.표).g[r]; return x ? x[c] || null : null; };
   const 범위 = () => [Math.min(지금.r0, 지금.r1), Math.min(지금.c0, 지금.c1), Math.max(지금.r0, 지금.r1), Math.max(지금.c0, 지금.c1)];
   function 칸판(b){   /* 범위 안 보이는 칸 [[td…]…] */
     const [r0, c0, r1, c1] = b || 범위(), 줄 = 줄들(지금.표), 판 = [];
     for(let r = r0; r <= r1; r++){ const tr = 줄[r]; if(!tr || tr.hidden) continue;
-      const 줄칸 = []; for(let c = c0; c <= c1; c++){ const td = tr.cells[c]; if(td && 보임(td)) 줄칸.push(td); } if(줄칸.length) 판.push(줄칸); }
+      const 줄칸 = [], 격 = 격자(지금.표); for(let c = c0; c <= c1; c++){ const td = (격.g[r] || [])[c]; if(td && 보임(td) && !줄칸.includes(td) && 격.자리.get(td)[0] === r) 줄칸.push(td); } if(줄칸.length) 판.push(줄칸); }
     return 판;
   }
   function 바꿔끼움(t){ if(!지금) return; 지금.표 = t; 지금.어 = 어들.get(t); 다시(); }
   function 고르기(td, 넓힘){
     const t = td.closest('table'), 어 = 어들.get(t); if(!어) return;
-    const r = 줄들(t).indexOf(td.parentNode), c = td.cellIndex;
+    const r = 줄들(t).indexOf(td.parentNode), c = 열of(td);
     if(넓힘 && 지금 && 지금.표 === t){ 지금.r1 = r; 지금.c1 = c; }
     else 지금 = { 표:t, 어, r0:r, c0:c, r1:r, c1:c };
     그리기(); 초점();
@@ -114,7 +124,7 @@
     const 통 = 지금.표.closest('.표통') || 지금.표.parentNode, s = 통.getBoundingClientRect();
     const 머 = 지금.표.tHead ? Math.min(지금.표.tHead.getBoundingClientRect().bottom, s.bottom) : s.top;
     let 붙 = s.left; const tr = 줄들(지금.표).find(x => !x.hidden);
-    if(tr) for(const td of tr.cells){ if(td.cellIndex >= Math.min(지금.c0, 지금.c1)) break; if(getComputedStyle(td).position === 'sticky') 붙 = Math.max(붙, td.getBoundingClientRect().right); }
+    if(tr) for(const td of tr.cells){ if(열of(td) >= Math.min(지금.c0, 지금.c1)) break; if(getComputedStyle(td).position === 'sticky') 붙 = Math.max(붙, td.getBoundingClientRect().right); }
     return { l:Math.max(L, 붙, s.left), t:Math.max(T, 머, s.top), r:Math.min(R, s.right - 10), b:Math.min(B, s.bottom - 10) };
   }
   function 둘레(판){ let L = Infinity, T = Infinity, R = -Infinity, B = -Infinity;
@@ -170,11 +180,12 @@
     if(!지금) return;
     const 줄 = 줄들(지금.표), 기r = 넓힘 ? 지금.r1 : 지금.r0, 기c = 넓힘 ? 지금.c1 : 지금.c0;
     let r = 기r, c = 기c;
-    if(dr){ let i = r + dr; while(줄[i] && 줄[i].hidden) i += dr; if(줄[i]) r = i; }
-    if(dc){ const tr = 줄[r]; let i = c + dc; while(tr && tr.cells[i] && !보임(tr.cells[i])) i += dc; if(tr && tr.cells[i]) c = i; }
-    const tr = 줄[r]; if(!tr || !tr.cells[c]) return;
+    const 격 = 격자(지금.표), 칸 = (i, j) => (격.g[i] || [])[j], 지금칸 = 칸(r, c);
+    if(dr){ let i = r + dr; while(줄[i] && (줄[i].hidden || 칸(i, c) === 지금칸)) i += dr; if(줄[i]) r = i; }
+    if(dc){ let i = c + dc; while(칸(r, i) && (!보임(칸(r, i)) || 칸(r, i) === 지금칸)) i += dc; if(칸(r, i)) c = i; }
+    const td = 칸(r, c); if(!td) return; r = 격.자리.get(td)[0];   /* 합친 칸 = 그 칸 첫 줄 */
     if(넓힘){ 지금.r1 = r; 지금.c1 = c; } else { 지금.r0 = 지금.r1 = r; 지금.c0 = 지금.c1 = c; }
-    보이게(tr.cells[c]); 그리기(); 초점();
+    보이게(td); 그리기(); 초점();
   }
 
   /* ── 고치기(겹친 입력 칸 하나 + 기억 드롭) ── */
@@ -291,8 +302,8 @@
     const [r0, c0] = 범위(), 표줄 = 줄들(지금.표), 아래 = 표줄.slice(r0).filter(tr => !tr.hidden), 목 = [], 닿은 = [];
     let 끝r = r0, 끝c = c0;
     for(let i = 0; i < 줄.length && i < 아래.length; i++){
-      const 보칸 = [...아래[i].cells].slice(c0).filter(보임);
-      for(let j = 0; j < 줄[i].length && j < 보칸.length; j++){ const td = 보칸[j]; 닿은.push(td); if(어.칸(td)) 목.push([td, 줄[i][j]]); 끝r = Math.max(끝r, 표줄.indexOf(td.parentNode)); 끝c = Math.max(끝c, td.cellIndex); }
+      const 격 = 격자(지금.표), ri = 표줄.indexOf(아래[i]), 보칸 = [...new Set((격.g[ri] || []).slice(c0))].filter(td => td && 보임(td) && 격.자리.get(td)[0] === ri);   /* 합친 칸은 첫 줄에서만 */
+      for(let j = 0; j < 줄[i].length && j < 보칸.length; j++){ const td = 보칸[j]; 닿은.push(td); if(어.칸(td)) 목.push([td, 줄[i][j]]); 끝r = Math.max(끝r, 표줄.indexOf(td.parentNode)); 끝c = Math.max(끝c, 열of(td)); }
     }
     지금.r0 = r0; 지금.c0 = c0; 지금.r1 = 끝r; 지금.c1 = 끝c;
     막음보기(닿은); if(목.length) 어.쓰기(목); 다시();
@@ -323,7 +334,7 @@
   }, true);
   document.addEventListener('mouseover', e => {
     if(!끌기 || !지금) return; const td = 내표칸(e.target); if(!td || td.closest('table') !== 지금.표) return;
-    const r = 줄들(지금.표).indexOf(td.parentNode), c = td.cellIndex; if(r === 지금.r1 && c === 지금.c1) return;
+    const r = 줄들(지금.표).indexOf(td.parentNode), c = 열of(td); if(r === 지금.r1 && c === 지금.c1) return;
     지금.r1 = r; 지금.c1 = c; 그리기();
   }, true);
   addEventListener('mouseup', () => { if(끌기){ 끌기 = null; 다시(); } });
@@ -342,7 +353,7 @@
     const 원 = 채우기.원; let 다 = null;
     for(const el of document.elementsFromPoint(x, y)){ const td = el.closest && el.closest('td'); if(td && td.closest('table') === 지금.표 && 보임(td)){ 다 = td; break; } }
     if(!다) return;
-    const r = 줄들(지금.표).indexOf(다.parentNode), c = 다.cellIndex;
+    const r = 줄들(지금.표).indexOf(다.parentNode), c = 열of(다);
     const 아래 = r - 원[2], 위 = 원[0] - r, 옆 = c - 원[3], 왼 = 원[1] - c;
     const 세 = Math.max(아래, 위, 0), 가 = Math.max(옆, 왼, 0);
     if(세 >= 가 && 세 > 0) 채우기.b = 아래 > 0 ? [원[0], 원[1], r, 원[3]] : [r, 원[1], 원[2], 원[3]];
@@ -392,7 +403,7 @@
     const 같음 = 앞톡 === td && 터 && 터.표 === td.closest('table') && 터.범위[0] === 터.범위[2] && 터.범위[1] === 터.범위[3];
     앞톡 = td;
     if(같음 && 쓸칸(td)){ 앞톡 = null; 지금 = { 표:td.closest('table'), 어:어들.get(td.closest('table')), r0:0, c0:0, r1:0, c1:0 };
-      const r = 줄들(지금.표).indexOf(td.parentNode); 지금.r0 = 지금.r1 = r; 지금.c0 = 지금.c1 = td.cellIndex;
+      const r = 줄들(지금.표).indexOf(td.parentNode); 지금.r0 = 지금.r1 = r; 지금.c0 = 지금.c1 = 열of(td);
       if(window.터치범위) 터치범위.끝(); 그리기(); 고치기('F2'); }   /* 목록은 ▾·글 치기로 */
   }, true);
   document.addEventListener('click', e => { if(e.pointerType === 'touch' && 내표칸(e.target) && 쓸칸(내표칸(e.target))) { e.stopPropagation(); e.preventDefault(); } }, true);   /* 쪽 옛 폰 누름 동작 대신 */
