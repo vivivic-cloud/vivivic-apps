@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v346 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v347 -->
 <!-- v336(11-25): 상단 「발주역입력」 메뉴 끝에 「품목등록test서버용」(발주역입력 새 쪽). -->
 <!-- v335(11-25): 상단 「발주역입력」 메뉴 맨 위 「에이엠티출고조사」 묶음(재단·이룸산업 출고내역·로앤 출고내역·업체별 단품명 — 발주역입력 쪽길과 같은 차례) · 나머지 그 아래. -->
 <!-- v334(11-25): 상단 「발주역입력」 메뉴에 「조혼가구부속명」(업체별 단품명 다음 — 발주역입력 쪽길 차례와 같게). -->
@@ -490,7 +490,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v346</span>
+    <span class="ver">v347</span>
     <div class="pick topnav" id="topnav">   <!-- v288 사장님 11-18 「입력폼 상단에 발주역입력 메뉴를 만들어 발주역입력 페이지로 이어지게」 — 이름 = 각 페이지 <title> 앞부분 · 같은 탭 -->
       <button type="button" class="btn small" aria-haspopup="menu" aria-expanded="false">발주역입력</button>
       <div class="pickmenu topnavmenu" role="menu" hidden>
@@ -8024,7 +8024,32 @@ function hbarFor(tw){
   return bar;
 }
 var LSHEET={};   /* 단계 키 → {on,q,k,dir,inp} */
+/* v347 사장님 「아니 모든 완료 건 시트로 보기 만들어」 — 나머지 메뉴도 완료 건 시트(보기만, 같은 표). 첫 칸 이름 = 그 메뉴 저장 목록 이름(recTitle)이 쓰는 칸 이름(lshFirst) · 많은 메뉴(WIN)는 지금 읽은 범위(이번 기간·미완료 + 「지난 자료 보기」로 고른 달)만 */
+function LSH_DONE(r){return r.status==='완료';}
 var LSHEET_STEPS={
+  materials:{only:LSH_DONE,note:'영림원 등록완료만'},
+  flows:{only:LSH_DONE,note:'영림원 등록완료만'},
+  boms:{only:LSH_DONE,note:'영림원 등록완료만'},
+  itemflows:{only:LSH_DONE,note:'영림원 등록완료만'},
+  itemmats:{only:LSH_DONE,note:'영림원 등록완료만'},
+  itemwcs:{only:LSH_DONE,note:'영림원 등록완료만'},
+  contracts:{only:LSH_DONE,note:'영림원 등록완료만'},
+  imporders:{only:LSH_DONE,note:'영림원 등록완료만'},
+  imppays:{only:LSH_DONE,note:'영림원 등록완료만'},
+  impinvs:{only:LSH_DONE,note:'영림원 등록완료만'},
+  impbls:{only:LSH_DONE,note:'영림원 등록완료만'},
+  impins:{only:LSH_DONE,note:'영림원 등록완료만'},
+  purprices:{only:LSH_DONE,note:'영림원 등록완료만'},
+  purreqs:{only:LSH_DONE,note:'영림원 등록완료만'},
+  purapprs:{only:LSH_DONE,note:'영림원 등록완료만'},
+  purords:{only:LSH_DONE,note:'영림원 등록완료만'},
+  purchases:{only:LSH_DONE,note:'영림원 등록완료만'},
+  purdelvs:{only:LSH_DONE,note:'영림원 등록완료만'},
+  pomods:{only:LSH_DONE,note:'영림원 등록완료만'},
+  purcalcs:{only:LSH_DONE,note:'영림원 등록완료만'},
+  prods:{only:LSH_DONE,note:'영림원 등록완료만'},
+  proddlvs:{only:LSH_DONE,note:'영림원 등록완료만'},
+  setitems:{only:LSH_DONE,note:'영림원 등록완료만'},
   depts:{first:'부서명'},   /* v333 */
   items:{first:'품명',only:function(r){return r.status==='완료';},note:'영림원 등록완료만'},   /* v339 사장님 11-26 「입력폼 품목등록 완료된 품목을 시트로 보기 등으로 확인할 수 있게 해」 — 분류(v302)와 같은 완료만 · 보기만 */
   warehouses:{first:'창고명'},   /* v325 */
@@ -8037,8 +8062,15 @@ function lsheetBtn(s){
   var on=lsheetOn(s);
   return h('div',{class:'delbar'},h('button',{type:'button',class:'btn small','aria-pressed':on?'true':'false',on:{click:function(){var o=LSHEET[s.key]||(LSHEET[s.key]={});o.on=!o.on;renderList();}}},on?'카드로 보기':'시트로 보기'));
 }
+function lshFirst(s){   /* v347 첫 칸 이름 = recTitle 이 읽는 칸(r.x)의 칸 이름 · recTitle 없으면 첫 칸 · 이미 있던 메뉴(first 있음)는 안 씀 */
+  if(!LSHEET_STEPS[s.key]||!LSHEET_STEPS[s.key].only||LSHEET_STEPS[s.key].note!=='영림원 등록완료만'||s.key==='classes'||s.key==='items')return '';
+  var all=(s.fields||[]).concat(Array.isArray(s.rowFields)?s.rowFields:[]),lab=function(k){var f=all.filter(function(x){return x.k===k;})[0];return f?f.label:'';};
+  if(!s.recTitle)return s.fields[0]?s.fields[0].label:'';
+  var ks=[],m,re=/r\.(\w+)/g,t=String(s.recTitle);while((m=re.exec(t))){if(ks.indexOf(m[1])<0&&lab(m[1]))ks.push(m[1]);}
+  return ks.map(lab).join(' · ');
+}
 function lsheetCols(s){
-  var c=[{lab:LSHEET_STEPS[s.key].first||(s.fields[0]&&s.recTitle?(s.key==='workcenters'?'워크센터':'거래처명'):'이름'),v:function(r){return s.recTitle(r)||'';},first:1}];
+  var c=[{lab:LSHEET_STEPS[s.key].first||lshFirst(s)||(s.fields[0]&&s.recTitle?(s.key==='workcenters'?'워크센터':'거래처명'):'이름'),v:function(r){return (s.recTitle?s.recTitle(r):(s.fields[0]?show(r[s.fields[0].k]):''))||'';},first:1}];
   s.fields.forEach(function(f){if(c[0].lab===f.label)return;c.push({lab:f.label,v:function(r){return show(r[f.k]);}});});
   c.push({lab:'상태',v:function(r){return STATUS.indexOf(r.status)>=0?r.status:'대기';},st:1});
   (LSHEET_STEPS[s.key].more||[]).forEach(function(m){c.push({lab:m[0],v:m[1]});});
