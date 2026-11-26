@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.52.2
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.53.0
+     v1.53.0(11-26): 사장님 「그럼 이거 켤 때 무조건 입력폼 로그인하게 해」 — 입력폼(erp-input) 로그인이 없으면(확인 전 포함) 거래처·표 안 보임 · 「외주자료 입력폼 로그인」 단추만(입력폼 쪽에서 로그인) · 로그인되면 보임 · 풀리면 다시 가림. 이 쪽 로그인 길은 그대로(새 로그인 없음).
      v1.52.1(11-25): 보관된 구매+가공 줄은 고른 줄(창고 줄)에 없어도 보이고 보냄(백색코 줄이 17:11 에 고른 줄에서 지워져 있었음).
      v1.52.0(11-25): 사장님 「완료된건인데 다시 넣는게 무슨의미가 있나요? 완료건으로 보관되게 하면 안되나요?」 — 등록완료 보관: 구매+가공 줄(여섯 단계 모두 입력폼 완료)은 그때 값을 `_가공품목_{거래처}.완료보관.{열쇠}` 에 · 영림원보내기 줄(등록완료)은 `{거래처}.완료보관.{열쇠}` 에 남김 → 칸 값이 바뀌거나 비어도 등록완료(보관 값으로 보임·잠금) · 구매+가공 등록완료 보기 「고치기」 = 묻고 보관 풂(이 화면 동안 다시 보관 안 함).
      v1.51.0(11-25): 사장님 「구매+가공품목 - 구매자재에 왜 등록완료된게 계속 보이냐고」 → 「당연하지 않나요?」 — 세 탭 등록완료 = 그 탭 단계(구매자재 = 원장 분류·자재·구매단가 · 가공 = 공정 · 가공완료품 = 가공품 분류·자재)가 모두 입력폼 완료면 그 탭에서 빠짐·잠금. 영림원보내기 가공 줄은 여섯 단계 그대로.
@@ -201,6 +202,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>보드/엣지 매입현황 — 발주역입력</title>
+<script>document.documentElement.classList.add('폼잠금');</script>   <!-- v1.53.0 입력폼 로그인 확인 전엔 가림 -->
 <script src="../shared/쓰기지킴.js?v=11-23b"></script>   <!-- 쓰기 안전장치(옛 판·잦은 쓰기 멈춤) — 모듈보다 먼저 -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
@@ -220,8 +222,10 @@
        로그인·로그아웃·쓰기 안 함 · 규칙 그대로(erp_ 읽기 = 담당자) · 로그인이 없거나 못 읽으면 공개 사본(_분류.영림원). */
     try{
         const 폼앱 = initializeApp(설정, 'erp-input'), 폼auth = getAuth(폼앱), 폼db = getFirestore(폼앱);
+        window.폼확인 = () => { if (!폼auth.currentUser) location.reload(); };   /* v1.53.0 입력폼 탭에서 로그인하고 돌아오면 다시 읽음 */
         let 끄기 = null;
         onAuthStateChanged(폼auth, (u) => {
+            document.documentElement.classList.toggle('폼잠금', !u);   /* v1.53.0 입력폼 로그인 없으면 가림 */
             if (끄기) { 끄기(); 끄기 = null; }
             const 받음 = (줄, 왜) => { window.폼분류대기 = [줄, 왜]; if (window.폼분류받음) window.폼분류받음(줄, 왜); };
             if (!u) { 받음(null, '입력폼 로그인 없음'); for (const k of ['자재','공정','흐름','구매단가']) { (window.폼완료대기 = window.폼완료대기 || {})[k] = null; if (window.폼완료받음) window.폼완료받음(k, null); } return; }
@@ -423,13 +427,14 @@ html,body{height:100%;overflow:hidden}
 .state .big{font-size:14px;font-weight:600;color:var(--vg-ink);padding-bottom:6px}
 .state .sub{font-size:12.5px;color:var(--vg-muted);line-height:1.85}
 .state .why{font-size:11.5px;color:var(--vg-red);padding-top:6px;font-family:ui-monospace,monospace}
+#폼문{display:none;margin:24px 0}#폼문 a.폼길{display:inline-block;color:#fff;background:var(--vg-ink);border-radius:4px;padding:8px 16px;text-decoration:none}html.폼잠금 #폼문{display:block}html.폼잠금 #거래처,html.폼잠금 #볼것,html.폼잠금 #목상태,html.폼잠금 #속{display:none!important}   /* v1.53.0 */
 </style>
 </head>
 <body>
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.52.2</div>
+  <div class="badge">v1.53.0</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -437,6 +442,8 @@ html,body{height:100%;overflow:hidden}
 <div class="months" id="볼것"></div>
 <div class="state" id="목상태"><div class="big">창고를 읽는 중입니다…</div></div>
 <div id="속"></div>
+<script>document.addEventListener('visibilitychange', () => { if(!document.hidden && document.documentElement.classList.contains('폼잠금') && window.폼확인) window.폼확인(); });</script>
+<div id="폼문"><a class="폼길" href="../영림원외주입력/영림원외주입력.html" target="_blank" rel="noopener" title="입력폼(외주자료 입력폼)에서 로그인하면 이 쪽이 열립니다">외주자료 입력폼 로그인</a></div>   <!-- v1.53.0 -->
 </div>
 
 <!-- 짚어서 지시하는 손잡이 — 바이글 박스에서 열면 켜진다. -->
