@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v339 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v340 -->
 <!-- v336(11-25): 상단 「발주역입력」 메뉴 끝에 「품목등록test서버용」(발주역입력 새 쪽). -->
 <!-- v335(11-25): 상단 「발주역입력」 메뉴 맨 위 「에이엠티출고조사」 묶음(재단·이룸산업 출고내역·로앤 출고내역·업체별 단품명 — 발주역입력 쪽길과 같은 차례) · 나머지 그 아래. -->
 <!-- v334(11-25): 상단 「발주역입력」 메뉴에 「조혼가구부속명」(업체별 단품명 다음 — 발주역입력 쪽길 차례와 같게). -->
@@ -490,7 +490,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v339</span>
+    <span class="ver">v340</span>
     <div class="pick topnav" id="topnav">   <!-- v288 사장님 11-18 「입력폼 상단에 발주역입력 메뉴를 만들어 발주역입력 페이지로 이어지게」 — 이름 = 각 페이지 <title> 앞부분 · 같은 탭 -->
       <button type="button" class="btn small" aria-haspopup="menu" aria-expanded="false">발주역입력</button>
       <div class="pickmenu topnavmenu" role="menu" hidden>
@@ -1007,7 +1007,8 @@ var STEPS=[
   F('rep','대표품목','check')
  ],
  recTitle:function(r){return r.name;},
- subt:function(r){return [r.code,r.asset,r.unit].filter(Boolean).join(' · ');}},
+ saveCheck:function(v,id){var d=itemScrap(v.code,id);return d?scrapMsg(v.code):'';},   /* v340 폐기 품번 다시 넣기 = 영림원이 막음 */
+ subt:function(r){return [r.code,r.asset,r.unit,r.state].filter(Boolean).join(' · ');}},   /* v340 품목상태(영림원 연동) */
 
 {key:'materials',n:7,title:'자재등록',screen:'자재등록',   /* v25: 원장·철물 등(영림원 자재등록 500251 — 품목등록과 같은 틀, 이름만 다름) */
  path:['기본','[기본] 품목정보','자재등록'],needs:['classes'],
@@ -4948,6 +4949,10 @@ function imGridBox(form){
    줄 = 메뉴 칸 묶음(칸 이름 = 이 메뉴 칸 글자 → 칸 키는 글자로 찾음) → 그 메뉴 대기 한 장(bdRun, bd.출처 「영림원품목등록」·열쇠·지문). 워크센터(11)는 iwInBox, 재공품(6)은 wipInBox.
    이미 넘긴 문서: 대기·오류 + 지문 다름 = 고쳐 다시 대기 · 완료·진행중 = 그대로(상태만) · 다른 길로 같은 건(같은 품번 등)이 있으면 넘기지 않고 그 상태만(완료 = 표시만).
    임시 칸(보내는 쪽이 빈칸으로 보낸 필수 칸) = 이 메뉴 칸 처음 값이 있으면 그 값 + 노랑(마우스), 없으면 필수 빠짐. 못 넘김 = 필수 빠짐 · 그 메뉴 검사(check·saveCheck) — 빨강 줄, 까닭 = 마우스. */
+/* v340 사장님 11-26 「현재 완료된 품목을 폐기 상태가 연동되도록 하고 해당 품번이 다시 입력 시도될 때 알아차릴 수 있게 해줘」.
+   영림원은 품목상태 「폐기」 품목의 품번을 다시 못 씀(500215·500259 「중복된 품번 ○○이(가) 입력되었습니다.」, 11-26 시험) → 같은 품번 = 못 넘김·저장 막음(빨강, 까닭 = 영림원 문구). */
+function itemScrap(code,id){var c=ygT(code);if(!c)return null;return (data.items||[]).filter(function(x){return x.id!==id&&x.status==='완료'&&!ylwGone(x)&&ygT(x.state)==='폐기'&&ygT(x.code)===c;})[0]||null;}
+function scrapMsg(code){return '중복된 품번 '+ygT(code)+'이(가) 입력되었습니다.';}
 var YIN=[
  {id:'_창고_영림원품목등록',key:'warehouses',grp:'창고등록',same:function(v){var n=ygT(v.name);return (data.warehouses||[]).filter(function(x){return x.status!=='오류'&&!ylwGone(x)&&ygT(x.name)===n;})[0];}},   /* v332 2 창고등록 ← 영림원품목등록 v2.69.0 본사창고관리 — 같은 창고명(완료·대기·진행중) = 안 넣음 */
  {id:'_품목_영림원품목등록',key:'items',grp:'품목등록',same:function(v){return (data.items||[]).filter(function(x){return x.status!=='오류'&&!ylwGone(x)&&ygT(x.code)===ygT(v.code);})[0];}},
@@ -4980,6 +4985,7 @@ function yinPlan(c){
     var R=yinRowVals(c,r),o={r:r,v:R.v,tmp:R.tmp,cur:yinMine(c,r['열쇠'])},cur=o.cur;
     if(cur&&(cur.bd['지문']===r['지문']||!(cur.status==='대기'||cur.status==='오류'))){o.st=cur.status||'대기';if(cur.status==='완료')out.have++;out.rows.push(o);return;}
     var other=cur?null:c.same(o.v);
+    if(other&&c.key==='items'&&other.status==='완료'&&ygT(other.state)==='폐기'){o.why=[scrapMsg(o.v.code)];out.rows.push(o);out.skip.push(o);return;}   /* v340 폐기 품번 = 못 넘김 */
     if(other){o.st=other.status||'대기';if(other.status==='완료')out.have++;out.rows.push(o);return;}
     var why=[],miss=recNeedMiss(s,o.v).map(function(f){return f.label;});if(miss.length)why.push('필수 빠짐: '+miss.join('·'));
     if(s.rowFields&&c.rows){var rm=[];(o.v.rows||[]).forEach(function(x){s.rowFields.forEach(function(f){if(f.req&&isEmpty(x[f.k])&&rm.indexOf(f.label)<0)rm.push(f.label);});});if(!(o.v.rows||[]).length)why.push((s.rowTitle||'줄')+' 없음');else if(rm.length)why.push('필수 빠짐: '+rm.join('·'));}

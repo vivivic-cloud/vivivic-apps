@@ -183,6 +183,12 @@
           continue;
         }
       }
+      // 폼 v340(11-26) 사장님 「현재 완료된 품목을 폐기 상태가 연동되도록」 — 품목 「품목상태」 만 영림원 값으로 덮는다(폼 완료 문서 ↔ 영림원 1:1). 다른 칸은 그대로 ylwDiff.
+      if (step === 'items' && f.status === '완료' && e.state && R.s(f.state) !== e.state) {
+        res.상태바꿈 = (res.상태바꿈 || 0) + 1;
+        if (mode === 'import') await I.patch(spec.coll, f.id, { state: e.state });
+        f.state = e.state;
+      }
       const d = I.diff(spec, f, e, got.labels);
       // 폼 v105: 같음도 ylwCheckedAt 을 적는다 — 폼이 「영림원에 있다고 확인된 거래처」를 드롭다운에 더하는 표시(거래처 외 단계도 같은 뜻).
       if (!d.length) { res.같음++; if (mode === 'import') await I.patch(spec.coll, f.id, { ylwDiff: '', ylwCheckedAt: now }); continue; }

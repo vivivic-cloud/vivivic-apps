@@ -5,6 +5,7 @@
 // 칸(11-01 실제 화면, 시트 SS1): 품명=ItemName · 품번=ItemNo · 규격=Spec · 품목자산분류=AssetName · 기준단위=UnitName · 품목상태=SMStatusName ·
 //   내외자구분=SMInOutKindName · 중요도=SMABCName · 품목소분류=ItemClassSName · 영문명=ItemEngName · 대표품목=IsSTDItem(체크 0/1).
 //   그 밖 칸(관리부서·품목대/중분류·출고구분·세트품목·BOM등록·Lot 관리 …)은 폼에 칸이 없어 안 읽는다.
+// ⚠ (폼 v340, 11-26) 폐기 품목도 읽어야 품목상태가 폼에 이어진다 — 조회 조건 「품목상태」 를 비우고(전체) 조회. 「사용」 만 조회하면 폐기 품목이 「영림원에 없음」 지울 후보가 된다(I.goneStop 이 막기 전에 확인).
 // 확인: 2026-11-01 — 사용 1,568개, T 로 시작하는 품명 0개.
 (function () {
   const Y = window.ylw;

@@ -2,7 +2,7 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.123.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.124.0
      v2.123.0(11-26): 사장님 「워크센터 기본값 품목별 — 품목이 미리 나타날 필요 없습니다. 영림원품목등록에 있는 제품 또는 입력폼에 등록완료된 품목을 검색하여 선택할 수 있게 해주세요. 제품별 자재별 칸은 현재 표가 비정상 상태입니다. 이곳도 같은 조건의 해당 속성을 검색하게 하면 됩니다.」 — 품목별 = 고른 품목만(검색 드롭 = 영림원품목등록 품목 + 입력폼 품목등록 완료) · 제품별·자재별 검색 = 같은 조건 · 빈 표 더하기 줄 높이(5px 로 눌려 안 보이던 것).
      v2.122.0(11-26): 사장님 「아, 제품별 설정도 필요합니다.」 — 워크센터 기본값 탭 안 「제품별」 표(제품 = 입력폼 품목등록 완료 제품 드롭 × 그 제품 반제품 공정) · 그 제품의 반제품 기본값 = 제품별. 차례(임시 — 사장님 미정): 품목 직접 → 품목별 → 제품별 → 자재별 → 공정별.
      v2.121.0(11-26): 사장님 「특정 자재에 대한 워크센터 자동입력을 설정해야겠어요. 흐름을 보니 자재에 따라 워크센터 순위가 변경되네요」 → 「네, 자재별 공정에 대한 워크센터를 이곳에서 설정하면 우선 표기가 되게 해주세요」 — 공정별/품목별 워크센터 기본값 탭 안 「자재별」 표(자재 = 입력폼 자재 완료 드롭 × 그 자재가 든 화면 반제품 공정) · 반제품 합판코드·필름코드가 그 자재면 기본값 = 자재별(차례: 품목 직접 → 품목별 → 자재별 → 공정별).
@@ -497,7 +497,7 @@ body:not(.펼침) .dpr-t .접힘{display:none}   /* v2.32.0 빈 열 접힘 — �
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.123.0</div>
+  <div class="badge">v2.124.0</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <div class="머리줄"><h1>영림원품목등록</h1><div id="설정" class="탭단추" hidden><div class="설정이름">입력설정</div><div class="기타줄"></div></div></div>
@@ -977,8 +977,9 @@ function 기본후보(종){ const 목 = [], 본 = new Set(), 넣 = (v, 글) => {
   for(const r of 줄){ if(종==='제품' && 트(r, ai)!=='제품') continue; 넣(트(r, pi), 트(r, ni)); }
   for(const m of (종==='제품' ? 완료제품 : 완료품목) || []) 넣(m.code, m.name);
   return 목; }
+let 폐기품번 = null;   /* v2.124.0 입력폼 품목등록 완료 중 품목상태 폐기 품번(영림원이 다시 못 씀) */
 let 완료제품 = null, 완료품목 = null;   /* v2.122.0 입력폼 품목등록 완료 제품 [{code, name}] — 로그인 기기만 · v2.123.0 완료품목 = 모든 품목자산분류 */
-window.폼품목받음 = 줄 => { 완료품목 = 줄 ? 줄.filter(r => !r.ylwGone && String(r.code||'').trim()).map(r => ({ code:String(r.code).trim(), name:String(r.name||'').trim() })) : null; 완료제품 = 줄 ? 줄.filter(r => !r.ylwGone && String(r.asset||'').trim()==='제품' && String(r.code||'').trim()).map(r => ({ code:String(r.code).trim(), name:String(r.name||'').trim() })) : null;
+window.폼품목받음 = 줄 => { 폐기품번 = 줄 ? new Set(줄.filter(r => !r.ylwGone && String(r.state||'').trim()==='폐기').map(r => String(r.code||'').trim()).filter(Boolean)) : null; try{ 기본꼭칠(); 흐름상태예약(); }catch(e){} 완료품목 = 줄 ? 줄.filter(r => !r.ylwGone && String(r.code||'').trim()).map(r => ({ code:String(r.code).trim(), name:String(r.name||'').trim() })) : null; 완료제품 = 줄 ? 줄.filter(r => !r.ylwGone && String(r.asset||'').trim()==='제품' && String(r.code||'').trim()).map(r => ({ code:String(r.code).trim(), name:String(r.name||'').trim() })) : null;
   try{ if(고른==='공정별/품목별 워크센터 기본값') 계산그리기(고른); }catch(e){} };
 let 제품캐시 = null;
 function 품목제품(p){ if(!제품캐시){ 캐시예약(); 제품캐시 = { 셋:new Set(제품기본줄().map(x => x.c)), 모:null }; } if(!제품캐시.셋.size) return '';
@@ -1825,7 +1826,16 @@ function 기본꼭칠(통 = 받은[품목시트]){
       else if(td.dataset.기꼭){ delete td.dataset.기꼭; if(!(k==='합판코드' && td.title.startsWith('공정흐름 「'))) td.classList.remove('꼭'); if(td.title.startsWith('꼭 채울 칸 — ')) td.removeAttribute('title'); }
     });
   });
+  폐기칠(통);   /* v2.124.0 */
   잠김칠(통);   /* v2.108.0 */
+}
+/* v2.124.0 사장님 11-26 「현재 완료된 품목을 폐기 상태가 연동되도록 하고 해당 품번이 다시 입력 시도될 때 알아차릴 수 있게 해줘」
+   품목등록업로드 품번이 입력폼 품목등록 완료 중 품목상태 「폐기」 품번과 같으면 그 품번 칸 빨강(td.꼭 → 확인필요) · 까닭 = 영림원 문구(11-26 시험, 500215·500259). */
+function 폐기칠(통){
+  const i = [...통.querySelectorAll('thead th')].findIndex(th => th.firstChild && th.firstChild.textContent.trim()==='품번'); if(i<0) return;
+  통.querySelectorAll('tbody tr[data-p]').forEach(tr => { const td = tr.cells[i]; if(!td) return; const p = tr.dataset.p;
+    if(폐기품번 && 폐기품번.has(p)){ if(!td.dataset.폐기){ td.dataset.폐기 = td.getAttribute('title') ?? ''; } td.classList.add('꼭'); td.title = `중복된 품번 ${p}이(가) 입력되었습니다.`; }
+    else if(td.dataset.폐기 != null){ const t = td.dataset.폐기; delete td.dataset.폐기; td.classList.remove('꼭'); if(t) td.title = t; else td.removeAttribute('title'); } });
 }
 function 동일칠(통 = 받은[품목시트]){
   if(!통 || !통.querySelector) return;
