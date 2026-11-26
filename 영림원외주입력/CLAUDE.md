@@ -67,7 +67,15 @@
   - 끄기: `firebase firestore:backups:schedules:delete <위 이름> --project vivivic-4b7ef`(이미 만든 백업은 보관 기간 뒤 저절로 지워짐)
   - 되살리기(실제 DB 덮어쓰기 아님 — 새 DB 로 만듦): `firebase firestore:databases:restore -d <새 DB 이름> -b <firestore:backups:list 의 백업 이름> --project vivivic-4b7ef` → 다 보면 `firebase firestore:databases:delete <새 DB 이름>`. ⚠ 11-26 만든 직후라 백업 0개 — 첫 백업(하루 안) 뒤 시험해야 함(아직 안 함).
   - 비용 어림: 백업 저장 = 보관 중 백업 수 × DB 크기(11-26 erp_ 약 0.6MB + 공개 자료 수 MB~수십 MB 어림 — 정확한 DB 크기는 확인 못 함) · 최대 28개 보관 → 1GB 아래 = 한 달 수십~백 원대(Firestore 백업 저장 단가 GB·월 몇 센트). 되살리기는 그때 GB 당 따로.
-  - 안 한 것: ② 매주 내보내기 → Cloud Storage 버킷(NAS 받기용) — gcloud 가 이 맥에 없음(설치·사장님 구글 로그인 필요) · ③ 되살리기 시험(백업 생긴 뒤).
+  - **매주 내보내기 → Cloud Storage(NAS 받기용)** — 사장님 단추 「깔고 진행」 → 이 맥 `brew install --cask google-cloud-sdk` · `gcloud auth login`(사장님 브라우저 승인) · 결제 사용 중(billingEnabled true) 확인. 만든 것:
+    - 버킷 `gs://vivivic-4b7ef-firestore-weekly` · ASIA-NORTHEAST3(서울) · 공개 막음(public access prevention) · 수명 규칙 = 98일(14주) 지난 파일 지움.
+    - 서비스 계정 `firestore-export@vivivic-4b7ef.iam.gserviceaccount.com` = 프로젝트 `roles/datastore.importExportAdmin` + 버킷 `roles/storage.admin` · Firestore 서비스 에이전트(`service-830175660542@gcp-sa-firestore…`)도 버킷 `roles/storage.admin`. 키 파일 안 만듦.
+    - Cloud Scheduler 작업 `firestore-weekly-export`(asia-northeast3) = 매주 일요일 04:00 Asia/Seoul · POST Firestore `exportDocuments`(전체 컬렉션) → `gs://vivivic-4b7ef-firestore-weekly/<시각>_<번호>/`. Cloud Scheduler API 켬.
+    - 11-26 바로 한 번 돌림 = 30,591 문서 · 약 260MB(`2026-11-26T06:37:35_15155` · 같은 때 하나 더 `06:38:06_40634` 생김 — 둘 다 성공, 98일 뒤 지워짐).
+    - NAS 로 받기: `gcloud storage cp -r gs://vivivic-4b7ef-firestore-weekly/<폴더> <NAS 경로>`(gcloud 로그인 기기).
+    - 끄기: `gcloud scheduler jobs pause firestore-weekly-export --location asia-northeast3`(지우기 = delete) · 버킷 파일은 98일 규칙으로 저절로 지워짐.
+  - **되살리기 시험(11-26, 실제 DB 안 건드림)**: 새 DB `restore-test`(서울) 만듦 → `gcloud firestore import gs://vivivic-4b7ef-firestore-weekly/2026-11-26T06:37:35_15155 --database=restore-test` = 30,591 문서 성공(원본과 같은 수) → `restore-test` 지움(남은 DB = (default) 하나). 실제 되살리기도 같은 길: 새 DB 로 가져와 확인한 뒤 옮김 — (default) 에 바로 import 하면 같은 id 문서를 덮어씀(지운 문서는 안 지움). 예약 백업은 `firebase firestore:databases:restore -d <새 DB> -b <백업>`.
+  - 비용 어림(DB 약 260MB 기준, 서울): 예약 백업 최대 28개 × 0.26GB ≈ 7GB 저장 → 한 달 수백 원 · 버킷 14개 × 0.26GB ≈ 3.6GB → 한 달 약 100원대 · 내보내기 = 주 1회 문서 3만 읽기(수십 원 아래) · Scheduler 작업 1개(무료 한도 안). 자료가 늘면 그만큼 늚.
 - **폼 v344(11-26) 1MB 한도 나눔 — erp_contracts 머리+조각**: 사장님 「지금 등록량이 전체의 10%에도 못 미칩니다 — 장기적인 해결방안을 결정하여 지금부터 실행합시다」. `connectDb` 껍데기를 `spWrap` 으로 감쌈 — `SPL` 컬렉션(지금 erp_contracts 하나)은 머리 문서(rows 뺌 + `__parts`·`__n`) + 같은 컬렉션 조각 `{id}~c{n}` `{__part:1,head,key,rows,i}`(제품번호 40개씩 — 한 트랜잭션 500쓰기 안). 읽기(onSnapshot·watch(+`__part` 질의)·get·range·트랜잭션) = 모아 예전 꼴 · 쓰기(add·update·create·updateIf·updateAll·delete·deleteIf) = rows 있으면 나눠 씀·지난 조각 지움. 화면·규칙 그대로. 예전 꼴(rows 안) 그대로 읽힘.
   - 찾은 근거(11-26 사장님 크롬, 읽기만): erp_ 24컬렉션 문서 최대 1.4KB(문서 = 한 품목·한 줄) — 제품 수 따라 한 문서에 줄이 쌓이는 곳 = **erp_contracts 뿐**(거래처 한 건에 모든 제품 계약 줄). 시험 등록(사장님 「지워 주세요」 로 바로 지움): 조혼가구 329줄 → 머리 597B + 조각 4(최대 37KB) · AMT 330 · 경기 120 · 이룸 91 · 로앤 103 · 폼 목록 줄 수 그대로 · 「대기·오류 모두 삭제」 = 머리·조각 0. 나누지 않으면 거래처 한 문서 약 100KB → 등록량 10배면 1MB.
   - erp_contracts 11-26 = 0건이라 옮길 것·백업 없음. 영림원 작업자 스크립트 읽기·쓰기 = `입력작업자/전달-외주계약-나눔저장.md`(스크립트는 안 고침).
