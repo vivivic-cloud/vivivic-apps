@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.56.11
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.56.12
+     v1.56.12(11-27): 칸넓이.js v3 — 사장님 「아이 표 넓히고 줄이는 게 어디 듣도 보도 못한 방식이야. 그냥 잡은 쪽이 늘어나고 줄어들면 되지 뭐야. 이게 그냥 엑셀이랑 구글시트처럼 해. 특이하게 하려고 그러지 말고」 → 엑셀·구글시트처럼(잡은 경계선이 마우스를 따라감 · 그 열만 · 옆 열 그대로 · 끄는 동안 파란 세로선). 보드 자체 손잡이(.열손 영림원보내기·구매+가공)도 같은 동작.
      v1.56.11(11-27): 표입력.js v9.6(칸을 빨리 끌어도 ▾ 가 같은 화면에서 글 끝을 따라감).
      v1.56.10(11-27): 표입력.js v9.5 · 드롭끝.js v2 — 칸 넓이를 끄는 동안 ▾ 가 글 끝을 바로 따라감(사장님 「아니 각 셀은 넓히기 기능이 있잖아. 이게 넓어져서 입력값이 모두 나오는 자리에 버튼이 옮겨가게 하면 되잖아」).
      v1.56.9(11-27): 표입력.js v9.4(낮은 줄에서도 ▾ 자리).
@@ -450,7 +451,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.56.11</div>
+  <div class="badge">v1.56.12</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -1196,11 +1197,11 @@ function 열손달기(표){
       if(e.button) return;
       e.preventDefault(); e.stopPropagation();
       try{ h.setPointerCapture(e.pointerId); }catch(_){}
-      const x0 = e.clientX, w0 = th.getBoundingClientRect().width, 이름 = 열이름(th); let 틀 = 0;
+      const x0 = e.clientX, w0 = th.getBoundingClientRect().width, 이름 = 열이름(th), 어긋 = th.getBoundingClientRect().right - e.clientX; let 틀 = 0;   /* v1.56.12 잡은 자리 ↔ 경계선 */
       h.classList.add('끄는중');
-      const 옮김 = ev => { 열너비[이름] = Math.max(24, Math.round(w0 + ev.clientX - x0)); if(!틀) 틀 = requestAnimationFrame(() => { 틀 = 0; 열너비맞춤(표, i); }); };
+      const 옮김 = ev => { 열너비[이름] = Math.max(24, Math.round(ev.clientX + 어긋 - th.getBoundingClientRect().left)); if(!틀) 틀 = requestAnimationFrame(() => { 틀 = 0; 열너비맞춤(표, i); if(window.칸넓이 && 칸넓이.선) 칸넓이.선(th.getBoundingClientRect().right, 표.closest('.표통') || 표); }); };   /* v1.56.12 경계선 = 마우스 자리(엑셀처럼) */
       const 끝 = () => {
-        h.classList.remove('끄는중'); ['pointermove','pointerup','pointercancel'].forEach((t, n) => h.removeEventListener(t, n ? 끝 : 옮김));
+        h.classList.remove('끄는중'); if(window.칸넓이 && 칸넓이.선끝) 칸넓이.선끝(); ['pointermove','pointerup','pointercancel'].forEach((t, n) => h.removeEventListener(t, n ? 끝 : 옮김));
         try{ localStorage.setItem(열너비키, JSON.stringify(열너비)); }catch(_){}
       };
       h.addEventListener('pointermove', 옮김); h.addEventListener('pointerup', 끝); h.addEventListener('pointercancel', 끝);
@@ -3128,7 +3129,7 @@ function 그리기(){
   addEventListener('resize', 다시);
 })();
 </script>
-<script src="칸넓이.js?v=2"></script>   <!-- v1.56.1 모든 표 칸 넓이 조절 -->
+<script src="칸넓이.js?v=3"></script>   <!-- v1.56.1 모든 표 칸 넓이 조절 -->
 <script>칸넓이.달기(document.body, { 열쇠:'발주역입력_보드매입현황_칸넓이' });</script>
 </body>
 </html>

@@ -8,6 +8,8 @@
    숨은 열(display:none — 빈 열 접기)은 세지 않음: colgroup 은 보이는 열만, 접기·펼침이 바뀌면 다시 맞춤.
    v2(11-27) 사장님 「모든표 가로넓이 조절 가능하게 해. 이걸 꼭 그때그때 말해야만 해주냐?」 — 옵션 표:'table'(고를 표 선택자, 없으면 table.dpr-t) ·
      머리 여러 줄(묶음 머리 colspan·rowspan)도 됨: 열마다 그 열 하나만 덮는 가장 아래 머리 칸에 손잡이 · 그런 칸이 없는 열이 있으면 그 표는 건너뜀 ·
+     v3(11-27): 사장님 「아이 표 넓히고 줄이는 게 어디 듣도 보도 못한 방식이야. 그냥 잡은 쪽이 늘어나고 줄어들면 되지 뭐야. 이게 그냥 엑셀이랑 구글시트처럼 해. 특이하게 하려고 그러지 말고」 —
+       엑셀·구글시트처럼: 잡은 경계선이 마우스를 그대로 따라감(넓이 = 마우스 x − 그 열 왼쪽 끝, 잡은 자리 어긋남 보정) · 그 열만 바뀌고 다른 열은 잰 넓이 그대로(올림 없이 소수까지 — 전엔 처음 고정할 때 올림으로 옆 열이 0.6~1px 바뀌었음) · 표 너비 = 열 합 · 끄는 동안 경계선 자리에 파란 세로선(표 상자 높이) · 커서 ↔ · 두 번 누름 = 원래대로 · 기억 그대로. 공용 `칸넓이.선(x, 상자)`/`선끝()` = 쪽 자체 손잡이(보드 .열손 · 재단 .칸끈)도 같은 선.
      v2.1(11-27): 열 이름 = 머리 글자에서 .열빨(영림원품목등록 열 제목 빨강 칸 수) 뺌 — 숫자가 바뀌어도 같은 열 기억.
      쪽이 따로 손잡이를 단 표(.칸끈 = 재단 v1.4.0 · .열손 = 보드매입현황 v1.32.0)는 건너뜀 — 이 파일 손잡이 = .칸끈.칸넓이끈. */
 (function(){
@@ -18,8 +20,14 @@
     '.칸끈:hover,.칸끈.끄는중{background:linear-gradient(to right,transparent 6px,#9C9C98 6px)}' +
     '@media (pointer:coarse){.칸끈{width:16px}.칸끈:hover,.칸끈.끄는중{background:linear-gradient(to right,transparent 14px,#9C9C98 14px)}}' +
     'table.칸고정{table-layout:fixed}table.칸고정>thead>tr>th,table.칸고정>tbody>tr>td{overflow:hidden;text-overflow:ellipsis;max-width:none}' +
-    'body.칸끄는중{cursor:col-resize;user-select:none;-webkit-user-select:none}';
+    'body.칸끄는중{cursor:col-resize;user-select:none;-webkit-user-select:none}body.칸끄는중 *{cursor:col-resize!important}' +
+    '.칸넓이선{position:fixed;z-index:60;width:2px;margin-left:-1px;background:#1a73e8;pointer-events:none;display:none}';   /* v3 끄는 동안 경계선(구글시트처럼) */
   document.head.appendChild(꼴);
+  let 선 = null;
+  function 선보임(x, 상자){ if(!선){ 선 = document.createElement('div'); 선.className = '칸넓이선'; document.body.appendChild(선); }
+    const r = (상자 || document.body).getBoundingClientRect(), 위 = Math.max(0, r.top), 아래 = Math.min(innerHeight, r.bottom);
+    Object.assign(선.style, { display:'block', left:x + 'px', top:위 + 'px', height:Math.max(0, 아래 - 위) + 'px' }); }
+  function 선끝(){ if(선) 선.style.display = 'none'; }
 
   function 달기(뿌리, 옵션){
     const 열쇠 = 옵션.열쇠, 묶음 = 옵션.묶음 || (() => ''), 표선 = 옵션.표 || 'table.dpr-t';
@@ -42,7 +50,7 @@
     function 고정(t){   /* 지금 넓이를 재어 colgroup 에 박고 고친 칸만 기억 값 */
       const ths = 머리들(t), 이름 = 이름들(t);
       풀기(t);
-      const 잰 = ths.map(th => Math.ceil(th.getBoundingClientRect().width));
+      const 잰 = ths.map(th => th.getBoundingClientRect().width);   /* v3 올림 안 함 — 옆 열이 안 바뀜 */
       const cg = document.createElement('colgroup'); cg.className = '칸넓이';
       let 합 = 0;
       잰.forEach((w, i) => { const v = Math.max(최소, 넓[이름[i]] || w); const c = document.createElement('col'); c.style.width = v + 'px'; cg.appendChild(c); 합 += v; });
@@ -81,7 +89,7 @@
       const h = e.target.closest && e.target.closest('.칸넓이끈'); if(!h || (e.pointerType === 'mouse' && e.button !== 0)) return;
       e.preventDefault(); e.stopPropagation();
       const th = h.parentNode, t = th.closest('table');
-      끌기 = { h, th, t, x:e.clientX, id:e.pointerId, 시작:false, 처음:th.getBoundingClientRect().width };
+      끌기 = { h, th, t, x:e.clientX, id:e.pointerId, 시작:false, 처음:th.getBoundingClientRect().width, 어긋:th.getBoundingClientRect().right - e.clientX };   /* v3 잡은 자리 ↔ 경계선 */
       try{ h.setPointerCapture(e.pointerId); }catch(_){}
     }, true);
     뿌리.addEventListener('pointermove', e => {
@@ -96,15 +104,15 @@
       }
       e.preventDefault();
       const cg = 끌기.t.querySelector(':scope>colgroup.칸넓이'), c = cg.children[끌기.i];
-      const v = Math.max(최소, Math.round(끌기.처음 + dx));
+      const v = Math.max(최소, Math.round(e.clientX + 끌기.어긋 - 끌기.th.getBoundingClientRect().left));   /* v3 경계선 = 마우스 자리 */
       c.style.width = v + 'px';
       끌기.t.style.width = [...cg.children].reduce((s, x) => s + parseFloat(x.style.width), 0) + 'px';
-      끌기.v = v;
+      끌기.v = v; 선보임(끌기.th.getBoundingClientRect().right, 끌기.t.closest('.표통') || 끌기.t);
     }, true);
     const 끝 = e => {
       if(!끌기 || e.pointerId !== 끌기.id) return;
       const { h, th, t, 시작, v } = 끌기; 끌기 = null;
-      h.classList.remove('끄는중'); document.body.classList.remove('칸끄는중');
+      h.classList.remove('끄는중'); document.body.classList.remove('칸끄는중'); 선끝();
       const k = 이름들(t)[머리들(t).indexOf(th)];
       if(시작){ if(k && v){ 넓[k] = v; 저장(); t.dataset.칸넓이 = 이름들(t).join('\t'); } 앞누름 = { 때:0, 손:null }; return; }
       if(e.type !== 'pointerup') return;
@@ -119,5 +127,5 @@
     뿌리.addEventListener('click', e => { if(e.target.closest && e.target.closest('.칸넓이끈')){ e.preventDefault(); e.stopPropagation(); } }, true);
     return { 다시 };
   }
-  window.칸넓이 = { 달기 };
+  window.칸넓이 = { 달기, 선:선보임, 선끝 };
 })();
