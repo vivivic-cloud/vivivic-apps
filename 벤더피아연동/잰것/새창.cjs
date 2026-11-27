@@ -29,7 +29,7 @@ window.VP저장 = { get: async function(){return {};}, set: async function(){}, 
   await 쪽.addScriptTag({ content: VP흉내 });
   await 쪽.addScriptTag({ content: fs.readFileSync(path.join(확장, 'menu.js'), 'utf8') });
   const 이름들 = await 쪽.$$eval('#vp-root .vp-btn', (a) => a.map((x) => x.textContent.trim()));
-  console.log('\n■ 새창 — 메뉴 단추 ' + 이름들.length + '개 ' + 못(이름들.length === 8) + ' · 비요크 메인에 없음 ' + 못(!이름들.includes('비요크선불비변경')));
+  console.log('\n■ 새창 — 메뉴 단추 ' + 이름들.length + '개 ' + 못(이름들.length === 9 && 이름들[8] === 'MD팀') + ' · 비요크 메인에 없음 ' + 못(!이름들.includes('비요크선불비변경')));
   /* 11-25 [새 지시 지난작업보기] 작은 「지난작업보기」 — 닫혀 있다가 누르면 비요크선불비변경 */
   const 지난 = await 쪽.evaluate(() => {
     const d = document.querySelector('#vp-root details.vp-지난'), s = d && d.querySelector('summary');

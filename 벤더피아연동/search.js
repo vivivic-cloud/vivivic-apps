@@ -262,6 +262,17 @@
   const CS글자 = (x) => String(x || "").replace(/[\s/]/g, "").toUpperCase();
   const 상담보기 = CS전용 && /(^|[#&])vgInq\b/i.test(location.hash || "");
   if (상담보기) { 상담내용보기(); return; }
+  /* 11-27 [새 지시 MD팀] 메인 메뉴 「MD팀」 = `orderMst.aspx#vgMD` — 형제 `MD팀.js` 가 쪽·시트 탭·표를 다 세운다(아이엔지홈 제품리스트, 창고 `mdteam_inghome` 읽기만).
+     이 글은 그 글과 이름 단추(goods.js 곁다리 — CS등록과 같은 `상품단추불러오기`)만 부르고 물러난다. */
+  if (CS전용 && /(^|[#&])vgMD\b/i.test(location.hash || "")) {
+    const sc = document.createElement("script");
+    sc.src = 형제("MD팀.js");
+    sc.async = false;
+    sc.addEventListener("error", () => window.VP말?.("MD팀:글 못 받음"));
+    document.head.appendChild(sc);
+    상품단추불러오기();
+    return;
+  }
   /* 11-07 [새 지시 CS정산] 메인 메뉴 「CS정산」 = `orderMst.aspx#vgCal` — 올리기·대조는 형제 파일 `cs정산.js`(확장이 search.js 를 보내는 쪽이라 덮어쓰기 없이 된다).
      [새 지시 CS정산목록] 사장님(그대로): 「일치하는 벤더피아의 주문관리 목록이 나타나야 함」
      → 일찍 돌아가지 않고 이 글을 끝까지 돌려 **CS등록과 같은 표**(`머리알기`+`addRows`)를 세운다. 맨 끝 `VP정산표` 가 그 표를 cs정산.js 에 빌려준다. */
