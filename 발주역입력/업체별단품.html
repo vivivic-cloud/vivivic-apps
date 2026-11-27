@@ -2,7 +2,8 @@
 <!-- 발주역입력 / 업체별 단품명 — 「업체별단품명」 엑셀(시트 「업체별단품코드」)을 A열 업체 표시로 나눠 업체마다 표로 본다.
      사장님 11-18: 「폴더에 업체별단품명 파일의 A열이 조혼가구인 것만 목록으로 보여지게 해줘.」 →
        「폴더에 업체별 단품폴더를 새로만들었어 그안에 있는 구글시트 A열 확인해서 업체별로 목록 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.6.6
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.6.7
+     v1.6.7(11-27): 사장님 「단품명 변경시 기존 입력 단품명으로 변경되게 해주세요」(분배 방 확인 = 엑셀 원래 단품코드·단품명으로 되돌리기) — 교체된 줄의 죽은 글씨(원래 단품코드·단품명) 누름 → 「되돌리겠습니까?」 → 교체 기록만 지움(발주역입력_업체별단품교체 그 열쇠 deleteField · 원래 엑셀·업체별 단품 창고 안 건드림).
      v1.6.6(11-27): 사장님 「모든표 가로넓이 조절 가능하게 해. 이걸 꼭 그때그때 말해야만 해주냐?」 — 공용 칸넓이.js v2 를 모든 표에(머리 칸 오른쪽 끝 끌기 · 두 번 누르면 원래대로 · 이 기기 기억). 다른 것은 안 바꿈.
      v1.6.5(11-25): 사장님 「네 공유용 제한된페이지를 다시 만들어주세요」 — 공용 공유.js: 주소 ?공유=에이엠티 = 쪽길 에이엠티출고조사 네 탭만(밖 탭·입력폼 단추 숨김, 네 탭에 표시 이어 붙임) · 표시 없는 주소 그대로.
      v1.6.4(11-25): 쪽길 「영림원품목등록」 다음 탭 「품목등록test서버용」(새 쪽).
@@ -137,13 +138,14 @@ html,body{height:100%;overflow:hidden}
 .vpd div.msg{color:var(--vg-muted);cursor:default}
 .vpd div.msg.bad{color:var(--vg-red)}
 .죽음{color:#9C9C98;text-decoration:line-through;font-size:10.5px}
+.죽음[data-되돌]{cursor:pointer}.죽음[data-되돌]:hover{color:var(--vg-ink)}   /* v1.6.7 누르면 원래 단품으로 되돌림 */
 </style>
 </head>
 <body>
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.6.6</div>
+  <div class="badge">v1.6.7</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html" class="on">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>업체별 단품명</h1>
@@ -299,8 +301,9 @@ function 그리기(d){
       const cls = (i===0?'dpr-k':'') + (숫자칸.has(k)?' num':'');
       /* v1.3.0 단품명 칸 = 벤더피아연동 단품 단추(단품코드가 있는 줄만) */
       let 값 = i===ni && 옛코드 && 옛이름 ? VP단품단추.단추글(x ? x.새코드 : 옛코드, x ? x.새이름 : 별명(옛이름)) : 글(별명(r.v[i]));
-      if(x && i===ci) 값 = `${글(x.새코드)}<div class="죽음">${글(옛코드)}</div>`;
-      if(x && i===ni) 값 += `<div class="죽음">${글(별명(옛이름))}</div>`;
+      const 되 = x ? ` data-되돌="${글(VP단품단추.키(옛코드))}" title="원래 단품으로 되돌리기 — ${글(옛코드)} ${글(별명(옛이름))}"` : '';   /* v1.6.7 */
+      if(x && i===ci) 값 = `${글(x.새코드)}<div class="죽음"${되}>${글(옛코드)}</div>`;
+      if(x && i===ni) 값 += `<div class="죽음"${되}>${글(별명(옛이름))}</div>`;
       const 표 = i===ni && 옛코드 ? ` data-ok="${글(옛코드)}" data-on="${글(옛이름)}"` : '';
       return `<td${cls.trim()?` class="${cls.trim()}"`:''}${표}>${값}</td>`;
     }).join('') + 단가칸(옛코드) + '</tr>';
@@ -398,6 +401,14 @@ function 고르기(input, d){
     .catch(e => alert('저장하지 못했습니다 ' + ((e && (e.code || e.message)) || '')));
   후보칸 = null; input.blur(); 후보닫기();
 }
+document.addEventListener('click', e => {   /* v1.6.7 교체 되돌리기 = 교체 기록만 지움 */
+  const d = e.target.closest && e.target.closest('.죽음[data-되돌]'); if(!d) return;
+  e.preventDefault(); e.stopPropagation();
+  if(!confirm('되돌리겠습니까?')) return;
+  const { doc, setDoc, deleteField } = window.fbRead, u = 고른;
+  setDoc(doc(window.db, ...교체자리, 문서이름(u)), { 업체: u, 교체: { [d.dataset.되돌]: deleteField() } }, { merge: true })
+    .catch(er => alert('저장하지 못했습니다 ' + ((er && (er.code || er.message)) || '')));
+}, true);
 VP단품단추.빨강누름 = (b) => {
   const td = b.closest('td'); if(!td || !td.dataset.ok) return;
   /* v1.4.1 사장님 「단품관리페이지가 나오라는게 아니라 … 검색창이 작게 나와서 검색후 드롭선택」 — 벤더피아 단품관리 탭을 열지 않는다(VP실시간.열기 안 부름). 이미 이어진 탭이 있을 때만 실시간을 덧씀 */
