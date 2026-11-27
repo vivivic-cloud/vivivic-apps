@@ -66,6 +66,8 @@ const 가짜goods = `(() => {
         if (창고없음) return r.fulfill({ status: 200, headers: 열림, contentType: 'application/json', body: '{}' });
         /* 11-27 [새 지시 MD팀스마트스토어칸] 사방넷 링크·화면 입력 창고 흉내 (값은 지어냄) */
         const 길 = decodeURIComponent(u.pathname);
+        if (/mdteam_inghome_cand\/links$/.test(길)) return r.fulfill({ status: 200, headers: 열림, contentType: 'application/json', body: JSON.stringify({ fields: { j: { stringValue: JSON.stringify(
+          { code3: [['8001', '타입선택: 지어낸 옵션 A'], ['8002', '타입선택: 지어낸 옵션 B']], code1: [['8003', '채워진 줄엔 안 보임']] }) } } }) });   // 11-27 [새 지시 MD팀후보체크]
         if (/mdteam_inghome_ss\/links$/.test(길)) return r.fulfill({ status: 200, headers: 열림, contentType: 'application/json', body: JSON.stringify({ fields: { j: { stringValue: JSON.stringify(
           { 'DUP-1': ['7001', '지어낸 상품'], code1: ['222', '같은 번호'], code4: ['333', '같은 번호'], code7: ['557', '다른 번호'] }) } } }) });   // 11-27 [새 지시 MD팀스마트스토어파일]
         if (/mdteam_inghome_sabang\/links$/.test(길) && q.method() !== 'GET') { 창고쓰기.push(q.method() + ' sabang ' + (q.postData() || '')); return r.fulfill({ status: 200, headers: 열림, contentType: 'application/json', body: '{}' }); }
@@ -202,7 +204,7 @@ const 가짜goods = `(() => {
     재(!쪽오류.length, '쪽 오류 없음 ' + 쪽오류.join(' | '));
     재(!밖.length, '밖으로 나간 요청 없음 ' + 밖.join(','));
     재(벤더.every((x) => /^GET /.test(x)), '벤더피아에 쓰기 없음(흉내 goods 라 조회 0): ' + 벤더.join(','));
-    재(창고요청.length === 4 && 창고요청.every((x) => /^GET mdteam_inghome/.test(x)) && 창고요청.some((x) => /mdteam_inghome_ss\/links/.test(x)) && !창고쓰기.length, '창고 = 열 때 GET 넷(자료·사방넷 링크·화면 입력·스마트스토어 파일, 쓰기 0): ' + 창고요청);
+    재(창고요청.length === 5 && 창고요청.every((x) => /^GET mdteam_inghome/.test(x)) && 창고요청.some((x) => /mdteam_inghome_ss\/links/.test(x)) && !창고쓰기.length, '창고 = 열 때 GET 다섯(자료·사방넷 링크·화면 입력·스마트스토어 파일·후보, 쓰기 0): ' + 창고요청);
 
     /* ── 11-27 [새 지시 MD팀스마트스토어칸] 「스마트스토어 url」 칸 ── */
     await p.click('#vp-root .vp-md탭 button:has-text("제품리스트")');
@@ -220,6 +222,16 @@ const 가짜goods = `(() => {
     재(!링.설명, '화면에 설명 글 없음(까닭은 title 만)');
     const 파 = await p.evaluate(() => { const t = [...document.querySelectorAll('#vp-root .vp-table')].find((x) => !x.hidden).querySelector('table');
       const f = (i) => [...t.tBodies[0].rows[i].cells[3].querySelectorAll('a')].map((a) => [a.getAttribute('href').split('/').pop(), getComputedStyle(a).color, a.title]); return { r1: f(1), r2: f(2), r4: f(4), r7: f(7) }; });
+    /* 11-27 [새 지시 MD팀후보체크] 빈 칸 = 후보 회색 + 체크 단추 */
+    const 후 = await p.evaluate(() => { const t = [...document.querySelectorAll('#vp-root .vp-table')].find((x) => !x.hidden).querySelector('table');
+      const td = t.tBodies[0].rows[3].cells[3], td1 = t.tBodies[0].rows[1].cells[3];
+      return { 후보: [...td.querySelectorAll('.vp-md후보')].map((s) => [s.querySelector('input').type, s.querySelector('a').getAttribute('href').split('/').pop(), getComputedStyle(s).color, s.querySelector('a').title]), 라벨: td.querySelectorAll('label').length, 채운줄후보: td1.querySelectorAll('.vp-md후보').length, 셈: window.VP_MD링크셈().제품리스트.후보 }; });
+    재(후.후보.length === 2 && 후.후보[0][0] === 'checkbox' && 후.후보[0][1] === '8001' && /155, 154, 151/.test(후.후보[0][2]) && /옵션 A/.test(후.후보[0][3]) && !후.라벨 && !후.채운줄후보 && 후.셈 === 1, '빈 칸 = 후보 회색 + 체크 단추(링크 눌러도 체크 안 되게 label 아님 · 채워진 줄엔 후보 없음): ' + JSON.stringify(후));
+    const 쓰기전 = 창고쓰기.length;
+    await p.evaluate(() => [...document.querySelectorAll('#vp-root .vp-table')].find((x) => !x.hidden).querySelector('table').tBodies[0].rows[3].cells[3].querySelectorAll('.vp-md후보 input')[1].click()); await p.waitForTimeout(600);
+    const 고른뒤 = await p.evaluate(() => { const td = [...document.querySelectorAll('#vp-root .vp-table')].find((x) => !x.hidden).querySelector('table').tBodies[0].rows[3].cells[3]; return [td.querySelectorAll('.vp-md후보').length, [...td.querySelectorAll('a')].map((a) => a.getAttribute('href').split('/').pop()), /화면 입력/.test(td.title)]; });
+    재(창고쓰기.length === 쓰기전 + 1 && /^PATCH c_636f646533 /.test(창고쓰기[쓰기전]) && /products\/8002/.test(창고쓰기[쓰기전]) && 고른뒤[0] === 0 && 고른뒤[1].join() === '8002' && 고른뒤[2], '체크 = 그 링크를 화면 입력으로 저장 → 후보 사라지고 그 링크만: ' + JSON.stringify([창고쓰기[쓰기전], 고른뒤]));
+    창고쓰기.splice(0);   // 아래 고치기 시험은 쓰기 차례를 0부터 센다
     재(파.r2.length === 1 && 파.r2[0][0] === '7001' && /판매자상품코드 DUP-1/.test(파.r2[0][2]), '스마트스토어 파일 = 판매자상품코드가 상품코드와 같으면 빈 칸에 넣음: ' + JSON.stringify(파.r2));
     재(파.r1.length === 1 && 파.r4.length === 2 && 파.r4[1][0] === '333', '사방넷과 같은 번호면 한 번만(겹침 뺌): ' + JSON.stringify([파.r1, 파.r4]));
     재(파.r7.length === 3 && /221, 28, 26/.test(파.r7[0][1]) && 파.r7[1][0] === '556' && 파.r7[2][0] === '557' && /판매자상품코드/.test(파.r7[2][2]), '다르면 기존 값 빨강 + 사방넷·파일 링크 함께: ' + JSON.stringify(파.r7));

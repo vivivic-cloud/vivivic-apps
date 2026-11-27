@@ -39,6 +39,8 @@
 #vp-root .vp-md사방넷단추:disabled { opacity: .5; cursor: default; }
 #vp-root table.vp-촘촘.vp-md표 td .vp-md링크옛 { color: #DD1C1A !important; }
 #vp-root table.vp-촘촘.vp-md표 td .vp-md링크사방넷 { margin-left: 8px; }
+#vp-root table.vp-촘촘.vp-md표 td .vp-md후보 { display: inline-flex; align-items: center; gap: 3px; margin-right: 10px; color: #9b9a97; white-space: nowrap; cursor: pointer; }
+#vp-root table.vp-촘촘.vp-md표 td .vp-md후보 input { width: auto; height: auto; margin: 0; padding: 0; flex: none; cursor: pointer; }
 #vp-root table.vp-촘촘.vp-md표 td.vp-md링크못함 { outline: 1px solid #DD1C1A; outline-offset: -1px; }
 #vp-root table.vp-촘촘.vp-md표 td input.vp-md링크입력 { width: 100%; min-width: 240px; box-sizing: border-box; margin: 0; padding: 0 3px; height: 20px; font: inherit; border: 1px solid #2383e2; border-radius: 2px; }
 #vp-root .vp-md메모 span { padding: 0 3px; white-space: pre; }
@@ -110,10 +112,14 @@
   const 사방넷주소 = (n) => "https://smartstore.naver.com/inggagu/products/" + n;
   let 사방넷링크 = {}, 파일링크 = {};      // 파일링크 = 스마트스토어 상품 파일(`MD팀스마트스토어올리기.py` → 창고 `mdteam_inghome_ss/links`) {판매자상품코드: [상품번호, 상품명]}
   const 파일창고 = 창고 + "_ss/links";
+  /* 11-27 [새 지시 MD팀후보체크] 후보링크 = 창고 `mdteam_inghome_cand/links` {상품코드: [[스마트스토어 상품번호, 스마트스토어 옵션 글], …]}
+     (사방넷 단품코드매핑관리: 스마트스토어 상품+옵션 → 사방넷 단품 → 옵션별칭·자체상품코드 = 상품코드, 지금 스마트스토어 상품 파일에 있는 번호만) */
+  let 후보링크 = {};
+  const 후보창고 = 창고 + "_cand/links";
   const 입력링크 = new Map();
   async function 링크자료받기() {
     const tok = await 표받기();
-    const [가, 나, 다] = await Promise.all([
+    const [가, 나, 다, 라] = await Promise.all([
       밖에(사방넷창고, { headers: { Authorization: "Bearer " + tok } }).catch(() => null),
       (async () => {
         const 모음 = []; let 다음 = "";
@@ -127,7 +133,9 @@
         return 모음;
       })().catch(() => []),
       밖에(파일창고, { headers: { Authorization: "Bearer " + tok } }).catch(() => null),
+      밖에(후보창고, { headers: { Authorization: "Bearer " + tok } }).catch(() => null),
     ]);
+    try { if (라 && 라.ok) 후보링크 = JSON.parse(((JSON.parse(라.글).fields || {}).j || {}).stringValue || "{}"); } catch (e) {}
     try { if (가 && 가.ok) 사방넷링크 = JSON.parse(((JSON.parse(가.글).fields || {}).j || {}).stringValue || "{}"); } catch (e) {}
     try { if (다 && 다.ok) 파일링크 = JSON.parse(((JSON.parse(다.글).fields || {}).j || {}).stringValue || "{}"); } catch (e) {}
     for (const d of 나) {
@@ -185,6 +193,25 @@
     const 견줄a = (x, i) => { const a = td.appendChild(새a(사방넷주소(x.n), 사방넷주소(x.n), x.까닭)); if (i) a.classList.add("vp-md링크사방넷"); return a; };
     if (!String(글).trim()) {
       if (견줄.length) { 견줄.forEach(견줄a); 칸.상태 = "채움"; 칸.출처 = 견줄.map((x) => x.출처).join("+"); td.classList.add("vp-md링크채움"); }
+      else if (code && 후보링크[code] && 후보링크[code].length) {
+        /* 11-27 [새 지시 MD팀후보체크] 빈 칸 = 사방넷 단품코드매핑관리 후보(그 상품이 옵션으로 팔리는 스마트스토어 상품) — 회색 + 체크 단추. 체크 = 그 링크를 화면 입력으로 저장. */
+        for (const [n, 옵션] of 후보링크[code]) {
+          const lb = td.appendChild(document.createElement("span"));      // label 아님 — 링크를 눌러도 체크되지 않게
+          lb.className = "vp-md후보";
+          const cb = lb.appendChild(document.createElement("input"));
+          cb.type = "checkbox";
+          cb.title = "이 링크로 정함";
+          cb.addEventListener("change", async () => {
+            if (!cb.checked) return;
+            for (const x of td.querySelectorAll(".vp-md후보 input")) x.disabled = true;
+            try { await 링크저장(code, 사방넷주소(n)); 말("후보고름 " + code); }
+            catch (e) { cb.checked = false; td.classList.add("vp-md링크못함"); td.title = "저장 못 함 — " + (e && e.message ? e.message : e); for (const x of td.querySelectorAll(".vp-md후보 input")) x.disabled = false; return; }
+            for (const c of 링크칸들) if (c.code === code && !c.고치는중) 링크칸그리기(c);
+          });
+          lb.appendChild(새a(사방넷주소(n), 사방넷주소(n), "후보 — 스마트스토어 옵션: " + 옵션));
+        }
+        칸.상태 = "후보";
+      }
     } else if (!견줄.length || 견줄.some((x) => x.n === 지금번)) {
       td.appendChild(기존()); 칸.상태 = 견줄.length ? "같음" : "";
     } else {
@@ -226,7 +253,7 @@
     const 셈 = {};
     for (const c of 링크칸들) {
       const k = c.시트;
-      셈[k] = 셈[k] || { 칸: 0, 채움: 0, 같음: 0, 다름: 0, 입력: 0, 채움파일: 0, 다름파일: 0 };
+      셈[k] = 셈[k] || { 칸: 0, 채움: 0, 같음: 0, 다름: 0, 입력: 0, 채움파일: 0, 다름파일: 0, 후보: 0 };
       셈[k].칸++;
       if (c.상태) 셈[k][c.상태]++;
       if (c.상태 === "채움" && /파일/.test(c.출처)) 셈[k].채움파일++;
