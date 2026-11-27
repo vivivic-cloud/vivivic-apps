@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <!-- 조혼가구부속명 — 드라이브 「하준이형」 엑셀(조혼가구 발주서 시트들) 목록. 사장님 11-24 「발주역입력 메뉴에 조혼가구부속명 메뉴를 만들고 폴더에 하준이형 파일을 목록으로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.9.1
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.9.2
+     v1.9.2(11-27): 사장님 「품번 입력시 하부목록에 동일한 부속이 있다면 동일규칙 으로 입력되게 해주세요.」 — 반제품 품번을 「단품코드_xx」 꼴로 손으로 넣으면 _입력.부속코드[부속명] = xx → 같은 부속명 줄(손 값 없는 줄) 기본 품번 = 자기 단품코드_xx(품목등록업로드 부속코드보다 먼저) · 그 꼴이 아니면 그 줄 값만.
      v1.9.1(11-27): 사장님 「모든표 가로넓이 조절 가능하게 해. 이걸 꼭 그때그때 말해야만 해주냐?」 — 공용 칸넓이.js v2 를 모든 표에(머리 칸 오른쪽 끝 끌기 · 두 번 누르면 원래대로 · 이 기기 기억). 다른 것은 안 바꿈.
      v1.9.0(11-27): 사장님 「품번 생성규칙 알려줄게 제품품번_부속코드 부속코드는 선택된 부속의 품목등록업로드 품번 규칙을보면 부속마다 _ 동일한 코드 규칙이 보일꺼야 이렇게 기본입력되게 해주고 텍스트 편집입력가능 하게 해줘」 — 반제품 품번 기본 = 단품코드_부속코드(품목등록업로드 반제품 품명 꼬리 부속명 → 품번 마지막 「-코드_」, 실시간 · 여럿이면 가장 많은 것) · 없으면 빈칸 빨강 · 살구 글 입력(손 값 = 벌마다 파랑).
      v1.8.1(11-27): 필름 소요량(M) = 공정흐름에 엣지 있을 때만(영림원품목등록 필름값과 같음).
@@ -178,7 +179,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.9.1</div>
+  <div class="badge">v1.9.2</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html" class="on">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>조혼가구부속명</h1>
@@ -398,7 +399,8 @@ function 자재고름(t, 두){ const 원 = (생산.자재 || []).filter(m => m.t
   return 목.sort((a, b) => (b.맞음 - a.맞음) || (a.name||a.code).localeCompare(b.name||b.code) || a.code.localeCompare(b.code)).map(m => ({ v:m.code, 글:m.name, 맞음:m.맞음 })); }
 function 필름셈(규, W, D){ const n = String(규||'').match(/\d+(?:\.\d+)?/g); if(!n || n.length < 2) return null;
   const v = ((+n[0] + 40) * (+W || 0) + (+n[1] + 40) * (+D || 0)) / 1000; return { v:String(Math.round(v * 1000) / 1000), 근거:`((${n[0]}+40)×${W||0} + (${n[1]}+40)×${D||0}) ÷ 1000` }; }
-function 기본품번(고, 부명){ const z = (생산.부속코드 || new Map()).get(부명); return 고 && z ? { v:고.코드 + '_' + z.코드, 왜:'단품코드_부속코드 — 품목등록업로드 「' + 부명 + '」 품번 ' + z.들.map(([c, n]) => '-' + c + '_ ' + n + '줄').join(' · ') } : null; }   /* v1.9.0 */
+function 기본품번(고, 부명){ const 학 = (((생산.입력 || {}).부속코드) || {})[부명]; if(고 && 학) return { v:고.코드 + '_' + 학, 왜:'단품코드_부속코드 — 손으로 넣은 「' + 부명 + '」 품번 규칙 _' + 학 };   /* v1.9.2 */
+  const z = (생산.부속코드 || new Map()).get(부명); return 고 && z ? { v:고.코드 + '_' + z.코드, 왜:'단품코드_부속코드 — 품목등록업로드 「' + 부명 + '」 품번 ' + z.들.map(([c, n]) => '-' + c + '_ ' + n + '줄').join(' · ') } : null; }   /* v1.9.0 */
 const 반품번 = (x, 고, 부명) => { const 손 = 고 ? 손값(x.키, '품번@' + 고.코드) : null; if(손 != null) return { v:손, 손:true }; const 기 = 기본품번(고, 부명); return 기 ? { v:기.v, 왜:기.왜 } : { v:'' }; };
 const 반품명 = (고, 부명) => 고 ? 고.이름 + '-' + '_' + 부명 : '';
 const 품명말 = '품명 = 단품명-(가운데 글자)_부속명 — 가운데 글자는 정한 규칙 없음(확인 못 함)';
@@ -436,7 +438,7 @@ function 생산그리기(){
     /* 반제품 줄 */
     for(const x of 줄){ const 확 = 부속값(x), 부명 = 확 || x.부, 흐름 = 덧값(x, '공정흐름'), 재 = /재단/.test(흐름), 엣 = /엣지/.test(흐름) && !x.엣없, 보 = /보링/.test(흐름);
       const 꼭칸 = k => !덧값(x, k) && (k === '공정흐름' || k === '소요량' || (재 && k === '보드두께') || (엣 && ['엣지두께','엣지W','엣지D'].includes(k)) || (보 && k === '보링수량'));
-      h += `<tr class="하위" data-m="${글(ck)}" data-p="${글(x.키)}" data-c="${글(고 ? 고.코드 : '')}"${열?'':' hidden'}>` + 덧칸.map(k => {
+      h += `<tr class="하위" data-m="${글(ck)}" data-p="${글(x.키)}" data-c="${글(고 ? 고.코드 : '')}" data-부="${글(부명)}"${열?'':' hidden'}>` + 덧칸.map(k => {
         if(x.엣없 && (k === '엣지두께' || k === '엣지W' || k === '엣지D')) return `<td class="막음 잠김" data-k="${k}" data-알림="엣지면 빈칸 — 엣지 작업 없음" title="엣지면 빈칸 — 엣지 작업 없음"></td>`;
         const 손 = 손값(x.키, k), 규 = 규칙값(x, k), 빨 = 꼭칸(k) || ((k === '엣지W' || k === '엣지D') && !x.엣없 && 손 == null && !규);
         const cls = ['편', 덧꼴[k], 손 != null ? '저장값' : 규 ? '공자동' : '', 빨 ? '꼭' : ''].filter(Boolean).join(' ');
@@ -468,7 +470,9 @@ function 생산그리기(){
   if(window.표입력){ 통.tabIndex = 0;
     표입력.표(표, { 이름:'조혼생산제품정보', 열: td => td.dataset.k, 칸: td => td.classList.contains('편'), 막음: td => td.classList.contains('막음'), 알림: td => 생산막음(td),
       읽기: td => td.classList.contains('부속칸') ? td.firstElementChild.textContent.trim() : td.textContent.trim(),
-      쓰기: 목 => 생산값쓰기(목.map(([td, v]) => [td.parentNode.dataset.p, td.dataset.k === '품번' ? '품번@' + td.parentNode.dataset.c : td.dataset.k, v])),   /* v1.9.0 품번 손 값 = 벌(단품)마다 */
+      쓰기: 목 => { 생산값쓰기(목.map(([td, v]) => [td.parentNode.dataset.p, td.dataset.k === '품번' ? '품번@' + td.parentNode.dataset.c : td.dataset.k, v]));
+        for(const [td, v] of 목){ const tr = td.parentNode, c = tr.dataset.c, 부 = tr.dataset.부, g = String(v ?? '').trim();   /* v1.9.2 품번 「단품코드_xx」 = 같은 부속명 규칙 */
+          if(td.dataset.k === '품번' && c && 부 && g.startsWith(c + '_') && g.length > c.length + 1 && (((생산.입력 || {}).부속코드) || {})[부] !== g.slice(c.length + 1)) 생산쓰기('부속코드', 부, g.slice(c.length + 1)); } },   /* v1.9.0 품번 손 값 = 벌(단품)마다 */
       목록: td => { const k = td.dataset.k; if(k === '공정흐름') return 생산.공정목록; if(k === '엣지W' || k === '엣지D') return ['0','1','2']; if(k === '결보호') return ['O','X'];
         if(k === '기본구매처') return 생산.외주 || [];
         if(k === '합판코드' || k === '필름코드'){ const x = 줄x(td.parentNode); return 자재고름(k === '합판코드' ? '합판' : '필름', x ? 덧값(x, k === '합판코드' ? '보드두께' : '엣지두께') : ''); }
