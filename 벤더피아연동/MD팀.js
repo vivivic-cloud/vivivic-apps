@@ -31,6 +31,12 @@
 #vp-root .vp-md메모 { display: flex; flex-wrap: wrap; gap: 4px 12px; font: 12px/18px "Microsoft Sans Serif", 돋움, sans-serif; color: #000; margin: 0 0 2px; }
 #vp-root .vp-md엑셀명 { margin-left: 4px; font-size: 10px; line-height: 13px; color: #787774; vertical-align: top; }
 #vp-root .vp-md메모:empty { display: none; }
+#vp-root .vp-md사방넷[hidden] { display: none !important; }
+#vp-root .vp-md사방넷줄 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 2px 0 8px; font: 12px/24px "Microsoft Sans Serif", 돋움, sans-serif; color: #37352f; }
+#vp-root .vp-md사방넷됨 { color: #086788; font-weight: 700; }
+#vp-root .vp-md사방넷안됨 { color: #DD1C1A; font-weight: 700; }
+#vp-root .vp-md사방넷단추 { width: auto; margin: 0; padding: 3px 12px; font: 700 12px/18px 'Inter', -apple-system, sans-serif; color: #fff; background: #37352f; border: 0; border-radius: 4px; cursor: pointer; }
+#vp-root .vp-md사방넷단추:disabled { opacity: .5; cursor: default; }
 #vp-root table.vp-촘촘.vp-md표 td .vp-md링크옛 { color: #DD1C1A !important; }
 #vp-root table.vp-촘촘.vp-md표 td .vp-md링크사방넷 { margin-left: 8px; }
 #vp-root table.vp-촘촘.vp-md표 td.vp-md링크못함 { outline: 1px solid #DD1C1A; outline-offset: -1px; }
@@ -484,11 +490,156 @@
   window.VP_MD셈 = () => Object.fromEntries(시트표.map((x) => [x.s.이름, { 단추: (x.단추칸 || []).filter((c) => c.된).length, 제품명칸: (x.단추칸 || []).length }]));
   addEventListener("vp상품단추준비", () => 단추붙이기());
 
+  /* ── 「사방넷」 탭 (11-27 [새 지시 MD팀사방넷]) ──
+     MD팀에 들어오면 먼저 사방넷 로그인을 본다(확장 다리 `VP사방넷` → bg.js). 안 돼 있으면 사방넷 **공식 로그인 창**을 연다 —
+     아이디·비밀번호는 사장님이 그 창에 직접(이 글·확장·창고 어디에도 안 적음). 로그인되면(쿠키, 약 12시간) 그 창을 닫고
+     사방넷을 **읽기만**: 품번코드매핑관리(스마트스토어) + 단품 목록 → MD팀 상품코드 = 단품 옵션별칭/자체상품코드 → 「매핑용」 아닌 품번 →
+     스마트스토어 상품코드가 딱 하나면 링크. 그 결과로 「스마트스토어 url」 칸을 다시 그리고 창고 `mdteam_inghome_sabang/links` 를 새로 적는다
+     (사방넷 로그인이 없는 사람·때도 마지막 연동 결과가 보이게). 한 번 로그인하면 쿠키가 살아 있는 동안 MD팀을 다시 열어도 다시 안 묻는다. */
+  const 사방넷 = { 탭: null, 통: null, 상태: null, 받은때: "", 셈: null, 기다림: 0, 하는중: false, 줄: [] };
+  const 단추 = (글, 할) => { const b = document.createElement("button"); b.type = "button"; b.className = "vp-md사방넷단추"; b.textContent = 글; b.addEventListener("click", 할); return b; };
+  function 사방넷그리기() {
+    const 통 = 사방넷.통;
+    if (!통) return;
+    const 상 = 사방넷.상태;
+    const 줄 = document.createElement("div");
+    줄.className = "vp-md사방넷줄";
+    const 글 = (t, 까닭) => { const sp = 줄.appendChild(document.createElement("span")); sp.textContent = t; if (까닭) sp.title = 까닭; return sp; };
+    if (!window.VP사방넷) 글("확장 덮어쓰기 필요", "벤더피아 보기 확장 0.35.27 이상이 깔려야 사방넷에 로그인할 수 있습니다").className = "vp-md사방넷안됨";
+    else if (!상) 글("사방넷 확인 중…");
+    else if (상.로그인) { 글("사방넷 " + (상.계정 || "") + " 로그인").className = "vp-md사방넷됨"; 글("남은 " + Math.floor(상.남은분 / 60) + "시간 " + (상.남은분 % 60) + "분", "사방넷 로그인 쿠키가 끝나는 때까지"); }
+    else { 글("사방넷 로그인 안 됨").className = "vp-md사방넷안됨"; 줄.appendChild(단추("사방넷 로그인", () => 사방넷로그인())); }
+    if (상 && 상.로그인) 줄.appendChild(단추(사방넷.하는중 ? "받는 중…" : "다시 받기", () => 사방넷연동())).disabled = 사방넷.하는중;
+    if (사방넷.받은때) 글("받은 때 " + 사방넷.받은때);
+    if (사방넷.셈) 글("매핑 " + 사방넷.셈.매핑 + " · 단품 " + 사방넷.셈.단품 + " · 링크 " + 사방넷.셈.링크);
+    if (사방넷.탈) 글("못 받음 — " + 사방넷.탈).className = "vp-md사방넷안됨";
+    const 머리 = ["상품코드", "사방넷 품번", "스마트스토어 상품코드", "스마트스토어 링크", "MD팀"];
+    const t = document.createElement("table");
+    t.className = "vp-촘촘 vp-md표 vp-md사방넷표";
+    const hr = t.createTHead().insertRow();
+    머리.forEach((h, i) => { const th = hr.appendChild(document.createElement("th")); th.textContent = h; if (!i) th.className = "vp-first"; });
+    const tb = t.createTBody();
+    const 상태글 = new Map();
+    for (const c of 링크칸들) if (c.code && c.상태 && !상태글.has(c.code)) 상태글.set(c.code, c.상태);
+    const 값줄 = Object.entries(사방넷링크).map(([code, [n, p]]) => [code, p, n, 사방넷주소(n), 상태글.get(code) || ""]);
+    for (const v of 값줄) {
+      const tr = tb.insertRow();
+      v.forEach((x, i) => {
+        const td = tr.insertCell();
+        if (!i) td.className = "vp-first";
+        if (i === 3) { const a = td.appendChild(document.createElement("a")); a.href = x; a.target = "_blank"; a.rel = "noopener"; a.textContent = x; a.style.color = "inherit"; a.style.textDecoration = "none"; }
+        else td.textContent = x;
+        if (i === 4 && x === "다름") td.style.color = "#DD1C1A";
+      });
+    }
+    const 표통 = document.createElement("div");
+    표통.className = "vp-table";
+    표통.appendChild(t);
+    통.replaceChildren(줄, 표통);
+    const 판 = window.VP표 && window.VP표.넓이틀(t, 머리, "vp열넓이:MD팀:사방넷");
+    if (판) 판.맞춤(값줄);
+  }
+  async function 사방넷상태보기() {
+    if (!window.VP사방넷) { 사방넷.상태 = null; 사방넷그리기(); return null; }
+    사방넷.상태 = await window.VP사방넷("상태");
+    사방넷그리기();
+    return 사방넷.상태;
+  }
+  async function 사방넷로그인() {
+    if (!window.VP사방넷) return;
+    const 상 = await window.VP사방넷("로그인창");
+    if (상 && 상.로그인) { 사방넷.상태 = 상; return 사방넷연동(); }
+    clearInterval(사방넷.기다림);
+    const 시작 = Date.now();
+    사방넷.기다림 = setInterval(async () => {
+      const s = await window.VP사방넷("상태");
+      if (s && s.로그인) {
+        clearInterval(사방넷.기다림);
+        사방넷.상태 = s;
+        window.VP사방넷("창닫기");
+        사방넷연동();
+      } else if (Date.now() - 시작 > 15 * 60000) clearInterval(사방넷.기다림);
+    }, 2000);
+  }
+  function 사방넷링크만들기(자료s, 매핑, 단품) {
+    const n = (s) => String(s || "").trim().toLowerCase();
+    const 묶음 = new Set(매핑.filter((r) => /매핑용/.test(r[2])).map((r) => r[0]));
+    const 품번별 = new Map();
+    for (const [p, s] of 매핑) { if (!품번별.has(p)) 품번별.set(p, new Set()); 품번별.get(p).add(s); }
+    const 코드별 = new Map();
+    const 더 = (k, p) => { if (!k) return; if (!코드별.has(k)) 코드별.set(k, new Set()); 코드별.get(k).add(p); };
+    for (const [p, 별칭, 자체] of 단품) { 더(n(별칭), p); 더(n(자체), p); }
+    const 답 = {};
+    for (const s of 자료s) {
+      const ci = s.칸.indexOf("상품코드");
+      if (ci < 0) continue;
+      for (const 줄 of s.줄) {
+        const code = String(셀값(줄[ci])).trim();
+        if (!code || 답[code]) continue;
+        const 품번들 = [...(코드별.get(n(code)) || [])].filter((p) => 품번별.has(p) && !묶음.has(p));
+        const 번호들 = [...new Set(품번들.flatMap((p) => [...품번별.get(p)]))];
+        if (번호들.length === 1) 답[code] = [번호들[0], 품번들.find((p) => 품번별.get(p).has(번호들[0]))];
+      }
+    }
+    return 답;
+  }
+  async function 사방넷연동() {
+    if (!window.VP사방넷 || 사방넷.하는중) return;
+    사방넷.하는중 = true; 사방넷.탈 = ""; 사방넷그리기();
+    try {
+      const 자 = await window.VP사방넷("자료");
+      if (!자) throw new Error("확장 답 없음");
+      if (자.로그인 === false) { 사방넷.상태 = { 로그인: false }; return; }
+      if (자.탈) throw new Error(자.탈);
+      const 새 = 사방넷링크만들기(시트표.map((x) => x.s), 자.매핑 || [], 자.단품 || []);
+      사방넷링크 = 새;
+      사방넷.셈 = { 매핑: (자.매핑 || []).length, 단품: (자.단품 || []).length, 링크: Object.keys(새).length };
+      사방넷.받은때 = new Date().toLocaleString("ko-KR", { hour12: false });
+      for (const c of 링크칸들) if (!c.고치는중) 링크칸그리기(c);
+      말("사방넷연동 " + JSON.stringify(사방넷.셈));
+      try {   // 마지막 연동 결과를 창고에(사방넷 로그인이 없는 때도 보이게). 화면 fetch 로 바로(다리는 이 칸 쓰기 안 받음)
+        const tok = await 표받기();
+        await fetch(사방넷창고, { method: "PATCH", credentials: "omit", headers: { "Content-Type": "application/json", Authorization: "Bearer " + tok },
+          body: JSON.stringify({ fields: { j: { stringValue: JSON.stringify(새) }, n: { integerValue: String(Object.keys(새).length) }, at: { stringValue: new Date().toISOString() }, 출처: { stringValue: "MD팀 사방넷 로그인 연동" } } }) });
+      } catch (e) {}
+    } catch (e) {
+      사방넷.탈 = String(e && e.message || e).slice(0, 60);
+    } finally {
+      사방넷.하는중 = false;
+      try { 사방넷.상태 = (await window.VP사방넷("상태")) || 사방넷.상태; } catch (e) {}
+      사방넷그리기();
+    }
+  }
+  window.VP_MD사방넷 = () => ({ 상태: 사방넷.상태, 셈: 사방넷.셈, 받은때: 사방넷.받은때, 탈: 사방넷.탈 || "", 다리: !!window.VP사방넷 });
+  function 사방넷탭고르기() {
+    시트표.forEach((x) => { x.탭.setAttribute("aria-selected", "false"); x.통.hidden = true; });
+    사방넷.탭.setAttribute("aria-selected", "true");
+    사방넷.통.hidden = false;
+    메모칸.replaceChildren();
+    거름판닫기();
+    사방넷그리기();
+  }
+  async function 사방넷시작() {
+    사방넷.탭 = 탭칸.appendChild(document.createElement("button"));
+    사방넷.탭.type = "button";
+    사방넷.탭.setAttribute("role", "tab");
+    사방넷.탭.textContent = "사방넷";
+    사방넷.탭.addEventListener("click", 사방넷탭고르기);
+    사방넷.통 = 쪽.appendChild(document.createElement("div"));
+    사방넷.통.className = "vp-md사방넷";
+    사방넷.통.hidden = true;
+    const 상 = await 사방넷상태보기();
+    if (!상) return;
+    if (상.로그인) 사방넷연동();
+    else 사방넷로그인();       // MD팀에 들어오면 먼저 사방넷 로그인 창
+  }
+
   function 탭고르기(k) {
     시트표.forEach((x, i) => {
       x.탭.setAttribute("aria-selected", String(i === k));
       x.통.hidden = i !== k;
     });
+    if (사방넷.탭) { 사방넷.탭.setAttribute("aria-selected", "false"); 사방넷.통.hidden = true; }
     const x = 시트표[k];
     메모칸.replaceChildren(...(x.s.메모 || []).map(([글, 꼴]) => { const sp = document.createElement("span"); sp.textContent = 글; 꼴입히기(sp, 꼴 ? 꼴표[꼴 - 1] : null); return sp; }));
     거름판닫기();
@@ -516,6 +667,7 @@
     });
     if (!시트표.length) { 알림.hidden = false; 알림.textContent = "MD팀 자료에 시트가 없습니다."; return; }
     탭고르기(0);
+    사방넷시작();
     /* 나머지 시트도 한가할 때 미리 그린다 — 이름 단추 찾기를 한 번에(시트끼리 같은 이름은 한 번만) */
     for (let i = 1; i < 시트표.length; i++) { await new Promise((풀) => setTimeout(풀, 30)); if (!시트표[i].그림) 표그리기(시트표[i]); }
     단추붙이기();

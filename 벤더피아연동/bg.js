@@ -235,3 +235,91 @@ chrome.runtime.onMessage.addListener((m, 보낸이, 답) => {
     return true;
   }
 });
+
+/* ── 사방넷 다리 (11-27 [새 지시 MD팀사방넷]) ──────────────────────────────
+   사장님(전달): 「MD팀 안에 사방넷 메뉴 · 크롬 확장으로 사방넷 아이디·비밀번호로 로그인 · 로그인한 상태로 사방넷 자료를 읽어
+                 MD팀 스마트스토어 url 과 계속 연동 · MD팀에 들어갈 때 로그인, 한 번 하면 MD팀 안에서 계속」.
+   · 로그인 = **사방넷 공식 로그인 창**(`www.sabangnet.co.kr/login/login-main`)을 작은 창으로 열 뿐. 아이디·비밀번호는 사장님이 그 창에 직접 넣는다.
+     ⚠ 이 확장은 아이디·비밀번호를 **받지도 적지도 않는다**(깃·창고·저장소 어디에도). 로그인되면 사방넷이 `.sabangnet.co.kr` 쿠키 `Authorization`(JWT, 약 12시간)을 남긴다.
+   · 자료 = 그 쿠키 표로 사방넷 관리 서버(쿠키 `WSRVR_URL_ADDR_NEW`, 예 sbadmin07)에 **읽기 두 길만** POST — 아래 `사방넷길` 밖은 거절(수정·전송·삭제 길 없음).
+     답은 여기서 필요한 칸만 남겨 넘긴다(품번·옵션별칭·자체상품코드 / 품번·스마트스토어 상품코드·상품명).
+   · 묻는 쪽 = 벤더피아 쪽 우리 content script(불러오기.js)뿐. 표(쿠키)는 화면으로 **안 넘긴다** — 상태는 {로그인, 남은분, 계정} 만. */
+const 사방넷집 = "https://www.sabangnet.co.kr";
+const 사방넷로그인쪽 = 사방넷집 + "/login/login-main";
+const 사방넷길 = {
+  매핑: "/prod-api/customer/order/ProductCodeMapping/getProductCodeMappingSearch",
+  단품: "/prod-api/customer/product/sku-bulk-modify-list",
+};
+let 사방넷창 = null;
+async function 사방넷쿠키(이름) {
+  try { const c = await chrome.cookies.get({ url: 사방넷집 + "/", name: 이름 }); return c ? decodeURIComponent(c.value) : ""; } catch (e) { return ""; }
+}
+async function 사방넷상태() {
+  const 표 = (await 사방넷쿠키("Authorization")).replace(/^Bearer\s+/i, "");
+  let 끝 = 0, 계정 = "";
+  try { const p = JSON.parse(atob(표.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))); 끝 = (p.exp || 0) * 1000; 계정 = String(p.svcAcntId || ""); } catch (e) {}
+  const 남은분 = 끝 ? Math.floor((끝 - Date.now()) / 60000) : 0;
+  return { 로그인: !!표 && 남은분 > 1, 남은분, 계정 };
+}
+const 배열찾기 = (o, d = 0) => {
+  if (Array.isArray(o) && o.length && typeof o[0] === "object") return o;
+  if (o && typeof o === "object" && d < 4) for (const k in o) { const x = 배열찾기(o[k], d + 1); if (x) return x; }
+  return null;
+};
+async function 사방넷묻기(길, 몸) {
+  const 표 = (await 사방넷쿠키("Authorization")).replace(/^Bearer\s+/i, "");
+  const 서버 = await 사방넷쿠키("WSRVR_URL_ADDR_NEW");
+  if (!표) return { 로그인: false };
+  if (!/^sbadmin\d{1,3}\.sabangnet\.co\.kr$/.test(서버)) return { 로그인: true, 탈: "관리 서버 모름" };
+  const 끊개 = new AbortController();
+  const 시계 = setTimeout(() => 끊개.abort(), 120000);
+  try {
+    const r = await fetch("https://" + 서버 + 길, {
+      method: "POST", signal: 끊개.signal, credentials: "omit", cache: "no-store",
+      headers: { Accept: "application/json", "Content-Type": "application/json;charset=UTF-8", Authorization: "Bearer " + 표 },
+      body: JSON.stringify(몸),
+    });
+    if (r.status === 401 || r.status === 403) return { 로그인: false, status: r.status };
+    if (!r.ok) return { 로그인: true, 탈: "HTTP " + r.status };
+    return { 로그인: true, 줄: 배열찾기(await r.json()) || [] };
+  } catch (e) {
+    return { 로그인: true, 탈: String(e && e.message || e).slice(0, 60) };
+  } finally { clearTimeout(시계); }
+}
+async function 사방넷자료() {
+  const 계정 = await 사방넷쿠키("svcAcntId");
+  const [매, 단] = await Promise.all([
+    사방넷묻기(사방넷길.매핑, { svcAcntId: 계정, dayOption: "001", startDate: "20000101", endDate: "20991231", pageOffset: 0, pageSize: 20000, currentPage: 1,
+      sortOption: "001", sort: "DESC", dateDiv: "reg_dm", orderStrd: "reg_dm", orderDegreeStrd: "asc", shmaId: "shop0055", amtInq: "N", excelDownYn: "N" }),
+    사방넷묻기(사방넷길.단품, { svcAcntId: 계정, dayOption: "prdFstRegsDt", startDate: "20000101", endDate: "20991231", pageSize: 50000, pageOffset: 0, currentPage: 1,
+      sortOption: "prdNo", sortValue: "ASC", catMpngDivCd: "", stdCatCdList: [], crtinvQtZero: false, vrtlStocQtZero: false, sftinvQtZero: false,
+      setDivCdL: false, setDivCdP: false, setDivCdG: false, stockUnderSft: false, useStockSelect: false, stockOption: "CRTINV_QT",
+      productStatus: [], skuSplyStsCd: "", searchCondition: "", searchKeyword: "", searchKeywordList: [], downloadScale: "SELECTED" }),
+  ]);
+  if (매.로그인 === false || 단.로그인 === false) return { 로그인: false };
+  if (매.탈 || 단.탈) return { 로그인: true, 탈: 매.탈 || 단.탈 };
+  return {
+    로그인: true,
+    매핑: 매.줄.map((x) => [String(x.prdNo || ""), String(x.shmaPrdNo || ""), String(x.prdNm || "")]),
+    단품: 단.줄.map((x) => [String(x.prdNo || ""), String(x.skuAbbrNm || ""), String(x.onsfPrdCd || "")]),
+  };
+}
+chrome.runtime.onMessage.addListener((m, 보낸이, 답) => {
+  if (!m || m.__vp !== "사방넷" || 보낸이.id !== chrome.runtime.id || !보낸이.tab) return;
+  if (!/^https:\/\/(www\.)?vendorpia\.com\//.test(String(보낸이.url || ""))) return;
+  (async () => {
+    if (m.할일 === "상태") return await 사방넷상태();
+    if (m.할일 === "로그인창") {
+      const 상 = await 사방넷상태();
+      if (상.로그인) return 상;
+      try { if (사방넷창 != null) await chrome.windows.update(사방넷창, { focused: true }); else throw 0; }
+      catch (e) { const w = await chrome.windows.create({ url: 사방넷로그인쪽, type: "popup", width: 560, height: 760, focused: true }); 사방넷창 = w.id; }
+      return 상;
+    }
+    if (m.할일 === "창닫기") { if (사방넷창 != null) { try { await chrome.windows.remove(사방넷창); } catch (e) {} 사방넷창 = null; } return true; }
+    if (m.할일 === "자료") return await 사방넷자료();
+    return null;
+  })().then(답, (e) => 답({ 탈: String(e && e.message || e).slice(0, 60) }));
+  return true;
+});
+chrome.windows.onRemoved.addListener((id) => { if (id === 사방넷창) 사방넷창 = null; });

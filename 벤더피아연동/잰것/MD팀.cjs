@@ -32,11 +32,24 @@ const 가짜goods = `(() => {
   const b = await chromium.launch({ executablePath: EXE, args: ['--no-sandbox'] });
   let 초록 = 0, 빨강 = 0;
   const 재 = (참, 말) => { console.log((참 ? '  ✓ ' : '  ✗ ') + 말); 참 ? 초록++ : 빨강++; };
-  async function 쪽열기(너비, { 창고없음 = false } = {}) {
+  async function 쪽열기(너비, { 창고없음 = false, 사방넷 = null } = {}) {
     const ctx = await b.newContext({ viewport: { width: 너비, height: 900 } });
     const p = await ctx.newPage();
     const 쪽오류 = [], 밖 = [], 벤더 = [], 창고요청 = [], 창고쓰기 = [];
     p.on('pageerror', (e) => 쪽오류.push(String(e)));
+    if (사방넷) await ctx.addInitScript((설정) => {
+      /* 11-27 [새 지시 MD팀사방넷] 확장 다리 흉내 — 처음엔 로그인 안 됨, 로그인창을 연 뒤 상태를 두 번 물으면 로그인 됨 */
+      let 로그인 = 설정.처음로그인, 물음 = 0;
+      window.__사방넷 = [];
+      window.VP사방넷 = async (할일) => {
+        window.__사방넷.push(할일);
+        if (할일 === '상태') { if (window.__사방넷.includes('로그인창') && ++물음 >= 2) 로그인 = true; return { 로그인, 남은분: 로그인 ? 700 : 0, 계정: 로그인 ? 'mw0000' : '' }; }
+        if (할일 === '로그인창') return { 로그인 };
+        if (할일 === '창닫기') return true;
+        if (할일 === '자료') return 로그인 ? { 로그인: true, 매핑: 설정.매핑, 단품: 설정.단품 } : { 로그인: false };
+        return null;
+      };
+    }, 사방넷);
     await ctx.route('**/*', async (r) => {
       const q = r.request(), u = new URL(q.url());
       if (u.hostname === 'vivivic-cloud.github.io') {
@@ -53,6 +66,7 @@ const 가짜goods = `(() => {
         if (창고없음) return r.fulfill({ status: 200, headers: 열림, contentType: 'application/json', body: '{}' });
         /* 11-27 [새 지시 MD팀스마트스토어칸] 사방넷 링크·화면 입력 창고 흉내 (값은 지어냄) */
         const 길 = decodeURIComponent(u.pathname);
+        if (/mdteam_inghome_sabang\/links$/.test(길) && q.method() !== 'GET') { 창고쓰기.push(q.method() + ' sabang ' + (q.postData() || '')); return r.fulfill({ status: 200, headers: 열림, contentType: 'application/json', body: '{}' }); }
         if (/mdteam_inghome_sabang\/links$/.test(길)) return r.fulfill({ status: 200, headers: 열림, contentType: 'application/json', body: JSON.stringify({ fields: { j: { stringValue: JSON.stringify(
           { code1: ['222', '901'], code4: ['333', '902'], code6: ['444', '903'], code7: ['556', '904'] }) } } }) });
         if (/mdteam_inghome_link/.test(길)) {
@@ -101,7 +115,7 @@ const 가짜goods = `(() => {
         시트셈: window.VP_MD셈 && window.VP_MD셈(), 설명: document.querySelector('#vp-root .vp-note').hidden };
     });
     재(판.h1 === 'MD팀', '제목 「MD팀」');
-    재(JSON.stringify(판.탭.map((x) => x[0])) === JSON.stringify(['제품리스트', '사은품리스트', '외부복사용', '중지단종']) && 판.탭[0][1] === 'true', '탭 = 시트 이름 그대로 넷, 처음 제품리스트: ' + 판.탭.map((x) => x.join(':')));
+    재(JSON.stringify(판.탭.map((x) => x[0])) === JSON.stringify(['제품리스트', '사은품리스트', '외부복사용', '중지단종', '사방넷']) && 판.탭[0][1] === 'true', '탭 = 시트 이름 그대로 넷 + 사방넷, 처음 제품리스트: ' + 판.탭.map((x) => x.join(':')));
     const 아래 = 판.머리 && 판.머리[0].map((x) => x[0]);
     재(판.머리 && 판.머리.length === 1 && JSON.stringify(아래) === JSON.stringify(['구분', '시리즈', '카테고리구분', '스마트스토어 url', '상품코드', '제품명', '옵션', '주의및 참고사항', '소비자가', '판매가', '할인율', '서울/경기', '경기외곽', '지방', '조립형태', '배송형태', '배송사', '합포장']),
       '칸 = 엑셀 차례 그대로 18칸(숨은 열 B 「순서」 뺌): ' + 아래);
@@ -193,7 +207,7 @@ const 가짜goods = `(() => {
     const 링 = await p.evaluate(() => {
       const t = [...document.querySelectorAll('#vp-root .vp-table')].find((x) => !x.hidden).querySelector('table');
       const 칸 = (i) => { const td = t.tBodies[0].rows[i].cells[3]; return { 글: td.textContent, a: [...td.querySelectorAll('a')].map((a) => [a.textContent, a.getAttribute('href'), getComputedStyle(a).color, a.title]), cls: td.className, title: td.title }; };
-      return { 머리: [...t.tHead.rows[0].cells].length, r0: 칸(0), r1: 칸(1), r4: 칸(4), r6: 칸(6), r7: 칸(7), 셈: window.VP_MD링크셈(), 설명: document.querySelector('#vp-root').innerText.includes('사방넷') };
+      return { 머리: [...t.tHead.rows[0].cells].length, r0: 칸(0), r1: 칸(1), r4: 칸(4), r6: 칸(6), r7: 칸(7), 셈: window.VP_MD링크셈(), 설명: /사방넷 품번|다름/.test(document.querySelector('#vp-root .vp-table:not([hidden])').innerText) };
     });
     재(링.머리 === 18, '열 구성 그대로 18칸');
     재(링.r0.a.length === 1 && 링.r0.a[0][1] === 'https://example.com/p/0' && /0, 0, 255/.test(링.r0.a[0][2]) && !/vp-md링크/.test(링.r0.cls), '사방넷 링크 없는 줄 = 엑셀 값 그대로: ' + JSON.stringify(링.r0.a));
@@ -226,6 +240,41 @@ const 가짜goods = `(() => {
     재(창고쓰기.length === 2 && (await p.evaluate((s) => document.querySelectorAll(s + ' a').length, 셀(4))) === 2, 'Esc = 저장 안 함');
     재(!쪽오류.length, '고친 뒤 쪽 오류 없음 ' + 쪽오류.join(' | '));
     await p.screenshot({ path: path.join(__dirname, '그림', `MD팀-${너비}.png`) });
+    await ctx.close();
+  }
+  console.log('\n■ 사방넷 로그인 연동 (확장 다리 흉내)');
+  {
+    const 매핑 = [['P1', '5001', '맞는 상품'], ['P2', '5002', '의자'], ['S1', '6001', '키즈가구 (매핑용)'], ['S1', '6002', '키즈가구 (매핑용)']];
+    const 단품 = [['P1', 'code1', ''], ['P2', '', 'code3'], ['S1', 'code6', ''], ['S1', 'code4', '']];
+    const { p, ctx, 쪽오류, 창고쓰기 } = await 쪽열기(1280, { 사방넷: { 처음로그인: false, 매핑, 단품 } });
+    await p.waitForFunction(() => window.VP_MD사방넷 && window.VP_MD사방넷().셈, null, { timeout: 20000 }).catch(() => {});
+    const 사 = await p.evaluate(() => ({ 부름: window.__사방넷, 판: window.VP_MD사방넷(), 셈: window.VP_MD링크셈().제품리스트,
+      칸: (i) => 0 }));
+    const 부름 = 사.부름.join(',');
+    재(/^상태,로그인창,(상태,)+창닫기/.test(부름) && 부름.includes('자료'), '들어오면 상태 → 로그인 안 됨 → 사방넷 로그인창 → 2초마다 상태 → 로그인되면 창닫기 → 자료: ' + 부름);
+    재(사.판.셈 && 사.판.셈.매핑 === 4 && 사.판.셈.단품 === 4 && 사.판.셈.링크 === 2, '받은 자료 셈 · 링크 = 매핑용 아닌 품번에 스마트스토어 코드 하나인 상품코드만(code1·code3, code4·code6 은 묶음 품번이라 뺌): ' + JSON.stringify(사.판.셈));
+    const 칸 = await p.evaluate(() => { const t = [...document.querySelectorAll('#vp-root .vp-table')].find((x) => !x.hidden).querySelector('table'); const f = (i) => [...t.tBodies[0].rows[i].cells[3].querySelectorAll('a')].map((a) => a.getAttribute('href')); return [f(1), f(3), f(4), f(6)]; });
+    재(JSON.stringify(칸) === JSON.stringify([['https://smartstore.naver.com/inggagu/products/5001'], ['https://smartstore.naver.com/inggagu/products/5002'], ['https://example.com/p/4'], ['https://smartstore.naver.com/inggagu/products/444']]),
+      '연동 뒤 칸 = 새 사방넷 링크로 다시 그림(빈 칸 채움 · 사방넷에 없으면 엑셀·화면 입력 그대로): ' + JSON.stringify(칸));
+    재(창고쓰기.some((x) => /^PATCH sabang /.test(x) && /5001/.test(x) && /MD팀 사방넷 로그인 연동/.test(x)), '마지막 연동 결과를 창고 mdteam_inghome_sabang/links 에 새로 적음');
+    재(!창고쓰기.some((x) => /비밀|password|pw/i.test(x)), '창고에 비밀번호 같은 것 없음');
+    await p.click('#vp-root .vp-md탭 button:has-text("사방넷")');
+    const 탭 = await p.evaluate(() => { const 통 = document.querySelector('#vp-root .vp-md사방넷'); const t = 통.querySelector('table');
+      return { 보임: !통.hidden, 줄글: 통.querySelector('.vp-md사방넷줄').innerText, 머리: [...t.tHead.rows[0].cells].map((c) => c.firstChild.textContent), 줄: t.tBodies[0].rows.length, 손: t.querySelectorAll('.vp-열손, [class*=손]').length,
+        시트숨음: [...document.querySelectorAll('#vp-root .vp-table')].filter((x) => !x.closest('.vp-md사방넷')).every((x) => x.hidden) }; });
+    재(탭.보임 && 탭.시트숨음 && /mw0000 로그인/.test(탭.줄글) && /링크 2/.test(탭.줄글) && 탭.줄 === 2 && 탭.머리.join(',') === '상품코드,사방넷 품번,스마트스토어 상품코드,스마트스토어 링크,MD팀', '「사방넷」 탭 = 로그인 상태·셈 + 링크 표: ' + JSON.stringify(탭));
+    await p.click('#vp-root .vp-md탭 button:has-text("제품리스트")');
+    재(await p.evaluate(() => document.querySelector('#vp-root .vp-md사방넷').hidden), '시트 탭으로 돌아가면 사방넷 통 숨음');
+    재(!쪽오류.length, '쪽 오류 없음 ' + 쪽오류.join(' | '));
+    await p.screenshot({ path: path.join(__dirname, '그림', 'MD팀-사방넷.png') });
+    await ctx.close();
+  }
+  console.log('\n■ 사방넷 이미 로그인');
+  {
+    const { p, ctx } = await 쪽열기(1280, { 사방넷: { 처음로그인: true, 매핑: [['P1', '5001', '맞는 상품']], 단품: [['P1', 'code1', '']] } });
+    await p.waitForFunction(() => window.VP_MD사방넷 && window.VP_MD사방넷().셈, null, { timeout: 20000 }).catch(() => {});
+    const 부름 = await p.evaluate(() => window.__사방넷.join(','));
+    재(!부름.includes('로그인창') && 부름.includes('자료'), '이미 로그인이면 창 안 열고 바로 자료: ' + 부름);
     await ctx.close();
   }
   console.log('\n■ 창고 비었음');

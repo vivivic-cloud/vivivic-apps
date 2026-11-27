@@ -42,4 +42,19 @@
     /* 받아오기는 저장보다 오래 걸린다. 그래도 끝내 답이 없으면 멈추지 않고 null 로 돌려준다. */
     setTimeout(() => { if (기다리는것2.delete(내표)) 풀(null); }, 20000);
   });
+
+  /* ── ⑨ 사방넷 다리 (11-27 [새 지시 MD팀사방넷]) — 할일: 상태 · 로그인창 · 창닫기 · 자료. 확장 쪽(불러오기.js → bg.js)이 받는다. */
+  let 표3 = 0;
+  const 기다리는것3 = new Map();
+  addEventListener("message", (e) => {
+    if (e.source !== window || !e.data || e.data.__vp !== "사방넷답") return;
+    const 풀 = 기다리는것3.get(e.data.표);
+    if (풀) { 기다리는것3.delete(e.data.표); 풀(e.data.답); }
+  });
+  window.VP사방넷 = (할일) => new Promise((풀) => {
+    const 내표 = ++표3;
+    기다리는것3.set(내표, 풀);
+    window.postMessage({ __vp: "사방넷", 표: 내표, 할일 }, location.origin);
+    setTimeout(() => { if (기다리는것3.delete(내표)) 풀(null); }, 150000);   // 자료(단품 1만여 줄)는 오래 걸릴 수 있다
+  });
 })();

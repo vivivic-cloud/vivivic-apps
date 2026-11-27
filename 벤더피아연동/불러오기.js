@@ -100,6 +100,18 @@
     window.postMessage({ __vp: "저장답", 표: e.data.표, 답 }, location.origin);
   });
 
+  /* ── ⑨ 사방넷 다리 (11-27 [새 지시 MD팀사방넷]) — 화면(MD팀.js)의 부탁을 배경(bg.js 「사방넷」)으로 건넨다.
+     할일은 넷뿐: 상태 · 로그인창(사방넷 공식 로그인 창 열기) · 창닫기 · 자료(읽기 두 길). 아이디·비밀번호·표는 이 길로 안 다닌다. */
+  addEventListener("message", (e) => {
+    if (e.source !== window || !e.data || e.data.__vp !== "사방넷") return;
+    const 할일 = String(e.data.할일 || "");
+    const 보내기 = (답) => window.postMessage({ __vp: "사방넷답", 표: e.data.표, 답 }, location.origin);
+    if (!["상태", "로그인창", "창닫기", "자료"].includes(할일)) return 보내기(null);
+    try {
+      chrome.runtime.sendMessage({ __vp: "사방넷", 할일 }, (r) => 보내기(chrome.runtime.lastError ? null : (r || null)));
+    } catch (err) { 보내기(null); }
+  });
+
   /* ── ⑧ **밖에서 받아 오는 다리** (10-15) ──────────────────────
      벤더피아 쪽 CSP(`connect-src`)가 창고로 나가는 것을 막아도, 확장 쪽 받아오기는
      그 CSP에 묶이지 않는다. 그래서 화면 글이 「이 주소 좀 받아 주십시오」 하면 여기서 받는다.
