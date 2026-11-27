@@ -31,6 +31,9 @@
 #vp-root .vp-md메모 { display: flex; flex-wrap: wrap; gap: 4px 12px; font: 12px/18px "Microsoft Sans Serif", 돋움, sans-serif; color: #000; margin: 0 0 2px; }
 #vp-root .vp-md엑셀명 { margin-left: 4px; font-size: 10px; line-height: 13px; color: #787774; vertical-align: top; }
 #vp-root .vp-md메모:empty { display: none; }
+#vp-root .vp-md검색판 { position: fixed; z-index: 60; padding: 3px; background: #fff; border: 1px solid #b0b0b0; border-radius: 4px; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+#vp-root .vp-md검색판 button { display: block; width: auto; margin: 0; padding: 4px 16px; font: 12px/18px "Microsoft Sans Serif", 돋움, sans-serif; color: #000; background: #fff; border: 0; border-radius: 3px; cursor: pointer; }
+#vp-root .vp-md검색판 button:hover { background: #2383e2; color: #fff; }
 #vp-root .vp-md사방넷[hidden], #vp-root .vp-md사방넷줄[hidden] { display: none !important; }
 #vp-root .vp-md사방넷줄 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 2px 0 8px; font: 12px/24px "Microsoft Sans Serif", 돋움, sans-serif; color: #37352f; }
 #vp-root .vp-md사방넷됨 { color: #086788; font-weight: 700; }
@@ -527,6 +530,31 @@
   const 셈글 = () => 시트표.map((x) => x.s.이름 + " " + (x.단추칸 || []).filter((c) => c.된).length + "/" + (x.단추칸 || []).length).join(" · ");
   window.VP_MD셈 = () => Object.fromEntries(시트표.map((x) => [x.s.이름, { 단추: (x.단추칸 || []).filter((c) => c.된).length, 제품명칸: (x.단추칸 || []).length }]));
   addEventListener("vp상품단추준비", () => 단추붙이기());
+
+  /* ── 11-27 [새 지시 MD팀제품명검색] 제품명 칸 오른쪽 단추 → 작은 메뉴 「검색」 → 아이엔지홈 스마트스토어(브랜드스토어) 안 검색 새 탭.
+     검색 글 = 파란 단추의 벤더피아 상품명(없으면 엑셀 제품명 글자). 주소 = brand.naver.com/inggagu/search?q= (11-27 잼: 200 ·
+     smartstore.naver.com/inggagu/search 는 로그인으로 돌림). 왼쪽 단추(이름 단추·상세)는 그대로. */
+  const 스토어검색 = (글) => "https://brand.naver.com/inggagu/search?q=" + encodeURIComponent(글);
+  function 검색판닫기() { r.querySelectorAll(".vp-md검색판").forEach((p) => p.remove()); }
+  r.addEventListener("contextmenu", (e) => {
+    const td = e.target.closest && e.target.closest("table.vp-md표 td.vp-상품칸");
+    if (!td) return;
+    const b = td.querySelector(".vp-goods-list button");
+    const 글 = (b ? String((b.firstChild && b.firstChild.nodeValue) || "") : td.textContent).trim();
+    if (!글) return;
+    e.preventDefault();
+    검색판닫기();
+    const 판 = r.appendChild(document.createElement("div"));
+    판.className = "vp-md검색판";
+    const 단 = 판.appendChild(document.createElement("button"));
+    단.type = "button"; 단.textContent = "검색"; 단.title = 글;
+    단.addEventListener("click", () => { window.open(스토어검색(글), "_blank", "noopener"); 검색판닫기(); 말("검색 " + 글); });
+    판.style.left = Math.min(e.clientX, innerWidth - 90) + "px";
+    판.style.top = Math.min(e.clientY, innerHeight - 40) + "px";
+  });
+  addEventListener("pointerdown", (e) => { if (!e.target.closest || !e.target.closest(".vp-md검색판")) 검색판닫기(); }, true);
+  addEventListener("keydown", (e) => { if (e.key === "Escape") 검색판닫기(); });
+  addEventListener("scroll", 검색판닫기, true);
 
   /* ── 「사방넷」 탭 (11-27 [새 지시 MD팀사방넷]) ──
      MD팀에 들어오면 먼저 사방넷 로그인을 본다(확장 다리 `VP사방넷` → bg.js). 안 돼 있으면 사방넷 **공식 로그인 창**을 연다 —

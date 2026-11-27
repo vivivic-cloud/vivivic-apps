@@ -257,6 +257,21 @@ const 가짜goods = `(() => {
     await p.dblclick(셀(4)); await p.waitForTimeout(200);
     await p.press(셀(4) + ' input', 'Escape'); await p.waitForTimeout(300);
     재(창고쓰기.length === 2 && (await p.evaluate((s) => document.querySelectorAll(s + ' a').length, 셀(4))) === 2, 'Esc = 저장 안 함');
+    /* 11-27 [새 지시 MD팀제품명검색] 제품명 칸 오른쪽 단추 → 「검색」 → 브랜드스토어 안 검색 새 탭 */
+    const 검 = await p.evaluate(async () => {
+      window.__열림 = []; window.open = (u) => { window.__열림.push(u); return null; };
+      const t = [...document.querySelectorAll('#vp-root .vp-table')].find((x) => !x.hidden).querySelector('table');
+      const 칸 = (i) => t.tBodies[0].rows[i].cells[5];
+      const 우 = (td) => { const ev = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 200, clientY: 200 }); const 막음 = !td.dispatchEvent(ev); return 막음; };
+      const 막음1 = 우(칸(1).querySelector('button') || 칸(1));
+      const 판 = document.querySelector('#vp-root .vp-md검색판'); const 글1 = 판 && 판.innerText; 판 && 판.querySelector('button').click();
+      const 남음 = !!document.querySelector('#vp-root .vp-md검색판');
+      우(칸(2)); document.querySelector('#vp-root .vp-md검색판 button').click();
+      const 막음딴칸 = 우(t.tBodies[0].rows[1].cells[8]);
+      return { 막음1, 글1, 남음, 열림: window.__열림, 막음딴칸, 판딴칸: !!document.querySelector('#vp-root .vp-md검색판') };
+    });
+    재(검.막음1 && 검.글1 === '검색' && !검.남음 && 검.열림[0] === 'https://brand.naver.com/inggagu/search?q=' + encodeURIComponent('벤더피아 이름 둘') && 검.열림[1] === 'https://brand.naver.com/inggagu/search?q=' + encodeURIComponent('없는 상품') && !검.막음딴칸 && !검.판딴칸,
+      '제품명 오른쪽 단추 = 「검색」 → 스토어 안 검색(단추 이름 · 단추 없으면 엑셀 제품명) · 다른 칸은 브라우저 메뉴 그대로: ' + JSON.stringify(검));
     재(!쪽오류.length, '고친 뒤 쪽 오류 없음 ' + 쪽오류.join(' | '));
     await p.screenshot({ path: path.join(__dirname, '그림', `MD팀-${너비}.png`) });
     await ctx.close();
