@@ -108,11 +108,12 @@
   const 문서이름 = (code) => "c_" + [...new TextEncoder().encode(code)].map((b) => b.toString(16).padStart(2, "0")).join("");
   const 링크번호 = (u) => { const m = String(u || "").match(/\/products\/(\d+)/); return m ? m[1] : ""; };
   const 사방넷주소 = (n) => "https://smartstore.naver.com/inggagu/products/" + n;
-  let 사방넷링크 = {};
+  let 사방넷링크 = {}, 파일링크 = {};      // 파일링크 = 스마트스토어 상품 파일(`MD팀스마트스토어올리기.py` → 창고 `mdteam_inghome_ss/links`) {판매자상품코드: [상품번호, 상품명]}
+  const 파일창고 = 창고 + "_ss/links";
   const 입력링크 = new Map();
   async function 링크자료받기() {
     const tok = await 표받기();
-    const [가, 나] = await Promise.all([
+    const [가, 나, 다] = await Promise.all([
       밖에(사방넷창고, { headers: { Authorization: "Bearer " + tok } }).catch(() => null),
       (async () => {
         const 모음 = []; let 다음 = "";
@@ -125,8 +126,10 @@
         }
         return 모음;
       })().catch(() => []),
+      밖에(파일창고, { headers: { Authorization: "Bearer " + tok } }).catch(() => null),
     ]);
     try { if (가 && 가.ok) 사방넷링크 = JSON.parse(((JSON.parse(가.글).fields || {}).j || {}).stringValue || "{}"); } catch (e) {}
+    try { if (다 && 다.ok) 파일링크 = JSON.parse(((JSON.parse(다.글).fields || {}).j || {}).stringValue || "{}"); } catch (e) {}
     for (const d of 나) {
       const f = d.fields || {};
       const code = f.code && f.code.stringValue;
@@ -155,6 +158,11 @@
     const 링 = 입력 ? 입력링크.get(code) : 셀링크(칸.엑셀);
     const 사 = code ? 사방넷링크[code] : null;
     const 사번 = 사 ? String(사[0]) : "";
+    /* 11-27 [새 지시 MD팀스마트스토어파일] 견줄 링크 = 사방넷 링크 + 스마트스토어 상품 파일(판매자상품코드 = 이 줄 상품코드) — 상품번호로 겹침 뺌 */
+    const 스 = code ? 파일링크[code] : null;
+    const 견줄 = [];
+    if (사번) 견줄.push({ n: 사번, 출처: "사방넷", 까닭: "사방넷 품번 " + 사[1] + " 스마트스토어 링크" });
+    if (스 && !견줄.some((x) => x.n === String(스[0]))) 견줄.push({ n: String(스[0]), 출처: "파일", 까닭: "스마트스토어 상품 파일 — 판매자상품코드 " + code + (스[1] ? " · " + 스[1] : "") });
     const 지금번 = 링크번호(링 || 글);
     const 새a = (주소, 보일글, 까닭) => {
       const a = document.createElement("a");
@@ -173,19 +181,20 @@
     };
     td.replaceChildren();
     td.classList.remove("vp-md링크다름", "vp-md링크채움", "vp-md링크못함");
-    칸.상태 = "";
+    칸.상태 = ""; 칸.출처 = "";
+    const 견줄a = (x, i) => { const a = td.appendChild(새a(사방넷주소(x.n), 사방넷주소(x.n), x.까닭)); if (i) a.classList.add("vp-md링크사방넷"); return a; };
     if (!String(글).trim()) {
-      if (사번) { td.appendChild(새a(사방넷주소(사번), 사방넷주소(사번), "사방넷 품번 " + 사[1] + " 스마트스토어 링크")); 칸.상태 = "채움"; td.classList.add("vp-md링크채움"); }
-    } else if (!사번 || 지금번 === 사번) {
-      td.appendChild(기존()); 칸.상태 = 사번 ? "같음" : "";
+      if (견줄.length) { 견줄.forEach(견줄a); 칸.상태 = "채움"; 칸.출처 = 견줄.map((x) => x.출처).join("+"); td.classList.add("vp-md링크채움"); }
+    } else if (!견줄.length || 견줄.some((x) => x.n === 지금번)) {
+      td.appendChild(기존()); 칸.상태 = 견줄.length ? "같음" : "";
     } else {
       const 옛 = td.appendChild(기존());
       옛.classList.add("vp-md링크옛");
-      옛.title = (입력 ? "화면 입력" : "엑셀") + " 값 — 사방넷 품번 " + 사[1] + " 스마트스토어 링크(" + 사번 + ")와 다름";
-      td.appendChild(새a(사방넷주소(사번), 사방넷주소(사번), "사방넷 품번 " + 사[1] + " 스마트스토어 링크")).classList.add("vp-md링크사방넷");
-      칸.상태 = "다름"; td.classList.add("vp-md링크다름");
+      옛.title = (입력 ? "화면 입력" : "엑셀") + " 값 — " + 견줄.map((x) => x.까닭 + "(" + x.n + ")").join(" · ") + "와 다름";
+      견줄.forEach((x) => 견줄a(x, 1));
+      칸.상태 = "다름"; 칸.출처 = 견줄.map((x) => x.출처).join("+"); td.classList.add("vp-md링크다름");
     }
-    td.title = [입력 ? "화면 입력: " + 글 : 글, 사번 && 칸.상태 !== "다름" ? "사방넷 품번 " + 사[1] : "", "두 번 누르면 고침"].filter(Boolean).join("\n");
+    td.title = [입력 ? "화면 입력: " + 글 : 글, 칸.상태 !== "다름" ? 견줄.map((x) => x.출처 === "사방넷" ? "사방넷 품번 " + 사[1] : "스마트스토어 상품 파일").join(" · ") : "", "두 번 누르면 고침"].filter(Boolean).join("\n");
   }
   function 링크고치기(칸) {
     if (칸.고치는중) return;
@@ -217,9 +226,11 @@
     const 셈 = {};
     for (const c of 링크칸들) {
       const k = c.시트;
-      셈[k] = 셈[k] || { 칸: 0, 채움: 0, 같음: 0, 다름: 0, 입력: 0 };
+      셈[k] = 셈[k] || { 칸: 0, 채움: 0, 같음: 0, 다름: 0, 입력: 0, 채움파일: 0, 다름파일: 0 };
       셈[k].칸++;
       if (c.상태) 셈[k][c.상태]++;
+      if (c.상태 === "채움" && /파일/.test(c.출처)) 셈[k].채움파일++;
+      if (c.상태 === "다름" && /파일/.test(c.출처)) 셈[k].다름파일++;
       if (c.code && 입력링크.has(c.code)) 셈[k].입력++;
     }
     return 셈;

@@ -66,6 +66,8 @@ const 가짜goods = `(() => {
         if (창고없음) return r.fulfill({ status: 200, headers: 열림, contentType: 'application/json', body: '{}' });
         /* 11-27 [새 지시 MD팀스마트스토어칸] 사방넷 링크·화면 입력 창고 흉내 (값은 지어냄) */
         const 길 = decodeURIComponent(u.pathname);
+        if (/mdteam_inghome_ss\/links$/.test(길)) return r.fulfill({ status: 200, headers: 열림, contentType: 'application/json', body: JSON.stringify({ fields: { j: { stringValue: JSON.stringify(
+          { 'DUP-1': ['7001', '지어낸 상품'], code1: ['222', '같은 번호'], code4: ['333', '같은 번호'], code7: ['557', '다른 번호'] }) } } }) });   // 11-27 [새 지시 MD팀스마트스토어파일]
         if (/mdteam_inghome_sabang\/links$/.test(길) && q.method() !== 'GET') { 창고쓰기.push(q.method() + ' sabang ' + (q.postData() || '')); return r.fulfill({ status: 200, headers: 열림, contentType: 'application/json', body: '{}' }); }
         if (/mdteam_inghome_sabang\/links$/.test(길)) return r.fulfill({ status: 200, headers: 열림, contentType: 'application/json', body: JSON.stringify({ fields: { j: { stringValue: JSON.stringify(
           { code1: ['222', '901'], code4: ['333', '902'], code6: ['444', '903'], code7: ['556', '904'] }) } } }) });
@@ -200,7 +202,7 @@ const 가짜goods = `(() => {
     재(!쪽오류.length, '쪽 오류 없음 ' + 쪽오류.join(' | '));
     재(!밖.length, '밖으로 나간 요청 없음 ' + 밖.join(','));
     재(벤더.every((x) => /^GET /.test(x)), '벤더피아에 쓰기 없음(흉내 goods 라 조회 0): ' + 벤더.join(','));
-    재(창고요청.length === 3 && 창고요청.every((x) => /^GET mdteam_inghome/.test(x)) && !창고쓰기.length, '창고 = 열 때 GET 셋(자료·사방넷 링크·화면 입력, 쓰기 0): ' + 창고요청);
+    재(창고요청.length === 4 && 창고요청.every((x) => /^GET mdteam_inghome/.test(x)) && 창고요청.some((x) => /mdteam_inghome_ss\/links/.test(x)) && !창고쓰기.length, '창고 = 열 때 GET 넷(자료·사방넷 링크·화면 입력·스마트스토어 파일, 쓰기 0): ' + 창고요청);
 
     /* ── 11-27 [새 지시 MD팀스마트스토어칸] 「스마트스토어 url」 칸 ── */
     await p.click('#vp-root .vp-md탭 button:has-text("제품리스트")');
@@ -214,9 +216,14 @@ const 가짜goods = `(() => {
     재(링.r1.a.length === 1 && 링.r1.a[0][1] === 'https://smartstore.naver.com/inggagu/products/222' && /vp-md링크채움/.test(링.r1.cls) && /901/.test(링.r1.a[0][3]), '빈 값 = 사방넷 링크 넣음(까닭은 마우스): ' + JSON.stringify(링.r1.a));
     재(링.r4.a.length === 2 && 링.r4.a[0][1] === 'https://example.com/p/4' && /221, 28, 26/.test(링.r4.a[0][2]) && /다름/.test(링.r4.a[0][3]) && 링.r4.a[1][1] === 'https://smartstore.naver.com/inggagu/products/333' && !/221, 28, 26/.test(링.r4.a[1][2]), '다름 = 기존 값 빨강 + 사방넷 링크 함께: ' + JSON.stringify(링.r4.a));
     재(링.r6.a.length === 1 && 링.r6.a[0][1] === 'https://smartstore.naver.com/inggagu/products/444' && /화면 입력/.test(링.r6.title), '화면 입력 값이 엑셀보다 먼저 · 사방넷과 같으면 그대로: ' + JSON.stringify(링.r6));
-    재(링.r7.a.length === 2 && /products\/555/.test(링.r7.a[0][1]) && /221, 28, 26/.test(링.r7.a[0][2]) && /화면 입력/.test(링.r7.a[0][3]), '화면 입력 값도 사방넷과 다르면 빨강: ' + JSON.stringify(링.r7.a));
+    재(링.r7.a.length === 3 && /products\/555/.test(링.r7.a[0][1]) && /221, 28, 26/.test(링.r7.a[0][2]) && /화면 입력/.test(링.r7.a[0][3]), '화면 입력 값도 사방넷과 다르면 빨강: ' + JSON.stringify(링.r7.a));
     재(!링.설명, '화면에 설명 글 없음(까닭은 title 만)');
-    재(링.셈.제품리스트 && 링.셈.제품리스트.채움 === 1 && 링.셈.제품리스트.다름 === 2 && 링.셈.제품리스트.같음 === 1 && 링.셈.제품리스트.입력 === 2, '셈: ' + JSON.stringify(링.셈.제품리스트));
+    const 파 = await p.evaluate(() => { const t = [...document.querySelectorAll('#vp-root .vp-table')].find((x) => !x.hidden).querySelector('table');
+      const f = (i) => [...t.tBodies[0].rows[i].cells[3].querySelectorAll('a')].map((a) => [a.getAttribute('href').split('/').pop(), getComputedStyle(a).color, a.title]); return { r1: f(1), r2: f(2), r4: f(4), r7: f(7) }; });
+    재(파.r2.length === 1 && 파.r2[0][0] === '7001' && /판매자상품코드 DUP-1/.test(파.r2[0][2]), '스마트스토어 파일 = 판매자상품코드가 상품코드와 같으면 빈 칸에 넣음: ' + JSON.stringify(파.r2));
+    재(파.r1.length === 1 && 파.r4.length === 2 && 파.r4[1][0] === '333', '사방넷과 같은 번호면 한 번만(겹침 뺌): ' + JSON.stringify([파.r1, 파.r4]));
+    재(파.r7.length === 3 && /221, 28, 26/.test(파.r7[0][1]) && 파.r7[1][0] === '556' && 파.r7[2][0] === '557' && /판매자상품코드/.test(파.r7[2][2]), '다르면 기존 값 빨강 + 사방넷·파일 링크 함께: ' + JSON.stringify(파.r7));
+    재(링.셈.제품리스트 && 링.셈.제품리스트.채움 === 3 && 링.셈.제품리스트.채움파일 === 2 && 링.셈.제품리스트.다름 === 2 && 링.셈.제품리스트.다름파일 === 1 && 링.셈.제품리스트.같음 === 1 && 링.셈.제품리스트.입력 === 2, '셈: ' + JSON.stringify(링.셈.제품리스트));
     /* 한 번 누름 = 링크 열기 · 두 번 누름 = 고치기(새 탭 안 열림) */
     await p.evaluate(() => { window.__열림 = []; window.open = (u) => { window.__열림.push(u); return null; };
       for (const tr of [...document.querySelectorAll('#vp-root .vp-table:not([hidden]) table tbody tr')]) tr.hidden = false; });   // 앞 시험의 거르개가 숨긴 줄 다시 보임
@@ -254,7 +261,7 @@ const 가짜goods = `(() => {
     재(/^상태,로그인창,(상태,)+창닫기/.test(부름) && 부름.includes('자료'), '들어오면 상태 → 로그인 안 됨 → 사방넷 로그인창 → 2초마다 상태 → 로그인되면 창닫기 → 자료: ' + 부름);
     재(사.판.셈 && 사.판.셈.매핑 === 4 && 사.판.셈.단품 === 4 && 사.판.셈.링크 === 2, '받은 자료 셈 · 링크 = 매핑용 아닌 품번에 스마트스토어 코드 하나인 상품코드만(code1·code3, code4·code6 은 묶음 품번이라 뺌): ' + JSON.stringify(사.판.셈));
     const 칸 = await p.evaluate(() => { const t = [...document.querySelectorAll('#vp-root .vp-table')].find((x) => !x.hidden).querySelector('table'); const f = (i) => [...t.tBodies[0].rows[i].cells[3].querySelectorAll('a')].map((a) => a.getAttribute('href')); return [f(1), f(3), f(4), f(6)]; });
-    재(JSON.stringify(칸) === JSON.stringify([['https://smartstore.naver.com/inggagu/products/5001'], ['https://smartstore.naver.com/inggagu/products/5002'], ['https://example.com/p/4'], ['https://smartstore.naver.com/inggagu/products/444']]),
+    재(JSON.stringify(칸) === JSON.stringify([['https://smartstore.naver.com/inggagu/products/5001', 'https://smartstore.naver.com/inggagu/products/222'], ['https://smartstore.naver.com/inggagu/products/5002'], ['https://example.com/p/4', 'https://smartstore.naver.com/inggagu/products/333'], ['https://smartstore.naver.com/inggagu/products/444']]),
       '연동 뒤 칸 = 새 사방넷 링크로 다시 그림(빈 칸 채움 · 사방넷에 없으면 엑셀·화면 입력 그대로): ' + JSON.stringify(칸));
     재(창고쓰기.some((x) => /^PATCH sabang /.test(x) && /5001/.test(x) && /MD팀 사방넷 로그인 연동/.test(x)), '마지막 연동 결과를 창고 mdteam_inghome_sabang/links 에 새로 적음');
     재(!창고쓰기.some((x) => /비밀|password|pw/i.test(x)), '창고에 비밀번호 같은 것 없음');
