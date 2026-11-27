@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <!-- 조혼가구부속명 — 드라이브 「하준이형」 엑셀(조혼가구 발주서 시트들) 목록. 사장님 11-24 「발주역입력 메뉴에 조혼가구부속명 메뉴를 만들고 폴더에 하준이형 파일을 목록으로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.9.7
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.9.8
+     v1.9.8(11-27): 사장님 「재단률 계산되게 해라」 — 재단률 = 영림원품목등록 재단셈과 같음: ① 에이엠티 재단편집 재단확정(_재단도[품번], 부속 = 규격) ② 없으면 shared/원장재단수량.js 소요량(규격 W×D · 결보호 O/X · 원장 = 합판코드 자재 규격, 없으면 재단편집 기본 4X8) · 안 되면 빈칸 빨강(까닭 = 마우스).
      v1.9.7(11-27): 사장님 「조혼생산제품정보 공정명이 조혼가공통합인것 각 부속별 소요자재만 입력하면 되는데」 — 흐름 「조혼가공통합」 줄 필름 소요량(M) = 엑셀 엣지면 기준으로 셈(흐름 글자에 엣지 없어도) · 보내기 값 조혼엣지(있음/빈칸) → 영림원품목등록 v2.159.4 가 그 줄 엣지 칸을 안 막음.
      v1.9.6(11-27): 사장님 「조혼생산제품정보 입력칸 입력할 수 있게 해달라고 품목등록업로드랑 똑같이」 — 칸마다 대조(입력 칸 묶음·누름·치기·붙여넣기·Delete 같음) · 다른 곳 = 드롭 목록만 칸: 기본구매처·합판코드·필름코드 목록 밖 글도 받음(품목등록업로드와 같게).
      v1.9.5(11-27): 표입력.js v8.2 — ▾ 가 + 손잡이를 가리지 않게(드롭 칸 오른쪽 여백 28px).
@@ -184,7 +185,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.9.7</div>
+  <div class="badge">v1.9.8</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html" class="on">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>조혼가구부속명</h1>
@@ -198,6 +199,7 @@ html,body{height:100%;overflow:hidden}
 <script src="../shared/viggle.js"></script>
 <script src="부속명통일.js?v=3"></script>
 <script src="터치범위.js?v=1"></script>   <!-- v1.6.0 조혼생산제품정보 표 = 영림원품목등록과 같은 입력(폰 범위) -->
+<script src="../shared/원장재단수량.js?v=11-21-1"></script>   <!-- v1.9.8 재단률 = 영림원품목등록·에이엠티 재단편집과 같은 셈 -->
 <script src="표입력.js?v=8.2"></script>   <!-- v1.6.0 공용 표 입력 -->
 <script>표입력.쪽('조혼가구부속명');</script>   <!-- v1.1.0 품목명 분할·부속명 드롭 공용(이룸산업과 같은 코드) -->
 
@@ -316,9 +318,10 @@ function 생산시작(){
     for(const u of 생산.시트) if(!(u in 생산.문서)){ 생산.문서[u] = null; onSnapshot(doc(window.db, ...생산자리, 문서이름(u)), s => { 생산.문서[u] = s.exists() ? s.data() : { 묶음:[] }; 생산다시(); }, () => {}); }
     생산다시(); }, () => {});
   onSnapshot(doc(window.db, 'artifacts','vivivic-4b7ef','public','data','발주역입력_영림원폼','_공정흐름'), d => { 생산.공정목록 = d.exists() && Array.isArray(d.data().줄) ? d.data().줄.map(x => String(x).trim()).filter(Boolean) : []; }, () => {});   /* v1.6.0 공정흐름 드롭 = 입력폼 공정흐름 완료 공개 사본 */
+  onSnapshot(doc(window.db, ...영품자리, '_재단도'), d => { 생산.재단편집 = (d.exists() && d.data().값) || {}; if(고른 === 생산메뉴) 생산그리기(); }, () => {});   /* v1.9.8 에이엠티 재단편집 재단확정 */
   onSnapshot(doc(window.db, ...영품자리, '_동일속성'), d => { 생산.동일 = (d.exists() && d.data().묶음) || {}; if(고른 === 생산메뉴) 생산그리기(); }, () => {});   /* v1.7.0 */
   const 트 = v => String(v ?? '').trim(), 자종 = b => { b = 트(b).toLowerCase(); return b === 'ed' ? '필름' : (b === 'md' || b === 'pb') ? '합판' : ''; };   /* v1.8.0 합판·필름 드롭 = 입력폼 자재 완료 공개 사본(영림원품목등록과 같은 사본) */
-  onSnapshot(doc(window.db, 'artifacts','vivivic-4b7ef','public','data','발주역입력_영림원폼','_자재'), d => { const 본 = new Set(); 생산.자재 = ((d.exists() && d.data().줄) || []).map(x => ({ code:트(x.자재번호), name:트(x.자재명), sm:트(x.소분류), t:자종(x.대분류) })).filter(m => m.t && m.code && !본.has(m.code) && 본.add(m.code)); }, () => {});
+  onSnapshot(doc(window.db, 'artifacts','vivivic-4b7ef','public','data','발주역입력_영림원폼','_자재'), d => { const 본 = new Set(); 생산.자재 = ((d.exists() && d.data().줄) || []).map(x => ({ code:트(x.자재번호), name:트(x.자재명), spec:트(x.규격), sm:트(x.소분류), t:자종(x.대분류) })).filter(m => m.t && m.code && !본.has(m.code) && 본.add(m.code)); }, () => {});
   onSnapshot(doc(window.db, 'artifacts','vivivic-4b7ef','public','data','발주역입력_영림원폼','_영림원거래처'), d => { const 본 = new Set(); 생산.외주 = [];   /* v1.8.0 기본구매처 드롭 = 외주가공거래처(T 시험 뺌 · 폐업 뺌) — 영림원품목등록 v2.5.0 과 같음 */
     for(const r of ((d.exists() && d.data().줄) || [])){ const 이 = 트(r.거래처), 종 = Array.isArray(r.거래처종류) ? r.거래처종류 : String(r.거래처종류 || '').split(/[,·]/).map(트);
       if(!이 || 트(r.거래처상태) === '폐업' || !종.includes('외주가공거래처') || /^T/.test(이) || 본.has(이)) continue; 본.add(이); 생산.외주.push({ v:이, 글:트(r.상호) && 트(r.상호) !== 이 ? 트(r.상호) : '' }); }
@@ -407,6 +410,18 @@ function 필름셈(규, W, D){ const n = String(규||'').match(/\d+(?:\.\d+)?/g)
 function 기본품번(고, 부명){ const 학 = (((생산.입력 || {}).부속코드) || {})[부명]; if(고 && 학) return { v:고.코드 + '_' + 학, 왜:'단품코드_부속코드 — 손으로 넣은 「' + 부명 + '」 품번 규칙 _' + 학 };   /* v1.9.2 */
   const z = (생산.부속코드 || new Map()).get(부명); return 고 && z ? { v:고.코드 + '_' + z.코드, 왜:'단품코드_부속코드 — 품목등록업로드 「' + 부명 + '」 품번 ' + z.들.map(([c, n]) => '-' + c + '_ ' + n + '줄').join(' · ') } : null; }   /* v1.9.0 */
 const 반품번 = (x, 고, 부명) => { const 손 = 고 ? 손값(x.키, '품번@' + 고.코드) : null; if(손 != null) return { v:손, 손:true }; const 기 = 기본품번(고, 부명); return 기 ? { v:기.v, 왜:기.왜 } : { v:'' }; };
+function 재단계산(x, 고, 부명){   /* v1.9.8 = 영림원품목등록 재단셈 그대로(값 = 이 표 손 값) */
+  const R = window.원장재단수량; if(!R) return { 왜:'계산 부품을 불러오지 못함 — 새로 고침' };
+  const p = R.크기읽기(x.규), 결 = String(덧값(x, '결보호') ?? '').trim().toUpperCase(), 합 = String(손값(x.키, '합판코드') || '').trim();
+  const 자 = 합 ? (생산.자재 || []).find(m => m.code === 합) : null, 판 = (자 && R.크기읽기(자.spec)) || R.원장크기('4X8');
+  const 판글 = 자 && R.크기읽기(자.spec) ? `원장 ${판.w}×${판.d}(BOM 하위규격 ${합})` : `원장 ${판.w}×${판.d}(재단편집 기본 4X8)`;
+  const 번 = 고 ? 반품번(x, 고, 부명).v : '', 편 = 번 ? (생산.재단편집 || {})[번] : null;
+  if(!p) return { 왜:'규격에 W*D 없음' };
+  if(편 && +편.원장당 > 0 && 편.부속 && +편.부속.w === p.w && +편.부속.d === p.d) return { n:+편.원장당, 근거:`에이엠티 재단편집 재단확정 원장당 ${편.원장당} · 부속 ${p.w}×${p.d} · 원장 ${편.원장 ? 편.원장.w + '×' + 편.원장.d : ''}` };
+  if(!['O','X'].includes(결)) return { 왜:'결보호 빈칸' };
+  const 셈 = R.소요량({ 부속:p, 원장:판, 결보호:결 });
+  if(!셈.n) return { 왜:셈.이유 || '원장에 안 앉음' };
+  return { n:셈.n, 근거:`에이엠티 재단편집 셈 · ${판글} · 전단컷 ${R.기본.전단컷} · 톱날 ${R.기본.톱날} · 부속 ${p.w}×${p.d} · 결보호 ${결}${셈.돌림 ? '(돌려 앉힘)' : ''} → 원장당 ${셈.n}` }; }
 const 반품명 = (고, 부명) => 고 ? 고.이름 + '-' + '_' + 부명 : '';
 const 품명말 = '품명 = 단품명-(가운데 글자)_부속명 — 가운데 글자는 정한 규칙 없음(확인 못 함)';
 function 생산그리기(){
@@ -460,7 +475,7 @@ function 생산그리기(){
           h += `<td class="편 드롭칸${손 ? ' 저장값' : ''}${빨 ? ' 꼭' : ''}" data-k="${k}"${빨 ? ' title="꼭 채울 칸"' : ''}>${글(손 || '')}</td>`; }
         else if(k === '필름코드') h += `<td class="막음 잠김" data-k="필름코드" data-알림="엣지면 빈칸 — 엣지 작업 없음" title="엣지면 빈칸 — 엣지 작업 없음"></td>`;
         else if(k === '품목설명'){ const 손 = 손값(x.키, k); h += `<td class="편 살구${손 != null ? ' 저장값' : ''}" data-k="품목설명" title="${살말}">${글(손 || '')}</td>`; }
-        else if(k === '재단률') h += `<td class="num 잠김" title="계산 값 — 영림원품목등록에서 셈(에이엠티 재단편집)"></td>`;
+        else if(k === '재단률'){ const 재 = 재단계산(x, 고, 부명); h += 재.n ? `<td class="num 잠김" title="${글(재.근거)}">${재.n}</td>` : `<td class="num 꼭" title="${글(재.왜)}"></td>`; }   /* v1.9.8 */
         else if(k === '필름 소요량(M)'){ const W = 덧값(x, '엣지W'), D = 덧값(x, '엣지D'), 셈 = (엣 || (흐름.trim() === '조혼가공통합' && !x.엣없)) && (W || D) ? 필름셈(x.규, W, D) : null;   /* v1.9.7 조혼가공통합 = 엑셀 엣지면 기준 */ h += `<td class="num 잠김" title="${글(셈 ? 셈.근거 : '계산 값 — 입력 칸 아님')}">${글(셈 ? 셈.v : '')}</td>`; }
         else if(영필수.has(k)) h += 빈필(k);
         else h += '<td></td>'; });
