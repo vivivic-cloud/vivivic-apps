@@ -31,6 +31,9 @@
 #vp-root .vp-md메모 { display: flex; flex-wrap: wrap; gap: 4px 12px; font: 12px/18px "Microsoft Sans Serif", 돋움, sans-serif; color: #000; margin: 0 0 2px; }
 #vp-root .vp-md엑셀명 { margin-left: 4px; font-size: 10px; line-height: 13px; color: #787774; vertical-align: top; }
 #vp-root .vp-md메모:empty { display: none; }
+/* 11-27 [새 지시 MD팀가로스크롤] 크롬 157 은 scrollbar-color 가 있으면 ::-webkit-scrollbar(search.css 의 26px 밀대)를 무시하고 맥의 숨는 밀대(두께 0)를 쓴다.
+   MD팀 표 통은 화면 높이에 맞춰져 통 밑(제 밀대)이 늘 화면 맨 아래라 떠밀대도 안 뜸 → 아무 밀대도 안 보였다. 이 통만 scrollbar-color 를 기본으로 돌려 26px 밀대를 늘 보이게. */
+#vp-root.vp-md팀 .vp-search > .vp-table { scrollbar-color: auto; scrollbar-width: auto; }
 #vp-root .vp-md검색판 { position: fixed; z-index: 60; padding: 3px; background: #fff; border: 1px solid #b0b0b0; border-radius: 4px; box-shadow: 0 4px 14px rgba(0,0,0,.18); }
 #vp-root .vp-md검색판 button { display: block; width: auto; margin: 0; padding: 4px 16px; font: 12px/18px "Microsoft Sans Serif", 돋움, sans-serif; color: #000; background: #fff; border: 0; border-radius: 3px; cursor: pointer; }
 #vp-root .vp-md검색판 button:hover { background: #2383e2; color: #fff; }

@@ -201,6 +201,8 @@ const 가짜goods = `(() => {
     재(외.칸 === 19 && 외.머리줄 === 1 && 외.순서 === '순서' && 외.거름 === 0, '외부복사용 = 19칸(B 숨김 아님) · 자동필터 없으니 거르개 없음');
     재(외.병합[0] === '세 줄 합친 참고' && !/vp-md병합/.test(외.병합[1]) && 외.병합[2] === '' && 외.병합[3] === '세 줄 합친 참고', '병합 = 첫 칸 값·칸 선 그대로(배송·CS 표)·아래 칸 마우스 올리면 값: ' + JSON.stringify(외.병합));
     재(!외.가로, '탭 바꿔도 쪽 가로 스크롤 없음');
+    const 밀 = await p.evaluate(() => { const 통 = [...document.querySelectorAll('#vp-root .vp-search > .vp-table')].find((x) => !x.hidden); const c = getComputedStyle(통); return [c.scrollbarColor, c.overflowX, 통.offsetHeight - 통.clientHeight]; });
+    재(밀[0] === 'auto' && 밀[1] === 'auto', 'MD팀 표 통 scrollbar-color 기본(=26px 꾸민 밀대가 숨는 밀대로 안 바뀜) · overflow-x auto: ' + JSON.stringify(밀));
     재(!쪽오류.length, '쪽 오류 없음 ' + 쪽오류.join(' | '));
     재(!밖.length, '밖으로 나간 요청 없음 ' + 밖.join(','));
     재(벤더.every((x) => /^GET /.test(x)), '벤더피아에 쓰기 없음(흉내 goods 라 조회 0): ' + 벤더.join(','));
