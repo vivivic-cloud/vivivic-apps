@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <!-- 조혼가구부속명 — 드라이브 「하준이형」 엑셀(조혼가구 발주서 시트들) 목록. 사장님 11-24 「발주역입력 메뉴에 조혼가구부속명 메뉴를 만들고 폴더에 하준이형 파일을 목록으로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.9.8
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.9.9
+     v1.9.9(11-27): 사장님 「조혼생산제품정보 기준단위 EA 로 통일 품목 대중소 분류 입력폼 연동하여 선택 할 수 있게」 — 기준단위 = EA(모든 줄, 보내기도) · 품목대분류·중분류·소분류 = 드롭(입력폼 품목대중소분류정의 완료 제상품 — 로그인 공유 실시간, 대 → 중 → 소 좁힘) · 글 입력도 · 완료에 없는 값 = 노랑(신규) · 소분류 빈칸 = 빨강(필수) · 손 값 = 제품 줄 단품코드 · 반제품 줄 벌마다.
      v1.9.8(11-27): 사장님 「재단률 계산되게 해라」 — 재단률 = 영림원품목등록 재단셈과 같음: ① 에이엠티 재단편집 재단확정(_재단도[품번], 부속 = 규격) ② 없으면 shared/원장재단수량.js 소요량(규격 W×D · 결보호 O/X · 원장 = 합판코드 자재 규격, 없으면 재단편집 기본 4X8) · 안 되면 빈칸 빨강(까닭 = 마우스).
      v1.9.7(11-27): 사장님 「조혼생산제품정보 공정명이 조혼가공통합인것 각 부속별 소요자재만 입력하면 되는데」 — 흐름 「조혼가공통합」 줄 필름 소요량(M) = 엑셀 엣지면 기준으로 셈(흐름 글자에 엣지 없어도) · 보내기 값 조혼엣지(있음/빈칸) → 영림원품목등록 v2.159.4 가 그 줄 엣지 칸을 안 막음.
      v1.9.6(11-27): 사장님 「조혼생산제품정보 입력칸 입력할 수 있게 해달라고 품목등록업로드랑 똑같이」 — 칸마다 대조(입력 칸 묶음·누름·치기·붙여넣기·Delete 같음) · 다른 곳 = 드롭 목록만 칸: 기본구매처·합판코드·필름코드 목록 밖 글도 받음(품목등록업로드와 같게).
@@ -41,7 +42,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
-    import { getFirestore, doc, getDoc, collection, getDocs, setDoc, onSnapshot, deleteField } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+    import { getFirestore, doc, getDoc, collection, getDocs, setDoc, onSnapshot, deleteField, query, where } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
     const 설정 = {
         apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
         authDomain: "vivivic-4b7ef.firebaseapp.com",
@@ -55,11 +56,14 @@
     /* v1.6.0 입력폼(앱 이름 'erp-input') 로그인을 같이 씀(영림원품목등록과 같은 길, 읽기만) — 5 품목등록 erp_items 오류 뺀 전부(대기·진행중·완료…) → 반제품 품명 마지막 「_」 뒤 = 부속명 목록 */
     try{
         const 폼앱 = initializeApp(설정, 'erp-input'), 폼auth = getAuth(폼앱), 폼db = getFirestore(폼앱);
-        let 끄기 = null;
+        let 끄기 = null, 끄기2 = null;
         const 받음 = (줄, 왜) => { window.폼품목대기 = [줄, 왜]; if (window.폼품목받음) window.폼품목받음(줄, 왜); };
+        const 받음2 = (줄, 왜) => { window.폼분류대기 = [줄, 왜]; if (window.폼분류받음) window.폼분류받음(줄, 왜); };   /* v1.9.9 입력폼 품목대중소분류정의(erp_classes) 완료 */
         onAuthStateChanged(폼auth, (u) => {
             if (끄기) { 끄기(); 끄기 = null; }
-            if (!u) { 받음(null, '입력폼 로그인 없음'); return; }
+            if (끄기2) { 끄기2(); 끄기2 = null; }
+            if (!u) { 받음(null, '입력폼 로그인 없음'); 받음2(null, '입력폼 로그인 없음'); return; }
+            끄기2 = onSnapshot(query(collection(폼db, 'erp_classes'), where('status', '==', '완료')), s => 받음2(s.docs.map(d => d.data()), ''), e => 받음2(null, (e && (e.code || e.message)) || ''));
             끄기 = onSnapshot(collection(폼db, 'erp_items'), s => 받음(s.docs.map(d => d.data()), ''), e => 받음(null, (e && (e.code || e.message)) || ''));
         });
     }catch(e){ window.폼품목대기 = [null, String(e && e.message || e)]; }
@@ -161,6 +165,7 @@ html,body{height:100%;overflow:hidden}
 .생산표 td.공자동{color:#A3A39F}
 .생산표 td.저장값{color:#1565c0;font-weight:400}
 .생산표 td.꼭{background:#FFCDD2;box-shadow:inset 0 0 0 1px #e53935}
+.생산표 td.분류새{background:#FFF3B0}   /* v1.9.9 신규 분류 = 노랑(보드매입현황 분류 칸과 같은 뜻) */
 .생산표 tbody tr.표입력줄 > td{background-image:linear-gradient(rgba(255,193,7,.22),rgba(255,193,7,.22))}
 .생산표 .저장값{color:#1565c0;font-weight:700}
 .생산표 td.부속칸 input{display:block;width:140px;height:20px;margin-top:2px;padding:0 4px;font:inherit;font-size:11px;border:1px solid #C7C7C3;border-radius:3px}
@@ -185,7 +190,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.9.8</div>
+  <div class="badge">v1.9.9</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html" class="on">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>조혼가구부속명</h1>
@@ -422,6 +427,20 @@ function 재단계산(x, 고, 부명){   /* v1.9.8 = 영림원품목등록 재�
   const 셈 = R.소요량({ 부속:p, 원장:판, 결보호:결 });
   if(!셈.n) return { 왜:셈.이유 || '원장에 안 앉음' };
   return { n:셈.n, 근거:`에이엠티 재단편집 셈 · ${판글} · 전단컷 ${R.기본.전단컷} · 톱날 ${R.기본.톱날} · 부속 ${p.w}×${p.d} · 결보호 ${결}${셈.돌림 ? '(돌려 앉힘)' : ''} → 원장당 ${셈.n}` }; }
+/* v1.9.9 품목 분류 — 입력폼 완료 제상품 [대, 중, 소] · 로그인 없으면 null */
+window.폼분류받음 = (줄, 왜) => { const 트 = v => String(v ?? '').trim(); 생산.품분류 = 줄 ? 줄.filter(r => r.kind === '제상품' && !r.ylwGone).map(r => [트(r.big), 트(r.mid), 트(r.name)]) : null; 생산.품분류왜 = 왜 || ''; if(고른 === 생산메뉴) 생산그리기(); };
+if(window.폼분류대기) window.폼분류받음(...window.폼분류대기);
+const 분류열 = ['품목대분류','품목중분류','품목소분류'];
+const 분류값 = (p, k, c) => p ? (손값(p, c ? k + '@' + c : k) || '') : '';
+function 분류td(p, k, c){
+  if(!p) return `<td class="막음 잠김${k === '품목소분류' ? ' 꼭' : ''}" title="단품명을 고름"></td>`;
+  const v = 분류값(p, k, c), 대 = 분류값(p, '품목대분류', c), 중 = 분류값(p, '품목중분류', c), 목 = 생산.품분류;
+  const 있 = !v || !목 ? true : k === '품목대분류' ? 목.some(r => r[0] === v) : k === '품목중분류' ? 목.some(r => r[0] === 대 && r[1] === v) : 목.some(r => r[0] === 대 && r[1] === 중 && r[2] === v);
+  const 빨 = !v && k === '품목소분류', t = !목 ? '입력폼 품목대중소분류정의 못 읽음 — ' + (생산.품분류왜 || '읽는 중') : 빨 ? '영림원 필수 — 빈칸' : !있 ? '신규 — 입력폼 품목대중소분류정의 완료에 없음' : '';
+  return `<td class="편 드롭칸${v ? ' 저장값' : ''}${빨 ? ' 꼭' : ''}${!있 ? ' 분류새' : ''}" data-k="${k}"${t ? ` title="${글(t)}"` : ''}>${글(v)}</td>`; }
+function 분류목록(td){ const 목 = 생산.품분류 || [], k = td.dataset.k, tr = td.parentNode, 값 = x => ((tr.querySelector(`td[data-k="${x}"]`) || {}).textContent || '').trim(), 대 = 값('품목대분류'), 중 = 값('품목중분류');
+  const 들 = k === '품목대분류' ? 목.map(r => r[0]) : k === '품목중분류' ? 목.filter(r => !대 || r[0] === 대).map(r => r[1]) : 목.filter(r => (!대 || r[0] === 대) && (!중 || r[1] === 중)).map(r => r[2]);
+  return [...new Set(들.filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko')); }
 const 반품명 = (고, 부명) => 고 ? 고.이름 + '-' + '_' + 부명 : '';
 const 품명말 = '품명 = 단품명-(가운데 글자)_부속명 — 가운데 글자는 정한 규칙 없음(확인 못 함)';
 function 생산그리기(){
@@ -452,6 +471,8 @@ function 생산그리기(){
       else if(k === '품목설명') h += 고 ? `<td class="편 살구${손값(고.코드, k) != null ? ' 저장값' : ''}" data-k="품목설명" title="${살말}">${글(손값(고.코드, k) || '')}</td>` : `<td class="막음 잠김" title="단품명을 고름"></td>`;
       else if(k === '투입수량' || k === '합판코드' || k === '필름코드') h += `<td class="막음 잠김" data-k="${k}" data-알림="${반막}" title="${반막}"></td>`;
       else if(k === '재단률' || k === '필름 소요량(M)') h += `<td class="num 잠김" title="계산 값 — 입력 칸 아님"></td>`;
+      else if(k === '기준단위') h += '<td>EA</td>';   /* v1.9.9 */
+      else if(분류열.includes(k)) h += 분류td(고 ? 고.코드 : '', k, '');
       else if(영필수.has(k)) h += 빈필(k);
       else h += '<td></td>'; });
     h += '</tr>';
@@ -477,6 +498,8 @@ function 생산그리기(){
         else if(k === '품목설명'){ const 손 = 손값(x.키, k); h += `<td class="편 살구${손 != null ? ' 저장값' : ''}" data-k="품목설명" title="${살말}">${글(손 || '')}</td>`; }
         else if(k === '재단률'){ const 재 = 재단계산(x, 고, 부명); h += 재.n ? `<td class="num 잠김" title="${글(재.근거)}">${재.n}</td>` : `<td class="num 꼭" title="${글(재.왜)}"></td>`; }   /* v1.9.8 */
         else if(k === '필름 소요량(M)'){ const W = 덧값(x, '엣지W'), D = 덧값(x, '엣지D'), 셈 = (엣 || (흐름.trim() === '조혼가공통합' && !x.엣없)) && (W || D) ? 필름셈(x.규, W, D) : null;   /* v1.9.7 조혼가공통합 = 엑셀 엣지면 기준 */ h += `<td class="num 잠김" title="${글(셈 ? 셈.근거 : '계산 값 — 입력 칸 아님')}">${글(셈 ? 셈.v : '')}</td>`; }
+        else if(k === '기준단위') h += '<td>EA</td>';   /* v1.9.9 */
+        else if(분류열.includes(k)) h += 분류td(고 ? x.키 : '', k, 고 ? 고.코드 : '');
         else if(영필수.has(k)) h += 빈필(k);
         else h += '<td></td>'; });
       h += '</tr>'; }
@@ -490,11 +513,11 @@ function 생산그리기(){
   if(window.표입력){ 통.tabIndex = 0;
     표입력.표(표, { 이름:'조혼생산제품정보', 열: td => td.dataset.k, 칸: td => td.classList.contains('편'), 막음: td => td.classList.contains('막음'), 알림: td => 생산막음(td),
       읽기: td => td.classList.contains('부속칸') ? td.firstElementChild.textContent.trim() : td.textContent.trim(),
-      쓰기: 목 => { 생산값쓰기(목.map(([td, v]) => [td.parentNode.dataset.p, td.dataset.k === '품번' ? '품번@' + td.parentNode.dataset.c : td.dataset.k, v]));
+      쓰기: 목 => { 생산값쓰기(목.map(([td, v]) => [td.parentNode.dataset.p, (td.dataset.k === '품번' || (분류열.includes(td.dataset.k) && td.parentNode.dataset.c)) ? td.dataset.k + '@' + td.parentNode.dataset.c : td.dataset.k, v]));   /* v1.9.9 분류도 반제품은 벌마다 */
         for(const [td, v] of 목){ const tr = td.parentNode, c = tr.dataset.c, 부 = tr.dataset.부, g = String(v ?? '').trim();   /* v1.9.2 품번 「단품코드_xx」 = 같은 부속명 규칙 */
           if(td.dataset.k === '품번' && c && 부 && g.startsWith(c + '_') && g.length > c.length + 1 && (((생산.입력 || {}).부속코드) || {})[부] !== g.slice(c.length + 1)) 생산쓰기('부속코드', 부, g.slice(c.length + 1)); } },   /* v1.9.0 품번 손 값 = 벌(단품)마다 */
       목록: td => { const k = td.dataset.k; if(k === '공정흐름') return 생산.공정목록; if(k === '엣지W' || k === '엣지D') return ['0','1','2']; if(k === '결보호') return ['O','X'];
-        if(k === '기본구매처') return 생산.외주 || [];
+        if(k === '기본구매처') return 생산.외주 || []; if(분류열.includes(k)) return 분류목록(td);
         if(k === '합판코드' || k === '필름코드'){ const x = 줄x(td.parentNode); return 자재고름(k === '합판코드' ? '합판' : '필름', x ? 덧값(x, k === '합판코드' ? '보드두께' : '엣지두께') : ''); }
         return []; },
       목록만: td => ['공정흐름','엣지W','엣지D','결보호'].includes(td.dataset.k) }); }   /* v1.9.6 영림원품목등록 품목등록업로드와 같음 — 기본구매처·합판코드·필름코드는 목록 밖 글도 받음 */
@@ -552,10 +575,10 @@ function 생산보내기(){   /* 체크한 벌(단품 고른 것) → _보내기
     단품들(키).forEach((고, n) => { if(!체[키 + '\t' + 고.코드] && !(n === 0 && 체[키] === true)) return;
       const 앞 = '조혼:' + u + ':' + b.행 + ':' + 고.코드;
       const 제값 = {}; if(손값(고.코드, '품목설명')) 제값.품목설명 = 손값(고.코드, '품목설명');
-      줄.push({ v:새v({ 품명:고.이름, 품번:고.코드, 품목자산분류:'제품' }), 행:앞, 열쇠:고.코드, 값:제값 });   /* v1.8.0 제품 품명 = 단품명(품목등록업로드와 같음) */
+      줄.push({ v:새v({ 품명:고.이름, 품번:고.코드, 품목자산분류:'제품', 기준단위:'EA', 품목대분류:분류값(고.코드, '품목대분류', ''), 품목중분류:분류값(고.코드, '품목중분류', ''), 품목소분류:분류값(고.코드, '품목소분류', '') }), 행:앞, 열쇠:고.코드, 값:제값 });   /* v1.8.0 제품 품명 = 단품명(품목등록업로드와 같음) */
       for(const x of 생산줄들(u, b)){ const 행 = 앞 + ':' + x.행, 부명 = 부속값(x) || x.부, 값 = {}; for(const k of 덧칸) if(k !== '소요량') 값[k] = 덧값(x, k); 값['투입수량@' + 고.코드] = 덧값(x, '소요량'); for(const k of ['기본구매처','품목설명','합판코드','필름코드']) if(손값(x.키, k) && !(k === '필름코드' && x.엣없)) 값[k] = 손값(x.키, k); 값.조혼엣지 = x.엣없 ? '' : '있음';   /* v1.9.7 영림원품목등록 조혼가공통합 줄 엣지 유무 */   /* v1.6.0 손 값 → 규칙 값 */
         const 번 = 반품번(x, 고, 부명).v;   /* v1.9.0 열쇠 = 품번(영림원품목등록 한제품번호·값 열쇠와 같음), 없으면 #행 */
-        줄.push({ v:새v({ 품명:반품명(고, 부명), 품번:번, 규격:x.규, 품목자산분류:'반제품', '모품목(상위 품번)':고.코드, 투입수량:덧값(x, '소요량') }), 행, 열쇠:번 || '#' + 행, 값 }); } }); }
+        줄.push({ v:새v({ 품명:반품명(고, 부명), 품번:번, 규격:x.규, 품목자산분류:'반제품', 기준단위:'EA', 품목대분류:분류값(x.키, '품목대분류', 고.코드), 품목중분류:분류값(x.키, '품목중분류', 고.코드), 품목소분류:분류값(x.키, '품목소분류', 고.코드), '모품목(상위 품번)':고.코드, 투입수량:덧값(x, '소요량') }), 행, 열쇠:번 || '#' + 행, 값 }); } }); }
   const 글자 = JSON.stringify(줄); if(글자 === 생산.판) return; 생산.판 = 글자;
   const { doc, setDoc } = window.fbRead;
   setDoc(doc(window.db, ...생산자리, '_보내기'), { 줄, 고친때:new Date().toISOString() })
