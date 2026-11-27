@@ -260,11 +260,14 @@ const 가짜goods = `(() => {
     재(!창고쓰기.some((x) => /비밀|password|pw/i.test(x)), '창고에 비밀번호 같은 것 없음');
     await p.click('#vp-root .vp-md탭 button:has-text("사방넷")');
     const 탭 = await p.evaluate(() => { const 통 = document.querySelector('#vp-root .vp-md사방넷'); const t = 통.querySelector('table');
-      return { 보임: !통.hidden, 줄글: 통.querySelector('.vp-md사방넷줄').innerText, 머리: [...t.tHead.rows[0].cells].map((c) => c.firstChild.textContent), 줄: t.tBodies[0].rows.length, 손: t.querySelectorAll('.vp-열손, [class*=손]').length,
+      const 꼴 = getComputedStyle(통), 줄칸 = document.querySelector('#vp-root .vp-md사방넷줄');
+      return { 보임: !통.hidden, 줄글: 줄칸.innerText, 줄칸보임: !줄칸.hidden, 바로아래: 통.parentElement.classList.contains('vp-search') && 통.classList.contains('vp-table'),
+        밀림: 꼴.overflowY + '/' + 꼴.overflowX + '/' + 꼴.flexGrow + '/' + 꼴.minHeight, 안넘침: 통.getBoundingClientRect().bottom <= innerHeight + 1, 쪽가로: document.documentElement.scrollWidth > innerWidth + 1, 머리: [...t.tHead.rows[0].cells].map((c) => c.firstChild.textContent), 줄: t.tBodies[0].rows.length, 손: t.querySelectorAll('.vp-열손, [class*=손]').length,
         시트숨음: [...document.querySelectorAll('#vp-root .vp-table')].filter((x) => !x.closest('.vp-md사방넷')).every((x) => x.hidden) }; });
     재(탭.보임 && 탭.시트숨음 && /mw0000 로그인/.test(탭.줄글) && /링크 2/.test(탭.줄글) && 탭.줄 === 2 && 탭.머리.join(',') === '상품코드,사방넷 품번,스마트스토어 상품코드,스마트스토어 링크,MD팀', '「사방넷」 탭 = 로그인 상태·셈 + 링크 표: ' + JSON.stringify(탭));
+    재(탭.바로아래 && 탭.줄칸보임 && 탭.밀림 === 'auto/auto/1/0px' && 탭.안넘침 && !탭.쪽가로, '사방넷 표 통 = 시트 표와 같은 .vp-search 바로 아래 .vp-table(남은 높이·통 안에서 세로·가로 밀림 · 쪽 가로 스크롤 없음): ' + JSON.stringify([탭.바로아래, 탭.밀림, 탭.안넘침, 탭.쪽가로]));
     await p.click('#vp-root .vp-md탭 button:has-text("제품리스트")');
-    재(await p.evaluate(() => document.querySelector('#vp-root .vp-md사방넷').hidden), '시트 탭으로 돌아가면 사방넷 통 숨음');
+    재(await p.evaluate(() => document.querySelector('#vp-root .vp-md사방넷').hidden && document.querySelector('#vp-root .vp-md사방넷줄').hidden), '시트 탭으로 돌아가면 사방넷 통·줄 숨음');
     재(!쪽오류.length, '쪽 오류 없음 ' + 쪽오류.join(' | '));
     await p.screenshot({ path: path.join(__dirname, '그림', 'MD팀-사방넷.png') });
     await ctx.close();

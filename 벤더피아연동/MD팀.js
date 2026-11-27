@@ -31,7 +31,7 @@
 #vp-root .vp-md메모 { display: flex; flex-wrap: wrap; gap: 4px 12px; font: 12px/18px "Microsoft Sans Serif", 돋움, sans-serif; color: #000; margin: 0 0 2px; }
 #vp-root .vp-md엑셀명 { margin-left: 4px; font-size: 10px; line-height: 13px; color: #787774; vertical-align: top; }
 #vp-root .vp-md메모:empty { display: none; }
-#vp-root .vp-md사방넷[hidden] { display: none !important; }
+#vp-root .vp-md사방넷[hidden], #vp-root .vp-md사방넷줄[hidden] { display: none !important; }
 #vp-root .vp-md사방넷줄 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 2px 0 8px; font: 12px/24px "Microsoft Sans Serif", 돋움, sans-serif; color: #37352f; }
 #vp-root .vp-md사방넷됨 { color: #086788; font-weight: 700; }
 #vp-root .vp-md사방넷안됨 { color: #DD1C1A; font-weight: 700; }
@@ -499,11 +499,10 @@
   const 사방넷 = { 탭: null, 통: null, 상태: null, 받은때: "", 셈: null, 기다림: 0, 하는중: false, 줄: [] };
   const 단추 = (글, 할) => { const b = document.createElement("button"); b.type = "button"; b.className = "vp-md사방넷단추"; b.textContent = 글; b.addEventListener("click", 할); return b; };
   function 사방넷그리기() {
-    const 통 = 사방넷.통;
+    const 통 = 사방넷.통, 줄 = 사방넷.줄칸;
     if (!통) return;
     const 상 = 사방넷.상태;
-    const 줄 = document.createElement("div");
-    줄.className = "vp-md사방넷줄";
+    줄.replaceChildren();
     const 글 = (t, 까닭) => { const sp = 줄.appendChild(document.createElement("span")); sp.textContent = t; if (까닭) sp.title = 까닭; return sp; };
     if (!window.VP사방넷) 글("확장 덮어쓰기 필요", "벤더피아 보기 확장 0.35.27 이상이 깔려야 사방넷에 로그인할 수 있습니다").className = "vp-md사방넷안됨";
     else if (!상) 글("사방넷 확인 중…");
@@ -532,10 +531,11 @@
         if (i === 4 && x === "다름") td.style.color = "#DD1C1A";
       });
     }
-    const 표통 = document.createElement("div");
-    표통.className = "vp-table";
-    표통.appendChild(t);
-    통.replaceChildren(줄, 표통);
+    /* 11-27 [새 지시 MD팀사방넷스크롤] 표 통 = 시트 표와 똑같이 `.vp-search` 바로 아래 `.vp-table`(쪽은 안 밀리고 이 통만 세로·가로로 밀림).
+       전에는 `.vp-md사방넷` 안에 한 겹 더 싸여 그 규칙(flex 남은 높이·overflow auto)을 못 받아 표가 늘어난 채 잘렸다 → 스크롤 안 됨. */
+    const 위 = 통.scrollTop, 옆 = 통.scrollLeft;
+    통.replaceChildren(t);
+    통.scrollTop = 위; 통.scrollLeft = 옆;
     const 판 = window.VP표 && window.VP표.넓이틀(t, 머리, "vp열넓이:MD팀:사방넷");
     if (판) 판.맞춤(값줄);
   }
@@ -615,6 +615,7 @@
     시트표.forEach((x) => { x.탭.setAttribute("aria-selected", "false"); x.통.hidden = true; });
     사방넷.탭.setAttribute("aria-selected", "true");
     사방넷.통.hidden = false;
+    사방넷.줄칸.hidden = false;
     메모칸.replaceChildren();
     거름판닫기();
     사방넷그리기();
@@ -625,8 +626,11 @@
     사방넷.탭.setAttribute("role", "tab");
     사방넷.탭.textContent = "사방넷";
     사방넷.탭.addEventListener("click", 사방넷탭고르기);
-    사방넷.통 = 쪽.appendChild(document.createElement("div"));
-    사방넷.통.className = "vp-md사방넷";
+    사방넷.줄칸 = 쪽.appendChild(document.createElement("div"));      // 상태 한 줄 (표 통 위, 안 밀림)
+    사방넷.줄칸.className = "vp-md사방넷줄";
+    사방넷.줄칸.hidden = true;
+    사방넷.통 = 쪽.appendChild(document.createElement("div"));        // 표 통 = 시트 표와 같은 `.vp-table` (이 통 안에서만 세로·가로 밀림)
+    사방넷.통.className = "vp-table vp-md사방넷";
     사방넷.통.hidden = true;
     const 상 = await 사방넷상태보기();
     if (!상) return;
@@ -639,7 +643,7 @@
       x.탭.setAttribute("aria-selected", String(i === k));
       x.통.hidden = i !== k;
     });
-    if (사방넷.탭) { 사방넷.탭.setAttribute("aria-selected", "false"); 사방넷.통.hidden = true; }
+    if (사방넷.탭) { 사방넷.탭.setAttribute("aria-selected", "false"); 사방넷.통.hidden = true; 사방넷.줄칸.hidden = true; }
     const x = 시트표[k];
     메모칸.replaceChildren(...(x.s.메모 || []).map(([글, 꼴]) => { const sp = document.createElement("span"); sp.textContent = 글; 꼴입히기(sp, 꼴 ? 꼴표[꼴 - 1] : null); return sp; }));
     거름판닫기();
