@@ -7,6 +7,7 @@
      ① 칸 안 입력 상자·고르기(select)의 글도 잼(전엔 td 글만 → 보드매입현황 칸은 ▾ 가 칸 오른쪽 위 = 글 위) ② 목록(원래 목록·기억)이 있는 열 = 그 열 입력 칸 모두 td.세모자리(드롭칸과 같은 오른쪽 여백)
      — 표를 등록할 때 · 기억을 처음 받을 때 한 번(그 뒤 입력으로 열이 바뀌지 않게) ③ 빈 칸 = 글 시작 자리 ④ 글 끝 뒤에 자리가 없으면(여백이 없는 칸) ▾ 안 그림(목록은 글 치기·Alt+↓) — 글 위에 절대 안 그림.
      ▾ 가 뜬 칸 = td.표입력세모칸(드롭끝.js 의 select·datalist ▾ 가 같은 자리에 둘 겹치지 않게).
+   v9.1(11-27): 칸 안 입력 상자·고르기도 ▾ 자리(상자 오른쪽 여백 28px — 보드매입현황 td 여백 0 이라 v9 자리가 안 생겼음) · 크롬이 font 빈 글이면 글꼴 조각으로 잼.
    ① 누름 = 칸 고름만(파란 틀 — 드롭 안 열림) · 칸 안 끌기·Shift+누름 = 범위만 · 고른 칸 오른쪽 아래 모서리 「+」 를 위·아래·옆으로 끌면 그 값(범위면 그 차례대로 되풀이) 복사.
       드롭 목록은 셋일 때만 열림: 칸 오른쪽 위 작은 ▾(목록이 있는 칸, + 와 안 겹침) · 글자 치기(친 글로 거름) · Alt+↓. 칸 밖 누름·끌기 시작·+ 끌기·Esc = 바로 닫힘(사장님 11-21 「드레그랑 드롭다운박스랑 클릭 겹쳐서」).
    ② 방향키·Enter·Tab = 칸 옮김(Shift = 반대·범위) · 옮긴 칸에서 바로 글자를 치면 그 칸 입력(한글 조합 포함) · Enter = 넣고 아래 · Tab = 넣고 옆 ·
@@ -30,7 +31,8 @@
     '@media (pointer:coarse){.표입력칸{font-size:16px}}' +
     '.표입력세모{position:fixed;z-index:35;width:15px;height:12px;display:none;align-items:center;justify-content:center;background:#fff;color:#1565c0;border:1px solid #1565c0;border-radius:3px;font:700 9px/1 -apple-system,sans-serif;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}' +
     '@media (pointer:coarse){.표입력세모{width:22px;height:18px;font-size:12px}}' +
-    'table td.드롭칸,table td.세모자리{padding-right:28px}@media (pointer:coarse){table td.드롭칸,table td.세모자리{padding-right:36px}}' +   /* v9 세모자리 = 목록 있는 열 */   /* v8.1~2 드롭 칸 오른쪽 = ▾ 자리 + 손잡이 비킴(늘 — 고를 때 열이 안 바뀜) → 글 끝 뒤에 ▾ */
+    'table td.드롭칸,table td.세모자리{padding-right:28px}@media (pointer:coarse){table td.드롭칸,table td.세모자리{padding-right:36px}}' +
+    'table td.세모자리 select,table td.세모자리 input:not([type=checkbox]):not([type=radio]){padding-right:28px!important}@media (pointer:coarse){table td.세모자리 select,table td.세모자리 input:not([type=checkbox]):not([type=radio]){padding-right:36px!important}}' +   /* v9.1 칸 안 입력 상자 = 상자 안에 ▾ 자리(쪽이 td 여백 0 으로 둔 표) */   /* v9 세모자리 = 목록 있는 열 */   /* v8.1~2 드롭 칸 오른쪽 = ▾ 자리 + 손잡이 비킴(늘 — 고를 때 열이 안 바뀜) → 글 끝 뒤에 ▾ */
     '.표입력목록{position:fixed;z-index:50;background:#fff;border:1px solid #C7C7C3;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.12);max-height:260px;overflow:auto;min-width:140px;padding:3px 0;font-size:12px;display:none}' +
     '.표입력목록 div{padding:4px 10px;white-space:nowrap;cursor:pointer;border-left:3px solid transparent}' +
     '.표입력목록 div:hover,.표입력목록 div.지금{background:#F4F4F2}' +
@@ -165,14 +167,15 @@
     if(편집 && 목록.style.display !== 'none') 목록자리();
   }
   let 재는판 = null;
+  const 글꼴 = cs => cs.font || [cs.fontStyle, cs.fontWeight, cs.fontSize, cs.fontFamily].join(' ');   /* v9.1 크롬이 font 를 빈 글로 줄 때 */
   function 글범위(td, q){   /* v8 칸에 보이는 글의 왼쪽·오른쪽 끝(화면 자리) · 글 없으면 null */
-    if(편집){ const v = 칸.value; if(!v) return null; const cs = getComputedStyle(칸); 재는판 = 재는판 || document.createElement('canvas'); const c = 재는판.getContext('2d'); c.font = cs.font;
+    if(편집){ const v = 칸.value; if(!v) return null; const cs = getComputedStyle(칸); 재는판 = 재는판 || document.createElement('canvas'); const c = 재는판.getContext('2d'); c.font = 글꼴(cs);
       const k = 칸.getBoundingClientRect(), 왼 = parseFloat(cs.paddingLeft) || 0, 오 = parseFloat(cs.paddingRight) || 0, 너 = Math.min(c.measureText(v).width, Math.max(0, k.width - 왼 - 오 - 4));   /* v9 칸 안 글 자리까지 */
       if(cs.textAlign === 'right' || cs.textAlign === 'end') return { l:k.right - 오 - 너, r:k.right - 오 };
       return { l:k.left + 왼, r:k.left + 왼 + 너 }; }
     const 상 = [...td.querySelectorAll('select, input:not([type=checkbox]):not([type=radio]):not([type=hidden]), textarea')].find(x => x.getClientRects().length);   /* v9 칸 안 입력 상자·고르기 */
     if(상){ const v = 상.tagName === 'SELECT' ? ((상.options[상.selectedIndex] || {}).text || '') : 상.value; if(!v) return null;
-      const cs = getComputedStyle(상); 재는판 = 재는판 || document.createElement('canvas'); const c = 재는판.getContext('2d'); c.font = cs.font;
+      const cs = getComputedStyle(상); 재는판 = 재는판 || document.createElement('canvas'); const c = 재는판.getContext('2d'); c.font = 글꼴(cs);
       const k = 상.getBoundingClientRect(), 왼 = (상.clientLeft || 0) + (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.textIndent) || 0), 안오 = k.left + (상.clientLeft || 0) + 상.clientWidth - (parseFloat(cs.paddingRight) || 0);
       const 너 = Math.min(c.measureText(v).width, Math.max(0, 안오 - k.left - 왼));
       if(cs.textAlign === 'right' || cs.textAlign === 'end') return { l:안오 - 너, r:안오 };
