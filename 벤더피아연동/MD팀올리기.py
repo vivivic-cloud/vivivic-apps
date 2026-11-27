@@ -1,14 +1,18 @@
 # -*- coding: utf-8 -*-
 """MD팀 화면 자료 만들기·올리기 (11-27 [새 지시 MD팀])
 
-아이엔지홈 제품리스트 엑셀(.xlsx, 이름이 .tmp 여도 됨)을 읽어 MD팀 화면(`MD팀.js`)이 그리는 JSON 으로 바꾸고,
+아이엔지홈 제품리스트 엑셀을 읽어 MD팀 화면(`MD팀.js`)이 그리는 JSON 으로 바꾸고,
 `--올리기` 를 주면 우리 Firestore 창고 `artifacts/vivivic-4b7ef/public/data/mdteam_inghome` 에 올린다.
 ⚠ 업무 자료다 — 공개 저장소·Pages 에 JSON 을 커밋하지 마라. 드라이브 원본은 읽기만 한다.
 
+원본(11-27 사장님 「이전 파일은 사용하지 않아요」) = 구글 드라이브
+  `관리프로그램/벤더피아/TalkFile_아이엔지홈_제품리스트 의 사본1124.xlsx` — 경로를 안 주면 이것(아래 `원본`).
+
 쓰는 법(맥):
   python3 -m venv /tmp/md && /tmp/md/bin/pip -q install openpyxl
-  /tmp/md/bin/python 벤더피아연동/MD팀올리기.py "<엑셀 경로>" --json /tmp/md.json        # 만들어 보기만
-  /tmp/md/bin/python 벤더피아연동/MD팀올리기.py "<엑셀 경로>" --올리기                     # 창고에 올림
+  /tmp/md/bin/python 벤더피아연동/MD팀올리기.py --json /tmp/md.json        # 원본으로 만들어 보기만
+  /tmp/md/bin/python 벤더피아연동/MD팀올리기.py --올리기                     # 원본을 창고에 올림
+  (다른 파일을 쓸 때만 첫 인자로 경로를 준다)
 """
 import sys, io, json, re, datetime, urllib.request, decimal
 import openpyxl
@@ -17,6 +21,7 @@ from openpyxl.utils import get_column_letter, column_index_from_string
 KEY = "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs"     # 확장이 쓰는 같은 공개 앱 열쇠(search.js 상담·goods.js 서류)
 PROJ = "vivivic-4b7ef"
 칸 = "mdteam_inghome"
+원본 = "/Users/leeajun/Library/CloudStorage/GoogleDrive-penee3@naver.com/내 드라이브/관리프로그램/벤더피아/TalkFile_아이엔지홈_제품리스트 의 사본1124.xlsx"
 조각크기 = 700_000                                   # 바이트 — Firestore 문서 1MiB 아래
 
 def 색(c):
@@ -47,7 +52,7 @@ def 보이는글(v, fmt):
     return str(v)
 
 def 만들기(경로):
-    with open(경로, "rb") as f: 몸 = f.read()          # 이름이 .tmp 여도 읽게(읽기만)
+    with open(경로, "rb") as f: 몸 = f.read()          # 바이트로 읽어 넘김(읽기만)
     wb = openpyxl.load_workbook(io.BytesIO(몸))                  # 꼴·조건부 서식·하이퍼링크
     wv = openpyxl.load_workbook(io.BytesIO(몸), data_only=True)  # 수식은 계산된 값
     꼴표, 꼴번호 = [], {}
@@ -228,6 +233,7 @@ def 올리기(자료):
 if __name__ == "__main__":
     a = sys.argv[1:]
     if not a: print(__doc__); sys.exit(1)
+    if a[0].startswith("--"): a = [원본] + a          # 경로를 안 주면 원본
     자료 = 만들기(a[0])
     if "--json" in a:
         with open(a[a.index("--json") + 1], "w", encoding="utf-8") as f: json.dump(자료, f, ensure_ascii=False)
