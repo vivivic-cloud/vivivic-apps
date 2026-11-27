@@ -2,7 +2,7 @@
    사장님(그대로): 「그냥 입력값 플러스 버튼으로 드레그 하면 복사되게 하고 방향키로 이동시 즉시 입력가능 상황 만들어 주세요.
                   그리고 한번 입련된건 기억해서 드롭다운 목록에 나타나게 해주세요」
    v8(11-27): 드롭 칸 ▾ = 칸 안 글자 끝 바로 뒤(글을 가리지 않게) — 세모그리기 · 글범위.
-   v8.1(11-27): td.드롭칸 오른쪽 여백 20px(터치 27px) = ▾ 자리 — 글이 칸을 꽉 채워도 글 끝 뒤 칸 안에 ▾.
+   v8.1~2(11-27): td.드롭칸 오른쪽 여백 28px(터치 36px) = ▾ 자리 + 손잡이 비킴 — 글이 칸을 꽉 채워도 글 끝 뒤 칸 안에 ▾ · + 손잡이 안 가림.
    ① 누름 = 칸 고름만(파란 틀 — 드롭 안 열림) · 칸 안 끌기·Shift+누름 = 범위만 · 고른 칸 오른쪽 아래 모서리 「+」 를 위·아래·옆으로 끌면 그 값(범위면 그 차례대로 되풀이) 복사.
       드롭 목록은 셋일 때만 열림: 칸 오른쪽 위 작은 ▾(목록이 있는 칸, + 와 안 겹침) · 글자 치기(친 글로 거름) · Alt+↓. 칸 밖 누름·끌기 시작·+ 끌기·Esc = 바로 닫힘(사장님 11-21 「드레그랑 드롭다운박스랑 클릭 겹쳐서」).
    ② 방향키·Enter·Tab = 칸 옮김(Shift = 반대·범위) · 옮긴 칸에서 바로 글자를 치면 그 칸 입력(한글 조합 포함) · Enter = 넣고 아래 · Tab = 넣고 옆 ·
@@ -26,7 +26,7 @@
     '@media (pointer:coarse){.표입력칸{font-size:16px}}' +
     '.표입력세모{position:fixed;z-index:35;width:15px;height:12px;display:none;align-items:center;justify-content:center;background:#fff;color:#1565c0;border:1px solid #1565c0;border-radius:3px;font:700 9px/1 -apple-system,sans-serif;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}' +
     '@media (pointer:coarse){.표입력세모{width:22px;height:18px;font-size:12px}}' +
-    'table td.드롭칸{padding-right:20px}@media (pointer:coarse){table td.드롭칸{padding-right:27px}}' +   /* v8.1 드롭 칸 오른쪽 = ▾ 자리(늘 — 고를 때 열이 안 바뀜) → 글 끝 뒤에 ▾ */
+    'table td.드롭칸{padding-right:28px}@media (pointer:coarse){table td.드롭칸{padding-right:36px}}' +   /* v8.1~2 드롭 칸 오른쪽 = ▾ 자리 + 손잡이 비킴(늘 — 고를 때 열이 안 바뀜) → 글 끝 뒤에 ▾ */
     '.표입력목록{position:fixed;z-index:50;background:#fff;border:1px solid #C7C7C3;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.12);max-height:260px;overflow:auto;min-width:140px;padding:3px 0;font-size:12px;display:none}' +
     '.표입력목록 div{padding:4px 10px;white-space:nowrap;cursor:pointer;border-left:3px solid transparent}' +
     '.표입력목록 div:hover,.표입력목록 div.지금{background:#F4F4F2}' +
@@ -176,7 +176,7 @@
     const w = 거 ? 22 : 15, h = 거 ? 18 : 12, y = q.top + 1;
     /* v8(11-27) 사장님 「드롭선택목록 확정버튼은 입력된 텍스트 끝에 셀안에 두어 이버튼이 텍스트를 가리지 않게 해주세요」 — ▾ = 칸 안 글자 끝 바로 뒤(3px) ·
        글 끝 뒤에 자리가 없으면(오른쪽 맞춤 숫자 등) 글 앞 · 그것도 없으면 칸 오른쪽 끝(전 자리) · 고치는 중이면 치는 글 끝 */
-    const 끝 = Math.min(q.right, 보.r) - 2, 글자리 = 글범위(td, q);   /* v8.1 ▾(위) 와 + 손잡이(아래 모서리)는 위아래로 안 겹침 */
+    const 끝 = Math.min(q.right, 보.r - 6) - 6 - 3, 글자리 = 글범위(td, q);   /* v8.2 + 손잡이(모서리 ±6px)보다 3px 왼쪽까지 — 끌어 채우기를 가리지 않음 */
     let x = 끝 - w;
     if(글자리){ if(글자리.r + 3 + w <= 끝) x = 글자리.r + 3; else if(글자리.l - 3 - w >= q.left + 1) x = 글자리.l - 3 - w; }
     if(x < 보.l || y < 보.t - 1 || y + h > 보.b + 2){ 세모.style.display = 'none'; return; }
