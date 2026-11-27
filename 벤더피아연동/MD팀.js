@@ -6,8 +6,9 @@
      만드는 글 = `MD팀올리기.py`(엑셀 → JSON → 창고). ⚠ 공개 저장소·Pages 에 자료를 두지 않는다(업무 자료 — 사은품 공급가 등).
    읽기만 한다: 창고 GET(확장 다리 `VP밖에` 먼저) · 벤더피아에는 이름 단추(goods.js 곁다리 — CS등록과 같은 것)가 공용 줄로 조회만.
    표 = `table.vp-촘촘` + `VP표.넓이틀`(열 끌기·넓이 기억 `vp열넓이:MD팀:<시트>`·표 안 가로 스크롤·화면 아래 밀대).
-   엑셀 그대로: 칸·차례(숨은 열 B 「순서」 뺌 — 제품리스트) · 계산된 값과 숫자 꼴(#,##0 · 0%) · 두 줄 머리(할인판매가·배송비) · 셀 색·글 색·굵게 ·
-     조건부 서식(같은 상품코드 = 굵은 빨강) · 하이퍼링크(새 탭) · 병합(첫 칸 값, 안쪽 선 지움) · 자동필터가 있는 시트만 칸별 거르개(▾).
+   엑셀 그대로: 칸·차례(숨은 열 B 「순서」 뺌 — 제품리스트) · 계산된 값과 숫자 꼴(#,##0 · 0%) · 셀 색·글 색·굵게 ·
+     조건부 서식(같은 상품코드 = 굵은 빨강) · 하이퍼링크(새 탭) · 병합(첫 칸 값)
+     (0.35.23 [새 지시 MD팀표동일] 머리는 배송·CS 표처럼 한 줄 — 위 머리(할인판매가·배송비)는 칸 title · 엑셀 가로 맞춤·병합 선 지움은 안 씀) · 자동필터가 있는 시트만 칸별 거르개(▾).
    화면에 설명 글 없음 — 색의 까닭(파일 2행 「색상표기건: …」)은 칸에 마우스를 올리면. */
 (() => {
   if (window.__vpMD팀) return;
@@ -31,11 +32,6 @@
 #vp-root .vp-md메모:empty { display: none; }
 #vp-root .vp-md메모 span { padding: 0 3px; white-space: pre; }
 #vp-root .vp-table[hidden] { display: none !important; }
-#vp-root table.vp-촘촘.vp-md표 thead tr + tr th { top: 25px; }
-#vp-root table.vp-촘촘.vp-md표 thead tr:first-child th.vp-md빈머리 { border-bottom-color: #f5f5f5; }
-#vp-root table.vp-촘촘.vp-md표 thead tr + tr th.vp-md아래만 { border-top-color: #f5f5f5; }
-#vp-root table.vp-촘촘.vp-md표 td.vp-md병합아래 { border-bottom-color: transparent; }
-#vp-root table.vp-촘촘.vp-md표 td.vp-md병합오른 { border-right-color: transparent; }
 #vp-root table.vp-촘촘.vp-md표 th .vp-md거름 { position: absolute; right: 7px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; margin: 0; padding: 0;
   font: 9px/13px sans-serif; color: #555; background: #fff; border: 1px solid #b0b0b0; border-radius: 2px; cursor: pointer; }
 #vp-root table.vp-촘촘.vp-md표 th.vp-md거름칸 { padding-right: 24px; }
@@ -123,7 +119,6 @@
     if (k.i) el.style.fontStyle = "italic";
     const 줄 = [k.u ? "underline" : "", k.s ? "line-through" : ""].filter(Boolean).join(" ");
     if (줄) el.style.textDecoration = 줄;
-    if (k.a) el.style.textAlign = k.a === "c" ? "center" : k.a === "r" ? "right" : "left";
   }
   const 비었음 = "(필드 값 없음)";
   function 표그리기(x) {
@@ -134,9 +129,10 @@
     s.칸.forEach((이름, i) => {
       const th = hr.appendChild(document.createElement("th"));
       th.textContent = 이름;
-      if (s.칸원래 && s.칸원래[i] !== 이름) th.title = s.칸원래[i];
+      const 묶음 = 위자리(s)[i] && 위자리(s)[i].글;           // 엑셀 위 머리(할인판매가·배송비)는 한 줄 머리의 title 로만
+      const 원래 = s.칸원래 && s.칸원래[i] !== 이름 ? s.칸원래[i] : "";
+      if (묶음 || 원래) th.title = [묶음, 원래 || 이름].filter(Boolean).join(" › ");
       if (!i) th.classList.add("vp-first");
-      if (s.위 && 위자리(s)[i].빈) th.classList.add("vp-md아래만");
     });
     const tb = t.createTBody();
     const 병합 = new Map();       // "r,c" → {아래, 오른, 값}
@@ -161,7 +157,6 @@
         } else td.textContent = 글;
         꼴입히기(td, k);
         const m = 병합.get(ri + "," + ci);
-        if (m) { if (m.아래) td.classList.add("vp-md병합아래"); if (m.오른) td.classList.add("vp-md병합오른"); }
         td.title = (k && k.t) || (m && !m.첫 ? m.값 : 글);
         if (ci === s.제품명칸 && 글.trim()) { td.classList.add("vp-상품칸"); x.단추칸.push({ td, 이름: 글 }); }
       });
@@ -169,17 +164,6 @@
     x.통.appendChild(t);
     const 판 = window.VP표 && window.VP표.넓이틀(t, s.칸, "vp열넓이:MD팀:" + s.이름);
     if (판) 판.맞춤(s.줄.map((줄) => 줄.map(셀값)), (i, h) => (i === s.제품명칸 ? { 끝: 280 } : {}));
-    if (s.위) {                    // 두 줄 머리 — 엑셀 4행(할인판매가 K4:L4 · 배송비 M4:O4)
-      const 위줄 = t.tHead.insertRow(0);
-      let i = 0;
-      for (const [글, 칸수] of s.위) {
-        const th = 위줄.appendChild(document.createElement("th"));
-        th.textContent = 글;
-        if (칸수 > 1) th.colSpan = 칸수; else th.classList.add("vp-md빈머리");
-        if (!i) th.classList.add("vp-first");
-        i += 칸수;
-      }
-    }
     x.표 = t;
     if (s.거르개) 거르개달기(x);
     x.그림 = true;
@@ -188,7 +172,7 @@
   function 위자리(s) {
     if (s._위자리) return s._위자리;
     const 답 = [];
-    for (const [, 칸수] of s.위 || []) for (let k = 0; k < 칸수; k++) 답.push({ 빈: 칸수 === 1 });
+    for (const [글, 칸수] of s.위 || []) for (let k = 0; k < 칸수; k++) 답.push({ 글: 칸수 > 1 ? 글 : "" });
     return (s._위자리 = 답);
   }
 
