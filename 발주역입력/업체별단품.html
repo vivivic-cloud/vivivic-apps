@@ -2,7 +2,8 @@
 <!-- 발주역입력 / 업체별 단품명 — 「업체별단품명」 엑셀(시트 「업체별단품코드」)을 A열 업체 표시로 나눠 업체마다 표로 본다.
      사장님 11-18: 「폴더에 업체별단품명 파일의 A열이 조혼가구인 것만 목록으로 보여지게 해줘.」 →
        「폴더에 업체별 단품폴더를 새로만들었어 그안에 있는 구글시트 A열 확인해서 업체별로 목록 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.6.7
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.6.8
+     v1.6.8(11-27): 사장님 「업체별단품명 하이라이트 현재 품목등록업로드에 도착한 것들만 나타나야지. 체크해제로 사라지면 하이라이트 해제」(분배 방 전달) — 줄 색(.등록) = 영림원품목등록 품목등록업로드에 보이는 제품만(영림원품목등록 한제품번호와 같은 기준): 품목등록업로드 시트 제품 중 품목등록test서버용 체크(_고른제품 — 문서 없으면 처음 값 한 제품) + 조혼생산제품정보 체크로 넘어온 제품(_보내기). 셋 다 실시간(onSnapshot) — 체크를 풀면 바로 꺼지고 다시 체크하면 켜짐. 단품코드 = 원래 제품 품번(폐기 품번 바꾸기와 상관없이 이어짐).
      v1.6.7(11-27): 사장님 「단품명 변경시 기존 입력 단품명으로 변경되게 해주세요」(분배 방 확인 = 엑셀 원래 단품코드·단품명으로 되돌리기) — 교체된 줄의 죽은 글씨(원래 단품코드·단품명) 누름 → 「되돌리겠습니까?」 → 교체 기록만 지움(발주역입력_업체별단품교체 그 열쇠 deleteField · 원래 엑셀·업체별 단품 창고 안 건드림).
      v1.6.6(11-27): 사장님 「모든표 가로넓이 조절 가능하게 해. 이걸 꼭 그때그때 말해야만 해주냐?」 — 공용 칸넓이.js v2 를 모든 표에(머리 칸 오른쪽 끝 끌기 · 두 번 누르면 원래대로 · 이 기기 기억). 다른 것은 안 바꿈.
      v1.6.5(11-25): 사장님 「네 공유용 제한된페이지를 다시 만들어주세요」 — 공용 공유.js: 주소 ?공유=에이엠티 = 쪽길 에이엠티출고조사 네 탭만(밖 탭·입력폼 단추 숨김, 네 탭에 표시 이어 붙임) · 표시 없는 주소 그대로.
@@ -145,7 +146,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.6.7</div>
+  <div class="badge">v1.6.8</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html" class="on">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>업체별 단품명</h1>
@@ -210,34 +211,40 @@ async function 업체고름(u){
 /* 영림원품목등록 창고의 「품목등록업로드」 제품 품번 — 실시간. 바뀌면 색만 다시 칠한다. */
 const 영림원자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_영림원품목등록'];
 const 영림원시트 = '품목등록업로드';
-let 등록품번 = new Set(), 조각값 = [], 조각끊기 = [];
+let 등록품번 = new Set(), 조각값 = [], 조각끊기 = [], 시트칸 = null, 고른제품 = null, 조혼보낸 = [];   /* v1.6.8 */
+const 한제품명 = '(KRW) 알렉스 1200 높은 수납장 올화이트';   /* v1.6.8 영림원품목등록 v2.16.0 처음 값(_고른제품 문서 없을 때) — 같은 기준 */
 function 영림원구독(){
   const { doc, onSnapshot } = window.fbRead;
   onSnapshot(doc(window.db, ...영림원자리, '_시트목록'), m => {
     const t = ((m.exists() && m.data().시트들) || []).find(x => x.이름===영림원시트);
     조각끊기.forEach(f => f()); 조각끊기 = []; 조각값 = [];
-    if(!t){ 품번셈(t); return; }
-    const 칸 = t.칸 || [], n = t.조각 || 1;
+    if(!t){ 시트칸 = null; 품번셈(); return; }
+    const 칸 = t.칸 || [], n = t.조각 || 1; 시트칸 = 칸;
     조각값 = Array(n).fill(null);
     for(let k=0;k<n;k++){
       조각끊기.push(onSnapshot(doc(window.db, ...영림원자리, `${문서이름(영림원시트)}_${k+1}`), s => {
         조각값[k] = s.exists() ? (s.data().줄||[]) : [];
-        if(조각값.every(x => x)) 품번셈(칸);
+        if(조각값.every(x => x)) 품번셈();
       }, () => {}));
     }
   }, () => {});
+  onSnapshot(doc(window.db, ...영림원자리, '_고른제품'), d => { 고른제품 = d.exists() && Array.isArray(d.data().제품) ? new Set(d.data().제품.map(x => String(x).trim())) : null; 품번셈(); }, () => {});   /* v1.6.8 품목등록test서버용 체크 */
+  onSnapshot(doc(window.db, 'artifacts','vivivic-4b7ef','public','data','발주역입력_조혼생산제품정보', '_보내기'), d => { 조혼보낸 = (d.exists() && Array.isArray(d.data().줄)) ? d.data().줄 : []; 품번셈(); }, () => {});   /* v1.6.8 조혼생산제품정보 체크 */
 }
-function 품번셈(칸){
-  const pi = (칸||[]).indexOf('품번'), ai = (칸||[]).indexOf('품목자산분류');
+/* v1.6.8 등록품번 = 품목등록업로드에 보이는 제품(영림원품목등록 한제품번호와 같음): 시트 제품 중 고른 것(문서 없으면 품명 = 한제품명) + 조혼 _보내기 제품 */
+function 품번셈(){
+  const 칸 = 시트칸 || [], pi = 칸.indexOf('품번'), ai = 칸.indexOf('품목자산분류'), ni = 칸.indexOf('품명'), 글 = (v, i) => i < 0 ? '' : String(v[i] ?? '').trim();
   등록품번 = new Set();
-  if(pi>=0 && ai>=0) for(const r of [].concat(...조각값)) if(String(r.v[ai]??'').trim()==='제품'){ const c = String(r.v[pi]??'').trim(); if(c) 등록품번.add(c); }
+  if(pi>=0 && ai>=0 && 조각값.every(x => x)){
+    for(const r of [].concat(...조각값)) if(글(r.v, ai)==='제품'){ const c = 글(r.v, pi); if(c && (고른제품 ? 고른제품.has(c) : 글(r.v, ni)===한제품명)) 등록품번.add(c); }
+    for(const r of 조혼보낸){ const v = r.v || []; if(글(v, ai)==='제품' && 글(v, pi)) 등록품번.add(글(v, pi)); } }
   색칠();
 }
 function 색칠(){
   document.querySelectorAll('#속 tr[data-code]').forEach(tr => {
     const on = 등록품번.has(tr.dataset.code);
     tr.classList.toggle('등록', on);
-    if(on) tr.title = '영림원품목등록 품목등록업로드'; else tr.removeAttribute('title');
+    if(on) tr.title = '영림원품목등록 품목등록업로드 — 지금 도착한 제품'; else tr.removeAttribute('title');
   });
 }
 
