@@ -11,12 +11,12 @@ const 깃 = 'https://vivivic-cloud.github.io/vivivic-apps/%EB%B2%A4%EB%8D%94%ED%
 const 자료 = JSON.parse(fs.readFileSync(path.join(__dirname, '본보기', 'MD팀-흉내.json'), 'utf8'));
 const 자료글 = JSON.stringify(자료);
 const 가짜goods = `(() => {
-  const 표 = new Set(["맞는 상품 하나", "맞는 상품 둘"]);           // 이름표(찾은 것 모음) — 「맞는  상품 둘」 은 빈칸 뭉개 맞음
-  const 뭉갬 = (t) => String(t).replace(/\\s+/g, "").toLowerCase();
+  /* 11-27 [새 지시 MD팀코드연결] 이름표 = 상품코드 → 벤더피아 상품명. 이름으로는 안 맞춤(진짜 표에서찾기("", 코드) 와 같음) */
+  const 표 = new Map([["code0", "맞는 상품 하나"], ["code1", "벤더피아 이름 둘"]]);
   window.__부름 = []; window.__찾음 = [];
   window.VP상품단추 = (이름, 코드) => {
     window.__부름.push([이름, 코드]);
-    const n = [...표].find((x) => x === String(이름).trim() || 뭉갬(x) === 뭉갬(이름));
+    const n = (!String(이름).trim() || null) && 표.get(String(코드).trim());
     if (!n) return null;
     const b = document.createElement("button"); b.type = "button"; b.className = "가짜단추"; b.textContent = n;
     const 점 = b.appendChild(document.createElement("span")); 점.className = "vp-점";
@@ -24,7 +24,7 @@ const 가짜goods = `(() => {
     return b;
   };
   window.VP상품표끝 = () => true;
-  window.VP상품찾기 = async (목록) => { window.__찾음.push(...목록.map((x) => x.이름)); 표.add("가짜 의자 7"); setTimeout(() => dispatchEvent(new Event("vp상품단추준비")), 50); return 1; };
+  window.VP상품찾기 = async (목록) => { window.__찾음.push(...목록.map((x) => x.코드)); 표.set("code7", "가짜 의자 7"); setTimeout(() => dispatchEvent(new Event("vp상품단추준비")), 50); return 1; };
   setTimeout(() => dispatchEvent(new Event("vp상품단추준비")), 300);
 })();`;
 
@@ -124,12 +124,15 @@ const 가짜goods = `(() => {
     재(칸.링크 && 칸.링크[0] === 'https://example.com/p/0' && 칸.링크[1] === '_blank' && /0, 0, 255/.test(칸.링크[2]), '하이퍼링크 = 새 탭 · 글 색 그대로: ' + 칸.링크);
     /* 이름 단추 */
     await p.waitForTimeout(400);
-    const 단 = await p.evaluate(() => ({ 셈: window.VP_MD셈(), 찾음: window.__찾음, 부름코드: window.__부름.every((x) => x[1] === ''),
-      첫: (() => { const t = [...document.querySelectorAll('#vp-root .vp-table')].find((x) => !x.hidden).querySelector('table'); return [0, 1, 2].map((i) => { const c = t.tBodies[0].rows[i].cells[5]; return [c.className, !!c.querySelector('.vp-goods-list > button'), c.textContent]; }); })() }));
-    재(단.첫[0][1] && 단.첫[1][1] && !단.첫[2][1] && 단.첫[2][2] === '없는 상품' && /vp-상품칸/.test(단.첫[0][0]), '제품명 = 이름표와 맞으면 상품 단추(빈칸 뭉갬 포함), 없으면 글자 그대로: ' + JSON.stringify(단.첫));
-    재(단.부름코드, '맞춤은 제품명만(상품코드 안 넘김)');
-    재(단.찾음.includes('없는 상품') && new Set(단.찾음).size === 단.찾음.length && !단.찾음.includes('맞는 상품 하나'), '모음에 없는 이름만 한 번씩 벤더피아에서 찾기(시트끼리 겹침 한 번): ' + 단.찾음.length);
-    재(단.셈.제품리스트.단추 === 4 && 단.셈.외부복사용.단추 === 2 && 단.셈.사은품리스트.제품명칸 === 0, '시트별 단추(찾은 뒤 「가짜 의자 7」 더함): ' + JSON.stringify(단.셈));
+    const 단 = await p.evaluate(() => ({ 셈: window.VP_MD셈(), 찾음: window.__찾음, 부름코드: window.__부름.every((x) => x[0] === '' && x[1]),
+      첫: (() => { const t = [...document.querySelectorAll('#vp-root .vp-table')].find((x) => !x.hidden).querySelector('table'); return [0, 1, 2, 3].map((i) => { const c = t.tBodies[0].rows[i].cells[5]; const s = c.querySelector('.vp-md엑셀명'); return [c.className, c.querySelector('.vp-goods-list > button')?.firstChild?.nodeValue || '', s ? s.textContent : '', c.textContent, s ? getComputedStyle(s).fontSize : '']; }); })() }));
+    재(/vp-상품칸/.test(단.첫[0][0]) && 단.첫[0][1] === '맞는 상품 하나' && 단.첫[0][2] === '', '코드 일치·같은 이름 = 단추만: ' + JSON.stringify(단.첫[0]));
+    재(단.첫[1][1] === '벤더피아 이름 둘' && 단.첫[1][2] === '맞는  상품 둘'.trim() && parseFloat(단.첫[1][4]) < 13, '코드 일치·다른 이름 = 단추 + 엑셀 제품명 작게: ' + JSON.stringify(단.첫[1]));
+    재(!단.첫[2][1] && 단.첫[2][3] === '없는 상품', '코드 없음(벤더피아에 없음) = 글자 그대로: ' + JSON.stringify(단.첫[2]));
+    재(!단.첫[3][1] && 단.첫[3][3] === '맞는 상품 하나', '이름이 같아도 코드가 다르면 단추 없음(이름으로 안 맞춤): ' + JSON.stringify(단.첫[3]));
+    재(단.부름코드, '맞춤은 상품코드만(이름 안 넘김)');
+    재(단.찾음.includes('DUP-1') && 단.찾음.includes('code7') && new Set(단.찾음).size === 단.찾음.length && !단.찾음.includes('code0'), '이름표에 없는 코드만 한 번씩 벤더피아에서 찾기(시트끼리 겹침 한 번): ' + 단.찾음.length);
+    재(단.셈.제품리스트.단추 === 3 && 단.셈.외부복사용.단추 === 3 && 단.셈.중지단종.단추 === 2 && 단.셈.사은품리스트.제품명칸 === 0, '시트별 단추(찾은 뒤 code7 더함): ' + JSON.stringify(단.셈));
     await p.click('#vp-root td.vp-상품칸 .vp-goods-list button');
     재(await p.evaluate(() => window.__누름 === '맞는 상품 하나'), '단추 누름 = 이름 단추 제 동작');
     /* 거르개 */

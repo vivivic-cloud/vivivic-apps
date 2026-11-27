@@ -29,6 +29,7 @@
   #vp-root .vp-md탭 button { padding: 7px 12px; font-size: 12px; flex-shrink: 0; }
 }
 #vp-root .vp-md메모 { display: flex; flex-wrap: wrap; gap: 4px 12px; font: 12px/18px "Microsoft Sans Serif", 돋움, sans-serif; color: #000; margin: 0 0 2px; }
+#vp-root .vp-md엑셀명 { margin-left: 4px; font-size: 10px; line-height: 13px; color: #787774; vertical-align: top; }
 #vp-root .vp-md메모:empty { display: none; }
 #vp-root .vp-md메모 span { padding: 0 3px; white-space: pre; }
 #vp-root .vp-table[hidden] { display: none !important; }
@@ -142,6 +143,7 @@
         병합.set(rr + "," + cc, { 아래: rr < r1, 오른: cc < c1, 값, 첫: rr === r0 && cc === c0 });
     }
     x.단추칸 = [];
+    const 코드칸 = s.칸.indexOf("상품코드");     // 11-27 [새 지시 MD팀코드연결] 이 줄의 상품코드 = 벤더피아 상품코드로 맞춘다
     s.줄.forEach((줄, ri) => {
       const tr = tb.insertRow();
       줄.forEach((c, ci) => {
@@ -158,7 +160,7 @@
         꼴입히기(td, k);
         const m = 병합.get(ri + "," + ci);
         td.title = (k && k.t) || (m && !m.첫 ? m.값 : 글);
-        if (ci === s.제품명칸 && 글.trim()) { td.classList.add("vp-상품칸"); x.단추칸.push({ td, 이름: 글 }); }
+        if (ci === s.제품명칸 && 글.trim()) { td.classList.add("vp-상품칸"); x.단추칸.push({ td, 이름: 글, 코드: 코드칸 >= 0 ? 셀값(줄[코드칸]).trim() : "" }); }
       });
     });
     x.통.appendChild(t);
@@ -280,9 +282,11 @@
   }
 
   /* ── 제품명 칸 = 상품관리 이름 단추 (goods.js 곁다리 `VP상품단추` — 배송관리·CS등록과 같은 단추·점·상세) ──
-     맞춤 = goods.js `표에서찾기`(앞뒤 빈칸 뗀 이름 그대로 → 빈칸 없애고 대소문자 무시) · 모음에 없는 이름은 `VP상품찾기`(벤더피아 상품관리 상품명 조회, 공용 줄 「뒤」, 3개씩).
-     맞지 않는 이름은 글자 그대로(가짜 단추 없음). */
+     11-27 [새 지시 MD팀코드연결] 맞춤 = **같은 줄 상품코드 = 벤더피아 상품코드**(goods.js `표에서찾기("", 코드)` — 이름으로는 안 맞춤).
+     이름표에 없는 코드는 `VP상품찾기`(벤더피아 상품관리 **상품코드 조회** = 전체 상품에서, 공용 줄 「뒤」, 3개씩).
+     단추 = 벤더피아 상품명. 엑셀 제품명이 그와 다르면(빈칸·대소문자 무시) 옆에 작은 글자 `.vp-md엑셀명`(줄 높이 그대로). 코드 없음·못 찾음 = 엑셀 글자 그대로(가짜 단추 없음). */
   let 찾아봄 = false, 붙이는중 = false, 또 = false;
+  const 뭉갬 = (t) => String(t == null ? "" : t).replace(/\s+/g, "").toLowerCase();
   async function 단추붙이기() {
     if (!window.VP상품단추) return;
     if (붙이는중) { 또 = true; return; }
@@ -291,12 +295,18 @@
       let 끝 = performance.now() + 25;
       for (const x of 시트표) {
         for (const 칸 of x.단추칸 || []) {
-          if (칸.된 || !칸.td.isConnected) continue;
-          const b = window.VP상품단추(칸.이름, "");
+          if (칸.된 || !칸.td.isConnected || !칸.코드) continue;
+          const b = window.VP상품단추("", 칸.코드);       // 이름은 안 넘김 → 상품코드로만 찾음
           if (b) {
             const 통 = document.createElement("div");
             통.className = "vp-goods-list";
             통.appendChild(b);
+            const 상품명 = String((b.firstChild && b.firstChild.nodeValue) || "");
+            if (뭉갬(상품명) !== 뭉갬(칸.이름)) {        // 엑셀 제품명이 상품명과 다르면 작게 함께
+              const 옛 = 통.appendChild(document.createElement("small"));
+              옛.className = "vp-md엑셀명";
+              옛.textContent = 칸.이름.trim();
+            }
             칸.td.replaceChildren(통);
             칸.된 = true;
           }
@@ -307,8 +317,8 @@
         찾아봄 = true;
         const 본 = new Set(), 목록 = [];
         for (const x of 시트표) for (const 칸 of x.단추칸 || []) {
-          const n = 칸.이름.trim();
-          if (!칸.된 && n && !본.has(n)) { 본.add(n); 목록.push({ 이름: n, 코드: "" }); }
+          const c = 칸.코드;
+          if (!칸.된 && c && !본.has(c)) { 본.add(c); 목록.push({ 이름: c, 코드: c }); }   // 이름 칸에도 코드(곁다리는 이름 없는 것을 건너뜀) — 코드 조회 먼저
         }
         if (목록.length) window.VP상품찾기(목록).then(() => 단추붙이기()).catch(() => {});
       }
