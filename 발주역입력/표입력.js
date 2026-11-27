@@ -1,6 +1,7 @@
 /* 발주역입력 표 입력 — 모든 입력 표가 같게 움직이는 공통 파일(11-21 — 보드매입현황 v1.41.0 · 영림원품목등록 v2.35.0 부터)
    사장님(그대로): 「그냥 입력값 플러스 버튼으로 드레그 하면 복사되게 하고 방향키로 이동시 즉시 입력가능 상황 만들어 주세요.
                   그리고 한번 입련된건 기억해서 드롭다운 목록에 나타나게 해주세요」
+   v8(11-27): 드롭 칸 ▾ = 칸 안 글자 끝 바로 뒤(글을 가리지 않게) — 세모그리기 · 글범위.
    ① 누름 = 칸 고름만(파란 틀 — 드롭 안 열림) · 칸 안 끌기·Shift+누름 = 범위만 · 고른 칸 오른쪽 아래 모서리 「+」 를 위·아래·옆으로 끌면 그 값(범위면 그 차례대로 되풀이) 복사.
       드롭 목록은 셋일 때만 열림: 칸 오른쪽 위 작은 ▾(목록이 있는 칸, + 와 안 겹침) · 글자 치기(친 글로 거름) · Alt+↓. 칸 밖 누름·끌기 시작·+ 끌기·Esc = 바로 닫힘(사장님 11-21 「드레그랑 드롭다운박스랑 클릭 겹쳐서」).
    ② 방향키·Enter·Tab = 칸 옮김(Shift = 반대·범위) · 옮긴 칸에서 바로 글자를 치면 그 칸 입력(한글 조합 포함) · Enter = 넣고 아래 · Tab = 넣고 옆 ·
@@ -155,12 +156,27 @@
     Object.assign(칸.style, { left:q.left + 'px', top:q.top + 'px', width:Math.max(q.width, 편집 ? 80 : 0) + 'px', height:q.height + 'px' });
     if(편집 && 목록.style.display !== 'none') 목록자리();
   }
+  let 재는판 = null;
+  function 글범위(td, q){   /* v8 칸에 보이는 글의 왼쪽·오른쪽 끝(화면 자리) · 글 없으면 null */
+    if(편집){ const v = 칸.value; if(!v) return null; const cs = getComputedStyle(칸); 재는판 = 재는판 || document.createElement('canvas'); const c = 재는판.getContext('2d'); c.font = cs.font;
+      const k = 칸.getBoundingClientRect(), 너 = Math.min(c.measureText(v).width, k.width), 왼 = parseFloat(cs.paddingLeft) || 0, 오 = parseFloat(cs.paddingRight) || 0;
+      if(cs.textAlign === 'right' || cs.textAlign === 'end') return { l:k.right - 오 - 너, r:k.right - 오 };
+      return { l:k.left + 왼, r:k.left + 왼 + 너 }; }
+    if(!td.textContent.trim()) return null;
+    const rg = document.createRange(); rg.selectNodeContents(td); const rs = [...rg.getClientRects()].filter(x => x.width > 0 && x.right > q.left && x.left < q.right);
+    if(!rs.length) return null;
+    return { l:Math.max(q.left, Math.min(...rs.map(x => x.left))), r:Math.min(q.right, Math.max(...rs.map(x => x.right))) }; }
   let 세모난때 = 0;   /* ▾ 가 막 나타난 직후의 누름(같은 손가락의 뒤따른 click)은 무시 */
   function 세모그리기(){   /* 고른 칸 하나(또는 고치는 중) + 그 칸에 목록이 있을 때만 · 끌기 중엔 숨김 */
     const td = 지금 && 머칸(), 하나 = 지금 && 지금.r0 === 지금.r1 && 지금.c0 === 지금.c1;
     if(!td || (!하나 && !편집) || 끌기 || 채우기 || !지금.어.칸(td) || !목록들(td).length){ 세모.style.display = 'none'; return; }
     const q = td.getBoundingClientRect(), 보 = 보이는틀(q.left, q.top, q.right, q.bottom), 거 = matchMedia('(pointer:coarse)').matches;
-    const w = 거 ? 22 : 15, h = 거 ? 18 : 12, x = Math.min(q.right, 보.r - 6) - 6 - w - 3, y = q.top + 1;   /* + 손잡이 실제 자리(모서리 ±6px, 상자 끝이면 안쪽으로 당김)보다 3px 왼쪽 */
+    const w = 거 ? 22 : 15, h = 거 ? 18 : 12, y = q.top + 1;
+    /* v8(11-27) 사장님 「드롭선택목록 확정버튼은 입력된 텍스트 끝에 셀안에 두어 이버튼이 텍스트를 가리지 않게 해주세요」 — ▾ = 칸 안 글자 끝 바로 뒤(3px) ·
+       글 끝 뒤에 자리가 없으면(오른쪽 맞춤 숫자 등) 글 앞 · 그것도 없으면 칸 오른쪽 끝(전 자리) · 고치는 중이면 치는 글 끝 */
+    const 끝 = Math.min(q.right, 보.r - 6) - 6 - 3, 글자리 = 글범위(td, q);
+    let x = 끝 - w;
+    if(글자리){ if(글자리.r + 3 + w <= 끝) x = 글자리.r + 3; else if(글자리.l - 3 - w >= q.left + 1) x = 글자리.l - 3 - w; }
     if(x < 보.l || y < 보.t - 1 || y + h > 보.b + 2){ 세모.style.display = 'none'; return; }
     if(세모.style.display !== 'flex') 세모난때 = Date.now();
     Object.assign(세모.style, { display:'flex', left:x + 'px', top:y + 'px' });
@@ -288,7 +304,7 @@
     }
   });
   칸.addEventListener('compositionstart', () => { if(지금 && !편집) 고치기('친'); });
-  칸.addEventListener('input', () => { if(편집) 목록그리기(); else if(지금 && 칸.value){ const v = 칸.value; if(!고치기('친', v)) 칸.value = ''; } });
+  칸.addEventListener('input', () => { if(편집){ 목록그리기(); 세모그리기(); } else if(지금 && 칸.value){ const v = 칸.value; if(!고치기('친', v)) 칸.value = ''; else 세모그리기(); } });   /* v8 ▾ 가 치는 글 끝을 따라감 */
   칸.addEventListener('blur', () => { setTimeout(() => { if(누르는중){ 누르는중 = false; return; } if(편집 && document.activeElement !== 칸) 끝내기(true); }, 0); });
 
   /* ── 복사·붙여넣기·지우기 ── */
