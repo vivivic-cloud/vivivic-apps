@@ -35,7 +35,7 @@ const 가짜goods = `(() => {
   async function 쪽열기(너비, { 창고없음 = false } = {}) {
     const ctx = await b.newContext({ viewport: { width: 너비, height: 900 } });
     const p = await ctx.newPage();
-    const 쪽오류 = [], 밖 = [], 벤더 = [], 창고요청 = [];
+    const 쪽오류 = [], 밖 = [], 벤더 = [], 창고요청 = [], 창고쓰기 = [];
     p.on('pageerror', (e) => 쪽오류.push(String(e)));
     await ctx.route('**/*', async (r) => {
       const q = r.request(), u = new URL(q.url());
@@ -51,7 +51,18 @@ const 가짜goods = `(() => {
       if (u.hostname === 'firestore.googleapis.com') {
         창고요청.push(q.method() + ' ' + decodeURIComponent(u.pathname).split('/public/data/')[1]);
         if (창고없음) return r.fulfill({ status: 200, headers: 열림, contentType: 'application/json', body: '{}' });
-        const 뿌리 = 'projects/vivivic-4b7ef/databases/(default)/documents/artifacts/vivivic-4b7ef/public/data/mdteam_inghome/';
+        /* 11-27 [새 지시 MD팀스마트스토어칸] 사방넷 링크·화면 입력 창고 흉내 (값은 지어냄) */
+        const 길 = decodeURIComponent(u.pathname);
+        if (/mdteam_inghome_sabang\/links$/.test(길)) return r.fulfill({ status: 200, headers: 열림, contentType: 'application/json', body: JSON.stringify({ fields: { j: { stringValue: JSON.stringify(
+          { code1: ['222', '901'], code4: ['333', '902'], code6: ['444', '903'], code7: ['556', '904'] }) } } }) });
+        if (/mdteam_inghome_link/.test(길)) {
+          if (q.method() !== 'GET') { 창고쓰기.push(q.method() + ' ' + 길.split('/').pop() + ' ' + (q.postData() || '')); return r.fulfill({ status: 200, headers: 열림, contentType: 'application/json', body: '{}' }); }
+          const 링뿌리 = 'projects/vivivic-4b7ef/databases/(default)/documents/artifacts/vivivic-4b7ef/public/data/mdteam_inghome_link/';
+          return r.fulfill({ status: 200, headers: 열림, contentType: 'application/json', body: JSON.stringify({ documents: [
+            { name: 링뿌리 + 'c_636f646536', fields: { code: { stringValue: 'code6' }, url: { stringValue: 'https://smartstore.naver.com/inggagu/products/444' } } },
+            { name: 링뿌리 + 'c_636f646537', fields: { code: { stringValue: 'code7' }, url: { stringValue: 'https://brand.naver.com/inggagu/products/555' } } }] }) });
+        }
+        const 뿌리 ='projects/vivivic-4b7ef/databases/(default)/documents/artifacts/vivivic-4b7ef/public/data/mdteam_inghome/';
         return r.fulfill({ status: 200, headers: 열림, contentType: 'application/json', body: JSON.stringify({ documents: [
           { name: 뿌리 + 'info', fields: { n: { integerValue: '1' }, file: { stringValue: '흉내.xlsx' } } },
           { name: 뿌리 + 'c1', fields: { j: { stringValue: 자료글 } } }] }) });
@@ -66,12 +77,12 @@ const 가짜goods = `(() => {
     await p.addScriptTag({ url: 깃 + 'search.js' });
     await p.waitForFunction(() => document.querySelector('#vp-root.vp-md팀 .vp-md탭 button') || /못/.test(document.querySelector('#vp-root .vp-note')?.textContent || ''), null, { timeout: 30000 });
     await p.waitForTimeout(900);
-    return { p, ctx, 쪽오류, 밖, 벤더, 창고요청 };
+    return { p, ctx, 쪽오류, 밖, 벤더, 창고요청, 창고쓰기 };
   }
 
   for (const 너비 of [1280, 375]) {
     console.log('\n■ ' + 너비);
-    const { p, ctx, 쪽오류, 밖, 벤더, 창고요청 } = await 쪽열기(너비);
+    const { p, ctx, 쪽오류, 밖, 벤더, 창고요청, 창고쓰기 } = await 쪽열기(너비);
     const 판 = await p.evaluate(() => {
       const 보이는통 = [...document.querySelectorAll('#vp-root .vp-table')].find((x) => !x.hidden);
       const t = 보이는통 && 보이는통.querySelector('table.vp-촘촘');
@@ -175,7 +186,45 @@ const 가짜goods = `(() => {
     재(!쪽오류.length, '쪽 오류 없음 ' + 쪽오류.join(' | '));
     재(!밖.length, '밖으로 나간 요청 없음 ' + 밖.join(','));
     재(벤더.every((x) => /^GET /.test(x)), '벤더피아에 쓰기 없음(흉내 goods 라 조회 0): ' + 벤더.join(','));
-    재(창고요청.length === 1 && /^GET mdteam_inghome/.test(창고요청[0]), '창고 = GET 한 번(쓰기 0): ' + 창고요청);
+    재(창고요청.length === 3 && 창고요청.every((x) => /^GET mdteam_inghome/.test(x)) && !창고쓰기.length, '창고 = 열 때 GET 셋(자료·사방넷 링크·화면 입력, 쓰기 0): ' + 창고요청);
+
+    /* ── 11-27 [새 지시 MD팀스마트스토어칸] 「스마트스토어 url」 칸 ── */
+    await p.click('#vp-root .vp-md탭 button:has-text("제품리스트")');
+    const 링 = await p.evaluate(() => {
+      const t = [...document.querySelectorAll('#vp-root .vp-table')].find((x) => !x.hidden).querySelector('table');
+      const 칸 = (i) => { const td = t.tBodies[0].rows[i].cells[3]; return { 글: td.textContent, a: [...td.querySelectorAll('a')].map((a) => [a.textContent, a.getAttribute('href'), getComputedStyle(a).color, a.title]), cls: td.className, title: td.title }; };
+      return { 머리: [...t.tHead.rows[0].cells].length, r0: 칸(0), r1: 칸(1), r4: 칸(4), r6: 칸(6), r7: 칸(7), 셈: window.VP_MD링크셈(), 설명: document.querySelector('#vp-root').innerText.includes('사방넷') };
+    });
+    재(링.머리 === 18, '열 구성 그대로 18칸');
+    재(링.r0.a.length === 1 && 링.r0.a[0][1] === 'https://example.com/p/0' && /0, 0, 255/.test(링.r0.a[0][2]) && !/vp-md링크/.test(링.r0.cls), '사방넷 링크 없는 줄 = 엑셀 값 그대로: ' + JSON.stringify(링.r0.a));
+    재(링.r1.a.length === 1 && 링.r1.a[0][1] === 'https://smartstore.naver.com/inggagu/products/222' && /vp-md링크채움/.test(링.r1.cls) && /901/.test(링.r1.a[0][3]), '빈 값 = 사방넷 링크 넣음(까닭은 마우스): ' + JSON.stringify(링.r1.a));
+    재(링.r4.a.length === 2 && 링.r4.a[0][1] === 'https://example.com/p/4' && /221, 28, 26/.test(링.r4.a[0][2]) && /다름/.test(링.r4.a[0][3]) && 링.r4.a[1][1] === 'https://smartstore.naver.com/inggagu/products/333' && !/221, 28, 26/.test(링.r4.a[1][2]), '다름 = 기존 값 빨강 + 사방넷 링크 함께: ' + JSON.stringify(링.r4.a));
+    재(링.r6.a.length === 1 && 링.r6.a[0][1] === 'https://smartstore.naver.com/inggagu/products/444' && /화면 입력/.test(링.r6.title), '화면 입력 값이 엑셀보다 먼저 · 사방넷과 같으면 그대로: ' + JSON.stringify(링.r6));
+    재(링.r7.a.length === 2 && /products\/555/.test(링.r7.a[0][1]) && /221, 28, 26/.test(링.r7.a[0][2]) && /화면 입력/.test(링.r7.a[0][3]), '화면 입력 값도 사방넷과 다르면 빨강: ' + JSON.stringify(링.r7.a));
+    재(!링.설명, '화면에 설명 글 없음(까닭은 title 만)');
+    재(링.셈.제품리스트 && 링.셈.제품리스트.채움 === 1 && 링.셈.제품리스트.다름 === 2 && 링.셈.제품리스트.같음 === 1 && 링.셈.제품리스트.입력 === 2, '셈: ' + JSON.stringify(링.셈.제품리스트));
+    /* 한 번 누름 = 링크 열기 · 두 번 누름 = 고치기(새 탭 안 열림) */
+    await p.evaluate(() => { window.__열림 = []; window.open = (u) => { window.__열림.push(u); return null; };
+      for (const tr of [...document.querySelectorAll('#vp-root .vp-table:not([hidden]) table tbody tr')]) tr.hidden = false; });   // 앞 시험의 거르개가 숨긴 줄 다시 보임
+    const 셀 = (i) => `#vp-root .vp-table:not([hidden]) table tbody tr:nth-child(${i + 1}) td:nth-child(4)`;
+    await p.click(셀(1) + ' a'); await p.waitForTimeout(450);
+    재(JSON.stringify(await p.evaluate(() => window.__열림)) === '["https://smartstore.naver.com/inggagu/products/222"]', '한 번 누름 = 링크 새 탭');
+    await p.dblclick(셀(1) + ' a'); await p.waitForTimeout(450);
+    const 입력칸 = await p.evaluate((s) => { const i = document.querySelector(s + ' input'); return i && [i.value, window.__열림.length]; }, 셀(1));
+    재(입력칸 && 입력칸[0] === '' && 입력칸[1] === 1, '두 번 누름 = 입력칸(새 탭 안 열림): ' + JSON.stringify(입력칸));
+    await p.fill(셀(1) + ' input', 'https://brand.naver.com/inggagu/products/777');
+    await p.press(셀(1) + ' input', 'Enter'); await p.waitForTimeout(600);
+    const 저장후 = await p.evaluate((s) => { const td = document.querySelector(s); return [...td.querySelectorAll('a')].map((a) => [a.getAttribute('href'), getComputedStyle(a).color]); }, 셀(1));
+    재(창고쓰기.length === 1 && /^PATCH c_636f646531 /.test(창고쓰기[0]) && /"code":\{"stringValue":"code1"\}/.test(창고쓰기[0]) && /products\/777/.test(창고쓰기[0]), '저장 = 창고 mdteam_inghome_link 에 상품코드 문서 PATCH: ' + 창고쓰기[0]);
+    재(저장후.length === 2 && /777/.test(저장후[0][0]) && /221, 28, 26/.test(저장후[0][1]) && /222/.test(저장후[1][0]), '저장 뒤 = 입력 값(사방넷과 다름 → 빨강) + 사방넷 링크: ' + JSON.stringify(저장후));
+    await p.dblclick(셀(1)); await p.waitForTimeout(200);
+    await p.fill(셀(1) + ' input', ''); await p.press(셀(1) + ' input', 'Enter'); await p.waitForTimeout(600);
+    const 지운뒤 = await p.evaluate((s) => [...document.querySelector(s).querySelectorAll('a')].map((a) => a.getAttribute('href')), 셀(1));
+    재(창고쓰기.length === 2 && /^DELETE c_636f646531/.test(창고쓰기[1]) && JSON.stringify(지운뒤) === '["https://smartstore.naver.com/inggagu/products/222"]', '비우고 저장 = 입력 지움 → 엑셀(빈 값)+사방넷 링크로: ' + 창고쓰기[1]);
+    await p.dblclick(셀(4)); await p.waitForTimeout(200);
+    await p.press(셀(4) + ' input', 'Escape'); await p.waitForTimeout(300);
+    재(창고쓰기.length === 2 && (await p.evaluate((s) => document.querySelectorAll(s + ' a').length, 셀(4))) === 2, 'Esc = 저장 안 함');
+    재(!쪽오류.length, '고친 뒤 쪽 오류 없음 ' + 쪽오류.join(' | '));
     await p.screenshot({ path: path.join(__dirname, '그림', `MD팀-${너비}.png`) });
     await ctx.close();
   }

@@ -31,6 +31,10 @@
 #vp-root .vp-md메모 { display: flex; flex-wrap: wrap; gap: 4px 12px; font: 12px/18px "Microsoft Sans Serif", 돋움, sans-serif; color: #000; margin: 0 0 2px; }
 #vp-root .vp-md엑셀명 { margin-left: 4px; font-size: 10px; line-height: 13px; color: #787774; vertical-align: top; }
 #vp-root .vp-md메모:empty { display: none; }
+#vp-root table.vp-촘촘.vp-md표 td .vp-md링크옛 { color: #DD1C1A !important; }
+#vp-root table.vp-촘촘.vp-md표 td .vp-md링크사방넷 { margin-left: 8px; }
+#vp-root table.vp-촘촘.vp-md표 td.vp-md링크못함 { outline: 1px solid #DD1C1A; outline-offset: -1px; }
+#vp-root table.vp-촘촘.vp-md표 td input.vp-md링크입력 { width: 100%; min-width: 240px; box-sizing: border-box; margin: 0; padding: 0 3px; height: 20px; font: inherit; border: 1px solid #2383e2; border-radius: 2px; }
 #vp-root .vp-md메모 span { padding: 0 3px; white-space: pre; }
 #vp-root .vp-table[hidden] { display: none !important; }
 #vp-root table.vp-촘촘.vp-md표 th .vp-md거름 { position: absolute; right: 7px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; margin: 0; padding: 0;
@@ -88,6 +92,133 @@
     try { localStorage.setItem("vg.tok", JSON.stringify({ tok: d.idToken, until: Date.now() + 3300000 })); } catch (e) {}
     return d.idToken;
   }
+  /* ── 「스마트스토어 url」 칸 (11-27 [새 지시 MD팀스마트스토어칸]) ──
+     값 차례: 화면 입력(창고 `mdteam_inghome_link`, 문서 = 상품코드마다 {code,url,at}) > 엑셀 E열(그대로 고정).
+     엑셀을 다시 올려도(`MD팀올리기.py` 는 `mdteam_inghome` 만 덮어씀) 화면 입력은 남는다.
+     사방넷 링크(창고 `mdteam_inghome_sabang/links`, `MD팀사방넷링크올리기.py`) 와 견줌 — 스마트스토어 상품번호로:
+       값 없음 → 사방넷 링크를 넣어 보임 · 같음 → 그대로 · 다름 → 기존 값 빨강 + 사방넷 링크 함께(까닭은 마우스 올림).
+     고치기 = 칸을 두 번 누름 → 입력 → Enter(저장)·Esc(그만). 비우거나 엑셀 값으로 되돌리고 저장하면 화면 입력을 지움. */
+  const 링크창고 = 창고 + "_link", 사방넷창고 = 창고 + "_sabang/links";
+  const 문서이름 = (code) => "c_" + [...new TextEncoder().encode(code)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const 링크번호 = (u) => { const m = String(u || "").match(/\/products\/(\d+)/); return m ? m[1] : ""; };
+  const 사방넷주소 = (n) => "https://smartstore.naver.com/inggagu/products/" + n;
+  let 사방넷링크 = {};
+  const 입력링크 = new Map();
+  async function 링크자료받기() {
+    const tok = await 표받기();
+    const [가, 나] = await Promise.all([
+      밖에(사방넷창고, { headers: { Authorization: "Bearer " + tok } }).catch(() => null),
+      (async () => {
+        const 모음 = []; let 다음 = "";
+        for (let i = 0; i < 20; i++) {
+          const 답 = await 밖에(링크창고 + "?pageSize=300" + (다음 ? "&pageToken=" + encodeURIComponent(다음) : ""), { headers: { Authorization: "Bearer " + tok } });
+          if (!답.ok) break;
+          const d = JSON.parse(답.글 || "{}");
+          모음.push(...(d.documents || []));
+          if (!(다음 = d.nextPageToken)) break;
+        }
+        return 모음;
+      })().catch(() => []),
+    ]);
+    try { if (가 && 가.ok) 사방넷링크 = JSON.parse(((JSON.parse(가.글).fields || {}).j || {}).stringValue || "{}"); } catch (e) {}
+    for (const d of 나) {
+      const f = d.fields || {};
+      const code = f.code && f.code.stringValue;
+      if (code) 입력링크.set(code, (f.url && f.url.stringValue) || "");
+    }
+  }
+  /* 쓰기는 확장 다리(`VP밖에`)를 거치지 않고 화면에서 창고로 바로 보낸다 — 다리는 쓰기를 `vpcs_note` 한 곳만 받는다(불러오기.js ⑧, 넓히지 않음).
+     11-27 벤더피아 orderMst.aspx 에는 창고를 막는 CSP 가 없다(화면에서 바로 GET → 403 = 길은 열림). 창고 규칙: `mdteam_` 칸 = 로그인(익명 표)한 누구나 읽기·쓰기. */
+  async function 링크저장(code, url) {
+    const tok = await 표받기();
+    const 주소 = 링크창고 + "/" + 문서이름(code);
+    const 옵션 = url
+      ? { method: "PATCH", headers: { "Content-Type": "application/json", Authorization: "Bearer " + tok },
+          body: JSON.stringify({ fields: { code: { stringValue: code }, url: { stringValue: url }, at: { stringValue: new Date().toISOString() } } }) }
+      : { method: "DELETE", headers: { Authorization: "Bearer " + tok } };
+    const x = await fetch(주소, Object.assign({ credentials: "omit" }, 옵션));
+    const 답 = { ok: x.ok, status: x.status };
+    if (!답.ok) throw new Error("저장 " + 답.status);
+    if (url) 입력링크.set(code, url); else 입력링크.delete(code);
+  }
+  const 링크칸들 = [];             // {td, code, 엑셀:[글, 꼴, 링크], 시트, 상태}
+  function 링크칸그리기(칸) {
+    const { td, code } = 칸;
+    const 입력 = !!code && 입력링크.has(code);
+    const 글 = 입력 ? 입력링크.get(code) : 셀값(칸.엑셀);
+    const 링 = 입력 ? 입력링크.get(code) : 셀링크(칸.엑셀);
+    const 사 = code ? 사방넷링크[code] : null;
+    const 사번 = 사 ? String(사[0]) : "";
+    const 지금번 = 링크번호(링 || 글);
+    const 새a = (주소, 보일글, 까닭) => {
+      const a = document.createElement("a");
+      a.href = 주소; a.target = "_blank"; a.rel = "noopener"; a.textContent = 보일글;
+      a.style.color = "inherit"; a.style.textDecoration = "none";
+      if (까닭) a.title = 까닭;
+      return a;
+    };
+    const 기존 = () => {
+      if (링) {
+        const a = 새a(링, 글);
+        if (!입력) { const k = 셀꼴(칸.엑셀); a.style.color = (k && k.f) || "inherit"; a.style.textDecoration = k && k.u ? "underline" : "none"; }
+        return a;
+      }
+      const sp = document.createElement("span"); sp.textContent = 글; return sp;
+    };
+    td.replaceChildren();
+    td.classList.remove("vp-md링크다름", "vp-md링크채움", "vp-md링크못함");
+    칸.상태 = "";
+    if (!String(글).trim()) {
+      if (사번) { td.appendChild(새a(사방넷주소(사번), 사방넷주소(사번), "사방넷 품번 " + 사[1] + " 스마트스토어 링크")); 칸.상태 = "채움"; td.classList.add("vp-md링크채움"); }
+    } else if (!사번 || 지금번 === 사번) {
+      td.appendChild(기존()); 칸.상태 = 사번 ? "같음" : "";
+    } else {
+      const 옛 = td.appendChild(기존());
+      옛.classList.add("vp-md링크옛");
+      옛.title = (입력 ? "화면 입력" : "엑셀") + " 값 — 사방넷 품번 " + 사[1] + " 스마트스토어 링크(" + 사번 + ")와 다름";
+      td.appendChild(새a(사방넷주소(사번), 사방넷주소(사번), "사방넷 품번 " + 사[1] + " 스마트스토어 링크")).classList.add("vp-md링크사방넷");
+      칸.상태 = "다름"; td.classList.add("vp-md링크다름");
+    }
+    td.title = [입력 ? "화면 입력: " + 글 : 글, 사번 && 칸.상태 !== "다름" ? "사방넷 품번 " + 사[1] : "", "두 번 누르면 고침"].filter(Boolean).join("\n");
+  }
+  function 링크고치기(칸) {
+    if (칸.고치는중) return;
+    칸.고치는중 = true;
+    const 엑셀값 = String(셀링크(칸.엑셀) || 셀값(칸.엑셀)).trim();
+    const 지금 = 입력링크.has(칸.code) ? 입력링크.get(칸.code) : 엑셀값;
+    const inp = document.createElement("input");
+    inp.type = "text"; inp.className = "vp-md링크입력"; inp.value = 지금;
+    칸.td.replaceChildren(inp);
+    inp.focus(); inp.select();
+    let 끝남 = false;
+    const 마침 = async (저장) => {
+      if (끝남) return; 끝남 = true;
+      const 새값 = inp.value.trim();
+      let 못함 = "";
+      if (저장 && 새값 !== String(지금).trim()) {
+        inp.disabled = true;
+        try { await 링크저장(칸.code, 새값 === 엑셀값 ? "" : 새값); 말("링크저장 " + 칸.code); }
+        catch (e) { 못함 = "저장 못 함 — " + (e && e.message ? e.message : e); 말("링크저장못함 " + 칸.code); }
+      }
+      칸.고치는중 = false;
+      for (const c of 링크칸들) if (c.code === 칸.code && !c.고치는중) 링크칸그리기(c);
+      if (못함) { 칸.td.classList.add("vp-md링크못함"); 칸.td.title = 못함; }
+    };
+    inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); 마침(true); } if (e.key === "Escape") { e.preventDefault(); 마침(false); } });
+    inp.addEventListener("blur", () => 마침(true));
+  }
+  window.VP_MD링크셈 = () => {
+    const 셈 = {};
+    for (const c of 링크칸들) {
+      const k = c.시트;
+      셈[k] = 셈[k] || { 칸: 0, 채움: 0, 같음: 0, 다름: 0, 입력: 0 };
+      셈[k].칸++;
+      if (c.상태) 셈[k][c.상태]++;
+      if (c.code && 입력링크.has(c.code)) 셈[k].입력++;
+    }
+    return 셈;
+  };
+
   async function 자료받기() {
     const tok = await 표받기();
     const 답 = await 밖에(창고 + "?pageSize=300", { headers: { Authorization: "Bearer " + tok } });
@@ -144,12 +275,33 @@
     }
     x.단추칸 = [];
     const 코드칸 = s.칸.indexOf("상품코드");     // 11-27 [새 지시 MD팀코드연결] 이 줄의 상품코드 = 벤더피아 상품코드로 맞춘다
+    const 링크칸 = s.칸.findIndex((이름) => String(이름).replace(/\s+/g, "").toLowerCase() === "스마트스토어url");
     s.줄.forEach((줄, ri) => {
       const tr = tb.insertRow();
       줄.forEach((c, ci) => {
         const td = tr.insertCell();
         const 글 = 셀값(c), k = 셀꼴(c), l = 셀링크(c);
         if (!ci) td.className = "vp-first";
+        if (ci === 링크칸) {                       // 11-27 [새 지시 MD팀스마트스토어칸]
+          꼴입히기(td, k);
+          const 칸 = { td, code: 코드칸 >= 0 ? String(셀값(줄[코드칸])).trim() : "", 엑셀: c, 시트: s.이름 };
+          링크칸들.push(칸);
+          링크칸그리기(칸);
+          if (칸.code) {
+            /* 한 번 누름 = 링크 열기(조금 기다렸다가) · 두 번 누름 = 고치기 — 두 번 누를 때 새 탭이 열리지 않게 */
+            let 기다림 = 0;
+            td.addEventListener("click", (e) => {
+              const a = e.target.closest && e.target.closest("a");
+              if (!a || e.ctrlKey || e.metaKey || e.shiftKey) return;
+              e.preventDefault();
+              clearTimeout(기다림);
+              if (e.detail > 1) return;
+              기다림 = setTimeout(() => window.open(a.href, "_blank", "noopener"), 280);
+            });
+            td.addEventListener("dblclick", (e) => { if (e.target.closest("input")) return; e.preventDefault(); clearTimeout(기다림); 링크고치기(칸); });
+          }
+          return;
+        }
         if (l) {
           const a = td.appendChild(document.createElement("a"));
           a.href = l; a.target = "_blank"; a.rel = "noopener";
@@ -345,7 +497,7 @@
 
   (async () => {
     let 자료;
-    try { 자료 = await 자료받기(); }
+    try { [자료] = await Promise.all([자료받기(), 링크자료받기().catch(() => {})]); }
     catch (e) { 알림.textContent = "MD팀 자료를 받지 못했습니다 — " + (e && e.message ? e.message : e); 말("못받음 " + (e && e.message)); return; }
     꼴표 = 자료.꼴 || [];
     알림.textContent = "";
