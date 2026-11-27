@@ -3,6 +3,10 @@
                   그리고 한번 입련된건 기억해서 드롭다운 목록에 나타나게 해주세요」
    v8(11-27): 드롭 칸 ▾ = 칸 안 글자 끝 바로 뒤(글을 가리지 않게) — 세모그리기 · 글범위.
    v8.1~2(11-27): td.드롭칸 오른쪽 여백 28px(터치 36px) = ▾ 자리 + 손잡이 비킴 — 글이 칸을 꽉 채워도 글 끝 뒤 칸 안에 ▾ · + 손잡이 안 가림.
+   v9(11-27): 사장님 「야 모든 드롭선택 버튼 입력된 텍스트 좀 안 가리게 해야. 전부 적용 좀 해. 텍스트 끝에 셀 안에 두라니까」 —
+     ① 칸 안 입력 상자·고르기(select)의 글도 잼(전엔 td 글만 → 보드매입현황 칸은 ▾ 가 칸 오른쪽 위 = 글 위) ② 목록(원래 목록·기억)이 있는 열 = 그 열 입력 칸 모두 td.세모자리(드롭칸과 같은 오른쪽 여백)
+     — 표를 등록할 때 · 기억을 처음 받을 때 한 번(그 뒤 입력으로 열이 바뀌지 않게) ③ 빈 칸 = 글 시작 자리 ④ 글 끝 뒤에 자리가 없으면(여백이 없는 칸) ▾ 안 그림(목록은 글 치기·Alt+↓) — 글 위에 절대 안 그림.
+     ▾ 가 뜬 칸 = td.표입력세모칸(드롭끝.js 의 select·datalist ▾ 가 같은 자리에 둘 겹치지 않게).
    ① 누름 = 칸 고름만(파란 틀 — 드롭 안 열림) · 칸 안 끌기·Shift+누름 = 범위만 · 고른 칸 오른쪽 아래 모서리 「+」 를 위·아래·옆으로 끌면 그 값(범위면 그 차례대로 되풀이) 복사.
       드롭 목록은 셋일 때만 열림: 칸 오른쪽 위 작은 ▾(목록이 있는 칸, + 와 안 겹침) · 글자 치기(친 글로 거름) · Alt+↓. 칸 밖 누름·끌기 시작·+ 끌기·Esc = 바로 닫힘(사장님 11-21 「드레그랑 드롭다운박스랑 클릭 겹쳐서」).
    ② 방향키·Enter·Tab = 칸 옮김(Shift = 반대·범위) · 옮긴 칸에서 바로 글자를 치면 그 칸 입력(한글 조합 포함) · Enter = 넣고 아래 · Tab = 넣고 옆 ·
@@ -26,7 +30,7 @@
     '@media (pointer:coarse){.표입력칸{font-size:16px}}' +
     '.표입력세모{position:fixed;z-index:35;width:15px;height:12px;display:none;align-items:center;justify-content:center;background:#fff;color:#1565c0;border:1px solid #1565c0;border-radius:3px;font:700 9px/1 -apple-system,sans-serif;cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}' +
     '@media (pointer:coarse){.표입력세모{width:22px;height:18px;font-size:12px}}' +
-    'table td.드롭칸{padding-right:28px}@media (pointer:coarse){table td.드롭칸{padding-right:36px}}' +   /* v8.1~2 드롭 칸 오른쪽 = ▾ 자리 + 손잡이 비킴(늘 — 고를 때 열이 안 바뀜) → 글 끝 뒤에 ▾ */
+    'table td.드롭칸,table td.세모자리{padding-right:28px}@media (pointer:coarse){table td.드롭칸,table td.세모자리{padding-right:36px}}' +   /* v9 세모자리 = 목록 있는 열 */   /* v8.1~2 드롭 칸 오른쪽 = ▾ 자리 + 손잡이 비킴(늘 — 고를 때 열이 안 바뀜) → 글 끝 뒤에 ▾ */
     '.표입력목록{position:fixed;z-index:50;background:#fff;border:1px solid #C7C7C3;border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.12);max-height:260px;overflow:auto;min-width:140px;padding:3px 0;font-size:12px;display:none}' +
     '.표입력목록 div{padding:4px 10px;white-space:nowrap;cursor:pointer;border-left:3px solid transparent}' +
     '.표입력목록 div:hover,.표입력목록 div.지금{background:#F4F4F2}' +
@@ -52,7 +56,8 @@
     if(기억받음 || !쪽이름) return;
     if(!창고() || !window.fbRead.onSnapshot){ setTimeout(기억구독, 800); return; }
     기억받음 = true;
-    try{ window.fbRead.onSnapshot(기억문서(), d => { 기억 = (d.exists() && d.data().열) || {}; }, () => {}); }catch(e){}
+    try{ window.fbRead.onSnapshot(기억문서(), d => { 기억 = (d.exists() && d.data().열) || {};
+      if(기억처음){ 기억처음 = false; for(const t of 이름표.values()) 자리달기(t); } }, () => {}); }catch(e){}   /* v9 기억 처음 받음 = 기억 열도 ▾ 자리 */
   }
   function 기억하기(열, 값들){
     if(!열) return;
@@ -86,6 +91,7 @@
     어들.set(t, 어);
     if(어0.이름){ const 옛 = 이름표.get(어0.이름); 이름표.set(어0.이름, t); if(지금 && 지금.표 === 옛 && 옛 !== t) 바꿔끼움(t); }
     if(window.터치범위) 터치범위.표(t, 어);
+    자리달기(t);   /* v9 */
     기억구독();
   }
 
@@ -161,25 +167,55 @@
   let 재는판 = null;
   function 글범위(td, q){   /* v8 칸에 보이는 글의 왼쪽·오른쪽 끝(화면 자리) · 글 없으면 null */
     if(편집){ const v = 칸.value; if(!v) return null; const cs = getComputedStyle(칸); 재는판 = 재는판 || document.createElement('canvas'); const c = 재는판.getContext('2d'); c.font = cs.font;
-      const k = 칸.getBoundingClientRect(), 너 = Math.min(c.measureText(v).width, k.width), 왼 = parseFloat(cs.paddingLeft) || 0, 오 = parseFloat(cs.paddingRight) || 0;
+      const k = 칸.getBoundingClientRect(), 왼 = parseFloat(cs.paddingLeft) || 0, 오 = parseFloat(cs.paddingRight) || 0, 너 = Math.min(c.measureText(v).width, Math.max(0, k.width - 왼 - 오 - 4));   /* v9 칸 안 글 자리까지 */
       if(cs.textAlign === 'right' || cs.textAlign === 'end') return { l:k.right - 오 - 너, r:k.right - 오 };
+      return { l:k.left + 왼, r:k.left + 왼 + 너 }; }
+    const 상 = [...td.querySelectorAll('select, input:not([type=checkbox]):not([type=radio]):not([type=hidden]), textarea')].find(x => x.getClientRects().length);   /* v9 칸 안 입력 상자·고르기 */
+    if(상){ const v = 상.tagName === 'SELECT' ? ((상.options[상.selectedIndex] || {}).text || '') : 상.value; if(!v) return null;
+      const cs = getComputedStyle(상); 재는판 = 재는판 || document.createElement('canvas'); const c = 재는판.getContext('2d'); c.font = cs.font;
+      const k = 상.getBoundingClientRect(), 왼 = (상.clientLeft || 0) + (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.textIndent) || 0), 안오 = k.left + (상.clientLeft || 0) + 상.clientWidth - (parseFloat(cs.paddingRight) || 0);
+      const 너 = Math.min(c.measureText(v).width, Math.max(0, 안오 - k.left - 왼));
+      if(cs.textAlign === 'right' || cs.textAlign === 'end') return { l:안오 - 너, r:안오 };
       return { l:k.left + 왼, r:k.left + 왼 + 너 }; }
     if(!td.textContent.trim()) return null;
     const rg = document.createRange(); rg.selectNodeContents(td); const rs = [...rg.getClientRects()].filter(x => x.width > 0 && x.right > q.left && x.left < q.right);
     if(!rs.length) return null;
-    return { l:Math.max(q.left, Math.min(...rs.map(x => x.left))), r:Math.min(q.right, Math.max(...rs.map(x => x.right))) }; }
-  let 세모난때 = 0;   /* ▾ 가 막 나타난 직후의 누름(같은 손가락의 뒤따른 click)은 무시 */
+    const 안오 = q.right - (parseFloat(getComputedStyle(td).paddingRight) || 0);   /* v9 글이 넘쳐 잘려도 끝 = 칸 안 글 자리 끝 */
+    return { l:Math.max(q.left, Math.min(...rs.map(x => x.left))), r:Math.min(안오, Math.max(...rs.map(x => x.right))) }; }
+  /* v9 목록 있는 열 = 그 열 입력 칸 모두 td.세모자리(오른쪽 여백 = ▾ 자리) — 표 등록·기억 처음 받음 때만(입력하는 동안 열이 안 바뀜) */
+  const 세모열 = new WeakMap();
+  function 자리달기(t){
+    const 어 = 어들.get(t); if(!어 || !t.isConnected) return;
+    const 열들 = 세모열.get(t) || new Set(); 세모열.set(t, 열들);
+    const 칸들 = [];
+    for(const b of t.tBodies) for(const tr of b.rows) for(const td of tr.cells){
+      if(!어.칸(td) || (어.막음 && 어.막음(td))) continue;
+      const 열 = 열이름(어, td); 칸들.push([td, 열]); if(열들.has(열)) continue;
+      const 만 = 어.목록만 && 어.목록만(td), 기 = !만 && 열 && 기억[열] && Object.keys(기억[열]).length;
+      let 있 = !!기; if(!있 && 어.목록){ try{ 있 = (어.목록(td) || []).length > 0; }catch(e){} }
+      if(있) 열들.add(열); }
+    for(const [td, 열] of 칸들) if(열들.has(열)) td.classList.add('세모자리');
+  }
+  let 기억처음 = true;
+  let 세모난때 = 0, 세모칸 = null;   /* ▾ 가 막 나타난 직후의 누름(같은 손가락의 뒤따른 click)은 무시 */
   function 세모그리기(){   /* 고른 칸 하나(또는 고치는 중) + 그 칸에 목록이 있을 때만 · 끌기 중엔 숨김 */
     const td = 지금 && 머칸(), 하나 = 지금 && 지금.r0 === 지금.r1 && 지금.c0 === 지금.c1;
-    if(!td || (!하나 && !편집) || 끌기 || 채우기 || !지금.어.칸(td) || !목록들(td).length){ 세모.style.display = 'none'; return; }
+    if(세모칸 && 세모칸 !== td){ 세모칸.classList.remove('표입력세모칸'); 세모칸 = null; }
+    if(!td || (!하나 && !편집) || 끌기 || 채우기 || !지금.어.칸(td) || !목록들(td).length){ 세모.style.display = 'none'; if(세모칸){ 세모칸.classList.remove('표입력세모칸'); 세모칸 = null; } return; }
+    { const 열들 = 세모열.get(지금.표); if(열들 && 열들.has(열이름(지금.어, td))) td.classList.add('세모자리'); }   /* v9 다시 그린 칸도 같은 여백 */
     const q = td.getBoundingClientRect(), 보 = 보이는틀(q.left, q.top, q.right, q.bottom), 거 = matchMedia('(pointer:coarse)').matches;
+    if(편집){ const pr = 거 ? '36px' : '28px'; if(칸.style.paddingRight !== pr) 칸.style.paddingRight = pr; }   /* v9 고치는 글도 ▾ 자리 앞까지(겹친 입력 칸 = 표 모양 안 바뀜) */
     const w = 거 ? 22 : 15, h = 거 ? 18 : 12, y = q.top + 1;
     /* v8(11-27) 사장님 「드롭선택목록 확정버튼은 입력된 텍스트 끝에 셀안에 두어 이버튼이 텍스트를 가리지 않게 해주세요」 — ▾ = 칸 안 글자 끝 바로 뒤(3px) ·
        글 끝 뒤에 자리가 없으면(오른쪽 맞춤 숫자 등) 글 앞 · 그것도 없으면 칸 오른쪽 끝(전 자리) · 고치는 중이면 치는 글 끝 */
     const 끝 = Math.min(q.right, 보.r - 6) - 6 - 3, 글자리 = 글범위(td, q);   /* v8.2 + 손잡이(모서리 ±6px)보다 3px 왼쪽까지 — 끌어 채우기를 가리지 않음 */
-    let x = 끝 - w;
-    if(글자리){ if(글자리.r + 3 + w <= 끝) x = 글자리.r + 3; else if(글자리.l - 3 - w >= q.left + 1) x = 글자리.l - 3 - w; }
-    if(x < 보.l || y < 보.t - 1 || y + h > 보.b + 2){ 세모.style.display = 'none'; return; }
+    /* v9 빈 칸 = 글 시작 자리(오른쪽 맞춤 칸은 끝) · 글 끝 뒤 자리 없으면 글 앞 · 그것도 없으면 안 그림(글 위에 안 그림) */
+    const ts = getComputedStyle(td), 오맞 = ts.textAlign === 'right' || ts.textAlign === 'end';
+    let x = 오맞 || 편집 ? 끝 - w : q.left + (parseFloat(ts.paddingLeft) || 0);
+    if(편집 && !글자리){ const k = 칸.getBoundingClientRect(); x = k.left + (parseFloat(getComputedStyle(칸).paddingLeft) || 0) + 3; }
+    if(글자리){ if(글자리.r + 3 + w <= 끝) x = 글자리.r + 3; else if(글자리.l - 3 - w >= q.left + 1) x = 글자리.l - 3 - w; else x = NaN; }
+    if(!(x >= 보.l) || x + w > 끝 + 0.5 || y < 보.t - 1 || y + h > 보.b + 2){ 세모.style.display = 'none'; if(세모칸){ 세모칸.classList.remove('표입력세모칸'); 세모칸 = null; } return; }
+    if(세모칸 !== td){ 세모칸 = td; td.classList.add('표입력세모칸'); }
     if(세모.style.display !== 'flex') 세모난때 = Date.now();
     Object.assign(세모.style, { display:'flex', left:x + 'px', top:y + 'px' });
   }
@@ -255,7 +291,7 @@
   }
   function 끝내기(넣기, 값){
     if(!편집) return;
-    const { td } = 편집, 어 = 지금 && 지금.어; 편집 = null;
+    const { td } = 편집, 어 = 지금 && 지금.어; 편집 = null; 칸.style.paddingRight = '';
     const v = 값 != null ? 값 : 칸.value;
     칸.value = ''; 칸.classList.add('숨음'); 칸.readOnly = false; 목록.style.display = 'none';
     if(넣기 && 어 && td.isConnected && v !== 어.읽기(td)){
