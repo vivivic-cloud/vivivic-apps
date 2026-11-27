@@ -7,6 +7,7 @@
      ① 칸 안 입력 상자·고르기(select)의 글도 잼(전엔 td 글만 → 보드매입현황 칸은 ▾ 가 칸 오른쪽 위 = 글 위) ② 목록(원래 목록·기억)이 있는 열 = 그 열 입력 칸 모두 td.세모자리(드롭칸과 같은 오른쪽 여백)
      — 표를 등록할 때 · 기억을 처음 받을 때 한 번(그 뒤 입력으로 열이 바뀌지 않게) ③ 빈 칸 = 글 시작 자리 ④ 글 끝 뒤에 자리가 없으면(여백이 없는 칸) ▾ 안 그림(목록은 글 치기·Alt+↓) — 글 위에 절대 안 그림.
      ▾ 가 뜬 칸 = td.표입력세모칸(드롭끝.js 의 select·datalist ▾ 가 같은 자리에 둘 겹치지 않게).
+   v9.3(11-27): ② 를 바꿈 — 목록 있는 열만 고르던 것(쪽이 줄을 다시 그리면 class 가 사라져 자리 0) → 입력 칸 모두 td.세모자리 · 줄을 다시 그리면 다시 붙임(MutationObserver).
    v9.2(11-27): 칸 높이 ≥ ▾ 높이 + 8 이면 ▾ 가 + 손잡이(아래 모서리)와 위아래로 안 겹침 → 오른쪽 끝 2px 까지 씀(여백 0 칸의 고르기 상자에서 ▾ 가 안 뜨던 것).
    v9.1(11-27): 칸 안 입력 상자·고르기도 ▾ 자리(상자 오른쪽 여백 28px — 보드매입현황 td 여백 0 이라 v9 자리가 안 생겼음) · 크롬이 font 빈 글이면 글꼴 조각으로 잼.
    ① 누름 = 칸 고름만(파란 틀 — 드롭 안 열림) · 칸 안 끌기·Shift+누름 = 범위만 · 고른 칸 오른쪽 아래 모서리 「+」 를 위·아래·옆으로 끌면 그 값(범위면 그 차례대로 되풀이) 복사.
@@ -59,8 +60,7 @@
     if(기억받음 || !쪽이름) return;
     if(!창고() || !window.fbRead.onSnapshot){ setTimeout(기억구독, 800); return; }
     기억받음 = true;
-    try{ window.fbRead.onSnapshot(기억문서(), d => { 기억 = (d.exists() && d.data().열) || {};
-      if(기억처음){ 기억처음 = false; for(const t of 이름표.values()) 자리달기(t); } }, () => {}); }catch(e){}   /* v9 기억 처음 받음 = 기억 열도 ▾ 자리 */
+    try{ window.fbRead.onSnapshot(기억문서(), d => { 기억 = (d.exists() && d.data().열) || {}; }, () => {}); }catch(e){}
   }
   function 기억하기(열, 값들){
     if(!열) return;
@@ -94,7 +94,7 @@
     어들.set(t, 어);
     if(어0.이름){ const 옛 = 이름표.get(어0.이름); 이름표.set(어0.이름, t); if(지금 && 지금.표 === 옛 && 옛 !== t) 바꿔끼움(t); }
     if(window.터치범위) 터치범위.표(t, 어);
-    자리달기(t);   /* v9 */
+    자리지킴(t);   /* v9.3 */
     기억구독();
   }
 
@@ -186,27 +186,23 @@
     if(!rs.length) return null;
     const 안오 = q.right - (parseFloat(getComputedStyle(td).paddingRight) || 0);   /* v9 글이 넘쳐 잘려도 끝 = 칸 안 글 자리 끝 */
     return { l:Math.max(q.left, Math.min(...rs.map(x => x.left))), r:Math.min(안오, Math.max(...rs.map(x => x.right))) }; }
-  /* v9 목록 있는 열 = 그 열 입력 칸 모두 td.세모자리(오른쪽 여백 = ▾ 자리) — 표 등록·기억 처음 받음 때만(입력하는 동안 열이 안 바뀜) */
-  const 세모열 = new WeakMap();
+  /* v9.3 입력 칸 = 모두 td.세모자리(오른쪽 여백 = ▾ 자리 — 기억 드롭은 어느 입력 칸에나 생기므로) · 줄을 다시 그려도 다시 붙임(MutationObserver) → 고르거나 입력해도 열 너비 안 바뀜 */
+  const 지켜봄 = new WeakSet();
   function 자리달기(t){
     const 어 = 어들.get(t); if(!어 || !t.isConnected) return;
-    const 열들 = 세모열.get(t) || new Set(); 세모열.set(t, 열들);
-    const 칸들 = [];
-    for(const b of t.tBodies) for(const tr of b.rows) for(const td of tr.cells){
-      if(!어.칸(td) || (어.막음 && 어.막음(td))) continue;
-      const 열 = 열이름(어, td); 칸들.push([td, 열]); if(열들.has(열)) continue;
-      const 만 = 어.목록만 && 어.목록만(td), 기 = !만 && 열 && 기억[열] && Object.keys(기억[열]).length;
-      let 있 = !!기; if(!있 && 어.목록){ try{ 있 = (어.목록(td) || []).length > 0; }catch(e){} }
-      if(있) 열들.add(열); }
-    for(const [td, 열] of 칸들) if(열들.has(열)) td.classList.add('세모자리');
+    for(const b of t.tBodies) for(const tr of b.rows) for(const td of tr.cells)
+      if(!td.classList.contains('세모자리') && 어.칸(td) && !(어.막음 && 어.막음(td))) td.classList.add('세모자리');
   }
-  let 기억처음 = true;
+  function 자리지킴(t){
+    자리달기(t); if(지켜봄.has(t)) return; 지켜봄.add(t);
+    let f = 0; new MutationObserver(() => { if(!f) f = requestAnimationFrame(() => { f = 0; 자리달기(t); }); }).observe(t, { childList:true, subtree:true });
+  }
   let 세모난때 = 0, 세모칸 = null;   /* ▾ 가 막 나타난 직후의 누름(같은 손가락의 뒤따른 click)은 무시 */
   function 세모그리기(){   /* 고른 칸 하나(또는 고치는 중) + 그 칸에 목록이 있을 때만 · 끌기 중엔 숨김 */
     const td = 지금 && 머칸(), 하나 = 지금 && 지금.r0 === 지금.r1 && 지금.c0 === 지금.c1;
     if(세모칸 && 세모칸 !== td){ 세모칸.classList.remove('표입력세모칸'); 세모칸 = null; }
     if(!td || (!하나 && !편집) || 끌기 || 채우기 || !지금.어.칸(td) || !목록들(td).length){ 세모.style.display = 'none'; if(세모칸){ 세모칸.classList.remove('표입력세모칸'); 세모칸 = null; } return; }
-    { const 열들 = 세모열.get(지금.표); if(열들 && 열들.has(열이름(지금.어, td))) td.classList.add('세모자리'); }   /* v9 다시 그린 칸도 같은 여백 */
+    if(!td.classList.contains('세모자리')) td.classList.add('세모자리');   /* v9.3 쪽이 class 를 다시 쓴 칸 */
     const q = td.getBoundingClientRect(), 보 = 보이는틀(q.left, q.top, q.right, q.bottom), 거 = matchMedia('(pointer:coarse)').matches;
     if(편집){ const pr = 거 ? '36px' : '28px'; if(칸.style.paddingRight !== pr) 칸.style.paddingRight = pr; }   /* v9 고치는 글도 ▾ 자리 앞까지(겹친 입력 칸 = 표 모양 안 바뀜) */
     const w = 거 ? 22 : 15, h = 거 ? 18 : 12, y = q.top + 1;
