@@ -8,6 +8,7 @@
    숨은 열(display:none — 빈 열 접기)은 세지 않음: colgroup 은 보이는 열만, 접기·펼침이 바뀌면 다시 맞춤.
    v2(11-27) 사장님 「모든표 가로넓이 조절 가능하게 해. 이걸 꼭 그때그때 말해야만 해주냐?」 — 옵션 표:'table'(고를 표 선택자, 없으면 table.dpr-t) ·
      머리 여러 줄(묶음 머리 colspan·rowspan)도 됨: 열마다 그 열 하나만 덮는 가장 아래 머리 칸에 손잡이 · 그런 칸이 없는 열이 있으면 그 표는 건너뜀 ·
+     v2.1(11-27): 열 이름 = 머리 글자에서 .열빨(영림원품목등록 열 제목 빨강 칸 수) 뺌 — 숫자가 바뀌어도 같은 열 기억.
      쪽이 따로 손잡이를 단 표(.칸끈 = 재단 v1.4.0 · .열손 = 보드매입현황 v1.32.0)는 건너뜀 — 이 파일 손잡이 = .칸끈.칸넓이끈. */
 (function(){
   const 최소 = 24, 시작거리 = 3, 두번간격 = 350;
@@ -36,7 +37,7 @@
     const 남손 = t => !!(t.tHead && t.tHead.querySelector('.칸끈:not(.칸넓이끈), .열손'));
     const 머리들 = t => { if(남손(t)) return []; const 칸 = 열머리(t); return 칸 ? 칸.filter(th => getComputedStyle(th).display !== 'none') : []; };   /* 숨은(접힌) 열은 표 칸에서 빠짐 — 보이는 열만 */
     const 표번 = t => [...뿌리.querySelectorAll(표선)].indexOf(t);
-    const 이름들 = t => { const 셈 = {}, 묶 = 묶음(t) + '|' + 표번(t); return 머리들(t).map(th => { const k = (th.dataset.k || th.textContent).trim(); 셈[k] = (셈[k] || 0) + 1; return 묶 + '|' + k + (셈[k] > 1 ? '#' + 셈[k] : ''); }); };
+    const 이름들 = t => { const 셈 = {}, 묶 = 묶음(t) + '|' + 표번(t); return 머리들(t).map(th => { const k = (th.dataset.k || [...th.childNodes].filter(n => !(n.nodeType === 1 && n.classList.contains('열빨'))).map(n => n.textContent).join('')).trim();   /* v2.1 머리 칸 숫자 표시(.열빨 — 영림원품목등록 v2.162)는 이름에서 뺌 */ 셈[k] = (셈[k] || 0) + 1; return 묶 + '|' + k + (셈[k] > 1 ? '#' + 셈[k] : ''); }); };
     function 풀기(t){ t.classList.remove('칸고정'); t.style.width = ''; const cg = t.querySelector(':scope>colgroup.칸넓이'); if(cg) cg.remove(); }
     function 고정(t){   /* 지금 넓이를 재어 colgroup 에 박고 고친 칸만 기억 값 */
       const ths = 머리들(t), 이름 = 이름들(t);
