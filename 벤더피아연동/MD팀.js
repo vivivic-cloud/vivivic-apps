@@ -17,10 +17,16 @@
   const 말 = (t) => window.VP말?.("MD팀:" + t);
 
   const 꼴글 = `
-#vp-root .vp-md탭 { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 6px; }
-#vp-root .vp-md탭 button { width: auto; margin: 0; padding: 5px 12px; font: 600 13px/1.3 inherit; font-family: inherit; color: #37352f; background: #f5f5f5;
-  border: 1px solid #c0c0c0; border-radius: 4px; cursor: pointer; }
-#vp-root .vp-md탭 button[aria-selected="true"] { background: #37352f; color: #fff; border-color: #37352f; }
+#vp-root .vp-md탭 { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 0 0 6px; padding: 4px; max-width: 100%; box-sizing: border-box;
+  border: 1px solid #ededeb; border-radius: 8px; background: #f7f6f3; }
+#vp-root .vp-md탭 button { width: auto; margin: 0; padding: 6px 14px; border: 0; border-radius: 6px; background: transparent; box-shadow: none;
+  font: 700 13px/1.3 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; color: #787774; white-space: nowrap; cursor: pointer; transition: all .2s; }
+#vp-root .vp-md탭 button[aria-selected="true"] { background: #ffffff; color: #37352f; box-shadow: 0 1px 3px rgba(0,0,0,0.08), inset 0 0 0 1px #ededeb; }
+@media (max-width: 767px) {
+  #vp-root .vp-md탭 { display: flex; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  #vp-root .vp-md탭::-webkit-scrollbar { display: none; }
+  #vp-root .vp-md탭 button { padding: 7px 12px; font-size: 12px; flex-shrink: 0; }
+}
 #vp-root .vp-md메모 { display: flex; flex-wrap: wrap; gap: 4px 12px; font: 12px/18px "Microsoft Sans Serif", 돋움, sans-serif; color: #000; margin: 0 0 2px; }
 #vp-root .vp-md메모:empty { display: none; }
 #vp-root .vp-md메모 span { padding: 0 3px; white-space: pre; }
