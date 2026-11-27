@@ -7,6 +7,7 @@
      ① 칸 안 입력 상자·고르기(select)의 글도 잼(전엔 td 글만 → 보드매입현황 칸은 ▾ 가 칸 오른쪽 위 = 글 위) ② 목록(원래 목록·기억)이 있는 열 = 그 열 입력 칸 모두 td.세모자리(드롭칸과 같은 오른쪽 여백)
      — 표를 등록할 때 · 기억을 처음 받을 때 한 번(그 뒤 입력으로 열이 바뀌지 않게) ③ 빈 칸 = 글 시작 자리 ④ 글 끝 뒤에 자리가 없으면(여백이 없는 칸) ▾ 안 그림(목록은 글 치기·Alt+↓) — 글 위에 절대 안 그림.
      ▾ 가 뜬 칸 = td.표입력세모칸(드롭끝.js 의 select·datalist ▾ 가 같은 자리에 둘 겹치지 않게).
+   v9.6(11-27): 크기 바뀜을 받은 그 화면에서 바로 다시 그림(전엔 한 화면 늦어 빨리 끌면 ▾ 가 잠깐 글 위에 남았음).
    v9.5(11-27): 사장님 「아니 각 셀은 넓히기 기능이 있잖아. 이게 넓어져서 입력값이 모두 나오는 자리에 버튼이 옮겨가게 하면 되잖아」 — 칸넓이.js 로 칸을 끄는 동안 ▾ 가 바로 글 끝을 따라감(ResizeObserver: 표·▾ 칸).
    v9.4(11-27): 손잡이 비킴 판단 = ▾ 아래 끝이 칸 아래 모서리 손잡이(−6px)보다 위면(칸 높이 19.9px 줄에서 1px 모자라 ▾ 가 안 뜨던 것).
    v9.3(11-27): ② 를 바꿈 — 목록 있는 열만 고르던 것(쪽이 줄을 다시 그리면 class 가 사라져 자리 0) → 입력 칸 모두 td.세모자리 · 줄을 다시 그리면 다시 붙임(MutationObserver).
@@ -195,7 +196,7 @@
     for(const b of t.tBodies) for(const tr of b.rows) for(const td of tr.cells)
       if(!td.classList.contains('세모자리') && 어.칸(td) && !(어.막음 && 어.막음(td))) td.classList.add('세모자리');
   }
-  const 크기봄 = window.ResizeObserver ? new ResizeObserver(() => 다시()) : null;   /* v9.5 칸 넓이를 끌어 바꾸는 동안에도 ▾ 가 글 끝을 따라감(표·고른 칸 크기 바뀜 = 다시 그림) */
+  const 크기봄 = window.ResizeObserver ? new ResizeObserver(() => { if(!지금) return; if(그림틀){ cancelAnimationFrame(그림틀); 그림틀 = 0; } 그리기(); }) : null;   /* v9.5 칸 넓이를 끌어 바꾸는 동안에도 ▾ 가 글 끝을 따라감(표·고른 칸 크기 바뀜 = 다시 그림) */
   function 자리지킴(t){
     자리달기(t); if(지켜봄.has(t)) return; 지켜봄.add(t); if(크기봄) 크기봄.observe(t);
     let f = 0; new MutationObserver(() => { if(!f) f = requestAnimationFrame(() => { f = 0; 자리달기(t); }); }).observe(t, { childList:true, subtree:true });
