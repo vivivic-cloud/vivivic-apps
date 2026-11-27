@@ -1,4 +1,5 @@
-/* 드롭끝.js v1 (11-27) — 드롭 단추(▾)를 칸 안 글자 끝 바로 뒤에, 글을 가리지 않게.
+/* 드롭끝.js v2 (11-27) — v2: 칸 넓이를 끌어 바꾸는 동안에도 ▾ 가 글 끝을 따라감(ResizeObserver) · 사장님 「아니 각 셀은 넓히기 기능이 있잖아. 이게 넓어져서 입력값이 모두 나오는 자리에 버튼이 옮겨가게 하면 되잖아」
+   v1 (11-27) — 드롭 단추(▾)를 칸 안 글자 끝 바로 뒤에, 글을 가리지 않게.
    사장님(분배 방 전달): 「야 모든 드롭선택 버튼 입력된 텍스트 좀 안 가리게 해야. 전부 적용 좀 해. 텍스트 끝에 셀 안에 두라니까」
    대상(이 파일을 부른 쪽 전부):
    · select(하나 고르기) — 브라우저 ▾ 를 걷고(appearance none) 같은 ▾ 그림을 고른 글 끝 3px 뒤에 · 오른쪽 16px 비움(글이 길면 … 로 줄고 ▾ 는 그 뒤).
@@ -21,8 +22,10 @@
   const 판 = document.createElement('canvas').getContext('2d');
   const 고름 = 'select:not([multiple]), input[list], input[data-분류], input.clsdd';
   const 글 = el => el.tagName === 'SELECT' ? ((el.options[el.selectedIndex] || {}).text || '') : (el.value || el.placeholder || '');
+  const 본 = new WeakSet(), 크기봄 = window.ResizeObserver ? new ResizeObserver(들 => 들.forEach(x => 재기(x.target))) : null;   /* v2 칸 넓이를 끄는 동안 ▾ 가 글 끝을 따라감 */
   function 재기(el){
     if(!el || !el.isConnected || !el.matches(고름)) return;
+    if(크기봄 && !본.has(el)){ 본.add(el); 크기봄.observe(el); }
     if(el.tagName === 'SELECT'){ if(el.size > 1) return; el.classList.add('끝세모'); }
     else if(el.hasAttribute('list')) el.classList.add('끝세모');
     else el.classList.add('끝세모칸');
