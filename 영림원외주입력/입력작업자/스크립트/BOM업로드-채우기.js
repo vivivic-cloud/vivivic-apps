@@ -54,6 +54,28 @@
     },
     // 공식 양식에는 하위유무(HaveChild) 칸이 없어(엑셀 끝에 붙여도 안 읽힘, 11-03) 표에서 켠다 — 폼 rows 순서 = 엑셀 줄 순서.
     subFix(list) { const sh = Y.sheet(PAGE, 'SSNew'), L = lines(list); Y.rows(sh).forEach((r, i) => Y.setChk(sh, i, 'HaveChild', !!(L[i] && L[i].r.hasSub))); return this.check(list); },
+    // 여러 줄 한 번에(11-27, 사장님 「셀 목록 상태로 여러 목록 붙여넣는 방법을 최대한 활용」): 칸 덩이마다 Y.pasteRows 한 번(\r\n). 50줄 약 160초, 대조 모두 맞음.
+    //   ⚠ 「신규」 직후 첫 붙여넣기는 0줄일 때가 있어 3번까지 다시. ⚠ 한 번 저장에 **모품목 종류를 섞지 않는다**(재공품=자재 모품목 / 반제품 / 제품) —
+    //   섞으면 「처리중 오류가 발생하였습니다.」로 전부 안 들어감(11-27 시험). 한 덩이 50줄 안팎. 저장 뒤 줄 머리 A 가 번호로 바뀌면 저장된 것(알림 없음).
+    async fillRows(list) {
+      const sh = Y.sheet(PAGE, 'SSNew');
+      if (Y.rows(sh).length) throw new Error('표가 비어 있지 않음 — 「신규」로 비우고 다시');
+      const L = lines(list), n = (x) => (x == null || x === '' ? '' : String(Number(x)));
+      const P = (col, f) => Y.pasteRows(sh, 0, col, L.map(f));
+      for (let t = 0; t < 3; t++) { await P('ItemNo', (x) => [x.b.pcode]); if (Y.rows(sh).length === L.length) break; await Y.sleep(1500); }
+      if (Y.rows(sh).length !== L.length) throw new Error('붙인 줄 ' + Y.rows(sh).length + ' / ' + L.length);
+      await P('ItemBomRevName', (x) => [x.b.pver]);
+      await P('ProcName', (x) => [x.r.proc, n(x.r.order)]);
+      await P('SubItemNo', (x) => [x.r.ccode]);
+      if (L.some((x) => x.r.cver)) await P('SubItemBomRevName', (x) => [x.r.cver || '']);
+      await P('SubUnitName', (x) => [x.r.inunit, n(x.r.qn), n(x.r.qd)]);
+      await P('NeedQtyNumerator', (x) => [n(x.r.qn), n(x.r.qd)]);
+      const ex = (r) => [n(r.inLoss) === '0' ? '' : n(r.inLoss), n(r.outLoss) === '0' ? '' : n(r.outLoss), day(r.from), day(r.to), S0(r.pos), S0(r.note), S0(r.note1), S0(r.note2), S0(r.note3), S0(r.note4), S0(r.note5)];
+      if (L.some((x) => ex(x.r).some((v) => v !== ''))) await P('InLossRate', (x) => ex(x.r));
+      L.forEach((x, i) => { if (x.r.hasSub) Y.setChk(sh, i, 'HaveChild', true); if (x.r.bomView) Y.setChk(sh, i, 'IsBOMOnly', true); if (x.r.subProcMat) Y.setChk(sh, i, 'IsIncludeProcMat', true); });
+      await Y.sleep(800);
+      return this.check(list);
+    },
     async fill(list) {
       const sh = Y.sheet(PAGE, 'SSNew');
       if (Y.rows(sh).length) throw new Error('표가 비어 있지 않음 — 「신규」로 비우고 다시');
