@@ -5,7 +5,10 @@
    기억 = 이 기기 localStorage(창고에 안 씀) {"묶음|표 차례|머리 글자": px}(같은 쪽 여러 표는 따로). 같은 머리 글자가 한 표에 또 있으면 「글자#2」.
    쓰는 법: 칸넓이.달기(뿌리 요소, { 열쇠:'localStorage 이름', 묶음: th => '시트 이름' })
      뿌리 안 table.dpr-t(머리 한 줄)를 지켜보다가 새로 그려지면 손잡이를 달고 기억한 넓이를 다시 입힌다. 표를 다시 그리는 코드는 안 고쳐도 됨.
-   숨은 열(display:none — 빈 열 접기)은 세지 않음: colgroup 은 보이는 열만, 접기·펼침이 바뀌면 다시 맞춤. */
+   숨은 열(display:none — 빈 열 접기)은 세지 않음: colgroup 은 보이는 열만, 접기·펼침이 바뀌면 다시 맞춤.
+   v2(11-27) 사장님 「모든표 가로넓이 조절 가능하게 해. 이걸 꼭 그때그때 말해야만 해주냐?」 — 옵션 표:'table'(고를 표 선택자, 없으면 table.dpr-t) ·
+     머리 여러 줄(묶음 머리 colspan·rowspan)도 됨: 열마다 그 열 하나만 덮는 가장 아래 머리 칸에 손잡이 · 그런 칸이 없는 열이 있으면 그 표는 건너뜀 ·
+     쪽이 따로 손잡이를 단 표(.칸끈 = 재단 v1.4.0 · .열손 = 보드매입현황 v1.32.0)는 건너뜀 — 이 파일 손잡이 = .칸끈.칸넓이끈. */
 (function(){
   const 최소 = 24, 시작거리 = 3, 두번간격 = 350;
   const 꼴 = document.createElement('style');
@@ -18,11 +21,21 @@
   document.head.appendChild(꼴);
 
   function 달기(뿌리, 옵션){
-    const 열쇠 = 옵션.열쇠, 묶음 = 옵션.묶음 || (() => '');
+    const 열쇠 = 옵션.열쇠, 묶음 = 옵션.묶음 || (() => ''), 표선 = 옵션.표 || 'table.dpr-t';
     let 넓 = {}; try{ 넓 = JSON.parse(localStorage.getItem(열쇠) || '{}') || {}; }catch(e){ 넓 = {}; }
     const 저장 = () => { try{ localStorage.setItem(열쇠, JSON.stringify(넓)); }catch(e){} };
-    const 머리들 = t => t.tHead && t.tHead.rows.length === 1 ? [...t.tHead.rows[0].cells].filter(th => getComputedStyle(th).display !== 'none') : [];   /* 숨은(접힌) 열은 표 칸에서 빠짐 — 보이는 열만 */
-    const 표번 = t => [...뿌리.querySelectorAll('table.dpr-t')].indexOf(t);
+    function 열머리(t){   /* v2 열마다 그 열 하나만 덮는 가장 아래 머리 칸 · 없으면 null */
+      if(!t.tHead || !t.tHead.rows.length) return null;
+      const 칸 = [], 찬 = [];
+      [...t.tHead.rows].forEach((tr, r) => { let c = 0;
+        for(const th of tr.cells){ while(찬[r] && 찬[r][c]) c++; const cs = th.colSpan || 1, rs = th.rowSpan || 1;
+          for(let y = r; y < r + rs; y++) for(let x = c; x < c + cs; x++){ (찬[y] = 찬[y] || [])[x] = 1; }
+          if(cs === 1) 칸[c] = th; c += cs; } });
+      const n = Math.max(0, ...찬.map(x => x ? x.length : 0)); for(let i = 0; i < n; i++) if(!칸[i]) return null;
+      return 칸; }
+    const 남손 = t => !!(t.tHead && t.tHead.querySelector('.칸끈:not(.칸넓이끈), .열손'));
+    const 머리들 = t => { if(남손(t)) return []; const 칸 = 열머리(t); return 칸 ? 칸.filter(th => getComputedStyle(th).display !== 'none') : []; };   /* 숨은(접힌) 열은 표 칸에서 빠짐 — 보이는 열만 */
+    const 표번 = t => [...뿌리.querySelectorAll(표선)].indexOf(t);
     const 이름들 = t => { const 셈 = {}, 묶 = 묶음(t) + '|' + 표번(t); return 머리들(t).map(th => { const k = (th.dataset.k || th.textContent).trim(); 셈[k] = (셈[k] || 0) + 1; return 묶 + '|' + k + (셈[k] > 1 ? '#' + 셈[k] : ''); }); };
     function 풀기(t){ t.classList.remove('칸고정'); t.style.width = ''; const cg = t.querySelector(':scope>colgroup.칸넓이'); if(cg) cg.remove(); }
     function 고정(t){   /* 지금 넓이를 재어 colgroup 에 박고 고친 칸만 기억 값 */
@@ -42,15 +55,15 @@
     }
     function 손달기(t){
       머리들(t).forEach(th => {
-        if(th.querySelector(':scope>.칸끈')) return;
+        if(th.querySelector(':scope>.칸넓이끈')) return;
         if(getComputedStyle(th).position === 'static') th.style.position = 'relative';
-        const h = document.createElement('span'); h.className = '칸끈'; th.appendChild(h);
+        const h = document.createElement('span'); h.className = '칸끈 칸넓이끈'; th.appendChild(h);
       });
     }
     function 살피기(){
       예약 = 0;
-      뿌리.querySelectorAll('table.dpr-t').forEach(t => {
-        if(!t.tHead || t.tHead.rows.length !== 1 || (끌기 && 끌기.t === t)) return;   /* 끄는 중인 표는 건드리지 않음 */
+      뿌리.querySelectorAll(표선).forEach(t => {
+        if(!t.tHead || !머리들(t).length || (끌기 && 끌기.t === t)) return;   /* 끄는 중인 표는 건드리지 않음 */
         손달기(t);
         const 이름 = 이름들(t).join('\t');
         if(t.dataset.칸넓이 !== 이름 || (이름들(t).some(k => 넓[k]) !== t.classList.contains('칸고정'))) 입히기(t);
@@ -64,7 +77,7 @@
 
     let 끌기 = null, 앞누름 = { 때:0, 손:null };
     뿌리.addEventListener('pointerdown', e => {
-      const h = e.target.closest && e.target.closest('.칸끈'); if(!h || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      const h = e.target.closest && e.target.closest('.칸넓이끈'); if(!h || (e.pointerType === 'mouse' && e.button !== 0)) return;
       e.preventDefault(); e.stopPropagation();
       const th = h.parentNode, t = th.closest('table');
       끌기 = { h, th, t, x:e.clientX, id:e.pointerId, 시작:false, 처음:th.getBoundingClientRect().width };
@@ -102,7 +115,7 @@
     };
     뿌리.addEventListener('pointerup', 끝, true);
     뿌리.addEventListener('pointercancel', 끝, true);
-    뿌리.addEventListener('click', e => { if(e.target.closest && e.target.closest('.칸끈')){ e.preventDefault(); e.stopPropagation(); } }, true);
+    뿌리.addEventListener('click', e => { if(e.target.closest && e.target.closest('.칸넓이끈')){ e.preventDefault(); e.stopPropagation(); } }, true);
     return { 다시 };
   }
   window.칸넓이 = { 달기 };
