@@ -13,6 +13,9 @@ v313(11-20) 공정흐름 사본도: `발주역입력_영림원폼/_공정흐름`
 v315(11-21) 구매+가공품목: `_가공품목_{거래처}.결과.{열쇠}.{원장분류|원장|공정|공정흐름|분류|자재}` = 폼 mixResSync 같은 셈(bd.출처 「구매+가공품목」·거래처·열쇠·단계 문서)
   + 완료 사본 `_자재`(erp_materials 완료) · `_공정`(erp_processes 완료) = 폼 bdCopyPub 같은 셈 → 보드매입현황 「구매+가공품목」 이 로그인 없을 때 실시간으로 받음.
   **자재·분류·공정·공정흐름 status 를 바꾼 뒤에도 이 스크립트를 돌린다.**
+v376(11-28) 영림원품목등록 보내기 결과도: `발주역입력_영림원품목등록_보내기/{이름}`(조각 `/제품/*`) `결과` = 폼 yinResSync(창고·워크센터등록·품목·BOM·품목별공정흐름·소요자재·외주계약) ·
+  iwResSync(워크센터) · mixResSync(재공품) 같은 셈 → 영림원품목등록 잠금·상태 칩(로그인 없는 기기). `python3 결과맞추기.py 영림원품목등록` = 이것만.
+  **품목·BOM·공정흐름·소요자재·워크센터·외주계약·창고·재공품 status 를 바꾼 뒤에도 이 스크립트를 돌린다.**
 토큰 = 작업자표.py. 출력엔 거래처·열쇠·단계·상태만(단가·토큰 안 적음).
 """
 import json, os, sys, time, urllib.request, urllib.parse, urllib.error
@@ -293,8 +296,95 @@ def copy_pub(docs, data, dry):   # 폼 bdCopyPub — _자재 · _공정 (다를 
     return n
 
 
+# ───── v376(11-28) 영림원품목등록 보내기 결과 — 폼 yinResSync · iwResSync · mixResSync(재공품) 같은 셈 ─────
+# 사장님 11-28 「모든 부분에서 실제 완료 상황 좀 보게 만들어」 — 입력폼 창이 안 열려 있어도 영림원품목등록 회색 잠금·상태 칩이 따라오게.
+# 자리 = 발주역입력_영림원품목등록_보내기/{이름} 머리 + /{이름}/제품/{조각} (폼 nwAssemble · nwPub — 결과는 그 열쇠의 조각 문서, 외주계약 = 머리)
+NW = 'artifacts/vivivic-4b7ef/public/data/발주역입력_영림원품목등록_보내기'
+YIN_SRC = '영림원품목등록'
+YIN_KEY = {'창고': 'warehouses', '워크센터등록': 'workcenters', '품목': 'items', 'BOM': 'boms', '품목별공정흐름': 'itemflows',
+           '소요자재': 'itemmats', '외주계약': 'contracts', '워크센터': 'itemwcs'}   # 워크센터 = 폼 iwResSync(12 워크센터 받기) · 나머지 = yinResSync
+WIP_ST = ['원장분류', '원장', '공정', '공정흐름', '분류', '자재', '구매단가']   # 폼 MIX_ST(v365)
+WIP_KEY = {'원장분류': 'classes', '원장': 'materials', '공정': 'processes', '공정흐름': 'flows', '분류': 'classes', '자재': 'materials', '구매단가': 'purprices'}
+
+
+def nw_assemble(name, heads):   # 폼 nwAssemble — (줄, 열쇠→조각 자리, 머리 자리, 결과) | None
+    M = heads.get(name)
+    b = (M or {}).get('보내기') or {}
+    if not b.get('나눔'): return None
+    main = NW + '/' + name
+    if name == '외주계약':
+        return [{'열쇠': h.get('열쇠'), '상태': h.get('상태')} for h in (b.get('머리') or [])], {}, main, dict(M.get('결과') or {})
+    P = {d['id']: d for d in col(main + '/제품')}
+    rows, where, res = [], {}, {}
+    for pid in b.get('제품들') or []:
+        x = P.get(pid)
+        if not x: continue
+        for r in x.get('줄') or []:
+            if isinstance(r, dict): rows.append(r); where[r.get('열쇠')] = main + '/제품/' + x['id']
+        res.update(x.get('결과') or {})
+    return rows, where, main, res
+
+
+def nw_mine(a, k):   # 폼 yinMine · iwInMine
+    return first([x for x in a if isinstance(x.get('bd'), dict) and x['bd'].get('출처') == YIN_SRC and x['bd'].get('열쇠') == k])
+
+
+def wip_doc(a, st, k):   # 폼 mixDoc(vn = 영림원품목등록)
+    rows = []
+    for x in a:
+        b = x.get('bd')
+        if not isinstance(b, dict) or b.get('출처') != YIN_SRC or b.get('거래처') != YIN_SRC or (b.get('단계') or '') != st: continue
+        y = b.get('열쇠')
+        if (k in y) if isinstance(y, list) else (y == k): rows.append(x)
+    return first(rows)
+
+
+def nw_write(path, ch):   # ch = [(칸 경로 조각들, 값|None=지움)]
+    mask, fields = [], {}
+    for segs, v in ch:
+        mask.append(fp(*segs))
+        if v is not None:
+            o = fields
+            for s_ in segs[:-1]: o = o.setdefault(s_, {})
+            o[segs[-1]] = v
+    body = {'fields': {n: enc(x) for n, x in fields.items()}}
+    req('PATCH', DB + q(path) + '?currentDocument.exists=true&' + '&'.join('updateMask.fieldPaths=' + urllib.parse.quote(m) for m in mask), body)
+
+
+def nw_pub(data, dry):
+    heads = {d['id']: d for d in col(NW)}
+    n = 0
+    for name in list(YIN_KEY) + ['재공품']:
+        A = nw_assemble(name, heads)
+        if not A: continue
+        rows, where, main, res = A
+        g = {}
+        for r in rows:
+            if r.get('상태') != '보냄': continue
+            k = r.get('열쇠'); pth = where.get(k) or main
+            if name == '재공품':
+                for st in WIP_ST:
+                    v = res_of(wip_doc(data[WIP_KEY[st]], st, k))
+                    o = (res.get(k) or {}).get(st) if isinstance(res.get(k), dict) else None
+                    if o != v:
+                        g.setdefault(pth, []).append((('결과', k, st), v))
+                        print('영림원품목등록 %s  %s  %s: %s → %s' % (name, str(k).replace('\t', ' ').strip(), st, (o or {}).get('상태', '없음'), (v or {}).get('상태', '지움')))
+            else:
+                v = res_of(nw_mine(data[YIN_KEY[name]], k)); o = res.get(k)
+                if o != v:
+                    g.setdefault(pth, []).append((('결과', k), v))
+                    print('영림원품목등록 %s  %s: %s → %s' % (name, str(k).replace('\t', ' ').strip(), (o or {}).get('상태', '없음'), (v or {}).get('상태', '지움')))
+        for pth, ch in g.items():
+            n += len(ch)
+            if not dry:
+                for i in range(0, len(ch), 200): nw_write(pth, ch[i:i + 200])
+    return n
+
+
 def run(only=None, dry=False):
     data = {k: col('erp_' + k) for k in ('classes', 'materials', 'purprices', 'flows', 'processes')}
+    yin = only is None or only == YIN_SRC   # v376
+    if yin: data.update({k: col('erp_' + k) for k in set(YIN_KEY.values())})
     docs = col(BD)
     vendors = sorted([d for d in docs if not d['id'].startswith('_') and isinstance((d.get('보내기') or {}).get('줄'), list)], key=lambda d: d['id'])
     left = 0
@@ -312,14 +402,15 @@ def run(only=None, dry=False):
     if f: print('_공정흐름 ' + ('다름' if dry else '올림'))
     mx = mix_pub(docs, data, dry)
     cp = copy_pub(docs, data, dry)
+    nw = nw_pub(data, dry) if yin else 0
     if not dry:   # 다시 읽어 확인
         docs = col(BD)
         for d in docs:
             if d['id'].startswith('_') or not isinstance((d.get('보내기') or {}).get('줄'), list) or (only and d['id'] != only): continue
             left += len(diff(d, want(d, data)))
         if flow_pub(docs, data, True): left += 1
-        left += mix_pub(docs, data, True) + copy_pub(docs, data, True)
-    else: left += (1 if f else 0) + mx + cp
+        left += mix_pub(docs, data, True) + copy_pub(docs, data, True) + (nw_pub(data, True) if yin else 0)
+    else: left += (1 if f else 0) + mx + cp + nw
     print('어긋남 %d' % left)
     return left
 
