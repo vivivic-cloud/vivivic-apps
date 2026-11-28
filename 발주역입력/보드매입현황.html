@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.59.42
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.59.43
+     v1.59.43(11-28): 분배 방 사장님 「스토리지에 올려주세요」 → 「해줘」 — 월별명세(전체·달마다) 표 아래 「명세서」 표 = 그 달 거래명세서 글자(날짜·번호·품목·수량·단가·금액·합계, 창고 `발주역입력_명세서/{거래처}_{yyyy-mm}`) + 「사진」 단추(Cloud Storage `statements/…` 보기용 사진, 누르면 큰 사진). 지금 엘데코 2026-01 만(자료 없는 거래처·달은 아무것도 안 보임). 이 줄 이후 코드 읽기만 — 월별 표·영림원보내기 안 고침.
      v1.59.42(11-28): 분배 방 사장님 「드롭 선택 시 거래처명 필터 기능 모든 드롭 선택 칸에 적용시켜」 — 구매+가공 원장(o_code) 드롭 = 거래처 체크·줄 옆 거래처명 다시(표입력.js v11 — 업체 = 입력폼 구매단가 완료 거래처).
      v1.59.41(11-28): 분배 방 사장님 「완료된 거만 보이게 하고, 입력폼에 대기 중이면 대기 표시를 하던가 … 입력폼대로만 보여 주면 되는데」 — 구매+가공품목 줄 = 입력폼 자재 문서가 있는 줄만 · 줄 끝 = 입력폼 문서 글(대기·진행중·오류, 오류 = 마우스 까닭) · v1.59.38 노랑·까닭 셈 걷음(지우기·신규·고치기 그대로). 또 사장님 「이건 지운 사람이 자기가 지운 목록 영림원 동기화하면 되는 거고」 — v1.59.39~40 「영림원에서 지운 자재 줄 저절로 빠짐」(지운자재·뺀줄·가공지운·등록된 기록) 걷음 · 조합 줄 분류 = 자기 값 먼저(v1.59.39 ㉠)는 남김. 창고 `등록된` 칸 자료는 그대로(안 씀).
      v1.59.40(11-28): 지움 판단 바꿈 — v106 부터 입력작업자는 영림원에 없는 문서를 지움(ylwGone 표시 안 남김) → 「한 번 입력폼 완료였던 번호(영림원보내기 완료보관 · 구매+가공 등록된/옛 완료보관)인데 지금 살아 있는 입력폼 문서 없음」 = 지움 · 구매+가공은 완료로 보인 번호를 `등록된.{열쇠}` 에 남김.
@@ -269,6 +270,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
     import { getFirestore, doc, getDoc, setDoc, collection, getDocs, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore.js";
+    import { getStorage, ref as storageRef, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-storage.js";
     const 설정 = {
         apiKey: "AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs",
         authDomain: "vivivic-4b7ef.firebaseapp.com",
@@ -301,6 +303,7 @@
     }catch(e){ window.폼분류대기 = [null, String(e && e.message || e)]; }
     window.db = getFirestore(app);
     window.fbRead = { doc, getDoc, setDoc, collection, getDocs, onSnapshot };
+    window.fbStorage = { st: getStorage(app), ref: storageRef, getDownloadURL };   /* 명세서 사진(읽기만) */
     onAuthStateChanged(auth, (u) => {
         if (!u) { signInAnonymously(auth).catch(e => window.목록못읽음('창고에 들어가지 못했습니다', (e&&(e.code||e.message))||'')); return; }
         window.목록읽기();
@@ -497,7 +500,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.59.42</div>
+  <div class="badge">v1.59.43</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -3158,8 +3161,52 @@ function 가공품목그리기(){   /* v1.59.29 분배 방 사장님 「구매+�
   if((보줄.length || 옛) && 고른값((옛 && 옛.줄) || []) !== 고른값(보줄) && !가공품목저장중[s]) 가공품목저장(s);
 }
 
+/* ===== 명세서(거래명세서) — 월별명세 아래에 그 달 명세서 글자 + 사진 단추. 창고 발주역입력_명세서/{거래처}_{yyyy-mm}(없으면 안 보임). 읽기만. ===== */
+const 명세서자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_명세서'];
+const 명세서문서 = {};
+async function 명세서붙이기(s, 달들){
+  const { doc, getDoc } = window.fbRead;
+  const 칸 = document.querySelector('#속 .표통'); if(!칸) return;
+  for(const 달 of 달들){
+    const m = String(달).match(/(\d+)월/); if(!m) continue;
+    const id = s + '_2026-' + String(m[1]).padStart(2,'0');
+    if(!(id in 명세서문서)){
+      try{ const d = await getDoc(doc(window.db, ...명세서자리, id)); 명세서문서[id] = d.exists() ? d.data() : null; }
+      catch(e){ 명세서문서[id] = null; }
+    }
+    const x = 명세서문서[id];
+    if(!x || !(x.서류||[]).length) continue;
+    if(고른 !== s || !document.body.contains(칸)) return;
+    const 수 = n => Number(n||0).toLocaleString('ko-KR');
+    let h = `<div class="표" data-명세서="${글(id)}"><div class="표제목">${글(달)} 명세서</div><table class="dpr-t"><thead><tr><th>날짜</th><th>번호</th><th>품목</th><th>수량</th><th>단가</th><th>금액</th><th>합계</th><th>사진</th></tr></thead><tbody>`;
+    for(const sv of x.서류){
+      const 줄 = sv.줄||[], 계 = 줄.reduce((a,l)=>a+Math.round((l.수량||0)*(l.단가||0)*1.1),0);
+      const 합맞 = Number(sv.합계)===계, 확 = sv.확인필요 ? ' style="background:#FFE9C7"' : '';
+      줄.forEach((l,i) => {
+        const 금맞 = Number(l.금액)===Math.round((l.수량||0)*(l.단가||0)*1.1);
+        h += '<tr>' + (i===0 ? `<td rowspan="${줄.length}">${글(sv.날짜)}</td><td rowspan="${줄.length}">${글(sv.번호)}</td>` : '') +
+          `<td>${글(l.품목)}</td><td class="num">${수(l.수량)}</td><td class="num">${수(l.단가)}</td><td class="num" style="background:${금맞?'#D9F2DE':'#FFD9D6'}" title="계산 ${수(Math.round((l.수량||0)*(l.단가||0)*1.1))}">${수(l.금액)}</td>` +
+          (i===0 ? `<td class="num" rowspan="${줄.length}" style="background:${합맞?'#D9F2DE':'#FFD9D6'}" title="${글(sv.확인필요||'계산 '+수(계))}">${수(sv.합계)}</td><td rowspan="${줄.length}"${확}><button class="chip 사진단추" data-p="${글(sv.사진||'')}">사진</button>${sv.확인필요?` <span title="${글(sv.확인필요)}">!</span>`:''}</td>` : '') + '</tr>';
+      });
+    }
+    h += '</tbody></table></div>';
+    칸.insertAdjacentHTML('beforeend', h);
+  }
+  칸.querySelectorAll('.사진단추').forEach(b => b.onclick = async () => {
+    try{
+      const { st, ref, getDownloadURL } = window.fbStorage;
+      const u = await getDownloadURL(ref(st, b.dataset.p));
+      const o = document.createElement('div');
+      o.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.8);display:flex;align-items:center;justify-content:center;z-index:99;cursor:zoom-out';
+      o.innerHTML = `<img src="${u}" style="max-width:96vw;max-height:96vh;background:#fff">`;
+      o.onclick = () => o.remove(); document.body.appendChild(o);
+    }catch(e){ 큰알림('사진을 열지 못했습니다 — ' + ((e&&(e.code||e.message))||'')); }
+  });
+}
+
 function 그리기(){
   const d = 받은[고른], 속 = document.getElementById('속');
+  let 명세서달 = [];
   const 표들 = d.표||[];
   if(!표들.length){ 속.innerHTML = '<div class="state"><div class="big">표 없음</div></div>'; return; }
   let h = '';
@@ -3182,8 +3229,10 @@ function 그리기(){
   }else{
     const 달 = 볼것.startsWith('m:') ? 볼것.slice(2) : '';
     h = 월명세표(고른, 월표, (월표.줄||[]).filter(z => !달 || z.월===달), d.제목);   /* v1.36.0 자재명·자재번호 */
+    명세서달 = 달 ? [달] : [...new Set((월표.줄||[]).map(z => z.월).filter(Boolean))];
   }
   속.innerHTML = '<div class="표통">' + h + '</div>';
+  if(명세서달.length){ const 달들 = 명세서달; 명세서달 = []; 명세서붙이기(고른, 달들); }
   if(월표 && !['누계','영림원','매입품목'].includes(볼것)) 명세준비(고른);
 }
 /* v1.20.8 머리 두 줄(영림원보내기) — 둘째 머리 줄은 첫 줄 높이만큼 아래에 붙는다. 표를 새로 그리거나 화면 폭이 바뀌면 다시 잰다. */
