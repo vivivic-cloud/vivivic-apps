@@ -16,7 +16,7 @@
     const im = (await Y.imp.list('erp_itemmats')).find((x) => x.code === code);
     if (!im || im.status !== '완료') throw new Error(code + ' 소요자재 완료 아님');
     const l = all.filter((x) => x.status === '대기'); if (!l.length) return code + ' 대기 없음';
-    for (const v of l) await Y.imp.patch('erp_itemwcs', v.id, { status: '진행중' });
+    for (const v of l) if (im.procs.some((p) => +p.seq === +v.seq && p.proc === v.proc)) await Y.imp.patch('erp_itemwcs', v.id, { status: '진행중' });
     Home.OpenPageSeq(500865); await Y.sleep(1800);
     await Y.iw.open(code);
     const G = (k) => Y.win('500865').document.getElementById(k);
@@ -35,7 +35,11 @@
     }
     tool('조회'); await Y.sleep(2500);
     for (const p of procs) { const list = all.filter((x) => +x.seq === +p.seq && x.proc === p.proc); if (!list.length) continue; await Y.iw.pick(p.seq, p.proc); const bad = Y.iw.cmp(list); if (bad.length) throw new Error(code + ' ' + p.proc + ' 저장 뒤 대조 틀림: ' + bad.join(' · ')); }
-    for (const v of all.filter((x) => x.status !== '완료')) await Y.imp.patch('erp_itemwcs', v.id, { status: '완료', agentNote: '영림원 제품별공정별워크센터등록 저장·다시 조회 대조 맞음' });
+    const inProc = (x) => im.procs.some((p) => +p.seq === +x.seq && p.proc === x.proc);
+    for (const v of all.filter((x) => x.status !== '완료')) {
+      if (inProc(v)) await Y.imp.patch('erp_itemwcs', v.id, { status: '완료', agentNote: '영림원 제품별공정별워크센터등록 저장·다시 조회 대조 맞음' });
+      else await Y.imp.patch('erp_itemwcs', v.id, { status: '오류', agentNote: '영림원에 안 넣음 — 공정 「' + v.seq + ' ' + v.proc + '」 이 소요자재(500299)·품목별공정흐름에 없음(옛 줄로 보임). 지금 공정 = ' + im.procs.map((p) => p.seq + ' ' + p.proc).join(', ') });
+    }
     return code + ' ' + done.join(' ');
   };
   window.__runItems = function (codes) { window.__g = { 끝: false, 결과: [] }; (async () => { for (const c of codes) { try { window.__g.결과.push(await window.__item(c)); } catch (e) { window.__g.오류 = String(e.message || e); break; } } window.__g.끝 = true; })(); return '시작 ' + codes.length; };
