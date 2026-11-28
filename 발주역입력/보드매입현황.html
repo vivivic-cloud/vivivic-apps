@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.59.44
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.59.45
+     v1.59.45(11-28): 사장님 「명세서 표 빨강·주황이 무엇이 어디가 안 맞는지 알 수 없다」 — 안 맞는 칸(수량·금액·합계·날짜)에만 색 + 칸 안에 「명세값 / 계산값 · 차이」 숫자(계산 = 수량×단가×1.1, 합계 = 줄 계산 합) + 줄 끝 「차이」 칸(칸 이름 ±값). 정정(수량 70→68·날짜 22→21)은 창고 서류 `정정:[{칸,줄,인쇄,정정}]` 로 주황 칸에 「인쇄 → 정정」. 「!」·문장 뺌.
      v1.59.44(11-28): 사장님 「사진은 팝업으로 새페이지에 뜨게 하고 사진이 아니라 실명세서라고 버튼 하세요」 — 명세서 표 「사진」 → 「실명세서」(머리 칸·단추) · 누르면 겹침 대신 새 창(팝업)에 명세서 그림.
      v1.59.43(11-28): 분배 방 사장님 「스토리지에 올려주세요」 → 「해줘」 — 월별명세(전체·달마다) 표 아래 「명세서」 표 = 그 달 거래명세서 글자(날짜·번호·품목·수량·단가·금액·합계, 창고 `발주역입력_명세서/{거래처}_{yyyy-mm}`) + 「사진」 단추(Cloud Storage `statements/…` 보기용 사진, 누르면 큰 사진). 지금 엘데코 2026-01 만(자료 없는 거래처·달은 아무것도 안 보임). 이 줄 이후 코드 읽기만 — 월별 표·영림원보내기 안 고침.
      v1.59.42(11-28): 분배 방 사장님 「드롭 선택 시 거래처명 필터 기능 모든 드롭 선택 칸에 적용시켜」 — 구매+가공 원장(o_code) 드롭 = 거래처 체크·줄 옆 거래처명 다시(표입력.js v11 — 업체 = 입력폼 구매단가 완료 거래처).
@@ -501,7 +502,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.59.44</div>
+  <div class="badge">v1.59.45</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -3179,15 +3180,35 @@ async function 명세서붙이기(s, 달들){
     if(!x || !(x.서류||[]).length) continue;
     if(고른 !== s || !document.body.contains(칸)) return;
     const 수 = n => Number(n||0).toLocaleString('ko-KR');
-    let h = `<div class="표" data-명세서="${글(id)}"><div class="표제목">${글(달)} 명세서</div><table class="dpr-t"><thead><tr><th>날짜</th><th>번호</th><th>품목</th><th>수량</th><th>단가</th><th>금액</th><th>합계</th><th>실명세서</th></tr></thead><tbody>`;
+    const 부호 = n => (n>0?'+':n<0?'−':'') + 수(Math.abs(n));
+    const 작 = t => `<div style="font-size:10px;line-height:1.2;font-weight:600">${t}</div>`;
+    const 빨 = 'background:#FFD9D6', 초 = 'background:#D9F2DE', 주 = 'background:#FFE9C7';
+    let h = `<div class="표" data-명세서="${글(id)}"><div class="표제목">${글(달)} 명세서</div><table class="dpr-t"><thead><tr><th>날짜</th><th>번호</th><th>품목</th><th>수량</th><th>단가</th><th>금액</th><th>합계</th><th>차이</th><th>실명세서</th></tr></thead><tbody>`;
     for(const sv of x.서류){
-      const 줄 = sv.줄||[], 계 = 줄.reduce((a,l)=>a+Math.round((l.수량||0)*(l.단가||0)*1.1),0);
-      const 합맞 = Number(sv.합계)===계, 확 = sv.확인필요 ? ' style="background:#FFE9C7"' : '';
+      const 줄 = sv.줄||[], 정 = sv.정정||[];
+      const 계산 = l => Math.round((l.수량||0)*(l.단가||0)*1.1);
+      const 줄계 = 줄.reduce((a,l)=>a+계산(l),0), 합차 = Number(sv.합계) - 줄계;
+      const 날정 = 정.find(c => c.칸==='날짜');
+      const 날차 = 날정 ? Math.round((Date.parse(날정.정정) - Date.parse(날정.인쇄)) / 86400000) : 0;
+      const 차들 = [];
+      if(날정) 차들.push('날짜 ' + 부호(날차) + '일');
       줄.forEach((l,i) => {
-        const 금맞 = Number(l.금액)===Math.round((l.수량||0)*(l.단가||0)*1.1);
-        h += '<tr>' + (i===0 ? `<td rowspan="${줄.length}">${글(sv.날짜)}</td><td rowspan="${줄.length}">${글(sv.번호)}</td>` : '') +
-          `<td>${글(l.품목)}</td><td class="num">${수(l.수량)}</td><td class="num">${수(l.단가)}</td><td class="num" style="background:${금맞?'#D9F2DE':'#FFD9D6'}" title="계산 ${수(Math.round((l.수량||0)*(l.단가||0)*1.1))}">${수(l.금액)}</td>` +
-          (i===0 ? `<td class="num" rowspan="${줄.length}" style="background:${합맞?'#D9F2DE':'#FFD9D6'}" title="${글(sv.확인필요||'계산 '+수(계))}">${수(sv.합계)}</td><td rowspan="${줄.length}"${확}><button class="chip 사진단추" data-p="${글(sv.사진||'')}">실명세서</button>${sv.확인필요?` <span title="${글(sv.확인필요)}">!</span>`:''}</td>` : '') + '</tr>';
+        const 수정 = 정.find(c => c.칸==='수량' && c.줄===i);
+        if(수정) 차들.push((줄.length>1?(i+1)+'번줄 ':'') + '수량 ' + 부호(Number(수정.정정)-Number(수정.인쇄)));
+        const 금차 = Number(l.금액) - 계산(l);
+        if(금차) 차들.push((줄.length>1?(i+1)+'번줄 ':'') + '금액 ' + 부호(금차));
+      });
+      if(합차) 차들.push('합계 ' + 부호(합차));
+      줄.forEach((l,i) => {
+        const 수정 = 정.find(c => c.칸==='수량' && c.줄===i);
+        const 금차 = Number(l.금액) - 계산(l);
+        const 수칸 = 수정 ? `<td class="num" style="${주}" title="인쇄 ${수(수정.인쇄)} → 정정 ${수(수정.정정)} · 차 ${부호(Number(수정.정정)-Number(수정.인쇄))}">${수(l.수량)}${작('인쇄 '+수(수정.인쇄)+' → 정정 '+수(수정.정정)+' · 차 '+부호(Number(수정.정정)-Number(수정.인쇄)))}</td>` : `<td class="num">${수(l.수량)}</td>`;
+        const 금칸 = 금차 ? `<td class="num" style="${빨}" title="명세 ${수(l.금액)} / 계산 ${수(계산(l))} · 차 ${부호(금차)}">${수(l.금액)}${작('명세 '+수(l.금액)+' / 계산 '+수(계산(l))+' · 차 '+부호(금차))}</td>` : `<td class="num" style="${초}" title="계산 ${수(계산(l))}">${수(l.금액)}</td>`;
+        h += '<tr>' + (i===0 ? (날정 ? `<td rowspan="${줄.length}" style="${주}" title="인쇄 ${글(날정.인쇄)} → 정정 ${글(날정.정정)}">${글(sv.날짜)}${작('인쇄 '+글(날정.인쇄.slice(5))+' → 정정 '+글(날정.정정.slice(5))+' · 차 '+부호(날차)+'일')}</td>` : `<td rowspan="${줄.length}">${글(sv.날짜)}</td>`) + `<td rowspan="${줄.length}">${글(sv.번호)}</td>` : '') +
+          `<td>${글(l.품목)}</td>${수칸}<td class="num">${수(l.단가)}</td>${금칸}` +
+          (i===0 ? `<td class="num" rowspan="${줄.length}" style="${합차?빨:초}" title="명세 ${수(sv.합계)} / 계산 ${수(줄계)}${합차?' · 차 '+부호(합차):''}">${수(sv.합계)}${합차?작('명세 '+수(sv.합계)+' / 계산 '+수(줄계)+' · 차 '+부호(합차)):''}</td>` +
+             `<td rowspan="${줄.length}" class="num" style="${차들.length?(합차||줄.some(l=>Number(l.금액)!==계산(l))?빨:주):''}">${차들.map(글).join('<br>')}</td>` +
+             `<td rowspan="${줄.length}"><button class="chip 사진단추" data-p="${글(sv.사진||'')}">실명세서</button></td>` : '') + '</tr>';
       });
     }
     h += '</tbody></table></div>';
