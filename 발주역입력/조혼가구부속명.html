@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <!-- 조혼가구부속명 — 드라이브 「하준이형」 엑셀(조혼가구 발주서 시트들) 목록. 사장님 11-24 「발주역입력 메뉴에 조혼가구부속명 메뉴를 만들고 폴더에 하준이형 파일을 목록으로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.14.3
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.15.0
+     v1.15.0(11-28): 분배 방 사장님 「드롭 선택 시 거래처명 필터 기능 모든 드롭 선택 칸에 적용시켜」 — 조혼생산제품정보 합판코드·필름코드 드롭 = 거래처 체크·거래처명(표입력.js v11 · 거래처 = ../shared/구매처.js 입력폼 구매단가 완료).
      v1.14.3(11-28): 질문.js v6 받기(사장님 「질문 트리에 해당 영역에 대한 지시 요청을 제가 적을 수 있게 해 주세요」 — 페이지 위 「지시」 칸 · 머리 「· 지시 N」).
      v1.14.2(11-28): 칸넓이.js v4 받기(사장님 「모바일에서는 셀 넓이 조절이 안 되네요?」 → 「고치세요」 — 손가락 넓이 조절).
      v1.14.1(11-28): 상태 칩 = 체크한 제품만(체크 푼 제품의 옛 보내기 조각은 안 봄).
@@ -222,7 +223,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.14.3</div>
+  <div class="badge">v1.15.0</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html" class="on">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>조혼가구부속명</h1>
@@ -239,7 +240,8 @@ html,body{height:100%;overflow:hidden}
 <script src="단품찾기.js?v=2"></script>   <!-- v1.10.0 표 위 검색창(로앤·이룸 누계와 같음) -->
 <script src="터치범위.js?v=1"></script>   <!-- v1.6.0 조혼생산제품정보 표 = 영림원품목등록과 같은 입력(폰 범위) -->
 <script src="../shared/원장재단수량.js?v=11-27b"></script>   <!-- v1.9.8 재단률 = 영림원품목등록·에이엠티 재단편집과 같은 셈 -->
-<script src="표입력.js?v=9.6"></script>   <!-- v1.6.0 공용 표 입력 -->
+<script src="../shared/구매처.js?v=1"></script>   <!-- v1.15.0 합판·필름 드롭 거래처 -->
+<script src="표입력.js?v=11"></script>   <!-- v1.6.0 공용 표 입력 -->
 <script>표입력.쪽('조혼가구부속명');</script>   <!-- v1.1.0 품목명 분할·부속명 드롭 공용(이룸산업과 같은 코드) -->
 
 <script>
@@ -455,7 +457,7 @@ function 두께맞음(m, 두께, t){ if(!String(두께||'').trim()) return false
   if(t==='필름' && /(^|[^\d.])(0\.45|045)(?!\d)/.test(String(m.sm||''))) b.push(...두께값들('0.45', t)); return a.some(v => b.includes(v)); }
 function 자재고름(t, 두){ const 원 = (생산.자재 || []).filter(m => m.t === t).map(m => Object.assign({}, m, { 맞음:두께맞음(m, 두, t) }));
   const 목 = t === '합판' && String(두||'').trim() ? 원.filter(m => m.맞음) : 원;
-  return 목.sort((a, b) => (b.맞음 - a.맞음) || (a.name||a.code).localeCompare(b.name||b.code) || a.code.localeCompare(b.code)).map(m => ({ v:m.code, 글:m.name, 맞음:m.맞음 })); }
+  return 목.sort((a, b) => (b.맞음 - a.맞음) || (a.name||a.code).localeCompare(b.name||b.code) || a.code.localeCompare(b.code)).map(m => { const u = window.구매처 ? 구매처.업(m.code) : null; return u ? { v:m.code, 글:m.name, 맞음:m.맞음, 업:u, 덧:u.join(' · ') } : { v:m.code, 글:m.name, 맞음:m.맞음 }; }); }   /* v1.15.0 거래처 체크 = 입력폼 구매단가 완료 구매거래처(../shared/구매처.js, 로그인 기기) */
 function 필름셈(규, W, D){ const n = String(규||'').match(/\d+(?:\.\d+)?/g); if(!n || n.length < 2) return null;
   const v = ((+n[0] + 40) * (+W || 0) + (+n[1] + 40) * (+D || 0)) / 1000; return { v:String(Math.round(v * 1000) / 1000), 근거:`((${n[0]}+40)×${W||0} + (${n[1]}+40)×${D||0}) ÷ 1000` }; }
 function 기본품번(고, 부명){ const 학 = (((생산.입력 || {}).부속코드) || {})[부명]; if(고 && 학) return { v:고.코드 + '_' + 학, 왜:'단품코드_부속코드 — 손으로 넣은 「' + 부명 + '」 품번 규칙 _' + 학 };   /* v1.9.2 */

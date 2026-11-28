@@ -1,4 +1,5 @@
-/* 드롭끝.js v2 (11-27) — v2: 칸 넓이를 끌어 바꾸는 동안에도 ▾ 가 글 끝을 따라감(ResizeObserver) · 사장님 「아니 각 셀은 넓히기 기능이 있잖아. 이게 넓어져서 입력값이 모두 나오는 자리에 버튼이 옮겨가게 하면 되잖아」
+/* 드롭끝.js v3 (11-28) — v3: input[list] 에 _업고르기(표입력.창 — 거래처 체크 드롭)가 달려 있으면 ▾ = 그 창(입력폼 시트로 보기 · 사장님 「드롭 선택 시 거래처명 필터 기능 모든 드롭 선택 칸에 적용시켜」).
+   v2 (11-27) — v2: 칸 넓이를 끌어 바꾸는 동안에도 ▾ 가 글 끝을 따라감(ResizeObserver) · 사장님 「아니 각 셀은 넓히기 기능이 있잖아. 이게 넓어져서 입력값이 모두 나오는 자리에 버튼이 옮겨가게 하면 되잖아」
    v1 (11-27) — 드롭 단추(▾)를 칸 안 글자 끝 바로 뒤에, 글을 가리지 않게.
    사장님(분배 방 전달): 「야 모든 드롭선택 버튼 입력된 텍스트 좀 안 가리게 해야. 전부 적용 좀 해. 텍스트 끝에 셀 안에 두라니까」
    대상(이 파일을 부른 쪽 전부):
@@ -51,7 +52,7 @@
   ['pointerup', 'keyup'].forEach(t => document.addEventListener(t, 예약, true));
   addEventListener('resize', 예약);
   document.addEventListener('click', e => { const el = e.target;   /* datalist ▾ = 목록 엶 */
-    if(el && el.tagName === 'INPUT' && el.classList.contains('끝세모') && 누름(el, e) && el.showPicker){ try{ el.showPicker(); }catch(_){} } }, true);
+    if(el && el.tagName === 'INPUT' && el.classList.contains('끝세모') && 누름(el, e)){ if(typeof el._업고르기 === 'function'){ e.preventDefault(); el._업고르기(); return; } if(el.showPicker){ try{ el.showPicker(); }catch(_){} } } }, true);   /* v3 업고르기(표입력.창 — 거래처 체크)가 달린 칸은 그 창 */
   const 보기 = () => { 모두(); new MutationObserver(예약).observe(document.body, { childList:true, subtree:true }); };
   if(document.body) 보기(); else document.addEventListener('DOMContentLoaded', 보기);
   window.드롭끝 = { 재기, 모두:예약, 누름 };
