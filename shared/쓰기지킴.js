@@ -50,7 +50,7 @@
   }
   function 글자(v){ try{ return JSON.stringify(v, (k, x) => (x && typeof x === 'object' && !Array.isArray(x) && Object.getPrototypeOf(x) === Object.prototype) ? Object.keys(x).sort().reduce((o, kk) => (o[kk] = x[kk], o), {}) : x); }catch(e){ return null; } }
   function 길(ref){ try{ return (ref && (ref.path || (ref._key && String(ref._key)))) || '?'; }catch(e){ return '?'; } }
-  function 거절(왜){ const e = new Error('쓰기지킴: ' + (왜 === '옛판' ? '옛 판 창 — 새로고침해 주세요' : '쓰기가 너무 잦아 멈춤 — 새로고침해 주세요')); e.code = '쓰기지킴/' + 왜; return Promise.reject(e); }
+  function 거절(왜){ const e = new Error('쓰기지킴: ' + (왜 === '옛판' ? '옛 판 창 — 새로고침해 주세요' : 왜 === '로그인' ? '입력폼 로그인 필요' : '쓰기가 너무 잦아 멈춤 — 새로고침해 주세요')); e.code = '쓰기지킴/' + 왜; return Promise.reject(e); }
   function 셈(p){
     const t = Date.now(), 목 = (상태.기록.get(p) || []).filter(x => t - x < 한도.창초 * 1000); 목.push(t); 상태.기록.set(p, 목);
     return 목.length > 한도.창횟수;
@@ -58,13 +58,15 @@
   function 감쌈(fn, 이름){
     if(typeof fn !== 'function' || fn.__지킴) return fn;
     let g;
-    if(이름 === 'runTransaction') g = function(...a){ return 상태.멈춤 ? 거절(상태.멈춤) : fn.apply(this, a); };
+    const 로막 = () => 상태.로그인필요 && !window.폼로그인;   /* 11-28 로그인 필요 쪽 = 입력폼 로그인 없으면 쓰기 안 함(사장님 「로그인이 될 때까지 안 나오게 하면 되잖아」 — 빈 목록으로 셈한 값이 창고를 덮지 않게) */
+    if(이름 === 'runTransaction') g = function(...a){ return 상태.멈춤 ? 거절(상태.멈춤) : 로막() ? 거절('로그인') : fn.apply(this, a); };
     else if(이름 === 'writeBatch') g = function(...a){
       const b = fn.apply(this, a);
-      if(b && typeof b.commit === 'function' && !b.commit.__지킴){ const c = b.commit; b.commit = function(...x){ return 상태.멈춤 ? 거절(상태.멈춤) : c.apply(this, x); }; b.commit.__지킴 = true; }
+      if(b && typeof b.commit === 'function' && !b.commit.__지킴){ const c = b.commit; b.commit = function(...x){ return 상태.멈춤 ? 거절(상태.멈춤) : 로막() ? 거절('로그인') : c.apply(this, x); }; b.commit.__지킴 = true; }
       return b; };
     else g = function(ref, ...a){
       if(상태.멈춤) return 거절(상태.멈춤);
+      if(로막()) return 거절('로그인');
       const p = 길(ref) + (이름 === 'addDoc' ? '/+' : '');
       if(이름 === 'setDoc' || 이름 === 'updateDoc'){
         const k = 글자(a), 옛 = 상태.마지막.get(p);

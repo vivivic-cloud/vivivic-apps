@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <!-- 조혼가구부속명 — 드라이브 「하준이형」 엑셀(조혼가구 발주서 시트들) 목록. 사장님 11-24 「발주역입력 메뉴에 조혼가구부속명 메뉴를 만들고 폴더에 하준이형 파일을 목록으로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.15.1
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.15.2
+     v1.15.2(11-28): 사장님(11-28) 「로그인이 될 때까지 안 나오게 하면 되잖아」 → 「바꿔」 — 공정흐름·합판/필름·기본구매처 드롭 = 입력폼 erp_ 완료(로그인 기기) · 공개 사본 안 읽음(로그인 전 = 빈 드롭·칩 없음) · 쓰기 안 함(쓰기지킴 로그인필요).
      v1.15.1(11-28): 사장님 「입력폼 등록대기 저장 안 한 건은 일반 상황이나 마찬가지잖아」 — 입력폼 문서 없는 제품 = 칩 없음(넘길·못 넘김 걷음).
      v1.15.0(11-28): 분배 방 사장님 「드롭 선택 시 거래처명 필터 기능 모든 드롭 선택 칸에 적용시켜」 — 조혼생산제품정보 합판코드·필름코드 드롭 = 거래처 체크·거래처명(표입력.js v11 · 거래처 = ../shared/구매처.js 입력폼 구매단가 완료).
      v1.14.3(11-28): 질문.js v6 받기(사장님 「질문 트리에 해당 영역에 대한 지시 요청을 제가 적을 수 있게 해 주세요」 — 페이지 위 「지시」 칸 · 머리 「· 지시 N」).
@@ -68,7 +69,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>조혼가구부속명 — 발주역입력</title>
-<script src="../shared/쓰기지킴.js?v=11-23b"></script>   <!-- 쓰기 안전장치 — 모듈보다 먼저 -->
+<script src="../shared/쓰기지킴.js?v=11-28"></script><script>쓰기지킴.상태.로그인필요 = true;</script>   <!-- v1.15.2 입력폼 로그인 없으면 쓰기 안 함 -->   <!-- 쓰기 안전장치 — 모듈보다 먼저 -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-app.js";
     import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.2.0/firebase-auth.js";
@@ -90,6 +91,11 @@
         const 받음 = (줄, 왜) => { window.폼품목대기 = [줄, 왜]; if (window.폼품목받음) window.폼품목받음(줄, 왜); };
         const 받음2 = (줄, 왜) => { window.폼분류대기 = [줄, 왜]; if (window.폼분류받음) window.폼분류받음(줄, 왜); };   /* v1.9.9 입력폼 품목대중소분류정의(erp_classes) 완료 */
         onAuthStateChanged(폼auth, (u) => {
+            window.폼로그인 = !!(u && !u.isAnonymous);   /* v1.15.2 로그인 여부(쓰기지킴 로그인필요) */
+            (window.__조끄기 || []).forEach(f => { try{ f(); }catch(e){} }); window.__조끄기 = [];
+            { const 넘 = (k, 줄) => { (window.폼조혼대기 = window.폼조혼대기 || {})[k] = 줄; if (window.폼조혼받음) window.폼조혼받음(k, 줄); };   /* v1.15.2 공정흐름·자재·거래처 = 입력폼 완료(공개 사본 대신) */
+              if (!u || u.isAnonymous) ['흐름', '자재', '거래처'].forEach(k => 넘(k, null));
+              else [['흐름', 'erp_flows'], ['자재', 'erp_materials'], ['거래처', 'erp_vendors']].forEach(([k, c]) => window.__조끄기.push(onSnapshot(query(collection(폼db, c), where('status', '==', '완료')), s => 넘(k, s.docs.map(d => d.data())), () => 넘(k, null)))); }
             if (끄기) { 끄기(); 끄기 = null; }
             if (끄기2) { 끄기2(); 끄기2 = null; }
             if (!u) { 받음(null, '입력폼 로그인 없음'); 받음2(null, '입력폼 로그인 없음'); return; }
@@ -224,7 +230,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.15.1</div>
+  <div class="badge">v1.15.2</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html" class="on">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>조혼가구부속명</h1>
@@ -360,16 +366,19 @@ function 생산시작(){
   onSnapshot(doc(window.db, ...생산자리, '_시트목록'), m => { 생산.시트 = (m.exists() && m.data().시트들) || [];
     for(const u of 생산.시트) if(!(u in 생산.문서)){ 생산.문서[u] = null; onSnapshot(doc(window.db, ...생산자리, 문서이름(u)), s => { 생산.문서[u] = s.exists() ? s.data() : { 묶음:[] }; 생산다시(); }, () => {}); }
     생산다시(); }, () => {});
-  onSnapshot(doc(window.db, 'artifacts','vivivic-4b7ef','public','data','발주역입력_영림원폼','_공정흐름'), d => { 생산.공정목록 = d.exists() && Array.isArray(d.data().줄) ? d.data().줄.map(x => String(x).trim()).filter(Boolean) : []; }, () => {});   /* v1.6.0 공정흐름 드롭 = 입력폼 공정흐름 완료 공개 사본 */
   onSnapshot(doc(window.db, ...영품자리, '_재단도'), d => { 생산.재단편집 = (d.exists() && d.data().값) || {}; if(고른 === 생산메뉴) 생산그리기(); }, () => {});   /* v1.9.8 에이엠티 재단편집 재단확정 */
   { const { collection } = window.fbRead; onSnapshot(collection(window.db, 'artifacts','vivivic-4b7ef','public','data','발주역입력_영림원품목등록_보내기','품목','제품'), q => { 생산.품보 = q.docs.map(d => { const x = d.data() || {}; return [x.결과 || {}, (x.줄 || []).map(r => r && r.열쇠).filter(k => k != null)]; }); 생산칩셈(); }, () => {}); }   /* v1.14.0 상태 칩 */
   onSnapshot(doc(window.db, ...영품자리, '_동일속성'), d => { 생산.동일 = (d.exists() && d.data().묶음) || {}; if(고른 === 생산메뉴) 생산그리기(); }, () => {});   /* v1.7.0 */
   const 트 = v => String(v ?? '').trim(), 자종 = b => { b = 트(b).toLowerCase(); return b === 'ed' ? '필름' : (b === 'md' || b === 'pb') ? '합판' : ''; };   /* v1.8.0 합판·필름 드롭 = 입력폼 자재 완료 공개 사본(영림원품목등록과 같은 사본) */
-  onSnapshot(doc(window.db, 'artifacts','vivivic-4b7ef','public','data','발주역입력_영림원폼','_자재'), d => { const 본 = new Set(); 생산.자재 = ((d.exists() && d.data().줄) || []).map(x => ({ code:트(x.자재번호), name:트(x.자재명), spec:트(x.규격), sm:트(x.소분류), t:자종(x.대분류) })).filter(m => m.t && m.code && !본.has(m.code) && 본.add(m.code)); }, () => {});
-  onSnapshot(doc(window.db, 'artifacts','vivivic-4b7ef','public','data','발주역입력_영림원폼','_영림원거래처'), d => { const 본 = new Set(); 생산.외주 = [];   /* v1.8.0 기본구매처 드롭 = 외주가공거래처(T 시험 뺌 · 폐업 뺌) — 영림원품목등록 v2.5.0 과 같음 */
-    for(const r of ((d.exists() && d.data().줄) || [])){ const 이 = 트(r.거래처), 종 = Array.isArray(r.거래처종류) ? r.거래처종류 : String(r.거래처종류 || '').split(/[,·]/).map(트);
-      if(!이 || 트(r.거래처상태) === '폐업' || !종.includes('외주가공거래처') || /^T/.test(이) || 본.has(이)) continue; 본.add(이); 생산.외주.push({ v:이, 글:트(r.상호) && 트(r.상호) !== 이 ? 트(r.상호) : '' }); }
-    생산.외주.sort((a, b) => a.v.localeCompare(b.v)); }, () => {});
+  /* v1.15.2 사장님(11-28) 「로그인이 될 때까지 안 나오게 하면 되잖아」 → 「바꿔」 — 공개 사본(_공정흐름·_자재·_영림원거래처) 안 읽음: 로그인 전 = 빈 드롭 · 로그인 뒤 = 입력폼 erp_flows·erp_materials·erp_vendors 완료 */
+  window.폼조혼받음 = (k, 줄) => { const 산 = (줄 || []).filter(r => !r.ylwGone);
+    if(k === '흐름') 생산.공정목록 = 산.slice().sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')) || 트(a.name).localeCompare(트(b.name))).map(r => 트(r.name)).filter((n, i, a) => n && a.indexOf(n) === i);
+    else if(k === '자재'){ const 본 = new Set(); 생산.자재 = 산.map(r => { const 길 = String(r.small || '').split('>').map(트); return { code:트(r.code), name:트(r.name), spec:트(r.spec), sm:길[길.length - 1], t:자종(길[0]) }; }).filter(m => m.t && m.code && !본.has(m.code) && 본.add(m.code)); }
+    else if(k === '거래처'){ const 본 = new Set(); 생산.외주 = [];
+      for(const r of 산){ const 이 = 트(r.name), 종 = Array.isArray(r.kinds) ? r.kinds : []; if(!이 || !종.includes('외주가공거래처') || /^T/.test(이) || 본.has(이)) continue; 본.add(이); 생산.외주.push({ v:이, 글:트(r.sangho) && 트(r.sangho) !== 이 ? 트(r.sangho) : '' }); }
+      생산.외주.sort((a, b) => a.v.localeCompare(b.v)); }
+    if(고른 === 생산메뉴) 생산다시(); };
+  for(const [k, 줄] of Object.entries(window.폼조혼대기 || {})) window.폼조혼받음(k, 줄);
   onSnapshot(doc(window.db, ...생산자리, '_입력'), d => { 생산.입력 = d.exists() ? d.data() : {}; 생산다시(); }, () => {});
   onSnapshot(doc(window.db, ...생산자리, '_보내기'), d => { 생산.판 = JSON.stringify((d.exists() && d.data().줄) || []); 생산보내기(); }, () => {});
   /* v1.4.5 사장님 「부속명 영림원품목등록에 현재 표기된 목록의 부속명이 드롭선택 되게 해달라고」 — 부속명 목록 = 영림원품목등록 품목등록업로드에 지금 보이는 반제품(_고른제품 제품의 반제품)의 품명 마지막 _ 뒤 · 실시간 */
@@ -412,6 +421,7 @@ function 생산줄들(u, b){   /* 묶음 → 반제품 줄(빈 행 뺌 · L/R �
    로그인 기기 = 입력폼 문서에서 바로 셈(../shared/폼결과.js) · 없으면 공개 보내기 결과 사본 · 보냈는데 결과 없음 = 넘길 · 체크했는데 보내기에 없음 = 못 넘김 · 까닭 = 마우스 */
 let 생산칩 = new Map(), 생산칩글 = '';
 function 생산칩셈(){ const m = new Map(), 원 = window.폼결과 ? 폼결과.결과('품목') : null;
+  if(!window.폼로그인){ 생산칩글 = ''; 생산칩 = m; if(고른 === 생산메뉴) 생산그리기(); return; }   /* v1.15.2 로그인 전 = 칩 없음(공개 결과 사본 안 씀) */
   for(const [결, 키들] of (생산.품보 || [])) for(const k of 키들){ const x = 원 ? 원[k] : 결[k]; m.set(k, x && typeof x.상태 === 'string' ? [x.상태, '입력폼 품목 ' + x.상태 + (x.이유 ? ' — ' + x.이유 : '')] : ['넘길', '넘길 — 입력폼 받기 상자에서 등록대기 전']); }
   const 글 = JSON.stringify([...m]); if(글 === 생산칩글) return; 생산칩글 = 글; 생산칩 = m; if(고른 === 생산메뉴) 생산그리기(); }
 function 생산칩칸(코드, 켬){ if(!켬) return ''; const c0 = 코드 && 생산칩.get(코드), c = c0 && c0[0] !== '넘길' ? c0 : null; if(!c) return '';   /* v1.15.1 입력폼 문서 없는 제품 = 보통 줄(칩 없음) */
@@ -706,7 +716,7 @@ document.addEventListener('focusout', e => { const i = 찾칸(e); if(!i) return;
   const 부 = (생산.입력 || {}).부속 || {}, 지금 = 부[i.dataset.r] || 부[i.dataset.k] || ''; if(i.value.trim() !== 지금) 부속고름(i.dataset.k, i.dataset.r, i.value.trim());
   else if(지금 && i.parentNode.querySelector('.부찾단추')) i.classList.add('숨'); });   /* v1.11.0 다시 숨김 */
 </script>
-<script src="../shared/폼결과.js?v=1"></script><script>폼결과.듣기(() => { try{ 생산칩셈(); }catch(e){} });</script>   <!-- v1.14.0 입력폼 지금 상태 -->
+<script src="../shared/폼결과.js?v=3"></script><script>폼결과.듣기(() => { try{ 생산칩셈(); }catch(e){} });</script>   <!-- v1.14.0 입력폼 지금 상태 -->
 <script src="칸넓이.js?v=4"></script>   <!-- v1.9.1 모든 표 칸 넓이 조절 -->
 <script>칸넓이.달기(document.body, { 열쇠:'발주역입력_조혼가구부속명_칸넓이' });</script>
 <script src="../shared/자리주소.js?v=2"></script><script>자리주소.달기(['#고름 .chip']);</script><script src="../shared/질문.js?v=6"></script><script>질문.스스로('발주역입력/조혼가구부속명','발주역입력 › 조혼가구부속명');</script>   <!-- 질문(입력폼 v369, 11-28) -->

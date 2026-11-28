@@ -4,7 +4,8 @@
        = bd.출처 「영림원품목등록」 · bd.열쇠 같음 · 오류 아닌 것 먼저 → 늦게 만든 것 먼저(bdOld) 첫 문서 → {상태, 이유, 때}(bdResOf)
      재공품 = materials·classes 중 bd.출처·bd.거래처 「영림원품목등록」 · bd.단계 → {열쇠:{단계:{…}}}(mixResSync)
    로그인(입력폼 'erp-input' 앱) 없음·익명·읽기 못 함 = null → 쓰는 쪽은 공개 사본 결과를 그대로 씀.
-   쓰는 법: <script src="../shared/폼결과.js?v=1"></script> · 폼결과.결과('품목') → {열쇠:{상태,이유,때}} | null · 폼결과.듣기(함수) · 폼결과.문서('BOM', 열쇠) → 그 결과의 입력폼 문서 | null */
+   v3(11-28): window.폼로그인(입력폼 로그인 여부) · 폼결과.로그인() — 사장님 「로그인이 될 때까지 안 나오게 하면 되잖아」(로그인 없으면 쪽은 공개 사본 대신 빈 값).
+   쓰는 법: <script src="../shared/폼결과.js?v=3"></script> · 폼결과.결과('품목') → {열쇠:{상태,이유,때}} | null · 폼결과.듣기(함수) · 폼결과.문서('BOM', 열쇠) → 그 결과의 입력폼 문서 | null */
 (function(){
   if(window.폼결과) return;
   var V = 'https://www.gstatic.com/firebasejs/11.2.0/', SRC = '영림원품목등록';
@@ -38,6 +39,7 @@
       var app = m[0].getApps().filter(function(a){ return a.name === 'erp-input'; })[0] || m[0].initializeApp(설정, 'erp-input');
       var auth = m[1].getAuth(app), F = m[2], fs = F.getFirestore(app);
       m[1].onAuthStateChanged(auth, function(u){
+        window.폼로그인 = !!(u && !u.isAnonymous);   /* v3 11-28 로그인 여부(쓰기지킴 로그인필요 · 쪽이 공개 사본 대신 빈 값) */
         끔(); 됨 = false;
         if(!u || u.isAnonymous){ 알림(); return; }
         Object.keys(표).map(function(n){ return 표[n]; }).concat(재표).forEach(function(c){
@@ -48,6 +50,6 @@
     }).catch(function(e){ console.warn('폼결과 불러오기', e); });
   }
   if(document.readyState === 'complete') setTimeout(시작, 0); else window.addEventListener('load', function(){ setTimeout(시작, 0); });
-  window.폼결과 = { 결과:function(n){ return 셈값 ? 셈값[n] || null : null; }, 듣기:function(f){ 듣는이.push(f); }, 다:function(){ return 셈값; },
+  window.폼결과 = { 로그인:function(){ return !!window.폼로그인; }, 결과:function(n){ return 셈값 ? 셈값[n] || null : null; }, 듣기:function(f){ 듣는이.push(f); }, 다:function(){ return 셈값; },
     문서:function(n, k){ return 문서값 && 문서값[n] ? 문서값[n][k] || null : null; } };   /* v2(11-28) 그 열쇠의 입력폼 문서(결과와 같은 문서) — 영림원품목등록 BOM 잠긴 줄 = 입력폼 완료 문서와 같아지면 새 줄 */
 })();
