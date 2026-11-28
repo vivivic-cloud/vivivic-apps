@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.59.46
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.59.47
+     v1.59.47(11-28): 사장님 「월 합계 계산도 없고 원래 있던 월명세랑 비교 보고도 없고」 — 명세서 표 바로 아래 「월 합계·월별명세 비교」 표(명세서 합계 / 월별명세 [N월 소계] / 차이 = 장수·수량·공급가액·세액·합계 칸별 숫자, 차이 0 초록·아니면 빨강) + 차이 난 서류(날짜·번호·칸 ±값). 화면 오른쪽 아래 구석에 판 번호 작게(캐시 확인용).
      v1.59.46(11-28): 사장님 「1월 명세서 표 끝에 여백이 없어 자료가 끝난 건지 알 수 없다」 — 명세서 표 맨 끝 「[N월 합계] N장」 줄(수량·금액·합계 합 + 월별명세 「[N월 소계]」 합계금액과 차이) + 표 아래 여백.
      v1.59.45(11-28): 사장님 「명세서 표 빨강·주황이 무엇이 어디가 안 맞는지 알 수 없다」 — 안 맞는 칸(수량·금액·합계·날짜)에만 색 + 칸 안에 「명세값 / 계산값 · 차이」 숫자(계산 = 수량×단가×1.1, 합계 = 줄 계산 합) + 줄 끝 「차이」 칸(칸 이름 ±값). 정정(수량 70→68·날짜 22→21)은 창고 서류 `정정:[{칸,줄,인쇄,정정}]` 로 주황 칸에 「인쇄 → 정정」. 「!」·문장 뺌.
      v1.59.44(11-28): 사장님 「사진은 팝업으로 새페이지에 뜨게 하고 사진이 아니라 실명세서라고 버튼 하세요」 — 명세서 표 「사진」 → 「실명세서」(머리 칸·단추) · 누르면 겹침 대신 새 창(팝업)에 명세서 그림.
@@ -306,7 +307,8 @@
     }catch(e){ window.폼분류대기 = [null, String(e && e.message || e)]; }
     window.db = getFirestore(app);
     window.fbRead = { doc, getDoc, setDoc, collection, getDocs, onSnapshot };
-    window.fbStorage = { st: getStorage(app), ref: storageRef, getDownloadURL };   /* 명세서 사진(읽기만) */
+    window.fbStorage = { st: getStorage(app), ref: storageRef, getDownloadURL };
+    try{ const 표 = () => { const b = document.querySelector('.badge'), e = document.getElementById('판표시'); if(b && e) e.textContent = b.textContent.trim(); }; if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', 표); else 표(); }catch(_){}   /* 명세서 사진(읽기만) */
     onAuthStateChanged(auth, (u) => {
         if (!u) { signInAnonymously(auth).catch(e => window.목록못읽음('창고에 들어가지 못했습니다', (e&&(e.code||e.message))||'')); return; }
         window.목록읽기();
@@ -503,7 +505,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.59.46</div>
+  <div class="badge">v1.59.47</div><div id="판표시" style="position:fixed;right:6px;bottom:3px;z-index:60;font-size:10px;line-height:1;color:#777;pointer-events:none"></div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -3212,6 +3214,7 @@ async function 명세서붙이기(s, 달들){
              `<td rowspan="${줄.length}"><button class="chip 사진단추" data-p="${글(sv.사진||'')}">실명세서</button></td>` : '') + '</tr>';
       });
     }
+    let 비교H = '';
     { /* 맨 끝 합계 줄 — 서류 장수 · 수량 합 · 금액 합 · 합계 합 + 월별명세 [N월 소계] 합계금액과 차이 */
       const 쪽수 = n => Number(n||0).toLocaleString('ko-KR'), 쪽부호 = n => (n>0?'+':n<0?'−':'') + 쪽수(Math.abs(n));
       const 월표 = ((받은[s]||{}).표||[]).find(t => t.이름==='월별'), 칸이름 = (월표&&월표.칸)||[];
@@ -3226,7 +3229,38 @@ async function 명세서붙이기(s, 달들){
         `<td class="num" style="border-top:2px solid #444;${합색}" title="${차===null?'':'월별명세 소계 '+쪽수(소값)+' · 차 '+쪽부호(차)}">${쪽수(합합)}${차 ? `<div style="font-size:10px;line-height:1.2;font-weight:600">소계 ${쪽수(소값)} · 차 ${쪽부호(차)}</div>` : ''}</td>` +
         `<td class="num" style="border-top:2px solid #444;${차 ? '' : ''}">${차 ? '합계 '+쪽부호(차) : ''}</td><td style="border-top:2px solid #444"></td></tr>`;
     }
-    h += '</tbody></table><div style="height:56px"></div></div>';
+    { /* 월 합계 · 월별명세 비교 표 — 칸별 숫자 + 차이 난 서류 */
+      const 쪽 = n => Number(n||0).toLocaleString('ko-KR'), 부 = n => (n>0?'+':n<0?'−':'') + 쪽(Math.abs(n));
+      const 월표2 = ((받은[s]||{}).표||[]).find(t => t.이름==='월별'), 이름들 = (월표2&&월표2.칸)||[];
+      const 칸번 = re => 이름들.findIndex(k => re.test(String(k)));
+      const 번 = { 수:칸번(/수량/), 공:칸번(/공급가액/), 세:칸번(/부가세/), 합:칸번(/합계금액/) };
+      const 소줄2 = 월표2 && (월표2.줄||[]).find(z => z.소 && (z.v||[]).some(c => String(c).trim()===`[${달} 소계]`));
+      const 숫 = i => (소줄2 && i>=0) ? Number(String((소줄2.v||[])[i]).replace(/[^0-9.-]/g,'')) : NaN;
+      const 명 = { 장:x.서류.length, 수:0, 공:0, 세:0, 합:0 };
+      const 틀린서류 = [];
+      x.서류.forEach(sv => {
+        const 줄들 = sv.줄||[], 정2 = sv.정정||[];
+        let 공 = 0, 세 = 0, 수 = 0;
+        줄들.forEach(l => { const 공급 = Math.round((l.수량||0)*(l.단가||0)); 수 += Number(l.수량)||0; 공 += 공급; 세 += (Number(l.금액)||0) - 공급; });
+        명.수 += 수; 명.공 += 공; 명.세 += 세; 명.합 += Number(sv.합계)||0;
+        const 칸차 = [], 계산합 = 줄들.reduce((a,l)=>a+Math.round((l.수량||0)*(l.단가||0)*1.1),0);
+        정2.forEach(c => { if(c.칸==='날짜') 칸차.push('날짜 ' + 부(Math.round((Date.parse(c.정정)-Date.parse(c.인쇄))/86400000)) + '일'); if(c.칸==='수량') 칸차.push('수량 ' + 부(Number(c.정정)-Number(c.인쇄))); });
+        줄들.forEach(l => { const d = (Number(l.금액)||0) - Math.round((l.수량||0)*(l.단가||0)*1.1); if(d) 칸차.push('금액 ' + 부(d)); });
+        if(Number(sv.합계) !== 계산합) 칸차.push('합계 ' + 부(Number(sv.합계) - 계산합));
+        if(칸차.length) 틀린서류.push(`${글(sv.날짜.slice(5))} ${글(sv.번호)} · ${칸차.map(글).join(' · ')}`);
+      });
+      const 소 = { 수:숫(번.수), 공:숫(번.공), 세:숫(번.세), 합:숫(번.합) };
+      const 있음 = !isNaN(소.합);
+      const 셀 = (v, 색) => `<td class="num" style="${색||''}">${isNaN(v)?'':쪽(v)}</td>`;
+      const 차셀 = k => { if(!있음 || isNaN(소[k])) return '<td></td>'; const d = 명[k] - 소[k]; return `<td class="num" style="${d? 'background:#FFD9D6;font-weight:800':'background:#D9F2DE'}">${d? 부(d) : '0'}</td>`; };
+      비교H = `<div class="표" style="margin-top:6px"><table class="dpr-t"><thead><tr><th>${글(달)} 비교</th><th>장수</th><th>수량</th><th>공급가액</th><th>세액</th><th>합계</th></tr></thead><tbody>` +
+        `<tr><td>명세서 합계</td><td class="num">${쪽(명.장)}</td>${셀(명.수)}${셀(명.공)}${셀(명.세)}${셀(명.합)}</tr>` +
+        `<tr><td>월별명세 [${글(달)} 소계]</td><td></td>${셀(소.수)}${셀(소.공)}${셀(소.세)}${셀(소.합)}</tr>` +
+        `<tr style="font-weight:800"><td>차이</td><td></td>${차셀('수')}${차셀('공')}${차셀('세')}${차셀('합')}</tr>` +
+        (틀린서류.length ? `<tr><td style="background:#FFD9D6">차이 난 서류 ${틀린서류.length}장</td><td colspan="5" style="white-space:normal">${틀린서류.join('<br>')}</td></tr>` : '') +
+        `</tbody></table></div>`;
+    }
+    h += '</tbody></table>' + 비교H + '<div style="height:56px"></div></div>';
     칸.insertAdjacentHTML('beforeend', h);
   }
   칸.querySelectorAll('.사진단추').forEach(b => b.onclick = async () => {
