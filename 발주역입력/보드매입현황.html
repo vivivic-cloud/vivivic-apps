@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.59.33
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.59.34
+     v1.59.34(11-28): 분배 방 사장님 「이게 품목명이 아니잖아. 구매+가공 품목명이 나와야 된다고」 — 구매+가공품목 표 맨 앞(붙박이) = 구매+가공 자재명 · 자재번호 · 규격·분류 → 가공(납품제품명·규격·단가) → 원장 / 거래처별 완료 건 = 자재명(붙박이) · 자재번호 · 납품제품명 · 나머지(보기만).
      v1.59.33(11-28): 분배 방 사장님 「구매가공품목 완료건 보여 줄 때 해당 품목명이 추가되어 나타나게 해 줘」 — 「거래처별 완료 건」 맨 앞 칸 「납품제품명(품목)」(보기만) = 명세 품목(구매+가공 = 보내기 가공 줄 · 조합 줄 = 원 줄 · 그 밖 = 영림원보내기 그 자재번호 줄). 구매+가공품목 표는 v1.59.29 부터 맨 앞 칸이 납품제품명.
      v1.59.32(11-28): 조합 줄에 원 코팅 번호·이름을 넣으면 빈칸으로 보던 v1.59.21 셈 걷음(새 고치기는 옛 값을 안 옮김) → 원 번호를 넣으면 겹침 빨강으로 보임.
      v1.59.31(11-28): 신규등록 줄 자재번호가 이미 있는 자재면 늘 겹침(빨강·저장 막음) — 전엔 그 번호 자재·구매단가가 완료라 완료 줄로 보고 겹침을 안 셈.
@@ -487,7 +488,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.59.33</div>
+  <div class="badge">v1.59.34</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -2841,8 +2842,8 @@ async function 완료건그리기(){
   { const 월표 = ((받은[s] || {}).표 || []).find(t => t.이름==='월별');
     if(월표 && 폼값[s]) for(const m of 품목모으기(월표).줄){ if(가공줄(s, m)) continue; const c = 트(칸값(폼칸.find(f => f.k==='m_code'), m, s)).toLowerCase(); if(c && !품목맵.has(c)) 품목맵.set(c, 품글(줄키(m))); }
     for(const z of (((가공품목보내기[s] || {}).줄) || [])){ const c = 트((z.자재등록 || {}).자재번호).toLowerCase(); if(c) 품목맵.set(c, 품글(z.조합원 || z.열쇠)); } }
-  const 머 = `<tr><th class="dpr-k" rowspan="2">납품제품명(품목)</th><th colspan="${완료건자재칸.length}">자재등록</th><th colspan="${완료건단가칸.length}">구매단가등록</th></tr><tr>` + 완료건자재칸.concat(완료건단가칸).map(([, t]) => `<th>${글(t)}</th>`).join('') + '</tr>';
-  const 몸 = 줄.map(({ p, m }) => '<tr>' + `<td class="dpr-k">${글(품목맵.get(트((m || p || {}).code).toLowerCase()) || '')}</td>` + 완료건자재칸.map(([k]) => `<td${!m ? ' title="입력폼 자재등록 완료 없음"' : ''}>${글(m ? 값(m, k) : (k==='name' ? 값(p, 'name') : k==='code' ? 값(p, 'code') : ''))}</td>`).join('')
+  const 머 = `<tr><th class="dpr-k" colspan="2">자재등록</th><th rowspan="2">납품제품명(품목)</th><th colspan="${완료건자재칸.length - 2}">자재등록</th><th colspan="${완료건단가칸.length}">구매단가등록</th></tr><tr>` + 완료건자재칸.concat(완료건단가칸).map(([, t], i) => `<th${i===0 ? ' class="dpr-k"' : ''}>${글(t)}</th>`).join('') + '</tr>';   /* v1.59.34 자재명(붙박이) · 자재번호 · 납품제품명 */
+  const 몸 = 줄.map(({ p, m }) => '<tr>' + 완료건자재칸.map(([k], i) => (i===2 ? `<td>${글(품목맵.get(트((m || p || {}).code).toLowerCase()) || '')}</td>` : '') + `<td${i===0 ? ' class="dpr-k"' : ''}${!m ? ' title="입력폼 자재등록 완료 없음"' : ''}>${글(m ? 값(m, k) : (k==='name' ? 값(p, 'name') : k==='code' ? 값(p, 'code') : ''))}</td>`).join('')
     + 완료건단가칸.map(([k]) => `<td${k==='price' ? ' class="num"' : ''}>${글(값(p, k))}</td>`).join('') + '</tr>').join('');
   속.innerHTML = `<div class="표통"><div class="표"><table class="dpr-t"><thead>${머}</thead><tbody>${몸}</tbody></table></div><div class="글">${줄.length}줄</div></div>`;
 }
@@ -3065,19 +3066,22 @@ function 가공품목그리기(){   /* v1.59.29 분배 방 사장님 「구매+�
   const 완 = m => { const 모 = 가공단계셈(s, m, 구매들); return (모.자재 || {}).상태==='완료' && (모.구매단가 || {}).상태==='완료'; };   /* 완료 = 입력폼 자재 · 현진 구매단가 둘 다 완료 */
   const 보일 = 모든.filter(m => 가공고친.has(아이디(m)) || 가공방금.has(아이디(m)) || 완(m));
   const 열 = l => ` data-열="${글('가공새_' + l)}"`;
-  const 칸들 = [ {k:'m_code', l:'자재번호'}, {k:'m_name', l:'자재명'}, {k:'m_spec', l:'규격'}, {k:'m_big', l:'대분류', 분:0}, {k:'m_mid', l:'중분류', 분:1}, {k:'m_small', l:'소분류', 분:2},
+  /* v1.59.34 사장님 「이게 품목명이 아니잖아. 구매+가공 품목명이 나와야 된다고」 — 맨 앞(붙박이) = 구매+가공 자재명 · 자재번호 · 그 뒤 가공(납품제품명) · 원장 */
+  const 칸들 = [ {k:'m_name', l:'자재명'}, {k:'m_code', l:'자재번호'}, {k:'m_spec', l:'규격'}, {k:'m_big', l:'대분류', 분:0}, {k:'m_mid', l:'중분류', 분:1}, {k:'m_small', l:'소분류', 분:2},
+    {가:'품', l:엑칸[품]}, {가:'규', l:엑칸[규]}, {가:'단가', l:'단가'},
     {k:'o_code', l:'자재번호', 원:1}, {k:'o_name', l:'자재명', 원:1, 읽:1}, {k:'o_vend', l:'업체', 원:1, 읽:1} ];
-  let h = `<table class="dpr-t 폼표 가공표"><thead><tr><th class="묶" colspan="3">가공</th><th class="묶" colspan="6">구매+가공 자재</th><th class="묶" colspan="3">원장</th><th class="묶" rowspan="2"${열('단추')}></th></tr><tr>` +
-    `<th class="dpr-k"${열(엑칸[품])}>${글(엑칸[품])}</th><th${열(엑칸[규])}>${글(엑칸[규])}</th><th${열('가공 단가')}>단가</th>` +
-    칸들.map((f, i) => `<th${i===0 || i===6 ? ' class="묶"' : ''}${열((f.원 ? '원장 ' : '') + f.l)}>${글(f.l)}</th>`).join('') + '</tr></thead><tbody>';
+  const 묶자리 = i => i===0 || i===6 || i===9;
+  let h = `<table class="dpr-t 폼표 가공표"><thead><tr><th class="묶" colspan="6">구매+가공 자재</th><th class="묶" colspan="3">가공</th><th class="묶" colspan="3">원장</th><th class="묶" rowspan="2"${열('단추')}></th></tr><tr>` +
+    칸들.map((f, i) => `<th class="${[i===0 ? 'dpr-k' : '', 묶자리(i) ? '묶' : ''].filter(Boolean).join(' ')}"${열((f.원 ? '원장 ' : f.가 ? '가공 ' : '') + f.l)}>${글(f.l)}</th>`).join('') + '</tr></thead><tbody>';
   const 겹침 = (m, 번) => { const v = 트(번).toLowerCase(); if(!v) return false; if(기존자재(v)) return true; return 모든.some(x => x !== m && 트(가공값(s, x, 구매들).자.자재번호).toLowerCase() === v); };   /* 신규 줄만 셈 — 이미 있는 자재번호·다른 줄 번호 = 겹침 */
   보일.forEach(m => {
     const id = 아이디(m), 고침 = 가공고친.has(id), 초 = 가공초안.get(id), 처음 = 초 ? JSON.parse(초.처음) : null, 값 = 가공값(s, m, 구매들), 새줄 = 고침 && !가공품목[s].has(줄키(m));
     const 열린 = k => 고침 && (k==='o_code' || (새줄 && (k==='m_code' || k==='m_name' || k==='m_spec' || (!m.조합키 && /^m_(big|mid|small)$/.test(k)))));
     let 막 = false;
-    h += `<tr data-key="${글(줄키(m))}"><td class="dpr-k 참">${글(라벨(m))}</td><td class="참">${글(m.규격)}</td><td class="참 num">${글(칸(m.원m || m, 'p_price'))}</td>`;
+    h += `<tr data-key="${글(줄키(m))}">`;
     h += 칸들.map((f, i) => {
-      const 묶 = i===0 || i===6 ? ' 묶' : '';
+      const 묶 = (i===0 ? ' dpr-k' : '') + (묶자리(i) ? ' 묶' : '');
+      if(f.가) return `<td class="참${묶}${f.가==='단가' ? ' num' : ''}">${글(f.가==='품' ? 라벨(m) : f.가==='규' ? m.규격 : 칸(m.원m || m, 'p_price'))}</td>`;
       let v, 색 = '', 제 = '';
       if(f.k==='o_code'){ v = 값.o.자재번호; if(!v){ 색 = '임칸'; 막 = 막 || 고침; } else if(값.o.신규){ 색 = '분류틀'; 제 = '입력폼 완료 원장 아님'; 막 = 막 || 고침; } }
       else if(f.k==='o_name') v = 값.o.자재명;
