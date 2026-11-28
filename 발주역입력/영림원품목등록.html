@@ -2,7 +2,8 @@
 <!-- 발주역입력 / 영림원품목등록 — 「품목등록test서버용」 엑셀의 시트 셋(품목등록업로드 · BOM등록업로드 · 원부자재) 목록.
      시트 단추(업체별단품.html 의 업체 단추와 같은 꼴) → 그 시트 표(머리 줄 칸 그대로, 모든 줄).
      사장님 11-18: 「이 파일 시트 모두 표기해야겠다. 영림원품목등록 이라는 메뉴를 만들어서 세 가지 시트가 모두 나오는 페이지로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.180.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v2.180.1
+     v2.180.1(11-28): 줄 상태 칩 글자가 안 보이던 것 — ::before attr() 은 td 속성을 읽음 → 첫 칸 td 에도 data-등상(보드 방이 찾음).
      v2.180.0(11-28): 사장님 「등록가능으로 된 곳은 고칠 곳이 수두룩하고」 — 흐름 단추 셈 = 빨강 + 주황(모자람 등) + 노랑(신규 등) · 하나라도 있으면 「확인필요 N」(색 = 가장 센 것 · 마우스 = 빨강·주황·노랑 수) · 0 일 때만 「등록가능」.
      v2.179.4(11-28): 잠긴 「공통」 단추 칸(v2.168 등록단추 회색 !important)이 빨강(확인필요)을 덮던 것 → 빨강 그대로 · 마우스 = 잠긴 까닭 + 빨강 까닭.
      v2.179.3(11-28): 분배 방 사장님 「품목등록업로드 확인필요 — 회색 스크린에 가려져 하이라이트 안 보이고 수정 못 해」 — 회색 덮개(v2.176) = 흐림만(!important 걷음): 확인필요 연보라·지금 줄·고른 줄 노랑 덧칠이 덮개 위 · 빨강·목록밖·노랑(신규) 칸은 덮개 없이 제 색.
@@ -587,7 +588,7 @@ body.받는중 #속 .표통,body.받는중 #고름 .흐름표{visibility:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v2.180.0</div>
+  <div class="badge">v2.180.1</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html" class="on">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <div class="머리줄"><h1>영림원품목등록</h1><div id="설정" class="탭단추" hidden><div class="설정이름">입력설정</div><div class="기타줄"></div></div></div>
@@ -2164,8 +2165,9 @@ function 잠김칠(표){
       let p = tr.dataset.p || ''; if(!p) for(const td of tr.cells){ const q = td.dataset.p || ''; if(q && !q.startsWith('#')){ p = q; break; } }
       if(!p && ki >= 0 && tr.cells[ki]) p = tr.cells[ki].textContent.trim();
       const 칩 = 칩메 && p ? 줄칩(칩메, p, !!tr.querySelector('td.꼭, td.목록밖')) : null;
-      if(칩){ tr.dataset.등상 = 칩[0]; tr.title = 칩[1]; tr.dataset.등상말 = '1'; }
-      else if(tr.dataset.등상말){ delete tr.dataset.등상; delete tr.dataset.등상말; tr.removeAttribute('title'); } }); }   /* v2.165.0 폐기 품번 칸은 열을 회색으로 안 만듦 */
+      const 첫 = tr.cells[0];   /* v2.180.1 ::before 의 attr() = 그 td 속성 → 첫 칸에도 글 */
+      if(칩){ tr.dataset.등상 = 칩[0]; tr.title = 칩[1]; tr.dataset.등상말 = '1'; if(첫) 첫.dataset.등상 = 칩[0]; }
+      else if(tr.dataset.등상말){ delete tr.dataset.등상; delete tr.dataset.등상말; tr.removeAttribute('title'); if(첫) delete 첫.dataset.등상; } }); }   /* v2.165.0 폐기 품번 칸은 열을 회색으로 안 만듦 */
   줄들.forEach(tr => tr.classList.contains('출처줄') || [...tr.cells].forEach((td, i) => {   /* v2.161.0 출처 머리 줄 뺌 */
     const 계 = td.dataset.k==='재단률' || td.dataset.k==='필름소요';
     const 막 = !td.classList.contains('편') && (td.classList.contains('막음') || 계 || (입력열.has(i) && !td.classList.contains('dpr-k')));
