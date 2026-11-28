@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.59.6
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.59.7
+     v1.59.7(11-28): 분배 방 사장님 「이런 드롭 선택마다 등록완료 업체 체크로 필터링해서 보여지게 해줘」 — 구매+가공 원장(구매자재) 드롭 위 = 입력폼 구매단가 등록완료 업체 체크(표입력.js v10 · 이 기기 기억).
      v1.59.6(11-28): 분배 방 「고치기 → 구매자재 선택했더니 다 없어지고 완료 목록에 그대로 있네」 — 고른 원장 저장이 예약(0.x초)된 사이 등록완료 보관 쓰기 알림(onSnapshot)이 창고 옛 줄로 메모리를 덮어, 저장 줄·보내기는 옛 원장 · 보관만 새 원장 → 등록완료 보기는 옛 원장. 저장 예약 중엔 창고 줄로 안 덮음.
      v1.59.5(11-28): 사장님 「고치기 구매자재 드롭 목록에 신태광 것 안 보이는데」 — 원장 드롭 줄마다 그 원장의 입력폼 완료 구매단가 거래처(신태광·엘데코·재하기업 …)를 글·덧에 보임 → 거래처 이름으로 쳐서 찾음(전엔 이 거래처 것만 거래처가 보이고 다른 거래처 원장은 이름·번호만이라 알아보기·찾기 어려움 — 목록에는 있었음).
      v1.59.4(11-28): 고치기 = 등록완료 보관 값(원장 짝 · 가공품 분류·자재번호·자재명·규격)을 그 줄 저장 값으로 옮긴 뒤 풂 — 전엔 저장 줄 없이 보관만 있던 줄은 고치기를 누르면 목록에서 사라짐(백색코(M2.7(E0)) 11-28 14:44 사라짐 → 되살림).
@@ -460,7 +461,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.59.6</div>
+  <div class="badge">v1.59.7</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -475,7 +476,7 @@ html,body{height:100%;overflow:hidden}
 <!-- 짚어서 지시하는 손잡이 — 바이글 박스에서 열면 켜진다. -->
 <script src="../shared/viggle.js"></script>
 <script src="터치범위.js?v=1"></script>   <!-- v1.40.0 폰 범위·복사·붙여넣기·채우기·지우기 -->
-<script src="표입력.js?v=9.6"></script><script src="드롭끝.js?v=2"></script>   <!-- v1.41.0 모든 입력 표 공통 -->
+<script src="표입력.js?v=10"></script><script src="드롭끝.js?v=2"></script>   <!-- v1.41.0 모든 입력 표 공통 -->
 <script>표입력.쪽('보드매입현황');</script>
 <script src="../shared/자재매입순위.js"></script>   <!-- v1.39.0 자재 매입 순위 자료실 갱신 -->
 
@@ -3096,8 +3097,8 @@ function 가공품목그리기(){
     if(k==='o_code'){ const 가공번 = new Set(가공후보.map(m => 트(가공값(s, m, 구매들).자.자재번호).toLowerCase()).filter(Boolean));   /* v1.59.2 가공 자재 뺌 */
       const 처 = new Map(); for(const kk of (폼등록.구매단가 || [])){ const [c, vv] = String(kk).split('\t'); if(!c || !vv) continue; if(!처.has(c)) 처.set(c, new Set()); 처.get(c).add(vv); }   /* v1.59.5 사장님 「고치기 구매자재 드롭 목록에 신태광 것 안 보이는데」 — 원장마다 입력폼 완료 구매단가 거래처를 글에(보이고 · 쳐서 찾음) */
       return (완료.자재 || []).filter(원장대분류).filter(x => !가공번.has(트(x.자재번호).toLowerCase())).map(x => { const 업 = [...(처.get(트(x.자재번호).toLowerCase()) || [])].join(' · ');
-        return { v:x.자재번호, 글:[x.자재명, x.규격, 업].filter(Boolean).join(' · '), 덧:업 || (내번호.has(x.자재번호) ? s : ''), 내:내번호.has(x.자재번호) }; })
-      .sort((a, b) => (b.내 - a.내) || a.v.localeCompare(b.v, 'ko')).map(({ v, 글, 덧 }) => ({ v, 글, 덧 })); }
+        return { v:x.자재번호, 글:[x.자재명, x.규격, 업].filter(Boolean).join(' · '), 덧:업 || (내번호.has(x.자재번호) ? s : ''), 내:내번호.has(x.자재번호), 업:[...(처.get(트(x.자재번호).toLowerCase()) || [])] }; })
+      .sort((a, b) => (b.내 - a.내) || a.v.localeCompare(b.v, 'ko')).map(({ v, 글, 덧, 업 }) => ({ v, 글, 덧, 업 })); }   /* v1.59.7 업 = 등록완료 구매단가 업체(드롭 위 업체 체크, 표입력.js v10) */
     if(k==='flow') return 흐름들.map(v => ({ v }));
     if(k==='proc') return (완료.공정 || []).map(v => ({ v }));
     if(f.분 != null){ const 앞 = f.앞, 읽 = kk => 트((tr.querySelector(`input[data-가="${앞}_${kk}"]`) || {}).value);

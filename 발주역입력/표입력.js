@@ -7,6 +7,7 @@
      ① 칸 안 입력 상자·고르기(select)의 글도 잼(전엔 td 글만 → 보드매입현황 칸은 ▾ 가 칸 오른쪽 위 = 글 위) ② 목록(원래 목록·기억)이 있는 열 = 그 열 입력 칸 모두 td.세모자리(드롭칸과 같은 오른쪽 여백)
      — 표를 등록할 때 · 기억을 처음 받을 때 한 번(그 뒤 입력으로 열이 바뀌지 않게) ③ 빈 칸 = 글 시작 자리 ④ 글 끝 뒤에 자리가 없으면(여백이 없는 칸) ▾ 안 그림(목록은 글 치기·Alt+↓) — 글 위에 절대 안 그림.
      ▾ 가 뜬 칸 = td.표입력세모칸(드롭끝.js 의 select·datalist ▾ 가 같은 자리에 둘 겹치지 않게).
+   v10(11-28): 분배 방 사장님 「이런 드롭 선택마다 등록완료 업체 체크로 필터링해서 보여지게 해줘」 — 목록 줄에 업:[업체…](입력폼 등록완료 업체)가 있으면 목록 맨 위에 업체마다 체크칸(+ 업체 없는 줄 「없음」) · 체크 푼 업체 줄은 숨김(줄 업체 중 하나라도 체크면 보임) · 이 기기에 기억(localStorage 표입력_업체끔:{열}) · 업 없는 줄(기억 값)은 늘 보임.
    v9.6(11-27): 크기 바뀜을 받은 그 화면에서 바로 다시 그림(전엔 한 화면 늦어 빨리 끌면 ▾ 가 잠깐 글 위에 남았음).
    v9.5(11-27): 사장님 「아니 각 셀은 넓히기 기능이 있잖아. 이게 넓어져서 입력값이 모두 나오는 자리에 버튼이 옮겨가게 하면 되잖아」 — 칸넓이.js 로 칸을 끄는 동안 ▾ 가 바로 글 끝을 따라감(ResizeObserver: 표·▾ 칸).
    v9.4(11-27): 손잡이 비킴 판단 = ▾ 아래 끝이 칸 아래 모서리 손잡이(−6px)보다 위면(칸 높이 19.9px 줄에서 1px 모자라 ▾ 가 안 뜨던 것).
@@ -44,7 +45,11 @@
     '.표입력목록 div.맞음{border-left-color:#1565c0}' +
     '.표입력목록 div.기억{color:#1565c0}' +
     '.표입력목록 div .곁{color:#9C9C98;margin-left:6px}' +
-    '.표입력목록 div .덧{color:#2e5a1e;font-weight:600;margin-left:8px}';
+    '.표입력목록 div .덧{color:#2e5a1e;font-weight:600;margin-left:8px}' +
+    '.표입력목록 div.업줄{display:flex;flex-wrap:wrap;gap:3px 10px;padding:4px 10px 5px;white-space:normal;cursor:default;border-bottom:1px solid #E4E4E0;position:sticky;top:-3px;background:#fff;z-index:1}' +
+    '.표입력목록 div.업줄:hover{background:#fff}' +
+    '.표입력목록 .업줄 label{display:inline-flex;align-items:center;gap:3px;cursor:pointer;white-space:nowrap}' +
+    '.표입력목록 .업줄 input{margin:0}';   /* v10 등록완료 업체 체크 */
   document.head.appendChild(꼴);
   const 만들 = (tag, cls) => { const e = document.createElement(tag); e.className = cls; return e; };
   const 틀 = 만들('div', '표입력틀'), 채틀 = 만들('div', '표입력채움'), 손 = 만들('div', '표입력손'), 목록 = 만들('div', '표입력목록'), 세모 = 만들('div', '표입력세모');
@@ -259,14 +264,24 @@
     return 원.concat(기);
   }
   let 목록줄 = [], 목록고름 = -1;
+  /* v10 등록완료 업체 체크 — 끈 업체 = 이 기기 localStorage(열마다) */
+  const 업없음 = '없음', 업열쇠 = () => '표입력_업체끔:' + (편집 ? 열이름(지금.어, 편집.td) : '');
+  const 업끔읽기 = () => { try{ return new Set(JSON.parse(localStorage.getItem(업열쇠()) || '[]')); }catch(e){ return new Set(); } };
+  const 업끔쓰기 = set => { try{ localStorage.setItem(업열쇠(), JSON.stringify([...set])); }catch(e){} };
   function 목록그리기(){
     if(!편집){ 목록.style.display = 'none'; return; }
-    const g = 칸.value.trim().toLowerCase(), 다 = 편집.목록;
+    const g = 칸.value.trim().toLowerCase(), 다0 = 편집.목록;
+    const 업있 = 다0.some(x => Array.isArray(x.업)), 끔 = 업있 ? 업끔읽기() : new Set(), 업수 = new Map();
+    if(업있) for(const x of 다0) if(Array.isArray(x.업)){ const u = x.업.length ? x.업 : [업없음]; for(const n of u) 업수.set(n, (업수.get(n) || 0) + 1); }
+    const 보임 = x => !Array.isArray(x.업) || (x.업.length ? x.업 : [업없음]).some(n => !끔.has(n));
+    const 다 = 업있 ? 다0.filter(보임) : 다0;
     목록줄 = 편집.처음글 ? 다 : 다.filter(x => !g || (String(x.v) + ' ' + (x.글 || '')).toLowerCase().includes(g));
-    편집.처음글 = false;
-    if(!목록줄.length){ 목록.style.display = 'none'; 목록고름 = -1; return; }
+    편집.다보임 = 편집.처음글; 편집.처음글 = false;
+    if(!목록줄.length && !업있){ 목록.style.display = 'none'; 목록고름 = -1; return; }
     목록고름 = Math.min(목록고름, 목록줄.length - 1);
-    목록.innerHTML = 목록줄.map((x, i) => `<div data-i="${i}" class="${[x.맞음 ? '맞음' : '', x.기억 ? '기억' : '', i === 목록고름 ? '지금' : ''].join(' ')}"${x.title ? ` title="${String(x.title).replace(/"/g, '&quot;')}"` : ''}>${글(x.v)}${x.글 && x.글 !== x.v ? `<span class="곁">${글(x.글)}</span>` : ''}${x.덧 ? `<span class="덧">${글(x.덧)}</span>` : ''}</div>`).join('');
+    const 업들 = [...업수].sort((a, b) => (a[0] === 업없음) - (b[0] === 업없음) || b[1] - a[1] || a[0].localeCompare(b[0], 'ko'));
+    const 업줄 = 업있 ? `<div class="업줄">${업들.map(([n, c]) => `<label data-업="${글(n)}" title="${글(n === 업없음 ? '입력폼 등록완료 업체 없음' : '입력폼 등록완료 업체')} · ${c}"><input type="checkbox"${끔.has(n) ? '' : ' checked'}>${글(n)}</label>`).join('')}</div>` : '';
+    목록.innerHTML = 업줄 + 목록줄.map((x, i) => `<div data-i="${i}" class="${[x.맞음 ? '맞음' : '', x.기억 ? '기억' : '', i === 목록고름 ? '지금' : ''].join(' ')}"${x.title ? ` title="${String(x.title).replace(/"/g, '&quot;')}"` : ''}>${글(x.v)}${x.글 && x.글 !== x.v ? `<span class="곁">${글(x.글)}</span>` : ''}${x.덧 ? `<span class="덧">${글(x.덧)}</span>` : ''}</div>`).join('');
     목록.style.display = 'block'; 목록자리();
   }
   const 글 = v => String(v ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
@@ -313,7 +328,9 @@
   let 누르는중 = false;   /* 목록·▾ 를 누르는 동안 입력 칸이 초점을 잃어도 고치기를 끝내지 않음(폰) */
   [목록, 세모].forEach(el => { el.addEventListener('pointerdown', e => { 누르는중 = true; if(el === 세모) e.preventDefault(); }); el.addEventListener('mousedown', e => e.preventDefault()); });
   세모.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); 누르는중 = false; if(Date.now() - 세모난때 < 400 && 톡뒤()) return; 목록열닫(); });
-  목록.addEventListener('click', e => { 누르는중 = false; const d = e.target.closest('[data-i]'); if(!d || !편집) return; 끝내기(true, String(목록줄[+d.dataset.i].v)); 초점(); });
+  목록.addEventListener('click', e => { 누르는중 = false;
+    { const u = e.target.closest('[data-업]'); if(u){ e.preventDefault(); if(!편집) return; const 끔 = 업끔읽기(), n = u.dataset.업; if(끔.has(n)) 끔.delete(n); else 끔.add(n); 업끔쓰기(끔); 편집.처음글 = !!편집.다보임; 목록그리기(); 칸.focus({ preventScroll:true }); return; } }   /* v10 업체 체크 */
+    const d = e.target.closest('[data-i]'); if(!d || !편집) return; 끝내기(true, String(목록줄[+d.dataset.i].v)); 초점(); });
 
   /* ── 글쇠 ── */
   칸.addEventListener('keydown', e => {
