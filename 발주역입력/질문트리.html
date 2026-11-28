@@ -1,7 +1,9 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 질문 트리 — 입력폼·발주역입력 질문(파이어스토어 erp_questions)을 자리 나무로 봄.
      사장님 11-28: 「나중에 확인할 질문 트리가 필요한데?」 → 「질문 트리는 새 페이지로 열리게 하고, 실제로 트리 구조가 보여야지. 이게 뭐야」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.0.0
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.1.0
+     v1.1.0(11-28): 사장님 「질문 트리에 해당 영역에 대한 지시 요청을 제가 적을 수 있게 해 주세요」 — 자리(잎·탭)를 고르면 오른쪽 「지시」 칸 + 「지시 올리기」
+       → erp_questions 문서 {종류:'지시', 상태 '새 지시'}(질문.js v6 지시올리기) · 그 자리 지시(새 지시·받음 = 위 · 끝남 = 접힘) · 나무 수 넷째 = 끝나지 않은 지시(보라) · 질문 수 셋은 지시 빼고(전과 같음).
      v1.0.0(11-28): 첫 판. 뿌리 입력폼(메뉴 박스 › 메뉴) · 발주역입력(묶음 › 페이지 › 탭) — 선(├ └)·들여쓰기 · ▸/▾ 접기 · 자리마다 대기(노랑)·답함(파랑)·실행함(초록) 수 ·
        누르면 오른쪽 = 그 자리(밑 가지 포함) 질문(대기 답 칸 · 지난 질문) + 그 자리 링크.
        나무 출처(이 브라우저 localStorage, 업무 자료 아님): 「질문나무.입력폼」 = 입력폼이 열릴 때 적는 메뉴 박스·발주역입력 머리 목록 · 「질문나무.탭」 = 각 페이지 자리주소.js 가 본 탭 단추.
@@ -48,18 +50,21 @@ ul.t ul>li::after{content:"";position:absolute;left:0;top:15px;width:12px;border
 .줄 .이.가{font-weight:700}
 .수{display:inline-flex;gap:3px;flex:none}
 .수 span{min-width:20px;padding:0 6px;border-radius:9px;font-size:11.5px;text-align:center;font-weight:700;color:#C4C4C0}
-.수 .대기{background:#FFF7C2;color:#8a6d00}.수 .답함{background:#E8F1FB;color:#1b5fa8}.수 .실행함{background:#E6F4EA;color:#2e7d32}
+.수 .대기{background:#FFF7C2;color:#8a6d00}.수 .지시{background:#7E57C2;color:#fff}.수 .답함{background:#E8F1FB;color:#1b5fa8}.수 .실행함{background:#E6F4EA;color:#2e7d32}
 #곳 h2{font-size:16px;font-weight:700;color:var(--vg-ink);margin:0 0 10px;overflow-wrap:anywhere}
 #곳 h2 a{color:#2383e2}
+.지칸{display:flex;gap:6px;align-items:flex-start;margin:0 0 14px}.지칸 textarea{flex:1 1 auto;min-width:0;min-height:56px;font:inherit;font-size:14px;padding:8px 10px;border:1px solid #7E57C2;border-radius:8px;box-sizing:border-box;resize:vertical}
+.지칸 button{font:inherit;font-size:13px;font-weight:700;padding:8px 12px;border-radius:8px;border:1px solid #7E57C2;background:#7E57C2;color:#fff;cursor:pointer;min-height:40px;white-space:nowrap}.지칸 button:disabled{opacity:.45;cursor:default}
+.지틀{color:#b91c1c;font-size:12px;margin:-8px 0 10px}
 </style>
 <script src="../shared/쓰기지킴.js?v=11-23b"></script>
-<script src="../shared/질문.js?v=5"></script>
+<script src="../shared/질문.js?v=6"></script>
 </head>
 <body>
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.0.0</div>
+  <div class="badge">v1.1.0</div>
 </header>
 <h1>질문 트리</h1>
 <div class="판"><div id="나무"></div><div id="곳"></div></div>
@@ -102,8 +107,14 @@ ul.t ul>li::after{content:"";position:absolute;left:0;top:15px;width:12px;border
     return n.아이.some(function(c){ return 속함(c, q); }); }
   function 찾(목, id){ for(var i = 0; i < 목.length; i++){ if(목[i].id === id) return 목[i]; var r = 찾(목[i].아이, id); if(r) return r; } return null; }
   function 길(목, id, 지금){ for(var i = 0; i < 목.length; i++){ var p = (지금 || []).concat([목[i].이름]); if(목[i].id === id) return p; var r = 길(목[i].아이, id, p); if(r) return r; } return null; }
-  function 수(qs){ var c = { 대기:0, 답함:0, 실행함:0 }; qs.forEach(function(q){ var t = q.상태 || '대기'; if(t in c) c[t]++; });
-    return h('span', { class:'수' }, ['대기', '답함', '실행함'].map(function(t){ return h('span', { class:c[t] ? t : '', title:t }, String(c[t])); })); }
+  var 지시냐 = function(q){ return q && q.종류 === '지시'; };   /* v1.1.0 */
+  function 수(qs){ var c = { 대기:0, 답함:0, 실행함:0, 지시:0 }; qs.forEach(function(q){ if(지시냐(q)){ if((q.상태 || '새 지시') !== '끝남') c.지시++; return; } var t = q.상태 || '대기'; if(t in c) c[t]++; });
+    return h('span', { class:'수' }, ['대기', '답함', '실행함', '지시'].map(function(t){ return h('span', { class:c[t] ? t : '', title:t === '지시' ? '지시(끝나지 않은 것)' : t }, String(c[t])); })); }
+  /* v1.1.0 마디 → 지시 문서 자리·자리이름·링크(질문 링크와 같은 꼴 — 저장소 뿌리에서 본 주소) */
+  function 지시곳(목, n){ if(!n.자리) return null; var 잎 = 찾(목, n.자리) || n, 입 = /^입력폼\//.test(n.자리);
+    var 이름 = 입 ? ((길(목, 잎.id) || [잎.이름]).slice(1).join(' › ') || 잎.이름) : '발주역입력 › ' + 잎.이름;
+    var 링 = String(n.주소 || '').replace(/^\.\.\//, '').replace(/^\.\//, '발주역입력/');
+    return { 자리:n.자리, 자리이름:이름, 링크:링 }; }
   function 그림(){
     var qs = (window.질문 && 질문.목록()) || [], 목 = 짓기(qs), 위 = 나무칸.scrollTop;
     function 마디(n){
@@ -121,13 +132,25 @@ ul.t ul>li::after{content:"";position:absolute;left:0;top:15px;width:12px;border
     var n = 고른 && 찾(목, 고른); if(!n){ 곳칸.replaceChildren(); return; }
     var 쓰던 = {}, 활 = document.activeElement;
     곳칸.querySelectorAll('.qc[data-id] textarea').forEach(function(t){ var id = t.closest('.qc').dataset.id; 쓰던[id] = { v:t.value, f:t === 활, s:t.selectionStart }; });
-    var 옛 = 곳칸.querySelector('details'), 지열 = 옛 ? 옛.open : false;
-    var mine = qs.filter(function(q){ return 속함(n, q); }), 대 = mine.filter(function(q){ return (q.상태 || '대기') === '대기'; }), 지 = mine.filter(function(q){ return (q.상태 || '대기') !== '대기'; }).reverse();
+    var 옛 = 곳칸.querySelector('details:not([data-지])'), 지열 = 옛 ? 옛.open : false;
+    var 모두 = qs.filter(function(q){ return 속함(n, q); }), mine = 모두.filter(function(q){ return !지시냐(q); }), 대 = mine.filter(function(q){ return (q.상태 || '대기') === '대기'; }), 지 = mine.filter(function(q){ return (q.상태 || '대기') !== '대기'; }).reverse();
+    var 시 = 모두.filter(지시냐), 시열 = 시.filter(function(q){ return (q.상태 || '새 지시') !== '끝남'; }), 시끝 = 시.filter(function(q){ return (q.상태 || '새 지시') === '끝남'; }).reverse();   /* v1.1.0 */
+    var 옛지 = 곳칸.querySelector('details[data-지]'), 끝열 = 옛지 ? 옛지.open : false, 옛칸 = 곳칸.querySelector('.지칸 textarea'), 쓰던지 = 옛칸 && 곳칸.dataset.k === n.id ? { v:옛칸.value, f:옛칸 === 활 } : null;
     var 이름 = (길(목, n.id) || [n.이름]).join(' › ');
     var 몸 = h('div', { class:'qna' }, [h('h2', {}, n.주소 ? h('a', { href:n.주소, target:'_blank', rel:'noopener' }, 이름) : 이름)]);
+    var 곳 = 지시곳(목, n);
+    if(곳 && 질문.지시올리기){ var 글칸 = h('textarea', { 'aria-label':'지시', rows:'3' }), 올 = h('button', { type:'button' }, '지시 올리기'), 틀 = h('div', { class:'지틀' });
+      올.addEventListener('click', function(){ var t = 글칸.value.trim(); if(!t) return; 올.disabled = true; 틀.textContent = '';
+        질문.지시올리기(곳.자리, 곳.자리이름, 곳.링크, t).then(function(){ 글칸.value = ''; 올.disabled = false; }, function(e){ 올.disabled = false; 틀.textContent = '저장하지 못했습니다 — ' + ((e && (e.code || e.message)) || ''); }); });
+      몸.append(h('div', { class:'qh' }, '지시'), h('div', { class:'지칸' }, [글칸, 올]), 틀); }
+    else if(시.length) 몸.append(h('div', { class:'qh' }, '지시'));
+    시열.forEach(function(q){ 몸.append(질문.카드(q)); });
+    if(시끝.length){ var 끝d = h('details', { 'data-지':'1' }, [h('summary', {}, '끝난 지시 ' + 시끝.length)].concat(시끝.map(function(q){ return 질문.카드(q); }))); 끝d.open = 끝열; 몸.append(끝d); }
+    if(mine.length) 몸.append(h('div', { class:'qh' }, '질문'));
     대.forEach(function(q){ 몸.append(질문.카드(q)); });
     if(지.length){ var d = h('details', {}, [h('summary', {}, '지난 질문 ' + 지.length)].concat(지.map(function(q){ return 질문.카드(q); }))); d.open = 지열; 몸.append(d); }
-    곳칸.replaceChildren(몸);
+    곳칸.replaceChildren(몸); 곳칸.dataset.k = n.id;
+    if(쓰던지){ var tt = 곳칸.querySelector('.지칸 textarea'); if(tt){ tt.value = 쓰던지.v; if(쓰던지.f) tt.focus(); } }
     Object.keys(쓰던).forEach(function(id){ var t = 곳칸.querySelector('.qc[data-id="' + id + '"] textarea'); if(!t) return; t.value = 쓰던[id].v; if(쓰던[id].f){ t.focus(); try{ t.setSelectionRange(쓰던[id].s, 쓰던[id].s); }catch(e){} } });
   }
   질문.꾸밈();

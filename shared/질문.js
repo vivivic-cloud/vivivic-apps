@@ -2,6 +2,9 @@
    자료 = 파이어스토어 erp_questions — 질문 하나 = 문서 하나.
      {자리:'입력폼/classes' | '발주역입력/재단', 자리이름:'기본입력 › 5. 품목대중소분류정의', 질문, 보낸이, 만든때(ISO),
       상태:'대기'|'답함'|'실행함', 답, 답한때, 답한이, 실행한때, 시험(true = 시험 질문)}
+   v6(11-28) 사장님 「질문 트리에 해당 영역에 대한 지시 요청을 제가 적을 수 있게 해 주세요」 — 지시 = 같은 컬렉션 문서 {종류:'지시', 자리, 자리이름, 링크, 지시(글), 보낸이, 만든때,
+      상태:'새 지시'|'받음'|'끝남', 받은때, 끝난때, 메모(작업자)} · 사장님이 질문트리.html 에서 적음 · 작업자 = 입력작업자/스크립트/지시.py 로 받음·끝남.
+      질문 화면·수(대기·답함·실행함)·「답 없는 질문」 수는 지시를 빼고 셈(전과 같음) · 지시는 따로: 페이지 위 칸 「지시」 · 모음 「새 지시」 · 머리 단추 「· 지시 N」(끝남 아닌 것).
    화면: 각 메뉴·페이지 위 = 그 자리 질문만(대기 = 답 칸 · 답함/실행함 = 접힌 「지난 질문」) · 입력폼 머리 「답 없는 질문 N」 = 모든 대기 모음.
    로그인 = 입력폼 로그인(파이어베이스 앱 이름 'erp-input') 그대로 — 따로 로그인·익명 로그인 안 함. 쓰기는 쓰기지킴 거침.
    쓰는 법
@@ -12,6 +15,8 @@
   var COL = 'erp_questions', V = 'https://www.gstatic.com/firebasejs/11.2.0/';
   var C = null, 목록 = null, 듣는이 = [], 끄기 = null;
   var 트 = function(v){ return String(v == null ? '' : v).trim(); };
+  var 지시냐 = function(q){ return q && q.종류 === '지시'; }, 열린지시 = function(q){ return 지시냐(q) && (q.상태 || '새 지시') !== '끝남'; };   /* v6 */
+  var 질문들 = function(){ return (목록 || []).filter(function(q){ return !지시냐(q); }); };
   function h(tag, at, kids){ var e = document.createElement(tag); at = at || {};
     Object.keys(at).forEach(function(k){ if(k === 'on') Object.keys(at.on).forEach(function(n){ e.addEventListener(n, at.on[n]); });
       else if(k === 'class') e.className = at[k]; else if(at[k] != null && at[k] !== false) e.setAttribute(k, at[k] === true ? '' : at[k]); });
@@ -36,6 +41,8 @@
       + '.qna details>summary{cursor:pointer;color:#6b6b68;font-size:12.5px;margin:2px 0 6px}'
       + '.qna .qg{font-weight:700;margin:10px 0 4px}.qna .qg a{color:inherit}'
       + '.qna .qe{color:#b91c1c;font-size:12px;margin:4px 0 0}'
+      + '.qna .qc.지시{border-color:#7E57C2;background:#F3EEFB}.qna .qc.지시.받음{border-color:#2383e2;background:#E8F1FB}.qna .qc.지시.끝남{border-color:#2e7d32;background:#E6F4EA}'   /* v6 지시 */
+      + '.qna .qn.지{background:#7E57C2;color:#fff}.qna .qs{display:inline-block;margin-left:6px;padding:0 6px;border-radius:8px;font-size:11px;font-weight:700;background:#fff;border:1px solid currentColor}'
       + '.qna a.ql{color:#2383e2;text-decoration:underline;overflow-wrap:anywhere}'
       + '.qtree details{margin:0 0 2px 14px}.qtree>details{margin-left:0}.qtree summary{cursor:pointer;padding:3px 0;display:flex;align-items:center;gap:8px;list-style-position:inside}'
       + '.qtree summary::-webkit-details-marker{margin-right:2px}.qtree .qtc{display:inline-flex;gap:4px;margin-left:auto}'
@@ -70,7 +77,15 @@
     var 조 = /^발주역입력\//.test(z) && l.indexOf('#') >= 0 ? l.slice(l.indexOf('#') + 1).split('/').map(function(x){ try{ return decodeURIComponent(x); }catch(e){ return x; } }).filter(Boolean) : [];
     var 주 = new URL('../' + l, location.href).href;
     return h('a', { class:'ql', href:주, title:'그 자리 열기' }, [q.자리이름 || z].concat(조).join(' › ')); }
+  function 지시카드(q){   /* v6 사장님 지시 — 글 · 보낸이·때 · 상태 · 그 자리 링크 · 작업자 메모 */
+    var 상 = q.상태 || '새 지시', 판 = h('div', { class:'qc 지시 ' + 상, 'data-id':q.id, title:'지시 · ' + 상 });
+    판.append(h('div', { class:'qq' }, [q.지시 || '', h('span', { class:'qs' }, 상)]));
+    판.append(h('div', { class:'qm' }, [(q.보낸이 || '') + ' · ' + 때(q.만든때), q.받은때 ? ' · 받음 ' + 때(q.받은때) : '', q.끝난때 ? ' · 끝남 ' + 때(q.끝난때) : '', q.시험 ? ' · 시험' : '']));
+    var 링 = 링크(q); if(링) 판.append(h('div', { class:'qm' }, 링));
+    if(트(q.메모)) 판.append(h('div', { class:'qa', title:'작업자 메모' }, q.메모));
+    return 판; }
   function 카드(q, 자리보임){
+    if(지시냐(q)) return 지시카드(q);
     var 상 = q.상태 || '대기', 판 = h('div', { class:'qc ' + 상, 'data-id':q.id, title:상 });
     판.append(h('div', { class:'qq' }, q.질문 || ''));
     판.append(h('div', { class:'qm' }, [(q.보낸이 || '') + ' · ' + 때(q.만든때), q.시험 ? ' · 시험' : '']));
@@ -90,16 +105,20 @@
     var 열림 = {};
     function 그림(){
       if(!칸.isConnected && 칸.dataset.qna !== 자리) return;
-      var 옛 = 칸.querySelector('details'); if(옛) 열림[자리] = 옛.open;
+      var 옛 = 칸.querySelector('details:not([data-지])'); if(옛) 열림[자리] = 옛.open; var 옛지 = 칸.querySelector('details[data-지]'); if(옛지) 열림[자리 + '#지'] = 옛지.open;
       var 활 = document.activeElement, 쓰던 = {};
       칸.querySelectorAll('.qc[data-id] textarea').forEach(function(t){ var id = t.closest('.qc').dataset.id; 쓰던[id] = { v:t.value, f:t === 활, s:t.selectionStart }; });
-      var 내 = (목록 || []).filter(function(q){ return q.자리 === 자리; });
+      var 내 = 질문들().filter(function(q){ return q.자리 === 자리; });
       var 대 = 내.filter(function(q){ return (q.상태 || '대기') === '대기'; }), 지 = 내.filter(function(q){ return (q.상태 || '대기') !== '대기'; }).reverse();
-      if(!내.length){ 칸.replaceChildren(); 칸.hidden = true; return; }
+      var 시 = (목록 || []).filter(function(q){ return 지시냐(q) && q.자리 === 자리; }), 시열 = 시.filter(열린지시), 시끝 = 시.filter(function(q){ return !열린지시(q); }).reverse();   /* v6 */
+      if(!내.length && !시.length){ 칸.replaceChildren(); 칸.hidden = true; return; }
       칸.hidden = false;
       var 몸 = h('div', { class:'qna' });
-      몸.append(h('div', { class:'qh' }, ['질문', 대.length ? h('span', { class:'qn' }, String(대.length)) : '']));
-      대.forEach(function(q){ 몸.append(카드(q)); });
+      if(시.length){ 몸.append(h('div', { class:'qh' }, ['지시', 시열.length ? h('span', { class:'qn 지' }, String(시열.length)) : '']));
+        시열.forEach(function(q){ 몸.append(지시카드(q)); });
+        if(시끝.length){ var 끝d = h('details', { 'data-지':'1' }, [h('summary', {}, '끝난 지시 ' + 시끝.length)].concat(시끝.map(지시카드))); 끝d.open = !!열림[자리 + '#지']; 몸.append(끝d); } }
+      if(내.length){ 몸.append(h('div', { class:'qh' }, ['질문', 대.length ? h('span', { class:'qn' }, String(대.length)) : '']));
+      대.forEach(function(q){ 몸.append(카드(q)); }); }
       if(지.length){ var d = h('details', {}, [h('summary', {}, '지난 질문 ' + 지.length)].concat(지.map(function(q){ return 카드(q); }))); d.open = !!열림[자리]; 몸.append(d); }
       칸.replaceChildren(몸);
       Object.keys(쓰던).forEach(function(id){ var t = 칸.querySelector('.qc[data-id="' + id + '"] textarea'); if(!t) return; t.value = 쓰던[id].v; if(쓰던[id].f){ t.focus(); try{ t.setSelectionRange(쓰던[id].s, 쓰던[id].s); }catch(e){} } });
@@ -114,10 +133,13 @@
   function 모음(칸, 나무){
     if(!칸) return; 꾸밈();
     function 그림(){
-      var 옛 = 칸.querySelector('details'), 열 = 옛 ? 옛.open : false, 쓰던 = {}, 활 = document.activeElement;
+      var 옛 = 칸.querySelector('details'), 열 = 옛 ? 옛.open : false, 쓰던 = {}, 활 = document.activeElement;   /* 모음 = 지난 질문 details 하나 */
       칸.querySelectorAll('.qc[data-id] textarea').forEach(function(t){ var id = t.closest('.qc').dataset.id; 쓰던[id] = { v:t.value, f:t === 활, s:t.selectionStart }; });
-      var 다 = 목록 || [], 대 = 다.filter(function(q){ return (q.상태 || '대기') === '대기'; }), 지 = 다.filter(function(q){ return (q.상태 || '대기') !== '대기'; }).reverse();
+      var 다 = 질문들(), 대 = 다.filter(function(q){ return (q.상태 || '대기') === '대기'; }), 지 = 다.filter(function(q){ return (q.상태 || '대기') !== '대기'; }).reverse();
       var 차 = (나무 || []).map(function(n){ return n.자리; }), 몸 = h('div', { class:'qna' });
+      var 시열 = (목록 || []).filter(열린지시);   /* v6 끝나지 않은 지시 — 자리마다 */
+      if(시열.length){ 몸.append(h('div', { class:'qh' }, ['지시', h('span', { class:'qn 지' }, String(시열.length))]));
+        시열.forEach(function(q){ 몸.append(지시카드(q)); }); }
       몸.append(h('div', { class:'qh' }, ['답 없는 질문', h('span', { class:'qn' }, String(대.length))]));
       var 묶 = {}; 대.forEach(function(q){ (묶[q.자리] = 묶[q.자리] || []).push(q); });
       Object.keys(묶).sort(function(a, b){ var i = 차.indexOf(a), j = 차.indexOf(b); return (i < 0 ? 1e9 : i) - (j < 0 ? 1e9 : j); }).forEach(function(k){
@@ -146,7 +168,7 @@
       var 열린 = {}; 칸.querySelectorAll('details[data-k]').forEach(function(d){ if(d.open) 열린[d.dataset.k] = 1; });
       var 쓰던 = {}, 활 = document.activeElement;
       칸.querySelectorAll('.qc[data-id] textarea').forEach(function(t){ var id = t.closest('.qc').dataset.id; 쓰던[id] = { v:t.value, f:t === 활, s:t.selectionStart }; });
-      var 다 = 목록 || [], 몸 = h('div', { class:'qna qtree' });
+      var 다 = 질문들(), 몸 = h('div', { class:'qna qtree' });
       function 덩이(k, 머리, 속, qs){ var d = h('details', { 'data-k':k }, [h('summary', {}, [머리, 수칩(qs)])].concat(속)); d.open = !!열린[k]; return d; }
       function 잎(z, 이름글){
         var qs = 다.filter(function(q){ return q.자리 === z.자리; }), 바로 = [], 탭 = {}, 탭차 = [];
@@ -176,7 +198,13 @@
     칸._qna = function(){ if(칸.dataset.qna === '나무') 그림(); };
     듣는이.push(칸._qna); 그림();
   }
-  function 대기수(){ return (목록 || []).filter(function(q){ return (q.상태 || '대기') === '대기'; }).length; }
+  function 대기수(){ return 질문들().filter(function(q){ return (q.상태 || '대기') === '대기'; }).length; }
+  function 지시수(){ return (목록 || []).filter(열린지시).length; }   /* v6 끝나지 않은 지시 */
+  /* v6 사장님 지시 올리기(질문 트리) — 링크 = 저장소 뿌리에서 본 주소(질문 링크와 같은 꼴) */
+  function 지시올리기(자리, 자리이름, 링크글, 글, 덧){
+    if(!C) return Promise.reject(new Error('로그인 없음')); 글 = 트(글); if(!글) return Promise.reject(new Error('빈 지시'));
+    return C.F.addDoc(C.F.collection(C.fs, COL), Object.assign({ 종류:'지시', 자리:자리, 자리이름:자리이름 || 자리, 링크:링크글 || '', 지시:글, 보낸이:C.who || '', 만든때:new Date().toISOString(), 상태:'새 지시', 받은때:'', 끝난때:'', 메모:'' }, 덧 || {}))
+      .then(function(r){ return r.id; }); }
   function 듣기(f){ 듣는이.push(f); }
   /* 시험·작업자용(화면 단추 없음) */
   function 올리기(자리, 자리이름, 글, 덧){
@@ -203,7 +231,7 @@
     var 단 = h('button', { type:'button', class:'qna-btn', hidden:true, 'aria-pressed':'false' }, '답 없는 질문');
     /* 11-28 「질문 트리」 = 입력폼 #질문트리(같은 로그인 · 나무는 입력폼 메뉴 박스로 그림) */
     var 트단 = h('a', { class:'qna-btn qna-tr', hidden:true, target:'_blank', rel:'noopener', href:new URL('../발주역입력/질문트리.html', location.href).href }, '질문 트리');   /* 11-28 「질문 트리는 새 페이지로」 */
-    function 단그림(){ var n = 대기수(); 단.hidden = 목록 == null; 트단.hidden = 목록 == null; 단.textContent = '답 없는 질문 ' + n; 단.classList.toggle('on', n > 0); 단.setAttribute('aria-pressed', 다봄 ? 'true' : 'false'); }
+    function 단그림(){ var n = 대기수(), m = 지시수(); 단.hidden = 목록 == null; 트단.hidden = 목록 == null; 단.textContent = '답 없는 질문 ' + n + (m ? ' · 지시 ' + m : ''); 단.classList.toggle('on', n > 0 || m > 0);   /* v6 지시 수 */ 단.setAttribute('aria-pressed', 다봄 ? 'true' : 'false'); }
     function 그칸(){ if(!C){ 놓기(칸); return; } if(다봄) 모음(칸, []); else 달기(칸, 자리, 자리이름); }
     단.addEventListener('click', function(){ 다봄 = !다봄; 단그림(); 그칸(); });
     듣기(단그림);
@@ -217,5 +245,5 @@
     }
     if(document.readyState === 'complete') setTimeout(시작, 0); else window.addEventListener('load', function(){ setTimeout(시작, 0); });
   }
-  window.질문 = { 로그인:로그인, 카드:function(q){ return 카드(q, true); }, 링크:링크, 꾸밈:꾸밈, 붙임:붙임, 달기:달기, 나무:나무, 놓기:놓기, 모음:모음, 대기수:대기수, 듣기:듣기, 올리기:올리기, 지움:지움, 스스로:스스로, 목록:function(){ return 목록; } };
+  window.질문 = { 로그인:로그인, 카드:function(q){ return 카드(q, true); }, 링크:링크, 꾸밈:꾸밈, 붙임:붙임, 달기:달기, 나무:나무, 놓기:놓기, 모음:모음, 대기수:대기수, 지시수:지시수, 지시올리기:지시올리기, 지시냐:지시냐, 듣기:듣기, 올리기:올리기, 지움:지움, 스스로:스스로, 목록:function(){ return 목록; } };
 })();

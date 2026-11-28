@@ -96,6 +96,8 @@ if __name__ == '__main__':
             print('올림', j['name'].rsplit('/', 1)[1], 이름)
         elif a[0] == '보기':
             for q in 모두():
+                if q.get('종류') == '지시':   # 11-28 지시 = 지시.py 로 봄
+                    continue
                 if len(a) > 1 and q.get('자리') != a[1]:
                     continue
                 print('[%s] %s · %s · %s\n  질문: %s' % (q.get('상태') or '대기', q['id'], q.get('자리이름') or q.get('자리'), q.get('만든때'), q.get('질문')))
