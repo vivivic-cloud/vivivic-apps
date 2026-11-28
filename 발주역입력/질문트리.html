@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<!-- 발주역입력 / 질문 트리 — 입력폼·발주역입력 질문(파이어스토어 erp_questions)을 자리 나무로 봄.
+     사장님 11-28: 「나중에 확인할 질문 트리가 필요한데?」 → 「질문 트리는 새 페이지로 열리게 하고, 실제로 트리 구조가 보여야지. 이게 뭐야」
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.0.0
+     v1.0.0(11-28): 첫 판. 뿌리 입력폼(메뉴 박스 › 메뉴) · 발주역입력(묶음 › 페이지 › 탭) — 선(├ └)·들여쓰기 · ▸/▾ 접기 · 자리마다 대기(노랑)·답함(파랑)·실행함(초록) 수 ·
+       누르면 오른쪽 = 그 자리(밑 가지 포함) 질문(대기 답 칸 · 지난 질문) + 그 자리 링크.
+       나무 출처(이 브라우저 localStorage, 업무 자료 아님): 「질문나무.입력폼」 = 입력폼이 열릴 때 적는 메뉴 박스·발주역입력 머리 목록 · 「질문나무.탭」 = 각 페이지 자리주소.js 가 본 탭 단추.
+       + 질문 링크의 # 조각(탭) · 나무에 없는 자리의 질문도 그 자리로 더함. 로그인 = 입력폼 로그인(질문.js 로그인). -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>질문 트리 — 발주역입력</title>
+<style>
+:root{
+  --vg-bg:#fff; --vg-ink:#111110; --vg-body:#1A1A19;
+  --vg-muted:#9C9C98; --vg-edge:#E2E2DF; --vg-fill:#F4F4F2; --vg-red:#FF3B30;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--vg-bg);color:var(--vg-body);
+  font:15px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",system-ui,sans-serif;
+  -webkit-text-size-adjust:100%}
+.wrap{max-width:1200px;margin:0 auto;padding:0 16px 40px}
+header{padding:16px 0 2px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.logo{font-size:13px;color:var(--vg-muted)}
+.logo b{font-size:15px;font-weight:800;letter-spacing:3.2px;color:var(--vg-ink);margin-right:4px}
+.badge{font-size:11px;font-weight:800;letter-spacing:1.2px;color:var(--vg-ink);border:1px solid var(--vg-ink);border-radius:999px;padding:3px 9px}
+h1{font-size:30px;line-height:1.1;letter-spacing:-1.2px;font-weight:700;color:var(--vg-ink);padding:12px 0 12px}
+.판{display:grid;grid-template-columns:minmax(300px,440px) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:820px){.판{grid-template-columns:minmax(0,1fr)}}
+#나무{border:1px solid var(--vg-edge);border-radius:10px;padding:10px 10px 10px 4px;max-height:calc(100vh - 140px);overflow:auto;font-size:13.5px}
+#곳{border:1px solid var(--vg-edge);border-radius:10px;padding:12px 14px;min-height:120px;position:sticky;top:12px;max-height:calc(100vh - 40px);overflow:auto}
+#곳:empty{display:none}
+ul.t,ul.t ul{list-style:none;margin:0;padding:0}
+ul.t ul{padding-left:20px}
+ul.t li{position:relative;padding-left:16px}
+ul.t>li{padding-left:6px}
+ul.t ul>li::before{content:"";position:absolute;left:0;top:0;bottom:0;border-left:1px solid #C9C9C5}
+ul.t ul>li:last-child::before{bottom:auto;height:15px}
+ul.t ul>li::after{content:"";position:absolute;left:0;top:15px;width:12px;border-top:1px solid #C9C9C5}
+.줄{display:flex;align-items:center;gap:6px;min-height:30px}
+.줄 .접{all:unset;cursor:pointer;width:16px;text-align:center;color:var(--vg-muted);font-size:12px;flex:none}
+.줄 .접.빈{cursor:default;visibility:hidden}
+.줄 .이{all:unset;cursor:pointer;padding:2px 6px;border-radius:6px;overflow-wrap:anywhere;flex:1 1 auto;min-width:0}
+.줄 .이:hover{background:var(--vg-fill)}
+.줄 .이.on{background:var(--vg-ink);color:#fff}
+.줄 .이.뿌{font-weight:800}
+.줄 .이.가{font-weight:700}
+.수{display:inline-flex;gap:3px;flex:none}
+.수 span{min-width:20px;padding:0 6px;border-radius:9px;font-size:11.5px;text-align:center;font-weight:700;color:#C4C4C0}
+.수 .대기{background:#FFF7C2;color:#8a6d00}.수 .답함{background:#E8F1FB;color:#1b5fa8}.수 .실행함{background:#E6F4EA;color:#2e7d32}
+#곳 h2{font-size:16px;font-weight:700;color:var(--vg-ink);margin:0 0 10px;overflow-wrap:anywhere}
+#곳 h2 a{color:#2383e2}
+</style>
+<script src="../shared/쓰기지킴.js?v=11-23b"></script>
+<script src="../shared/질문.js?v=5"></script>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
+  <div class="badge">v1.0.0</div>
+</header>
+<h1>질문 트리</h1>
+<div class="판"><div id="나무"></div><div id="곳"></div></div>
+</div>
+<script>
+(function(){
+  var 나무칸 = document.getElementById('나무'), 곳칸 = document.getElementById('곳');
+  var 열림 = { '입력폼':1, '발주역입력':1 }, 고른 = '';
+  var 트 = function(v){ return String(v == null ? '' : v).trim(); };
+  function h(tag, at, kids){ var e = document.createElement(tag); at = at || {};
+    Object.keys(at).forEach(function(k){ if(k === 'on') Object.keys(at.on).forEach(function(n){ e.addEventListener(n, at.on[n]); }); else if(k === 'class') e.className = at[k]; else if(at[k] != null && at[k] !== false) e.setAttribute(k, at[k]); });
+    [].concat(kids == null ? [] : kids).forEach(function(c){ if(c == null || c === '') return; e.append(c.nodeType ? c : String(c)); });
+    return e; }
+  function 읽(k){ try{ return JSON.parse(localStorage.getItem(k) || 'null'); }catch(e){ return null; } }
+  function 조각(q){ var l = 트(q.링크); if(!/^발주역입력\//.test(트(q.자리)) || l.indexOf('#') < 0) return [];
+    return l.slice(l.indexOf('#') + 1).split('/').map(function(x){ try{ return decodeURIComponent(x); }catch(e){ return x; } }).filter(Boolean); }
+  /* 마디 = {id, 이름, 종류:'뿌'|'가'|'잎'|'탭', 자리, 탭:[…], 주소, 아이:[]} */
+  function 짓기(qs){
+    var 폼 = 읽('질문나무.입력폼') || {}, 탭 = 읽('질문나무.탭') || {};
+    var 뿌1 = { id:'입력폼', 이름:'입력폼', 종류:'뿌', 아이:[] }, 뿌2 = { id:'발주역입력', 이름:'발주역입력', 종류:'뿌', 아이:[] }, 자리들 = {};
+    (폼.입력폼 || []).forEach(function(b){ var g = { id:'입력폼›' + b.이름, 이름:b.이름, 종류:'가', 아이:[] }; 뿌1.아이.push(g);
+      (b.잎 || []).forEach(function(z){ var n = { id:z.자리, 이름:z.이름, 종류:'잎', 자리:z.자리, 탭:[], 주소:'../영림원외주입력/영림원외주입력.html#' + encodeURIComponent(z.자리.replace(/^입력폼\//, '')), 아이:[] }; g.아이.push(n); 자리들[z.자리] = n; }); });
+    var 묶 = {};
+    function 쪽마디(자리, 이름){ var f = 자리.replace(/^발주역입력\//, ''); var n = { id:자리, 이름:이름, 종류:'잎', 자리:자리, 탭:[], 주소:'./' + f + '.html', 아이:[] }; 자리들[자리] = n;
+      (function 붙(곳, 부모, 길){ Object.keys(곳 || {}).forEach(function(k){ var p = 길.concat([k]); var c = { id:자리 + '#' + p.join('/'), 이름:k, 종류:'탭', 자리:자리, 탭:p, 주소:'./' + f + '.html#' + p.map(encodeURIComponent).join('/'), 아이:[] }; 부모.아이.push(c); 붙(곳[k], c, p); }); })(탭[f], n, []);
+      return n; }
+    (폼.발주역입력 || []).forEach(function(z){ var n = 쪽마디(z.자리, z.이름);
+      if(z.묶음){ if(!묶[z.묶음]){ 묶[z.묶음] = { id:'발주역입력›' + z.묶음, 이름:z.묶음, 종류:'가', 아이:[] }; 뿌2.아이.push(묶[z.묶음]); } 묶[z.묶음].아이.push(n); } else 뿌2.아이.push(n); });
+    /* 나무에 없는 자리·탭 = 질문에서 더함 */
+    qs.forEach(function(q){ var z = 트(q.자리); if(!z) return;
+      var n = 자리들[z];
+      if(!n){ if(/^발주역입력\//.test(z)){ n = 쪽마디(z, (트(q.자리이름) || z).replace(/^발주역입력 › /, '')); 뿌2.아이.push(n); }
+        else { n = { id:z, 이름:(트(q.자리이름) || z).replace(/^입력폼 › /, ''), 종류:'잎', 자리:z, 탭:[], 주소:'../영림원외주입력/영림원외주입력.html#' + encodeURIComponent(z.replace(/^입력폼\//, '')), 아이:[] }; 뿌1.아이.push(n); 자리들[z] = n; } }
+      var p = 조각(q), 곳 = n, f = z.replace(/^발주역입력\//, '');
+      p.forEach(function(k, i){ var 길 = p.slice(0, i + 1), id = z + '#' + 길.join('/'), c = 곳.아이.filter(function(x){ return x.id === id; })[0];
+        if(!c){ c = { id:id, 이름:k, 종류:'탭', 자리:z, 탭:길, 주소:'./' + f + '.html#' + 길.map(encodeURIComponent).join('/'), 아이:[] }; 곳.아이.push(c); } 곳 = c; }); });
+    return [뿌1, 뿌2];
+  }
+  function 속함(n, q){ if(n.자리){ if(트(q.자리) !== n.자리) return false; var p = 조각(q); return n.탭.every(function(k, i){ return p[i] === k; }); }
+    return n.아이.some(function(c){ return 속함(c, q); }); }
+  function 찾(목, id){ for(var i = 0; i < 목.length; i++){ if(목[i].id === id) return 목[i]; var r = 찾(목[i].아이, id); if(r) return r; } return null; }
+  function 길(목, id, 지금){ for(var i = 0; i < 목.length; i++){ var p = (지금 || []).concat([목[i].이름]); if(목[i].id === id) return p; var r = 길(목[i].아이, id, p); if(r) return r; } return null; }
+  function 수(qs){ var c = { 대기:0, 답함:0, 실행함:0 }; qs.forEach(function(q){ var t = q.상태 || '대기'; if(t in c) c[t]++; });
+    return h('span', { class:'수' }, ['대기', '답함', '실행함'].map(function(t){ return h('span', { class:c[t] ? t : '', title:t }, String(c[t])); })); }
+  function 그림(){
+    var qs = (window.질문 && 질문.목록()) || [], 목 = 짓기(qs), 위 = 나무칸.scrollTop;
+    function 마디(n){
+      var mine = qs.filter(function(q){ return 속함(n, q); }), 열 = !!열림[n.id], 있 = n.아이.length > 0;
+      var li = h('li', {}, h('div', { class:'줄' }, [
+        h('button', { type:'button', class:'접' + (있 ? '' : ' 빈'), 'aria-expanded':있 ? String(열) : null, on:{ click:function(){ if(열림[n.id]) delete 열림[n.id]; else 열림[n.id] = 1; 그림(); } } }, 있 ? (열 ? '▾' : '▸') : ''),
+        h('button', { type:'button', class:'이 ' + n.종류 + (고른 === n.id ? ' on' : ''), on:{ click:function(){ 고른 = n.id; if(있) 열림[n.id] = 1; 그림(); } } }, n.이름),
+        수(mine)]));
+      if(있 && 열) li.append(h('ul', {}, n.아이.map(마디)));
+      return li; }
+    나무칸.replaceChildren(h('ul', { class:'t' }, 목.map(마디))); 나무칸.scrollTop = 위;
+    곳그림(목, qs);
+  }
+  function 곳그림(목, qs){
+    var n = 고른 && 찾(목, 고른); if(!n){ 곳칸.replaceChildren(); return; }
+    var 쓰던 = {}, 활 = document.activeElement;
+    곳칸.querySelectorAll('.qc[data-id] textarea').forEach(function(t){ var id = t.closest('.qc').dataset.id; 쓰던[id] = { v:t.value, f:t === 활, s:t.selectionStart }; });
+    var 옛 = 곳칸.querySelector('details'), 지열 = 옛 ? 옛.open : false;
+    var mine = qs.filter(function(q){ return 속함(n, q); }), 대 = mine.filter(function(q){ return (q.상태 || '대기') === '대기'; }), 지 = mine.filter(function(q){ return (q.상태 || '대기') !== '대기'; }).reverse();
+    var 이름 = (길(목, n.id) || [n.이름]).join(' › ');
+    var 몸 = h('div', { class:'qna' }, [h('h2', {}, n.주소 ? h('a', { href:n.주소, target:'_blank', rel:'noopener' }, 이름) : 이름)]);
+    대.forEach(function(q){ 몸.append(질문.카드(q)); });
+    if(지.length){ var d = h('details', {}, [h('summary', {}, '지난 질문 ' + 지.length)].concat(지.map(function(q){ return 질문.카드(q); }))); d.open = 지열; 몸.append(d); }
+    곳칸.replaceChildren(몸);
+    Object.keys(쓰던).forEach(function(id){ var t = 곳칸.querySelector('.qc[data-id="' + id + '"] textarea'); if(!t) return; t.value = 쓰던[id].v; if(쓰던[id].f){ t.focus(); try{ t.setSelectionRange(쓰던[id].s, 쓰던[id].s); }catch(e){} } });
+  }
+  질문.꾸밈();
+  질문.듣기(그림);
+  질문.로그인(function(){ 그림(); });
+  그림();
+})();
+</script>
+</body>
+</html>

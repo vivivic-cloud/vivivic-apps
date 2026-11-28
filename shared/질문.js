@@ -184,13 +184,25 @@
     return C.F.addDoc(C.F.collection(C.fs, COL), Object.assign({ 자리:자리, 자리이름:자리이름 || 자리, 질문:트(글), 보낸이:C.who || '', 만든때:new Date().toISOString(), 상태:'대기', 답:'', 답한때:'', 답한이:'' }, 덧 || {}))
       .then(function(r){ return r.id; }); }
   function 지움(id){ if(!C) return Promise.reject(new Error('로그인 없음')); return C.F.deleteDoc(C.F.doc(C.fs, COL, id)); }
+  /* 입력폼 로그인('erp-input' 앱) 그대로 붙음 — 로그인 없음·익명 = cb(null). 질문 트리 쪽·발주역입력 쪽이 씀 */
+  function 로그인(cb){
+    Promise.all([import(V + 'firebase-app.js'), import(V + 'firebase-auth.js'), import(V + 'firebase-firestore.js')]).then(function(m){
+      var 설정 = { apiKey:'AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs', authDomain:'vivivic-4b7ef.firebaseapp.com', projectId:'vivivic-4b7ef',
+        storageBucket:'vivivic-4b7ef.firebasestorage.app', messagingSenderId:'830175660542', appId:'1:830175660542:web:9054030480c8280af8d8af' };
+      var app = m[0].getApps().filter(function(a){ return a.name === 'erp-input'; })[0] || m[0].initializeApp(설정, 'erp-input');
+      var auth = m[1].getAuth(app), F = window.쓰기지킴 ? window.쓰기지킴.덮개(Object.assign({}, m[2])) : m[2], fs = F.getFirestore(app);
+      m[1].onAuthStateChanged(auth, function(u){
+        if(!u || u.isAnonymous){ if(끄기){ try{ 끄기(); }catch(e){} 끄기 = null; } 목록 = null; C = null; 알림(); cb(null); return; }
+        붙임({ F:F, fs:fs, who:u.displayName || u.email || '' }); cb(u); });
+    }).catch(function(e){ console.warn('질문 불러오기', e); cb(null); });
+  }
   /* 발주역입력 쪽 — 페이지가 다 뜬 뒤(페이지 모듈이 'erp-input' 앱을 먼저 만들게) 입력폼 로그인으로 붙음 */
   function 스스로(자리, 자리이름){
     var 칸 = h('div', { class:'qna-slot', hidden:true }), 다봄 = false;
     /* 11-28 사장님 「이거 입력폼뿐만 아니라 발주역입력에서도 보여야지」 — 머리 줄 「답 없는 질문 N」(입력폼 머리와 같음 · 대기 있으면 노랑) · 누르면 모든 대기 모음 · 다시 누르면 이 페이지 질문 */
     var 단 = h('button', { type:'button', class:'qna-btn', hidden:true, 'aria-pressed':'false' }, '답 없는 질문');
     /* 11-28 「질문 트리」 = 입력폼 #질문트리(같은 로그인 · 나무는 입력폼 메뉴 박스로 그림) */
-    var 트단 = h('a', { class:'qna-btn qna-tr', hidden:true, href:new URL('../영림원외주입력/영림원외주입력.html#' + encodeURIComponent('질문트리'), location.href).href }, '질문 트리');
+    var 트단 = h('a', { class:'qna-btn qna-tr', hidden:true, target:'_blank', rel:'noopener', href:new URL('../발주역입력/질문트리.html', location.href).href }, '질문 트리');   /* 11-28 「질문 트리는 새 페이지로」 */
     function 단그림(){ var n = 대기수(); 단.hidden = 목록 == null; 트단.hidden = 목록 == null; 단.textContent = '답 없는 질문 ' + n; 단.classList.toggle('on', n > 0); 단.setAttribute('aria-pressed', 다봄 ? 'true' : 'false'); }
     function 그칸(){ if(!C){ 놓기(칸); return; } if(다봄) 모음(칸, []); else 달기(칸, 자리, 자리이름); }
     단.addEventListener('click', function(){ 다봄 = !다봄; 단그림(); 그칸(); });
@@ -201,17 +213,9 @@
       var 머 = document.querySelector('body > header, header'); if(머){ 꾸밈(); 머.append(단, 트단); } }
     function 시작(){
       놓을곳();
-      Promise.all([import(V + 'firebase-app.js'), import(V + 'firebase-auth.js'), import(V + 'firebase-firestore.js')]).then(function(m){
-        var 설정 = { apiKey:'AIzaSyB9X_hzd2D3goQ7oenK53Pz805P1c7oSqs', authDomain:'vivivic-4b7ef.firebaseapp.com', projectId:'vivivic-4b7ef',
-          storageBucket:'vivivic-4b7ef.firebasestorage.app', messagingSenderId:'830175660542', appId:'1:830175660542:web:9054030480c8280af8d8af' };
-        var app = m[0].getApps().filter(function(a){ return a.name === 'erp-input'; })[0] || m[0].initializeApp(설정, 'erp-input');
-        var auth = m[1].getAuth(app), F = window.쓰기지킴 ? window.쓰기지킴.덮개(Object.assign({}, m[2])) : m[2], fs = F.getFirestore(app);
-        m[1].onAuthStateChanged(auth, function(u){
-          if(!u || u.isAnonymous){ if(끄기){ try{ 끄기(); }catch(e){} 끄기 = null; } 목록 = null; 놓기(칸); 단그림(); return; }
-          붙임({ F:F, fs:fs, who:u.displayName || u.email || '' }); 그칸(); 단그림(); });
-      }).catch(function(e){ console.warn('질문 불러오기', e); });
+      로그인(function(u){ if(!u){ 놓기(칸); 단그림(); return; } 그칸(); 단그림(); });
     }
     if(document.readyState === 'complete') setTimeout(시작, 0); else window.addEventListener('load', function(){ setTimeout(시작, 0); });
   }
-  window.질문 = { 붙임:붙임, 달기:달기, 나무:나무, 놓기:놓기, 모음:모음, 대기수:대기수, 듣기:듣기, 올리기:올리기, 지움:지움, 스스로:스스로, 목록:function(){ return 목록; } };
+  window.질문 = { 로그인:로그인, 카드:function(q){ return 카드(q, true); }, 링크:링크, 꾸밈:꾸밈, 붙임:붙임, 달기:달기, 나무:나무, 놓기:놓기, 모음:모음, 대기수:대기수, 듣기:듣기, 올리기:올리기, 지움:지움, 스스로:스스로, 목록:function(){ return 목록; } };
 })();

@@ -8,7 +8,25 @@
   function 이름(b){ return String(b.textContent || '').replace(/\s+[\d,]+$/, '').trim(); }
   function 켜짐(sel){ var a = Array.prototype.slice.call(document.querySelectorAll(sel)); return a.filter(function(b){ return b.classList.contains('on') && b.offsetParent !== null; })[0] || null; }
   function 지금(){ var out = []; for(var i = 0; i < 층.length; i++){ var b = 켜짐(층[i]); if(!b) break; out.push(이름(b)); } return out; }
+  /* 11-28 질문 트리 — 이 페이지의 탭 단추(층마다 보이는 단추 이름, 켜진 단추 밑으로 다음 층)를 이 브라우저에 모아 둠(localStorage 「질문나무.탭」, 더하기만).
+     질문 트리 쪽(발주역입력/질문트리.html)이 페이지 밑 가지로 그림. 업무 자료 아님(단추 글자뿐) · 저장 못 해도 그냥 넘어감. */
+  var 탭글 = '';
+  function 탭모음(){
+    try{
+      var 쪽 = decodeURIComponent(location.pathname.split('/').pop() || '').replace(/\.html$/, ''); if(!쪽) return;
+      var 다 = JSON.parse(localStorage.getItem('질문나무.탭') || '{}'), 뿌 = 다[쪽] = 다[쪽] || {}, 곳 = 뿌;
+      for(var i = 0; i < 층.length; i++){
+        var bs = Array.prototype.slice.call(document.querySelectorAll(층[i])).filter(function(b){ return b.offsetParent !== null; });
+        if(!bs.length) break;
+        bs.forEach(function(b){ var n = 이름(b); if(n && !곳[n]) 곳[n] = {}; });
+        var on = bs.filter(function(b){ return b.classList.contains('on'); })[0]; if(!on) break;
+        곳 = 곳[이름(on)] = 곳[이름(on)] || {};
+      }
+      var 글 = JSON.stringify(다); if(글 !== 탭글){ 탭글 = 글; localStorage.setItem('질문나무.탭', 글); }
+    }catch(e){}
+  }
   function 쓰기(){
+    if(!되살리는중) 탭모음();
     if(되살리는중 || !층.length) return;
     var p = 지금(); if(!p.length) return;
     var h = '#' + p.map(encodeURIComponent).join('/');
