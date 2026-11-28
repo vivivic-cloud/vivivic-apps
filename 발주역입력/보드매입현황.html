@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.59.28
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.59.29
+     v1.59.29(11-28): 분배 방 사장님 「구매+가공품목 입력폼 실제 등록된 영림원 자료 확인하고, 완료된 구매+가공품만 보이는 페이지로 바꿔. 구매자재·가공완료품·오류건 이딴 거 다 삭제하고 완료된 것만 보이게 바꾸고, 여기서 고치기·신규등록 다 되게 구성해」 · 「이전·이후 연관점 조사해서 구매+가공 조합 만들기 외에 지장 안 생기는 것은 모두 지워」 — 구매+가공품목 = 표 하나(완료 = 입력폼 자재·현진 구매단가 둘 다 완료 줄 · 고치는 줄 · 이 화면에서 방금 저장한 신규) · 고치기 = 원장만, 저장 눌러야 반영 · 신규등록 = 가공 줄 고름(빈 줄이면 그 줄, 이미 있으면 조합 줄) → 원장·자재번호·자재명(·분류) → 저장 → 보내기(입력폼 등록대기). 걷음 = 탭 둘 · 오류건/등록완료 전환 · 단계 점 · 완료보관 읽기·쓰기(자료는 그대로) · 원장 드롭 이 거래처 먼저·덧·업체 체크(이 드롭만) · 구매+가공 자재번호 → 입력폼 값 채움(영림원보내기 것은 그대로) · 완료 가공 불러오기(신규등록으로 합침). 남김 = 원장 = 입력폼 완료 원장만(아니면 빨강·저장 막음) · 자재번호 겹침 빨강 · 조합 줄 자료 꼴 · 보내기 꼴.
      v1.59.28(11-28): 분배 방 사장님 「코드 걷어내기 내가 시켰냐고」 — v1.59.27(새 조합 코드 걷음)을 그대로 되돌림 = v1.59.26 코드(판 번호만 올림 · 자료 안 건드림).
      v1.59.26(11-28): 영림원보내기 자재번호 겹침(v1.11 — 두 줄 같은 번호 빨강)에서 입력폼 완료 자재번호는 뺌(여러 명세 줄이 같은 기존 자재를 씀 · 자재 값은 그 자재 값으로 같음).
      v1.59.25(11-28): 자재번호를 표 입력(바로 치기·붙여넣기·채우기)으로 넣어도 그 줄 자재 칸이 바로 바뀜(v1.59.24 는 change 길만).
@@ -482,7 +483,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.59.28</div>
+  <div class="badge">v1.59.29</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -1345,7 +1346,7 @@ function 현진폼완료(s, 키){   /* v1.46.0 구매 줄 — 자재번호 입�
   if(가공키(s, 키)){   /* v1.47.1 가공 줄 = 구매+가공 줄 등록완료(가공완료품 자재 입력폼 완료 · 또는 가공품목 결과 자재 완료) */
     if(!가공품목[s]){ if(!가공받는중[s]){ 가공받는중[s] = true; 가공품목받기(s).then(() => { if(볼것==='폼' && 고른===s) 결과칠(s); try{ 명세칠(s); }catch(e){} }, () => {}); }   /* v1.53.1 월별 명세도 */ return null; }
     가공초안끔 = true; let c, 다; try{ const 구매들 = [...현진줄맵.values()].filter(x => !가공줄(s, x) && !뺀줄(s, x)); c = 트(가공값(s, m, 구매들).자.자재번호);
-    const 단 = 가공단계셈(s, m, 구매들); 다 = 가공다완(단); if(다) 가공보관(s, 키, 가공값(s, m, 구매들)); } finally{ 가공초안끔 = false; }   /* v1.59.10 초안 안 셈 */   /* v1.52.0 */
+    const 단 = 가공단계셈(s, m, 구매들); 다 = 가공다완(단); } finally{ 가공초안끔 = false; }   /* v1.59.10 초안 안 셈 */   /* v1.52.0 */
     return 다 ? { 상태:'완료', 오:[], 고침:false, 자재번호:c, 폼:true } : null; }   /* v1.48.0 단계 여섯 모두 입력폼 완료일 때만 */
   if(!폼등록.구매단가) return null;
   const 칸 = k => 트(칸값(폼칸.find(f => f.k===k), m, s)), c = 칸('m_code').toLowerCase(), v = 칸('p_vendor');
@@ -2835,7 +2836,7 @@ async function 완료건그리기(){
     + 완료건단가칸.map(([k]) => `<td${k==='price' ? ' class="num"' : ''}>${글(값(p, k))}</td>`).join('') + '</tr>').join('');
   속.innerHTML = `<div class="표통"><div class="표"><table class="dpr-t"><thead>${머}</thead><tbody>${몸}</tbody></table></div><div class="글">${줄.length}줄</div></div>`;
 }
-const 가공품목 = {}, 가공품목보내기 = {}, 가공품목결과 = {}, 가공품목듣기 = {}, 가공품목보관 = {}, 가공풀린 = new Set(), 가공고친 = new Set(), 가공초안 = new Map(); let 가공초안끔 = false;   /* v1.59.10 사장님 「그 자리에 남기보다 내가 저장을 눌러야 변경돼야 하는 거 아니야?」 — 가공고친 = 고치기로 연 줄(거래처 \n 열쇠) · 가공초안 = 그 줄 화면 값(저장 전 — 창고·보관·보내기에 안 감) · 저장 단추 = 반영 · 취소 = 버림 */   /* v1.52.0 완료보관 · 고치기로 푼 줄(거래처 \n 열쇠, 이 화면 동안) */
+const 가공품목 = {}, 가공품목보내기 = {}, 가공품목결과 = {}, 가공품목듣기 = {}, 가공품목보관 = {}, 가공풀린 = new Set(), 가공고친 = new Set(), 가공초안 = new Map(), 가공방금 = new Set(); let 가공초안끔 = false;   /* v1.59.10 사장님 「그 자리에 남기보다 내가 저장을 눌러야 변경돼야 하는 거 아니야?」 — 가공고친 = 고치기로 연 줄(거래처 \n 열쇠) · 가공초안 = 그 줄 화면 값(저장 전 — 창고·보관·보내기에 안 감) · 저장 단추 = 반영 · 취소 = 버림 */   /* v1.52.0 완료보관 · 고치기로 푼 줄(거래처 \n 열쇠, 이 화면 동안) */
 /* v1.52.0 구매+가공 등록완료 보관 — 여섯 단계 모두 입력폼 완료가 된 때의 값을 _가공품목_{거래처}.완료보관.{열쇠} 에(통째 mergeFields) */
 async function 가공보관바꿈(s, 더, 뺄){
   const 새 = { ...(가공품목보관[s] || {}), ...(더 || {}) }; for(const k of (뺄 || [])) delete 새[k];
@@ -2940,9 +2941,9 @@ async function 가공품목받기(s){
    조합 줄 = 등록완료 가공 줄(원 줄)의 가공품 분류·자재·구매단가 그대로 + 원장만 새로 고름 · 저장 열쇠 '#조합\t{id}' · 값.조합원 = 원 줄 열쇠 · 입력폼은 완료된 분류·자재·구매단가를 다시 안 넘김 */
 const 조합키머리 = '#조합\t';
 function 조합들(s, 후보){
-  const 키들 = new Set([...가공품목[s].keys(), ...Object.keys(가공품목보관[s] || {})].concat(가공초안끔 ? [] : [...가공초안.keys()].filter(k => k.startsWith(s + '\n')).map(k => k.slice(s.length + 1))).filter(k => k.startsWith(조합키머리)));
+  const 키들 = new Set([...가공품목[s].keys()].concat(가공초안끔 ? [] : [...가공초안.keys()].filter(k => k.startsWith(s + '\n')).map(k => k.slice(s.length + 1))).filter(k => k.startsWith(조합키머리)));
   const 밖 = [];
-  for(const k of 키들){ const 저 = (!가공초안끔 && 가공초안.get(s + '\n' + k)) || 가공품목[s].get(k), 보 = (가공품목보관[s] || {})[k];
+  for(const k of 키들){ const 저 = (!가공초안끔 && 가공초안.get(s + '\n' + k)) || 가공품목[s].get(k), 보 = null;
     const 원키 = (저 && 저.값 && 저.값.조합원) || (보 && 보.조합원) || '', 원m = 후보.find(m => 줄키(m) === 원키);
     if(원m) 밖.push({ ...원m, 조합키:k, 원m }); }
   return 밖;
@@ -2955,11 +2956,6 @@ function 가공값(s, m, 구매들){
     const 자 = { ...원값.자, 자재번호:같(v.m_code, 원값.자.자재번호) ? '' : 트(v.m_code), 자재명:같(v.m_name, 원값.자.자재명) ? '' : 트(v.m_name), 규격:'m_spec' in v ? 트(v.m_spec) : 원값.자.규격 };   /* v1.59.17 사장님 「다른 조합의 구매+가공품은 당연히 새로운 자재번호가 생겨야 되는 거 아니야?」 — 새 자재(번호·이름 = 손으로 · 규격 = 원 줄) · 분류 = 원 줄 */
     return { ...원값, 저, v, o, 자, 보관:undefined, 조합원:줄키(m.원m) }; }   /* v1.59.13 조합 줄 = 원 줄 분류·구매단가 + 원장 · v1.59.17 + 새 자재 */
   const 초 = !가공초안끔 && 가공초안.get(s + '\n' + 줄키(m)), 저 = 초 || 가공품목[s].get(줄키(m)) || { 원장:'', 값:{} }, v = 저.값, 칸 = (m2, k) => 칸값(폼칸.find(f => f.k===k), m2, s);
-  { const 보 = (가공품목보관[s] || {})[줄키(m)];   /* v1.52.0 등록완료 보관 = 그 값 */
-    if(보 && !가공풀린.has(s + '\n' + 줄키(m)) && !가공고친.has(s + '\n' + 줄키(m))){ let o = { ...(보.원장 || {}), 신규:false, 구매거래처:칸(m, 'p_vendor') };
-      { const 새 = 'o_code' in v ? 트(v.o_code) : '';   /* v1.59.1 사장님 「현진이 아니라 다른 업체에서 사온 걸로 변경해야」 — 등록완료 줄도 원장 짝만 바꿈(가공품 자재·분류는 보관 값 그대로) */
-        if(새 && 새 !== 트(o.자재번호)){ const 원 = 자재찾기(새); o = { 자재번호:새, 신규:!원, 구매거래처:칸(m, 'p_vendor'), 단가:'' }; for(const n of ['자재명','규격','기준단위','대분류','중분류','소분류']) o[n] = 원 ? 원[n] : ''; } }
-      return { 저, v:{}, o, 흐름:보.공정 || '', 공정:보.공정 || '', c:{ ...(보.분류 || {}) }, 자:{ ...(보.자재 || {}), 품목자산분류:'원자재' }, 참고:'', 보관:보 }; } }   /* v1.57.2 등록완료 보관 줄도 원자재 */
   const 결 = ((창고본[s] || {}).결과) || {};
   const 원줄 = 저.원장 ? 구매들.find(x => 줄키(x)===저.원장) : null;   /* v1.42~44 옛 저장(영림원보내기 줄) → 그 줄 자재번호 */
   const o_code = 'o_code' in v ? v.o_code : (원줄 ? ((결[줄키(원줄)] || {}).자재 || {}).자재번호 || 칸(원줄, 'm_code') : '');
@@ -2972,15 +2968,13 @@ function 가공값(s, m, 구매들){
   const c = { 대분류:트(v.m_big), 중분류:트(v.m_mid), 소분류:트(v.m_small) };
   const 참고 = '';   /* v1.49.0 자재명 짓지 않음 */
   const 자 = { 자재명:트(v.m_name), 자재번호:트(v.m_code), 규격:'m_spec' in v ? 트(v.m_spec) : o.규격, 품목자산분류:'원자재', 자재상태:'사용', 기준단위:'EA', 자재소분류:c.소분류 };   /* v1.57.2 원자재 */
-  const 기 = 기존자재(자.자재번호);   /* v1.59.22 입력폼 완료 자재번호 = 자재명·규격·단위·분류를 그 자재 값으로 */
-  if(기){ for(const n of ['대분류','중분류','소분류']) if(기[n]) c[n] = 기[n]; 자.자재명 = 기.자재명; if(기.규격) 자.규격 = 기.규격; if(기.기준단위) 자.기준단위 = 기.기준단위; 자.자재소분류 = c.소분류; }
-  return { 저, v, o, 흐름, 공정, c, 자, 참고, 기존:!!기 };
+  return { 저, v, o, 흐름, 공정, c, 자, 참고 };
 }
 const 가공지문 = r => 고른값([r.가공, [r.원장.자재번호, r.원장.자재명, r.원장.규격, r.원장.기준단위, r.원장.대분류, r.원장.중분류, r.원장.소분류], r.공정.공정명, r.분류, r.자재등록, r.구매단가등록 || null]);
 function 가공품목줄들(s){ 가공초안끔 = true; try{ return 가공품목줄들원(s); } finally{ 가공초안끔 = false; } }   /* v1.59.10 보내기 = 저장 값만(초안 안 넣음) */
 function 가공품목줄들원(s){
   const 월표 = ((받은[s] || {}).표 || []).find(t => t.이름==='월별'); if(!월표 || !폼값[s] || !가공품목[s] || !완료.자재 || !완료.공정 || !완료.흐름) return null;
-  const 줄 = 품목모으기(월표).줄, 가공들 = 줄.filter(m => 가공줄(s, m) && !뺀줄(s, m) && (가공품목[s].has(줄키(m)) || 가공보관있음(s, 줄키(m)))).concat(조합들(s, 줄.filter(m => 가공줄(s, m) && !뺀줄(s, m)))), 구매들 = 줄.filter(m => !가공줄(s, m) && !뺀줄(s, m));   /* v1.50.0 고른 줄만 */
+  const 줄 = 품목모으기(월표).줄, 가공들 = 줄.filter(m => 가공줄(s, m) && !뺀줄(s, m) && 가공품목[s].has(줄키(m))).concat(조합들(s, 줄.filter(m => 가공줄(s, m) && !뺀줄(s, m)))), 구매들 = 줄.filter(m => !가공줄(s, m) && !뺀줄(s, m));   /* v1.50.0 고른 줄만 */
   const 칸 = (m, k) => 칸값(폼칸.find(f => f.k===k), m, s);
   return 가공들.map(m => {
     const { o, 흐름, 공정, c, 자 } = 가공값(s, m, 구매들), 임시 = [];
@@ -3044,7 +3038,7 @@ function 가공단계(s, r, 단){
   const x = ((가공품목결과[s] || {})[r.열쇠] || {})[단];
   return x && x.상태 ? x : { 상태:'' };
 }
-function 가공품목그리기(){
+function 가공품목그리기(){   /* v1.59.29 분배 방 사장님 「구매+가공품목 … 완료된 구매+가공품만 보이는 페이지로 바꿔. 구매자재·가공완료품·오류건 이딴 거 다 삭제하고 완료된 것만 보이게 바꾸고, 여기서 고치기·신규등록 다 되게 구성해」 — 표 하나 */
   const s = 고른, 속 = document.getElementById('속'); 가공다시미룸 = false;
   if(!받은[s]){ 속.innerHTML = '<div class="state"><div class="big">표 없음</div></div>'; return; }
   if(!가공품목[s] || !폼값[s] || !완료.자재 || !완료.공정 || !완료.흐름){
@@ -3055,148 +3049,67 @@ function 가공품목그리기(){
   }
   const 월표 = (받은[s].표 || []).find(t => t.이름==='월별'), { 칸:엑칸, 품, 규, 줄 } = 품목모으기(월표);
   const 가공후보 = 줄.filter(m => 가공줄(s, m) && !뺀줄(s, m)), 구매들 = 줄.filter(m => !가공줄(s, m) && !뺀줄(s, m));
-  const 가공들 = 가공후보.filter(m => 가공품목[s].has(줄키(m)) || 가공보관있음(s, 줄키(m))).concat(조합들(s, 가공후보));   /* v1.59.13 조합 줄 */   /* v1.50.0 고른 줄만(저절로 안 만듦) · v1.52.0 보관된 줄도 */
-  const 라벨 = m => m.규격 ? m.이름 + ' / ' + m.규격 : m.이름, 라벨키 = new Map(가공후보.map(m => [라벨(m), 줄키(m)]));
-  const 보줄 = 가공품목줄들(s) || [], 보맵 = new Map(보줄.map(r => [r.열쇠, r]));
-  const 결 = ((창고본[s] || {}).결과) || {}, 칸 = (m, k) => 칸값(폼칸.find(f => f.k===k), m, s);
-  const 내번호 = new Set(구매들.map(x => (((결[줄키(x)] || {}).자재 || {}).자재번호 || 칸(x, 'm_code'))).filter(Boolean));
-  { const 처 = new Set(구매들.map(x => 트(칸(x, 'p_vendor'))).filter(Boolean)); for(const k of (폼등록.구매단가 || [])){ const [c, v] = k.split('\t'); if(처.has(v)) for(const x of (완료.자재 || [])) if(x.자재번호.toLowerCase()===c) 내번호.add(x.자재번호); } }   /* v1.49.0 입력폼 구매단가 완료 거래처 = 이 거래처 */
-  const T = 가공탭들.find(t => t.k===가공탭) || 가공탭들[0];
-  /* 줄 상태(이 탭) */
-  /* v1.48.0 줄 등록완료 = 단계 여섯 모두 입력폼 완료 · 오류·대기 = 이 탭 단계 */
-  const 상태들 = 가공들.map(m => { const 모 = 가공단계셈(s, m, 구매들), st = T.단계.map(단 => [단, 모[단]]);
-    return { 모, st, 오:st.some(([, x]) => x.상태==='오류'), 대:st.some(([, x]) => x.상태==='대기' || x.상태==='진행중'), 완:st.every(([, x]) => x.상태==='완료'), 보관:!!((가공품목보관[s] || {})[줄키(m)]) && !가공풀린.has(s + '\n' + 줄키(m)) }; });   /* v1.51.0 탭마다 그 탭 단계 */
-  가공들.forEach((m, i) => { if(가공다완(상태들[i].모)) 가공보관(s, 줄키(m), 가공값(s, m, 구매들)); });   /* v1.52.0 여섯 단계 모두 완료 = 보관 */
-  const 오수 = 상태들.filter(x => x.오).length, 완수 = 상태들.filter(x => x.완).length;
-  const 보일 = (x, m) => 가공보기==='오류' ? x.오 : 가공보기==='완료' ? x.완 : (!x.완 || (m && 가공고친.has(s + '\n' + 줄키(m))));   /* v1.59.8 고치기로 연 줄 = 다시 완료돼도 기본 보기에 남음 */
-  const 칸들 = T.묶음.flatMap(g => g.칸.map((f, i) => ({ ...f, 첫:i===0 })));
-  const 열 = l => ` data-열="${글('가공_' + T.k + '_' + l)}"`;
-  let h = `<table class="dpr-t 폼표 가공표"><thead><tr><th class="묶" colspan="${T.k==='완료품' ? 2 : 4}">가공</th>` +
-    T.묶음.map(g => `<th class="묶" colspan="${g.칸.length}">${글(g.이름)}</th>`).join('') + `<th class="묶" rowspan="2"${열('영림원 등록')} title="영림원 등록 — 입력폼 상태">영림원 등록</th></tr><tr>` +
-    `<th class="dpr-k"${열(엑칸[품])}>${글(엑칸[품])}</th><th${열(엑칸[규])}>${글(엑칸[규])}</th>` + (T.k==='완료품' ? '' : `<th${열('구매거래처')}>구매거래처</th><th${열('가공 단가')}>단가</th>`) +
-    칸들.map(f => `<th${f.첫 ? ' class="묶"' : ''}${열(f.l)}${f.근거 ? ` title="${글(f.근거)}"` : ''}>${글(f.l)}</th>`).join('') + '</tr></thead><tbody>';
-  const 흐름들 = 완료.흐름 || [];
-  가공들.forEach((m, i) => {
-    const 상 = 상태들[i]; if(!보일(상, m) || (가공보기==='완료' && 가공고친.has(s + '\n' + 줄키(m)))) return;   /* v1.59.10 고치는 줄 = 기본 보기에서만 */
-    const 고친줄 = 가공고친.has(s + '\n' + 줄키(m)) && 가공보기!=='완료', 초 = 고친줄 && 가공초안.get(s + '\n' + 줄키(m)), 처음값 = 초 ? JSON.parse(초.처음) : null;
-    const 키 = 줄키(m), 값 = 가공값(s, m, 구매들), r = 보맵.get(키), 잠 = 상.대 || (상.완 && 가공보기!=='완료' && !고친줄) || 가공보기==='완료';
-    const 줄틀 = 상.완 ? ' class="완료"' : 상.오 ? ' class="오류"' : '';
-    h += `<tr data-key="${글(키)}"${줄틀}><td class="dpr-k 입" title="${글(가공말)}"><input data-가="가공" value="${글(라벨(m))}" autocomplete="off"${잠 || 고친줄 || m.조합키 ? ' disabled' : ''}></td><td class="참">${글(m.규격)}</td>` + (T.k==='완료품' ? '' : `<td class="참">${글(칸(m.원m || m, 'p_vendor'))}</td><td class="참 num">${글(칸(m.원m || m, 'p_price'))}</td>`);
-    h += 칸들.map(f => {
-      const 묶 = f.첫 ? ' 묶' : '';
-      let v = '', 색 = '', 제 = f.근거 || '', 입력 = true;
-      if(T.k==='원장'){
-        const o = 값.o;
-        if(f.k==='o_code'){ v = o.자재번호; 색 = !v || o.신규 ? '임칸' : '완칸'; 제 = !v ? '원장(등록 구매자재)을 고르세요' : o.신규 ? '신규 — 입력폼 완료 자재에 없음 · 입력폼이 등록할 자재로 받음' : '입력폼 자재 완료'; }
-        else if(f.k==='o_vend'){ v = 원장업체(o.자재번호); 입력 = false; 제 = '입력폼 구매단가 등록완료 업체'; }   /* v1.59.11 */
-        else if(f.k==='o_price'){ v = o.단가; 입력 = false; 제 = '영림원보내기 이 거래처 줄 단가(같은 자재번호일 때)'; }
-        else { v = o[f.원]; 입력 = false;   /* v1.59.2 원장 정보 = 그 원장 입력폼 완료 값(읽기만) */
-          if(!o.신규){ 색 = v ? '완칸' : ''; 제 = '입력폼 완료 자재 값'; }
-          else if(f.분 != null){ const 경 = [o.대분류, o.중분류, o.소분류].slice(0, f.분 + 1); 색 = !v ? '임칸' : 완료분류().some(x => 경.every((y, j) => x[j]===y)) ? '완칸' : '분류새'; 제 = !v ? 임시말 : 색==='완칸' ? '입력폼 완료 분류' : '신규 — 입력폼 완료 분류에 없음 · 입력폼이 등록할 분류로 받음'; const 꼴 = 색==='분류새' ? 분류꼴틀(경) : ''; if(꼴){ 색 = '임칸'; 제 = 꼴; } }   /* v1.59.0 */
-          else { 색 = !v && !f.빈칸됨 ? '임칸' : ''; 제 = 임시말; } }
-      }else if(T.k==='가공'){
-        if(f.k==='proc'){ v = 값.공정; const 완 = (완료.공정 || []).includes(v); 색 = !v ? '임칸' : 완 ? '완칸' : '분류새'; 제 = !v ? '공정을 고르세요(입력폼 완료) 또는 직접' : 완 ? '입력폼 공정 완료' : '신규 — 입력폼 완료 공정에 없음 · 입력폼이 공정 등록대기로 받음'; }
-        else { v = 값.흐름; const 완 = 흐름들.includes(v); 색 = !v ? '임칸' : 완 ? '완칸' : '분류새'; 제 = !v ? '공정흐름을 고르세요(입력폼 완료) 또는 직접' : 완 ? '입력폼 공정흐름유형 완료' : '신규 — 입력폼 완료 공정흐름에 없음 · 입력폼이 공정흐름 등록대기로 받음'; }
-      }else{
-        const c = 값.c, 자 = 값.자;
-        if(f.k==='x_ocode' || f.k==='x_oname' || f.k==='x_ovend'){ const o = 값.o; v = f.k==='x_ocode' ? o.자재번호 : f.k==='x_oname' ? o.자재명 : 원장업체(o.자재번호); 입력 = f.k==='x_ocode' && 고친줄; 제 = f.k==='x_ovend' ? '입력폼 구매단가 등록완료 업체' : '짝 원장(구매자재)'; }   /* v1.59.11 */   /* v1.59.15 사장님 「고치기 구매자재 선택 안 된다」 「아니 입력 자체가 안 되는 칸이라고」 — 가공완료품 탭에서 고치기로 연 줄 = 구매자재 자재번호 칸이 원장 고르는 칸 */
-        else if(f.고정){ v = f.고정; 입력 = false; }
-        else if(f.따공정){ v = 값.공정; 입력 = false; const 완 = (완료.공정 || []).includes(v); 색 = !v ? '임칸' : 완 ? '완칸' : '분류새'; 제 = f.근거 + ' · ' + (!v ? '공정 빈칸' : 완 ? '입력폼 공정 완료' : '신규 공정'); }
-        else if(f.따라){ v = 자.자재소분류; 입력 = false; 색 = !v ? '임칸' : ''; }
-        else if(f.분 != null){ v = c[['대분류','중분류','소분류'][f.분]]; const 경 = [c.대분류, c.중분류, c.소분류].slice(0, f.분 + 1);
-          색 = !v ? '임칸' : 완료분류().some(x => 경.every((y, j) => x[j]===y)) ? '완칸' : '분류새'; 제 = !v ? 임시말 : 색==='완칸' ? '입력폼 완료 분류' : '신규 — 입력폼 완료 분류에 없음 · 입력폼이 등록할 분류로 받음'; const 꼴 = 색==='분류새' ? 분류꼴틀(경) : ''; if(꼴){ 색 = '임칸'; 제 = 꼴; } }   /* v1.59.0 */
-        else if(f.k==='m_code' && m.조합키){ v = 자.자재번호; const 겹 = v && (조합겹침(s, m, v) || 가공들.some(x => x !== m && 트(가공값(s, x, 구매들).자.자재번호).toLowerCase() === v.toLowerCase()));   /* v1.59.17 새 조합 = 새 자재번호 — 있는 번호와 같으면 빨강 */
-          색 = !v ? '임칸' : 겹 ? '분류틀' : '분류새'; 제 = !v ? '새 조합 자재번호 — 직접 넣음' : 겹 ? `자재번호 겹침 — 이미 있는 「${(기존자재(v) || {}).자재명 || (() => { const x = 가공들.find(x => x !== m && 트(가공값(s, x, 구매들).자.자재번호).toLowerCase() === v.toLowerCase()); return x ? 가공값(s, x, 구매들).자.자재명 : ''; })()}」` : '신규 — 입력폼이 자재 등록대기로 받음'; }
-        else if(f.k==='m_code'){ v = 자.자재번호; 색 = !v ? '임칸' : 자재찾기(v) ? '완칸' : '분류새'; 제 = !v ? 임시말 + ' · ' + f.근거 : 자재찾기(v) ? '입력폼 자재 완료' : '신규 — 입력폼이 자재(재공품) 등록대기로 받음'; }
-        else if(f.k==='m_name'){ v = 자.자재명; 색 = !v ? '임칸' : ''; 제 = f.근거; }
-        else if(f.k==='m_spec'){ v = 자.규격; if(!('m_spec' in 값.v)) 색 = '참고값'; }
-      }
-      { const 단 = T.k==='원장' ? (f.분 != null ? '원장분류' : f.k==='o_price' ? '원장단가' : '원장') : T.k==='가공' ? '공정' : /^x_o/.test(f.k) ? '원장' : (f.따공정 ? '공정' : (f.k==='c_kind' || f.분 != null) ? '분류' : '자재');
-        const x = 상.모[단] || { 상태:'' }, 끝 = 가공단계이름[단] + ': ' + (x.상태 ? x.상태 : '입력폼 등록완료 아님') + (x.이유 ? ' — ' + x.이유 : '');   /* v1.48.0 칸 색 = 그 단계 */
-        if(x.상태==='완료'){ if(!/임칸/.test(색)) 색 = 색.replace(/분류새/, '') + ' 완칸'; }
-        else if(x.상태==='대기' || x.상태==='진행중') 색 = 색.replace(/완칸|분류새/, '') + ' 대기칸';
-        else if(x.상태==='오류') 색 = 색.replace(/완칸|분류새/, '') + ' 고칠칸';
-        else if(/완칸/.test(색)) 색 = 색.replace(/완칸/, '분류새');
-        제 = (제 ? 제 + ' · ' : '') + 끝; }
-      const 키k = f.k==='x_ocode' ? 'o_code' : f.k;   /* v1.59.15 */
-      const 파 = 입력 && (키k in 값.v) && !(T.k==='원장' && !값.o.신규 && f.k!=='o_code') ? ' class="저장값"' : '';
-      if(값.기존 && !m.조합키 && ['m_name','m_spec','m_big','m_mid','m_small'].includes(키k)){ const 손 = 트((값.v || {})[키k]); if(손 && 손 !== 트(v)){ 색 += ' 고칠칸'; 제 = `입력폼 완료 자재 값 「${v}」 — 넣은 값 「${손}」 와 다름 · ` + 제; } }   /* v1.59.22 */
-      const 겹이름 = m.조합키 && 키k==='m_name' && !v && 조합겹침(s, m, 값.자.자재번호) ? ((기존자재(값.자.자재번호) || {}).자재명 || '') : '';   /* v1.59.22 겹친 자재 이름 보임(값 아님) */
-      if(!입력) return `<td class="따${묶} ${색}"${제 ? ` title="${글(제)}"` : ''}>${글(v)}</td>`;
-      const 잠칸 = 잠 || (!!m.조합키 && !['o_code','m_code','m_name','m_spec'].includes(키k));   /* v1.59.17 조합 줄 = 원장 · 새 자재번호·자재명·규격 */   /* v1.59.10 등록완료 줄 = 고치기로만(v1.59.1 원장 칸 바로 고침 걷음) · v1.59.13 조합 줄 = 원장만 */
-      const 바 = 처음값 && 트(처음값[키k]) !== 트(초.값[키k]) ? ' 바뀜' : '';   /* v1.59.10 저장 전 바뀐 칸 */
-      return `<td class="입${묶} ${색}${바}"${제 ? ` title="${글(제)}"` : ''}><input data-가="${키k}" value="${글(v)}"${파}${겹이름 ? ` placeholder="${글(겹이름)}"` : ''} autocomplete="off"${잠칸 ? ' disabled' : ''}></td>`;
+  const 라벨 = m => m.규격 ? m.이름 + ' / ' + m.규격 : m.이름, 칸 = (m, k) => 칸값(폼칸.find(f => f.k===k), m, s), 아이디 = m => s + '\n' + 줄키(m);
+  const 보줄 = 가공품목줄들(s) || [];
+  const 모든 = 가공후보.filter(m => 가공품목[s].has(줄키(m)) || 가공초안.has(아이디(m))).concat(조합들(s, 가공후보));
+  const 완 = m => { const 모 = 가공단계셈(s, m, 구매들); return (모.자재 || {}).상태==='완료' && (모.구매단가 || {}).상태==='완료'; };   /* 완료 = 입력폼 자재 · 현진 구매단가 둘 다 완료 */
+  const 보일 = 모든.filter(m => 가공고친.has(아이디(m)) || 가공방금.has(아이디(m)) || 완(m));
+  const 열 = l => ` data-열="${글('가공새_' + l)}"`;
+  const 칸들 = [ {k:'m_code', l:'자재번호'}, {k:'m_name', l:'자재명'}, {k:'m_spec', l:'규격'}, {k:'m_big', l:'대분류', 분:0}, {k:'m_mid', l:'중분류', 분:1}, {k:'m_small', l:'소분류', 분:2},
+    {k:'o_code', l:'자재번호', 원:1}, {k:'o_name', l:'자재명', 원:1, 읽:1}, {k:'o_vend', l:'업체', 원:1, 읽:1} ];
+  let h = `<table class="dpr-t 폼표 가공표"><thead><tr><th class="묶" colspan="3">가공</th><th class="묶" colspan="6">구매+가공 자재</th><th class="묶" colspan="3">원장</th><th class="묶" rowspan="2"${열('단추')}></th></tr><tr>` +
+    `<th class="dpr-k"${열(엑칸[품])}>${글(엑칸[품])}</th><th${열(엑칸[규])}>${글(엑칸[규])}</th><th${열('가공 단가')}>단가</th>` +
+    칸들.map((f, i) => `<th${i===0 || i===6 ? ' class="묶"' : ''}${열((f.원 ? '원장 ' : '') + f.l)}>${글(f.l)}</th>`).join('') + '</tr></thead><tbody>';
+  const 겹침 = (m, 번) => { const v = 트(번).toLowerCase(); if(!v) return false; if(기존자재(v) && !(((가공품목결과[s] || {})[줄키(m)] || {}).자재)) return !완(m); return 모든.some(x => x !== m && 트(가공값(s, x, 구매들).자.자재번호).toLowerCase() === v); };
+  보일.forEach(m => {
+    const id = 아이디(m), 고침 = 가공고친.has(id), 초 = 가공초안.get(id), 처음 = 초 ? JSON.parse(초.처음) : null, 값 = 가공값(s, m, 구매들), 새줄 = 고침 && !가공품목[s].has(줄키(m));
+    const 열린 = k => 고침 && (k==='o_code' || (새줄 && (k==='m_code' || k==='m_name' || k==='m_spec' || (!m.조합키 && /^m_(big|mid|small)$/.test(k)))));
+    let 막 = false;
+    h += `<tr data-key="${글(줄키(m))}"><td class="dpr-k 참">${글(라벨(m))}</td><td class="참">${글(m.규격)}</td><td class="참 num">${글(칸(m.원m || m, 'p_price'))}</td>`;
+    h += 칸들.map((f, i) => {
+      const 묶 = i===0 || i===6 ? ' 묶' : '';
+      let v, 색 = '', 제 = '';
+      if(f.k==='o_code'){ v = 값.o.자재번호; if(!v){ 색 = '임칸'; 막 = 막 || 고침; } else if(값.o.신규){ 색 = '분류틀'; 제 = '입력폼 완료 원장 아님'; 막 = 막 || 고침; } }
+      else if(f.k==='o_name') v = 값.o.자재명;
+      else if(f.k==='o_vend') v = 원장업체(값.o.자재번호);
+      else if(f.k==='m_code'){ v = 값.자.자재번호; if(새줄){ if(!v){ 색 = '임칸'; 막 = true; } else if(겹침(m, v)){ 색 = '분류틀'; 제 = '자재번호 겹침 — 「' + ((기존자재(v) || {}).자재명 || '') + '」'; 막 = true; } } }
+      else if(f.k==='m_name'){ v = 값.자.자재명; if(새줄 && !v){ 색 = '임칸'; 막 = true; } }
+      else if(f.k==='m_spec') v = 값.자.규격;
+      else { v = 값.c[['대분류','중분류','소분류'][f.분]]; if(새줄 && !m.조합키 && !v){ 색 = '임칸'; 막 = true; } }
+      const 바 = 처음 && 'k' in f && !f.읽 && 트(처음[f.k]) !== 트(초.값[f.k]) ? ' 바뀜' : '';
+      if(!열린(f.k)) return `<td class="따${묶} ${색}${바}"${제 ? ` title="${글(제)}"` : ''}>${글(v)}</td>`;
+      return `<td class="입${묶} ${색}${바}"${제 ? ` title="${글(제)}"` : ''}><input data-가="${f.k}" value="${글(v)}" autocomplete="off"></td>`;
     }).join('');
-    const 점 = 상.st.map(([단, x]) => `<span class="점 ${x.상태==='완료' ? '완' : x.상태==='오류' ? '오' : x.상태 ? '작' : ''}" title="${글(가공단계이름[단] + ': ' + (x.상태 || '입력폼 등록완료 아님') + (x.이유 ? ' — ' + x.이유 : ''))}"></span>`).join(' ');   /* v1.48.0 */
-    h += `<td class="등록 묶">${점}${고친줄 ? ` <button type="button" class="chip on" data-가저장="${i}"${m.조합키 && (조합겹침(s, m, 값.자.자재번호) || 가공들.some(x => x !== m && 트(값.자.자재번호) && 트(가공값(s, x, 구매들).자.자재번호).toLowerCase() === 트(값.자.자재번호).toLowerCase())) ? ' disabled title="자재번호 겹침"' : ''}>저장</button> <button type="button" class="chip" data-가취소="${i}">취소</button>` : 상.보관 && 가공보기==='완료' ? ` <button type="button" class="chip" data-가풀="${i}">고치기</button>` : ''}</td></tr>`;   /* v1.52.0 · v1.59.10 고치기로 연 줄 = 저장 · 취소 */
+    const 상 = (() => { if(완(m)) return ''; const 모 = 가공단계셈(s, m, 구매들), x = [모.분류, 모.자재, 모.구매단가].find(y => y && y.상태 && y.상태!=='완료'); return x ? x.상태 : ''; })();
+    h += `<td class="등록 묶">${고침 ? `<button type="button" class="chip on" data-가저장="${글(id)}"${막 ? ' disabled' : ''}>저장</button> <button type="button" class="chip" data-가취소="${글(id)}">취소</button>` : 완(m) ? `<button type="button" class="chip" data-가풀="${글(id)}">고치기</button>` : 글(상)}</td></tr>`;
   });
-  if(!가공보기 && 가공들.filter(m => !m.조합키).length < 가공후보.length) h += `<tr data-key=""><td class="dpr-k 입 임칸" title="${글(가공말)}"><input data-가="가공" value="" autocomplete="off"></td>` + '<td></td>'.repeat(1 + (T.k==='완료품' ? 0 : 2) + 칸들.length + 1) + '</tr>';   /* v1.50.0 새 줄 = 가공 드롭 */
   h += '</tbody></table>';
-  const 탭글 = 가공탭들.map(t => `<button class="chip${t.k===T.k ? ' on' : ''}" data-가탭="${t.k}">${글(t.이름)}</button>`).join('');
-  const 조합원후보 = 가공후보.filter(m => 가공보관있음(s, 줄키(m)));   /* v1.59.13 등록완료 가공 줄 */
-  const 조합고름 = 조합원후보.length ? `<select class="chip" data-가조합><option value="">완료 가공 불러오기</option>${조합원후보.map(m => `<option value="${글(줄키(m))}">${글(라벨(m) + ' · ' + 트(가공값(s, m, 구매들).자.자재번호))}</option>`).join('')}</select>` : '';
-  속.innerHTML = `<div class="폼줄">${탭글}${조합고름}<span class="폼상태">·</span>` +
-    `<button class="chip${가공보기==='오류' ? ' on' : ''}" data-가보기="오류" title="이 탭 영림원 등록 오류 줄만">오류건 <b>${오수}</b></button>` +
-    `<button class="chip${가공보기==='완료' ? ' on' : ''}" data-가보기="완료" title="이 탭 영림원 등록 완료 줄만(잠금)">등록완료 <b>${완수}</b></button>` +
-    `<span id="가공상태" class="폼상태"></span></div><div class="표통">${h}<div class="글">${상태들.filter((x, i) => 보일(x, 가공들[i])).length}줄</div></div>`;
-  속.querySelectorAll('[data-가탭]').forEach(b => b.onclick = () => { 가공탭 = b.dataset.가탭; 가공보기 = ''; 가공품목그리기(); });
-  속.querySelectorAll('[data-가보기]').forEach(b => b.onclick = () => { 가공보기 = 가공보기===b.dataset.가보기 ? '' : b.dataset.가보기; 가공품목그리기(); });
-  속.querySelectorAll('[data-가풀]').forEach(b => b.onclick = () => { const 키 = 줄키(가공들[+b.dataset.가풀]), id = s + '\n' + 키;   /* v1.59.10 고치기 = 화면 초안만(쓰기 없음) — 보관 값(원장 짝·가공품 분류·자재)을 초안에 */
-    const 보 = (가공품목보관[s] || {})[키] || {}, 저 = 가공품목[s].get(키) || { 원장:'', 값:{} }, 값 = { ...저.값 }, 넣 = (k, v) => { if(!(k in 값) && 트(v)) 값[k] = 트(v); };
-    넣('o_code', (보.원장 || {}).자재번호); 넣('m_big', (보.분류 || {}).대분류); 넣('m_mid', (보.분류 || {}).중분류); 넣('m_small', (보.분류 || {}).소분류);
-    if(!키.startsWith(조합키머리)){ 넣('m_code', (보.자재 || {}).자재번호); 넣('m_name', (보.자재 || {}).자재명); 넣('m_spec', (보.자재 || {}).규격); }   /* v1.59.21 조합 줄 = 새 자재라 보관 자재 값 안 옮김 */
-    if(키.startsWith(조합키머리)){ const 원 = 가공값(s, 가공들[+b.dataset.가풀].원m, 구매들).자; if(트(값.m_code).toLowerCase() === 트(원.자재번호).toLowerCase()) delete 값.m_code; if(트(값.m_name) === 트(원.자재명)) delete 값.m_name; }
-    가공초안.set(id, { 원장:저.원장 || '', 값, 처음:JSON.stringify(값) }); 가공고친.add(id); 가공보기 = ''; 가공품목그리기(); });
-  { const 고름 = 속.querySelector('[data-가조합]'); if(고름) 고름.onchange = () => { const 원키 = 고름.value; if(!원키) return;   /* v1.59.13 새 조합 줄 = 초안(원장만 고름 → 저장) */
-    const 키 = 조합키머리 + Date.now().toString(36), id = s + '\n' + 키, 값 = { 조합원:원키 };
-    가공초안.set(id, { 원장:'', 값, 처음:JSON.stringify(값) }); 가공고친.add(id); 가공탭 = '원장'; 가공보기 = ''; 가공품목그리기(); }; }
-  속.querySelectorAll('[data-가저장]').forEach(b => b.onclick = () => { const m = 가공들[+b.dataset.가저장], 키 = 줄키(m), id = s + '\n' + 키, 초 = 가공초안.get(id); if(!초) return;   /* v1.59.10 저장 = 저장 줄 · 보관 · 보내기 */
-    가공품목[s].set(키, { 원장:초.원장, 값:{ ...초.값 } }); 가공초안.delete(id); 가공고친.delete(id); 가공풀린.delete(id);
-    const 값 = 가공값(s, m, 구매들), 다 = 가공다완(가공단계셈(s, m, 구매들));
-    if(다) 가공보관바꿈(s, { [키]:{ 때:new Date().toISOString(), ...가공보관값(값) } }); else 가공보관바꿈(s, null, [키]);
-    가공품목저장(s); 가공보기 = 다 ? '완료' : ''; 가공품목그리기(); });
-  속.querySelectorAll('[data-가취소]').forEach(b => b.onclick = () => { const id = s + '\n' + 줄키(가공들[+b.dataset.가취소]); 가공초안.delete(id); 가공고친.delete(id); 가공보기 = '완료'; 가공품목그리기(); });   /* v1.59.10 취소 = 초안 버림 */
+  const 신규 = `<select class="chip" data-가신규><option value="">신규등록</option>${가공후보.map(m => `<option value="${글(줄키(m))}">${글(라벨(m))}</option>`).join('')}</select>`;
+  속.innerHTML = `<div class="폼줄">${신규}<span id="가공상태" class="폼상태"></span></div><div class="표통">${h}<div class="글">${보일.length}줄</div></div>`;
+  const 찾m = id => 보일.find(m => 아이디(m) === id);
+  속.querySelector('[data-가신규]').onchange = e => { const 원키 = e.target.value; if(!원키) return;   /* 신규 = 그 가공 줄이 비었으면 그 줄 · 이미 있으면 조합 줄(원 줄 분류·구매단가) */
+    if(!가공품목[s].has(원키) && !가공초안.has(s + '\n' + 원키)){ 가공초안.set(s + '\n' + 원키, { 원장:'', 값:{}, 처음:'{}' }); 가공고친.add(s + '\n' + 원키); }
+    else { const 키 = 조합키머리 + Date.now().toString(36), 값 = { 조합원:원키 }; 가공초안.set(s + '\n' + 키, { 원장:'', 값, 처음:JSON.stringify(값) }); 가공고친.add(s + '\n' + 키); }
+    가공품목그리기(); };
+  속.querySelectorAll('[data-가풀]').forEach(b => b.onclick = () => { const id = b.dataset.가풀, 키 = id.slice(s.length + 1), 저 = 가공품목[s].get(키) || { 원장:'', 값:{} };
+    가공초안.set(id, { 원장:저.원장 || '', 값:{ ...저.값 }, 처음:JSON.stringify(저.값) }); 가공고친.add(id); 가공품목그리기(); });
+  속.querySelectorAll('[data-가저장]').forEach(b => b.onclick = () => { const id = b.dataset.가저장, 키 = id.slice(s.length + 1), 초 = 가공초안.get(id); if(!초) return;
+    if(!가공품목[s].has(키)) 가공방금.add(id);
+    가공품목[s].set(키, { 원장:초.원장, 값:{ ...초.값 } }); 가공초안.delete(id); 가공고친.delete(id); 가공품목저장(s); 가공품목그리기(); });
+  속.querySelectorAll('[data-가취소]').forEach(b => b.onclick = () => { const id = b.dataset.가취소; 가공초안.delete(id); 가공고친.delete(id); 가공품목그리기(); });
   const 표 = 속.querySelector('.가공표');
-  const 고침 = el => {
-    const tr = el.closest('tr'), 키 = tr.dataset.key, k = el.dataset.가, v = 트(el.value);
-    if(k==='가공'){   /* v1.50.0 가공 고름 = 줄 만듦 · 바꿈 = 값 옮김 · 지움 = 묻고 그 줄 지움 */
-      const 새 = v ? 라벨키.get(v) : '';
-      if((v && !새) || 새===키 || (새 && 가공품목[s].has(새))){ 가공품목그리기(); return; }
-      if(!새){ if(!키 || !confirm('삭제하겠습니까?')){ 가공품목그리기(); return; } 가공품목[s].delete(키); }
-      else { const 저 = 키 ? 가공품목[s].get(키) : null; if(키) 가공품목[s].delete(키); 가공품목[s].set(새, 저 || { 원장:'', 값:{} }); }
-      가공품목저장(s); 가공품목그리기(); return; }
-    const 초id = s + '\n' + 키, 초 = 가공초안.get(초id);
-    const 저 = 초 || 가공품목[s].get(키) || { 원장:'', 값:{} }, 새 = { 원장:저.원장, 값:{ ...저.값 } };
-    if(k==='o_code'){ 새.값.o_code = v; 새.원장 = ''; }
-    else if(k==='proc'){ const m0 = 가공들.find(x => 줄키(x)===키); if(v===m0.이름) delete 새.값.proc; else 새.값.proc = v; }   /* 처음 값(가공 납품제품명)과 같으면 저장 안 함 */
-    else if(k==='flow'){ const m0 = 가공들.find(x => 줄키(x)===키); if(v===가공값(s, m0, 구매들).공정) delete 새.값.flow; else 새.값.flow = v; }   /* v1.45.4 처음 값(공정명)과 같으면 저장 안 함 · 비우면 '' 로 남김 */
-    else if(k==='m_name' || k==='m_spec'){ const m0 = 가공들.find(x => 줄키(x)===키), 기 = 가공값(s, m0, 구매들); const 기본 = k==='m_name' ? '' : 기.o.규격;
-      if(v===기본) delete 새.값[k]; else 새.값[k] = v; }
-    else if(v) 새.값[k] = v; else delete 새.값[k];
-    if(고른값(새) === 고른값(저)) return;
-    if(초){ 가공초안.set(초id, { ...초, 원장:새.원장, 값:새.값 }); 가공품목그리기(); return; }   /* v1.59.10 고치기로 연 줄 = 화면에서만 */
-    가공풀린.delete(s + '\n' + 키);   /* v1.59.3 사장님 「고치기를 누르면 해당 납품자재명이 그대로 와서 수정되게 해야 되는 거 아니냐」 — 고친 뒤엔 입력폼 지금 상태로 다시 셈 → 모두 완료면 다시 등록완료(보관) */
-    가공품목[s].set(키, 새); 가공품목저장(s); 가공품목그리기();
-  };
   표.querySelectorAll('input[data-가]').forEach(el => {
-    el.onchange = () => 고침(el);
+    el.onchange = () => { const tr = el.closest('tr'), m = 보일.find(x => 줄키(x) === tr.dataset.key), id = m && 아이디(m), 초 = id && 가공초안.get(id); if(!초) return;
+      const k = el.dataset.가, v = 트(el.value), 새 = { ...초.값 }; if(v) 새[k] = v; else delete 새[k]; if(k==='o_code') 초.원장 = '';
+      가공초안.set(id, { ...초, 값:새 }); 가공품목그리기(); };
     el.onkeydown = e => { if(e.key==='Enter') el.blur(); };
-    el.addEventListener('blur', () => setTimeout(() => { if(가공다시미룸 && !(document.activeElement && document.activeElement.closest && document.activeElement.closest('.가공표'))) 가공품목그리기(); }, 0));
   });
-  /* 드롭 목록 = 입력폼 완료 자료(표입력.js 기억 드롭과 같은 꼴) — 목록 밖 글도 받음(= 신규) */
   const 목록 = td => {
     const el = td.querySelector('input[data-가]'); if(!el) return [];
-    const k = el.dataset.가, f = 칸들.find(x => x.k===k) || {}, tr = td.closest('tr');
-    if(k==='가공'){ const 지금 = tr.dataset.key; return 가공후보.filter(m => 줄키(m)===지금 || !가공품목[s].has(줄키(m))).map(m => ({ v:라벨(m) })); }
-    if(k==='o_code'){ const 가공번 = new Set(가공후보.map(m => 트(가공값(s, m, 구매들).자.자재번호).toLowerCase()).filter(Boolean));   /* v1.59.2 가공 자재 뺌 */
-      const 처 = new Map(); for(const kk of (폼등록.구매단가 || [])){ const [c, vv] = String(kk).split('\t'); if(!c || !vv) continue; if(!처.has(c)) 처.set(c, new Set()); 처.get(c).add(vv); }   /* v1.59.5 사장님 「고치기 구매자재 드롭 목록에 신태광 것 안 보이는데」 — 원장마다 입력폼 완료 구매단가 거래처를 글에(보이고 · 쳐서 찾음) */
-      return (완료.자재 || []).filter(원장대분류).filter(x => !가공번.has(트(x.자재번호).toLowerCase())).map(x => { const 업 = [...(처.get(트(x.자재번호).toLowerCase()) || [])].join(' · ');
-        return { v:x.자재번호, 글:[x.자재명, x.규격, 업].filter(Boolean).join(' · '), 덧:업 || (내번호.has(x.자재번호) ? s : ''), 내:내번호.has(x.자재번호), 업:[...(처.get(트(x.자재번호).toLowerCase()) || [])] }; })
-      .sort((a, b) => (b.내 - a.내) || a.v.localeCompare(b.v, 'ko')).map(({ v, 글, 덧, 업 }) => ({ v, 글, 덧, 업 })); }   /* v1.59.7 업 = 등록완료 구매단가 업체(드롭 위 업체 체크, 표입력.js v10) */
-    if(k==='flow') return 흐름들.map(v => ({ v }));
-    if(k==='proc') return (완료.공정 || []).map(v => ({ v }));
-    if(f.분 != null){ const 앞 = f.앞, 읽 = kk => 트((tr.querySelector(`input[data-가="${앞}_${kk}"]`) || {}).value);
-      const 위 = [읽('big'), 읽('mid')].slice(0, f.분);
+    const k = el.dataset.가, tr = td.closest('tr'), f = 칸들.find(x => x.k===k) || {};
+    if(k==='o_code'){ const 가공번 = new Set(가공후보.map(m => 트(가공값(s, m, 구매들).자.자재번호).toLowerCase()).filter(Boolean));
+      return (완료.자재 || []).filter(원장대분류).filter(x => !가공번.has(트(x.자재번호).toLowerCase())).map(x => ({ v:x.자재번호, 글:[x.자재명, x.규격, 원장업체(x.자재번호)].filter(Boolean).join(' · ') })); }
+    if(f.분 != null){ const 읽 = kk => 트((tr.querySelector(`input[data-가="m_${kk}"]`) || {}).value); const 위 = [읽('big'), 읽('mid')].slice(0, f.분);
       return [...new Set(완료분류().filter(x => 위.every((y, j) => x[j]===y)).map(x => x[f.분]))].map(v => ({ v })); }
     return [];
   };
@@ -3206,8 +3119,7 @@ function 가공품목그리기(){
     읽기: td => { const el = td.querySelector('input[data-가]'); return el ? el.value : td.textContent.trim(); },
     쓰기: 목 => { for(const [td, v0] of 목){ const el = td.querySelector('input[data-가]'); if(!el || el.disabled) continue; const v = String(v0 ?? ''); if(el.value===v) continue; el.value = v; el.dispatchEvent(new Event('change', { bubbles:true })); } }
   });
-  열손달기(표); 열너비맞춤(표);   /* v1.45.0 칸 너비 끌기 — 영림원보내기와 같은 손잡이 · 이 기기 기억(열 이름 「가공_탭_칸」) */
-  /* 열 때 — 창고 보내기가 지금 셈과 다르면(완료 자료·영림원보내기 가공 줄이 바뀜) 다시 씀 */
+  열손달기(표); 열너비맞춤(표);
   const 옛 = 가공품목보내기[s];
   if((보줄.length || 옛) && 고른값((옛 && 옛.줄) || []) !== 고른값(보줄) && !가공품목저장중[s]) 가공품목저장(s);
 }
