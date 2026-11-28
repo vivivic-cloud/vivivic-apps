@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.59.45
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.59.46
+     v1.59.46(11-28): 사장님 「1월 명세서 표 끝에 여백이 없어 자료가 끝난 건지 알 수 없다」 — 명세서 표 맨 끝 「[N월 합계] N장」 줄(수량·금액·합계 합 + 월별명세 「[N월 소계]」 합계금액과 차이) + 표 아래 여백.
      v1.59.45(11-28): 사장님 「명세서 표 빨강·주황이 무엇이 어디가 안 맞는지 알 수 없다」 — 안 맞는 칸(수량·금액·합계·날짜)에만 색 + 칸 안에 「명세값 / 계산값 · 차이」 숫자(계산 = 수량×단가×1.1, 합계 = 줄 계산 합) + 줄 끝 「차이」 칸(칸 이름 ±값). 정정(수량 70→68·날짜 22→21)은 창고 서류 `정정:[{칸,줄,인쇄,정정}]` 로 주황 칸에 「인쇄 → 정정」. 「!」·문장 뺌.
      v1.59.44(11-28): 사장님 「사진은 팝업으로 새페이지에 뜨게 하고 사진이 아니라 실명세서라고 버튼 하세요」 — 명세서 표 「사진」 → 「실명세서」(머리 칸·단추) · 누르면 겹침 대신 새 창(팝업)에 명세서 그림.
      v1.59.43(11-28): 분배 방 사장님 「스토리지에 올려주세요」 → 「해줘」 — 월별명세(전체·달마다) 표 아래 「명세서」 표 = 그 달 거래명세서 글자(날짜·번호·품목·수량·단가·금액·합계, 창고 `발주역입력_명세서/{거래처}_{yyyy-mm}`) + 「사진」 단추(Cloud Storage `statements/…` 보기용 사진, 누르면 큰 사진). 지금 엘데코 2026-01 만(자료 없는 거래처·달은 아무것도 안 보임). 이 줄 이후 코드 읽기만 — 월별 표·영림원보내기 안 고침.
@@ -502,7 +503,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.59.45</div>
+  <div class="badge">v1.59.46</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -3211,7 +3212,21 @@ async function 명세서붙이기(s, 달들){
              `<td rowspan="${줄.length}"><button class="chip 사진단추" data-p="${글(sv.사진||'')}">실명세서</button></td>` : '') + '</tr>';
       });
     }
-    h += '</tbody></table></div>';
+    { /* 맨 끝 합계 줄 — 서류 장수 · 수량 합 · 금액 합 · 합계 합 + 월별명세 [N월 소계] 합계금액과 차이 */
+      const 쪽수 = n => Number(n||0).toLocaleString('ko-KR'), 쪽부호 = n => (n>0?'+':n<0?'−':'') + 쪽수(Math.abs(n));
+      const 월표 = ((받은[s]||{}).표||[]).find(t => t.이름==='월별'), 칸이름 = (월표&&월표.칸)||[];
+      const 합칸 = 칸이름.findIndex(k => /합계금액/.test(String(k)));
+      const 소줄 = 월표 && (월표.줄||[]).find(z => z.소 && (z.v||[]).some(c => String(c).trim()===`[${달} 소계]`));
+      const 소값 = (소줄 && 합칸>=0) ? Number(String((소줄.v||[])[합칸]).replace(/[^0-9.-]/g,'')) : NaN;
+      let 장 = x.서류.length, 수합 = 0, 금합 = 0, 합합 = 0;
+      x.서류.forEach(sv => { 합합 += Number(sv.합계)||0; (sv.줄||[]).forEach(l => { 수합 += Number(l.수량)||0; 금합 += Number(l.금액)||0; }); });
+      const 차 = isNaN(소값) ? null : 합합 - 소값;
+      const 합색 = 차===null ? '' : (차===0 ? 'background:#D9F2DE' : 'background:#FFD9D6');
+      h += `<tr class="sub" style="font-weight:800;border-top:2px solid #444"><td colspan="3" style="border-top:2px solid #444">[${글(달)} 합계] ${장}장</td><td class="num" style="border-top:2px solid #444">${쪽수(수합)}</td><td style="border-top:2px solid #444"></td><td class="num" style="border-top:2px solid #444">${쪽수(금합)}</td>` +
+        `<td class="num" style="border-top:2px solid #444;${합색}" title="${차===null?'':'월별명세 소계 '+쪽수(소값)+' · 차 '+쪽부호(차)}">${쪽수(합합)}${차 ? `<div style="font-size:10px;line-height:1.2;font-weight:600">소계 ${쪽수(소값)} · 차 ${쪽부호(차)}</div>` : ''}</td>` +
+        `<td class="num" style="border-top:2px solid #444;${차 ? '' : ''}">${차 ? '합계 '+쪽부호(차) : ''}</td><td style="border-top:2px solid #444"></td></tr>`;
+    }
+    h += '</tbody></table><div style="height:56px"></div></div>';
     칸.insertAdjacentHTML('beforeend', h);
   }
   칸.querySelectorAll('.사진단추').forEach(b => b.onclick = async () => {
