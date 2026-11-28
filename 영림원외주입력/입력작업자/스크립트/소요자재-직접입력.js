@@ -81,4 +81,38 @@ window.__one = async (code) => {
   const s = await __save('SS1'); if (ylw.rows(s1).some(r => r.WorkingTag)) throw new Error(code + ' 공정 표 저장 안 됨 ' + JSON.stringify(s));
   return await __mats(v); };
 window.__run = (list) => { window.__g = { 끝: false, 결과: [] }; (async () => { for (const c of list) { __g.cur = c; try { __g.결과.push(await __one(c)); } catch (e) { __g.오류 = S(e.message || e); try { await __discard(); __g.버림 = 1; } catch (e2) { __g.버림 = 'ERR ' + e2.message; } break; } } __g.끝 = true; })(); return '시작 ' + list.length; };
+
+// ★ 11-28 사장님 결정 길: 525162 「일괄등록」 → 500299 에서 문서와 다른 칸만 고침 → 저장 → 대조 → 폼 완료. ⛔ 525162 「일괄삭제」 탭 금지.
+//   쓰는 법: 525162·500299 두 화면을 연 채 __runB(['품번', …]) → window.__g 를 읽는다(한 건 약 25초).
+window.__reg = async (code) => { const w = ylw.win('525162'), d = w.document, sh = d.getElementById('SS1'); w.confirm = (m) => { throw new Error('확인창: ' + m); };
+  const mouse = (b) => { const r = b.getBoundingClientRect(), o = { bubbles: true, cancelable: true, view: w, clientX: r.x + 5, clientY: r.y + 5, button: 0 }; for (const t of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click']) b.dispatchEvent(new (t.startsWith('pointer') ? w.PointerEvent : w.MouseEvent)(t, o)); };
+  const q = async () => { const el = d.getElementById('txtItemNo_txt'); el.focus(); el.value = code; ['input', 'keyup', 'change', 'blur'].forEach(t => el.dispatchEvent(new Event(t, { bubbles: true }))); mouse([...d.querySelectorAll('a')].find(e => /^\s*조회\s*$/.test(e.textContent))); for (let i = 0; i < 60; i++) { await ylw.sleep(500); const r = ylw.rows(sh); if (r.length && r.every(x => x.ItemNo.includes(code))) break; } return ylw.rows(sh); };
+  let rows = await q(); const i = rows.findIndex(r => r.ItemNo === code); if (i < 0) throw new Error(code + ' 525162 표에 없음 ' + rows.map(r => r.ItemNo).join(','));
+  if (rows[i].IsReg === '1') return '이미 등록';
+  rows.forEach((r, j) => { if (r.Select === '1' && j !== i) ylw.setChk(sh, j, 'Select', false); }); ylw.setChk(sh, i, 'Select', true); await ylw.sleep(600);
+  if (ylw.rows(sh).filter(r => r.Select === '1').length !== 1 || ylw.rows(sh)[i].Select !== '1') throw new Error(code + ' 선택 안 됨/여럿');
+  mouse(d.getElementById('btn_proc_btn')); for (let k = 0; k < 60; k++) { await ylw.sleep(500); const ok = document.getElementById('msgBtnOk'); if (ok && ok.getClientRects().length) { ok.click(); break; } }
+  await ylw.sleep(800); rows = await q(); const a = rows.find(r => r.ItemNo === code); if (!a || a.IsReg !== '1') throw new Error(code + ' 일괄등록 뒤 등록여부 꺼짐'); return '일괄등록 됨'; };
+window.__fix = async (v) => { const d = W(), s1 = d.getElementById('SS1'), s2 = d.getElementById('SS2');
+  const r1 = ylw.rows(s1), r2 = ylw.rows(s2); if (r1.length !== v.procs.length) throw new Error(v.code + ' 공정 줄 수 ' + r1.length + '/' + v.procs.length); if (r2.length !== v.mats.length) throw new Error(v.code + ' 자재 줄 수 ' + r2.length + '/' + v.mats.length);
+  const row = (sh, i) => ylw.rows(sh).find(x => +x.IDX_NO === i + 1) || {};
+  for (let i = 0; i < v.procs.length; i++) { const p = v.procs[i], r = row(s1, i); if (+r.ProcNo !== +p.seq || S(r.ProcName) !== S(p.proc) || +r.ToProcNo !== +p.next) throw new Error(v.code + ' 공정 ' + (i + 1) + '행 공정 다름 ' + r.ProcName);
+    if (S(r.WorkCenterName) !== S(p.wc)) { await ylw.paste(s1, i, 'WorkCenterName', [S(p.wc)], 3000); for (let k = 0; k < 60 && S(row(s1, i).WorkCenterName) !== S(p.wc); k++) await ylw.sleep(500); }
+    const c = row(s1, i); if (S(c.TimeUnitName) !== S(p.tunit) || +c.WorkHour !== +p.time) await ylw.paste(s1, i, 'TimeUnitName', [S(p.tunit), S(p.time)], 2000);
+    if (S(p.pcode) && S(row(s1, i).AssyItemNo) !== S(p.pcode)) { await ylw.paste(s1, i, 'AssyItemNo', [S(p.pcode)], 3000); for (let k = 0; k < 60 && S(row(s1, i).AssyItemNo) !== S(p.pcode); k++) await ylw.sleep(500); } }
+  for (const m of v.mats) { const rr = ylw.rows(s2).find(x => S(x.MatItemNo) === S(m.ccode) && +x.UserNo === +m.order); if (!rr) throw new Error(v.code + ' 자재 ' + m.ccode + '/' + m.order + ' 화면에 없음'); const j = +rr.IDX_NO - 1;
+    if (S(rr.ProcName) !== S(m.proc)) await ylw.paste(s2, j, 'ProcName', [S(m.proc)], 2000);
+    if (S(rr.Remark) && !S(m.note)) await ylw.paste(s2, j, 'Remark', [''], 1200); }
+  for (let k = 0; k < 20; k++) { if (!__onlyAsset(ylw.im.check2(v)).length) break; await ylw.sleep(500); } return ylw.im.check2(v); };
+window.__bulk1 = async (code) => { const t0 = Date.now(); const v = (await ylw.imp.list('erp_itemmats')).find(x => x.code === code); if (!v || !(v.status === '대기' || v.status === '진행중')) throw new Error(code + ' 대기 아님 ' + (v && v.status)); if (v.wips && v.wips.length) throw new Error(code + ' wips');
+  if (v.status === '대기') await ylw.imp.patch('erp_itemmats', v.id, { status: '진행중' });
+  const said = await __reg(code); await ylw.im.open(code, v.mats.length);
+  const bad = __onlyAsset(await __fix(v)); if (bad.length) throw new Error(code + ' 고친 뒤 대조: ' + bad.join(' · '));
+  const d = W(), tag = () => [...ylw.rows(d.getElementById('SS1')), ...ylw.rows(d.getElementById('SS2'))].some(r => r.WorkingTag);
+  if (tag()) { await __save('SS1'); for (let i = 0; i < 60 && tag(); i++) await ylw.sleep(500); }
+  if (tag()) throw new Error(code + ' 저장 안 됨');
+  await ylw.im.open(code, v.mats.length); const bad2 = __onlyAsset(ylw.im.check2(v)); if (bad2.length) throw new Error(code + ' 저장 뒤 대조: ' + bad2.join(' · '));
+  await ylw.imp.patch('erp_itemmats', v.id, { status: '완료', agentNote: '525162 일괄등록(' + said + ') → 500299 에서 다른 칸만 고침(워크센터·시간단위·표준 작업시간·투입공정 · 특이사항 「반제품 투입」 지움) → 다시 열어 모든 칸 대조 맞음 · 공정차수 ' + v.rev + ' (11-28, 사장님 「이렇게 입력하게 바꾸고」)' });
+  const x = (await ylw.imp.list('erp_itemmats')).find(y => y.id === v.id); if (x.status !== '완료') throw new Error(code + ' 동기화 ' + x.status); return code + ' ' + Math.round((Date.now() - t0) / 1000) + '초'; };
+window.__runB = (list) => { window.__g = { 끝: false, 결과: [] }; (async () => { for (const c of list) { __g.cur = c; try { __g.결과.push(await __bulk1(c)); } catch (e) { __g.오류 = S(e.message || e); break; } } __g.끝 = true; })(); return '시작 ' + list.length; };
 '도우미 준비됨';
