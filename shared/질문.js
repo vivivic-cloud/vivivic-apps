@@ -36,7 +36,9 @@
       + '.qna details>summary{cursor:pointer;color:#6b6b68;font-size:12.5px;margin:2px 0 6px}'
       + '.qna .qg{font-weight:700;margin:10px 0 4px}.qna .qg a{color:inherit}'
       + '.qna .qe{color:#b91c1c;font-size:12px;margin:4px 0 0}'
-      + '.qna a.ql{color:#2383e2;text-decoration:underline;overflow-wrap:anywhere}';
+      + '.qna a.ql{color:#2383e2;text-decoration:underline;overflow-wrap:anywhere}'
+      + '.qna-btn{font:inherit;font-size:12px;font-weight:600;padding:5px 12px;border-radius:999px;border:1px solid #d6d6d2;background:#fff;color:#1A1A19;cursor:pointer;margin-left:auto;white-space:nowrap}'
+      + '.qna-btn.on{background:#FFF7C2;border-color:#E5B800}.qna-btn[aria-pressed="true"]{box-shadow:inset 0 0 0 2px #1A1A19}';
     document.head.append(st); }
   function 알림(){ 듣는이.forEach(function(f){ try{ f(); }catch(e){ console.warn('질문 그리기', e); } }); }
   function 붙임(c){
@@ -114,7 +116,8 @@
       var 묶 = {}; 대.forEach(function(q){ (묶[q.자리] = 묶[q.자리] || []).push(q); });
       Object.keys(묶).sort(function(a, b){ var i = 차.indexOf(a), j = 차.indexOf(b); return (i < 0 ? 1e9 : i) - (j < 0 ? 1e9 : j); }).forEach(function(k){
         var n = (나무 || []).filter(function(x){ return x.자리 === k; })[0], 이름 = (n && n.자리이름) || 묶[k][0].자리이름 || k;
-        몸.append(h('div', { class:'qg' }, n && n.감 ? h('a', { href:'#', on:{ click:function(e){ e.preventDefault(); n.감(); } } }, 이름) : 이름));
+        var 기 = n && n.감 ? null : 링크({ 자리:k, 자리이름:이름 });   /* 11-28 나무 없는 쪽(발주역입력) = 그 자리 기본 주소 */
+        몸.append(h('div', { class:'qg' }, n && n.감 ? h('a', { href:'#', on:{ click:function(e){ e.preventDefault(); n.감(); } } }, 이름) : 기 || 이름));
         묶[k].forEach(function(q){ 몸.append(카드(q)); }); });
       if(지.length){ var d = h('details', {}, [h('summary', {}, '지난 질문 ' + 지.length)].concat(지.map(function(q){ return 카드(q, true); }))); d.open = 열; 몸.append(d); }
       칸.replaceChildren(몸); 칸.hidden = false;
@@ -135,10 +138,17 @@
   function 지움(id){ if(!C) return Promise.reject(new Error('로그인 없음')); return C.F.deleteDoc(C.F.doc(C.fs, COL, id)); }
   /* 발주역입력 쪽 — 페이지가 다 뜬 뒤(페이지 모듈이 'erp-input' 앱을 먼저 만들게) 입력폼 로그인으로 붙음 */
   function 스스로(자리, 자리이름){
-    var 칸 = h('div', { class:'qna-slot', hidden:true });
+    var 칸 = h('div', { class:'qna-slot', hidden:true }), 다봄 = false;
+    /* 11-28 사장님 「이거 입력폼뿐만 아니라 발주역입력에서도 보여야지」 — 머리 줄 「답 없는 질문 N」(입력폼 머리와 같음 · 대기 있으면 노랑) · 누르면 모든 대기 모음 · 다시 누르면 이 페이지 질문 */
+    var 단 = h('button', { type:'button', class:'qna-btn', hidden:true, 'aria-pressed':'false' }, '답 없는 질문');
+    function 단그림(){ var n = 대기수(); 단.hidden = 목록 == null; 단.textContent = '답 없는 질문 ' + n; 단.classList.toggle('on', n > 0); 단.setAttribute('aria-pressed', 다봄 ? 'true' : 'false'); }
+    function 그칸(){ if(!C){ 놓기(칸); return; } if(다봄) 모음(칸, []); else 달기(칸, 자리, 자리이름); }
+    단.addEventListener('click', function(){ 다봄 = !다봄; 단그림(); 그칸(); });
+    듣기(단그림);
     function 놓을곳(){ var hd = document.querySelector('body > header, header.top, .topbar, header');
       if(hd && hd.parentNode) hd.parentNode.insertBefore(칸, hd.nextSibling); else document.body.prepend(칸);
-      칸.style.margin = '12px 16px 0'; }
+      칸.style.margin = '12px 16px 0';
+      var 머 = document.querySelector('body > header, header'); if(머){ 꾸밈(); 머.append(단); } }
     function 시작(){
       놓을곳();
       Promise.all([import(V + 'firebase-app.js'), import(V + 'firebase-auth.js'), import(V + 'firebase-firestore.js')]).then(function(m){
@@ -147,8 +157,8 @@
         var app = m[0].getApps().filter(function(a){ return a.name === 'erp-input'; })[0] || m[0].initializeApp(설정, 'erp-input');
         var auth = m[1].getAuth(app), F = window.쓰기지킴 ? window.쓰기지킴.덮개(Object.assign({}, m[2])) : m[2], fs = F.getFirestore(app);
         m[1].onAuthStateChanged(auth, function(u){
-          if(!u || u.isAnonymous){ if(끄기){ try{ 끄기(); }catch(e){} 끄기 = null; } 목록 = null; 놓기(칸); return; }
-          붙임({ F:F, fs:fs, who:u.displayName || u.email || '' }); 달기(칸, 자리, 자리이름); });
+          if(!u || u.isAnonymous){ if(끄기){ try{ 끄기(); }catch(e){} 끄기 = null; } 목록 = null; 놓기(칸); 단그림(); return; }
+          붙임({ F:F, fs:fs, who:u.displayName || u.email || '' }); 그칸(); 단그림(); });
       }).catch(function(e){ console.warn('질문 불러오기', e); });
     }
     if(document.readyState === 'complete') setTimeout(시작, 0); else window.addEventListener('load', function(){ setTimeout(시작, 0); });
