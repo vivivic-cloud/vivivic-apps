@@ -35,7 +35,8 @@
       + '.qna button:disabled{opacity:.45;cursor:default}'
       + '.qna details>summary{cursor:pointer;color:#6b6b68;font-size:12.5px;margin:2px 0 6px}'
       + '.qna .qg{font-weight:700;margin:10px 0 4px}.qna .qg a{color:inherit}'
-      + '.qna .qe{color:#b91c1c;font-size:12px;margin:4px 0 0}';
+      + '.qna .qe{color:#b91c1c;font-size:12px;margin:4px 0 0}'
+      + '.qna a.ql{color:#2383e2;text-decoration:underline;overflow-wrap:anywhere}';
     document.head.append(st); }
   function 알림(){ 듣는이.forEach(function(f){ try{ f(); }catch(e){ console.warn('질문 그리기', e); } }); }
   function 붙임(c){
@@ -53,10 +54,19 @@
     C.F.updateDoc(C.F.doc(C.fs, COL, q.id), { 상태:'답함', 답:글, 답한때:new Date().toISOString(), 답한이:C.who || '' })
       .catch(function(e){ 버튼.disabled = false; if(틀) 틀.textContent = '저장하지 못했습니다 — ' + ((e && (e.code || e.message)) || ''); });
   }
+  /* 11-28 사장님 「질문에 해당 부분 링크도 걸어 줄 수 있냐」 — 링크 = 저장소 뿌리에서 본 주소(예: 발주역입력/보드매입현황.html#현진산업/구매%2B가공품목/구매자재).
+     없으면 자리로: 입력폼/<키> → 영림원외주입력/영림원외주입력.html#<키> · 발주역입력/<파일> → 발주역입력/<파일>.html. 모든 쪽이 뿌리 한 칸 아래라 '../' 로 이음. 글 = 자리이름 + # 조각(› 로) */
+  function 링크(q){ var l = 트(q.링크), z = 트(q.자리);
+    if(!l){ var m = /^입력폼\/(.+)$/.exec(z), n = /^발주역입력\/(.+)$/.exec(z); l = m ? '영림원외주입력/영림원외주입력.html#' + encodeURIComponent(m[1]) : n ? '발주역입력/' + n[1] + '.html' : ''; }
+    if(!l) return null;
+    var 조 = /^발주역입력\//.test(z) && l.indexOf('#') >= 0 ? l.slice(l.indexOf('#') + 1).split('/').map(function(x){ try{ return decodeURIComponent(x); }catch(e){ return x; } }).filter(Boolean) : [];
+    var 주 = new URL('../' + l, location.href).href;
+    return h('a', { class:'ql', href:주, title:'그 자리 열기' }, [q.자리이름 || z].concat(조).join(' › ')); }
   function 카드(q, 자리보임){
     var 상 = q.상태 || '대기', 판 = h('div', { class:'qc ' + 상, 'data-id':q.id, title:상 });
     판.append(h('div', { class:'qq' }, q.질문 || ''));
-    판.append(h('div', { class:'qm' }, [자리보임 ? (q.자리이름 || q.자리) + ' · ' : '', (q.보낸이 || '') + ' · ' + 때(q.만든때), q.시험 ? ' · 시험' : '']));
+    판.append(h('div', { class:'qm' }, [(q.보낸이 || '') + ' · ' + 때(q.만든때), q.시험 ? ' · 시험' : '']));
+    var 링 = 링크(q); if(링) 판.append(h('div', { class:'qm' }, 링));
     if(상 === '대기'){
       var 칸 = h('textarea', { 'aria-label':'답', rows:'2' }), 틀 = h('div', { class:'qe' }), 단 = h('button', { type:'button' }, '답');
       단.addEventListener('click', function(){ 답하기(q, 칸.value, 단, 틀); });
