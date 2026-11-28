@@ -1,5 +1,6 @@
 <!doctype html>
-<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v361 -->
+<!-- 영림원외주입력 — 판 번호는 머리띠 VIVIVIC 옆 배지와 같다. 고칠 때 둘을 같이 올린다: v362 -->
+<!-- v362(11-28): 사장님 「영림원품목등록에 구매+가공품 입력을 그렇게 되게 바꿔야지」 — 구매+가공품 = 「구매+가공이 합쳐진 구매품 = 소모되는 원장(원자재)」 · 단가 = 원장값 + 가공비: mixPlan 등록 = 분류 → 자재(보내기 품목자산분류) → 구매단가(보내기 구매단가등록 — 새 단계) · 원장분류·원장·공정·공정흐름 안 넘김. 구매발주납품 관리 「구매+가공」 묶음 발주는 그대로(분배 방에 물음). -->
 <!-- v361(11-28): 사장님 「이 검사부터 넣자」 — 6 품목등록 「영림원품목등록」 받기: 품목소분류가 5 품목대중소분류정의(제상품)에 없으면 그 분류 등록대기를 같이 넣음(창고 → 부서 v333 과 같은 길 · 머리 「새 분류 N」, 마우스 = 경로). -->
 <!-- v360(11-27): 사장님 「경기산업 엣지 공정 있는데」 · 「이동선반 경기산업 아니야?」 — WC_RULE 엣지 업체에 경기산업 더함(입력작업자/사장님-규칙.md 표도). 다른 공정·업체 그대로. -->
 <!-- v359(11-27): 사장님 「지금까지 100줄 넘는 등록대기를 누를 때마다 이렇게 멈춰. 리셋하면 저장되긴 해.」 — 원인(잼): 저장 뒤 깨우미 신호 pingQ 가 저장한 건마다 erp_agentq/ping 을 한 번씩 씀(223건 = 223번) → shared 쓰기지킴 「같은 문서 10초에 50번」 에 걸려 51번째에 이 창 저장을 모두 멈춤(위 주황 띠 · 그 뒤 결과 맞추기 등 쓰기 모두 거절 → 새로고침해야 풀림). 저장 자체(트랜잭션 · 모두 아니면 아무것도)는 끝나 있었음. 고침 = pingQ 묶음: 0.3초 안 여러 번 = 신호 한 번(깨우미는 n·at 바뀜만 봄). 저장 길·규칙 그대로. -->
@@ -500,7 +501,7 @@ body[data-step="purords"] .rowcard>:not(.rowtop):not(.grid),body[data-step="purc
 <header class="topbar">
   <div class="topbar-in">
     <div class="brand">VIVIVIC</div>
-    <span class="ver">v361</span>
+    <span class="ver">v362</span>
     <div class="pick topnav" id="topnav">   <!-- v288 사장님 11-18 「입력폼 상단에 발주역입력 메뉴를 만들어 발주역입력 페이지로 이어지게」 — 이름 = 각 페이지 <title> 앞부분 · 같은 탭 -->
       <button type="button" class="btn small" aria-haspopup="menu" aria-expanded="false">발주역입력</button>
       <div class="pickmenu topnavmenu" role="menu" hidden>
@@ -4719,7 +4720,7 @@ function renderBdReg(){
       ⚠ 임시: 원장 창고 = 거래처 이름(등록 방법 1단계 「같은 이름의 창고」) · 재단업체 창고 = PUR_WHS · 반제품 품번 = 손으로 · 원장·가공 수량 따로. */
 var MIX_PRE='_가공품목_',MIX_SRC='구매+가공품목';
 var MIX={vn:'',busy:false,msg:'',bad:false,fail:'',open:'',f:{}};
-var MIX_ST=['원장분류','원장','공정','공정흐름','분류','자재'],MIX_KEY={'원장분류':'classes','원장':'materials','공정':'processes','공정흐름':'flows','분류':'classes','자재':'materials'};
+var MIX_ST=['원장분류','원장','공정','공정흐름','분류','자재','구매단가'],MIX_KEY={'원장분류':'classes','원장':'materials','공정':'processes','공정흐름':'flows','분류':'classes','자재':'materials','구매단가':'purprices'};   /* v362 구매단가 단계 */
 var mixDraw=null;
 /* v328 영림원품목등록(발주역입력) 재공품 보내기 = 같은 꼴 줄(공개 _재공품_영림원품목등록.보내기) — 거래처 대신 WIP_VN, 출처 WIP_SRC. 6 자재등록 화면에서 받음(wipInBox) · 구매+가공품목 거래처·발주 박스엔 안 나옴 */
 var WIP_ID='_재공품_영림원품목등록',WIP_VN='영림원품목등록',WIP_SRC='영림원품목등록';
@@ -4733,6 +4734,7 @@ function mixRows(d){return d['보내기']['줄'].filter(function(r){return r&&r[
 function mixDoc(st,vn,k){var src=mixSrcOf(vn);return (data[MIX_KEY[st]]||[]).filter(function(x){var b=x.bd;if(!b||b['출처']!==src||b['거래처']!==vn||(b['단계']||'')!==st)return false;var y=b['열쇠'];return Array.isArray(y)?y.indexOf(k)>=0:y===k;}).sort(bdOld)[0]||null;}
 /* 단계 문서 — 이 줄이 넘긴 문서, 없으면 같은 값(분류 경로·자재번호·공정·흐름 이름)의 문서(오류 뺌 — 다른 줄·다른 곳에서 넘긴 것) */
 function mixStageDoc(st,vn,r){return mixDoc(st,vn,r['열쇠']);}   /* v316 사장님 「아까 구매+가공품 화면에서 내가 고치라고 했던 것만 고쳐」 — 결과 = 이 줄이 넘긴 문서만(같은 값 다른 문서로 채우던 것 뺌) */
+function mixPurDone(pp){var v=bdTr(pp['구매거래처']),cd=bdTr(pp['품번']);return v&&cd?(data.purprices||[]).filter(function(x){return x.status==='완료'&&!ylwGone(x)&&bdTr(x.vendor)===v&&bdTr(x.code)===cd;})[0]||null:null;}   /* v362 */
 function mixMatDone(code){code=bdTr(code);return code?(data.materials||[]).filter(function(x){return x.status==='완료'&&!ylwGone(x)&&bdTr(x.code)===code;})[0]||null:null;}
 function mixNameDone(key,n){n=bdTr(n);return n?(data[key]||[]).filter(function(x){return x.status==='완료'&&!ylwGone(x)&&bdTr(x.name)===n;})[0]||null:null;}
 function mixClsHave(c){var v={big:bdTr(c['대분류']),mid:bdTr(c['중분류']),name:bdTr(c['소분류'])},p=clsPath(v);if(!v.big||!v.mid||!v.name)return null;return (data.classes||[]).filter(function(x){return x.kind==='자재'&&x.status!=='오류'&&!ylwGone(x)&&clsPath(x)===p;}).sort(function(a,b){return (b.status==='완료')-(a.status==='완료');})[0]||null;}
@@ -4746,13 +4748,12 @@ function mixPlan(vn,r){
   var clsV=function(x){return {kind:'자재',big:bdTr(x['대분류']),mid:bdTr(x['중분류']),name:bdTr(x['소분류']),use:true};};
   var matV=function(x,asset,state){var v={};BYKEY.materials.fields.forEach(function(f){v[f.k]=fieldDef(f);});
     return Object.assign(v,{name:bdTr(x['자재명']),code:bdTr(x['자재번호']),spec:bdTr(x['규격']),asset:asset,state:state,unit:bdTr(x['기준단위']),small:bdPath(x)});};
-  if(o['신규']){
-    if(!mixClsHave(o))add('원장분류',clsV(o));
-    if(!mixMatDone(o['자재번호']))add('원장',matV(o,'원자재','사용'));}
-  if(pc['신규']&&!mixNameDone('processes',pc['공정명']))add('공정',{name:bdTr(pc['공정명']),memo:'',inspect:false});
-  if(fl['신규']&&!mixNameDone('flows',fl['이름']))add('공정흐름',{name:bdTr(fl['이름']),memo:'',rows:flowRows(splitFlow(fl['이름']).map(function(p){return {proc:p};}))});
+  /* v362 사장님 「영림원품목등록에 구매+가공품 입력을 그렇게 되게 바꿔야지」(11-28) — 구매+가공품 = 재공품이 아니라 「구매+가공이 합쳐진 구매품 = 소모되는 원장(원자재)」 · 단가 = 원장값 + 가공비
+     → 원장분류·원장(따로 원장 구매)·공정·공정흐름은 안 넘김 · 분류 → 자재(보내기 품목자산분류 — 구매+가공품목 = 원자재, 영림원품목등록 재공품 = 재공품) → 구매단가(보내기 구매단가등록이 있을 때) */
   if(!mixClsHave(c))add('분류',clsV(c));
   if(!mixMatDone(m['자재번호']))add('자재',matV(Object.assign({},m,{'대분류':c['대분류'],'중분류':c['중분류'],'소분류':c['소분류']}),bdTr(m['품목자산분류'])||'재공품',bdTr(m['자재상태'])||'사용'));
+  var pp=r['구매단가등록'];
+  if(pp&&!mixPurDone(pp)){var pv={};BYKEY.purprices.fields.forEach(function(f){pv[f.k]=bdTr(pp[f.label]);});add('구매단가',pv);}
   go.forEach(function(g){if(g.k!=='materials'||g.x.st.t!=='new')return;var cd=g.x.e.vals.code,d=cd&&(data.materials||[]).filter(function(x){return x.status!=='오류'&&bdTr(x.code)===cd;})[0];
     if(d)why.push(g.st+' 자재번호 「'+cd+'」 가 이미 있음');});
   return {go:why.length?[]:go,have:have,why:why};
@@ -4763,6 +4764,7 @@ function mixState(st,vn,r){
   if(st==='원장')done=!!mixMatDone(o['자재번호']);else if(st==='원장분류'){var h0=mixClsHave(o);done=!o['신규']||(!!h0&&h0.status==='완료');}
   else if(st==='공정')done=!!mixNameDone('processes',(r['공정']||{})['공정명']);else if(st==='공정흐름')done=!!mixNameDone('flows',(r['공정흐름']||{})['이름']);
   else if(st==='분류'){var h=mixClsHave(c);done=!!h&&h.status==='완료';}else if(st==='자재')done=!!mixMatDone(m['자재번호']);
+  else if(st==='구매단가')done=!!(r['구매단가등록']&&mixPurDone(r['구매단가등록']));   /* v362 */
   if(done)return {t:'완료'};var d=mixStageDoc(st,vn,r);return d?{t:d.status||'대기',doc:d}:{t:''};
 }
 /* 결과 돌려줌 — 공개 _가공품목_{거래처}.결과.{열쇠}.{단계} = {상태,이유,때} (바뀐 칸만) */
