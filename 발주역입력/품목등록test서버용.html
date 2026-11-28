@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 품목등록test서버용 — 영림원품목등록 「품목등록업로드」 의 기본 자료(엑셀 「품목등록test서버용」 의 품목등록업로드 줄, 창고 발주역입력_영림원품목등록 그대로)를 제품마다 묶어 본다.
      사장님 11-25(그대로): 「품목등록업로드의 기본자료가되는 엑셀자료를 새페이지로 만들어 주세요 해주세요. 각제품 이하 반제품들은 제품의 하위 토글로 접혀있게 만들어 주세요 제품명 앞에 체크표시를 두어 체크시 해당 제품에대한 반제품 등의 정보가 품목등록업로드에 나타나게 해주세요. 품목등록업로드에 매칭시 불필요한 자료는 임의로 참고 하지 않습니다.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.6.7
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.7.0
+     v1.7.0(11-28): 사장님 「모든 부분에서 실제 완료 상황 좀 보게 만들어」 — 제품 줄 맨 앞 상태 칩(입력폼 품목 대기·진행중·완료·오류 · 넘길 · 못 넘김, 까닭 마우스) · 잠금·칩 = 로그인 기기는 입력폼 문서에서 바로 셈(../shared/폼결과.js), 없으면 공개 결과 사본.
      v1.6.7(11-28): 사장님 「질문 트리는 새 페이지로 열리게 하고, 실제로 트리 구조가 보여야지」 — 머리 「질문 트리」 = 새 탭 질문트리.html(질문.js v5) · 탭 단추 기억(자리주소.js v2).
      v1.6.6(11-28): 사장님 「나중에 확인할 질문 트리가 필요한데?」 — 머리 「질문 트리」(질문.js v4) = 입력폼 #질문트리.
      v1.6.5(11-28): 사장님 「이거 입력폼뿐만 아니라 발주역입력에서도 보여야지」 — 머리 줄 「답 없는 질문 N」(질문.js v3, 입력폼 로그인 기기) · 누르면 모든 대기 모음.
@@ -121,6 +122,8 @@ html,body{height:100%;overflow:hidden}
 .vpd input{display:block;width:100%;height:24px;padding:1px 6px;font:inherit;font-size:11.5px;border:0;border-bottom:1px solid #EDEDEA;outline:none}
 @media (max-width:600px){.vpd input{font-size:16px;height:30px}.dpr-t td .동일{height:22px}}   /* v1.1.0 업체별 단품명과 같음(조혼가구부속명 v1.2 와 같은 값) */
 .dpr-t tr.제품.켬 td{background:#E8F1FD}
+.등칩{display:inline-block;margin:0 5px 0 0;padding:0 5px;border-radius:8px;font-size:10px;font-weight:700;line-height:15px;vertical-align:1px;border:1px solid transparent;cursor:default}   /* v1.7.0 상태 칩(영림원품목등록과 같은 색) */
+.등칩[data-등상="대기"]{background:#FFF7C2;color:#8a6d00;border-color:#E5B800}.등칩[data-등상="진행중"]{background:#E8F1FB;color:#1b5fa8;border-color:#2383e2}.등칩[data-등상="완료"]{background:#E6F4EA;color:#2e7d32;border-color:#2e7d32}.등칩[data-등상="오류"]{background:#FDE2E1;color:#b91c1c;border-color:#b91c1c}.등칩[data-등상="넘길"]{background:#fff;color:#6b6b68;border-color:#C9C9C5}.등칩[data-등상="못 넘김"]{background:#fff;color:#b91c1c;border-color:#b91c1c}
 .dpr-t tr.하위 td.dpr-k{padding-left:46px;font-weight:500}
 .dpr-t tr.하위[hidden]{display:none}
 .띠{position:fixed;top:0;left:0;right:0;z-index:60;background:var(--vg-red);color:#fff;font-size:12.5px;font-weight:600;padding:6px 16px;text-align:center}
@@ -135,7 +138,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.6.7</div>
+  <div class="badge">v1.7.0</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html" class="on">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>품목등록test서버용</h1>
@@ -216,7 +219,8 @@ function 그리기(){
     const 명짝 = 업이름.get(b.트(r, b.ni)) || null, 번짝 = 업코드.get(p) || null;   /* v1.1.0 */
     const 번칸 = `<td${번짝 ? ` class="맞음" title="${글('업체별 단품명 단품코드 — ' + 짝글(번짝.map(x => ({ 업체:x.업체, 이름:x.이름 }))))}"` : ''}>${글(r.v[b.pi])}</td>`;
     const 조 = [...new Set((번짝 || []).concat(명짝 || []).map(x => 별명(x.업체)))], 조말 = 조.length ? '업체별 단품명 — ' + [번짝 ? '단품코드 ' + p : '', 명짝 ? '단품명 ' + b.트(r, b.ni) : ''].filter(Boolean).join(' · ') : '업체별 단품명에 이 제품 없음';   /* v1.5.0 조립업체 */
-    h += `<tr class="제품${체?' 켬':''}" data-p="${글(p)}"><td title="${글(조말)}">${글(조.join(' · '))}</td>` + 칸들(r, `<td class="dpr-k 고름칸${명짝?' 맞음':''}"${명짝 ? ` title="${글('업체별 단품명 단품명 — ' + 짝글(명짝))}"` : ''}><button type="button" class="동일${동일[p]?' on':''}" data-p="${글(p)}"${동일잠김(p) ? ' disabled' : ''} title="${글(동일잠김(p) || (동일[p] ? '동일속성 ' + 동일[p] : '동일속성'))}">${동일[p] ? 글(동일[p]) : '▾'}</button><input type="checkbox" data-p="${글(p)}"${체?' checked':''}>${하.length ? `<button type="button" class="토글" data-p="${글(p)}" title="반제품 ${하.length}">${열?'▾':'▸'}</button>` : ''}${글(r.v[0])}</td>`, 번칸) + '</tr>';
+    const 칩 = 제품칩(p, 체);   /* v1.7.0 */
+    h += `<tr class="제품${체?' 켬':''}" data-p="${글(p)}"><td title="${글(조말)}">${칩 ? `<span class="등칩" data-등상="${글(칩[0])}" title="${글(칩[1])}">${글(칩[0])}</span>` : ''}${글(조.join(' · '))}</td>` + 칸들(r, `<td class="dpr-k 고름칸${명짝?' 맞음':''}"${명짝 ? ` title="${글('업체별 단품명 단품명 — ' + 짝글(명짝))}"` : ''}><button type="button" class="동일${동일[p]?' on':''}" data-p="${글(p)}"${동일잠김(p) ? ' disabled' : ''} title="${글(동일잠김(p) || (동일[p] ? '동일속성 ' + 동일[p] : '동일속성'))}">${동일[p] ? 글(동일[p]) : '▾'}</button><input type="checkbox" data-p="${글(p)}"${체?' checked':''}>${하.length ? `<button type="button" class="토글" data-p="${글(p)}" title="반제품 ${하.length}">${열?'▾':'▸'}</button>` : ''}${글(r.v[0])}</td>`, 번칸) + '</tr>';
     for(const x of 하) h += `<tr class="하위" data-m="${글(p)}"${열?'':' hidden'}><td></td>` + 칸들(x, `<td class="dpr-k">${글(x.v[0])}</td>`) + '</tr>';
   }
   for(const x of b.남) h += '<tr class="하위"><td></td>' + 칸들(x, `<td class="dpr-k">${글(x.v[0])}</td>`) + '</tr>';
@@ -231,9 +235,17 @@ const 보내기자리 = ['artifacts','vivivic-4b7ef','public','data','발주역�
 let 잠긴제품 = new Map(), 잠글 = ''; const 잠조 = {};
 function 결상태(x){ if(!x || typeof x !== 'object') return ''; if(typeof x.상태 === 'string') return 막힘상태.has(x.상태) ? x.상태 : ''; for(const v of Object.values(x)) if(v && typeof v === 'object' && 막힘상태.has(v.상태)) return v.상태; return ''; }
 function 잠김구독(){ const { collection, onSnapshot } = window.fbRead;
-  for(const n of 잠김이름) onSnapshot(collection(window.db, ...보내기자리, n, '제품'), q => { 잠조[n] = q.docs.map(d => [d.id, (d.data() || {}).결과 || {}]); 잠셈(); }, () => {}); }
-function 잠셈(){ const m = new Map(); for(const [n, 목] of Object.entries(잠조)) for(const [id, 결] of 목){ if(m.has(id)) continue; for(const v of Object.values(결)){ const st = 결상태(v); if(st){ m.set(id, '입력폼 ' + n + ' ' + st); break; } } }
-  const 글 = JSON.stringify([...m]); if(글 === 잠글) return; 잠글 = 글; 잠긴제품 = m; 그리기(); }
+  for(const n of 잠김이름) onSnapshot(collection(window.db, ...보내기자리, n, '제품'), q => { 잠조[n] = q.docs.map(d => { const x = d.data() || {}; return [d.id, x.결과 || {}, (x.줄 || []).map(r => r && r.열쇠).filter(k => k != null)]; }); 잠셈(); }, () => {}); }
+/* v1.7.0 사장님(11-28) 「모든 부분에서 실제 완료 상황 좀 보게 만들어」 — 로그인 기기 = 입력폼 문서에서 바로 셈(../shared/폼결과.js, 영림원품목등록과 같음) · 없으면 공개 결과 사본 */
+const 산결 = n => window.폼결과 ? 폼결과.결과(n === '품목별공정흐름' ? '공정흐름' : n) : null;
+/* v1.7.0 제품 줄 상태 칩 = 그 제품 품번의 입력폼 품목(6 품목등록) 상태 — 영림원품목등록 품목등록업로드 칩과 같음: 대기·진행중·완료·오류 / 보냈는데 결과 없음 = 넘길 / 체크했는데 보내기에 없음 = 못 넘김(영림원품목등록 빨강 칸) · 까닭 = 마우스 */
+let 품칩 = new Map();
+function 칩셈(){ const m = new Map(), 원 = 산결('품목'), 목 = 잠조.품목; if(!목) return m;
+  for(const [, 결, 키들] of 목) for(const k of 키들){ const x = 원 ? 원[k] : 결[k]; m.set(k, x && typeof x.상태 === 'string' ? [x.상태, '입력폼 품목 ' + x.상태 + (x.이유 ? ' — ' + x.이유 : '')] : ['넘길', '넘길 — 입력폼 받기 상자에서 등록대기 전']); }
+  return m; }
+function 제품칩(p, 체){ const c = 품칩.get(p); if(c) return c; return 체 && 잠조.품목 ? ['못 넘김', '못 넘김 — 영림원품목등록 빨강 칸이 있어 입력폼에 안 보냄'] : null; }
+function 잠셈(){ const m = new Map(); for(const [n, 목] of Object.entries(잠조)){ const 원 = 산결(n); for(const [id, 결, 키들] of 목){ if(m.has(id)) continue; for(const v of (원 ? 키들.map(k => 원[k]) : Object.values(결))){ const st = 결상태(v); if(st){ m.set(id, '입력폼 ' + n + ' ' + st); break; } } } }
+  const 칩 = 칩셈(), 글 = JSON.stringify([[...m], [...칩]]); if(글 === 잠글) return; 잠글 = 글; 잠긴제품 = m; 품칩 = 칩; 그리기(); }
 const 제품잠김 = p => 잠긴제품.get(문서이름(p)) || '';
 function 묶음잠김(g){ if(!g) return ''; for(const [q, v] of Object.entries(동일)) if(v === g){ const w = 제품잠김(q); if(w) return w + ' — 동일속성 「' + g + '」 ' + q; } return ''; }
 const 동일잠김 = p => 제품잠김(p) || 묶음잠김(동일[p]);
@@ -311,6 +323,7 @@ document.addEventListener('change', e => {
     .then(() => 띠(''), er => 띠('저장하지 못했습니다 — 새로고침 뒤 다시 해 보십시오 ' + ((er&&(er.code||er.message))||'')));
 });
 </script>
+<script src="../shared/폼결과.js?v=1"></script><script>폼결과.듣기(() => { try{ 잠셈(); }catch(e){} });</script>   <!-- v1.7.0 입력폼 지금 상태 -->
 <script src="칸넓이.js?v=3"></script>   <!-- v1.5.1 모든 표 칸 넓이 조절 -->
 <script>칸넓이.달기(document.body, { 열쇠:'발주역입력_품목등록test서버용_칸넓이' });</script>
 <script src="../shared/질문.js?v=5"></script><script>질문.스스로('발주역입력/품목등록test서버용','발주역입력 › 품목등록test서버용');</script>   <!-- 질문(입력폼 v369, 11-28) -->

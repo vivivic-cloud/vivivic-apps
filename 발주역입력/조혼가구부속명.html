@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <!-- 조혼가구부속명 — 드라이브 「하준이형」 엑셀(조혼가구 발주서 시트들) 목록. 사장님 11-24 「발주역입력 메뉴에 조혼가구부속명 메뉴를 만들고 폴더에 하준이형 파일을 목록으로 만들어줘」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.13.17
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.14.0
+     v1.14.0(11-28): 사장님 「모든 부분에서 실제 완료 상황 좀 보게 만들어」 — 조혼생산제품정보 제품 줄 상태 칩(입력폼 품목 대기·진행중·완료·오류 · 넘길 · 못 넘김, 까닭 마우스) · 로그인 기기는 입력폼 문서에서 바로 셈(../shared/폼결과.js), 없으면 공개 결과 사본.
      v1.13.17(11-28): 사장님 「질문 트리는 새 페이지로 열리게 하고, 실제로 트리 구조가 보여야지」 — 머리 「질문 트리」 = 새 탭 질문트리.html(질문.js v5) · 탭 단추 기억(자리주소.js v2).
      v1.13.16(11-28): 사장님 「나중에 확인할 질문 트리가 필요한데?」 — 머리 「질문 트리」(질문.js v4) = 입력폼 #질문트리.
      v1.13.15(11-28): 사장님 「이거 입력폼뿐만 아니라 발주역입력에서도 보여야지」 — 머리 줄 「답 없는 질문 N」(질문.js v3, 입력폼 로그인 기기) · 누르면 모든 대기 모음.
@@ -177,6 +178,8 @@ html,body{height:100%;overflow:hidden}
 .생산표 .단품고름 select.빈{box-shadow:inset 0 0 0 2px var(--vg-red)}
 .생산표 tr.하위 td.dpr-k{font-weight:400}
 .생산표 tr.제품줄 td.품명칸{font-weight:700}.생산표 thead th.영열{background:#CDEB8B}.생산표 td.num{text-align:right}   /* v1.8.0 영림원품목등록 품목등록업로드와 같음 */
+.등칩{display:inline-block;padding:0 5px;border-radius:8px;font-size:10px;font-weight:700;line-height:15px;border:1px solid transparent;cursor:default}   /* v1.14.0 상태 칩(영림원품목등록과 같은 색) */
+.등칩[data-등상="대기"]{background:#FFF7C2;color:#8a6d00;border-color:#E5B800}.등칩[data-등상="진행중"]{background:#E8F1FB;color:#1b5fa8;border-color:#2383e2}.등칩[data-등상="완료"]{background:#E6F4EA;color:#2e7d32;border-color:#2e7d32}.등칩[data-등상="오류"]{background:#FDE2E1;color:#b91c1c;border-color:#b91c1c}.등칩[data-등상="넘길"]{background:#fff;color:#6b6b68;border-color:#C9C9C5}.등칩[data-등상="못 넘김"]{background:#fff;color:#b91c1c;border-color:#b91c1c}
 .생산표 tr.묶머리 td{padding:4px 6px}.생산표 .묶안{position:sticky;left:6px;display:inline-flex;align-items:center;flex-wrap:wrap;gap:4px 6px;max-width:calc(100vw - 48px)}
 .생산표 .묶안 .단품고름{display:inline-flex;align-items:center;gap:6px;margin:0 0 0 10px}.생산표 .묶안 .단품이름{margin:0}.생산표 .묶안 input.단품찾{width:220px}
 .생산표 tr.하위[hidden]{display:none}
@@ -216,7 +219,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.13.17</div>
+  <div class="badge">v1.14.0</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html">보드/엣지 매입현황</a><a href="조혼가구부속명.html" class="on">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>조혼가구부속명</h1>
@@ -353,6 +356,7 @@ function 생산시작(){
     생산다시(); }, () => {});
   onSnapshot(doc(window.db, 'artifacts','vivivic-4b7ef','public','data','발주역입력_영림원폼','_공정흐름'), d => { 생산.공정목록 = d.exists() && Array.isArray(d.data().줄) ? d.data().줄.map(x => String(x).trim()).filter(Boolean) : []; }, () => {});   /* v1.6.0 공정흐름 드롭 = 입력폼 공정흐름 완료 공개 사본 */
   onSnapshot(doc(window.db, ...영품자리, '_재단도'), d => { 생산.재단편집 = (d.exists() && d.data().값) || {}; if(고른 === 생산메뉴) 생산그리기(); }, () => {});   /* v1.9.8 에이엠티 재단편집 재단확정 */
+  { const { collection } = window.fbRead; onSnapshot(collection(window.db, 'artifacts','vivivic-4b7ef','public','data','발주역입력_영림원품목등록_보내기','품목','제품'), q => { 생산.품보 = q.docs.map(d => { const x = d.data() || {}; return [x.결과 || {}, (x.줄 || []).map(r => r && r.열쇠).filter(k => k != null)]; }); 생산칩셈(); }, () => {}); }   /* v1.14.0 상태 칩 */
   onSnapshot(doc(window.db, ...영품자리, '_동일속성'), d => { 생산.동일 = (d.exists() && d.data().묶음) || {}; if(고른 === 생산메뉴) 생산그리기(); }, () => {});   /* v1.7.0 */
   const 트 = v => String(v ?? '').trim(), 자종 = b => { b = 트(b).toLowerCase(); return b === 'ed' ? '필름' : (b === 'md' || b === 'pb') ? '합판' : ''; };   /* v1.8.0 합판·필름 드롭 = 입력폼 자재 완료 공개 사본(영림원품목등록과 같은 사본) */
   onSnapshot(doc(window.db, 'artifacts','vivivic-4b7ef','public','data','발주역입력_영림원폼','_자재'), d => { const 본 = new Set(); 생산.자재 = ((d.exists() && d.data().줄) || []).map(x => ({ code:트(x.자재번호), name:트(x.자재명), spec:트(x.규격), sm:트(x.소분류), t:자종(x.대분류) })).filter(m => m.t && m.code && !본.has(m.code) && 본.add(m.code)); }, () => {});
@@ -398,6 +402,14 @@ function 생산줄들(u, b){   /* 묶음 → 반제품 줄(빈 행 뺌 · L/R �
   }
   return 나;
 }
+/* v1.14.0 사장님(11-28) 「모든 부분에서 실제 완료 상황 좀 보게 만들어」 — 제품 줄 상태 칩 = 그 단품코드(품번)의 입력폼 품목(6 품목등록) 상태(영림원품목등록 품목등록업로드 칩과 같음)
+   로그인 기기 = 입력폼 문서에서 바로 셈(../shared/폼결과.js) · 없으면 공개 보내기 결과 사본 · 보냈는데 결과 없음 = 넘길 · 체크했는데 보내기에 없음 = 못 넘김 · 까닭 = 마우스 */
+let 생산칩 = new Map(), 생산칩글 = '';
+function 생산칩셈(){ const m = new Map(), 원 = window.폼결과 ? 폼결과.결과('품목') : null;
+  for(const [결, 키들] of (생산.품보 || [])) for(const k of 키들){ const x = 원 ? 원[k] : 결[k]; m.set(k, x && typeof x.상태 === 'string' ? [x.상태, '입력폼 품목 ' + x.상태 + (x.이유 ? ' — ' + x.이유 : '')] : ['넘길', '넘길 — 입력폼 받기 상자에서 등록대기 전']); }
+  const 글 = JSON.stringify([...m]); if(글 === 생산칩글) return; 생산칩글 = 글; 생산칩 = m; if(고른 === 생산메뉴) 생산그리기(); }
+function 생산칩칸(코드, 켬){ const c = 코드 && 생산칩.get(코드); const z = c || (코드 && 켬 && 생산.품보 ? ['못 넘김', '못 넘김 — 영림원품목등록 빨강 칸이 있어 입력폼에 안 보냄'] : null);
+  return z ? `<span class="등칩" data-등상="${글(z[0])}" title="${글(z[1])}">${글(z[0])}</span>` : ''; }
 function 생산다시(){ 생산보내기(); if(고른 === 생산메뉴) 생산그리기(); }
 /* v1.5.0 사장님 「단품명 추가검색하게 해주고 추가 검색되면 해당 품명으로 같은 그룹의 제품그룹이 각각 생기게 해줘 … 단품명을 해당그룹에서 추가선택하면 똑같은 그룹이 현재그룹 바로아래 생성 … 드롭선택되면 다른 목록에 동일한 부속명이 동일한 부속으로 선택되게 해줘」
    단품 = _입력.단품[묶음키] = [{코드,이름}…](옛 꼴 {코드,이름} 하나도 읽음) — 단품마다 같은 묶음이 한 벌(고른 차례, 고른 단품 바로 아래) · 체크 = 체크[묶음키⇥코드](첫 벌은 옛 체크[묶음키]도 읽음)
@@ -491,7 +503,7 @@ function 생산그리기(){
   const 빈필 = k => `<td class="꼭" title="영림원 필수 — 빈칸"></td>`;
   for(const { u, b, 키, 줄, 고, n } of 차례){
     const ck = 키 + '\t' + (고 ? 고.코드 : ''), 켬 = !!체[ck] || (n === 0 && 체[키] === true), 열 = 생산.열림.has(ck);
-    h += `<tr class="제품 묶머리${켬?' 켬':''}${n?' 덧벌':''}"><td colspan="${열수}"><div class="묶안 고름칸">${고 ? `<button type="button" class="동일${동[고.코드]?' on':''}" data-p="${글(고.코드)}" title="${글(동[고.코드] ? '동일속성 ' + 동[고.코드] : '동일속성')}">${동[고.코드] ? 글(동[고.코드]) : '▾'}</button>` : ''}<input type="checkbox" data-c="${글(ck)}" data-g="${글(키)}" data-n="${n}"${켬?' checked':''}><button type="button" class="토글" data-g="${글(ck)}" title="반제품 ${줄.length}">${열?'▾':'▸'}</button><span class="제품명" title="${글(u + ' ' + b.행 + '행')}">${글(b.제품명)}</span>`
+    h += `<tr class="제품 묶머리${켬?' 켬':''}${n?' 덧벌':''}"><td colspan="${열수}"><div class="묶안 고름칸">${고 ? `<button type="button" class="동일${동[고.코드]?' on':''}" data-p="${글(고.코드)}" title="${글(동[고.코드] ? '동일속성 ' + 동[고.코드] : '동일속성')}">${동[고.코드] ? 글(동[고.코드]) : '▾'}</button>` : ''}<input type="checkbox" data-c="${글(ck)}" data-g="${글(키)}" data-n="${n}"${켬?' checked':''}><button type="button" class="토글" data-g="${글(ck)}" title="반제품 ${줄.length}">${열?'▾':'▸'}</button>${생산칩칸(고 ? 고.코드 : '', 켬)}<span class="제품명" title="${글(u + ' ' + b.행 + '행')}">${글(b.제품명)}</span>`
       + `<span class="단품고름">${고 ? `<span class="단품이름 저장값 vk" data-u="조혼가구" title="${글('업체별 단품명 조혼가구 — ' + 고.이름 + ' · ' + 고.코드)}"><span class="dn" data-c="${글(고.코드)}">${글(고.이름)}</span> · ${글(고.코드)}<button type="button" class="단품빼기" data-g="${글(키)}" data-c="${글(고.코드)}" title="삭제">×</button></span>` : ''}`
       + `<input type="text" class="단품찾${고?'':' 빈'}" data-g="${글(키)}" data-뒤="${글(고 ? 고.코드 : '')}" data-이="${글(고 ? 고.이름 : String(b.제품명 || '').replace(/\s+/g, ' ').trim())}" autocomplete="off" title="${글(고 ? '단품명 추가 — 고르면 같은 묶음이 바로 아래 생김' : '업체별 단품명 조혼가구 단품을 고름')}"></span></div></td></tr>`;
     /* 제품 줄 */
@@ -688,6 +700,7 @@ document.addEventListener('focusout', e => { const i = 찾칸(e); if(!i) return;
   const 부 = (생산.입력 || {}).부속 || {}, 지금 = 부[i.dataset.r] || 부[i.dataset.k] || ''; if(i.value.trim() !== 지금) 부속고름(i.dataset.k, i.dataset.r, i.value.trim());
   else if(지금 && i.parentNode.querySelector('.부찾단추')) i.classList.add('숨'); });   /* v1.11.0 다시 숨김 */
 </script>
+<script src="../shared/폼결과.js?v=1"></script><script>폼결과.듣기(() => { try{ 생산칩셈(); }catch(e){} });</script>   <!-- v1.14.0 입력폼 지금 상태 -->
 <script src="칸넓이.js?v=3"></script>   <!-- v1.9.1 모든 표 칸 넓이 조절 -->
 <script>칸넓이.달기(document.body, { 열쇠:'발주역입력_조혼가구부속명_칸넓이' });</script>
 <script src="../shared/자리주소.js?v=2"></script><script>자리주소.달기(['#고름 .chip']);</script><script src="../shared/질문.js?v=5"></script><script>질문.스스로('발주역입력/조혼가구부속명','발주역입력 › 조혼가구부속명');</script>   <!-- 질문(입력폼 v369, 11-28) -->
