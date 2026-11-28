@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.59.47
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.59.48
+     v1.59.48(11-28): 사장님 「명세표 왼쪽 아래 손글씨(예: AMT) = 이 자재가 도착한 외주가공처 — 입력폼 등록 외주가공처와 매칭」 — 명세서 표 「도착 외주가공처」 칸(손글씨 크롭 사진 · 읽은 글자(고칠 수 있음) · 등록 외주가공처 드롭 · 패스). 등록 외주가공처 = 입력폼 거래처 공개 사본(`_영림원거래처`, 거래처종류에 외주가공거래처 · 이름 T 시작 뺌). 글자가 이름과 같거나 한 곳에만 들어맞으면 초록 · 앞 글자만 같거나 둘 이상이면 주황(후보 — 사람이 고름) · 없으면 빨강. 고른·패스 = 창고 서류 `가공처결정`. 비교 표 맨 끝 줄 = 일치·후보·미등록·글자 없음 장수.
      v1.59.47(11-28): 사장님 「월 합계 계산도 없고 원래 있던 월명세랑 비교 보고도 없고」 — 명세서 표 바로 아래 「월 합계·월별명세 비교」 표(명세서 합계 / 월별명세 [N월 소계] / 차이 = 장수·수량·공급가액·세액·합계 칸별 숫자, 차이 0 초록·아니면 빨강) + 차이 난 서류(날짜·번호·칸 ±값). 화면 오른쪽 아래 구석에 판 번호 작게(캐시 확인용).
      v1.59.46(11-28): 사장님 「1월 명세서 표 끝에 여백이 없어 자료가 끝난 건지 알 수 없다」 — 명세서 표 맨 끝 「[N월 합계] N장」 줄(수량·금액·합계 합 + 월별명세 「[N월 소계]」 합계금액과 차이) + 표 아래 여백.
      v1.59.45(11-28): 사장님 「명세서 표 빨강·주황이 무엇이 어디가 안 맞는지 알 수 없다」 — 안 맞는 칸(수량·금액·합계·날짜)에만 색 + 칸 안에 「명세값 / 계산값 · 차이」 숫자(계산 = 수량×단가×1.1, 합계 = 줄 계산 합) + 줄 끝 「차이」 칸(칸 이름 ±값). 정정(수량 70→68·날짜 22→21)은 창고 서류 `정정:[{칸,줄,인쇄,정정}]` 로 주황 칸에 「인쇄 → 정정」. 「!」·문장 뺌.
@@ -505,7 +506,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.59.47</div><div id="판표시" style="position:fixed;right:6px;bottom:3px;z-index:60;font-size:10px;line-height:1;color:#777;pointer-events:none"></div>
+  <div class="badge">v1.59.48</div><div id="판표시" style="position:fixed;right:6px;bottom:3px;z-index:60;font-size:10px;line-height:1;color:#777;pointer-events:none"></div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -3169,6 +3170,58 @@ function 가공품목그리기(){   /* v1.59.29 분배 방 사장님 「구매+�
 /* ===== 명세서(거래명세서) — 월별명세 아래에 그 달 명세서 글자 + 사진 단추. 창고 발주역입력_명세서/{거래처}_{yyyy-mm}(없으면 안 보임). 읽기만. ===== */
 const 명세서자리 = ['artifacts','vivivic-4b7ef','public','data','발주역입력_명세서'];
 const 명세서문서 = {};
+let 가공처목록 = null;
+async function 가공처목록받기(){   /* 입력폼 거래처 공개 사본 → 외주가공거래처(이름 T 시작 뺌) 이름·상호 */
+  if(가공처목록) return 가공처목록;
+  try{
+    const { doc, getDoc } = window.fbRead, d = await getDoc(doc(window.db, ...폼자리, '_영림원거래처'));
+    const 줄 = d.exists() ? (d.data().줄||[]) : [];
+    가공처목록 = 줄.filter(z => [].concat(z.거래처종류||[]).includes('외주가공거래처') && !/^T/.test(String(z.거래처||'')) && z.거래처상태!=='사용중지')
+      .map(z => ({ 이름:String(z.거래처||''), 상호:String(z.상호||'') })).sort((a,b) => a.이름.localeCompare(b.이름,'ko'));
+  }catch(e){ 가공처목록 = []; }
+  return 가공처목록;
+}
+const 가공정규 = t => String(t||'').toLowerCase().replace(/\(주\)|주식회사|\s|[()]/g,'');
+function 가공맞춤(읽음, 목록){   /* → {상태:'일치'|'후보'|'미등록'|'없음', 후보:[이름…], 고름} */
+  const r = 가공정규(읽음); if(!r) return { 상태:'없음', 후보:[], 고름:'' };
+  const 같 = 목록.filter(v => 가공정규(v.이름)===r);
+  if(같.length===1) return { 상태:'일치', 후보:[같[0].이름], 고름:같[0].이름 };
+  const 포 = 목록.filter(v => 가공정규(v.이름).includes(r) || 가공정규(v.상호).includes(r) || (가공정규(v.이름).length>=2 && r.includes(가공정규(v.이름))));
+  if(포.length===1) return { 상태:'일치', 후보:[포[0].이름], 고름:포[0].이름 };
+  if(포.length>1) return { 상태:'후보', 후보:포.map(v=>v.이름), 고름:'' };
+  const 앞 = 목록.filter(v => 가공정규(v.이름).slice(0,2)===r.slice(0,2) && r.length>=2);
+  if(앞.length) return { 상태:'후보', 후보:앞.map(v=>v.이름), 고름:'' };
+  return { 상태:'미등록', 후보:[], 고름:'' };
+}
+function 가공처달기(칸, id, x, 가공){   /* 사진 · 읽은 글자 고침 · 드롭 고름 · 패스 → 창고 서류 가공처결정 */
+  const 표 = 칸.querySelector(`[data-명세서="${id}"]`); if(!표) return;
+  const { doc, setDoc } = window.fbRead;
+  const 저장 = async (파일, 값) => {
+    x.가공처결정 = x.가공처결정 || {}; x.가공처결정[파일] = Object.assign(x.가공처결정[파일]||{}, 값);
+    try{ await setDoc(doc(window.db, ...명세서자리, id), { 가공처결정:{ [파일]: x.가공처결정[파일] } }, { merge:true }); }
+    catch(e){ 큰알림('가공처 결정을 저장하지 못했습니다 — ' + ((e&&(e.code||e.message))||'')); }
+  };
+  const 칠 = td => {   /* 그 서류 칸만 다시 칠함(표 위치 그대로) + 맨 끝 장수 줄 */
+    const 파일 = td.dataset.f, sv = x.서류.find(v => v.파일===파일), 결 = (x.가공처결정||{})[파일] || {};
+    const 읽 = 결.읽음 ?? sv.가공처읽음 ?? '', 맞 = 가공맞춤(읽, 가공), 고 = 결.고름 ?? 맞.고름, 패 = !!결.패스;
+    const 상 = 고 ? '일치' : 맞.상태, 색 = 상==='일치' ? '#D9F2DE' : 상==='후보' ? '#FFE9C7' : 상==='미등록' ? '#FFD9D6' : '';
+    const 먼저 = [...맞.후보.filter(n => 가공.some(v => v.이름===n)), ...가공.map(v => v.이름).filter(n => !맞.후보.includes(n))];
+    td.style.background = 색; td.style.boxShadow = 패 ? 'inset 0 0 0 2px #176B2C' : '';
+    td.querySelector('.가공처읽음').value = 읽;
+    td.querySelector('.가공처고름').innerHTML = '<option value=""></option>' + 먼저.map(n => `<option value="${글(n)}"${n===고?' selected':''}>${글(n)}${맞.후보.includes(n)&&맞.후보.length>1?' ·후보':''}</option>`).join('');
+    td.querySelector('.가공처패스').classList.toggle('on', 패); td.dataset.상 = 상;
+    const 수 = { 일치:0, 후보:0, 미등록:0, 없음:0 }; 표.querySelectorAll('.가공처칸').forEach(t => { 수[t.dataset.상 || '없음']++; });
+    const 줄 = [...칸.querySelectorAll('.가공수줄')].pop(); if(줄) 줄.textContent = `일치 ${수.일치} · 후보 ${수.후보} · 미등록 ${수.미등록} · 글자 없음 ${수.없음}`;
+  };
+  표.querySelectorAll('.가공처칸').forEach(td => {
+    const 파일 = td.dataset.f, img = td.querySelector('.가공처사진');
+    if(img && img.dataset.p){ const { st, ref, getDownloadURL } = window.fbStorage; getDownloadURL(ref(st, img.dataset.p)).then(u => { img.src = u; }, () => {}); }
+    td.dataset.상 = td.dataset.상 || ''; 칠(td);
+    td.querySelector('.가공처읽음').onchange = async e => { await 저장(파일, { 읽음:e.target.value.trim(), 고름:null, 패스:false }); 칠(td); };
+    td.querySelector('.가공처고름').onchange = async e => { await 저장(파일, { 고름:e.target.value, 패스:false }); 칠(td); };
+    td.querySelector('.가공처패스').onclick = async () => { const 선 = td.querySelector('.가공처고름').value; if(!선){ 큰알림('패스하려면 외주가공처를 먼저 고르십시오.'); return; } await 저장(파일, { 고름:선, 패스:!((x.가공처결정[파일]||{}).패스) }); 칠(td); };
+  });
+}
 async function 명세서붙이기(s, 달들){
   const { doc, getDoc } = window.fbRead;
   const 칸 = document.querySelector('#속 .표통'); if(!칸) return;
@@ -3182,11 +3235,13 @@ async function 명세서붙이기(s, 달들){
     const x = 명세서문서[id];
     if(!x || !(x.서류||[]).length) continue;
     if(고른 !== s || !document.body.contains(칸)) return;
+    const 가공 = await 가공처목록받기(), 결정 = x.가공처결정 || (x.가공처결정 = {});
+    const 가공수 = { 일치:0, 후보:0, 미등록:0, 없음:0 };
     const 수 = n => Number(n||0).toLocaleString('ko-KR');
     const 부호 = n => (n>0?'+':n<0?'−':'') + 수(Math.abs(n));
     const 작 = t => `<div style="font-size:10px;line-height:1.2;font-weight:600">${t}</div>`;
     const 빨 = 'background:#FFD9D6', 초 = 'background:#D9F2DE', 주 = 'background:#FFE9C7';
-    let h = `<div class="표" data-명세서="${글(id)}"><div class="표제목">${글(달)} 명세서</div><table class="dpr-t"><thead><tr><th>날짜</th><th>번호</th><th>품목</th><th>수량</th><th>단가</th><th>금액</th><th>합계</th><th>차이</th><th>실명세서</th></tr></thead><tbody>`;
+    let h = `<div class="표" data-명세서="${글(id)}"><div class="표제목">${글(달)} 명세서</div><table class="dpr-t"><thead><tr><th>날짜</th><th>번호</th><th>품목</th><th>수량</th><th>단가</th><th>금액</th><th>합계</th><th>차이</th><th style="min-width:300px">도착 외주가공처</th><th>실명세서</th></tr></thead><tbody>`;
     for(const sv of x.서류){
       const 줄 = sv.줄||[], 정 = sv.정정||[];
       const 계산 = l => Math.round((l.수량||0)*(l.단가||0)*1.1);
@@ -3211,6 +3266,14 @@ async function 명세서붙이기(s, 달들){
           `<td>${글(l.품목)}</td>${수칸}<td class="num">${수(l.단가)}</td>${금칸}` +
           (i===0 ? `<td class="num" rowspan="${줄.length}" style="${합차?빨:초}" title="명세 ${수(sv.합계)} / 계산 ${수(줄계)}${합차?' · 차 '+부호(합차):''}">${수(sv.합계)}${합차?작('명세 '+수(sv.합계)+' / 계산 '+수(줄계)+' · 차 '+부호(합차)):''}</td>` +
              `<td rowspan="${줄.length}" class="num" style="${차들.length?(합차||줄.some(l=>Number(l.금액)!==계산(l))?빨:주):''}">${차들.map(글).join('<br>')}</td>` +
+             (() => {
+               const 결 = 결정[sv.파일] || {}, 읽 = 결.읽음 ?? sv.가공처읽음 ?? '', 맞 = 가공맞춤(읽, 가공), 고 = 결.고름 ?? 맞.고름, 패 = !!결.패스;
+               const 상 = 고 ? '일치' : 맞.상태; 가공수[상]++;
+               const 색 = 상==='일치' ? '#D9F2DE' : 상==='후보' ? '#FFE9C7' : 상==='미등록' ? '#FFD9D6' : '';
+               const 후보먼저 = [...맞.후보.filter(n => 가공.some(v => v.이름===n)), ...가공.map(v => v.이름).filter(n => !맞.후보.includes(n))];
+               const 옵 = '<option value=""></option>' + 후보먼저.map(n => `<option value="${글(n)}"${n===고?' selected':''}>${글(n)}${맞.후보.includes(n)&&맞.후보.length>1?' ·후보':''}</option>`).join('');
+               return `<td rowspan="${줄.length}" class="가공처칸" data-f="${글(sv.파일)}" style="background:${색};${패?'box-shadow:inset 0 0 0 2px #176B2C;':''}"><div style="display:flex;gap:4px;align-items:center"><img class="가공처사진" data-p="${글(sv.가공처사진||'')}" alt="" style="height:30px;border:1px solid #D6D6D3;background:#fff"><input class="가공처읽음" value="${글(읽)}" style="width:64px"><select class="가공처고름" style="min-width:120px">${옵}</select><button class="chip 가공처패스${패?' on':''}">패스</button></div></td>`;
+             })() +
              `<td rowspan="${줄.length}"><button class="chip 사진단추" data-p="${글(sv.사진||'')}">실명세서</button></td>` : '') + '</tr>';
       });
     }
@@ -3227,7 +3290,7 @@ async function 명세서붙이기(s, 달들){
       const 합색 = 차===null ? '' : (차===0 ? 'background:#D9F2DE' : 'background:#FFD9D6');
       h += `<tr class="sub" style="font-weight:800;border-top:2px solid #444"><td colspan="3" style="border-top:2px solid #444">[${글(달)} 합계] ${장}장</td><td class="num" style="border-top:2px solid #444">${쪽수(수합)}</td><td style="border-top:2px solid #444"></td><td class="num" style="border-top:2px solid #444">${쪽수(금합)}</td>` +
         `<td class="num" style="border-top:2px solid #444;${합색}" title="${차===null?'':'월별명세 소계 '+쪽수(소값)+' · 차 '+쪽부호(차)}">${쪽수(합합)}${차 ? `<div style="font-size:10px;line-height:1.2;font-weight:600">소계 ${쪽수(소값)} · 차 ${쪽부호(차)}</div>` : ''}</td>` +
-        `<td class="num" style="border-top:2px solid #444;${차 ? '' : ''}">${차 ? '합계 '+쪽부호(차) : ''}</td><td style="border-top:2px solid #444"></td></tr>`;
+        `<td class="num" style="border-top:2px solid #444;${차 ? '' : ''}">${차 ? '합계 '+쪽부호(차) : ''}</td><td style="border-top:2px solid #444"></td><td style="border-top:2px solid #444"></td></tr>`;
     }
     { /* 월 합계 · 월별명세 비교 표 — 칸별 숫자 + 차이 난 서류 */
       const 쪽 = n => Number(n||0).toLocaleString('ko-KR'), 부 = n => (n>0?'+':n<0?'−':'') + 쪽(Math.abs(n));
@@ -3258,10 +3321,14 @@ async function 명세서붙이기(s, 달들){
         `<tr><td>월별명세 [${글(달)} 소계]</td><td></td>${셀(소.수)}${셀(소.공)}${셀(소.세)}${셀(소.합)}</tr>` +
         `<tr style="font-weight:800"><td>차이</td><td></td>${차셀('수')}${차셀('공')}${차셀('세')}${차셀('합')}</tr>` +
         (틀린서류.length ? `<tr><td style="background:#FFD9D6">차이 난 서류 ${틀린서류.length}장</td><td colspan="5" style="white-space:normal">${틀린서류.join('<br>')}</td></tr>` : '') +
+        `<tr><td>도착 외주가공처</td><td colspan="5" class="가공수줄"></td></tr>` +
         `</tbody></table></div>`;
     }
     h += '</tbody></table>' + 비교H + '<div style="height:56px"></div></div>';
     칸.insertAdjacentHTML('beforeend', h);
+    { const 줄수 = 칸.querySelector(`[data-명세서="${id}"] .가공수줄`) || [...칸.querySelectorAll('.가공수줄')].pop();
+      if(줄수) 줄수.textContent = `일치 ${가공수.일치} · 후보 ${가공수.후보} · 미등록 ${가공수.미등록} · 글자 없음 ${가공수.없음}`; }
+    가공처달기(칸, id, x, 가공);
   }
   칸.querySelectorAll('.사진단추').forEach(b => b.onclick = async () => {
     const w = window.open('', '실명세서', 'popup=yes,width=1000,height=760');   /* 클릭 안에서 먼저 열어야 팝업이 막히지 않음 */
