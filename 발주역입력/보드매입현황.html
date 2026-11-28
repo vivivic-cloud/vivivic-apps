@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.59.37
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.59.38
+     v1.59.38(11-28): 분배 방 사장님 「화면에 안 보이는 게 입력폼에 있는 게 말이 되냐?」 「전후 상황 확인하고 고쳐」 — 구매+가공품목 화면 = 보내기 줄 전부(완료만 거르던 것 걷음) · 완료 아닌 줄 = 노랑 덧칠(tr.미완)·마우스 = 입력폼 분류·자재·현진 구매단가 상태 · 줄마다 「지우기」(묻고 → 창고 줄·보내기에서 뺌 · 사본 = 같은 문서 `지운.{열쇠}` · 영림원 안 건드림) · 모든 줄 「고치기」(원장).
      v1.59.37(11-28): 질문.js v6 받기(사장님 「질문 트리에 해당 영역에 대한 지시 요청을 제가 적을 수 있게 해 주세요」 — 페이지 위 「지시」 칸 · 머리 「· 지시 N」).
      v1.59.36(11-28): 칸넓이.js v4 받기(사장님 「모바일에서는 셀 넓이 조절이 안 되네요?」 → 「고치세요」 — 손가락 넓이 조절).
      v1.59.35(11-28): 폰(600px 이하) — 구매+가공품목·거래처별 완료 건 맨 앞 붙박이 자재명 칸 = 줄바꿈·최대 140px(375 폭에서 칸 하나가 화면을 다 덮던 것).
@@ -475,6 +476,7 @@ html,body{height:100%;overflow:hidden}
 .가공표 td.바뀜,.가공표 td.바뀜 input{background:#FFF3B0!important}
 .가공표 td.대기칸{background:#EFEFEC}.가공표 td.대기칸 input{color:#6B6B67}   /* v1.48.0 단계 대기·진행중 */
 .가공표 td.고칠칸{background:#FFE9E7;box-shadow:inset 0 0 0 2px var(--vg-red)}
+.가공표 tr.미완 > td{background-image:linear-gradient(rgba(255,193,7,.20),rgba(255,193,7,.20))}   /* v1.59.38 완료 아닌 줄 */
 @media (max-width:600px){.가공표 td.dpr-k,.가공표 th.dpr-k,.완료건표 td.dpr-k,.완료건표 th.dpr-k{max-width:140px;white-space:normal;overflow-wrap:anywhere}}   /* v1.59.35 폰 — 맨 앞 붙박이 자재명 칸이 화면을 다 덮지 않게(줄바꿈) */
 .가공표 td.참고값 input,.가공표 td.따.참고값{color:#A3A39F}
 .가공표 td.분류새,.폼표.가공표 tr.오류 td.분류새{background:#FFF7C2;box-shadow:inset 0 0 0 2px #E5B800}
@@ -492,7 +494,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.59.37</div>
+  <div class="badge">v1.59.38</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -3068,7 +3070,7 @@ function 가공품목그리기(){   /* v1.59.29 분배 방 사장님 「구매+�
   const 보줄 = 가공품목줄들(s) || [];
   const 모든 = 가공후보.filter(m => 가공품목[s].has(줄키(m)) || 가공초안.has(아이디(m))).concat(조합들(s, 가공후보));
   const 완 = m => { const 모 = 가공단계셈(s, m, 구매들); return (모.자재 || {}).상태==='완료' && (모.구매단가 || {}).상태==='완료'; };   /* 완료 = 입력폼 자재 · 현진 구매단가 둘 다 완료 */
-  const 보일 = 모든.filter(m => 가공고친.has(아이디(m)) || 가공방금.has(아이디(m)) || 완(m));
+  const 보일 = 모든;   /* v1.59.38 사장님 「화면에 안 보이는 게 입력폼에 있는 게 말이 되냐?」 — 보내기(입력폼으로 넘어가는) 줄 전부 + 고치는·신규 줄 · 완료 아닌 줄 = 색(tr.미완)·까닭 마우스 */
   const 열 = l => ` data-열="${글('가공새_' + l)}"`;
   /* v1.59.34 사장님 「이게 품목명이 아니잖아. 구매+가공 품목명이 나와야 된다고」 — 맨 앞(붙박이) = 구매+가공 자재명 · 자재번호 · 그 뒤 가공(납품제품명) · 원장 */
   const 칸들 = [ {k:'m_name', l:'자재명'}, {k:'m_code', l:'자재번호'}, {k:'m_spec', l:'규격'}, {k:'m_big', l:'대분류', 분:0}, {k:'m_mid', l:'중분류', 분:1}, {k:'m_small', l:'소분류', 분:2},
@@ -3082,7 +3084,8 @@ function 가공품목그리기(){   /* v1.59.29 분배 방 사장님 「구매+�
     const id = 아이디(m), 고침 = 가공고친.has(id), 초 = 가공초안.get(id), 처음 = 초 ? JSON.parse(초.처음) : null, 값 = 가공값(s, m, 구매들), 새줄 = 고침 && !가공품목[s].has(줄키(m));
     const 열린 = k => 고침 && (k==='o_code' || (새줄 && (k==='m_code' || k==='m_name' || k==='m_spec' || (!m.조합키 && /^m_(big|mid|small)$/.test(k)))));
     let 막 = false;
-    h += `<tr data-key="${글(줄키(m))}">`;
+    const 미완 = !완(m) && !고침, 까닭 = 미완 ? (() => { const 모 = 가공단계셈(s, m, 구매들); return '입력폼 ' + [['분류','분류'],['자재','자재'],['구매단가','현진 구매단가']].filter(([k]) => ((모[k] || {}).상태) !== '완료').map(([k, n]) => n + ' ' + (((모[k] || {}).상태) || '없음')).join(' · '); })() : '';
+    h += `<tr data-key="${글(줄키(m))}"${미완 ? ` class="미완" title="${글(까닭)}"` : ''}>`;
     h += 칸들.map((f, i) => {
       const 묶 = (i===0 ? ' dpr-k' : '') + (묶자리(i) ? ' 묶' : '');
       if(f.가) return `<td class="참${묶}${f.가==='단가' ? ' num' : ''}">${글(f.가==='품' ? 라벨(m) : f.가==='규' ? m.규격 : 칸(m.원m || m, 'p_price'))}</td>`;
@@ -3099,7 +3102,7 @@ function 가공품목그리기(){   /* v1.59.29 분배 방 사장님 「구매+�
       return `<td class="입${묶} ${색}${바}"${제 ? ` title="${글(제)}"` : ''}><input data-가="${f.k}" value="${글(v)}" autocomplete="off"></td>`;
     }).join('');
     const 상 = (() => { if(완(m)) return ''; const 모 = 가공단계셈(s, m, 구매들), x = [모.분류, 모.자재, 모.구매단가].find(y => y && y.상태 && y.상태!=='완료'); return x ? x.상태 : ''; })();
-    h += `<td class="등록 묶">${고침 ? `<button type="button" class="chip on" data-가저장="${글(id)}"${막 ? ' disabled' : ''}>저장</button> <button type="button" class="chip" data-가취소="${글(id)}">취소</button>` : 완(m) ? `<button type="button" class="chip" data-가풀="${글(id)}">고치기</button>` : 글(상)}</td></tr>`;
+    h += `<td class="등록 묶">${고침 ? `<button type="button" class="chip on" data-가저장="${글(id)}"${막 ? ' disabled' : ''}>저장</button> <button type="button" class="chip" data-가취소="${글(id)}">취소</button>` : `${글(상)}${상 ? ' ' : ''}<button type="button" class="chip" data-가풀="${글(id)}">고치기</button> <button type="button" class="chip" data-가지움="${글(id)}">지우기</button>`}</td></tr>`;
   });
   h += '</tbody></table>';
   const 신규 = `<select class="chip" data-가신규><option value="">신규등록</option>${가공후보.map(m => `<option value="${글(줄키(m))}">${글(라벨(m))}</option>`).join('')}</select>`;
@@ -3115,6 +3118,10 @@ function 가공품목그리기(){   /* v1.59.29 분배 방 사장님 「구매+�
     if(!가공품목[s].has(키)) 가공방금.add(id);
     가공품목[s].set(키, { 원장:초.원장, 값:{ ...초.값 } }); 가공초안.delete(id); 가공고친.delete(id); 가공품목저장(s); 가공품목그리기(); });
   속.querySelectorAll('[data-가취소]').forEach(b => b.onclick = () => { const id = b.dataset.가취소; 가공초안.delete(id); 가공고친.delete(id); 가공품목그리기(); });
+  속.querySelectorAll('[data-가지움]').forEach(b => b.onclick = async () => { const id = b.dataset.가지움, 키 = id.slice(s.length + 1); if(!가공품목[s].has(키) || !confirm('삭제하겠습니까?')) return;   /* v1.59.38 줄 지우기 = 창고 줄·보내기에서 뺌(입력폼 받기에서도 빠짐) · 사본 = 같은 문서 지운.{열쇠} · 영림원 안 건드림 */
+    const 사본 = { 때:new Date().toISOString(), 줄:JSON.parse(JSON.stringify(가공품목[s].get(키))), 보내기줄:(((가공품목보내기[s] || {}).줄) || []).find(z => z.열쇠 === 키) || null };
+    가공품목[s].delete(키); 가공방금.delete(id); 가공품목저장(s); 가공품목그리기();
+    try{ const { doc, setDoc } = window.fbRead; await setDoc(doc(window.db, ...폼자리, 가공품목문서(s)), { 지운:{ [키]:사본 } }, { merge:true }); }catch(e){ 큰알림('지운 줄 사본을 저장하지 못했습니다 — ' + ((e && (e.code || e.message)) || '')); } });
   const 표 = 속.querySelector('.가공표');
   표.querySelectorAll('input[data-가]').forEach(el => {
     el.onchange = () => { const tr = el.closest('tr'), m = 보일.find(x => 줄키(x) === tr.dataset.key), id = m && 아이디(m), 초 = id && 가공초안.get(id); if(!초) return;
