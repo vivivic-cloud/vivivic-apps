@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!-- 발주역입력 / 보드매입현황 — 「2026년 국내거래처 구매내역서」 엑셀(6개 업체, 1~10월)을 거래처 시트마다 표로 본다.
      사장님 11-16: 「각 거래처별 시트를 분석해서 목록으로 나타나는 페이지를 현재 페이지에 추가해 줘. 페이지 제목은 보드매입현황.」
-     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.59.23
+     판 번호는 머리의 배지와 같다. 고칠 때 둘을 같이 올린다: v1.59.24
+     v1.59.24(11-28): 영림원보내기에서 자재번호를 바꾸면 그 줄 자재 칸(자재명 등)이 바로 입력폼 완료 자재 값으로 바뀜(전엔 다시 그릴 때만).
      v1.59.23(11-28): v1.59.22 영림원보내기가 안 열리던 것(자재번호 기본값이 자재명을 읽고 자재명이 자재번호를 읽는 고리 — Maximum call stack) 고침.
      v1.59.22(11-28): 분배 방 사장님 「기존 자재번호 선택하면 동일한 자재명 나와야 되는 거 아니냐?」 — 자재번호가 입력폼 완료 자재면 그 줄 자재 칸(영림원보내기 자재명·규격·영문명·품목자산분류·자재상태·내외자구분·중요도·기준단위·대중소분류 · 구매+가공 가공완료품 자재명·규격·단위·분류) = 그 자재 값(넣은 값보다 먼저 · 다르면 빨강, 마우스 = 두 값) → 입력폼 일괄등록은 같은 자재로 보고(bdDocOf 자재번호·자재명 같음) 자재등록 대기 안 만듦 · 새 조합 겹침 = 마우스에 겹친 자재 이름 · 자재명 칸에 흐린 글.
      v1.59.21(11-28): 분배 방 사장님 「구매가공자재 가공완료품 자재번호 중복이 아닌데 왜 뻘건색이여」 — 15:46 조합 줄 자재번호 칸에 원 코팅 번호 md-2.7-ra-boc 가 고치기(옛 보관 값 옮김)로 들어가 저장돼 겹침 빨강이었음 → 조합 줄은 원 코팅과 같은 번호·이름 = 안 넣은 것(빈칸 · 넣을 칸 테) · 조합 줄 고치기는 보관 자재 값을 안 옮김.
@@ -478,7 +479,7 @@ html,body{height:100%;overflow:hidden}
 <div class="wrap">
 <header>
   <div class="logo"><b>VIVIVIC</b> — 발주역입력</div>
-  <div class="badge">v1.59.23</div>
+  <div class="badge">v1.59.24</div>
 </header>
 <nav class="쪽길"><span class="묶음"><b>에이엠티출고조사</b><a href="재단.html">재단 세부내역</a><a href="이룸산업.html">이룸산업 출고내역</a><a href="로앤.html">로앤 출고내역</a><a href="업체별단품.html">업체별 단품명</a></span><a href="보드매입현황.html" class="on">보드/엣지 매입현황</a><a href="조혼가구부속명.html">조혼가구부속명</a><a href="영림원품목등록.html">영림원품목등록</a><a href="품목등록test서버용.html">품목등록test서버용</a><a class="폼길" href="../영림원외주입력/영림원외주입력.html">← 외주자료 입력폼</a></nav>
 <h1>보드/엣지 매입현황</h1>
@@ -831,6 +832,15 @@ function 칸임시(k, m, s){
 const 기존자재칸 = { m_name:'자재명', m_spec:'규격', m_eng:'영문명', m_asset:'품목자산분류', m_state:'자재상태', m_io:'내외자구분', m_imp:'중요도', m_unit:'기준단위', m_big:'대분류', m_mid:'중분류', m_small:'소분류' };
 let 기존자재지도 = null, 기존자재판 = null;
 function 기존자재(번){ const 목 = typeof 완료 !== 'undefined' && 완료.자재; if(!목 || !트(번)) return null; if(기존자재판 !== 목){ 기존자재판 = 목; 기존자재지도 = new Map(목.map(x => [String(x.자재번호).toLowerCase(), x])); } return 기존자재지도.get(트(번).toLowerCase()) || null; }
+function 기존자재칠(tr, m, s){   /* v1.59.24 영림원보내기 한 줄 — 자재 칸 값·빨강·마우스를 지금 셈으로 */
+  for(const f of 폼칸){ if(!기존자재칸[f.k]) continue; const el = tr.querySelector(`[data-k="${f.k}"]`); if(!el) continue; const td = el.closest('td');
+    const 기 = 기존자재값(f, m, s), 손 = ((폼값[s] && 폼값[s].get(줄키(m))) || {})[f.k], 다름 = 기 !== undefined && 손 != null && 트(손) !== '' && 트(손) !== 트(기);
+    if(document.activeElement !== el){ const v = 칸값(f, m, s); if(el.tagName === 'SELECT' && v && ![...el.options].some(o => o.value === v)) el.add(new Option(v, v)); el.value = v; }
+    td.classList.toggle('고칠칸', 다름);
+    const 옛 = (td.title || '').split(' · ').filter(t => !/^입력폼 완료 자재 값/.test(t));
+    if(다름) 옛.push(`입력폼 완료 자재 값 「${기}」 — 넣은 값 「${트(손)}」 와 다름`); else if(기 !== undefined) 옛.push('입력폼 완료 자재 값');
+    if(옛.length) td.title = 옛.join(' · '); else td.removeAttribute('title'); }
+}
 let 기존자재찾는중 = false;   /* v1.59.23 자재번호 기본값(해피코 등)이 자재명을 읽어 다시 이리로 오는 고리 막음 */
 function 기존자재값(f, m, 거래처){   /* 그 칸의 입력폼 완료 자재 값(없으면 undefined) */
   if(기존자재찾는중 || !기존자재칸[f.k] || 가공키(거래처, 줄키(m))) return undefined;
@@ -1633,6 +1643,7 @@ async function 폼그리기(){
     }
     if(!칸적용(el)) return;
     if(k==='x_kind') 결과칠(s);   /* v1.38.0 가공 줄 잠금·색 */
+    if(k==='m_code' || 기존자재칸[k]) 기존자재칠(tr, m, s);   /* v1.59.24 자재번호를 바꾸면 그 줄 자재 칸 = 입력폼 완료 자재 값(화면에서 바로) */
     if(k==='m_code' || k==='m_name') 겹침그리기(표, s);   /* v1.11.0 자재명 → 엘데코 자재번호 기본값 */
     if(f분류(k)) 분류틀그리기(표, s);   /* v1.17.1 */
     저장예약(s);
