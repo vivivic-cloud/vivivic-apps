@@ -37,7 +37,13 @@
       + '.qna .qg{font-weight:700;margin:10px 0 4px}.qna .qg a{color:inherit}'
       + '.qna .qe{color:#b91c1c;font-size:12px;margin:4px 0 0}'
       + '.qna a.ql{color:#2383e2;text-decoration:underline;overflow-wrap:anywhere}'
+      + '.qtree details{margin:0 0 2px 14px}.qtree>details{margin-left:0}.qtree summary{cursor:pointer;padding:3px 0;display:flex;align-items:center;gap:8px;list-style-position:inside}'
+      + '.qtree summary::-webkit-details-marker{margin-right:2px}.qtree .qtc{display:inline-flex;gap:4px;margin-left:auto}'
+      + '.qtree .qtn{min-width:20px;padding:0 6px;border-radius:9px;font-size:11.5px;text-align:center;font-weight:700}'
+      + '.qtree .qtn.대기{background:#FFF7C2;color:#8a6d00}.qtree .qtn.답함{background:#E8F1FB;color:#1b5fa8}.qtree .qtn.실행함{background:#E6F4EA;color:#2e7d32}.qtree .qtn.영{color:#b4b4b0}'
+      + '.qtree .qc{margin:4px 0 8px 14px}'
       + '.qna-btn{font:inherit;font-size:12px;font-weight:600;padding:5px 12px;border-radius:999px;border:1px solid #d6d6d2;background:#fff;color:#1A1A19;cursor:pointer;margin-left:auto;white-space:nowrap}'
+      + '.qna-btn.qna-tr{margin-left:0;text-decoration:none;display:inline-block}.qna-btn[hidden]{display:none}'
       + '.qna-btn.on{background:#FFF7C2;border-color:#E5B800}.qna-btn[aria-pressed="true"]{box-shadow:inset 0 0 0 2px #1A1A19}';
     document.head.append(st); }
   function 알림(){ 듣는이.forEach(function(f){ try{ f(); }catch(e){ console.warn('질문 그리기', e); } }); }
@@ -128,6 +134,48 @@
     칸._qna = function(){ if(칸.dataset.qna === '*') 그림(); };
     듣는이.push(칸._qna); 그림();
   }
+  /* 11-28 사장님 「나중에 확인할 질문 트리가 필요한데?」 — 질문 트리: 나무 = [{이름, 가지:[{이름, 잎:[{자리, 이름, 감}]}]}](입력폼이 메뉴 박스·발주역입력 머리 목록으로 만듦).
+     잎(자리) = 누르면 그 자리 질문 모두(대기·답함·실행함) · 질문 링크에 # 조각(탭)이 있으면 잎 밑 가지로 · 수 = 대기 노랑 · 답함 파랑 · 실행함 초록(0 은 회색) · 이름 = 그 자리 링크. 질문 없는 자리도 보임. */
+  function 수칩(qs){ var c = { 대기:0, 답함:0, 실행함:0 }; qs.forEach(function(q){ var t = q.상태 || '대기'; if(t in c) c[t]++; });
+    return h('span', { class:'qtc' }, ['대기', '답함', '실행함'].map(function(t){ return h('span', { class:'qtn ' + (c[t] ? t : '영'), title:t }, String(c[t])); })); }
+  function 곳조각(q){ var l = 트(q.링크); if(!/^발주역입력\//.test(트(q.자리)) || l.indexOf('#') < 0) return [];
+    return l.slice(l.indexOf('#') + 1).split('/').map(function(x){ try{ return decodeURIComponent(x); }catch(e){ return x; } }).filter(Boolean); }
+  function 나무(칸, 나무목){
+    if(!칸) return; 꾸밈();
+    function 그림(){
+      var 열린 = {}; 칸.querySelectorAll('details[data-k]').forEach(function(d){ if(d.open) 열린[d.dataset.k] = 1; });
+      var 쓰던 = {}, 활 = document.activeElement;
+      칸.querySelectorAll('.qc[data-id] textarea').forEach(function(t){ var id = t.closest('.qc').dataset.id; 쓰던[id] = { v:t.value, f:t === 활, s:t.selectionStart }; });
+      var 다 = 목록 || [], 몸 = h('div', { class:'qna qtree' });
+      function 덩이(k, 머리, 속, qs){ var d = h('details', { 'data-k':k }, [h('summary', {}, [머리, 수칩(qs)])].concat(속)); d.open = !!열린[k]; return d; }
+      function 잎(z, 이름글){
+        var qs = 다.filter(function(q){ return q.자리 === z.자리; }), 바로 = [], 탭 = {}, 탭차 = [];
+        qs.forEach(function(q){ var p = 곳조각(q); if(!p.length){ 바로.push(q); return; } var k = p.join(' › '); if(!탭[k]){ 탭[k] = []; 탭차.push(k); } 탭[k].push(q); });
+        var 줄 = function(a){ return a.slice().sort(function(x, y){ return ((x.상태 || '대기') === '대기' ? 0 : 1) - ((y.상태 || '대기') === '대기' ? 0 : 1) || (트(y.만든때) < 트(x.만든때) ? -1 : 1); }).map(function(q){ return 카드(q); }); };
+        var 이 = z.감 ? h('a', { class:'ql', href:'#', on:{ click:function(e){ e.preventDefault(); e.stopPropagation(); z.감(); } } }, 이름글) : (링크({ 자리:z.자리, 자리이름:이름글 }) || 이름글);
+        if(이 && 이.tagName === 'A') 이.addEventListener('click', function(e){ e.stopPropagation(); });
+        var 속 = 줄(바로).concat(탭차.sort().map(function(k){ var l = 링크(탭[k][0]); return 덩이(z.자리 + '#' + k, l ? h('a', { class:'ql', href:l.href, on:{ click:function(e){ e.stopPropagation(); } } }, k) : k, 줄(탭[k]), 탭[k]); }));
+        return 덩이(z.자리, 이, 속, qs);
+      }
+      (나무목 || []).forEach(function(줄기){
+        var 줄기qs = [], 가지들 = (줄기.가지 || []).map(function(g){
+          var gqs = 다.filter(function(q){ return (g.잎 || []).some(function(z){ return z.자리 === q.자리; }); }); 줄기qs = 줄기qs.concat(gqs);
+          var 잎들 = (g.잎 || []).map(function(z){ return 잎(z, z.이름); });
+          return g.이름 ? 덩이(줄기.이름 + '›' + g.이름, g.이름, 잎들, gqs) : 잎들; });
+        몸.append(덩이(줄기.이름, 줄기.이름, [].concat.apply([], 가지들), 줄기qs));
+      });
+      var 아는 = {}; (나무목 || []).forEach(function(a){ (a.가지 || []).forEach(function(g){ (g.잎 || []).forEach(function(z){ 아는[z.자리] = 1; }); }); });
+      var 밖 = 다.filter(function(q){ return !아는[q.자리]; });
+      if(밖.length){ var 밖자리 = []; 밖.forEach(function(q){ if(밖자리.indexOf(q.자리) < 0) 밖자리.push(q.자리); });
+        몸.append(덩이('밖', '그 밖', 밖자리.map(function(k){ var q0 = 밖.filter(function(q){ return q.자리 === k; })[0]; return 잎({ 자리:k }, q0.자리이름 || k); }), 밖)); }
+      칸.replaceChildren(몸); 칸.hidden = false;
+      Object.keys(쓰던).forEach(function(id){ var t = 칸.querySelector('.qc[data-id="' + id + '"] textarea'); if(!t) return; t.value = 쓰던[id].v; if(쓰던[id].f){ t.focus(); try{ t.setSelectionRange(쓰던[id].s, 쓰던[id].s); }catch(e){} } });
+    }
+    칸.dataset.qna = '나무';
+    if(칸._qna){ var i = 듣는이.indexOf(칸._qna); if(i >= 0) 듣는이.splice(i, 1); }
+    칸._qna = function(){ if(칸.dataset.qna === '나무') 그림(); };
+    듣는이.push(칸._qna); 그림();
+  }
   function 대기수(){ return (목록 || []).filter(function(q){ return (q.상태 || '대기') === '대기'; }).length; }
   function 듣기(f){ 듣는이.push(f); }
   /* 시험·작업자용(화면 단추 없음) */
@@ -141,14 +189,16 @@
     var 칸 = h('div', { class:'qna-slot', hidden:true }), 다봄 = false;
     /* 11-28 사장님 「이거 입력폼뿐만 아니라 발주역입력에서도 보여야지」 — 머리 줄 「답 없는 질문 N」(입력폼 머리와 같음 · 대기 있으면 노랑) · 누르면 모든 대기 모음 · 다시 누르면 이 페이지 질문 */
     var 단 = h('button', { type:'button', class:'qna-btn', hidden:true, 'aria-pressed':'false' }, '답 없는 질문');
-    function 단그림(){ var n = 대기수(); 단.hidden = 목록 == null; 단.textContent = '답 없는 질문 ' + n; 단.classList.toggle('on', n > 0); 단.setAttribute('aria-pressed', 다봄 ? 'true' : 'false'); }
+    /* 11-28 「질문 트리」 = 입력폼 #질문트리(같은 로그인 · 나무는 입력폼 메뉴 박스로 그림) */
+    var 트단 = h('a', { class:'qna-btn qna-tr', hidden:true, href:new URL('../영림원외주입력/영림원외주입력.html#' + encodeURIComponent('질문트리'), location.href).href }, '질문 트리');
+    function 단그림(){ var n = 대기수(); 단.hidden = 목록 == null; 트단.hidden = 목록 == null; 단.textContent = '답 없는 질문 ' + n; 단.classList.toggle('on', n > 0); 단.setAttribute('aria-pressed', 다봄 ? 'true' : 'false'); }
     function 그칸(){ if(!C){ 놓기(칸); return; } if(다봄) 모음(칸, []); else 달기(칸, 자리, 자리이름); }
     단.addEventListener('click', function(){ 다봄 = !다봄; 단그림(); 그칸(); });
     듣기(단그림);
     function 놓을곳(){ var hd = document.querySelector('body > header, header.top, .topbar, header');
       if(hd && hd.parentNode) hd.parentNode.insertBefore(칸, hd.nextSibling); else document.body.prepend(칸);
       칸.style.margin = '12px 16px 0';
-      var 머 = document.querySelector('body > header, header'); if(머){ 꾸밈(); 머.append(단); } }
+      var 머 = document.querySelector('body > header, header'); if(머){ 꾸밈(); 머.append(단, 트단); } }
     function 시작(){
       놓을곳();
       Promise.all([import(V + 'firebase-app.js'), import(V + 'firebase-auth.js'), import(V + 'firebase-firestore.js')]).then(function(m){
@@ -163,5 +213,5 @@
     }
     if(document.readyState === 'complete') setTimeout(시작, 0); else window.addEventListener('load', function(){ setTimeout(시작, 0); });
   }
-  window.질문 = { 붙임:붙임, 달기:달기, 놓기:놓기, 모음:모음, 대기수:대기수, 듣기:듣기, 올리기:올리기, 지움:지움, 스스로:스스로, 목록:function(){ return 목록; } };
+  window.질문 = { 붙임:붙임, 달기:달기, 나무:나무, 놓기:놓기, 모음:모음, 대기수:대기수, 듣기:듣기, 올리기:올리기, 지움:지움, 스스로:스스로, 목록:function(){ return 목록; } };
 })();
