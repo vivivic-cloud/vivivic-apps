@@ -11,14 +11,17 @@
      v3(11-27): 사장님 「아이 표 넓히고 줄이는 게 어디 듣도 보도 못한 방식이야. 그냥 잡은 쪽이 늘어나고 줄어들면 되지 뭐야. 이게 그냥 엑셀이랑 구글시트처럼 해. 특이하게 하려고 그러지 말고」 —
        엑셀·구글시트처럼: 잡은 경계선이 마우스를 그대로 따라감(넓이 = 마우스 x − 그 열 왼쪽 끝, 잡은 자리 어긋남 보정) · 그 열만 바뀌고 다른 열은 잰 넓이 그대로(올림 없이 소수까지 — 전엔 처음 고정할 때 올림으로 옆 열이 0.6~1px 바뀌었음) · 표 너비 = 열 합 · 끄는 동안 경계선 자리에 파란 세로선(표 상자 높이) · 커서 ↔ · 두 번 누름 = 원래대로 · 기억 그대로. 공용 `칸넓이.선(x, 상자)`/`선끝()` = 쪽 자체 손잡이(보드 .열손 · 재단 .칸끈)도 같은 선.
      v2.1(11-27): 열 이름 = 머리 글자에서 .열빨(영림원품목등록 열 제목 빨강 칸 수) 뺌 — 숫자가 바뀌어도 같은 열 기억.
-     쪽이 따로 손잡이를 단 표(.칸끈 = 재단 v1.4.0 · .열손 = 보드매입현황 v1.32.0)는 건너뜀 — 이 파일 손잡이 = .칸끈.칸넓이끈. */
+     쪽이 따로 손잡이를 단 표(.칸끈 = 재단 v1.4.0 · .열손 = 보드매입현황 v1.32.0)는 건너뜀 — 이 파일 손잡이 = .칸끈.칸넓이끈.
+     v4(11-28): 사장님 「모바일에서는 셀 넓이 조절이 안 되네요?」 → 「고치세요」 — 손가락(pointer:coarse)에서 손잡이 28px · 길게 누름 메뉴·글 고르기 끔 ·
+       손잡이(.칸끈 · .열손 — 이 파일·재단·보드매입현황 모두)에서 시작한 터치 = touchstart·touchmove 기본 동작 막음(passive:false) → 표·쪽이 밀리지 않고 그 칸만 넓어짐(touch-action 을 무시하는 브라우저도).
+       끄는 셈(pointer 이벤트)·PC 마우스 8px·기억 열쇠는 그대로. */
 (function(){
   const 최소 = 24, 시작거리 = 3, 두번간격 = 350;
   const 꼴 = document.createElement('style');
   꼴.textContent =
     '.칸끈{position:absolute;top:0;right:0;bottom:0;width:8px;cursor:col-resize;touch-action:none;z-index:2}' +
     '.칸끈:hover,.칸끈.끄는중{background:linear-gradient(to right,transparent 6px,#9C9C98 6px)}' +
-    '@media (pointer:coarse){.칸끈{width:16px}.칸끈:hover,.칸끈.끄는중{background:linear-gradient(to right,transparent 14px,#9C9C98 14px)}}' +
+    '@media (pointer:coarse){.칸끈,.폼표 thead th .열손{width:28px;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}.칸끈:hover,.칸끈.끄는중,.폼표 thead th .열손:hover,.폼표 thead th .열손.끄는중{background:linear-gradient(to right,transparent calc(100% - 2px),#9C9C98 0)}}' +   /* v4 손가락 = 28px(재단 .칸끈 · 보드매입현황 .열손 도) */
     'table.칸고정{table-layout:fixed}table.칸고정>thead>tr>th,table.칸고정>tbody>tr>td{overflow:hidden;text-overflow:ellipsis;max-width:none}' +
     'body.칸끄는중{cursor:col-resize;user-select:none;-webkit-user-select:none}body.칸끄는중 *{cursor:col-resize!important}' +
     '.칸넓이선{position:fixed;z-index:60;width:2px;margin-left:-1px;background:#1a73e8;pointer-events:none;display:none}';   /* v3 끄는 동안 경계선(구글시트처럼) */
@@ -127,5 +130,10 @@
     뿌리.addEventListener('click', e => { if(e.target.closest && e.target.closest('.칸넓이끈')){ e.preventDefault(); e.stopPropagation(); } }, true);
     return { 다시 };
   }
+  /* v4 손잡이에서 시작한 터치 = 쪽·표 밀기·확대 안 함(pointer 끄는 셈은 그대로) — 이 파일·재단 .칸끈·보드매입현황 .열손 모두 */
+  let 손터치 = false;
+  document.addEventListener('touchstart', e => { const t = e.target; 손터치 = !!(t && t.closest && t.closest('.칸끈, .열손')); if(손터치 && e.cancelable) e.preventDefault(); }, { capture:true, passive:false });
+  document.addEventListener('touchmove', e => { if(손터치 && e.cancelable) e.preventDefault(); }, { capture:true, passive:false });
+  document.addEventListener('touchend', () => { 손터치 = false; }, true); document.addEventListener('touchcancel', () => { 손터치 = false; }, true);
   window.칸넓이 = { 달기, 선:선보임, 선끝 };
 })();
